@@ -1,3 +1,5 @@
+using ClassicMac.Core;
+
 namespace ClassicMac.Resources.Compression
 {
     // System 'dcmp' 0 and 1 (version-8 form). Read in the Mac OS 9.0 System's dcmp 0/1 and checked by emulation;

@@ -1,3 +1,6 @@
+using ClassicMac.Core;
+using ClassicMac.Files;
+
 namespace ClassicMac.Resources.Cli.Tests;
 
 public class CommandLineTests
@@ -35,22 +38,25 @@ public class CommandLineTests
     }
 
     [Fact]
-    public void Limit_options_map_onto_ReadOptions()
+    public void Limit_options_map_onto_the_options_records()
     {
         var cli = new CommandLine(TextWriter.Null, TextWriter.Null);
         var result = cli.BuildRoot().Parse(["list", "x", "--max-resource-size", "1MiB", "--max-nesting-depth", "3"]);
         var options = cli.ReadOptionsFrom(result);
+        var containerOptions = cli.ContainerOptionsFrom(result);
 
         Assert.Equal(1L << 20, options.MaxResourceSize);
-        Assert.Equal(3, options.MaxNestingDepth);
-        Assert.Equal(ReadOptions.Default.MaxExpandedBytesPerInput, options.MaxExpandedBytesPerInput);
+        Assert.Equal(3, containerOptions.MaxNestingDepth);
+        Assert.Equal(ContainerReadOptions.Default.MaxExpandedBytesPerInput, containerOptions.MaxExpandedBytesPerInput);
     }
 
     [Fact]
-    public void Defaults_come_from_ReadOptions()
+    public void Defaults_come_from_the_options_records()
     {
         var cli = new CommandLine(TextWriter.Null, TextWriter.Null);
-        Assert.Equal(ReadOptions.Default, cli.ReadOptionsFrom(cli.BuildRoot().Parse(["list", "x"])));
+        var result = cli.BuildRoot().Parse(["list", "x"]);
+        Assert.Equal(ReadOptions.Default, cli.ReadOptionsFrom(result));
+        Assert.Equal(ContainerReadOptions.Default, cli.ContainerOptionsFrom(result));
     }
 
     [Fact]

@@ -1,6 +1,6 @@
 using System;
 
-namespace ClassicMac.Resources
+namespace ClassicMac.Files
 {
     /// <summary>
     /// A classic Mac OS date: unsigned seconds since midnight, 1 January 1904, in the local time of the Mac that wrote

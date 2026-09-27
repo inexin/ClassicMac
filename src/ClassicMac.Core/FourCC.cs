@@ -2,7 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Text;
 
-namespace ClassicMac.Resources
+namespace ClassicMac.Core
 {
     /// <summary>
     /// A four-character code (OSType, ResType): four bytes, compared exactly and case-sensitively.

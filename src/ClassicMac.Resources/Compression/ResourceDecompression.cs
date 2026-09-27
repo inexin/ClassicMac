@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ClassicMac.Core;
 using ClassicMac.Resources.Compression;
 
 namespace ClassicMac.Resources

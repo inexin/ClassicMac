@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Files\ClassicMac.Files.csproj" />
     <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
   </ItemGroup>
 

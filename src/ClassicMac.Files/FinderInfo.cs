@@ -1,6 +1,7 @@
 using System;
+using ClassicMac.Core;
 
-namespace ClassicMac.Resources
+namespace ClassicMac.Files
 {
     /// <summary>
     /// Finder flags (<c>fdFlags</c>), from <i>Inside Macintosh: Macintosh Toolbox Essentials</i>, the Finder Interface

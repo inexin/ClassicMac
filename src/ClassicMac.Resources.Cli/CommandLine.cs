@@ -3,12 +3,13 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
 using System.IO;
+using ClassicMac.Files;
 
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
     /// The <c>classicmac</c> command tree. Phase 1 has <c>info</c>, <c>list</c> and <c>extract</c>; <c>pack</c> joins
-    /// in phase 5. Every limit option maps onto <see cref="ReadOptions"/>.
+    /// in phase 5. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
     /// </summary>
     internal sealed class CommandLine(TextWriter output, TextWriter error)
     {
@@ -29,14 +30,14 @@ namespace ClassicMac.Resources.Cli
         private readonly Option<int> maxNestingDepth = new("--max-nesting-depth")
         {
             Description = "How deep containers may nest",
-            DefaultValueFactory = _ => ReadOptions.Default.MaxNestingDepth,
+            DefaultValueFactory = _ => ContainerReadOptions.Default.MaxNestingDepth,
             Recursive = true,
         };
 
         private readonly Option<long> maxExpandedBytes = new("--max-expanded-bytes")
         {
             Description = "Most bytes decompression and unwrapping may produce from one input (bytes, or KiB/MiB/GiB)",
-            DefaultValueFactory = _ => ReadOptions.Default.MaxExpandedBytesPerInput,
+            DefaultValueFactory = _ => ContainerReadOptions.Default.MaxExpandedBytesPerInput,
             CustomParser = ParseSize,
             Recursive = true,
         };
@@ -69,6 +70,11 @@ namespace ClassicMac.Resources.Cli
         internal ReadOptions ReadOptionsFrom(ParseResult result) => ReadOptions.Default with
         {
             MaxResourceSize = result.GetValue(maxResourceSize),
+        };
+
+        /// <summary>The <see cref="ContainerReadOptions"/> the parsed limit options describe.</summary>
+        internal ContainerReadOptions ContainerOptionsFrom(ParseResult result) => ContainerReadOptions.Default with
+        {
             MaxNestingDepth = result.GetValue(maxNestingDepth),
             MaxExpandedBytesPerInput = result.GetValue(maxExpandedBytes),
         };
@@ -146,6 +152,7 @@ namespace ClassicMac.Resources.Cli
         private int NotImplemented(ParseResult result)
         {
             _ = ReadOptionsFrom(result);
+            _ = ContainerOptionsFrom(result);
             error.WriteLine($"'{result.CommandResult.Command.Name}' is not implemented yet.");
             return ExitCodes.NotImplemented;
         }

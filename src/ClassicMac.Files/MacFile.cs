@@ -1,4 +1,6 @@
-namespace ClassicMac.Resources
+using ClassicMac.Core;
+
+namespace ClassicMac.Files
 {
     /// <summary>
     /// A file as the Mac saw it: name, Finder information, dates and both forks. Every container yields these.

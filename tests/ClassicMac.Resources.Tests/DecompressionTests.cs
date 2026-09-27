@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using ClassicMac.Core;
 using ClassicMac.Resources.Compression;
 
 namespace ClassicMac.Resources.Tests;

@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Resources
+namespace ClassicMac.Files
 {
     /// <summary>
     /// The contents of one fork, opened on demand so browsing a large disk image does not read every file.

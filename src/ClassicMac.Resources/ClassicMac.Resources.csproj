@@ -2,9 +2,13 @@
 
   <PropertyGroup>
     <PackageId>ClassicMac.Resources</PackageId>
-    <Description>Dependency-free reader and writer for classic Mac OS resource forks and the containers they travel in (AppleDouble, AppleSingle, MacBinary, BinHex, HFS disk images).</Description>
-    <PackageTags>macintosh;classic-mac;resource-fork;rsrc;macbinary;binhex;appledouble;hfs</PackageTags>
+    <Description>Dependency-free reader and writer for classic Mac OS resource forks, with the System's compressed-resource decompressors (dcmp 0-3).</Description>
+    <PackageTags>macintosh;classic-mac;resource-fork;rsrc;dcmp</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Core\ClassicMac.Core.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.Resources.Tests" />

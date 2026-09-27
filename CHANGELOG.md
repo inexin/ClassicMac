@@ -3,8 +3,9 @@
 ## Unreleased
 
 - Repository layout, build settings and CI.
-- Core model: `FourCC`, `MacString`, `MacDate`, `FinderInfo`, `MacFile`, `Resource`, `ResourceFork`, diagnostics,
-  `ReadOptions` and `IContainerReader`.
+- Packages: `ClassicMac.Core` (`FourCC`, `MacString`, diagnostics), `ClassicMac.Files` (`MacFile`, `FinderInfo`,
+  `MacDate`, `ForkData`, `IContainerReader`, `ContainerReadOptions`) and `ClassicMac.Resources` (`Resource`,
+  `ResourceFork`, `ReadOptions`), each with its own test project.
 - Resource fork reader (damage reported as diagnostics) and canonical writer.
 - Compressed resources: `ResourceDecompression` with System `dcmp` 0, 1, 2 (from disassembly) and 3 (behavioural);
   Mac OS 9 or 68k ROM Resource Manager behaviour via `ReadOptions.ResourceManager`.

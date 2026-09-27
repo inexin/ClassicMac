@@ -1,3 +1,5 @@
+using ClassicMac.Core;
+
 namespace ClassicMac.Resources.Compression
 {
     // System 'dcmp' 2 ("GreggyBits"): 16-bit words from a 256-word table, optionally mixed with literal words.

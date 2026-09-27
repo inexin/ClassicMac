@@ -1,6 +1,6 @@
 using System;
 
-namespace ClassicMac.Resources
+namespace ClassicMac.Core
 {
     /// <summary>
     /// Text as the Mac stored it: the raw bytes of a Pascal string, in whatever encoding the file used. Kept as bytes so

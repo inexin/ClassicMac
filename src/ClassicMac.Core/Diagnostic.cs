@@ -1,4 +1,4 @@
-namespace ClassicMac.Resources
+namespace ClassicMac.Core
 {
     /// <summary>How serious a <see cref="Diagnostic"/> is.</summary>
     public enum DiagnosticSeverity

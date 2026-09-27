@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 
 namespace ClassicMac.Resources
 {

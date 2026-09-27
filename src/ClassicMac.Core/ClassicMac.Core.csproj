@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>ClassicMac.Core</PackageId>
+    <Description>Dependency-free types shared by the ClassicMac packages: four-character codes, Mac strings and diagnostics.</Description>
+    <PackageTags>macintosh;classic-mac;ostype;fourcc</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Core.Tests" />
+  </ItemGroup>
+
+</Project>

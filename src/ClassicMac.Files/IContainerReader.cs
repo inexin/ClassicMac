@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using System.IO;
+using ClassicMac.Core;
 
-namespace ClassicMac.Resources
+namespace ClassicMac.Files
 {
     /// <summary>
     /// Reads one container format (MacBinary, BinHex, an HFS image, …) into Mac files. Applications register their own
@@ -20,6 +21,6 @@ namespace ClassicMac.Resources
         /// <summary>
         /// Reads the container's files. Damage goes to <paramref name="diagnostics"/>; only unusable input throws.
         /// </summary>
-        IReadOnlyList<MacFile> Read(Stream input, ReadOptions options, ICollection<Diagnostic> diagnostics);
+        IReadOnlyList<MacFile> Read(Stream input, ContainerReadOptions options, ICollection<Diagnostic> diagnostics);
     }
 }
