@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using Avalonia;
 using Avalonia.Controls;
@@ -5,6 +6,7 @@ using Avalonia.Controls.Documents;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
 
 namespace ClassicMac.App.Views
@@ -75,5 +77,54 @@ namespace ClassicMac.App.Views
             "Helvetica" or "Geneva" or "Chicago" => FontFamily.Default,
             _ => new FontFamily($"{name}, {FontFamily.Default.Name}"),
         };
+    }
+
+    /// <summary>A sound's waveform: one lane per channel, the lowest and highest sample under each pixel column.</summary>
+    internal sealed class WaveformView : Control
+    {
+        public static readonly StyledProperty<DecodedSound?> SoundProperty =
+            AvaloniaProperty.Register<WaveformView, DecodedSound?>(nameof(Sound));
+
+        private static readonly IBrush Background = new SolidColorBrush(Color.FromRgb(0xF6, 0xF6, 0xF6));
+        private static readonly IBrush Wave = new SolidColorBrush(Color.FromRgb(0x2B, 0x6C, 0xC4));
+        private static readonly Pen Axis = new(new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xC8)));
+
+        static WaveformView() => AffectsRender<WaveformView>(SoundProperty);
+
+        public DecodedSound? Sound
+        {
+            get => GetValue(SoundProperty);
+            set => SetValue(SoundProperty, value);
+        }
+
+        public override void Render(DrawingContext context)
+        {
+            var size = Bounds.Size;
+            context.FillRectangle(Background, new Rect(size));
+            if (Sound is not { Frames: > 0 } sound || size.Width < 1) return;
+            var lane = size.Height / sound.Channels;
+            var columns = (int)size.Width;
+            for (var c = 0; c < sound.Channels; c++)
+            {
+                var middle = lane * c + lane / 2;
+                var half = Math.Max(1, lane / 2 - 2);
+                context.DrawLine(Axis, new Point(0, middle), new Point(size.Width, middle));
+                for (var x = 0; x < columns; x++)
+                {
+                    var first = (int)((long)x * sound.Frames / columns);
+                    var last = Math.Min(sound.Frames, Math.Max(first + 1, (int)((long)(x + 1) * sound.Frames / columns)));
+                    float low = 1, high = -1;
+                    for (var f = first; f < last; f++)
+                    {
+                        var v = sound.Samples[f * sound.Channels + c];
+                        low = Math.Min(low, v);
+                        high = Math.Max(high, v);
+                    }
+                    var top = middle - Math.Clamp(high, -1, 1) * half;
+                    var bottom = middle - Math.Clamp(low, -1, 1) * half;
+                    context.FillRectangle(Wave, new Rect(x, top, 1, Math.Max(1, bottom - top)));
+                }
+            }
+        }
     }
 }

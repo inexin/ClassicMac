@@ -433,7 +433,8 @@ like ResEdit, read-only at first.
 **Structure:** the app adds nothing format-specific — it sits on the same `ClassicMac.Resources` and `Decoders`
 packages as the CLI. MVVM with plain C# view-models (testable without a UI), one preview control per kind (image, hex,
 text, sound, font, dialog) chosen by resource type, lazy opening and decoding so large disk images browse instantly;
-sound playback is the only native dependency.
+sound playback is the only native dependency: SoundFlow 1.4.1 (MIT), which bundles miniaudio (MIT or public domain) for
+Windows, Linux and macOS; only the app references it (behind `IAudioPlayer`), so the libraries stay pure.
 
 **First version (built):** `src/ClassicMac.App` (Avalonia 12, Fluent theme, CommunityToolkit.Mvvm) — open files,
 disk images and resource forks (menu, drag and drop, command line), browse the tree (input › containers › folders ›
@@ -447,8 +448,10 @@ Save Resource As (decoded or `.bin`, current screen depth), Export Resources (a 
 Extract All Resources (input, container or folder) and Unpack as AppleDouble or Basilisk II (input, container, folder
 or file). They run the CLI's code (`ClassicMac.Files.Export`) off the UI thread, one at a time, into a new subfolder
 named after the item ("Disk unpacked", numbered when it exists), with progress in the status line and problems in the
-diagnostics list. **Next:** drag and drop out of the app, then the other previews (sound, fonts, dialogs) as their
-decoders arrive.
+diagnostics list. **Sound (built):** a `snd ` shows its waveform (one lane per channel) and details (exact rate, channels,
+size, length, loop, base note) and plays through SoundFlow at its true pitch (converted to the device's 48 kHz
+stereo); playback stops when the selection changes. **Next:** drag and drop out of the app, then the other previews
+(fonts, dialogs) as their decoders arrive.
 
 **Editing, in three stages** — the viewer becomes an editor, ResEdit-style. Every save writes a verified round trip
 (read back and compared) and keeps the original; undo within a session.

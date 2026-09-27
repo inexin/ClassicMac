@@ -44,3 +44,11 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   including its position-code tables) as DART and Disk Copy 6.3.3 use it; it was written from the disassembly of Disk
   Copy's codec, which follows the authors' freely distributed `lzhuf.c`. The authors placed the program in the public
   domain; they are credited here for the algorithm and tables.
+
+## Bundled with the viewer app
+
+The app (not the libraries) references these NuGet packages, which ship their own licence files:
+
+- [SoundFlow](https://github.com/LSXPrime/SoundFlow) 1.4.1, MIT, for sound playback. It bundles native
+  [miniaudio](https://miniaud.io) builds (MIT or public domain, at your choice).
+- Avalonia and CommunityToolkit.Mvvm, MIT.

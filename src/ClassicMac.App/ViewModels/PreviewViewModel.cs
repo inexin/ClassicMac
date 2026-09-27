@@ -11,6 +11,7 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
+using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
 
@@ -24,6 +25,7 @@ namespace ClassicMac.App.ViewModels
         Image,
         Text,
         Json,
+        Sound,
     }
 
     /// <summary>One decoded image: PNG bytes, its size, and a caption (a list item's number, a cursor's hotspot).</summary>
@@ -31,7 +33,8 @@ namespace ClassicMac.App.ViewModels
 
     /// <summary>
     /// The preview of a resource or file, made by the same decoders as <c>extract</c>: images (pictures, icons, cursors,
-    /// patterns), text (strings, styled text) or JSON (version resources, lone style runs); otherwise a note to look at
+    /// patterns), text (strings, styled text), JSON (version resources, lone style runs) or sound (<c>snd </c>, drawn and
+    /// played); otherwise a note to look at
     /// the hex view.
     /// </summary>
     public sealed class PreviewViewModel
@@ -58,7 +61,15 @@ namespace ClassicMac.App.ViewModels
 
         public string Text { get; private init; } = "";
 
-        public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json;
+        /// <summary>A sound's samples, for the waveform and playback.</summary>
+        public DecodedSound? Sound { get; private init; }
+
+        /// <summary>A sound's rate, channels, sample size, length, format and loop.</summary>
+        public string SoundDetails { get; private init; } = "";
+
+        public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound;
+
+        public bool IsSound => Kind == PreviewKind.Sound;
 
         public bool IsImage => Kind == PreviewKind.Image;
 
@@ -97,6 +108,8 @@ namespace ClassicMac.App.ViewModels
                     : ReadOnlyMemory<byte>.Empty;
                 return StyledPreview(StyledText.Read(data.Span, styl.Span, options));
             }
+            if (type == "snd " && SoundResource.Read(data, diagnostics, resource.ToString()) is { Sound: { } sampled })
+                return SoundPreview(sampled);
             var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(resource.Type));
             if (decoder is null) return Nothing($"'{type}'");
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));
@@ -123,6 +136,22 @@ namespace ClassicMac.App.ViewModels
                 return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl.Span, options));
             }
             return None;
+        }
+
+        private static PreviewViewModel SoundPreview(SampledSound sampled)
+        {
+            var bits = sampled.Kind == SoundHeaderKind.Compressed ? $"'{sampled.Format}'" : $"{sampled.SampleSize}-bit";
+            if (SoundSamples.Decode(sampled) is not { } sound)
+                return new PreviewViewModel(PreviewKind.None, $"A {bits} sound, which is not decoded yet; see Hex.");
+            var channels = sound.Channels == 1 ? "mono" : sound.Channels == 2 ? "stereo" : $"{sound.Channels} channels";
+            var loop = sampled.LoopEnd > sampled.LoopStart + 1 ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
+            var note = sampled.BaseNote is not (0 or 60) ? $", base note {sampled.BaseNote}" : "";
+            return new PreviewViewModel(PreviewKind.Sound, "")
+            {
+                Sound = sound,
+                SoundDetails = string.Create(CultureInfo.InvariantCulture,
+                    $"{sound.SampleRate:0.###} Hz, {channels}, {bits}, {sound.Duration:0.00} s ({sound.Frames:N0} frames){loop}{note}"),
+            };
         }
 
         private static PreviewViewModel StyledPreview(StyledText styled) => new(PreviewKind.Text, "") { Styled = styled, Text = styled.Text.Replace('\r', '\n') };

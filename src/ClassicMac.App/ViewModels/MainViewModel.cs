@@ -95,6 +95,7 @@ namespace ClassicMac.App.ViewModels
         private int zoom = 1;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(PlaySoundCommand))]
         private PreviewViewModel preview = PreviewViewModel.None;
 
         [ObservableProperty]

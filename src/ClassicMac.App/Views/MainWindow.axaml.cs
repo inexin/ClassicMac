@@ -5,6 +5,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using ClassicMac.App.Audio;
 using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views
@@ -18,9 +19,14 @@ namespace ClassicMac.App.Views
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             DataContextChanged += (_, _) =>
             {
-                if (DataContext is MainViewModel model) model.FilePicker = this;
+                if (DataContext is not MainViewModel model) return;
+                model.FilePicker = this;
+                model.AudioPlayer ??= audio;
             };
+            Closed += (_, _) => audio.Dispose();
         }
+
+        private readonly SoundFlowPlayer audio = new();
 
         public async Task<IReadOnlyList<string>> PickFilesAsync()
         {

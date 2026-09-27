@@ -121,6 +121,16 @@
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
                   <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
                 </ScrollViewer>
+                <DockPanel IsVisible="{Binding Preview.IsSound}" Margin="12,8">
+                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+                    <Button Content="Play" Command="{Binding PlaySoundCommand}" />
+                    <Button Content="Stop" Command="{Binding StopSoundCommand}" />
+                    <TextBlock Text="{Binding Preview.SoundDetails}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                  </StackPanel>
+                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding PlaybackNote}" Opacity="0.65" Margin="0,6,0,0"
+                             IsVisible="{Binding PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <views:WaveformView Sound="{Binding Preview.Sound}" MinHeight="120" />
+                </DockPanel>
               </Panel>
             </DockPanel>
           </TabItem>

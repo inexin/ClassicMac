@@ -11,8 +11,8 @@ using ClassicMac.Files.Tests;
 namespace ClassicMac.App.Tests;
 
 // The main window loads its XAML and draws, headless (Skia, no screen): the tree, an image preview, a styled-text
-// preview, the hex view and the tree's context menu. With CLASSICMAC_SCREENSHOT set to a path, the frames are saved
-// beside it for a look.
+// preview, the hex view, the tree's context menu and a sound's waveform. With CLASSICMAC_SCREENSHOT set to a path,
+// the frames are saved beside it for a look.
 public class WindowTests
 {
     private static readonly Lazy<bool> Started = new(() =>
@@ -64,6 +64,7 @@ public class WindowTests
             disk.File(HfsBuilder.Root, "Manual", [], PreviewTests.Fork(
                 ("ICN#", 128, null, [.. Enumerable.Range(0, 128).Select(i => (byte)(i % 8 < 4 ? 0xF0 : 0x0F)), .. Enumerable.Repeat((byte)0xFF, 128)]),
                 ("TEXT", 128, null, text),
+                ("snd ", 128, "Sine", SoundPreviewTests.Sound(20000)),
                 ("styl", 128, null, PreviewTests.Styl((0, 20, 1, 24, 0, 0, 0), (9, 3, 0, 12, 0, 0, 0), (17, 3, 1, 12, 0xFFFF, 0, 0), (20, 3, 0, 12, 0, 0, 0)))));
             var path = Path.Combine(folder, "disk.img");
             File.WriteAllBytes(path, disk.Build("Disk"));
@@ -99,6 +100,11 @@ public class WindowTests
             Assert.Equal(["_Save Resource As…"], items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
             Capture(window, "context-menu");
             menu.Close();
+
+            model.Selected = types.Single(t => t.Type.ToString() == "snd ").Children[0];
+            Pump(model.PreviewTask);
+            Assert.True(model.Preview.IsSound);
+            Capture(window, "sound");
             window.Close();
         }
         finally
