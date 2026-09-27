@@ -36,7 +36,7 @@ namespace ClassicMac.Resources.Cli
             var indent = new string(' ', depth * 2);
             var file = node.File;
             var info = file.FinderInfo;
-            output.WriteLine($"{indent}{node.Format}: \"{file.Name}\"");
+            output.WriteLine($"{indent}{node.Format}: \"{file.MacPath}\"");
             output.WriteLine($"{indent}  type '{info.Type}'  creator '{info.Creator}'  flags {Flags(info.Flags)}");
             if (file.Created is not null || file.Modified is not null)
                 output.WriteLine($"{indent}  created {Date(file.Created)}  modified {Date(file.Modified)}");

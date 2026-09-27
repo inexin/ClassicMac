@@ -90,7 +90,7 @@ namespace ClassicMac.Resources.Cli
         // Where a diagnostic came from: the input, and the Mac file inside it when that has another name.
         private static string Source(FileInfo input, MacFile file)
         {
-            var name = file.Name.ToString();
+            var name = file.MacPath;
             return name == input.Name ? input.Name : $"{input.Name} > {name}";
         }
 
@@ -98,6 +98,15 @@ namespace ClassicMac.Resources.Cli
         private static ResourceFork? TryDataForkAsFork(ForkData data, ReadOptions options)
         {
             if (data.Length is < 256 or > ResourceFork.MaxForkLength) return null;
+            // A cheap look at the header first, so a volume's thousands of data files are not all read in full: the
+            // data and map areas must lie inside the fork, the map after the reserved area.
+            var header = data.ReadPrefix(16);
+            long dataOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header);
+            long mapOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
+            long dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
+            long mapLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(12));
+            if (dataOffset < 16 || mapOffset < 16 || mapLength < 30 || dataOffset + dataLength > data.Length
+                || mapOffset + mapLength > data.Length) return null;
             try
             {
                 var fork = ReadFork(data, options);
@@ -117,7 +126,7 @@ namespace ClassicMac.Resources.Cli
             {
                 // A lone raw fork prints its table only, as before containers existed.
                 if (entries.Count > 1 || entry.Chain[0] != "raw resource fork")
-                    output.WriteLine($"\"{entry.File.Name}\" ({string.Join(" > ", entry.Chain)})");
+                    output.WriteLine($"\"{entry.File.MacPath}\" ({string.Join(" > ", entry.Chain)})");
                 if (entry.Fork is not { } fork)
                 {
                     output.WriteLine("  no resource fork");
@@ -140,6 +149,7 @@ namespace ClassicMac.Resources.Cli
         {
             var list = new ListOutput(input.Name, entries.Select(e => new ListFile(
                 e.File.Name.ToString(),
+                e.File.MacPath,
                 e.Chain.ToList(),
                 e.File.FinderInfo.Type.ToString(),
                 e.File.FinderInfo.Creator.ToString(),
@@ -158,7 +168,8 @@ namespace ClassicMac.Resources.Cli
 
     internal sealed record ListOutput(string Input, List<ListFile> Files);
 
-    internal sealed record ListFile(string Name, List<string> Formats, string Type, string Creator, List<ListResource>? Resources);
+    internal sealed record ListFile(
+        string Name, string Path, List<string> Formats, string Type, string Creator, List<ListResource>? Resources);
 
     internal sealed record ListResource(string Type, short Id, string? Name, int Size, string Attributes);
 

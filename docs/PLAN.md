@@ -137,7 +137,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 
 | Options object | Package | Settings (default) |
 | --- | --- | --- |
-| `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local) |
+| `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local), max files and folders read from one volume (1,000,000) |
 | `ReadOptions` | Resources | Max decompressed resource size (64 MiB), Resource Manager model (Mac OS 9), text encoding override (none) |
 | `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off) |
@@ -149,8 +149,8 @@ defaults are a static `Default` on each. Each object arrives with the code that 
 
 ### Core API
 
-The model, by package (namespaces start with the package name). `ResourceFork.Read` and `ResourceFork.Write`/`ToArray` read
-and write a fork; `ResourceDecompression` returns a resource's data as the Resource Manager would:
+The model, by package (namespaces start with the package name). `ResourceFork.Read` and `ResourceFork.Write`/`ToArray`
+read and write a fork; `ResourceDecompression` returns a resource's data as the Resource Manager would:
 
 | Package | Type | What it is |
 | --- | --- | --- |
@@ -161,11 +161,12 @@ and write a fork; `ResourceDecompression` returns a resource's data as the Resou
 | Core | `MacPoint`, `MacRect` | QuickDraw `Point` (v, h) and `Rect` (top, left, bottom, right), read and written big-endian; used by Finder info and by many resources (`DLOG`, `DITL`, `WIND`, `PICT` frames, `cicn` bounds) |
 | Core | `Fixed`, `UnsignedFixed` | 16.16 fixed-point numbers (resolutions, font metrics, QuickTime values; sound sample rates are unsigned) |
 | Files | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
-| Files | `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
+| Files | `MacFile` | Name, folder path inside its container (`MacPath` joins it with `:`), Finder info, dates, and both forks as `ForkData` (opened on demand) |
 | Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
 | Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
-| Files | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0 |
-| Files | `HostFiles`, `PcExchange` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
+| Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
+| Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2 images, Apple partition maps; each yields files the next can open |
+| Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
 | Resources | `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
@@ -421,7 +422,9 @@ The Resource Manager model is the native Mac OS 9 one (plus the 68k ROM where se
 extensions install — Multiple Users, Apple Menu Options, language packs, the Process Manager's font-release rule.
 They change what running applications see, not what a file contains.
 
-- **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS, MFS),
+- **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS),
+  *Inside Macintosh II* (MFS), *Inside Macintosh: Devices* (Apple partition map), Apple's File Type Note $E0/$0005
+  (Disk Copy 4.2),
   *Sound* (`snd `), Apple's *AppleSingle/AppleDouble Formats for Foreign Files* Developer Note (versions 1 and 2;
   RFC 1740). No Apple code in Mac OS 7.1–9 reads or writes AppleSingle/AppleDouble (only mail clients and StuffIt
   do), so the Developer Note is the whole reference.

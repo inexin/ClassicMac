@@ -16,5 +16,9 @@
   with PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files and macOS named
   forks; `ContainerUnwrapper` for nesting;
   lazy `ForkData` slices. `MacRoman` in Core.
-- `classicmac` CLI: `info` and `list` read through containers (text or JSON); `extract` parsed, not yet implemented;
+- Disk images in `ClassicMac.Files.Hfs`: HFS and MFS volumes (files with folder paths, forks read in place through
+  their extents), Disk Copy 4.2 and Apple partition maps; `MacFile.FolderPath` and `MacPath`. The file layer is one
+  package: single-file readers moved to `ClassicMac.Files.Containers`.
+- `classicmac` CLI: `info` and `list` read through containers and disk images, showing Mac paths (text or JSON);
+  `extract` parsed, not yet implemented;
   limit options, exit codes.
