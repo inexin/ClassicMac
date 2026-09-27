@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files
@@ -9,6 +11,12 @@ namespace ClassicMac.Files
     {
         /// <summary>The file name, in the encoding of the volume or container it came from.</summary>
         public required MacString Name { get; init; }
+
+        /// <summary>
+        /// The folders from the container's root down to the file (a volume's root folder is not included); empty for
+        /// single-file containers.
+        /// </summary>
+        public IReadOnlyList<MacString> FolderPath { get; init; } = [];
 
         /// <summary>Type, creator, flags and icon position.</summary>
         public FinderInfo FinderInfo { get; init; } = FinderInfo.Empty;
@@ -24,5 +32,8 @@ namespace ClassicMac.Files
 
         /// <summary>The resource fork.</summary>
         public ForkData ResourceFork { get; init; } = ForkData.Empty;
+
+        /// <summary>The Mac path inside the container, folders and name joined with ':' as the Mac wrote paths.</summary>
+        public string MacPath => string.Join(":", FolderPath.Append(Name).Select(n => n.ToString()));
     }
 }

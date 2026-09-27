@@ -81,6 +81,40 @@ public class ForkSliceTests
     }
 }
 
+public class ExtentForkTests
+{
+    private static readonly byte[] Image = Enumerable.Range(0, 100).Select(i => (byte)i).ToArray();
+
+    [Fact]
+    public void Extents_read_as_one_fork_cut_to_its_length()
+    {
+        var fork = new ExtentForkData(ForkData.FromBytes(Image), [(50, 10), (10, 10), (80, 10)], 25);
+
+        Assert.Equal(25, fork.Length);
+        Assert.Equal([.. Image[50..60], .. Image[10..20], .. Image[80..85]], fork.ToArray());
+    }
+
+    [Fact]
+    public void Extent_forks_seek_across_ranges()
+    {
+        var fork = new ExtentForkData(ForkData.FromBytes(Image).Slice(0, 100), [(50, 10), (10, 10)], 20);
+        using var stream = fork.Open();
+        stream.Seek(8, SeekOrigin.Begin);
+        var bytes = new byte[4];
+        stream.ReadExactly(bytes);
+        Assert.Equal([58, 59, 10, 11], bytes);
+        Assert.Equal(0, stream.Read(new byte[4], 0, 0));
+    }
+
+    [Fact]
+    public void Extents_outside_the_image_or_too_short_throw()
+    {
+        var image = ForkData.FromBytes(Image);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ExtentForkData(image, [(95, 10)], 5));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ExtentForkData(image, [(0, 10)], 11));
+    }
+}
+
 public class MacFileTests
 {
     [Fact]
@@ -89,6 +123,10 @@ public class MacFileTests
         var file = new MacFile { Name = new MacString("Read Me"u8) };
 
         Assert.Same(FinderInfo.Empty, file.FinderInfo);
+        Assert.Empty(file.FolderPath);
+        Assert.Equal("Read Me", file.MacPath);
+        Assert.Equal("Games:Realmz:Read Me",
+            (file with { FolderPath = [MacString.FromMacRoman("Games"), MacString.FromMacRoman("Realmz")] }).MacPath);
         Assert.Null(file.Created);
         Assert.Null(file.Modified);
         Assert.Equal(0, file.DataFork.Length);
