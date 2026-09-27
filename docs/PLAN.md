@@ -16,8 +16,8 @@ they are wrapped in — and turns them into modern files with a manifest, and la
   extend it through custom decoders.
 
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
-the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Resources`, `ClassicMac.Resources.Decoders`,
-`ClassicMac.Resources.Cli`; the app carries the same name. QuickDraw.Pict stays a separate repo and package for now;
+the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Resources`, `ClassicMac.Encodings`,
+`ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app carries the same name. QuickDraw.Pict stays a separate repo and package for now;
 merging it into ClassicMac (as `ClassicMac.QuickDraw`) is the long-term intent.
 
 ## Inputs
@@ -57,7 +57,35 @@ The core reads a resource fork into an in-memory model and writes one back.
   exceptions; only unusable input throws.
 - **Writing:** rebuild a fork from the model, for modding and round-trip tests.
 - **Text encodings:** MacRoman by default; the script of a file or of a font picks other Mac encodings (Japanese,
-  Cyrillic, …).
+  Cyrillic, …). See [Text encodings](#text-encodings).
+- **Untrusted input:** see [Hostile input](#hostile-input).
+
+### Text encodings
+
+.NET has no Mac encodings built in (`CodePagesEncodingProvider` must be registered and does not cover every Mac
+script), so ClassicMac ships its own tables, generated from Unicode's published Apple mapping files (Unicode licence,
+noted in `THIRD-PARTY-NOTICES.md`).
+
+- **Core:** MacRoman and the single-byte Mac scripts (Central European, Cyrillic, Greek, Turkish, Icelandic, Croatian,
+  Romanian, Symbol, Dingbats), small enough to keep the core dependency-free.
+- **`ClassicMac.Encodings`:** the multi-byte scripts (Japanese, Traditional and Simplified Chinese, Korean), optional
+  because their tables are large.
+- **Choosing the script:** an explicit `--encoding` wins; otherwise the font's script (`FOND` family ID range), then
+  the file's region (`vers`), then MacRoman. The choice is recorded in the manifest.
+- MacRoman ↔ Unicode is lossless (every byte maps to one code point), so names and four-character codes stored as
+  text round-trip exactly.
+
+### Hostile input
+
+The readers parse arbitrary downloaded files, so every size and offset is checked before use.
+
+- **Bounds:** offsets and lengths are checked against the stream before reading; anything outside goes to diagnostics.
+- **Allocation limits:** a per-resource ceiling on decompressed size (default 64 MiB, configurable); `dcmp` output
+  must match the size its header declares; decoders check image dimensions before allocating.
+- **Nesting and cycles:** container recursion stops at a depth limit (default 8); HFS B-tree and extent walks detect
+  cycles.
+- **Fuzzing:** SharpFuzz with libFuzzer on each container reader, the resource map and `dcmp`, seeded from the test
+  fixtures; a short run on every CI build, a longer one nightly; crashes become regression fixtures.
 
 ## Decoders
 
@@ -87,22 +115,47 @@ One folder per input file, one subfolder per resource type, and a manifest that 
 MyApp/
   manifest.json
   PICT/128 Title Screen.png
-  snd /200 Door.wav
+  snd%20/200 Door.wav
   STR#/1000 Messages.json
   CODE/1.bin
 ```
 
-- **File names:** `<id> <name>.<ext>`, with characters illegal on Windows or macOS escaped; the type folder keeps its
-  four characters (escaped when needed).
-- **Manifest:** the file's Finder info, then per resource: type, ID, name, attributes, original size, decoder used,
-  output path, and any warnings.
 - **Images:** 32-bit RGBA PNG by default; `--depth` renders at a chosen screen depth (1, 2, 4, 8, 16 bit).
-- **Round trip:** a `pack` command rebuilds a resource fork from the folder and manifest, using raw data where a file
-  was not changed.
+- **Round trip:** a `pack` command rebuilds a resource fork from the folder and manifest (below).
+
+### Names on disk
+
+Folder and file names must be valid and distinct on Windows, macOS and Linux. The manifest, not the name, is the
+authority: `pack` reads type, ID and name from it, so escaping only has to be safe and readable, never reversible.
+
+- **Resource files:** `<id> <name>.<ext>`, or `<id>.<ext>` when unnamed; the name is converted to Unicode through the
+  file's encoding and cut so the whole path stays under 200 characters.
+- **Escaping:** `%XX` (the byte in the file's encoding) for control characters, `% / \ : * ? " < > |`, and a trailing
+  space or dot — so `snd ` becomes `snd%20` and `PAT ` becomes `PAT%20`.
+- **Reserved Windows names:** a name that matches `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9` or `LPT1`–`LPT9`
+  (ignoring case and extension) gets its last character escaped: `COM1` → `COM%31`.
+- **Case collisions:** types are case-sensitive but Windows and macOS disks are not. When two types in one fork fold
+  to the same name (`PICT` and `pict`, `snd ` and `SND `), each of them gets `~` and the type's hex bytes appended:
+  `PICT~50494354`, `pict~70696374`. Types without a collision keep their plain name, so output stays readable.
+
+### Manifest
+
+`manifest.json` is a versioned format, because `pack` and other tools depend on it.
+
+- **Schema:** a JSON Schema per major version in the repo (`schemas/manifest-1.schema.json`), referenced by the
+  manifest's `$schema` and `formatVersion` fields. New optional fields are a minor change; anything else is a new
+  major version. Readers reject a newer major version and ignore unknown fields.
+- **Contents:** the source (container chain, file name), Finder info, encoding used, and diagnostics; then per
+  resource: type (as text), ID, name, attributes, original size, `dcmp` ID if compressed, decoder and its version,
+  output path (relative, `/`-separated), SHA-256 of the raw data and of the output file, and warnings.
+- **Pack rules:** a file whose hash is unchanged takes the original raw data, from `raw/` (written by
+  `extract --keep-raw`; three characters, so it never clashes with a type folder) or from the original fork given with
+  `--base`; a changed file is re-encoded by its decoder's encoder, or is an error if there is none.
+  Resources in the manifest with no file are dropped only with `--allow-deletes`.
 
 ## Architecture and packaging
 
-Three packages and an app, layered so the core can be embedded anywhere and the heavy dependencies stay optional.
+Four packages and an app, layered so the core can be embedded anywhere and the heavy dependencies stay optional.
 
 ```mermaid
 flowchart LR
@@ -121,6 +174,7 @@ flowchart LR
 ```
 
 - **ClassicMac.Resources** — containers, the resource map and `dcmp`; no dependencies, .NET 10.
+- **ClassicMac.Encodings** — the multi-byte Mac text encodings; optional, no dependencies.
 - **ClassicMac.Resources.Decoders** — the built-in decoders; depends on QuickDraw.Pict for images.
 - **CLI** — a `dotnet tool` with `list`, `extract` and `pack`.
 - **Viewer app** — a cross-platform desktop app on the same packages (below).
@@ -207,8 +261,11 @@ implementation's guess. A rule fitted to real data instead is marked as such.
 
 ### Testing
 
-- **Fixtures in the repo are synthetic:** built by our own writer, or from Rez source compiled with Apple's Rez
-  through `mpw` (the output is ours, not an Apple file).
+- **Fixtures in the repo are synthetic:** built by our own writer inside the tests, or from Rez source compiled with
+  Apple's Rez through `mpw` (the output is ours, not an Apple file).
+- **Rez fixtures are compiled locally, not in CI:** MPW is Apple software and never enters the repo or CI. The `.r`
+  source and the compiled fork are both committed; a script regenerates them on a machine where `MPW_ROOT` points to
+  an MPW install and records each source's hash beside its fork; CI checks the hashes so a stale fork fails the build.
 - **Real-file corpus outside the repo:** system files, applications, games such as Realmz, shareware — found through
   an environment variable (`CLASSICMAC_CORPUS`); those tests skip when it is absent. Only hashes and manifests of
   corpus results are committed, never the files or their decoded output.
@@ -285,6 +342,12 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Decoder priority after images:** text, sound, UI, fonts.
 - **Image output:** 32-bit RGBA PNG by default; other screen depths on request.
 - **Editing order:** resource-level edits, typed editors, then writing disk images.
+- **Names on disk:** `%XX` escaping, reserved-name escaping, hex suffix on case collisions; the manifest is the
+  authority (see Names on disk).
+- **Manifest:** versioned JSON Schema; hashes decide what `pack` re-encodes.
+- **Encodings:** own tables from Unicode's Apple mappings; single-byte in the core, multi-byte in
+  `ClassicMac.Encodings`.
+- **Hostile input:** bounds checks, allocation and nesting limits, fuzzing in CI.
 
 ## Open questions
 
