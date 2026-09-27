@@ -438,8 +438,10 @@ sound playback is the only native dependency.
 disk images and resource forks (menu, drag and drop, command line), browse the tree (input › containers › folders ›
 files › resource types › resources, resources read on expand), details of the selection, and a diagnostics list
 that leads to its node. View-models carry no Avalonia types and are tested; a headless test draws the window.
-**Next:** previews (images with the screen-depth switch, text, hex) and export, then the other previews as their
-decoders arrive.
+**Previews (built):** Details | Preview | Hex tabs. Previews come from the same decoders as `extract`: images
+(zoom, screen depth, nearest-neighbour on a checkerboard), styled `TEXT` drawn with its fonts and colours (through the
+public `StyledText` model), strings, `vers` as JSON, and PICT/TEXT files; hex over any fork or resource, read on
+demand. **Next:** export from the app, then the other previews (sound, fonts, dialogs) as their decoders arrive.
 
 **Editing, in three stages** — the viewer becomes an editor, ResEdit-style. Every save writes a verified round trip
 (read back and compared) and keeps the original; undo within a session.
@@ -598,7 +600,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
    pixel limit and `--screen-depth`. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
-   decoders. Browse, details and diagnostics built; previews and export next.
+   decoders. Browse, details, diagnostics, previews and hex built; export next.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
    *Exit:* extract → `pack` is byte-identical for unchanged resources.
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers.
