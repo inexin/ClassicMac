@@ -496,7 +496,7 @@ They change what running applications see, not what a file contains.
   Hybrid discs mount as HFS, as the Mac mounts them, because the HFS and partition-map readers go first.
 - **Zip and tar:** Info-ZIP's `extrafld.txt` for the Mac extra fields; POSIX tar.
 - **NDIF and ADC:** no Apple spec; from the disassembly of Disk Copy 6.3.3 (its `.HDI` driver and codecs; there is
-  no separate extension on OS 9 and no UDIF support), confirmed on images it made in SheepShaver (each decodes to its
+  no separate extension on OS 9 and no UDIF support), confirmed on images it and Disk Copy 6.1.2 made in SheepShaver (each decodes to its
   source sectors, the CRC matches). The `bcem` header and its validator (what refuses a mount is refused, the rest
   reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end, all decoded; KenCode
   confirmed on a "Smaller (KC)" image from Disk Copy's hidden Control-Save dialog, 512-sector chunks), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
