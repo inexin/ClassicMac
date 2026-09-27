@@ -25,49 +25,14 @@ namespace ClassicMac.Resources.Cli
                 var opened = Input.Open(input, containerOptions, containerDiagnostics);
                 reporter.Write(input.Name, containerDiagnostics);
 
-                if (opened.IsPlain && opened.Root.File.ResourceFork.Length == 0)
+                try
                 {
-                    // Not a container: the file itself should be a resource fork.
-                    ResourceFork raw;
-                    try
-                    {
-                        raw = ReadFork(opened.Root.File.DataFork, options);
-                    }
-                    catch (InvalidDataException e)
-                    {
-                        error.WriteLine($"{input.Name}: not a Mac container or a resource fork: {e.Message}");
-                        return ExitCodes.Unreadable;
-                    }
-                    reporter.Write(input.Name, raw.Diagnostics);
-                    entries.Add(new ListEntry(opened.Root.File, ["raw resource fork"], raw));
+                    entries.AddRange(opened.Forks(input, options, reporter).Select(f => new ListEntry(f.Node.File, f.Chain, f.Fork)));
                 }
-                else
+                catch (InvalidDataException e)
                 {
-                    foreach (var (node, chain) in opened.Leaves)
-                    {
-                        ResourceFork? fork = null;
-                        if (node.File.ResourceFork.Length == 0 && TryDataForkAsFork(node.File.DataFork, options) is { } inData)
-                        {
-                            // Some applications keep resource-fork data in a data file (Realmz's .rsf files).
-                            reporter.Write(Source(input, node.File), inData.Diagnostics);
-                            entries.Add(new ListEntry(node.File, [.. chain, "data fork as resource fork"], inData));
-                            continue;
-                        }
-                        if (node.File.ResourceFork.Length > 0)
-                        {
-                            try
-                            {
-                                fork = ReadFork(node.File.ResourceFork, options);
-                                reporter.Write(Source(input, node.File), fork.Diagnostics);
-                            }
-                            catch (InvalidDataException e)
-                            {
-                                reporter.Write(Source(input, node.File),
-                                    [new Diagnostic(DiagnosticSeverity.Error, "fork.unreadable", e.Message)]);
-                            }
-                        }
-                        entries.Add(new ListEntry(node.File, chain, fork));
-                    }
+                    error.WriteLine($"{input.Name}: not a Mac container or a resource fork: {e.Message}");
+                    return ExitCodes.Unreadable;
                 }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -79,45 +44,6 @@ namespace ClassicMac.Resources.Cli
             if (format == CommandLine.ListFormat.Json) WriteJson(input, entries);
             else WriteText(entries);
             return reporter.ExitCode;
-        }
-
-        private static ResourceFork ReadFork(ForkData fork, ReadOptions options)
-        {
-            using var stream = fork.Open();
-            return ResourceFork.Read(stream, options);
-        }
-
-        // Where a diagnostic came from: the input, and the Mac file inside it when that has another name.
-        private static string Source(FileInfo input, MacFile file)
-        {
-            var name = file.MacPath;
-            return name == input.Name ? input.Name : $"{input.Name} > {name}";
-        }
-
-        // A data fork that reads as a resource fork with at least one resource and no errors, or null.
-        private static ResourceFork? TryDataForkAsFork(ForkData data, ReadOptions options)
-        {
-            if (data.Length is < 256 or > ResourceFork.MaxForkLength) return null;
-            // A cheap look at the header first, so a volume's thousands of data files are not all read in full: the
-            // data and map areas must lie inside the fork, the map after the reserved area.
-            var header = data.ReadPrefix(16);
-            long dataOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header);
-            long mapOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
-            long dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
-            long mapLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(12));
-            if (dataOffset < 16 || mapOffset < 16 || mapLength < 30 || dataOffset + dataLength > data.Length
-                || mapOffset + mapLength > data.Length) return null;
-            try
-            {
-                var fork = ReadFork(data, options);
-                return fork.Resources.Count > 0 && !fork.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)
-                    ? fork
-                    : null;
-            }
-            catch (InvalidDataException)
-            {
-                return null;
-            }
         }
 
         private void WriteText(List<ListEntry> entries)

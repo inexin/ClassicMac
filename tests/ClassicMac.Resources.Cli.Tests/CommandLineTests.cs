@@ -228,11 +228,4 @@ public class CommandLineTests
         Directory.Delete(folder, recursive: true);
     }
 
-    [Fact]
-    public void Unbuilt_commands_say_so()
-    {
-        var (code, _, error) = Run("extract", Path.GetTempFileName());
-        Assert.Equal(ExitCodes.NotImplemented, code);
-        Assert.Contains("not implemented", error);
-    }
 }

@@ -2,6 +2,7 @@ using System;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
+using System.Linq;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Files;
@@ -164,9 +165,9 @@ namespace ClassicMac.Resources.Cli
             var input = InputArgument();
             var outputDir = new Option<DirectoryInfo>("--output", "-o")
             {
-                Description = "Output folder (default: the input's name next to it)",
+                Description = "Output folder (default: \"<input> resources\" next to the input)",
             };
-            var raw = new Option<bool>("--raw") { Description = "Write every resource's data as stored, undecoded" };
+            var raw = new Option<bool>("--raw") { Description = "Write each resource's data (decompressed), undecoded; the only mode until decoders exist" };
             var keepRaw = new Option<bool>("--keep-raw") { Description = "Also keep the raw data in raw/, for pack" };
             var types = new Option<string[]>("--type", "-t")
             {
@@ -178,21 +179,28 @@ namespace ClassicMac.Resources.Cli
                 foreach (var type in r.GetValueOrDefault<string[]>() ?? [])
                     if (!FourCC.TryParse(type, out _)) r.AddError($"'{type}' is not a four-character type.");
             });
-            var overwrite = new Option<bool>("--overwrite") { Description = "Replace an existing output folder" };
+            var overwrite = new Option<bool>("--overwrite") { Description = "Write into output folders that already hold files" };
             var command = new Command("extract", "Extract resources into a folder with a manifest")
             {
                 input, outputDir, raw, keepRaw, types, overwrite,
             };
-            command.SetAction(NotImplemented);
+            command.SetAction(result =>
+            {
+                var chosen = result.GetValue(types) is { Length: > 0 } list
+                    ? list.Select(t => { FourCC.TryParse(t, out var type); return type; }).ToHashSet()
+                    : null;
+                return new ExtractCommand(output, error).Run(
+                    result.GetRequiredValue(input), result.GetValue(outputDir),
+                    Export.ExportOptions.Default with
+                    {
+                        KeepRaw = result.GetValue(keepRaw),
+                        Types = chosen,
+                        Overwrite = result.GetValue(overwrite),
+                        ReadOptions = ReadOptionsFrom(result),
+                    },
+                    ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet));
+            });
             return command;
-        }
-
-        private int NotImplemented(ParseResult result)
-        {
-            _ = ReadOptionsFrom(result);
-            _ = ContainerOptionsFrom(result);
-            error.WriteLine($"'{result.CommandResult.Command.Name}' is not implemented yet.");
-            return ExitCodes.NotImplemented;
         }
 
         // Sizes: plain bytes, or a number with KiB, MiB or GiB (also K, M, G), case-insensitive.
