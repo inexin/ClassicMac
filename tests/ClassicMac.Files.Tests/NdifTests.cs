@@ -142,6 +142,21 @@ public class NdifTests
         }
     }
 
+    // Version 2 (Disk Image Mounter, Disk Copy 6.0.1): no real image seen and Apple's readers disagree, so it is refused
+    // with the fields that would tell its layout.
+    [Fact]
+    public void Version_2_maps_are_refused_with_their_layout_fields()
+    {
+        var (data, resource) = NdifBuilder.Build(Volume(), "Test Disk", (800, Kind.Raw));
+        var diagnostics = new List<Diagnostic>();
+
+        var e = Assert.Throws<InvalidDataException>(() =>
+            NdifReader.Instance.Read(Image(data, WithMap(resource, m => m[1] = 2)), new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains("version 2", e.Message, StringComparison.Ordinal);
+        Assert.Contains(diagnostics, d => d.Code == "ndif.version-2" && d.Message.Contains("+$7C = $00000002", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Unknown_chunks_read_as_zeros_and_are_reported()
     {
@@ -156,6 +171,9 @@ public class NdifTests
 
         var odd = WithMap(resource, map => map[0x80 + 12 + 3] = 0x42);
         Assert.Contains(Disk(Image(data, odd)).Diagnostics, d => d.Code == "ndif.unknown-chunk");
+
+        var shrinkWrap = WithMap(resource, map => map[0x80 + 12 + 3] = 0xF0);
+        Assert.Contains(Disk(Image(data, shrinkWrap)).Diagnostics, d => d.Code == "ndif.unknown-chunk" && d.Message.Contains("ShrinkWrap", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -234,6 +252,25 @@ public class NdifTests
         Assert.Empty(diagnostics);
         var decoded = Path.Combine(Path.GetDirectoryName(path)!, "kc_decoded.bin");
         if (File.Exists(decoded)) Assert.Equal(File.ReadAllBytes(decoded), disk);
+    }
+
+    // Disk Copy 6.5b13's version 12 map (the harness's run21/out): the end entry's offset is 0, not the data's end.
+    [Fact]
+    public void Disk_Copy_6_5_image_decodes_to_its_volume()
+    {
+        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
+        var path = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
+            : Directory.EnumerateFiles(corpus, "uc.img", SearchOption.AllDirectories)
+                .FirstOrDefault(f => !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') && File.Exists(Path.ChangeExtension(f, ".bin")));
+        if (path is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run21/out images to run this.");
+
+        var diagnostics = new List<Diagnostic>();
+        var host = HostFiles.Read(path);
+        var disk = Assert.Single(NdifReader.Instance.Read(host.File,
+            new ContainerContext(ContainerReadOptions.Default with { VerifyChecksums = true }, diagnostics))).DataFork.ToArray();
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(File.ReadAllBytes(Path.ChangeExtension(path, ".bin")), disk);
     }
 
     [Fact]

@@ -34,10 +34,11 @@
 - Image decoders (`ClassicMac.Resources.Decoders.Images`, through QuickDraw.Pict): `PICT`, icons (`ICON`, `ICN#`
   and the colour icon families masked by their lists, `cicn`, `SICN`), cursors (PNG + JSON), patterns; written as
   PNG by a built-in encoder behind `IImageEncoder`; `extract --screen-depth`.
-- NDIF disk images (Disk Copy 6: read-only, ADC-compressed, DART RLE chunks, version 2 maps, `.smi`, segmented
+- NDIF disk images (Disk Copy 6: read-only, ADC-compressed, DART RLE chunks, map versions 10–12 (Disk Copy 6.1–6.5), `.smi`, segmented
   parts found by their `bcm#` ID, CRC-32 verified on request) with ADC in
   `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;
   `ClassicMac.Files` references `ClassicMac.Resources`.
+  Version 2 maps (Disk Image Mounter, Disk Copy 6.0.1) are refused with a request for the image.
 - Raw CD images (`.bin`, 2352/2336-byte sectors) and cue sheets, read as the 2048-byte blocks a drive hands the Mac.
 - CD volumes in `ClassicMac.Files.Iso`: ISO 9660 and High Sierra as Mac OS 9 reads them (Apple `AA`/`BA` Finder
   info, associated files as resource forks, the Mac's name, date and listing rules), matching OS 9 on a test disc.

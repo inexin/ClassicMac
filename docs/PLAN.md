@@ -507,11 +507,26 @@ They change what running applications see, not what a file contains.
 - **NDIF and ADC:** no Apple spec; from the disassembly of Disk Copy 6.3.3 (its `.HDI` driver and codecs; there is
   no separate extension on OS 9 and no UDIF support), confirmed on images it and Disk Copy 6.1.2 made in SheepShaver (each decodes to its
   source sectors, the CRC matches). The `bcem` header and its validator (what refuses a mount is refused, the rest
-  reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end, all decoded; KenCode
+  reported), chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end, all decoded; KenCode
   confirmed on a "Smaller (KC)" image from Disk Copy's hidden Control-Save dialog, 512-sector chunks), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
-  verified only when `VerifyChecksums` is set, as only Disk Copy's "Verify checksum" does), and segments found by their
-  `bcm#` ID among `dseg` files in the folder, never by name. Disk Copy picks the format by file type; we find the
-  `bcem` itself, so images that lost their type still open.
+  hdiutil's "CRC28"; verified only when `VerifyChecksums` is set, as only Disk Copy's "Verify checksum" does), and segments found by their
+  `bcm#` ID among `dseg` files in the folder, never by name. Disk Copy picks the format by file type (`dimg`,
+  `rohd`, the older `hdro`); we find the `bcem` itself, so images that lost their type still open.
+  - Map versions 10, 11 (ADC) and 12 (Disk Copy 6.5b13, confirmed on its images; the end entry's offset is 0) are
+    read. `+$48` is the buffer size (chunk size plus the largest compression overrun); the chunk size is the user's
+    choice (6.1.2: 32 sectors, 6.3.3: 512 by default) and any compressed image may mix raw chunks. KenCode is the
+    System's `dcmp` 3 codec; our KenCode decoder stays separate (already byte-exact).
+  - **Version 2 is refused** (decision): no real image has been seen; Disk Copy 6.3.3 reads it as a blank disk, 6.5b13
+    rejects it, only 6.1.2's code is right, and ShrinkWrap 2.1 reads a different layout. The error asks the user to
+    send the image, and an info diagnostic records type/creator, `+$54`, `+$7C` and the map size, which tell the
+    layouts apart.
+  - Chunk type `$F0` (ShrinkWrap 3, per Aaru) and the `+$74`/`+$78` encryption fields are unverified: `$F0` is
+    reported by name and reads as zeros; no image with either has been seen.
+- **ShrinkWrap 2.1** writes nothing new: `dImg` is Disk Copy 4.2 byte for byte (junk after the name's Str63 is
+  ignored), `hdrv` (volume image, Drive Container) and the self-mounting `APPL`/`sImg`/`iImg` are raw volumes in the
+  data fork. All read today (harness run20). Disk Copy 6.0 (1994, `dCpy`)'s own RLE `dImg` variants are not decoded
+  (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices; they need real 2000–2002 `.dmg`
+  files or `hdiutil`.
 - **DART:** Disk Copy 6.3.3's DART reading (disassembly) confirmed on DART 1.5.3's own files (CiderPress2's test
   data): header and block lengths (RLE in words, LZH in bytes, −1 stored), 20,480 data + 480 tag bytes per block,
   "fast" RLE and "best" LZH (Okumura/Yoshizaki LZHUF with a zero-filled window whose tail carries between blocks; a
