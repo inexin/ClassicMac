@@ -31,11 +31,15 @@ Proposed priority:
 | 1 | AppleDouble (`._file`, `__MACOSX/` in zips) and AppleSingle | Files copied to FAT/SMB, zip archives |
 | 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites |
 | 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites |
-| 2 | HFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF | Emulator disks, floppy images, CD-ROMs |
+| 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF | Emulator disks, floppy images, CD-ROMs |
 | 3 | HFS+ images | Mac OS 8.1–9 disks |
 | 3 | StuffIt (`.sit`) and Compact Pro (`.cpt`) archives | Most classic Mac downloads |
 
 Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
+
+Every container yields the same *Mac file* entry: name (MacRoman), type and creator, Finder flags, creation and
+modification dates (seconds since 1904, local time), data fork and resource fork. Single-file containers yield one
+entry; disk images and archives yield a tree of them.
 
 ## Core: the resource map
 
@@ -43,9 +47,14 @@ The core reads a resource fork into an in-memory model and writes one back.
 
 - **Model:** file → types → resources; each resource has type, ID, name, attributes (system heap, purgeable, locked,
   protected, preload, compressed) and its data.
-- **Compressed resources:** System 7's `dcmp` 0, 1 and 2 decompressed natively. Unknown `dcmp` IDs are kept
-  compressed and flagged in the manifest.
-- **Tolerant reading:** truncated or overlapping entries are reported, not fatal.
+- **Finder info:** the file's type, creator, flags and dates travel with the model into the manifest and back.
+- **Compressed resources:** System 7's `dcmp` 0, 1 and 2 decompressed natively, following the System's own
+  decompressors (disassembly) where the documentation is silent. Unknown `dcmp` IDs are kept compressed and flagged in
+  the manifest.
+- **API shape:** read from a `Stream`; resource data is read lazily from its offset, so large files and disk images
+  stay cheap to open.
+- **Tolerant reading:** truncated or overlapping entries go to a diagnostics list (severity, offset, message), not
+  exceptions; only unusable input throws.
 - **Writing:** rebuild a fork from the model, for modding and round-trip tests.
 - **Text encodings:** MacRoman by default; the script of a file or of a font picks other Mac encodings (Japanese,
   Cyrillic, …).
@@ -56,13 +65,16 @@ Each decoder turns one resource type into a modern file; anything without a deco
 
 | Group | Resource types | Output |
 | --- | --- | --- |
-| Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icl4/8`, `ics4/8`, `cicn`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `SICN` | PNG, via QuickDraw.Pict (screen depth selectable) |
+| Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icl4/8`, `ics4/8`, `cicn`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `SICN`, `icns` | PNG, via QuickDraw.Pict (screen depth selectable) |
 | Sound | `snd ` (sampled formats 1/2; MACE 3:1/6:1, IMA4, µ-law) | WAV |
 | Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text / JSON; styled text as RTF or Markdown |
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL` | JSON, optionally a rendered preview of the dialog |
 | Colour | `clut`, `pltt` | JSON and `.act` palettes |
-| Unknown | anything else | raw `.bin` + hex preview in the manifest |
+| Finder | `BNDL`, `FREF`, `SIZE` | JSON |
+| Unknown | anything else, including `CODE` | raw `.bin` + hex preview in the manifest |
+
+Disassembling `CODE` is out of scope; resource_dasm covers it.
 
 App-specific types (a game's data records, an application's private resources) plug in as custom decoders
 registered by the application.
@@ -82,7 +94,9 @@ MyApp/
 
 - **File names:** `<id> <name>.<ext>`, with characters illegal on Windows or macOS escaped; the type folder keeps its
   four characters (escaped when needed).
-- **Manifest:** per resource: type, ID, name, attributes, original size, decoder used, output path, and any warnings.
+- **Manifest:** the file's Finder info, then per resource: type, ID, name, attributes, original size, decoder used,
+  output path, and any warnings.
+- **Images:** 32-bit RGBA PNG by default; `--depth` renders at a chosen screen depth (1, 2, 4, 8, 16 bit).
 - **Round trip:** a `pack` command rebuilds a resource fork from the folder and manifest, using raw data where a file
   was not changed.
 
@@ -106,12 +120,14 @@ flowchart LR
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
-- **ClassicMac.Resources** — containers, the resource map and `dcmp`; no dependencies, .NET 8.
+- **ClassicMac.Resources** — containers, the resource map and `dcmp`; no dependencies, .NET 10.
 - **ClassicMac.Resources.Decoders** — the built-in decoders; depends on QuickDraw.Pict for images.
 - **CLI** — a `dotnet tool` with `list`, `extract` and `pack`.
 - **Viewer app** — a cross-platform desktop app on the same packages (below).
 - **Extension points:** an `IContainerReader` per container format and an `IResourceDecoder` per resource type, so
   apps add their own.
+- **Own core (decided):** the resource map and disk-image layers are written here, because writing and exact Apple
+  behaviour are needed throughout; ResourceForkReader, HfsReader and MfsReader (read-only) serve as cross-checks.
 
 ### Target layering after the QuickDraw.Pict merge
 
@@ -179,20 +195,26 @@ previews arrive with their decoders.
 
 ## Ground truth and licensing
 
-Same approach as QuickDraw.Pict: Apple's documentation is the spec, other implementations are behavioural references,
-and results are checked against real data.
+Apple's documentation decides first; where it is silent or ambiguous, the answer comes from disassembling the Mac OS
+code that handles the format (the Resource Manager, Sound Manager, Icon Utilities, HFS) — never from another
+implementation's guess. A rule fitted to real data instead is marked as such.
 
-- **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS), *Sound*
-  (`snd `), the Apple file-format notes for MacBinary, AppleSingle/AppleDouble and BinHex 4.0.
+- **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS, MFS),
+  *Sound* (`snd `), the Apple file-format notes for MacBinary, AppleSingle/AppleDouble and BinHex 4.0.
 - **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
   edge cases.
-- **Verification:** a corpus of real files (system files, applications, games such as Realmz, shareware) extracted and compared;
-  round-trip tests (read → write → read gives the same map); golden outputs for each decoder.
 - **Licence:** MIT, with third-party notices for anything ported; no Apple code or files in the repo.
 
-**When unsure, go to the source.** Apple's documentation decides first; where it is silent or ambiguous, the answer
-comes from disassembling the Mac OS code that handles the format (the Resource Manager, Sound Manager, Icon Utilities,
-HFS) — never from another implementation's guess.
+### Testing
+
+- **Fixtures in the repo are synthetic:** built by our own writer, or from Rez source compiled with Apple's Rez
+  through `mpw` (the output is ours, not an Apple file).
+- **Real-file corpus outside the repo:** system files, applications, games such as Realmz, shareware — found through
+  an environment variable (`CLASSICMAC_CORPUS`); those tests skip when it is absent. Only hashes and manifests of
+  corpus results are committed, never the files or their decoded output.
+- **Checks:** round trip (read → write → read gives the same map, and unchanged forks are byte-identical); golden
+  outputs for each decoder on the synthetic fixtures; corpus output diffed against resource_dasm and DeRez.
+- **Tooling:** xUnit; CI on GitHub Actions for Windows, Linux and macOS.
 
 ### Prior art: Realmz.ResourceExtractor
 
@@ -219,8 +241,8 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 
 | Project | Language, licence | Covers | Use for us |
 | --- | --- | --- | --- |
-| [ResourceForkReader](https://github.com/hughbe/ResourceForkReader) | C#, MIT; NuGet, active since 2025 | Reads raw forks; typed parsers for ~130 resource types; no `dcmp`, containers, conversion or writing | Candidate to build on; cross-check record layouts |
-| [HfsReader](https://github.com/hughbe/HfsReader) / [MfsReader](https://github.com/hughbe/MfsReader) | C#, MIT; NuGet | Read HFS and MFS disk images | Candidate for the disk-image layer |
+| [ResourceForkReader](https://github.com/hughbe/ResourceForkReader) | C#, MIT; NuGet, active since 2025 | Reads raw forks; typed parsers for ~130 resource types; no `dcmp`, containers, conversion or writing | Cross-check record layouts and parsing |
+| [HfsReader](https://github.com/hughbe/HfsReader) / [MfsReader](https://github.com/hughbe/MfsReader) | C#, MIT; NuGet | Read HFS and MFS disk images | Cross-check for the disk-image layer |
 | [macresources](https://github.com/elliotnunn/macresources) | Python, MIT; dormant since 2020 | Rez-style text dumps, round trip, BinHex, `dcmp` 2 (GreggyBits) | Round-trip design; `dcmp` 2 reference |
 | [machfs](https://github.com/elliotnunn/machfs) | Python, MIT | Reads and writes HFS volumes | Reference for writing HFS images |
 | [resource_dasm](https://github.com/fuzziqersoftware/resource_dasm) | C++, MIT; very active | Decodes a very wide range of resource types to modern formats; `dcmp` via 68k emulation; disassembly | Widest coverage to compare output against |
@@ -232,15 +254,18 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 
 ## Phases
 
-Each phase ships something usable; no dates set yet.
+Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
-1. **Core** — resource map read/write, `dcmp` 0/1/2, raw forks, AppleDouble/AppleSingle, MacBinary, BinHex; CLI
-   `list` and raw `extract`.
-2. **Decoders I** — images through QuickDraw.Pict, `STR `/`STR#`/`TEXT`/`vers`, `snd ` to WAV; the manifest.
-3. **Disk images** — HFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping.
-4. **Decoders II** — fonts, UI resources to JSON and dialog previews, palettes; `pack` round trip.
-5. **Viewer app** — browse disk images, files and resources with previews and export; can start once phases 1–2
-   exist and grow with them.
+1. **Core** — resource map read/write, `dcmp` 0/1/2, Finder info, raw forks, AppleDouble/AppleSingle, MacBinary,
+   BinHex; CLI `list` and raw `extract`. *Exit:* read → write is byte-identical on the corpus forks.
+2. **Disk images** — HFS and MFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping. *Exit:* every file of the corpus
+   images lists and extracts with both forks and Finder info.
+3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
+   including MACE and IMA4; the manifest. *Exit:* golden outputs pass and the corpus exports without errors.
+4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
+   decoders.
+5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
+   *Exit:* extract → `pack` is byte-identical for unchanged resources.
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers.
 7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders).
 8. **Editor III** — writing HFS disk images.
@@ -248,15 +273,19 @@ Each phase ships something usable; no dates set yet.
    MacPaint, QuickDraw); the old packages are deprecated.
 10. **Later** — HFS+, StuffIt and Compact Pro.
 
+## Decisions
+
+- **Name:** ClassicMac (see Purpose and goals).
+- **Repository:** a new repo, `inexin/ClassicMac`; QuickDraw.Pict stays separate for now, to be merged in later.
+- **UI framework:** Avalonia (see Viewer app).
+- **Own core:** written here rather than built on ResourceForkReader/HfsReader, which are read-only; they serve as
+  cross-checks.
+- **Target framework:** .NET 10 (LTS; .NET 8 support ends November 2026).
+- **Disk images early:** phase 2, right after the core, because much classic software survives only as disk images.
+- **Decoder priority after images:** text, sound, UI, fonts.
+- **Image output:** 32-bit RGBA PNG by default; other screen depths on request.
+- **Editing order:** resource-level edits, typed editors, then writing disk images.
+
 ## Open questions
 
-- [x] **Name:** decided — ClassicMac (see Purpose and goals).
-- [x] **Repository:** decided — a new repo, `inexin/ClassicMac`; QuickDraw.Pict stays separate for now, to be merged
-  in later.
-- [ ] **Disk images:** in phase 3 as planned, or earlier because much classic software survives only as disk images?
-- [ ] **Decoder priority:** which of sound, text, fonts and UI matters most after images?
-- [ ] **Output defaults:** PNG at 32-bit only, or also the screen depth the file was made for?
-- [x] **UI framework:** decided — Avalonia (see Viewer app).
-- [ ] **Editing order:** the order of the editing stages after the read-only viewer.
-- [ ] **Build on or own the core:** build on ResourceForkReader and HfsReader (MIT, .NET, read-only) for the map and
-  HFS layers, or write our own core for writing and exact Apple behaviour throughout?
+None at present.
