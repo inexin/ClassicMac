@@ -2,6 +2,14 @@
 
 ClassicMac is MIT-licensed. Code or data taken from other projects is listed here with its licence.
 
+## Mac OS Roman mapping (Apple, distributed by Unicode)
+
+<https://www.unicode.org/Public/MAPPINGS/VENDORS/APPLE/ROMAN.TXT> (version c02, 2005)
+
+- `src/ClassicMac.Core/MacRoman.cs` holds the byte-to-Unicode values of this mapping table. The file is © Apple
+  Computer, Inc., published by the Unicode Consortium with Apple's other vendor mappings; ClassicMac contains the
+  values, not the file.
+
 ## resource_dasm
 
 <https://github.com/fuzziqersoftware/resource_dasm>

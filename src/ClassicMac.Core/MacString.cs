@@ -23,9 +23,15 @@ namespace ClassicMac.Core
         /// <summary>The length in bytes.</summary>
         public int Length => bytes?.Length ?? 0;
 
+        /// <summary>A string from Unicode text encoded as Mac OS Roman; throws if it does not fit or cannot be encoded.</summary>
+        public static MacString FromMacRoman(string text) => new(MacRoman.Encode(text));
+
+        /// <summary>The text decoded as Mac OS Roman, control characters included.</summary>
+        public string ToMacRoman() => MacRoman.Decode(Bytes);
+
         /// <summary>
-        /// The text: printable ASCII as is, other bytes as <c>\xHH</c>. Mac encodings replace this once the text
-        /// encodings exist.
+        /// Display text: Mac OS Roman, with control characters and backslash as <c>\xHH</c>. Other Mac encodings need the
+        /// file's script and come with the text encodings.
         /// </summary>
         public override string ToString() => MacText.Escape(Bytes);
 

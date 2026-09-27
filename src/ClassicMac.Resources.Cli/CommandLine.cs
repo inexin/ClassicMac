@@ -3,6 +3,7 @@ using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
 using System.IO;
+using ClassicMac.Core;
 using ClassicMac.Files;
 
 namespace ClassicMac.Resources.Cli
@@ -132,13 +133,13 @@ namespace ClassicMac.Resources.Cli
             var keepRaw = new Option<bool>("--keep-raw") { Description = "Also keep the raw data in raw/, for pack" };
             var types = new Option<string[]>("--type", "-t")
             {
-                Description = "Only resources of this type (repeatable; four characters, e.g. \"snd \")",
+                Description = "Only resources of this type (repeatable; four characters, e.g. \"snd \", or \\xHH escapes)",
                 AllowMultipleArgumentsPerToken = true,
             };
             types.Validators.Add(r =>
             {
                 foreach (var type in r.GetValueOrDefault<string[]>() ?? [])
-                    if (type.Length != 4) r.AddError($"'{type}' is not a four-character type.");
+                    if (!FourCC.TryParse(type, out _)) r.AddError($"'{type}' is not a four-character type.");
             });
             var overwrite = new Option<bool>("--overwrite") { Description = "Replace an existing output folder" };
             var command = new Command("extract", "Extract resources into a folder with a manifest")
