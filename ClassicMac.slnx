@@ -3,12 +3,14 @@
     <Project Path="src/ClassicMac.Core/ClassicMac.Core.csproj" />
     <Project Path="src/ClassicMac.Files/ClassicMac.Files.csproj" />
     <Project Path="src/ClassicMac.Resources.Cli/ClassicMac.Resources.Cli.csproj" />
+    <Project Path="src/ClassicMac.Resources.Decoders/ClassicMac.Resources.Decoders.csproj" />
     <Project Path="src/ClassicMac.Resources/ClassicMac.Resources.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ClassicMac.Core.Tests/ClassicMac.Core.Tests.csproj" />
     <Project Path="tests/ClassicMac.Files.Tests/ClassicMac.Files.Tests.csproj" />
     <Project Path="tests/ClassicMac.Resources.Cli.Tests/ClassicMac.Resources.Cli.Tests.csproj" />
+    <Project Path="tests/ClassicMac.Resources.Decoders.Tests/ClassicMac.Resources.Decoders.Tests.csproj" />
     <Project Path="tests/ClassicMac.Resources.Tests/ClassicMac.Resources.Tests.csproj" />
   </Folder>
 </Solution>

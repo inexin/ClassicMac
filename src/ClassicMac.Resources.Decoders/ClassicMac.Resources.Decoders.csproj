@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>ClassicMac.Resources.Decoders</PackageId>
+    <Description>Decoders that turn classic Mac OS resources into modern files for ClassicMac's exporter: strings and styled text (UTF-8, JSON, RTF) and version resources; images and sound to follow.</Description>
+    <PackageTags>macintosh;classic-mac;resource-fork;styl;rtf;decoder</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Resources.Decoders.Tests" />
+  </ItemGroup>
+
+</Project>

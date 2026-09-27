@@ -1,0 +1,145 @@
+using System.Buffers.Binary;
+using System.Text;
+using System.Text.Json;
+using ClassicMac.Core;
+using ClassicMac.Resources.Export;
+
+namespace ClassicMac.Resources.Decoders.Tests;
+
+public class TextDecoderTests
+{
+    private static readonly IReadOnlyList<IResourceDecoder> Decoders = ResourceDecoders.Create();
+
+    private static (IReadOnlyList<DecodedFile> Files, List<Diagnostic> Diagnostics) Decode(Resource resource, params Resource[] others)
+    {
+        var fork = new ResourceFork();
+        fork.Add(resource);
+        foreach (var other in others) fork.Add(other);
+        var diagnostics = new List<Diagnostic>();
+        var decoder = Decoders.Single(d => d.CanDecode(resource.Type));
+        return (decoder.Decode(new DecodeInput(resource, resource.GetData(), fork, diagnostics: diagnostics)), diagnostics);
+    }
+
+    private static Resource Res(string type, short id, byte[] data) => new(FourCC.FromString(type), id, data);
+
+    private static byte[] Pascal(string text) => [(byte)MacRoman.Encode(text).Length, .. MacRoman.Encode(text)];
+
+    private static string Utf8(DecodedFile file) => Encoding.UTF8.GetString(file.Content.Span);
+
+    [Fact]
+    public void Strings_become_UTF8_text()
+    {
+        var (files, diagnostics) = Decode(Res("STR ", 128, Pascal("Café ƒ™\rline 2")));
+
+        Assert.Empty(diagnostics);
+        var file = Assert.Single(files);
+        Assert.Equal((".txt", "Café ƒ™\nline 2", "macintosh"), (file.Extension, Utf8(file), file.Encoding));
+    }
+
+    [Fact]
+    public void A_string_longer_than_its_resource_is_cut_and_reported()
+    {
+        var (files, diagnostics) = Decode(Res("STR ", 128, [10, (byte)'a', (byte)'b']));
+        Assert.Equal("ab", Utf8(files[0]));
+        Assert.Equal("text.string-short", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void String_lists_become_JSON()
+    {
+        var (files, diagnostics) = Decode(Res("STR#", 129, [0, 3, .. Pascal("Human"), .. Pascal("Élf"), .. Pascal("")]));
+
+        Assert.Empty(diagnostics);
+        var json = JsonDocument.Parse(files[0].Content);
+        Assert.Equal(["Human", "Élf", ""], json.RootElement.GetProperty("strings").EnumerateArray().Select(e => e.GetString()));
+        Assert.Equal(".json", files[0].Extension);
+    }
+
+    [Fact]
+    public void A_string_list_shorter_than_its_count_keeps_what_is_there()
+    {
+        var (files, diagnostics) = Decode(Res("STR#", 129, [0, 3, .. Pascal("one"), 5, (byte)'t', (byte)'w']));
+
+        var strings = JsonDocument.Parse(files[0].Content).RootElement.GetProperty("strings").EnumerateArray().Select(e => e.GetString());
+        Assert.Equal(["one", "tw"], strings);
+        Assert.Equal("text.string-list-short", Assert.Single(diagnostics).Code);
+    }
+
+    // A styl: count, then (start, height, ascent, font, face, filler, size, r, g, b) per run.
+    private static byte[] Styl(params (int Start, short Font, byte Face, short Size, ushort R, ushort G, ushort B)[] runs)
+    {
+        var data = new byte[2 + runs.Length * 20];
+        BinaryPrimitives.WriteUInt16BigEndian(data, (ushort)runs.Length);
+        for (var i = 0; i < runs.Length; i++)
+        {
+            var e = data.AsSpan(2 + i * 20);
+            var (start, font, face, size, r, g, b) = runs[i];
+            BinaryPrimitives.WriteInt32BigEndian(e, start);
+            BinaryPrimitives.WriteInt16BigEndian(e[4..], 16);
+            BinaryPrimitives.WriteInt16BigEndian(e[6..], 12);
+            BinaryPrimitives.WriteInt16BigEndian(e[8..], font);
+            e[10] = face;
+            BinaryPrimitives.WriteInt16BigEndian(e[12..], size);
+            BinaryPrimitives.WriteUInt16BigEndian(e[14..], r);
+            BinaryPrimitives.WriteUInt16BigEndian(e[16..], g);
+            BinaryPrimitives.WriteUInt16BigEndian(e[18..], b);
+        }
+        return data;
+    }
+
+    [Fact]
+    public void Styled_text_becomes_text_and_RTF()
+    {
+        var text = MacRoman.Encode("Title\rBold {x} \\ Café");
+        var styl = Styl((0, 20, 0x01 | 0x04, 18, 0, 0, 0xFFFF), (6, 3, 0x01, 12, 0, 0, 0), (11, 3, 0x02, 12, 0xFFFF, 0, 0));
+
+        var (files, diagnostics) = Decode(Res("TEXT", 128, text), Res("styl", 128, styl));
+
+        Assert.Empty(diagnostics);
+        Assert.Equal([".txt", ".rtf"], files.Select(f => f.Extension));
+        Assert.Equal("Title\nBold {x} \\ Café", Utf8(files[0]));
+        Assert.Equal(
+            "{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1\n" +
+            "{\\fonttbl{\\f0 Times;}{\\f1 Geneva;}}\n" +
+            "{\\colortbl;\\red0\\green0\\blue255;\\red0\\green0\\blue0;\\red255\\green0\\blue0;}\n" +
+            "\\plain\\f0\\fs36\\cf1\\b\\ul Title\\par\n" +
+            "\\plain\\f1\\fs24\\cf2\\b Bold \\plain\\f1\\fs24\\cf3\\i \\{x\\} \\\\ Caf\\u233?}\n",
+            Encoding.ASCII.GetString(files[1].Content.Span));
+    }
+
+    [Fact]
+    public void Text_without_styl_is_text_only_and_styl_alone_is_JSON()
+    {
+        var (files, _) = Decode(Res("TEXT", 200, MacRoman.Encode("plain")));
+        Assert.Equal([".txt"], files.Select(f => f.Extension));
+
+        (files, _) = Decode(Res("styl", 128, Styl((0, 4, 0x02, 9, 1, 2, 3))));
+        var run = JsonDocument.Parse(files[0].Content).RootElement.GetProperty("runs")[0];
+        Assert.Equal(("Monaco", 9, 2), (run.GetProperty("fontName").GetString(), run.GetProperty("size").GetInt32(), run.GetProperty("face").GetInt32()));
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x04, 0x84, 0x80, 0x00 }, "4.8.4", "final")]
+    [InlineData(new byte[] { 0x01, 0x00, 0x60, 0x03 }, "1.0b3", "beta")]
+    [InlineData(new byte[] { 0x10, 0x25, 0x20, 0x12 }, "10.2.5d12", "development")]
+    [InlineData(new byte[] { 0x02, 0x10, 0x40, 0x01 }, "2.1a1", "alpha")]
+    public void Versions_display_as_the_Finder_shows_them(byte[] numbers, string display, string stage)
+    {
+        byte[] data = [.. numbers, 0x00, 0x00, .. Pascal("4.8.4"), .. Pascal("4.8.4 © 1986-1998 Green Mountain Software")];
+
+        var (files, diagnostics) = Decode(Res("vers", 1, data));
+
+        Assert.Empty(diagnostics);
+        var json = JsonDocument.Parse(files[0].Content).RootElement;
+        Assert.Equal((display, stage), (json.GetProperty("display").GetString(), json.GetProperty("stage").GetString()));
+        Assert.Equal("4.8.4 © 1986-1998 Green Mountain Software", json.GetProperty("longVersion").GetString());
+    }
+
+    [Fact]
+    public void Too_short_versions_are_left_raw()
+    {
+        var (files, diagnostics) = Decode(Res("vers", 1, [1, 0, 0x80]));
+        Assert.Empty(files);
+        Assert.Equal("text.vers-short", Assert.Single(diagnostics).Code);
+    }
+}

@@ -66,7 +66,7 @@ namespace ClassicMac.Resources.Export
         /// </summary>
         public ReadOnlyMemory<byte>? Find(FourCC type, short id) =>
             fork.Find(type, id) is { } other
-                ? ResourceDecompression.Default.GetData(other, fork, options, Diagnostics)
+                ? (ReadOnlyMemory<byte>?)ResourceDecompression.Default.GetData(other, fork, options, Diagnostics)
                 : null;
     }
 }
