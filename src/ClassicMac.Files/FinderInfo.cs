@@ -54,11 +54,8 @@ namespace ClassicMac.Files
         /// <summary>The Finder flags (<c>fdFlags</c>).</summary>
         public FinderFlags Flags { get; init; }
 
-        /// <summary>The icon's vertical position in its window (<c>fdLocation.v</c>).</summary>
-        public short LocationV { get; init; }
-
-        /// <summary>The icon's horizontal position in its window (<c>fdLocation.h</c>).</summary>
-        public short LocationH { get; init; }
+        /// <summary>The icon's position in its window (<c>fdLocation</c>).</summary>
+        public MacPoint Location { get; init; }
 
         /// <summary>The window the icon is in (<c>fdFldr</c>).</summary>
         public short Folder { get; init; }

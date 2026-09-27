@@ -3,7 +3,8 @@
 ## Unreleased
 
 - Repository layout, build settings and CI.
-- Packages: `ClassicMac.Core` (`FourCC`, `MacString`, `MacDate`, diagnostics), `ClassicMac.Files` (`MacFile`,
+- Packages: `ClassicMac.Core` (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `UnsignedFixed`,
+  diagnostics), `ClassicMac.Files` (`MacFile`,
   `FinderInfo`, `ForkData`, `IContainerReader`, `ContainerReadOptions`) and `ClassicMac.Resources` (`Resource`,
   `ResourceFork`, `ReadOptions`), each with its own test project.
 - Resource fork reader (damage reported as diagnostics) and canonical writer.

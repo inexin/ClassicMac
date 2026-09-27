@@ -140,6 +140,8 @@ and write a fork; `ResourceDecompression` returns a resource's data as the Resou
 | Core | `MacString` | A Pascal string's raw bytes; decoded to Unicode only with the file's encoding, so round trips are exact |
 | Core | `Diagnostic` | Severity, stable code, message, offset |
 | Core | `MacDate` | Seconds since 1904 in the writer's local time; converts to a `DateTime` of unspecified kind |
+| Core | `MacPoint`, `MacRect` | QuickDraw `Point` (v, h) and `Rect` (top, left, bottom, right), read and written big-endian; used by Finder info and by many resources (`DLOG`, `DITL`, `WIND`, `PICT` frames, `cicn` bounds) |
+| Core | `Fixed`, `UnsignedFixed` | 16.16 fixed-point numbers (resolutions, font metrics, QuickTime values; sound sample rates are unsigned) |
 | Files | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
 | Files | `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
 | Files | `IContainerReader` | One per container format: `CanRead(stream)`, `Read(stream, options, diagnostics)` |
@@ -251,7 +253,7 @@ its own and the heavy dependencies stay optional. Arrows point from a package to
 
 ```mermaid
 flowchart LR
-    B["ClassicMac.Core<br/>FourCC, MacString,<br/>MacDate, diagnostics"]
+    B["ClassicMac.Core<br/>FourCC, MacString, MacDate,<br/>Point, Rect, Fixed,<br/>diagnostics"]
     subgraph filelayer["File layer"]
         F["ClassicMac.Files<br/>Mac files, Finder info;<br/>AppleSingle/Double, MacBinary,<br/>BinHex, Basilisk II folders"]
         H["ClassicMac.Hfs<br/>HFS/MFS volumes;<br/>raw, DiskCopy 4.2, NDIF"]
@@ -270,8 +272,8 @@ flowchart LR
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
-- **ClassicMac.Core** — `FourCC`, `MacString`, `MacDate`, `Diagnostic` and (later) the single-byte text encodings; no
-  dependencies, .NET 10.
+- **ClassicMac.Core** — `FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic` and (later) the
+  single-byte text encodings; no dependencies, .NET 10.
 - **ClassicMac.Files** — the Mac file model (`MacFile`, `FinderInfo`, `ForkData`, `IContainerReader`) and
   the single-file wrappers: AppleSingle, AppleDouble, MacBinary, BinHex, Basilisk II folders; depends on Core.
 - **ClassicMac.Hfs** — HFS and MFS volumes and the disk images that hold them (raw, DiskCopy 4.2, NDIF); depends on
@@ -319,7 +321,7 @@ with a test that fails on any dependency pointing up; the merge moves those fold
 
 | Layer | Contains | Depends on |
 | --- | --- | --- |
-| `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), PackBits, colour-table and PixMap reading | nothing |
+| `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), PackBits, colour-table and PixMap reading | Core (`MacRect`, `MacPoint`, `Fixed`) |
 | `ClassicMac.QuickTime` | ImageDescription, the codecs (`raw `, `rle `, `rpza`, `smc `, `cvid`, `8BPS`, `yuv2`, `YVU9`, `tga `), the codec plugin hook, QTIF files | Graphics, MacPaint (its `PNTG` codec) |
 | `ClassicMac.MacPaint` (or inside Graphics) | PNTG files and the `PNTG` codec's decoder | Graphics |
 | `ClassicMac.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics (and font parsing, see open questions) |
@@ -328,7 +330,9 @@ with a test that fails on any dependency pointing up; the merge moves those fold
 | `ClassicMac.Resources` (+ `.Decoders`) | Resource forks; icons, cursors and patterns become resource decoders here | Core; the decoders on Graphics, QuickDraw |
 | `ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp` | One integration package per host library, covering every image format (PICT, QTIF, MacPaint, icons) | the layers above |
 
-Colour tables and PixMaps sit in the base because QuickTime's codecs and QuickDraw both need them. At the merge,
+Colour tables and PixMaps sit in the base because QuickTime's codecs and QuickDraw both need them. QuickDraw.Pict's
+own geometry (`PictRect`, points, fixed-point values) is replaced by Core's `MacRect`, `MacPoint` and `Fixed`, so the
+graphics stack and the resource decoders share one set of types. At the merge,
 `QuickDraw.Pict`, `QuickDraw.Pict.ImageSharp` and `QuickDraw.Pict.SkiaSharp` are deprecated on NuGet, pointing to
 the new packages.
 
@@ -504,8 +508,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   match package names; format specs live under `docs/formats/`.
 - **Files and disk images as their own packages (split):** `ClassicMac.Files` (file model and single-file wrappers),
   `ClassicMac.Hfs` (phase 2) and `ClassicMac.Archives` (later) are separate from `ClassicMac.Resources`; the shared
-  types (`FourCC`, `MacString`, `MacDate`, `Diagnostic`) sit in the dependency-free base `ClassicMac.Core` (see
-  Inputs).
+  types (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic`) sit in the dependency-free
+  base `ClassicMac.Core` (see Inputs).
 
 ## Open questions
 
