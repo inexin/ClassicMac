@@ -38,6 +38,7 @@ Proposed priority:
 | 3 | HFS+ images | Mac OS 8.1–9 disks |
 | 3 | StuffIt (`.sit`) and Compact Pro (`.cpt`) archives | Most classic Mac downloads |
 | 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators |
+| 3 | PC Exchange / File Exchange `RESOURCE.FRK` folders | DOS/Windows disks written by Mac OS 7.5–9 |
 
 Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
 
@@ -97,9 +98,10 @@ don't need the containers, and each package stays smaller to test and fuzz. The 
 script), so ClassicMac ships its own tables, generated from Unicode's published Apple mapping files (Unicode licence,
 noted in `THIRD-PARTY-NOTICES.md`).
 
-- **`ClassicMac.Core`:** MacRoman and the single-byte Mac scripts (Central European, Cyrillic, Greek, Turkish,
-  Icelandic, Croatian, Romanian, Symbol, Dingbats) beside `MacString`, which both file names and resource names use;
-  small enough to keep the base dependency-free.
+- **`ClassicMac.Core`:** MacRoman (done: `MacRoman`, `MacString.FromMacRoman`/`ToMacRoman`) and the single-byte Mac
+  scripts (Central European, Cyrillic, Greek, Turkish, Icelandic, Croatian, Romanian, Symbol, Dingbats) beside
+  `MacString`, which both file names and resource names use; small enough to keep the base dependency-free.
+  `FourCC` and `MacString` display as Mac OS Roman with control characters as `\xHH`, and `FourCC` parses that form.
 - **`ClassicMac.Encodings`:** the multi-byte scripts (Japanese, Traditional and Simplified Chinese, Korean), optional
   because their tables are large.
 - **Choosing the script:** an explicit `--encoding` wins; otherwise the font's script (`FOND` family ID range), then
@@ -125,7 +127,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 
 | Options object | Package | Settings (default) |
 | --- | --- | --- |
-| `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB) |
+| `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local) |
 | `ReadOptions` | Resources | Max decompressed resource size (64 MiB), Resource Manager model (Mac OS 9), text encoding override (none) |
 | `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off) |
@@ -150,8 +152,12 @@ and write a fork; `ResourceDecompression` returns a resource's data as the Resou
 | Core | `Fixed`, `UnsignedFixed` | 16.16 fixed-point numbers (resolutions, font metrics, QuickTime values; sound sample rates are unsigned) |
 | Files | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
 | Files | `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
-| Files | `IContainerReader` | One per container format: `CanRead(stream)`, `Read(stream, options, diagnostics)` |
-| Files | `ContainerReadOptions` | Unwrapping limits (see Configuration) |
+| Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
+| Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
+| Files | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0 |
+| Files | `HostFiles` | A host file with its companions: Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
+| Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
+| Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
 | Resources | `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
 | Resources | `ResourceFork` | Resources in read order, map attributes, the reserved header areas and the map's runtime handle and file reference (kept so such forks round-trip exactly); add, remove, renumber, find |
 | Resources | `ResourceDecompression`, `IResourceDecompressor` | `dcmp` 0–3 and app-supplied decompressors |
@@ -174,8 +180,8 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 
 | Command | Does | Options | Phase |
 | --- | --- | --- | --- |
-| `info <input>` | Container chain, Finder info, fork sizes | — | 1 |
-| `list <input>` | Files and resources inside the input | `--format text\|json` | 1 |
+| `info <input>` | Companions, container chain, Finder info, dates, fork sizes (built) | — | 1 |
+| `list <input>` | Resources of every file inside the input, through containers; a data fork holding a resource fork (Realmz `.rsf`) or a raw fork file is read as a fork (built) | `--format text\|json` | 1 |
 | `extract <input>` | Resources into a folder with a manifest | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`; later `--depth`, `--encoding` | 1 (raw), 3 (decoded) |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest | `-o <file>`, `--base <fork>`, `--allow-deletes`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
 
@@ -407,7 +413,11 @@ extensions install — Multiple Users, Apple Menu Options, language packs, the P
 They change what running applications see, not what a file contains.
 
 - **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS, MFS),
-  *Sound* (`snd `), the Apple file-format notes for MacBinary, AppleSingle/AppleDouble and BinHex 4.0.
+  *Sound* (`snd `), Apple's *AppleSingle/AppleDouble Formats for Foreign Files* Developer Note (versions 1 and 2;
+  RFC 1740).
+- **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
+  specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
+  source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
 - **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
   edge cases.
 - **Licence:** MIT, with third-party notices for anything ported; no Apple code or files in the repo.

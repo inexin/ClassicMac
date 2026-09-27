@@ -96,14 +96,16 @@ namespace ClassicMac.Resources.Cli
 
         private static Argument<FileInfo> InputArgument() => new Argument<FileInfo>("input")
         {
-            Description = "A resource fork, AppleDouble/AppleSingle, MacBinary or BinHex file, or a disk image",
+            Description = "A Mac file: AppleSingle, MacBinary, BinHex, a file in a Basilisk II folder or with an " +
+                "AppleDouble ._ file, or a raw resource fork",
         }.AcceptExistingOnly();
 
         private Command InfoCommand()
         {
             var input = InputArgument();
             var command = new Command("info", "Show the container chain, Finder info and fork sizes") { input };
-            command.SetAction(NotImplemented);
+            command.SetAction(result => new InfoCommand(output, error).Run(
+                result.GetRequiredValue(input), ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
             return command;
         }
 
@@ -118,7 +120,7 @@ namespace ClassicMac.Resources.Cli
             var command = new Command("list", "List the files and resources inside the input") { input, format };
             command.SetAction(result => new ListCommand(output, error).Run(
                 result.GetRequiredValue(input), result.GetValue(format), ReadOptionsFrom(result),
-                result.GetValue(strict), result.GetValue(quiet)));
+                ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
             return command;
         }
 
