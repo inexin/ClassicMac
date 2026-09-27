@@ -173,6 +173,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
 | Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2 images, Apple partition maps; each yields files the next can open |
 | Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
+| Files.Iso | `IsoReader` | ISO 9660 and High Sierra volumes as Mac OS 9 shows them: `AA`/`BA` Finder info, associated files as resource forks |
 | Files.Containers | `ExtensionMap` | Internet Config's name-ending map, as File Exchange applies it to `TEXT`/`dosa` files; opt-in through `ContainerReadOptions.ExtensionMap` |
 | Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
@@ -310,7 +311,8 @@ flowchart LR
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
   - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, DiskCopy 4.2 (NDIF, DART, UDIF and HFS+
     later);
-  - `ClassicMac.Files.Iso` (later): ISO 9660 volumes with Apple extensions, raw-sector CD images and cue sheets;
+  - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them (raw-sector CD images and cue
+    sheets later);
   - `ClassicMac.Files.Compression` (later): decompressors shared by disk images and archives (ADC for NDIF and UDIF;
     the StuffIt and Compact Pro methods);
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
@@ -456,8 +458,14 @@ They change what running applications see, not what a file contains.
   OS 9 listed them (local test against the harness logs).
 - **FAT:** Microsoft's FAT specification (fatgen103): BPB, type by cluster count, 12/16/28-bit entries, VFAT long
   names; DOS partition tables by the standard MBR layout. Not Apple formats, so no Apple code decides them.
-- **CD images:** ECMA-119 (ISO 9660) and Apple's ISO 9660 extensions (the `AA`/`BA` system-use fields carrying
-  type, creator and Finder flags); hybrid discs are an Apple partition map read by the existing readers.
+- **CD images:** ECMA-119 (ISO 9660) for the layout; the Mac view from the disassembly of Mac OS 9's ISO 9660 and
+  High Sierra File Access 5.3, confirmed in SheepShaver on a test disc (every entry matched): only the primary
+  descriptor (no Joliet, no Rock Ridge); root from the big-endian path table; type/creator from `BA`, or `AA`
+  version 2 with flags masked to $B020 (never invisible), else `TEXT`/`hscd` (no extension map); an associated record
+  is the resource fork and its Finder info wins; names cut to 31 bytes before `;1` is stripped, a final '.' dropped
+  only up to 9 bytes; dates as local time (GMT offset ignored), clamped to 1904–2040; multi-extent files not joined;
+  a name over 37 bytes or an empty file's record ends that sector's listing; icons in a six-column 64-pixel grid.
+  Hybrid discs mount as HFS, as the Mac mounts them, because the HFS and partition-map readers go first.
 - **Zip and tar:** Info-ZIP's `extrafld.txt` for the Mac extra fields; POSIX tar.
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
@@ -535,7 +543,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
    NDIF (with ADC in `ClassicMac.Files.Compression`), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
-   images (`ClassicMac.Files.Iso`); zip and tar with Mac data; `.sea`/`.smi` detection; recursive unwrapping through
+   images (`ClassicMac.Files.Iso`: ISO 9660 and High Sierra built; raw sectors and cue sheets next); zip and tar with
+   Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and extracts with both forks and Finder info, and file and folder counts match each volume's.
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
