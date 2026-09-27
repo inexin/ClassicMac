@@ -187,6 +187,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Resources | `ResourceFork` | Resources in read order, map attributes, the reserved header areas and the map's runtime handle and file reference (kept so such forks round-trip exactly); add, remove, renumber, find |
 | Resources | `ResourceDecompression`, `IResourceDecompressor` | `dcmp` 0–3 and app-supplied decompressors |
 | Resources | `ReadOptions` | Resource-reading limits and the Resource Manager model (see Configuration) |
+| Files.Export | `Unpacker`, `OutputLayout`, `ExportFolders` | Every Mac file under a tree to a folder (`unpack`), or every resource fork (`extract`), placed as the tree nests; new numbered folders that never overwrite. Shared by the CLI and the app |
 | Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (decoded, or the data itself; stored bytes in `raw/` on request) with `manifest.json`, format 1.1 (`schemas/manifest-1.schema.json`) |
 | Resources.Export | `IResourceDecoder`, `DecodeInput`, `DecodedFile` | A decoder for some resource types; the exporter uses the first that handles a type and falls back to raw |
 | Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` and `.Images` built; `.Sound` next) |
@@ -441,7 +442,13 @@ that leads to its node. View-models carry no Avalonia types and are tested; a he
 **Previews (built):** Details | Preview | Hex tabs. Previews come from the same decoders as `extract`: images
 (zoom, screen depth, nearest-neighbour on a checkerboard), styled `TEXT` drawn with its fonts and colours (through the
 public `StyledText` model), strings, `vers` as JSON, and PICT/TEXT files; hex over any fork or resource, read on
-demand. **Next:** export from the app, then the other previews (sound, fonts, dialogs) as their decoders arrive.
+demand. **Export (built):** Export menu and tree context menu, each command enabled for the nodes it applies to —
+Save Resource As (decoded or `.bin`, current screen depth), Export Resources (a file, or one type, with a manifest),
+Extract All Resources (input, container or folder) and Unpack as AppleDouble or Basilisk II (input, container, folder
+or file). They run the CLI's code (`ClassicMac.Files.Export`) off the UI thread, one at a time, into a new subfolder
+named after the item ("Disk unpacked", numbered when it exists), with progress in the status line and problems in the
+diagnostics list. **Next:** drag and drop out of the app, then the other previews (sound, fonts, dialogs) as their
+decoders arrive.
 
 **Editing, in three stages** — the viewer becomes an editor, ResEdit-style. Every save writes a verified round trip
 (read back and compared) and keeps the original; undo within a session.
@@ -600,7 +607,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
    pixel limit and `--screen-depth`. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
-   decoders. Browse, details, diagnostics, previews and hex built; export next.
+   decoders. First version built (browse, details, diagnostics, previews, hex, export); drag-out next.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
    *Exit:* extract → `pack` is byte-identical for unchanged resources.
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers.

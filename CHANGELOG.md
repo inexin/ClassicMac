@@ -4,7 +4,9 @@
 
 - Viewer app (`src/ClassicMac.App`, Avalonia): open files, disk images and resource forks, browse them down to
   individual resources, see details and diagnostics; preview images, styled text, strings and version resources,
-  and any fork or resource in hex. `MacFileResources` in Files, shared with the CLI; `StyledText` in Decoders.
+  and any fork or resource in hex; export a resource, a file's resources, everything under a node, or unpack it
+  (AppleDouble, Basilisk II) into new folders. `MacFileResources` and `ClassicMac.Files.Export` (`Unpacker`,
+  `OutputLayout`, `ExportFolders`) in Files, shared with the CLI; `StyledText` in Decoders.
 
 - Repository layout, build settings and CI.
 - Packages: `ClassicMac.Core` (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `UnsignedFixed`,
