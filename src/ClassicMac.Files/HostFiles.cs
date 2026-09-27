@@ -143,7 +143,7 @@ namespace ClassicMac.Files
             options ??= HostWriteOptions.Default;
             if (options.Layout is not (HostLayout.AppleDouble or HostLayout.BasiliskII))
                 throw new ArgumentException($"Files cannot be written as {options.Layout}.", nameof(options));
-            var name = hostName ?? HostNames.ToHostName(file.Name, options.Layout);
+            var name = hostName ?? ToHostName(file.Name, options.Layout);
 
             var data = Path.Combine(directory, name);
             var paths = new List<string> { data };
@@ -186,6 +186,13 @@ namespace ClassicMac.Files
             using var input = fork.Open();
             input.CopyTo(output);
         }
+
+        /// <summary>
+        /// The host name for <paramref name="name"/> in a layout: SheepShaver's naming for Basilisk II folders
+        /// (<see cref="HostNames.ToBasiliskName"/>), the portable one otherwise (<see cref="HostNames.ToHostName(MacString, int)"/>).
+        /// </summary>
+        public static string ToHostName(MacString name, HostLayout layout, int maxLength = 255) =>
+            layout == HostLayout.BasiliskII ? HostNames.ToBasiliskName(name, maxLength) : HostNames.ToHostName(name, maxLength);
 
         /// <summary>The name a layout is shown under in a container chain.</summary>
         public static string FormatName(HostLayout layout) => layout switch

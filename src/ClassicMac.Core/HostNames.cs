@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using ClassicMac.Core;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Core
 {
     /// <summary>
     /// Names for the host's disk. <see cref="ToHostName(MacString, int)"/> gives names valid and distinct on Windows,
@@ -57,10 +56,6 @@ namespace ClassicMac.Files
             return Fit(parts, maxLength);
         }
 
-        /// <summary>The host name for <paramref name="name"/> in the given layout: SheepShaver's rules for Basilisk II folders.</summary>
-        public static string ToHostName(MacString name, HostLayout layout, int maxLength = 255) =>
-            layout == HostLayout.BasiliskII ? ToBasiliskName(name, maxLength) : ToHostName(name, maxLength);
-
         /// <summary>
         /// The host name SheepShaver (on Windows) gives a Mac name in its shared folder, so the emulator reads it back:
         /// each Mac Roman byte as the Windows-1252 character with the same value (it does no Unicode conversion), and
@@ -100,6 +95,20 @@ namespace ClassicMac.Files
             var index = Array.IndexOf(Cp1252High, c);
             value = (byte)(0x80 + Math.Max(index, 0));
             return index >= 0 && c != '\0';
+        }
+
+        /// <summary>
+        /// The folder name for a resource type in an export: its four bytes as a name (<c>snd </c> → <c>snd%20</c>), and,
+        /// when another type in the same fork differs from it only in case (<paramref name="collides"/>), <c>~</c> and
+        /// the type's bytes in hex (<c>PICT~50494354</c>, <c>pict~70696374</c>), since Windows and macOS disks ignore
+        /// case.
+        /// </summary>
+        public static string TypeFolder(FourCC type, bool collides)
+        {
+            Span<byte> bytes = stackalloc byte[4];
+            type.CopyTo(bytes);
+            var name = ToHostName(new MacString(bytes), 255);
+            return collides ? $"{name}~{type.Value:X8}" : name;
         }
 
         /// <summary>

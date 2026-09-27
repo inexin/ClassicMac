@@ -86,7 +86,7 @@ namespace ClassicMac.Resources.Cli
         private string FolderName(string root, List<string> parents, MacString name)
         {
             var directory = Path.Combine([root, .. parents]);
-            var host = HostNames.ToHostName(name, layout);
+            var host = HostFiles.ToHostName(name, layout);
             // A folder met again (it holds several files) keeps the name it was given.
             var key = directory + "/" + host;
             if (!folders.TryGetValue(key, out var chosen)) folders[key] = chosen = HostNames.MakeUnique(host, Taken(directory));
@@ -103,7 +103,7 @@ namespace ClassicMac.Resources.Cli
         {
             var directory = Path.Combine([root, .. folder]);
             var relative = string.Join('/', folder).Length + (folder.Count > 0 ? 1 : 0);
-            var host = HostNames.ToHostName(file.Name, options.Layout, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
+            var host = HostFiles.ToHostName(file.Name, options.Layout, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
             if (options.Layout == HostLayout.BasiliskII && HostFiles.ToMacName(host, basilisk: true, new ContainerContext()) != file.Name)
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "unpack.name-changed",
