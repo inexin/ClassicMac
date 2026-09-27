@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json",
+  "title": "ClassicMac export manifest, format 1",
+  "description": "manifest.json as written by ClassicMac's resource exporter (classicmac extract). Readers reject a newer major formatVersion and ignore unknown fields.",
+  "type": "object",
+  "required": ["formatVersion", "source", "fork", "resources", "diagnostics"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "formatVersion": { "type": "string", "pattern": "^1\\.[0-9]+$" },
+    "source": {
+      "description": "The Mac file the fork came from.",
+      "type": "object",
+      "required": ["name", "formats", "type", "creator", "flags"],
+      "properties": {
+        "name": { "type": "string", "description": "Mac name; bytes outside printable Mac Roman as \\xHH." },
+        "formats": { "type": "array", "items": { "type": "string" }, "description": "Containers it was found through, outermost first." },
+        "type": { "type": "string" },
+        "creator": { "type": "string" },
+        "flags": { "type": "integer", "minimum": 0, "maximum": 65535, "description": "Finder flags." }
+      }
+    },
+    "fork": {
+      "type": "object",
+      "required": ["attributes", "mapFlags"],
+      "properties": {
+        "attributes": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "mapFlags": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "typeBytes", "id", "name", "attributes", "size", "storedSize", "dcmp", "decoder", "decoderVersion", "path", "sha256", "storedSha256", "rawPath", "warnings"],
+        "properties": {
+          "type": { "type": "string", "description": "Four characters; \\xHH for bytes outside printable Mac Roman." },
+          "typeBytes": { "type": "string", "pattern": "^[0-9A-F]{8}$" },
+          "id": { "type": "integer", "minimum": -32768, "maximum": 32767 },
+          "name": { "type": ["string", "null"] },
+          "attributes": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "size": { "type": "integer", "minimum": 0, "description": "Length of the file written (decompressed when compressed)." },
+          "storedSize": { "type": "integer", "minimum": 0, "description": "Length of the data as stored in the fork." },
+          "dcmp": { "type": ["integer", "null"], "description": "Decompressor ID of a compressed resource." },
+          "decoder": { "type": "string", "description": "What wrote the file; \"raw\" is the data itself." },
+          "decoderVersion": { "type": "integer", "minimum": 1 },
+          "path": { "type": "string", "description": "Relative to the manifest, '/'-separated." },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "storedSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "rawPath": { "type": ["string", "null"], "description": "Copy of the stored bytes in raw/, when kept." },
+          "warnings": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "code", "message"],
+        "properties": {
+          "severity": { "enum": ["info", "warning", "error"] },
+          "code": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}
