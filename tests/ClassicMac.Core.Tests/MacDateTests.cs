@@ -1,4 +1,4 @@
-namespace ClassicMac.Files.Tests;
+namespace ClassicMac.Core.Tests;
 
 public class MacDateTests
 {

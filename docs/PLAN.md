@@ -50,8 +50,9 @@ single-file wrappers), `ClassicMac.Hfs` (volumes and disk images) and later `Cla
 Pro).
 People who only unpack old downloads or disk images don't need the resource map, people who only edit resource forks
 don't need the containers, and each package stays smaller to test and fuzz. The types both sides use — `FourCC`
-(types, creators, resource types), `MacString` (file and resource names) and `Diagnostic` — live in a small shared
-base, `ClassicMac.Core`, so neither side depends on the other.
+(types, creators, resource types), `MacString` (file and resource names), `MacDate` (file and volume dates, and the
+1904-based dates inside resource data such as QuickTime headers) and `Diagnostic` — live in a small shared base,
+`ClassicMac.Core`, so neither side depends on the other.
 
 ## Core: the resource map
 
@@ -138,7 +139,7 @@ and write a fork; `ResourceDecompression` returns a resource's data as the Resou
 | Core | `FourCC` | A four-byte code (type, creator, resource type); exact, case-sensitive comparison |
 | Core | `MacString` | A Pascal string's raw bytes; decoded to Unicode only with the file's encoding, so round trips are exact |
 | Core | `Diagnostic` | Severity, stable code, message, offset |
-| Files | `MacDate` | Seconds since 1904 in the writer's local time; converts to a `DateTime` of unspecified kind |
+| Core | `MacDate` | Seconds since 1904 in the writer's local time; converts to a `DateTime` of unspecified kind |
 | Files | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
 | Files | `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
 | Files | `IContainerReader` | One per container format: `CanRead(stream)`, `Read(stream, options, diagnostics)` |
@@ -250,7 +251,7 @@ its own and the heavy dependencies stay optional. Arrows point from a package to
 
 ```mermaid
 flowchart LR
-    B["ClassicMac.Core<br/>FourCC, MacString,<br/>diagnostics"]
+    B["ClassicMac.Core<br/>FourCC, MacString,<br/>MacDate, diagnostics"]
     subgraph filelayer["File layer"]
         F["ClassicMac.Files<br/>Mac files, Finder info;<br/>AppleSingle/Double, MacBinary,<br/>BinHex, Basilisk II folders"]
         H["ClassicMac.Hfs<br/>HFS/MFS volumes;<br/>raw, DiskCopy 4.2, NDIF"]
@@ -269,9 +270,9 @@ flowchart LR
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
-- **ClassicMac.Core** — `FourCC`, `MacString`, `Diagnostic` and (later) the single-byte text encodings; no
+- **ClassicMac.Core** — `FourCC`, `MacString`, `MacDate`, `Diagnostic` and (later) the single-byte text encodings; no
   dependencies, .NET 10.
-- **ClassicMac.Files** — the Mac file model (`MacFile`, `FinderInfo`, `MacDate`, `ForkData`, `IContainerReader`) and
+- **ClassicMac.Files** — the Mac file model (`MacFile`, `FinderInfo`, `ForkData`, `IContainerReader`) and
   the single-file wrappers: AppleSingle, AppleDouble, MacBinary, BinHex, Basilisk II folders; depends on Core.
 - **ClassicMac.Hfs** — HFS and MFS volumes and the disk images that hold them (raw, DiskCopy 4.2, NDIF); depends on
   Files.
@@ -503,7 +504,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   match package names; format specs live under `docs/formats/`.
 - **Files and disk images as their own packages (split):** `ClassicMac.Files` (file model and single-file wrappers),
   `ClassicMac.Hfs` (phase 2) and `ClassicMac.Archives` (later) are separate from `ClassicMac.Resources`; the shared
-  types (`FourCC`, `MacString`, `Diagnostic`) sit in the dependency-free base `ClassicMac.Core` (see Inputs).
+  types (`FourCC`, `MacString`, `MacDate`, `Diagnostic`) sit in the dependency-free base `ClassicMac.Core` (see
+  Inputs).
 
 ## Open questions
 
