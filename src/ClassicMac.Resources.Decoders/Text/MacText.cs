@@ -28,7 +28,8 @@ namespace ClassicMac.Resources.Decoders.Text
         public static byte[] Json(Action<Utf8JsonWriter> write)
         {
             var buffer = new ArrayBufferWriter<byte>();
-            using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = true }))
+            // Relaxed escaping keeps non-ASCII text readable; the output is a file, never embedded in HTML.
+            using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }))
                 write(writer);
             return [.. buffer.WrittenSpan, (byte)'\n'];
         }

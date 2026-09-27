@@ -167,7 +167,7 @@ namespace ClassicMac.Resources.Cli
             {
                 Description = "Output folder (default: \"<input> resources\" next to the input)",
             };
-            var raw = new Option<bool>("--raw") { Description = "Write each resource's data (decompressed), undecoded; the only mode until decoders exist" };
+            var raw = new Option<bool>("--raw") { Description = "Write each resource's data (decompressed) as .bin, without decoding" };
             var keepRaw = new Option<bool>("--keep-raw") { Description = "Also keep the raw data in raw/, for pack" };
             var types = new Option<string[]>("--type", "-t")
             {
@@ -194,6 +194,7 @@ namespace ClassicMac.Resources.Cli
                     Export.ExportOptions.Default with
                     {
                         KeepRaw = result.GetValue(keepRaw),
+                        Decoders = result.GetValue(raw) ? [] : Decoders.ResourceDecoders.Create(),
                         Types = chosen,
                         Overwrite = result.GetValue(overwrite),
                         ReadOptions = ReadOptionsFrom(result),

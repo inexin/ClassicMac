@@ -35,6 +35,8 @@
   (through containers and disk images) to a folder. Basilisk II folder names follow SheepShaver (Windows-1252
   bytes, its escape set), checked in the emulator.
 - `classicmac` CLI: `info` and `list` read through containers and disk images, showing Mac paths (text or JSON);
-  `extract` writes every resource (decompressed) into type folders with a `manifest.json` (format 1, with a JSON
+  `extract` decodes text resources by default (`STR `/`TEXT` → UTF-8, `STR#`/`styl`/`vers` → JSON, `TEXT` + `styl`
+  → RTF; `ClassicMac.Resources.Decoders`, `--raw` for the data itself) and writes every resource into type folders
+  with a `manifest.json` (format 1.1, with a JSON
   Schema), a folder per file for disk images; `--keep-raw` keeps the stored bytes; `HostNames` moved to Core;
   limit options, exit codes.

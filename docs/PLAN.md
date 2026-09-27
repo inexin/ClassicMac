@@ -145,7 +145,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 | --- | --- | --- |
 | `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local), max files and folders read from one volume (1,000,000), File Exchange extension map (none), verify whole-image checksums (off) |
 | `ReadOptions` | Resources | Max decompressed resource size (64 MiB), Resource Manager model (Mac OS 9), text encoding override (none) |
-| `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
+| `DecodeOptions` | Decoders | Text encoding (Mac OS Roman; more scripts later), line endings in text output (LF); later max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off), types to export (all), overwrite (off), `ReadOptions` for decompression |
 | `HostWriteOptions` | Files | Layout for unpacked files (AppleDouble or Basilisk II; AppleDouble), max path length (200 characters), overwrite (off), time zone for dates (local) |
 | `PackOptions` | Resources | Base fork (none), allow deletes (off) |
@@ -186,7 +186,9 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Resources | `ResourceFork` | Resources in read order, map attributes, the reserved header areas and the map's runtime handle and file reference (kept so such forks round-trip exactly); add, remove, renumber, find |
 | Resources | `ResourceDecompression`, `IResourceDecompressor` | `dcmp` 0–3 and app-supplied decompressors |
 | Resources | `ReadOptions` | Resource-reading limits and the Resource Manager model (see Configuration) |
-| Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (data decompressed; stored bytes in `raw/` on request) with `manifest.json`, format 1 (`schemas/manifest-1.schema.json`) |
+| Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (decoded, or the data itself; stored bytes in `raw/` on request) with `manifest.json`, format 1.1 (`schemas/manifest-1.schema.json`) |
+| Resources.Export | `IResourceDecoder`, `DecodeInput`, `DecodedFile` | A decoder for some resource types; the exporter uses the first that handles a type and falls back to raw |
+| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` built; `.Images`, `.Sound` next) |
 
 A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`).
 `ClassicMac.Files` references `ClassicMac.Resources` (never the other way), because a few disk images keep their
@@ -226,7 +228,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | --- | --- | --- |
 | Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icl4/8`, `ics4/8`, `cicn`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `SICN`, `icns` | PNG, via QuickDraw.Pict (screen depth selectable) |
 | Sound | `snd ` (sampled formats 1/2; MACE 3:1/6:1, IMA4, µ-law) | WAV |
-| Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text / JSON; styled text as RTF or Markdown |
+| Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text (`STR `, `TEXT`), JSON (`STR#`, `styl`, `vers`); styled text also as RTF (built) |
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL` | JSON, optionally a rendered preview of the dialog |
 | Colour | `clut`, `pltt` | JSON and `.act` palettes |
@@ -336,7 +338,8 @@ flowchart LR
   - `ClassicMac.Files.Archives` (later): zip and tar with Mac data, StuffIt, Compact Pro, DiskDoubler, PackIt.
 - **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only.
 - **ClassicMac.Encodings** — the multi-byte Mac text encodings; optional, depends on Core.
-- **ClassicMac.Resources.Decoders** — the built-in decoders; depends on Resources and QuickDraw.Pict for images.
+- **ClassicMac.Resources.Decoders** — the built-in decoders, one package with a namespace per area (text, images,
+  sound; decided, like the file layer); depends on Resources, and on QuickDraw.Pict once images arrive.
 - **CLI** — a `dotnet tool` with `info`, `list`, `extract` and `pack`; references the file and resource packages.
 - **Viewer app** — a cross-platform desktop app on the same packages (below).
 - **Extension points:** an `IContainerReader` per container format and an `IResourceDecoder` per resource type, so
@@ -580,7 +583,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
-   including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. *Exit:* golden outputs pass and the corpus exports without errors.
+   including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
+   decoder interface and `extract` decoding by default). *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
@@ -645,5 +649,3 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
 - [ ] **Fonts package:** a `ClassicMac.Fonts` package for `FONT`/`NFNT`/`FOND`/`fctb` parsing (used by the renderer's
   text and by font export), or font parsing inside `ClassicMac.QuickDraw`?
-- [ ] **One or several decoder packages:** a single `ClassicMac.Resources.Decoders`, or split by area (icons, text,
-  UI, sound) for users who want a small subset?

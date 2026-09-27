@@ -45,13 +45,19 @@ public class ExtractTests : IDisposable
 
         Assert.True(code == ExitCodes.Success, error);
         Assert.Contains("2 resources from 1 files", output);
-        Assert.True(File.Exists(Path.Combine(target, "STR%20", "128 Hello.bin")));
-        Assert.True(File.Exists(Path.Combine(target, "ICN#", "128.bin")));
+        Assert.Equal("Hello", File.ReadAllText(Path.Combine(target, "STR%20", "128 Hello.txt"))); // decoded
+        Assert.True(File.Exists(Path.Combine(target, "ICN#", "128.bin"))); // no decoder yet: raw
         Assert.Equal(["raw resource fork"], Manifest(target).Source.Formats);
 
         // Again into the same folder: refused unless overwriting.
         Assert.Equal(ExitCodes.IoError, Run("extract", input, "-o", target).Code);
         Assert.Equal(ExitCodes.Success, Run("extract", input, "-o", target, "--overwrite").Code);
+
+        // --raw writes the data itself.
+        var rawTarget = Path.Combine(folder, "raw");
+        Assert.Equal(ExitCodes.Success, Run("extract", input, "-o", rawTarget, "--raw").Code);
+        Assert.Equal([5, 72, 101, 108, 108, 111], File.ReadAllBytes(Path.Combine(rawTarget, "STR%20", "128 Hello.bin")));
+        Assert.All(Manifest(rawTarget).Resources, r => Assert.Equal("raw", r.Decoder));
     }
 
     [Fact]
@@ -74,7 +80,7 @@ public class ExtractTests : IDisposable
         Assert.Equal(("Realmz", "APPL", "RLMZ"), (realmz.Source.Name, realmz.Source.Type, realmz.Source.Creator));
         Assert.Equal([0x4E, 0x75], File.ReadAllBytes(Path.Combine(target, "Realmz", "CODE", "1 Main.bin")));
         Assert.True(File.Exists(Path.Combine(target, "Realmz", "raw", "CODE", "1.bin")));
-        Assert.Equal("Once upon a time"u8.ToArray(), File.ReadAllBytes(Path.Combine(target, "Data", "Scenario", "TEXT", "128 Intro.bin")));
+        Assert.Equal("Once upon a time", File.ReadAllText(Path.Combine(target, "Data", "Scenario", "TEXT", "128 Intro.txt")));
         Assert.False(Directory.Exists(Path.Combine(target, "Read Me")));
     }
 
