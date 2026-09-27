@@ -37,3 +37,10 @@ WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEM
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
+
+## LZHUF (Haruyasu Yoshizaki, Haruhiko Okumura, 1988)
+
+- `src/ClassicMac.Files/Compression/DartLzh.cs` implements the LZHUF algorithm (adaptive Huffman coding with LZSS,
+  including its position-code tables) as DART and Disk Copy 6.3.3 use it; it was written from the disassembly of Disk
+  Copy's codec, which follows the authors' freely distributed `lzhuf.c`. The authors placed the program in the public
+  domain; they are credited here for the algorithm and tables.
