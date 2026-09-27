@@ -312,12 +312,14 @@ tools/                      fixture and table generators; never packed
 
 When QuickDraw.Pict moves into ClassicMac, it is split so every dependency points down: QuickTime and MacPaint stop
 living inside PICT, PICT calls QuickTime for its embedded images (`$8200`/`$8201`), and the QuickDraw renderer is
-separated from the PICT file format. Until the merge, QuickDraw.Pict stays as it is.
+separated from the PICT file format. Until the merge, QuickDraw.Pict stays one package, but its code already
+follows this split in layer folders (`Graphics/`, `MacPaint/`, `QuickTime/`, `QuickDraw/`, `Pict/`, `Resources/`),
+with a test that fails on any dependency pointing up; the merge moves those folders into projects.
 
 | Layer | Contains | Depends on |
 | --- | --- | --- |
 | `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), PackBits, colour-table and PixMap reading | nothing |
-| `ClassicMac.QuickTime` | ImageDescription, the codecs (`raw `, `rle `, `rpza`, `smc `, `cvid`, `8BPS`, `yuv2`, `YVU9`, `tga `), the codec plugin hook, QTIF files | Graphics |
+| `ClassicMac.QuickTime` | ImageDescription, the codecs (`raw `, `rle `, `rpza`, `smc `, `cvid`, `8BPS`, `yuv2`, `YVU9`, `tga `), the codec plugin hook, QTIF files | Graphics, MacPaint (its `PNTG` codec) |
 | `ClassicMac.MacPaint` (or inside Graphics) | PNTG files and the `PNTG` codec's decoder | Graphics |
 | `ClassicMac.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics (and font parsing, see open questions) |
 | `ClassicMac.Pict` | The PICT file format: the opcode reader that replays a picture into the renderer, and the writer | QuickDraw, QuickTime |
