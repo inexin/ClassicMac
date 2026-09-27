@@ -83,6 +83,8 @@ The readers parse arbitrary downloaded files, so every size and offset is checke
 - **Allocation limits:** a per-resource ceiling on decompressed size; `dcmp` output must match the size its header
   declares; decoders check image dimensions against a pixel ceiling before allocating.
 - **Nesting and cycles:** container recursion stops at a depth limit; HFS B-tree and extent walks detect cycles.
+- **Fuzzing:** SharpFuzz with libFuzzer on each container reader, the resource map and `dcmp`, seeded from the test
+  fixtures; a short run on every CI build, a longer one nightly; crashes become regression fixtures.
 
 ### Configuration
 
@@ -97,9 +99,32 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 | `PackOptions` | Resources | Base fork (none), allow deletes (off) |
 
 Options objects are immutable records with `with` for changes, so one instance can be shared across threads; the
-defaults are a static `Default` on each.
-- **Fuzzing:** SharpFuzz with libFuzzer on each container reader, the resource map and `dcmp`, seeded from the test
-  fixtures; a short run on every CI build, a longer one nightly; crashes become regression fixtures.
+defaults are a static `Default` on each. Each object arrives with the code that uses it; the encoding override joins
+`ReadOptions` with the encodings.
+
+### Core API
+
+The model, in `ClassicMac.Resources` (first sketch; readers and writers come next):
+
+| Type | What it is |
+| --- | --- |
+| `FourCC` | A four-byte code (type, creator, resource type); exact, case-sensitive comparison |
+| `MacString` | A Pascal string's raw bytes; decoded to Unicode only with the file's encoding, so round trips are exact |
+| `MacDate` | Seconds since 1904 in the writer's local time; converts to a `DateTime` of unspecified kind |
+| `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
+| `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
+| `IContainerReader` | One per container format: `CanRead(stream)`, `Read(stream, options, diagnostics)` |
+| `Resource` | Type, ID, optional name, attributes, and data as stored (loaded lazily by readers) |
+| `ResourceFork` | Resources in read order, map attributes, the reserved header areas; add, remove, renumber, find |
+| `Diagnostic` | Severity, stable code, message, offset |
+| `ReadOptions` | Reading limits (see Configuration) |
+
+- **Mutable model, immutable records:** `ResourceFork` and `Resource` are mutable, because the editors change them;
+  everything describing a file (`MacFile`, `FinderInfo`, options) is an immutable record. The model is not
+  thread-safe.
+- **Uniqueness enforced:** a fork holds one resource per type and ID, and a resource belongs to one fork at a time.
+- **Order kept:** resources stay in the order read, and the reserved header areas are kept, so an unchanged fork can
+  be written back byte for byte.
 
 ## Decoders
 
@@ -305,7 +330,8 @@ implementation's guess. A rule fitted to real data instead is marked as such.
   corpus results are committed, never the files or their decoded output.
 - **Checks:** round trip (read → write → read gives the same map, and unchanged forks are byte-identical); golden
   outputs for each decoder on the synthetic fixtures; corpus output diffed against resource_dasm and DeRez.
-- **Tooling:** xUnit; CI on GitHub Actions for Windows, Linux and macOS.
+- **Tooling:** xUnit v3 on Microsoft.Testing.Platform (`dotnet test --solution ClassicMac.slnx`); CI on GitHub
+  Actions for Windows, Linux and macOS.
 
 ### Prior art: Realmz.ResourceExtractor
 

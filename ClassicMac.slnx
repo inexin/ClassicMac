@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/ClassicMac.Resources/ClassicMac.Resources.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ClassicMac.Resources.Tests/ClassicMac.Resources.Tests.csproj" />
+  </Folder>
 </Solution>
