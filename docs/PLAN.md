@@ -175,6 +175,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `NdifReader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2 and NDIF images (chunks decoded on demand, segments joined), Apple partition maps; each yields files the next can open |
 | Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
 | Files.Iso | `IsoReader` | ISO 9660 and High Sierra volumes as Mac OS 9 shows them: `AA`/`BA` Finder info, associated files as resource forks |
+| Files.Iso | `RawCdReader`, `CueSheetReader` | Raw CD images (2352/2336-byte sectors, per-sector mode) and cue sheets (first data track, from the `.bin` beside it) as 2048-byte blocks for the volume readers |
 | Files.Containers | `ExtensionMap` | Internet Config's name-ending map, as File Exchange applies it to `TEXT`/`dosa` files; opt-in through `ContainerReadOptions.ExtensionMap` |
 | Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks; `Write` puts a Mac file back on disk as AppleDouble or Basilisk II |
 | Files | `HostNames` | Mac names as safe, distinct host names (`%XX` escapes, reserved Windows names, collisions, length), shared by `unpack` and `extract`; SheepShaver's own naming for Basilisk II folders |
@@ -315,8 +316,8 @@ flowchart LR
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
   - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, Disk Copy 4.2, NDIF (Disk Copy 6, including
     `.smi` and segmented images); DART, UDIF and HFS+ later;
-  - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them (raw-sector CD images and cue
-    sheets later);
+  - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them, raw-sector CD images
+    (`.bin`, 2352/2336-byte sectors) and cue sheets (multisession later);
   - `ClassicMac.Files.Compression`: decompressors shared by disk images and archives (ADC, built for NDIF and used
     by UDIF later; the StuffIt and Compact Pro methods later);
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
@@ -462,6 +463,9 @@ They change what running applications see, not what a file contains.
   OS 9 listed them (local test against the harness logs).
 - **FAT:** Microsoft's FAT specification (fatgen103): BPB, type by cluster count, 12/16/28-bit entries, VFAT long
   names; DOS partition tables by the standard MBR layout. Not Apple formats, so no Apple code decides them.
+- **Raw CD sectors and cue sheets:** ECMA-130 for the sector layout (user data at +16 in mode 1, +24 in mode 2 form
+  1, +8 in 2336-byte sectors; form 2 has none); the Apple CD driver never parses sectors (the drive does), so the
+  2048-byte blocks are all the Mac sees (driver disassembly). Cue sheets follow the de facto CDRWIN format.
 - **CD images:** ECMA-119 (ISO 9660) for the layout; the Mac view from the disassembly of Mac OS 9's ISO 9660 and
   High Sierra File Access 5.3, confirmed in SheepShaver on a test disc (every entry matched): only the primary
   descriptor (no Joliet, no Rock Ridge); root from the big-endian path table; type/creator from `BA`, or `AA`
@@ -559,7 +563,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
    NDIF (with ADC in `ClassicMac.Files.Compression`) (built), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
-   images (`ClassicMac.Files.Iso`: ISO 9660 and High Sierra built; raw sectors and cue sheets next); zip and tar with
+   images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors and cue sheets built; multisession next); zip and tar with
    Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's

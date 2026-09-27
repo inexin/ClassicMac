@@ -55,6 +55,8 @@ namespace ClassicMac.Files
                 MfsReader.Instance,
                 MbrReader.Instance,
                 FatReader.Instance,
+                RawCdReader.Instance,
+                CueSheetReader.Instance,
                 IsoReader.Instance,
             ];
         }

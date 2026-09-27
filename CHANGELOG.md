@@ -27,6 +27,7 @@
   parts found by their `bcm#` ID, CRC-32 verified on request) with ADC in
   `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;
   `ClassicMac.Files` references `ClassicMac.Resources`.
+- Raw CD images (`.bin`, 2352/2336-byte sectors) and cue sheets, read as the 2048-byte blocks a drive hands the Mac.
 - CD volumes in `ClassicMac.Files.Iso`: ISO 9660 and High Sierra as Mac OS 9 reads them (Apple `AA`/`BA` Finder
   info, associated files as resource forks, the Mac's name, date and listing rules), matching OS 9 on a test disc.
 - Writing Mac files to the host: `HostFiles.Write` (AppleDouble or Basilisk II layout, `HostWriteOptions`),
