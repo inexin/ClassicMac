@@ -89,6 +89,75 @@ internal static class Fixtures
 
     private static int Pad(int length) => (length + 127) / 128 * 128;
 
+    // A BinHex 4.0 file: header, forks and CRCs, run-length encoded ($90), 6-bit text in 64-character lines between
+    // colons, after the marker line and some leading text.
+    public static string BinHex(
+        string name, byte[] data, byte[] resource, string type = "TEXT", string creator = "ttxt", ushort flags = 0,
+        bool corruptDataCrc = false)
+    {
+        var binary = new MemoryStream();
+        var header = new MemoryStream();
+        header.WriteByte((byte)name.Length);
+        header.Write(Encoding.ASCII.GetBytes(name));
+        header.WriteByte(0);
+        header.Write(Encoding.ASCII.GetBytes(type));
+        header.Write(Encoding.ASCII.GetBytes(creator));
+        header.Write([(byte)(flags >> 8), (byte)flags]);
+        header.Write(UInt32s((uint)data.Length, (uint)resource.Length));
+        WithCrc(binary, header.ToArray(), false);
+        WithCrc(binary, data, corruptDataCrc);
+        WithCrc(binary, resource, false);
+
+        var packed = RunLengthEncode(binary.ToArray());
+        const string alphabet = "!\"#$%&'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr";
+        var text = new StringBuilder();
+        int buffer = 0, bits = 0;
+        foreach (var b in packed)
+        {
+            buffer = buffer << 8 | b;
+            bits += 8;
+            while (bits >= 6)
+            {
+                bits -= 6;
+                text.Append(alphabet[buffer >> bits & 0x3F]);
+            }
+        }
+        if (bits > 0) text.Append(alphabet[buffer << (6 - bits) & 0x3F]);
+
+        var lines = new StringBuilder("From: someone\r\nSubject: a file\r\n\r\n(This file must be converted with BinHex 4.0)\r\n:");
+        var encoded = text.ToString();
+        for (var i = 0; i < encoded.Length; i += 63) lines.Append(encoded, i, Math.Min(63, encoded.Length - i)).Append("\r\n");
+        return lines.Append(":\r\n").ToString();
+    }
+
+    private static void WithCrc(Stream output, byte[] bytes, bool corrupt)
+    {
+        output.Write(bytes);
+        var crc = (ushort)(Crc16.Compute(bytes) ^ (corrupt ? 1 : 0));
+        output.Write([(byte)(crc >> 8), (byte)crc]);
+    }
+
+    // Runs of 3 or more become byte, $90, count; a $90 in the data becomes $90 $00.
+    private static byte[] RunLengthEncode(byte[] data)
+    {
+        var output = new MemoryStream();
+        for (var i = 0; i < data.Length;)
+        {
+            var b = data[i];
+            var run = 1;
+            while (i + run < data.Length && data[i + run] == b && run < 255) run++;
+            if (b == 0x90) output.Write([0x90, 0x00]);
+            else output.WriteByte(b);
+            if (run >= 3)
+            {
+                output.Write([0x90, (byte)run]);
+                i += run;
+            }
+            else i++;
+        }
+        return output.ToArray();
+    }
+
     public static byte[] Int32s(params int[] values)
     {
         var bytes = new byte[values.Length * 4];
