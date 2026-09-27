@@ -35,6 +35,10 @@ namespace ClassicMac.Resources.Cli
             var entries = new List<ForkEntry>();
             if (IsPlain && Root.File.ResourceFork.Length == 0)
             {
+                // Files that are no fork (an application's own data files) are told apart by their header, as the
+                // Resource Manager would refuse them.
+                if (!PlausibleHeader(Root.File.DataFork))
+                    throw new InvalidDataException("its first 16 bytes do not describe a resource fork's data and map.");
                 var raw = ReadFork(Root.File.DataFork, options);
                 reporter.Write(input.Name, raw.Diagnostics);
                 entries.Add(new ForkEntry(Root, ["raw resource fork"], raw));
@@ -82,16 +86,7 @@ namespace ClassicMac.Resources.Cli
         // A data fork that reads as a resource fork with at least one resource and no errors, or null.
         private static ResourceFork? TryDataForkAsFork(ForkData data, ReadOptions options)
         {
-            if (data.Length is < 256 or > ResourceFork.MaxForkLength) return null;
-            // A cheap look at the header first, so a volume's thousands of data files are not all read in full: the
-            // data and map areas must lie inside the fork, the map after the reserved area.
-            var header = data.ReadPrefix(16);
-            long dataOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header);
-            long mapOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
-            long dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
-            long mapLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(12));
-            if (dataOffset < 16 || mapOffset < 16 || mapLength < 30 || dataOffset + dataLength > data.Length
-                || mapOffset + mapLength > data.Length) return null;
+            if (!PlausibleHeader(data)) return null;
             try
             {
                 var fork = ReadFork(data, options);
@@ -103,6 +98,20 @@ namespace ClassicMac.Resources.Cli
             {
                 return null;
             }
+        }
+
+        // A cheap look at a fork header, so data files are not all read in full: the data and map areas lie inside
+        // the fork, after the 16-byte header, and the map is at least its fixed part long.
+        private static bool PlausibleHeader(ForkData data)
+        {
+            if (data.Length is < 256 or > ResourceFork.MaxForkLength) return false;
+            var header = data.ReadPrefix(16);
+            long dataOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header);
+            long mapOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
+            long dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
+            long mapLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(12));
+            return dataOffset >= 16 && mapOffset >= 16 && mapLength >= 30 && dataOffset + dataLength <= data.Length
+                && mapOffset + mapLength <= data.Length;
         }
 
         private static void Collect(ContainerNode node, List<string> chain, List<(ContainerNode, IReadOnlyList<string>)> leaves)

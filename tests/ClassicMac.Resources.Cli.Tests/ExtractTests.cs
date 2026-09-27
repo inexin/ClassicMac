@@ -132,5 +132,14 @@ public class ExtractTests : IDisposable
         var input = Path.Combine(folder, "notes.txt");
         File.WriteAllText(input, "just text, no resources here at all");
         Assert.Equal(ExitCodes.Unreadable, Run("extract", input, "-o", Path.Combine(folder, "out")).Code);
+
+        // An application's own data file (like Realmz's "Data Caste"): big enough, but its first 16 bytes point
+        // outside it, so it is not taken for a damaged resource fork.
+        var data = Path.Combine(folder, "Data Caste");
+        File.WriteAllBytes(data, Enumerable.Range(0, 4096).Select(i => (byte)(i * 7 + 5)).ToArray());
+        var (code, _, error) = Run("list", data);
+        Assert.Equal(ExitCodes.Unreadable, code);
+        Assert.Contains("do not describe a resource fork", error);
+        Assert.Equal(ExitCodes.Unreadable, Run("extract", data, "-o", Path.Combine(folder, "out2")).Code);
     }
 }
