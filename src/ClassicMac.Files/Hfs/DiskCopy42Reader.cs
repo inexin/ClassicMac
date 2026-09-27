@@ -69,7 +69,19 @@ namespace ClassicMac.Files.Hfs
         }
 
         // The note's checksum: add each big-endian 16-bit word, then rotate the 32-bit sum right by one. The tag
-        // checksum skips the first 12 bytes (the first block's tags), as Disk Copy does.
+        // checksum skips the first 12 bytes (the first block's tags), as Disk Copy does (confirmed on a DART 1.5.3
+        // sample's Disk Copy 4.2 export).
+        internal static uint Sum(ReadOnlySpan<byte> data)
+        {
+            uint sum = 0;
+            for (var i = 0; i + 1 < data.Length; i += 2)
+            {
+                sum += BinaryPrimitives.ReadUInt16BigEndian(data[i..]);
+                sum = sum >> 1 | sum << 31;
+            }
+            return sum;
+        }
+
         private static void CheckSum(ForkData data, int skip, uint stored, string what, ContainerContext context)
         {
             using var stream = data.Open();

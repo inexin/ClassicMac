@@ -172,7 +172,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
 | Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
 | Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
-| Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `NdifReader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2 and NDIF images (chunks decoded on demand, segments joined), Apple partition maps; each yields files the next can open |
+| Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `NdifReader`, `DartReader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2, NDIF (chunks decoded on demand, segments joined) and DART images, Apple partition maps; each yields files the next can open |
 | Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
 | Files.Iso | `IsoReader` | ISO 9660 and High Sierra volumes as Mac OS 9 shows them: `AA`/`BA` Finder info, associated files as resource forks |
 | Files.Iso | `RawCdReader`, `CueSheetReader` | Raw CD images (2352/2336-byte sectors, per-sector mode) and cue sheets (first data track, from the `.bin` beside it) as 2048-byte blocks for the volume readers |
@@ -328,7 +328,7 @@ flowchart LR
     `ContainerUnwrapper`, options;
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
   - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, Disk Copy 4.2, NDIF (Disk Copy 6, including
-    `.smi` and segmented images); DART, UDIF and HFS+ later;
+    `.smi` and segmented images), DART; UDIF and HFS+ later;
   - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them, raw-sector CD images
     (`.bin`, 2352/2336-byte sectors) and cue sheets (multisession later);
   - `ClassicMac.Files.Compression`: decompressors shared by disk images and archives (ADC, built for NDIF and used
@@ -492,11 +492,16 @@ They change what running applications see, not what a file contains.
 - **NDIF and ADC:** no Apple spec; from the disassembly of Disk Copy 6.3.3 (its `.HDI` driver and codecs; there is
   no separate extension on OS 9 and no UDIF support), confirmed on images it made in SheepShaver (each decodes to its
   source sectors, the CRC matches). The `bcem` header and its validator (what refuses a mount is refused, the rest
-  reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end; KenCode and LZH not
-  decoded yet), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
+  reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end; KenCode not decoded
+  yet), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
   verified only when `VerifyChecksums` is set, as only Disk Copy's "Verify checksum" does), and segments found by their
   `bcm#` ID among `dseg` files in the folder, never by name. Disk Copy picks the format by file type; we find the
   `bcem` itself, so images that lost their type still open.
+- **DART:** Disk Copy 6.3.3's DART reading (disassembly) confirmed on DART 1.5.3's own files (CiderPress2's test
+  data): header and block lengths (RLE in words, LZH in bytes, −1 stored), 20,480 data + 480 tag bytes per block,
+  "fast" RLE and "best" LZH (Okumura/Yoshizaki LZHUF with a zero-filled window whose tail carries between blocks; a
+  block may end a tag byte short, zero-filled), `CKSM` 2 = Disk Copy 4.2 sum of the data and `CKSM` 1 of all the tags
+  (a Disk Copy 4.2 header's tag sum skips the first 12 bytes, now confirmed).
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only), checked in the SheepShaver harness (Windows build): name bytes pass 1:1 through
@@ -576,7 +581,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    forks come back byte for byte.
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
-   NDIF (with ADC in `ClassicMac.Files.Compression`) (built), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
+   NDIF (with ADC in `ClassicMac.Files.Compression`) and DART (built), UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
    images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors and cue sheets built; multisession next); zip and tar with
    Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS

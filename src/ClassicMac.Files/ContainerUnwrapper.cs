@@ -51,6 +51,7 @@ namespace ClassicMac.Files
                 PartitionMapReader.Instance,
                 DiskCopy42Reader.Instance,
                 NdifReader.Instance,
+                DartReader.Instance,
                 HfsReader.Instance,
                 MfsReader.Instance,
                 MbrReader.Instance,
