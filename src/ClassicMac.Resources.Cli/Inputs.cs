@@ -35,45 +35,20 @@ namespace ClassicMac.Resources.Cli
             var entries = new List<ForkEntry>();
             if (IsPlain && Root.File.ResourceFork.Length == 0)
             {
-                // Files that are no fork (an application's own data files) are told apart by their header, as the
-                // Resource Manager would refuse them.
-                if (!PlausibleHeader(Root.File.DataFork))
-                    throw new InvalidDataException("its first 16 bytes do not describe a resource fork's data and map.");
-                var raw = ReadFork(Root.File.DataFork, options);
-                reporter.Write(input.Name, raw.Diagnostics);
-                entries.Add(new ForkEntry(Root, ["raw resource fork"], raw));
+                var diagnostics = new List<Diagnostic>();
+                var raw = MacFileResources.ReadRaw(Root.File.DataFork, options, diagnostics);
+                reporter.Write(input.Name, diagnostics);
+                entries.Add(new ForkEntry(Root, ["raw resource fork"], raw.Fork));
                 return entries;
             }
             foreach (var (node, chain) in Leaves)
             {
-                if (node.File.ResourceFork.Length == 0 && TryDataForkAsFork(node.File.DataFork, options) is { } inData)
-                {
-                    reporter.Write(Source(input, node.File), inData.Diagnostics);
-                    entries.Add(new ForkEntry(node, [.. chain, "data fork as resource fork"], inData));
-                    continue;
-                }
-                ResourceFork? fork = null;
-                if (node.File.ResourceFork.Length > 0)
-                {
-                    try
-                    {
-                        fork = ReadFork(node.File.ResourceFork, options);
-                        reporter.Write(Source(input, node.File), fork.Diagnostics);
-                    }
-                    catch (InvalidDataException e)
-                    {
-                        reporter.Write(Source(input, node.File), [new Diagnostic(DiagnosticSeverity.Error, "fork.unreadable", e.Message)]);
-                    }
-                }
-                entries.Add(new ForkEntry(node, chain, fork));
+                var diagnostics = new List<Diagnostic>();
+                var found = MacFileResources.Read(node.File, options, diagnostics);
+                reporter.Write(Source(input, node.File), diagnostics);
+                entries.Add(new ForkEntry(node, found.Source == ResourceForkSource.DataFork ? [.. chain, "data fork as resource fork"] : chain, found.Fork));
             }
             return entries;
-        }
-
-        internal static ResourceFork ReadFork(ForkData fork, ReadOptions options)
-        {
-            using var stream = fork.Open();
-            return ResourceFork.Read(stream, options);
         }
 
         // Where a diagnostic came from: the input, and the Mac file inside it when that has another name.
@@ -81,37 +56,6 @@ namespace ClassicMac.Resources.Cli
         {
             var name = file.MacPath;
             return name == input.Name ? input.Name : $"{input.Name} > {name}";
-        }
-
-        // A data fork that reads as a resource fork with at least one resource and no errors, or null.
-        private static ResourceFork? TryDataForkAsFork(ForkData data, ReadOptions options)
-        {
-            if (!PlausibleHeader(data)) return null;
-            try
-            {
-                var fork = ReadFork(data, options);
-                return fork.Resources.Count > 0 && !fork.Diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error)
-                    ? fork
-                    : null;
-            }
-            catch (InvalidDataException)
-            {
-                return null;
-            }
-        }
-
-        // A cheap look at a fork header, so data files are not all read in full: the data and map areas lie inside
-        // the fork, after the 16-byte header, and the map is at least its fixed part long.
-        private static bool PlausibleHeader(ForkData data)
-        {
-            if (data.Length is < 256 or > ResourceFork.MaxForkLength) return false;
-            var header = data.ReadPrefix(16);
-            long dataOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header);
-            long mapOffset = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
-            long dataLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
-            long mapLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(12));
-            return dataOffset >= 16 && mapOffset >= 16 && mapLength >= 30 && dataOffset + dataLength <= data.Length
-                && mapOffset + mapLength <= data.Length;
         }
 
         private static void Collect(ContainerNode node, List<string> chain, List<(ContainerNode, IReadOnlyList<string>)> leaves)
