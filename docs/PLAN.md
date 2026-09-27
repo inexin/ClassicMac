@@ -147,6 +147,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 | `ReadOptions` | Resources | Max decompressed resource size (64 MiB), Resource Manager model (Mac OS 9), text encoding override (none) |
 | `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off) |
+| `HostWriteOptions` | Files | Layout for unpacked files (AppleDouble or Basilisk II; AppleDouble), max path length (200 characters), overwrite (off), time zone for dates (local) |
 | `PackOptions` | Resources | Base fork (none), allow deletes (off) |
 
 Options objects are immutable records with `with` for changes, so one instance can be shared across threads; the
@@ -175,7 +176,9 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
 | Files.Iso | `IsoReader` | ISO 9660 and High Sierra volumes as Mac OS 9 shows them: `AA`/`BA` Finder info, associated files as resource forks |
 | Files.Containers | `ExtensionMap` | Internet Config's name-ending map, as File Exchange applies it to `TEXT`/`dosa` files; opt-in through `ContainerReadOptions.ExtensionMap` |
-| Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
+| Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks; `Write` puts a Mac file back on disk as AppleDouble or Basilisk II |
+| Files | `HostNames` | Mac names as safe, distinct host names (`%XX` escapes, reserved Windows names, collisions, length), shared by `unpack` and `extract` |
+| Files.Containers | `AppleDoubleWriter` | AppleDouble v2 `._` files: real name, dates, Finder info, resource fork |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
 | Resources | `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
@@ -202,6 +205,7 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 | --- | --- | --- | --- |
 | `info <input>` | Companions, container chain, Finder info, dates, fork sizes (built) | — | 1 |
 | `list <input>` | Resources of every file inside the input, through containers; a data fork holding a resource fork (Realmz `.rsf`) or a raw fork file is read as a fork (built) | `--format text\|json` | 1 |
+| `unpack <input>` | Every Mac file inside the input, through containers and disk images, to a folder with both forks and Finder info; folders kept, a container of one file replaced by it, a disk or archive of several becomes a folder (built) | `-o <dir>`, `--layout appledouble\|basilisk`, `--overwrite` | 2 |
 | `extract <input>` | Resources into a folder with a manifest | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`; later `--depth`, `--encoding` | 1 (raw), 3 (decoded) |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest | `-o <file>`, `--base <fork>`, `--allow-deletes`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
 
@@ -550,7 +554,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    images (`ClassicMac.Files.Iso`: ISO 9660 and High Sierra built; raw sectors and cue sheets next); zip and tar with
    Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
-   images) lists and extracts with both forks and Finder info, and file and folder counts match each volume's.
+   images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
+   (`classicmac unpack`, built: every corpus image unpacks and reads back identically).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later

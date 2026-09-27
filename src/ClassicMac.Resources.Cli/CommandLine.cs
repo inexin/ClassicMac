@@ -9,7 +9,7 @@ using ClassicMac.Files;
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// The <c>classicmac</c> command tree. Phase 1 has <c>info</c>, <c>list</c> and <c>extract</c>; <c>pack</c> joins
+    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c> and <c>extract</c>; <c>pack</c> joins
     /// in phase 5. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
     /// </summary>
     internal sealed class CommandLine(TextWriter output, TextWriter error)
@@ -90,6 +90,7 @@ namespace ClassicMac.Resources.Cli
             root.Options.Add(quiet);
             root.Subcommands.Add(InfoCommand());
             root.Subcommands.Add(ListCommand());
+            root.Subcommands.Add(UnpackCommand());
             root.Subcommands.Add(ExtractCommand());
             return root;
         }
@@ -120,6 +121,40 @@ namespace ClassicMac.Resources.Cli
             var command = new Command("list", "List the files and resources inside the input") { input, format };
             command.SetAction(result => new ListCommand(output, error).Run(
                 result.GetRequiredValue(input), result.GetValue(format), ReadOptionsFrom(result),
+                ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
+            return command;
+        }
+
+        internal enum UnpackLayout
+        {
+            AppleDouble,
+            Basilisk,
+        }
+
+        private Command UnpackCommand()
+        {
+            var input = InputArgument();
+            var outputDir = new Option<DirectoryInfo>("--output", "-o")
+            {
+                Description = "Output folder (default: \"<input> unpacked\" next to the input)",
+            };
+            var layout = new Option<UnpackLayout>("--layout")
+            {
+                Description = "How resource forks and Finder info are stored: AppleDouble ._ files, or Basilisk II / SheepShaver .rsrc and .finf folders",
+                DefaultValueFactory = _ => UnpackLayout.AppleDouble,
+            };
+            var overwrite = new Option<bool>("--overwrite") { Description = "Replace existing files" };
+            var command = new Command("unpack", "Write every Mac file inside the input, with both forks and Finder info, to a folder")
+            {
+                input, outputDir, layout, overwrite,
+            };
+            command.SetAction(result => new UnpackCommand(output, error).Run(
+                result.GetRequiredValue(input), result.GetValue(outputDir),
+                HostWriteOptions.Default with
+                {
+                    Layout = result.GetValue(layout) == UnpackLayout.Basilisk ? HostLayout.BasiliskII : HostLayout.AppleDouble,
+                    Overwrite = result.GetValue(overwrite),
+                },
                 ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
             return command;
         }

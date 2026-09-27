@@ -28,6 +28,9 @@
   `ClassicMac.Files` references `ClassicMac.Resources`.
 - CD volumes in `ClassicMac.Files.Iso`: ISO 9660 and High Sierra as Mac OS 9 reads them (Apple `AA`/`BA` Finder
   info, associated files as resource forks, the Mac's name, date and listing rules), matching OS 9 on a test disc.
+- Writing Mac files to the host: `HostFiles.Write` (AppleDouble or Basilisk II layout, `HostWriteOptions`),
+  `AppleDoubleWriter`, `HostNames`, `FinderInfo.Write`; `classicmac unpack` writes every file inside an input
+  (through containers and disk images) to a folder.
 - `classicmac` CLI: `info` and `list` read through containers and disk images, showing Mac paths (text or JSON);
   `extract` parsed, not yet implemented;
   limit options, exit codes.
