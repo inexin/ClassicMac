@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>ClassicMac.Resources</PackageId>
+    <Description>Dependency-free reader and writer for classic Mac OS resource forks and the containers they travel in (AppleDouble, AppleSingle, MacBinary, BinHex, HFS disk images).</Description>
+    <PackageTags>macintosh;classic-mac;resource-fork;rsrc;macbinary;binhex;appledouble;hfs</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Resources.Tests" />
+  </ItemGroup>
+
+</Project>

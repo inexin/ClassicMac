@@ -13,3 +13,12 @@
 *.pct     binary
 *.png     binary
 *.rsrc    binary
+
+# Binary test data: resource forks and containers.
+*.rsrc    binary
+*.bin     binary
+*.hqx     binary
+*.dsk     binary
+*.img     binary
+*.png     binary
+*.wav     binary

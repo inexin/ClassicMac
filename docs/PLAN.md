@@ -197,6 +197,26 @@ flowchart LR
 - **Own core (decided):** the resource map and disk-image layers are written here, because writing and exact Apple
   behaviour are needed throughout; ResourceForkReader, HfsReader and MfsReader (read-only) serve as cross-checks.
 
+### Repository layout and build
+
+```
+ClassicMac.slnx
+global.json                 .NET 10 SDK, rolling forward to the latest feature band
+Directory.Build.props       shared settings (below) and package metadata
+Directory.Packages.props    every package version, in one place
+src/ClassicMac.<Package>/   one folder per package; the app goes in src/ClassicMac.App/
+tests/ClassicMac.<Package>.Tests/
+tests/fixtures/             synthetic fixtures (and their Rez sources)
+schemas/                    manifest JSON Schemas
+tools/                      fixture and table generators; never packed
+```
+
+- **Every project:** `net10.0`, nullable enabled, warnings as errors, implicit usings off, deterministic builds.
+- **Projects under `src/`:** XML documentation, `IsAotCompatible` (trimming and AOT analysers on), so the CLI can
+  publish as a native executable; tests and tools are never packable.
+- **Packages** are referenced without versions; `Directory.Packages.props` holds them.
+- **CI:** `dotnet test` on Windows, Linux and macOS for every push; fuzzing and the Rez hash check join as they arrive.
+
 ### Target layering after the QuickDraw.Pict merge
 
 When QuickDraw.Pict moves into ClassicMac, it is split so every dependency points down: QuickTime and MacPaint stop
