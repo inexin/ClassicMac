@@ -180,7 +180,7 @@ public class ResourceForkReadWriteTests
         var fork = ResourceFork.Read(bytes);
 
         Assert.Equal(3, fork.Resources.Count);
-        AssertCodes(fork, "fork.data-length", "fork.map-length", "fork.header-mismatch");
+        AssertCodes(fork, "fork.data-length", "fork.map-length", "fork.header-mismatch", "fork.mac-rejects");
     }
 
     [Fact]
@@ -215,7 +215,7 @@ public class ResourceForkReadWriteTests
         var fork = ResourceFork.Read(bytes);
 
         Assert.Null(fork.Find(Test, 128));
-        AssertCodes(fork, "resource.data-out-of-range");
+        AssertCodes(fork, "resource.data-out-of-range", "fork.mac-rejects");
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class ResourceForkReadWriteTests
         var fork = ResourceFork.Read(bytes);
 
         Assert.Null(fork.Find(Test, 128)!.Name);
-        AssertCodes(fork, "resource.name-out-of-range");
+        AssertCodes(fork, "resource.name-out-of-range", "fork.mac-rejects");
     }
 
     [Fact]
@@ -283,6 +283,150 @@ public class ResourceForkReadWriteTests
 
         Assert.Equal([1, 2, 3], fork.Find(Snd, 1)!.GetData().ToArray());
         AssertCodes(fork, "resource.data-overlap");
+    }
+
+    // --- Write layout: what the Resource Manager's compaction does ---
+
+    private static int DataOffsetOf(byte[] fork, FourCC type, short id)
+    {
+        var read = ResourceFork.Read(fork);
+        var written = read.ToArray();
+        Assert.Equal(fork, written);
+        // Find the reference entry and return its 24-bit data offset.
+        var map = BinaryPrimitives.ReadInt32BigEndian(fork.AsSpan(4));
+        var typeList = map + BinaryPrimitives.ReadUInt16BigEndian(fork.AsSpan(map + 24));
+        var types = BinaryPrimitives.ReadUInt16BigEndian(fork.AsSpan(typeList)) + 1;
+        for (var i = 0; i < types; i++)
+        {
+            var entry = typeList + 2 + i * 8;
+            if (new FourCC(fork.AsSpan(entry, 4)) != type) continue;
+            var refs = typeList + BinaryPrimitives.ReadUInt16BigEndian(fork.AsSpan(entry + 6));
+            var count = BinaryPrimitives.ReadUInt16BigEndian(fork.AsSpan(entry + 4)) + 1;
+            for (var r = 0; r < count; r++)
+            {
+                if (BinaryPrimitives.ReadInt16BigEndian(fork.AsSpan(refs + r * 12)) == id)
+                    return (int)(BinaryPrimitives.ReadUInt32BigEndian(fork.AsSpan(refs + r * 12 + 4)) & 0xFFFFFF);
+            }
+        }
+        throw new InvalidOperationException("Not found.");
+    }
+
+    [Fact]
+    public void Grown_data_moves_to_the_end_and_unchanged_data_keeps_its_place()
+    {
+        var fork = ResourceFork.Read(Canonical());
+        fork.Find(Test, 128)!.SetData(new byte[] { 1, 2, 3, 4, 5 }); // grows: moves after the others
+        fork.Find(Test, -1)!.SetData(ReadOnlyMemory<byte>.Empty); // same size: stays
+        var written = fork.ToArray();
+
+        Assert.Equal(0, DataOffsetOf(written, Test, -1));
+        Assert.Equal(4, DataOffsetOf(written, Snd, 1));
+        Assert.Equal(9, DataOffsetOf(written, Test, 128));
+    }
+
+    [Fact]
+    public void A_new_name_moves_to_the_end_of_the_name_list()
+    {
+        var fork = ResourceFork.Read(Canonical());
+        fork.Find(Test, 128)!.Name = new MacString("Hello"u8);
+        var written = fork.ToArray();
+
+        var map = BinaryPrimitives.ReadInt32BigEndian(written.AsSpan(4));
+        var names = map + BinaryPrimitives.ReadUInt16BigEndian(written.AsSpan(map + 26));
+        Assert.Equal(Hex("00 05 48656C6C6F"), written[names..]); // "" first, then "Hello"
+    }
+
+    [Fact]
+    public void Shared_data_stays_shared_when_written()
+    {
+        var bytes = Canonical();
+        Hex("000000").CopyTo(bytes, SndReferences + 5); // 'snd ' 1 shares 'TEST' 128's data
+        var fork = ResourceFork.Read(bytes);
+        var written = fork.ToArray();
+
+        Assert.Equal(DataOffsetOf(written, Test, 128), DataOffsetOf(written, Snd, 1));
+        Assert.Equal([1, 2, 3], ResourceFork.Read(written).Find(Snd, 1)!.GetData().ToArray());
+        Assert.Equal(written.Length, ResourceFork.Read(written).ToArray().Length);
+    }
+
+    [Fact]
+    public void Compact_and_changed_map_attributes_are_not_written()
+    {
+        var fork = new ResourceFork
+        {
+            Attributes = ResourceForkAttributes.ReadOnly | ResourceForkAttributes.Compact | ResourceForkAttributes.Changed,
+        };
+        var written = fork.ToArray();
+        Assert.Equal(0x80, written[256 + 22]);
+    }
+
+    [Fact]
+    public void Reference_handle_fields_round_trip()
+    {
+        var bytes = Canonical();
+        Hex("1DC6A548").CopyTo(bytes, TestReferences + 8); // memory the Resource Manager left in the handle field
+        Assert.Equal(bytes, ResourceFork.Read(bytes).ToArray());
+    }
+
+    [Fact]
+    public void A_new_fork_matches_CreateResFile()
+    {
+        // Mac OS 9's CreateResFile: header 100/100/0/1E, 240 zero bytes, empty map with type count $FFFF.
+        var expected = new byte[286];
+        Hex("00000100 00000100 00000000 0000001E").CopyTo(expected, 0);
+        Hex("00000100 00000100 00000000 0000001E 00000000 0000 0000 001C 001E FFFF").CopyTo(expected, 256);
+        Assert.Equal(Convert.ToHexString(expected), Convert.ToHexString(new ResourceFork().ToArray()));
+    }
+
+    // --- What the Resource Manager would open ---
+
+    private static List<string> Codes(byte[] bytes, ResourceManagerModel model) =>
+        ResourceFork.Read(bytes, ReadOptions.Default with { ResourceManager = model }).Diagnostics.Select(d => d.Code).ToList();
+
+    [Fact]
+    public void A_data_offset_inside_the_header_is_rejected_by_OS_9_only()
+    {
+        var bytes = Canonical();
+        BinaryPrimitives.WriteUInt32BigEndian(bytes, 16); // data "starts" in the reserved area (harness T06)
+        Assert.Contains("fork.mac-rejects", Codes(bytes, ResourceManagerModel.MacOS9));
+        Assert.DoesNotContain("fork.mac-rejects", Codes(bytes, ResourceManagerModel.Rom68k));
+    }
+
+    [Fact]
+    public void A_negative_type_count_is_rejected_by_OS_9_only()
+    {
+        var bytes = Canonical();
+        BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(TypeList), 0x8000); // harness T19
+        Assert.Contains("fork.mac-rejects", Codes(bytes, ResourceManagerModel.MacOS9));
+        Assert.DoesNotContain("fork.mac-rejects", Codes(bytes, ResourceManagerModel.Rom68k));
+    }
+
+    [Fact]
+    public void A_resource_count_of_FFFF_opens_on_OS_9_and_hangs()
+    {
+        var bytes = Canonical();
+        BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(TypeList + 2 + 4), 0xFFFF); // harness T20
+        var codes = Codes(bytes, ResourceManagerModel.MacOS9);
+        Assert.DoesNotContain("fork.mac-rejects", codes);
+        Assert.Contains("fork.mac-hangs", codes);
+    }
+
+    [Fact]
+    public void Reference_lists_out_of_type_order_are_reported()
+    {
+        var bytes = Canonical();
+        // Swap the two types' reference-list offsets (harness T22): the lists no longer follow in type order.
+        BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(TypeList + 2 + 6), 42);
+        BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(TypeList + 2 + 8 + 6), 18);
+        Assert.Contains("fork.ref-lists-out-of-order", Codes(bytes, ResourceManagerModel.MacOS9));
+    }
+
+    [Fact]
+    public void Well_formed_forks_open_everywhere()
+    {
+        Assert.Empty(Codes(Canonical(), ResourceManagerModel.MacOS9));
+        Assert.Empty(Codes(Canonical(), ResourceManagerModel.Rom68k));
+        Assert.Empty(Codes(new ResourceFork().ToArray(), ResourceManagerModel.MacOS9));
     }
 
     [Fact]

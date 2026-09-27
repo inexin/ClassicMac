@@ -19,13 +19,26 @@ namespace ClassicMac.Resources
             if (bytes.Length < HeaderLength)
                 throw new InvalidDataException($"A resource fork needs a {HeaderLength}-byte header; this is {bytes.Length}.");
 
+            // Whether the Mac would open the fork; said in the diagnostics, and in the exception when we cannot read it.
+            var verdict = "";
+            if (ResourceForkChecks.Rejects(bytes, options.ResourceManager) is var (error, reason))
+            {
+                var who = options.ResourceManager == ResourceManagerModel.Rom68k ? "The 68k ROM" : "Mac OS 9";
+                var name = error switch { -39 => "eofErr", -40 => "posErr", -50 => "paramErr", _ => "mapReadErr" };
+                verdict = error == 0
+                    ? $"{who} would open this fork but read memory past its map: {reason}."
+                    : $"{who} would not open this fork ({name} {error}): {reason}.";
+                fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning,
+                    error == 0 ? "fork.mac-misreads" : "fork.mac-rejects", $"{verdict} Read anyway."));
+            }
+
             long dataOffset = BinaryPrimitives.ReadUInt32BigEndian(bytes);
             long mapOffset = BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]);
             long dataLength = BinaryPrimitives.ReadUInt32BigEndian(bytes[8..]);
             long mapLength = BinaryPrimitives.ReadUInt32BigEndian(bytes[12..]);
 
             if (mapOffset + MapHeaderLength > bytes.Length)
-                throw new InvalidDataException($"The resource map at {mapOffset} lies outside the {bytes.Length}-byte fork.");
+                throw new InvalidDataException($"The resource map at {mapOffset} lies outside the {bytes.Length}-byte fork. {verdict}".TrimEnd());
 
             var mapEnd = mapOffset + mapLength;
             if (mapLength < MapHeaderLength || mapEnd > bytes.Length)
@@ -63,11 +76,14 @@ namespace ClassicMac.Resources
             var typeList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapTypeListOffsetOffset)..]);
             var nameList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapNameListOffsetOffset)..]);
             if (typeList + TypeCountLength > mapEnd)
-                throw new InvalidDataException($"The type list at {typeList} lies outside the resource map.");
+                throw new InvalidDataException($"The type list at {typeList} lies outside the resource map. {verdict}".TrimEnd());
 
             var context = new Context(input, fork, options, dataOffset, dataEnd, mapEnd, nameList);
             var typeCount = (ushort)(BinaryPrimitives.ReadUInt16BigEndian(bytes[(int)typeList..]) + 1);
             var seenTypes = new HashSet<FourCC>();
+            // The Resource Manager assumes the reference lists follow the type list contiguously, in type order.
+            long expectedReferences = TypeCountLength + (long)typeCount * TypeEntryLength;
+            var outOfOrderReported = false;
             for (var i = 0; i < typeCount; i++)
             {
                 var entry = typeList + TypeCountLength + (long)i * TypeEntryLength;
@@ -84,8 +100,24 @@ namespace ClassicMac.Resources
                 if (!seenTypes.Add(type))
                 {
                     fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "fork.duplicate-type",
-                        $"Type '{type}' appears more than once in the type list; its lists are merged.", entry));
+                        $"Type '{type}' appears more than once in the type list; its lists are merged. On the Mac, " +
+                        "counting and indexing see only the first list; Mac OS 9's GetResource searches all, the ROM's " +
+                        "only the first.", entry));
                 }
+                if (count - 1 >= 0x7FFF && options.ResourceManager == ResourceManagerModel.MacOS9)
+                {
+                    fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "fork.mac-hangs",
+                        $"Type '{type}' claims {count} resources; Mac OS 9 opens such a fork and then loops forever " +
+                        "preloading it.", entry));
+                }
+                if (references - typeList != expectedReferences && !outOfOrderReported)
+                {
+                    outOfOrderReported = true;
+                    fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "fork.ref-lists-out-of-order",
+                        $"The reference list of '{type}' is not where the previous lists end; the Mac assumes they are " +
+                        "contiguous in type order and would report wrong IDs and names for later types.", entry));
+                }
+                expectedReferences = references - typeList + (long)count * ReferenceEntryLength;
                 ReadReferences(context, type, count, references);
             }
 
@@ -124,6 +156,12 @@ namespace ClassicMac.Resources
 
                 var resource = new Resource(type, id, data.Value) { Attributes = attributes };
                 if (nameOffset != NoName) resource.Name = ReadName(context, label, nameOffset, entry);
+                // Where the data and name sat, and the handle field, so the writer can lay the fork out as the
+                // Resource Manager's compaction would and keep what real files carry.
+                resource.DataPlacement = dataOffset;
+                resource.NamePlacement = nameOffset;
+                resource.DataModified = false;
+                resource.StoredHandle = BinaryPrimitives.ReadUInt32BigEndian(e[8..]);
                 context.Fork.Add(resource);
             }
         }
@@ -148,7 +186,8 @@ namespace ClassicMac.Resources
             if (length > available)
             {
                 context.Report(DiagnosticSeverity.Error, "resource.data-truncated",
-                    $"{label} claims {length} bytes but only {available} remain; the rest is missing.", start);
+                    $"{label} claims {length} bytes but only {available} remain; the rest is missing (the Mac " +
+                    "cannot load it at all: eofErr).", start);
                 length = available;
             }
             context.Blocks.Add((start, start + 4 + length, label));

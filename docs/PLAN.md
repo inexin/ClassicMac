@@ -79,14 +79,23 @@ don't need the containers, and each package stays smaller to test and fuzz. The 
 - **API shape:** read from a `Stream` or memory. A fork's 24-bit data offsets cap it at 16 MiB of data, so a fork is
   loaded whole and each resource's data is a slice of that buffer; laziness lives one level up, in `ForkData`, so
   disk images stay cheap to open.
-- **Canonical writing (decided):** the writer always produces one compact layout — header, reserved areas, data in
-  type then resource order, the map with its type list at 28, reference lists, then names. Real forks carry gaps,
-  stale bytes and runtime values, so round trips are judged on the model; forks already in canonical layout come
-  back byte for byte. The layout is fitted to real files, to be checked against Rez and the Resource Manager.
+- **Canonical writing (decided):** the writer produces what the Resource Manager's compaction leaves (UpdateResFile /
+  CloseResFile, from the ROM and Mac OS 9 disassembly, checked in SheepShaver): header; the reserved areas; data items
+  packed with no padding in ascending order of where they were, added or grown data after the old data, shared data
+  kept shared; the map with the header copy, its runtime fields as read (zero for a new fork), attributes without
+  compact and changed ($60), type list at 28, types in the order first added, references in the order added, names in
+  the order set (a new name goes to the end). A new fork matches CreateResFile (286 bytes). Round trips are judged on
+  the model; a fork the Mac left compacted comes back byte for byte — 142 of 152 corpus forks, and 29 of 33 forks
+  written by Mac OS 9 in the harness (the rest: stale bytes left by in-place shrinking, duplicate IDs, and a fork
+  OS 9 itself corrupts).
 - **Duplicates (decided):** a damaged fork with two resources of the same type and ID keeps the first, as
-  `GetResource` would, and reports the rest.
+  `GetResource` would (confirmed in the harness), and reports the rest. A type listed twice is merged (Mac OS 9's
+  GetResource searches all its lists; counting and indexing see only the first).
 - **Tolerant reading:** truncated or overlapping entries go to a diagnostics list (severity, offset, message), not
-  exceptions; only unusable input throws.
+  exceptions; only unusable input throws. The reader also reports whether the modelled Resource Manager would open the
+  fork (`fork.mac-rejects`, from Mac OS 9's vNewMap/CheckMap or the ROM's much weaker checks, matching the analysis
+  model on all harness forks it reads), would read past its map (`fork.mac-misreads`), would hang (a resource count of
+  $FFFF), or would misread reference lists that are not contiguous in type order.
 - **Writing:** rebuild a fork from the model, for modding and round-trip tests.
 - **Text encodings:** MacRoman by default; the script of a file or of a font picks other Mac encodings (Japanese,
   Cyrillic, …). See [Text encodings](#text-encodings).
@@ -171,8 +180,8 @@ so the two packages need no reference to each other; a convenience overload taki
   everything describing a file (`MacFile`, `FinderInfo`, options) is an immutable record. The model is not
   thread-safe.
 - **Uniqueness enforced:** a fork holds one resource per type and ID, and a resource belongs to one fork at a time.
-- **Order kept:** resources stay in the order read, and the reserved header areas are kept, so a canonical fork is
-  written back byte for byte.
+- **Order kept:** resources stay in the order read, and each resource remembers where its data and name sat and its
+  handle field, so a fork the Mac left compacted is written back byte for byte.
 
 ### CLI
 

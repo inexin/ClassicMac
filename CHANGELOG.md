@@ -6,7 +6,8 @@
 - Packages: `ClassicMac.Core` (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `UnsignedFixed`,
   diagnostics), `ClassicMac.Files` (`MacFile`, `FinderInfo`, `ForkData`, `IContainerReader`, `ContainerReadOptions`)
   and `ClassicMac.Resources` (`Resource`, `ResourceFork`, `ReadOptions`), each with its own test project.
-- Resource fork reader (damage reported as diagnostics) and canonical writer; map attributes (`mAttr`) and map
+- Resource fork reader (damage reported as diagnostics; whether Mac OS 9 or the ROM would open the fork) and a
+  writer that lays forks out as the Resource Manager's compaction does; map attributes (`mAttr`) and map
   flags (`mInMemoryAttr`) kept as separate bytes.
 - Compressed resources: `ResourceDecompression` with System `dcmp` 0–3 (from disassembly), including dcmp 3's
   overshoot into the memory after the block; Mac OS 9 or 68k ROM Resource Manager behaviour via
