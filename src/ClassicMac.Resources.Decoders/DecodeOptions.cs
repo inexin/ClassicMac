@@ -35,6 +35,21 @@ namespace ClassicMac.Resources.Decoders
 
         /// <summary>How line breaks are written in <c>.txt</c> output. Default LF.</summary>
         public LineEndings LineEndings { get; init; } = LineEndings.Lf;
+
+        /// <summary>How pictures and icons are written. Default PNG.</summary>
+        public Images.IImageEncoder ImageEncoder { get; init; } = Images.PngEncoder.Instance;
+
+        /// <summary>
+        /// The screen depth pictures are drawn at: 32 (the default, full colour), or 1, 2, 4, 8 or 16 bits, where
+        /// QuickDraw's colour matching and dithering for that depth apply (the output is still RGBA).
+        /// </summary>
+        public int ScreenDepth { get; init; } = 32;
+
+        /// <summary>The largest picture decoded, in pixels (width × height). Default 64 megapixels.</summary>
+        public long MaxImagePixels { get; init; } = 64L * 1024 * 1024;
+
+        /// <summary>Whose QuickDraw pictures are drawn as: Mac OS 9's (the default) or the 68k ROM's.</summary>
+        public ResourceManagerModel QuickDraw { get; init; } = ResourceManagerModel.MacOS9;
     }
 
     /// <summary>The built-in decoders.</summary>

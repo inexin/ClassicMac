@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
+    <PackageReference Include="QuickDraw.Pict" />
   </ItemGroup>
 
   <ItemGroup>
