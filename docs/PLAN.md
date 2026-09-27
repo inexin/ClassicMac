@@ -49,8 +49,8 @@ Single-file containers yield one entry; disk images and archives yield a tree of
 
 **File layer and resource map are separate packages (decided).** Containers wrap whole Mac files (both forks and
 Finder info), not resource forks, so they live apart from the resource map in one package, `ClassicMac.Files`: the
-file model and single-file wrappers, `ClassicMac.Files.Hfs` for HFS and MFS volumes and disk images, and later
-`ClassicMac.Files.Fat` and `ClassicMac.Files.Archives`.
+file model and single-file wrappers, `ClassicMac.Files.Hfs` for HFS and MFS volumes and disk images, `ClassicMac.Files.Fat` for FAT volumes, and later
+`ClassicMac.Files.Archives`.
 People who only unpack old downloads or disk images don't need the resource map, people who only edit resource forks
 don't need the containers, and each package stays smaller to test and fuzz. The types both sides use — `FourCC`
 (types, creators, resource types), `MacString` (file and resource names), `MacDate` (file and volume dates, and the
@@ -166,6 +166,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
 | Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
 | Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2 images, Apple partition maps; each yields files the next can open |
+| Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
 | Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
@@ -278,7 +279,7 @@ its own and the heavy dependencies stay optional. Arrows point from a package to
 flowchart LR
     B["ClassicMac.Core<br/>FourCC, MacString, MacDate,<br/>Point, Rect, Fixed,<br/>diagnostics"]
     subgraph filelayer["File layer"]
-        F["ClassicMac.Files<br/>Mac files, Finder info, host folders;<br/>.Containers: AppleSingle/Double,<br/>MacBinary, BinHex, PC Exchange;<br/>.Hfs: HFS/MFS, DiskCopy 4.2;<br/>later .Fat, .Archives"]
+        F["ClassicMac.Files<br/>Mac files, Finder info, host folders;<br/>.Containers: AppleSingle/Double,<br/>MacBinary, BinHex, PC Exchange;<br/>.Hfs: HFS/MFS, DiskCopy 4.2;<br/>.Fat: FAT, DOS partitions;<br/>later .Archives"]
     end
     subgraph resourcelayer["Resource layer"]
         M["ClassicMac.Resources<br/>resource map, dcmp,<br/>read and write"]
@@ -299,7 +300,8 @@ flowchart LR
     `ContainerUnwrapper`, options;
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
   - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, DiskCopy 4.2 (NDIF and HFS+ later);
-  - `ClassicMac.Files.Fat` (later): FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them;
+  - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
+    (MBR) partition tables;
   - `ClassicMac.Files.Archives` (later): StuffIt and Compact Pro.
 - **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only (Files only if a convenience overload
   ever needs it).
@@ -433,7 +435,10 @@ They change what running applications see, not what a file contains.
   creation comes from the DOS entry, modification is the later of the DOS entry's and the record's; DOS keeps even
   seconds, and years from 2032 read as 128 years earlier (Mac 1904–1979); the extension→type map only replaces the
   `TEXT`/`dosa` placeholder on display and is never stored, so a placeholder record reads as `TEXT`/`dosa`. The
-  record packing's cluster size is not stored and is found by trying the FAT sizes (fitted).
+  record packing's cluster size is not stored and is found by trying the FAT sizes (fitted) — on a FAT volume the
+  reader knows it. A floppy File Exchange wrote reads as OS 9 listed it (local test against the harness log).
+- **FAT:** Microsoft's FAT specification (fatgen103): BPB, type by cluster count, 12/16/28-bit entries, VFAT long
+  names; DOS partition tables by the standard MBR layout. Not Apple formats, so no Apple code decides them.
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
@@ -486,10 +491,11 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 | [macresources](https://github.com/elliotnunn/macresources) | Python, MIT; dormant since 2020 | Rez-style text dumps, round trip, BinHex, `dcmp` 2 (GreggyBits) | Round-trip design; `dcmp` 2 reference |
 | [machfs](https://github.com/elliotnunn/machfs) | Python, MIT | Reads and writes HFS volumes | Reference for writing HFS images |
 | [resource_dasm](https://github.com/fuzziqersoftware/resource_dasm) | C++, MIT; very active | Decodes a very wide range of resource types to modern formats; `dcmp` via 68k emulation; disassembly | Widest coverage to compare output against |
-| Claunia.RsrcFork (Aaru) | C#; NuGet, ~16k downloads | Resource fork reading for the [Aaru](https://github.com/aaru-dps/Aaru) preservation suite | Cross-check; Aaru for disk-image formats |
+| Claunia.RsrcFork (Aaru) | C#; NuGet, ~16k downloads | Resource fork reading for the [Aaru](https://github.com/aaru-dps/Aaru) preservation suite | Cross-check; Aaru for disk-image formats (its FAT reader and host-folder PC Exchange filter are LGPL: reference only) |
 | [HFSExplorer](https://github.com/unsound/hfsexplorer) | Java, GPL-3 | GUI browser for HFS/HFS+ images, extracts both forks | UX reference for the viewer |
 | [XADMaster](https://github.com/MacPaw/XADMaster) | C/Objective-C, LGPL-2.1 | The Unarchiver's engine: StuffIt, Compact Pro, BinHex, MacBinary | Reference for archive formats |
 | [mpw](https://github.com/ksherlock/mpw) | C | Runs Apple's MPW tools (Rez, DeRez) on modern systems | Ground truth: compile/decompile with Apple's own Rez |
+| [DiscUtils](https://github.com/LTRData/DiscUtils) (LTRData fork) | C#, MIT; NuGet `LTRData.DiscUtils.Fat`, active | Reads, formats and writes FAT12/16/32 with long names; nothing Mac | Cross-check for the FAT layer; candidate base for FAT writing |
 | [ResourceForker](https://github.com/csammis/ResourceForker) | C; dormant since 2016 | Small utilities to split resource forks | Minor reference |
 
 ## Phases
@@ -501,7 +507,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    CLI `list` and raw `extract`. *Exit:* read → write → read gives the same model on every corpus fork, and canonical
    forks come back byte for byte.
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
-   map; then `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data) and NDIF; recursive
+   map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then NDIF; recursive
    unwrapping through all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and extracts with both forks and Finder info, and file and folder counts match each volume's.
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
@@ -549,7 +555,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   with the package name, and areas inside a package get sub-namespaces (`ClassicMac.Files.Hfs`); format specs live
   under `docs/formats/`.
 - **One file-layer package (revised):** the file layer is a single package, `ClassicMac.Files`, with one namespace
-  per area (containers, HFS/MFS, later FAT and archives), to avoid a project per format; it stays separate from
+  per area (containers, HFS/MFS, FAT, later archives), to avoid a project per format; it stays separate from
   `ClassicMac.Resources`, so resource-only users skip the containers and vice versa; the shared
   types (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic`) sit in the dependency-free
   base `ClassicMac.Core` (see Inputs).
