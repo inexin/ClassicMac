@@ -39,16 +39,26 @@
           "id": { "type": "integer", "minimum": -32768, "maximum": 32767 },
           "name": { "type": ["string", "null"] },
           "attributes": { "type": "integer", "minimum": 0, "maximum": 255 },
-          "size": { "type": "integer", "minimum": 0, "description": "Length of the file written (decompressed when compressed)." },
+          "size": { "type": "integer", "minimum": 0, "description": "Length of the main file written." },
           "storedSize": { "type": "integer", "minimum": 0, "description": "Length of the data as stored in the fork." },
           "dcmp": { "type": ["integer", "null"], "description": "Decompressor ID of a compressed resource." },
-          "decoder": { "type": "string", "description": "What wrote the file; \"raw\" is the data itself." },
+          "decoder": { "type": "string", "description": "What wrote the files; \"raw\" is the data itself (decompressed), otherwise the decoder's name." },
           "decoderVersion": { "type": "integer", "minimum": 1 },
           "path": { "type": "string", "description": "Relative to the manifest, '/'-separated." },
           "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "storedSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "rawPath": { "type": ["string", "null"], "description": "Copy of the stored bytes in raw/, when kept." },
-          "warnings": { "type": "array", "items": { "type": "string" } }
+          "warnings": { "type": "array", "items": { "type": "string" } },
+          "otherFiles": {
+            "description": "Since 1.1: files the decoder wrote besides the main one.",
+            "type": ["array", "null"],
+            "items": {
+              "type": "object",
+              "required": ["path", "sha256"],
+              "properties": { "path": { "type": "string" }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+            }
+          },
+          "encoding": { "type": ["string", "null"], "description": "Since 1.1: the text encoding used (IANA name, e.g. macintosh)." }
         }
       }
     },

@@ -57,18 +57,52 @@ namespace ClassicMac.Resources.Export
             {
                 var warnings = new List<Diagnostic>();
                 var data = ResourceDecompression.Default.GetData(resource, fork, options.ReadOptions, warnings);
-                diagnostics.AddRange(warnings);
                 var stored = resource.GetData();
 
+                // The first decoder for the type, or the data itself; a decoder that fails leaves the data.
+                IReadOnlyList<DecodedFile> outputs = [new DecodedFile(Extension, data)];
+                var (decoderName, decoderVersion) = ("raw", 1);
+                if (options.Decoders.FirstOrDefault(d => d.CanDecode(resource.Type)) is { } decoder)
+                {
+                    IReadOnlyList<DecodedFile> decoded = [];
+                    try
+                    {
+                        decoded = decoder.Decode(new DecodeInput(resource, data, fork, options.ReadOptions, warnings));
+                    }
+                    catch (Exception e) when (e is InvalidDataException or ArgumentException or IndexOutOfRangeException
+                        or FormatException or OverflowException or NotSupportedException)
+                    {
+                        warnings.Add(new Diagnostic(DiagnosticSeverity.Warning, "export.decoder-failed",
+                            $"{resource}: the {decoder.Name} decoder failed ({e.Message}); exported raw."));
+                    }
+                    if (decoded.Count > 0)
+                    {
+                        outputs = decoded;
+                        (decoderName, decoderVersion) = (decoder.Name, decoder.Version);
+                    }
+                    else if (warnings.Count == 0)
+                    {
+                        warnings.Add(new Diagnostic(DiagnosticSeverity.Info, "export.not-decoded",
+                            $"{resource}: the {decoder.Name} decoder could not decode it; exported raw."));
+                    }
+                }
+                diagnostics.AddRange(warnings.Where(w => !diagnostics.Contains(w)));
+
                 var folder = HostNames.TypeFolder(resource.Type, folded.Contains(resource.Type));
-                var budget = Math.Max(8, options.MaxPathLength - folder.Length - 1 - Extension.Length);
+                var longest = outputs.Max(o => o.Extension.Length);
+                var budget = Math.Max(8, options.MaxPathLength - folder.Length - 1 - longest);
                 var stem = HostNames.ToHostName(FileStem(resource), budget);
                 if (!taken.TryGetValue(folder, out var names)) taken[folder] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var fileName = HostNames.MakeUnique(stem + Extension, names);
-                var path = Path.Combine(directory, folder, fileName);
                 Directory.CreateDirectory(Path.Combine(directory, folder));
-                File.WriteAllBytes(path, data.ToArray());
-                files.Add(path);
+                var written = new List<ManifestFile>();
+                foreach (var output in outputs)
+                {
+                    var name = HostNames.MakeUnique(stem + output.Extension, names);
+                    var full = Path.Combine(directory, folder, name);
+                    File.WriteAllBytes(full, output.Content.ToArray());
+                    files.Add(full);
+                    written.Add(new ManifestFile($"{folder}/{name}", Hash(output.Content.Span)));
+                }
 
                 string? rawPath = null;
                 if (options.KeepRaw)
@@ -84,9 +118,9 @@ namespace ClassicMac.Resources.Export
                 resource.Type.CopyTo(typeBytes);
                 entries.Add(new ManifestResource(
                     resource.Type.ToString(), Convert.ToHexString(typeBytes), resource.Id, resource.Name?.ToString(),
-                    (int)resource.Attributes, data.Length, stored.Length, Dcmp(resource),
-                    "raw", 1, $"{folder}/{fileName}", Hash(data.Span), Hash(stored.Span), rawPath,
-                    warnings.Select(w => w.Message).ToList()));
+                    (int)resource.Attributes, outputs[0].Content.Length, stored.Length, Dcmp(resource),
+                    decoderName, decoderVersion, written[0].Path, written[0].Sha256, Hash(stored.Span), rawPath,
+                    warnings.Select(w => w.Message).ToList(), written.Skip(1).ToList(), outputs[0].Encoding));
             }
 
             var manifest = new ExportManifest(

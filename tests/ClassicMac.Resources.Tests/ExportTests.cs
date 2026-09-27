@@ -126,6 +126,46 @@ public class ExportTests : IDisposable
         Assert.StartsWith("TEXT/1 nnn", entry.Path);
     }
 
+    // Decodes TEXT into two files; throws for id 2, gives nothing for id 3.
+    private sealed class StubDecoder : IResourceDecoder
+    {
+        public string Name => "stub";
+
+        public int Version => 7;
+
+        public bool CanDecode(FourCC type) => type == FourCC.FromString("TEXT");
+
+        public IReadOnlyList<DecodedFile> Decode(DecodeInput input) => input.Resource.Id switch
+        {
+            2 => throw new InvalidDataException("broken"),
+            3 => [],
+            _ => [new(".txt", "main"u8.ToArray(), "macintosh"), new(".json", "{}"u8.ToArray()), new(".txt", "second"u8.ToArray())],
+        };
+    }
+
+    [Fact]
+    public void Decoders_write_their_files_and_fall_back_to_raw()
+    {
+        var fork = Fork(Res("TEXT", 1, [1], "Good"), Res("TEXT", 2, [2]), Res("TEXT", 3, [3]), Res("PICT", 4, [4]));
+
+        var result = ResourceExporter.Export(fork, folder, Source,
+            ExportOptions.Default with { Decoders = [new StubDecoder()], KeepRaw = true });
+
+        var good = result.Manifest.Resources.Single(r => r.Id == 1);
+        Assert.Equal(("stub", 7, "TEXT/1 Good.txt", "macintosh"), (good.Decoder, good.DecoderVersion, good.Path, good.Encoding));
+        Assert.Equal(["TEXT/1 Good.json", "TEXT/1 Good ~2.txt"], good.OtherFiles!.Select(f => f.Path));
+        Assert.Equal("second"u8.ToArray(), File.ReadAllBytes(Path.Combine(folder, "TEXT", "1 Good ~2.txt")));
+        Assert.Equal(good.OtherFiles![0].Sha256, Sha("{}"u8.ToArray()));
+        Assert.Equal("raw/TEXT/1.bin", good.RawPath);
+
+        var failed = result.Manifest.Resources.Single(r => r.Id == 2);
+        Assert.Equal(("raw", "TEXT/2.bin"), (failed.Decoder, failed.Path));
+        Assert.Contains(result.Diagnostics, d => d.Code == "export.decoder-failed");
+        Assert.Equal("raw", result.Manifest.Resources.Single(r => r.Id == 3).Decoder);
+        Assert.Contains(result.Diagnostics, d => d.Code == "export.not-decoded");
+        Assert.Equal("raw", result.Manifest.Resources.Single(r => r.Id == 4).Decoder); // no decoder for PICT
+    }
+
     [Fact]
     public void A_folder_with_files_is_not_written_into_unless_overwriting()
     {

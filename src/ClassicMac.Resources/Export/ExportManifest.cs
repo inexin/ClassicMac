@@ -23,7 +23,7 @@ namespace ClassicMac.Resources.Export
         IReadOnlyList<ManifestDiagnostic> Diagnostics)
     {
         /// <summary>The current format's version.</summary>
-        public const string CurrentVersion = "1.0";
+        public const string CurrentVersion = "1.1";
 
         /// <summary>Where the format's schema is published.</summary>
         public const string SchemaUrl = "https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json";
@@ -48,20 +48,27 @@ namespace ClassicMac.Resources.Export
     /// <param name="Id">The ID.</param>
     /// <param name="Name">The name, or null (<c>\xHH</c> escapes).</param>
     /// <param name="Attributes">The attributes byte, as stored.</param>
-    /// <param name="Size">The exported data's length (decompressed, when compressed).</param>
+    /// <param name="Size">The main file's length.</param>
     /// <param name="StoredSize">The data's length as stored in the fork.</param>
     /// <param name="Dcmp">The decompressor's ID for a compressed resource, or null.</param>
-    /// <param name="Decoder">What wrote the file: <c>raw</c> for the data itself.</param>
+    /// <param name="Decoder">What wrote the files: <c>raw</c> for the data itself (decompressed), or the decoder's name.</param>
     /// <param name="DecoderVersion">The decoder's version.</param>
-    /// <param name="Path">The file, relative to the manifest, <c>/</c>-separated.</param>
-    /// <param name="Sha256">SHA-256 of the file written.</param>
+    /// <param name="Path">The main file, relative to the manifest, <c>/</c>-separated.</param>
+    /// <param name="Sha256">SHA-256 of the main file.</param>
     /// <param name="StoredSha256">SHA-256 of the data as stored.</param>
     /// <param name="RawPath">The stored bytes' copy in <c>raw/</c>, or null.</param>
     /// <param name="Warnings">Problems with this resource.</param>
+    /// <param name="OtherFiles">Files the decoder wrote besides the main one (format 1.1).</param>
+    /// <param name="Encoding">The text encoding the resource was read with, as an IANA name, or null (format 1.1).</param>
     public sealed record ManifestResource(
         string Type, string TypeBytes, short Id, string? Name, int Attributes, int Size, int StoredSize, short? Dcmp,
         string Decoder, int DecoderVersion, string Path, string Sha256, string StoredSha256, string? RawPath,
-        IReadOnlyList<string> Warnings);
+        IReadOnlyList<string> Warnings, IReadOnlyList<ManifestFile>? OtherFiles = null, string? Encoding = null);
+
+    /// <summary>A file written for a resource.</summary>
+    /// <param name="Path">Relative to the manifest, <c>/</c>-separated.</param>
+    /// <param name="Sha256">SHA-256 of the file.</param>
+    public sealed record ManifestFile(string Path, string Sha256);
 
     /// <summary>A problem found while reading or exporting.</summary>
     /// <param name="Severity">info, warning or error.</param>

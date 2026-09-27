@@ -24,6 +24,12 @@ namespace ClassicMac.Resources.Export
         /// <summary>Whether an export folder that already has files in it may be written into. Default false.</summary>
         public bool Overwrite { get; init; }
 
+        /// <summary>
+        /// The decoders tried for each resource, in order (the first that handles its type is used); empty (the default)
+        /// exports every resource raw. <c>ClassicMac.Resources.Decoders</c> provides the built-in ones.
+        /// </summary>
+        public IReadOnlyList<IResourceDecoder> Decoders { get; init; } = [];
+
         /// <summary>Limits and the Resource Manager model for decompressing resources.</summary>
         public ReadOptions ReadOptions { get; init; } = ReadOptions.Default;
     }
