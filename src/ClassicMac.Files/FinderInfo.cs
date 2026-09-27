@@ -62,5 +62,27 @@ namespace ClassicMac.Files
 
         /// <summary>The extended Finder information (<c>FXInfo</c>), 16 bytes, uninterpreted.</summary>
         public ReadOnlyMemory<byte> Extended { get; init; } = new byte[16];
+
+        /// <summary>The size of <c>FInfo</c> followed by <c>FXInfo</c>, as containers store them.</summary>
+        public const int Length = 32;
+
+        /// <summary>
+        /// Reads <c>FInfo</c> (16 bytes: type, creator, flags, location, folder) and, if present, <c>FXInfo</c> (the next
+        /// 16). Shorter input is padded with zeros, since some writers store only <c>FInfo</c>.
+        /// </summary>
+        public static FinderInfo Read(ReadOnlySpan<byte> source)
+        {
+            Span<byte> bytes = stackalloc byte[Length];
+            source[..Math.Min(source.Length, Length)].CopyTo(bytes);
+            return new FinderInfo
+            {
+                Type = new FourCC(bytes[..4]),
+                Creator = new FourCC(bytes[4..8]),
+                Flags = (FinderFlags)System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(bytes[8..]),
+                Location = MacPoint.Read(bytes[10..]),
+                Folder = System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(bytes[14..]),
+                Extended = bytes[16..].ToArray(),
+            };
+        }
     }
 }
