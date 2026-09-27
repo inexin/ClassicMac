@@ -136,6 +136,65 @@ namespace ClassicMac.Files
             };
         }
 
+        /// <summary>
+        /// Writes <paramref name="file"/> into <paramref name="directory"/> as <paramref name="hostName"/> (default: from
+        /// its Mac name through <see cref="HostNames"/>), in the options' layout: the data fork as the file itself, the
+        /// resource fork, Finder info and dates in an AppleDouble <c>._</c> file or in Basilisk II's <c>.rsrc/</c> (only
+        /// when there is a resource fork) and <c>.finf/</c>. The data file's creation and modification times are set from
+        /// the Mac dates. Throws <see cref="IOException"/> when a file exists and overwriting is off. Returns the paths
+        /// written.
+        /// </summary>
+        public static IReadOnlyList<string> Write(MacFile file, string directory, HostWriteOptions? options = null, string? hostName = null)
+        {
+            ArgumentNullException.ThrowIfNull(file);
+            ArgumentNullException.ThrowIfNull(directory);
+            options ??= HostWriteOptions.Default;
+            if (options.Layout is not (HostLayout.AppleDouble or HostLayout.BasiliskII))
+                throw new ArgumentException($"Files cannot be written as {options.Layout}.", nameof(options));
+            var name = hostName ?? HostNames.ToHostName(file.Name);
+
+            var data = Path.Combine(directory, name);
+            var paths = new List<string> { data };
+            if (options.Layout == HostLayout.AppleDouble) paths.Add(Path.Combine(directory, "._" + name));
+            else
+            {
+                if (file.ResourceFork.Length > 0) paths.Add(Path.Combine(directory, ".rsrc", name));
+                paths.Add(Path.Combine(directory, ".finf", name));
+            }
+            if (!options.Overwrite && paths.FirstOrDefault(File.Exists) is { } existing)
+                throw new IOException($"{existing} exists.");
+
+            Directory.CreateDirectory(directory);
+            CopyTo(file.DataFork, data);
+            if (options.Layout == HostLayout.AppleDouble)
+            {
+                using var header = new FileStream(paths[1], FileMode.Create, FileAccess.Write);
+                AppleDoubleWriter.Write(file, header, options.TimeZone);
+            }
+            else
+            {
+                if (file.ResourceFork.Length > 0)
+                {
+                    Directory.CreateDirectory(Path.Combine(directory, ".rsrc"));
+                    CopyTo(file.ResourceFork, paths[1]);
+                }
+                Directory.CreateDirectory(Path.Combine(directory, ".finf"));
+                File.WriteAllBytes(paths[^1], file.FinderInfo.ToArray());
+            }
+
+            // Mac dates are local times.
+            if (file.Created is { } created) File.SetCreationTime(data, created.ToDateTime());
+            if (file.Modified is { } modified) File.SetLastWriteTime(data, modified.ToDateTime());
+            return paths;
+        }
+
+        private static void CopyTo(ForkData fork, string path)
+        {
+            using var output = new FileStream(path, FileMode.Create, FileAccess.Write);
+            using var input = fork.Open();
+            input.CopyTo(output);
+        }
+
         /// <summary>The name a layout is shown under in a container chain.</summary>
         public static string FormatName(HostLayout layout) => layout switch
         {

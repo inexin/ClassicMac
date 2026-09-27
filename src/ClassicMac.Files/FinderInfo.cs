@@ -84,5 +84,26 @@ namespace ClassicMac.Files
                 Extended = bytes[16..].ToArray(),
             };
         }
+
+        /// <summary>Writes <c>FInfo</c> and <c>FXInfo</c>, 32 bytes, as <see cref="Read"/> reads them.</summary>
+        public void Write(Span<byte> destination)
+        {
+            if (destination.Length < Length) throw new ArgumentException($"Finder info needs {Length} bytes.", nameof(destination));
+            Type.CopyTo(destination);
+            Creator.CopyTo(destination[4..]);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(destination[8..], (ushort)Flags);
+            Location.Write(destination[10..]);
+            System.Buffers.Binary.BinaryPrimitives.WriteInt16BigEndian(destination[14..], Folder);
+            destination[16..Length].Clear();
+            Extended.Span[..Math.Min(Extended.Length, 16)].CopyTo(destination[16..]);
+        }
+
+        /// <summary>The 32 bytes <see cref="Write"/> writes.</summary>
+        public byte[] ToArray()
+        {
+            var bytes = new byte[Length];
+            Write(bytes);
+            return bytes;
+        }
     }
 }
