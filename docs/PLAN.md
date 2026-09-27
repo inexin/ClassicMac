@@ -178,6 +178,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Iso | `RawCdReader`, `CueSheetReader` | Raw CD images (2352/2336-byte sectors, per-sector mode) and cue sheets (first data track, from the `.bin` beside it) as 2048-byte blocks for the volume readers |
 | Files.Containers | `ExtensionMap` | Internet Config's name-ending map, as File Exchange applies it to `TEXT`/`dosa` files; opt-in through `ContainerReadOptions.ExtensionMap` |
 | Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._name` or `name.rsrc` files (The Unarchiver), macOS named forks; `Write` puts a Mac file back on disk as AppleDouble or Basilisk II |
+| Files | `MacFileResources` | A file's resources: its resource fork, or a data fork that is a clean resource fork (Realmz `.rsf`), or a plain file read as a fork when its header describes one; shared by the CLI and the app |
 | Core | `HostNames` | Mac names as safe, distinct host names (`%XX` escapes, reserved Windows names, collisions, length) and type folder names, shared by `unpack` and `extract`; SheepShaver's own naming for Basilisk II folders |
 | Files.Containers | `AppleDoubleWriter` | AppleDouble v2 `._` files: real name, dates, Finder info, resource fork |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
@@ -433,8 +434,12 @@ packages as the CLI. MVVM with plain C# view-models (testable without a UI), one
 text, sound, font, dialog) chosen by resource type, lazy opening and decoding so large disk images browse instantly;
 sound playback is the only native dependency.
 
-**First version:** read-only — open a file or disk image, browse the tree, preview images and hex, export. Other
-previews arrive with their decoders.
+**First version (built):** `src/ClassicMac.App` (Avalonia 12, Fluent theme, CommunityToolkit.Mvvm) — open files,
+disk images and resource forks (menu, drag and drop, command line), browse the tree (input › containers › folders ›
+files › resource types › resources, resources read on expand), details of the selection, and a diagnostics list
+that leads to its node. View-models carry no Avalonia types and are tested; a headless test draws the window.
+**Next:** previews (images with the screen-depth switch, text, hex) and export, then the other previews as their
+decoders arrive.
 
 **Editing, in three stages** — the viewer becomes an editor, ResEdit-style. Every save writes a verified round trip
 (read back and compared) and keeps the original; undo within a session.
@@ -593,7 +598,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
    pixel limit and `--screen-depth`. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
-   decoders.
+   decoders. Browse, details and diagnostics built; previews and export next.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
    *Exit:* extract → `pack` is byte-identical for unchanged resources.
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers.
@@ -611,7 +616,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
 - **Name:** ClassicMac (see Purpose and goals).
 - **Repository:** a new repo, `inexin/ClassicMac`; QuickDraw.Pict stays separate for now, to be merged in later.
-- **UI framework:** Avalonia (see Viewer app).
+- **UI framework:** Avalonia (see Viewer app); view-models with CommunityToolkit.Mvvm (source-generated, AOT-safe).
 - **Own core:** written here rather than built on ResourceForkReader/HfsReader, which are read-only; they serve as
   cross-checks.
 - **Target framework:** .NET 10 (LTS; .NET 8 support ends November 2026).

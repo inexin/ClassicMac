@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Viewer app (`src/ClassicMac.App`, Avalonia): open files, disk images and resource forks, browse them down to
+  individual resources, see details and diagnostics. `MacFileResources` in Files, shared with the CLI.
+
 - Repository layout, build settings and CI.
 - Packages: `ClassicMac.Core` (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `UnsignedFixed`,
   diagnostics), `ClassicMac.Files` (`MacFile`, `FinderInfo`, `ForkData`, `IContainerReader`, `ContainerReadOptions`)
