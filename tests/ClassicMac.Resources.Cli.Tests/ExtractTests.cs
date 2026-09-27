@@ -46,7 +46,7 @@ public class ExtractTests : IDisposable
         Assert.True(code == ExitCodes.Success, error);
         Assert.Contains("2 resources from 1 files", output);
         Assert.Equal("Hello", File.ReadAllText(Path.Combine(target, "STR%20", "128 Hello.txt"))); // decoded
-        Assert.True(File.Exists(Path.Combine(target, "ICN#", "128.bin"))); // no decoder yet: raw
+        Assert.True(File.Exists(Path.Combine(target, "ICN#", "128.png"))); // decoded to PNG
         Assert.Equal(["raw resource fork"], Manifest(target).Source.Formats);
 
         // Again into the same folder: refused unless overwriting.
