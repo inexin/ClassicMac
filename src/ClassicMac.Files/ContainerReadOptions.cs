@@ -31,5 +31,11 @@ namespace ClassicMac.Files
         /// and creator stored on the disk.
         /// </summary>
         public Containers.ExtensionMap? ExtensionMap { get; init; }
+
+        /// <summary>
+        /// Whether whole-image checksums that cost a full read (NDIF's CRC-32) are verified. Default false: Disk Copy's
+        /// driver never checks them, only its "Verify checksum" setting does.
+        /// </summary>
+        public bool VerifyChecksums { get; init; }
     }
 }

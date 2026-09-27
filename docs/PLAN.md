@@ -143,7 +143,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 
 | Options object | Package | Settings (default) |
 | --- | --- | --- |
-| `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local), max files and folders read from one volume (1,000,000) |
+| `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local), max files and folders read from one volume (1,000,000), File Exchange extension map (none), verify whole-image checksums (off) |
 | `ReadOptions` | Resources | Max decompressed resource size (64 MiB), Resource Manager model (Mac OS 9), text encoding override (none) |
 | `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off) |
@@ -471,10 +471,14 @@ They change what running applications see, not what a file contains.
   a name over 37 bytes or an empty file's record ends that sector's listing; icons in a six-column 64-pixel grid.
   Hybrid discs mount as HFS, as the Mac mounts them, because the HFS and partition-map readers go first.
 - **Zip and tar:** Info-ZIP's `extrafld.txt` for the Mac extra fields; POSIX tar.
-- **NDIF and ADC:** no Apple spec. The layout (the `bcem` map, chunk types $00/$02/$83/$FF, segments with `bcm#`
-  and `… 1of4` names, offsets across parts) and ADC are fitted to images Disk Copy 6.3.3 made in SheepShaver, each
-  decoded back to its source sectors; the checksum, other chunk types and damage handling wait for the Disk Copy
-  disassembly.
+- **NDIF and ADC:** no Apple spec; from the disassembly of Disk Copy 6.3.3 (its `.HDI` driver and codecs; there is
+  no separate extension on OS 9 and no UDIF support), confirmed on images it made in SheepShaver (each decodes to its
+  source sectors, the CRC matches). The `bcem` header and its validator (what refuses a mount is refused, the rest
+  reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end; KenCode and LZH not
+  decoded yet), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
+  verified only when `VerifyChecksums` is set, as only Disk Copy's "Verify checksum" does), and segments found by their
+  `bcm#` ID among `dseg` files in the folder, never by name. Disk Copy picks the format by file type; we find the
+  `bcem` itself, so images that lost their type still open.
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
@@ -550,7 +554,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    forks come back byte for byte.
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
-   NDIF (with ADC in `ClassicMac.Files.Compression`) (built; checksum pending), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
+   NDIF (with ADC in `ClassicMac.Files.Compression`) (built), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
    images (`ClassicMac.Files.Iso`: ISO 9660 and High Sierra built; raw sectors and cue sheets next); zip and tar with
    Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS

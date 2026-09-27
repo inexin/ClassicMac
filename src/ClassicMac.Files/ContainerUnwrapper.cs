@@ -115,13 +115,13 @@ namespace ClassicMac.Files
                         $"Unwrapping produced more than {context.Options.MaxExpandedBytesPerInput} bytes; stopped.");
                     break;
                 }
-                children.Add(Unwrap(inner, reader.FormatName, context.For(null, name => SiblingOf(contents, inner, name)), depth + 1, ref expanded));
+                children.Add(Unwrap(inner, reader.FormatName, context.For(null, () => SiblingsOf(contents, inner)), depth + 1, ref expanded));
             }
             return new ContainerNode(format, file, children);
         }
 
-        // Another file the same container read, in the same folder.
-        private static MacFile? SiblingOf(IReadOnlyList<MacFile> contents, MacFile file, MacString name) =>
-            contents.FirstOrDefault(f => !ReferenceEquals(f, file) && f.Name == name && f.FolderPath.SequenceEqual(file.FolderPath));
+        // The other files the same container read, in the same folder.
+        private static IEnumerable<MacFile> SiblingsOf(IReadOnlyList<MacFile> contents, MacFile file) =>
+            contents.Where(f => !ReferenceEquals(f, file) && f.FolderPath.SequenceEqual(file.FolderPath));
     }
 }

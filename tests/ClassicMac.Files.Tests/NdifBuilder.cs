@@ -49,12 +49,13 @@ internal static class NdifBuilder
         return fork.ToArray();
     }
 
-    // 'bcm#' 128: part number and count, then 20 bytes this reader does not use.
-    public static byte[] PartResource(int number, int count)
+    // 'bcm#' 128: part number, part count, a 16-byte image ID (here filled with one byte), the part's CRC.
+    public static byte[] PartResource(int number, int count, int image = 1)
     {
         var bytes = new byte[24];
         BinaryPrimitives.WriteUInt16BigEndian(bytes, (ushort)number);
         BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(2), (ushort)count);
+        bytes.AsSpan(4, 16).Fill((byte)image);
         return bytes;
     }
 

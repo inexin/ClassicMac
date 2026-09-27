@@ -113,27 +113,19 @@ namespace ClassicMac.Files
         }
 
         /// <summary>
-        /// Finds the other files in <paramref name="path"/>'s folder by Mac name (each read with its companions), for
-        /// formats split across files.
+        /// The other files in <paramref name="path"/>'s folder (each read with its companions, when enumerated), for
+        /// formats split across files. AppleDouble <c>._</c> files are companions, not files, and are left out.
         /// </summary>
-        public static Func<MacString, MacFile?> Siblings(string path, ContainerReadOptions? options = null, ICollection<Diagnostic>? diagnostics = null)
+        public static Func<IEnumerable<MacFile>> Siblings(string path, ContainerReadOptions? options = null, ICollection<Diagnostic>? diagnostics = null)
         {
             ArgumentNullException.ThrowIfNull(path);
             var full = Path.GetFullPath(path);
             var directory = Path.GetDirectoryName(full) ?? ".";
-            var context = new ContainerContext(options, diagnostics);
-            return name =>
-            {
-                if (!Directory.Exists(directory)) return null;
-                foreach (var candidate in Directory.EnumerateFiles(directory))
-                {
-                    if (string.Equals(candidate, full, StringComparison.OrdinalIgnoreCase)) continue;
-                    var host = Path.GetFileName(candidate);
-                    if (ToMacName(host, basilisk: false, context) == name || ToMacName(host, basilisk: true, context) == name)
-                        return Read(candidate, options, diagnostics).File;
-                }
-                return null;
-            };
+            return () => Directory.Exists(directory)
+                ? Directory.EnumerateFiles(directory)
+                    .Where(f => !string.Equals(f, full, StringComparison.OrdinalIgnoreCase) && !Path.GetFileName(f).StartsWith("._", StringComparison.Ordinal))
+                    .Select(f => Read(f, options, diagnostics).File)
+                : [];
         }
 
         /// <summary>

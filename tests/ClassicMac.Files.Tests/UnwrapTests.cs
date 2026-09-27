@@ -180,7 +180,7 @@ public class HostFilesTests : IDisposable
 
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
-            var rest = context.Siblings?.Invoke(MacString.FromMacRoman("part 2"));
+            var rest = context.Siblings?.Invoke().FirstOrDefault(f => f.Name.ToMacRoman() == "part 2");
             return [new MacFile { Name = MacString.FromMacRoman("joined"), DataFork = ForkData.FromBytes(input.ToArray().Concat(rest?.DataFork.ToArray() ?? []).ToArray()) }];
         }
     }

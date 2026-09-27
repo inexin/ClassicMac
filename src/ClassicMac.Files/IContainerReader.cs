@@ -38,7 +38,7 @@ namespace ClassicMac.Files
         /// <summary>A context with the given options, diagnostics sink and host name.</summary>
         public ContainerContext(
             ContainerReadOptions? options = null, ICollection<Diagnostic>? diagnostics = null, MacString? hostName = null,
-            Func<MacString, MacFile?>? siblings = null)
+            Func<IEnumerable<MacFile>>? siblings = null)
         {
             Options = options ?? ContainerReadOptions.Default;
             Diagnostics = diagnostics ?? new List<Diagnostic>();
@@ -58,16 +58,16 @@ namespace ClassicMac.Files
         public MacString? HostName { get; }
 
         /// <summary>
-        /// Finds another file in the same folder as the input by its Mac name, or null; for formats split across files
-        /// (segmented disk images). Null when the input has no folder to look in.
+        /// The other files in the same folder as the input, read on demand; for formats split across files (segmented
+        /// disk images). Null when the input has no folder to look in.
         /// </summary>
-        public Func<MacString, MacFile?>? Siblings { get; }
+        public Func<IEnumerable<MacFile>>? Siblings { get; }
 
         /// <summary>The same context for an inner container with a different host name (and no siblings).</summary>
         public ContainerContext WithHostName(MacString? hostName) => new(Options, Diagnostics, hostName);
 
         /// <summary>The same context for an inner container with a different host name and siblings.</summary>
-        public ContainerContext For(MacString? hostName, Func<MacString, MacFile?>? siblings) =>
+        public ContainerContext For(MacString? hostName, Func<IEnumerable<MacFile>>? siblings) =>
             new(Options, Diagnostics, hostName, siblings);
 
         /// <summary>Records a problem.</summary>

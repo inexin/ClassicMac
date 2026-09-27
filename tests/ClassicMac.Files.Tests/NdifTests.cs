@@ -20,14 +20,28 @@ public class NdifTests
         return volume;
     }
 
-    private static MacFile Image(byte[] data, byte[] resource, string name = "Test.img") =>
-        new() { Name = MacString.FromMacRoman(name), DataFork = ForkData.FromBytes(data), ResourceFork = ForkData.FromBytes(resource) };
+    private static MacFile Image(byte[] data, byte[] resource, string name = "Test.img", string type = "rohd") =>
+        new()
+        {
+            Name = MacString.FromMacRoman(name),
+            FinderInfo = new FinderInfo { Type = FourCC.FromString(type), Creator = FourCC.FromString("ddsk") },
+            DataFork = ForkData.FromBytes(data),
+            ResourceFork = ForkData.FromBytes(resource),
+        };
 
-    private static (byte[] Disk, List<Diagnostic> Diagnostics) Disk(MacFile image, Func<MacString, MacFile?>? siblings = null)
+    // The bcem 128 of a built image, changed by the caller and put back.
+    private static byte[] WithMap(byte[] resource, Action<byte[]> change, params (string Type, short Id, byte[] Data)[] more)
+    {
+        var map = ClassicMac.Resources.ResourceFork.Read(resource).Resources[0].GetData().ToArray();
+        change(map);
+        return NdifBuilder.Fork([("bcem", 128, map), .. more]);
+    }
+
+    private static (byte[] Disk, List<Diagnostic> Diagnostics) Disk(MacFile image, IEnumerable<MacFile>? siblings = null, ContainerReadOptions? options = null)
     {
         Assert.True(NdifReader.Instance.CanRead(image));
         var diagnostics = new List<Diagnostic>();
-        var disk = Assert.Single(NdifReader.Instance.Read(image, new ContainerContext(diagnostics: diagnostics, siblings: siblings)));
+        var disk = Assert.Single(NdifReader.Instance.Read(image, new ContainerContext(options, diagnostics, siblings: siblings is null ? null : () => siblings)));
         return (disk.DataFork.ToArray(), diagnostics);
     }
 
@@ -76,24 +90,56 @@ public class NdifTests
     }
 
     [Fact]
-    public void Segments_are_joined_from_their_siblings()
+    public void Segments_are_found_by_their_part_resource_not_their_names()
     {
         var volume = Volume();
-        var (data, map) = NdifBuilder.Build(volume, "Test Disk", (300, Kind.Raw), (500, Kind.Zero));
-        var third = data.Length / 3;
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (300, Kind.Raw), (500, Kind.Zero));
+        var third = data.Length / 3 / 512 * 512;
         var parts = new[] { data[..third], data[third..(2 * third)], data[(2 * third)..] };
-        var bcem = ClassicMac.Resources.ResourceFork.Read(map).Resources[0].GetData().ToArray();
-        MacFile Part(int n) => Image(parts[n - 1], n == 1
-            ? NdifBuilder.Fork(("bcem", 128, bcem), ("bcm#", 128, NdifBuilder.PartResource(1, 3)))
-            : NdifBuilder.Fork(("bcm#", 128, NdifBuilder.PartResource(n, 3))), $"Disk {n}of3");
+        var master = WithMap(resource, map =>
+        {
+            map[1] = 12; // version 12, segmented
+            map[0x57] = 1;
+        }, ("bcm#", 128, NdifBuilder.PartResource(1, 3, image: 7)));
+        MacFile Part(int n, int image = 7, string? name = null) =>
+            Image(parts[n - 1], NdifBuilder.Fork(("bcm#", 128, NdifBuilder.PartResource(n, 3, image))), name ?? $"x{n}", type: "dseg");
+        var first = Image(parts[0], master, "Disk 1of3");
 
-        var (disk, diagnostics) = Disk(Part(1), name => name.ToMacRoman() switch { "Disk 2of3" => Part(2), "Disk 3of3" => Part(3), _ => null });
+        // Renamed, out of order, and among another image's parts: joined by ID and number.
+        var (disk, diagnostics) = Disk(first, [Part(3, name: "whatever"), Part(2, image: 8), Part(2, name: "Disk 9of9"), Image([1, 2], [], "Other")]);
         Assert.Empty(diagnostics);
         Assert.Equal(volume, disk);
 
-        (_, diagnostics) = Disk(Part(1), name => name.ToMacRoman() == "Disk 2of3" ? Part(2) : null);
+        (_, diagnostics) = Disk(first, [Part(2)]);
         Assert.Contains(diagnostics, d => d.Code == "ndif.missing-segment");
         Assert.False(NdifReader.Instance.CanRead(Part(2))); // later parts have no map
+    }
+
+    [Fact]
+    public void The_checksum_is_verified_only_when_asked()
+    {
+        var volume = Volume();
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (800, Kind.Adc));
+        var right = NdifReader.Crc(ForkData.FromBytes(volume));
+        byte[] Crc(uint crc) => WithMap(resource, map => System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x50), crc));
+        var verify = ContainerReadOptions.Default with { VerifyChecksums = true };
+
+        Assert.Empty(Disk(Image(data, Crc(right)), options: verify).Diagnostics);
+        Assert.Empty(Disk(Image(data, Crc(right ^ 1))).Diagnostics);
+        Assert.Contains(Disk(Image(data, Crc(right ^ 1)), options: verify).Diagnostics, d => d.Code == "ndif.bad-checksum");
+    }
+
+    [Fact]
+    public void Maps_Disk_Copy_refuses_are_not_read()
+    {
+        var (data, resource) = NdifBuilder.Build(Volume(), "Test Disk", (800, Kind.Raw));
+        var diagnostics = new List<Diagnostic>();
+        foreach (var change in new Action<byte[]>[] { m => m[1] = 13, m => m[1] = 9, m => m[0x7F] = 1, m => m[0x57] = 1 })
+        {
+            var image = Image(data, WithMap(resource, change));
+            Assert.True(NdifReader.Instance.CanRead(image));
+            Assert.Throws<InvalidDataException>(() => NdifReader.Instance.Read(image, new ContainerContext(diagnostics: diagnostics)));
+        }
     }
 
     [Fact]
@@ -104,9 +150,24 @@ public class NdifTests
 
         var (disk, diagnostics) = Disk(Image(data, resource));
 
-        Assert.Contains(diagnostics, d => d.Code == "ndif.unsupported-chunk");
+        Assert.Contains(diagnostics, d => d.Code == "ndif.unsupported-chunk"); // KenCode
         Assert.Equal(volume[..3072], disk[..3072]);
         Assert.All(disk[3072..], b => Assert.Equal(0, b));
+
+        var odd = WithMap(resource, map => map[0x80 + 12 + 3] = 0x42);
+        Assert.Contains(Disk(Image(data, odd)).Diagnostics, d => d.Code == "ndif.unknown-chunk");
+    }
+
+    [Fact]
+    public void DART_RLE_chunks_decode()
+    {
+        // Two literal words, then one word repeated 254 times: 512 bytes.
+        byte[] stored = [0, 2, 0xAB, 0xCD, 0x12, 0x34, 0xFF, 0x02, 0x55, 0xAA];
+        var output = new byte[512];
+        Assert.True(DartRle.Decompress(stored, output, out var written));
+        Assert.Equal(512, written);
+        Assert.Equal([0xAB, 0xCD, 0x12, 0x34, 0x55, 0xAA, 0x55, 0xAA], output[..8]);
+        Assert.False(DartRle.Decompress(stored[..6], output, out _));
     }
 
     [Fact]
@@ -122,7 +183,7 @@ public class NdifTests
         var corrupt = adcOnly.Data.ToArray();
         corrupt[0] = 0x00; // a match before any output
         (_, diagnostics) = Disk(Image(corrupt, adcOnly.Resource));
-        Assert.Contains(diagnostics, d => d.Code == "ndif.bad-adc");
+        Assert.Contains(diagnostics, d => d.Code == "ndif.bad-chunk");
     }
 
     [Fact]
@@ -146,6 +207,9 @@ public class NdifTests
 
         Assert.Equal(Adc.Result.BadDistance, Adc.Decompress([0x80, 1, 0b0000_0000, 5], new byte[8], out _));
         Assert.Equal(Adc.Result.Truncated, Adc.Decompress([0x80, 1, 0x40], new byte[8], out _));
+        // A token passing the end is an error, checked before it is written.
+        Assert.Equal(Adc.Result.Overrun, Adc.Decompress([0x82, 1, 2, 3], new byte[2], out var partial));
+        Assert.Equal(0, partial);
     }
 
     // Disk Copy 6.3.3's own images (the user's SheepShaver harness, run14/out): each NDIF variant decodes to the
@@ -159,11 +223,12 @@ public class NdifTests
                 .Select(Path.GetDirectoryName).FirstOrDefault(d => !Path.GetFileName(d!).StartsWith('.'));
         if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run14/out images to run this.");
 
+        // With the checksum verified: Disk Copy's CRC-32 of each disk matches the one it stored.
         byte[] Decode(string path)
         {
             var diagnostics = new List<Diagnostic>();
             var host = HostFiles.Read(path, diagnostics: diagnostics);
-            var context = new ContainerContext(diagnostics: diagnostics, siblings: HostFiles.Siblings(path));
+            var context = new ContainerContext(ContainerReadOptions.Default with { VerifyChecksums = true }, diagnostics, siblings: HostFiles.Siblings(path));
             Assert.True(NdifReader.Instance.CanRead(host.File), path);
             var disk = Assert.Single(NdifReader.Instance.Read(host.File, context)).DataFork.ToArray();
             Assert.Empty(diagnostics);
