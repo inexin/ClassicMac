@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using ClassicMac.Core;
+using ClassicMac.Files.Containers;
 using ClassicMac.Files.Fat;
 using static ClassicMac.Files.Tests.Fixtures;
 
@@ -237,43 +238,124 @@ public class FatTests
         Assert.Equal(expected is null ? null : DateTime.Parse(expected, CultureInfo.InvariantCulture), decoded?.ToDateTime());
     }
 
-    // What OS 9 with File Exchange 3.0.2 reported for every file on a floppy it wrote (the user's SheepShaver harness:
-    // run12\log.txt, last "F list" block), compared with our read of the same floppy. Two known differences: the
-    // Finder updated the Desktop file after the listing, and File Exchange shows a placeholder record's type through
-    // its extension map (display only; the disk keeps TEXT/dosa).
+    [Theory]
+    [InlineData("readme.txt", "readme.txt")]
+    [InlineData("a:b c.txt", "a:b c.txt")] // ':' kept when the name converts
+    [InlineData("Résumé.doc", "Résumé.doc")] // precomposed
+    [InlineData("漢字 kanji.txt", "\"W kanji.txt")] // no Mac Roman: each unit's low byte
+    [InlineData("漢:.txt", "\"_.txt")] // ... and ':' becomes '_'
+    [InlineData("This is a very long Windows file name.txt", "This is a very long Win#7C7.txt")] // harness-confirmed
+    [InlineData("ABCDEFGHIJKLMNOPQRSTUVWXYZabcde", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcde")] // 31: fits
+    public void Long_names_become_Mac_names_as_File_Exchange_shows_them(string longName, string macName)
+    {
+        Assert.Equal(macName, FatNames.FromLongName(longName).ToMacRoman());
+    }
+
     [Fact]
-    public void Floppy_written_by_File_Exchange_reads_as_OS_9_listed_it()
+    public void Shortened_names_keep_their_extension_and_a_CRC()
+    {
+        var name = FatNames.FromLongName("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef.jpeg").ToMacRoman();
+        var crc = FatNames.Crc("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef.jpeg") & 0xFFF;
+        Assert.Equal($"ABCDEFGHIJKLMNOPQRSTUV#{crc:X3}.jpeg", name); // 22 + 4 + 5 = 31
+        // No '.' in the last six characters: no extension.
+        var plain = FatNames.FromLongName("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh.eleven").ToMacRoman();
+        Assert.Equal(31, plain.Length);
+        Assert.Equal("ABCDEFGHIJKLMNOPQRSTUVWXYZa#", plain[..28]);
+    }
+
+    // Internet Config entries the harness showed File Exchange using.
+    private static readonly ExtensionMap HarnessMap = new(
+    [
+        new(".txt", (FourCC.FromString("TEXT"), FourCC.FromString("ttxt"))),
+        new(".bin", (FourCC.FromString("BINA"), FourCC.FromString("SITx"))),
+        new(".doc", (FourCC.FromString("WDBN"), FourCC.FromString("MSWD"))),
+        new(".jpg", (FourCC.FromString("JPEG"), FourCC.FromString("ogle"))),
+        new(".gif", (FourCC.FromString("GIFf"), FourCC.FromString("ogle"))),
+    ]);
+
+    [Fact]
+    public void An_extension_map_applies_to_placeholders_only_and_only_when_given()
+    {
+        var builder = new FatBuilder(12);
+        builder.File("PIC.JPG", "PIC.JPG", [1]);
+        builder.File("NOTE.TXT", "NOTE.TXT", [1]);
+        builder.File("KEEP.TXT", "KEEP.TXT", [1]);
+        builder.File("FINDER.DAT", "FINDER.DAT", [
+            .. Record("pic.jpg", "TEXT", "dosa", 0, 0, "PIC     JPG"),
+            .. Record("keep.txt", "APPL", "abcd", 0, 0, "KEEP    TXT"),
+            .. Record("stray", "XXXX", "XXXX", 0, 0, "\0\0\0\0\0\0\0\0\0\0\0"), // free: no 8.3 name
+        ]);
+        var image = builder.Build();
+        string[] Types(ContainerReadOptions options) => FatReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(options))
+            .OrderBy(f => f.Name.ToMacRoman(), StringComparer.Ordinal).Select(f => $"{f.FinderInfo.Type}/{f.FinderInfo.Creator}").ToArray();
+
+        // NOTE.TXT (no record), keep.txt, pic.jpg.
+        Assert.Equal(["TEXT/dosa", "APPL/abcd", "TEXT/dosa"], Types(ContainerReadOptions.Default));
+        Assert.Equal(["TEXT/ttxt", "APPL/abcd", "JPEG/ogle"], Types(ContainerReadOptions.Default with { ExtensionMap = HarnessMap }));
+    }
+
+    [Fact]
+    public void The_longest_ending_wins_then_the_earlier_entry()
+    {
+        var map = new ExtensionMap(
+        [
+            new(".gz", (FourCC.FromString("Gzip"), FourCC.FromString("Gzip"))),
+            new(".tar.gz", (FourCC.FromString("TARF"), FourCC.FromString("SITx"))),
+            new(".GZ", (FourCC.FromString("XXXX"), FourCC.FromString("XXXX"))),
+        ]);
+        Assert.Equal(FourCC.FromString("TARF"), map.Apply(PcExchange.Placeholder, "a.TAR.GZ").Type);
+        Assert.Equal(FourCC.FromString("Gzip"), map.Apply(PcExchange.Placeholder, "a.gz").Type);
+    }
+
+    // What OS 9 with File Exchange 9.0 listed for every file on floppies it wrote (the user's SheepShaver harness:
+    // run12/fxtest.img and run13/fxtest13.img, each with the log.txt beside it), compared with our read of the same
+    // floppies. Our read uses the file types the harness showed for the extension map, since OS 9 lists mapped types.
+    // One known difference: the Finder updated the Desktop file after the listing.
+    [Fact]
+    public void Floppies_written_by_File_Exchange_read_as_OS_9_listed_them()
     {
         var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateFiles(corpus, "fxtest.img", SearchOption.AllDirectories)
-                .Select(Path.GetDirectoryName).FirstOrDefault(d => d!.EndsWith("run12", StringComparison.Ordinal) && File.Exists(Path.Combine(d, "log.txt")));
-        if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding run12/fxtest.img and run12/log.txt to run this.");
+        var images = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? []
+            : Directory.EnumerateFiles(corpus, "fxtest*.img", SearchOption.AllDirectories)
+                .Where(f => !f.Contains("_orig", StringComparison.Ordinal)
+                    && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') // Basilisk II .rsrc/.finf companions
+                    && File.Exists(Path.Combine(Path.GetDirectoryName(f)!, "log.txt")))
+                .ToList();
+        if (images.Count == 0) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's fxtest*.img and log.txt to run this.");
 
-        var lines = File.ReadAllText(Path.Combine(folder, "log.txt")).Split('\r', '\n');
-        var lastList = Array.FindLastIndex(lines, l => l.StartsWith("F list FXTEST: end", StringComparison.Ordinal));
-        var first = Array.FindLastIndex(lines, lastList, l => l.StartsWith("F list FXTEST:#1 ", StringComparison.Ordinal));
-        var pattern = new Regex(@"FILE '(?<name>.*)' num \d+ attrib \S+ type '(?<type>.{4})' creator '(?<creator>.{4})' flags (?<flags>[0-9A-F]{4}) .* cr (?<cr>[0-9A-F]{8}) md (?<md>[0-9A-F]{8}) .* data (?<data>\d+) rsrc (?<rsrc>\d+)");
-        var listed = lines[first..lastList].Select(l => pattern.Match(l)).Where(m => m.Success).ToList();
-        Assert.NotEmpty(listed);
-
-        var (files, diagnostics) = Read(File.ReadAllBytes(Path.Combine(folder, "fxtest.img")));
-        Assert.Empty(diagnostics);
-        var root = files.Where(f => f.FolderPath.Count == 0).ToList();
-        foreach (var m in listed)
+        var pattern = new Regex(@"^F list [^:]+:(?<folder>[^#]*)#\d+ FILE '(?<name>.*)' num \d+ attrib \S+ type '(?<type>.{4})' creator '(?<creator>.{4})' flags (?<flags>[0-9A-F]{4}) .* cr (?<cr>[0-9A-F]{8}) md (?<md>[0-9A-F]{8}) .* data (?<data>\d+) rsrc (?<rsrc>\d+)");
+        var compared = 0;
+        foreach (var image in images)
         {
-            var name = m.Groups["name"].Value;
-            // The harness prints names up to a NUL; a garbage record name keeps its bytes past one.
-            var file = root.Single(f => f.Name.ToMacRoman().Split('\0')[0] == name);
-            var what = $"\"{name}\"";
-            Assert.True(ulong.Parse(m.Groups["data"].Value) == (ulong)file.DataFork.Length, what);
-            if (name == "Desktop") continue; // changed by the Finder after the listing
-            Assert.True(ulong.Parse(m.Groups["rsrc"].Value) == (ulong)file.ResourceFork.Length, what);
-            var type = (file.FinderInfo.Type.ToString(), file.FinderInfo.Creator.ToString());
-            if (type != ("TEXT", "dosa")) Assert.Equal((m.Groups["type"].Value, m.Groups["creator"].Value), type);
-            Assert.Equal(Convert.ToUInt16(m.Groups["flags"].Value, 16), (ushort)file.FinderInfo.Flags);
-            Assert.Equal(Convert.ToUInt32(m.Groups["cr"].Value, 16), file.Created?.Seconds ?? 0);
-            Assert.Equal(Convert.ToUInt32(m.Groups["md"].Value, 16), file.Modified?.Seconds ?? 0);
+            // The log is Mac Roman; the last listing of each file wins.
+            var log = MacRoman.Decode(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(image)!, "log.txt")));
+            var listed = new Dictionary<string, Match>();
+            foreach (var line in log.Split('\r', '\n'))
+            {
+                if (pattern.Match(line) is { Success: true } m)
+                    listed[(m.Groups["folder"].Value.Length > 0 ? m.Groups["folder"].Value + ":" : "") + m.Groups["name"].Value] = m;
+            }
+
+            var diagnostics = new List<Diagnostic>();
+            var files = FatReader.Instance.Read(ForkData.FromBytes(File.ReadAllBytes(image)),
+                new ContainerContext(ContainerReadOptions.Default with { ExtensionMap = HarnessMap }, diagnostics));
+            Assert.All(diagnostics, d => Assert.Equal("fat.suspect-name", d.Code));
+            foreach (var (path, m) in listed)
+            {
+                // The harness prints names up to a NUL; a garbage record name keeps its bytes past one.
+                var file = files.SingleOrDefault(f => string.Join(':', [.. f.FolderPath.Select(p => p.ToMacRoman()), f.Name.ToMacRoman()]).Split('\0')[0] == path)
+                    ?? throw new Xunit.Sdk.XunitException($"{Path.GetFileName(image)}: \"{path}\" is not among {string.Join(", ", files.Select(f => $"\"{f.MacPath}\""))}.");
+                var what = $"{Path.GetFileName(image)}: \"{path}\"";
+                Assert.True(ulong.Parse(m.Groups["data"].Value) == (ulong)file.DataFork.Length, what);
+                compared++;
+                if (path == "Desktop") continue; // changed by the Finder after the listing
+                Assert.True(ulong.Parse(m.Groups["rsrc"].Value) == (ulong)file.ResourceFork.Length, what);
+                Assert.Equal((m.Groups["type"].Value, m.Groups["creator"].Value), (file.FinderInfo.Type.ToString(), file.FinderInfo.Creator.ToString()));
+                Assert.Equal(Convert.ToUInt16(m.Groups["flags"].Value, 16), (ushort)file.FinderInfo.Flags);
+                Assert.Equal(Convert.ToUInt32(m.Groups["cr"].Value, 16), file.Created?.Seconds ?? 0);
+                Assert.Equal(Convert.ToUInt32(m.Groups["md"].Value, 16), file.Modified?.Seconds ?? 0);
+            }
         }
+        TestContext.Current.SendDiagnosticMessage($"{images.Count} floppies, {compared} files compared.");
     }
 }

@@ -61,7 +61,7 @@ namespace ClassicMac.Files.Containers
             var records = new List<PcExchangeRecord>();
             foreach (var offset in Offsets(data.Length, clusterSize))
             {
-                if (data[offset] != 0) records.Add(Parse(data.AsSpan(offset, RecordLength)));
+                if (Used(data, offset)) records.Add(Parse(data.AsSpan(offset, RecordLength)));
             }
             return records;
         }
@@ -100,7 +100,7 @@ namespace ClassicMac.Files.Containers
             foreach (var cluster in ClusterSizes)
             {
                 var offsets = Offsets(data.Length, cluster).ToList();
-                var used = offsets.Where(o => data[o] != 0).ToList();
+                var used = offsets.Where(o => Used(data, o)).ToList();
                 var plausible = used.Count(o => Plausible(data.AsSpan(o, RecordLength)));
                 if (plausible == used.Count && plausible > bestPlausible)
                 {
@@ -143,6 +143,9 @@ namespace ClassicMac.Files.Containers
                 }
             }
         }
+
+        // A free record has a zero name length or, as File Exchange leaves some stray ones, a zero first 8.3 byte.
+        private static bool Used(byte[] data, int offset) => data[offset] != 0 && data[offset + 0x50] != 0;
 
         // A used record has a name of 1–31 bytes and a printable, space-padded 8.3 name.
         private static bool Plausible(ReadOnlySpan<byte> record) =>

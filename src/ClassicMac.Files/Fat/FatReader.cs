@@ -144,7 +144,16 @@ namespace ClassicMac.Files.Fat
                         return;
                     }
                     var record = records.FirstOrDefault(r => r.DosName == entry.Key);
-                    var name = record?.MacName ?? HostFiles.ToMacName(entry.LongName ?? entry.DisplayShortName, basilisk: false, context);
+                    // The record's name, else the long name, else the 8.3 name (File Exchange's lookup order).
+                    var name = record?.MacName
+                        ?? (entry.LongName is { } longName ? FatNames.FromLongName(longName) : HostFiles.ToMacName(entry.DisplayShortName, basilisk: false, context));
+                    if (record is not null && name.Bytes.IndexOfAnyInRange((byte)0, (byte)0x1F) >= 0)
+                    {
+                        // File Exchange can create a record with a garbage name (for a file with a resource fork and no
+                        // record) and shows it as it is; so does this reader.
+                        context.Report(DiagnosticSeverity.Warning, "fat.suspect-name",
+                            $"The FINDER.DAT record for {entry.DisplayShortName} has control characters in its Mac name; shown as File Exchange shows it.");
+                    }
                     if (entry.IsDirectory)
                     {
                         if (entry.FirstCluster == 0 || !directoriesRead.Add(entry.FirstCluster))
@@ -169,6 +178,8 @@ namespace ClassicMac.Files.Fat
                     };
                     file = PcExchange.Apply(file, record,
                         DosTime.FromFields(entry.CreatedDate, entry.CreatedTime), DosTime.FromFields(entry.ModifiedDate, entry.ModifiedTime));
+                    if (context.Options.ExtensionMap is { } map)
+                        file = file with { FinderInfo = map.Apply(file.FinderInfo, file.Name.ToMacRoman()) };
                     // DOS hidden or system makes the file invisible.
                     if ((entry.Attributes & (AttrHidden | AttrSystem)) != 0)
                         file = file with { FinderInfo = file.FinderInfo with { Flags = file.FinderInfo.Flags | FinderFlags.IsInvisible } };

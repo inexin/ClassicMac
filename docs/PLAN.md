@@ -173,6 +173,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
 | Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2 images, Apple partition maps; each yields files the next can open |
 | Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
+| Files.Containers | `ExtensionMap` | Internet Config's name-ending map, as File Exchange applies it to `TEXT`/`dosa` files; opt-in through `ContainerReadOptions.ExtensionMap` |
 | Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
@@ -444,10 +445,15 @@ They change what running applications see, not what a file contains.
 - **PC Exchange / File Exchange:** from the disassembly of PC Exchange 1.0.4 and File Exchange 3.0.2 (the same format
   in both), confirmed on a FAT12 disk in SheepShaver: browsing alone creates records (zero dates, `TEXT`/`dosa`);
   creation comes from the DOS entry, modification is the later of the DOS entry's and the record's; DOS keeps even
-  seconds, and years from 2032 read as 128 years earlier (Mac 1904–1979); the extension→type map only replaces the
-  `TEXT`/`dosa` placeholder on display and is never stored, so a placeholder record reads as `TEXT`/`dosa`. The
-  record packing's cluster size is not stored and is found by trying the FAT sizes (fitted) — on a FAT volume the
-  reader knows it. A floppy File Exchange wrote reads as OS 9 listed it (local test against the harness log).
+  seconds, and years from 2032 read as 128 years earlier (Mac 1904–1979). The only type mapping (File Exchange 9.0's
+  own table is always empty) is Internet Config's map of name endings, applied to the `TEXT`/`dosa` placeholder and
+  written back only when the data fork is closed, so readers show stored types and apply a map only when the app
+  supplies one (`ExtensionMap`; no Apple-derived table ships). Names without a record come from the VFAT long name as
+  File Exchange converts it: Mac Roman when every character maps (`:` kept), else each UTF-16 unit's low byte (`:` →
+  `_`); over 31 bytes, the start, `#`, three hex digits of a CRC-16 and the extension. Garbage names in lazily made
+  records are shown as the Mac shows them, with a warning. The record packing's cluster size is not stored and is
+  found by trying the FAT sizes (fitted) — on a FAT volume the reader knows it. Floppies File Exchange wrote read as
+  OS 9 listed them (local test against the harness logs).
 - **FAT:** Microsoft's FAT specification (fatgen103): BPB, type by cluster count, 12/16/28-bit entries, VFAT long
   names; DOS partition tables by the standard MBR layout. Not Apple formats, so no Apple code decides them.
 - **CD images:** ECMA-119 (ISO 9660) and Apple's ISO 9660 extensions (the `AA`/`BA` system-use fields carrying

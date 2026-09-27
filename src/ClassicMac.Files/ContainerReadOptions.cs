@@ -25,5 +25,11 @@ namespace ClassicMac.Files
         /// and AppleDouble version 2 — since Mac dates are local time. Default: this machine's zone.
         /// </summary>
         public TimeZoneInfo TimeZone { get; init; } = TimeZoneInfo.Local;
+
+        /// <summary>
+        /// The extension map File Exchange applies when it shows files on DOS disks, or null (the default) for the type
+        /// and creator stored on the disk.
+        /// </summary>
+        public Containers.ExtensionMap? ExtensionMap { get; init; }
     }
 }

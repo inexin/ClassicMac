@@ -21,7 +21,8 @@
   package: single-file readers moved to `ClassicMac.Files.Containers`.
 - FAT volumes in `ClassicMac.Files.Fat`: FAT12/16/32 with long names, and the PC Exchange / File Exchange data
   on them (Mac names, Finder info, dates, resource forks), matching what OS 9 lists; DOS partition tables.
-  `DosTime` and `PcExchange.Apply` shared with host folders.
+  `DosTime` and `PcExchange.Apply` shared with host folders. Long names converted as File Exchange converts them;
+  an opt-in `ExtensionMap` for placeholder types.
 - `classicmac` CLI: `info` and `list` read through containers and disk images, showing Mac paths (text or JSON);
   `extract` parsed, not yet implemented;
   limit options, exit codes.

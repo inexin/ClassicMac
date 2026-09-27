@@ -176,6 +176,8 @@ namespace ClassicMac.Files
                     companions.Add(finderData);
                     file = PcExchange.Apply(file, record,
                         DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
+                    if (context.Options.ExtensionMap is { } map)
+                        file = file with { FinderInfo = map.Apply(file.FinderInfo, hostName) };
                 }
             }
 
