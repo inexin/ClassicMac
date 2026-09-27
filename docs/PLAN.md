@@ -35,13 +35,19 @@ Proposed priority:
 | 1 | PC Exchange / File Exchange folders (`RESOURCE.FRK/<8.3 name>` fork, `FINDER.DAT` records) | DOS and Windows disks written by Mac OS 7.1–9 |
 | 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites |
 | 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites |
-| 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF | Emulator disks, floppy images, CD-ROMs |
+| 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF (Disk Copy 6 `.img`, `.smi`), DART, UDIF `.dmg` | Emulator disks, floppy images, Apple system software, images re-shared from Mac OS X |
+| 2 | CD images: ISO 9660 with Apple extensions, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw `.bin` + `.cue` | Magazine, game and system CDs |
 | 2 | FAT disk images with PC Exchange / File Exchange data (e.g. `RealmzClassicHD.img`) | Emulator hard disks and floppies shared with PCs |
 | 3 | HFS+ images | Mac OS 8.1–9 disks |
-| 3 | StuffIt (`.sit`) and Compact Pro (`.cpt`) archives | Most classic Mac downloads |
+| 2 | Zip with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers |
+| 3 | StuffIt 1.x–5 (`.sit`, `.sea`) and Compact Pro (`.cpt`) archives; self-extractors found by signature | Most classic Mac downloads |
+| 4 | DiskDoubler (`.dd`), segmented archives (StuffIt SegmentIt, Compact Pro segments), PackIt (`.pit`) | Early 1990s downloads, multi-floppy BBS files |
+| 5 | Only on request: AppleLink PackageIt, Now Compress, MacLHA, MOOF flux images, MAME CHD, Apple II formats | Rare, or not classic Mac |
 | 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators |
 
 Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
+
+Out of scope: StuffIt X (`.sitx`, 2002+, a large proprietary format), `.sparseimage`/`.sparsebundle` (Mac OS X).
 
 Every container yields the same *Mac file* entry (`MacFile`, in `ClassicMac.Files`): name (MacRoman), type and
 creator, Finder flags, creation and modification dates (seconds since 1904, local time), data fork and resource fork.
@@ -299,10 +305,14 @@ flowchart LR
   - `ClassicMac.Files`: the Mac file model (`MacFile`, `FinderInfo`, `ForkData`), `IContainerReader`, `HostFiles`,
     `ContainerUnwrapper`, options;
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
-  - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, DiskCopy 4.2 (NDIF and HFS+ later);
+  - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, DiskCopy 4.2 (NDIF, DART, UDIF and HFS+
+    later);
+  - `ClassicMac.Files.Iso` (later): ISO 9660 volumes with Apple extensions, raw-sector CD images and cue sheets;
+  - `ClassicMac.Files.Compression` (later): decompressors shared by disk images and archives (ADC for NDIF and UDIF;
+    the StuffIt and Compact Pro methods);
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
     (MBR) partition tables;
-  - `ClassicMac.Files.Archives` (later): StuffIt and Compact Pro.
+  - `ClassicMac.Files.Archives` (later): zip and tar with Mac data, StuffIt, Compact Pro, DiskDoubler, PackIt.
 - **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only (Files only if a convenience overload
   ever needs it).
 - **ClassicMac.Encodings** — the multi-byte Mac text encodings; optional, depends on Core.
@@ -439,6 +449,9 @@ They change what running applications see, not what a file contains.
   reader knows it. A floppy File Exchange wrote reads as OS 9 listed it (local test against the harness log).
 - **FAT:** Microsoft's FAT specification (fatgen103): BPB, type by cluster count, 12/16/28-bit entries, VFAT long
   names; DOS partition tables by the standard MBR layout. Not Apple formats, so no Apple code decides them.
+- **CD images:** ECMA-119 (ISO 9660) and Apple's ISO 9660 extensions (the `AA`/`BA` system-use fields carrying
+  type, creator and Finder flags); hybrid discs are an Apple partition map read by the existing readers.
+- **Zip and tar:** Info-ZIP's `extrafld.txt` for the Mac extra fields; POSIX tar.
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
@@ -491,11 +504,17 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 | [macresources](https://github.com/elliotnunn/macresources) | Python, MIT; dormant since 2020 | Rez-style text dumps, round trip, BinHex, `dcmp` 2 (GreggyBits) | Round-trip design; `dcmp` 2 reference |
 | [machfs](https://github.com/elliotnunn/machfs) | Python, MIT | Reads and writes HFS volumes | Reference for writing HFS images |
 | [resource_dasm](https://github.com/fuzziqersoftware/resource_dasm) | C++, MIT; very active | Decodes a very wide range of resource types to modern formats; `dcmp` via 68k emulation; disassembly | Widest coverage to compare output against |
-| Claunia.RsrcFork (Aaru) | C#; NuGet, ~16k downloads | Resource fork reading for the [Aaru](https://github.com/aaru-dps/Aaru) preservation suite | Cross-check; Aaru for disk-image formats (its FAT reader and host-folder PC Exchange filter are LGPL: reference only) |
+| Claunia.RsrcFork (Aaru) | C#; NuGet, ~16k downloads | Resource fork reading for the [Aaru](https://github.com/aaru-dps/Aaru) preservation suite | Cross-check; Aaru (GPL-3 overall, some files LGPL) for disk-image formats, NDIF/ADC, DART, FAT and its host-folder PC Exchange filter: reference only |
 | [HFSExplorer](https://github.com/unsound/hfsexplorer) | Java, GPL-3 | GUI browser for HFS/HFS+ images, extracts both forks | UX reference for the viewer |
 | [XADMaster](https://github.com/MacPaw/XADMaster) | C/Objective-C, LGPL-2.1 | The Unarchiver's engine: StuffIt, Compact Pro, BinHex, MacBinary | Reference for archive formats |
 | [mpw](https://github.com/ksherlock/mpw) | C | Runs Apple's MPW tools (Rez, DeRez) on modern systems | Ground truth: compile/decompile with Apple's own Rez |
 | [DiscUtils](https://github.com/LTRData/DiscUtils) (LTRData fork) | C#, MIT; NuGet `LTRData.DiscUtils.Fat`, active | Reads, formats and writes FAT12/16/32 with long names; nothing Mac | Cross-check for the FAT layer; candidate base for FAT writing |
+| DiscUtils (other packages) | C#, MIT | ISO 9660/Joliet/Rock Ridge, HFS+, UDIF `.dmg` (zlib, ADC) | Cross-check or port (with notice) for CD images, HFS+ and UDIF |
+| hughbe's [StuffItReader](https://github.com/hughbe/StuffItReader), DiskCopyReader and Apple II readers | C#, MIT | StuffIt headers (v1, v5) with store and LZW only; Disk Copy images; ProDOS, DOS 3.3, WOZ | Cross-check for archive headers and disk images |
+| [CiderPress2](https://github.com/fadden/CiderPress2) | C#, Apache-2.0 | Apple II disk images and archives (ShrinkIt, Binary II), some Mac formats | Reusable with NOTICE; reference for Apple II formats if ever wanted |
+| [deark](https://github.com/jsummers/deark) | C, MIT-style | Many old formats, partial StuffIt and Compact Pro | Reusable with notice; archive cross-check |
+| [dmg2img](https://github.com/Lekensteyn/dmg2img), [libdmg-hfsplus](https://github.com/planetbeing/libdmg-hfsplus) | C, GPL | UDIF `.dmg` decoding | Reference only |
+| macutils | C, licence unclear | `unsit`, `macunpack` (StuffIt, Compact Pro, PackIt) | Reference only |
 | [ResourceForker](https://github.com/csammis/ResourceForker) | C; dormant since 2016 | Small utilities to split resource forks | Minor reference |
 
 ## Phases
@@ -507,8 +526,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    CLI `list` and raw `extract`. *Exit:* read → write → read gives the same model on every corpus fork, and canonical
    forks come back byte for byte.
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
-   map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then NDIF; recursive
-   unwrapping through all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
+   map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
+   NDIF (with ADC in `ClassicMac.Files.Compression`), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
+   images (`ClassicMac.Files.Iso`); zip and tar with Mac data; `.sea`/`.smi` detection; recursive unwrapping through
+   all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and extracts with both forks and Finder info, and file and folder counts match each volume's.
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest. *Exit:* golden outputs pass and the corpus exports without errors.
@@ -522,7 +543,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated.
-10. **Later** — HFS+ (`ClassicMac.Files.Hfs`), StuffIt and Compact Pro (`ClassicMac.Files.Archives`).
+10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
+    1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
+    14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
+    (RLE81 + LZH); then DiskDoubler, PackIt and segmented archives. Anything from row 5 of Inputs only on request.
 
 ## Decisions
 
@@ -559,6 +583,12 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   `ClassicMac.Resources`, so resource-only users skip the containers and vice versa; the shared
   types (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic`) sit in the dependency-free
   base `ClassicMac.Core` (see Inputs).
+- **Archive decompressors without a spec:** StuffIt and Compact Pro methods have no Apple or vendor spec; XADMaster
+  (LGPL) and macutils are reference only, deark and hughbe's readers may be ported with notice. The decompressors are
+  written here and verified against archives made by the real StuffIt and Compact Pro in an emulator (the corpus),
+  marked as fitted where behaviour comes from test data rather than a published description.
+- **More input formats (decided):** CD images, DART, UDIF and zip/tar with Mac data join Phase 2; DiskDoubler, PackIt
+  and segmented archives follow StuffIt and Compact Pro; StuffIt X and Mac OS X sparse images are out of scope.
 - **`dcmp` 0–3 from disassembly:** all four decompressors follow the Mac OS 9.0 System's code (68k, emulated and
   compared on all 34 compressed System resources); the memory after the in-place block is modelled as 2 KiB of zeros.
 
