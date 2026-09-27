@@ -50,6 +50,49 @@ namespace ClassicMac.Files.Containers
             return ReadRecords(data);
         }
 
+        /// <summary>
+        /// The used records of a <c>FINDER.DAT</c> read from its volume, whose cluster size is known: every record not
+        /// marked free, as the Mac uses them, corrupt or not.
+        /// </summary>
+        public static IReadOnlyList<PcExchangeRecord> ReadFinderData(byte[] data, int clusterSize)
+        {
+            ArgumentNullException.ThrowIfNull(data);
+            if (clusterSize < RecordLength) throw new ArgumentOutOfRangeException(nameof(clusterSize));
+            var records = new List<PcExchangeRecord>();
+            foreach (var offset in Offsets(data.Length, clusterSize))
+            {
+                if (data[offset] != 0) records.Add(Parse(data.AsSpan(offset, RecordLength)));
+            }
+            return records;
+        }
+
+        /// <summary>The type and creator File Exchange gives a file with no stored ones: <c>TEXT</c>/<c>dosa</c>.</summary>
+        public static FinderInfo Placeholder { get; } = new()
+        {
+            Type = FourCC.FromString("TEXT"),
+            Creator = FourCC.FromString("dosa"),
+        };
+
+        // A file from a DOS disk as File Exchange presents it (confirmed in SheepShaver): with a record, its Mac name and
+        // Finder info; creation from the DOS entry (the record's only when there is none: PC Exchange 1.0.4 read it,
+        // File Exchange writes but never reads it); modification the later of the DOS entry's and the record's. Without
+        // a record, the placeholder type and the DOS dates.
+        internal static MacFile Apply(MacFile file, PcExchangeRecord? record, MacDate? dosCreated, MacDate? dosModified)
+        {
+            if (record is null)
+                return file with { FinderInfo = Placeholder, Created = dosCreated, Modified = dosModified };
+            var modified = record.Modified is { } m && (dosModified is null || m.Seconds >= dosModified.Value.Seconds)
+                ? record.Modified
+                : dosModified;
+            return file with
+            {
+                Name = record.MacName,
+                FinderInfo = record.FinderInfo,
+                Created = dosCreated ?? record.Created,
+                Modified = modified,
+            };
+        }
+
         private static List<PcExchangeRecord> ReadRecords(byte[] data)
         {
             var best = new List<int>();

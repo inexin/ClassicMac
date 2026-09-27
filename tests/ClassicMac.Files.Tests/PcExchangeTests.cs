@@ -89,7 +89,7 @@ public class PcExchangeTests : IDisposable
         Assert.Equal(FourCC.FromString("MOSS"), host.File.FinderInfo.Creator);
         Assert.Equal([1, 2, 3], host.File.ResourceFork.ToArray());
         // Creation comes from the DOS entry (File Exchange 9.0), not the record.
-        Assert.Equal(HostFiles.MacDateFromDos(File.GetCreationTime(Path.Combine(folder, "FANTAS~1.EML"))), host.File.Created);
+        Assert.Equal(DosTime.FromLocal(File.GetCreationTime(Path.Combine(folder, "FANTAS~1.EML"))), host.File.Created);
         Assert.True(host.File.Modified!.Value.Seconds >= 0xBAED36D4); // the later of the record's and the host's
     }
 
@@ -100,7 +100,7 @@ public class PcExchangeTests : IDisposable
     [InlineData("2078-01-01 00:00:00", "1950-01-01 00:00:00")]
     public void DOS_times_read_as_File_Exchange_reads_them(string dos, string mac)
     {
-        Assert.Equal(DateTime.Parse(mac), HostFiles.MacDateFromDos(DateTime.Parse(dos))!.Value.ToDateTime());
+        Assert.Equal(DateTime.Parse(mac), DosTime.FromLocal(DateTime.Parse(dos))!.Value.ToDateTime());
     }
 
     [Fact]

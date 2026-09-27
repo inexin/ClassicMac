@@ -150,20 +150,8 @@ namespace ClassicMac.Files
                 if (record is not null)
                 {
                     companions.Add(finderData);
-                    // File Exchange 9.0, confirmed on a FAT12 disk in SheepShaver: creation from the DOS entry,
-                    // modification the later of the DOS entry's and the record's. The record's creation date is used
-                    // only when the host has none (PC Exchange 1.0.4 read it; File Exchange writes but never reads it).
-                    var hostModified = MacDateFromDos(File.GetLastWriteTime(full));
-                    var modified = record.Modified is { } m && (hostModified is null || m.Seconds >= hostModified.Value.Seconds)
-                        ? record.Modified
-                        : hostModified;
-                    file = file with
-                    {
-                        Name = record.MacName,
-                        FinderInfo = record.FinderInfo,
-                        Created = MacDateFromDos(File.GetCreationTime(full)) ?? record.Created,
-                        Modified = modified,
-                    };
+                    file = PcExchange.Apply(file, record,
+                        DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
                 }
             }
 
@@ -183,22 +171,6 @@ namespace ClassicMac.Files
             return entries.FirstOrDefault(e => string.Equals(Path.GetFileName(e), name, StringComparison.OrdinalIgnoreCase));
         }
 
-        // A DOS directory time as File Exchange reads it (confirmed in SheepShaver): even seconds only, and years from
-        // 2032 on wrap back 128 years, because File Exchange stores Mac years 1904–1979 as DOS 2032–2107 (DOS 2040 reads
-        // as 1912).
-        internal static MacDate? MacDateFromDos(DateTime local)
-        {
-            local = local.AddTicks(-(local.Ticks % (2 * TimeSpan.TicksPerSecond)));
-            if (local.Year >= 2032) local = local.AddYears(-128);
-            try
-            {
-                return MacDate.FromDateTime(local);
-            }
-            catch (ArgumentOutOfRangeException)
-            {
-                return null;
-            }
-        }
 
         /// <summary>
         /// A host file name as a Mac name: each character in Mac OS Roman; for Basilisk II names, <c>%XX</c> is the
