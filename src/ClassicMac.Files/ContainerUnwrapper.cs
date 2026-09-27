@@ -29,7 +29,7 @@ namespace ClassicMac.Files
 
         /// <summary>
         /// The built-in readers: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex 4.0, Apple partition maps,
-        /// Disk Copy 4.2 and HFS volumes.
+        /// Disk Copy 4.2, and HFS and MFS volumes.
         /// </summary>
         public static ContainerUnwrapper Default { get; } = new([]);
 
@@ -49,6 +49,7 @@ namespace ClassicMac.Files
                 PartitionMapReader.Instance,
                 DiskCopy42Reader.Instance,
                 HfsReader.Instance,
+                MfsReader.Instance,
             ];
         }
 
