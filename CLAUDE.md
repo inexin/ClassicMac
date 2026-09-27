@@ -14,6 +14,8 @@ it in the same change when a decision changes.
   never from another implementation's guess. Other projects (see the plan's prior-art tables) are behavioural
   references only.
 - A rule fitted to real data rather than read from code is marked as such in code comments and docs.
+- The resource extractor in the Realmz project is inspiration, not authority; re-check anything taken from it. Realmz
+  data files are a test corpus, but ClassicMac is standalone and never depends on Realmz.
 
 ## Licensing
 

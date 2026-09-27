@@ -186,7 +186,7 @@ and results are checked against real data.
   (`snd `), the Apple file-format notes for MacBinary, AppleSingle/AppleDouble and BinHex 4.0.
 - **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
   edge cases.
-- **Verification:** a corpus of real files (system files, applications, games, shareware) extracted and compared;
+- **Verification:** a corpus of real files (system files, applications, games such as Realmz, shareware) extracted and compared;
   round-trip tests (read → write → read gives the same map); golden outputs for each decoder.
 - **Licence:** MIT, with third-party notices for anything ported; no Apple code or files in the repo.
 
@@ -194,10 +194,12 @@ and results are checked against real data.
 comes from disassembling the Mac OS code that handles the format (the Resource Manager, Sound Manager, Icon Utilities,
 HFS) — never from another implementation's guess.
 
-### Prior art: an earlier extractor
+### Prior art: Realmz.ResourceExtractor
 
-An earlier extractor, written for one game's files, is a useful starting point, not an authority: its rules must be
-re-checked against Apple's documentation or the disassembly before they are carried over.
+The resource extractor in the Realmz project (a separate game reimplementation) is inspiration, not an authority: its
+rules were written for Realmz's files and must be re-checked against Apple's documentation or the disassembly before
+they are carried over. ClassicMac does not depend on Realmz; Realmz's data files are one of the test corpora, and the
+Realmz project can serve as a real-world consumer to try the libraries against.
 
 | Area | What it does today | Take from it |
 | --- | --- | --- |
