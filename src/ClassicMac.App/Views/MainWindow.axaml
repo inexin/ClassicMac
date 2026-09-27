@@ -1,0 +1,85 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ClassicMac.App.ViewModels"
+        xmlns:views="using:ClassicMac.App.Views"
+        x:Class="ClassicMac.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="ClassicMac"
+        Width="1200" Height="780" MinWidth="700" MinHeight="450"
+        DragDrop.AllowDrop="True">
+
+  <Window.Styles>
+    <Style Selector="TreeViewItem" x:DataType="vm:NodeViewModel">
+      <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem Header="_Open…" Command="{Binding OpenCommand}" InputGesture="Ctrl+O" HotKey="Ctrl+O" />
+        <MenuItem Header="_Close" Command="{Binding CloseCommand}" InputGesture="Ctrl+W" HotKey="Ctrl+W" />
+        <Separator />
+        <MenuItem Header="_Quit" Click="OnQuit" />
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+      <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
+    </Border>
+
+    <Grid RowDefinitions="*,5,180">
+      <Grid ColumnDefinitions="380,5,*">
+        <TreeView ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
+          <TreeView.ItemTemplate>
+            <TreeDataTemplate DataType="vm:NodeViewModel" ItemsSource="{Binding Children}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Width="14" Height="14" Data="{Binding Kind, Converter={x:Static views:NodeIcons.Converter}}" />
+                <TextBlock Text="{Binding Title}" />
+              </StackPanel>
+            </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+        </TreeView>
+
+        <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
+
+        <ScrollViewer Grid.Column="2" Padding="16,12">
+          <StackPanel Spacing="10">
+            <TextBlock Text="{Binding Details.Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Details.Rows}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:DetailRow">
+                  <Grid ColumnDefinitions="140,*" Margin="0,2">
+                    <TextBlock Text="{Binding Label}" Opacity="0.65" />
+                    <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </Grid>
+
+      <GridSplitter Grid.Row="1" ResizeDirection="Rows" />
+
+      <DockPanel Grid.Row="2">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="8,4">
+          <TextBlock Text="Diagnostics" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter, Mode=TwoWay}" MinWidth="170" />
+        </StackPanel>
+        <ListBox ItemsSource="{Binding Diagnostics}" SelectedItem="{Binding SelectedDiagnostic, Mode=TwoWay}">
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="vm:DiagnosticEntry">
+              <Grid ColumnDefinitions="70,260,200,*">
+                <TextBlock Text="{Binding Severity}" />
+                <TextBlock Grid.Column="1" Text="{Binding Source}" TextTrimming="CharacterEllipsis" Opacity="0.75" />
+                <TextBlock Grid.Column="2" Text="{Binding Code}" TextTrimming="CharacterEllipsis" Opacity="0.75" />
+                <TextBlock Grid.Column="3" Text="{Binding Message}" TextTrimming="CharacterEllipsis" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>
