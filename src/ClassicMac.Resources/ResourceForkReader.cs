@@ -58,7 +58,8 @@ namespace ClassicMac.Resources
             }
 
             fork.MapReservedData = input.Slice(map + HeaderLength, ResourceFork.MapReservedDataLength).ToArray();
-            fork.Attributes = (ResourceForkAttributes)BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapAttributesOffset)..]);
+            fork.Attributes = (ResourceForkAttributes)bytes[map + MapAttributesOffset];
+            fork.MapFlags = (ResourceMapFlags)bytes[map + MapFlagsOffset];
             var typeList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapTypeListOffsetOffset)..]);
             var nameList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapNameListOffsetOffset)..]);
             if (typeList + TypeCountLength > mapEnd)

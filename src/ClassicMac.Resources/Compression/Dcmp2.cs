@@ -42,7 +42,7 @@ namespace ClassicMac.Resources.Compression
             if (header.IsVersion8)
                 throw new DecompressionFormException("'dcmp' 2 has the version-9 entry points but the resource uses a version-8 header.");
 
-            var cursor = new BlockCursor(context.Block, context.SourceOffset);
+            var cursor = new BlockCursor(context);
             var table = DefaultTable;
             var customCount = 256;
             if ((header.Param2 & 1) != 0)

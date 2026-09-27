@@ -9,10 +9,11 @@ namespace ClassicMac.Resources
         // The header plus the system (112) and application (128) areas; data conventionally starts here.
         public const int ReservedEnd = 256;
 
-        // Map header: header copy (16), next-map handle (4), file reference (2), attributes (2), type-list offset (2),
-        // name-list offset (2).
+        // Map header: header copy (16), next-map handle (4), file reference (2), attributes (mAttr, 1), in-memory flags
+        // (mInMemoryAttr, 1), type-list offset (2), name-list offset (2).
         public const int MapHeaderLength = 28;
         public const int MapAttributesOffset = 22;
+        public const int MapFlagsOffset = 23;
         public const int MapTypeListOffsetOffset = 24;
         public const int MapNameListOffsetOffset = 26;
 

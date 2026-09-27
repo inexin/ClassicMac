@@ -37,6 +37,7 @@ Proposed priority:
 | 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF | Emulator disks, floppy images, CD-ROMs |
 | 3 | HFS+ images | Mac OS 8.1–9 disks |
 | 3 | StuffIt (`.sit`) and Compact Pro (`.cpt`) archives | Most classic Mac downloads |
+| 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators |
 
 Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
 
@@ -62,13 +63,18 @@ don't need the containers, and each package stays smaller to test and fuzz. The 
   protected, preload, compressed) and its data.
 - **Finder info:** belongs to the file (`FinderInfo` in `ClassicMac.Files`), not the fork; the manifest records it
   beside the fork's resources.
-- **Compressed resources:** the System's `dcmp` 0, 1, 2 and 3 decompressed natively
-  (`ResourceDecompression`). 0, 1 and 2, and the Resource Manager's handling (header, in-place block, working buffer,
-  failures), follow the disassembly of the ROM $077D and Mac OS 9.0 code; `dcmp` 3 (bit-stream LZ77, used by every
-  compressed Mac OS 9 System resource) is ported from resource_dasm and marked behavioural until it is traced.
-  Malformed-input behaviour follows Mac OS 9 by default, the 68k ROM when `ReadOptions.ResourceManager` says so.
-  Where the Mac has no bounds (memo tables, in-place overlap) the result is reproduced, and an overrun stops with a
-  diagnostic. Unknown `dcmp` IDs are kept compressed and flagged in the manifest; applications can add decompressors.
+- **Compressed resources:** the System's `dcmp` 0, 1, 2 and 3 decompressed natively (`ResourceDecompression`),
+  all four and the Resource Manager's handling (header, in-place block, working buffer, failures) following the
+  disassembly of the ROM $077D and Mac OS 9.0 code; `dcmp` 3 (bit-stream LZ77, used by every compressed Mac OS 9
+  System resource) was first ported from resource_dasm and then checked against it. On Mac OS 9 all decompressors run
+  as 68k code (the native `ncmp` ones are never used). Malformed-input behaviour follows Mac OS 9 by default, the 68k
+  ROM when `ReadOptions.ResourceManager` says so. Where the Mac has no bounds the result is reproduced: memo tables
+  overwrite each other, output may overtake input in place, and the memory after the block (2 KiB, zero) takes
+  `dcmp` 3's overshoot and reads past the input; anything further stops with a diagnostic. Unknown `dcmp` IDs are kept
+  compressed and flagged in the manifest; applications can add decompressors.
+- **Map attributes:** the word at map offset 22 is two bytes — `mAttr` (read-only, compact, changed, force system
+  heap) and `mInMemoryAttr` (flags such as the decompression password bit, which some files carry on disk); both are
+  kept (`ResourceFork.Attributes`, `ResourceFork.MapFlags`).
 - **API shape:** read from a `Stream` or memory. A fork's 24-bit data offsets cap it at 16 MiB of data, so a fork is
   loaded whole and each resource's data is a slice of that buffer; laziness lives one level up, in `ForkData`, so
   disk images stay cheap to open.
@@ -396,6 +402,10 @@ Apple's documentation decides first; where it is silent or ambiguous, the answer
 code that handles the format (the Resource Manager, Sound Manager, Icon Utilities, HFS) — never from another
 implementation's guess. A rule fitted to real data instead is marked as such.
 
+The Resource Manager model is the native Mac OS 9 one (plus the 68k ROM where selected) without the trap patches that
+extensions install — Multiple Users, Apple Menu Options, language packs, the Process Manager's font-release rule.
+They change what running applications see, not what a file contains.
+
 - **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS, MFS),
   *Sound* (`snd `), the Apple file-format notes for MacBinary, AppleSingle/AppleDouble and BinHex 4.0.
 - **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
@@ -510,6 +520,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   `ClassicMac.Hfs` (phase 2) and `ClassicMac.Archives` (later) are separate from `ClassicMac.Resources`; the shared
   types (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic`) sit in the dependency-free
   base `ClassicMac.Core` (see Inputs).
+- **`dcmp` 0–3 from disassembly:** all four decompressors follow the Mac OS 9.0 System's code (68k, emulated and
+  compared on all 34 compressed System resources); the memory after the in-place block is modelled as 2 KiB of zeros.
 
 ## Open questions
 
@@ -517,6 +529,3 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   text and by font export), or font parsing inside `ClassicMac.QuickDraw`?
 - [ ] **One or several decoder packages:** a single `ClassicMac.Resources.Decoders`, or split by area (icons, text,
   UI, sound) for users who want a small subset?
-- [ ] **`dcmp` 3 in disassembly:** bit order and refill, the two length codes, the offset thresholds (including the
-  two resource_dasm calls bugs in Apple's code), the literal-run rule and termination. Until then it is behavioural;
-  all 34 compressed resources in the Mac OS 9.0 System decompress to their declared sizes with plausible content.

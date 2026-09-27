@@ -15,6 +15,12 @@ namespace ClassicMac.Resources
     /// </summary>
     public sealed class ResourceDecompression
     {
+        // The memory after the block that decompressors may touch without stopping: dcmp 3's last command overshoots
+        // the declared size by up to 2044 bytes, and no decompressor checks the end of its input (disassembly of the
+        // Mac OS 9.0 System's dcmp 0–3). The emulator's memory there was zero, and so is ours. Not a limit to tune:
+        // it models memory the Mac would use.
+        private const int MemoryAfterBlock = 2048;
+
         private static readonly FourCC Dcmp = FourCC.FromString("dcmp");
         private readonly Dictionary<short, IResourceDecompressor> decompressors;
 
@@ -106,7 +112,9 @@ namespace ClassicMac.Resources
                     $"needs 'dcmp' {header.DecompressorId}, which is not available; kept compressed.");
                 return stored;
             }
-            if (fork?.Find(Dcmp, header.DecompressorId) is not null)
+            // The ROM searches for 'dcmp' only in maps with the decompression password bit; Mac OS 9 in every map.
+            if (fork?.Find(Dcmp, header.DecompressorId) is not null
+                && (!rom || (fork.MapFlags & ResourceMapFlags.DecompressionPassword) != 0))
             {
                 Report(DiagnosticSeverity.Info, "resource.dcmp-overridden",
                     $"the file carries its own 'dcmp' {header.DecompressorId}, which the Mac would run; the built-in one was used.");
@@ -122,15 +130,18 @@ namespace ClassicMac.Resources
                     $"the {sourceLength} compressed bytes do not fit the {blockLength}-byte block.");
                 return stored;
             }
-            var block = new byte[blockLength];
+            // After the block comes zeroed memory standing in for the Mac's heap, which decompressors may use.
+            var block = new byte[blockLength + MemoryAfterBlock];
             var source = (int)(blockLength - sourceLength);
             bytes[CompressedResourceHeader.Length..].CopyTo(block.AsSpan(source));
 
             int written;
+            DecompressionContext context = new(
+                header, block, (int)blockLength, source, options,
+                d => diagnostics?.Add(d with { Message = $"{label}: {d.Message}" }));
             try
             {
-                written = decompressor.Decompress(new DecompressionContext(
-                    header, block, source, options, d => diagnostics?.Add(d with { Message = $"{label}: {d.Message}" })));
+                written = decompressor.Decompress(context);
             }
             catch (DecompressionOverrunException e)
             {
@@ -148,12 +159,26 @@ namespace ClassicMac.Resources
                 return stored;
             }
 
-            // The Mac then sets the handle to the declared size, whatever was written (error ignored).
-            if (written != header.DecompressedSize)
+            if (context.ReadPastInput)
+            {
+                Report(DiagnosticSeverity.Warning, "resource.dcmp-read-past-input",
+                    "the decompressor read past its input (truncated or malformed data); the Mac would read whatever " +
+                    "follows in memory, zeros here.");
+            }
+            if (context.WrotePastBlock)
+            {
+                Report(DiagnosticSeverity.Info, "resource.dcmp-wrote-past-block",
+                    "the last command overshot the block into the memory after it, as the Mac allows; the result is cut " +
+                    "to the declared size.");
+            }
+
+            // The Mac then sets the handle to the declared size, whatever was written (error ignored): overshoot is cut
+            // (normal for dcmp 3's last command), short output is padded with the block's contents.
+            if (written < header.DecompressedSize)
             {
                 Report(DiagnosticSeverity.Warning, "resource.dcmp-size",
                     $"'dcmp' {header.DecompressorId} wrote {written} bytes for a declared {header.DecompressedSize}; " +
-                    "the result is cut or padded with the block's contents, as on the Mac.");
+                    "the rest is the block's leftover contents, as on the Mac.");
             }
             return block.AsMemory(0, (int)header.DecompressedSize);
         }

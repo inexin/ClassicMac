@@ -36,6 +36,9 @@ namespace ClassicMac.Resources
         /// <summary>The resource map's attributes.</summary>
         public ResourceForkAttributes Attributes { get; set; }
 
+        /// <summary>The map's in-memory flags byte (<c>mInMemoryAttr</c>), kept as read.</summary>
+        public ResourceMapFlags MapFlags { get; set; }
+
         /// <summary>The 112 bytes after the fork header reserved for the system, kept as read.</summary>
         public ReadOnlyMemory<byte> SystemData
         {

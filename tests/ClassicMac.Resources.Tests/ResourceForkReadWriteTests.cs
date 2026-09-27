@@ -26,7 +26,7 @@ public class ResourceForkReadWriteTests
             "00000000" + // 'TEST' -1
             "00000001 AA" + // 'snd ' 1
             "00000100 00000110 00000010 00000056" + // map: header copy
-            "12345678 9ABC 0080 001C 0052" + // handle, file ref, attributes (read-only), type list, name list
+            "12345678 9ABC 80 01 001C 0052" + // handle, file ref, attributes (read-only), flags (password bit), lists
             "0001" + // two types
             "54455354 0001 0012" + // 'TEST', two resources, references at 18
             "736E6420 0000 002A" + // 'snd ', one resource, references at 42
@@ -46,6 +46,7 @@ public class ResourceForkReadWriteTests
             SystemData = Area(ResourceFork.SystemDataLength, 0x11),
             ApplicationData = Area(ResourceFork.ApplicationDataLength, 0x22),
             MapReservedData = Hex("123456789ABC"),
+            MapFlags = ResourceMapFlags.DecompressionPassword,
         };
         fork.Add(new Resource(Test, 128, new byte[] { 1, 2, 3 })
         {
@@ -74,6 +75,7 @@ public class ResourceForkReadWriteTests
 
         Assert.Empty(fork.Diagnostics);
         Assert.Equal(ResourceForkAttributes.ReadOnly, fork.Attributes);
+        Assert.Equal(ResourceMapFlags.DecompressionPassword, fork.MapFlags);
         Assert.Equal(0x11, fork.SystemData.Span[0]);
         Assert.Equal(0x22, fork.ApplicationData.Span[0]);
         Assert.Equal(Hex("123456789ABC"), fork.MapReservedData.ToArray());
@@ -305,6 +307,7 @@ public class ResourceForkReadWriteTests
     private static void AssertSameModel(ResourceFork expected, ResourceFork actual)
     {
         Assert.Equal(expected.Attributes & ~ResourceForkAttributes.Changed, actual.Attributes);
+        Assert.Equal(expected.MapFlags, actual.MapFlags);
         Assert.Equal(expected.SystemData.ToArray(), actual.SystemData.ToArray());
         Assert.Equal(expected.ApplicationData.ToArray(), actual.ApplicationData.ToArray());
         Assert.Equal(expected.MapReservedData.ToArray(), actual.MapReservedData.ToArray());

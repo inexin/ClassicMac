@@ -6,7 +6,8 @@ ClassicMac is MIT-licensed. Code or data taken from other projects is listed her
 
 <https://github.com/fuzziqersoftware/resource_dasm>
 
-- `src/ClassicMac.Resources/Compression/Dcmp3.cs` ports the `'dcmp'` 3 decompressor from `System3.cc`.
+- `src/ClassicMac.Resources/Compression/Dcmp3.cs` was ported from its `System3.cc`, then checked against the
+  disassembly of the Mac OS 9.0 System's `'dcmp'` 3.
 - The constant tables in `Dcmp01.cs` and `Dcmp2.cs` were cross-checked against its `System01.cc` and `System2.cc`.
   The tables themselves come from the Mac OS 9.0 System's decompressors.
 

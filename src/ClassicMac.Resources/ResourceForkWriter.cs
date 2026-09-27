@@ -64,8 +64,8 @@ namespace ClassicMac.Resources
             var map = span[(int)mapOffset..];
             WriteHeader(map, dataOffset, mapOffset, dataLength, mapLength);
             fork.MapReservedData.Span.CopyTo(map[HeaderLength..]);
-            var attributes = (ushort)(fork.Attributes & ~ResourceForkAttributes.Changed);
-            BinaryPrimitives.WriteUInt16BigEndian(map[MapAttributesOffset..], attributes);
+            map[MapAttributesOffset] = (byte)(fork.Attributes & ~ResourceForkAttributes.Changed);
+            map[MapFlagsOffset] = (byte)fork.MapFlags;
             BinaryPrimitives.WriteUInt16BigEndian(map[MapTypeListOffsetOffset..], MapHeaderLength);
             BinaryPrimitives.WriteUInt16BigEndian(map[MapNameListOffsetOffset..], (ushort)nameListOffset);
 

@@ -141,6 +141,18 @@ public class DecompressionTests
     }
 
     [Fact]
+    public void The_ROM_runs_a_files_own_dcmp_only_with_the_password_bit()
+    {
+        var fork = new ResourceFork();
+        fork.Add(new Resource(FourCC.FromString("dcmp"), 2, new byte[] { 0x4E, 0x75 }));
+        var resource = Compressed("02", size: 2, id: 2, version: 9);
+
+        Assert.Empty(Decompress(resource, Rom, fork).Diagnostics);
+        fork.MapFlags = ResourceMapFlags.DecompressionPassword;
+        Assert.Equal("resource.dcmp-overridden", Assert.Single(Decompress(resource, Rom, fork).Diagnostics).Code);
+    }
+
+    [Fact]
     public void Entry_form_follows_the_header_version()
     {
         var (_, diagnostics) = Decompress(Compressed("FF", size: 2, id: 0, version: 9));
@@ -180,7 +192,7 @@ public class DecompressionTests
 
         public int Decompress(DecompressionContext context)
         {
-            var input = context.Block[context.SourceOffset..];
+            var input = context.Block[context.SourceOffset..context.BlockLength];
             Array.Reverse(input);
             input.CopyTo(context.Block, 0);
             return input.Length;
@@ -271,7 +283,7 @@ public class DecompressionTests
         // Size 0 still writes a word (a do-while loop); the handle is then cut to 0.
         var (hex, diagnostics) = Decompress(Compressed("02", size: 0, id: 2, version: 9, expansion: 2));
         Assert.Equal("", hex);
-        Assert.Equal("resource.dcmp-size", Assert.Single(diagnostics).Code);
+        Assert.Empty(diagnostics); // overshooting the declared size is normal; the Mac cuts it
     }
 
     [Fact]
@@ -301,6 +313,42 @@ public class DecompressionTests
         // code 10 + 01 (1 + 2 = 3): copies "ABCA" from three back.
         var stream = Bits("00 101 01000001 01000010 01000011 01 1001");
         Assert.Equal(Convert.ToHexString("ABCABCA"u8), Clean(Compressed(stream, size: 7, id: 3, version: 9)));
+    }
+
+    [Fact]
+    public void Dcmp3_overshoot_runs_into_the_memory_after_the_block()
+    {
+        // Literal "A", then a forced back-reference of 19 + 3 = 22 bytes at offset 1: 23 bytes written for a declared
+        // size of 2, through a 5-byte block. The Mac overwrites what follows; the result is cut to 2 bytes.
+        var stream = Bits("00 0 01000001 11110000 0");
+        var (hex, diagnostics) = Decompress(Compressed(stream, size: 2, id: 3, version: 9, expansion: 3));
+        Assert.Equal("4141", hex);
+        Assert.Equal("resource.dcmp-wrote-past-block", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void Dcmp3_reads_zeros_past_its_input()
+    {
+        // One byte of input: a 3-byte literal run needs 24 more bits, so the rest come from the zeroed memory after the
+        // block: 40 00 00, then a forced back-reference (code 00 → 3 bytes, offset 1).
+        var (hex, diagnostics) = Decompress(Compressed(Bits("00 101 010"), size: 4, id: 3, version: 9, expansion: 4));
+        Assert.Equal("40000000", hex);
+        Assert.Equal("resource.dcmp-read-past-input", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void Dcmp3_uses_the_66C_threshold()
+    {
+        // "AB" repeated to $670 bytes, then a 3-byte back-reference. With $670 written the offset code's third form
+        // reads 11 bits (the Mac's $66C threshold; the regular rule, $680, would read 10). Offset 642 copies "ABA";
+        // reading 10 bits would give offset 641 and "BAB".
+        var stream = Bits(
+            "00 100 01000001 01000010" + // literal "AB"
+            "1111111111 1001110000 10 00" + // back-reference, length 1019 + 624 + 3 = 1646, offset 2
+            "01 11 00000000001"); // back-reference, length 1 + 2 = 3, offset $281 + 1
+        var expected = string.Concat(Enumerable.Repeat("AB", 825)) + "A";
+        Assert.Equal(Convert.ToHexString(System.Text.Encoding.ASCII.GetBytes(expected)),
+            Clean(Compressed(stream, size: 0x673, id: 3, version: 9, expansion: 8)));
     }
 
     [Fact]
