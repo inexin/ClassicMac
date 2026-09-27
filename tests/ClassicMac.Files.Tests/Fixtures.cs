@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using ClassicMac.Files.Containers;
 
 namespace ClassicMac.Files.Tests;
 

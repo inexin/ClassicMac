@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using ClassicMac.Core;
+using ClassicMac.Files.Containers;
 
 namespace ClassicMac.Files
 {

@@ -1,6 +1,6 @@
 using System;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Files.Containers
 {
     // CRC-16 with polynomial $1021, initial value 0, no reflection or final XOR (CRC-16/XMODEM, "CCITT"), which MacBinary
     // II and BinHex 4.0 both use.

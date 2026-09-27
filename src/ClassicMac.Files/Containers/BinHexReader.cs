@@ -5,7 +5,7 @@ using System.IO;
 using System.Text;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Files.Containers
 {
     /// <summary>
     /// BinHex 4.0 (.hqx): a Mac file as 7-bit text. There is no Apple specification and no Mac OS code for it; the

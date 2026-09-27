@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Files.Containers
 {
     /// <summary>One record of a PC Exchange / File Exchange <c>FINDER.DAT</c> file.</summary>
     /// <param name="MacName">The Mac name (at most 31 bytes).</param>

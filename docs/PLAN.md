@@ -17,8 +17,8 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Core`, `ClassicMac.Files`,
-`ClassicMac.Hfs`, `ClassicMac.Fat`, `ClassicMac.Archives`, `ClassicMac.Resources`, `ClassicMac.Encodings`,
-`ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app carries the same name. QuickDraw.Pict stays a
+`ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app
+carries the same name. QuickDraw.Pict stays a
 separate repo and package for now; merging it into ClassicMac (as `ClassicMac.QuickDraw` and `ClassicMac.Pict`) is the
 long-term intent.
 
@@ -48,9 +48,9 @@ creator, Finder flags, creation and modification dates (seconds since 1904, loca
 Single-file containers yield one entry; disk images and archives yield a tree of them.
 
 **File layer and resource map are separate packages (decided).** Containers wrap whole Mac files (both forks and
-Finder info), not resource forks, so they live apart from the resource map: `ClassicMac.Files` (the file model and the
-single-file wrappers), `ClassicMac.Hfs` (HFS and MFS volumes and disk images), `ClassicMac.Fat` (FAT volumes Mac OS
-wrote to through PC Exchange / File Exchange) and later `ClassicMac.Archives` (StuffIt, Compact Pro).
+Finder info), not resource forks, so they live apart from the resource map in one package, `ClassicMac.Files`: the
+file model and single-file wrappers, `ClassicMac.Files.Hfs` for HFS and MFS volumes and disk images, and later
+`ClassicMac.Files.Fat` and `ClassicMac.Files.Archives`.
 People who only unpack old downloads or disk images don't need the resource map, people who only edit resource forks
 don't need the containers, and each package stays smaller to test and fuzz. The types both sides use — `FourCC`
 (types, creators, resource types), `MacString` (file and resource names), `MacDate` (file and volume dates, and the
@@ -149,7 +149,7 @@ defaults are a static `Default` on each. Each object arrives with the code that 
 
 ### Core API
 
-The model, by package (namespaces match package names). `ResourceFork.Read` and `ResourceFork.Write`/`ToArray` read
+The model, by package (namespaces start with the package name). `ResourceFork.Read` and `ResourceFork.Write`/`ToArray` read
 and write a fork; `ResourceDecompression` returns a resource's data as the Resource Manager would:
 
 | Package | Type | What it is |
@@ -277,10 +277,7 @@ its own and the heavy dependencies stay optional. Arrows point from a package to
 flowchart LR
     B["ClassicMac.Core<br/>FourCC, MacString, MacDate,<br/>Point, Rect, Fixed,<br/>diagnostics"]
     subgraph filelayer["File layer"]
-        F["ClassicMac.Files<br/>Mac files, Finder info;<br/>AppleSingle/Double, MacBinary,<br/>BinHex, Basilisk II folders"]
-        H["ClassicMac.Hfs<br/>HFS/MFS volumes;<br/>raw, DiskCopy 4.2, NDIF"]
-        T["ClassicMac.Fat<br/>FAT volumes with<br/>PC Exchange data"]
-        R["ClassicMac.Archives<br/>StuffIt, Compact Pro<br/>(later)"]
+        F["ClassicMac.Files<br/>Mac files, Finder info, host folders;<br/>.Containers: AppleSingle/Double,<br/>MacBinary, BinHex, PC Exchange;<br/>.Hfs: HFS/MFS, DiskCopy 4.2;<br/>later .Fat, .Archives"]
     end
     subgraph resourcelayer["Resource layer"]
         M["ClassicMac.Resources<br/>resource map, dcmp,<br/>read and write"]
@@ -288,23 +285,21 @@ flowchart LR
     end
     E["CLI · viewer app<br/>unwrap, browse, export,<br/>pack back"]
     B --> F & M
-    F --> H & T & R
     M --> D
-    F & H & T & R & D --> E
+    F & D --> E
     Q["QuickDraw.Pict<br/>PICT and icon drawing"] --> D
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
 - **ClassicMac.Core** — `FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic` and (later) the
   single-byte text encodings; no dependencies, .NET 10.
-- **ClassicMac.Files** — the Mac file model (`MacFile`, `FinderInfo`, `ForkData`, `IContainerReader`) and
-  the single-file wrappers: AppleSingle, AppleDouble, MacBinary, BinHex, Basilisk II folders; depends on Core.
-- **ClassicMac.Hfs** — HFS and MFS volumes and the disk images that hold them (raw, DiskCopy 4.2, NDIF); depends on
-  Files.
-- **ClassicMac.Fat** — FAT12/16/32 volumes in disk images, with the PC Exchange / File Exchange data Mac OS kept on
-  them (`RESOURCE.FRK`, `FINDER.DAT`, read with `ClassicMac.Files`' `PcExchange`); depends on Files. Separate from
-  Hfs because FAT is not an Apple format: the package names the file system it reads.
-- **ClassicMac.Archives** — StuffIt and Compact Pro, later; depends on Files.
+- **ClassicMac.Files** — the whole file layer, one package with one namespace per area; depends on Core:
+  - `ClassicMac.Files`: the Mac file model (`MacFile`, `FinderInfo`, `ForkData`), `IContainerReader`, `HostFiles`,
+    `ContainerUnwrapper`, options;
+  - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
+  - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, DiskCopy 4.2 (NDIF and HFS+ later);
+  - `ClassicMac.Files.Fat` (later): FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them;
+  - `ClassicMac.Files.Archives` (later): StuffIt and Compact Pro.
 - **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only (Files only if a convenience overload
   ever needs it).
 - **ClassicMac.Encodings** — the multi-byte Mac text encodings; optional, depends on Core.
@@ -324,7 +319,7 @@ global.json                 .NET 10 SDK, rolling forward to the latest feature b
 Directory.Build.props       shared settings (below) and package metadata
 Directory.Packages.props    every package version, in one place
 src/ClassicMac.<Package>/   one folder per package; the app goes in src/ClassicMac.App/
-                            today: Core, Files, Resources, Resources.Cli (Hfs and Fat in phase 2, Archives later)
+                            today: Core, Files, Resources, Resources.Cli
 tests/ClassicMac.<Package>.Tests/   one test project per package
 tests/fixtures/             synthetic fixtures (and their Rez sources)
 schemas/                    manifest JSON Schemas
@@ -352,7 +347,7 @@ with a test that fails on any dependency pointing up; the merge moves those fold
 | `ClassicMac.MacPaint` (or inside Graphics) | PNTG files and the `PNTG` codec's decoder | Graphics |
 | `ClassicMac.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics (and font parsing, see open questions) |
 | `ClassicMac.Pict` | The PICT file format: the opcode reader that replays a picture into the renderer, and the writer | QuickDraw, QuickTime |
-| `ClassicMac.Core`, `ClassicMac.Files`, `ClassicMac.Hfs`, `ClassicMac.Fat`, `ClassicMac.Archives` | The shared base and the file layer (unchanged by the merge) | Core; the file packages on Files |
+| `ClassicMac.Core`, `ClassicMac.Files` | The shared base and the file layer (unchanged by the merge) | nothing; Files on Core |
 | `ClassicMac.Resources` (+ `.Decoders`) | Resource forks; icons, cursors and patterns become resource decoders here | Core; the decoders on Graphics, QuickDraw |
 | `ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp` | One integration package per host library, covering every image format (PICT, QTIF, MacPaint, icons) | the layers above |
 
@@ -500,9 +495,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    `ClassicMac.Files`: Finder info, AppleDouble/AppleSingle, MacBinary, BinHex, Basilisk II shared folders; raw forks;
    CLI `list` and raw `extract`. *Exit:* read → write → read gives the same model on every corpus fork, and canonical
    forks come back byte for byte.
-2. **Disk images** — `ClassicMac.Hfs`: HFS and MFS (raw, DiskCopy 4.2, NDIF); `ClassicMac.Fat`: FAT volumes with
-   PC Exchange / File Exchange data; recursive unwrapping across Files, Hfs and Fat. *Exit:* every file of the corpus
-   images (including `RealmzClassicHD.img`) lists and extracts with both forks and Finder info.
+2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
+   map; then `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data) and NDIF; recursive
+   unwrapping through all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
+   images) lists and extracts with both forks and Finder info, and file and folder counts match each volume's.
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
@@ -515,7 +511,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated.
-10. **Later** — HFS+ (`ClassicMac.Hfs`), StuffIt and Compact Pro (`ClassicMac.Archives`).
+10. **Later** — HFS+ (`ClassicMac.Files.Hfs`), StuffIt and Compact Pro (`ClassicMac.Files.Archives`).
 
 ## Decisions
 
@@ -544,11 +540,12 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   (`ClassicMac.Pict`) become separate packages (see Target layering).
 - **Integrations:** one package per host library (`ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp`) covering every
   image format, instead of one per format.
-- **Package naming:** `ClassicMac.<Area>`, named after the Apple technology (QuickDraw, QuickTime, Hfs); namespaces
-  match package names; format specs live under `docs/formats/`.
-- **Files and disk images as their own packages (split):** `ClassicMac.Files` (file model and single-file wrappers),
-  `ClassicMac.Hfs` and `ClassicMac.Fat` (phase 2) and `ClassicMac.Archives` (later) are separate from
-  `ClassicMac.Resources`; the shared
+- **Package naming:** `ClassicMac.<Area>`, named after the Apple technology (QuickDraw, QuickTime); namespaces start
+  with the package name, and areas inside a package get sub-namespaces (`ClassicMac.Files.Hfs`); format specs live
+  under `docs/formats/`.
+- **One file-layer package (revised):** the file layer is a single package, `ClassicMac.Files`, with one namespace
+  per area (containers, HFS/MFS, later FAT and archives), to avoid a project per format; it stays separate from
+  `ClassicMac.Resources`, so resource-only users skip the containers and vice versa; the shared
   types (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic`) sit in the dependency-free
   base `ClassicMac.Core` (see Inputs).
 - **`dcmp` 0–3 from disassembly:** all four decompressors follow the Mac OS 9.0 System's code (68k, emulated and

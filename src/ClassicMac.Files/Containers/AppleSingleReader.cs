@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Files.Containers
 {
     /// <summary>
     /// AppleSingle and AppleDouble, from Apple's <i>AppleSingle/AppleDouble Formats for Foreign Files</i> Developer Note

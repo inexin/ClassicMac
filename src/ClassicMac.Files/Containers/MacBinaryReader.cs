@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Files.Containers
 {
     /// <summary>
     /// MacBinary I, II and III: a 128-byte header, an optional secondary header, then the data and resource forks, each
