@@ -1,0 +1,10 @@
+[Bb]in/
+[Oo]bj/
+[Tt]est[Rr]esults/
+.vs/
+.idea/
+*.user
+*.suo
+*.nupkg
+
+*.snupkg
