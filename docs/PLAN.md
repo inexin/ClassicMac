@@ -190,7 +190,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Export | `Unpacker`, `OutputLayout`, `ExportFolders` | Every Mac file under a tree to a folder (`unpack`), or every resource fork (`extract`), placed as the tree nests; new numbered folders that never overwrite. Shared by the CLI and the app |
 | Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (decoded, or the data itself; stored bytes in `raw/` on request) with `manifest.json`, format 1.1 (`schemas/manifest-1.schema.json`) |
 | Resources.Export | `IResourceDecoder`, `DecodeInput`, `DecodedFile` | A decoder for some resource types; the exporter uses the first that handles a type and falls back to raw |
-| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` and `.Images` built; `.Sound` next) |
+| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` and `.Images` built; `.Sound` PCM built, codecs next) |
 | Resources.Decoders.Images | `IImageEncoder`, `PngEncoder` | How decoded images are written; PNG (8-bit RGBA) built in |
 
 A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`).
@@ -230,7 +230,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | Group | Resource types | Output |
 | --- | --- | --- |
 | Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icm#`, `icl4/8`, `ics4/8`, `icm4/8`, `cicn`, `SICN`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `ppt#` (built); `icns` later | PNG via QuickDraw.Pict (screen depth selectable); cursors add a JSON file (hotspot, inverted pixels); lists give one image each (`.1.png` …). The image format is a setting (`IImageEncoder`, PNG built in; lossless WebP later) |
-| Sound | `snd ` (sampled formats 1/2; MACE 3:1/6:1, IMA4, µ-law) | WAV |
+| Sound | `snd ` formats 1 and 2, standard/extended/compressed headers: uncompressed PCM (`raw `, `twos`, `sowt`, `in24`, `in32`, `fl32`, `fl64`) built; MACE 3:1/6:1 and IMA4 next (from the Sound Manager's disassembly); µ-law, A-law, `csnd` and AIFF later | WAV (rate rounded; loop and base note in a `smpl` chunk) plus JSON (exact rate, header, synthesizers, commands); commands-only sounds give the JSON alone |
 | Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text (`STR `, `TEXT`), JSON (`STR#`, `styl`, `vers`); styled text also as RTF (built) |
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL` | JSON, optionally a rendered preview of the dialog |
@@ -570,7 +570,7 @@ Realmz project can serve as a real-world consumer to try the libraries against.
 | Input | Raw resource-fork files (`.rsf`) only | The resource map reader, as a first draft |
 | Resource map | Types, IDs, data; names not read; no `dcmp` | Needs names, attributes and compression |
 | Images | PICT, `cicn`, icon lists and `icl`/`ics` with their masks, cursors with hotspots, `ppat` via QuickDraw.Pict | The icon-list pairing and the hotspot JSON |
-| Sound | `snd ` formats 1/2, uncompressed PCM only (MACE and IMA4 throw) | The WAV writer; codecs still to do |
+| Sound | `snd ` formats 1/2, uncompressed PCM only (MACE and IMA4 throw) | Taken: the header walk, re-checked against *Inside Macintosh: Sound* (it read the extended header's sample size from the compressed header's place and ignored `bufferCmd`'s offset). Its note that it follows resource_dasm, and resource_dasm's MACE (from FFmpeg, LGPL), are reference only |
 | Text | `TEXT` and `STR#` (JSON, 0-based) in MacRoman | The `STR#` layout |
 | Fonts | `sfnt` → TTF, adding a Windows Unicode `cmap` and a missing `OS/2` table so modern loaders accept it | A "make it loadable" option for exported fonts |
 | UI | `DLOG`, `DITL`, `WIND`, `CNTL`, `MENU`, `MBAR` → JSON | The field layouts, re-checked against *Inside Macintosh* |
@@ -620,7 +620,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
-   pixel limit and `--screen-depth`. *Exit:* golden outputs pass and the corpus exports without errors.
+   pixel limit and `--screen-depth`; `snd ` PCM to WAV built (274 of the corpus's 275 sounds; the other is MACE).
+   *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders. First version built (browse, details, diagnostics, previews, hex, export); drag-out next.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.

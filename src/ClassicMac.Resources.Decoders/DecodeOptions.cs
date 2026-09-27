@@ -70,6 +70,7 @@ namespace ClassicMac.Resources.Decoders
                 new Images.IconDecoder(options),
                 new Images.CursorDecoder(options),
                 new Images.PatternDecoder(options),
+                new Sound.SoundDecoder(),
             ];
         }
     }
