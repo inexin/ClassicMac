@@ -101,6 +101,16 @@ namespace ClassicMac.Files
                     $"{header} is not an AppleDouble header file; ignored.");
             }
 
+            // AppleDouble as name.rsrc beside the file, as The Unarchiver writes archives' forks on other systems
+            // (unar -k visible); only taken when it really is an AppleDouble header.
+            var visible = Path.Combine(directory, hostName + ".rsrc");
+            if (File.Exists(visible) && AppleSingleReader.AppleDouble.CanRead(ForkData.FromFile(visible)))
+            {
+                var parts = AppleSingleReader.AppleDouble.Read(ForkData.FromFile(visible), context.WithHostName(file.Name))[0];
+                file = parts with { DataFork = file.DataFork };
+                return new HostFile(file, HostLayout.AppleDouble, [visible]);
+            }
+
             // macOS keeps the resource fork as a named fork of the file itself.
             if (OperatingSystem.IsMacOS())
             {

@@ -130,6 +130,23 @@ public class HostFilesTests : IDisposable
     }
 
     [Fact]
+    public void AppleDouble_files_named_dot_rsrc_join_too()
+    {
+        // As The Unarchiver writes forks on other systems: "name" and "name.rsrc" (AppleDouble).
+        var path = Write("System Disk", "disk"u8.ToArray());
+        Write("System Disk.rsrc", AppleSingle(AppleDoubleMagic, 0x00020000, "", (9, FinderInfo("dImg", "dCpy")), (2, [7])));
+        Write("Plain", "x"u8.ToArray());
+        Write("Plain.rsrc", "not AppleDouble"u8.ToArray());
+
+        var host = HostFiles.Read(path);
+
+        Assert.Equal(HostLayout.AppleDouble, host.Layout);
+        Assert.Equal("System Disk", host.File.Name.ToMacRoman());
+        Assert.Equal((FourCC.FromString("dImg"), (byte)7), (host.File.FinderInfo.Type, host.File.ResourceFork.ToArray()[0]));
+        Assert.Equal(HostLayout.Plain, HostFiles.Read(Path.Combine(Path.GetDirectoryName(path)!, "Plain")).Layout);
+    }
+
+    [Fact]
     public void Plain_files_have_only_a_data_fork()
     {
         var host = HostFiles.Read(Write("notes.txt", "hi"u8.ToArray()));
