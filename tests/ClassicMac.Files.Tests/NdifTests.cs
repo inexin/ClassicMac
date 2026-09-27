@@ -150,7 +150,7 @@ public class NdifTests
 
         var (disk, diagnostics) = Disk(Image(data, resource));
 
-        Assert.Contains(diagnostics, d => d.Code == "ndif.unsupported-chunk"); // KenCode
+        Assert.Contains(diagnostics, d => d.Code == "ndif.unknown-chunk"); // $84: no such type
         Assert.Equal(volume[..3072], disk[..3072]);
         Assert.All(disk[3072..], b => Assert.Equal(0, b));
 
@@ -192,6 +192,48 @@ public class NdifTests
         Assert.False(NdifReader.Instance.CanRead(Image(Volume(), [])));
         Assert.False(NdifReader.Instance.CanRead(Image(Volume(), NdifBuilder.Fork(("vers", 1, [1, 2, 3])))));
         Assert.False(NdifReader.Instance.CanRead(Image(Volume(), Bytes(1000, 5))));
+    }
+
+    [Fact]
+    public void KenCode_streams_decode()
+    {
+        // Length code 0 ("00"), literal run of 3 ("1 01"), "abc"; then (a run of 3 needs a match) length code 0 = 3
+        // bytes ("00"), distance 3 at position 3 (class 0: "10" + 2 bits of 3-1-1 = "01").
+        var bits = "00" + "101" + "01100001" + "01100010" + "01100011" + "00" + "1001";
+        var input = Pack(bits);
+        var output = new byte[6];
+
+        Assert.Equal(KenCode.Result.Done, KenCode.Decompress(input, output, out var written));
+        Assert.Equal((6, "abcabc"), (written, System.Text.Encoding.ASCII.GetString(output)));
+
+        // A match before any output, and more bits than eight per output byte.
+        Assert.Equal(KenCode.Result.BadDistance, KenCode.Decompress(Pack("10" + "0" + "0" + "0"), new byte[8], out _));
+        Assert.Equal(KenCode.Result.Overread, KenCode.Decompress(Pack("00" + "101" + "01100001" + "01100010" + "01100011"), new byte[2], out _));
+    }
+
+    private static byte[] Pack(string bits)
+    {
+        bits = bits.PadRight((bits.Length + 7) / 8 * 8, '0');
+        return Enumerable.Range(0, bits.Length / 8).Select(i => Convert.ToByte(bits.Substring(i * 8, 8), 2)).ToArray();
+    }
+
+    // Disk Copy 6.3.3's "Smaller (KC)" image (harness run17/kc): KenCode chunks decode to the stored CRC-32.
+    [Fact]
+    public void Disk_Copy_KenCode_image_matches_its_checksum()
+    {
+        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
+        var path = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
+            : Directory.EnumerateFiles(corpus, "F800 KC.img", SearchOption.AllDirectories).FirstOrDefault(f => !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.'));
+        if (path is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run17/kc image to run this.");
+
+        var diagnostics = new List<Diagnostic>();
+        var host = HostFiles.Read(path);
+        var disk = Assert.Single(NdifReader.Instance.Read(host.File,
+            new ContainerContext(ContainerReadOptions.Default with { VerifyChecksums = true }, diagnostics))).DataFork.ToArray();
+
+        Assert.Empty(diagnostics);
+        var decoded = Path.Combine(Path.GetDirectoryName(path)!, "kc_decoded.bin");
+        if (File.Exists(decoded)) Assert.Equal(File.ReadAllBytes(decoded), disk);
     }
 
     [Fact]

@@ -9,7 +9,7 @@ namespace ClassicMac.Files.Tests;
 // with literal runs and one long match per run of repeated bytes, enough to exercise the decoder.
 internal static class NdifBuilder
 {
-    public enum Kind : byte { Zero = 0x00, Raw = 0x02, Adc = 0x83, Unknown = 0x80 }
+    public enum Kind : byte { Zero = 0x00, Raw = 0x02, Adc = 0x83, Unknown = 0x84 }
 
     public static (byte[] Data, byte[] Resource) Build(byte[] disk, string name, params (int Sectors, Kind Kind)[] chunks)
     {

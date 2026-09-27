@@ -24,7 +24,7 @@
   `DosTime` and `PcExchange.Apply` shared with host folders. Long names converted as File Exchange converts them;
   an opt-in `ExtensionMap` for placeholder types.
 - DART images ("fast" RLE, "best" LZH, stored; checksums checked), verified on DART 1.5.3's own files; LZH also
-  decodes NDIF chunk type $82.
+  decodes NDIF chunk type $82, and KenCode ($80, Disk Copy's "Smaller (KC)") is decoded too.
 - NDIF disk images (Disk Copy 6: read-only, ADC-compressed, DART RLE chunks, version 2 maps, `.smi`, segmented
   parts found by their `bcm#` ID, CRC-32 verified on request) with ADC in
   `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;

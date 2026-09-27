@@ -492,8 +492,8 @@ They change what running applications see, not what a file contains.
 - **NDIF and ADC:** no Apple spec; from the disassembly of Disk Copy 6.3.3 (its `.HDI` driver and codecs; there is
   no separate extension on OS 9 and no UDIF support), confirmed on images it made in SheepShaver (each decodes to its
   source sectors, the CRC matches). The `bcem` header and its validator (what refuses a mount is refused, the rest
-  reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end; KenCode not decoded
-  yet), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
+  reported), the version 2 map, chunk types (zero, raw, KenCode, DART RLE, DART LZH, ADC, end, all decoded; KenCode
+  confirmed on a "Smaller (KC)" image from Disk Copy's hidden Control-Save dialog, 512-sector chunks), ADC with its overrun check, the CRC-32 (reflected table from the normal polynomial, no final xor;
   verified only when `VerifyChecksums` is set, as only Disk Copy's "Verify checksum" does), and segments found by their
   `bcm#` ID among `dseg` files in the folder, never by name. Disk Copy picks the format by file type; we find the
   `bcem` itself, so images that lost their type still open.

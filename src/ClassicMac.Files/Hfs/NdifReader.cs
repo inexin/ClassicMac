@@ -15,8 +15,8 @@ namespace ClassicMac.Files.Hfs
     /// segmented images. The data fork holds the disk in chunks, mapped by the <c>bcem</c> 128 resource: a 128-byte
     /// header (version, volume name, disk blocks, max chunk size, data start, CRC-32, segmented flag, chunk count) and
     /// 12-byte entries (start block and type, offset from the data start, stored length) ending with type $FF; the old
-    /// version 2 map has 8-byte entries. Chunks are zero-filled ($00), raw ($02), DART RLE ($81), DART LZH ($82) or ADC
-    /// ($83); KenCode ($80) is recognised but not decoded yet. A segmented image (version 12) has parts in the same
+    /// version 2 map has 8-byte entries. Chunks are zero-filled ($00), raw ($02), KenCode ($80, "Smaller (KC)"), DART
+    /// RLE ($81), DART LZH ($82) or ADC ($83). A segmented image (version 12) has parts in the same
     /// folder, each with a <c>bcm#</c> 128 (part number, count, image ID); Disk Copy finds them by that, typed
     /// <c>dseg</c>, never by name, and the map's offsets run across the parts' data forks back to back. The disk comes
     /// out as one file whose data fork is the volume, for the HFS or MFS reader to open next.
@@ -200,16 +200,11 @@ namespace ClassicMac.Files.Hfs
                     case ChunkRaw:
                         if (stored < size) context.Report(DiagnosticSeverity.Error, "ndif.short", $"{where} stores {stored} of its {size} bytes; the rest reads as zeros.");
                         break;
-                    case ChunkAdc or ChunkDartRle or ChunkDartLzh:
+                    case ChunkAdc or ChunkDartRle or ChunkDartLzh or ChunkKenCode:
                         if (type == ChunkAdc && header.Version < 11)
                             context.Report(DiagnosticSeverity.Error, "ndif.bad-map", $"{where} is ADC-compressed, which needs map version 11.");
                         if (header.MaxChunk != 0 && next - start > header.MaxChunk)
                             context.Report(DiagnosticSeverity.Warning, "ndif.chunk-size", $"{where} is larger than the map's largest chunk ({header.MaxChunk} blocks).");
-                        break;
-                    case ChunkKenCode:
-                        context.Report(DiagnosticSeverity.Error, "ndif.unsupported-chunk",
-                            $"{where} is KenCode-compressed, which is not read yet; it reads as zeros.");
-                        type = ChunkZero;
                         break;
                     default:
                         context.Report(DiagnosticSeverity.Error, "ndif.unknown-chunk",
@@ -366,6 +361,10 @@ namespace ClassicMac.Files.Hfs
                             case ChunkDartRle:
                                 if (!DartRle.Decompress(stored, bytes, out var rleWritten))
                                     problem = $"decodes to {rleWritten} of its {bytes.Length} bytes";
+                                break;
+                            case ChunkKenCode:
+                                var kcResult = KenCode.Decompress(stored, bytes, out var kcWritten);
+                                if (kcResult != KenCode.Result.Done) problem = $"decodes to {kcWritten} of its {bytes.Length} bytes ({kcResult})";
                                 break;
                             case ChunkDartLzh:
                                 // Each chunk starts with a clear window tail; Disk Copy's driver carries it over from the
