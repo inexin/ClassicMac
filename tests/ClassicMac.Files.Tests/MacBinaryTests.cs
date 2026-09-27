@@ -89,6 +89,28 @@ public class MacBinaryTests
     }
 
     [Fact]
+    public void MacBinary_I_needs_the_length_its_header_gives()
+    {
+        var bytes = MacBinary(1, "Old", new byte[10], [1]);
+        Assert.NotNull(Detect(bytes)); // fully padded
+        Assert.NotNull(Detect(bytes[..(128 + 128 + 1)])); // last fork unpadded
+        Assert.Null(Detect(bytes[..200])); // truncated: not recognisable as MacBinary I
+        Assert.Null(Detect([.. bytes, .. new byte[128]])); // longer
+    }
+
+    [Fact]
+    public void Data_starting_with_zeros_is_not_MacBinary_I()
+    {
+        // A Realmz data file ("Data TD") that passes MacBinary I's zero-byte checks: its "name" holds NUL bytes and its
+        // "resource fork" (25,600 bytes) is longer than the file.
+        var bytes = new byte[2688];
+        byte[] start = [0x00, 0x0B, 0x00, 0xD1, 0x01, 0x95, 0x03, 0x74, 0x01, 0xC6, 0x03, 0x6D, 0x03, 0x6D, 0x03, 0x6D];
+        start.CopyTo(bytes, 0);
+        bytes[0x59] = 0x64;
+        Assert.Null(Detect(bytes));
+    }
+
+    [Fact]
     public void A_bad_CRC_is_not_MacBinary_II()
     {
         var bytes = MacBinary(2, "Bad", [1], []);

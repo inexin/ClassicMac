@@ -35,28 +35,37 @@ namespace ClassicMac.Files
         public string FormatName => version switch { 3 => "MacBinary III", 2 => "MacBinary II", _ => "MacBinary I" };
 
         /// <inheritdoc/>
-        public bool CanRead(ForkData input) => Detect(input.ReadPrefix(HeaderLength)) == version;
+        public bool CanRead(ForkData input) => Detect(input.ReadPrefix(HeaderLength), input.Length) == version;
 
-        // The version the header shows, or 0. Checks fitted to the specifications' "must be zero" bytes and limits:
-        // bytes 0, 74 and 82 zero, a name of 1–63 bytes, fork lengths within $7FFFFF; then the CRC decides II/III
-        // against I, and 'mBIN' decides III against II.
-        internal static int Detect(ReadOnlySpan<byte> header)
+        // The version the header shows, or 0. Checks fitted to the specifications' "must be zero" bytes and limits and
+        // to real files: bytes 0, 74 and 82 zero, a name of 1–63 bytes without ':' (HFS forbids it) or NUL, fork
+        // lengths within $7FFFFF; then the CRC decides II/III against I, and 'mBIN' decides III against II. MacBinary I
+        // has no CRC, so data that happens to start with zeros would pass; it must also have exactly the length its
+        // header gives (forks padded to 128, the last one possibly not).
+        internal static int Detect(ReadOnlySpan<byte> header, long totalLength)
         {
             if (header.Length < HeaderLength) return 0;
             if (header[0] != 0 || header[74] != 0 || header[82] != 0) return 0;
             if (header[1] is < 1 or > 63) return 0;
-            if (BinaryPrimitives.ReadUInt32BigEndian(header[83..]) > MaxForkLength) return 0;
-            if (BinaryPrimitives.ReadUInt32BigEndian(header[87..]) > MaxForkLength) return 0;
+            if (header.Slice(2, header[1]).IndexOfAny((byte)':', (byte)0) >= 0) return 0;
+            long dataLength = BinaryPrimitives.ReadUInt32BigEndian(header[83..]);
+            long resourceLength = BinaryPrimitives.ReadUInt32BigEndian(header[87..]);
+            if (dataLength > MaxForkLength || resourceLength > MaxForkLength) return 0;
             if (Crc16.Compute(header[..124]) == BinaryPrimitives.ReadUInt16BigEndian(header[124..]))
                 return BinaryPrimitives.ReadUInt32BigEndian(header[102..]) == MBin ? 3 : 2;
-            return header[99..126].IndexOfAnyExcept((byte)0) < 0 ? 1 : 0;
+            if (header[99..126].IndexOfAnyExcept((byte)0) >= 0) return 0;
+            var padded = HeaderLength + Padded(dataLength) + Padded(resourceLength);
+            var lastUnpadded = resourceLength > 0
+                ? HeaderLength + Padded(dataLength) + resourceLength
+                : HeaderLength + dataLength;
+            return totalLength == padded || totalLength == lastUnpadded ? 1 : 0;
         }
 
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             var header = input.ReadPrefix(HeaderLength);
-            if (Detect(header) != version) throw new InvalidDataException($"Not a {FormatName} file.");
+            if (Detect(header, input.Length) != version) throw new InvalidDataException($"Not a {FormatName} file.");
 
             var name = new MacString(header.AsSpan(2, header[1]));
             // Finder flags: the high byte at 73 in every version, the low byte at 101 from MacBinary II on.

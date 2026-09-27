@@ -5,7 +5,7 @@ namespace ClassicMac.Files
 {
     /// <summary>
     /// Reads one container format (MacBinary, BinHex, AppleSingle, …) into Mac files. Applications register their own
-    /// alongside the built-in ones.
+    /// with <see cref="ContainerUnwrapper"/> alongside the built-in ones.
     /// </summary>
     public interface IContainerReader
     {
