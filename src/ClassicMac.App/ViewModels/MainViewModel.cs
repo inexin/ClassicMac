@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Resources;
+using ClassicMac.Resources.Decoders;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -29,6 +31,9 @@ namespace ClassicMac.App.ViewModels
         WarningsAndErrors,
         Errors,
     }
+
+    /// <summary>An image of the preview at the chosen zoom.</summary>
+    public sealed record ImageItem(PreviewImage Image, double Width, double Height);
 
     /// <summary>Picks files to open; the window provides it, tests replace it.</summary>
     public interface IFilePicker
@@ -68,6 +73,40 @@ namespace ClassicMac.App.ViewModels
 
         [ObservableProperty]
         private string status = "Open a Mac file, disk image or resource fork (File ▸ Open, or drop it here).";
+
+        private CancellationTokenSource? previewing;
+
+        public IReadOnlyList<int> ScreenDepths { get; } = [1, 2, 4, 8, 16, 32];
+
+        public IReadOnlyList<int> Zooms { get; } = [1, 2, 4, 8];
+
+        [ObservableProperty]
+        private int screenDepth = 32;
+
+        [ObservableProperty]
+        private int zoom = 1;
+
+        [ObservableProperty]
+        private PreviewViewModel preview = PreviewViewModel.None;
+
+        [ObservableProperty]
+        private IReadOnlyList<ImageItem> images = [];
+
+        [ObservableProperty]
+        private HexViewModel hex = HexViewModel.Empty;
+
+        [ObservableProperty]
+        private HexSource? hexSource;
+
+        [ObservableProperty]
+        private HexLines? hexLines;
+
+        /// <summary>The tab shown: 0 details, 1 preview, 2 hex.</summary>
+        [ObservableProperty]
+        private int selectedTab;
+
+        /// <summary>The preview being made for the selection (tests wait for it).</summary>
+        internal Task PreviewTask { get; private set; } = Task.CompletedTask;
 
         /// <summary>Reads <paramref name="path"/> (off the UI thread) and adds it to the tree.</summary>
         public async Task<InputNode?> OpenAsync(string path)
@@ -141,7 +180,60 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnFilterChanged(DiagnosticFilter value) => RefreshDiagnostics();
 
-        partial void OnSelectedChanged(NodeViewModel? value) => Details = DetailsViewModel.For(value);
+        partial void OnSelectedChanged(NodeViewModel? value)
+        {
+            Details = DetailsViewModel.For(value);
+            Hex = HexViewModel.For(value);
+            HexSource = Hex.Sources.FirstOrDefault();
+            PreviewTask = MakePreviewAsync(value);
+        }
+
+        partial void OnScreenDepthChanged(int value) => PreviewTask = MakePreviewAsync(Selected);
+
+        partial void OnZoomChanged(int value) => Images = ItemsAt(Preview, value);
+
+        partial void OnPreviewChanged(PreviewViewModel value) => Images = ItemsAt(value, Zoom);
+
+        partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
+
+        private static IReadOnlyList<ImageItem> ItemsAt(PreviewViewModel preview, int zoom) =>
+            preview.Images.Select(i => new ImageItem(i, i.Width * zoom, i.Height * zoom)).ToList();
+
+        // Decodes the selection's preview off the UI thread; a newer selection cancels an older one.
+        private async Task MakePreviewAsync(NodeViewModel? node)
+        {
+            previewing?.Cancel();
+            var cancellation = previewing = new CancellationTokenSource();
+            if (node is null)
+            {
+                Preview = PreviewViewModel.None;
+                return;
+            }
+            Preview = PreviewViewModel.Loading;
+            var diagnostics = new List<Diagnostic>();
+            PreviewViewModel result;
+            try
+            {
+                result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
+                    ReadOptions, diagnostics, cancellation.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception e) when (e is InvalidDataException or IOException or ArgumentException or NotSupportedException)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "preview.failed", e.Message));
+                result = PreviewViewModel.None;
+            }
+            if (cancellation.IsCancellationRequested) return;
+            foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
+            // Small images (icons, patterns) open enlarged.
+            if (result.Kind == PreviewKind.Image) Zoom = result.Images.Max(i => Math.Max(i.Width, i.Height)) <= 64 ? 4 : 1;
+            Preview = result;
+            if (result.HasPreview) SelectedTab = 1;
+            else if (SelectedTab == 1) SelectedTab = 0;
+        }
 
         // Selecting a diagnostic shows its node: its ancestors open and it becomes the selection.
         partial void OnSelectedDiagnosticChanged(DiagnosticEntry? value)

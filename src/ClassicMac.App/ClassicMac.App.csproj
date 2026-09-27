@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Files\ClassicMac.Files.csproj" />
+    <ProjectReference Include="..\ClassicMac.Resources.Decoders\ClassicMac.Resources.Decoders.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -12,6 +12,10 @@
     <Style Selector="TreeViewItem" x:DataType="vm:NodeViewModel">
       <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
     </Style>
+    <Style Selector="ListBox.hex ListBoxItem">
+      <Setter Property="Padding" Value="12,1" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
   </Window.Styles>
 
   <DockPanel>
@@ -43,21 +47,90 @@
 
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
 
-        <ScrollViewer Grid.Column="2" Padding="16,12">
-          <StackPanel Spacing="10">
-            <TextBlock Text="{Binding Details.Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-            <ItemsControl ItemsSource="{Binding Details.Rows}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate DataType="vm:DetailRow">
-                  <Grid ColumnDefinitions="140,*" Margin="0,2">
-                    <TextBlock Text="{Binding Label}" Opacity="0.65" />
-                    <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
-        </ScrollViewer>
+        <TabControl Grid.Column="2" SelectedIndex="{Binding SelectedTab, Mode=TwoWay}" Padding="0">
+          <TabItem Header="Details">
+            <ScrollViewer Padding="16,12">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding Details.Heading}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <ItemsControl ItemsSource="{Binding Details.Rows}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:DetailRow">
+                      <Grid ColumnDefinitions="140,*" Margin="0,2">
+                        <TextBlock Text="{Binding Label}" Opacity="0.65" />
+                        <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="Preview">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8" IsVisible="{Binding Preview.IsImage}">
+                <TextBlock Text="Zoom" VerticalAlignment="Center" />
+                <ComboBox ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}" />
+                <TextBlock Text="Screen depth" VerticalAlignment="Center" Margin="12,0,0,0" />
+                <ComboBox ItemsSource="{Binding ScreenDepths}" SelectedItem="{Binding ScreenDepth, Mode=TwoWay}" />
+              </StackPanel>
+              <Panel>
+                <TextBlock Text="{Binding Preview.Message}" Margin="16" Opacity="0.65" IsVisible="{Binding Preview.IsMessage}" />
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Preview.IsImage}">
+                  <ItemsControl ItemsSource="{Binding Images}" Margin="12">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <WrapPanel />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:ImageItem">
+                        <StackPanel Margin="0,0,16,16" Spacing="4">
+                          <Border Background="{x:Static views:Images.Checkerboard}" HorizontalAlignment="Left">
+                            <Image Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}"
+                                   Width="{Binding Width}" Height="{Binding Height}" Stretch="Fill"
+                                   RenderOptions.BitmapInterpolationMode="None" />
+                          </Border>
+                          <TextBlock Text="{Binding Image.Caption}" Opacity="0.65" FontSize="12" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding Preview.IsStyledText}" Padding="16,12">
+                  <views:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+                  <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
+                </ScrollViewer>
+              </Panel>
+            </DockPanel>
+          </TabItem>
+
+          <TabItem Header="Hex">
+            <DockPanel>
+              <ComboBox DockPanel.Dock="Top" Margin="12,8" MinWidth="260"
+                        ItemsSource="{Binding Hex.Sources}" SelectedItem="{Binding HexSource, Mode=TwoWay}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate DataType="vm:HexSource">
+                    <TextBlock Text="{Binding Label}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <ListBox Classes="hex" ItemsSource="{Binding HexLines}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13">
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="vm:HexLine">
+                    <StackPanel Orientation="Horizontal" Spacing="16">
+                      <TextBlock Text="{Binding Offset}" Opacity="0.55" />
+                      <TextBlock Text="{Binding Hex}" />
+                      <TextBlock Text="{Binding Characters}" Opacity="0.8" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+          </TabItem>
+        </TabControl>
       </Grid>
 
       <GridSplitter Grid.Row="1" ResizeDirection="Rows" />
