@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Containers;
+using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Files
 {
@@ -27,7 +28,8 @@ namespace ClassicMac.Files
         private readonly IReadOnlyList<IContainerReader> readers;
 
         /// <summary>
-        /// The built-in readers: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex 4.0.
+        /// The built-in readers: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex 4.0, Apple partition maps,
+        /// Disk Copy 4.2 and HFS volumes.
         /// </summary>
         public static ContainerUnwrapper Default { get; } = new([]);
 
@@ -44,6 +46,9 @@ namespace ClassicMac.Files
                 MacBinaryReader.II,
                 MacBinaryReader.I,
                 BinHexReader.Instance,
+                PartitionMapReader.Instance,
+                DiskCopy42Reader.Instance,
+                HfsReader.Instance,
             ];
         }
 

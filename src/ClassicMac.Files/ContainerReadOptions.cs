@@ -17,6 +17,9 @@ namespace ClassicMac.Files
         /// <summary>The most bytes unwrapping and decompression may produce from one input. Default 1 GiB.</summary>
         public long MaxExpandedBytesPerInput { get; init; } = 1024L * 1024 * 1024;
 
+        /// <summary>The most files and folders read from one volume, a guard against damaged catalogs. Default 1,000,000.</summary>
+        public int MaxVolumeEntries { get; init; } = 1_000_000;
+
         /// <summary>
         /// The zone of the Mac that reads the files, used where a container stores absolute (UTC) dates — AppleSingle
         /// and AppleDouble version 2 — since Mac dates are local time. Default: this machine's zone.
