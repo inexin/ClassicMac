@@ -18,6 +18,7 @@ namespace ClassicMac.Resources.Cli
 
         private readonly Dictionary<string, HashSet<string>> taken = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> folders = new(StringComparer.OrdinalIgnoreCase);
+        private HostLayout layout;
         private int files;
         private long bytes;
         private bool ioFailed;
@@ -26,6 +27,7 @@ namespace ClassicMac.Resources.Cli
             bool strict, bool quiet)
         {
             var reporter = new Reporter(error, strict, quiet);
+            layout = options.Layout;
             Input opened;
             try
             {
@@ -84,7 +86,7 @@ namespace ClassicMac.Resources.Cli
         private string FolderName(string root, List<string> parents, MacString name)
         {
             var directory = Path.Combine([root, .. parents]);
-            var host = HostNames.ToHostName(name);
+            var host = HostNames.ToHostName(name, layout);
             // A folder met again (it holds several files) keeps the name it was given.
             var key = directory + "/" + host;
             if (!folders.TryGetValue(key, out var chosen)) folders[key] = chosen = HostNames.MakeUnique(host, Taken(directory));
@@ -101,7 +103,12 @@ namespace ClassicMac.Resources.Cli
         {
             var directory = Path.Combine([root, .. folder]);
             var relative = string.Join('/', folder).Length + (folder.Count > 0 ? 1 : 0);
-            var host = HostNames.ToHostName(file.Name, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
+            var host = HostNames.ToHostName(file.Name, options.Layout, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
+            if (options.Layout == HostLayout.BasiliskII && HostFiles.ToMacName(host, basilisk: true, new ContainerContext()) != file.Name)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "unpack.name-changed",
+                    $"\"{file.MacPath}\" is written as \"{host}\": SheepShaver's shared folders cannot hold its name as it is.", null));
+            }
             var set = Taken(directory);
             var name = HostNames.MakeUnique(host, set);
             if (name != host)

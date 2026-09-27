@@ -103,14 +103,15 @@ public class HostFilesTests : IDisposable
     }
 
     [Fact]
-    public void Basilisk_II_names_map_through_Mac_OS_Roman()
+    public void Basilisk_II_names_map_through_Windows_1252()
     {
-        var path = Write("Hax 1.0 Ä%3F", []);
-        Write(".finf/Hax 1.0 Ä%3F", FinderInfo("fold", "MACS"));
+        // SheepShaver (Windows) hands name bytes over unconverted: host 'Ž' (1252 $8E) is Mac 'é' ($8E).
+        var path = Write("Hax 1.0 \u017D%3F", []);
+        Write(".finf/Hax 1.0 \u017D%3F", FinderInfo("fold", "MACS"));
 
         var name = HostFiles.Read(path).File.Name;
 
-        Assert.Equal([.. "Hax 1.0 "u8, 0x80, (byte)'?'], name.Bytes.ToArray());
+        Assert.Equal([.. "Hax 1.0 "u8, 0x8E, (byte)'?'], name.Bytes.ToArray());
     }
 
     [Fact]
@@ -160,8 +161,18 @@ public class HostFilesTests : IDisposable
         {
             var folderName = Path.GetFileName(Path.GetDirectoryName(path));
             if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._")) continue;
+            // The harness's deliberately damaged NDIF images (checked by NdifTests against OS 9's results).
+            if (path.Contains($"{Path.DirectorySeparatorChar}ndiftest{Path.DirectorySeparatorChar}", StringComparison.Ordinal)) continue;
             var diagnostics = new List<Diagnostic>();
-            var root = ContainerUnwrapper.Default.Unwrap(path, diagnostics: diagnostics);
+            ContainerNode root;
+            try
+            {
+                root = ContainerUnwrapper.Default.Unwrap(path, diagnostics: diagnostics);
+            }
+            catch (IOException)
+            {
+                continue; // in use (an emulator holding a disk image)
+            }
             Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
             files++;
             if (root.Format == "Basilisk II folder") basilisk++;

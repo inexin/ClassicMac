@@ -245,4 +245,38 @@ public class NdifTests
         Assert.Equal(s5m, Decode(Path.Combine(folder, "seg", "S5M RO seg 1of4")));
         Assert.Equal(Decode(Path.Combine(folder, "S5M RO del.img")), Decode(Path.Combine(folder, "S5M ADC del.img")));
     }
+
+    // The harness's damaged images (run15/ndiftest) and what Disk Copy 6.3.3 did with them (run15/ndif_results.txt):
+    // a bad CRC or damaged ADC data is refused only with "Verify checksum" on; a missing part, or a part of another
+    // image, is -8821 "Part N is missing"; renamed parts mount.
+    [Fact]
+    public void Damaged_images_are_reported_as_Disk_Copy_refuses_them()
+    {
+        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
+        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
+            : Directory.EnumerateDirectories(corpus, "ndiftest", SearchOption.AllDirectories).FirstOrDefault(d => File.Exists(Path.Combine(d, "control.img")));
+        if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run15/ndiftest images to run this.");
+
+        List<Diagnostic> Read(string relative, bool verify)
+        {
+            var path = Path.Combine(folder, relative);
+            var diagnostics = new List<Diagnostic>();
+            var context = new ContainerContext(ContainerReadOptions.Default with { VerifyChecksums = verify }, diagnostics, siblings: HostFiles.Siblings(path));
+            var disk = Assert.Single(NdifReader.Instance.Read(HostFiles.Read(path).File, context));
+            _ = disk.DataFork.ToArray(); // decode every chunk
+            return diagnostics;
+        }
+
+        Assert.Empty(Read("control.img", verify: true));
+        Assert.Empty(Read("badcrc.img", verify: false));
+        Assert.Contains(Read("badcrc.img", verify: true), d => d.Code == "ndif.bad-checksum");
+        foreach (var damaged in new[] { "adc_flip.img", "adc_garb.img" })
+            Assert.Contains(Read(damaged, verify: true), d => d.Code is "ndif.bad-checksum" or "ndif.bad-chunk");
+        Assert.Empty(Read(Path.Combine("seg_ok", "S5M RO seg 1of4"), verify: true));
+        Assert.Empty(Read(Path.Combine("seg_renamed", "Apple one"), verify: true));
+        Assert.Contains(Read(Path.Combine("seg_missing3", "S5M RO seg 1of4"), verify: false),
+            d => d.Code == "ndif.missing-segment" && d.Message.StartsWith("Part 3 of 4", StringComparison.Ordinal));
+        Assert.Contains(Read(Path.Combine("seg_foreign2", "S5M RO seg 1of4"), verify: false),
+            d => d.Code == "ndif.missing-segment" && d.Message.StartsWith("Part 2 of 4", StringComparison.Ordinal));
+    }
 }

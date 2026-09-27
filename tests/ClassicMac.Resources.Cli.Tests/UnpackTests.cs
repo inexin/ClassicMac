@@ -54,7 +54,10 @@ public class UnpackTests : IDisposable
         var readMe = HostFiles.Read(Path.Combine(target, "Read Me"));
         Assert.Equal(expected, readMe.Layout);
         Assert.Equal(Bytes(700, 3), readMe.File.DataFork.ToArray());
-        Assert.Equal("a/b", HostFiles.Read(Path.Combine(target, "a%2Fb")).File.Name.ToMacRoman());
+        // SheepShaver's folders cannot hold a '/', so the Basilisk layout replaces it (and warns).
+        var ab = HostFiles.Read(Path.Combine(target, expected == HostLayout.BasiliskII ? "a_b" : "a%2Fb")).File;
+        Assert.Equal(expected == HostLayout.BasiliskII ? "a_b" : "a/b", ab.Name.ToMacRoman());
+        Assert.Equal(expected == HostLayout.BasiliskII, error.Contains("unpack.name-changed", StringComparison.Ordinal));
         // The NDIF image in Games is replaced by a folder of its volume's files.
         var tree = string.Join(", ", Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories).Select(f => Path.GetRelativePath(target, f)));
         Assert.True(File.Exists(Path.Combine(target, "Games", "Inner.img", "Deep")), tree);

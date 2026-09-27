@@ -74,7 +74,11 @@ public class HostWriteTests : IDisposable
     [InlineData(HostLayout.BasiliskII)]
     public void Written_files_read_back_the_same(HostLayout layout)
     {
-        foreach (var name in new[] { "Read Me", "a/b: 100%", "Icon\r", "Résumé ƒ™", "COM1", "trail." })
+        // Names SheepShaver's folders can hold; AppleDouble keeps any name in its header.
+        string[] names = layout == HostLayout.AppleDouble
+            ? ["Read Me", "a/b: 100%", "Icon\r", "Résumé ƒ™", "COM1", "trail."]
+            : ["Read Me", "100% done?", "Icon\r", "Résumé ƒ™ ©® \u00a0", "x%41y", "CLOCK$"];
+        foreach (var name in names)
         {
             var file = Sample(name);
             var paths = HostFiles.Write(file, folder, HostWriteOptions.Default with { Layout = layout });
@@ -90,6 +94,36 @@ public class HostWriteTests : IDisposable
             if (layout == HostLayout.AppleDouble)
                 Assert.Equal((file.Created, file.Modified), (host.File.Created, host.File.Modified));
         }
+    }
+
+    // SheepShaver (Windows build) in the harness: bytes 1:1 through Windows-1252, "% ? * \" < > |" and control
+    // characters as %XX; what its folders cannot hold is replaced.
+    [Theory]
+    [InlineData("Résumé", "R\u017Dsum\u017D", true)]
+    [InlineData("50% done?", "50%25 done%3F", true)]
+    [InlineData("star* <q\"> pipe|", "star%2A %3Cq%22%3E pipe%7C", true)]
+    [InlineData("Icon\r", "Icon%0D", true)]
+    [InlineData("CLOCK$", "CLOCK$", true)]
+    [InlineData("a/b", "a_b", false)]
+    [InlineData("back\\slash", "back_slash", false)]
+    [InlineData("trail.", "trail_", false)]
+    [InlineData("dots..", "dots__", false)]
+    [InlineData("space ", "space_", false)]
+    [InlineData("COM1", "COM1_", false)]
+    [InlineData("con.txt", "con_.txt", false)]
+    public void Basilisk_names_follow_SheepShaver(string mac, string host, bool exact)
+    {
+        var name = new MacString(MacRoman.Encode(mac));
+        Assert.Equal(host, HostNames.ToBasiliskName(name));
+        Assert.Equal(exact, HostFiles.ToMacName(host, basilisk: true, new ContainerContext()) == name);
+    }
+
+    [Fact]
+    public void Bytes_Windows_1252_lacks_are_escaped_for_Basilisk()
+    {
+        var name = new MacString([0x41, 0x81, 0x8D, 0x42]); // Mac Roman Å and ç
+        Assert.Equal("A%81%8DB", HostNames.ToBasiliskName(name));
+        Assert.Equal(name, HostFiles.ToMacName("A%81%8DB", basilisk: true, new ContainerContext()));
     }
 
     [Fact]

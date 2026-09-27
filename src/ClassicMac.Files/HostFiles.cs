@@ -143,7 +143,7 @@ namespace ClassicMac.Files
             options ??= HostWriteOptions.Default;
             if (options.Layout is not (HostLayout.AppleDouble or HostLayout.BasiliskII))
                 throw new ArgumentException($"Files cannot be written as {options.Layout}.", nameof(options));
-            var name = hostName ?? HostNames.ToHostName(file.Name);
+            var name = hostName ?? HostNames.ToHostName(file.Name, options.Layout);
 
             var data = Path.Combine(directory, name);
             var paths = new List<string> { data };
@@ -250,10 +250,11 @@ namespace ClassicMac.Files
 
 
         /// <summary>
-        /// A host file name as a Mac name: each character in Mac OS Roman; for Basilisk II names, <c>%XX</c> is the
-        /// byte itself (it escapes control characters and characters the host forbids, e.g. <c>Icon%0D</c>,
-        /// <c>%3F</c> for <c>?</c>; fitted to real shared folders). Characters without a Mac OS Roman byte become
-        /// <c>?</c> and names are cut to 255 bytes, both reported.
+        /// A host file name as a Mac name: each character in Mac OS Roman. For Basilisk II / SheepShaver names, as the
+        /// emulator reads them (harness, Windows build): <c>%XX</c> is the byte itself (<c>Icon%0D</c>, <c>%3F</c> for
+        /// <c>?</c>), and every other character is the byte it has in Windows-1252, which the emulator hands to the Mac
+        /// unconverted (host <c>RŽsumŽ</c> is Mac <c>Résumé</c>). Characters without a byte become <c>?</c> and names
+        /// are cut to 255 bytes, both reported.
         /// </summary>
         public static MacString ToMacName(string hostName, bool basilisk, ContainerContext context)
         {
@@ -269,7 +270,7 @@ namespace ClassicMac.Files
                     bytes.Add(escaped);
                     i += 2;
                 }
-                else if (MacRoman.TryGetByte(hostName[i], out var b)) bytes.Add(b);
+                else if (basilisk ? HostNames.TryGetBasiliskByte(hostName[i], out var b) : MacRoman.TryGetByte(hostName[i], out b)) bytes.Add(b);
                 else
                 {
                     bytes.Add((byte)'?');

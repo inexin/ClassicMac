@@ -177,7 +177,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Iso | `IsoReader` | ISO 9660 and High Sierra volumes as Mac OS 9 shows them: `AA`/`BA` Finder info, associated files as resource forks |
 | Files.Containers | `ExtensionMap` | Internet Config's name-ending map, as File Exchange applies it to `TEXT`/`dosa` files; opt-in through `ContainerReadOptions.ExtensionMap` |
 | Files | `HostFiles` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks; `Write` puts a Mac file back on disk as AppleDouble or Basilisk II |
-| Files | `HostNames` | Mac names as safe, distinct host names (`%XX` escapes, reserved Windows names, collisions, length), shared by `unpack` and `extract` |
+| Files | `HostNames` | Mac names as safe, distinct host names (`%XX` escapes, reserved Windows names, collisions, length), shared by `unpack` and `extract`; SheepShaver's own naming for Basilisk II folders |
 | Files.Containers | `AppleDoubleWriter` | AppleDouble v2 `._` files: real name, dates, Finder info, resource fork |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
@@ -481,7 +481,11 @@ They change what running applications see, not what a file contains.
   `bcem` itself, so images that lost their type still open.
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
-  source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
+  source is reference only), checked in the SheepShaver harness (Windows build): name bytes pass 1:1 through
+  Windows-1252 (no Unicode conversion), only `% ? * " < > |` are escaped as `%XX` and any `%XX` is decoded, so names
+  it cannot store (`/ \ :`, a trailing dot or space, device names) are replaced when unpacking, with a warning; folder
+  Finder info lives in the parent's `.finf`. Detection heuristics and name mappings fitted to real files are marked
+  in the code.
 - **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
   edge cases.
 - **Licence:** MIT, with third-party notices for anything ported; no Apple code or files in the repo.
