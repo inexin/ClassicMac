@@ -70,6 +70,72 @@ public class CommandLineTests
         Assert.Contains("'PIC'", error);
     }
 
+    private static string ForkFile(Action<byte[]>? damage = null)
+    {
+        var fork = new ResourceFork();
+        fork.Add(new Resource(FourCC.FromString("PICT"), 128, new byte[] { 1, 2, 3 })
+        {
+            Name = new MacString("Title"u8),
+            Attributes = ResourceAttributes.Purgeable | ResourceAttributes.Preload,
+        });
+        fork.Add(new Resource(FourCC.FromString("snd "), -4, new byte[10]));
+        var bytes = fork.ToArray();
+        damage?.Invoke(bytes);
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, bytes);
+        return path;
+    }
+
+    [Fact]
+    public void List_prints_each_resource()
+    {
+        var (code, output, error) = Run("list", ForkFile());
+
+        Assert.Equal(ExitCodes.Success, code);
+        Assert.Empty(error);
+        Assert.Contains("'PICT'      128         3  Preload,Purgeable        \"Title\"", output);
+        Assert.Contains("'snd '       -4        10", output);
+        Assert.Contains("2 resources in 2 types", output);
+    }
+
+    [Fact]
+    public void List_writes_json()
+    {
+        var (code, output, _) = Run("list", ForkFile(), "--format", "json");
+
+        Assert.Equal(ExitCodes.Success, code);
+        using var json = System.Text.Json.JsonDocument.Parse(output);
+        var first = json.RootElement.GetProperty("resources")[0];
+        Assert.Equal("PICT", first.GetProperty("type").GetString());
+        Assert.Equal(128, first.GetProperty("id").GetInt32());
+        Assert.Equal("Title", first.GetProperty("name").GetString());
+        Assert.Equal(3, first.GetProperty("size").GetInt32());
+    }
+
+    [Fact]
+    public void List_reports_damage_on_stderr_and_exits_with_1()
+    {
+        // Point the first resource's data far outside the data area (its reference entry's 24-bit offset).
+        var path = ForkFile(bytes =>
+        {
+            var map = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(bytes.AsSpan(4));
+            bytes[map + 28 + 2 + 16 + 5] = 0xFF;
+        });
+        var (code, output, error) = Run("list", path);
+
+        Assert.Equal(ExitCodes.Damaged, code);
+        Assert.Contains("resource.data-out-of-range", error);
+        Assert.Contains("1 resources", output);
+    }
+
+    [Fact]
+    public void List_rejects_input_that_is_not_a_fork()
+    {
+        var path = Path.GetTempFileName();
+        File.WriteAllText(path, "not a fork");
+        Assert.Equal(ExitCodes.Unreadable, Run("list", path).Code);
+    }
+
     [Fact]
     public void Unbuilt_commands_say_so()
     {

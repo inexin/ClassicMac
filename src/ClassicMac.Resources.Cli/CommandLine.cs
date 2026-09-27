@@ -109,7 +109,9 @@ namespace ClassicMac.Resources.Cli
                 DefaultValueFactory = _ => ListFormat.Text,
             };
             var command = new Command("list", "List the files and resources inside the input") { input, format };
-            command.SetAction(NotImplemented);
+            command.SetAction(result => new ListCommand(output, error).Run(
+                result.GetRequiredValue(input), result.GetValue(format), ReadOptionsFrom(result),
+                result.GetValue(strict), result.GetValue(quiet)));
             return command;
         }
 
