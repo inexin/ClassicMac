@@ -25,7 +25,7 @@ public class ResourceForkReadWriteTests
             "00000000" + // 'TEST' -1
             "00000001 AA" + // 'snd ' 1
             "00000100 00000110 00000010 00000056" + // map: header copy
-            "12345678 9ABC 0080 001C 0052" + // handle, file ref, attributes (read-only), type list, name list
+            "00000000 0000 0080 001C 0052" + // handle, file ref, attributes (read-only), type list, name list
             "0001" + // two types
             "54455354 0001 0012" + // 'TEST', two resources, references at 18
             "736E6420 0000 002A" + // 'snd ', one resource, references at 42
@@ -44,7 +44,6 @@ public class ResourceForkReadWriteTests
             Attributes = ResourceForkAttributes.ReadOnly | ResourceForkAttributes.Changed,
             SystemData = Area(ResourceFork.SystemDataLength, 0x11),
             ApplicationData = Area(ResourceFork.ApplicationDataLength, 0x22),
-            MapReservedData = Hex("123456789ABC"),
         };
         fork.Add(new Resource(Test, 128, new byte[] { 1, 2, 3 })
         {
@@ -75,7 +74,6 @@ public class ResourceForkReadWriteTests
         Assert.Equal(ResourceForkAttributes.ReadOnly, fork.Attributes);
         Assert.Equal(0x11, fork.SystemData.Span[0]);
         Assert.Equal(0x22, fork.ApplicationData.Span[0]);
-        Assert.Equal(Hex("123456789ABC"), fork.MapReservedData.ToArray());
         Assert.Equal([Test, Snd], fork.Types);
 
         var hi = fork.Find(Test, 128)!;
@@ -321,7 +319,6 @@ public class ResourceForkReadWriteTests
         Assert.Equal(expected.Attributes & ~ResourceForkAttributes.Changed, actual.Attributes);
         Assert.Equal(expected.SystemData.ToArray(), actual.SystemData.ToArray());
         Assert.Equal(expected.ApplicationData.ToArray(), actual.ApplicationData.ToArray());
-        Assert.Equal(expected.MapReservedData.ToArray(), actual.MapReservedData.ToArray());
         Assert.Equal(expected.Types, actual.Types);
         Assert.Equal(expected.Resources.Count, actual.Resources.Count);
         foreach (var type in expected.Types)

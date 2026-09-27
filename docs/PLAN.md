@@ -29,6 +29,7 @@ Proposed priority:
 | --- | --- | --- |
 | 1 | Raw resource fork (`.rsrc`, `file/..namedfork/rsrc` on macOS) | Extracted forks, macOS copies |
 | 1 | AppleDouble (`._file`, `__MACOSX/` in zips) and AppleSingle | Files copied to FAT/SMB, zip archives |
+| 1 | Basilisk II / SheepShaver shared folders (`.rsrc/<name>` fork, `.finf/<name>` Finder info) | Files copied out of emulators |
 | 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites |
 | 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites |
 | 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF | Emulator disks, floppy images, CD-ROMs |
@@ -122,7 +123,7 @@ The model, in `ClassicMac.Resources`; `ResourceFork.Read` and `ResourceFork.Writ
 | `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
 | `IContainerReader` | One per container format: `CanRead(stream)`, `Read(stream, options, diagnostics)` |
 | `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
-| `ResourceFork` | Resources in read order, map attributes, the reserved header areas; add, remove, renumber, find |
+| `ResourceFork` | Resources in read order, map attributes, the reserved header areas and the map's runtime handle and file reference (kept so such forks round-trip exactly); add, remove, renumber, find |
 | `Diagnostic` | Severity, stable code, message, offset |
 | `ReadOptions` | Reading limits (see Configuration) |
 
@@ -399,8 +400,8 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
 1. **Core** — resource map read/write, `dcmp` 0/1/2, Finder info, raw forks, AppleDouble/AppleSingle, MacBinary,
-   BinHex; CLI `list` and raw `extract`. *Exit:* read → write → read gives the same model on every corpus
-   fork, and canonical forks come back byte for byte.
+   BinHex, Basilisk II shared folders; CLI `list` and raw `extract`. *Exit:* read → write → read gives the same
+   model on every corpus fork, and canonical forks come back byte for byte.
 2. **Disk images** — HFS and MFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping. *Exit:* every file of the corpus
    images lists and extracts with both forks and Finder info.
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV

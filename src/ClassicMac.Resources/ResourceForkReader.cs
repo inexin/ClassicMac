@@ -56,6 +56,7 @@ namespace ClassicMac.Resources
                     "The map's copy of the fork header differs from the header.", mapOffset));
             }
 
+            fork.MapReservedData = input.Slice(map + HeaderLength, ResourceFork.MapReservedDataLength).ToArray();
             fork.Attributes = (ResourceForkAttributes)BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapAttributesOffset)..]);
             var typeList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapTypeListOffsetOffset)..]);
             var nameList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapNameListOffsetOffset)..]);

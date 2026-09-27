@@ -17,10 +17,14 @@ namespace ClassicMac.Resources
         /// <summary>Size of the area after the system area reserved for the application.</summary>
         public const int ApplicationDataLength = 128;
 
+        /// <summary>Size of the map's next-map handle and file reference number.</summary>
+        public const int MapReservedDataLength = 6;
+
         private readonly List<Resource> resources = [];
         private readonly Dictionary<(FourCC Type, short Id), Resource> index = [];
         private ReadOnlyMemory<byte> systemData = new byte[SystemDataLength];
         private ReadOnlyMemory<byte> applicationData = new byte[ApplicationDataLength];
+        private ReadOnlyMemory<byte> mapReservedData = new byte[MapReservedDataLength];
 
         /// <summary>The resources, in the order they were read or added.</summary>
         public IReadOnlyList<Resource> Resources => resources;
@@ -47,6 +51,18 @@ namespace ClassicMac.Resources
             set => applicationData = value.Length == ApplicationDataLength
                 ? value
                 : throw new ArgumentException($"The application area is {ApplicationDataLength} bytes.", nameof(value));
+        }
+
+        /// <summary>
+        /// The map's next-map handle (4 bytes) and file reference number (2), kept as read. They are runtime values the
+        /// Resource Manager leaves in the file; keeping them lets such forks round-trip byte for byte.
+        /// </summary>
+        public ReadOnlyMemory<byte> MapReservedData
+        {
+            get => mapReservedData;
+            set => mapReservedData = value.Length == MapReservedDataLength
+                ? value
+                : throw new ArgumentException($"The map's reserved fields are {MapReservedDataLength} bytes.", nameof(value));
         }
 
         /// <summary>Problems found while reading this fork.</summary>

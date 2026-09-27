@@ -8,8 +8,8 @@ using static ClassicMac.Resources.ResourceForkFormat;
 namespace ClassicMac.Resources
 {
     // Writes a fork in one canonical, compact layout. The layout is fitted, not taken from Apple code: header, reserved
-    // areas, data (types in order, resources in order), then the map (header copy, type list at 28, reference lists in
-    // type order, names in resource order). To be checked against Rez output and the Resource Manager's compaction.
+    // areas, data (types in order, resources in order), then the map (header copy, the kept handle and file reference,
+    // type list at 28, reference lists in type order, names in resource order). To be checked against Rez output and the Resource Manager's compaction.
     internal static class ResourceForkWriter
     {
         public static byte[] Write(ResourceFork fork)
@@ -63,6 +63,7 @@ namespace ClassicMac.Resources
 
             var map = span[(int)mapOffset..];
             WriteHeader(map, dataOffset, mapOffset, dataLength, mapLength);
+            fork.MapReservedData.Span.CopyTo(map[HeaderLength..]);
             var attributes = (ushort)(fork.Attributes & ~ResourceForkAttributes.Changed);
             BinaryPrimitives.WriteUInt16BigEndian(map[MapAttributesOffset..], attributes);
             BinaryPrimitives.WriteUInt16BigEndian(map[MapTypeListOffsetOffset..], MapHeaderLength);
