@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>classicmac</ToolCommandName>
+    <AssemblyName>classicmac</AssemblyName>
+    <PackageId>ClassicMac.Resources.Cli</PackageId>
+    <Description>Command-line tool that lists and extracts the resources of classic Mac OS files, whatever they are wrapped in, into modern files with a manifest.</Description>
+    <PackageTags>macintosh;classic-mac;resource-fork;rsrc;cli;dotnet-tool</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Resources.Cli.Tests" />
+  </ItemGroup>
+
+</Project>

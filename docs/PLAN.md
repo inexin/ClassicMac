@@ -126,6 +126,24 @@ The model, in `ClassicMac.Resources` (first sketch; readers and writers come nex
 - **Order kept:** resources stay in the order read, and the reserved header areas are kept, so an unchanged fork can
   be written back byte for byte.
 
+### CLI
+
+A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built on System.CommandLine.
+
+| Command | Does | Options | Phase |
+| --- | --- | --- | --- |
+| `info <input>` | Container chain, Finder info, fork sizes | — | 1 |
+| `list <input>` | Files and resources inside the input | `--format text\|json` | 1 |
+| `extract <input>` | Resources into a folder with a manifest | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`; later `--depth`, `--encoding` | 1 (raw), 3 (decoded) |
+| `pack <dir>` | Rebuild a fork or container from a folder and manifest | `-o <file>`, `--base <fork>`, `--allow-deletes`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
+
+- **Every command:** `--max-resource-size`, `--max-nesting-depth`, `--max-expanded-bytes` (sizes in bytes or
+  KiB/MiB/GiB) map onto `ReadOptions`, defaults taken from `ReadOptions.Default`; `--strict` makes warnings fail;
+  `-q` prints errors only.
+- **Exit codes:** 0 success (warnings printed); 1 part of the input could not be read (or warnings with `--strict`);
+  2 usage error; 3 input not recognised or unusable; 4 file-system error; 70 command not built yet.
+- **Output:** results to stdout, diagnostics to stderr, so `list --format json` can be piped.
+
 ## Decoders
 
 Each decoder turns one resource type into a modern file; anything without a decoder is exported raw.
