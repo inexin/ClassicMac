@@ -25,6 +25,9 @@
   an opt-in `ExtensionMap` for placeholder types.
 - DART images ("fast" RLE, "best" LZH, stored; checksums checked), verified on DART 1.5.3's own files; LZH also
   decodes NDIF chunk type $82, and KenCode ($80, Disk Copy's "Smaller (KC)") is decoded too.
+- Image decoders (`ClassicMac.Resources.Decoders.Images`, through QuickDraw.Pict): `PICT`, icons (`ICON`, `ICN#`
+  and the colour icon families masked by their lists, `cicn`, `SICN`), cursors (PNG + JSON), patterns; written as
+  PNG by a built-in encoder behind `IImageEncoder`; `extract --screen-depth`.
 - NDIF disk images (Disk Copy 6: read-only, ADC-compressed, DART RLE chunks, version 2 maps, `.smi`, segmented
   parts found by their `bcm#` ID, CRC-32 verified on request) with ADC in
   `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;

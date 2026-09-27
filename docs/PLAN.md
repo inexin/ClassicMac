@@ -145,7 +145,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 | --- | --- | --- |
 | `ContainerReadOptions` | Files | Max container nesting depth (8), max total bytes expanded per input (1 GiB), time zone for UTC container dates (local), max files and folders read from one volume (1,000,000), File Exchange extension map (none), verify whole-image checksums (off) |
 | `ReadOptions` | Resources | Max decompressed resource size (64 MiB), Resource Manager model (Mac OS 9), text encoding override (none) |
-| `DecodeOptions` | Decoders | Text encoding (Mac OS Roman; more scripts later), line endings in text output (LF); later max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
+| `DecodeOptions` | Decoders | Text encoding (Mac OS Roman; more scripts later), line endings in text output (LF), image encoder (PNG), screen depth (32-bit), max image pixels (64 megapixels), QuickDraw model (Mac OS 9); later make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off), types to export (all), overwrite (off), `ReadOptions` for decompression |
 | `HostWriteOptions` | Files | Layout for unpacked files (AppleDouble or Basilisk II; AppleDouble), max path length (200 characters), overwrite (off), time zone for dates (local) |
 | `PackOptions` | Resources | Base fork (none), allow deletes (off) |
@@ -188,7 +188,8 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Resources | `ReadOptions` | Resource-reading limits and the Resource Manager model (see Configuration) |
 | Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (decoded, or the data itself; stored bytes in `raw/` on request) with `manifest.json`, format 1.1 (`schemas/manifest-1.schema.json`) |
 | Resources.Export | `IResourceDecoder`, `DecodeInput`, `DecodedFile` | A decoder for some resource types; the exporter uses the first that handles a type and falls back to raw |
-| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` built; `.Images`, `.Sound` next) |
+| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` and `.Images` built; `.Sound` next) |
+| Resources.Decoders.Images | `IImageEncoder`, `PngEncoder` | How decoded images are written; PNG (8-bit RGBA) built in |
 
 A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`).
 `ClassicMac.Files` references `ClassicMac.Resources` (never the other way), because a few disk images keep their
@@ -226,7 +227,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 
 | Group | Resource types | Output |
 | --- | --- | --- |
-| Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icl4/8`, `ics4/8`, `cicn`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `SICN`, `icns` | PNG, via QuickDraw.Pict (screen depth selectable) |
+| Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icm#`, `icl4/8`, `ics4/8`, `icm4/8`, `cicn`, `SICN`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `ppt#` (built); `icns` later | PNG via QuickDraw.Pict (screen depth selectable); cursors add a JSON file (hotspot, inverted pixels); lists give one image each (`.1.png` …). The image format is a setting (`IImageEncoder`, PNG built in; lossless WebP later) |
 | Sound | `snd ` (sampled formats 1/2; MACE 3:1/6:1, IMA4, µ-law) | WAV |
 | Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text (`STR `, `TEXT`), JSON (`STR#`, `styl`, `vers`); styled text also as RTF (built) |
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
@@ -589,7 +590,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
-   decoder interface and `extract` decoding by default). *Exit:* golden outputs pass and the corpus exports without errors.
+   decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
+   pixel limit and `--screen-depth`. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.

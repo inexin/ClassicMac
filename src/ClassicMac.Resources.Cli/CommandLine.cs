@@ -169,6 +169,12 @@ namespace ClassicMac.Resources.Cli
             };
             var raw = new Option<bool>("--raw") { Description = "Write each resource's data (decompressed) as .bin, without decoding" };
             var keepRaw = new Option<bool>("--keep-raw") { Description = "Also keep the raw data in raw/, for pack" };
+            var screenDepth = new Option<int>("--screen-depth")
+            {
+                Description = "Screen depth pictures are drawn at: 32 (full colour), or 1, 2, 4, 8 or 16 bits with QuickDraw's colour matching and dithering",
+                DefaultValueFactory = _ => Decoders.DecodeOptions.Default.ScreenDepth,
+            };
+            screenDepth.AcceptOnlyFromAmong("1", "2", "4", "8", "16", "32");
             var types = new Option<string[]>("--type", "-t")
             {
                 Description = "Only resources of this type (repeatable; four characters, e.g. \"snd \", or \\xHH escapes)",
@@ -182,7 +188,7 @@ namespace ClassicMac.Resources.Cli
             var overwrite = new Option<bool>("--overwrite") { Description = "Write into output folders that already hold files" };
             var command = new Command("extract", "Extract resources into a folder with a manifest")
             {
-                input, outputDir, raw, keepRaw, types, overwrite,
+                input, outputDir, raw, keepRaw, types, overwrite, screenDepth,
             };
             command.SetAction(result =>
             {
@@ -194,7 +200,13 @@ namespace ClassicMac.Resources.Cli
                     Export.ExportOptions.Default with
                     {
                         KeepRaw = result.GetValue(keepRaw),
-                        Decoders = result.GetValue(raw) ? [] : Decoders.ResourceDecoders.Create(),
+                        Decoders = result.GetValue(raw)
+                            ? []
+                            : Decoders.ResourceDecoders.Create(Decoders.DecodeOptions.Default with
+                            {
+                                ScreenDepth = result.GetValue(screenDepth),
+                                QuickDraw = ReadOptionsFrom(result).ResourceManager,
+                            }),
                         Types = chosen,
                         Overwrite = result.GetValue(overwrite),
                         ReadOptions = ReadOptionsFrom(result),
