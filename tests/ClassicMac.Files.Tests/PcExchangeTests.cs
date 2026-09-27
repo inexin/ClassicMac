@@ -88,8 +88,19 @@ public class PcExchangeTests : IDisposable
         Assert.Equal("Fantasoft news.eml", host.File.Name.ToMacRoman());
         Assert.Equal(FourCC.FromString("MOSS"), host.File.FinderInfo.Creator);
         Assert.Equal([1, 2, 3], host.File.ResourceFork.ToArray());
-        Assert.Equal(new DateTime(2003, 5, 18, 13, 10, 44), host.File.Created!.Value.ToDateTime());
+        // Creation comes from the DOS entry (File Exchange 9.0), not the record.
+        Assert.Equal(HostFiles.MacDateFromDos(File.GetCreationTime(Path.Combine(folder, "FANTAS~1.EML"))), host.File.Created);
         Assert.True(host.File.Modified!.Value.Seconds >= 0xBAED36D4); // the later of the record's and the host's
+    }
+
+    [Theory]
+    [InlineData("2003-05-18 13:10:45", "2003-05-18 13:10:44")] // DOS keeps even seconds
+    [InlineData("2031-12-31 23:59:58", "2031-12-31 23:59:58")]
+    [InlineData("2040-06-01 12:00:00", "1912-06-01 12:00:00")] // years from 2032 wrap back 128
+    [InlineData("2078-01-01 00:00:00", "1950-01-01 00:00:00")]
+    public void DOS_times_read_as_File_Exchange_reads_them(string dos, string mac)
+    {
+        Assert.Equal(DateTime.Parse(mac), HostFiles.MacDateFromDos(DateTime.Parse(dos))!.Value.ToDateTime());
     }
 
     [Fact]

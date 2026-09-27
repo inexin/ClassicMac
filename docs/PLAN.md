@@ -429,9 +429,11 @@ They change what running applications see, not what a file contains.
   RFC 1740). No Apple code in Mac OS 7.1–9 reads or writes AppleSingle/AppleDouble (only mail clients and StuffIt
   do), so the Developer Note is the whole reference.
 - **PC Exchange / File Exchange:** from the disassembly of PC Exchange 1.0.4 and File Exchange 3.0.2 (the same format
-  in both). Still to confirm on a running Mac (a FAT floppy in SheepShaver): whether browsing creates records, whether
-  the extension→type table overrides stored types, which creation date wins, and how years before 1980 or after 2031
-  wrap. The record packing's cluster size is not stored and is found by trying the FAT sizes (fitted).
+  in both), confirmed on a FAT12 disk in SheepShaver: browsing alone creates records (zero dates, `TEXT`/`dosa`);
+  creation comes from the DOS entry, modification is the later of the DOS entry's and the record's; DOS keeps even
+  seconds, and years from 2032 read as 128 years earlier (Mac 1904–1979); the extension→type map only replaces the
+  `TEXT`/`dosa` placeholder on display and is never stored, so a placeholder record reads as `TEXT`/`dosa`. The
+  record packing's cluster size is not stored and is found by trying the FAT sizes (fitted).
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
