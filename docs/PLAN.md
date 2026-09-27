@@ -12,7 +12,8 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 - **Decode, faithfully.** Convert each resource type to a modern format the way the Mac would have shown it: images
   through QuickDraw.Pict, sound to WAV, text to UTF-8, fonts, and UI resources to JSON.
 - **Stay dependency-free at the core**, like QuickDraw.Pict, so other tools can embed it.
-- **Serve Realmz.** Realmz's own extractor should become a thin layer of Realmz-specific decoders on top of this.
+- **Stand alone.** A general tool for anyone working with classic Mac files; applications with their own formats
+  extend it through custom decoders.
 
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Resources`, `ClassicMac.Resources.Decoders`,
@@ -63,19 +64,20 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | Colour | `clut`, `pltt` | JSON and `.act` palettes |
 | Unknown | anything else | raw `.bin` + hex preview in the manifest |
 
-App-specific types (such as Realmz's scenario records) plug in as custom decoders registered by the application.
+App-specific types (a game's data records, an application's private resources) plug in as custom decoders
+registered by the application.
 
 ## Output
 
 One folder per input file, one subfolder per resource type, and a manifest that describes everything.
 
 ```
-Scenario/
+MyApp/
   manifest.json
   PICT/128 Title Screen.png
   snd /200 Door.wav
   STR#/1000 Messages.json
-  Data CT/0.bin
+  CODE/1.bin
 ```
 
 - **File names:** `<id> <name>.<ext>`, with characters illegal on Windows or macOS escaped; the type folder keeps its
@@ -101,7 +103,7 @@ flowchart LR
     end
     M --> D --> E
     Q["QuickDraw.Pict<br/>PICT and icon drawing"] --> D
-    A["App decoders<br/>e.g. Realmz records"] --> D
+    A["App decoders<br/>an app's own formats"] --> D
 ```
 
 - **ClassicMac.Resources** — containers, the resource map and `dcmp`; no dependencies, .NET 8.
@@ -109,7 +111,7 @@ flowchart LR
 - **CLI** — a `dotnet tool` with `list`, `extract` and `pack`.
 - **Viewer app** — a cross-platform desktop app on the same packages (below).
 - **Extension points:** an `IContainerReader` per container format and an `IResourceDecoder` per resource type, so
-  apps add their own (Realmz's scenario records).
+  apps add their own.
 
 ### Target layering after the QuickDraw.Pict merge
 
@@ -184,7 +186,7 @@ and results are checked against real data.
   (`snd `), the Apple file-format notes for MacBinary, AppleSingle/AppleDouble and BinHex 4.0.
 - **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
   edge cases.
-- **Verification:** a corpus of real files (Realmz scenarios, system files, shareware) extracted and compared;
+- **Verification:** a corpus of real files (system files, applications, games, shareware) extracted and compared;
   round-trip tests (read → write → read gives the same map); golden outputs for each decoder.
 - **Licence:** MIT, with third-party notices for anything ported; no Apple code or files in the repo.
 
@@ -192,10 +194,10 @@ and results are checked against real data.
 comes from disassembling the Mac OS code that handles the format (the Resource Manager, Sound Manager, Icon Utilities,
 HFS) — never from another implementation's guess.
 
-### Prior art: Realmz.ResourceExtractor
+### Prior art: an earlier extractor
 
-The Realmz project's extractor is a useful starting point, not an authority: its rules were written for Realmz's files
-and must be re-checked against Apple's documentation or the disassembly before they are carried over.
+An earlier extractor, written for one game's files, is a useful starting point, not an authority: its rules must be
+re-checked against Apple's documentation or the disassembly before they are carried over.
 
 | Area | What it does today | Take from it |
 | --- | --- | --- |
@@ -233,25 +235,23 @@ Each phase ships something usable; no dates set yet.
 1. **Core** — resource map read/write, `dcmp` 0/1/2, raw forks, AppleDouble/AppleSingle, MacBinary, BinHex; CLI
    `list` and raw `extract`.
 2. **Decoders I** — images through QuickDraw.Pict, `STR `/`STR#`/`TEXT`/`vers`, `snd ` to WAV; the manifest.
-3. **Realmz on top** — Realmz's extractor rebuilt as custom decoders over the library.
-4. **Disk images** — HFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping.
-5. **Decoders II** — fonts, UI resources to JSON and dialog previews, palettes; `pack` round trip.
-6. **Viewer app** — browse disk images, files and resources with previews and export; can start once phases 1–2
+3. **Disk images** — HFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping.
+4. **Decoders II** — fonts, UI resources to JSON and dialog previews, palettes; `pack` round trip.
+5. **Viewer app** — browse disk images, files and resources with previews and export; can start once phases 1–2
    exist and grow with them.
-7. **Editor I** — resource-level edits and saving back into forks and single-file containers.
-8. **Editor II** — typed editors and PNG/WAV import (image and sound encoders).
-9. **Editor III** — writing HFS disk images.
-10. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
-    MacPaint, QuickDraw); the old packages are deprecated.
-11. **Later** — HFS+, StuffIt and Compact Pro.
+6. **Editor I** — resource-level edits and saving back into forks and single-file containers.
+7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders).
+8. **Editor III** — writing HFS disk images.
+9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
+   MacPaint, QuickDraw); the old packages are deprecated.
+10. **Later** — HFS+, StuffIt and Compact Pro.
 
 ## Open questions
 
 - [x] **Name:** decided — ClassicMac (see Purpose and goals).
-- [ ] **Audience:** a general tool for anyone, or mainly Realmz first?
 - [x] **Repository:** decided — a new repo, `inexin/ClassicMac`; QuickDraw.Pict stays separate for now, to be merged
   in later.
-- [ ] **Disk images:** in phase 4 as planned, or earlier because Realmz scenarios ship as disk images?
+- [ ] **Disk images:** in phase 3 as planned, or earlier because much classic software survives only as disk images?
 - [ ] **Decoder priority:** which of sound, text, fonts and UI matters most after images?
 - [ ] **Output defaults:** PNG at 32-bit only, or also the screen depth the file was made for?
 - [x] **UI framework:** decided — Avalonia (see Viewer app).

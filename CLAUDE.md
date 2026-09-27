@@ -13,7 +13,6 @@ it in the same change when a decision changes.
 - Where it is silent or ambiguous, the answer comes from the Mac OS code that handles the format (disassembly),
   never from another implementation's guess. Other projects (see the plan's prior-art tables) are behavioural
   references only.
-- The Realmz project's extractor is inspiration, not authority: re-check anything taken from it.
 - A rule fitted to real data rather than read from code is marked as such in code comments and docs.
 
 ## Licensing
