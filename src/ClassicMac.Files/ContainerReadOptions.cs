@@ -1,8 +1,10 @@
+using System;
+
 namespace ClassicMac.Files
 {
     /// <summary>
-    /// Limits for unwrapping containers. Every tunable value lives here rather than in the readers; the CLI and the app
-    /// map their settings onto this record.
+    /// Limits and choices for unwrapping containers. Every tunable value lives here rather than in the readers; the CLI
+    /// and the app map their settings onto this record.
     /// </summary>
     public sealed record ContainerReadOptions
     {
@@ -14,5 +16,11 @@ namespace ClassicMac.Files
 
         /// <summary>The most bytes unwrapping and decompression may produce from one input. Default 1 GiB.</summary>
         public long MaxExpandedBytesPerInput { get; init; } = 1024L * 1024 * 1024;
+
+        /// <summary>
+        /// The zone of the Mac that reads the files, used where a container stores absolute (UTC) dates — AppleSingle
+        /// and AppleDouble version 2 — since Mac dates are local time. Default: this machine's zone.
+        /// </summary>
+        public TimeZoneInfo TimeZone { get; init; } = TimeZoneInfo.Local;
     }
 }

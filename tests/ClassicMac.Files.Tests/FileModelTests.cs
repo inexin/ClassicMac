@@ -26,6 +26,61 @@ public class ForkDataTests
     }
 }
 
+public class ForkSliceTests
+{
+    private static readonly byte[] Bytes = Enumerable.Range(0, 100).Select(i => (byte)i).ToArray();
+
+    public static TheoryData<string> Sources => ["memory", "file"];
+
+    private static ForkData Source(string kind)
+    {
+        if (kind == "memory") return ForkData.FromBytes(Bytes);
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, Bytes);
+        return ForkData.FromFile(path);
+    }
+
+    [Theory]
+    [MemberData(nameof(Sources))]
+    public void Slices_read_their_range(string kind)
+    {
+        var slice = Source(kind).Slice(10, 20);
+        Assert.Equal(20, slice.Length);
+        Assert.Equal(Bytes[10..30], slice.ToArray());
+        Assert.Equal(Bytes[10..14], slice.ReadPrefix(4));
+    }
+
+    [Theory]
+    [MemberData(nameof(Sources))]
+    public void Slices_of_slices_and_seeking_stay_in_range(string kind)
+    {
+        var inner = Source(kind).Slice(10, 50).Slice(5, 10);
+        Assert.Equal(Bytes[15..25], inner.ToArray());
+
+        using var stream = inner.Open();
+        stream.Seek(-2, SeekOrigin.End);
+        var tail = new byte[5];
+        Assert.Equal(2, stream.Read(tail, 0, 5));
+        Assert.Equal(Bytes[23..25], tail[..2]);
+    }
+
+    [Fact]
+    public void Slices_outside_the_fork_throw()
+    {
+        var fork = ForkData.FromBytes(Bytes);
+        Assert.Throws<ArgumentOutOfRangeException>(() => fork.Slice(90, 20));
+        Assert.Throws<ArgumentOutOfRangeException>(() => fork.Slice(-1, 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => fork.Slice(0, 10).Slice(5, 6));
+        Assert.Throws<InvalidDataException>(() => fork.ToArray(maxLength: 99));
+    }
+
+    [Fact]
+    public void ReadPrefix_stops_at_the_end()
+    {
+        Assert.Equal(Bytes[..3], ForkData.FromBytes(Bytes[..3]).ReadPrefix(128));
+    }
+}
+
 public class MacFileTests
 {
     [Fact]
