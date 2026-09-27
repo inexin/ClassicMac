@@ -46,6 +46,49 @@ internal static class Fixtures
         return output.ToArray();
     }
 
+    // A MacBinary file: 128-byte header, secondary header, data and resource forks each padded to 128.
+    public static byte[] MacBinary(
+        int version, string name, byte[] data, byte[] resource, string type = "TEXT", string creator = "ttxt",
+        ushort flags = 0, uint created = 0, uint modified = 0, int secondaryLength = 0)
+    {
+        var header = new byte[128];
+        header[1] = (byte)name.Length;
+        Encoding.ASCII.GetBytes(name).CopyTo(header, 2);
+        Encoding.ASCII.GetBytes(type).CopyTo(header, 65);
+        Encoding.ASCII.GetBytes(creator).CopyTo(header, 69);
+        header[73] = (byte)(flags >> 8);
+        BinaryPrimitives.WriteInt16BigEndian(header.AsSpan(75), 30); // v
+        BinaryPrimitives.WriteInt16BigEndian(header.AsSpan(77), 40); // h
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(83), (uint)data.Length);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(87), (uint)resource.Length);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(91), created);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(95), modified);
+        if (version >= 2)
+        {
+            header[101] = (byte)flags;
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(120), (ushort)secondaryLength);
+            header[122] = (byte)(version == 3 ? 130 : 129);
+            header[123] = 129;
+            if (version == 3)
+            {
+                Encoding.ASCII.GetBytes("mBIN").CopyTo(header, 102);
+                header[106] = 7; // fdScript
+                header[107] = 0x80; // fdXFlags
+            }
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(124), Crc16.Compute(header.AsSpan(0, 124)));
+        }
+        var output = new MemoryStream();
+        output.Write(header);
+        output.Write(new byte[Pad(secondaryLength)]);
+        output.Write(data);
+        output.Write(new byte[Pad(data.Length) - data.Length]);
+        output.Write(resource);
+        output.Write(new byte[Pad(resource.Length) - resource.Length]);
+        return output.ToArray();
+    }
+
+    private static int Pad(int length) => (length + 127) / 128 * 128;
+
     public static byte[] Int32s(params int[] values)
     {
         var bytes = new byte[values.Length * 4];
