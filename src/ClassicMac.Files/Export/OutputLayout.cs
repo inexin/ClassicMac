@@ -2,32 +2,34 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
-using ClassicMac.Files;
 
-namespace ClassicMac.Resources.Cli
+namespace ClassicMac.Files.Export
 {
-    // Where each file of an unwrapped input goes in an output folder, for `unpack` and `extract`: folders inside volumes
-    // become folders; a container that holds one file in the end (MacBinary, BinHex, …) is replaced by that file; one
-    // that holds several, or folders (a disk image or archive inside a volume), becomes a folder named after it. Names
-    // are made host-safe by hostName and kept distinct within each folder.
-    internal sealed class OutputTree(Func<MacString, string> hostName)
+    /// <summary>
+    /// Where each file of an unwrapped input goes in an output folder, for unpacking and extracting: folders inside
+    /// volumes become folders; a container that holds one file in the end (MacBinary, BinHex, …) is replaced by that
+    /// file; one that holds several, or folders (a disk image or archive inside a volume), becomes a folder named after
+    /// it. Names are made host-safe by the given function and kept distinct within each folder.
+    /// </summary>
+    public sealed class OutputLayout(Func<MacString, string> hostName)
     {
         private readonly Dictionary<string, HashSet<string>> taken = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> folders = new(StringComparer.OrdinalIgnoreCase);
 
-        // Every leaf of the input with the folders (host names, outermost first) it goes into. A lone file goes to the
-        // top.
+        /// <summary>Every leaf of <paramref name="root"/> with the folders (host names, outermost first) it goes into; a lone file goes to the top.</summary>
         public List<(ContainerNode Leaf, List<string> Folder)> Place(ContainerNode root)
         {
+            ArgumentNullException.ThrowIfNull(root);
             var placed = new List<(ContainerNode, List<string>)>();
             if (root.Children.Count == 0) placed.Add((root, []));
             else Walk(root, [], null, placed);
             return placed;
         }
 
-        // A name for a file or folder in folder, distinct from the others there (" ~2" …); true when it had to change.
+        /// <summary>A name for a file or folder in <paramref name="folder"/>, distinct from the others there (" ~2" …).</summary>
         public string Unique(List<string> folder, string name, out bool changed)
         {
+            ArgumentNullException.ThrowIfNull(folder);
             var unique = HostNames.MakeUnique(name, Taken(folder));
             changed = unique != name;
             return unique;

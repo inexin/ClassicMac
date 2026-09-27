@@ -120,4 +120,16 @@ public class HostWriteTests : IDisposable
         Assert.Equal((file.Created, file.Modified), (read.Created, read.Modified));
         Assert.Equal(file.ResourceFork.ToArray(), read.ResourceFork.ToArray());
     }
+
+    [Fact]
+    public void Export_folders_are_new_and_numbered()
+    {
+        var first = ClassicMac.Files.Export.ExportFolders.CreateNew(folder, "Disk unpacked");
+        var second = ClassicMac.Files.Export.ExportFolders.CreateNew(folder, "Disk unpacked");
+        File.WriteAllText(Path.Combine(folder, "Disk unpacked 3"), "a file in the way");
+        var fourth = ClassicMac.Files.Export.ExportFolders.CreateNew(folder, "Disk unpacked");
+
+        Assert.Equal(["Disk unpacked", "Disk unpacked 2", "Disk unpacked 4"], new[] { first, second, fourth }.Select(Path.GetFileName));
+        Assert.True(Directory.Exists(fourth));
+    }
 }

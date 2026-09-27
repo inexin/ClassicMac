@@ -3,16 +3,14 @@ using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Export;
 
 namespace ClassicMac.Resources.Cli
 {
     // `unpack`: every Mac file inside the input, through containers and disk images, written to a folder with both
-    // forks and Finder info (AppleDouble or Basilisk II layout), placed as OutputTree says.
+    // forks and Finder info (AppleDouble or Basilisk II layout), by Unpacker.
     internal sealed class UnpackCommand(TextWriter output, TextWriter error)
     {
-        // Room kept in the path for the companion's prefix (".rsrc/" or "._").
-        private const int CompanionRoom = 7;
-
         public int Run(FileInfo input, DirectoryInfo? outputDirectory, HostWriteOptions options, ContainerReadOptions readOptions,
             bool strict, bool quiet)
         {
@@ -32,44 +30,13 @@ namespace ClassicMac.Resources.Cli
 
             var root = outputDirectory?.FullName
                 ?? Path.Combine(input.DirectoryName ?? ".", Path.GetFileNameWithoutExtension(input.Name) + " unpacked");
-            var tree = new OutputTree(name => HostFiles.ToHostName(name, options.Layout));
-            var diagnosticsOut = new List<Diagnostic>();
-            int files = 0;
-            long bytes = 0;
-            var ioFailed = false;
-            foreach (var (leaf, folder) in tree.Place(opened.Root))
-            {
-                var file = leaf.File;
-                var directory = Path.Combine([root, .. folder]);
-                var relative = string.Join('/', folder).Length + (folder.Count > 0 ? 1 : 0);
-                var host = HostFiles.ToHostName(file.Name, options.Layout, Math.Max(8, options.MaxPathLength - relative - CompanionRoom));
-                if (options.Layout == HostLayout.BasiliskII && HostFiles.ToMacName(host, basilisk: true, new ContainerContext()) != file.Name)
-                {
-                    diagnosticsOut.Add(new Diagnostic(DiagnosticSeverity.Warning, "unpack.name-changed",
-                        $"\"{file.MacPath}\" is written as \"{host}\": SheepShaver's shared folders cannot hold its name as it is."));
-                }
-                var name = tree.Unique(folder, host, out var changed);
-                if (changed)
-                {
-                    diagnosticsOut.Add(new Diagnostic(DiagnosticSeverity.Warning, "unpack.name-collision",
-                        $"\"{file.MacPath}\" is written as \"{name}\": \"{host}\" is taken in that folder."));
-                }
-                try
-                {
-                    HostFiles.Write(file, directory, options, name);
-                    files++;
-                    bytes += file.DataFork.Length + file.ResourceFork.Length;
-                }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
-                {
-                    error.WriteLine($"{Path.Combine(directory, name)}: {e.Message}");
-                    ioFailed = true;
-                }
-            }
-            reporter.Write(input.Name, diagnosticsOut);
+            var written = new List<Diagnostic>();
+            var result = Unpacker.Unpack(opened.Root, root, options, written);
+            reporter.Write(input.Name, written);
+            foreach (var failure in result.Failed) error.WriteLine(failure);
 
-            output.WriteLine($"{files} files, {bytes} bytes, to {root}");
-            return ioFailed ? ExitCodes.IoError : reporter.ExitCode;
+            output.WriteLine($"{result.Files} files, {result.Bytes} bytes, to {root}");
+            return result.Failed.Count > 0 ? ExitCodes.IoError : reporter.ExitCode;
         }
     }
 }
