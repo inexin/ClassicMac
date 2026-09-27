@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Containers;
+using ClassicMac.Files.Fat;
 using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Files
@@ -29,7 +30,7 @@ namespace ClassicMac.Files
 
         /// <summary>
         /// The built-in readers: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex 4.0, Apple partition maps,
-        /// Disk Copy 4.2, and HFS and MFS volumes.
+        /// Disk Copy 4.2, HFS and MFS volumes, and FAT volumes with PC Exchange data.
         /// </summary>
         public static ContainerUnwrapper Default { get; } = new([]);
 
@@ -50,6 +51,7 @@ namespace ClassicMac.Files
                 DiskCopy42Reader.Instance,
                 HfsReader.Instance,
                 MfsReader.Instance,
+                FatReader.Instance,
             ];
         }
 

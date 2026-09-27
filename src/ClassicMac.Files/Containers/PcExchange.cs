@@ -157,7 +157,7 @@ namespace ClassicMac.Files.Containers
                 Date(BinaryPrimitives.ReadUInt32BigEndian(record[0x40..])),
                 Date(BinaryPrimitives.ReadUInt32BigEndian(record[0x44..])),
                 BinaryPrimitives.ReadUInt32BigEndian(record[0x4C..]),
-                Encoding.ASCII.GetString(record.Slice(0x50, 11)));
+                Encoding.Latin1.GetString(record.Slice(0x50, 11)));
         }
 
         private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
