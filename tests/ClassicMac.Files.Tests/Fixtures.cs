@@ -90,6 +90,34 @@ internal static class Fixtures
 
     private static int Pad(int length) => (length + 127) / 128 * 128;
 
+    // A Disk Copy 4.2 image: 84-byte header with checksums (sum of words, rotated right), the disk, 12 tag bytes a block.
+    public static byte[] DiskCopy42(string name, byte[] disk, bool withTags = false, bool corruptChecksum = false)
+    {
+        var tags = withTags ? Enumerable.Range(0, disk.Length / 512 * 12).Select(i => (byte)i).ToArray() : [];
+        var header = new byte[84];
+        header[0] = (byte)name.Length;
+        Encoding.ASCII.GetBytes(name).CopyTo(header, 1);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(64), (uint)disk.Length);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(68), (uint)tags.Length);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(72), DiskCopySum(disk, 0) ^ (corruptChecksum ? 1u : 0));
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(76), DiskCopySum(tags, 12));
+        header[80] = 1; // 800K
+        header[81] = 0x22;
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(82), 0x0100);
+        return [.. header, .. disk, .. tags];
+    }
+
+    private static uint DiskCopySum(byte[] data, int skip)
+    {
+        uint sum = 0;
+        for (var i = skip; i + 1 < data.Length; i += 2)
+        {
+            sum += BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(i));
+            sum = sum >> 1 | sum << 31;
+        }
+        return sum;
+    }
+
     // A BinHex 4.0 file: header, forks and CRCs, run-length encoded ($90), 6-bit text in 64-character lines between
     // colons, after the marker line and some leading text.
     public static string BinHex(
