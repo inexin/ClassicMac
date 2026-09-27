@@ -51,8 +51,15 @@ The core reads a resource fork into an in-memory model and writes one back.
 - **Compressed resources:** System 7's `dcmp` 0, 1 and 2 decompressed natively, following the System's own
   decompressors (disassembly) where the documentation is silent. Unknown `dcmp` IDs are kept compressed and flagged in
   the manifest.
-- **API shape:** read from a `Stream`; resource data is read lazily from its offset, so large files and disk images
-  stay cheap to open.
+- **API shape:** read from a `Stream` or memory. A fork's 24-bit data offsets cap it at 16 MiB of data, so a fork is
+  loaded whole and each resource's data is a slice of that buffer; laziness lives one level up, in `ForkData`, so
+  disk images stay cheap to open.
+- **Canonical writing (decided):** the writer always produces one compact layout — header, reserved areas, data in
+  type then resource order, the map with its type list at 28, reference lists, then names. Real forks carry gaps,
+  stale bytes and runtime values, so round trips are judged on the model; forks already in canonical layout come
+  back byte for byte. The layout is fitted to real files, to be checked against Rez and the Resource Manager.
+- **Duplicates (decided):** a damaged fork with two resources of the same type and ID keeps the first, as
+  `GetResource` would, and reports the rest.
 - **Tolerant reading:** truncated or overlapping entries go to a diagnostics list (severity, offset, message), not
   exceptions; only unusable input throws.
 - **Writing:** rebuild a fork from the model, for modding and round-trip tests.
@@ -104,7 +111,7 @@ defaults are a static `Default` on each. Each object arrives with the code that 
 
 ### Core API
 
-The model, in `ClassicMac.Resources` (first sketch; readers and writers come next):
+The model, in `ClassicMac.Resources`; `ResourceFork.Read` and `ResourceFork.Write`/`ToArray` read and write it:
 
 | Type | What it is |
 | --- | --- |
@@ -114,7 +121,7 @@ The model, in `ClassicMac.Resources` (first sketch; readers and writers come nex
 | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
 | `MacFile` | Name, Finder info, dates, and both forks as `ForkData` (opened on demand) |
 | `IContainerReader` | One per container format: `CanRead(stream)`, `Read(stream, options, diagnostics)` |
-| `Resource` | Type, ID, optional name, attributes, and data as stored (loaded lazily by readers) |
+| `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
 | `ResourceFork` | Resources in read order, map attributes, the reserved header areas; add, remove, renumber, find |
 | `Diagnostic` | Severity, stable code, message, offset |
 | `ReadOptions` | Reading limits (see Configuration) |
@@ -123,8 +130,8 @@ The model, in `ClassicMac.Resources` (first sketch; readers and writers come nex
   everything describing a file (`MacFile`, `FinderInfo`, options) is an immutable record. The model is not
   thread-safe.
 - **Uniqueness enforced:** a fork holds one resource per type and ID, and a resource belongs to one fork at a time.
-- **Order kept:** resources stay in the order read, and the reserved header areas are kept, so an unchanged fork can
-  be written back byte for byte.
+- **Order kept:** resources stay in the order read, and the reserved header areas are kept, so a canonical fork is
+  written back byte for byte.
 
 ### CLI
 
@@ -346,7 +353,7 @@ implementation's guess. A rule fitted to real data instead is marked as such.
 - **Real-file corpus outside the repo:** system files, applications, games such as Realmz, shareware — found through
   an environment variable (`CLASSICMAC_CORPUS`); those tests skip when it is absent. Only hashes and manifests of
   corpus results are committed, never the files or their decoded output.
-- **Checks:** round trip (read → write → read gives the same map, and unchanged forks are byte-identical); golden
+- **Checks:** round trip (read → write → read gives the same model, and canonical forks are byte-identical); golden
   outputs for each decoder on the synthetic fixtures; corpus output diffed against resource_dasm and DeRez.
 - **Tooling:** xUnit v3 on Microsoft.Testing.Platform (`dotnet test --solution ClassicMac.slnx`); CI on GitHub
   Actions for Windows, Linux and macOS.
@@ -392,7 +399,8 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
 1. **Core** — resource map read/write, `dcmp` 0/1/2, Finder info, raw forks, AppleDouble/AppleSingle, MacBinary,
-   BinHex; CLI `list` and raw `extract`. *Exit:* read → write is byte-identical on the corpus forks.
+   BinHex; CLI `list` and raw `extract`. *Exit:* read → write → read gives the same model on every corpus
+   fork, and canonical forks come back byte for byte.
 2. **Disk images** — HFS and MFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping. *Exit:* every file of the corpus
    images lists and extracts with both forks and Finder info.
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV

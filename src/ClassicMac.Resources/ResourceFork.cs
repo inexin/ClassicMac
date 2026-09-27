@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 
 namespace ClassicMac.Resources
@@ -50,6 +51,54 @@ namespace ClassicMac.Resources
 
         /// <summary>Problems found while reading this fork.</summary>
         public List<Diagnostic> Diagnostics { get; } = [];
+
+        /// <summary>
+        /// The most bytes <see cref="Read(Stream, ReadOptions?)"/> accepts: 16 MiB of data (24-bit offsets) plus a map,
+        /// whose lists are addressed by 16-bit offsets.
+        /// </summary>
+        public const int MaxForkLength = 32 * 1024 * 1024;
+
+        /// <summary>
+        /// Reads a fork from the stream's current position to its end. An empty stream gives an empty fork. Damage goes
+        /// to <see cref="Diagnostics"/>; throws <see cref="InvalidDataException"/> only when the header or map cannot
+        /// be found.
+        /// </summary>
+        public static ResourceFork Read(Stream input, ReadOptions? options = null)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            if (input.CanSeek && input.Length - input.Position > MaxForkLength)
+                throw new InvalidDataException($"A resource fork is at most {MaxForkLength} bytes.");
+            using var buffer = new MemoryStream();
+            var chunk = new byte[81920];
+            int read;
+            while ((read = input.Read(chunk)) > 0)
+            {
+                if (buffer.Length + read > MaxForkLength)
+                    throw new InvalidDataException($"A resource fork is at most {MaxForkLength} bytes.");
+                buffer.Write(chunk, 0, read);
+            }
+            return Read(buffer.ToArray(), options);
+        }
+
+        /// <summary>
+        /// Reads a fork held in memory; the resources' data are slices of <paramref name="input"/>, which must not
+        /// change afterwards.
+        /// </summary>
+        public static ResourceFork Read(ReadOnlyMemory<byte> input, ReadOptions? options = null) =>
+            ResourceForkReader.Read(input, options ?? ReadOptions.Default);
+
+        /// <summary>
+        /// Writes the fork in a compact canonical layout. The in-memory <see cref="ResourceAttributes.Changed"/> bits are
+        /// cleared; throws <see cref="InvalidOperationException"/> when the fork exceeds the format's limits.
+        /// </summary>
+        public void Write(Stream output)
+        {
+            ArgumentNullException.ThrowIfNull(output);
+            ResourceForkWriter.Write(this, output);
+        }
+
+        /// <summary>The fork written as by <see cref="Write"/>.</summary>
+        public byte[] ToArray() => ResourceForkWriter.Write(this);
 
         /// <summary>The resource with this type and ID, or <see langword="null"/>.</summary>
         public Resource? Find(FourCC type, short id) => index.GetValueOrDefault((type, id));
