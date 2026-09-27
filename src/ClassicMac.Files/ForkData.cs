@@ -76,7 +76,8 @@ namespace ClassicMac.Files
         {
             public override long Length => length;
 
-            public override Stream Open() => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            // Read even while another program (an emulator with the image mounted) has the file open for writing.
+            public override Stream Open() => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         }
 
         private sealed class SliceForkData(ForkData parent, long offset, long length) : ForkData
