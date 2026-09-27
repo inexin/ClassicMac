@@ -26,6 +26,14 @@
         <Separator />
         <MenuItem Header="_Quit" Click="OnQuit" />
       </MenuItem>
+      <MenuItem Header="_Export">
+        <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
+        <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
+        <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
+        <Separator />
+        <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
+        <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
+      </MenuItem>
     </Menu>
 
     <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
@@ -43,6 +51,16 @@
               </StackPanel>
             </TreeDataTemplate>
           </TreeView.ItemTemplate>
+          <TreeView.ContextMenu>
+            <ContextMenu>
+              <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+S" />
+              <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
+              <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
+              <Separator />
+              <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
+              <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
+            </ContextMenu>
+          </TreeView.ContextMenu>
         </TreeView>
 
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />

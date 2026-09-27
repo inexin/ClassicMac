@@ -39,6 +39,14 @@ namespace ClassicMac.App.ViewModels
     public interface IFilePicker
     {
         Task<IReadOnlyList<string>> PickFilesAsync();
+
+        /// <summary>A folder to export into, or null when cancelled.</summary>
+        Task<string?> PickFolderAsync(string title);
+
+        /// <summary>
+        /// A file to save as, offering <paramref name="extensions"/> (with the dot) as file types, or null when cancelled.
+        /// </summary>
+        Task<string?> PickSaveFileAsync(string title, string suggestedName, IReadOnlyList<string> extensions);
     }
 
     /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
@@ -59,7 +67,7 @@ namespace ClassicMac.App.ViewModels
         public ReadOptions ReadOptions { get; init; } = ReadOptions.Default;
 
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CloseCommand), nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand))]
         private NodeViewModel? selected;
 
         [ObservableProperty]

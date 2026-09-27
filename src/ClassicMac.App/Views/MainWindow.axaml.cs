@@ -32,6 +32,24 @@ namespace ClassicMac.App.Views
             return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
         }
 
+        public async Task<string?> PickFolderAsync(string title)
+        {
+            var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title });
+            return folders.Select(f => f.TryGetLocalPath()).OfType<string>().FirstOrDefault();
+        }
+
+        public async Task<string?> PickSaveFileAsync(string title, string suggestedName, IReadOnlyList<string> extensions)
+        {
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = title,
+                SuggestedFileName = suggestedName,
+                DefaultExtension = extensions.FirstOrDefault()?.TrimStart('.'),
+                FileTypeChoices = extensions.Select(e => new FilePickerFileType(e.TrimStart('.').ToUpperInvariant()) { Patterns = ["*" + e] }).ToList(),
+            });
+            return file?.TryGetLocalPath();
+        }
+
         private void OnDragOver(object? sender, DragEventArgs e) =>
             e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
 

@@ -1,6 +1,8 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
@@ -8,8 +10,9 @@ using ClassicMac.Files.Tests;
 
 namespace ClassicMac.App.Tests;
 
-// The main window loads its XAML and draws, headless (Skia, no screen): the tree, an image preview and a styled-text
-// preview. With CLASSICMAC_SCREENSHOT set to a path, the frames are saved beside it for a look.
+// The main window loads its XAML and draws, headless (Skia, no screen): the tree, an image preview, a styled-text
+// preview, the hex view and the tree's context menu. With CLASSICMAC_SCREENSHOT set to a path, the frames are saved
+// beside it for a look.
 public class WindowTests
 {
     private static readonly Lazy<bool> Started = new(() =>
@@ -86,6 +89,16 @@ public class WindowTests
             model.SelectedTab = 2;
             Dispatcher.UIThread.RunJobs();
             Capture(window, "hex");
+
+            // The tree's context menu, on a resource: only Save Resource As applies.
+            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+            var menu = tree.ContextMenu!;
+            menu.Open(tree);
+            Dispatcher.UIThread.RunJobs();
+            var items = menu.Items.OfType<MenuItem>().ToList();
+            Assert.Equal(["_Save Resource As…"], items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
+            Capture(window, "context-menu");
+            menu.Close();
             window.Close();
         }
         finally
