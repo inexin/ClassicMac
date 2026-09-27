@@ -80,10 +80,24 @@ noted in `THIRD-PARTY-NOTICES.md`).
 The readers parse arbitrary downloaded files, so every size and offset is checked before use.
 
 - **Bounds:** offsets and lengths are checked against the stream before reading; anything outside goes to diagnostics.
-- **Allocation limits:** a per-resource ceiling on decompressed size (default 64 MiB, configurable); `dcmp` output
-  must match the size its header declares; decoders check image dimensions before allocating.
-- **Nesting and cycles:** container recursion stops at a depth limit (default 8); HFS B-tree and extent walks detect
-  cycles.
+- **Allocation limits:** a per-resource ceiling on decompressed size; `dcmp` output must match the size its header
+  declares; decoders check image dimensions against a pixel ceiling before allocating.
+- **Nesting and cycles:** container recursion stops at a depth limit; HFS B-tree and extent walks detect cycles.
+
+### Configuration
+
+No tunable value is hard-coded: every limit and default lives as a property on an options object, with its default
+documented there, and the CLI flags and the app's settings map onto the same objects.
+
+| Options object | Package | Settings (default) |
+| --- | --- | --- |
+| `ReadOptions` | Resources | Max decompressed resource size (64 MiB), max container nesting depth (8), max total bytes expanded per input (1 GiB), text encoding override (none) |
+| `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
+| `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off) |
+| `PackOptions` | Resources | Base fork (none), allow deletes (off) |
+
+Options objects are immutable records with `with` for changes, so one instance can be shared across threads; the
+defaults are a static `Default` on each.
 - **Fuzzing:** SharpFuzz with libFuzzer on each container reader, the resource map and `dcmp`, seeded from the test
   fixtures; a short run on every CI build, a longer one nightly; crashes become regression fixtures.
 
@@ -129,7 +143,7 @@ Folder and file names must be valid and distinct on Windows, macOS and Linux. Th
 authority: `pack` reads type, ID and name from it, so escaping only has to be safe and readable, never reversible.
 
 - **Resource files:** `<id> <name>.<ext>`, or `<id>.<ext>` when unnamed; the name is converted to Unicode through the
-  file's encoding and cut so the whole path stays under 200 characters.
+  file's encoding and cut so the whole path stays within the configured maximum (see Configuration).
 - **Escaping:** `%XX` (the byte in the file's encoding) for control characters, `% / \ : * ? " < > |`, and a trailing
   space or dot — so `snd ` becomes `snd%20` and `PAT ` becomes `PAT%20`.
 - **Reserved Windows names:** a name that matches `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9` or `LPT1`–`LPT9`
@@ -348,6 +362,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Encodings:** own tables from Unicode's Apple mappings; single-byte in the core, multi-byte in
   `ClassicMac.Encodings`.
 - **Hostile input:** bounds checks, allocation and nesting limits, fuzzing in CI.
+- **Configuration:** every limit and default is a property on an immutable options object (`ReadOptions`,
+  `DecodeOptions`, `ExportOptions`, `PackOptions`); nothing tunable is hard-coded.
 
 ## Open questions
 
