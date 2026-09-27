@@ -271,20 +271,30 @@ tools/                      fixture and table generators; never packed
 ### Target layering after the QuickDraw.Pict merge
 
 When QuickDraw.Pict moves into ClassicMac, it is split so every dependency points down: QuickTime and MacPaint stop
-living inside PICT, and PICT calls QuickTime for its embedded images (`$8200`/`$8201`). Until the merge,
-QuickDraw.Pict stays as it is.
+living inside PICT, PICT calls QuickTime for its embedded images (`$8200`/`$8201`), and the QuickDraw renderer is
+separated from the PICT file format. Until the merge, QuickDraw.Pict stays as it is.
 
 | Layer | Contains | Depends on |
 | --- | --- | --- |
 | `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), PackBits, colour-table and PixMap reading | nothing |
 | `ClassicMac.QuickTime` | ImageDescription, the codecs (`raw `, `rle `, `rpza`, `smc `, `cvid`, `8BPS`, `yuv2`, `YVU9`, `tga `), the codec plugin hook, QTIF files | Graphics |
 | `ClassicMac.MacPaint` (or inside Graphics) | PNTG files and the `PNTG` codec's decoder | Graphics |
-| `ClassicMac.QuickDraw` | PICT reading and writing, the drawing engine, regions, text, screen depths | Graphics, QuickTime |
+| `ClassicMac.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics (and font parsing, see open questions) |
+| `ClassicMac.Pict` | The PICT file format: the opcode reader that replays a picture into the renderer, and the writer | QuickDraw, QuickTime |
 | `ClassicMac.Resources` (+ `.Decoders`) | Resource forks and containers; icons, cursors and patterns become resource decoders here | Graphics, QuickDraw |
-| ImageSharp plugins | One thin adapter per format | the layers above |
+| `ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp` | One integration package per host library, covering every image format (PICT, QTIF, MacPaint, icons) | the layers above |
 
 Colour tables and PixMaps sit in the base because QuickTime's codecs and QuickDraw both need them. At the merge,
-`QuickDraw.Pict` and `QuickDraw.Pict.ImageSharp` are deprecated on NuGet, pointing to the new packages.
+`QuickDraw.Pict`, `QuickDraw.Pict.ImageSharp` and `QuickDraw.Pict.SkiaSharp` are deprecated on NuGet, pointing to
+the new packages.
+
+**Renderer and file format are separate (decided).** A picture is a recording of QuickDraw calls, which is why the two
+grew up together, but other parts need the renderer without PICT: dialog previews drawn from `DLOG`/`DITL` the way the
+Dialog Manager draws them, icons scaled with CopyBits, `cicn` masks, cursors and patterns at a screen depth, and any
+later QuickDraw GX or 3DMF work reusing regions and colour. Exposing the renderer's drawing API (today internal and
+shaped around PICT playback) is part of the merge work. The specification splits the same way: QuickDraw.Pict's
+`PICT-FORMAT.md` becomes `docs/formats/PICT.md` (opcodes and operands) and `docs/formats/QUICKDRAW.md` (the drawing
+rules), with one spec per format under `docs/formats/`.
 
 **Where icons live (settled by this layering):** icons, cursors and patterns are resources, so their decoders go in
 `ClassicMac.Resources.Decoders`. Plain decoding (`ICN#`, `icl8`, `cicn`, …) needs only Graphics (colour tables,
@@ -414,7 +424,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders).
 8. **Editor III** — writing HFS disk images.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
-   MacPaint, QuickDraw); the old packages are deprecated.
+   MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
+   package); the old packages are deprecated.
 10. **Later** — HFS+, StuffIt and Compact Pro.
 
 ## Decisions
@@ -437,7 +448,20 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Hostile input:** bounds checks, allocation and nesting limits, fuzzing in CI.
 - **Configuration:** every limit and default is a property on an immutable options object (`ReadOptions`,
   `DecodeOptions`, `ExportOptions`, `PackOptions`); nothing tunable is hard-coded.
+- **Renderer and file format:** at the merge, the QuickDraw renderer (`ClassicMac.QuickDraw`) and the PICT format
+  (`ClassicMac.Pict`) become separate packages (see Target layering).
+- **Integrations:** one package per host library (`ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp`) covering every
+  image format, instead of one per format.
+- **Package naming:** `ClassicMac.<Area>`, named after the Apple technology (QuickDraw, QuickTime, Hfs); namespaces
+  match package names; format specs live under `docs/formats/`.
 
 ## Open questions
 
-None at present.
+- [ ] **Files and disk images as their own packages:** containers wrap whole files (both forks and Finder info), not
+  resource forks. Keep `MacFile` and the container readers in `ClassicMac.Resources` (as built today), or move them to
+  `ClassicMac.Files` (AppleSingle/Double, MacBinary, BinHex, Basilisk II folders) with `ClassicMac.Hfs` and later
+  `ClassicMac.Archives` beside it, so tools that only need file unwrapping skip the resource map?
+- [ ] **Fonts package:** a `ClassicMac.Fonts` package for `FONT`/`NFNT`/`FOND`/`fctb` parsing (used by the renderer's
+  text and by font export), or font parsing inside `ClassicMac.QuickDraw`?
+- [ ] **One or several decoder packages:** a single `ClassicMac.Resources.Decoders`, or split by area (icons, text,
+  UI, sound) for users who want a small subset?
