@@ -28,13 +28,13 @@ namespace ClassicMac.Resources.Decoders.Text
             var files = new List<DecodedFile> { new(".txt", MacText.Utf8(MacText.Lines(text, options)), encoding) };
             if (input.Find(Styl, input.Resource.Id) is { } styl)
             {
-                var runs = StyleRuns.Read(styl.Span, out var complete);
-                if (!complete)
+                var styled = StyledText.Read(input.Data.Span, styl.Span, options);
+                if (!styled.Complete)
                 {
                     input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "text.styl-short",
                         $"{input.Resource}: its 'styl' ends before its last style run; the runs there are used."));
                 }
-                files.Add(new DecodedFile(".rtf", Encoding.ASCII.GetBytes(Rtf.Write(text, runs)), encoding));
+                files.Add(new DecodedFile(".rtf", Encoding.ASCII.GetBytes(Rtf.Write(styled)), encoding));
             }
             return files;
         }

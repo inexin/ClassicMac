@@ -108,6 +108,25 @@ public class TextDecoderTests
     }
 
     [Fact]
+    public void Styled_text_gives_runs_over_the_whole_text()
+    {
+        var text = MacRoman.Encode("Title\rBody é");
+        var styl = Styl((0, 20, 0x01, 18, 0xFFFF, 0, 0), (6, 4, 0x02, 0, 0, 0, 0));
+
+        var styled = Text.StyledText.Read(text, styl);
+
+        Assert.Equal("Title\rBody é", styled.Text);
+        Assert.True(styled.Complete);
+        Assert.Equal(2, styled.Runs.Count);
+        var (title, body) = (styled.Runs[0], styled.Runs[1]);
+        Assert.Equal((0, 6, "Times", 18, true, (byte)255), (title.Start, title.Length, title.FontName, title.Size, title.Bold, title.Red));
+        Assert.Equal((6, 6, "Monaco", 12, true), (body.Start, body.Length, body.FontName, body.Size, body.Italic));
+
+        var plain = Text.StyledText.Read(text, []);
+        Assert.Equal((0, 12, "Geneva"), (plain.Runs.Single().Start, plain.Runs.Single().Length, plain.Runs.Single().FontName));
+    }
+
+    [Fact]
     public void Text_without_styl_is_text_only_and_styl_alone_is_JSON()
     {
         var (files, _) = Decode(Res("TEXT", 200, MacRoman.Encode("plain")));

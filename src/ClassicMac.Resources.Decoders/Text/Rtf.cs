@@ -12,39 +12,30 @@ namespace ClassicMac.Resources.Decoders.Text
     // the Mac's CR becomes \par.
     internal static class Rtf
     {
-        public static string Write(string text, IReadOnlyList<StyleRun> runs)
+        public static string Write(StyledText styled)
         {
-            var fonts = runs.Select(r => r.Font).Distinct().ToList();
-            if (fonts.Count == 0) fonts.Add(0);
+            var runs = styled.Runs;
+            var fonts = runs.Select(r => r.FontId).Distinct().ToList();
             var colours = runs.Select(r => (r.Red, r.Green, r.Blue)).Distinct().ToList();
 
             var rtf = new StringBuilder("{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1\n{\\fonttbl");
             for (var i = 0; i < fonts.Count; i++) rtf.Append(CultureInfo.InvariantCulture, $"{{\\f{i} {Escape(StyleRuns.FontName(fonts[i]))};}}");
             rtf.Append("}\n{\\colortbl;");
-            foreach (var (r, g, b) in colours) rtf.Append(CultureInfo.InvariantCulture, $"\\red{r >> 8}\\green{g >> 8}\\blue{b >> 8};");
+            foreach (var (r, g, b) in colours) rtf.Append(CultureInfo.InvariantCulture, $"\\red{r}\\green{g}\\blue{b};");
             rtf.Append("}\n");
 
-            var ordered = runs.Where(r => r.Start >= 0).OrderBy(r => r.Start).ToList();
-            if (ordered.Count == 0 || ordered[0].Start > 0) ordered.Insert(0, new StyleRun(0, 0, 0, fonts[0], 0, 12, 0, 0, 0));
-            for (var i = 0; i < ordered.Count; i++)
+            foreach (var run in runs)
             {
-                var run = ordered[i];
-                var start = Math.Min(run.Start, text.Length);
-                var end = i + 1 < ordered.Count ? Math.Min(ordered[i + 1].Start, text.Length) : text.Length;
-                if (end <= start) continue;
-                var size = run.Size > 0 ? run.Size : 12;
-                rtf.Append(CultureInfo.InvariantCulture, $"\\plain\\f{fonts.IndexOf(run.Font)}\\fs{size * 2}");
-                var colour = colours.IndexOf((run.Red, run.Green, run.Blue));
-                if (colour >= 0) rtf.Append(CultureInfo.InvariantCulture, $"\\cf{colour + 1}");
-                if ((run.Face & 0x01) != 0) rtf.Append("\\b");
-                if ((run.Face & 0x02) != 0) rtf.Append("\\i");
-                if ((run.Face & 0x04) != 0) rtf.Append("\\ul");
-                if ((run.Face & 0x08) != 0) rtf.Append("\\outl");
-                if ((run.Face & 0x10) != 0) rtf.Append("\\shad");
-                if ((run.Face & 0x20) != 0) rtf.Append("\\expnd-2\\expndtw-10");
-                if ((run.Face & 0x40) != 0) rtf.Append("\\expnd2\\expndtw10");
+                rtf.Append(CultureInfo.InvariantCulture, $"\\plain\\f{fonts.IndexOf(run.FontId)}\\fs{run.Size * 2}\\cf{colours.IndexOf((run.Red, run.Green, run.Blue)) + 1}");
+                if (run.Bold) rtf.Append("\\b");
+                if (run.Italic) rtf.Append("\\i");
+                if (run.Underline) rtf.Append("\\ul");
+                if (run.Outline) rtf.Append("\\outl");
+                if (run.Shadow) rtf.Append("\\shad");
+                if (run.Condense) rtf.Append("\\expnd-2\\expndtw-10");
+                if (run.Extend) rtf.Append("\\expnd2\\expndtw10");
                 rtf.Append(' ');
-                rtf.Append(Escape(text[start..end]));
+                rtf.Append(Escape(styled.Text.Substring(run.Start, run.Length)));
             }
             rtf.Append("}\n");
             return rtf.ToString();
