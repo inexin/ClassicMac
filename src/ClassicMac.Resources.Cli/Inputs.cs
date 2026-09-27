@@ -19,7 +19,8 @@ namespace ClassicMac.Resources.Cli
         {
             var host = HostFiles.Read(file.FullName, options, diagnostics);
             var root = ContainerUnwrapper.Default.Unwrap(
-                host.File, HostFiles.FormatName(host.Layout), new ContainerContext(options, diagnostics));
+                host.File, HostFiles.FormatName(host.Layout),
+                new ContainerContext(options, diagnostics, siblings: HostFiles.Siblings(file.FullName, options, diagnostics)));
             var leaves = new List<(ContainerNode, IReadOnlyList<string>)>();
             Collect(root, [], leaves);
             return new Input(host, root, leaves);

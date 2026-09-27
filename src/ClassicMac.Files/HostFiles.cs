@@ -112,6 +112,30 @@ namespace ClassicMac.Files
             return new HostFile(file, HostLayout.Plain, []);
         }
 
+        /// <summary>
+        /// Finds the other files in <paramref name="path"/>'s folder by Mac name (each read with its companions), for
+        /// formats split across files.
+        /// </summary>
+        public static Func<MacString, MacFile?> Siblings(string path, ContainerReadOptions? options = null, ICollection<Diagnostic>? diagnostics = null)
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            var full = Path.GetFullPath(path);
+            var directory = Path.GetDirectoryName(full) ?? ".";
+            var context = new ContainerContext(options, diagnostics);
+            return name =>
+            {
+                if (!Directory.Exists(directory)) return null;
+                foreach (var candidate in Directory.EnumerateFiles(directory))
+                {
+                    if (string.Equals(candidate, full, StringComparison.OrdinalIgnoreCase)) continue;
+                    var host = Path.GetFileName(candidate);
+                    if (ToMacName(host, basilisk: false, context) == name || ToMacName(host, basilisk: true, context) == name)
+                        return Read(candidate, options, diagnostics).File;
+                }
+                return null;
+            };
+        }
+
         /// <summary>The name a layout is shown under in a container chain.</summary>
         public static string FormatName(HostLayout layout) => layout switch
         {

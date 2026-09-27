@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Core\ClassicMac.Core.csproj" />
+    <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
   </ItemGroup>
 
   <ItemGroup>

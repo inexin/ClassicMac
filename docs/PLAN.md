@@ -181,9 +181,9 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Resources | `ResourceDecompression`, `IResourceDecompressor` | `dcmp` 0–3 and app-supplied decompressors |
 | Resources | `ReadOptions` | Resource-reading limits and the Resource Manager model (see Configuration) |
 
-A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`),
-so the two packages need no reference to each other; a convenience overload taking a `MacFile` can be added to
-`ClassicMac.Resources` later if it earns a dependency on `ClassicMac.Files`.
+A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`).
+`ClassicMac.Files` references `ClassicMac.Resources` (never the other way), because a few disk images keep their
+layout in resources (NDIF's `bcem`, early UDIF's `blkx`).
 
 - **Mutable model, immutable records:** `ResourceFork` and `Resource` are mutable, because the editors change them;
   everything describing a file (`MacFile`, `FinderInfo`, options) is an immutable record. The model is not
@@ -293,6 +293,7 @@ flowchart LR
     end
     E["CLI · viewer app<br/>unwrap, browse, export,<br/>pack back"]
     B --> F & M
+    M --> F
     M --> D
     F & D --> E
     Q["QuickDraw.Pict<br/>PICT and icon drawing"] --> D
@@ -301,7 +302,8 @@ flowchart LR
 
 - **ClassicMac.Core** — `FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic` and (later) the
   single-byte text encodings; no dependencies, .NET 10.
-- **ClassicMac.Files** — the whole file layer, one package with one namespace per area; depends on Core:
+- **ClassicMac.Files** — the whole file layer, one package with one namespace per area; depends on Core and
+  Resources:
   - `ClassicMac.Files`: the Mac file model (`MacFile`, `FinderInfo`, `ForkData`), `IContainerReader`, `HostFiles`,
     `ContainerUnwrapper`, options;
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
@@ -313,8 +315,7 @@ flowchart LR
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
     (MBR) partition tables;
   - `ClassicMac.Files.Archives` (later): zip and tar with Mac data, StuffIt, Compact Pro, DiskDoubler, PackIt.
-- **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only (Files only if a convenience overload
-  ever needs it).
+- **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only.
 - **ClassicMac.Encodings** — the multi-byte Mac text encodings; optional, depends on Core.
 - **ClassicMac.Resources.Decoders** — the built-in decoders; depends on Resources and QuickDraw.Pict for images.
 - **CLI** — a `dotnet tool` with `info`, `list`, `extract` and `pack`; references the file and resource packages.
@@ -580,7 +581,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   under `docs/formats/`.
 - **One file-layer package (revised):** the file layer is a single package, `ClassicMac.Files`, with one namespace
   per area (containers, HFS/MFS, FAT, later archives), to avoid a project per format; it stays separate from
-  `ClassicMac.Resources`, so resource-only users skip the containers and vice versa; the shared
+  `ClassicMac.Resources`, so resource-only users skip the containers; Files references Resources (one way) for disk
+  images whose layout is in resources (NDIF); the shared
   types (`FourCC`, `MacString`, `MacDate`, `MacPoint`, `MacRect`, `Fixed`, `Diagnostic`) sit in the dependency-free
   base `ClassicMac.Core` (see Inputs).
 - **Archive decompressors without a spec:** StuffIt and Compact Pro methods have no Apple or vendor spec; XADMaster

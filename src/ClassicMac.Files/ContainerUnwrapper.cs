@@ -73,13 +73,14 @@ namespace ClassicMac.Files
         {
             var context = new ContainerContext(options, diagnostics);
             var host = HostFiles.Read(path, context.Options, context.Diagnostics);
-            return Unwrap(host.File, HostFiles.FormatName(host.Layout), context);
+            return Unwrap(host.File, HostFiles.FormatName(host.Layout),
+                context.For(null, HostFiles.Siblings(path, context.Options, context.Diagnostics)));
         }
 
         private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, ref long expanded)
         {
             if (file.DataFork.Length == 0) return new ContainerNode(format, file, []);
-            var reader = readers.FirstOrDefault(r => r.CanRead(file.DataFork));
+            var reader = readers.FirstOrDefault(r => r.CanRead(file));
             if (reader is null) return new ContainerNode(format, file, []);
             if (depth >= context.Options.MaxNestingDepth)
             {
@@ -92,7 +93,7 @@ namespace ClassicMac.Files
             IReadOnlyList<MacFile> contents;
             try
             {
-                contents = reader.Read(file.DataFork, context.WithHostName(file.Name));
+                contents = reader.Read(file, context.For(file.Name, context.Siblings));
             }
             catch (InvalidDataException e)
             {
@@ -111,9 +112,13 @@ namespace ClassicMac.Files
                         $"Unwrapping produced more than {context.Options.MaxExpandedBytesPerInput} bytes; stopped.");
                     break;
                 }
-                children.Add(Unwrap(inner, reader.FormatName, context, depth + 1, ref expanded));
+                children.Add(Unwrap(inner, reader.FormatName, context.For(null, name => SiblingOf(contents, inner, name)), depth + 1, ref expanded));
             }
             return new ContainerNode(format, file, children);
         }
+
+        // Another file the same container read, in the same folder.
+        private static MacFile? SiblingOf(IReadOnlyList<MacFile> contents, MacFile file, MacString name) =>
+            contents.FirstOrDefault(f => !ReferenceEquals(f, file) && f.Name == name && f.FolderPath.SequenceEqual(file.FolderPath));
     }
 }

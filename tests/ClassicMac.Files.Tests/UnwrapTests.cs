@@ -170,4 +170,45 @@ public class HostFilesTests : IDisposable
         TestContext.Current.SendDiagnosticMessage(
             $"{files} host files; {basilisk} in Basilisk II folders; {withFinderInfo} with a file type.");
     }
+
+    // A format split across files: "SEG1" in the first file's data fork, the rest in a sibling called "part 2".
+    private sealed class SegmentReader : IContainerReader
+    {
+        public string FormatName => "segmented";
+
+        public bool CanRead(ForkData input) => input.ReadPrefix(4).AsSpan().SequenceEqual("SEG1"u8);
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
+        {
+            var rest = context.Siblings?.Invoke(MacString.FromMacRoman("part 2"));
+            return [new MacFile { Name = MacString.FromMacRoman("joined"), DataFork = ForkData.FromBytes(input.ToArray().Concat(rest?.DataFork.ToArray() ?? []).ToArray()) }];
+        }
+    }
+
+    [Fact]
+    public void Readers_find_sibling_files_on_the_host_and_in_containers()
+    {
+        var unwrapper = new ContainerUnwrapper([new SegmentReader()]);
+        var folder = Directory.CreateTempSubdirectory("classicmac-siblings-").FullName;
+        try
+        {
+            File.WriteAllText(Path.Combine(folder, "part 1"), "SEG1abc");
+            File.WriteAllText(Path.Combine(folder, "part 2"), "def");
+            var host = unwrapper.Unwrap(Path.Combine(folder, "part 1"));
+            Assert.Equal("SEG1abcdef"u8.ToArray(), Assert.Single(host.Leaves()).File.DataFork.ToArray());
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+
+        // The same two files side by side in an HFS volume.
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, "part 1", "SEG1abc"u8.ToArray(), []);
+        builder.File(HfsBuilder.Root, "part 2", "def"u8.ToArray(), []);
+        var root = unwrapper.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("disk"), DataFork = ForkData.FromBytes(builder.Build("Disk")) },
+            "host file", new ContainerContext());
+        Assert.Contains(root.Leaves(), l => l.File.DataFork.ToArray().AsSpan().SequenceEqual("SEG1abcdef"u8));
+    }
 }
