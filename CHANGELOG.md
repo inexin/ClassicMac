@@ -23,6 +23,9 @@
   on them (Mac names, Finder info, dates, resource forks), matching what OS 9 lists; DOS partition tables.
   `DosTime` and `PcExchange.Apply` shared with host folders. Long names converted as File Exchange converts them;
   an opt-in `ExtensionMap` for placeholder types.
+- NDIF disk images (Disk Copy 6: read-only, ADC-compressed, `.smi`, segmented) with ADC in
+  `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;
+  `ClassicMac.Files` references `ClassicMac.Resources`.
 - CD volumes in `ClassicMac.Files.Iso`: ISO 9660 and High Sierra as Mac OS 9 reads them (Apple `AA`/`BA` Finder
   info, associated files as resource forks, the Mac's name, date and listing rules), matching OS 9 on a test disc.
 - `classicmac` CLI: `info` and `list` read through containers and disk images, showing Mac paths (text or JSON);

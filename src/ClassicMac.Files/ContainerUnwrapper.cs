@@ -50,6 +50,7 @@ namespace ClassicMac.Files
                 BinHexReader.Instance,
                 PartitionMapReader.Instance,
                 DiskCopy42Reader.Instance,
+                NdifReader.Instance,
                 HfsReader.Instance,
                 MfsReader.Instance,
                 MbrReader.Instance,
