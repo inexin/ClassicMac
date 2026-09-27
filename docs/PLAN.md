@@ -49,9 +49,13 @@ The core reads a resource fork into an in-memory model and writes one back.
 - **Model:** file → types → resources; each resource has type, ID, name, attributes (system heap, purgeable, locked,
   protected, preload, compressed) and its data.
 - **Finder info:** the file's type, creator, flags and dates travel with the model into the manifest and back.
-- **Compressed resources:** System 7's `dcmp` 0, 1 and 2 decompressed natively, following the System's own
-  decompressors (disassembly) where the documentation is silent. Unknown `dcmp` IDs are kept compressed and flagged in
-  the manifest.
+- **Compressed resources:** the System's `dcmp` 0, 1, 2 and 3 decompressed natively
+  (`ResourceDecompression`). 0, 1 and 2, and the Resource Manager's handling (header, in-place block, working buffer,
+  failures), follow the disassembly of the ROM $077D and Mac OS 9.0 code; `dcmp` 3 (bit-stream LZ77, used by every
+  compressed Mac OS 9 System resource) is ported from resource_dasm and marked behavioural until it is traced.
+  Malformed-input behaviour follows Mac OS 9 by default, the 68k ROM when `ReadOptions.ResourceManager` says so.
+  Where the Mac has no bounds (memo tables, in-place overlap) the result is reproduced, and an overrun stops with a
+  diagnostic. Unknown `dcmp` IDs are kept compressed and flagged in the manifest; applications can add decompressors.
 - **API shape:** read from a `Stream` or memory. A fork's 24-bit data offsets cap it at 16 MiB of data, so a fork is
   loaded whole and each resource's data is a slice of that buffer; laziness lives one level up, in `ForkData`, so
   disk images stay cheap to open.
@@ -101,7 +105,7 @@ documented there, and the CLI flags and the app's settings map onto the same obj
 
 | Options object | Package | Settings (default) |
 | --- | --- | --- |
-| `ReadOptions` | Resources | Max decompressed resource size (64 MiB), max container nesting depth (8), max total bytes expanded per input (1 GiB), text encoding override (none) |
+| `ReadOptions` | Resources | Max decompressed resource size (64 MiB), max container nesting depth (8), max total bytes expanded per input (1 GiB), Resource Manager model (Mac OS 9), text encoding override (none) |
 | `DecodeOptions` | Decoders | Max image pixels (64 megapixels), screen depth (32-bit), make fonts loadable (off) |
 | `ExportOptions` | Resources | Max output path length (200 characters), keep raw data (off) |
 | `PackOptions` | Resources | Base fork (none), allow deletes (off) |
@@ -409,7 +413,7 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 
 Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
-1. **Core** — resource map read/write, `dcmp` 0/1/2, Finder info, raw forks, AppleDouble/AppleSingle, MacBinary,
+1. **Core** — resource map read/write, `dcmp` 0/1/2/3, Finder info, raw forks, AppleDouble/AppleSingle, MacBinary,
    BinHex, Basilisk II shared folders; CLI `list` and raw `extract`. *Exit:* read → write → read gives the same
    model on every corpus fork, and canonical forks come back byte for byte.
 2. **Disk images** — HFS and MFS (raw, DiskCopy 4.2, NDIF), recursive unwrapping. *Exit:* every file of the corpus
@@ -446,6 +450,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Encodings:** own tables from Unicode's Apple mappings; single-byte in the core, multi-byte in
   `ClassicMac.Encodings`.
 - **Hostile input:** bounds checks, allocation and nesting limits, fuzzing in CI.
+- **Resource Manager model:** Mac OS 9's behaviour is the default where it and the 68k ROM differ (only on malformed
+  compressed resources); the ROM's is selectable in `ReadOptions`.
 - **Configuration:** every limit and default is a property on an immutable options object (`ReadOptions`,
   `DecodeOptions`, `ExportOptions`, `PackOptions`); nothing tunable is hard-coded.
 - **Renderer and file format:** at the merge, the QuickDraw renderer (`ClassicMac.QuickDraw`) and the PICT format
@@ -465,3 +471,6 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   text and by font export), or font parsing inside `ClassicMac.QuickDraw`?
 - [ ] **One or several decoder packages:** a single `ClassicMac.Resources.Decoders`, or split by area (icons, text,
   UI, sound) for users who want a small subset?
+- [ ] **`dcmp` 3 in disassembly:** bit order and refill, the two length codes, the offset thresholds (including the
+  two resource_dasm calls bugs in Apple's code), the literal-run rule and termination. Until then it is behavioural;
+  all 34 compressed resources in the Mac OS 9.0 System decompress to their declared sizes with plausible content.
