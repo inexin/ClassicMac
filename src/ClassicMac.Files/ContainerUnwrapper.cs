@@ -51,6 +51,7 @@ namespace ClassicMac.Files
                 DiskCopy42Reader.Instance,
                 HfsReader.Instance,
                 MfsReader.Instance,
+                MbrReader.Instance,
                 FatReader.Instance,
             ];
         }

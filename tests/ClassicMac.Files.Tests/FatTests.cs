@@ -195,6 +195,37 @@ public class FatTests
         Assert.Equal("NOTE.TXT", Assert.Single(root.Leaves()).File.MacPath);
     }
 
+    [Fact]
+    public void Partitioned_disks_unwrap_to_their_FAT_volumes()
+    {
+        var builder = new FatBuilder(16);
+        builder.File("NOTE.TXT", "NOTE.TXT", Bytes(9, 3));
+        var volume = builder.Build();
+        var disk = new byte[63 * 512 + volume.Length];
+        volume.CopyTo(disk, 63 * 512);
+        void Partition(int i, byte type, uint start, uint count)
+        {
+            var at = 446 + i * 16;
+            disk[at + 4] = type;
+            BinaryPrimitives.WriteUInt32LittleEndian(disk.AsSpan(at + 8), start);
+            BinaryPrimitives.WriteUInt32LittleEndian(disk.AsSpan(at + 12), count);
+        }
+        Partition(0, 0x06, 63, (uint)(volume.Length / 512));
+        Partition(1, 0x83, 1, 1); // Linux: skipped
+        disk[510] = 0x55;
+        disk[511] = 0xAA;
+        var diagnostics = new List<Diagnostic>();
+
+        var root = ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("disk.img"), DataFork = ForkData.FromBytes(disk) },
+            "host file", new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal("DOS partition table", Assert.Single(root.Children).Format);
+        Assert.Equal("NOTE.TXT", Assert.Single(root.Leaves()).File.MacPath);
+        Assert.Contains(diagnostics, d => d.Code == "mbr.skipped");
+        Assert.False(MbrReader.Instance.CanRead(ForkData.FromBytes(volume))); // a bare FAT volume has no table
+    }
+
     [Theory]
     [InlineData(0x0000, 0x0000, null)]
     [InlineData(0x2E43, 0x6A83, "2003-02-03 13:20:06")] // (2003−1980)<<9 | 2<<5 | 3; 13<<11 | 20<<5 | 3
