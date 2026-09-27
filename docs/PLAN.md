@@ -32,13 +32,14 @@ Proposed priority:
 | 1 | Raw resource fork (`.rsrc`, `file/..namedfork/rsrc` on macOS) | Extracted forks, macOS copies |
 | 1 | AppleDouble (`._file`, `__MACOSX/` in zips) and AppleSingle | Files copied to FAT/SMB, zip archives |
 | 1 | Basilisk II / SheepShaver shared folders (`.rsrc/<name>` fork, `.finf/<name>` Finder info) | Files copied out of emulators |
+| 1 | PC Exchange / File Exchange folders (`RESOURCE.FRK/<8.3 name>` fork, `FINDER.DAT` records) | DOS and Windows disks written by Mac OS 7.1–9 |
 | 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites |
 | 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites |
 | 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF | Emulator disks, floppy images, CD-ROMs |
+| 2 | FAT disk images with PC Exchange / File Exchange data (e.g. `RealmzClassicHD.img`) | Emulator hard disks and floppies shared with PCs |
 | 3 | HFS+ images | Mac OS 8.1–9 disks |
 | 3 | StuffIt (`.sit`) and Compact Pro (`.cpt`) archives | Most classic Mac downloads |
 | 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators |
-| 3 | PC Exchange / File Exchange `RESOURCE.FRK` folders | DOS/Windows disks written by Mac OS 7.5–9 |
 
 Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
 
@@ -164,7 +165,7 @@ and write a fork; `ResourceDecompression` returns a resource's data as the Resou
 | Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
 | Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
 | Files | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0 |
-| Files | `HostFiles` | A host file with its companions: Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
+| Files | `HostFiles`, `PcExchange` | A host file with its companions: PC Exchange `RESOURCE.FRK`/`FINDER.DAT`, Basilisk II `.rsrc`/`.finf`, AppleDouble `._` files, macOS named forks |
 | Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
 | Resources | `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
@@ -423,7 +424,12 @@ They change what running applications see, not what a file contains.
 
 - **Specs:** *Inside Macintosh: More Macintosh Toolbox* (resource format), *Inside Macintosh: Files* (HFS, MFS),
   *Sound* (`snd `), Apple's *AppleSingle/AppleDouble Formats for Foreign Files* Developer Note (versions 1 and 2;
-  RFC 1740).
+  RFC 1740). No Apple code in Mac OS 7.1–9 reads or writes AppleSingle/AppleDouble (only mail clients and StuffIt
+  do), so the Developer Note is the whole reference.
+- **PC Exchange / File Exchange:** from the disassembly of PC Exchange 1.0.4 and File Exchange 3.0.2 (the same format
+  in both). Still to confirm on a running Mac (a FAT floppy in SheepShaver): whether browsing creates records, whether
+  the extension→type table overrides stored types, which creation date wins, and how years before 1980 or after 2031
+  wrap. The record packing's cluster size is not stored and is found by trying the FAT sizes (fitted).
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only). Detection heuristics and name mappings fitted to real files are marked in the code.
@@ -548,3 +554,6 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   text and by font export), or font parsing inside `ClassicMac.QuickDraw`?
 - [ ] **One or several decoder packages:** a single `ClassicMac.Resources.Decoders`, or split by area (icons, text,
   UI, sound) for users who want a small subset?
+- [ ] **FAT disk images:** where does a FAT volume reader go — `ClassicMac.Hfs` (disk images in general), or its own
+  `ClassicMac.Fat` beside it? It would unwrap PC Exchange / File Exchange data (`RESOURCE.FRK`, `FINDER.DAT`) the way
+  `HostFiles` does on a host folder; `RealmzClassicHD.img` is one.

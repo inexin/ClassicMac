@@ -63,13 +63,7 @@ namespace ClassicMac.Files
         {
             var context = new ContainerContext(options, diagnostics);
             var host = HostFiles.Read(path, context.Options, context.Diagnostics);
-            return Unwrap(host.File, host.Layout switch
-            {
-                HostLayout.BasiliskII => "Basilisk II folder",
-                HostLayout.AppleDouble => "AppleDouble pair",
-                HostLayout.MacOSNamedFork => "macOS named fork",
-                _ => "host file",
-            }, context);
+            return Unwrap(host.File, HostFiles.FormatName(host.Layout), context);
         }
 
         private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, ref long expanded)

@@ -18,19 +18,12 @@ namespace ClassicMac.Resources.Cli
         public static Input Open(FileInfo file, ContainerReadOptions options, ICollection<Diagnostic> diagnostics)
         {
             var host = HostFiles.Read(file.FullName, options, diagnostics);
-            var root = ContainerUnwrapper.Default.Unwrap(host.File, Format(host.Layout), new ContainerContext(options, diagnostics));
+            var root = ContainerUnwrapper.Default.Unwrap(
+                host.File, HostFiles.FormatName(host.Layout), new ContainerContext(options, diagnostics));
             var leaves = new List<(ContainerNode, IReadOnlyList<string>)>();
             Collect(root, [], leaves);
             return new Input(host, root, leaves);
         }
-
-        public static string Format(HostLayout layout) => layout switch
-        {
-            HostLayout.BasiliskII => "Basilisk II folder",
-            HostLayout.AppleDouble => "AppleDouble pair",
-            HostLayout.MacOSNamedFork => "macOS named fork",
-            _ => "host file",
-        };
 
         private static void Collect(ContainerNode node, List<string> chain, List<(ContainerNode, IReadOnlyList<string>)> leaves)
         {

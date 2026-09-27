@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files
@@ -23,6 +24,12 @@ namespace ClassicMac.Files
 
         /// <summary>A macOS file whose resource fork is read from <c>&lt;path&gt;/..namedfork/rsrc</c>.</summary>
         MacOSNamedFork,
+
+        /// <summary>
+        /// A folder from a DOS disk written by PC Exchange or File Exchange: the resource fork in
+        /// <c>RESOURCE.FRK/&lt;8.3 name&gt;</c>, Mac name, Finder info and dates in a <c>FINDER.DAT</c> record.
+        /// </summary>
+        PcExchange,
     }
 
     /// <summary>A host file read as a Mac file, with the companion files used.</summary>
@@ -33,7 +40,8 @@ namespace ClassicMac.Files
 
     /// <summary>
     /// Reads files on the host's disk as Mac files, joining the companions that carry their resource forks and Finder
-    /// info: Basilisk II / SheepShaver shared folders, AppleDouble <c>._</c> files, and macOS named forks.
+    /// info: PC Exchange / File Exchange folders, Basilisk II / SheepShaver shared folders, AppleDouble <c>._</c> files,
+    /// and macOS named forks.
     /// </summary>
     public static class HostFiles
     {
@@ -46,6 +54,8 @@ namespace ClassicMac.Files
             var directory = Path.GetDirectoryName(full) ?? ".";
             var hostName = Path.GetFileName(full);
             var file = new MacFile { Name = ToMacName(hostName, basilisk: false, context), DataFork = ForkData.FromFile(full) };
+
+            if (ReadPcExchange(full, directory, hostName, file, context) is { } pcExchange) return pcExchange;
 
             // Basilisk II: .rsrc and .finf beside the file, same host name.
             var rsrc = Path.Combine(directory, ".rsrc", hostName);
@@ -99,6 +109,88 @@ namespace ClassicMac.Files
             }
 
             return new HostFile(file, HostLayout.Plain, []);
+        }
+
+        /// <summary>The name a layout is shown under in a container chain.</summary>
+        public static string FormatName(HostLayout layout) => layout switch
+        {
+            HostLayout.BasiliskII => "Basilisk II folder",
+            HostLayout.AppleDouble => "AppleDouble pair",
+            HostLayout.MacOSNamedFork => "macOS named fork",
+            HostLayout.PcExchange => "PC Exchange folder",
+            _ => "host file",
+        };
+
+        // PC Exchange / File Exchange: RESOURCE.FRK and FINDER.DAT in the file's directory (FAT names, so matched
+        // without regard to case). The record is found by the file's 8.3 name; a long host name has no 8.3 key on this
+        // side, so it is matched against the records' Mac names instead (fitted: the Mac keyed by the 8.3 alias).
+        private static HostFile? ReadPcExchange(string full, string directory, string hostName, MacFile file, ContainerContext context)
+        {
+            var rsrcFolder = FindEntry(directory, PcExchange.ResourceFolder, directories: true);
+            var finderData = FindEntry(directory, PcExchange.FinderData, directories: false);
+            if (rsrcFolder is null && finderData is null) return null;
+            if (string.Equals(hostName, PcExchange.FinderData, StringComparison.OrdinalIgnoreCase)) return null;
+
+            var companions = new List<string>();
+            if (rsrcFolder is not null && FindEntry(rsrcFolder, hostName, directories: false) is { } rsrc)
+            {
+                companions.Add(rsrc);
+                var fork = ForkData.FromFile(rsrc);
+                if (fork.Length > 0) file = file with { ResourceFork = fork };
+            }
+
+            if (finderData is not null)
+            {
+                var records = PcExchange.ReadFinderData(File.ReadAllBytes(finderData));
+                var key = PcExchange.DosKey(hostName);
+                var record = key is not null
+                    ? records.FirstOrDefault(r => r.DosName == key)
+                    : records.FirstOrDefault(r => string.Equals(r.MacName.ToMacRoman(), hostName, StringComparison.OrdinalIgnoreCase));
+                if (record is not null)
+                {
+                    companions.Add(finderData);
+                    // Modification: the later of the record's date and the DOS entry's (both versions); creation: the
+                    // record's (PC Exchange 1.0.4; File Exchange 9.0 takes the DOS entry's, which a copy may not keep).
+                    var hostModified = MacDateFromHost(File.GetLastWriteTime(full));
+                    var modified = record.Modified is { } m && (hostModified is null || m.Seconds >= hostModified.Value.Seconds)
+                        ? record.Modified
+                        : hostModified;
+                    file = file with
+                    {
+                        Name = record.MacName,
+                        FinderInfo = record.FinderInfo,
+                        Created = record.Created,
+                        Modified = modified,
+                    };
+                }
+            }
+
+            // DOS hidden or system makes the file invisible.
+            if ((File.GetAttributes(full) & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+                file = file with { FinderInfo = file.FinderInfo with { Flags = file.FinderInfo.Flags | FinderFlags.IsInvisible } };
+
+            return companions.Count == 0 ? null : new HostFile(file, HostLayout.PcExchange, companions);
+        }
+
+        private static string? FindEntry(string directory, string name, bool directories)
+        {
+            var exact = Path.Combine(directory, name);
+            if (directories ? Directory.Exists(exact) : File.Exists(exact)) return exact;
+            if (!Directory.Exists(directory)) return null;
+            var entries = directories ? Directory.EnumerateDirectories(directory) : Directory.EnumerateFiles(directory);
+            return entries.FirstOrDefault(e => string.Equals(Path.GetFileName(e), name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static MacDate? MacDateFromHost(DateTime local)
+        {
+            try
+            {
+                return MacDate.FromDateTime(local);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return null;
+            }
         }
 
         /// <summary>
