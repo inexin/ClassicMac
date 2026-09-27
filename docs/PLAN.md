@@ -235,6 +235,16 @@ Each decoder turns one resource type into a modern file; anything without a deco
 
 Disassembling `CODE` is out of scope; resource_dasm covers it.
 
+**Document decoders** turn a whole file's resources into one document, beside the per-resource output:
+
+| Document | Recognised by | Resources | Output |
+| --- | --- | --- | --- |
+| DOCMaker stand-alone documents (Green Mountain Software, 1986–1998; common for shareware manuals, e.g. Divinity's) | `APPL`/`Dk@P` | per chapter `TEXT` + `styl` and `Wndo`; `PICT` placed by `pInf`; `STR ` chapter titles, `foot`, `conp`, `xtr2`, `sTwD` | HTML, one page per chapter, pictures as PNG |
+| SimpleText / TeachText documents | `TEXT`/`ttxt`, `ttro` | data-fork text, `styl` 128, `PICT` 1000+ at the option-space markers | HTML or Markdown |
+
+DOCMaker's private resources (`pInf`, `Wndo`, `foot`, `conp`, …) have no published description; their layout comes
+from the reader code each document carries (disassembly), checked against real documents.
+
 App-specific types (a game's data records, an application's private resources) plug in as custom decoders
 registered by the application.
 
@@ -570,7 +580,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
-   including MACE and IMA4; the manifest. *Exit:* golden outputs pass and the corpus exports without errors.
+   including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
