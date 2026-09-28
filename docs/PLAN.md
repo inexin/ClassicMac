@@ -471,6 +471,11 @@ Apple's documentation decides first; where it is silent or ambiguous, the answer
 code that handles the format (the Resource Manager, Sound Manager, Icon Utilities, HFS) — never from another
 implementation's guess. A rule fitted to real data instead is marked as such.
 
+**Format documentation:** `docs/formats/` holds an implementer's specification per format family (resource forks,
+containers, host folders, HFS/MFS, disk images, FAT, ISO 9660, sound, text, the export manifest), each rule tagged
+with its source ([Doc], [Code], [Verified], [Author], [Fitted]). They are written in our own words, never cite the
+private harness, and change in the same commit as the behaviour they describe.
+
 The Resource Manager model is the native Mac OS 9 one (plus the 68k ROM where selected) without the trap patches that
 extensions install — Multiple Users, Apple Menu Options, language packs, the Process Manager's font-release rule.
 They change what running applications see, not what a file contains.

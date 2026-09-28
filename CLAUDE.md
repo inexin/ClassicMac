@@ -31,3 +31,4 @@ MacPaint / QuickDraw layers (see the plan).
 ## Conventions
 
 - Work on `main` (no feature branches).
+- A change to how a format is read or written updates its document in `docs/formats/` in the same commit.
