@@ -681,8 +681,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    pixel limit and `--screen-depth`; `snd ` to WAV built (PCM, MACE, IMA4, µ-law; every corpus sound decodes).
    *Exit:* golden outputs pass and the corpus exports without errors. **Done:** golden outputs for every decoder,
    and the corpus (Realmz, the Divinity manual, the harness runs: 321 inputs, 13,890 resources) exports with no decoder
-   failure, pinned by a committed baseline. DOCMaker was deferred at the exit; its disassembly answers have since
-   arrived, and it comes next among the decoders.
+   failure, pinned by a committed baseline. DOCMaker was deferred at the exit and has since been built: DOCMaker
+   and SimpleText documents to HTML, in `extract`, the `convert` command and the viewer
+   ([formats/DOCUMENTS.md](formats/DOCUMENTS.md)).
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders. First version built (browse, details, diagnostics, previews, hex, export); drag-out next.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
