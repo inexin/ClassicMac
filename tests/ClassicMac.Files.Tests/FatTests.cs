@@ -245,21 +245,60 @@ public class FatTests
         Assert.False(MbrReader.Instance.CanRead(ForkData.FromBytes(volume))); // a bare FAT volume has no table
     }
 
+    // As File Exchange converts them through Mac OS 9's Date2Secs; the impossible dates are the ones checked in
+    // SheepShaver (they roll over).
     [Theory]
-    [InlineData(0x0000, 0x0000, null)]
-    [InlineData(0x2E43, 0x6A83, "2003-02-03 13:20:06")] // (2003−1980)<<9 | 2<<5 | 3; 13<<11 | 20<<5 | 3
-    [InlineData(0x2E5F, 0x0000, null)] // day 31 of February
-    [InlineData(0x9021, 0x0000, "1924-01-01 00:00:00")] // 2052: years from 2032 read 128 earlier, as File Exchange reads them
-    public void DOS_date_fields_decode(ushort date, ushort time, string? expected)
+    [InlineData(1999, 0, 1, "1998-12-02")]
+    [InlineData(1999, 0, 0, "1998-12-01")]
+    [InlineData(1999, 1, 0, "1998-12-31")]
+    [InlineData(1999, 3, 0, "1999-02-28")]
+    [InlineData(1999, 2, 29, "1999-03-01")]
+    [InlineData(1999, 4, 31, "1999-05-01")]
+    [InlineData(1999, 13, 1, "2000-01-01")]
+    [InlineData(1999, 14, 1, "2000-02-01")]
+    [InlineData(1999, 15, 1, "2000-03-02")]
+    [InlineData(1999, 15, 31, "2000-04-01")]
+    [InlineData(2000, 2, 29, "2000-02-29")]
+    [InlineData(2003, 2, 3, "2003-02-03")]
+    [InlineData(2052, 1, 1, "1924-01-01")] // years from 2032 read 128 earlier
+    [InlineData(2032, 1, 0, "1947-04-29 17:31:44")] // 1904-01-00 wraps in 16-bit day arithmetic
+    public void DOS_dates_convert_as_Date2Secs_does(int year, int month, int day, string expected)
     {
-        var decoded = DosTime.FromFields(date, time);
-        Assert.Equal(expected is null ? null : DateTime.Parse(expected, CultureInfo.InvariantCulture), decoded?.ToDateTime());
+        var date = (ushort)((year - 1980) << 9 | month << 5 | day);
+        Assert.Equal(DateTime.Parse(expected, CultureInfo.InvariantCulture), DosTime.FromFields(date, 0)!.Value.ToDateTime());
+    }
+
+    [Fact]
+    public void DOS_times_and_zero_dates_convert_as_Date2Secs_does()
+    {
+        var date = (ushort)((1999 - 1980) << 9 | 1 << 5 | 1);
+        Assert.Equal(new DateTime(1999, 1, 2, 8, 4, 2), DosTime.FromFields(date, (ushort)(31 << 11 | 63 << 5 | 31))!.Value.ToDateTime());
+        Assert.Equal(new DateTime(2003, 2, 3, 13, 20, 6), DosTime.FromFields(0x2E43, 0x6A83)!.Value.ToDateTime());
+        Assert.Equal(new DateTime(1979, 12, 1), DosTime.FromFields(0, 0)!.Value.ToDateTime()); // a zero modification date
+        Assert.Null(DosTime.FromFields(0, 0x0800, zeroIsNull: true)); // a zero creation date: File Exchange shows "now"
+    }
+
+    // Decomposed (NFD) names are not composed: an accent takes the low-byte path (checked in SheepShaver).
+    [Theory]
+    [InlineData("Cafe\u0301.txt", new byte[] { 0x43, 0x61, 0x66, 0x65, 0x01, 0x2E, 0x74, 0x78, 0x74 })]
+    [InlineData("Caf\u00E9.txt", new byte[] { 0x43, 0x61, 0x66, 0x8E, 0x2E, 0x74, 0x78, 0x74 })]
+    public void Decomposed_long_names_are_not_composed(string longName, byte[] expected) =>
+        Assert.Equal(expected, FatNames.FromLongName(longName).Bytes.ToArray());
+
+    [Fact]
+    public void Long_shortened_names_hash_the_stored_UTF16()
+    {
+        var composed = "Cr\u00E8me br\u00FBl\u00E9e with a very long name.txt";
+        var decomposed = composed.Normalize(System.Text.NormalizationForm.FormD);
+        Assert.Equal("Cr\u00E8me br\u00FBl\u00E9e with a ver#F28.txt", FatNames.FromLongName(composed).ToMacRoman());
+        Assert.Equal([.. "Cre"u8, 0x00, .. "me bru"u8, 0x02, .. "le"u8, 0x01, .. "e with a #366.txt"u8],
+            FatNames.FromLongName(decomposed).Bytes.ToArray());
     }
 
     [Theory]
     [InlineData("readme.txt", "readme.txt")]
     [InlineData("a:b c.txt", "a:b c.txt")] // ':' kept when the name converts
-    [InlineData("Résumé.doc", "Résumé.doc")] // precomposed
+    [InlineData("R\u00E9sum\u00E9.doc", "R\u00E9sum\u00E9.doc")] // precomposed
     [InlineData("漢字 kanji.txt", "\"W kanji.txt")] // no Mac Roman: each unit's low byte
     [InlineData("漢:.txt", "\"_.txt")] // ... and ':' becomes '_'
     [InlineData("This is a very long Windows file name.txt", "This is a very long Win#7C7.txt")] // harness-confirmed

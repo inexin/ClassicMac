@@ -186,7 +186,7 @@ namespace ClassicMac.Files.Fat
                             : ForkData.Empty,
                     };
                     file = PcExchange.Apply(file, record,
-                        DosTime.FromFields(entry.CreatedDate, entry.CreatedTime), DosTime.FromFields(entry.ModifiedDate, entry.ModifiedTime));
+                        DosTime.FromFields(entry.CreatedDate, entry.CreatedTime, zeroIsNull: true), DosTime.FromFields(entry.ModifiedDate, entry.ModifiedTime));
                     if (context.Options.ExtensionMap is { } map)
                         file = file with { FinderInfo = map.Apply(file.FinderInfo, file.Name.ToMacRoman()) };
                     // DOS hidden or system makes the file invisible.

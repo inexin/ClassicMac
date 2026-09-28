@@ -11,13 +11,14 @@ namespace ClassicMac.Files.Fat
     {
         private const int MaxName = 31;
 
-        // A VFAT long name as a Mac name. In Mac Roman (precomposed) when every character has a byte: whole if it fits
+        // A VFAT long name as a Mac name, as stored (no Unicode normalization: decomposed accents take the low-byte path,
+        // checked in SheepShaver). In Mac Roman when every character has a byte: whole if it fits
         // 31 bytes, else shortened. When some character has none, each UTF-16 unit's low byte stands for it and ':'
         // becomes '_'. A shortened name is the start of the name, '#', three hex digits of a CRC of the UTF-16 name,
         // and the extension (a '.' within the last six characters), 31 bytes in all.
         public static MacString FromLongName(string longName)
         {
-            var units = longName.Normalize(NormalizationForm.FormC);
+            var units = longName;
             var roman = MacRoman.TryEncode(units, out var encoded);
             if (roman && encoded.Length <= MaxName) return new MacString(encoded);
             if (!roman && units.Length <= MaxName) return new MacString(LowBytes(units));
@@ -27,7 +28,7 @@ namespace ClassicMac.Files.Fat
             var head = units[..Math.Min(units.Length, MaxName - 4 - extensionBytes.Length)];
             var name = new List<byte>(MaxName);
             name.AddRange(roman ? MacRoman.Encode(head) : LowBytes(head));
-            var crc = Crc(longName); // over the long name's own UTF-16, as stored
+            var crc = Crc(units);
             name.Add((byte)'#');
             foreach (var shift in new[] { 8, 4, 0 }) name.Add((byte)"0123456789ABCDEF"[crc >> shift & 0xF]);
             name.AddRange(extensionBytes);
