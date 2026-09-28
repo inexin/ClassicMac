@@ -27,14 +27,14 @@ public class ExportTests : IDisposable
         }
     }
 
-    // An HFS disk: "Picture" (PICT 128 "Logo" and STR# 128) at the top, and in Games a "Read Me" and "Icons" (ICN# 128).
+    // An HFS disk: "Picture" (PICT 128 "Logo" and STR# 128) at the top, and in Games a "Read Me" and "Icons" (ICN# 128, SICN 128 of two icons).
     private string Disk()
     {
         var disk = new HfsBuilder();
         disk.File(HfsBuilder.Root, "Picture", [], PreviewTests.Fork(("PICT", 128, "Logo", PreviewTests.Picture), ("STR#", 128, null, [0, 1, .. PreviewTests.Pascal])));
         var games = disk.Folder(HfsBuilder.Root, "Games");
         disk.File(games, "Read Me", "hello"u8.ToArray(), [], type: "TEXT", creator: "ttxt");
-        disk.File(games, "Icons", [], PreviewTests.Fork(("ICN#", 128, null, new byte[256])));
+        disk.File(games, "Icons", [], PreviewTests.Fork(("ICN#", 128, null, new byte[256]), ("SICN", 128, null, new byte[64])));
         var path = Path.Combine(folder, "Disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
         return path;
@@ -105,6 +105,20 @@ public class ExportTests : IDisposable
         Assert.Equal(PreviewTests.Picture, File.ReadAllBytes(Path.Combine(output, "logo.bin")));
     }
 
+    // A list resource (SICN: two icons) offers its first image as a .png, and writes the PNG, not the raw data.
+    [Fact]
+    public async Task A_list_resource_saves_its_first_image()
+    {
+        var (model, input, picker, output) = await Open();
+        var icons = await Loaded(input.Children.OfType<FolderNode>().Single(), "Icons");
+        model.Selected = icons.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "SICN").Children.OfType<ResourceNode>().Single();
+
+        await model.SaveResourceAsCommand.ExecuteAsync(null);
+
+        Assert.Equal([".png", ".bin"], picker.Extensions);
+        Assert.Equal([0x89, (byte)'P', (byte)'N', (byte)'G'], File.ReadAllBytes(Path.Combine(output, "128.png"))[..4]);
+    }
+
     [Fact]
     public async Task A_type_exports_only_that_type_and_again_into_a_numbered_folder()
     {
@@ -134,7 +148,7 @@ public class ExportTests : IDisposable
         Assert.Contains("Picture/manifest.json", files);
         Assert.Contains("Games/Icons/manifest.json", files);
         Assert.DoesNotContain(files, f => f.Contains("Read Me", StringComparison.Ordinal));
-        Assert.StartsWith("3 resources from 2 files", model.Status, StringComparison.Ordinal);
+        Assert.StartsWith("4 resources from 2 files", model.Status, StringComparison.Ordinal);
     }
 
     [Fact]

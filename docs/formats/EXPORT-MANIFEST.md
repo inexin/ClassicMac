@@ -145,7 +145,9 @@ The order of forks is the caller's. Folder names and the " ~2" suffixes they may
   - *Extract All Resources* (an input, a container or a folder): folder `<item's host name> resources`; every file
     under the item that has at least one resource, by `Unpacker.Extract`.
   - *Save Resource As* writes one resource's decoded file (or its data as `.bin`) to a file the user chooses, with no
-    manifest. Its suggested name is the stem of section 4.3 cut to 200 characters.
+    manifest. Its suggested name is the stem of section 4.3 cut to 200 characters. It offers one file per kind,
+    by its last extension: a list resource's first image as `.png`, a sidecar `.json` only when it is the only
+    output.
 
 ---
 

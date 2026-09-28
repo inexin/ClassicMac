@@ -44,7 +44,7 @@ namespace ClassicMac.App.ViewModels
             if (Selected is not ResourceNode node || FilePicker is null) return;
             var diagnostics = new List<Diagnostic>();
             var (outputs, raw) = await Task.Run(() => Decode(node, diagnostics));
-            var extensions = outputs.Select(o => o.Extension).Append(".bin").Distinct().ToList();
+            var extensions = outputs.Select(o => o.Extension).Append(".bin").ToList();
             var stem = HostNames.ToHostName(Stem(node.Resource), 200);
             var path = await FilePicker.PickSaveFileAsync($"Save {node.Resource}", stem + extensions[0], extensions);
             if (path is null) return;
@@ -151,8 +151,14 @@ namespace ClassicMac.App.ViewModels
             var raw = ResourceDecompression.Default.GetData(node.Resource, node.Fork, ReadOptions, diagnostics);
             var decoder = ResourceDecoders.Create(CurrentDecodeOptions).FirstOrDefault(d => d.CanDecode(node.Resource.Type));
             IReadOnlyList<DecodedFile> outputs = decoder?.Decode(new DecodeInput(node.Resource, raw, node.Fork, ReadOptions, diagnostics)) ?? [];
-            // Several numbered images (SICN, PAT#): the first is offered.
-            return (outputs.Where(o => !o.Extension.EndsWith(".json", StringComparison.Ordinal) || outputs.Count == 1).ToList(), raw);
+            // One file per kind, named by its last extension: the first of several numbered images (SICN, PAT#: ".1.png"
+            // is offered as ".png"), and a sidecar JSON only when it is the only output.
+            var offered = outputs
+                .Where(o => !o.Extension.EndsWith(".json", StringComparison.Ordinal) || outputs.Count == 1)
+                .GroupBy(o => Path.GetExtension(o.Extension), StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First() with { Extension = g.Key })
+                .ToList();
+            return (offered, raw);
         }
 
         private static MacString Stem(Resource resource)
