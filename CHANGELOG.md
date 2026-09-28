@@ -36,7 +36,8 @@
   PNG by a built-in encoder behind `IImageEncoder`; `extract --screen-depth`.
 - Sound decoder (`ClassicMac.Resources.Decoders.Sound`): `snd ` formats 1 and 2 with standard, extended and
   compressed headers, uncompressed PCM to WAV (loops and base note in `smpl`) plus a JSON of the exact rate, header and
-  commands; `SoundResource` model. MACE and IMA4 are exported raw until their codecs land.
+  commands; `SoundResource` model. MACE 3:1/6:1, IMA4 and µ-law decoded as the Mac OS 9 Sound Manager decodes them
+  (disassembly; byte-identical to its output); format 2 headers found as SndPlay finds them.
 - NDIF disk images (Disk Copy 6: read-only, ADC-compressed, DART RLE chunks, map versions 10–12 (Disk Copy 6.1–6.5), `.smi`, segmented
   parts found by their `bcm#` ID, CRC-32 verified on request) with ADC in
   `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;

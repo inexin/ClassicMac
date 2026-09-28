@@ -19,13 +19,12 @@ namespace ClassicMac.Resources.Decoders.Sound
     /// <summary>Decodes a <see cref="SampledSound"/>'s samples.</summary>
     public static class SoundSamples
     {
-        /// <summary>The samples of <paramref name="sound"/>, or null when its codec is not decoded yet.</summary>
+        /// <summary>The samples of <paramref name="sound"/>, or null when its format is not read.</summary>
         public static DecodedSound? Decode(SampledSound sound)
         {
             ArgumentNullException.ThrowIfNull(sound);
-            if (Pcm.ToWav(sound) is not { } wav) return null;
-            var width = Pcm.BytesPerSample(sound.Format, sound.SampleSize);
-            var isFloat = Pcm.IsFloat(sound.Format);
+            if (SoundCodecs.ToWav(sound) is not { } decoded) return null;
+            var (wav, width, isFloat) = decoded;
             var samples = new float[wav.Length / width];
             var span = wav.AsSpan();
             for (var i = 0; i < samples.Length; i++)

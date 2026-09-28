@@ -60,7 +60,7 @@ namespace ClassicMac.Resources.Decoders.Sound
         /// <summary>The rate in hertz.</summary>
         public double SampleRate => SampleRateFixed / 65536.0;
 
-        /// <summary>Loop start, as stored.</summary>
+        /// <summary>Loop start, as stored (the Sound Manager uses the loop only for instrument playback).</summary>
         public uint LoopStart { get; init; }
 
         /// <summary>Loop end, as stored.</summary>
@@ -69,7 +69,7 @@ namespace ClassicMac.Resources.Decoders.Sound
         /// <summary>The MIDI note the samples sound at (60 = middle C).</summary>
         public byte BaseNote { get; init; }
 
-        /// <summary>Sample frames (a standard header's length; for compressed sounds, as the header counts them).</summary>
+        /// <summary>Sample frames as the header counts them: for MACE and IMA4, packets per channel.</summary>
         public int Frames { get; init; }
 
         /// <summary>Bits per sample of the decoded sound.</summary>
@@ -100,8 +100,7 @@ namespace ClassicMac.Resources.Decoders.Sound
     {
         private const int HeaderLength = 22, LongHeaderLength = 64;
 
-        private static readonly FourCC Raw = FourCC.FromString("raw "), Twos = FourCC.FromString("twos"),
-            Mace3 = FourCC.FromString("MAC3"), Mace6 = FourCC.FromString("MAC6");
+        private static readonly FourCC Raw = FourCC.FromString("raw "), Twos = FourCC.FromString("twos");
 
         private SoundResource(int format, IReadOnlyList<SoundSynth> synths, int referenceCount, IReadOnlyList<SoundCommand> commands,
             SampledSound? sound)
@@ -176,29 +175,22 @@ namespace ClassicMac.Resources.Decoders.Sound
                     BinaryPrimitives.ReadInt32BigEndian(data[(at + 4)..])));
             }
 
-            // The sound the resource plays: the first buffer or sound command pointing into it.
+            // The sound the resource plays: the first buffer or sound command pointing into it. SndPlay finds a format 2
+            // resource's header itself, right after the commands, and never reads the offset (Sound Manager 3.5.1,
+            // disassembly); Realmz's format 2 sounds point to 20 but play from there.
             var players = commands.FindAll(c => c.DataOffset && c.Code is SoundCommand.BufferCmd or SoundCommand.SoundCmd);
             if (players.Count > 1)
                 Report(DiagnosticSeverity.Info, "sound.several-sounds", $"{players.Count} commands point to sound headers; the first is decoded.");
             var offset = players.Count > 0 ? players[0].Param2 : -1;
-            if (offset >= 0 && !Plausible(data, offset) && offset != at && Plausible(data, at))
+            if (format == 2 && offset >= 0 && offset != at)
             {
-                // Fitted to data, not from code: Realmz's format 2 sounds point to offset 20 (where a format 1 sound with
-                // one synthesizer has its header) while the header follows the commands.
-                Report(DiagnosticSeverity.Warning, "sound.header-moved",
-                    $"the command points to offset {offset}, which holds no sound header; the one after the commands (offset {at}) is read.");
+                Report(DiagnosticSeverity.Info, "sound.header-offset",
+                    $"the command points to offset {offset}; as SndPlay does, the header after the commands (offset {at}) is read.");
                 offset = at;
             }
             var sound = offset >= 0 ? Header(resource, offset, Report) : null;
             return new SoundResource(format, synths, referenceCount, commands, sound);
         }
-
-        // A sound header with no sample pointer, a rate and a known encode byte.
-        private static bool Plausible(ReadOnlySpan<byte> data, int offset) =>
-            offset >= 0 && offset + HeaderLength <= data.Length
-            && BinaryPrimitives.ReadUInt32BigEndian(data[offset..]) == 0
-            && BinaryPrimitives.ReadUInt32BigEndian(data[(offset + 8)..]) != 0
-            && data[offset + 20] is (byte)SoundHeaderKind.Standard or (byte)SoundHeaderKind.Extended or (byte)SoundHeaderKind.Compressed;
 
         private static SampledSound? Header(ReadOnlyMemory<byte> resource, int offset, Action<DiagnosticSeverity, string, string> report)
         {
@@ -248,10 +240,11 @@ namespace ClassicMac.Resources.Decoders.Sound
                         report(DiagnosticSeverity.Error, "sound.short", "the resource ends inside the sound header.");
                         return null;
                     }
-                    var channels = (int)Math.Clamp(lengthOrChannels, 0, 64);
-                    if (channels == 0 || channels != lengthOrChannels)
+                    // The Sound Manager reads numChannels as the word at +6.
+                    int channels = BinaryPrimitives.ReadUInt16BigEndian(h[6..]);
+                    if (channels is 0 or > 64)
                     {
-                        report(DiagnosticSeverity.Error, "sound.bad-header", $"the header gives {lengthOrChannels} channels.");
+                        report(DiagnosticSeverity.Error, "sound.bad-header", $"the header gives {channels} channels.");
                         return null;
                     }
                     var frames = (int)Math.Min(BinaryPrimitives.ReadUInt32BigEndian(h[22..]), int.MaxValue);
@@ -278,29 +271,34 @@ namespace ClassicMac.Resources.Decoders.Sound
                         };
                     }
 
-                    // Compressed header: compressionID 3 and 4 are MACE; -1 and -2 (and 0) leave it to format.
+                    // Compressed header (Sound Manager 3.5.1): compressionID 0 is PCM whatever format says, 3 and 4 are
+                    // MACE, -1 and -2 leave it to format; it refuses any other (-223). A codec's numFrames counts packets.
                     var format = new FourCC(BinaryPrimitives.ReadUInt32BigEndian(h[40..]));
                     var compressionId = BinaryPrimitives.ReadInt16BigEndian(h[56..]);
                     var packetSize = BinaryPrimitives.ReadUInt16BigEndian(h[58..]);
-                    format = compressionId switch
+                    switch (compressionId)
                     {
-                        3 => Mace3,
-                        4 => Mace6,
-                        _ when format.Value == 0 => sampleSize == 8 ? Raw : Twos,
-                        _ => format,
-                    };
+                        case 0: format = sampleSize == 8 ? Raw : Twos; break;
+                        case 3: format = SoundCodecs.Mace3; break;
+                        case 4: format = SoundCodecs.Mace6; break;
+                        case -1 or -2: break;
+                        default:
+                            report(DiagnosticSeverity.Error, "sound.bad-header", $"compressionID {compressionId} is one the Sound Manager refuses.");
+                            return null;
+                    }
                     var pcm = Pcm.BytesPerSample(format, sampleSize);
+                    var packet = SoundCodecs.Packet(format);
                     return sound with
                     {
                         Kind = SoundHeaderKind.Compressed,
                         Channels = channels,
                         Frames = frames,
-                        SampleSize = pcm > 0 ? pcm * 8 : 16,
+                        SampleSize = pcm > 0 ? pcm * 8 : SoundCodecs.OutputSize(format),
                         Format = format,
                         CompressionId = compressionId,
                         PacketSize = packetSize,
-                        Data = pcm > 0
-                            ? Samples(resource, start, (long)frames * channels * pcm, report)
+                        Data = pcm > 0 ? Samples(resource, start, (long)frames * channels * pcm, report)
+                            : packet is { } p ? Samples(resource, start, (long)frames * channels * p.Bytes, report)
                             : resource[Math.Min(start, resource.Length)..],
                     };
                 }

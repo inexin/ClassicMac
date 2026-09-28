@@ -34,7 +34,7 @@ public class SoundPreviewTests : IDisposable
         public void Finish() => ended?.Invoke();
     }
 
-    // A format 1 'snd ' with a standard header: 8-bit, 11127.27 Hz, a loop, base note 72; and a MACE one.
+    // A format 1 'snd ' with a standard header: 8-bit, 11127.27 Hz, a loop, base note 72.
     internal static byte[] Sound(int length = 1000, byte encode = 0x00)
     {
         byte[] header = [0, 0, 0, 0, .. BigEndian((uint)length), 0x2B, 0x77, 0x45, 0xD1, 0, 0, 0, 10, .. BigEndian((uint)(length - 10)), encode, 72];
@@ -46,12 +46,14 @@ public class SoundPreviewTests : IDisposable
 
     private async Task<(MainViewModel Model, ResourceNode Sound)> Open(FakePlayer? player)
     {
-        byte[] mace = [.. Sound(64)[..20], .. new byte[64]];
-        mace[20 + 20] = 0xFE; // compressed header, compressionID 3
-        mace[20 + 4 + 3] = 1; // one channel
-        mace[20 + 56 + 1] = 3;
+        byte[] other = [.. Sound(64)[..20], .. new byte[64]];
+        other[20 + 20] = 0xFE; // compressed header, compressionID -2, format 'QDM2'
+        other[20 + 7] = 1; // one channel
+        "QDM2"u8.CopyTo(other.AsSpan(20 + 40));
+        other[20 + 56] = other[20 + 57] = 0xFF;
+        other[20 + 57] = 0xFE;
         var disk = new HfsBuilder();
-        disk.File(HfsBuilder.Root, "Sounds", [], PreviewTests.Fork(("snd ", 128, "Sine", Sound()), ("snd ", 129, "Mace", mace)));
+        disk.File(HfsBuilder.Root, "Sounds", [], PreviewTests.Fork(("snd ", 128, "Sine", Sound()), ("snd ", 129, "Other", other)));
         var path = Path.Combine(folder, "disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
         var model = new MainViewModel { AudioPlayer = player };
@@ -108,14 +110,14 @@ public class SoundPreviewTests : IDisposable
     }
 
     [Fact]
-    public async Task Sounds_not_decoded_yet_say_so()
+    public async Task Sounds_in_formats_not_read_say_so()
     {
         var (model, sound) = await Open(new FakePlayer());
         model.Selected = sound.Parent!.Children.OfType<ResourceNode>().Single(r => r.Resource.Id == 129);
         await model.PreviewTask;
 
         Assert.Equal(PreviewKind.None, model.Preview.Kind);
-        Assert.Contains("'MAC3'", model.Preview.Message, StringComparison.Ordinal);
+        Assert.Contains("'QDM2'", model.Preview.Message, StringComparison.Ordinal);
     }
 
     [Fact]

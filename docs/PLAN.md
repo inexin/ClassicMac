@@ -190,7 +190,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files.Export | `Unpacker`, `OutputLayout`, `ExportFolders` | Every Mac file under a tree to a folder (`unpack`), or every resource fork (`extract`), placed as the tree nests; new numbered folders that never overwrite. Shared by the CLI and the app |
 | Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (decoded, or the data itself; stored bytes in `raw/` on request) with `manifest.json`, format 1.1 (`schemas/manifest-1.schema.json`) |
 | Resources.Export | `IResourceDecoder`, `DecodeInput`, `DecodedFile` | A decoder for some resource types; the exporter uses the first that handles a type and falls back to raw |
-| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text` and `.Images` built; `.Sound` PCM built, codecs next) |
+| Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text`, `.Images` and `.Sound` built) |
 | Resources.Decoders.Images | `IImageEncoder`, `PngEncoder` | How decoded images are written; PNG (8-bit RGBA) built in |
 
 A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`).
@@ -230,7 +230,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | Group | Resource types | Output |
 | --- | --- | --- |
 | Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icm#`, `icl4/8`, `ics4/8`, `icm4/8`, `cicn`, `SICN`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `ppt#` (built); `icns` later | PNG via QuickDraw.Pict (screen depth selectable); cursors add a JSON file (hotspot, inverted pixels); lists give one image each (`.1.png` …). The image format is a setting (`IImageEncoder`, PNG built in; lossless WebP later) |
-| Sound | `snd ` formats 1 and 2, standard/extended/compressed headers: uncompressed PCM (`raw `, `twos`, `sowt`, `in24`, `in32`, `fl32`, `fl64`) built; MACE 3:1/6:1 and IMA4 next (from the Sound Manager's disassembly); µ-law, A-law, `csnd` and AIFF later | WAV (rate rounded; loop and base note in a `smpl` chunk) plus JSON (exact rate, header, synthesizers, commands); commands-only sounds give the JSON alone |
+| Sound | `snd ` formats 1 and 2, standard/extended/compressed headers: PCM (`raw `, `twos`, `sowt`, `in24`, `in32`, `fl32`, `fl64`), MACE 3:1/6:1, IMA4 and µ-law (built; the codecs from the Sound Manager 3.5.1 disassembly, byte-identical to its output on harness samples); AIFF/AIFC files later (the Sound Manager plays them through the same decompressors); `csnd` is not a Sound Manager type | WAV (rate rounded; loop and base note in a `smpl` chunk) plus JSON (exact rate, header, synthesizers, commands); commands-only sounds give the JSON alone |
 | Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text (`STR `, `TEXT`), JSON (`STR#`, `styl`, `vers`); styled text also as RTF (built) |
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL` | JSON, optionally a rendered preview of the dialog |
@@ -535,6 +535,15 @@ They change what running applications see, not what a file contains.
   "fast" RLE and "best" LZH (Okumura/Yoshizaki LZHUF with a zero-filled window whose tail carries between blocks; a
   block may end a tag byte short, zero-filled), `CKSM` 2 = Disk Copy 4.2 sum of the data and `CKSM` 1 of all the tags
   (a Disk Copy 4.2 header's tag sum skips the first 12 bytes, now confirmed).
+- **Sound:** *Inside Macintosh: Sound* for the resource and headers; where it is silent, the Mac OS 9.0 Sound Manager
+  (3.5.1) disassembly: numChannels is the word at +6; compressionID 0 is PCM whatever `format` says, 3/4 MACE, −1/−2
+  use `format`, others refused; a codec's numFrames counts packets; SndPlay reads a format 2 sound's header right
+  after the commands and never its offset (so Realmz's format 2 sounds, which point to 20, play). MACE 3:1/6:1 from
+  SoundLib's Exp1to3/Exp1to6 (the PowerPC code OS 9 runs; its 6:1 rounds slightly differently from the 68k ROM's),
+  8-bit output as the Sound Manager gives it; IMA4 from the `ima4` decompressor, including its preamble rule (read at
+  the start of each 16-packet batch, only when it differs from the running state). All checked byte for byte against
+  the Sound Manager's own decoding (harness run22). The loop and base note are used only for instrument playback;
+  they are kept in WAV's `smpl` chunk as information.
 - **Formats with no Apple spec or Mac OS code:** MacBinary I/II/III and BinHex 4.0 follow their authors' published
   specifications (BinHex also RFC 1741); Basilisk II's shared-folder layout follows the emulator's behaviour (its GPL
   source is reference only), checked in the SheepShaver harness (Windows build): name bytes pass 1:1 through
@@ -623,7 +632,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
-   pixel limit and `--screen-depth`; `snd ` PCM to WAV built (274 of the corpus's 275 sounds; the other is MACE).
+   pixel limit and `--screen-depth`; `snd ` to WAV built (PCM, MACE, IMA4, µ-law; every corpus sound decodes).
    *Exit:* golden outputs pass and the corpus exports without errors.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders. First version built (browse, details, diagnostics, previews, hex, export); drag-out next.

@@ -153,15 +153,15 @@ public class SoundDecoderTests
         Assert.Equal(0, Json(files[1]).GetProperty("referenceCount").GetInt32());
     }
 
-    // Realmz's format 2 sounds point to offset 20 while their header is at 14 (a rule fitted to that data).
+    // SndPlay reads a format 2 sound's header after the commands, whatever the offset says (Realmz's say 20).
     [Fact]
-    public void A_header_after_the_commands_is_used_when_the_offset_holds_none()
+    public void Format_2_headers_follow_the_commands_whatever_the_offset()
     {
         byte[] data = [.. BE((ushort)2, (ushort)0, (ushort)1, (ushort)0x8051, (short)0, 20u), .. Standard([1, 2, 3, 4, 5, 6, 7, 8])];
 
         var (files, diagnostics) = Decode(data);
 
-        Assert.Equal("sound.header-moved", Assert.Single(diagnostics).Code);
+        Assert.Equal("sound.header-offset", Assert.Single(diagnostics).Code);
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], Wav(files[0]).Data);
     }
 
@@ -196,12 +196,72 @@ public class SoundDecoderTests
     }
 
     [Fact]
-    public void Codecs_not_decoded_yet_are_exported_raw()
+    public void Formats_not_read_are_exported_raw()
     {
-        var (files, diagnostics) = Decode(Format1(Long(0xFE, 1, 10, 8, "\0\0\0\0", 3, new byte[20])));
+        var (files, diagnostics) = Decode(Format1(Long(0xFE, 1, 10, 16, "QDM2", -2, new byte[20])));
 
         Assert.Empty(files);
-        Assert.Contains(diagnostics, d => d.Code == "sound.codec" && d.Message.Contains("MAC3", StringComparison.Ordinal));
+        Assert.Contains(diagnostics, d => d.Code == "sound.codec" && d.Message.Contains("QDM2", StringComparison.Ordinal));
+    }
+
+    // compressionID 0 is PCM whatever format says; the Sound Manager refuses IDs other than 0, 3, 4, -1 and -2.
+    [Fact]
+    public void Compression_IDs_are_read_as_the_Sound_Manager_reads_them()
+    {
+        var (files, _) = Decode(Format1(Long(0xFE, 1, 2, 16, "MAC3", 0, [0x12, 0x34, 0x56, 0x78])));
+        Assert.Equal([0x34, 0x12, 0x78, 0x56], Wav(files[0]).Data);
+
+        Assert.Contains(Decode(Format1(Long(0xFE, 1, 2, 16, "twos", 5, new byte[4]))).Diagnostics, d => d.Code == "sound.bad-header");
+    }
+
+    // IMA4, worked by hand from the IMA tables: preamble 0, then nibbles 4 and 4 (step 7 → +7, index 2; step 9 →
+    // +10, index 4), then zeros; a second packet in the same batch keeps the running state.
+    [Fact]
+    public void IMA4_packets_decode()
+    {
+        var packet = new byte[34];
+        packet[2] = 0x44;
+        byte[] second = [0x7F, 0x80, .. new byte[32]]; // a preamble the decoder ignores mid-batch
+
+        var (files, diagnostics) = Decode(Format1(Long(0xFE, 1, 2, 16, "ima4", -1, [.. packet, .. second])));
+
+        Assert.Empty(diagnostics);
+        var samples = Wav(files[0]).Data;
+        Assert.Equal(128 * 2, samples.Length);
+        Assert.Equal((7, 17), (BinaryPrimitives.ReadInt16LittleEndian(samples), BinaryPrimitives.ReadInt16LittleEndian(samples.AsSpan(2))));
+        Assert.True(BinaryPrimitives.ReadInt16LittleEndian(samples.AsSpan(128)) < 1000); // not reset to $7F80
+    }
+
+    // The harness's Sound Manager 3.5.1 samples (run22): MACE 3 and 6, IMA4 and µ-law, mono and stereo, against the
+    // Sound Manager's own decoding (.p8 for MACE, which it gives 8-bit; .p16 big-endian for the rest).
+    [Fact]
+    public void Sound_Manager_samples_decode_as_the_Sound_Manager_does()
+    {
+        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
+        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
+            : Directory.EnumerateFiles(corpus, "mac3m8.p8", SearchOption.AllDirectories).Select(Path.GetDirectoryName).FirstOrDefault();
+        if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run22/out samples to run this.");
+
+        foreach (var name in new[] { "mac3m8", "mac3s8", "mac6m8", "mac6s8", "mac3m16", "mac6m16", "ima4m", "ima4s", "ulawm" })
+        {
+            var fork = ResourceFork.Read(File.ReadAllBytes(Path.Combine(folder!, ".rsrc", name + ".snd")));
+            var resource = fork.Find(FourCC.FromString("snd "), 128)!;
+            var diagnostics = new List<Diagnostic>();
+            var files = Decoder.Decode(new DecodeInput(resource, resource.GetData(), fork, diagnostics: diagnostics));
+            Assert.Empty(diagnostics);
+            var wav = Wav(files[0]);
+            byte[] expected;
+            if (wav.Bits == 8)
+            {
+                expected = File.ReadAllBytes(Path.Combine(folder!, name + ".p8"));
+            }
+            else
+            {
+                expected = File.ReadAllBytes(Path.Combine(folder!, name + ".p16"));
+                for (var i = 0; i + 1 < expected.Length; i += 2) (expected[i], expected[i + 1]) = (expected[i + 1], expected[i]);
+            }
+            Assert.True(expected.AsSpan().SequenceEqual(wav.Data), name);
+        }
     }
 
     [Fact]

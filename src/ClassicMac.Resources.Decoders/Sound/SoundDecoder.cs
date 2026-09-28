@@ -11,7 +11,8 @@ namespace ClassicMac.Resources.Decoders.Sound
     /// <c>'snd '</c>: the sampled sound as a WAV (the rate rounded to whole hertz; a loop and a base note other than
     /// middle C in its <c>smpl</c> chunk), and a JSON file with what WAV cannot hold: the exact rate, the header, the
     /// synthesizers and the commands. A resource with commands only (no sampled sound) gives the JSON alone; one whose
-    /// samples use a codec not decoded yet is exported raw.
+    /// samples are in a format not read is exported raw. MACE
+    /// comes out 8-bit, as the Sound Manager gives it; IMA4 and µ-law 16-bit.
     /// </summary>
     internal sealed class SoundDecoder : IResourceDecoder
     {
@@ -41,16 +42,14 @@ namespace ClassicMac.Resources.Decoders.Sound
             if (resource is null) return [];
             if (resource.Sound is not { } sound) return [new DecodedFile(".json", Json(resource))];
 
-            var samples = Pcm.ToWav(sound);
-            if (samples is null)
+            if (SoundCodecs.ToWav(sound) is not { } samples)
             {
                 input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "sound.codec",
-                    $"{input.Resource}: the samples are '{sound.Format}'-compressed, which is not decoded yet; exported raw."));
+                    $"{input.Resource}: the samples are in '{sound.Format}', which is not decoded; exported raw."));
                 return [];
             }
-            var width = Pcm.BytesPerSample(sound.Format, sound.SampleSize);
-            var frames = samples.Length / (width * sound.Channels);
-            var wav = WavWriter.Write(samples, sound.Channels, width, Pcm.IsFloat(sound.Format), sound.SampleRate, Sampler(sound, frames));
+            var frames = samples.Data.Length / (samples.Width * sound.Channels);
+            var wav = WavWriter.Write(samples.Data, sound.Channels, samples.Width, samples.IsFloat, sound.SampleRate, Sampler(sound, frames));
             return [new DecodedFile(".wav", wav), new DecodedFile(".json", Json(resource))];
         }
 
