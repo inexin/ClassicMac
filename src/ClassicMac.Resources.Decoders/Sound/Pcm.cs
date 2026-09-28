@@ -15,7 +15,10 @@ namespace ClassicMac.Resources.Decoders.Sound
         /// <summary>Bytes per sample of an uncompressed <paramref name="format"/>, or 0 for a codec.</summary>
         public static int BytesPerSample(FourCC format, int sampleSize)
         {
-            if (format == Raw || format == Twos || format == Sowt) return sampleSize is 16 or 24 or 32 ? sampleSize / 8 : 1;
+            // The Sound Manager reads 'raw ' and 'twos' as 8-bit when the header says 8 and as 16-bit otherwise, and 'sowt'
+            // always as 16-bit (disassembly of Sound Manager 3.5.1); the headers refuse sizes other than 8 and 16.
+            if (format == Sowt) return 2;
+            if (format == Raw || format == Twos) return sampleSize == 8 ? 1 : 2;
             if (format == In24) return 3;
             if (format == In32 || format == Fl32) return 4;
             if (format == Fl64) return 8;
@@ -38,15 +41,6 @@ namespace ClassicMac.Resources.Decoders.Sound
             {
                 // WAV's 8-bit samples are unsigned, as 'raw ' (offset binary) is; 'twos' and 'sowt' are signed.
                 if (f != Raw) for (var i = 0; i < output.Length; i++) output[i] ^= 0x80;
-            }
-            else if (f == Raw)
-            {
-                // Offset binary, big-endian: flip the sign bit and swap.
-                for (var i = 0; i < output.Length; i += width)
-                {
-                    output.AsSpan(i, width).Reverse();
-                    output[i + width - 1] ^= 0x80;
-                }
             }
             else if (f != Sowt)
             {

@@ -139,7 +139,29 @@ public class SoundDecoderTests
         Assert.Equal(1, BinaryPrimitives.ReadInt32LittleEndian(smpl.AsSpan(28))); // one loop
         Assert.Equal((10, 89), (BinaryPrimitives.ReadInt32LittleEndian(smpl.AsSpan(44)), BinaryPrimitives.ReadInt32LittleEndian(smpl.AsSpan(48))));
 
-        Assert.Null(Wav(Decode(Format1(Standard(new byte[100], note: 0))).Files[0]).Smpl); // 0 is middle C
+        Assert.Null(Wav(Decode(Format1(Standard(new byte[100], note: 60))).Files[0]).Smpl); // middle C, no loop
+        var zero = Wav(Decode(Format1(Standard(new byte[100], note: 0))).Files[0]).Smpl!; // note 0, no special case
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(zero.AsSpan(12)));
+    }
+
+    // SndPlay never reads a format 2 resource's commands: with none at all, the header right after the count plays.
+    [Fact]
+    public void Format_2_sounds_play_without_commands()
+    {
+        byte[] data = [.. BE((ushort)2, (ushort)0, (ushort)0), .. Standard([7, 8, 9])];
+
+        var (files, diagnostics) = Decode(data);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal([7, 8, 9], Wav(files[0]).Data);
+    }
+
+    // The Sound Manager reads every sample size but 8 as 16-bit, so 24- and 32-bit PCM headers are refused.
+    [Fact]
+    public void PCM_sizes_other_than_8_and_16_are_refused()
+    {
+        Assert.Contains(Decode(Format1(Long(0xFF, 1, 2, 24, "", 0, new byte[6]))).Diagnostics, d => d.Code == "sound.bad-header");
+        Assert.Contains(Decode(Format1(Long(0xFE, 1, 2, 24, "twos", -1, new byte[6]))).Diagnostics, d => d.Code == "sound.bad-header");
     }
 
     [Fact]
@@ -185,7 +207,7 @@ public class SoundDecoderTests
     [InlineData("sowt", 16, new byte[] { 0x34, 0x12 }, new byte[] { 0x34, 0x12 }, 1)]
     [InlineData("in24", 24, new byte[] { 0x01, 0x02, 0x03 }, new byte[] { 0x03, 0x02, 0x01 }, 1)]
     [InlineData("fl32", 32, new byte[] { 0x3F, 0x80, 0x00, 0x00 }, new byte[] { 0x00, 0x00, 0x80, 0x3F }, 3)]
-    [InlineData("raw ", 16, new byte[] { 0x80, 0x00 }, new byte[] { 0x00, 0x00 }, 1)]
+    [InlineData("raw ", 16, new byte[] { 0x80, 0x00 }, new byte[] { 0x00, 0x80 }, 1)] // 16-bit 'raw ' is signed, as 'twos'
     public void Compressed_headers_with_PCM_formats_decode(string format, int size, byte[] samples, byte[] expected, int wavFormat)
     {
         var (files, diagnostics) = Decode(Format1(Long(0xFE, 1, (uint)(samples.Length / (size / 8)), (ushort)size, format, -1, samples)));

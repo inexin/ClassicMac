@@ -187,10 +187,14 @@ namespace ClassicMac.Resources.Decoders.Sound
             if (players.Count > 1)
                 Report(DiagnosticSeverity.Info, "sound.several-sounds", $"{players.Count} commands point to sound headers; the first is decoded.");
             var offset = players.Count > 0 ? players[0].Param2 : -1;
-            if (format == 2 && offset >= 0 && offset != at)
+            if (format == 2)
             {
-                Report(DiagnosticSeverity.Info, "sound.header-offset",
-                    $"the command points to offset {offset}; as SndPlay does, the header after the commands (offset {at}) is read.");
+                // SndPlay never reads a format 2 resource's commands: it plays the header after them, whatever they say.
+                if (offset >= 0 && offset != at)
+                {
+                    Report(DiagnosticSeverity.Info, "sound.header-offset",
+                        $"the command points to offset {offset}; as SndPlay does, the header after the commands (offset {at}) is read.");
+                }
                 offset = at;
             }
             var sound = offset >= 0 ? Header(resource, offset, Report) : null;
@@ -258,11 +262,13 @@ namespace ClassicMac.Resources.Decoders.Sound
                     int sampleSize = BinaryPrimitives.ReadUInt16BigEndian(h[(encode == (byte)SoundHeaderKind.Extended ? 48 : 62)..]);
                     if (encode == (byte)SoundHeaderKind.Extended)
                     {
-                        // Extended header: 8-bit samples offset binary as in a standard header, larger ones two's
-                        // complement big-endian, channels interleaved.
-                        if (sampleSize is not (8 or 16 or 24 or 32))
+                        // Extended header: 8-bit samples offset binary as in a standard header, 16-bit two's complement
+                        // big-endian, channels interleaved. The Sound Manager reads every other size as 16-bit, so it
+                        // misreads 24- and 32-bit samples: they are refused here.
+                        if (sampleSize is not (8 or 16))
                         {
-                            report(DiagnosticSeverity.Error, "sound.bad-header", $"the header gives {sampleSize}-bit samples.");
+                            report(DiagnosticSeverity.Error, "sound.bad-header",
+                                $"the header gives {sampleSize}-bit samples, which the Sound Manager reads as 16-bit.");
                             return null;
                         }
                         return sound with
@@ -290,6 +296,12 @@ namespace ClassicMac.Resources.Decoders.Sound
                         default:
                             report(DiagnosticSeverity.Error, "sound.bad-header", $"compressionID {compressionId} is one the Sound Manager refuses.");
                             return null;
+                    }
+                    if ((format == Raw || format == Twos) && sampleSize is not (8 or 16))
+                    {
+                        report(DiagnosticSeverity.Error, "sound.bad-header",
+                            $"the header gives {sampleSize}-bit '{format}' samples, which the Sound Manager reads as 16-bit.");
+                        return null;
                     }
                     var pcm = Pcm.BytesPerSample(format, sampleSize);
                     var packet = SoundCodecs.Packet(format);
