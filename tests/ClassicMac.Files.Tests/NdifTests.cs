@@ -62,19 +62,23 @@ public class NdifTests
         Assert.Equal(volume, disk);
     }
 
-    // A compressed chunk covering more sectors than the buffer size (+$48) is damaged to every Disk Copy; equal passes.
+    // A compressed chunk over +$48 sectors: Disk Copy 6.1.2 refuses it (a warning here); 6.3.3 and 6.5b13 only fail when
+    // it overflows the decode buffer, +$48 doubled for version 10 (an error). Equal passes; the chunk still decodes.
     [Fact]
-    public void Compressed_chunks_over_the_buffer_size_are_errors()
+    public void Compressed_chunks_over_the_buffer_size_are_reported()
     {
         var volume = Volume();
         var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (6, Kind.Raw), (200, Kind.Adc), (594, Kind.Raw));
+        (DiagnosticSeverity, string)[] With(uint size, ushort version) => Disk(Image(data, WithMap(resource, m =>
+        {
+            BinaryPrimitives.WriteUInt16BigEndian(m, version);
+            BinaryPrimitives.WriteUInt32BigEndian(m.AsSpan(0x48), size);
+        }))).Diagnostics.Select(d => (d.Severity, d.Code)).ToArray();
 
-        var equal = WithMap(resource, m => BinaryPrimitives.WriteUInt32BigEndian(m.AsSpan(0x48), 200));
-        Assert.Empty(Disk(Image(data, equal)).Diagnostics);
-
-        var (disk, diagnostics) = Disk(Image(data, WithMap(resource, m => BinaryPrimitives.WriteUInt32BigEndian(m.AsSpan(0x48), 199))));
-        Assert.Equal((DiagnosticSeverity.Error, "ndif.chunk-size"), (Assert.Single(diagnostics).Severity, diagnostics[0].Code));
-        Assert.Equal(volume, disk); // still decoded
+        Assert.Empty(With(200, 11));
+        Assert.Equal([(DiagnosticSeverity.Error, "ndif.chunk-size")], With(199, 11));
+        Assert.Equal([(DiagnosticSeverity.Error, "ndif.bad-map"), (DiagnosticSeverity.Warning, "ndif.chunk-size")], With(199, 10)); // ADC needs 11
+        Assert.Equal(volume, Disk(Image(data, WithMap(resource, m => BinaryPrimitives.WriteUInt32BigEndian(m.AsSpan(0x48), 199)))).Disk);
     }
 
     [Fact]

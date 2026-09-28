@@ -214,10 +214,20 @@ namespace ClassicMac.Files.Hfs
                     case ChunkAdc or ChunkDartRle or ChunkDartLzh or ChunkKenCode:
                         if (type == ChunkAdc && header.Version < 11)
                             context.Report(DiagnosticSeverity.Error, "ndif.bad-map", $"{where} is ADC-compressed, which needs map version 11.");
-                        // Every Disk Copy (6.1.2, 6.3.3, 6.5b13) calls the image damaged; the chunk still decodes here.
-                        if (next - start > header.MaxChunk)
+                        // Disk Copy 6.1.2 refuses a chunk over +$48 blocks; 6.3.3 and 6.5b13 clear that validator error at
+                        // the next entry and fail only when the chunk overflows the decode buffer, +$48 blocks (doubled
+                        // for version 10) (disassembly; checked in SheepShaver). The chunk still decodes here.
+                        var buffer = header.MaxChunk * (header.Version == 10 ? 2L : 1L);
+                        if (next - start > buffer)
+                        {
                             context.Report(DiagnosticSeverity.Error, "ndif.chunk-size",
-                                $"{where} covers more blocks than the map's buffer size ({header.MaxChunk}); Disk Copy calls the image damaged.");
+                                $"{where} is larger than Disk Copy's decode buffer ({buffer} blocks); it cannot read the image.");
+                        }
+                        else if (next - start > header.MaxChunk)
+                        {
+                            context.Report(DiagnosticSeverity.Warning, "ndif.chunk-size",
+                                $"{where} covers more blocks than the map's buffer size ({header.MaxChunk}); Disk Copy 6.1.2 calls the image damaged, later versions read it.");
+                        }
                         break;
                     case ChunkShrinkWrap:
                         // Named by Aaru as ShrinkWrap's (StuffIt) codec; not seen in any image yet.
