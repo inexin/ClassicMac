@@ -967,8 +967,8 @@ is in the JSON.
 
 `fact` chunk (float only): 4 bytes, the number of frames.
 
-`smpl` chunk, written when the loop lies inside the sound (`loopEnd` > `loopStart` + 1 and `loopEnd` ≤ the decoded
-frame count) or the base note is not 60 (a base note of 0 counts as 60):
+`smpl` chunk, written when the loop lies inside the sound (a loop as the Sound Manager counts one, §7, and `loopEnd`
+≤ the decoded frame count) or the base note is not 60 (a base note of 0 counts as 60):
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |

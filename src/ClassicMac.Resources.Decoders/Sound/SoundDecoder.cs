@@ -59,7 +59,7 @@ namespace ClassicMac.Resources.Decoders.Sound
         private static SamplerInfo? Sampler(SampledSound sound, int frames)
         {
             var note = sound.BaseNote is 0 ? 60 : sound.BaseNote;
-            var loop = sound.LoopEnd > sound.LoopStart + 1 && sound.LoopEnd <= frames;
+            var loop = sound.LoopEnd > sound.LoopStart && sound.LoopEnd - sound.LoopStart > 2 && sound.LoopEnd <= frames;
             if (!loop && note == 60) return null;
             return new SamplerInfo(note, loop ? sound.LoopStart : null, loop ? sound.LoopEnd - 1 : 0);
         }

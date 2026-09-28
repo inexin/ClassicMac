@@ -7,7 +7,7 @@ namespace ClassicMac.Resources.Decoders.Sound
 {
     /// <summary>A synthesizer (data format) entry of a format 1 <c>'snd '</c>.</summary>
     /// <param name="Id">The data format: 5 is sampled sound.</param>
-    /// <param name="InitOptions">The channel's init options (<c>initStereo</c> $80, <c>initMono</c> $80 clear, …).</param>
+    /// <param name="InitOptions">The channel's init options (<c>initMono</c> $80, <c>initStereo</c> $C0, …).</param>
     public readonly record struct SoundSynth(ushort Id, uint InitOptions);
 
     /// <summary>A sound command as stored.</summary>
@@ -161,6 +161,11 @@ namespace ClassicMac.Resources.Decoders.Sound
                 return null;
             }
 
+            if (at + 2 > data.Length)
+            {
+                Report(DiagnosticSeverity.Error, "sound.short", "the resource ends before its command count.");
+                return null;
+            }
             int commandCount = BinaryPrimitives.ReadUInt16BigEndian(data[at..]);
             at += 2;
             var commands = new List<SoundCommand>();

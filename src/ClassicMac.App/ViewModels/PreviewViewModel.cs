@@ -144,7 +144,7 @@ namespace ClassicMac.App.ViewModels
             if (SoundSamples.Decode(sampled) is not { } sound)
                 return new PreviewViewModel(PreviewKind.None, $"A {bits} sound, a format ClassicMac does not read; see Hex.");
             var channels = sound.Channels == 1 ? "mono" : sound.Channels == 2 ? "stereo" : $"{sound.Channels} channels";
-            var loop = sampled.LoopEnd > sampled.LoopStart + 1 ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
+            var loop = sampled.LoopEnd > sampled.LoopStart && sampled.LoopEnd - sampled.LoopStart > 2 ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
             var note = sampled.BaseNote is not (0 or 60) ? $", base note {sampled.BaseNote}" : "";
             return new PreviewViewModel(PreviewKind.Sound, "")
             {

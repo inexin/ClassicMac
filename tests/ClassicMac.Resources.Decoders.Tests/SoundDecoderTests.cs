@@ -284,6 +284,8 @@ public class SoundDecoderTests
         Assert.Contains(Decode(Format1(Standard([1, 2, 3, 4]))[..^2]).Diagnostics, d => d.Code == "sound.short");
         Assert.Contains(Decode(BE((ushort)1, (ushort)0, (ushort)1, (ushort)0x8051, (short)0, 500u)).Diagnostics, d => d.Code == "sound.bad-offset");
         Assert.Contains(Decode(BE((ushort)1, (ushort)5)).Diagnostics, d => d.Code == "sound.short");
+        Assert.Contains(Decode(BE((ushort)2, (ushort)0)).Diagnostics, d => d.Code == "sound.short"); // format 2, no command count
+        Assert.Contains(Decode([0, 2, 0, 0, 0]).Diagnostics, d => d.Code == "sound.short");
         var bad = Format1(Standard([1]));
         bad[40] = 0x42; // encode
         Assert.Contains(Decode(bad).Diagnostics, d => d.Code == "sound.bad-header");
