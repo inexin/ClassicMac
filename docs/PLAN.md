@@ -528,8 +528,19 @@ They change what running applications see, not what a file contains.
 - **ShrinkWrap 2.1** writes nothing new: `dImg` is Disk Copy 4.2 byte for byte (junk after the name's Str63 is
   ignored), `hdrv` (volume image, Drive Container) and the self-mounting `APPL`/`sImg`/`iImg` are raw volumes in the
   data fork. All read today (harness run20). Disk Copy 6.0 (1994, `dCpy`)'s own RLE `dImg` variants are not decoded
-  (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices; they need real 2000–2002 `.dmg`
-  files or `hdiutil`.
+  (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices (its hidden debug menu, Option at
+  launch, has UDIF test items); they need real 2000–2002 `.dmg` files or `hdiutil`.
+- **UDIF (not built; to verify on a real sample first):**
+  - The `koly` trailer is the last 512 bytes.
+  - Early images (Disk Copy 6.4/6.5) have XMLOffset/Length 0. Their RsrcForkOffset/Length point to a flattened
+    resource fork inside the data fork. Its `blkx` resources hold the `mish` block tables that later images keep
+    base64-encoded in the XML plist.
+  - ClassicMac reads that fork's map properly; dmg2img (GPL, reference only) just walks the blocks.
+  - `mish` runs are 0x28-byte entries from +0xCC. Types: 0 zero, 1 raw, 2 ignore, 0x80000004 ADC (the NDIF codec),
+    0x80000005 zlib, 0x80000006 bzip2, 0x80000007 LZFSE, 0x7FFFFFFE comment, 0xFFFFFFFF end.
+  - Encrypted images are recognised and refused, not parsed: `encrcdsa` at offset 0 (header v2), or `cdsaencr` at
+    the end (v1) (VileFault).
+  - HFVExplorer adds nothing (libhfs, GPL).
 - **DART:** Disk Copy 6.3.3's DART reading (disassembly) confirmed on DART 1.5.3's own files (CiderPress2's test
   data): header and block lengths (RLE in words, LZH in bytes, −1 stored), 20,480 data + 480 tag bytes per block,
   "fast" RLE and "best" LZH (Okumura/Yoshizaki LZHUF with a zero-filled window whose tail carries between blocks; a
