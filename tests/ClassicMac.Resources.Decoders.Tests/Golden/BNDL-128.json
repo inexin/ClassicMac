@@ -1,0 +1,44 @@
+{
+  "signature": "RLMZ",
+  "signatureId": 0,
+  "maps": [
+    {
+      "type": "ICN#",
+      "ids": [
+        {
+          "local": 0,
+          "resource": 128
+        },
+        {
+          "local": 1,
+          "resource": 129
+        }
+      ]
+    },
+    {
+      "type": "FREF",
+      "ids": [
+        {
+          "local": 0,
+          "resource": 128
+        },
+        {
+          "local": 1,
+          "resource": 129
+        }
+      ]
+    }
+  ],
+  "fileTypes": [
+    {
+      "fileType": "APPL",
+      "fref": 128,
+      "icon": 128
+    },
+    {
+      "fileType": "TEXT",
+      "fref": 129,
+      "icon": null
+    }
+  ]
+}

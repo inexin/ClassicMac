@@ -236,7 +236,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL`, and their colour and extension resources (`wctb`, `dctb`, `actb`, `cctb`, `mctb`, `ictb`, `dlgx`, `alrx`, `xmnu`) (built) | JSON (built), optionally a rendered preview of the dialog |
 | Colour | `clut`, `pltt` (built) | JSON and `.act` palettes (built) |
-| Finder | `BNDL`, `FREF`, `SIZE` | JSON |
+| Finder | `BNDL`, `FREF`, `SIZE` (built) | JSON (built) |
 | Unknown | anything else, including `CODE` | raw `.bin` + hex preview in the manifest |
 
 Disassembling `CODE` is out of scope; resource_dasm covers it.

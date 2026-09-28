@@ -1,0 +1,11 @@
+{
+  "flags": 22656,
+  "flagNames": [
+    "acceptSuspendResumeEvents",
+    "canBackground",
+    "doesActivateOnFGSwitch",
+    "is32BitCompatible"
+  ],
+  "preferredSize": 2097152,
+  "minimumSize": 1048576
+}

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Finder resources (`BNDL`, `FREF`, `SIZE`) to JSON, a bundle with each file type's icon, specified in
+  `docs/formats/FINDER.md`.
 - Colour tables (`clut`) and palettes (`pltt`) to JSON and Adobe `.act`, specified in `docs/formats/PALETTES.md`;
   the viewer shows them as swatches.
 - Interface resources to JSON: menus and menu bars, window, dialog and alert templates, dialog item lists and

@@ -781,6 +781,50 @@
           "length": 772
         }
       ]
+    },
+    {
+      "key": "BNDL-128",
+      "decoder": "finder.bundle 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "BNDL-128.json"
+        }
+      ]
+    },
+    {
+      "key": "FREF-128",
+      "decoder": "finder.file-reference 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "FREF-128.json"
+        }
+      ]
+    },
+    {
+      "key": "FREF-129",
+      "decoder": "finder.file-reference 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "FREF-129.json"
+        }
+      ]
+    },
+    {
+      "key": "SIZE--1",
+      "decoder": "finder.size 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "SIZE--1.json"
+        }
+      ]
     }
   ]
 }

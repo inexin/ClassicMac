@@ -18,6 +18,7 @@ behaviour of Apple's own code decides, as traced in disassembly and checked on r
 | [TEXT.md](TEXT.md) | `STR `, `STR#`, `TEXT` and `styl`, `vers`; the text, RTF and JSON output | `ClassicMac.Resources.Decoders.Text` |
 | [INTERFACE.md](INTERFACE.md) | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL`, their colour tables and Appearance extensions; the JSON output | `ClassicMac.Resources.Decoders.Interface` |
 | [PALETTES.md](PALETTES.md) | `clut` colour tables and `pltt` palettes; the JSON and `.act` output | `ClassicMac.Resources.Decoders.Colors` |
+| [FINDER.md](FINDER.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
 | [DOCUMENTS.md](DOCUMENTS.md) | DOCMaker stand-alone documents and SimpleText documents with pictures; the HTML output | `ClassicMac.Resources.Decoders.Documents` |
 | [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 
