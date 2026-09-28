@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Documents;
 using static ClassicMac.Resources.Decoders.Tests.DocumentFixtures;
@@ -61,5 +64,60 @@ public class DocumentTests
         fork.Add(new Resource(FourCC.FromString("STR "), 128, Pascal("hi")));
         Assert.Null(StyledDocuments.Read("plain"u8.ToArray(), fork, FourCC.FromString("TEXT"), "x")); // no styl, no pictures
         Assert.Null(StyledDocuments.Read("plain"u8.ToArray(), null, FourCC.FromString("APPL"), "x"));
+    }
+
+    // The HTML folder, compared with Golden/Documents/<name>/: pages and style.css as files, pictures as SHA-256 in
+    // images.txt. CLASSICMAC_UPDATE_GOLDEN=1 rewrites them.
+    [Fact]
+    public void DOCMaker_documents_convert_to_their_golden_HTML()
+    {
+        var document = StyledDocuments.Read(ReadOnlyMemory<byte>.Empty, DocMaker(), FourCC.FromString("APPL"), "Manual")!;
+        var diagnostics = new List<Diagnostic>();
+
+        var files = HtmlDocuments.Write(document, diagnostics: diagnostics);
+
+        Assert.Equal(["index.html", "chapter-01.html", "chapter-02.html", "style.css", "images/pict-1001.png", "images/pict-1002.png", "images/pict-1003.png"],
+            files.Select(f => f.Path));
+        Assert.Empty(diagnostics);
+        var chapter = Encoding.UTF8.GetString(files[1].Content.Span);
+        // The two pictures on one line share a row (left, right) with the blank line after them dropped; the wide one is
+        // scaled to the 260-pixel column; the link to chapter 9 is not a link.
+        Assert.Contains("<p class=\"s1\">The game begins here.</p>\n<div class=\"row\"><div class=\"l\"><a href=\"chapter-02.html\">", chapter);
+        Assert.Contains("</div></div>\n<p class=\"s1\">A wide map:</p>\n<div class=\"row\"><div class=\"c\"><img src=\"images/pict-1003.png\" width=\"260\" height=\"65\"", chapter);
+        Assert.DoesNotContain("chapter-09", chapter);
+        CompareGolden("DocMaker", files);
+    }
+
+    [Fact]
+    public void SimpleText_documents_convert_to_their_golden_HTML()
+    {
+        var fork = new ResourceFork();
+        fork.Add(new Resource(FourCC.FromString("styl"), 128, Styl((0, 16, 12, 22, 0, 12, 0), (6, 16, 12, 22, 1, 12, 0xFFFF))));
+        fork.Add(new Resource(FourCC.FromString("PICT"), 1000, Picture(10, 10)));
+        byte[] text = [.. "Title\rRed <b> & bold\r\r   "u8, 0xCA, .. "   \r\r\r  Indented after the picture.\r\rEnd"u8];
+        var document = StyledDocuments.Read(text, fork, FourCC.FromString("TEXT"), "Read Me")!;
+
+        var files = HtmlDocuments.Write(document);
+
+        Assert.Equal(["index.html", "style.css", "images/pict-1000.png"], files.Select(f => f.Path));
+        CompareGolden("SimpleText", files);
+    }
+
+    private static void CompareGolden(string name, IReadOnlyList<DocumentFile> files, [CallerFilePath] string source = "")
+    {
+        var folder = Path.Combine(Path.GetDirectoryName(source)!, "Golden", "Documents", name);
+        var expected = files.Where(f => !f.Path.StartsWith("images/", StringComparison.Ordinal)).Select(f => (f.Path, Bytes: f.Content.ToArray())).ToList();
+        var images = string.Concat(files.Where(f => f.Path.StartsWith("images/", StringComparison.Ordinal))
+            .Select(f => $"{f.Path} {Convert.ToHexStringLower(SHA256.HashData(f.Content.Span))}\n"));
+        expected.Add(("images.txt", Encoding.UTF8.GetBytes(images)));
+        if (Environment.GetEnvironmentVariable("CLASSICMAC_UPDATE_GOLDEN") == "1")
+        {
+            Directory.CreateDirectory(folder);
+            foreach (var (path, bytes) in expected) File.WriteAllBytes(Path.Combine(folder, path), bytes);
+            return;
+        }
+        var problems = expected.Where(e => !File.Exists(Path.Combine(folder, e.Path)) || !File.ReadAllBytes(Path.Combine(folder, e.Path)).AsSpan().SequenceEqual(e.Bytes))
+            .Select(e => $"{name}/{e.Path} differs from its golden").ToList();
+        Assert.True(problems.Count == 0, string.Join("\n", problems) + "\nIf the change is intended, run with CLASSICMAC_UPDATE_GOLDEN=1 and review Golden/ in git.");
     }
 }

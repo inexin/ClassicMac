@@ -355,9 +355,8 @@ What ClassicMac does [ClassicMac]:
 
 - Its viewer shows such files as styled text (§6.4), with the `'styl'` 128 when there is one and one default run when
   there is not. It reads data forks up to 4 MB for this, past SimpleText's limit.
-- It does not draw the pictures.
-- `extract` writes the `'styl'` 128 like any resource (JSON); `unpack` writes the data fork unchanged. A document
-  output (text with its pictures) is planned, not built.
+- `extract` writes the `'styl'` 128 like any resource (JSON); `unpack` writes the data fork unchanged.
+- The document with its pictures converts to HTML: [DOCUMENTS.md](DOCUMENTS.md).
 
 ---
 
@@ -665,10 +664,5 @@ The decoders' names and versions, recorded in the manifest: `text.string`, `text
 
 ## 13. Not covered yet
 
-- **DOCMaker** stand-alone documents (Green Mountain Software; type `'APPL'`, creator `'Dk@P'`): chapters as
-  `'TEXT'`/`'styl'` pairs with their own window, picture-placement, footer and contents resources. The per-resource
-  decoders above handle the `'TEXT'`, `'styl'` and `'STR '` resources; the document itself, and its private resources,
-  will be specified here when its decoder is built.
 - **Other Mac encodings** (§2.4).
-- **SimpleText document output** with pictures placed (§7).
 - **Writing** text resources: planned with the editors.

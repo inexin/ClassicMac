@@ -74,13 +74,16 @@ namespace ClassicMac.Resources.Decoders.Images
                     return [];
                 }
             }
-            var bitmap = PictReader.Decode(data, new PictDecodeOptions
-            {
-                ScreenDepth = Options.ScreenDepth,
-                QuickDraw = Options.QuickDraw == ResourceManagerModel.Rom68k ? PictQuickDraw.MacRom : PictQuickDraw.MacOS9,
-            });
-            return [Image(bitmap)];
+            return [Image(Draw(data, Options))];
         }
+
+        // A picture drawn at the options' screen depth, as the Mac they choose draws it.
+        internal static PictBitmap Draw(byte[] data, DecodeOptions options) =>
+            PictReader.Decode(data, new PictDecodeOptions
+            {
+                ScreenDepth = options.ScreenDepth,
+                QuickDraw = options.QuickDraw == ResourceManagerModel.Rom68k ? PictQuickDraw.MacRom : PictQuickDraw.MacOS9,
+            });
     }
 
     /// <summary>

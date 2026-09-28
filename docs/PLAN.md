@@ -244,11 +244,14 @@ Disassembling `CODE` is out of scope; resource_dasm covers it.
 
 | Document | Recognised by | Resources | Output |
 | --- | --- | --- | --- |
-| DOCMaker stand-alone documents (Green Mountain Software, 1986–1998; common for shareware manuals, e.g. Divinity's) | `APPL`/`Dk@P` | per chapter `TEXT` + `styl` and `Wndo`; `PICT` placed by `pInf`; `STR ` chapter titles, `foot`, `conp`, `xtr2`, `sTwD` | HTML, one page per chapter, pictures as PNG |
-| SimpleText / TeachText documents | `TEXT`/`ttxt`, `ttro` | data-fork text, `styl` 128, `PICT` 1000+ at the option-space markers | HTML or Markdown |
+| DOCMaker stand-alone documents (Green Mountain Software, 1986–1998; common for shareware manuals, e.g. Divinity's) | `APPL`/`Dk@P` | per chapter `TEXT` + `styl` and `Wndo`; `PICT` placed by `pInf`; `STR ` chapter titles, `foot`, `conp`, `xtr2`, `sTwD` | HTML, one page per chapter, pictures as PNG reflowed into the text |
+| SimpleText / TeachText documents | `TEXT`/`ttxt`, `ttro` | data-fork text, `styl` 128, `PICT` 1000+ at the option-space markers | HTML |
 
 DOCMaker's private resources (`pInf`, `Wndo`, `foot`, `conp`, …) have no published description; their layout comes
-from the reader code each document carries (disassembly), checked against real documents.
+from the reader code each document carries (disassembly), checked against real documents. Both readers draw a
+picture over the text at its anchor's line; the HTML puts it in the text flow instead (side by side for anchors on one
+line, the blank lines left for it dropped), since a browser's line breaks differ from the Mac's
+([formats/DOCUMENTS.md](formats/DOCUMENTS.md) §6.2).
 
 App-specific types (a game's data records, an application's private resources) plug in as custom decoders
 registered by the application.
@@ -675,7 +678,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
    pixel limit and `--screen-depth`; `snd ` to WAV built (PCM, MACE, IMA4, µ-law; every corpus sound decodes).
    *Exit:* golden outputs pass and the corpus exports without errors. **Done:** golden outputs for every decoder,
-   and the corpus (Realmz, the Divinity manual, the harness runs: 156 inputs, 10,868 resources) exports with no decoder
+   and the corpus (Realmz, the Divinity manual, the harness runs: 321 inputs, 13,890 resources) exports with no decoder
    failure, pinned by a committed baseline. DOCMaker was deferred at the exit; its disassembly answers have since
    arrived, and it comes next among the decoders.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
