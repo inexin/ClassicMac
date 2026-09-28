@@ -5,6 +5,9 @@
 - DOCMaker stand-alone documents and SimpleText documents with pictures: read into a styled-document model
   (`StyledDocuments`) and converted to an HTML folder (`HtmlDocuments`: a page per chapter, a contents page, the
   pictures as PNG reflowed into the text, picture actions as links). Specified in `docs/formats/DOCUMENTS.md`.
+  `extract` adds a document's HTML folder as `document/` (manifest format 1.2: a `document` field; `--no-documents`
+  leaves it out); the new `convert` command writes only the documents. Document converters plug in through
+  `IDocumentConverter` and `ExportOptions.Documents`.
 - UDIF disk images (`.dmg`): Disk Copy 6.4/6.5's (block tables in an embedded resource fork) and Mac OS X's (XML
   property list), with zeros, raw, ADC, zlib and bzip2 runs (a bzip2 decoder in `ClassicMac.Files.Compression`) and
   CRC-32/MD5 checksums checked with `--verify`; encrypted and segmented images refused. NDIF and UDIF share a

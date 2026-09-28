@@ -73,6 +73,24 @@
           "message": { "type": "string" }
         }
       }
+    },
+    "document": {
+      "description": "Since 1.2: the file converted as a whole document (DOCMaker, SimpleText), or null.",
+      "type": ["object", "null"],
+      "required": ["converter", "converterVersion", "path", "files"],
+      "properties": {
+        "converter": { "type": "string" },
+        "converterVersion": { "type": "integer" },
+        "path": { "type": "string" },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "sha256"],
+            "properties": { "path": { "type": "string" }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
+          }
+        }
+      }
     }
   }
 }

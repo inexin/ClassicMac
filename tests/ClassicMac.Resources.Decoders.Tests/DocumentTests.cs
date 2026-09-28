@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Documents;
+using ClassicMac.Resources.Export;
 using static ClassicMac.Resources.Decoders.Tests.DocumentFixtures;
 
 namespace ClassicMac.Resources.Decoders.Tests;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Export;
@@ -18,6 +19,12 @@ namespace ClassicMac.Files.Export
     /// <param name="Files">Files whose resources were exported.</param>
     /// <param name="Failed">Folders that could not be written, with why.</param>
     public sealed record ExtractResult(int Resources, int Files, IReadOnlyList<string> Failed);
+
+    /// <summary>What a document conversion wrote.</summary>
+    /// <param name="Documents">The documents written, each as its manifest entry (paths relative to the output folder)
+    /// with the file's Mac path.</param>
+    /// <param name="Failed">Folders that could not be written, with why.</param>
+    public sealed record ConvertResult(IReadOnlyList<(string MacPath, ManifestDocument Document)> Documents, IReadOnlyList<string> Failed);
 
     /// <summary>A resource fork found in an unwrapped input: the file it belongs to, the formats down to it, and the fork.</summary>
     /// <param name="Node">The file's node in the tree.</param>
@@ -110,7 +117,8 @@ namespace ClassicMac.Files.Export
                 try
                 {
                     var result = ResourceExporter.Export(entry.Fork, target, source,
-                        options with { MaxPathLength = Math.Max(24, options.MaxPathLength - relative) });
+                        options with { MaxPathLength = Math.Max(24, options.MaxPathLength - relative) },
+                        () => file.DataFork.ToArray(options.ReadOptions.MaxResourceSize));
                     // The fork's own diagnostics were reported when it was read.
                     for (var i = entry.Fork.Diagnostics.Count; i < result.Diagnostics.Count; i++)
                         diagnostics?.Add((file.MacPath, result.Diagnostics[i]));
@@ -124,6 +132,68 @@ namespace ClassicMac.Files.Export
                 }
             }
             return new ExtractResult(resources, files, failed);
+        }
+    }
+
+    /// <summary>Converts the documents among Mac files to folders (the <c>convert</c> command).</summary>
+    public static class DocumentConverter
+    {
+        /// <summary>
+        /// Writes every document among <paramref name="forks"/>' files (found under <paramref name="root"/>) into
+        /// <paramref name="directory"/>, converted by the first of <paramref name="converters"/> that knows it: one
+        /// document straight into it, several into a folder each, placed by <see cref="OutputLayout"/>. Problems go to
+        /// <paramref name="diagnostics"/>, as (Mac path, diagnostic). Throws <see cref="IOException"/> when the folder
+        /// already holds files and <paramref name="overwrite"/> is off.
+        /// </summary>
+        public static ConvertResult Convert(ContainerNode root, IReadOnlyList<ForkToExtract> forks, string directory,
+            IReadOnlyList<IDocumentConverter> converters, ReadOptions? readOptions = null, bool overwrite = false,
+            ICollection<(string Source, Diagnostic Diagnostic)>? diagnostics = null)
+        {
+            ArgumentNullException.ThrowIfNull(root);
+            ArgumentNullException.ThrowIfNull(forks);
+            ArgumentNullException.ThrowIfNull(directory);
+            ArgumentNullException.ThrowIfNull(converters);
+            readOptions ??= ReadOptions.Default;
+            if (!overwrite && Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any())
+                throw new IOException($"{directory} is not empty.");
+
+            // Converted first, to know whether there are several.
+            var converted = new List<(ForkToExtract Entry, IDocumentConverter Converter, IReadOnlyList<DocumentFile> Files)>();
+            foreach (var entry in forks)
+            {
+                var file = entry.Node.File;
+                var found = new List<Diagnostic>();
+                var input = new DocumentInput(entry.Fork, () => file.DataFork.ToArray(readOptions.MaxResourceSize), file.FinderInfo.Type,
+                    file.FinderInfo.Creator, file.Name.ToString(), readOptions, found);
+                if (DocumentExport.Convert(converters, input) is var (converter, files)) converted.Add((entry, converter, files));
+                foreach (var d in found) diagnostics?.Add((file.MacPath, d));
+            }
+
+            var layout = new OutputLayout(name => HostNames.ToHostName(name));
+            var folders = new Dictionary<ContainerNode, List<string>>(ReferenceEqualityComparer.Instance);
+            foreach (var (leaf, place) in layout.Place(root)) folders[leaf] = place;
+            var documents = new List<(string, ManifestDocument)>();
+            var failed = new List<string>();
+            foreach (var (entry, converter, files) in converted)
+            {
+                var parts = new List<string>();
+                if (converted.Count > 1)
+                {
+                    var place = folders.GetValueOrDefault(entry.Node) ?? [];
+                    parts = [.. place, layout.Unique(place, HostNames.ToHostName(entry.Node.File.Name), out _)];
+                }
+                var target = Path.Combine([directory, .. parts]);
+                try
+                {
+                    documents.Add((entry.Node.File.MacPath,
+                        DocumentExport.Write(converter, files, target, parts.Count > 0 ? string.Join('/', parts) + "/" : "")));
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    failed.Add($"{target}: {e.Message}");
+                }
+            }
+            return new ConvertResult(documents, failed);
         }
     }
 

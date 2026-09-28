@@ -213,7 +213,8 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 | `info <input>` | Companions, container chain, Finder info, dates, fork sizes (built) | — | 1 |
 | `list <input>` | Resources of every file inside the input, through containers; a data fork holding a resource fork (Realmz `.rsf`) or a raw fork file is read as a fork (built) | `--format text\|json` | 1 |
 | `unpack <input>` | Every Mac file inside the input, through containers and disk images, to a folder with both forks and Finder info; folders kept, a container of one file replaced by it, a disk or archive of several becomes a folder (built) | `-o <dir>`, `--layout appledouble\|basilisk`, `--overwrite` | 2 |
-| `extract <input>` | Resources into a folder with a manifest; a folder per file when the input holds several; decoded by default (built) | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`, `--screen-depth`; later `--encoding` | 1 (raw), 3 (decoded) |
+| `extract <input>` | Resources into a folder with a manifest; a folder per file when the input holds several; decoded by default; a DOCMaker or SimpleText document also as HTML in `document/` (built) | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`, `--screen-depth`, `--no-documents`; later `--encoding` | 1 (raw), 3 (decoded) |
+| `convert <input>` | Every DOCMaker and SimpleText document inside the input as an HTML folder; a folder per document when there are several (built) | `-o <dir>`, `--overwrite`, `--screen-depth` | 3 |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest | `-o <file>`, `--base <fork>`, `--allow-deletes`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`

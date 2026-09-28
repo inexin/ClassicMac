@@ -14,16 +14,18 @@ namespace ClassicMac.Resources.Export
     /// <param name="Fork">The fork's own attributes.</param>
     /// <param name="Resources">The exported resources, in the fork's order.</param>
     /// <param name="Diagnostics">Problems found reading the fork and exporting it.</param>
+    /// <param name="Document">The file converted as a whole document, or null (format 1.2).</param>
     public sealed record ExportManifest(
         [property: JsonPropertyName("$schema")] string Schema,
         string FormatVersion,
         ManifestSource Source,
         ManifestFork Fork,
         IReadOnlyList<ManifestResource> Resources,
-        IReadOnlyList<ManifestDiagnostic> Diagnostics)
+        IReadOnlyList<ManifestDiagnostic> Diagnostics,
+        ManifestDocument? Document = null)
     {
         /// <summary>The current format's version.</summary>
-        public const string CurrentVersion = "1.1";
+        public const string CurrentVersion = "1.2";
 
         /// <summary>Where the format's schema is published.</summary>
         public const string SchemaUrl = "https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json";
@@ -65,7 +67,14 @@ namespace ClassicMac.Resources.Export
         string Decoder, int DecoderVersion, string Path, string Sha256, string StoredSha256, string? RawPath,
         IReadOnlyList<string> Warnings, IReadOnlyList<ManifestFile>? OtherFiles = null, string? Encoding = null);
 
-    /// <summary>A file written for a resource.</summary>
+    /// <summary>A document converted from the whole file (format 1.2).</summary>
+    /// <param name="Converter">The converter's name.</param>
+    /// <param name="ConverterVersion">The converter's version.</param>
+    /// <param name="Path">The entry page, relative to the manifest, <c>/</c>-separated.</param>
+    /// <param name="Files">Every file of the document, the entry page first.</param>
+    public sealed record ManifestDocument(string Converter, int ConverterVersion, string Path, IReadOnlyList<ManifestFile> Files);
+
+    /// <summary>A file written for a resource or a document.</summary>
     /// <param name="Path">Relative to the manifest, <c>/</c>-separated.</param>
     /// <param name="Sha256">SHA-256 of the file.</param>
     public sealed record ManifestFile(string Path, string Sha256);

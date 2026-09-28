@@ -61,7 +61,7 @@ and carries a tag of its own:
 | --- | --- |
 | **[ClassicMac]** | A choice ClassicMac made for its own output format. No Mac software reads or writes it; another tool that consumes an export relies on the rule, but it could have been chosen otherwise |
 
-Sections with no tag describe what the current code does, as a specification of format 1.1.
+Sections with no tag describe what the current code does, as a specification of format 1.2.
 
 ---
 
@@ -83,6 +83,9 @@ Realmz resources/
   SICN/128.2.png
   raw/CODE/1.bin              (only with KeepRaw)
   raw/PICT/128.bin
+  document/index.html         (only for a document, with Documents)
+  document/chapter-01.html
+  document/images/pict-2067.png
   …
 ```
 
@@ -92,6 +95,8 @@ Realmz resources/
   **[ClassicMac]**
 - With the KeepRaw option, `raw/<type folder>/<id>.bin` holds each resource's stored data (section 5.3).
   **[ClassicMac]**
+- With document converters, a file that is a whole document (a DOCMaker or SimpleText document) is also converted
+  into `document/` (section 6.10). **[ClassicMac]**
 - `manifest.json` lists every resource with where it came from and what was written (section 6). It is written last:
   a folder without it is an incomplete export.
 
@@ -104,8 +109,9 @@ places files (section 3.2).
 
 ### 3.1 One fork
 
-`ResourceExporter.Export(fork, directory, source, options)` writes one fork into `directory`, which it creates if
-needed.
+`ResourceExporter.Export(fork, directory, source, options, dataFork)` writes one fork into `directory`, which it
+creates if needed. `dataFork` reads the file's data fork, for a document converter that needs it (a SimpleText
+document's text); without it, the data fork counts as empty.
 
 - If `directory` already holds any file or folder and `Overwrite` is off, nothing is written and the export fails
   (`IOException`, "… is not empty"). **[ClassicMac]**
@@ -270,7 +276,7 @@ clashes with a type folder (section 4.2).
 ## 6. manifest.json
 
 `manifest.json` is written in the export folder's root. Format 1 is described by the JSON Schema
-`schemas/manifest-1.schema.json`, published at the URL the `$schema` field gives. The current version is **1.1**.
+`schemas/manifest-1.schema.json`, published at the URL the `$schema` field gives. The current version is **1.2**.
 
 ### 6.1 Versioning
 
@@ -280,6 +286,7 @@ clashes with a type folder (section 4.2).
   **[ClassicMac]**
 - Format 1.1 added `otherFiles` and `encoding` to resource entries. A reader of 1.x must accept their absence (1.0) and,
   as the schema allows, a `null` value.
+- Format 1.2 added `document` at the top level. A reader must accept its absence (1.0, 1.1) and `null`.
 
 ### 6.2 Serialization
 
@@ -297,11 +304,12 @@ What ClassicMac writes (a reader must accept any valid JSON with the same conten
 | Name | Type | Meaning | Example |
 | --- | --- | --- | --- |
 | `$schema` | string | The schema's URL (not required by the schema; always written) | `"https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json"` |
-| `formatVersion` | string, `1.<minor>` | The format's version (section 6.1) | `"1.1"` |
+| `formatVersion` | string, `1.<minor>` | The format's version (section 6.1) | `"1.2"` |
 | `source` | object | The Mac file the fork came from (section 6.4) | |
 | `fork` | object | The fork's own attributes (section 6.5) | |
 | `resources` | array of objects | One entry per exported resource, in the fork's order (section 6.6) | |
 | `diagnostics` | array of objects | Problems found reading the fork and exporting it (section 6.8) | `[]` |
+| `document` | object or null | Since 1.2: the file converted as a whole document (section 6.10); `null` when it is none, or when no converter ran | `null` |
 
 ### 6.4 source
 
@@ -402,7 +410,7 @@ with the built-in decoders (three of its 38 resources):
 ```json
 {
   "$schema": "https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json",
-  "formatVersion": "1.1",
+  "formatVersion": "1.2",
   "source": {
     "name": "Fixtures",
     "formats": [
@@ -480,12 +488,29 @@ with the built-in decoders (three of its 38 resources):
       "encoding": null
     }
   ],
-  "diagnostics": []
+  "diagnostics": [],
+  "document": null
 }
 ```
 
 A compressed resource exported with KeepRaw has, for instance, `"attributes": 1`, `"dcmp": 0`, `"size"` the
 decompressed length, `"storedSize"` the stored length, and `"rawPath": "raw/CODE/1.bin"`.
+
+### 6.10 document
+
+With `ExportOptions.Documents` (section 9.1), the exporter asks each converter in turn whether the file is a document;
+the first that gives files has them written into `document/` beside the type folders. Documents are converted only
+when every type is exported (`Types` is null). **[ClassicMac]**
+
+| Name | Type | Meaning | Example |
+| --- | --- | --- | --- |
+| `converter` | string | The converter's name | `"document.html"` |
+| `converterVersion` | integer | The converter's version, raised when its output changes | `1` |
+| `path` | string | The entry page, relative to the manifest | `"document/index.html"` |
+| `files` | array of objects | Every file of the document, the entry page first: `path` (relative to the manifest) and `sha256` | `[{"path": "document/index.html", "sha256": "…"}]` |
+
+The built-in converter, `document.html` version 1, converts DOCMaker and SimpleText documents to HTML
+([DOCUMENTS.md](DOCUMENTS.md) §6). Its diagnostics (`document.*`) join the manifest's `diagnostics`.
 
 ---
 
@@ -642,6 +667,7 @@ Every tunable value of an export (`ClassicMac.Resources.Export.ExportOptions`):
 | `KeepRaw` | boolean | false | Also write each resource's stored data to `raw/` (section 5.3) |
 | `Overwrite` | boolean | false | Allow writing into an export folder that already holds files (section 3.1) |
 | `Decoders` | list of decoders | empty | The decoders tried, in order; empty exports everything raw. `ResourceDecoders.Create` gives the built-in ones |
+| `Documents` | list of document converters | empty | The converters tried for the whole file (section 6.10); empty converts none. `ResourceDecoders.CreateDocumentConverters` gives the built-in one |
 | `ReadOptions` | `ReadOptions` | `ReadOptions.Default` | Size limits and the Resource Manager model (Mac OS 9 or 68k ROM) used to decompress resources ([RESOURCE-FORK.md](RESOURCE-FORK.md)) |
 
 The fork's source is given separately, as an `ExportSource` (name, formats, type, creator, Finder flags), and becomes
@@ -665,17 +691,18 @@ The options of the built-in decoders (`ClassicMac.Resources.Decoders.DecodeOptio
 ## 10. The extract command
 
 ```
-classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--overwrite] [--screen-depth <n>]
+classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--overwrite] [--screen-depth <n>] [--no-documents]
 ```
 
 | Option | Maps to |
 | --- | --- |
 | `-o`, `--output <dir>` | The output folder; default `<input name without extension> resources` next to the input |
-| `--raw` | `Decoders` empty: every resource written as its data, `.bin` |
+| `--raw` | `Decoders` and `Documents` empty: every resource written as its data, `.bin`, and no document |
 | `--keep-raw` | `KeepRaw` |
 | `-t`, `--type <type>` | `Types`; repeatable; four characters (`"snd "`) or `\xHH` escapes. A value that is not four characters is a usage error |
 | `--overwrite` | `Overwrite` |
 | `--screen-depth <n>` | `DecodeOptions.ScreenDepth`; one of 1, 2, 4, 8, 16, 32 (default 32) |
+| `--no-documents` | `Documents` empty. By default the built-in converter runs (section 6.10) |
 | `--max-resource-size`, `--max-nesting-depth`, `--max-expanded-bytes`, `--verify`, `--strict`, `-q` | The options every command takes: limits (`ReadOptions`, `ContainerReadOptions`), exit-code strictness and quiet output |
 
 `MaxPathLength` is not exposed (200). Decoders other than the screen depth use their defaults; the QuickDraw model
@@ -685,7 +712,8 @@ follows `ReadOptions.ResourceManager` (Mac OS 9, as the CLI does not change it).
 recognises is read as a raw resource fork (formats `["raw resource fork"]`); otherwise each file inside is read for a
 resource fork, or a data fork that holds one. Only forks with at least one resource of the chosen types are kept. They
 are exported with `Unpacker.Extract` (section 3.2): straight into the output folder when there is one, a folder each
-when there are several. Files without resources get no folder.
+when there are several. Files without resources get no folder. A file that is a document also gets its `document/`
+folder (section 6.10); the `convert` command writes documents alone ([DOCUMENTS.md](DOCUMENTS.md) §7).
 
 **Output.** One line on stdout: `<n> resources from <m> files, to <folder>`. Diagnostics go to stderr, one per line:
 `<source>: <severity>[ at <offset>]: <message> [<code>]`, where `<source>` is the input's name, followed by
@@ -711,6 +739,7 @@ the manifest's `diagnostics`, and is printed by the CLI.
 | Code | Severity | Raised by | Meaning |
 | --- | --- | --- | --- |
 | `export.decoder-failed` | Warning | `ResourceExporter` | The decoder threw a data error (section 5.2); the message gives the decoder and the error. The resource is written raw |
+| `export.converter-failed` | Warning | `ResourceExporter`, `convert` | A document converter threw a data error; no document is written, and the next converter is tried |
 | `export.not-decoded` | Info | `ResourceExporter` | The decoder returned no files and nothing had been reported for the resource (neither by decompression nor by the decoder). The resource is written raw |
 | `image.undecodable` | Warning | image decoders | QuickDraw.Pict rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
 | `image.too-large` | Warning | `image.picture` | The picture's frame is over `MaxImagePixels` (section 8.2). The resource is written raw |
@@ -720,7 +749,8 @@ Other codes reach the manifest from the code the exporter calls:
 
 - reading the fork and decompressing resources (`fork.*`, `resource.*`): [RESOURCE-FORK.md](RESOURCE-FORK.md);
 - the text decoders (`text.*`): [TEXT.md](TEXT.md);
-- the sound decoder (`sound.*`): [SOUND.md](SOUND.md).
+- the sound decoder (`sound.*`): [SOUND.md](SOUND.md);
+- the document converter (`document.*`): [DOCUMENTS.md](DOCUMENTS.md).
 
 The viewer also reports `export.failed` (Error) when an export cannot be written (a file-system error, or an export
 folder that failed in `Unpacker.Extract`). It is shown in the viewer's diagnostics list only and never written to a
@@ -730,7 +760,7 @@ manifest.
 
 ## 12. Reading and producing an export
 
-**Checking an export.** Every file listed (`path`, `otherFiles[].path`, `rawPath`) exists and its SHA-256 matches;
+**Checking an export.** Every file listed (`path`, `otherFiles[].path`, `rawPath`, `document.files[].path`) exists and its SHA-256 matches;
 `sha256` against the file, `storedSha256` against the `raw/` copy when there is one. Files in the folder that the
 manifest does not list are not part of the export (section 3.1).
 
@@ -751,6 +781,6 @@ not built yet):
 own node, not the chain above it.
 
 **Producing an export.** Another tool may write exports that ClassicMac's readers accept: any valid JSON meeting the
-schema, with `formatVersion` `1.1` (or `1.0` without the 1.1 fields), and files where the manifest says. The folder and
+schema, with `formatVersion` `1.2` (or an earlier 1.x without the later fields), and files where the manifest says. The folder and
 file names of sections 3 and 4 are ClassicMac's choice and are not required: a reader finds files through the
 manifest's paths.

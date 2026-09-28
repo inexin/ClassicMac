@@ -28,12 +28,16 @@ namespace ClassicMac.Resources.Export
     {
         private const string Extension = ".bin";
         private const string RawFolder = "raw";
+        private const string DocumentFolder = "document";
 
         /// <summary>
         /// Writes <paramref name="fork"/>'s resources into <paramref name="directory"/>. Throws <see cref="IOException"/>
-        /// when the folder already holds files and <see cref="ExportOptions.Overwrite"/> is off.
+        /// when the folder already holds files and <see cref="ExportOptions.Overwrite"/> is off. With
+        /// <see cref="ExportOptions.Documents"/>, a file that is a document is also converted into <c>document/</c>;
+        /// <paramref name="dataFork"/> reads the file's data fork for that (none when null).
         /// </summary>
-        public static ExportResult Export(ResourceFork fork, string directory, ExportSource source, ExportOptions? options = null)
+        public static ExportResult Export(ResourceFork fork, string directory, ExportSource source, ExportOptions? options = null,
+            Func<ReadOnlyMemory<byte>>? dataFork = null)
         {
             ArgumentNullException.ThrowIfNull(fork);
             ArgumentNullException.ThrowIfNull(directory);
@@ -123,12 +127,22 @@ namespace ClassicMac.Resources.Export
                     warnings.Select(w => w.Message).ToList(), written.Skip(1).ToList(), outputs[0].Encoding));
             }
 
+            ManifestDocument? document = null;
+            if (options.Documents.Count > 0 && options.Types is null)
+            {
+                var input = new DocumentInput(fork, dataFork ?? (() => ReadOnlyMemory<byte>.Empty), source.Type, source.Creator,
+                    source.Name.ToString(), options.ReadOptions, diagnostics);
+                document = DocumentExport.Write(options.Documents, input, Path.Combine(directory, DocumentFolder), DocumentFolder + "/");
+                if (document is not null) files.AddRange(document.Files.Select(f => Path.Combine([directory, .. f.Path.Split('/')])));
+            }
+
             var manifest = new ExportManifest(
                 ExportManifest.SchemaUrl, ExportManifest.CurrentVersion,
                 new ManifestSource(source.Name.ToString(), source.Formats, source.Type.ToString(), source.Creator.ToString(), source.Flags),
                 new ManifestFork((int)fork.Attributes, (int)fork.MapFlags),
                 entries,
-                diagnostics.Select(d => new ManifestDiagnostic(d.Severity.ToString().ToLowerInvariant(), d.Code, d.Message)).ToList());
+                diagnostics.Select(d => new ManifestDiagnostic(d.Severity.ToString().ToLowerInvariant(), d.Code, d.Message)).ToList(),
+                document);
             var manifestPath = Path.Combine(directory, "manifest.json");
             File.WriteAllText(manifestPath, JsonSerializer.Serialize(manifest, ExportManifestJson.Default.ExportManifest), new UTF8Encoding(false));
             files.Add(manifestPath);

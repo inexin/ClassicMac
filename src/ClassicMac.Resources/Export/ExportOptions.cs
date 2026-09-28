@@ -30,6 +30,13 @@ namespace ClassicMac.Resources.Export
         /// </summary>
         public IReadOnlyList<IResourceDecoder> Decoders { get; init; } = [];
 
+        /// <summary>
+        /// The converters tried for the whole file, in order (the first that finds a document in it is used); the document
+        /// goes to <c>document/</c> beside the resources. Empty (the default) converts none. Used only when every type is
+        /// exported (<see cref="Types"/> is null).
+        /// </summary>
+        public IReadOnlyList<IDocumentConverter> Documents { get; init; } = [];
+
         /// <summary>Limits and the Resource Manager model for decompressing resources.</summary>
         public ReadOptions ReadOptions { get; init; } = ReadOptions.Default;
     }

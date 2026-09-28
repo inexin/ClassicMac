@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json",
-  "formatVersion": "1.1",
+  "formatVersion": "1.2",
   "source": {
     "name": "Fixtures",
     "formats": [
@@ -813,5 +813,6 @@
       "encoding": null
     }
   ],
-  "diagnostics": []
+  "diagnostics": [],
+  "document": null
 }

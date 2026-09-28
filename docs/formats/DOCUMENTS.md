@@ -24,8 +24,9 @@ Contents
 4. [Picture placement on the Mac](#4-picture-placement-on-the-mac)
 5. [The document model](#5-the-document-model)
 6. [HTML output](#6-html-output)
-7. [Diagnostics](#7-diagnostics)
-8. [Not covered yet](#8-not-covered-yet)
+7. [Where documents are converted](#7-where-documents-are-converted)
+8. [Diagnostics](#8-diagnostics)
+9. [Not covered yet](#9-not-covered-yet)
 
 ---
 
@@ -190,7 +191,7 @@ All text files are UTF-8 with LF line ends, and the same document always gives t
 - The chapter is a `<main class="column">` of its column width in pixels, justified as the chapter says, on a
   `<body>` of its background colour.
 - Each line (up to a CR) is a `<p>`, classed with the style of its first character; a run in another style is a
-  `<span>`. An empty line is `<p><br></p>`, keeping its height. Spaces and tabs are kept (`white-space: pre-wrap`).
+  `<span>`. An empty line (or one of control characters only, which are dropped) is `<p><br></p>`, keeping its height. Spaces and tabs are kept (`white-space: pre-wrap`).
 - A style is: the font (its Mac name, then a similar font found on other systems: Palatino → "Palatino Linotype",
   "Book Antiqua", serif; Geneva → Verdana, sans-serif; Chicago → system-ui; Monaco → Consolas, monospace; …), the size
   in pixels (72 dpi: a point is a CSS pixel), the line height from the style run when it has one, bold, italic,
@@ -233,13 +234,37 @@ contents and the next chapter at its top and bottom.
 
 ---
 
-## 7. Diagnostics
+## 7. Where documents are converted
+
+The converter is `document.html`, version 1 (`ResourceDecoders.CreateDocumentConverters`, an `IDocumentConverter`)
+[ClassicMac]. It reads the data fork only for a `'TEXT'` or `'ttro'` file, up to the `--max-resource-size` limit.
+
+- **`extract`** writes a document's folder as `document/` in the file's export folder, and records it in the
+  manifest's `document` field (format 1.2, [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) §6.10). `--no-documents`, `--raw`
+  and `-t` leave it out.
+- **`convert`** writes only the documents:
+
+  ```
+  classicmac convert <input> [-o <dir>] [--overwrite] [--screen-depth <n>]
+  ```
+
+  The input is opened and unwrapped as by `extract`, and every file with a resource fork is offered to the converter.
+  One document is written straight into the output folder (default `<input name without extension> documents` next
+  to the input); several get a folder each, placed as `extract` places forks ([EXPORT-MANIFEST.md](EXPORT-MANIFEST.md)
+  §3.2). An existing non-empty output folder is refused unless `--overwrite` is given. It prints one line per document
+  (`<Mac path>: <entry page>`), then `<n> documents, to <folder>`, or `No documents in <input>.`; diagnostics and exit
+  codes are those of `extract`.
+
+---
+
+## 8. Diagnostics
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
 | `document.missing-part` | Error | A DOCMaker chapter has no `'TEXT'` or `'Wndo'` (under 20 bytes counts as none); the chapter is left out |
 | `document.bad-picture` | Error | A `'pInf'` under 8 bytes; the picture is left out |
 | `document.unanchored-picture` | Warning | A `'pInf'` with no $CA left to anchor it; left out, as the reader cannot place it |
+| `document.unreadable-text` | Warning | A SimpleText document's data fork cannot be read (over the size limit, or a read error); no document |
 | `document.missing-picture` | Warning | A `'pInf'` names a `'PICT'` the document does not have; the HTML shows an empty box |
 | `document.undrawable-picture` | Warning | A picture cannot be drawn (damaged, unsupported or over the pixel limit); the HTML shows an empty box |
 | `document.bad-link` | Info | Action 1 goes to a chapter the document does not have; the reader ignores the click, and the HTML has no link |
@@ -247,10 +272,10 @@ contents and the next chapter at its top and bottom.
 
 ---
 
-## 8. Not covered yet
+## 9. Not covered yet
 
 - DOCMaker's footer, custom About box, `'cntp'` font and feature flags (§2.4): read by the reader, not by ClassicMac.
 - DOCMaker versions other than 4.8.4: nothing shows what 5.x and 6.x changed.
 - SimpleText's printing page breaks (`'form'` resources) and voice annotations.
 - Multi-byte encodings: the anchors are byte offsets, which the model uses as character offsets.
-- Where documents show up: `extract`, a `convert` command and the viewer are planned.
+- The viewer: a document preview and a Convert Document command are planned.

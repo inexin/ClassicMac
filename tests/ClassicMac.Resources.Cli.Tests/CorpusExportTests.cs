@@ -26,7 +26,7 @@ public class CorpusExportTests : IDisposable
 
     private static string CorpusFile(string name, [CallerFilePath] string source = "") => Path.Combine(Path.GetDirectoryName(source)!, "Corpus", name);
 
-    private sealed record Summary(string Name, string Sha256, int Forks, int Resources, int Decoded, int Raw, string Outputs);
+    private sealed record Summary(string Name, string Sha256, int Forks, int Resources, int Decoded, int Raw, string Outputs, int Documents = 0);
 
     private sealed record Allowed(string Sha256, string Type, int Id, string Reason);
 
@@ -36,6 +36,7 @@ public class CorpusExportTests : IDisposable
         if (!CorpusFolders.Any) Assert.Skip("Set CLASSICMAC_CORPUS to one or more corpus folders (separated by ';') to run this.");
 
         var decoders = ResourceDecoders.Create();
+        var converters = ResourceDecoders.CreateDocumentConverters();
         var allowlist = ReadAllowlist();
         var failures = new List<string>();
         var damaged = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -69,7 +70,7 @@ public class CorpusExportTests : IDisposable
             if (summaries.ContainsKey(sha)) continue;
             var output = Path.Combine(folder, (target++).ToString(System.Globalization.CultureInfo.InvariantCulture));
             var exported = new List<(string Source, Diagnostic Diagnostic)>();
-            var result = Unpacker.Extract(root, forks, output, ExportOptions.Default with { Decoders = decoders }, exported);
+            var result = Unpacker.Extract(root, forks, output, ExportOptions.Default with { Decoders = decoders, Documents = converters }, exported);
             var name = Path.GetFileName(path);
             var damageTest = CorpusFolders.IsDamageTest(path);
             foreach (var failure in result.Failed) failures.Add($"{name}: {failure}");
@@ -81,7 +82,7 @@ public class CorpusExportTests : IDisposable
             }
 
             // The manifests: decoded or raw per resource, the hashes checked, all outputs hashed together.
-            int resources = 0, decoded = 0, raw = 0;
+            int resources = 0, decoded = 0, raw = 0, documents = 0;
             var outputs = new List<string>();
             foreach (var manifestPath in Directory.EnumerateFiles(output, "manifest.json", SearchOption.AllDirectories))
             {
@@ -108,17 +109,27 @@ public class CorpusExportTests : IDisposable
                             failures.Add($"{name} > {relative}: '{type}' {id} was left raw although a decoder handles its type");
                     }
                 }
+                if (manifest.RootElement.GetProperty("document") is { ValueKind: JsonValueKind.Object } document)
+                {
+                    documents++;
+                    foreach (var f in document.GetProperty("files").EnumerateArray())
+                    {
+                        var (filePath, fileSha) = (f.GetProperty("path").GetString()!, f.GetProperty("sha256").GetString()!);
+                        if (Sha256(Path.Combine(directory, filePath)) != fileSha) failures.Add($"{name} > {relative}/{filePath}: hash differs from its manifest");
+                        outputs.Add($"{relative}/{filePath} {fileSha}");
+                    }
+                }
             }
             outputs.Sort(StringComparer.Ordinal);
             var outputsHash = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\n', outputs))));
-            summaries[sha] = new Summary(name, sha, forks.Count, resources, decoded, raw, outputsHash);
+            summaries[sha] = new Summary(name, sha, forks.Count, resources, decoded, raw, outputsHash, documents);
             Directory.Delete(output, recursive: true);
         }
 
         var changes = CompareBaseline(summaries.Values);
         TestContext.Current.SendDiagnosticMessage(
             $"{summaries.Count} inputs, {summaries.Values.Sum(s => s.Resources)} resources ({summaries.Values.Sum(s => s.Decoded)} decoded, "
-            + $"{summaries.Values.Sum(s => s.Raw)} raw). Damaged inputs: {Format(damaged)}. Warnings: {Format(warnings)}.");
+            + $"{summaries.Values.Sum(s => s.Raw)} raw), {summaries.Values.Sum(s => s.Documents)} documents. Damaged inputs: {Format(damaged)}. Warnings: {Format(warnings)}.");
         Assert.True(failures.Count == 0, $"{failures.Count} decoder failures:\n" + string.Join('\n', failures.Take(50)));
         Assert.True(changes.Count == 0, "Outputs changed from the baseline (if intended, run with CLASSICMAC_UPDATE_BASELINE=1):\n"
             + string.Join('\n', changes.Take(50)));
@@ -177,7 +188,7 @@ public class CorpusExportTests : IDisposable
     }
 
     private static string Describe(Summary s) =>
-        $"{s.Forks} forks, {s.Resources} resources ({s.Decoded} decoded, {s.Raw} raw), outputs {s.Outputs[..12]}";
+        $"{s.Forks} forks, {s.Resources} resources ({s.Decoded} decoded, {s.Raw} raw), {s.Documents} documents, outputs {s.Outputs[..12]}";
 
     private static List<Allowed> ReadAllowlist()
     {

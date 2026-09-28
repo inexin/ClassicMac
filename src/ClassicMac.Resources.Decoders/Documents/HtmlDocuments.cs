@@ -7,14 +7,10 @@ using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Images;
 using ClassicMac.Resources.Decoders.Text;
+using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Decoders.Documents
 {
-    /// <summary>One file of a converted document: its path in the output folder ('/'-separated) and its content.</summary>
-    /// <param name="Path">The path, relative to the output folder.</param>
-    /// <param name="Content">The bytes.</param>
-    public sealed record DocumentFile(string Path, ReadOnlyMemory<byte> Content);
-
     /// <summary>
     /// Writes a <see cref="StyledDocument"/> as a folder of HTML: <c>index.html</c> (a DOCMaker document's contents, or a
     /// SimpleText document's text), <c>chapter-NN.html</c> per DOCMaker chapter, <c>style.css</c>, and the pictures in
@@ -29,6 +25,9 @@ namespace ClassicMac.Resources.Decoders.Documents
     /// </remarks>
     public static class HtmlDocuments
     {
+        /// <summary>The converter's name in manifests.</summary>
+        public const string ConverterName = "document.html";
+
         /// <summary>The document's files: pages first, then <c>style.css</c>, then the pictures by ID.</summary>
         public static IReadOnlyList<DocumentFile> Write(StyledDocument document, DecodeOptions? options = null,
             ICollection<Diagnostic>? diagnostics = null)
@@ -229,13 +228,14 @@ namespace ClassicMac.Resources.Decoders.Documents
             }
 
             // One line: a paragraph styled by its first run (its line height), its text in spans per run; an empty line
-            // keeps its height.
+            // (or one of control characters only, which are dropped) keeps its height.
             private void Paragraph(StringBuilder html, DocumentChapter chapter, int start, int end)
             {
                 var runs = chapter.Text.Runs;
                 var first = runs.FirstOrDefault(r => r.Start <= start && start < r.Start + r.Length) ?? runs.LastOrDefault();
                 html.Append("<p").Append(first is null ? "" : $" class=\"{Style(first)}\"").Append('>');
-                if (start == end)
+                var line = chapter.Text.Text.AsSpan(start, end - start);
+                if (!line.ContainsAnyExceptInRange('\0', '\u001F') && !line.Contains('\t'))
                 {
                     html.Append("<br>");
                 }

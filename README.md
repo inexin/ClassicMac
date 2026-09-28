@@ -13,6 +13,7 @@ dotnet run --project src/ClassicMac.App -- "some disk.img"          # the viewer
 dotnet run --project src/ClassicMac.Resources.Cli -- list "some disk.img"
 dotnet run --project src/ClassicMac.Resources.Cli -- extract "App.rsrc" -o out
 dotnet run --project src/ClassicMac.Resources.Cli -- unpack "some disk.img" -o files
+dotnet run --project src/ClassicMac.Resources.Cli -- convert "Manual" -o manual
 ```
 
 Related: [QuickDraw.Pict](https://github.com/inexin/QuickDraw.Pict), which draws PICT pictures and QuickDraw images

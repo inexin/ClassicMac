@@ -10,7 +10,7 @@ using ClassicMac.Files;
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c> and <c>extract</c>; <c>pack</c> joins
+    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c> and <c>convert</c>; <c>pack</c> joins
     /// in phase 5. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
     /// </summary>
     internal sealed class CommandLine(TextWriter output, TextWriter error)
@@ -101,6 +101,7 @@ namespace ClassicMac.Resources.Cli
             root.Subcommands.Add(ListCommand());
             root.Subcommands.Add(UnpackCommand());
             root.Subcommands.Add(ExtractCommand());
+            root.Subcommands.Add(ConvertCommand());
             return root;
         }
 
@@ -177,12 +178,11 @@ namespace ClassicMac.Resources.Cli
             };
             var raw = new Option<bool>("--raw") { Description = "Write each resource's data (decompressed) as .bin, without decoding" };
             var keepRaw = new Option<bool>("--keep-raw") { Description = "Also keep the raw data in raw/, for pack" };
-            var screenDepth = new Option<int>("--screen-depth")
+            var screenDepth = ScreenDepthOption();
+            var noDocuments = new Option<bool>("--no-documents")
             {
-                Description = "Screen depth pictures are drawn at: 32 (full colour), or 1, 2, 4, 8 or 16 bits with QuickDraw's colour matching and dithering",
-                DefaultValueFactory = _ => Decoders.DecodeOptions.Default.ScreenDepth,
+                Description = "Do not convert DOCMaker and SimpleText documents to HTML (in document/)",
             };
-            screenDepth.AcceptOnlyFromAmong("1", "2", "4", "8", "16", "32");
             var types = new Option<string[]>("--type", "-t")
             {
                 Description = "Only resources of this type (repeatable; four characters, e.g. \"snd \", or \\xHH escapes)",
@@ -196,25 +196,22 @@ namespace ClassicMac.Resources.Cli
             var overwrite = new Option<bool>("--overwrite") { Description = "Write into output folders that already hold files" };
             var command = new Command("extract", "Extract resources into a folder with a manifest")
             {
-                input, outputDir, raw, keepRaw, types, overwrite, screenDepth,
+                input, outputDir, raw, keepRaw, types, overwrite, screenDepth, noDocuments,
             };
             command.SetAction(result =>
             {
                 var chosen = result.GetValue(types) is { Length: > 0 } list
                     ? list.Select(t => { FourCC.TryParse(t, out var type); return type; }).ToHashSet()
                     : null;
+                var decodeOptions = DecodeOptionsFrom(result, screenDepth);
+                var decode = !result.GetValue(raw);
                 return new ExtractCommand(output, error).Run(
                     result.GetRequiredValue(input), result.GetValue(outputDir),
                     Export.ExportOptions.Default with
                     {
                         KeepRaw = result.GetValue(keepRaw),
-                        Decoders = result.GetValue(raw)
-                            ? []
-                            : Decoders.ResourceDecoders.Create(Decoders.DecodeOptions.Default with
-                            {
-                                ScreenDepth = result.GetValue(screenDepth),
-                                QuickDraw = ReadOptionsFrom(result).ResourceManager,
-                            }),
+                        Decoders = decode ? Decoders.ResourceDecoders.Create(decodeOptions) : [],
+                        Documents = decode && !result.GetValue(noDocuments) ? Decoders.ResourceDecoders.CreateDocumentConverters(decodeOptions) : [],
                         Types = chosen,
                         Overwrite = result.GetValue(overwrite),
                         ReadOptions = ReadOptionsFrom(result),
@@ -223,6 +220,43 @@ namespace ClassicMac.Resources.Cli
             });
             return command;
         }
+
+        private Command ConvertCommand()
+        {
+            var input = InputArgument();
+            var outputDir = new Option<DirectoryInfo>("--output", "-o")
+            {
+                Description = "Output folder (default: \"<input> documents\" next to the input)",
+            };
+            var screenDepth = ScreenDepthOption();
+            var overwrite = new Option<bool>("--overwrite") { Description = "Write into an output folder that already holds files" };
+            var command = new Command("convert", "Convert the DOCMaker and SimpleText documents inside the input to HTML folders")
+            {
+                input, outputDir, overwrite, screenDepth,
+            };
+            command.SetAction(result => new ConvertCommand(output, error).Run(
+                result.GetRequiredValue(input), result.GetValue(outputDir),
+                Decoders.ResourceDecoders.CreateDocumentConverters(DecodeOptionsFrom(result, screenDepth)), ReadOptionsFrom(result),
+                ContainerOptionsFrom(result), result.GetValue(overwrite), result.GetValue(strict), result.GetValue(quiet)));
+            return command;
+        }
+
+        private static Option<int> ScreenDepthOption()
+        {
+            var screenDepth = new Option<int>("--screen-depth")
+            {
+                Description = "Screen depth pictures are drawn at: 32 (full colour), or 1, 2, 4, 8 or 16 bits with QuickDraw's colour matching and dithering",
+                DefaultValueFactory = _ => Decoders.DecodeOptions.Default.ScreenDepth,
+            };
+            screenDepth.AcceptOnlyFromAmong("1", "2", "4", "8", "16", "32");
+            return screenDepth;
+        }
+
+        private Decoders.DecodeOptions DecodeOptionsFrom(ParseResult result, Option<int> screenDepth) => Decoders.DecodeOptions.Default with
+        {
+            ScreenDepth = result.GetValue(screenDepth),
+            QuickDraw = ReadOptionsFrom(result).ResourceManager,
+        };
 
         // Sizes: plain bytes, or a number with KiB, MiB or GiB (also K, M, G), case-insensitive.
         internal static long ParseSize(ArgumentResult result)
