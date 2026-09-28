@@ -6,7 +6,7 @@ using ClassicMac.Core;
 namespace ClassicMac.Files.Containers
 {
     /// <summary>
-    /// The type and creator File Exchange 9.0 shows for a file on a DOS disk whose Finder info is the <c>TEXT</c>/<c>dosa</c>
+    /// The type and creator File Exchange 3.0.2 (Mac OS 9.0) shows for a file on a DOS disk whose Finder info is the <c>TEXT</c>/<c>dosa</c>
     /// placeholder: Internet Config's map of name endings (<c>.doc</c> → <c>WDBN</c>/<c>MSWD</c>), matched against the
     /// long name without regard to case, longest ending first, the earlier entry on a tie. Other types are shown as
     /// stored. File Exchange writes the mapped type into <c>FINDER.DAT</c> only when the file's data fork is closed or

@@ -213,7 +213,7 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 | `info <input>` | Companions, container chain, Finder info, dates, fork sizes (built) | — | 1 |
 | `list <input>` | Resources of every file inside the input, through containers; a data fork holding a resource fork (Realmz `.rsf`) or a raw fork file is read as a fork (built) | `--format text\|json` | 1 |
 | `unpack <input>` | Every Mac file inside the input, through containers and disk images, to a folder with both forks and Finder info; folders kept, a container of one file replaced by it, a disk or archive of several becomes a folder (built) | `-o <dir>`, `--layout appledouble\|basilisk`, `--overwrite` | 2 |
-| `extract <input>` | Resources into a folder with a manifest; a folder per file when the input holds several (raw built) | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`; later `--depth`, `--encoding` | 1 (raw), 3 (decoded) |
+| `extract <input>` | Resources into a folder with a manifest; a folder per file when the input holds several; decoded by default (built) | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`, `--screen-depth`; later `--encoding` | 1 (raw), 3 (decoded) |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest | `-o <file>`, `--base <fork>`, `--allow-deletes`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`
@@ -266,7 +266,7 @@ MyApp/
   CODE/1.bin
 ```
 
-- **Images:** 32-bit RGBA PNG by default; `--depth` renders at a chosen screen depth (1, 2, 4, 8, 16 bit).
+- **Images:** 32-bit RGBA PNG by default; `--screen-depth` renders at a chosen screen depth (1, 2, 4, 8, 16 bit).
 - **Round trip:** a `pack` command rebuilds a resource fork from the folder and manifest (below).
 
 ### Names on disk
@@ -489,7 +489,7 @@ They change what running applications see, not what a file contains.
 - **PC Exchange / File Exchange:** from the disassembly of PC Exchange 1.0.4 and File Exchange 3.0.2 (the same format
   in both), confirmed on a FAT12 disk in SheepShaver: browsing alone creates records (zero dates, `TEXT`/`dosa`);
   creation comes from the DOS entry, modification is the later of the DOS entry's and the record's; DOS keeps even
-  seconds, and years from 2032 read as 128 years earlier (Mac 1904–1979). The only type mapping (File Exchange 9.0's
+  seconds, and years from 2032 read as 128 years earlier (Mac 1904–1979). The only type mapping (File Exchange 3.0.2's
   own table is always empty) is Internet Config's map of name endings, applied to the `TEXT`/`dosa` placeholder and
   written back only when the data fork is closed, so readers show stored types and apply a map only when the app
   supplies one (`ExtensionMap`; no Apple-derived table ships). Names without a record come from the VFAT long name as

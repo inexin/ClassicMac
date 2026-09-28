@@ -30,8 +30,9 @@ namespace ClassicMac.Files
         private readonly IReadOnlyList<IContainerReader> readers;
 
         /// <summary>
-        /// The built-in readers: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex 4.0, Apple partition maps,
-        /// Disk Copy 4.2, HFS and MFS volumes, FAT volumes with PC Exchange data, and ISO 9660 / High Sierra volumes.
+        /// The built-in readers, in the order they are tried: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex
+        /// 4.0, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS and MFS volumes, DOS partition tables, FAT volumes
+        /// with PC Exchange data, raw CD images, cue sheets, and ISO 9660 / High Sierra volumes.
         /// </summary>
         public static ContainerUnwrapper Default { get; } = new([]);
 

@@ -5,7 +5,7 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Files.Fat
 {
-    // Names of FAT files without a FINDER.DAT record as File Exchange 9.0 shows them (disassembly of PCXFS
+    // Names of FAT files without a FINDER.DAT record as File Exchange 3.0.2 (Mac OS 9.0) shows them (disassembly of PCXFS
     // Win95NameToMac, MakeCRC, FindExtension and UDFChecksum; confirmed in SheepShaver).
     internal static class FatNames
     {
