@@ -1,0 +1,19 @@
+{
+  "version": "\\x00\\x01\\x00\\x00",
+  "trueType": true,
+  "familyName": "Test",
+  "subfamilyName": null,
+  "fullName": "Te",
+  "tables": [
+    {
+      "tag": "glyf",
+      "offset": 44,
+      "length": 0
+    },
+    {
+      "tag": "name",
+      "offset": 44,
+      "length": 38
+    }
+  ]
+}

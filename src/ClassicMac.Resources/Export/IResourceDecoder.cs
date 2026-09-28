@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Resources.Export
@@ -59,6 +60,10 @@ namespace ClassicMac.Resources.Export
 
         /// <summary>Where problems go.</summary>
         public ICollection<Diagnostic> Diagnostics { get; }
+
+        /// <summary>The IDs and names (decoded as Mac OS Roman) of the fork's resources of <paramref name="type"/>, in the fork's order.</summary>
+        public IEnumerable<(short Id, string? Name)> Ids(FourCC type) =>
+            fork.OfType(type).Select(r => (r.Id, r.Name?.ToMacRoman()));
 
         /// <summary>
         /// Another resource of the same fork, decompressed (a <c>TEXT</c> decoder looks for the <c>styl</c> of the same

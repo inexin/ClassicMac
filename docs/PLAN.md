@@ -17,7 +17,7 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Core`, `ClassicMac.Files`,
-`ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app
+`ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Fonts`, `ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app
 carries the same name. QuickDraw.Pict stays a
 separate repo and package for now; merging it into ClassicMac (as `ClassicMac.QuickDraw` and `ClassicMac.Pict`) is the
 long-term intent.
@@ -233,7 +233,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | Images | `PICT`, `ICON`, `ICN#`, `ics#`, `icm#`, `icl4/8`, `ics4/8`, `icm4/8`, `cicn`, `SICN`, `CURS`, `crsr`, `PAT `, `PAT#`, `ppat`, `ppt#` (built); `icns` later | PNG via QuickDraw.Pict (screen depth selectable); cursors add a JSON file (hotspot, inverted pixels); lists give one image each (`.1.png` …). The image format is a setting (`IImageEncoder`, PNG built in; lossless WebP later) |
 | Sound | `snd ` formats 1 and 2, standard/extended/compressed headers: PCM (`raw `, `twos`, `sowt`, `in24`, `in32`, `fl32`, `fl64`), MACE 3:1/6:1, IMA4 and µ-law (built; the codecs from the Sound Manager 3.5.1 disassembly, byte-identical to its output on harness samples); AIFF/AIFC files later (the Sound Manager plays them through the same decompressors); `csnd` is not a Sound Manager type | WAV (rate rounded; loop and base note in a `smpl` chunk) plus JSON (exact rate, header, synthesizers, commands); commands-only sounds give the JSON alone |
 | Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text (`STR `, `TEXT`), JSON (`STR#`, `styl`, `vers`); styled text also as RTF (built) |
-| Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
+| Fonts | `sfnt`; `NFNT`/`FONT` + `FOND`; `fctb` (built, through `ClassicMac.Fonts`) | TTF; BDF, a glyph sheet PNG and metrics JSON (built) |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL`, and their colour and extension resources (`wctb`, `dctb`, `actb`, `cctb`, `mctb`, `ictb`, `dlgx`, `alrx`, `xmnu`) (built) | JSON (built), optionally a rendered preview of the dialog |
 | Colour | `clut`, `pltt` (built) | JSON and `.act` palettes (built) |
 | Finder | `BNDL`, `FREF`, `SIZE` (built) | JSON (built) |
@@ -318,8 +318,10 @@ flowchart LR
         M["ClassicMac.Resources<br/>resource map, dcmp,<br/>read and write"]
         D["ClassicMac.Resources.Decoders<br/>images to PNG, sound to WAV,<br/>text, fonts, UI to JSON"]
     end
+    T["ClassicMac.Fonts<br/>NFNT/FONT, FOND, fctb,<br/>sfnt parsing"]
     E["CLI · viewer app<br/>unwrap, browse, export,<br/>pack back"]
-    B --> F & M
+    B --> F & M & T
+    T --> D
     M --> F
     M --> D
     F & D --> E
@@ -345,6 +347,12 @@ flowchart LR
   - `ClassicMac.Files.Archives` (later): zip and tar with Mac data, StuffIt, Compact Pro, DiskDoubler, PackIt.
 - **ClassicMac.Resources** — the resource map and `dcmp`; depends on Core only.
 - **ClassicMac.Encodings** — the multi-byte Mac text encodings; optional, depends on Core.
+- **ClassicMac.Fonts** (decided) — the Font Manager's resources: bitmap strikes (`NFNT`, `FONT`), families
+  (`FOND`), font colour tables (`fctb`) and TrueType `sfnt` data, parsed into glyphs as plain pixel arrays and metrics;
+  depends on Core only. It finds a family's strikes through a small lookup (type and ID to bytes) rather than
+  `ClassicMac.Resources`, so the renderer can use it too. The decoders use it for font export; after the QuickDraw.Pict
+  merge `ClassicMac.QuickDraw` uses it for text and QuickDraw.Pict's own parser goes. Until then QuickDraw.Pict keeps
+  its parser, and the two are checked against the same fonts.
 - **ClassicMac.Resources.Decoders** — the built-in decoders, one package with a namespace per area (text, images,
   sound; decided, like the file layer); depends on Resources, and on QuickDraw.Pict once images arrive.
 - **CLI** — a `dotnet tool` with `info`, `list`, `extract` and `pack`; references the file and resource packages.
@@ -362,7 +370,7 @@ global.json                 .NET 10 SDK, rolling forward to the latest feature b
 Directory.Build.props       shared settings (below) and package metadata
 Directory.Packages.props    every package version, in one place
 src/ClassicMac.<Package>/   one folder per package; the app goes in src/ClassicMac.App/
-                            today: Core, Files, Resources, Resources.Cli
+                            today: Core, Files, Fonts, Resources, Resources.Decoders, Resources.Cli, App
 tests/ClassicMac.<Package>.Tests/   one test project per package
 tests/fixtures/             synthetic fixtures (and their Rez sources)
 schemas/                    manifest JSON Schemas
@@ -388,7 +396,7 @@ with a test that fails on any dependency pointing up; the merge moves those fold
 | `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), PackBits, colour-table and PixMap reading | Core (`MacRect`, `MacPoint`, `Fixed`) |
 | `ClassicMac.QuickTime` | ImageDescription, the codecs (`raw `, `rle `, `rpza`, `smc `, `cvid`, `8BPS`, `yuv2`, `YVU9`, `tga `), the codec plugin hook, QTIF files | Graphics, MacPaint (its `PNTG` codec) |
 | `ClassicMac.MacPaint` (or inside Graphics) | PNTG files and the `PNTG` codec's decoder | Graphics |
-| `ClassicMac.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics (and font parsing, see open questions) |
+| `ClassicMac.QuickDraw` | The renderer: GrafPort state, regions, shapes, patterns, transfer modes, CopyBits/StretchBits, text drawing, screen depths, with a public drawing API (`FrameRect`, `PaintRgn`, `CopyBits`, `DrawText`, …) on a canvas | Graphics, Fonts |
 | `ClassicMac.Pict` | The PICT file format: the opcode reader that replays a picture into the renderer, and the writer | QuickDraw, QuickTime |
 | `ClassicMac.Core`, `ClassicMac.Files` | The shared base and the file layer (unchanged by the merge) | nothing; Files on Core |
 | `ClassicMac.Resources` (+ `.Decoders`) | Resource forks; icons, cursors and patterns become resource decoders here | Core; the decoders on Graphics, QuickDraw |
@@ -690,7 +698,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    *Exit:* extract → `pack` is byte-identical for unchanged resources. **Built:** UI resources and their colour and
    extension resources to JSON with dialog, alert and menu previews ([formats/INTERFACE.md](formats/INTERFACE.md)),
    palettes, Finder resources, and `pack` with MacBinary III, BinHex 4.0 and AppleSingle writers; the exit check passes
-   on the whole corpus (the corpus test packs every export back). Fonts wait for the open question below.
+   on the whole corpus (the corpus test packs every export back); fonts through the new `ClassicMac.Fonts`
+   ([formats/FONTS.md](formats/FONTS.md)).
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers.
 7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders).
 8. **Editor III** — writing HFS disk images.
@@ -712,6 +721,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Target framework:** .NET 10 (LTS; .NET 8 support ends November 2026).
 - **Disk images early:** phase 2, right after the core, because much classic software survives only as disk images.
 - **Decoder priority after images:** text, sound, UI, fonts.
+- **Fonts package:** a standalone `ClassicMac.Fonts` on Core only (2026-09-28); see Architecture.
 - **Image output:** 32-bit RGBA PNG by default; other screen depths on request.
 - **Editing order:** resource-level edits, typed editors, then writing disk images.
 - **Names on disk:** `%XX` escaping, reserved-name escaping, hex suffix on case collisions; the manifest is the
@@ -749,5 +759,5 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
 ## Open questions
 
-- [ ] **Fonts package:** a `ClassicMac.Fonts` package for `FONT`/`NFNT`/`FOND`/`fctb` parsing (used by the renderer's
-  text and by font export), or font parsing inside `ClassicMac.QuickDraw`?
+- [x] **Fonts package:** decided: a standalone `ClassicMac.Fonts` on Core only, used by the decoders and, after the
+  merge, by `ClassicMac.QuickDraw` (see Architecture).

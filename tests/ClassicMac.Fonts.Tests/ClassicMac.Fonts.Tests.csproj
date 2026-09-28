@@ -14,11 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ClassicMac.Resources.Decoders\ClassicMac.Resources.Decoders.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.Fonts\ClassicMac.Fonts.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
-    <Compile Include="..\ClassicMac.Fonts.Tests\FontBuilder.cs" Link="Builders\FontBuilder.cs" />
-  </ItemGroup>
 </Project>

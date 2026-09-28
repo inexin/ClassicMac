@@ -553,6 +553,7 @@ version 1.
 | `image.pattern` | `PAT `, `ppat`; `PAT#`, `ppt#` | `.png`; lists: `.1.png` | lists: `.2.png`, … | null | section 8.6 |
 | `sound.snd` | `snd ` | `.wav`, or `.json` for a sound of commands only | `.json` after a `.wav` | null | [SOUND.md](SOUND.md) |
 | `ui.menu`, `ui.menu-bar`, `ui.window`, `ui.dialog`, `ui.alert`, `ui.dialog-items`, `ui.control` | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL` | `.json` | — | `macintosh` | [INTERFACE.md](INTERFACE.md) |
+| `font.bitmap`, `font.family`, `font.outline`, `font.colors` | `NFNT`, `FONT`; `FOND`; `sfnt`; `fctb` | strikes `.png`; `.json`; `.ttf`; `.json` | strikes `.bdf`, `.json`; `sfnt` `.json` | `FOND`: `macintosh` | [FONTS.md](FONTS.md) |
 | `finder.bundle`, `finder.file-reference`, `finder.size` | `BNDL`, `FREF`, `SIZE` | `.json` | — | `macintosh` | [FINDER.md](FINDER.md) |
 | `color.table`, `color.palette` | `clut`, `pltt` | `.json` | `.act` | null | [PALETTES.md](PALETTES.md) |
 | `ui.colors`, `ui.menu-colors`, `ui.item-colors`, `ui.dialog-extension`, `ui.alert-extension`, `ui.menu-extension` | `wctb`, `dctb`, `actb`, `cctb`; `mctb`; `ictb`; `dlgx`; `alrx`; `xmnu` | `.json` | — | null | [INTERFACE.md](INTERFACE.md) |
@@ -763,6 +764,7 @@ Other codes reach the manifest from the code the exporter calls:
 - the interface decoders (`ui.*`): [INTERFACE.md](INTERFACE.md);
 - the palette decoders (`color.*`): [PALETTES.md](PALETTES.md);
 - the Finder decoders (`finder.*`): [FINDER.md](FINDER.md);
+- the font decoders (`font.*`): [FONTS.md](FONTS.md);
 - the document converter (`document.*`): [DOCUMENTS.md](DOCUMENTS.md).
 
 The viewer also reports `export.failed` (Error) when an export cannot be written (a file-system error, or an export

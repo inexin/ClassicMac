@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `ClassicMac.Fonts`, a new package on Core only: bitmap strikes (`NFNT`, `FONT`), families (`FOND`) with their width,
+  kerning and style-mapping tables, font colour tables and TrueType `sfnt` data. Font decoders: strikes to a glyph
+  sheet PNG, BDF and metrics JSON; families and font colours to JSON; `sfnt` to `.ttf`. Specified in
+  `docs/formats/FONTS.md`.
 - `pack`: an export folder back into a resource fork, raw or in an AppleDouble, AppleSingle, MacBinary III or
   BinHex 4.0 file (new writers for the last three); unchanged resources come back byte for byte from `raw/` or a
   base fork. The corpus test now packs every export back.

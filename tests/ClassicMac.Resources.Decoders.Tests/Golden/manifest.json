@@ -1305,6 +1305,143 @@
       "encoding": "macintosh"
     },
     {
+      "type": "FOND",
+      "typeBytes": "464F4E44",
+      "id": 1024,
+      "name": "Example",
+      "attributes": 0,
+      "size": 2775,
+      "storedSize": 360,
+      "dcmp": null,
+      "decoder": "font.family",
+      "decoderVersion": 1,
+      "path": "FOND/1024 Example.json",
+      "sha256": "72662b6b602b57748fc17d5a8165277a008c5f174b4b169ab543217f554ed7ee",
+      "storedSha256": "c3695b1601676ec78f4853f17a80112fbc2ea1d685ca54645f62b254da2acf52",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [],
+      "encoding": "macintosh"
+    },
+    {
+      "type": "FONT",
+      "typeBytes": "464F4E54",
+      "id": 1033,
+      "name": null,
+      "attributes": 0,
+      "size": 131,
+      "storedSize": 56,
+      "dcmp": null,
+      "decoder": "font.bitmap",
+      "decoderVersion": 1,
+      "path": "FONT/1033.png",
+      "sha256": "e696c48b6a60b3197772b27422cbe51d0ab7756ced4d3ceebf61f62a78e24639",
+      "storedSha256": "44edd301ccd27365966035248364501af0a95b32b04db45e2b1acee551229dfd",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "FONT/1033.bdf",
+          "sha256": "6a7c3594f7e32d8fb7dddacb5324fefb83f6733bca799fd6182545a008100f61"
+        },
+        {
+          "path": "FONT/1033.json",
+          "sha256": "a6e4e1c8fde51a0c31e34cc636897ccc77665beaca2894359517be6a5b4605cf"
+        }
+      ],
+      "encoding": null
+    },
+    {
+      "type": "NFNT",
+      "typeBytes": "4E464E54",
+      "id": 1036,
+      "name": null,
+      "attributes": 0,
+      "size": 131,
+      "storedSize": 76,
+      "dcmp": null,
+      "decoder": "font.bitmap",
+      "decoderVersion": 1,
+      "path": "NFNT/1036.png",
+      "sha256": "e696c48b6a60b3197772b27422cbe51d0ab7756ced4d3ceebf61f62a78e24639",
+      "storedSha256": "2f1da73bbb17c2f2a19000e7f2787ca14a7ba6bc7a26ae32de9f9acea622d351",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "NFNT/1036.bdf",
+          "sha256": "5a6cda7a124cec0d4e7e9ab94227c702d49ebaf696a0ec8f25629ba010773e09"
+        },
+        {
+          "path": "NFNT/1036.json",
+          "sha256": "c2d76b6801a131f896dddee6c6748668ac019a640c2e57b11a615f94dbd365e5"
+        }
+      ],
+      "encoding": null
+    },
+    {
+      "type": "sfnt",
+      "typeBytes": "73666E74",
+      "id": 1024,
+      "name": null,
+      "attributes": 0,
+      "size": 82,
+      "storedSize": 82,
+      "dcmp": null,
+      "decoder": "font.outline",
+      "decoderVersion": 1,
+      "path": "sfnt/1024.ttf",
+      "sha256": "1d0b60380571b963359b290f5f186b02481924fa63179c0092fc2e8d996f1b93",
+      "storedSha256": "1d0b60380571b963359b290f5f186b02481924fa63179c0092fc2e8d996f1b93",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "sfnt/1024.json",
+          "sha256": "9147a90f63a2c50dcabcb1840b345d83351c2b4f37434691e8d914dc2e168f43"
+        }
+      ],
+      "encoding": null
+    },
+    {
+      "type": "FONT",
+      "typeBytes": "464F4E54",
+      "id": 1024,
+      "name": "Example",
+      "attributes": 0,
+      "size": 45,
+      "storedSize": 0,
+      "dcmp": null,
+      "decoder": "font.bitmap",
+      "decoderVersion": 1,
+      "path": "FONT/1024 Example.json",
+      "sha256": "77b942fc06dff62a26ae6619f271a4aba6a9a712036c366892856958eb9ea4d7",
+      "storedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [],
+      "encoding": null
+    },
+    {
+      "type": "fctb",
+      "typeBytes": "66637462",
+      "id": 1036,
+      "name": null,
+      "attributes": 0,
+      "size": 240,
+      "storedSize": 24,
+      "dcmp": null,
+      "decoder": "font.colors",
+      "decoderVersion": 1,
+      "path": "fctb/1036.json",
+      "sha256": "4c6b9b7b3b2d125578282d66356d70c4a2e8c54fb130f9c31cd533f6e41e105f",
+      "storedSha256": "73d9d67df12d2d2f7e728a5d96293e9ab472b2304a6565fe2b58cb0ad413ec30",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [],
+      "encoding": null
+    },
+    {
       "type": "CODE",
       "typeBytes": "434F4445",
       "id": 1,

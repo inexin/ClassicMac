@@ -825,6 +825,95 @@
           "file": "SIZE--1.json"
         }
       ]
+    },
+    {
+      "key": "FOND-1024",
+      "decoder": "font.family 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "FOND-1024.json"
+        }
+      ]
+    },
+    {
+      "key": "FONT-1033",
+      "decoder": "font.bitmap 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "e696c48b6a60b3197772b27422cbe51d0ab7756ced4d3ceebf61f62a78e24639",
+          "length": 131
+        },
+        {
+          "extension": ".bdf",
+          "file": "FONT-1033.bdf"
+        },
+        {
+          "extension": ".json",
+          "file": "FONT-1033.json"
+        }
+      ]
+    },
+    {
+      "key": "NFNT-1036",
+      "decoder": "font.bitmap 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "e696c48b6a60b3197772b27422cbe51d0ab7756ced4d3ceebf61f62a78e24639",
+          "length": 131
+        },
+        {
+          "extension": ".bdf",
+          "file": "NFNT-1036.bdf"
+        },
+        {
+          "extension": ".json",
+          "file": "NFNT-1036.json"
+        }
+      ]
+    },
+    {
+      "key": "sfnt-1024",
+      "decoder": "font.outline 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".ttf",
+          "sha256": "1d0b60380571b963359b290f5f186b02481924fa63179c0092fc2e8d996f1b93",
+          "length": 82
+        },
+        {
+          "extension": ".json",
+          "file": "sfnt-1024.json"
+        }
+      ]
+    },
+    {
+      "key": "FONT-1024",
+      "decoder": "font.bitmap 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "FONT-1024.json"
+        }
+      ]
+    },
+    {
+      "key": "fctb-1036",
+      "decoder": "font.colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "fctb-1036.json"
+        }
+      ]
     }
   ]
 }

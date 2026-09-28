@@ -142,6 +142,16 @@ internal static class GoldenFixtures
         yield return Res("FREF", 129, [.. "TEXT"u8, 0, 7, 0]);
         yield return Res("SIZE", -1, [0x58, 0x80, 0, 0x20, 0, 0, 0, 0x10, 0, 0]);
 
+        // Fonts: the family "Example" (FOND 1024) with a 9-point FONT (1033), a 12-point NFNT (1036, with width and height
+        // tables), and its outline font (sfnt 1024); the old-style family-name FONT (family 8 × 128, empty); a 2-bit colour
+        // NFNT's colour table.
+        yield return Res("FOND", 1024, ClassicMac.Fonts.Tests.FontBuilder.Family(), "Example");
+        yield return Res("FONT", 1033, ClassicMac.Fonts.Tests.FontBuilder.Sample());
+        yield return Res("NFNT", 1036, ClassicMac.Fonts.Tests.FontBuilder.Sample(tables: true));
+        yield return Res("sfnt", 1024, ClassicMac.Fonts.Tests.FontBuilder.Sfnt());
+        yield return Res("FONT", 1024, [], "Example");
+        yield return Res("fctb", 1036, [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0xFF, 0xFF, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0xFF, 0xFF]);
+
         // A type no decoder handles: exported raw.
         yield return Res("CODE", 1, [0x4E, 0x75]);
     }

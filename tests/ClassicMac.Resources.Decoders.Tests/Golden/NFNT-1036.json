@@ -1,0 +1,48 @@
+{
+  "family": "Example",
+  "size": 12,
+  "style": 0,
+  "fontType": 36867,
+  "depth": 1,
+  "fixedWidth": false,
+  "firstChar": 65,
+  "lastChar": 67,
+  "ascent": 4,
+  "descent": 1,
+  "leading": 1,
+  "maxWidth": 4,
+  "maxKern": -1,
+  "rectWidth": 3,
+  "rectHeight": 5,
+  "glyphs": [
+    {
+      "character": 65,
+      "text": "A",
+      "advance": 4,
+      "left": -1,
+      "width": 3,
+      "fractionalAdvance": 4.5,
+      "top": 0,
+      "rows": 4
+    },
+    {
+      "character": 67,
+      "text": "C",
+      "advance": 3,
+      "left": 0,
+      "width": 2,
+      "fractionalAdvance": 3.5,
+      "top": 0,
+      "rows": 4
+    },
+    {
+      "character": -1,
+      "advance": 4,
+      "left": -1,
+      "width": 3,
+      "fractionalAdvance": 4.5,
+      "top": 0,
+      "rows": 3
+    }
+  ]
+}
