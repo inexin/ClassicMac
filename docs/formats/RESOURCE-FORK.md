@@ -259,7 +259,8 @@ Macintosh Toolbox*].
 
 A signed 16-bit ID, unique within its type. *Inside Macintosh* reserves −32768 to −16385, gives −16384 to −1 to
 resources owned by other system resources (drivers, desk accessories), 0 to 127 to system resources, and leaves 128 to
-32767 to applications [Doc: *More Macintosh Toolbox*]. The format does not enforce any of this, and neither does ClassicMac.
+32767 to applications [Doc: *More Macintosh Toolbox*]. The format does not enforce any of this, and neither does
+ClassicMac.
 
 ### 6.3 Names
 
