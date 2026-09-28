@@ -1,0 +1,22 @@
+{
+  "title": "Maps",
+  "bounds": {
+    "top": 40,
+    "left": 40,
+    "bottom": 300,
+    "right": 440
+  },
+  "definition": 8,
+  "definitionName": "zoomDocProc",
+  "visible": true,
+  "goAway": true,
+  "refCon": 7,
+  "position": {
+    "code": 10250,
+    "name": "centerMainScreen",
+    "used": true,
+    "screen": "main",
+    "centerHorizontally": true,
+    "vertical": "center"
+  }
+}

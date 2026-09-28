@@ -1,0 +1,16 @@
+{
+  "title": "Save",
+  "bounds": {
+    "top": 50,
+    "left": 50,
+    "bottom": 150,
+    "right": 350
+  },
+  "definition": 5,
+  "definitionName": "movableDBoxProc",
+  "visible": true,
+  "goAway": false,
+  "refCon": 0,
+  "items": 128,
+  "position": null
+}

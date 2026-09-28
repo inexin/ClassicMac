@@ -551,6 +551,7 @@ version 1.
 | `image.cursor` | `CURS`, `crsr` | `.png` | `.json` (section 8.5) | null | section 8.5 |
 | `image.pattern` | `PAT `, `ppat`; `PAT#`, `ppt#` | `.png`; lists: `.1.png` | lists: `.2.png`, … | null | section 8.6 |
 | `sound.snd` | `snd ` | `.wav`, or `.json` for a sound of commands only | `.json` after a `.wav` | null | [SOUND.md](SOUND.md) |
+| `ui.menu`, `ui.menu-bar`, `ui.window`, `ui.dialog`, `ui.alert`, `ui.dialog-items`, `ui.control` | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL` | `.json` | — | `macintosh` | [INTERFACE.md](INTERFACE.md) |
 
 The image extensions are those of the configured image encoder (`.png` by default, section 8.1). Every other type,
 `CODE` included, is written raw.
@@ -755,6 +756,7 @@ Other codes reach the manifest from the code the exporter calls:
 - reading the fork and decompressing resources (`fork.*`, `resource.*`): [RESOURCE-FORK.md](RESOURCE-FORK.md);
 - the text decoders (`text.*`): [TEXT.md](TEXT.md);
 - the sound decoder (`sound.*`): [SOUND.md](SOUND.md);
+- the interface decoders (`ui.*`): [INTERFACE.md](INTERFACE.md);
 - the document converter (`document.*`): [DOCUMENTS.md](DOCUMENTS.md).
 
 The viewer also reports `export.failed` (Error) when an export cannot be written (a file-system error, or an export

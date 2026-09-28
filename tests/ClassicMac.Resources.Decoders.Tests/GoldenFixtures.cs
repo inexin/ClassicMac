@@ -90,9 +90,34 @@ internal static class GoldenFixtures
         yield return Res("snd ", 136, SoundFormat1(Long(0xFE, 1, 16, 16, "ulaw", -1, Bytes(16, 0x17))));
         yield return Res("snd ", 137, [0, 1, 0, 0, 0, 2, 0, 40, 0, 60, 0, 0, 3, 0xE8, 0, 46, 0, 0, 1, 0, 1, 0]);
 
+        // Interface resources (Inside Macintosh: Macintosh Toolbox Essentials): a menu with a divider, a Command key, a
+        // check mark, a submenu and a disabled item (Quit); a menu bar; window, dialog and alert templates with and without the
+        // positioning word; an item list of every type; controls.
+        yield return Res("MENU", 128, [0, 128, 0, 0, 0, 0, 0, 0, 0, 0, .. BE32(0b1011_1011), .. Pascal("File"),
+            .. Pascal("Open…"), 0, (byte)'O', 0, 0, .. Pascal("-"), 0, 0, 0, 0, .. Pascal("Checked"), 0, 0, 0x12, 1,
+            .. Pascal("Recent"), 0, 0x1B, 130, 0, .. Pascal("Italic"), 0, 0, 0, 2, .. Pascal("Quit"), 0, (byte)'Q', 0, 0, 0]);
+        yield return Res("MBAR", 128, [0, 3, 0, 1, 0, 128, 0, 129]);
+        yield return Res("WIND", 128, [0, 40, 0, 40, 1, 44, 1, 184, 0, 8, 1, 0, 1, 0, 0, 0, 0, 7, .. Pascal("Maps"), 0, 0x28, 0x0A]);
+        yield return Res("DLOG", 128, [0, 50, 0, 50, 0, 150, 1, 94, 0, 5, 1, 0, 0, 0, 0, 0, 0, 0, 0, 128, .. Pascal("Save")]);
+        yield return Res("ALRT", 128, [0, 40, 0, 40, 0, 140, 1, 144, 0, 128, 0x76, 0x54, 0x30, 0x0A]);
+        yield return Res("DITL", 128, [0, 9,
+            .. DitlItem(4, [60, 10, 80, 70], Pascal("OK")[1..]), .. DitlItem(5, [30, 10, 48, 150], Pascal("Sound")[1..]),
+            .. DitlItem(6, [30, 160, 48, 250], Pascal("Music")[1..]), .. DitlItem(7, [90, 10, 110, 150], [0, 128]),
+            .. DitlItem(8 | 0x80, [10, 50, 26, 250], MacRoman.Encode("Save changes to ^0?")), .. DitlItem(16, [120, 10, 136, 150], []),
+            .. DitlItem(32 | 0x80, [10, 10, 42, 42], [0, 1]), .. DitlItem(64, [140, 10, 172, 42], [0, 128]), .. DitlItem(0, [180, 10, 200, 200], []),
+            .. DitlItem(1, [0, 0, 0, 0], [0, 8, 0, 128, 0, 0])]);
+        yield return Res("DITL", 129, [0, 1, .. DitlItem(4, [0, 0, 20, 60], Pascal("OK")[1..])]); // says 2 items, holds 1
+        yield return Res("CNTL", 128, [0, 10, 0, 10, 0, 26, 0, 150, 0, 1, 1, 0, 0, 5, 0, 1, 3, 0xF0, 0, 0, 0, 0, .. Pascal("Level:")]);
+        // A pop-up menu control: menu 128 (min), title width 60 (max), centred bold title (value), AddResMenu of 'FONT'.
+        yield return Res("CNTL", 129, [0, 40, 0, 10, 0, 60, 0, 200, 0x01, 0x01, 1, 0, 0, 60, 0, 128, 0x03, 0xF4, .. "FONT"u8, .. Pascal("Font:")]);
+
         // A type no decoder handles: exported raw.
         yield return Res("CODE", 1, [0x4E, 0x75]);
     }
+
+    // A dialog item: placeholder, rectangle (top, left, bottom, right), type, length, data padded to even.
+    private static byte[] DitlItem(int type, short[] rect, byte[] data) =>
+        [0, 0, 0, 0, .. rect.SelectMany(v => new[] { (byte)(v >> 8), (byte)v }), (byte)type, (byte)data.Length, .. data, .. (data.Length % 2 == 1 ? new byte[1] : [])];
 
     private static byte[] Pascal(string text) => [(byte)MacRoman.Encode(text).Length, .. MacRoman.Encode(text)];
 

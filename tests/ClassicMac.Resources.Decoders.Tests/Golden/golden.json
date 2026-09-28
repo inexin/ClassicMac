@@ -522,6 +522,107 @@
           "file": "snd_-137.json"
         }
       ]
+    },
+    {
+      "key": "MENU-128",
+      "decoder": "ui.menu 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "MENU-128.json"
+        }
+      ]
+    },
+    {
+      "key": "MBAR-128",
+      "decoder": "ui.menu-bar 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "MBAR-128.json"
+        }
+      ]
+    },
+    {
+      "key": "WIND-128",
+      "decoder": "ui.window 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "WIND-128.json"
+        }
+      ]
+    },
+    {
+      "key": "DLOG-128",
+      "decoder": "ui.dialog 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "DLOG-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ALRT-128",
+      "decoder": "ui.alert 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "ALRT-128.json"
+        }
+      ]
+    },
+    {
+      "key": "DITL-128",
+      "decoder": "ui.dialog-items 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "DITL-128.json"
+        }
+      ]
+    },
+    {
+      "key": "DITL-129",
+      "decoder": "ui.dialog-items 1",
+      "diagnostics": [
+        "Warning ui.short"
+      ],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "DITL-129.json"
+        }
+      ]
+    },
+    {
+      "key": "CNTL-128",
+      "decoder": "ui.control 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "CNTL-128.json"
+        }
+      ]
+    },
+    {
+      "key": "CNTL-129",
+      "decoder": "ui.control 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "CNTL-129.json"
+        }
+      ]
     }
   ]
 }

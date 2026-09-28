@@ -1,0 +1,26 @@
+{
+  "title": "Font:",
+  "bounds": {
+    "top": 40,
+    "left": 10,
+    "bottom": 60,
+    "right": 200
+  },
+  "definition": 1012,
+  "definitionName": "popupMenuProc+popupUseAddResMenu",
+  "value": 257,
+  "minimum": 128,
+  "maximum": 60,
+  "visible": true,
+  "refCon": 1179602516,
+  "popup": {
+    "menu": 128,
+    "titleWidth": 60,
+    "titleJustification": 1,
+    "titleNoStyle": false,
+    "titleStyle": [
+      "bold"
+    ],
+    "addResMenu": "FONT"
+  }
+}

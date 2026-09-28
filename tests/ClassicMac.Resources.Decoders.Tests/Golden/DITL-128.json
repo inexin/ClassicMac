@@ -1,0 +1,136 @@
+{
+  "items": [
+    {
+      "number": 1,
+      "type": "button",
+      "typeCode": 4,
+      "enabled": true,
+      "bounds": {
+        "top": 60,
+        "left": 10,
+        "bottom": 80,
+        "right": 70
+      },
+      "text": "OK"
+    },
+    {
+      "number": 2,
+      "type": "checkBox",
+      "typeCode": 5,
+      "enabled": true,
+      "bounds": {
+        "top": 30,
+        "left": 10,
+        "bottom": 48,
+        "right": 150
+      },
+      "text": "Sound"
+    },
+    {
+      "number": 3,
+      "type": "radioButton",
+      "typeCode": 6,
+      "enabled": true,
+      "bounds": {
+        "top": 30,
+        "left": 160,
+        "bottom": 48,
+        "right": 250
+      },
+      "text": "Music"
+    },
+    {
+      "number": 4,
+      "type": "control",
+      "typeCode": 7,
+      "enabled": true,
+      "bounds": {
+        "top": 90,
+        "left": 10,
+        "bottom": 110,
+        "right": 150
+      },
+      "resourceId": 128
+    },
+    {
+      "number": 5,
+      "type": "staticText",
+      "typeCode": 8,
+      "enabled": false,
+      "bounds": {
+        "top": 10,
+        "left": 50,
+        "bottom": 26,
+        "right": 250
+      },
+      "text": "Save changes to ^0?"
+    },
+    {
+      "number": 6,
+      "type": "editText",
+      "typeCode": 16,
+      "enabled": true,
+      "bounds": {
+        "top": 120,
+        "left": 10,
+        "bottom": 136,
+        "right": 150
+      },
+      "text": ""
+    },
+    {
+      "number": 7,
+      "type": "icon",
+      "typeCode": 32,
+      "enabled": false,
+      "bounds": {
+        "top": 10,
+        "left": 10,
+        "bottom": 42,
+        "right": 42
+      },
+      "resourceId": 1
+    },
+    {
+      "number": 8,
+      "type": "picture",
+      "typeCode": 64,
+      "enabled": true,
+      "bounds": {
+        "top": 140,
+        "left": 10,
+        "bottom": 172,
+        "right": 42
+      },
+      "resourceId": 128
+    },
+    {
+      "number": 9,
+      "type": "user",
+      "typeCode": 0,
+      "enabled": true,
+      "bounds": {
+        "top": 180,
+        "left": 10,
+        "bottom": 200,
+        "right": 200
+      }
+    },
+    {
+      "number": 10,
+      "type": "help",
+      "typeCode": 1,
+      "enabled": true,
+      "bounds": {
+        "top": 0,
+        "left": 0,
+        "bottom": 0,
+        "right": 0
+      },
+      "helpKind": 8,
+      "helpKindName": "appendHdlg",
+      "resourceId": 128,
+      "offset": 0
+    }
+  ]
+}

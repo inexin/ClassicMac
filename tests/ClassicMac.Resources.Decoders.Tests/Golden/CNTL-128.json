@@ -1,0 +1,23 @@
+{
+  "title": "Level:",
+  "bounds": {
+    "top": 10,
+    "left": 10,
+    "bottom": 26,
+    "right": 150
+  },
+  "definition": 1008,
+  "definitionName": "popupMenuProc",
+  "value": 1,
+  "minimum": 1,
+  "maximum": 5,
+  "visible": true,
+  "refCon": 0,
+  "popup": {
+    "menu": 1,
+    "titleWidth": 5,
+    "titleJustification": 1,
+    "titleNoStyle": false,
+    "titleStyle": []
+  }
+}

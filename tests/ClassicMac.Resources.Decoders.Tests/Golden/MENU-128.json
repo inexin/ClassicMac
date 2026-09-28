@@ -1,0 +1,75 @@
+{
+  "id": 128,
+  "title": "File",
+  "enabled": true,
+  "definition": 0,
+  "width": 0,
+  "height": 0,
+  "enableFlags": 187,
+  "items": [
+    {
+      "text": "Open…",
+      "enabled": true,
+      "icon": 0,
+      "keyEquivalent": 79,
+      "key": "O",
+      "mark": 0,
+      "face": 0,
+      "style": []
+    },
+    {
+      "text": "-",
+      "enabled": false,
+      "divider": true,
+      "icon": 0,
+      "keyEquivalent": 0,
+      "mark": 0,
+      "face": 0,
+      "style": []
+    },
+    {
+      "text": "Checked",
+      "enabled": true,
+      "icon": 0,
+      "keyEquivalent": 0,
+      "mark": 18,
+      "markCharacter": "✓",
+      "face": 1,
+      "style": [
+        "bold"
+      ]
+    },
+    {
+      "text": "Recent",
+      "enabled": true,
+      "icon": 0,
+      "keyEquivalent": 27,
+      "keyKind": "submenu",
+      "mark": 130,
+      "submenu": 130,
+      "face": 0,
+      "style": []
+    },
+    {
+      "text": "Italic",
+      "enabled": true,
+      "icon": 0,
+      "keyEquivalent": 0,
+      "mark": 0,
+      "face": 2,
+      "style": [
+        "italic"
+      ]
+    },
+    {
+      "text": "Quit",
+      "enabled": false,
+      "icon": 0,
+      "keyEquivalent": 81,
+      "key": "Q",
+      "mark": 0,
+      "face": 0,
+      "style": []
+    }
+  ]
+}

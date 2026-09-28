@@ -78,6 +78,7 @@ namespace ClassicMac.Resources.Decoders
                 new Images.CursorDecoder(options),
                 new Images.PatternDecoder(options),
                 new Sound.SoundDecoder(),
+                .. Interface.InterfaceDecoder.All(options),
             ];
         }
 
