@@ -304,9 +304,15 @@ The byte at reference +$04 [Doc: *More Macintosh Toolbox*, except bit 0]:
 
 - **A fork is effectively capped at 16 MiB.** Mac OS 9 will not open a fork whose data area or map ends past
   `$FFFFFE` [Code: Mac OS 9.0]; the 68k ROM rejects `$FFFFFF` and beyond [Code: 68k ROM].
-- **The Resource Manager itself can write larger forks.** Mac OS 9 corrupts a fork whose map comes before its data when
-  it compacts it: adding one 3-byte resource to such a fork produced a 63 MB fork with a garbage data offset
-  [Verified]. The 68k ROM rebases the offsets correctly [Code: 68k ROM].
+- **The Resource Manager does not grow a fork that far.** AddResource and ChangedResource return `eofErr` (−39)
+  when the fork's end + the resource's size + `$118` reaches `$1000000`, and SetResourceSize returns −195 for a size of
+  `$FFFFFF` or more [Code: Mac OS 9.0]. Where an item offset does pass 24 bits, every store keeps `offset & $FFFFFF`
+  and UpdateResFile reports nothing [Code: Mac OS 9.0], but normal calls on a fork that opens cannot get there.
+- **The one larger fork seen is corruption.** Mac OS 9 corrupts a fork whose map comes before its data when it
+  compacts it: its item offsets are rebased but `dO` is not, and a length read past the end from an uncleared buffer
+  is copied. Adding one 3-byte resource to such a fork produced a 63 MB fork with a garbage data offset, which Mac OS 9
+  then refuses to open (`mapReadErr`) [Code: Mac OS 9.0; Verified]. The 68k ROM rebases the offsets correctly
+  [Code: 68k ROM].
 
 **ClassicMac's limits:**
 
@@ -318,10 +324,10 @@ The byte at reference +$04 [Doc: *More Macintosh Toolbox*, except bit 0]:
 - **Too damaged.** Bytes of another format read as a fork can promise 65536 types of 65536 references each. Past
   **1000 Error diagnostics** from the reference lists, the reader stops and throws `InvalidDataException` ("The fork is
   too damaged to read: over 1000 errors in its map"), instead of reporting millions.
-- The writer throws `InvalidOperationException` for more than 65536 types or 65536 resources in one type, a data item
-  that would start past `$FFFFFF`, a name that would start at `$FFFF` or later, type and reference lists that pass
-  64 KiB, or a total over 2 GiB. It does **not** stop at `$FFFFFE`: a fork of 16 MiB or more writes, but Mac OS 9 will
-  not open it (§8.1).
+- The writer throws `InvalidOperationException` for more than 65536 types or 65536 resources in one type, a name
+  that would start at `$FFFF` or later, type and reference lists that pass 64 KiB, or a fork that would end past
+  `$FFFFFE`, the Resource Manager's own limit: it writes nothing Mac OS 9 would refuse to open, and never truncates an
+  offset as the Resource Manager's stores would.
 
 ---
 

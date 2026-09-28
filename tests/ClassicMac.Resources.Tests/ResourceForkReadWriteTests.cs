@@ -149,12 +149,19 @@ public class ResourceForkReadWriteTests
         Assert.Equal(written, read.ToArray());
     }
 
+    // No fork may end past $FFFFFE: the Resource Manager neither opens nor grows one that far (CheckMap, CheckGrow).
     [Fact]
-    public void Writing_past_24_bit_data_offsets_fails()
+    public void Writing_a_fork_that_ends_past_FFFFFE_fails()
     {
-        var fork = new ResourceFork();
-        for (short id = 0; id < 3; id++) fork.Add(new Resource(Test, id, new byte[8 * 1024 * 1024]));
-        Assert.Throws<InvalidOperationException>(() => fork.ToArray());
+        // Header (256) + map (28 + 2 + 8 + 12 = 50) + the item's length word (4): the largest resource that fits.
+        var largest = 0xFFFFFE - 256 - 50 - 4;
+        var fits = new ResourceFork();
+        fits.Add(new Resource(Test, 0, new byte[largest]));
+        Assert.Equal(0xFFFFFE, fits.ToArray().Length);
+
+        var over = new ResourceFork();
+        over.Add(new Resource(Test, 0, new byte[largest + 1]));
+        Assert.Throws<InvalidOperationException>(() => over.ToArray());
     }
 
     [Fact]

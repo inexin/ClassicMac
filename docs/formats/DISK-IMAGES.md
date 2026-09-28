@@ -313,7 +313,7 @@ are only logged [Code: 6.3.3]:
 | `$83` in a map below version 11 | error | reports |
 | Zero chunk with a nonzero length | warning | reports |
 | Raw chunk storing fewer than size bytes | error (more is a warning) | reports, zero-fills |
-| Compressed chunk larger than `+$48` sectors | error (the stored length is not checked) | reports as a warning when `+$48` ≠ 0 |
+| Compressed chunk covering more than `+$48` sectors (as stored, no doubling; equal passes) | error, in every version [Code] (the stored length is not checked) | reports as an error, decodes the chunk |
 | Starts not increasing, or past the disk | error | reports, reads the map up to that entry |
 | Chunk data past the end of the data fork | error | reports, reads what is there |
 | Last start ≠ disk size | error | reports |
@@ -486,7 +486,10 @@ the release history it was the only compression of Disk Image Mounter and Disk C
 outputs: the length, literal and distance codes are identical [Code: Mac OS 9.0 System, Disk Copy 6.3.3], and a model
 of `dcmp` 3 verified in emulation decodes real KenCode chunks of up to 33 sectors byte for byte [Verified]. The two
 choose the same distance class up to `$5400` bytes of output; from `$5401` `dcmp` 3 moves on to classes 11–14 while
-KenCode stays at 10 ([§8.4](#84-distance-class)) [Code]. ClassicMac keeps its own KenCode decoder.
+KenCode stays at 10 ([§8.4](#84-distance-class)): every Disk Copy KenCode decoder (6.1.2, 6.3.3, 6.5b13, and the
+self-mounting `oneb` code) also tests a window value set to `$2800`, so class 11 is never reached [Code]. A `dcmp` 3
+decoder goes wrong on real KenCode images at the first match past `$5400` [Verified]. ClassicMac keeps its own KenCode
+decoder.
 
 ### 8.1 Bits
 
@@ -654,8 +657,12 @@ Arrays: `freq[T + 1]` (16-bit), `prnt[T + N_CHAR]`, `son[T]` [Author].
   [Code: 6.3.3], [Verified]. A token that would write past the block's end is an error in Disk Copy (−50); ClassicMac
   stops at the end.
 
-In an NDIF image, Disk Copy's driver carries the window tail over from the chunk it decoded last [Code: 6.3.3];
-ClassicMac starts each `$82` chunk with a zero tail ([§13](#13-open-questions)).
+In an NDIF image, Disk Copy 6.3.3 and 6.5b13 allocate the LZH workspace once per driver and clear only ring bytes
+0–`$FC3` for each `$82` chunk, so the 60-byte tail is left from the last chunk decoded, in read order; 6.1.2 keeps its
+state on the stack, so its tail is stack garbage [Code]. The tail makes no difference in practice: every block of
+DART's own files decodes identically with a random tail and in reverse order [Verified]. ClassicMac clears the whole
+ring for each chunk. No Disk Copy writes `$82` chunks (none has the LZH encoder); the type exists only in the map
+the driver builds in memory for DART files [Code].
 
 ## 11. UDIF (not built in ClassicMac yet)
 
@@ -815,7 +822,7 @@ codes.
 | `ndif.gap` | Warning | The first chunk does not start at sector 0 | those sectors read as zeros | not checked; reads garbage |
 | `ndif.zero-length` | Warning | A zero chunk stores bytes | ignores them | warning |
 | `ndif.short` | Error | A raw chunk stores less than its size, or a chunk's data run past the data fork | reads what is there, then zeros | −8819 |
-| `ndif.chunk-size` | Warning | A compressed chunk is larger than `+$48` sectors | decodes it | −8819 |
+| `ndif.chunk-size` | Error | A compressed chunk covers more sectors than `+$48` (as stored; equal passes) | decodes it | damaged: −8819 (6.3.3, 6.5b13), −10 (6.1.2) [Code] |
 | `ndif.unknown-chunk` | Error | A chunk type Disk Copy does not know (`$F0` named as ShrinkWrap's) | reads it as zeros | −8820 |
 | `ndif.missing-segment` | Error | Segmented, but no `bcm#` 128, or a part not found in the folder | reads the disk up to the missing part | −8821 |
 | `ndif.bad-segment` | Error | A part other than the last is not a whole number of sectors | reads it as it is | −39 |
@@ -843,7 +850,5 @@ File Exchange 3.0.3 was active, because that extension installs its own, newer `
   [Fitted?].
 - **Chunk type `$F0` and `+$74`/`+$78`** come only from Aaru; no image with them has been seen [Fitted?].
 - **Disk Copy 4.2's tag checksum** skipping the first 12 bytes was matched on one image, not traced in code [Fitted].
-- **DART LZH window tail in NDIF.** Disk Copy's driver carries the tail from the last decoded `$82` chunk; ClassicMac
-  starts each chunk with zeros. No NDIF file with `$82` chunks has been seen, so the effect is untested.
 - **UDIF:** zlib, bzip2, LZFSE, zero and comment runs, the XML property list and later `koly` versions are known only
   from dmg2img. Bit 1 of the `koly` flags (set in "entire device" images) is not understood.

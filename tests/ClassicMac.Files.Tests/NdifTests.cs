@@ -62,6 +62,21 @@ public class NdifTests
         Assert.Equal(volume, disk);
     }
 
+    // A compressed chunk covering more sectors than the buffer size (+$48) is damaged to every Disk Copy; equal passes.
+    [Fact]
+    public void Compressed_chunks_over_the_buffer_size_are_errors()
+    {
+        var volume = Volume();
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (6, Kind.Raw), (200, Kind.Adc), (594, Kind.Raw));
+
+        var equal = WithMap(resource, m => BinaryPrimitives.WriteUInt32BigEndian(m.AsSpan(0x48), 200));
+        Assert.Empty(Disk(Image(data, equal)).Diagnostics);
+
+        var (disk, diagnostics) = Disk(Image(data, WithMap(resource, m => BinaryPrimitives.WriteUInt32BigEndian(m.AsSpan(0x48), 199))));
+        Assert.Equal((DiagnosticSeverity.Error, "ndif.chunk-size"), (Assert.Single(diagnostics).Severity, diagnostics[0].Code));
+        Assert.Equal(volume, disk); // still decoded
+    }
+
     [Fact]
     public void Images_nest_through_the_unwrapper_to_the_volume()
     {

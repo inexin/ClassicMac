@@ -214,8 +214,10 @@ namespace ClassicMac.Files.Hfs
                     case ChunkAdc or ChunkDartRle or ChunkDartLzh or ChunkKenCode:
                         if (type == ChunkAdc && header.Version < 11)
                             context.Report(DiagnosticSeverity.Error, "ndif.bad-map", $"{where} is ADC-compressed, which needs map version 11.");
-                        if (header.MaxChunk != 0 && next - start > header.MaxChunk)
-                            context.Report(DiagnosticSeverity.Warning, "ndif.chunk-size", $"{where} is larger than the map's largest chunk ({header.MaxChunk} blocks).");
+                        // Every Disk Copy (6.1.2, 6.3.3, 6.5b13) calls the image damaged; the chunk still decodes here.
+                        if (next - start > header.MaxChunk)
+                            context.Report(DiagnosticSeverity.Error, "ndif.chunk-size",
+                                $"{where} covers more blocks than the map's buffer size ({header.MaxChunk}); Disk Copy calls the image damaged.");
                         break;
                     case ChunkShrinkWrap:
                         // Named by Aaru as ShrinkWrap's (StuffIt) codec; not seen in any image yet.
@@ -384,8 +386,8 @@ namespace ClassicMac.Files.Hfs
                                 if (kcResult != KenCode.Result.Done) problem = $"decodes to {kcWritten} of its {bytes.Length} bytes ({kcResult})";
                                 break;
                             case ChunkDartLzh:
-                                // Each chunk starts with a clear window tail; Disk Copy's driver carries it over from the
-                                // chunk it read last, which only matters when chunks are read out of order.
+                                // Each chunk starts with a clear window. Disk Copy leaves the ring's last 60 bytes from the
+                                // chunk decoded before, which changes nothing on real data; no Disk Copy writes $82 chunks.
                                 var lzhWritten = new DartLzh().Decode(stored, bytes);
                                 if (lzhWritten < bytes.Length - 1) problem = $"decodes to {lzhWritten} of its {bytes.Length} bytes";
                                 break;

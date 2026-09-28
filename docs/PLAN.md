@@ -522,8 +522,10 @@ They change what running applications see, not what a file contains.
   `rohd`, the older `hdro`); we find the `bcem` itself, so images that lost their type still open.
   - Map versions 10, 11 (ADC) and 12 (Disk Copy 6.5b13, confirmed on its images; the end entry's offset is 0) are
     read. `+$48` is the buffer size (chunk size plus the largest compression overrun); the chunk size is the user's
-    choice (6.1.2: 32 sectors, 6.3.3: 512 by default) and any compressed image may mix raw chunks. KenCode is the
-    System's `dcmp` 3 codec; our KenCode decoder stays separate (already byte-exact).
+    choice (6.1.2: 32 sectors, 6.3.3: 512 by default) and any compressed image may mix raw chunks. KenCode shares the
+    System's `dcmp` 3 codes but not its distance classes: every Disk Copy stays at class 10 from `$2A01`, where
+    `dcmp` 3 moves to class 11 at `$5401`, so the two match only while matches start at or below `$5400`. Our KenCode
+    decoder stays separate (byte-exact).
   - **Version 2 is read as Disk Copy 6.1.2's driver reads it** (decision, replacing the earlier refusal): that driver
     mounted hand-built version 2 images (raw and KenCode) with a valid checksum and refused ADC in them (-10). Layout:
     the version 10 header up to +$54, the count there (end entry included), 8-byte entries {start<<8|type, offset} from

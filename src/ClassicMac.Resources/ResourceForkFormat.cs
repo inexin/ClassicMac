@@ -29,5 +29,8 @@ namespace ClassicMac.Resources
 
         // Data offsets are 24-bit.
         public const int MaxDataOffset = 0xFFFFFF;
+
+        // The last byte a fork's data area or map may end at: the Resource Manager opens and grows none past it.
+        public const long MaxForkEnd = 0xFFFFFE;
     }
 }

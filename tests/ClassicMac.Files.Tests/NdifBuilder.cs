@@ -31,6 +31,9 @@ internal static class NdifBuilder
         map[4] = (byte)name.Length;
         MacRoman.Encode(name).CopyTo(map, 5);
         BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x44), (uint)(disk.Length / 512));
+        // Buffer size, as Disk Copy writes it: the largest compressed chunk plus a sector of room (0 with none).
+        var compressed = chunks.Where(c => c.Kind == Kind.Adc).Select(c => c.Sectors).DefaultIfEmpty(-1).Max();
+        BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x48), (uint)(compressed + 1));
         BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x7C), (uint)entries.Count);
         for (var k = 0; k < entries.Count; k++)
         {

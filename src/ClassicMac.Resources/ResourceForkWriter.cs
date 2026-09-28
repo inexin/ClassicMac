@@ -43,8 +43,6 @@ namespace ClassicMac.Resources
                     dataOffsets[resource] = existing;
                     continue;
                 }
-                if (dataLength > MaxDataOffset)
-                    throw new InvalidOperationException("The resource data exceeds the 16 MiB a fork can address.");
                 dataOffsets[resource] = (int)dataLength;
                 if (!resource.DataModified) shared[resource.DataPlacement] = (int)dataLength;
                 items.Add((resource, (int)dataLength));
@@ -74,7 +72,11 @@ namespace ClassicMac.Resources
             var dataOffset = ReservedEnd;
             var mapOffset = dataOffset + dataLength;
             var total = mapOffset + mapLength;
-            if (total > int.MaxValue) throw new InvalidOperationException("The fork is too large to write.");
+            // Mac OS 9 and the 68k ROM refuse to open a fork whose data or map ends past $FFFFFE (mapReadErr), and the
+            // Resource Manager refuses to grow one that far (eofErr): so no fork ends past it (disassembly of CheckMap
+            // and CheckGrow).
+            if (total > MaxForkEnd)
+                throw new InvalidOperationException($"The fork would be {total} bytes; the Resource Manager opens none that end past $FFFFFE.");
 
             var output = new byte[total];
             var span = output.AsSpan();
