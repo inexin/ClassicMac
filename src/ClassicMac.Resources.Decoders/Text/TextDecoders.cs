@@ -11,7 +11,7 @@ namespace ClassicMac.Resources.Decoders.Text
     /// <c>'TEXT'</c>: plain text (<i>Inside Macintosh: Text</i>), written as UTF-8. When the fork has a <c>'styl'</c> of
     /// the same ID — as SimpleText and TextEdit keep them — the styled text is also written as RTF.
     /// </summary>
-    internal sealed class TextDecoder(DecodeOptions options) : IResourceDecoder
+    internal sealed class TextDecoder(DecodeOptions options) : IResourceDecoder, IBuiltInDecoder
     {
         private static readonly FourCC Type = FourCC.FromString("TEXT"), Styl = FourCC.FromString("styl");
 
@@ -20,6 +20,8 @@ namespace ClassicMac.Resources.Decoders.Text
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => type == Type;
+
+        public IReadOnlyCollection<FourCC> Types => [Type];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
@@ -41,7 +43,7 @@ namespace ClassicMac.Resources.Decoders.Text
     }
 
     /// <summary><c>'styl'</c> on its own: the style runs as JSON.</summary>
-    internal sealed class StyleDecoder : IResourceDecoder
+    internal sealed class StyleDecoder : IResourceDecoder, IBuiltInDecoder
     {
         private static readonly FourCC Type = FourCC.FromString("styl");
 
@@ -50,6 +52,8 @@ namespace ClassicMac.Resources.Decoders.Text
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => type == Type;
+
+        public IReadOnlyCollection<FourCC> Types => [Type];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
@@ -93,7 +97,7 @@ namespace ClassicMac.Resources.Decoders.Text
     /// beta, $80 final) and non-release number, a region code, and short and long version strings — as JSON, with the
     /// number displayed as the Finder does ("1.0.2b3").
     /// </summary>
-    internal sealed class VersionDecoder(DecodeOptions options) : IResourceDecoder
+    internal sealed class VersionDecoder(DecodeOptions options) : IResourceDecoder, IBuiltInDecoder
     {
         private static readonly FourCC Type = FourCC.FromString("vers");
 
@@ -102,6 +106,8 @@ namespace ClassicMac.Resources.Decoders.Text
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => type == Type;
+
+        public IReadOnlyCollection<FourCC> Types => [Type];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {

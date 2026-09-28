@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
 
@@ -50,6 +51,12 @@ namespace ClassicMac.Resources.Decoders
 
         /// <summary>Whose QuickDraw pictures are drawn as: Mac OS 9's (the default) or the 68k ROM's.</summary>
         public ResourceManagerModel QuickDraw { get; init; } = ResourceManagerModel.MacOS9;
+    }
+
+    // The types a built-in decoder handles (for the golden tests' coverage check).
+    internal interface IBuiltInDecoder
+    {
+        IReadOnlyCollection<FourCC> Types { get; }
     }
 
     /// <summary>The built-in decoders.</summary>

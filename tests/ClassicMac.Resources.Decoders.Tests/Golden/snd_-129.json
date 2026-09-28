@@ -1,0 +1,26 @@
+{
+  "format": 2,
+  "referenceCount": 0,
+  "commands": [
+    {
+      "command": 81,
+      "name": "bufferCmd",
+      "dataOffset": true,
+      "param1": 0,
+      "param2": 14
+    }
+  ],
+  "sound": {
+    "header": "standard",
+    "headerOffset": 14,
+    "sampleRate": 11127.27272,
+    "sampleRateFixed": "$2B7745D1",
+    "channels": 1,
+    "sampleSize": 8,
+    "sampleFormat": "raw ",
+    "frames": 32,
+    "loopStart": 0,
+    "loopEnd": 0,
+    "baseNote": 60
+  }
+}

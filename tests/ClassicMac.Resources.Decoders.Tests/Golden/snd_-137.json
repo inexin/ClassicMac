@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "synthesizers": [],
+  "commands": [
+    {
+      "command": 40,
+      "name": "freqDurationCmd",
+      "param1": 60,
+      "param2": 1000
+    },
+    {
+      "command": 46,
+      "name": "volumeCmd",
+      "param1": 0,
+      "param2": 16777472
+    }
+  ]
+}

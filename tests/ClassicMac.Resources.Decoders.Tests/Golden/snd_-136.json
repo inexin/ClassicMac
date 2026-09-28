@@ -1,0 +1,33 @@
+{
+  "format": 1,
+  "synthesizers": [
+    {
+      "id": 5,
+      "initOptions": "$00000080"
+    }
+  ],
+  "commands": [
+    {
+      "command": 81,
+      "name": "bufferCmd",
+      "dataOffset": true,
+      "param1": 0,
+      "param2": 20
+    }
+  ],
+  "sound": {
+    "header": "compressed",
+    "headerOffset": 20,
+    "sampleRate": 11127.27272,
+    "sampleRateFixed": "$2B7745D1",
+    "channels": 1,
+    "sampleSize": 16,
+    "sampleFormat": "ulaw",
+    "compressionId": -1,
+    "packetSize": 0,
+    "frames": 16,
+    "loopStart": 0,
+    "loopEnd": 0,
+    "baseNote": 60
+  }
+}

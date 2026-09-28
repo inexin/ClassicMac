@@ -1,0 +1,527 @@
+{
+  "fixtures": [
+    {
+      "key": "STR_-128",
+      "decoder": "text.string 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".txt",
+          "file": "STR_-128.txt"
+        }
+      ]
+    },
+    {
+      "key": "STR#-128",
+      "decoder": "text.string-list 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "STR#-128.json"
+        }
+      ]
+    },
+    {
+      "key": "TEXT-128",
+      "decoder": "text.text 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".txt",
+          "file": "TEXT-128.txt"
+        },
+        {
+          "extension": ".rtf",
+          "file": "TEXT-128.rtf"
+        }
+      ]
+    },
+    {
+      "key": "styl-128",
+      "decoder": "text.style 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "styl-128.json"
+        }
+      ]
+    },
+    {
+      "key": "TEXT-129",
+      "decoder": "text.text 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".txt",
+          "file": "TEXT-129.txt"
+        }
+      ]
+    },
+    {
+      "key": "styl-130",
+      "decoder": "text.style 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "styl-130.json"
+        }
+      ]
+    },
+    {
+      "key": "vers-1",
+      "decoder": "text.version 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "vers-1.json"
+        }
+      ]
+    },
+    {
+      "key": "PICT-128",
+      "decoder": "image.picture 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "cf563e5aabe1a3a07a3a5fc70748b0c1aee27a4651260cabb19e29e1728779ae",
+          "length": 77
+        }
+      ]
+    },
+    {
+      "key": "PICT-129",
+      "decoder": "image.picture 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "e1dafc51b33375b8b0001805a126e66f40a1e8d1dc7a6157f30940d1e134c814",
+          "length": 79
+        }
+      ]
+    },
+    {
+      "key": "PICT-129-d1",
+      "decoder": "image.picture 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "4a81f008d66ecb61169e95a983c8810238754ca556146bfc4bb4024eb7a54122",
+          "length": 76
+        }
+      ]
+    },
+    {
+      "key": "PICT-129-d8",
+      "decoder": "image.picture 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "8f2e06ce87a1c3ff7964897eaa7c3745f3acbd5dd322de95c037d29b9ba33696",
+          "length": 79
+        }
+      ]
+    },
+    {
+      "key": "ICON-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "80bd3dc2e33a09c4afbd631a057e7e7f497936f9c32e61ba8695c1eb2ce4a754",
+          "length": 139
+        }
+      ]
+    },
+    {
+      "key": "ICN#-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "b2f26608fd9c845b4fef1823c1585a6217a57f7367b1128abdcc4a5dba14e01d",
+          "length": 210
+        }
+      ]
+    },
+    {
+      "key": "ics#-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "93df52c335bef6fdf54908aa7cf9fe9356b078ca75280529ac1f1fef178decdb",
+          "length": 136
+        }
+      ]
+    },
+    {
+      "key": "icm#-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "a56733dd338e091d6fd5a65cd4ff4f72e3f5e498035945d00b9937229f4b1cb1",
+          "length": 115
+        }
+      ]
+    },
+    {
+      "key": "icl4-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "8c83165fa6eac7beab0165f62da380eae45e8ceea6b5125e7cdd1f1035d86a47",
+          "length": 791
+        }
+      ]
+    },
+    {
+      "key": "icl8-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "1b74a299db76ef35970985762b378dda737f63e351055901c0cc908a12d5b043",
+          "length": 673
+        }
+      ]
+    },
+    {
+      "key": "ics4-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "3c72c18c448fcfd1ee821df4333329ae144970842103e9b3090f3c897e7647c0",
+          "length": 400
+        }
+      ]
+    },
+    {
+      "key": "ics8-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "2b822c2735ff791142b8e92ef10339b3edb1b988ce3c3e6c857b76f290181857",
+          "length": 468
+        }
+      ]
+    },
+    {
+      "key": "icm4-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "363c88e87152d9cf4e2e4e681658df2548e3badc367c0605b6a9099b5278ffc0",
+          "length": 295
+        }
+      ]
+    },
+    {
+      "key": "icm8-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "f11596417128d3ec9df482e32874bef1c921dc9231a417baf8ec40ebb35d71aa",
+          "length": 305
+        }
+      ]
+    },
+    {
+      "key": "cicn-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "57453533dbf6080ccf03ac3b78aee2deb1836bbcdca4d9eb7519d6f56fe91353",
+          "length": 149
+        }
+      ]
+    },
+    {
+      "key": "SICN-128",
+      "decoder": "image.icon 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".1.png",
+          "sha256": "f609bcbcfe441bfd690e9acdbb2338717260853a03f1fad908d9c0bf2bb87e95",
+          "length": 105
+        },
+        {
+          "extension": ".2.png",
+          "sha256": "d32bd874c5e3494120e2065fddf3dd7b0069066bd76e51849054266bb3410edb",
+          "length": 122
+        }
+      ]
+    },
+    {
+      "key": "CURS-128",
+      "decoder": "image.cursor 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "93df52c335bef6fdf54908aa7cf9fe9356b078ca75280529ac1f1fef178decdb",
+          "length": 136
+        },
+        {
+          "extension": ".json",
+          "file": "CURS-128.json"
+        }
+      ]
+    },
+    {
+      "key": "crsr-128",
+      "decoder": "image.cursor 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "57453533dbf6080ccf03ac3b78aee2deb1836bbcdca4d9eb7519d6f56fe91353",
+          "length": 149
+        },
+        {
+          "extension": ".json",
+          "file": "crsr-128.json"
+        }
+      ]
+    },
+    {
+      "key": "PAT_-128",
+      "decoder": "image.pattern 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "af0a451f8bfb164f25c9ee3cee98b0f80c29b62694d861655460ecbc59a1c868",
+          "length": 92
+        }
+      ]
+    },
+    {
+      "key": "PAT#-128",
+      "decoder": "image.pattern 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".1.png",
+          "sha256": "62a80895df9f56d50f64a5e2c41befbc8ecd43eda6a76f8c61ad88523999d191",
+          "length": 78
+        },
+        {
+          "extension": ".2.png",
+          "sha256": "ce41d6966e3091eb4a03c774b2615abba8a8912dc0cc5cc18651b30d3e515127",
+          "length": 100
+        }
+      ]
+    },
+    {
+      "key": "ppat-128",
+      "decoder": "image.pattern 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".png",
+          "sha256": "57fcae28d400ed72ab0ec6bb034c026eb7abbc5954a9036fac82ddb5b7d5a43f",
+          "length": 104
+        }
+      ]
+    },
+    {
+      "key": "ppt#-128",
+      "decoder": "image.pattern 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".1.png",
+          "sha256": "57fcae28d400ed72ab0ec6bb034c026eb7abbc5954a9036fac82ddb5b7d5a43f",
+          "length": 104
+        },
+        {
+          "extension": ".2.png",
+          "sha256": "57fcae28d400ed72ab0ec6bb034c026eb7abbc5954a9036fac82ddb5b7d5a43f",
+          "length": 104
+        }
+      ]
+    },
+    {
+      "key": "snd_-128",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "b9c6c4be1a3ed2f09914b070e7b65a56328dda5e5b8f009990a40b34548b1651",
+          "length": 176
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-128.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-129",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "92ce7e1e50b15ab3b186af2841e5ec5d34ac4440bf792cfc602324c8e00d142d",
+          "length": 76
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-129.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-130",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "b92c2d98a439497fefbe253335fc3aacbcd0d82d0e31187ac5ce62656dac4148",
+          "length": 108
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-130.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-131",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "d39cc6e9715dbe3dc84fb132b22969fdd55b54399f3e64c4cd027a7b3c5d0645",
+          "length": 108
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-131.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-132",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "2be62ae29a07b1fdbc0ae193ae990d92a8141fc12a276e3250433585bff77010",
+          "length": 112
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-132.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-133",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "cbb8b36bd3655896e491281d02680b9799cc5d126896ae64435b800d8f986de5",
+          "length": 68
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-133.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-134",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "a23f7c6db8df19b25eb0cc89404c110b35a4785dc68d4b76fdca2da345f14fa0",
+          "length": 92
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-134.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-135",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "35cfad505edd1790ac6cb48cfbbdc7347a4c9b4ef0d793dc11692c637bfe3c07",
+          "length": 300
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-135.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-136",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".wav",
+          "sha256": "25d3b46af7046863cb5fe1fca9bd476fd07f1f1eb3daa7c3df02f4d57e1196bf",
+          "length": 76
+        },
+        {
+          "extension": ".json",
+          "file": "snd_-136.json"
+        }
+      ]
+    },
+    {
+      "key": "snd_-137",
+      "decoder": "sound.snd 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "snd_-137.json"
+        }
+      ]
+    }
+  ]
+}

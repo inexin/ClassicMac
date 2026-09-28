@@ -1,0 +1,46 @@
+{
+  "runs": [
+    {
+      "start": 0,
+      "height": 22,
+      "ascent": 18,
+      "font": 20,
+      "fontName": "Times",
+      "face": 1,
+      "size": 18,
+      "color": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "start": 6,
+      "height": 12,
+      "ascent": 10,
+      "font": 4,
+      "fontName": "Monaco",
+      "face": 2,
+      "size": 10,
+      "color": [
+        65535,
+        0,
+        0
+      ]
+    },
+    {
+      "start": 11,
+      "height": 15,
+      "ascent": 12,
+      "font": 3,
+      "fontName": "Geneva",
+      "face": 4,
+      "size": 12,
+      "color": [
+        0,
+        32768,
+        0
+      ]
+    }
+  ]
+}

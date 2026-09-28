@@ -14,7 +14,7 @@ namespace ClassicMac.Resources.Decoders.Sound
     /// samples are in a format not read is exported raw. MACE
     /// comes out 8-bit, as the Sound Manager gives it; IMA4 and µ-law 16-bit.
     /// </summary>
-    internal sealed class SoundDecoder : IResourceDecoder
+    internal sealed class SoundDecoder : IResourceDecoder, IBuiltInDecoder
     {
         private static readonly FourCC Type = FourCC.FromString("snd ");
 
@@ -35,6 +35,8 @@ namespace ClassicMac.Resources.Decoders.Sound
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => type == Type;
+
+        public IReadOnlyCollection<FourCC> Types => [Type];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {

@@ -14,7 +14,7 @@ namespace ClassicMac.Resources.Decoders.Images
 {
     // What the image decoders share: turning QuickDraw.Pict's bitmaps into image files, and its exceptions (it reports
     // problems only by throwing) into a diagnostic, after which the exporter writes the resource raw.
-    internal abstract class ImageDecoder(DecodeOptions options, string name, params string[] types) : IResourceDecoder
+    internal abstract class ImageDecoder(DecodeOptions options, string name, params string[] types) : IResourceDecoder, IBuiltInDecoder
     {
         private readonly HashSet<FourCC> handled = types.Select(FourCC.FromString).ToHashSet();
 
@@ -25,6 +25,8 @@ namespace ClassicMac.Resources.Decoders.Images
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => handled.Contains(type);
+
+        public IReadOnlyCollection<FourCC> Types => handled;
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {

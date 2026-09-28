@@ -8,7 +8,7 @@ namespace ClassicMac.Resources.Decoders.Text
     /// <summary>
     /// <c>'STR '</c>: one Pascal string (<i>Inside Macintosh: Text</i>, "String Resource"), written as UTF-8 text.
     /// </summary>
-    internal sealed class StringDecoder(DecodeOptions options) : IResourceDecoder
+    internal sealed class StringDecoder(DecodeOptions options) : IResourceDecoder, IBuiltInDecoder
     {
         private static readonly FourCC Type = FourCC.FromString("STR ");
 
@@ -17,6 +17,8 @@ namespace ClassicMac.Resources.Decoders.Text
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => type == Type;
+
+        public IReadOnlyCollection<FourCC> Types => [Type];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
@@ -36,7 +38,7 @@ namespace ClassicMac.Resources.Decoders.Text
     /// <c>'STR#'</c>: a count and that many Pascal strings (<i>Inside Macintosh: Text</i>, "String List Resource"),
     /// written as JSON (<c>{"strings": [...]}</c>).
     /// </summary>
-    internal sealed class StringListDecoder(DecodeOptions options) : IResourceDecoder
+    internal sealed class StringListDecoder(DecodeOptions options) : IResourceDecoder, IBuiltInDecoder
     {
         private static readonly FourCC Type = FourCC.FromString("STR#");
 
@@ -45,6 +47,8 @@ namespace ClassicMac.Resources.Decoders.Text
         public int Version => 1;
 
         public bool CanDecode(FourCC type) => type == Type;
+
+        public IReadOnlyCollection<FourCC> Types => [Type];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
