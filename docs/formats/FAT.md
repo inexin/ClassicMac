@@ -439,26 +439,31 @@ A date of 0 means none [Doc]. DOS times have no time zone; they are the local ti
   cannot hold, as DOS years 2032–2107, and reads them back the same way: DOS 2040 reads as 1912, and Mac 1950 is
   written as DOS 2078 and reads back as 1950. The cost is that genuine DOS dates from 2032 on read wrong. PC Exchange
   has no wrap; dates before 1980 come out as garbage [Code].
-- **Nothing is checked, and nothing reads as "no date"** [Code]. File Exchange unpacks the fields as they are (year,
-  month, day, hours, minutes, seconds × 2) and hands them to Mac OS 9's `Date2Secs`, which works in 16-bit day
-  arithmetic with truncating division and clamps nothing [Code]. So impossible values roll over:
+- **Nothing is checked, and nothing reads as "no date"** [Code] [Verified]. File Exchange unpacks the fields as they
+  are (year, month, day, hours, minutes, seconds × 2) and hands them to Mac OS 9's `Date2Secs`, which works in 16-bit
+  day arithmetic with truncating division and clamps nothing [Code]. So impossible values roll over [Code]
+  [Verified: all 14 dates tried, which also confirms that this `Date2Secs` is the one Mac OS 9 installs]:
 
   | DOS date or time | Shown as |
   | --- | --- |
   | 1999, month 0, day 1 | 1998-12-02 (month 0 is 30 days back, not 31) |
+  | 1999, month 0, day 0 | 1998-12-01 |
   | 1999-01, day 0 | 1998-12-31 (day 0 is the day before the 1st) |
+  | 1999-03, day 0 | 1999-02-28 |
   | 1999-02-29 | 1999-03-01 |
   | 1999-04-31 | 1999-05-01 |
   | 1999, month 13, day 1 | 2000-01-01 |
+  | 1999, month 14, day 1 | 2000-02-01 |
   | 1999, month 15, day 1 | 2000-03-02 (the month interpolation is a day off this far out) |
+  | 1999, month 15, day 31 | 2000-04-01 |
   | date and time `$0000` | 1979-12-01 00:00 |
   | 1999-01-01 at 31:63:62 | 1999-01-02 08:04:02 (hours, minutes and seconds simply add) |
+  | 2032-01, day 0 | 1947-04-29 17:31:44 (year 1904, day −1: 65,535 days, which overflow the `u32` seconds) |
 
   The one exception is the creation date: a creation date word of 0 shows as **now** (only the date word is tested,
-  not the time). A modification date of 0 is not special and shows as 1979-12-01 [Code]. That `Date2Secs` routine is
-  the one Mac OS 9 installs is inferred from its constants and structure, not yet checked on a running system.
-- ClassicMac reads a zero date, and a date with an impossible month, day, hour, minute or second, as no date. It
-  does not reproduce the rollover until the rule above is checked on a running Mac; a zero creation date is 11.3.
+  not the time) [Code] [Verified]. A modification date of 0 is not special and shows as 1979-12-01 [Code] [Verified].
+- ClassicMac converts every DOS date the same way, rollover included. The one difference is a creation date word of
+  0: ClassicMac has no "now" to match and uses the record's creation date instead (11.3).
 
 ---
 
@@ -536,9 +541,10 @@ holding **92-byte records**, big-endian, with no header and no version [Code]:
 A reader cannot assume that a file has a record, nor that a record's contents were set by an application:
 
 - Records are created **lazily**. Merely listing a writable FAT disk on the Mac creates a record for every item that
-  has none, because the Mac asks for a file number [Code] [Verified]. Such a record has type `TEXT`, creator `dosa`,
-  Finder flags 0, put-away folder 2 and **zero dates** [Verified]. (The code leaves the dates uninitialised [Code];
-  they were zero in every record seen.)
+  has none, because the Mac asks for a file number [Code] [Verified]. Such a record has the file's Mac name, type
+  `TEXT`, creator `dosa`, Finder flags 0, put-away folder 2, **zero dates** and a file number `$7FFFFFxx` from the
+  counter [Verified], even for a file whose name ending the Mac shows mapped (13.3): the mapped type is not written
+  back [Verified]. (The code leaves the dates uninitialised [Code]; they were zero in every record seen.)
 - A record is also created when a file's Mac name differs from its 8.3 name, and whenever Finder info is set [Code].
 - Records are written only while the volume's "save info" setting is on [Code].
 - A new record takes the first free slot, but never offset 0 (a quirk), else it is appended [Code].
@@ -591,8 +597,15 @@ A folder's name follows the same order, using the folder's record in its parent'
   placeholder.
 - Then, for a `TEXT`/`dosa` file with a record only, the Mac may show a mapped type (section 13) [Code]. A file with
   no record never gets one; on a writable volume with "save info" on, though, the Mac makes the record before it
-  reads the Finder info, so the mapped type shows there [Code] [Verified]. On a locked or read-only volume, or with
-  "save info" off, the file shows plain `TEXT`/`dosa` [Code] (not yet checked on a running system).
+  reads the Finder info, so the mapped type shows there [Code] [Verified: `.TXT` → `TEXT`/`ttxt`, `.BIN` →
+  `BINA`/`SITx`, `.JPG` → `JPEG`/`ogle`]. On a locked or read-only volume, or with "save info" off, the file shows
+  plain `TEXT`/`dosa` [Code]; File Exchange has only one mapping path, and it needs a record [Code]. This is not yet
+  checked on a volume the Mac sees as locked. An image that was read-only only on the host is no such test: the Mac
+  saw it writable, File Exchange made `FINDER.DAT` and records in its cache, the writes failed (the Finder reported
+  a problem with the disk), and a `.JPG` file with no record on disk showed `JPEG`/`ogle` [Verified], mapped through
+  a stale cached record [Code], while a file with a `RESOURCE.FRK` fork and no record showed `TEXT`/`dosa`, flags 0, put-away
+  folder 2 [Verified]. The run needs repeating with the image write-protected in the emulator. "Save info" off was
+  not tested.
 - DOS **hidden** or **system** makes the file invisible: the Finder flag `isInvisible` (`$4000`) is ORed onto the
   stored flags and never cleared, so a record that stores `$4000` keeps the file invisible after the PC clears the
   hidden attribute [Code]. (Making a file invisible on the Mac sets DOS hidden and stores the flags in the record
@@ -610,11 +623,11 @@ File Exchange [Code] [Verified]:
 
 - **Creation:** from the DOS entry's creation fields (section 9). The record's creation date ($40) is written but
   never read. When the DOS creation date word is 0, whatever the time word, File Exchange shows the current time
-  [Code]; ClassicMac, which has no "now" to match, uses the record's creation date instead (PC Exchange's rule), or
-  none.
+  [Code] [Verified]; ClassicMac, which has no "now" to match, uses the record's creation date instead (PC
+  Exchange's rule), or none.
 - **Modification:** the later of the DOS entry's modification date and the record's ($44), compared as unsigned
-  Mac dates [Code]. A record date of 0 counts as earlier than any DOS date. A DOS date of 0 is not special on the Mac
-  (it reads as 1979-12-01, 9.2); ClassicMac reads it as no date, so with neither date it has none.
+  Mac dates [Code]. A record date of 0 counts as earlier than any DOS date. A DOS date of 0 is not special: it reads
+  as 1979-12-01 (9.2) [Verified], on the Mac and in ClassicMac.
 - **Backup:** the record's ($48) [Code]. ClassicMac does not carry backup dates.
 
 PC Exchange [Code]: creation from the record's $40 (0 without a record); modification the later of the DOS date and
@@ -655,10 +668,11 @@ A file with no record but a long name gets a Mac name from the long name, conver
 
 1. File Exchange does **no Unicode normalization**: the UTF-16 from the long-name entries goes to the Text Encoding
    Converter unchanged, from Unicode 2.1 to the **system script's** encoding (Mac OS Roman on a Roman system;
-   MacIcelandic, MacJapanese and so on elsewhere) [Code]. Whether the converter composes a decomposed sequence
-   (`e` + U+0301 into `é`) is not known; if it does not, the combining mark has no byte and step 3 applies.
-   ClassicMac converts to Mac OS Roman, as on a Roman system, and puts the name in precomposed form (normalization
-   form C) first, which assumes the converter composes.
+   MacIcelandic, MacJapanese and so on elsewhere) [Code]. The converter does **not** compose a decomposed sequence
+   (`e` + U+0301 into `é`): the combining mark has no byte, so step 3 applies [Verified: `Cafe`+U+0301`.txt` shows
+   as `Cafe`, `$01`, `.txt` (the low byte of U+0301), while the precomposed `Café.txt` stays `Café.txt`]. The
+   low bytes can include `$00`: a Mac name can hold a NUL byte (12.2). ClassicMac converts to Mac OS Roman, as on
+   a Roman system, and takes the name as stored, with no normalization, the same way.
 2. If **every** character has a Mac OS Roman equivalent, the name is its Mac Roman bytes [Code] [Verified]. A `:` is
    kept as it is, even though it is the Mac's path separator [Verified: `a:b c.txt`].
 3. If **any** character has none, the converter reports that it used fallbacks, and the **whole** name takes the other
@@ -678,21 +692,21 @@ name      = first (27 − length(extension)) characters, '#', three upper-case h
 
 - The characters and the extension are converted by the same path as the whole name (Mac Roman or low bytes).
 - The **CRC** is CRC-16 with polynomial `$1021`, initial value 0, no reflection and no final XOR, computed over the
-  long name's own UTF-16 units as stored, **not normalized**, all of them, as **big-endian** UTF-16 [Code]; the three
-  digits are its low 12 bits. ClassicMac computes it the same way, so a decomposed and a precomposed spelling of one
-  name get different digits, as on the Mac. This is the unique-name
-  checksum of the OSTA UDF specification, which File Exchange borrowed [Code].
+  long name's own UTF-16 units as stored, **not normalized**, all of them, as **big-endian** UTF-16 [Code]
+  [Verified]; the three digits are its low 12 bits. ClassicMac computes it the same way, so a decomposed and a
+  precomposed spelling of one name get different digits, as on the Mac. This is the unique-name checksum of the OSTA
+  UDF specification, which File Exchange borrowed [Code].
 - `This is a very long Windows file name.txt` becomes `This is a very long Win#7C7.txt` [Verified].
+- `Crème brûlée with a very long name.txt`, 38 characters precomposed, becomes `Crème brûlée with a ver#F28.txt`
+  (Mac Roman); the same name decomposed, 41 characters, takes the low-byte path and becomes `Cre`, `$00`,
+  `me bru`, `$02`, `le`, `$01`, `e with a #366.txt` (U+0300, U+0302 and U+0301 give `$00`, `$02` and `$01`)
+  [Verified].
 - `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef.jpeg` becomes `ABCDEFGHIJKLMNOPQRSTUV#` + 3 digits + `.jpeg` (22 + 4 + 5).
 - In `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh.eleven` the last `.` is seven characters from the end, so there is no
   extension: the first 27 characters, `#` and the digits.
 
 The extension search follows File Exchange's `FindExtension` [Code]. For names shorter than seven characters its window
 is smaller, but such names are never shortened.
-
-For a long name stored decomposed, ClassicMac's result is therefore a guess until the converter's handling is checked
-on a running Mac: it composes the name before the Mac Roman conversion and before taking low bytes, where File
-Exchange takes the low bytes of the name as stored [Code].
 
 ---
 
@@ -851,9 +865,8 @@ for the free-record rules of 10.4.
 - FAT32 FSInfo, the backup boot sector, and active-FAT selection by `BPB_ExtFlags` (6.2).
 - The locked state from DOS attributes and the `'scut'`/`'dosa'` alias (11.2); backup dates (11.3); folder Finder
   info (11.6).
-- Open on the Mac side, to be checked on a running Mac OS 9.0: the rollover of impossible DOS dates (9.2), which
-  ClassicMac does not reproduce yet; whether the Text Encoding Converter composes decomposed long names (12.1); what
-  a file with a fork but no record shows on a read-only volume (11.2).
+- Open on the Mac side, to be checked on a running Mac OS 9.0: a file with no record on a volume the Mac sees as
+  locked (an image write-protected in the emulator), and with "save info" off (11.2).
 - ProDOS volumes, which File Exchange also mounts with ProDOS's own extended files, and ISO 9660
   ([ISO9660.md](ISO9660.md)).
 - PC Exchange 2.x (Mac OS 7.5–8.x), not available for tracing; its creation-date rule is unknown.

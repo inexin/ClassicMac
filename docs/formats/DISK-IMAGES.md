@@ -313,7 +313,7 @@ are only logged [Code: 6.3.3]:
 | `$83` in a map below version 11 | error | reports |
 | Zero chunk with a nonzero length | warning | reports |
 | Raw chunk storing fewer than size bytes | error (more is a warning) | reports, zero-fills |
-| Compressed chunk covering more than `+$48` sectors (as stored, no doubling; equal passes) | error, in every version [Code] (the stored length is not checked) | reports as an error, decodes the chunk |
+| Compressed chunk covering more than `+$48` sectors (as stored, no doubling; equal passes) | error, per chunk (see below; the stored length is not checked) | reports (a warning; an error past the decode buffer), decodes the chunk |
 | Starts not increasing, or past the disk | error | reports, reads the map up to that entry |
 | Chunk data past the end of the data fork | error | reports, reads what is there |
 | Last start ≠ disk size | error | reports |
@@ -321,15 +321,36 @@ are only logged [Code: 6.3.3]:
 | First chunk not starting at sector 0 | not checked (those sectors read garbage) | reports; they read as zeros |
 | Read/write mount with zero or compressed chunks | error | (read-only) |
 
-Disk Copy 6.1.2 makes the same checks for versions 2, 10 and 11, except the reserved and segment fields, and returns
-−10 for every error, an unknown type included [Code: 6.1.2].
+**Per-chunk checks count only on the last entry.** The 6.3.3 and 6.5b13 validators clear the error at the start of
+every table entry, so an error found in a chunk's entry (a count over `+$48`, an unknown type, `$83` below version 11,
+a raw chunk storing too little, a start out of order or past the disk, data past the end of the data fork) refuses
+the mount only when it is found in the last entry, normally the `$FF` one [Code: 6.3.3, 6.5b13]. The checks on the
+header and the map as a whole are not affected.
+
+Disk Copy 6.1.2 makes the same checks for versions 2, 10 and 11, except the reserved and segment fields, keeps every
+error, and returns −10 for each, an unknown type included [Code: 6.1.2].
 
 The `+$48` check applies to types `$80`–`$83`, with `+$48` as stored (not doubled for version 10). Disk Copy 6.3.3
-logs it as "compressed block count exceeds max chunk block count"; 6.5b13 refuses it both in its driver and in its
-Check Image command (−8819) [Code: 6.1.2, 6.3.3, 6.5b13]. No version checks a chunk's stored length; a chunk that
-decodes to the wrong size fails only when read (the codec's error, −8819 or −10) [Code: 6.3.3, 6.5b13, 6.1.2].
-Disk Copy 6.5b13 turns the NDIF map into UDIF runs in memory: `+$48` becomes the buffers-needed value (doubled for
-version 10) and types `$80`–`$83` become `$80000001`–`$80000004` [Code: 6.5b13].
+logs it as "compressed block count exceeds max chunk block count" [Code: 6.3.3]. What each version does with a chunk
+over `+$48` [Code: 6.1.2, 6.3.3, 6.5b13]:
+
+- **Disk Copy 6.1.2** refuses the image as damaged (−10) [Verified: 6.1.2 refuses a KenCode image whose `+$48` is
+  511 with 512-sector chunks with "The Mount Image operation did not complete (−10) … is damaged", and mounts the
+  same image with `+$48` = 512, checksum valid].
+- **Disk Copy 6.3.3 and 6.5b13** forget the error at the next entry (above), so the chunk fails only when it does not
+  fit the decode buffer, `+$48` × 512 bytes doubled for version 10 ([§5.9](#59-reading-the-disk)), at the first read
+  of it. A version 10 (KenCode) image with `+$48` = 511 and 512-sector chunks mounts, checksum valid; the same with
+  version 11 (ADC) fails with −27 (possibly −37: the digits were hard to read) [Verified: 6.5b13; 6.3.3 not run].
+  6.5b13's Check Image command gave −50 on both images [Verified: 6.5b13].
+
+No version checks a chunk's stored length; a chunk that decodes to the wrong size fails only when read (the codec's
+error, −8819 or −10) [Code: 6.3.3, 6.5b13, 6.1.2]. Disk Copy 6.5b13 turns the NDIF map into UDIF runs in memory:
+`+$48` becomes the buffers-needed value (doubled for version 10) and types `$80`–`$83` become
+`$80000001`–`$80000004` [Code: 6.5b13].
+
+ClassicMac reports a chunk over `+$48` as `ndif.chunk-size`, a Warning (6.1.2 refuses the image, later versions read
+it), and as an Error when the chunk is also larger than the decode buffer, which no version can read. It decodes the
+chunk either way.
 
 ### 5.6 The checksum (CRC28)
 
@@ -837,12 +858,17 @@ codes.
 | `ndif.gap` | Warning | The first chunk does not start at sector 0 | those sectors read as zeros | not checked; reads garbage |
 | `ndif.zero-length` | Warning | A zero chunk stores bytes | ignores them | warning |
 | `ndif.short` | Error | A raw chunk stores less than its size, or a chunk's data run past the data fork | reads what is there, then zeros | −8819 |
-| `ndif.chunk-size` | Error | A compressed chunk covers more sectors than `+$48` (as stored; equal passes) | decodes it | damaged: −8819 (6.3.3, 6.5b13), −10 (6.1.2) [Code] |
+| `ndif.chunk-size` | Warning | A compressed chunk covers more sectors than `+$48` (as stored; equal passes) but fits the decode buffer (`+$48`, doubled for version 10) | decodes it | 6.1.2: damaged, −10 [Code] [Verified]; 6.3.3, 6.5b13: reads it [Code] [Verified: 6.5b13] |
+| `ndif.chunk-size` | Error | A compressed chunk covers more sectors than the decode buffer | decodes it | 6.1.2: −10 [Code]; 6.3.3, 6.5b13: fails at the first read of the chunk [Code] (−27 or −37 in 6.5b13 [Verified]) |
 | `ndif.unknown-chunk` | Error | A chunk type Disk Copy does not know (`$F0` named as ShrinkWrap's) | reads it as zeros | −8820 |
 | `ndif.missing-segment` | Error | Segmented, but no `bcm#` 128, or a part not found in the folder | reads the disk up to the missing part | −8821 |
 | `ndif.bad-segment` | Error | A part other than the last is not a whole number of sectors | reads it as it is | −39 |
 | `ndif.bad-checksum` | Error | The disk's CRC28 differs from `+$50` (only with `VerifyChecksums` / `--verify`) | reads the disk | INVALID alert (130) with "Verify checksum" on; nothing otherwise |
 | `ndif.bad-chunk` | Error | A compressed chunk fails to decode: ADC overrun, truncated input or match before the start; KenCode overread or match before the start; RLE or LZH short | the rest of the chunk reads as zeros; reported once per chunk | overrun and overread: −8819 when read; before-start and truncated input: not checked, garbage |
+
+Where the Disk Copy column gives a validator error for one chunk's entry (`ndif.short`, `ndif.unknown-chunk`, and the
+order, range and ADC cases of `ndif.bad-map`), Disk Copy 6.3.3 and 6.5b13 refuse the mount only when that entry is the
+last one; 6.1.2 refuses on any entry ([§5.5](#55-validation)) [Code].
 
 Maps ClassicMac cannot read at all throw instead of reporting: a version above 12 (Disk Copy −8818) or other than 2,
 10, 11 and 12 (−8819), a map shorter than its header, fewer than two entries, a disk of 0 or `$400000` sectors or
@@ -865,9 +891,10 @@ File Exchange 3.0.3 was active, because that extension installs its own, newer `
   [Fitted?].
 - **Chunk type `$F0` and `+$74`/`+$78`** come only from Aaru; no image with them has been seen [Fitted?].
 - **Disk Copy 4.2's tag checksum** skipping the first 12 bytes was matched on one image, not traced in code [Fitted].
-- **The `+$48` check in an emulator.** The rule of [§5.5](#55-validation) (a compressed chunk covering more sectors
-  than `+$48` is damaged; equal passes) is traced in all three Disk Copy versions but not yet run: a KenCode image
-  whose `+$48` is one below its largest chunk should give −8819 in 6.3.3, −10 in 6.1.2 and message 50 from 6.5b13's
-  Check Image, and mount at equal.
+- **The `+$48` check in Disk Copy 6.3.3 and 6.5b13** ([§5.5](#55-validation)). 6.1.2's refusal (−10) is run;
+  6.5b13 mounting a version 10 image whose chunks pass `+$48` but fit the doubled buffer is run, and matches the
+  traced rule that the validator's per-entry error is cleared. Not yet run: 6.3.3 (the emulator hung); the exact
+  code 6.5b13 gives for the ADC image (−27 or −37); why its Check Image gives −50; and the equal case in Check
+  Image, which hung the application.
 - **UDIF:** zlib, bzip2, LZFSE, zero and comment runs, the XML property list and later `koly` versions are known only
   from dmg2img.

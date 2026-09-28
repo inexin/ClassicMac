@@ -295,7 +295,7 @@ The byte at reference +$04 [Doc: *More Macintosh Toolbox*, except bit 0]:
 | Limit | Value | Why | Source |
 | --- | --- | --- | --- |
 | Offset of a data item | ≤ `$FFFFFF` from `dO` | 24-bit data offsets | [Doc] |
-| End of the data area and of the map | ≤ `$FFFFFE` (Mac OS 9), < `$FFFFFF` (68k ROM) | checked at open (§8) | [Code: Mac OS 9.0; 68k ROM] |
+| End of the data area and of the map | ≤ `$FFFFFE` (Mac OS 9), < `$FFFFFF` (68k ROM) | checked at open (§8) | [Code: Mac OS 9.0; 68k ROM] [Verified: Mac OS 9.0] |
 | Map header, type list and reference lists | within the first 64 KiB of the map | `mN` is a 16-bit offset; reference-list offsets are 16-bit | [Doc] |
 | Name list | a name must start within 64 KiB of `mN` | 16-bit name offsets | [Doc] |
 | Types; resources per type | 65536 each | 16-bit counts minus one | [Doc] |
@@ -303,17 +303,20 @@ The byte at reference +$04 [Doc: *More Macintosh Toolbox*, except bit 0]:
 | Resource count `$FFFF` (65536) in one type | hangs Mac OS 9 | Preload loops forever after the fork opens | [Verified] |
 
 - **A fork is effectively capped at 16 MiB.** Mac OS 9 will not open a fork whose data area or map ends past
-  `$FFFFFE` [Code: Mac OS 9.0]; the 68k ROM rejects `$FFFFFF` and beyond [Code: 68k ROM].
+  `$FFFFFE` [Code: Mac OS 9.0] [Verified: a fork ending at `$FFFFFE` opens, one ending at `$FFFFFF` gives −199];
+  the 68k ROM rejects `$FFFFFF` and beyond [Code: 68k ROM].
 - **The Resource Manager does not grow a fork that far.** AddResource and ChangedResource return `eofErr` (−39)
-  when the fork's end + the resource's size + `$118` reaches `$1000000`, and SetResourceSize returns −195 for a size of
-  `$FFFFFF` or more, and −39 when moving the data would pass that limit [Code: Mac OS 9.0]. Where an item offset
+  when the fork's end + the resource's size + `$118` reaches `$1000000` [Code: Mac OS 9.0] [Verified: to a fork
+  ending at `$FFFE00`, adding 512 bytes gives −39 and adding 3 bytes succeeds, and the fork is then laid out as the
+  code predicts]. SetResourceSize returns −195 for a size of `$FFFFFF` or more, and −39 when moving the data would
+  pass that limit [Code: Mac OS 9.0]. Where an item offset
   does pass 24 bits, every store keeps `offset & $FFFFFF` and UpdateResFile reports nothing [Code: Mac OS 9.0], but
   normal calls on a fork that opens cannot get there.
 - **The one larger fork seen is corruption.** Mac OS 9 corrupts a fork whose map comes before its data when it
   compacts it: its item offsets are rebased but `dO` is not, and a length read past the end from an uncleared buffer
   is copied. Adding one 3-byte resource to such a fork produced a 63 MB fork with a garbage data offset
   [Code: Mac OS 9.0; Verified], which Mac OS 9 then refuses to open (`mapReadErr`, check 5 of §8.1)
-  [Code: Mac OS 9.0]. The 68k ROM rebases the offsets correctly [Code: 68k ROM].
+  [Code: Mac OS 9.0] [Verified: reopening it gives −199]. The 68k ROM rebases the offsets correctly [Code: 68k ROM].
 
 **ClassicMac's limits:**
 
@@ -348,7 +351,7 @@ Mac OS 9 checks the header (in vNewMap), then the map (in CheckMap), in this ord
 | 2 | `mO` ≥ 40, `mO` ≤ `EOF` − 30, `mL` ≥ 30, `mL` ≤ `EOF` − 40, `mO` + `mL` ≤ `EOF` | `mapReadErr` −199 |
 | 3 | `dO` ≥ 40, `dO` ≤ `EOF`, `dL` ≤ `EOF` − 40, `dO` + `dL` ≤ `EOF` | −199 [Verified: `dO` = 16 is rejected] |
 | 4 | the data area does not **start** inside the map (`mO` < `dO` < `mO` + `mL` fails; starting before the map and running into it passes) | −199 |
-| 5 | max(`dO` + `dL`, `mO` + `mL`) ≤ `$FFFFFE` | −199 |
+| 5 | max(`dO` + `dL`, `mO` + `mL`) ≤ `$FFFFFE` | −199 [Verified: a fork ending at `$FFFFFE` opens, at `$FFFFFF` gives −199] |
 | 6 | `mT` < `mL` | −199 |
 | 7 | `mN` = `$FFFF`, or `mT` < `mN` ≤ `mL` (so `mN` = 0 fails) | −199 |
 | 8 | `mT` is even | −199 |
@@ -1031,8 +1034,6 @@ decompression diagnostics by `ResourceDecompression.GetData`, their message pref
 
 - The Ind-call size cache for duplicate IDs (§8.4) was read in code only.
 - The 68k ROM's behaviour was traced in code only; it was never run (SheepShaver runs the native Resource Manager).
-- The size limits of §7 were traced in code but not yet run: reopening the 63 MB fork, forks ending at `$FFFFFE`
-  (open) and `$FFFFFF` (`mapReadErr`), and AddResource's `eofErr` near `$1000000`.
 - `'dcmp'` 0–3 of System versions other than 9.0, and the native `'ncmp'` decompressors, which Mac OS 9.0 never uses
   (they differ from `'dcmp'` 0 and 2 only on bad input).
 - The trap patches that extensions install on the Resource Manager (Multiple Users, Apple Menu Options, language

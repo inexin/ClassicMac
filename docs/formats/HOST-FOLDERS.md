@@ -320,8 +320,10 @@ wins a tie. If no size gives only plausible records, no records are read [Fitted
 - Getting catalog information for an item with no file number creates a record, so **browsing a writable disk
   creates records** [Code] [Verified]. Records are also made when the Mac name differs from the 8.3 name and
   whenever Finder info is set [Code], but only while the volume's "save info" flag is set [Code].
-- A new record has type `TEXT`, creator `'dosa'`, flags 0 and `fdPutAway` 2 [Code] [Verified]. Its dates are 0 in
-  File Exchange 3.0.2 [Verified]; the code of both versions leaves them from uninitialised memory [Code].
+- A new record has type `TEXT`, creator `'dosa'`, flags 0 and `fdPutAway` 2 [Code] [Verified], and a file number
+  `$7FFFFFxx` from the counter, which counts down [Verified]. The mapped type (section 9) is not written back to it
+  [Verified]. Its dates are 0 in File Exchange 3.0.2 [Verified]; the code of both versions leaves them from
+  uninitialised memory [Code].
 - A record File Exchange created for a file that had a resource fork but no record got a **garbage Mac name**
   [Verified]: its name routine gives up without filling its buffer when its directory search misses, and the record
   takes its name from that uninitialised buffer [Code]. File Exchange shows such names as they are; see
@@ -365,8 +367,8 @@ DOS directory entries hold local time [Code], in two little-endian `u16` fields 
   wrap; pre-1980 dates come out as garbage [Code].
 - File Exchange checks nothing: impossible fields roll over through `Date2Secs` arithmetic (month 13 is January of
   the next year, day 0 the day before the 1st), a zero creation date shows as now and a zero modification date as
-  1979-12-01 [Code]; see [FAT.md](FAT.md) section 9.2. ClassicMac reads a date field of 0, or an impossible date or
-  time, as no date, until the rollover is checked on a running Mac [ClassicMac].
+  1979-12-01 [Code] [Verified]; see [FAT.md](FAT.md) section 9.2. ClassicMac's FAT reader does the same, except that
+  a zero creation date takes the record's +$40 [ClassicMac].
 
 Which date the Mac shows:
 
@@ -397,8 +399,10 @@ File Exchange gives a file with no record the blank Finder info: `TEXT`/`'dosa'`
 2 (the root directory's ID, never read) [Code]. A `RESOURCE.FRK` fork plays no part in it: it only gives the fork's
 length [Code]. The extension map (section 9) applies only when a record exists; on a writable volume with "save
 info" on, the Mac creates the record before reading the Finder info, so the mapped type shows there [Code]
-[Verified], while on a locked or read-only volume, or with "save info" off, the file stays `TEXT`/`'dosa'` [Code]
-(not yet checked on a running system).
+[Verified], while on a locked or read-only volume, or with "save info" off, the file stays `TEXT`/`'dosa'`: the
+only mapping path needs a record [Code]. A volume the Mac sees as locked is not yet checked; an image read-only only
+on the host is not one (the Mac mounts it writable, makes records in its cache and maps through them), and "save
+info" off was not tested. See [FAT.md](FAT.md) section 11.2.
 
 ClassicMac gives the same placeholder with the DOS dates, on a FAT volume [ClassicMac] and in a host folder, where a
 file with a `RESOURCE.FRK` fork but no record gets the placeholder and the host file's times as its dates (section
@@ -439,8 +443,9 @@ File Exchange 3.0.2, in order [Code] [Verified: 14 names, every 8.3 name exact]:
 [Code] [Verified]:
 
 - The long name is converted as stored, with no Unicode normalization, to the system script's encoding (Mac OS
-  Roman on a Roman system) [Code]. Whether the converter composes a decomposed name is not known; ClassicMac takes
-  the name in precomposed form (NFC) and converts to Mac OS Roman [ClassicMac].
+  Roman on a Roman system) [Code]. The converter does not compose a decomposed name: a combining mark has no byte,
+  so the name takes the low-byte path below, and can hold a `$00` [Verified: `Cafe`+U+0301`.txt` shows as `Cafe`,
+  `$01`, `.txt`]. ClassicMac converts to Mac OS Roman, as stored, the same way [ClassicMac].
 - If **every** character has a Mac OS Roman byte, the Mac OS Roman bytes are the name, **`:` included**
   (`a:b c.txt` shows with its colon).
 - If even one character has none, the whole name takes another path: each UTF-16 unit's **low byte**, with `:`
