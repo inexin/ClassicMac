@@ -235,7 +235,7 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | Text | `STR `, `STR#`, `TEXT` + `styl`, `vers` | UTF-8 text (`STR `, `TEXT`), JSON (`STR#`, `styl`, `vers`); styled text also as RTF (built) |
 | Fonts | `sfnt`; `NFNT`/`FONT` + `FOND` | TTF; BDF or a PNG strike + metrics JSON |
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL`, and their colour and extension resources (`wctb`, `dctb`, `actb`, `cctb`, `mctb`, `ictb`, `dlgx`, `alrx`, `xmnu`) (built) | JSON (built), optionally a rendered preview of the dialog |
-| Colour | `clut`, `pltt` | JSON and `.act` palettes |
+| Colour | `clut`, `pltt` (built) | JSON and `.act` palettes (built) |
 | Finder | `BNDL`, `FREF`, `SIZE` | JSON |
 | Unknown | anything else, including `CODE` | raw `.bin` + hex preview in the manifest |
 

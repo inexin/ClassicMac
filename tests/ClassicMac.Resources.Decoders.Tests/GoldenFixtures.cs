@@ -127,6 +127,14 @@ internal static class GoldenFixtures
         yield return Res("alrx", 129, [0, 0, 0, 0, 0, 0x0B, 0, 0, 0, 0, 0, 0, .. new byte[16], .. Pascal("Old")]);
         yield return Res("xmnu", 128, [0, 0, 0, 2, 0, 0, 0, 1, .. "quit"u8, 3, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFE, 0, 0, 0, 0, 0, 0, 0, 0, 1, 44, 0, 3, 0, 0]);
 
+        // Palettes: a pixel map's colour table (values as indices; two stray bytes after it), a device table (in order),
+        // and a palette with usages and tolerances.
+        yield return Res("clut", 128, [0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 5, 0x80, 0x00, 0, 0, 0, 0,
+            0, 255, 0, 0, 0, 0, 0, 0, 0, 9]);
+        yield return Res("clut", 129, [0, 0, 0, 0, 0x80, 0, 0, 1, 0, 0, 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0, 0]);
+        yield return Res("pltt", 128, [0, 2, .. new byte[14], 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0x02, 0x10, 0x00, .. new byte[6],
+            0x33, 0x33, 0x66, 0x66, 0x99, 0x99, 0, 0x24, 0, 0, .. new byte[6]]);
+
         // A type no decoder handles: exported raw.
         yield return Res("CODE", 1, [0x4E, 0x75]);
     }

@@ -1157,6 +1157,78 @@
       "encoding": null
     },
     {
+      "type": "clut",
+      "typeBytes": "636C7574",
+      "id": 128,
+      "name": null,
+      "attributes": 0,
+      "size": 457,
+      "storedSize": 34,
+      "dcmp": null,
+      "decoder": "color.table",
+      "decoderVersion": 1,
+      "path": "clut/128.json",
+      "sha256": "a9ab923e7b2b1919b55eb32a6316ea830eafada02b0da1a9eaf3ea8a0ba8e3d4",
+      "storedSha256": "64fc40178317536743908f7b8583adf6a27e4e6b22a581d38afdbce4f379bb0c",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "clut/128.act",
+          "sha256": "fa774f09f3e9e1fb273ef3e7fdbecf62d2fc6bb8fc1735db663a3ae7fe870fc0"
+        }
+      ],
+      "encoding": null
+    },
+    {
+      "type": "clut",
+      "typeBytes": "636C7574",
+      "id": 129,
+      "name": null,
+      "attributes": 0,
+      "size": 325,
+      "storedSize": 24,
+      "dcmp": null,
+      "decoder": "color.table",
+      "decoderVersion": 1,
+      "path": "clut/129.json",
+      "sha256": "074c60e45396f01dc77ccf27de345bf21dd265a17b09a885dc7d6b593ec73b97",
+      "storedSha256": "f3ec4514ad4263c96e660c15f259daffdb98ebd7283c56214c6857ac77018644",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "clut/129.act",
+          "sha256": "5a843ee8d1637d671919d12f27eb059a25e8dce6a36b525cd1b35259466a815e"
+        }
+      ],
+      "encoding": null
+    },
+    {
+      "type": "pltt",
+      "typeBytes": "706C7474",
+      "id": 128,
+      "name": null,
+      "attributes": 0,
+      "size": 463,
+      "storedSize": 48,
+      "dcmp": null,
+      "decoder": "color.palette",
+      "decoderVersion": 1,
+      "path": "pltt/128.json",
+      "sha256": "e8d552431f22c2f103c5f233b24281cb071db2db0ae70530fd678ec2f589c367",
+      "storedSha256": "f6cd198665f8d1c3691812fe51ee06927f823a293c27137bfb40219b70b10ce0",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "pltt/128.act",
+          "sha256": "ee22e496b366e4eacdce3ba3e23091c987816e3a765b4a928932931dc4546553"
+        }
+      ],
+      "encoding": null
+    },
+    {
       "type": "CODE",
       "typeBytes": "434F4445",
       "id": 1,

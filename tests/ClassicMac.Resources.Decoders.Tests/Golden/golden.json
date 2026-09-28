@@ -733,6 +733,54 @@
           "file": "xmnu-128.json"
         }
       ]
+    },
+    {
+      "key": "clut-128",
+      "decoder": "color.table 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "clut-128.json"
+        },
+        {
+          "extension": ".act",
+          "sha256": "fa774f09f3e9e1fb273ef3e7fdbecf62d2fc6bb8fc1735db663a3ae7fe870fc0",
+          "length": 772
+        }
+      ]
+    },
+    {
+      "key": "clut-129",
+      "decoder": "color.table 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "clut-129.json"
+        },
+        {
+          "extension": ".act",
+          "sha256": "5a843ee8d1637d671919d12f27eb059a25e8dce6a36b525cd1b35259466a815e",
+          "length": 772
+        }
+      ]
+    },
+    {
+      "key": "pltt-128",
+      "decoder": "color.palette 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "pltt-128.json"
+        },
+        {
+          "extension": ".act",
+          "sha256": "ee22e496b366e4eacdce3ba3e23091c987816e3a765b4a928932931dc4546553",
+          "length": 772
+        }
+      ]
     }
   ]
 }

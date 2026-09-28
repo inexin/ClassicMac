@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Colour tables (`clut`) and palettes (`pltt`) to JSON and Adobe `.act`, specified in `docs/formats/PALETTES.md`;
+  the viewer shows them as swatches.
 - Interface resources to JSON: menus and menu bars, window, dialog and alert templates, dialog item lists and
   control templates, and their colour tables and Appearance extensions (`ui.*` decoders), specified in
   `docs/formats/INTERFACE.md`. The viewer draws dialogs, alerts, item lists and menus in the System 7 style.

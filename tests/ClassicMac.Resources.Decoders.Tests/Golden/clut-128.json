@@ -1,0 +1,31 @@
+{
+  "seed": 1,
+  "flags": 0,
+  "device": false,
+  "entries": [
+    {
+      "index": 0,
+      "value": 0,
+      "red": 65535,
+      "green": 65535,
+      "blue": 65535,
+      "hex": "#ffffff"
+    },
+    {
+      "index": 5,
+      "value": 5,
+      "red": 32768,
+      "green": 0,
+      "blue": 0,
+      "hex": "#800000"
+    },
+    {
+      "index": 255,
+      "value": 255,
+      "red": 0,
+      "green": 0,
+      "blue": 0,
+      "hex": "#000000"
+    }
+  ]
+}

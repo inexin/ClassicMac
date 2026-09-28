@@ -80,6 +80,7 @@ namespace ClassicMac.Resources.Decoders
                 new Sound.SoundDecoder(),
                 .. Interface.InterfaceDecoder.All(options),
                 .. Interface.ExtensionDecoder.All(options),
+                .. Colors.PaletteDecoder.All(),
             ];
         }
 

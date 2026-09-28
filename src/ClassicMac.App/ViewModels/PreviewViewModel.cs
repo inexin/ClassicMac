@@ -135,6 +135,12 @@ namespace ClassicMac.App.ViewModels
                 return SoundPreview(sampled);
             if (InterfacePreviews.Dialog(resource, data, fork, options, readOptions, diagnostics) is { } dialog)
                 return new PreviewViewModel(PreviewKind.Dialog, "") { Dialog = dialog };
+            if (type is "clut" or "pltt")
+            {
+                var entries = type == "clut" ? Resources.Decoders.Colors.Palettes.ReadColorTable(data.Span, out _, out _, out _)
+                    : Resources.Decoders.Colors.Palettes.ReadPalette(data.Span, out _);
+                return entries.Count == 0 ? Nothing($"'{type}'") : Swatches(entries);
+            }
             if (type == "MENU")
                 return new PreviewViewModel(PreviewKind.Menu, "") { Menu = InterfaceResources.ReadMenu(data.Span, options, diagnostics, resource.ToString()) };
             var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(resource.Type));
@@ -177,6 +183,33 @@ namespace ClassicMac.App.ViewModels
             var text = isText ? file.DataFork.ToArray() : ReadOnlyMemory<byte>.Empty;
             var document = StyledDocuments.Read(text, fork, file.FinderInfo.Type, file.Name.ToString(), options, readOptions, diagnostics);
             return document is { Kind: DocumentKind.DocMaker } || document?.Chapters.Any(c => c.Pictures.Count > 0) == true ? document : null;
+        }
+
+        // A palette as a grid of 16 × 16-pixel swatches, 16 to a row, in entry order, captioned with the count.
+        private static PreviewViewModel Swatches(IReadOnlyList<Resources.Decoders.Colors.PaletteEntry> entries)
+        {
+            const int Cell = 16, Columns = 16;
+            var width = Math.Min(entries.Count, Columns) * Cell;
+            var height = (entries.Count + Columns - 1) / Columns * Cell;
+            var rgba = new byte[width * height * 4];
+            for (var i = 0; i < entries.Count; i++)
+            {
+                var (x0, y0) = (i % Columns * Cell, i / Columns * Cell);
+                for (var y = y0; y < y0 + Cell; y++)
+                {
+                    for (var x = x0; x < x0 + Cell; x++)
+                    {
+                        var at = (y * width + x) * 4;
+                        var edge = x == x0 + Cell - 1 || y == y0 + Cell - 1; // a white gap between swatches
+                        rgba[at] = edge ? (byte)255 : (byte)(entries[i].Red >> 8);
+                        rgba[at + 1] = edge ? (byte)255 : (byte)(entries[i].Green >> 8);
+                        rgba[at + 2] = edge ? (byte)255 : (byte)(entries[i].Blue >> 8);
+                        rgba[at + 3] = 255;
+                    }
+                }
+            }
+            var png = Resources.Decoders.Images.PngEncoder.Instance.Encode(width, height, rgba);
+            return new PreviewViewModel(PreviewKind.Image, "") { Images = [new PreviewImage(png, width, height, $"{entries.Count} colours")] };
         }
 
         private static PreviewViewModel SoundPreview(SampledSound sampled)

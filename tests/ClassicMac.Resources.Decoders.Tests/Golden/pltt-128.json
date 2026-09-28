@@ -1,0 +1,29 @@
+{
+  "entries": [
+    {
+      "index": 0,
+      "red": 65535,
+      "green": 65535,
+      "blue": 65535,
+      "hex": "#ffffff",
+      "usage": 2,
+      "usageNames": [
+        "pmTolerant"
+      ],
+      "tolerance": 4096
+    },
+    {
+      "index": 1,
+      "red": 13107,
+      "green": 26214,
+      "blue": 39321,
+      "hex": "#336699",
+      "usage": 36,
+      "usageNames": [
+        "pmAnimated",
+        "pmBlack"
+      ],
+      "tolerance": 0
+    }
+  ]
+}

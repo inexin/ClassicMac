@@ -1,0 +1,23 @@
+{
+  "seed": 0,
+  "flags": 32768,
+  "device": true,
+  "entries": [
+    {
+      "index": 0,
+      "value": 0,
+      "red": 65535,
+      "green": 0,
+      "blue": 0,
+      "hex": "#ff0000"
+    },
+    {
+      "index": 1,
+      "value": 0,
+      "red": 0,
+      "green": 65535,
+      "blue": 0,
+      "hex": "#00ff00"
+    }
+  ]
+}

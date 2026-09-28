@@ -17,7 +17,8 @@ namespace ClassicMac.Resources.Cli.Tests;
 // harness's damage tests) and warnings are reported, not failed. Known, explained cases are listed in
 // Corpus/allowlist.json. Corpus/baseline.json holds, per input (by name and SHA-256, wherever the corpus lives), its
 // counts and one hash of all its outputs, so a change in any decoded output names the input; inputs not present are
-// skipped. CLASSICMAC_UPDATE_BASELINE=1 rewrites the baseline (keeping entries for inputs not present).
+// skipped. CLASSICMAC_UPDATE_BASELINE=1 rewrites the baseline (keeping entries for inputs not present);
+// CLASSICMAC_CORPUS_REPORT=<file> writes the summary and every export warning to a file.
 public class CorpusExportTests : IDisposable
 {
     private readonly string folder = Directory.CreateTempSubdirectory("classicmac-corpus-").FullName;
@@ -41,6 +42,7 @@ public class CorpusExportTests : IDisposable
         var failures = new List<string>();
         var damaged = new SortedDictionary<string, int>(StringComparer.Ordinal);
         var warnings = new SortedDictionary<string, int>(StringComparer.Ordinal);
+        var details = new List<string>();
         var summaries = new Dictionary<string, Summary>(StringComparer.Ordinal);
         var target = 0;
 
@@ -78,7 +80,11 @@ public class CorpusExportTests : IDisposable
             {
                 if (d.Severity == DiagnosticSeverity.Error && damageTest) Count(damaged, d.Code);
                 else if (d.Severity == DiagnosticSeverity.Error || d.Code == "export.decoder-failed") failures.Add($"{name} > {source}: {d.Message} [{d.Code}]");
-                else Count(warnings, d.Code);
+                else
+                {
+                    Count(warnings, d.Code);
+                    details.Add($"{name} > {source}: {d.Severity}: {d.Message} [{d.Code}]");
+                }
             }
 
             // The manifests: decoded or raw per resource, the hashes checked, all outputs hashed together.
@@ -127,9 +133,12 @@ public class CorpusExportTests : IDisposable
         }
 
         var changes = CompareBaseline(summaries.Values);
-        TestContext.Current.SendDiagnosticMessage(
-            $"{summaries.Count} inputs, {summaries.Values.Sum(s => s.Resources)} resources ({summaries.Values.Sum(s => s.Decoded)} decoded, "
-            + $"{summaries.Values.Sum(s => s.Raw)} raw), {summaries.Values.Sum(s => s.Documents)} documents. Damaged inputs: {Format(damaged)}. Warnings: {Format(warnings)}.");
+        var summary = $"{summaries.Count} inputs, {summaries.Values.Sum(s => s.Resources)} resources ({summaries.Values.Sum(s => s.Decoded)} decoded, "
+            + $"{summaries.Values.Sum(s => s.Raw)} raw), {summaries.Values.Sum(s => s.Documents)} documents. Damaged inputs: {Format(damaged)}. Warnings: {Format(warnings)}.";
+        TestContext.Current.SendDiagnosticMessage(summary);
+        // CLASSICMAC_CORPUS_REPORT names a file for the summary and every export warning, for a look.
+        if (Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS_REPORT") is { Length: > 0 } report)
+            File.WriteAllLines(report, [summary, .. failures, .. details]);
         Assert.True(failures.Count == 0, $"{failures.Count} decoder failures:\n" + string.Join('\n', failures.Take(50)));
         Assert.True(changes.Count == 0, "Outputs changed from the baseline (if intended, run with CLASSICMAC_UPDATE_BASELINE=1):\n"
             + string.Join('\n', changes.Take(50)));

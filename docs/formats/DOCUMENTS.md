@@ -76,7 +76,10 @@ rules below are DOCMaker 4.8.4's reader [Code: DOCMaker 4.8.4]; ClassicMac recog
 | +$11 | 1 | `u8` | Unused |
 | +$12 | 2 | `i16` | Justification of the whole chapter (`TESetJust`): 0 left, 1 centre, −1 right |
 
-**Background colour:** entry *k* − 1 of `'clut'` 128 (`RGBBackColor`), or entry 0 when there is no entry *k* − 1.
+**Background colour:** entry *k* − 1 of `'clut'` 128 (`RGBBackColor`), or entry 0 when there is no entry *k* − 1. The
+Divinity manual's `'clut'` 128 stores the number of entries (24) where a `ColorTable` stores it less one, so a
+colour table reader finds one entry short (`color.short`, [PALETTES.md](PALETTES.md)); the chapters' entries are all
+there.
 
 **Window width:** from `'sTwD'` 128. Word 0 is a mode: 1, the screen's full height and the width in word 1; 2, the
 position in word 1, the height in word 2 and the **width in word 3**, clamped to the screen. When bytes 8 and 9 are both
