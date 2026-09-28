@@ -172,7 +172,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
 | Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
 | Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
-| Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `NdifReader`, `DartReader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2, NDIF (chunks decoded on demand, segments joined) and DART images, Apple partition maps; each yields files the next can open |
+| Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `NdifReader`, `DartReader`, `UdifReader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2, UDIF, NDIF (chunks decoded on demand, segments joined) and DART images, Apple partition maps; each yields files the next can open |
 | Files.Fat | `FatReader`, `MbrReader` | FAT12/16/32 volumes with each file's Mac name, Finder info, dates and resource fork from `FINDER.DAT`/`RESOURCE.FRK`; DOS partition tables |
 | Files.Iso | `IsoReader` | ISO 9660 and High Sierra volumes as Mac OS 9 shows them: `AA`/`BA` Finder info, associated files as resource forks |
 | Files.Iso | `RawCdReader`, `CueSheetReader` | Raw CD images (2352/2336-byte sectors, per-sector mode) and cue sheets (first data track, from the `.bin` beside it) as 2048-byte blocks for the volume readers |
@@ -331,11 +331,11 @@ flowchart LR
     `ContainerUnwrapper`, options;
   - `ClassicMac.Files.Containers`: AppleSingle/AppleDouble, MacBinary, BinHex, PC Exchange records;
   - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, Disk Copy 4.2, NDIF (Disk Copy 6, including
-    `.smi` and segmented images), DART; UDIF and HFS+ later;
+    `.smi` and segmented images), DART, UDIF `.dmg`; HFS+ later;
   - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them, raw-sector CD images
     (`.bin`, 2352/2336-byte sectors) and cue sheets (multisession later);
-  - `ClassicMac.Files.Compression`: decompressors shared by disk images and archives (ADC, built for NDIF and used
-    by UDIF later; the StuffIt and Compact Pro methods later);
+  - `ClassicMac.Files.Compression`: decompressors shared by disk images and archives (ADC for NDIF and UDIF, KenCode,
+    DART RLE and LZH, bzip2 for UDIF; the StuffIt and Compact Pro methods later);
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
     (MBR) partition tables;
   - `ClassicMac.Files.Archives` (later): zip and tar with Mac data, StuffIt, Compact Pro, DiskDoubler, PackIt.
@@ -541,12 +541,15 @@ They change what running applications see, not what a file contains.
   (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices (its hidden debug menu, Option at
   launch, has UDIF test items; its conversion fails on OS 9.0); they need OS 9.1–9.2.2, real 2000–2002 `.dmg` files
   or `hdiutil`. (Disk Copy cannot mount images on SheepShaver's shared volume, -8812.)
-- **UDIF (not built; real Disk Copy 6.5b13 samples in hand, layout in `docs/formats/DISK-IMAGES.md` §11):**
+- **UDIF (built; `docs/formats/DISK-IMAGES.md` §12):** Disk Copy 6.5b13's read-only, compressed and "entire device"
+  images decode to their source device exactly, every checksum matching; Mac OS X's XML-plist images are read as
+  dmg2img describes them, tested on synthetic images (no OS X-made `.dmg` in the corpus yet). Runs: zeros, raw, ADC,
+  zlib, bzip2 (our own decoder); LZFSE reads as zeros with an error; segmented and encrypted images are refused.
   - The `koly` trailer is the last 512 bytes.
   - Early images (Disk Copy 6.4/6.5) have XMLOffset/Length 0. Their RsrcForkOffset/Length point to a flattened
     resource fork inside the data fork. Its `blkx` resources hold the `mish` block tables that later images keep
     base64-encoded in the XML plist.
-  - The reader will read that fork's map properly; dmg2img (GPL, reference only) just walks the blocks.
+  - The reader reads that fork's map properly; dmg2img (GPL, reference only) just walks the blocks.
   - Checksums name their algorithm: type 2 CRC-32, type 4 MD5 ("entire device" images); verifying is optional.
     Read/write device images (`devr`) and CD-R masters (`GImg`/`CDr3`) are raw devices, read as raw.
   - `mish` runs are 0x28-byte entries from +0xCC. Types: 0 zero, 1 raw, 2 ignore, 0x80000004 ADC (the NDIF codec),
@@ -590,7 +593,7 @@ They change what running applications see, not what a file contains.
   harness's samples. `CLASSICMAC_CORPUS` names one or more folders, separated by `;`; the tests that use it skip when
   it is absent. Only names, counts and hashes of corpus results are committed, never the files or their decoded output.
   A folder holding a `.classicmac-damage-test` file (or named `ndiftest`) holds deliberately damaged inputs: tests that
-  expect clean reads skip it, the tests written for it read it. Formats not read yet (UDIF) are skipped the same way.
+  expect clean reads skip it, the tests written for it read it.
 - **Checks:**
   - Round trip: read → write → read gives the same model, and canonical forks are byte-identical.
   - **Golden outputs** (`tests/ClassicMac.Resources.Decoders.Tests/Golden/`): a fixture fork made in code, with one
@@ -661,7 +664,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    forks come back byte for byte.
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
-   NDIF (with ADC in `ClassicMac.Files.Compression`) and DART (built), UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed); CD
+   NDIF (with ADC in `ClassicMac.Files.Compression`), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed) (built); CD
    images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors and cue sheets built; multisession next); zip and tar with
    Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS

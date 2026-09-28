@@ -1,8 +1,8 @@
 # Disk images — an implementer's specification
 
 This document describes the classic Mac OS disk image formats that wrap a floppy or volume — Disk Copy 4.2, DART,
-NDIF (Disk Copy 6, including self-mounting and segmented images), ShrinkWrap's outputs and the early UDIF `.dmg` —
-and the codecs inside them (ADC, KenCode, DART RLE and DART LZH), completely enough to write a reader and each
+NDIF (Disk Copy 6, including self-mounting and segmented images), ShrinkWrap's outputs and UDIF (`.dmg`) — and
+the codecs inside them (ADC, KenCode, DART RLE, DART LZH and bzip2), completely enough to write a reader and each
 decoder without reading ClassicMac's code. Every reader here yields the disk's sectors as one volume, which the HFS or
 MFS reader ([HFS-MFS.md](HFS-MFS.md)) or the partition-map reader opens next.
 
@@ -11,8 +11,8 @@ early UDIF have none: the rules below come from the disassembly of Disk Copy 6.1
 block driver, its `bcem` validator and version converter, the `hdi1`/`hdi2` codec plug-ins, the DART reader), checked
 on images the real software made in SheepShaver (Mac OS 9.0), each decoded back to its source sectors with the stored
 checksum matching. DART files were checked on DART 1.5.3's own output (CiderPress2's test data). LZHUF is Okumura and
-Yoshizaki's public-domain program. dmg2img, libdmg-hfsplus and Aaru (GPL/LGPL) and VileFault were behavioural
-references only; what they alone say is marked as such.
+Yoshizaki's public-domain program; bzip2 is Julian Seward's format. dmg2img, libdmg-hfsplus and Aaru (GPL/LGPL) and
+VileFault were behavioural references only; what they alone say is marked as such.
 
 Contents
 
@@ -26,9 +26,10 @@ Contents
 8. [KenCode](#8-kencode)
 9. [DART RLE](#9-dart-rle)
 10. [DART LZH (LZHUF)](#10-dart-lzh-lzhuf)
-11. [UDIF (not built in ClassicMac yet)](#11-udif-not-built-in-classicmac-yet)
-12. [Diagnostics](#12-diagnostics)
-13. [Open questions](#13-open-questions)
+11. [bzip2](#11-bzip2)
+12. [UDIF](#12-udif)
+13. [Diagnostics](#13-diagnostics)
+14. [Open questions](#14-open-questions)
 
 ---
 
@@ -37,7 +38,8 @@ Contents
 The shared conventions and source tags of [README.md](README.md) apply: big-endian values, offsets in hex, sizes in
 decimal, 512-byte sectors (also called blocks here), and one tag per rule — **[Doc]**, **[Code]** (with the software
 and version), **[Verified]**, **[Author]**, **[Fitted]**. **[Fitted?]** marks a rule that is inferred or not yet
-settled, listed again in [§13](#13-open-questions).
+settled, listed again in [§14](#14-open-questions); **[ClassicMac]** marks ClassicMac's own choice where the format
+leaves one.
 
 Also in this document:
 
@@ -71,11 +73,13 @@ a nonzero multiple of 512 bytes, and is otherwise refused with −8816 [Code: Di
 | `devr` | `ddsk` | raw device image (UDIF read/write) | [Code: 6.5b13], [Verified] |
 | `GImg`, `PImg` | | Toast and other device images | [Code: 6.5b13] |
 
-ClassicMac does not rely on types, because images copied through other systems lose them. After the partition-map
-reader it tries, in order: a Disk Copy 4.2 header ([§3.3](#33-recognition)), an NDIF map in the resource fork
-(any `bcem` 128 of at least `$58` bytes), a DART header ([§4.1](#41-header)), then the volume readers on the data
-fork itself, which catch every raw image. Early UDIF and encrypted images are not read yet
-([§11](#11-udif-not-built-in-classicmac-yet)).
+ClassicMac does not rely on types, because images copied through other systems lose them. It tries UDIF first — a
+`koly` trailer in the last 512 bytes, or an encryption signature ([§12.6](#126-how-classicmac-reads-udif)) — before
+the partition-map reader, because a UDIF image whose runs are all raw starts with the device's driver descriptor.
+After the partition-map reader it tries, in order: a Disk Copy 4.2 header ([§3.3](#33-recognition)), an NDIF map in
+the resource fork (any `bcem` 128 of at least `$58` bytes), a DART header ([§4.1](#41-header)), then the volume
+readers on the data fork itself, which catch every raw image. Encrypted and segmented UDIF images are recognised and
+refused.
 
 ## 3. Disk Copy 4.2
 
@@ -692,19 +696,106 @@ DART's own files decodes identically with a random tail and in reverse order [Ve
 ring for each chunk. No Disk Copy writes `$82` chunks (none has the LZH encoder); the type exists only in the map
 the driver builds in memory for DART files [Code].
 
-## 11. UDIF (not built in ClassicMac yet)
+## 11. bzip2
+
+bzip2 is UDIF run type `$80000006` ([§12.3](#123-mish-block-tables)), a block-sorting compressor. The rules are
+Julian Seward's bzip2 1.0 format [Author]; ClassicMac's decoder is written from the format, with no GPL code, and is
+checked on streams libbzip2 1.0 wrote (Python's `bz2`: a short stream, one of three 100 kB blocks, and two streams
+back to back). No UDIF image with bzip2 runs is in the corpus.
+
+Bits are read **most significant first**, with no byte alignment inside a stream. Decoding a block runs the encoder's
+five stages backwards: Huffman codes, zero runs (RUNA/RUNB), move-to-front, the Burrows–Wheeler transform, and a first
+run-length stage.
+
+### 11.1 Streams and blocks
+
+| Bits | Field |
+| --- | --- |
+| 24 | `"BZh"` |
+| 8 | Level, `'1'`–`'9'`: a block holds at most level × 100,000 bytes before the last stage is undone |
+| … | Blocks, each starting with the 48-bit magic `$314159265359` |
+| 48 | End of stream: `$177245385090` |
+| 32 | Combined CRC |
+| 0–7 | Padding to a byte boundary |
+
+Streams may be concatenated; a reader decodes one after another while the next bytes are `"BZh"`.
+
+A block:
+
+| Bits | Field |
+| --- | --- |
+| 48 | `$314159265359` |
+| 32 | Block CRC of the block's output ([§11.5](#115-the-crcs)) |
+| 1 | Randomised: 1 only from bzip2 0.9.0 and earlier. ClassicMac refuses such a block [ClassicMac] |
+| 24 | Origin pointer: the row of the original string in the sorted matrix ([§11.4](#114-inverse-bwt-and-the-first-run-length-stage)) |
+| 16 | Range map: bit *i* (from the top) set when bytes 16*i* … 16*i* + 15 are used |
+| 16 × ranges | For each range present, a 16-bit map of its bytes, top bit first |
+| 3 | Group count: 2–6 Huffman tables |
+| 15 | Selector count, at least 1 |
+| … | Selectors ([§11.2](#112-selectors-and-huffman-tables)) |
+| … | Code lengths, per table ([§11.2](#112-selectors-and-huffman-tables)) |
+| … | The Huffman-coded symbols, up to the end-of-block symbol ([§11.3](#113-symbols)) |
+
+The used bytes, in increasing order, form the **symbol map** (*inUse* entries, at least 1). The alphabet is *inUse* +
+2 symbols: 0 = RUNA, 1 = RUNB, 2 … *inUse* = move-to-front indexes 1 … *inUse* − 1, and *inUse* + 1 = end of block.
+
+### 11.2 Selectors and Huffman tables
+
+- **Selectors.** Each is a unary number *j*: count 1 bits up to the ending 0; *j* must be below the group count. *j*
+  indexes a move-to-front list of the tables, which starts 0, 1, 2, …: the table at position *j* is the selector,
+  and moves to the front.
+- **Code lengths.** For each table: a 5-bit starting length; then for each symbol, while the next bit is 1, read one
+  more bit and add 1 (bit 0) or subtract 1 (bit 1); a 0 bit ends the symbol, whose length is the current value. The
+  length carries to the next symbol and must stay 1–20.
+- **Codes** are canonical: assigned in increasing order of length, and of symbol within a length, each code one more
+  than the last, doubled when the length grows.
+
+### 11.3 Symbols
+
+- Symbols come in **groups of 50**: each group is decoded with the table the next selector names; running out of
+  selectors is an error.
+- **Zero runs.** RUNA and RUNB write a run of move-to-front index 0 (the byte at the list's front) in bijective base
+  2: with a weight starting at 1, RUNA adds the weight and RUNB twice the weight, and the weight then doubles. The run
+  ends at the next other symbol, which resets the weight to 1.
+- **Move-to-front.** The list starts 0, 1, … *inUse* − 1 (positions in the symbol map). Symbol *s* ≥ 2 takes the
+  entry at position *s* − 1, moves it to the front and outputs the symbol map's byte for it.
+- The output (at most level × 100,000 bytes) is the last column *L* of the sorted matrix; the origin pointer must be
+  below its length.
+
+### 11.4 Inverse BWT and the first run-length stage
+
+- **Links.** Count each byte value in *L*, and let *start*[*b*] be the number of bytes below *b*. For each position
+  *i* in order: *next*[*start*[*L*[*i*]]++] = *i*.
+- **Walk.** *p* = *next*[origin]; then, *n* times (*n* = the length of *L*), output *L*[*p*] and set *p* =
+  *next*[*p*].
+- **Run-length stage.** After four equal bytes in a row, the next byte walked is a count (0–255) of further copies
+  of that byte, not a byte of data; counting starts again after it.
+
+### 11.5 The CRCs
+
+- **Block CRC:** polynomial `$04C11DB7`, **most significant bit first**
+  (`crc = (crc << 8) ^ table[(crc >> 24) ^ byte]`), starting at `$FFFFFFFF`, complemented at the end, over the
+  block's final output. `123456789` gives `$FC891918`.
+- **Combined CRC:** start at 0; after each block, `c = ((c << 1) | (c >> 31)) ^ blockCRC`.
+
+ClassicMac checks both; a mismatch, bad data, output that overflows the run, or a stream ending short of the run's
+size is a damaged run (`udif.bad-run`, [§13](#13-diagnostics)).
+
+## 12. UDIF
 
 The Universal Disk Image Format replaced NDIF from Disk Copy 6.4 and 6.5 (2000–2002) and is Mac OS X's `.dmg`.
-ClassicMac does not read it yet. What follows was verified on **early UDIF images made by Disk Copy 6.5b13** (Mac OS
-9.0 in SheepShaver, patched to run below 9.1): read-only compressed (ADC), read-only and read/write device images of
-an Apple partition map with an 800K HFS volume, plus "entire device" and CD-R master images of the same device, each
-decoded back to the source device exactly. Facts only dmg2img (GPL, behavioural reference) gives are marked so.
+ClassicMac reads it ([§12.6](#126-how-classicmac-reads-udif)). What follows was verified on **early UDIF images made
+by Disk Copy 6.5b13** (Mac OS 9.0 in SheepShaver, patched to run below 9.1): read-only compressed (ADC), read-only and
+read/write device images of an Apple partition map with an 800K HFS volume, plus "entire device" and CD-R master
+images of the same device, each decoded back to the source device exactly. Facts only dmg2img (GPL, behavioural
+reference) gives are marked so: the XML property list and the zero, zlib, bzip2, LZFSE and comment runs of Mac OS X's
+images.
 
 Disk Copy 6.5b13 offers UDIF formats only when saving **device images** (types `devi`, `devr`, `devs`, `GImg`,
 `PImg`); its menu lists read/write, read-only, read-only compressed, read-only (entire device), CD-R master and two
 "OBSOLETE (6.4d50)" formats [Code: 6.5b13], [Verified]. Disk Copy 6.3.3 has no UDIF code at all [Code: 6.3.3].
 
-### 11.1 The `koly` trailer
+### 12.1 The `koly` trailer
 
 The last 512 bytes of the data fork [Verified: 6.5b13; the layout agrees with dmg2img]:
 
@@ -713,7 +804,7 @@ The last 512 bytes of the data fork [Verified: 6.5b13; the layout agrees with dm
 | `+$000` | 4 | `OSType` | `'koly'` | |
 | `+$004` | 4 | `u32` | Version | 4 |
 | `+$008` | 4 | `u32` | Header size | 512 |
-| `+$00C` | 4 | `u32` | Flags: bit 0 = the resource fork is flattened into the data fork; bit 1 = every data run is raw ([§11.4](#114-checksums)) | 1; 3 for "entire device" |
+| `+$00C` | 4 | `u32` | Flags: bit 0 = the resource fork is flattened into the data fork; bit 1 = every data run is raw ([§12.4](#124-checksums)) | 1; 3 for "entire device" |
 | `+$010` | 8 | `u64` | Running data fork offset | 0 |
 | `+$018` | 8 | `u64` | Data fork offset: where the runs' data start | 0 |
 | `+$020` | 8 | `u64` | Data fork length | up to the embedded resource fork |
@@ -737,13 +828,14 @@ The last 512 bytes of the data fork [Verified: 6.5b13; the layout agrees with dm
 
 The flags [Code: 6.5b13]:
 
-- **Bit 0**: the resource fork is stored in the data fork, at the resource fork offset (§11.2). Disk Copy's flatten
-  routine sets it, its unflatten routine clears it, and opening an image tests it.
+- **Bit 0**: the resource fork is stored in the data fork, at the resource fork offset
+  ([§12.2](#122-where-the-block-tables-are)). Disk Copy's flatten routine sets it, its unflatten routine clears it,
+  and opening an image tests it.
 - **Bit 1**: every data run is raw, so the data fork is a sector-for-sector copy of the device. The image builder
   starts with it set and clears it at the first run that is not raw; when it is set, Disk Copy skips the run tables
   and reads the data fork directly. (The name is ClassicMac's; the code only tests the bit.)
 
-### 11.2 Where the block tables are
+### 12.2 Where the block tables are
 
 - **Early images (Disk Copy 6.4/6.5):** XML offset and length are 0. The resource fork offset and length point to a
   **complete classic resource fork stored inside the data fork** ([RESOURCE-FORK.md](RESOURCE-FORK.md)). It holds one
@@ -754,7 +846,7 @@ The flags [Code: 6.5b13]:
 - **Later images** keep the same `mish` tables base64-encoded in an XML property list at the XML offset
   [dmg2img, behavioural reference only].
 
-### 11.3 `mish` block tables
+### 12.3 `mish` block tables
 
 Each `blkx` resource's data is a `mish` table [Verified: 6.5b13]:
 
@@ -792,7 +884,7 @@ A run:
 | `$00000002` | Free space ("ignore"): not stored, reads as zeros; also used with a count of 0 as a marker | [Verified: 6.5b13] |
 | `$80000004` | ADC ([§7](#7-adc)), the NDIF codec | [Verified: 6.5b13] |
 | `$80000005` | zlib | dmg2img only |
-| `$80000006` | bzip2 | dmg2img only |
+| `$80000006` | bzip2 ([§11](#11-bzip2)) | dmg2img only |
 | `$80000007` | LZFSE | dmg2img only |
 | `$7FFFFFFE` | Comment | dmg2img only |
 | `$FFFFFFFF` | End of the table (its first sector = the sector count) | [Verified: 6.5b13] |
@@ -801,7 +893,7 @@ Disk Copy 6.5b13's HFS layout mirrors NDIF's: sectors 0–3, the used data, free
 [Verified]. The compressed image packs the partitions' data tightly (data offsets 0, 35, 1,559); the read-only one
 aligns them (0, 512, 32,768) [Verified].
 
-### 11.4 Checksums
+### 12.4 Checksums
 
 Each checksum field says its algorithm: type 2 is the standard (zlib) CRC-32 (32 bits), **not** NDIF's CRC28; type 4
 is MD5 (128 bits) [Verified: 6.5b13]. The read-only, read-only compressed and read/write images use CRC-32; the
@@ -823,9 +915,9 @@ With MD5 (the "entire device" image, which stores every sector, free space inclu
   `vers` text shows it as "MD5 $…".
 
 Its `koly` flags are 3 where the other images have 1 [Verified: 6.5b13]: bit 1 says every run is raw
-([§11.1](#111-the-koly-trailer)) [Code: 6.5b13].
+([§12.1](#121-the-koly-trailer)) [Code: 6.5b13].
 
-### 11.5 Other UDIF files
+### 12.5 Other UDIF files
 
 - **Read/write device images** (`devr`) are the raw device, with no `koly`; the `blkx`, `plst` and other resources
   are in the real resource fork [Verified: 6.5b13]. Read them as raw.
@@ -835,11 +927,57 @@ Its `koly` flags are 3 where the other images have 1 [Verified: 6.5b13]: bit 1 s
   2, `cdsaencr` in the last bytes of the file is version 1 [VileFault, behavioural reference; Mac OS X 10.2 and
   later].
 
-## 12. Diagnostics
+### 12.6 How ClassicMac reads UDIF
+
+Disk Copy 6.5b13's read-only, read-only compressed (ADC) and "entire device" (MD5) images decode to their source
+device byte for byte, with every checksum matching [Verified: 6.5b13]. The Mac OS X parts — the XML property list and
+zero, zlib, bzip2 and comment runs — follow dmg2img (GPL, behavioural reference only) and are tested on synthetic
+images only: no `.dmg` made by Mac OS X is in the corpus.
+
+- **Recognition.** A data fork of at least 512 bytes whose last 512 bytes start with `'koly'`, or an encrypted image
+  (`encrcdsa` at offset 0, `cdsaencr` in the last 8 bytes, [§12.5](#125-other-udif-files)). UDIF is tried right after
+  BinHex and **before the partition-map reader**: an image whose runs are all raw starts with the device's driver
+  descriptor, which the partition-map reader would otherwise take [ClassicMac]. The `koly` version and flags are not
+  checked or used; the runs are always read through the tables [ClassicMac].
+- **Refused** (the read throws): encrypted images; a segment count above 1 (segmented UDIF is not read yet); no
+  `blkx` tables; a property list or embedded resource fork lying outside the file, a property list over 64 MiB, XML
+  or base64 that does not parse; a device over the configured expansion limit.
+- **The tables.** When the `koly` XML length is nonzero, from the property list: the top `dict`'s `resource-fork` key,
+  its `blkx` array, each entry's `Data` (base64, whitespace ignored) and `ID` [dmg2img]. Otherwise from the embedded
+  resource fork's `blkx` resources ([§12.2](#122-where-the-block-tables-are)). Tables are taken **in ID order**, the
+  order the master checksum uses. A table shorter than `$CC` bytes or not starting `'mish'` is skipped
+  (`udif.bad-table`).
+- **Runs → disk.** A run covers device sectors from (table first sector + run first sector) for its sector count;
+  its bytes are at **`koly` data fork offset + table data offset + run offset** in the data fork, for its stored
+  length. Runs from every table are sorted by start; an overlap is reported (`udif.bad-table`) and the later run
+  wins. The end run (`$FFFFFFFF`) stops a table (missing: `udif.bad-table`, a warning); comment runs (`$7FFFFFFE`) and
+  runs of 0 sectors are skipped. A run count larger than the table holds is cut to what it holds.
+- **Reading.** The disk is read on demand, through the chunked disk NDIF uses too ([§5.9](#59-reading-the-disk)):
+  zero (`$0`) and free (`$2`) runs read as zeros; raw runs straight from the file; ADC ([§7](#7-adc)), zlib (.NET's
+  `ZLibStream`) and bzip2 ([§11](#11-bzip2)) runs are decoded one whole run at a time, the last one kept. A run that
+  does not decode to exactly its sector count × 512 bytes is reported once (`udif.bad-run`) and the rest of it reads
+  as zeros; stored bytes past the end of the file are reported and read as far as they go; sectors no run covers read
+  as zeros [ClassicMac].
+- **LZFSE** (`$80000007`) and unknown run types are reported (`udif.unsupported-run`) and read as zeros
+  [ClassicMac].
+- **Device length:** the `koly` sector count × 512, or, when that is 0, the end of the furthest table.
+- **Output:** one file whose data fork is the device, for the next readers (usually the partition map). It is named
+  after the host file without its extension, else "Disk image" [ClassicMac].
+- **Checksums** are verified only on request (`VerifyChecksums`, the CLI's `--verify`), each with the algorithm its
+  field names — type 2 CRC-32 (zlib's, stored big-endian), type 4 MD5 ([§12.4](#124-checksums)); any mismatch is
+  `udif.bad-checksum`:
+  - each table's over the sectors its runs store: raw and compressed runs, in run order; zero, free, LZFSE and
+    unknown runs are skipped;
+  - the master over the tables' computed checksums in ID order;
+  - the data over the data fork from its offset for its length.
+
+  A table whose checksum type is neither 2 nor 4 stops the verification [ClassicMac].
+
+## 13. Diagnostics
 
 Every problem is reported with a code and a severity ([README.md](README.md#diagnostics)). The codecs emit none of
-their own: their failures surface as `dart.bad-block` or `ndif.bad-chunk`. There are no `adc.`, `kencode.` or `udif.`
-codes.
+their own: their failures surface as `dart.bad-block`, `ndif.bad-chunk` or `udif.bad-run`. There are no `adc.`,
+`kencode.` or `bzip2.` codes.
 
 | Code | Severity | Meaning | ClassicMac | Disk Copy |
 | --- | --- | --- | --- | --- |
@@ -865,6 +1003,11 @@ codes.
 | `ndif.bad-segment` | Error | A part other than the last is not a whole number of sectors | reads it as it is | −39 |
 | `ndif.bad-checksum` | Error | The disk's CRC28 differs from `+$50` (only with `VerifyChecksums` / `--verify`) | reads the disk | INVALID alert (130) with "Verify checksum" on; nothing otherwise |
 | `ndif.bad-chunk` | Error | A compressed chunk fails to decode: ADC overrun, truncated input or match before the start; KenCode overread or match before the start; RLE or LZH short | the rest of the chunk reads as zeros; reported once per chunk | overrun and overread: −8819 when read; before-start and truncated input: not checked, garbage |
+| `udif.bad-table` | Error | A `blkx` that is not a `mish` table; a run count larger than the table holds; runs of two tables (or one) overlapping | skips the table; reads the runs it holds; the later run wins | not traced |
+| `udif.bad-table` | Warning | A table with no end run | reads its runs | not traced |
+| `udif.bad-run` | Error | A run's stored bytes pass the end of the file; a compressed run over 2 GiB; a run that fails to decode (ADC, zlib or bzip2 damage, or a size other than its sectors') | reads what is there; the rest of the run reads as zeros; reported once per run | not traced |
+| `udif.unsupported-run` | Error | An LZFSE run, or a run type ClassicMac does not know | reads it as zeros | not traced |
+| `udif.bad-checksum` | Error | A table's, the master or the data checksum differs (only with `VerifyChecksums` / `--verify`) | reads the disk | not traced |
 
 Where the Disk Copy column gives a validator error for one chunk's entry (`ndif.short`, `ndif.unknown-chunk`, and the
 order, range and ADC cases of `ndif.bad-map`), Disk Copy 6.3.3 and 6.5b13 refuse the mount only when that entry is the
@@ -873,7 +1016,8 @@ last one; 6.1.2 refuses on any entry ([§5.5](#55-validation)) [Code].
 Maps ClassicMac cannot read at all throw instead of reporting: a version above 12 (Disk Copy −8818) or other than 2,
 10, 11 and 12 (−8819), a map shorter than its header, fewer than two entries, a disk of 0 or `$400000` sectors or
 more, the segmented flag below version 12 (all −8819 in Disk Copy), a disk larger than the configured expansion
-limit, and an NDIF data fork without its resource fork.
+limit, and an NDIF data fork without its resource fork. UDIF images throw for the reasons in
+[§12.6](#126-how-classicmac-reads-udif) (encrypted, segmented, no tables, tables outside the file or unreadable).
 
 Other Disk Copy results worth knowing: −8816, an unknown file type whose data fork is not a multiple of 512; −8812,
 "cannot be mounted from the disk it is presently on" (Disk Copy 6.1.2 and 6.5b13 on SheepShaver's shared host
@@ -881,7 +1025,7 @@ volume) [Verified]; −20, a write to a zero or compressed chunk [Code: 6.3.3]. 
 File Exchange 3.0.3 was active, because that extension installs its own, newer `.HDI` driver, which 6.1.2 then uses
 [Verified].
 
-## 13. Open questions
+## 14. Open questions
 
 - **Version 2's real layout.** No image from Disk Image Mounter or Disk Copy 6.0.x has been seen. Disk Copy 6.1.2's
   8-byte layout ([§5.7](#57-version-2)) was verified only on hand-built images; ShrinkWrap 2.1 reads such files with
@@ -896,5 +1040,6 @@ File Exchange 3.0.3 was active, because that extension installs its own, newer `
   traced rule that the validator's per-entry error is cleared. Not yet run: 6.3.3 (the emulator hung); the exact
   code 6.5b13 gives for the ADC image (−27 or −37); why its Check Image gives −50; and the equal case in Check
   Image, which hung the application.
-- **UDIF:** zlib, bzip2, LZFSE, zero and comment runs, the XML property list and later `koly` versions are known only
-  from dmg2img.
+- **UDIF from Mac OS X.** The XML property list and zlib, bzip2, zero and comment runs are known only from dmg2img
+  and tested only on synthetic images; no `.dmg` made by Mac OS X is in the corpus. LZFSE runs are not decoded.
+  Later `koly` versions and segmented UDIF images (segment count above 1, refused) have not been seen.

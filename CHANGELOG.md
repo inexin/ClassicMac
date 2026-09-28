@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- UDIF disk images (`.dmg`): Disk Copy 6.4/6.5's (block tables in an embedded resource fork) and Mac OS X's (XML
+  property list), with zeros, raw, ADC, zlib and bzip2 runs (a bzip2 decoder in `ClassicMac.Files.Compression`) and
+  CRC-32/MD5 checksums checked with `--verify`; encrypted and segmented images refused. NDIF and UDIF share a
+  chunked-disk reader.
 - Phase 3 exit check: golden outputs for every decoder (fixtures made in code; text outputs as files, images and
   sounds as hashes; the export manifest pinned) and a corpus export test with a committed baseline of counts and
   output hashes; `CLASSICMAC_CORPUS` takes several folders. A resource fork whose map gives over 1,000 errors (another
