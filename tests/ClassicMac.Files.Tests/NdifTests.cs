@@ -1,8 +1,10 @@
+using System.Buffers.Binary;
 using ClassicMac.Core;
 using ClassicMac.Files.Compression;
 using ClassicMac.Files.Hfs;
 using static ClassicMac.Files.Tests.Fixtures;
 using Kind = ClassicMac.Files.Tests.NdifBuilder.Kind;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Files.Tests;
 
@@ -142,19 +144,64 @@ public class NdifTests
         }
     }
 
-    // Version 2 (Disk Image Mounter, Disk Copy 6.0.1): no real image seen and Apple's readers disagree, so it is refused
-    // with the fields that would tell its layout.
-    [Fact]
-    public void Version_2_maps_are_refused_with_their_layout_fields()
+    // Version 2 (Disk Image Mounter, Disk Copy 6.0.1), as Disk Copy 6.1.2's driver reads it: the version 10 header up to
+    // +$54, the count there (end entry included), 8-byte entries from +$58, each chunk running to the next offset.
+    private static byte[] Version2(byte[] resource)
     {
-        var (data, resource) = NdifBuilder.Build(Volume(), "Test Disk", (800, Kind.Raw));
-        var diagnostics = new List<Diagnostic>();
+        var map = ClassicMac.Resources.ResourceFork.Read(resource).Resources[0].GetData().ToArray();
+        var count = (int)BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x7C));
+        var old = new byte[0x58 + 8 * count];
+        map.AsSpan(0, 0x54).CopyTo(old);
+        old[1] = 2;
+        BinaryPrimitives.WriteUInt32BigEndian(old.AsSpan(0x54), (uint)count);
+        for (var k = 0; k < count; k++)
+        {
+            var e = map.AsSpan(0x80 + k * 12);
+            e[..4].CopyTo(old.AsSpan(0x58 + k * 8));
+            // A zero chunk stores nothing: its offset is the next chunk's, so every length is the gap to the next.
+            var offset = e[3] == 0 && k + 1 < count ? BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x80 + (k + 1) * 12 + 4)) : BinaryPrimitives.ReadUInt32BigEndian(e[4..]);
+            BinaryPrimitives.WriteUInt32BigEndian(old.AsSpan(0x58 + k * 8 + 4), offset);
+        }
+        return NdifBuilder.Fork([("bcem", 128, old)]);
+    }
 
-        var e = Assert.Throws<InvalidDataException>(() =>
-            NdifReader.Instance.Read(Image(data, WithMap(resource, m => m[1] = 2)), new ContainerContext(diagnostics: diagnostics)));
+    [Fact]
+    public void Version_2_maps_are_read_as_Disk_Copy_6_1_2_reads_them()
+    {
+        var volume = Volume();
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (6, Kind.Raw), (594, Kind.Raw), (100, Kind.Zero), (100, Kind.Raw));
 
-        Assert.Contains("version 2", e.Message, StringComparison.Ordinal);
-        Assert.Contains(diagnostics, d => d.Code == "ndif.version-2" && d.Message.Contains("+$7C = $00000002", StringComparison.Ordinal));
+        var (disk, diagnostics) = Disk(Image(data, Version2(resource)));
+
+        Assert.Equal(volume, disk);
+        var note = Assert.Single(diagnostics);
+        Assert.Equal(("ndif.version-2", DiagnosticSeverity.Info), (note.Code, note.Severity));
+        Assert.Contains("please send it", note.Message, StringComparison.Ordinal);
+    }
+
+    // The harness's version 2 images (C:\Temp\V2), which Disk Copy 6.1.2's driver mounted with a valid checksum; it
+    // refused ADC in version 2 (-10), and a wrong checksum fails the verification.
+    [Fact]
+    public void Version_2_test_images_match_their_checksums()
+    {
+        var folder = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateFiles("v2 kc.img", SearchOption.AllDirectories)
+                .Select(Path.GetDirectoryName).FirstOrDefault(d => !Path.GetFileName(d!).StartsWith('.'));
+        if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's version 2 images to run this.");
+
+        List<Diagnostic> Read(string name)
+        {
+            var path = Path.Combine(folder, name);
+            var diagnostics = new List<Diagnostic>();
+            var context = new ContainerContext(ContainerReadOptions.Default with { VerifyChecksums = true }, diagnostics);
+            _ = Assert.Single(NdifReader.Instance.Read(HostFiles.Read(path).File, context)).DataFork.ToArray();
+            return diagnostics;
+        }
+
+        foreach (var name in new[] { "v2 raw.img", "v2 kc.img" })
+            Assert.Equal(["ndif.version-2"], Read(name).Select(d => d.Code));
+        Assert.Contains(Read("v2 kc badcrc.img"), d => d.Code == "ndif.bad-checksum");
+        Assert.Contains(Read("v2 adc.img"), d => d.Code == "ndif.bad-map");
     }
 
     [Fact]
@@ -239,9 +286,8 @@ public class NdifTests
     [Fact]
     public void Disk_Copy_KenCode_image_matches_its_checksum()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var path = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateFiles(corpus, "F800 KC.img", SearchOption.AllDirectories).FirstOrDefault(f => !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.'));
+        var path = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateFiles("F800 KC.img", SearchOption.AllDirectories).FirstOrDefault(f => !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.'));
         if (path is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run17/kc image to run this.");
 
         var diagnostics = new List<Diagnostic>();
@@ -258,9 +304,8 @@ public class NdifTests
     [Fact]
     public void Disk_Copy_6_5_image_decodes_to_its_volume()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var path = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateFiles(corpus, "uc.img", SearchOption.AllDirectories)
+        var path = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateFiles("uc.img", SearchOption.AllDirectories)
                 .FirstOrDefault(f => !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') && File.Exists(Path.ChangeExtension(f, ".bin")));
         if (path is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run21/out images to run this.");
 
@@ -296,9 +341,8 @@ public class NdifTests
     [Fact]
     public void Disk_Copy_images_decode_to_their_volumes()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateFiles(corpus, "S800 RW.img", SearchOption.AllDirectories)
+        var folder = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateFiles("S800 RW.img", SearchOption.AllDirectories)
                 .Select(Path.GetDirectoryName).FirstOrDefault(d => !Path.GetFileName(d!).StartsWith('.'));
         if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run14/out images to run this.");
 
@@ -331,9 +375,8 @@ public class NdifTests
     [Fact]
     public void Damaged_images_are_reported_as_Disk_Copy_refuses_them()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateDirectories(corpus, "ndiftest", SearchOption.AllDirectories).FirstOrDefault(d => File.Exists(Path.Combine(d, "control.img")));
+        var folder = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateDirectories("ndiftest", SearchOption.AllDirectories).FirstOrDefault(d => File.Exists(Path.Combine(d, "control.img")));
         if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run15/ndiftest images to run this.");
 
         List<Diagnostic> Read(string relative, bool verify)

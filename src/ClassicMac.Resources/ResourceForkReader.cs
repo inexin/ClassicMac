@@ -224,6 +224,8 @@ namespace ClassicMac.Resources
             }
         }
 
+        private const int MaxErrors = 1000;
+
         private sealed class Context(
             ReadOnlyMemory<byte> input, ResourceFork fork, ReadOptions options,
             long dataOffset, long dataEnd, long mapEnd, long nameList)
@@ -237,8 +239,16 @@ namespace ClassicMac.Resources
             public long NameList { get; } = nameList;
             public List<(long Start, long End, string Label)> Blocks { get; } = [];
 
-            public void Report(DiagnosticSeverity severity, string code, string message, long offset) =>
+            private int errors;
+
+            // A map that is not one (another format's bytes read as a fork) gives an error per entry, and can promise
+            // 65536 types of thousands of entries each: past MaxErrors the fork is refused instead of read.
+            public void Report(DiagnosticSeverity severity, string code, string message, long offset)
+            {
+                if (severity == DiagnosticSeverity.Error && ++errors > MaxErrors)
+                    throw new InvalidDataException($"The fork is too damaged to read: over {MaxErrors} errors in its map.");
                 Fork.Diagnostics.Add(new Diagnostic(severity, code, message, offset));
+            }
         }
     }
 }

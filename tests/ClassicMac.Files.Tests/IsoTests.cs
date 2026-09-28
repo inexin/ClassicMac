@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using ClassicMac.Core;
 using ClassicMac.Files.Iso;
 using static ClassicMac.Files.Tests.IsoBuilder;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Files.Tests;
 
@@ -174,9 +175,8 @@ public class IsoTests
     [Fact]
     public void Test_disc_reads_as_OS_9_listed_it()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateFiles(corpus, "iso_tests.iso", SearchOption.AllDirectories)
+        var folder = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateFiles("iso_tests.iso", SearchOption.AllDirectories)
                 .Select(Path.GetDirectoryName)
                 .FirstOrDefault(d => !Path.GetFileName(d!).StartsWith('.') && File.Exists(Path.Combine(d!, "log.txt"))
                     && File.ReadAllText(Path.Combine(d!, "log.txt")).Contains(":#1 FILE", StringComparison.Ordinal));
@@ -184,7 +184,7 @@ public class IsoTests
 
         var log = MacRoman.Decode(File.ReadAllBytes(Path.Combine(folder, "log.txt"))).Split('\r', '\n');
         // The emulator may still hold the disc open; any copy of it will do.
-        var disc = Directory.EnumerateFiles(corpus!, "iso_tests.iso", SearchOption.AllDirectories)
+        var disc = CorpusFolders.EnumerateFiles("iso_tests.iso", SearchOption.AllDirectories)
             .OrderBy(f => Path.GetDirectoryName(f) == folder ? 0 : 1).Select(TryRead).FirstOrDefault(b => b is not null);
         if (disc is null) Assert.Skip("The harness's iso_tests.iso is in use.");
         var (files, diagnostics) = Read(disc);

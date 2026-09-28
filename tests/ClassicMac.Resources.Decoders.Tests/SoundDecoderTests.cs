@@ -3,6 +3,7 @@ using System.Text.Json;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Export;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Resources.Decoders.Tests;
 
@@ -237,9 +238,8 @@ public class SoundDecoderTests
     [Fact]
     public void Sound_Manager_samples_decode_as_the_Sound_Manager_does()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var folder = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? null
-            : Directory.EnumerateFiles(corpus, "mac3m8.p8", SearchOption.AllDirectories).Select(Path.GetDirectoryName).FirstOrDefault();
+        var folder = !CorpusFolders.Any ? null
+            : CorpusFolders.EnumerateFiles("mac3m8.p8", SearchOption.AllDirectories).Select(Path.GetDirectoryName).FirstOrDefault();
         if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run22/out samples to run this.");
 
         foreach (var name in new[] { "mac3m8", "mac3s8", "mac6m8", "mac6s8", "mac3m16", "mac6m16", "ima4m", "ima4s", "ulawm" })

@@ -432,20 +432,30 @@ public class ResourceForkReadWriteTests
     [Fact]
     public void Corpus_forks_round_trip()
     {
-        var files = Corpus.ForkFiles();
-        var identical = 0;
-        foreach (var file in files)
+        var forks = Corpus.ReadableForks(out var refused);
+        int identical = 0, unwritable = 0;
+        foreach (var (_, original, read) in forks)
         {
-            var original = File.ReadAllBytes(file);
-            var read = ResourceFork.Read(original);
-            var written = read.ToArray();
+            // A fork past what the map can address (the harness grew one to 63 MB through the Resource Manager) is
+            // counted, not failed.
+            byte[] written;
+            try
+            {
+                written = read.ToArray();
+            }
+            catch (InvalidOperationException)
+            {
+                unwritable++;
+                continue;
+            }
             var reread = ResourceFork.Read(written);
-            Assert.Empty(reread.Diagnostics);
+            // Only what the original already had (shared or overlapping data is kept as it was).
+            Assert.Empty(reread.Diagnostics.Select(d => d.Code).Except(read.Diagnostics.Select(d => d.Code)));
             AssertSameModel(read, reread);
             if (written.AsSpan().SequenceEqual(original)) identical++;
         }
         TestContext.Current.SendDiagnosticMessage(
-            $"{files.Count} corpus forks round-trip; {identical} are byte-identical (already canonical).");
+            $"{forks.Count} corpus forks round-trip; {identical} are byte-identical (already canonical); {refused} refused as damaged; {unwritable} past the format's limits.");
     }
 
     private static void AssertSameModel(ResourceFork expected, ResourceFork actual)

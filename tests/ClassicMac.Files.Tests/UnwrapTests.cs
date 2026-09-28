@@ -2,6 +2,7 @@ using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Files.Containers;
 using static ClassicMac.Files.Tests.Fixtures;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Files.Tests;
 
@@ -169,17 +170,16 @@ public class HostFilesTests : IDisposable
     [Fact]
     public void Corpus_host_files_unwrap()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        if (string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus))
+        if (!CorpusFolders.Any)
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of Mac files to run this.");
 
         int files = 0, basilisk = 0, withFinderInfo = 0;
-        foreach (var path in Directory.EnumerateFiles(corpus, "*", SearchOption.AllDirectories))
+        foreach (var path in CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories))
         {
             var folderName = Path.GetFileName(Path.GetDirectoryName(path));
             if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._")) continue;
-            // The harness's deliberately damaged NDIF images (checked by NdifTests against OS 9's results).
-            if (path.Contains($"{Path.DirectorySeparatorChar}ndiftest{Path.DirectorySeparatorChar}", StringComparison.Ordinal)) continue;
+            // The harness's deliberately damaged images (checked by their own tests).
+            if (CorpusFolders.IsDamageTest(path) || CorpusFolders.IsUnsupported(path)) continue;
             var diagnostics = new List<Diagnostic>();
             ContainerNode root;
             try
@@ -190,7 +190,7 @@ public class HostFilesTests : IDisposable
             {
                 continue; // in use (an emulator holding a disk image)
             }
-            Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+            Assert.False(diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error), $"{path}: {string.Join("; ", diagnostics.Select(d => d.Message))}");
             files++;
             if (root.Format == "Basilisk II folder") basilisk++;
             if (root.File.FinderInfo.Type != default) withFinderInfo++;

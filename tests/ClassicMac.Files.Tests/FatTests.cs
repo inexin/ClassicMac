@@ -6,6 +6,7 @@ using ClassicMac.Core;
 using ClassicMac.Files.Containers;
 using ClassicMac.Files.Fat;
 using static ClassicMac.Files.Tests.Fixtures;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Files.Tests;
 
@@ -314,9 +315,8 @@ public class FatTests
     [Fact]
     public void Floppies_written_by_File_Exchange_read_as_OS_9_listed_them()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var images = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? []
-            : Directory.EnumerateFiles(corpus, "fxtest*.img", SearchOption.AllDirectories)
+        var images = !CorpusFolders.Any ? []
+            : CorpusFolders.EnumerateFiles("fxtest*.img", SearchOption.AllDirectories)
                 .Where(f => !f.Contains("_orig", StringComparison.Ordinal)
                     && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') // Basilisk II .rsrc/.finf companions
                     && File.Exists(Path.Combine(Path.GetDirectoryName(f)!, "log.txt")))

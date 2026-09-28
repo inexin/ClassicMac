@@ -3,6 +3,7 @@ using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Files.Hfs;
 using static ClassicMac.Files.Tests.Fixtures;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Files.Tests;
 
@@ -137,13 +138,13 @@ public class HfsTests
     [Fact]
     public void Corpus_disk_images_read_cleanly()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        if (string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus))
+        if (!CorpusFolders.Any)
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of disk images to run this.");
 
         string[] extensions = [".img", ".dsk", ".hfv", ".image", ".dc42"];
-        var images = Directory.EnumerateFiles(corpus, "*", SearchOption.AllDirectories)
+        var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
             .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
+            .Where(f => !CorpusFolders.IsDamageTest(f) && !CorpusFolders.IsUnsupported(f))
             .Where(f => { try { using var _ = File.OpenRead(f); return true; } catch (IOException) { return false; } }) // skip images in use
             .ToList();
         var files = 0;

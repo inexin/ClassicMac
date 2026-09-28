@@ -367,9 +367,8 @@ public class DecompressionTests
         // Corpora may hold deliberately malformed resources, or ones meant for a file's own 'dcmp': those must be
         // reported, never thrown; cleanly decompressed ones must have their declared size.
         int compressed = 0, clean = 0;
-        foreach (var file in Corpus.ForkFiles())
+        foreach (var (_, _, fork) in Corpus.ReadableForks(out _))
         {
-            var fork = ResourceFork.Read(File.ReadAllBytes(file));
             foreach (var resource in fork.Resources.Where(r => (r.Attributes & ResourceAttributes.Compressed) != 0))
             {
                 if (!CompressedResourceHeader.TryRead(resource.GetData().Span, out var header) || !header.IsCompressed)

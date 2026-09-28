@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using ClassicMac.Core;
 using ClassicMac.Files.Hfs;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Files.Tests;
 
@@ -82,10 +83,9 @@ public class DartTests
     [Fact]
     public void DART_153_files_decode_to_their_source_disks()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        var samples = string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus) ? []
-            : Directory.EnumerateFiles(corpus, "*-best.data", SearchOption.AllDirectories)
-                .Concat(Directory.EnumerateFiles(corpus, "*-fast.data", SearchOption.AllDirectories))
+        var samples = !CorpusFolders.Any ? []
+            : CorpusFolders.EnumerateFiles("*-best.data", SearchOption.AllDirectories)
+                .Concat(CorpusFolders.EnumerateFiles("*-fast.data", SearchOption.AllDirectories))
                 .Where(f => !f.Contains("__MACOSX", StringComparison.Ordinal)).ToList();
         if (samples.Count == 0) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the dart_samples to run this.");
 

@@ -17,4 +17,7 @@
     <ProjectReference Include="..\..\src\ClassicMac.Resources\ClassicMac.Resources.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
+  </ItemGroup>
 </Project>

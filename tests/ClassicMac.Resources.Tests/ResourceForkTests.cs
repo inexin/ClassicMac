@@ -7,6 +7,25 @@ public class ResourceForkTests
     private static readonly FourCC Pict = FourCC.FromString("PICT");
     private static readonly FourCC Snd = FourCC.FromString("snd ");
 
+    // Another format's bytes read as a fork (an AppleDouble file named .rsrc in the corpus): a map of 0xFF promises
+    // 65536 types of 65536 entries, each entry an error. Past a thousand errors the fork is refused, quickly.
+    [Fact]
+    public void Forks_too_damaged_to_read_are_refused()
+    {
+        var bytes = Enumerable.Repeat((byte)0xFF, 200_000).ToArray();
+        byte[] header = [0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // data at 256, map at 1024, both lengths 0
+        header.CopyTo(bytes, 0);
+        bytes[1024 + 24] = 0;
+        bytes[1024 + 25] = 28; // type list right after the map header, promising 65535 types
+        bytes[1024 + 28 + 1] = 0xFE;
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var e = Assert.Throws<InvalidDataException>(() => ResourceFork.Read(bytes));
+
+        Assert.Contains("too damaged", e.Message, StringComparison.Ordinal);
+        Assert.True(watch.ElapsedMilliseconds < 2000, $"{watch.ElapsedMilliseconds} ms");
+    }
+
     [Fact]
     public void Keeps_order_and_finds_by_type_and_id()
     {

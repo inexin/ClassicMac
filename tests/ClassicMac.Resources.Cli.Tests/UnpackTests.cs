@@ -1,6 +1,7 @@
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Tests;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Resources.Cli.Tests;
 
@@ -82,13 +83,12 @@ public class UnpackTests : IDisposable
     [Fact]
     public void Corpus_images_unpack_and_read_back()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        if (string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus))
+        if (!CorpusFolders.Any)
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of disk images to run this.");
 
         string[] extensions = [".img", ".dsk", ".iso", ".hfv", ".image", ".smi"];
-        var images = Directory.EnumerateFiles(corpus, "*", SearchOption.AllDirectories)
-            .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()) && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.'))
+        var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
+            .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()) && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') && !CorpusFolders.IsDamageTest(f))
             .ToList();
         var checkedImages = 0;
         foreach (var image in images)

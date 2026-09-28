@@ -2,6 +2,7 @@ using System.Text.Json;
 using ClassicMac.Core;
 using ClassicMac.Files.Tests;
 using ClassicMac.Resources.Export;
+using ClassicMac.Tests;
 
 namespace ClassicMac.Resources.Cli.Tests;
 
@@ -101,14 +102,13 @@ public class ExtractTests : IDisposable
     [Fact]
     public void Corpus_images_extract_with_matching_manifests()
     {
-        var corpus = Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS");
-        if (string.IsNullOrEmpty(corpus) || !Directory.Exists(corpus))
+        if (!CorpusFolders.Any)
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of disk images to run this.");
 
         string[] extensions = [".img", ".dsk", ".iso", ".hfv", ".image", ".smi"];
-        var images = Directory.EnumerateFiles(corpus, "*", SearchOption.AllDirectories)
+        var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
             .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()) && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.')
-                && !f.Contains($"{Path.DirectorySeparatorChar}ndiftest{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+                && !CorpusFolders.IsDamageTest(f))
             .ToList();
         int extracted = 0, resources = 0;
         foreach (var image in images)
