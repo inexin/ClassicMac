@@ -118,6 +118,10 @@ public class FatTests
         var file = Assert.Single(Read(builder.Build()).Files);
 
         Assert.Equal([0x82, (byte)'t', (byte)'e', (byte)'.', (byte)'t', (byte)'x', (byte)'t'], file.Name.Bytes.ToArray());
+
+        var spaced = new FatBuilder(12);
+        spaced.File("X.A B", "X.A B", Bytes(3, 1)); // an extension keeps its inner space; only trailing ones go
+        Assert.Equal("X.A B", Assert.Single(Read(spaced.Build()).Files).Name.ToMacRoman());
     }
 
     [Fact]

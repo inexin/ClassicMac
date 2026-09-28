@@ -252,8 +252,11 @@ namespace ClassicMac.Files
             else if (companions.Count > 0)
             {
                 // A fork but no record: File Exchange shows the placeholder Finder info (the fork only gives lengths).
+                // On a writable volume it first creates the record, so the extension map applies, as on FAT volumes.
                 file = PcExchange.Apply(file, null,
                     DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
+                if (context.Options.ExtensionMap is { } map)
+                    file = file with { FinderInfo = map.Apply(file.FinderInfo, hostName) };
             }
 
             // DOS hidden or system makes the file invisible.

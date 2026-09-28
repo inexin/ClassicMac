@@ -18,6 +18,9 @@ References:
 - *Inside Macintosh: Macintosh Toolbox Essentials*, the Finder Interface chapter: `FInfo`, `FXInfo`, `DInfo`, `DXInfo`.
 - Technical Note TN1150, *HFS Plus Volume Format*: the HFS wrapper around an HFS Plus volume, and the volume
   attribute bits HFS and HFS Plus share.
+- The Mac OS 9.0 ROM (File Manager, B-tree manager, boot loaders) and Apple CD/DVD Driver 1.3.1, traced in
+  disassembly; the System 7.1 File Manager for the routines found unchanged in that ROM; Disk Copy 6.5's partition
+  map code.
 
 Contents
 
@@ -48,8 +51,9 @@ Roman text, Mac dates as local-time seconds since 1904. In addition:
   allocation blocks from 2, HFS from 0.
 - `Str27` and `Str31` are Pascal strings stored in a field of 28 and 32 bytes; only the length byte and that many
   bytes count.
-- Each rule carries a source tag from [README.md](README.md). **[Fitted?]** marks a rule stated without a firm
-  source, listed again in section 13.
+- Each rule carries a source tag from [README.md](README.md). **[Code]** names the software: "Mac OS 9.0 ROM" for
+  the File Manager and boot code in the Mac OS 9.0 ROM, "System 7.1 File Manager" for a routine read in that older
+  code only. What is still open is listed in section 13.
 - Paragraphs that begin **"ClassicMac"** describe the reader's own choices for damaged or unusual input. They are
   not format rules and carry no tag; the diagnostics they raise are in section 12.
 
@@ -65,23 +69,25 @@ A volume starts with two logical blocks of boot blocks, and its identifying head
 | `$D2D7` | MFS **[Doc]** *Inside Macintosh II* | 4 |
 | `$4244` (`'BD'`) | HFS **[Doc]** *Inside Macintosh: Files* | 5 |
 | `$482B` (`'H+'`) | HFS Plus **[Doc]** TN1150 | 11 |
+| `$4858` (`'HX'`) | HFSX **[Doc]** TN1150; not a volume Mac OS 9.0 knows **[Code]** Mac OS 9.0 ROM | 11 |
 
 A whole disk (a hard disk, a CD) instead starts with a driver descriptor map in logical block 0 and a partition map
 from block 1 (section 3); each volume sits inside a partition.
 
 When Mac OS 9.0 mounts a drive, the File Manager's `MountVol` reads the block at byte 1024 and tries HFS first; only
 if that fails does it pass the drive to the external file systems (Foreign File Access and its plug-ins) **[Code]**
-Mac OS 9.0 File Manager. The ISO 9660 plug-in answers `extFSErr` (−58) for a volume that is not ISO 9660 **[Code]**
-ISO 9660 File Access 5.3. So a hybrid CD
-whose partition map holds an HFS volume and which also carries ISO 9660 descriptors mounts as HFS, and the ISO 9660
-view is never used **[Code]** Mac OS 9.0 File Manager and CD-ROM driver.
+Mac OS 9.0 File Manager. The ROM's `MountVol` knows only `'BD'` and `$D2D7`; its own answer for any other signature
+is `noMacDskErr` (−57), and `'H+'` is handled by code in the System file **[Code]** Mac OS 9.0 ROM and System. The ISO
+9660 plug-in answers `extFSErr` (−58) for a volume that is not ISO 9660 **[Code]** ISO 9660 File Access 5.3. So a
+hybrid CD whose partition map holds an HFS volume and which also carries ISO 9660 descriptors mounts as HFS, and the
+ISO 9660 view is never used **[Code]** Mac OS 9.0 File Manager and CD-ROM driver.
 
 ClassicMac tries its readers in the same spirit: the partition map reader first, then the disk image formats, then
 HFS, MFS, FAT and last ISO 9660. A file that is none of these is left as a plain file.
 
 - HFS (and HFS Plus) needs at least 1024 + 162 bytes and `'BD'` or `'H+'` at 1024.
 - MFS needs at least 1024 + 64 bytes and `$D2D7` at 1024.
-- A partition map needs at least 1024 bytes, `'ER'` at 0 and `'PM'` at 512.
+- A partition map needs `'ER'` or a zero word at 0, and `'PM'` at 512 or, failing that, at 2048 (section 3.4).
 
 ---
 
@@ -104,7 +110,11 @@ HFS, MFS, FAT and last ISO 9660. A file that is none of these is left as a plain
 All of it **[Doc]** *Inside Macintosh: Devices*. The drivers themselves live in partitions of type `Apple_Driver…`
 (section 3.3), which is how the Mac loads a disk's driver at startup **[Doc]** *Inside Macintosh: Devices*.
 
-ClassicMac checks only `sbSig`; it needs no driver and reads no other field.
+Mac OS 9.0's CD-ROM driver reads only `sbSig` and goes on when it is `'ER'` **or 0**; nothing else in block 0 is
+read, not even `sbBlkSize` **[Code]** Mac OS 9.0 CD-ROM driver (Apple CD/DVD Driver 1.3.1). Two boot loaders use
+`sbBlkSize` only as the unit of `ddSize` **[Code]** Mac OS 9.0 ROM.
+
+ClassicMac does the same: it checks only `sbSig`, accepting `'ER'` or 0, and needs no driver.
 
 ### 3.2 Partition entries (blocks 1 to n)
 
@@ -134,10 +144,22 @@ Each partition, including the map itself, has one 512-byte entry; the entries fi
 | +$88 | 376 | | `pmPad`: reserved, zero |
 
 All of it **[Doc]** *Inside Macintosh: Devices*. An older map format with the signature `'TS'` preceded this one
-**[Doc]** *Inside Macintosh: Devices*; ClassicMac does not read it.
+**[Doc]** *Inside Macintosh: Devices*; the CD-ROM driver still accepts it at byte 512 **[Code]** Mac OS 9.0 CD-ROM
+driver. ClassicMac does not read it.
 
-Block numbers in the entries count 512-byte blocks whatever `sbBlkSize` says **[Fitted?]**; ClassicMac always uses
-512.
+The block numbers in an entry (`pmPyPartStart`, `pmPartBlkCnt`, `pmLgDataStart`) count blocks of the size the reader
+addresses the device in, **never `sbBlkSize`** **[Code]** Mac OS 9.0 ROM and CD-ROM driver; Disk Copy 6.5:
+
+| Reader | Entries at | Unit of the block numbers |
+| --- | --- | --- |
+| ROM boot-volume locator, ATA driver loader | 512-byte blocks 1, 2, … | 512 |
+| ROM ATAPI boot loader | 2048-byte blocks 1, 2, … (the first 512 bytes of each) | 2048 |
+| CD-ROM driver, ATAPI | a probed stride of 512 or 2048 bytes (section 3.4) | the stride |
+| CD-ROM driver, SCSI | 512-byte blocks | 512 |
+| Disk Copy 6.5 | a probed stride of 8, 4, 2 or 1 × 512 bytes | the stride, for `Apple_HFS` |
+
+So a disk or disk image uses 512-byte units, and a CD mastered with its map at a 2048-byte stride uses 2048-byte
+units throughout. ClassicMac takes the unit from the stride, as the CD-ROM driver does (section 3.4).
 
 ### 3.3 Partition types
 
@@ -156,20 +178,42 @@ recognise the two volume types.
 
 ### 3.4 Which partitions are Mac volumes
 
-Mac OS 9.0's CD-ROM driver, given a disc whose block 0 holds `'ER'` or is all zeros, looks for `'PM'` entries first
-at a 512-byte stride and then at a 2048-byte stride, and makes **every** `Apple_HFS` partition a drive of its own, so
-several volumes on one disc all mount **[Code]** Mac OS 9.0 CD-ROM driver. A disc without a partition map becomes one
-drive covering the whole disc **[Code]** Mac OS 9.0 CD-ROM driver.
+Mac OS 9.0's ATAPI CD-ROM driver reads a disc's map this way **[Code]** Mac OS 9.0 CD-ROM driver:
 
-A volume's bytes start at block `pmPyPartStart + pmLgDataStart` and run for `pmDataCnt` blocks **[Doc]** *Inside
-Macintosh: Devices*. When `pmDataCnt` is 0, ClassicMac uses the rest of the partition,
-`pmPartBlkCnt − pmLgDataStart` blocks **[Fitted?]**.
+1. Block 0 must start with `'ER'` or a zero word (section 3.1); otherwise there is no map.
+2. **The stride is probed:** `'PM'` at byte 512 gives a stride of 512; otherwise `'PM'` at byte 2048 gives 2048;
+   otherwise there is no map. Nothing else is tried.
+3. The entries are at byte `i × stride` for i = 1 to the first entry's `pmMapBlkCnt`; the walk stops at the first
+   entry without `'PM'`.
+4. Every block number is multiplied by the stride. The drive starts at `(pmPyPartStart + pmLgDataStart) × stride`
+   and is `pmPartBlkCnt × stride` bytes long: `pmLgDataStart` is not taken off the size, and **`pmDataCnt` is never
+   read**. (The session base of a multisession disc is multiplied by the stride too, a quirk that matters only for a
+   2048-byte map outside the first session.)
+5. An entry whose type's first nine bytes are `Apple_HFS` becomes a drive; every other type is ignored. A partition
+   whose `pmPartStatus` bit 5 (writable) is clear is write-protected.
 
-ClassicMac reads `pmMapBlkCnt` from the entry in block 1 and visits that many entries. Each `Apple_HFS` or `Apple_MFS`
-partition becomes one file, named after `pmPartName`, whose data fork is the volume's bytes; the volume readers then
-open it like any other volume. Every other type (the map itself, drivers, free space) is skipped with an Info
-diagnostic. The type must match exactly, case included. ClassicMac needs `'ER'` in block 0 and reads entries only at
-a 512-byte stride.
+So **every** `Apple_HFS` partition becomes a drive of its own, and several volumes on one disc all mount. The SCSI
+CD-ROM driver is simpler: a 512-byte stride only, `pmLgDataStart` ignored, and only the **first** `Apple_HFS`
+partition mounted **[Code]** Mac OS 9.0 CD-ROM driver. A disc without a partition map becomes one drive covering the
+whole disc **[Code]** Mac OS 9.0 CD-ROM driver.
+
+*Inside Macintosh: Devices* describes `pmDataCnt` as the size of the data area **[Doc]**, but no Mac OS 9.0 mounting
+path reads it: the CD-ROM drivers, the ROM's boot-volume locator and ATA driver loader all size a partition from
+`pmPartBlkCnt` **[Code]** Mac OS 9.0 ROM and CD-ROM driver. Disk Copy 6.5, rescaling a map, rewrites `pmDataCnt`
+only when it is non-zero, so 0 means "not given" **[Code]** Disk Copy 6.5.
+
+ClassicMac reads the map as the ATAPI driver does: block 0 with `'ER'` or a zero word, the stride probed at 512 then
+2048, `pmMapBlkCnt` from the first entry, every block number times the stride, and `pmDataCnt` ignored. Each
+`Apple_HFS` or `Apple_MFS` partition becomes one file, named after `pmPartName`, whose data fork is the volume's
+bytes; the volume readers then open it like any other volume. Every other type (the map itself, drivers, free space)
+is skipped with an Info diagnostic. Where it differs from the driver:
+
+- the volume runs from `(pmPyPartStart + pmLgDataStart) × stride` for `pmPartBlkCnt − pmLgDataStart` blocks, so it
+  ends where the partition ends;
+- `Apple_MFS` partitions are read too;
+- the type must be exactly `Apple_HFS` or `Apple_MFS`, case included, where the driver compares nine bytes;
+- an entry without `'PM'` is skipped and the walk goes on (section 3.5), where the driver stops;
+- the image is one session: no session base is added.
 
 ### 3.5 Damaged and truncated maps
 
@@ -267,10 +311,17 @@ logical block; the space after a block's last entry is unused **[Doc]** *Inside 
 All of it **[Doc]** *Inside Macintosh II*. The entry's length is `51 + n`, rounded up to even **[Doc]** *Inside
 Macintosh II*.
 
-ClassicMac reads each directory block from its start and takes entries while `flFlags` has bit 7 set; the first
-entry without it ends that block. An entry whose name would run past the block ends the block too
-(`mfs.bad-entry`). A directory that runs past the end of the image is read as far as whole blocks go
-(`mfs.directory-truncated`).
+The File Manager scans each directory block from its start **[Code]** Mac OS 9.0 ROM:
+
+- A `flFlags` byte of **0** ends the block's entries. The whole byte is tested, not bit 7: a non-zero flags byte
+  without bit 7 is still an entry. Bit 7 is only set when an entry is made.
+- The next entry is at `offset + 51 + n`, rounded up to even, and the scan goes on only while that is below **460**.
+- Deleting an entry slides the later ones down and zeroes the tail, so a block has no holes **[Code]** System 7.1
+  File Manager.
+
+ClassicMac scans the same way: an entry is any non-zero flags byte, a zero one ends the block, and no entry starts at
+block offset 460 or later. An entry whose name would run past the block ends the block too (`mfs.bad-entry`). A
+directory that runs past the end of the image is read as far as whole blocks go (`mfs.directory-truncated`).
 
 ### 4.5 Reading an MFS fork
 
@@ -481,9 +532,12 @@ Leaf nodes (type −1, level 1) hold the tree's data records, in ascending key o
 node along the `ndFLink` chain, which starts at `bthFNode` and ends at `bthLNode` **[Doc]** *Inside Macintosh: Files*.
 
 Index nodes (type 0, level 2 and up) hold pointer records: a key and a `u32` child node number; the key is the first
-key in that child **[Doc]** *Inside Macintosh: Files*. In an HFS tree the keys in index nodes are stored at the
-maximum length `bthKeyLen`, with the key length byte set to it; only leaf keys have their actual length
-**[Fitted?]**.
+key in that child **[Doc]** *Inside Macintosh: Files*. In an HFS tree the keys in index nodes are always stored at
+the maximum length: the key length byte is `bthKeyLen`, the key is padded with zeros to that length, and the child
+node number follows at `(bthKeyLen + 2)` rounded down to even **[Code]** Mac OS 9.0 ROM. A catalog index key is
+therefore 38 bytes (key length 37) and an extents index key 8 bytes (key length 7), each followed by the `u32` child;
+the initializer sets `bthKeyLen` to 37 and 7 **[Code]** System 7.1 File Manager. Only leaf keys have their actual
+length (section 7.1).
 
 To find a key, start at `bthRoot`; in each index node take the last record whose key is less than or equal to the
 key sought (none: the key is not in the tree) and go to its child; in the leaf, look for an equal key **[Doc]**
@@ -503,22 +557,50 @@ A B-tree file shorter than one node is read as empty.
 
 ### 6.6 Key comparison
 
-Keys are kept in ascending order **[Doc]** *Inside Macintosh: Files*.
+Keys are kept in ascending order **[Doc]** *Inside Macintosh: Files*. Names compare as the File Manager compares all
+names: uppercase and lowercase letters are equal, but letters with diacritical marks differ from those without
+**[Doc]** *Inside Macintosh: Files*. The exact order is that of the File Manager's compare routines, the same in the
+Mac OS 9.0 ROM as in System 7.1 **[Code]** Mac OS 9.0 ROM.
 
-- **Catalog keys** order by parent ID (unsigned), then by name **[Doc]** *Inside Macintosh: Files*.
-- **Names** compare as the File Manager compares all names: uppercase and lowercase letters are equal, but letters
-  with diacritical marks differ from those without **[Doc]** *Inside Macintosh: Files*. So two names in one folder
-  cannot differ only in case **[Doc]** *Inside Macintosh: Files*.
-- The order is the Mac OS Roman sort order of `RelString` called case-insensitive and diacritical-sensitive
-  **[Doc]** *Inside Macintosh: Text*, **[Fitted?]** that the catalog uses exactly this order. In it, an accented
-  letter sorts after its base letter and before the next letter (`a` = `A` < `ä` < `b`) **[Fitted?]**.
-- A name that is a prefix of another sorts first; so the empty name of a thread record (section 7.4) sorts before
-  every other key with the same parent ID **[Fitted?]**.
-- **Extents keys** order by file ID, then fork type, then starting block **[Fitted?]**.
+**Catalog keys** **[Code]** Mac OS 9.0 ROM:
 
-The full order of Mac OS Roman's upper half (symbols, ligatures, `ß`, `Æ`) as the File Manager applies it has not
-been traced for ClassicMac. A reader that walks the leaves never needs it; a lookup or a writer does (writing HFS is
-phase 8 of the plan).
+1. The parent ID, unsigned 32-bit.
+2. For equal parent IDs, the names, with plain `_RelString`: case-insensitive, diacritical-sensitive, each name
+   taking its own length byte (not `ckrKeyLen`).
+
+`_RelString` works on weights, from its tables in the ROM (the same bytes as in System 7.1) **[Code]** Mac OS 9.0 ROM:
+
+- Each byte `c` weighs `w(c) = CmpTab[UpperTab[c]]`, a `u16` whose high byte is the base letter and low byte the
+  modifier. `UpperTab` folds case; `CmpTab` gives the order.
+- The names are compared position by position over the shorter length; the **first unequal weight** decides
+  (unsigned).
+- If all are equal, **the shorter name sorts first** (a prefix before the longer name, `AB` < `ABC`); equal lengths
+  are equal. So the empty name of a thread record (section 7.4) sorts before every other key with the same parent ID.
+- **An accent decides at its own position**, not as a tie-break at the end: `É` weighs `$4502`, between `E` (`$4500`)
+  and `F` (`$4600`), so `Éa` sorts after `Ez` and before `F`.
+- Within a letter the modifiers run: plain `$00` < acute `$02` < grave `$04` < circumflex `$06` < umlaut `$08` <
+  tilde `$0A` < ring `$0C` < slash `$0E` < cedilla `$10` < under `$12` < ligature `$14`. After them come the
+  lowercase accented letters that `UpperTab` does not fold, at `$80` + the same modifier (`á` = `$4182`, `è` =
+  `$4584`).
+- Case folding covers `a`–`z` and only these accented letters: `äÄ åÅ çÇ éÉ ñÑ öÖ üÜ àÀ ãÃ õÕ æÆ øØ œŒ`.
+
+Quirks of the tables **[Code]** Mac OS 9.0 ROM:
+
+- `á` and `Á` differ (and likewise the other accented letters not in the fold list), so two names in one folder can
+  differ in the case of such a letter.
+- The uppercase accented letters `$E5`–`$F4` (`Â Ê Á Ë È Í Î Ï Ì Ó Ô Ò Ú Û Ù`) and `Ÿ` (`$D9`) weigh their own code
+  times 256: they sort by code, after `~` and after every letter.
+- `` ` `` (`$60`) folds to `$61` and weighs `$4180`: it sorts as a variant of A.
+- `ß` weighs `$5382`, between S and T; `ÿ` weighs `$5988`.
+- `$CA` (non-breaking space) weighs `$2000`, **equal to a space**.
+- Curly quotes and guillemets sort as variants of the straight quotes: `“ ”` are `"` + `$02`/`$04`, `« »` are `"` +
+  `$06`/`$08`, `‘ ’` are `'` + `$02`/`$04`.
+
+**Extents keys**: the file ID (unsigned 32-bit), then the fork type (`$00` data before `$FF` resource), then the
+starting block (unsigned 16-bit) **[Code]** Mac OS 9.0 ROM.
+
+ClassicMac walks the leaves (section 6.5) and never compares keys, so it does not depend on this order; a lookup or a
+writer does (writing HFS is phase 8 of the plan).
 
 ---
 
@@ -694,7 +776,10 @@ The volume header's counts let a reader check it saw the whole directory:
 - **MFS:** `drNmFls` is the number of files on the volume **[Doc]** *Inside Macintosh II*.
 - **HFS:** `drFilCnt` is the number of files and `drDirCnt` the number of folders on the volume **[Doc]** *Inside
   Macintosh: Files*. `drDirCnt` does not count the root folder **[Doc]** TN1150 (for the HFS Plus field that
-  replaces it); **[Fitted]** every HFS volume in ClassicMac's corpus matches with the root left out.
+  replaces it); **[Code]** Mac OS 9.0 ROM: mounting a volume that was not unmounted cleanly, `MountVol` finds the
+  root folder's record, counts the folder records after it and rewrites `drDirCnt` if it differs. The initializer
+  leaves it 0, and only folders made or deleted through the File Manager change it **[Code]** System 7.1 File
+  Manager.
   `drNmFls` and `drNmRtDirs` count only the root folder's contents **[Doc]** *Inside Macintosh: Files*.
 
 ClassicMac compares the files it read with `drNmFls` (MFS) or `drFilCnt` (HFS), and the folders other than the root
@@ -714,6 +799,13 @@ It is read later (phase 10 of the plan). Two cases are recognised now:
   given by `drEmbedExtent` (+$7E, start and count) **[Doc]** TN1150. ClassicMac lists the wrapper's files and reports
   `hfs.plus-wrapper`.
 
+HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
+**[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,
+and the ROM's `MountVol` accepts only `'BD'` and `$D2D7` **[Code]** Mac OS 9.0 ROM and System. An HFSX volume
+presumably fails to mount with `noMacDskErr` (−57); that outcome is inferred, not run. ClassicMac does not recognise
+`'HX'` either: the HFS reader does not claim the image, no diagnostic is given, and the image is left as a plain file
+unless another reader recognises it.
+
 ---
 
 ## 12. Diagnostics
@@ -724,8 +816,8 @@ followed in its code.
 | Code | Sev. | Meaning | ClassicMac | The Mac |
 | --- | --- | --- | --- | --- |
 | `partition.map-truncated` | E | The image ends before all `pmMapBlkCnt` entries | Stops; keeps the volumes found | Not traced |
-| `partition.bad-entry` | E | An entry within the map has no `'PM'` | Skips it | Not traced |
-| `partition.skipped` | I | A partition is not `Apple_HFS` or `Apple_MFS` (the map, drivers, free space, …) | Skips it | The CD-ROM driver makes a drive of each `Apple_HFS` partition **[Code]** Mac OS 9.0 |
+| `partition.bad-entry` | E | An entry within the map has no `'PM'` | Skips it | The CD-ROM driver stops reading the map there **[Code]** Mac OS 9.0 |
+| `partition.skipped` | I | A partition is not `Apple_HFS` or `Apple_MFS` (the map, drivers, free space, …) | Skips it | The CD-ROM driver makes a drive of each `Apple_HFS` partition and ignores the rest **[Code]** Mac OS 9.0 |
 | `partition.outside` | E | A volume starts at or past the end of the image | Skips it | Not traced |
 | `partition.truncated` | E | A volume runs past the end of the image | Keeps the part that is there | Not traced |
 | `mfs.directory-truncated` | E | The file directory runs past the end of the image | Reads the whole blocks there | Not traced |
@@ -766,16 +858,15 @@ Not covered: the volume bitmap, B-tree map records and free-node management, and
 and nodes, which only a writer needs (phase 8 of the plan); the boot blocks; HFS Plus (section 11); the old `'TS'`
 partition map.
 
-Rules marked **[Fitted?]**, to be settled from the Mac's code:
+No rule in this document is fitted to data alone. Still open:
 
-1. Partition map block numbers are in 512-byte units even when `sbBlkSize` is 2048 (section 3.2).
-2. A `pmDataCnt` of 0 means the rest of the partition after `pmLgDataStart` (section 3.4).
-3. HFS index node keys are stored at the maximum key length (section 6.4).
-4. The catalog's name order is exactly `RelString`'s case-insensitive, diacritical-sensitive order, and an accented
-   letter sorts between its base letter and the next (section 6.6).
-5. A name that is a prefix of another sorts first (section 6.6).
-6. Extents keys order by file ID, then fork type, then starting block (section 6.6).
+1. The partition map rules (sections 3.1–3.4) come from the code only. They cannot be checked in SheepShaver, which
+   uses its own disk and CD drivers rather than Apple's.
+2. That an HFSX volume fails to mount on Mac OS 9.0 with −57 is inferred from the code, not run (section 11).
+3. The Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (section 10).
 
-Differences from the Mac that ClassicMac knowingly keeps: it needs `'ER'` in block 0 and reads partition entries
-only at a 512-byte stride, where Mac OS 9.0's CD-ROM driver also accepts a zero block 0 and tries a 2048-byte stride
-(section 3.4); and it matches partition types exactly, where the Mac's comparison has not been traced.
+Differences from the Mac that ClassicMac knowingly keeps (section 3.4): a partition's volume ends where the partition
+ends (`pmPartBlkCnt − pmLgDataStart` blocks, where the CD-ROM driver takes `pmPartBlkCnt` from the data start);
+`Apple_MFS` partitions are read too; partition types must match exactly, where the driver compares the first nine
+bytes with `Apple_HFS`; an entry without `'PM'` is skipped rather than ending the map; and no multisession base is
+applied.

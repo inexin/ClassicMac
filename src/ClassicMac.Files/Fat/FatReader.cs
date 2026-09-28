@@ -96,17 +96,19 @@ namespace ClassicMac.Files.Fat
             public string DisplayShortName => MacShortName.ToMacRoman();
 
             // The 8.3 name as File Exchange shows it: the stored bytes as they are, each read as the Mac Roman byte of the
-            // same value (no code page conversion, no case change), base and extension each cut at their first byte of
-            // $20 or less.
+            // same value (no code page conversion, no case change); a lead $05 stands for $E5; the base cut at its first
+            // byte of $20 or less, the extension at its first below $20 with trailing spaces trimmed ("A B" stays).
             public MacString MacShortName
             {
                 get
                 {
-                    static ReadOnlySpan<byte> Part(ReadOnlySpan<byte> bytes) =>
-                        bytes.IndexOfAnyInRange((byte)0, (byte)0x20) is var end and >= 0 ? bytes[..end] : bytes;
-                    var stem = Part(ShortName.AsSpan(0, 8));
-                    var extension = Part(ShortName.AsSpan(8, 3));
-                    return new MacString(extension.Length > 0 ? [.. stem, (byte)'.', .. extension] : stem.ToArray());
+                    var stem = ShortName.AsSpan(0, 8).ToArray();
+                    if (stem[0] == 0x05) stem[0] = 0xE5;
+                    if (stem.AsSpan().IndexOfAnyInRange((byte)0, (byte)0x20) is var stemEnd and >= 0) stem = stem[..stemEnd];
+                    ReadOnlySpan<byte> extension = ShortName.AsSpan(8, 3);
+                    if (extension.IndexOfAnyInRange((byte)0, (byte)0x1F) is var cut and >= 0) extension = extension[..cut];
+                    extension = extension.TrimEnd((byte)' ');
+                    return new MacString(extension.Length > 0 ? [.. stem, (byte)'.', .. extension] : stem);
                 }
             }
         }
@@ -216,8 +218,7 @@ namespace ClassicMac.Files.Fat
                         longParts.Add((e[0] & 0x1F, LongPart(e)));
                         continue;
                     }
-                    var shortName = e[..11].ToArray();
-                    if (shortName[0] == 0x05) shortName[0] = 0xE5; // a name that really starts with E5
+                    var shortName = e[..11].ToArray(); // as stored: FINDER.DAT keys compare these bytes
                     string? longName = null;
                     if (longParts.Count > 0 && Checksum(e[..11]) == longChecksum)
                         longName = string.Concat(longParts.OrderBy(p => p.Order).Select(p => p.Part));
