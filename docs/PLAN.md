@@ -519,10 +519,13 @@ They change what running applications see, not what a file contains.
     read. `+$48` is the buffer size (chunk size plus the largest compression overrun); the chunk size is the user's
     choice (6.1.2: 32 sectors, 6.3.3: 512 by default) and any compressed image may mix raw chunks. KenCode is the
     System's `dcmp` 3 codec; our KenCode decoder stays separate (already byte-exact).
-  - **Version 2 is refused** (decision): no real image has been seen; Disk Copy 6.3.3 reads it as a blank disk, 6.5b13
-    rejects it, and 6.1.2, whose code handles it, still refuses the hand-built ones as -8819 "damaged" (the check is
-    being traced); ShrinkWrap 2.1 reads a different layout. The error asks the user to send the image, and an info
-    diagnostic records type/creator, `+$54`, `+$7C` and the map size, which tell the layouts apart.
+  - **Version 2 is read as Disk Copy 6.1.2's driver reads it** (decision, replacing the earlier refusal): that driver
+    mounted hand-built version 2 images (raw and KenCode) with a valid checksum and refused ADC in them (-10). Layout:
+    the version 10 header up to +$54, the count there (end entry included), 8-byte entries {start<<8|type, offset} from
+    +$58, each chunk running to the next offset; types 0, 2 and $80–$82. (Disk Copy 6.3.3 reads version 2 as a blank
+    disk, 6.5b13 rejects it, and ShrinkWrap 2.1 expects the 12-byte layout.) No real image has been seen, so an info
+    diagnostic asks for one and records type/creator, `+$54` and the map size.
+  - The CLI's `--verify` checks the CRC-32 (as Disk Copy's "Verify checksum" does).
   - Chunk type `$F0` (ShrinkWrap 3, per Aaru) and the `+$74`/`+$78` encryption fields are unverified: `$F0` is
     reported by name and reads as zeros; no image with either has been seen.
 - **ShrinkWrap 2.1** writes nothing new: `dImg` is Disk Copy 4.2 byte for byte (junk after the name's Str63 is
@@ -574,11 +577,25 @@ They change what running applications see, not what a file contains.
 - **Rez fixtures are compiled locally, not in CI:** MPW is Apple software and never enters the repo or CI. The `.r`
   source and the compiled fork are both committed; a script regenerates them on a machine where `MPW_ROOT` points to
   an MPW install and records each source's hash beside its fork; CI checks the hashes so a stale fork fails the build.
-- **Real-file corpus outside the repo:** system files, applications, games such as Realmz, shareware — found through
-  an environment variable (`CLASSICMAC_CORPUS`); those tests skip when it is absent. Only hashes and manifests of
-  corpus results are committed, never the files or their decoded output.
-- **Checks:** round trip (read → write → read gives the same model, and canonical forks are byte-identical); golden
-  outputs for each decoder on the synthetic fixtures; corpus output diffed against resource_dasm and DeRez.
+- **Real-file corpus outside the repo:** system files, applications, games such as Realmz, shareware and the
+  harness's samples. `CLASSICMAC_CORPUS` names one or more folders, separated by `;`; the tests that use it skip when
+  it is absent. Only names, counts and hashes of corpus results are committed, never the files or their decoded output.
+  A folder holding a `.classicmac-damage-test` file (or named `ndiftest`) holds deliberately damaged inputs: tests that
+  expect clean reads skip it, the tests written for it read it. Formats not read yet (UDIF) are skipped the same way.
+- **Checks:**
+  - Round trip: read → write → read gives the same model, and canonical forks are byte-identical.
+  - **Golden outputs** (`tests/ClassicMac.Resources.Decoders.Tests/Golden/`): a fixture fork made in code, with one
+    resource per decoder, type and variant. Text outputs are committed as files, images and sounds as SHA-256 and
+    length, with each fixture's decoder and diagnostic codes. The export manifest is pinned too, and a coverage check
+    fails when a type a decoder handles has no fixture. `CLASSICMAC_UPDATE_GOLDEN=1` regenerates them; review the
+    change in git.
+  - **Corpus export** (`CorpusExportTests`): every input exports with the built-in decoders.
+    - Failures: decoder errors or exceptions, a resource of a decoded type left raw, a manifest hash mismatch.
+    - Damaged inputs and warnings are reported, not failed.
+    - Explained exceptions go in `Corpus/allowlist.json`.
+    - `Corpus/baseline.json` holds per input (name and SHA-256) its counts and one hash of all its outputs, so any
+      change in decoded output names the input. `CLASSICMAC_UPDATE_BASELINE=1` rewrites it.
+  - Later, separately: corpus output compared with resource_dasm and DeRez.
 - **Tooling:** xUnit v3 on Microsoft.Testing.Platform (`dotnet test --solution ClassicMac.slnx`); CI on GitHub
   Actions for Windows, Linux and macOS.
 
@@ -645,7 +662,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
    pixel limit and `--screen-depth`; `snd ` to WAV built (PCM, MACE, IMA4, µ-law; every corpus sound decodes).
-   *Exit:* golden outputs pass and the corpus exports without errors.
+   *Exit:* golden outputs pass and the corpus exports without errors. **Done:** golden outputs for every decoder,
+   and the corpus (Realmz, the Divinity manual, the harness runs: 156 inputs, 10,868 resources) exports with no decoder
+   failure, pinned by a committed baseline. DOCMaker was deferred at the exit; its disassembly answers have since
+   arrived, and it comes next among the decoders.
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders. First version built (browse, details, diagnostics, previews, hex, export); drag-out next.
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.

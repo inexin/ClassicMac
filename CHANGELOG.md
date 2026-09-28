@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Phase 3 exit check: golden outputs for every decoder (fixtures made in code; text outputs as files, images and
+  sounds as hashes; the export manifest pinned) and a corpus export test with a committed baseline of counts and
+  output hashes; `CLASSICMAC_CORPUS` takes several folders. A resource fork whose map gives over 1,000 errors (another
+  format read as a fork) is refused instead of read slowly.
 - Viewer app (`src/ClassicMac.App`, Avalonia): open files, disk images and resource forks, browse them down to
   individual resources, see details and diagnostics; preview images, styled text, strings and version resources,
   sounds (waveform and playback through SoundFlow), and any fork or resource in hex; export a resource, a file's resources, everything under a node, or unpack it
@@ -42,7 +46,8 @@
   parts found by their `bcm#` ID, CRC-32 verified on request) with ADC in
   `ClassicMac.Files.Compression`; container readers can see the whole file (resource fork) and sibling files;
   `ClassicMac.Files` references `ClassicMac.Resources`.
-  Version 2 maps (Disk Image Mounter, Disk Copy 6.0.1) are refused with a request for the image.
+  Version 2 maps (Disk Image Mounter, Disk Copy 6.0.1) read as Disk Copy 6.1.2's driver reads them, with a request
+  for real samples. CLI `--verify` checks disk image checksums.
 - Raw CD images (`.bin`, 2352/2336-byte sectors) and cue sheets, read as the 2048-byte blocks a drive hands the Mac.
 - CD volumes in `ClassicMac.Files.Iso`: ISO 9660 and High Sierra as Mac OS 9 reads them (Apple `AA`/`BA` Finder
   info, associated files as resource forks, the Mac's name, date and listing rules), matching OS 9 on a test disc.
