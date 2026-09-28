@@ -69,7 +69,7 @@ namespace ClassicMac.Resources.Export
                     {
                         decoded = decoder.Decode(new DecodeInput(resource, data, fork, options.ReadOptions, warnings));
                     }
-                    catch (Exception e) when (e is InvalidDataException or ArgumentException or IndexOutOfRangeException
+                    catch (Exception e) when (e is InvalidDataException or EndOfStreamException or ArgumentException or IndexOutOfRangeException
                         or FormatException or OverflowException or NotSupportedException)
                     {
                         warnings.Add(new Diagnostic(DiagnosticSeverity.Warning, "export.decoder-failed",

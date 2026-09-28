@@ -249,11 +249,12 @@ decoder name `raw` and version 1 — when: **[ClassicMac]**
 
 - no decoder handles its type (and always when `Decoders` is empty, as with the CLI's `--raw`);
 - the decoder returns no files (it reports why, or the exporter adds `export.not-decoded`);
-- the decoder throws a data error (`InvalidDataException`, `ArgumentException`, `IndexOutOfRangeException`,
-  `FormatException`, `OverflowException` or `NotSupportedException`); the exporter reports `export.decoder-failed`.
+- the decoder throws a data error (`InvalidDataException`, `EndOfStreamException`, `ArgumentException`,
+  `IndexOutOfRangeException`, `FormatException`, `OverflowException` or `NotSupportedException`); the exporter reports
+  `export.decoder-failed`.
 
-Any other exception is not caught by the exporter; `Unpacker.Extract` reports a file-system exception (which includes
-`EndOfStreamException`) as a failed fork folder.
+Any other exception is not caught by the exporter; `Unpacker.Extract` reports a file-system exception as a failed
+fork folder.
 
 ### 5.3 KeepRaw and the raw folder
 

@@ -139,6 +139,7 @@ public class ExportTests : IDisposable
         {
             2 => throw new InvalidDataException("broken"),
             3 => [],
+            5 => throw new EndOfStreamException("short"),
             _ => [new(".txt", "main"u8.ToArray(), "macintosh"), new(".json", "{}"u8.ToArray()), new(".txt", "second"u8.ToArray())],
         };
     }
@@ -146,7 +147,7 @@ public class ExportTests : IDisposable
     [Fact]
     public void Decoders_write_their_files_and_fall_back_to_raw()
     {
-        var fork = Fork(Res("TEXT", 1, [1], "Good"), Res("TEXT", 2, [2]), Res("TEXT", 3, [3]), Res("PICT", 4, [4]));
+        var fork = Fork(Res("TEXT", 1, [1], "Good"), Res("TEXT", 2, [2]), Res("TEXT", 3, [3]), Res("PICT", 4, [4]), Res("TEXT", 5, [5]));
 
         var result = ResourceExporter.Export(fork, folder, Source,
             ExportOptions.Default with { Decoders = [new StubDecoder()], KeepRaw = true });
@@ -164,6 +165,7 @@ public class ExportTests : IDisposable
         Assert.Equal("raw", result.Manifest.Resources.Single(r => r.Id == 3).Decoder);
         Assert.Contains(result.Diagnostics, d => d.Code == "export.not-decoded");
         Assert.Equal("raw", result.Manifest.Resources.Single(r => r.Id == 4).Decoder); // no decoder for PICT
+        Assert.Equal("raw", result.Manifest.Resources.Single(r => r.Id == 5).Decoder); // ran past its data
     }
 
     [Fact]
