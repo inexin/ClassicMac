@@ -41,13 +41,14 @@ public class CommandLineTests
     public void Limit_options_map_onto_the_options_records()
     {
         var cli = new CommandLine(TextWriter.Null, TextWriter.Null);
-        var result = cli.BuildRoot().Parse(["list", "x", "--max-resource-size", "1MiB", "--max-nesting-depth", "3"]);
+        var result = cli.BuildRoot().Parse(["list", "x", "--max-resource-size", "1MiB", "--max-nesting-depth", "3", "--verify"]);
         var options = cli.ReadOptionsFrom(result);
         var containerOptions = cli.ContainerOptionsFrom(result);
 
         Assert.Equal(1L << 20, options.MaxResourceSize);
         Assert.Equal(3, containerOptions.MaxNestingDepth);
         Assert.Equal(ContainerReadOptions.Default.MaxExpandedBytesPerInput, containerOptions.MaxExpandedBytesPerInput);
+        Assert.True(containerOptions.VerifyChecksums);
     }
 
     [Fact]

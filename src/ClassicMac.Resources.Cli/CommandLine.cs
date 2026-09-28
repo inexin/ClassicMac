@@ -44,6 +44,12 @@ namespace ClassicMac.Resources.Cli
             Recursive = true,
         };
 
+        private readonly Option<bool> verify = new("--verify")
+        {
+            Description = "Verify whole-image checksums that need a full read (NDIF's CRC-32, as Disk Copy's Verify checksum does)",
+            Recursive = true,
+        };
+
         private readonly Option<bool> strict = new("--strict")
         {
             Description = "Treat warnings as errors for the exit code",
@@ -79,6 +85,7 @@ namespace ClassicMac.Resources.Cli
         {
             MaxNestingDepth = result.GetValue(maxNestingDepth),
             MaxExpandedBytesPerInput = result.GetValue(maxExpandedBytes),
+            VerifyChecksums = result.GetValue(verify),
         };
 
         internal RootCommand BuildRoot()
@@ -87,6 +94,7 @@ namespace ClassicMac.Resources.Cli
             root.Options.Add(maxResourceSize);
             root.Options.Add(maxNestingDepth);
             root.Options.Add(maxExpandedBytes);
+            root.Options.Add(verify);
             root.Options.Add(strict);
             root.Options.Add(quiet);
             root.Subcommands.Add(InfoCommand());

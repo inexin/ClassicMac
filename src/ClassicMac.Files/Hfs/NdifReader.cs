@@ -18,15 +18,16 @@ namespace ClassicMac.Files.Hfs
     /// 12-byte entries (start block and type, offset from the data start, stored length) ending with type $FF. Chunks
     /// are zero-filled ($00), raw ($02), KenCode ($80, "Smaller (KC)"), DART RLE ($81), DART LZH ($82) or ADC ($83); a
     /// compressed image stores any chunk that does not shrink raw, so types mix. Version 2 (Disk Image Mounter 1.0 and
-    /// Disk Copy 6.0.1) is refused: no real image has been seen, and Apple's own readers disagree on its layout. A segmented image (version 12) has parts in the same
-    /// folder, each with a <c>bcm#</c> 128 (part number, count, image ID); Disk Copy finds them by that, typed
+    /// Disk Copy 6.0.1) is read as Disk Copy 6.1.2's driver reads it (confirmed by mounting test images): the same header up
+    /// to +$54, where the count (end entry included) stands, then 8-byte entries (start block and type, offset), each
+    /// chunk's length running to the next offset. A segmented image (version 12) has parts in the same folder, each with a <c>bcm#</c> 128 (part number, count, image ID); Disk Copy finds them by that, typed
     /// <c>dseg</c>, never by name, and the map's offsets run across the parts' data forks back to back. The disk comes
     /// out as one file whose data fork is the volume, for the HFS or MFS reader to open next.
     /// </summary>
     public sealed class NdifReader : IContainerReader
     {
         private const int SectorSize = 512;
-        private const int HeaderLength = 0x80, EntryLength = 12;
+        private const int HeaderLength = 0x80, EntryLength = 12, OldHeaderLength = 0x58, OldEntryLength = 8;
         private const byte ChunkZero = 0x00, ChunkRaw = 0x02, ChunkKenCode = 0x80, ChunkDartRle = 0x81, ChunkDartLzh = 0x82,
             ChunkAdc = 0x83, ChunkShrinkWrap = 0xF0, ChunkEnd = 0xFF;
         private const uint MaxBlocks = 0x400000;
@@ -99,33 +100,31 @@ namespace ClassicMac.Files.Hfs
         // MaxChunk is the buffer size in blocks: the chunk size plus room for the largest compression overrun (0 when
         // nothing is compressed). The chunk size itself is the user's choice, recorded only by the entries.
         private sealed record Header(int Version, MacString Name, uint Blocks, uint MaxChunk, uint DataStart, uint Crc,
-            bool Segmented, int Count)
+            bool Segmented, int Count, int EntriesAt, int EntrySize)
         {
             // The checks Disk Copy's validator makes that stop it from mounting throw; the rest are reported.
             public static Header Read(byte[] map, MacFile file, ContainerContext context)
             {
                 int version = BinaryPrimitives.ReadUInt16BigEndian(map);
-                if (version == 2)
-                {
-                    // Disk Copy 6.3.3 reads these as a blank disk and 6.5 refuses them; only 6.1.2's code is right, and
-                    // ShrinkWrap reads another layout. The fields that tell the layouts apart are reported.
-                    context.Report(DiagnosticSeverity.Info, "ndif.version-2",
-                        $"Version 2 map: type '{file.FinderInfo.Type}', creator '{file.FinderInfo.Creator}', "
-                        + $"+$54 = ${BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x54)):X8}, "
-                        + $"+$7C = ${(map.Length >= HeaderLength ? BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x7C)) : 0):X8}, map {map.Length} bytes.");
-                    throw new InvalidDataException(
-                        "The image is NDIF version 2 (Disk Image Mounter 1.0 or Disk Copy 6.0.1), which ClassicMac does not read: "
-                        + "no real image of this kind has been seen. Please send it to the ClassicMac project so support can be added.");
-                }
                 if (version > 12)
                     throw new InvalidDataException($"The image is NDIF version {version}, newer than Disk Copy 6.5 writes.");
-                if (version is not (10 or 11 or 12))
+                if (version is not (2 or 10 or 11 or 12))
                     throw new InvalidDataException($"The image's map has version {version}; Disk Copy calls it damaged.");
-                if (map.Length < HeaderLength) throw new InvalidDataException("The map is shorter than its header.");
-                var count = (int)BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x7C));
+                var old = version == 2;
+                var (entriesAt, entrySize) = old ? (OldHeaderLength, OldEntryLength) : (HeaderLength, EntryLength);
+                if (map.Length < entriesAt) throw new InvalidDataException("The map is shorter than its header.");
+                if (old)
+                {
+                    // No real image has been seen: the fields that would show another layout are reported with a request.
+                    context.Report(DiagnosticSeverity.Info, "ndif.version-2",
+                        $"A version 2 map (Disk Image Mounter 1.0 or Disk Copy 6.0.1), read as Disk Copy 6.1.2 reads it: type "
+                        + $"'{file.FinderInfo.Type}', creator '{file.FinderInfo.Creator}', +$54 = ${BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x54)):X8}, "
+                        + $"map {map.Length} bytes. No real image of this kind has been seen yet: please send it to the ClassicMac project.");
+                }
+                var count = (int)BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(old ? 0x54 : 0x7C));
                 if (count < 2) throw new InvalidDataException($"The map lists {count} chunks; Disk Copy calls it damaged.");
-                var room = (map.Length - HeaderLength) / EntryLength;
-                if (map.Length != HeaderLength + count * EntryLength)
+                var room = (map.Length - entriesAt) / entrySize;
+                if (map.Length != entriesAt + count * entrySize)
                 {
                     // Disk Copy 6.0 wrote version 10 maps one entry longer or shorter than their count.
                     if (version == 10 && Math.Abs(room - count) == 1)
@@ -142,7 +141,7 @@ namespace ClassicMac.Files.Hfs
                 var blocks = BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x44));
                 if (blocks == 0 || blocks >= MaxBlocks)
                     throw new InvalidDataException($"The disk is {blocks} blocks; Disk Copy calls it damaged.");
-                var segmented = BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x54)) != 0;
+                var segmented = !old && BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x54)) != 0;
                 if (segmented && version < 12)
                     throw new InvalidDataException("The map says segmented but its version is below 12; Disk Copy calls it damaged.");
                 var crc = BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x50));
@@ -150,7 +149,7 @@ namespace ClassicMac.Files.Hfs
                     context.Report(DiagnosticSeverity.Warning, "ndif.crc-uninitialized", "The image's checksum was never set.");
                 return new Header(version, new MacString(map.AsSpan(5, Math.Min(nameLength, (byte)63))), blocks,
                     BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x48)), BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x4C)),
-                    crc, segmented, count);
+                    crc, segmented, count, entriesAt, entrySize);
             }
         }
 
@@ -163,9 +162,15 @@ namespace ClassicMac.Files.Hfs
             var entries = new List<(long Start, byte Type, long Offset, long Stored)>();
             for (var k = 0; k < header.Count; k++)
             {
-                var e = map.AsSpan(HeaderLength + k * EntryLength, EntryLength);
+                var e = map.AsSpan(header.EntriesAt + k * header.EntrySize, header.EntrySize);
                 var word = BinaryPrimitives.ReadUInt32BigEndian(e);
-                entries.Add((word >> 8, (byte)word, BinaryPrimitives.ReadUInt32BigEndian(e[4..]), BinaryPrimitives.ReadUInt32BigEndian(e[8..])));
+                long stored = header.EntrySize == EntryLength ? BinaryPrimitives.ReadUInt32BigEndian(e[8..]) : 0;
+                entries.Add((word >> 8, (byte)word, BinaryPrimitives.ReadUInt32BigEndian(e[4..]), stored));
+            }
+            if (header.EntrySize == OldEntryLength)
+            {
+                // Version 2: a chunk's length runs to the next entry's offset (the end entry's offset is the data's end).
+                for (var k = 0; k + 1 < entries.Count; k++) entries[k] = entries[k] with { Stored = entries[k + 1].Offset - entries[k].Offset };
             }
 
             var end = entries.FindIndex(e => e.Type == ChunkEnd);
