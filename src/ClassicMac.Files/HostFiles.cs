@@ -232,21 +232,28 @@ namespace ClassicMac.Files
                 if (fork.Length > 0) file = file with { ResourceFork = fork };
             }
 
+            PcExchangeRecord? record = null;
             if (finderData is not null)
             {
                 var records = PcExchange.ReadFinderData(File.ReadAllBytes(finderData));
                 var key = PcExchange.DosKey(hostName);
-                var record = key is not null
+                record = key is not null
                     ? records.FirstOrDefault(r => r.DosName == key)
                     : records.FirstOrDefault(r => string.Equals(r.MacName.ToMacRoman(), hostName, StringComparison.OrdinalIgnoreCase));
-                if (record is not null)
-                {
-                    companions.Add(finderData);
-                    file = PcExchange.Apply(file, record,
-                        DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
-                    if (context.Options.ExtensionMap is { } map)
-                        file = file with { FinderInfo = map.Apply(file.FinderInfo, hostName) };
-                }
+            }
+            if (record is not null)
+            {
+                companions.Add(finderData!);
+                file = PcExchange.Apply(file, record,
+                    DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
+                if (context.Options.ExtensionMap is { } map)
+                    file = file with { FinderInfo = map.Apply(file.FinderInfo, hostName) };
+            }
+            else if (companions.Count > 0)
+            {
+                // A fork but no record: File Exchange shows the placeholder Finder info (the fork only gives lengths).
+                file = PcExchange.Apply(file, null,
+                    DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
             }
 
             // DOS hidden or system makes the file invisible.

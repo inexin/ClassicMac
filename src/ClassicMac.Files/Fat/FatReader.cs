@@ -93,13 +93,20 @@ namespace ClassicMac.Files.Fat
             public string Key => Encoding.Latin1.GetString(ShortName);
 
             // The 8.3 name as a file name: "NOTE.TXT".
-            public string DisplayShortName
+            public string DisplayShortName => MacShortName.ToMacRoman();
+
+            // The 8.3 name as File Exchange shows it: the stored bytes as they are, each read as the Mac Roman byte of the
+            // same value (no code page conversion, no case change), base and extension each cut at their first byte of
+            // $20 or less.
+            public MacString MacShortName
             {
                 get
                 {
-                    var stem = Encoding.Latin1.GetString(ShortName, 0, 8).TrimEnd();
-                    var extension = Encoding.Latin1.GetString(ShortName, 8, 3).TrimEnd();
-                    return extension.Length > 0 ? $"{stem}.{extension}" : stem;
+                    static ReadOnlySpan<byte> Part(ReadOnlySpan<byte> bytes) =>
+                        bytes.IndexOfAnyInRange((byte)0, (byte)0x20) is var end and >= 0 ? bytes[..end] : bytes;
+                    var stem = Part(ShortName.AsSpan(0, 8));
+                    var extension = Part(ShortName.AsSpan(8, 3));
+                    return new MacString(extension.Length > 0 ? [.. stem, (byte)'.', .. extension] : stem.ToArray());
                 }
             }
         }
@@ -146,7 +153,7 @@ namespace ClassicMac.Files.Fat
                     var record = records.FirstOrDefault(r => r.DosName == entry.Key);
                     // The record's name, else the long name, else the 8.3 name (File Exchange's lookup order).
                     var name = record?.MacName
-                        ?? (entry.LongName is { } longName ? FatNames.FromLongName(longName) : HostFiles.ToMacName(entry.DisplayShortName, basilisk: false, context));
+                        ?? (entry.LongName is { } longName ? FatNames.FromLongName(longName) : entry.MacShortName);
                     if (record is not null && name.Bytes.IndexOfAnyInRange((byte)0, (byte)0x1F) >= 0)
                     {
                         // File Exchange can create a record with a garbage name (for a file with a resource fork and no

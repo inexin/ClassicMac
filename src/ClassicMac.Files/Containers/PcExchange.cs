@@ -66,11 +66,15 @@ namespace ClassicMac.Files.Containers
             return records;
         }
 
-        /// <summary>The type and creator File Exchange gives a file with no stored ones: <c>TEXT</c>/<c>dosa</c>.</summary>
+        /// <summary>
+        /// The Finder info File Exchange gives a file with no FINDER.DAT record: <c>TEXT</c>/<c>dosa</c>, no flags, and the
+        /// default put-away folder, 2 (the root directory's ID), which File Exchange never reads.
+        /// </summary>
         public static FinderInfo Placeholder { get; } = new()
         {
             Type = FourCC.FromString("TEXT"),
             Creator = FourCC.FromString("dosa"),
+            Extended = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
         };
 
         // A file from a DOS disk as File Exchange presents it (confirmed in SheepShaver): with a record, its Mac name and

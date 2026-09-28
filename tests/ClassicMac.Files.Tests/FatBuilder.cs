@@ -223,7 +223,7 @@ internal sealed class FatBuilder
         var dot = name.IndexOf('.');
         var stem = dot < 0 ? name : name[..dot];
         var extension = dot < 0 ? "" : name[(dot + 1)..];
-        return Encoding.ASCII.GetBytes(stem.PadRight(8) + extension.PadRight(3));
+        return Encoding.Latin1.GetBytes(stem.PadRight(8) + extension.PadRight(3)); // one byte per character, as stored
     }
 
     private static string Parent(string path) => path.Contains('/') ? path[..path.LastIndexOf('/')] : "";

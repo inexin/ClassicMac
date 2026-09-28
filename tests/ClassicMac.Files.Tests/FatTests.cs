@@ -107,6 +107,19 @@ public class FatTests
         Assert.True(files.Single(f => f.Name.ToMacRoman() == "HIDDEN.SYS").FinderInfo.Flags.HasFlag(FinderFlags.IsInvisible));
     }
 
+    // File Exchange shows an 8.3 name's bytes as they are stored: each OEM byte as the Mac Roman byte of the same value
+    // (CP437 $82 é shows as Mac Roman $82 Ç), no case change, each part cut at its first byte of $20 or less.
+    [Fact]
+    public void Short_names_are_shown_byte_for_byte()
+    {
+        var builder = new FatBuilder(12);
+        builder.File("\u0082TE.TXT", "\u0082te.txt", Bytes(3, 1));
+
+        var file = Assert.Single(Read(builder.Build()).Files);
+
+        Assert.Equal([0x82, (byte)'t', (byte)'e', (byte)'.', (byte)'t', (byte)'x', (byte)'t'], file.Name.Bytes.ToArray());
+    }
+
     [Fact]
     public void A_looping_chain_is_cut_and_reported()
     {

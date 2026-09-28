@@ -116,6 +116,22 @@ public class PcExchangeTests : IDisposable
         Assert.Equal(FourCC.FromString("MOSS"), host.File.FinderInfo.Creator);
     }
 
+    // A fork in RESOURCE.FRK but no FINDER.DAT record: File Exchange shows TEXT/dosa (the fork only gives lengths).
+    [Fact]
+    public void A_fork_without_a_record_gets_the_placeholder_Finder_info()
+    {
+        File.WriteAllText(Path.Combine(folder, "LETTER.TXT"), "x");
+        Directory.CreateDirectory(Path.Combine(folder, "RESOURCE.FRK"));
+        File.WriteAllBytes(Path.Combine(folder, "RESOURCE.FRK", "LETTER.TXT"), [1, 2, 3]);
+
+        var host = HostFiles.Read(Path.Combine(folder, "LETTER.TXT"));
+
+        Assert.Equal(HostLayout.PcExchange, host.Layout);
+        Assert.Equal(("TEXT", "dosa"), (host.File.FinderInfo.Type.ToString(), host.File.FinderInfo.Creator.ToString()));
+        Assert.Equal(2, host.File.FinderInfo.Extended.Span[15]); // put-away folder 2, the root
+        Assert.Equal([1, 2, 3], host.File.ResourceFork.ToArray());
+    }
+
     [Fact]
     public void Files_without_a_record_or_fork_stay_plain()
     {

@@ -108,18 +108,26 @@ internal static class Fixtures
     }
 
     // An Apple partition map: driver descriptor, the map itself as partition 1, then the given partitions in order.
-    public static byte[] PartitionMap(params (string Name, string Type, byte[] Data)[] partitions)
+    public static byte[] PartitionMap(params (string Name, string Type, byte[] Data)[] partitions) =>
+        PartitionMap(512, driverDescriptor: true, partitions);
+
+    // A map with its entries every `stride` bytes and block numbers in that unit (2048 as on CDs); block 0 holds an 'ER'
+    // descriptor, or zeros.
+    public static byte[] PartitionMap(int stride, bool driverDescriptor, params (string Name, string Type, byte[] Data)[] partitions)
     {
         var entries = partitions.Length + 1;
         var blocks = new List<byte[]>();
-        var ddm = new byte[512];
-        Encoding.ASCII.GetBytes("ER").CopyTo(ddm, 0);
-        BinaryPrimitives.WriteUInt16BigEndian(ddm.AsSpan(2), 512);
+        var ddm = new byte[stride];
+        if (driverDescriptor)
+        {
+            Encoding.ASCII.GetBytes("ER").CopyTo(ddm, 0);
+            BinaryPrimitives.WriteUInt16BigEndian(ddm.AsSpan(2), (ushort)stride);
+        }
         blocks.Add(ddm);
         long next = 1 + entries;
         byte[] Entry(string name, string type, long start, long count)
         {
-            var e = new byte[512];
+            var e = new byte[stride];
             Encoding.ASCII.GetBytes("PM").CopyTo(e, 0);
             BinaryPrimitives.WriteUInt32BigEndian(e.AsSpan(4), (uint)entries);
             BinaryPrimitives.WriteUInt32BigEndian(e.AsSpan(8), (uint)start);
@@ -132,8 +140,8 @@ internal static class Fixtures
         blocks.Add(Entry("Apple", "Apple_partition_map", 1, entries));
         foreach (var (name, type, data) in partitions)
         {
-            blocks.Add(Entry(name, type, next, data.Length / 512));
-            next += data.Length / 512;
+            blocks.Add(Entry(name, type, next, data.Length / stride));
+            next += data.Length / stride;
         }
         return [.. blocks.SelectMany(b => b), .. partitions.SelectMany(p => p.Data)];
     }

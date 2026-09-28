@@ -8,14 +8,16 @@ using ClassicMac.Core;
 namespace ClassicMac.Files.Hfs
 {
     /// <summary>
-    /// Apple partition maps, from <i>Inside Macintosh: Devices</i> (SCSI Manager, "Partition Map"): a driver descriptor
-    /// ('ER') in block 0 and one partition entry ('PM') per 512-byte block from block 1. Each HFS or MFS partition comes
-    /// out as one file whose data fork is the volume, for the volume readers to open next; drivers and free space are
-    /// skipped.
+    /// Apple partition maps, from <i>Inside Macintosh: Devices</i> (SCSI Manager, "Partition Map"), read as the Mac OS 9
+    /// CD driver reads them (disassembly): block 0 holds a driver descriptor ('ER') or starts with a zero word, and the
+    /// partition entries ('PM') follow at a stride found by probing: 512 bytes, else 2048 (CDs mastered with 2048-byte
+    /// blocks). Every block number in an entry is in units of that stride; the driver descriptor's block size is never
+    /// used. Each HFS or MFS partition comes out as one file whose data fork is the volume, for the volume readers to
+    /// open next; drivers and free space are skipped.
     /// </summary>
     public sealed class PartitionMapReader : IContainerReader
     {
-        private const int Block = 512;
+        private const int Block = 512, CdBlock = 2048;
         private const ushort DriverSignature = 0x4552; // 'ER'
         private const ushort EntrySignature = 0x504D; // 'PM'
 
@@ -30,24 +32,31 @@ namespace ClassicMac.Files.Hfs
         public string FormatName => "Apple partition map";
 
         /// <inheritdoc/>
-        public bool CanRead(ForkData input)
+        public bool CanRead(ForkData input) => Stride(input) > 0;
+
+        // The entry stride: 'PM' at byte 512, else at byte 2048; 0 when there is no map. Block 0 must start with 'ER' or
+        // a zero word; nothing else in it is read.
+        private static int Stride(ForkData input)
         {
-            var start = input.ReadPrefix(2 * Block);
-            return start.Length == 2 * Block
-                && BinaryPrimitives.ReadUInt16BigEndian(start) == DriverSignature
-                && BinaryPrimitives.ReadUInt16BigEndian(start.AsSpan(Block)) == EntrySignature;
+            var start = input.ReadPrefix(CdBlock + 2);
+            if (start.Length < Block + 2) return 0;
+            if (BinaryPrimitives.ReadUInt16BigEndian(start) is not (DriverSignature or 0)) return 0;
+            if (BinaryPrimitives.ReadUInt16BigEndian(start.AsSpan(Block)) == EntrySignature) return Block;
+            if (start.Length == CdBlock + 2 && BinaryPrimitives.ReadUInt16BigEndian(start.AsSpan(CdBlock)) == EntrySignature) return CdBlock;
+            return 0;
         }
 
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
-            if (!CanRead(input)) throw new InvalidDataException("Not an Apple partition map.");
-            var first = input.Slice(Block, Block).ToArray();
+            var stride = Stride(input);
+            if (stride == 0) throw new InvalidDataException("Not an Apple partition map.");
+            var first = input.Slice(stride, Block).ToArray();
             long entries = BinaryPrimitives.ReadUInt32BigEndian(first.AsSpan(4));
             var files = new List<MacFile>();
             for (long i = 0; i < entries; i++)
             {
-                var at = (1 + i) * Block;
+                var at = (1 + i) * stride;
                 if (at + Block > input.Length)
                 {
                     context.Report(DiagnosticSeverity.Error, "partition.map-truncated",
@@ -68,13 +77,13 @@ namespace ClassicMac.Files.Hfs
                     continue;
                 }
 
-                // Physical start and size in 512-byte blocks; the data area may start later and be shorter.
+                // Physical start and size, and where the data starts in the partition, in units of the stride. The
+                // size comes from the partition's block count: no Mac mounting code reads pmDataCnt.
                 long start = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(8));
                 long count = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(12));
                 long dataStart = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(80));
-                long dataCount = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(84));
-                var offset = (start + dataStart) * Block;
-                var length = (dataCount > 0 ? dataCount : count - dataStart) * Block;
+                var offset = (start + dataStart) * stride;
+                var length = Math.Max(0, count - dataStart) * stride;
                 if (offset >= input.Length)
                 {
                     context.Report(DiagnosticSeverity.Error, "partition.outside", $"Partition {i + 1} starts past the end of the image.", at);

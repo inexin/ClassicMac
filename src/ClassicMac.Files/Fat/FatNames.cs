@@ -27,7 +27,7 @@ namespace ClassicMac.Files.Fat
             var head = units[..Math.Min(units.Length, MaxName - 4 - extensionBytes.Length)];
             var name = new List<byte>(MaxName);
             name.AddRange(roman ? MacRoman.Encode(head) : LowBytes(head));
-            var crc = Crc(units);
+            var crc = Crc(longName); // over the long name's own UTF-16, as stored
             name.Add((byte)'#');
             foreach (var shift in new[] { 8, 4, 0 }) name.Add((byte)"0123456789ABCDEF"[crc >> shift & 0xF]);
             name.AddRange(extensionBytes);

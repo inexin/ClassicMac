@@ -23,6 +23,20 @@ public class PartitionMapTests
         Assert.Equal(2, diagnostics.Count(d => d.Code == "partition.skipped")); // the map itself and the driver
     }
 
+    // As the Mac OS 9 CD driver reads them: block 0 may be zeros, entries every 2048 bytes when there is no 'PM' at 512,
+    // and every block number in 2048-byte units.
+    [Fact]
+    public void CD_maps_use_a_2048_byte_stride()
+    {
+        var hfs = Enumerable.Range(0, 4096).Select(i => (byte)i).ToArray();
+        var image = PartitionMap(2048, driverDescriptor: false, ("CD", "Apple_HFS", hfs));
+        var input = ForkData.FromBytes(image);
+
+        Assert.True(PartitionMapReader.Instance.CanRead(input));
+        var volume = Assert.Single(PartitionMapReader.Instance.Read(input, new ContainerContext()));
+        Assert.Equal(hfs, volume.DataFork.ToArray());
+    }
+
     [Fact]
     public void A_partition_past_the_end_is_cut()
     {
