@@ -1,0 +1,27 @@
+{
+  "version": 0,
+  "items": [
+    {
+      "number": 1,
+      "key": 0
+    },
+    {
+      "number": 2,
+      "key": 1,
+      "commandId": 1903520116,
+      "command": "quit",
+      "modifiers": 3,
+      "modifiersNames": [
+        "shift",
+        "option"
+      ],
+      "iconType": 0,
+      "textEncoding": -2,
+      "refCon": 0,
+      "refCon2": 0,
+      "submenu": 300,
+      "font": 3,
+      "glyph": 0
+    }
+  ]
+}

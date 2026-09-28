@@ -1,0 +1,22 @@
+{
+  "seed": 0,
+  "flags": 0,
+  "entries": [
+    {
+      "value": 0,
+      "part": "content",
+      "red": 65535,
+      "green": 65535,
+      "blue": 52428,
+      "hex": "#ffffcc"
+    },
+    {
+      "value": 1,
+      "part": "frame",
+      "red": 0,
+      "green": 0,
+      "blue": 32768,
+      "hex": "#000080"
+    }
+  ]
+}

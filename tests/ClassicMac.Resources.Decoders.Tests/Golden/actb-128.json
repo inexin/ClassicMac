@@ -1,0 +1,14 @@
+{
+  "seed": 0,
+  "flags": 0,
+  "entries": [
+    {
+      "value": 2,
+      "part": "text",
+      "red": 65535,
+      "green": 0,
+      "blue": 0,
+      "hex": "#ff0000"
+    }
+  ]
+}

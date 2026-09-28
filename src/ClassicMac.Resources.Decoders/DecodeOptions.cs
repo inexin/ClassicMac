@@ -79,6 +79,7 @@ namespace ClassicMac.Resources.Decoders
                 new Images.PatternDecoder(options),
                 new Sound.SoundDecoder(),
                 .. Interface.InterfaceDecoder.All(options),
+                .. Interface.ExtensionDecoder.All(options),
             ];
         }
 

@@ -1,0 +1,120 @@
+{
+  "entries": [
+    {
+      "menu": 0,
+      "item": 0,
+      "kind": "menuBar",
+      "titles": {
+        "red": 12336,
+        "green": 12336,
+        "blue": 12336,
+        "hex": "#303030"
+      },
+      "menuBackground": {
+        "red": 24672,
+        "green": 24672,
+        "blue": 24672,
+        "hex": "#606060"
+      },
+      "items": {
+        "red": 37008,
+        "green": 37008,
+        "blue": 37008,
+        "hex": "#909090"
+      },
+      "menuBar": {
+        "red": 49344,
+        "green": 49344,
+        "blue": 49344,
+        "hex": "#c0c0c0"
+      }
+    },
+    {
+      "menu": 128,
+      "item": 0,
+      "kind": "title",
+      "title": {
+        "red": 12336,
+        "green": 12336,
+        "blue": 12336,
+        "hex": "#303030"
+      },
+      "menuBackground": {
+        "red": 24672,
+        "green": 24672,
+        "blue": 24672,
+        "hex": "#606060"
+      },
+      "items": {
+        "red": 37008,
+        "green": 37008,
+        "blue": 37008,
+        "hex": "#909090"
+      },
+      "menuBar": {
+        "red": 49344,
+        "green": 49344,
+        "blue": 49344,
+        "hex": "#c0c0c0"
+      }
+    },
+    {
+      "menu": 128,
+      "item": 3,
+      "kind": "item",
+      "mark": {
+        "red": 12336,
+        "green": 12336,
+        "blue": 12336,
+        "hex": "#303030"
+      },
+      "text": {
+        "red": 24672,
+        "green": 24672,
+        "blue": 24672,
+        "hex": "#606060"
+      },
+      "key": {
+        "red": 37008,
+        "green": 37008,
+        "blue": 37008,
+        "hex": "#909090"
+      },
+      "background": {
+        "red": 49344,
+        "green": 49344,
+        "blue": 49344,
+        "hex": "#c0c0c0"
+      }
+    },
+    {
+      "menu": -99,
+      "item": 0,
+      "kind": "end",
+      "title": {
+        "red": 12336,
+        "green": 12336,
+        "blue": 12336,
+        "hex": "#303030"
+      },
+      "menuBackground": {
+        "red": 24672,
+        "green": 24672,
+        "blue": 24672,
+        "hex": "#606060"
+      },
+      "items": {
+        "red": 37008,
+        "green": 37008,
+        "blue": 37008,
+        "hex": "#909090"
+      },
+      "menuBar": {
+        "red": 49344,
+        "green": 49344,
+        "blue": 49344,
+        "hex": "#c0c0c0"
+      }
+    }
+  ]
+}

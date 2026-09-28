@@ -623,6 +623,116 @@
           "file": "CNTL-129.json"
         }
       ]
+    },
+    {
+      "key": "wctb-128",
+      "decoder": "ui.colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "wctb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "dctb-128",
+      "decoder": "ui.colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "dctb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "actb-128",
+      "decoder": "ui.colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "actb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "cctb-128",
+      "decoder": "ui.colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "cctb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "mctb-128",
+      "decoder": "ui.menu-colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "mctb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ictb-128",
+      "decoder": "ui.item-colors 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "ictb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "dlgx-128",
+      "decoder": "ui.dialog-extension 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "dlgx-128.json"
+        }
+      ]
+    },
+    {
+      "key": "alrx-128",
+      "decoder": "ui.alert-extension 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "alrx-128.json"
+        }
+      ]
+    },
+    {
+      "key": "alrx-129",
+      "decoder": "ui.alert-extension 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "alrx-129.json"
+        }
+      ]
+    },
+    {
+      "key": "xmnu-128",
+      "decoder": "ui.menu-extension 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "xmnu-128.json"
+        }
+      ]
     }
   ]
 }

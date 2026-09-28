@@ -1,7 +1,9 @@
 # Interface resources — an implementer's specification
 
 This document describes the classic Mac OS Toolbox's interface resources: menus (`'MENU'`, `'MBAR'`), window, dialog
-and alert templates (`'WIND'`, `'DLOG'`, `'ALRT'`), dialog item lists (`'DITL'`) and control templates (`'CNTL'`). It
+and alert templates (`'WIND'`, `'DLOG'`, `'ALRT'`), dialog item lists (`'DITL'`), control templates (`'CNTL'`), and
+their colour and Appearance extension resources (`'wctb'`, `'dctb'`, `'actb'`, `'cctb'`, `'mctb'`, `'ictb'`,
+`'dlgx'`, `'alrx'`, `'xmnu'`). It
 describes them completely enough to write a reader without reading ClassicMac's code, and it specifies the JSON
 ClassicMac writes for them.
 
@@ -25,9 +27,10 @@ Contents
 7. [Positioning](#7-positioning)
 8. [Dialog item lists (DITL)](#8-dialog-item-lists-ditl)
 9. [Control templates (CNTL)](#9-control-templates-cntl)
-10. [JSON output](#10-json-output)
-11. [Diagnostics](#11-diagnostics)
-12. [Not covered yet](#12-not-covered-yet)
+10. [Colour and extension resources](#10-colour-and-extension-resources)
+11. [JSON output](#11-json-output)
+12. [Diagnostics](#12-diagnostics)
+13. [Not covered yet](#13-not-covered-yet)
 
 ---
 
@@ -40,7 +43,7 @@ native managers unless it names the 68k code. **[ClassicMac]** marks ClassicMac'
 
 The Toolbox checks almost nothing: it never compares a template's counts with its size and reads past the end of
 a short one [Code]. ClassicMac reads short data as far as it goes, with zeros for missing fields, and reports it
-(§11) [ClassicMac].
+(§12) [ClassicMac].
 
 ---
 
@@ -89,7 +92,7 @@ $1A), then `'ICON'` or `'SICN'`; with $1A, $1D or $1E an icon is looked up even 
   logo [Doc] (*Toolbox Essentials*: `commandMark`, `checkMark`, `diamondMark`, `appleMark`); the JSON shows them as
   those Unicode characters.
 - **Colours and extensions.** `GetMenu` also applies the `'mctb'` of the same ID, and Mac OS 9's reads an `'xmnu'`
-  (extended item data) of the same ID [Code]. ClassicMac reads neither yet (§12).
+  (extended item data) of the same ID [Code]. ClassicMac reads them as their own resources (§10).
 
 ---
 
@@ -136,7 +139,7 @@ As `'WIND'` (§4), with the item list's ID inserted before the title [Doc]:
 | (even) | 2 | `u16` | Positioning (§7), when the resource holds it |
 
 The Dialog Manager also reads, by the `'DLOG'`'s ID, a `'dctb'` (colours) and a `'dlgx'` (Appearance flags), and by
-the `'DITL'`'s ID an `'ictb'` (item colours and fonts) [Code] (§12).
+the `'DITL'`'s ID an `'ictb'` (item colours and fonts) [Code] (§10).
 
 ---
 
@@ -153,7 +156,7 @@ The stages word holds four 4-bit entries, stage 1 in the lowest and stage 4 in t
 [Code]. Each entry: bit 3, the default button (0 item 1, 1 item 2); bit 2, the alert is drawn at this stage; bits 0–1,
 the number of beeps (`SysBeep` through `ErrorSound`; not a `'snd '` ID) [Code].
 
-An `'actb'` and an `'alrx'` of the same ID give the colours and the Appearance flags [Code] (§12).
+An `'actb'` and an `'alrx'` of the same ID give the colours and the Appearance flags [Code] (§10).
 
 ---
 
@@ -211,7 +214,7 @@ An `i16` count **less one**, then the items [Doc]:
 
 - **Count.** A signed number: −1 ($FFFF) or any negative count is an empty list [Code]. It is never checked against
   the resource's size: a count past the data makes the Dialog Manager read past the end [Code]. ClassicMac stops at the
-  end of the data (§11) [ClassicMac].
+  end of the data (§12) [ClassicMac].
 - **Types.** Mac OS 9 accepts exactly these values of the type less bit 7; any other item draws nothing but still
   takes space and clicks [Code]. The 68k Dialog Manager tested bits in the order control, editable text, static text,
   icon, picture, so combined values took the first that matched [Code: 68k].
@@ -269,7 +272,60 @@ Once made, the control sets its minimum to 1, its maximum to the number of items
 
 ---
 
-## 10. JSON output
+## 10. Colour and extension resources
+
+Each is found by the ID of what it belongs to [Code].
+
+**`'wctb'`, `'dctb'`, `'actb'`, `'cctb'`** (a window's, a dialog's, an alert's and a control's colours, by the
+`'WIND'`, `'DLOG'`, `'ALRT'` and `'CNTL'` ID) are colour tables [Doc] [Code]: `u32` seed, `u16` flags, `i16` count
+less one (−1: no entries), then per entry an `i16` part code and an `RGBColor`. An 8-byte `'dctb'` or `'actb'` with no
+entries makes the dialog a colour one with the default colours [Code].
+
+| Part | Windows, dialogs, alerts | Controls |
+| --- | --- | --- |
+| 0 | content | frame |
+| 1 | frame | body |
+| 2 | text | text |
+| 3 | hilite | thumb |
+| 4 | title bar | fill pattern |
+| 5–6 | hilite light, dark | arrows light, dark |
+| 7–8 | title bar light, dark | thumb light, dark |
+| 9–10 | dialog light, dark | hilite light, dark |
+| 11–12 | tinge light, dark | title bar light, dark |
+| 13–14 | | tinge light, dark |
+
+**`'mctb'`** (a menu's colours, by the `'MENU'` ID) [Doc] (*Toolbox Essentials*): an `i16` count, then 30-byte entries
+of `i16` menu ID, `i16` item, four `RGBColor`s and a reserved `i16`; an entry with menu ID −99 ends the table. The
+colours of the menu bar entry (ID 0): the titles, the menus' background, the items, the bar; of a title entry (item 0):
+the title, the menu's background, its items, the bar; of an item: its mark, its text, its Command key, its background.
+
+**`'ictb'`** (item colours and fonts, by the `'DITL'` ID) [Code]: one 4-byte entry per item (an `i16` value and an
+`i16` offset from the start of the `'ictb'`), in item order; 0 and 0 keep the defaults.
+
+- A button, check box, radio button or control: the value is the length of a control colour table (as `'cctb'`) at the
+  offset.
+- Static or editable text: the value is a set of flags for a 20-byte text style at the offset: `i16` font, face (the
+  high byte of a word), `i16` size, foreground and background `RGBColor`s, `i16` transfer mode. Flags: bit 0 font,
+  bit 1 face, bit 2 size, bit 3 foreground, bit 4 the size is added to the dialog's, bit 13 background, bit 14 mode,
+  bit 15 the font word is an offset to the font's name (a Pascal string).
+
+**`'dlgx'`** (by the `'DLOG'` ID) [Code]: `i16` version (0), `u32` flags: 1 theme background, 2 control hierarchy,
+4 movable modal, 8 theme controls.
+
+**`'alrx'`** (by the `'ALRT'` ID) [Code]: `i16` version (0 or 1), `u32` flags (as `'dlgx'`, with 4: the alert is
+movable), `i32` reference value, a byte (non-zero: the Appearance alert window), a filler byte, then the window's
+title: at +12 in version 1, at +28 after 16 reserved bytes in version 0. A version 0 resource too short for its title
+there is read as version 1.
+
+**`'xmnu'`** (extended menu item data, by the `'MENU'` ID; Mac OS 8.5 and later) [Code]: `i16` version (not checked),
+`i16` count, then per item from item 1 an `i16` key: 1 is followed by 28 bytes (`u32` command ID, a modifiers byte (1
+Shift, 2 Option, 4 Control, 8 no Command key), an icon type byte, a 4-byte placeholder, `i32` text encoding (−1 the
+system's, −2 the item's own), two `i32` reference values, `u16` submenu ID (used when the item's mark gives none),
+`u16` font, `i16` keyboard glyph); any other key has no data.
+
+---
+
+## 11. JSON output
 
 One `.json` file per resource, UTF-8, indented by two spaces, LF line ends [ClassicMac]. Every stored field is kept;
 names for known codes are added beside the numbers. Rectangles are objects `{"top", "left", "bottom", "right"}`.
@@ -286,22 +342,32 @@ names for known codes are added beside the numbers. Rectangles are objects `{"to
 
 `position` is `null` when the resource has no positioning word, else `{"code", "name", "used"}`, `name` only for the
 values of §7, and for a used word `screen` (`main`, `parentWindowScreen`, `parentWindow`, `parent`),
-`centerHorizontally` and `vertical` (`none`, `center`, `alertPosition`, `stagger`). All decoders are version 1, and
-record the encoding (`macintosh`).
+`centerHorizontally` and `vertical` (`none`, `center`, `alertPosition`, `stagger`). All decoders are version 1; those
+above record the encoding (`macintosh`).
+
+| Type | Decoder | Fields |
+| --- | --- | --- |
+| `wctb`, `dctb`, `actb`, `cctb` | `ui.colors` | `seed`, `flags`, `entries[]`: `value`, `part` (when known), `red`, `green`, `blue` (0–65535), `hex` (`#rrggbb`) |
+| `mctb` | `ui.menu-colors` | `entries[]`: `menu`, `item`, `kind` (`menuBar`, `title`, `item`, `end`), then the four colours by name |
+| `ictb` | `ui.item-colors` | `itemList` (whether the `'DITL'` was found), `items[]`: `number`, `data`, `offset`, and `colors` (a control's table) or `textStyle` (`flags`, `font` or `fontName`, `face`, `size`, `addSize`, `foreground`, `background`, `mode`, as the flags give) |
+| `dlgx` | `ui.dialog-extension` | `version`, `flags`, `flagsNames` |
+| `alrx` | `ui.alert-extension` | `version`, `flags`, `flagsNames`, `movable`, `refCon`, `useThemeWindow`, `title` |
+| `xmnu` | `ui.menu-extension` | `version`, `items[]`: `number`, `key`, and for key 1 `commandId`, `command`, `modifiers`, `modifiersNames`, `iconType`, `textEncoding`, `refCon`, `refCon2`, `submenu`, `font`, `glyph` |
+
+Without its `'DITL'`, an `'ictb'`'s entries are listed without their colours or styles, as the item types are unknown.
 
 ---
 
-## 11. Diagnostics
+## 12. Diagnostics
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
-| `ui.short` | Warning | The data ends before the resource's fields do (a `'DITL'` with fewer items than its count says, a `'MENU'` without its closing 0 byte, …); the JSON holds what was read |
+| `ui.short` | Warning | The data ends before the resource's fields do (a `'DITL'` with fewer items than its count says, a `'MENU'` without its closing 0 byte, a colour table with fewer entries than its count, …); the JSON holds what was read |
 
 ---
 
-## 12. Not covered yet
+## 13. Not covered yet
 
-- Colour and extension resources: `'mctb'`, `'wctb'`, `'dctb'`, `'actb'`, `'cctb'`, `'ictb'`, `'dlgx'`, `'alrx'`,
-  `'xmnu'`, `'dftb'`.
+- `'dftb'` (Appearance's dialog font table) and `'hdlg'`/`'hrct'` (the Help Manager's).
 - Previews of dialogs, alerts and menus in the viewer.
 - Writing these resources from JSON (with `pack`).

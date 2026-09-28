@@ -111,9 +111,30 @@ internal static class GoldenFixtures
         // A pop-up menu control: menu 128 (min), title width 60 (max), centred bold title (value), AddResMenu of 'FONT'.
         yield return Res("CNTL", 129, [0, 40, 0, 10, 0, 60, 0, 200, 0x01, 0x01, 1, 0, 0, 60, 0, 128, 0x03, 0xF4, .. "FONT"u8, .. Pascal("Font:")]);
 
+        // Colour and extension resources: window, dialog (the 8-byte "default colours" form), alert and control colour
+        // tables; menu colours (the bar, a title, an item, the end); item colours for DITL 128 (the button's colour
+        // table; the static text's font by name, size and colour); Appearance extensions (dlgx, alrx of both versions,
+        // xmnu with a skipped entry).
+        yield return Res("wctb", 128, [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF, 0xCC, 0xCC, 0, 1, 0, 0, 0, 0, 0x80, 0]);
+        yield return Res("dctb", 128, [0, 0, 0, 0, 0, 0, 0xFF, 0xFF]);
+        yield return Res("actb", 128, [0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0xFF, 0xFF, 0, 0, 0, 0]);
+        yield return Res("cctb", 128, [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0xFF, 0xFF]);
+        yield return Res("mctb", 128, [0, 4, .. MenuColor(0, 0), .. MenuColor(128, 0), .. MenuColor(128, 3), .. MenuColor(-99, 0)]);
+        yield return Res("ictb", 128, [0, 16, 0, 40, .. new byte[12], 0x80, 0x0C, 0, 56, .. new byte[20],
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0xFF, 0xFF, 0, 0, 0, 0, 0, 76, 0, 0, 0, 12, 0xFF, 0xFF, 0, 0, 0, 0, .. new byte[8], .. Pascal("Geneva")]);
+        yield return Res("dlgx", 128, [0, 0, 0, 0, 0, 0x0B]);
+        yield return Res("alrx", 128, [0, 1, 0, 0, 0, 0x0F, 0, 0, 0, 7, 1, 0, .. Pascal("Warning")]);
+        yield return Res("alrx", 129, [0, 0, 0, 0, 0, 0x0B, 0, 0, 0, 0, 0, 0, .. new byte[16], .. Pascal("Old")]);
+        yield return Res("xmnu", 128, [0, 0, 0, 2, 0, 0, 0, 1, .. "quit"u8, 3, 0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFE, 0, 0, 0, 0, 0, 0, 0, 0, 1, 44, 0, 3, 0, 0]);
+
         // A type no decoder handles: exported raw.
         yield return Res("CODE", 1, [0x4E, 0x75]);
     }
+
+    // An mctb entry: menu, item, four colours (grey levels 1–4), reserved.
+    private static byte[] MenuColor(short menu, short item) =>
+        [(byte)(menu >> 8), (byte)menu, (byte)(item >> 8), (byte)item,
+            .. Enumerable.Range(1, 4).SelectMany(level => Enumerable.Repeat((byte)(level * 0x30), 6)), 0, 0];
 
     // A dialog item: placeholder, rectangle (top, left, bottom, right), type, length, data padded to even.
     private static byte[] DitlItem(int type, short[] rect, byte[] data) =>

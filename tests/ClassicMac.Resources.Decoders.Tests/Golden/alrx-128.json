@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "flags": 15,
+  "flagsNames": [
+    "useThemeBackground",
+    "useControlHierarchy",
+    "movable",
+    "useThemeControls"
+  ],
+  "movable": true,
+  "refCon": 7,
+  "useThemeWindow": true,
+  "title": "Warning"
+}

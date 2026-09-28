@@ -1,0 +1,81 @@
+{
+  "itemList": true,
+  "items": [
+    {
+      "number": 1,
+      "data": 16,
+      "offset": 40,
+      "colors": {
+        "seed": 0,
+        "flags": 0,
+        "entries": [
+          {
+            "value": 1,
+            "part": "body",
+            "red": 65535,
+            "green": 0,
+            "blue": 0,
+            "hex": "#ff0000"
+          }
+        ]
+      }
+    },
+    {
+      "number": 2,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 3,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 4,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 5,
+      "data": -32756,
+      "offset": 56,
+      "textStyle": {
+        "flags": 32780,
+        "fontName": "Geneva",
+        "size": 12,
+        "addSize": false,
+        "foreground": {
+          "red": 65535,
+          "green": 0,
+          "blue": 0,
+          "hex": "#ff0000"
+        }
+      }
+    },
+    {
+      "number": 6,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 7,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 8,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 9,
+      "data": 0,
+      "offset": 0
+    },
+    {
+      "number": 10,
+      "data": 0,
+      "offset": 0
+    }
+  ]
+}

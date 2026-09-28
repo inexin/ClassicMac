@@ -1,0 +1,9 @@
+{
+  "version": 0,
+  "flags": 11,
+  "flagsNames": [
+    "useThemeBackground",
+    "useControlHierarchy",
+    "useThemeControls"
+  ]
+}
