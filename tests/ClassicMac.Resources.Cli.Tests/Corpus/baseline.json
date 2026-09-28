@@ -396,8 +396,26 @@
     "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80"
   },
   {
+    "name": "FLOP1440.dsk",
+    "sha256": "dc6222285a59e6abcc4221f3caf9dd2430cc6ebfb1f6be3faa2c33b8dcef5457",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80"
+  },
+  {
     "name": "FLOP1440_orig.dsk",
     "sha256": "dea2af2ae3eacc68c9709f5bc586e3da3dee11b279ffa73a9e8a9f42f27d8362",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80"
+  },
+  {
+    "name": "FLOP400.dsk",
+    "sha256": "26484f127c07f02d34c1ac23d1bfde71a9293fbcd9329c66774863870c040008",
     "forks": 2,
     "resources": 4,
     "decoded": 1,
@@ -425,6 +443,15 @@
   {
     "name": "FLOP400_orig.dsk",
     "sha256": "dc1922bc31b9f90957efbecc9657978c2a1110ad85f7899e77ff88b15c831a55",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80"
+  },
+  {
+    "name": "FLOP800.dsk",
+    "sha256": "1ced0f5e1f0d2234c80102158f5de06dcb1e6674285aad3025432b4fa98780c3",
     "forks": 2,
     "resources": 4,
     "decoded": 1,
@@ -811,6 +838,15 @@
   },
   {
     "name": "SRC5M.dsk",
+    "sha256": "04e5800ce847d9d7732395a99f87dac70f847a7664ea6d3ce81831de149227cd",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80"
+  },
+  {
+    "name": "SRC5M.dsk",
     "sha256": "132bcc4c1617acfc1702939c1fbcf25df7f641020f7050036c6109c34e6e1c77",
     "forks": 2,
     "resources": 4,
@@ -848,6 +884,15 @@
   {
     "name": "SRC800.dsk",
     "sha256": "d8f481e57d4140ca542ebe123e7f2e75e30932275017b7fa40eeb05ec2fe6c5b",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80"
+  },
+  {
+    "name": "SRC800.dsk",
+    "sha256": "df0d3f416f0d86336e261abbbd49899ef86cd04024211c7df1f0c294ef3bd09a",
     "forks": 2,
     "resources": 4,
     "decoded": 1,
@@ -1305,6 +1350,15 @@
     "outputs": "d829570b801119b853f207af97b307f8f91aa968607f3f746defa6dcf059d3a3"
   },
   {
+    "name": "fx26rw.img",
+    "sha256": "273bbc9c6639a59d46960a853c2bf8a42cca24b7e85f936ff0dc5112ce51616e",
+    "forks": 1,
+    "resources": 1,
+    "decoded": 1,
+    "raw": 0,
+    "outputs": "f87b4aa099b5942879d6bf8a5c5ccc220267400719373f5fb8a7f2ed146f9742"
+  },
+  {
     "name": "fxtest.img",
     "sha256": "c6e9a79963383593c47ccd6070d267cac590be830717922816fb0293e2c26635",
     "forks": 2,
@@ -1321,6 +1375,15 @@
     "decoded": 0,
     "raw": 3,
     "outputs": "eae96b9abbdb7f41b4bb49f189557a2b3e67f32c5d5b6060316033af61a809f8"
+  },
+  {
+    "name": "grow",
+    "sha256": "40c11a21853ff86676f20cf450c9789ba5be4ff4bef02cd5aedd4868dd1dce08",
+    "forks": 1,
+    "resources": 1,
+    "decoded": 0,
+    "raw": 1,
+    "outputs": "01519e344144dae5b5a2e7522e3b999602244e7094aed3f71824e01f18123760"
   },
   {
     "name": "m.img",
@@ -1357,6 +1420,15 @@
     "decoded": 3,
     "raw": 6,
     "outputs": "051cdeb8a55afa78e0164e5942ce11b215eac190df0fe4ff296a5dd99c1d110b"
+  },
+  {
+    "name": "scratch.dsk",
+    "sha256": "dbabf9408db09744ca36b8d21c0fcb30df03d4af5f88f1c26513750a22212e6d",
+    "forks": 13,
+    "resources": 25,
+    "decoded": 7,
+    "raw": 18,
+    "outputs": "b4e1298b18438731d07131952ac226eaf95e3c5492d0542374eb5fd643091e7b"
   },
   {
     "name": "size.r.rsrc.bin",
@@ -1433,11 +1505,11 @@
   {
     "name": "uco",
     "sha256": "159a697bb1ffd00728ec11f25287c84024e9ae2712aec2fbba4eb807351ece22",
-    "forks": 1,
-    "resources": 1,
+    "forks": 2,
+    "resources": 4,
     "decoded": 1,
-    "raw": 0,
-    "outputs": "422bdd1511d938b0d65ed520c113456fd97895cd880811f31c452fa19910c312"
+    "raw": 3,
+    "outputs": "2f1867aee6c2c4e9c7b06bfded22f57cfd290721de08ed1df70d36c792428b7d"
   },
   {
     "name": "ued",
@@ -1446,7 +1518,7 @@
     "resources": 4,
     "decoded": 1,
     "raw": 3,
-    "outputs": "d829570b801119b853f207af97b307f8f91aa968607f3f746defa6dcf059d3a3"
+    "outputs": "38a96e6092b5527d71f21884ee0799b613e53ce04caa76ccf4f4ab8498832a68"
   },
   {
     "name": "ued.rsrc",
@@ -1464,7 +1536,7 @@
     "resources": 4,
     "decoded": 1,
     "raw": 3,
-    "outputs": "d829570b801119b853f207af97b307f8f91aa968607f3f746defa6dcf059d3a3"
+    "outputs": "58652b88ed17d607328620ac0504f3947a100a6d499f2a8bc89fcb1c495db8dd"
   },
   {
     "name": "v2 adc.img",

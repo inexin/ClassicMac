@@ -179,7 +179,7 @@ public class HostFilesTests : IDisposable
             var folderName = Path.GetFileName(Path.GetDirectoryName(path));
             if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._")) continue;
             // The harness's deliberately damaged images (checked by their own tests).
-            if (CorpusFolders.IsDamageTest(path) || CorpusFolders.IsUnsupported(path)) continue;
+            if (CorpusFolders.IsDamageTest(path)) continue;
             var diagnostics = new List<Diagnostic>();
             ContainerNode root;
             try

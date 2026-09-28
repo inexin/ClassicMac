@@ -79,7 +79,8 @@ namespace ClassicMac.Files.Hfs
                 context.Report(DiagnosticSeverity.Error, "ndif.bad-map", $"The data starts at {header.DataStart}, past the {data.Length}-byte data fork.");
 
             var chunks = Chunks(map, header, data.Length, context);
-            var disk = new ChunkedForkData(data, chunks, diskLength, context);
+            var disk = new ChunkedForkData(data, chunks, diskLength, Decode, (chunk, problem) => context.Report(DiagnosticSeverity.Error,
+                "ndif.bad-chunk", $"The compressed chunk at block {chunk.Start / SectorSize} {problem}; Disk Copy calls it damaged. The rest reads as zeros."));
             if (context.Options.VerifyChecksums) VerifyChecksum(disk, header.Crc, context);
             return [new MacFile { Name = header.Name.Bytes.Length > 0 ? header.Name : file.Name, DataFork = disk }];
         }
@@ -153,11 +154,10 @@ namespace ClassicMac.Files.Hfs
             }
         }
 
-        private sealed record Chunk(long Start, long End, byte Type, long Offset, long Stored);
 
         // The entries, checked as Disk Copy's validator checks them. What it refuses is reported as an error and read
         // as zeros, so the rest of the disk stays readable.
-        private static List<Chunk> Chunks(byte[] map, Header header, long dataLength, ContainerContext context)
+        private static List<DiskChunk> Chunks(byte[] map, Header header, long dataLength, ContainerContext context)
         {
             var entries = new List<(long Start, byte Type, long Offset, long Stored)>();
             for (var k = 0; k < header.Count; k++)
@@ -190,7 +190,7 @@ namespace ClassicMac.Files.Hfs
                     $"The first chunk starts at block {entries[0].Start}; the blocks before it read as zeros (Disk Copy reads garbage).");
             }
 
-            var chunks = new List<Chunk>();
+            var chunks = new List<DiskChunk>();
             for (var k = 0; k < end; k++)
             {
                 var (start, type, offset, stored) = entries[k];
@@ -247,7 +247,8 @@ namespace ClassicMac.Files.Hfs
                     context.Report(DiagnosticSeverity.Error, "ndif.short", $"{where} lies past the end of the image's data; what is there is read.");
                     stored = Math.Max(0, dataLength - absolute);
                 }
-                chunks.Add(new Chunk(start * SectorSize, next * SectorSize, type, absolute, stored));
+                var storage = type switch { ChunkZero => ChunkStorage.Zeros, ChunkRaw => ChunkStorage.Raw, _ => ChunkStorage.Compressed };
+                chunks.Add(new DiskChunk(start * SectorSize, next * SectorSize, type, storage, absolute, stored));
             }
             return chunks;
         }
@@ -355,130 +356,27 @@ namespace ClassicMac.Files.Hfs
 
         // The disk: each chunk decoded when first read (the last one kept, as Disk Copy's driver does), zeros where the
         // map says so. A chunk that fails to decode is reported once and reads as far as it decoded, then zeros.
-        private sealed class ChunkedForkData(ForkData data, List<Chunk> chunks, long length, ContainerContext context) : ForkData
+
+        // A chunk's stored bytes decoded into its disk bytes: the problem to report, or null.
+        private static string? Decode(DiskChunk chunk, byte[] stored, byte[] bytes)
         {
-            private readonly List<Chunk> chunks = chunks;
-            private readonly long length = length;
-            private readonly HashSet<int> reported = [];
-            private int cachedIndex = -1;
-            private byte[] cached = [];
-
-            public override long Length => length;
-
-            public override Stream Open() => new ChunkStream(this);
-
-            private ReadOnlySpan<byte> Decoded(int index)
+            switch (chunk.Type)
             {
-                lock (reported)
-                {
-                    if (index == cachedIndex) return cached;
-                    var chunk = chunks[index];
-                    var bytes = new byte[chunk.End - chunk.Start];
-                    if (chunk.Type != ChunkZero && chunk.Stored > 0)
-                    {
-                        var stored = data.Slice(chunk.Offset, chunk.Stored).ToArray();
-                        string? problem = null;
-                        switch (chunk.Type)
-                        {
-                            case ChunkRaw:
-                                stored.AsSpan(0, (int)Math.Min(stored.Length, bytes.Length)).CopyTo(bytes);
-                                break;
-                            case ChunkAdc:
-                                var result = Adc.Decompress(stored, bytes, out var adcWritten);
-                                if (result != Adc.Result.Done) problem = $"decodes to {adcWritten} of its {bytes.Length} bytes ({result})";
-                                break;
-                            case ChunkDartRle:
-                                if (!DartRle.Decompress(stored, bytes, out var rleWritten))
-                                    problem = $"decodes to {rleWritten} of its {bytes.Length} bytes";
-                                break;
-                            case ChunkKenCode:
-                                var kcResult = KenCode.Decompress(stored, bytes, out var kcWritten);
-                                if (kcResult != KenCode.Result.Done) problem = $"decodes to {kcWritten} of its {bytes.Length} bytes ({kcResult})";
-                                break;
-                            case ChunkDartLzh:
-                                // Each chunk starts with a clear window. Disk Copy leaves the ring's last 60 bytes from the
-                                // chunk decoded before, which changes nothing on real data; no Disk Copy writes $82 chunks.
-                                var lzhWritten = new DartLzh().Decode(stored, bytes);
-                                if (lzhWritten < bytes.Length - 1) problem = $"decodes to {lzhWritten} of its {bytes.Length} bytes";
-                                break;
-                        }
-                        if (problem is not null && reported.Add(index))
-                        {
-                            context.Report(DiagnosticSeverity.Error, "ndif.bad-chunk",
-                                $"The compressed chunk at block {chunk.Start / SectorSize} {problem}; Disk Copy calls it damaged. The rest reads as zeros.");
-                        }
-                    }
-                    cachedIndex = index;
-                    cached = bytes;
-                    return cached;
-                }
-            }
-
-            private sealed class ChunkStream(ChunkedForkData fork) : Stream
-            {
-                private long position;
-
-                public override bool CanRead => true;
-                public override bool CanSeek => true;
-                public override bool CanWrite => false;
-                public override long Length => fork.length;
-
-                public override long Position
-                {
-                    get => position;
-                    set => position = value >= 0 ? value : throw new IOException("Cannot seek before the start of the stream.");
-                }
-
-                public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
-
-                public override int Read(Span<byte> buffer)
-                {
-                    var total = 0;
-                    while (buffer.Length > 0 && position < fork.length)
-                    {
-                        var index = fork.chunks.FindLastIndex(c => c.Start <= position);
-                        int take;
-                        if (index < 0 || position >= fork.chunks[index].End)
-                        {
-                            // Blocks no chunk covers read as zeros.
-                            var nextStart = index + 1 < fork.chunks.Count ? fork.chunks[index + 1].Start : fork.length;
-                            take = (int)Math.Min(buffer.Length, nextStart - position);
-                            buffer[..take].Clear();
-                        }
-                        else
-                        {
-                            var chunk = fork.chunks[index];
-                            var bytes = fork.Decoded(index);
-                            var within = (int)(position - chunk.Start);
-                            take = Math.Min(buffer.Length, bytes.Length - within);
-                            bytes.Slice(within, take).CopyTo(buffer);
-                        }
-                        buffer = buffer[take..];
-                        position += take;
-                        total += take;
-                    }
-                    return total;
-                }
-
-                public override long Seek(long offset, SeekOrigin origin)
-                {
-                    Position = origin switch
-                    {
-                        SeekOrigin.Begin => offset,
-                        SeekOrigin.Current => position + offset,
-                        SeekOrigin.End => fork.length + offset,
-                        _ => throw new ArgumentOutOfRangeException(nameof(origin)),
-                    };
-                    return position;
-                }
-
-                public override void Flush()
-                {
-                }
-
-                public override void SetLength(long value) => throw new NotSupportedException();
-
-                public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+                case ChunkAdc:
+                    var result = Adc.Decompress(stored, bytes, out var adcWritten);
+                    return result == Adc.Result.Done ? null : $"decodes to {adcWritten} of its {bytes.Length} bytes ({result})";
+                case ChunkDartRle:
+                    return DartRle.Decompress(stored, bytes, out var rleWritten) ? null : $"decodes to {rleWritten} of its {bytes.Length} bytes";
+                case ChunkKenCode:
+                    var kcResult = KenCode.Decompress(stored, bytes, out var kcWritten);
+                    return kcResult == KenCode.Result.Done ? null : $"decodes to {kcWritten} of its {bytes.Length} bytes ({kcResult})";
+                case ChunkDartLzh:
+                    // Each chunk starts with a clear window. Disk Copy leaves the ring's last 60 bytes from the chunk
+                    // decoded before, which changes nothing on real data; no Disk Copy writes $82 chunks.
+                    var lzhWritten = new DartLzh().Decode(stored, bytes);
+                    return lzhWritten < bytes.Length - 1 ? $"decodes to {lzhWritten} of its {bytes.Length} bytes" : null;
+                default:
+                    return null;
             }
         }
     }

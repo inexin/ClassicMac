@@ -144,7 +144,7 @@ public class HfsTests
         string[] extensions = [".img", ".dsk", ".hfv", ".image", ".dc42"];
         var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
             .Where(f => extensions.Contains(Path.GetExtension(f).ToLowerInvariant()))
-            .Where(f => !CorpusFolders.IsDamageTest(f) && !CorpusFolders.IsUnsupported(f))
+            .Where(f => !CorpusFolders.IsDamageTest(f))
             .Where(f => { try { using var _ = File.OpenRead(f); return true; } catch (IOException) { return false; } }) // skip images in use
             .ToList();
         var files = 0;
