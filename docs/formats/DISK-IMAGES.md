@@ -662,8 +662,8 @@ ClassicMac starts each `$82` chunk with a zero tail ([§13](#13-open-questions))
 The Universal Disk Image Format replaced NDIF from Disk Copy 6.4 and 6.5 (2000–2002) and is Mac OS X's `.dmg`.
 ClassicMac does not read it yet. What follows was verified on **early UDIF images made by Disk Copy 6.5b13** (Mac OS
 9.0 in SheepShaver, patched to run below 9.1): read-only compressed (ADC), read-only and read/write device images of
-an Apple partition map with an 800K HFS volume, each decoded back to the source device exactly. Facts only dmg2img
-(GPL, behavioural reference) gives are marked so.
+an Apple partition map with an 800K HFS volume, plus "entire device" and CD-R master images of the same device, each
+decoded back to the source device exactly. Facts only dmg2img (GPL, behavioural reference) gives are marked so.
 
 Disk Copy 6.5b13 offers UDIF formats only when saving **device images** (types `devi`, `devr`, `devs`, `GImg`,
 `PImg`); its menu lists read/write, read-only, read-only compressed, read-only (entire device), CD-R master and two
@@ -760,7 +760,11 @@ aligns them (0, 512, 32,768) [Verified].
 
 ### 11.4 Checksums
 
-All three are the standard (zlib) CRC-32, **not** NDIF's CRC28 [Verified: 6.5b13]:
+Each checksum field says its algorithm: type 2 is the standard (zlib) CRC-32 (32 bits), **not** NDIF's CRC28; type 4
+is MD5 (128 bits) [Verified: 6.5b13]. The read-only, read-only compressed and read/write images use CRC-32; the
+read-only "entire device" image (`devi`) uses MD5 in every field. Verifying is optional: decoding never depends on it.
+
+With CRC-32:
 
 - each `mish` checksum covers **only the sectors its runs store**: free runs are skipped, so for HFS it is not the CRC
   of the whole partition;
@@ -768,10 +772,22 @@ All three are the standard (zlib) CRC-32, **not** NDIF's CRC28 [Verified: 6.5b13
 - the `koly` master checksum is the CRC-32 of the `mish` checksums' big-endian 4-byte values in `blkx` order
   (−1, 0, 1); the `vers` text repeats it as "CRC32 $…".
 
+With MD5 (the "entire device" image, which stores every sector, free space included, as raw runs):
+
+- each `mish` checksum is the MD5 of its partition's sectors;
+- the `koly` data checksum is the MD5 of the data fork, which is the device;
+- the `koly` master checksum is the MD5 of the partitions' 16-byte MD5s concatenated in `blkx` order (−1, 0, 1); the
+  `vers` text shows it as "MD5 $…".
+
+Its `koly` flags are 3 where the other images have 1; bit 1's meaning is unknown [Verified: 6.5b13; meaning not
+traced].
+
 ### 11.5 Other UDIF files
 
 - **Read/write device images** (`devr`) are the raw device, with no `koly`; the `blkx`, `plst` and other resources
   are in the real resource fork [Verified: 6.5b13]. Read them as raw.
+- **CD-R master images** (`GImg`/`CDr3`, the Toast type and creator) are the raw device too, with no `koly` or
+  `blkx`; the resource fork holds only `vers` [Verified: 6.5b13]. Read them as raw.
 - **Encrypted images** are recognised and refused, not parsed: `encrcdsa` at offset 0 is encryption header version
   2, `cdsaencr` in the last bytes of the file is version 1 [VileFault, behavioural reference; Mac OS X 10.2 and
   later].
@@ -830,4 +846,4 @@ File Exchange 3.0.3 was active, because that extension installs its own, newer `
 - **DART LZH window tail in NDIF.** Disk Copy's driver carries the tail from the last decoded `$82` chunk; ClassicMac
   starts each chunk with zeros. No NDIF file with `$82` chunks has been seen, so the effect is untested.
 - **UDIF:** zlib, bzip2, LZFSE, zero and comment runs, the XML property list and later `koly` versions are known only
-  from dmg2img; "entire device" and CD-R master images from Disk Copy 6.5b13 were not made.
+  from dmg2img. Bit 1 of the `koly` flags (set in "entire device" images) is not understood.

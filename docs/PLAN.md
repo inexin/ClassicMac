@@ -539,12 +539,14 @@ They change what running applications see, not what a file contains.
   (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices (its hidden debug menu, Option at
   launch, has UDIF test items; its conversion fails on OS 9.0); they need OS 9.1–9.2.2, real 2000–2002 `.dmg` files
   or `hdiutil`. (Disk Copy cannot mount images on SheepShaver's shared volume, -8812.)
-- **UDIF (not built; to verify on a real sample first):**
+- **UDIF (not built; real Disk Copy 6.5b13 samples in hand, layout in `docs/formats/DISK-IMAGES.md` §11):**
   - The `koly` trailer is the last 512 bytes.
   - Early images (Disk Copy 6.4/6.5) have XMLOffset/Length 0. Their RsrcForkOffset/Length point to a flattened
     resource fork inside the data fork. Its `blkx` resources hold the `mish` block tables that later images keep
     base64-encoded in the XML plist.
-  - ClassicMac reads that fork's map properly; dmg2img (GPL, reference only) just walks the blocks.
+  - The reader will read that fork's map properly; dmg2img (GPL, reference only) just walks the blocks.
+  - Checksums name their algorithm: type 2 CRC-32, type 4 MD5 ("entire device" images); verifying is optional.
+    Read/write device images (`devr`) and CD-R masters (`GImg`/`CDr3`) are raw devices, read as raw.
   - `mish` runs are 0x28-byte entries from +0xCC. Types: 0 zero, 1 raw, 2 ignore, 0x80000004 ADC (the NDIF codec),
     0x80000005 zlib, 0x80000006 bzip2, 0x80000007 LZFSE, 0x7FFFFFFE comment, 0xFFFFFFFF end.
   - Encrypted images are recognised and refused, not parsed: `encrcdsa` at offset 0 (header v2), or `cdsaencr` at
