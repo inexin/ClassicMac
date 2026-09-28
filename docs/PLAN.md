@@ -520,16 +520,17 @@ They change what running applications see, not what a file contains.
     choice (6.1.2: 32 sectors, 6.3.3: 512 by default) and any compressed image may mix raw chunks. KenCode is the
     System's `dcmp` 3 codec; our KenCode decoder stays separate (already byte-exact).
   - **Version 2 is refused** (decision): no real image has been seen; Disk Copy 6.3.3 reads it as a blank disk, 6.5b13
-    rejects it, only 6.1.2's code is right, and ShrinkWrap 2.1 reads a different layout. The error asks the user to
-    send the image, and an info diagnostic records type/creator, `+$54`, `+$7C` and the map size, which tell the
-    layouts apart.
+    rejects it, and 6.1.2, whose code handles it, still refuses the hand-built ones as -8819 "damaged" (the check is
+    being traced); ShrinkWrap 2.1 reads a different layout. The error asks the user to send the image, and an info
+    diagnostic records type/creator, `+$54`, `+$7C` and the map size, which tell the layouts apart.
   - Chunk type `$F0` (ShrinkWrap 3, per Aaru) and the `+$74`/`+$78` encryption fields are unverified: `$F0` is
     reported by name and reads as zeros; no image with either has been seen.
 - **ShrinkWrap 2.1** writes nothing new: `dImg` is Disk Copy 4.2 byte for byte (junk after the name's Str63 is
   ignored), `hdrv` (volume image, Drive Container) and the self-mounting `APPL`/`sImg`/`iImg` are raw volumes in the
   data fork. All read today (harness run20). Disk Copy 6.0 (1994, `dCpy`)'s own RLE `dImg` variants are not decoded
   (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices (its hidden debug menu, Option at
-  launch, has UDIF test items); they need real 2000–2002 `.dmg` files or `hdiutil`.
+  launch, has UDIF test items; its conversion fails on OS 9.0); they need OS 9.1–9.2.2, real 2000–2002 `.dmg` files
+  or `hdiutil`. (Disk Copy cannot mount images on SheepShaver's shared volume, -8812.)
 - **UDIF (not built; to verify on a real sample first):**
   - The `koly` trailer is the last 512 bytes.
   - Early images (Disk Copy 6.4/6.5) have XMLOffset/Length 0. Their RsrcForkOffset/Length point to a flattened
