@@ -401,8 +401,8 @@ Output: JSON (§10.4) [ClassicMac].
 - UTF-8, no byte-order mark, one object per file, indented two spaces [ClassicMac].
 - Non-ASCII characters are written as themselves, not escaped; `"` and `\` are escaped, CR and LF as `\r` and `\n`,
   other control characters as `\u00XX` [ClassicMac].
-- Lines inside the object end with the platform's line break (CR LF on Windows, LF elsewhere), and the file ends with
-  one LF [ClassicMac].
+- Lines end with LF on every platform, and the file ends with one LF, so outputs and their hashes are the same
+  everywhere [ClassicMac].
 
 ### 10.2 STR#
 

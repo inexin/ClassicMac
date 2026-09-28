@@ -24,7 +24,7 @@
     "resources": 2,
     "decoded": 2,
     "raw": 0,
-    "outputs": "e3c738d670a6edd40b31f86cfc078c7b0017a4cc253ef4edc16e7ffe99fd21f4"
+    "outputs": "b97ccd868b1eadc4ad4b0f6a470a5809165f0913d6053b116682da545a24964a"
   },
   {
     "name": "2.1 Release Notes.rsrc",
@@ -33,7 +33,7 @@
     "resources": 2,
     "decoded": 2,
     "raw": 0,
-    "outputs": "e3c738d670a6edd40b31f86cfc078c7b0017a4cc253ef4edc16e7ffe99fd21f4"
+    "outputs": "b97ccd868b1eadc4ad4b0f6a470a5809165f0913d6053b116682da545a24964a"
   },
   {
     "name": "4.img",
@@ -51,7 +51,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "cb24b4534ef78d0e0e4b53b607c671f4e924fe30355b5895b5dd55d7ec0b016f"
+    "outputs": "8fd5215fdd4c439dbb24e00d7a0fcf7dfaeb027e87042953df8e6175cfebdec3"
   },
   {
     "name": "Apple_Chancery.rsrc",
@@ -60,7 +60,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "0ac6722bb4107e7baa3ba0b28be7b996e691e6b835c0132ad88899d1090a8dc4"
+    "outputs": "a558aea7945cc8e974e7a100aeac93671a858a007b85a05b7745653fc58f5d4b"
   },
   {
     "name": "Arial.rsrc",
@@ -69,7 +69,7 @@
     "resources": 8,
     "decoded": 2,
     "raw": 6,
-    "outputs": "5a5d9bd651c2b902964cda91613e6196a310e5a2bd3d0a031892f6e4928d8850"
+    "outputs": "f76ccea3f0d30f2ba1c00d5d0c02e621dd4a2e735f1f8f0921312d521ff00ea7"
   },
   {
     "name": "Arial_Black.rsrc",
@@ -78,7 +78,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "43561ade19494d7bffca25e70cc7c8d6d44ae3be812227f83b85a2441da0705e"
+    "outputs": "eafd00ff6056d2224661e63e5e3aea778c322e2651cfceb2045bdb7c9aa85f39"
   },
   {
     "name": "CHARACTER EDITOR RESOURCES.RSF",
@@ -87,7 +87,7 @@
     "resources": 76,
     "decoded": 26,
     "raw": 50,
-    "outputs": "3aa82acce9b384d34cd6432d40399abbf5ddef3f608301404196969cb78bad7b"
+    "outputs": "420a4616f9a178ac0bd899e6ef17cb2dad4cac6b3619d62436312811a0e6981a"
   },
   {
     "name": "Capitals.rsrc",
@@ -96,7 +96,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "987c910c6730d0b4f65b4d024d3b1935a6ca5efefde7247ebc88bb36d22fa45a"
+    "outputs": "baa9e70926fb8c3a67903541ff23f95d677c282ce66518f5d7052459c109030b"
   },
   {
     "name": "Charcoal.rsrc",
@@ -105,7 +105,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "f27f33333cb0fa3509fd4ecfbf14c7a0f19a3240228a46e2f15a8517b0ec9002"
+    "outputs": "306e0fb01964c19aeedbfd09ea9f0d776ddfd411f33309159fc640b25f6b624b"
   },
   {
     "name": "Chicago.rsrc",
@@ -114,7 +114,7 @@
     "resources": 6,
     "decoded": 2,
     "raw": 4,
-    "outputs": "aeed5a0739e3776c8a82dae9e5e579557cccb351f2cbbb00a5575088a4f4ff7e"
+    "outputs": "44a04c6eed69fb4d261d6e48bece4849302bb0da6222ce82aa06ee43ad991bce"
   },
   {
     "name": "Comic_Sans_MS.rsrc",
@@ -123,7 +123,7 @@
     "resources": 7,
     "decoded": 2,
     "raw": 5,
-    "outputs": "daf3f44981979c5e341884bedb5539d937aa45788741ac93ef3d6477b97aa827"
+    "outputs": "47187232149859672ce5a160a95d855cc1bd258d6614e59a073124dea9330a7e"
   },
   {
     "name": "Courier.rsrc",
@@ -132,7 +132,7 @@
     "resources": 12,
     "decoded": 2,
     "raw": 10,
-    "outputs": "0c8ecc80fb80748c5c749eb5d62dc6e32e8fb3fd17e0ed70d34d34cebc240b22"
+    "outputs": "acbe97211ecd2751f2a5b3d9c542e9c13082adc5a09f4c24bf28f12cef7f06a7"
   },
   {
     "name": "Courier_New.rsrc",
@@ -141,7 +141,7 @@
     "resources": 8,
     "decoded": 2,
     "raw": 6,
-    "outputs": "32538373a15fad76e12d1eef068a2835a82b87d71933106910136833713d79c0"
+    "outputs": "0355b04701aecdd6ed3ec1d394bc1eda9be2c37fb2c45708145964cc0d1226a0"
   },
   {
     "name": "Custom Names.rsf",
@@ -150,7 +150,7 @@
     "resources": 36,
     "decoded": 36,
     "raw": 0,
-    "outputs": "9c6e4729c5ccf22b540461073c8434f7ce58791416f48f817adc747256a822d1"
+    "outputs": "6a5cd74fa282fdc24abcd671412127f246a83ef59733266ebba5b0d898c9efd6"
   },
   {
     "name": "DART\u00AA 1.5.3.image",
@@ -159,7 +159,7 @@
     "resources": 225,
     "decoded": 115,
     "raw": 110,
-    "outputs": "93505cc0897b4fb18eecd2680669c45420df31db6f080d34b20ef177252f5e3f"
+    "outputs": "b5665bbc7642b59400f871c4dcc090e1078fc15743f4e8af2f63b8daf7218978"
   },
   {
     "name": "DATA SPELL.RSF",
@@ -168,7 +168,7 @@
     "resources": 7,
     "decoded": 7,
     "raw": 0,
-    "outputs": "a52e30c2fd98983f4fef97510cccf09fb1fe5870402e59700122c1869955cce9"
+    "outputs": "0f8823b0745d1b9afc3e0db3e4d2a7fb7bfb475d423e75d3d946a437f913bda6"
   },
   {
     "name": "DC612",
@@ -177,7 +177,7 @@
     "resources": 289,
     "decoded": 116,
     "raw": 173,
-    "outputs": "26a227a8024ef009b8bc0bfbda39c3b2b43d084bc4c1a9c8dc97a0c2d78a4cb5"
+    "outputs": "c33bc155df62a1cbafb806670f056f112077d69b3be2e9206e527f6d0d763553"
   },
   {
     "name": "Data Caste.rsf",
@@ -186,7 +186,7 @@
     "resources": 1,
     "decoded": 1,
     "raw": 0,
-    "outputs": "820b7224d9fd56d9b55c95f24d45edad5149bc8867796225e8b6ab21638a8763"
+    "outputs": "b4cdbb58029755caa2bc51b6ffcacffc74f07e3f2a20c96105e5f8306c1e4fbf"
   },
   {
     "name": "Data ID.rsf",
@@ -195,7 +195,7 @@
     "resources": 13,
     "decoded": 13,
     "raw": 0,
-    "outputs": "3a1cb13aee76ddceb68a87c3cca4c67c0ed0a24569e3f07f0dca01ae73c1507d"
+    "outputs": "a3cc48adc78700afddfe51e00509d5e99a683809f3c5935eb03b477fa71ef706"
   },
   {
     "name": "Data Race.rsf",
@@ -204,7 +204,7 @@
     "resources": 1,
     "decoded": 1,
     "raw": 0,
-    "outputs": "3b14adf23b4dee9e21c3626c580eec93eb95b51cd7b4a75d98fdec66fcfe1292"
+    "outputs": "feb9e4a036716b0cc47414150cc9a642c23aa08463fa01efcd2fe3f787c49a26"
   },
   {
     "name": "Data S.rsf",
@@ -213,7 +213,7 @@
     "resources": 1,
     "decoded": 1,
     "raw": 0,
-    "outputs": "7adf935507d552cfd471e1e9e93968feed111670c259cf92e03c7517db8cf5bf"
+    "outputs": "8459bc969abc1458ffebece5f018d616e5d2f644e65cc8f0b76633120ff67fff"
   },
   {
     "name": "Data SD2.rsf",
@@ -222,7 +222,7 @@
     "resources": 2,
     "decoded": 1,
     "raw": 1,
-    "outputs": "373a48c0249b83e02c040553c76c5146a639667a6fce7c7725aca5e060e0de78"
+    "outputs": "8e1cadcb668e7830f935085a7faff43f347b58a193eac67924ac54d2e9765618"
   },
   {
     "name": "Data Spell.rsf",
@@ -231,7 +231,7 @@
     "resources": 7,
     "decoded": 7,
     "raw": 0,
-    "outputs": "f41a5c9dee9a15fededa75adee1b247bf8ac223e79ed383381f91973d3795230"
+    "outputs": "e318e8c1465636af7aef8fc5de2fb36188eafad12eb14b7b345b29e5ca96d98a"
   },
   {
     "name": "Data Spell.rsf",
@@ -240,7 +240,7 @@
     "resources": 7,
     "decoded": 7,
     "raw": 0,
-    "outputs": "e3b81cce412fe57c18d092775503e92b5be3b19023759bcadf64b011831e6ff8"
+    "outputs": "47f75ae1bb49e882476a0657277db4901d1418f7e42ee18679b2eb8cc9a00e12"
   },
   {
     "name": "Data Spell.rsf",
@@ -249,7 +249,7 @@
     "resources": 7,
     "decoded": 7,
     "raw": 0,
-    "outputs": "f41a5c9dee9a15fededa75adee1b247bf8ac223e79ed383381f91973d3795230"
+    "outputs": "e318e8c1465636af7aef8fc5de2fb36188eafad12eb14b7b345b29e5ca96d98a"
   },
   {
     "name": "Data Spell.rsf",
@@ -258,7 +258,7 @@
     "resources": 7,
     "decoded": 7,
     "raw": 0,
-    "outputs": "d82d9bb7ee2e376e0ebdfe29b3292b50b8cead3c3b42a20cd5a0abb3b3dc5684"
+    "outputs": "90d67c9ca0edf8b319840038e365a34ac4eb8add4db911aa2649dbc6bafb982f"
   },
   {
     "name": "Disk Copy",
@@ -267,7 +267,7 @@
     "resources": 289,
     "decoded": 116,
     "raw": 173,
-    "outputs": "a8d56f26eee24052f56623f19ffbe45ece6b5d42dcc93b1d5c2585efbe8b518d"
+    "outputs": "26931c9971d65634c9980d2fde9c1913d40dd23ab2b0c6e980b86e3d70e4b8c8"
   },
   {
     "name": "Disk Copy 6.1 Manual",
@@ -276,7 +276,7 @@
     "resources": 1,
     "decoded": 1,
     "raw": 0,
-    "outputs": "74c526faba878ac0c69cac494acac4f5cea7290b05f2fe1d33ccae20aad2d353"
+    "outputs": "fee749c67107151f9027441a78eb757543d50943013f8f54add44c6467cfa69d"
   },
   {
     "name": "Disk Copy 6.1 Manual.rsrc",
@@ -285,7 +285,7 @@
     "resources": 1,
     "decoded": 1,
     "raw": 0,
-    "outputs": "74c526faba878ac0c69cac494acac4f5cea7290b05f2fe1d33ccae20aad2d353"
+    "outputs": "fee749c67107151f9027441a78eb757543d50943013f8f54add44c6467cfa69d"
   },
   {
     "name": "Disk Copy 6.1 Quick Reference",
@@ -294,7 +294,7 @@
     "resources": 3,
     "decoded": 3,
     "raw": 0,
-    "outputs": "7e4c478c0908c9e8b229d5e6c37bca5971c2710a892e9cb0e001fcb61aa108ee"
+    "outputs": "4ab4ae68aa66244d41cf0d5c77f7b5fb991532fa07284d3c8098ffeb6e2adc0a"
   },
   {
     "name": "Disk Copy 6.1 Quick Reference.rsrc",
@@ -303,7 +303,7 @@
     "resources": 3,
     "decoded": 3,
     "raw": 0,
-    "outputs": "7e4c478c0908c9e8b229d5e6c37bca5971c2710a892e9cb0e001fcb61aa108ee"
+    "outputs": "4ab4ae68aa66244d41cf0d5c77f7b5fb991532fa07284d3c8098ffeb6e2adc0a"
   },
   {
     "name": "Disk Copy 6.1.2 Quick Reference",
@@ -312,7 +312,7 @@
     "resources": 4,
     "decoded": 4,
     "raw": 0,
-    "outputs": "9c46da5a1ef35b5c89416aeb212b728e6de98a66ec688e25887e211ed9353d0b"
+    "outputs": "04de4662bfb2d5aeb33b1f35a5a126d79561503c71ac89125b68c32446fed9aa"
   },
   {
     "name": "Disk Copy 6.1.2.img",
@@ -321,7 +321,7 @@
     "resources": 293,
     "decoded": 120,
     "raw": 173,
-    "outputs": "430a2f96c037effbd8042d2ef61d3fa0df84176177c4a589984fb6dc596414fb"
+    "outputs": "48d50b7d753cbf9f7658bc70311a465e42b5b260c872bd83ef91babe34fca840"
   },
   {
     "name": "Disk Copy 6.1.2.img.rsrc",
@@ -330,7 +330,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "592db0151f736131ac422f957f123535cb0137ba892e759be12d25eeb7df3226"
+    "outputs": "bff9dd2e582e55fcaf979a22e608fa097ec7d0df9edf9451762a78746fb7e6fb"
   },
   {
     "name": "Disk Copy 6.5b13",
@@ -339,7 +339,7 @@
     "resources": 387,
     "decoded": 139,
     "raw": 248,
-    "outputs": "b579dc13cef5310ce5709d097e071fd462c3e141b57eee126125d8c42271e787"
+    "outputs": "6997b64a58d5c137286e20379c7541696518e1484f0e02faf93ef2e64049c3d7"
   },
   {
     "name": "Disk Copy 6.5b13.rsrc",
@@ -348,7 +348,7 @@
     "resources": 387,
     "decoded": 139,
     "raw": 248,
-    "outputs": "b579dc13cef5310ce5709d097e071fd462c3e141b57eee126125d8c42271e787"
+    "outputs": "6997b64a58d5c137286e20379c7541696518e1484f0e02faf93ef2e64049c3d7"
   },
   {
     "name": "Disk Copy.rsrc",
@@ -357,7 +357,7 @@
     "resources": 289,
     "decoded": 116,
     "raw": 173,
-    "outputs": "a8d56f26eee24052f56623f19ffbe45ece6b5d42dcc93b1d5c2585efbe8b518d"
+    "outputs": "26931c9971d65634c9980d2fde9c1913d40dd23ab2b0c6e980b86e3d70e4b8c8"
   },
   {
     "name": "DiskCopy 6.0.rsrc",
@@ -366,7 +366,7 @@
     "resources": 78,
     "decoded": 26,
     "raw": 52,
-    "outputs": "1c821a86b32ec2c4f2212598c3c63a3a46f94e8adbb9dbde10a756cc684d1706"
+    "outputs": "3fca810736e53b4db9be195b98440e3d3b6b45fe98dd9b96a447e85cf2a44c57"
   },
   {
     "name": "F800 KC.img",
@@ -438,7 +438,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "58d5bd9f4b36453d60394cdbaf1fbaa5a74badeaa5dbd8511f4830e23f64b33b"
+    "outputs": "27eeaae41b9e9caa92de90cb6a918eafe749c212a30f2b00b5373c8a4725f078"
   },
   {
     "name": "Geneva.rsrc",
@@ -447,7 +447,7 @@
     "resources": 13,
     "decoded": 2,
     "raw": 11,
-    "outputs": "b5a93f46e4a00f251374cc39872ef2c46af7439e674aaf7d9bc4359fb11945ca"
+    "outputs": "7b97cd80d4115bbcf09fced77112db0ed9140e1e1151bf6a440c859df39ece91"
   },
   {
     "name": "Georgia.rsrc",
@@ -456,7 +456,7 @@
     "resources": 8,
     "decoded": 2,
     "raw": 6,
-    "outputs": "6b087ecaae54eaadea271fa82695abf7c70eecc55453f3a575acba0d566e9232"
+    "outputs": "0b11244b1cba551dc838b8dbcc300f02ec5a4b99159af470082ff21d16c6f27c"
   },
   {
     "name": "HISTORY OF THE GEYSER.RSF",
@@ -465,7 +465,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "1954ed3d82d8044a9bb25bb5554d7e0e71908d76acaff96b04d04e98c17c0d19"
+    "outputs": "70371901bcef99f91eadfba47e19c23361a7f6a7555642611711b59c95e6a61b"
   },
   {
     "name": "Helvetica.rsrc",
@@ -474,7 +474,7 @@
     "resources": 12,
     "decoded": 2,
     "raw": 10,
-    "outputs": "f33bf495d172608fa3a8ee37e21a50aa5f2469a4dad1d7f33e52ea356bcda70d"
+    "outputs": "e7575e0f833cf38594cf5dc10e29b3e12c3615bfa99a71c48911e15ef1d718ea"
   },
   {
     "name": "Hoefler_Text.rsrc",
@@ -483,7 +483,7 @@
     "resources": 10,
     "decoded": 2,
     "raw": 8,
-    "outputs": "39e54c4b985b64e285ba69ab9c283fe42b8c147c3d0b14ca1a240422b2479bf9"
+    "outputs": "1a94c4f346b2a47738d89748cb5c9d1fba38afb5c22fea376dd9eedff2f4137d"
   },
   {
     "name": "Icon_.rsrc",
@@ -501,7 +501,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "7f5d0511b8eabee33a7df6f3b27ad178332c21f77b561a4551d6118c2db4255c"
+    "outputs": "98d10b53b48aa79c4f67e7e241369225937e9cce28c7e8bdbb65118ca84a439a"
   },
   {
     "name": "Licensing Info",
@@ -510,7 +510,7 @@
     "resources": 2,
     "decoded": 2,
     "raw": 0,
-    "outputs": "9e2f18ad72ceb2d6044763eac283d5bfaa8b49bdc304f06e133d91698f0788e9"
+    "outputs": "07e845f2d1a2a6ddb74b10c29a58ec7f7176a4a9938c0bfc379785b88ff63351"
   },
   {
     "name": "Licensing Info.rsrc",
@@ -519,7 +519,7 @@
     "resources": 2,
     "decoded": 2,
     "raw": 0,
-    "outputs": "9e2f18ad72ceb2d6044763eac283d5bfaa8b49bdc304f06e133d91698f0788e9"
+    "outputs": "07e845f2d1a2a6ddb74b10c29a58ec7f7176a4a9938c0bfc379785b88ff63351"
   },
   {
     "name": "MAGISTRATES TALE.RSF",
@@ -528,7 +528,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "0e734bdcb453170abcf39ef9a2f706d295ee1d94329535c9c69f116ed6fd649c"
+    "outputs": "c604b37e6be6a12a662de79b28fcac1a381189da47bbbc081864e9d9cb79cb40"
   },
   {
     "name": "Monaco.rsrc",
@@ -537,7 +537,7 @@
     "resources": 7,
     "decoded": 2,
     "raw": 5,
-    "outputs": "7199e431bb4e7f8820a7f41e74b2dd682697945be30b99e7ee3c10f7f07af439"
+    "outputs": "5f5eebcec09d74cd81ec07a0aa784615d2c0dcd32e4f6efb804df50b0e054225"
   },
   {
     "name": "New_York.rsrc",
@@ -546,7 +546,7 @@
     "resources": 12,
     "decoded": 2,
     "raw": 10,
-    "outputs": "a655c7bbc9c1d8e3155e66f97ed48a7ad4e34dfe0c1aa65632e64eaa80d87042"
+    "outputs": "09aafada09a04946f600803f6799a9902404588315f45731553d0622f811e293"
   },
   {
     "name": "Palatino.rsrc",
@@ -555,7 +555,7 @@
     "resources": 13,
     "decoded": 2,
     "raw": 11,
-    "outputs": "c885761c17b8970cd64a6f45dfdd55311ce49c691e0e91785afd479fe31e4a78"
+    "outputs": "488ebadd476d8a32ffc731e7102474013caf5f70569fa2fab0e7cb8a88425c3a"
   },
   {
     "name": "Portraits.rsf",
@@ -609,7 +609,7 @@
     "resources": 9,
     "decoded": 7,
     "raw": 2,
-    "outputs": "e0cb6965088bc03510d10065c99867cbd697a1078305d219a7da073249606e03"
+    "outputs": "57a3ea093c9fef9683e5ffebbd95a9d37b015d3e9879adc74ae616cf4f020670"
   },
   {
     "name": "Register.rsrc",
@@ -618,7 +618,7 @@
     "resources": 79,
     "decoded": 45,
     "raw": 34,
-    "outputs": "2d582f3c79b336baa529c719a23cdd3b2c50280e284829570f63464c0bede148"
+    "outputs": "858642090dde669a10936ab6b42412760239bcff18862551e6696ec01ae2d51f"
   },
   {
     "name": "Res File",
@@ -627,7 +627,7 @@
     "resources": 3,
     "decoded": 3,
     "raw": 0,
-    "outputs": "444a8eb804c1615a5c1057db182927ec32b2fe43cfbcc1d6d1dfc1c17037c8ee"
+    "outputs": "4eea5aed03ce9e80f1a69e571bd12f6bc5c13bee0fe4ef50dd2d24fe4245563e"
   },
   {
     "name": "Res File",
@@ -681,7 +681,7 @@
     "resources": 2,
     "decoded": 1,
     "raw": 1,
-    "outputs": "c4849c68abb75ce45eaea08aa960d60e27e4461370fefc0b2c246af77d10eeb1"
+    "outputs": "ae8b3eeaff77533e6cf968ccee7a9073fe23048a4a64e9f49e3eddf02ac57a81"
   },
   {
     "name": "S5M RO seg 3of4",
@@ -690,7 +690,7 @@
     "resources": 2,
     "decoded": 1,
     "raw": 1,
-    "outputs": "672f23b668eb2e584ae6e0a89c8258da1dd06285f032981480aa0ec1911d1242"
+    "outputs": "aa0fe2346e9e7e6cd19d4aae3c83de1247e64ca521dc5fb39be89e7dde9bc439"
   },
   {
     "name": "S5M RO seg 4of4",
@@ -699,7 +699,7 @@
     "resources": 2,
     "decoded": 1,
     "raw": 1,
-    "outputs": "9ca362634977f2ef1b373d4d10fccf62033761b9838676bc94f02e73b3a999be"
+    "outputs": "234581df170b4905285cb7f8fdb87d2add6a140aee519d184c7054dbc8a0e977"
   },
   {
     "name": "S5M RO.img",
@@ -762,7 +762,7 @@
     "resources": 188,
     "decoded": 180,
     "raw": 8,
-    "outputs": "5a7cc87bc9b26aa96f75d4fd707a69f3824210d143b9b60cd823900665d25a06"
+    "outputs": "d00c1294f466fe436f1908d7dc34ba888fb15eaa54fc694f7f6077318ae22312"
   },
   {
     "name": "SCENARIO.RSF",
@@ -771,7 +771,7 @@
     "resources": 329,
     "decoded": 317,
     "raw": 12,
-    "outputs": "77a529650fc3642ffb8574b3551336e87d15ea62a99e20dc5eca576c8ad6436a"
+    "outputs": "e1412aaf4e761b2965f3f089f303cca6f3f20d09328e2ef39ef84139721ad509"
   },
   {
     "name": "SIR MAXWELLS TASK.RSF",
@@ -780,7 +780,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "5ce21cd2bd222a6cbef107c5b597412602b2d4a406d01cd6ea687bc5d6709a8f"
+    "outputs": "2524b4d56b3422debb38def75c5b6e604b68e551b559fc93d692664925f65aaa"
   },
   {
     "name": "SRC5M.dsk",
@@ -825,7 +825,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "bd9af6e4d56b2a930785be7360034ca5be463de850dfc5c346b42dff335b635d"
+    "outputs": "6a564e43907ecd6143b5c627719a0bd7bb5700720f07718b4d2a01387804d147"
   },
   {
     "name": "Scenario Names.rsf",
@@ -834,7 +834,7 @@
     "resources": 8,
     "decoded": 8,
     "raw": 0,
-    "outputs": "26b8c69d2df53af4087766ec9363bcb1a44a2b64ee6613a6e85e80505c843719"
+    "outputs": "bbab64f48c510af43657a421e4ecc67d58ec8a5c20bc38265aa874af04910ccf"
   },
   {
     "name": "Scenario.rsf",
@@ -843,7 +843,7 @@
     "resources": 57,
     "decoded": 50,
     "raw": 7,
-    "outputs": "5b7b3b1d1cec72e978aa20a0bd495aa36141f0dbe284e1804e8300a4be45b644"
+    "outputs": "7bbdcc66473f45e1951c578640227dd0e0d90ba87d41affade5a27c9ae0fc989"
   },
   {
     "name": "Scenario.rsf",
@@ -852,7 +852,7 @@
     "resources": 214,
     "decoded": 204,
     "raw": 10,
-    "outputs": "428bd8904013ee288122812cb93887e4b04b3c5992b94df91abced74250d92da"
+    "outputs": "b3ebc66bb20fd3c8e6c00839baed1661978541cb6835910d6843416f55a313ba"
   },
   {
     "name": "Scenario.rsf",
@@ -861,7 +861,7 @@
     "resources": 220,
     "decoded": 206,
     "raw": 14,
-    "outputs": "7727ba949ae21e592823240a8c7f6f8a7164d16b08f662090090f75c30884dbd"
+    "outputs": "460779152d34b9f8a0406764a5f35da5c413a4fb3d4e96c8206869860fa74c4c"
   },
   {
     "name": "Scenario.rsf",
@@ -870,7 +870,7 @@
     "resources": 52,
     "decoded": 46,
     "raw": 6,
-    "outputs": "e4f94a91515553ddbb89b201c90e08c1b61322f6a63c72632742c45c24147f22"
+    "outputs": "6c13a25052df693186977b2b9c3a257dcac5081b5b5841a14c16e6b0781b2cc2"
   },
   {
     "name": "Scenario.rsf",
@@ -879,7 +879,7 @@
     "resources": 560,
     "decoded": 545,
     "raw": 15,
-    "outputs": "1ca80cdd0e0332df1d1ee7e01de57ba70600673f4c92bc6b7c92ab1176701545"
+    "outputs": "acc9d05229d2dc8d7e224442282d43acef61aa871c0f953a052cab56567af64f"
   },
   {
     "name": "Scenario.rsf",
@@ -888,7 +888,7 @@
     "resources": 21,
     "decoded": 16,
     "raw": 5,
-    "outputs": "96036f4856ae40236a9b3d78268f6b54a58b736371e57efedb86937daa8e413a"
+    "outputs": "4f2d1fa34749e187ac729c885d28849e59ee240fc7be2b823d997c7bf594d452"
   },
   {
     "name": "Scenario.rsf",
@@ -897,7 +897,7 @@
     "resources": 137,
     "decoded": 124,
     "raw": 13,
-    "outputs": "19d7b57a40601a39253ede27a09ab61e1f1b7f3252d24d41c8bb73c3fef62d85"
+    "outputs": "315d9fb671c6dca792c9a6ad600e0cf22a2c1a67e2d3b39914e1fe589cdc7889"
   },
   {
     "name": "Scenario.rsf",
@@ -906,7 +906,7 @@
     "resources": 487,
     "decoded": 470,
     "raw": 17,
-    "outputs": "1e2b5d3e64af1507e3a18b420e8f66cad844e5b47307cecb354b4241640a036a"
+    "outputs": "812d9918817153cf44328bf4a0562f96b79bed86a065112df93f023c559110d0"
   },
   {
     "name": "Scenario.rsf",
@@ -915,7 +915,7 @@
     "resources": 140,
     "decoded": 129,
     "raw": 11,
-    "outputs": "fc56858601d56864c717b2d1415efd25b37830b6c4fb120300e7aa3bed99f948"
+    "outputs": "804d28be9308f868a10304b48cd161e3727094d56bc7951589b742cb53aae271"
   },
   {
     "name": "Scenario.rsf",
@@ -924,7 +924,7 @@
     "resources": 73,
     "decoded": 64,
     "raw": 9,
-    "outputs": "df25e1fdb1dda429540de6714e358804cdeb92f170a64b139d6a31441a423402"
+    "outputs": "f3d0e5c566ef37dea0c2b7e9a058eca58a061ffd1c87aea9986fa73f7e80827f"
   },
   {
     "name": "ShrinkWrap\u2122",
@@ -933,7 +933,7 @@
     "resources": 143,
     "decoded": 43,
     "raw": 100,
-    "outputs": "4b4dbd49e581d21fe51d9dd14add63be7d10928d67f49a69c9e9e81114414506"
+    "outputs": "792f10f38a92d2266c9112ec7c3b3af829ead1157992c282f6ae79a11c5c3945"
   },
   {
     "name": "ShrinkWrap\u2122 Read Me",
@@ -942,7 +942,7 @@
     "resources": 4,
     "decoded": 3,
     "raw": 1,
-    "outputs": "989e9129ad0cb79907c8239e8ae082094cf30039fe8546992757e197ab2b8975"
+    "outputs": "487ec69da8b7c08012b5e2f4e488a16da51d88dcc18a1a37a305533d770310ba"
   },
   {
     "name": "ShrinkWrap\u2122 Read Me.rsrc",
@@ -951,7 +951,7 @@
     "resources": 4,
     "decoded": 3,
     "raw": 1,
-    "outputs": "989e9129ad0cb79907c8239e8ae082094cf30039fe8546992757e197ab2b8975"
+    "outputs": "487ec69da8b7c08012b5e2f4e488a16da51d88dcc18a1a37a305533d770310ba"
   },
   {
     "name": "ShrinkWrap\u2122.rsrc",
@@ -960,7 +960,7 @@
     "resources": 143,
     "decoded": 43,
     "raw": 100,
-    "outputs": "4b4dbd49e581d21fe51d9dd14add63be7d10928d67f49a69c9e9e81114414506"
+    "outputs": "792f10f38a92d2266c9112ec7c3b3af829ead1157992c282f6ae79a11c5c3945"
   },
   {
     "name": "Skia.rsrc",
@@ -969,7 +969,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "b5454a50eabf644e3dd2d3dbdcdf1ac673da8f59aff9c83ad39a999717dac43b"
+    "outputs": "12e23e382c40a696a556398941377b6b49855a82ffdb67f3623c37041dac7901"
   },
   {
     "name": "SndHarness",
@@ -1005,7 +1005,7 @@
     "resources": 11,
     "decoded": 2,
     "raw": 9,
-    "outputs": "6fbdd60fd345374cf2c1b0267e37d808221572d8e6acdba735595ef0f485c119"
+    "outputs": "8ce7339982a74cab01d9995b33b7fc83c865c2a19f0a5816888cca6839c53270"
   },
   {
     "name": "System.rsrc",
@@ -1014,7 +1014,7 @@
     "resources": 2188,
     "decoded": 729,
     "raw": 1459,
-    "outputs": "12c73f1334ae32d05977eddc320b2f7b233550e6e45a06de95c74b23f86b1c98"
+    "outputs": "12600b51c6fa0fd0dbe5b79bfc701e66ad422af05b4bed843628f3b305de51e0"
   },
   {
     "name": "TALE OF MITHRIL VAULT.RSF",
@@ -1023,7 +1023,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "4e2284e525b607f96e5cca4ebac113b30c522bc47a246eb6b859ef07e375374c"
+    "outputs": "c8f7e0f138bb97c602b496b114e6137042cdcaea5e135b8ebed9062f0f59ec76"
   },
   {
     "name": "Tacticals.rsf",
@@ -1041,7 +1041,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "279f411103b1c2d25dc41d687f37a6ff9effa307abc1e2ca87d18e5931faaf4f"
+    "outputs": "45d6b692e033f57275767ca0d0baefbd259bb1d045669723c3f621b5ca07a070"
   },
   {
     "name": "Textile.rsrc",
@@ -1050,7 +1050,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "62058447412258f7d6fda474a096081cc438b660ea78968d738fca49ef8fddfb"
+    "outputs": "9109d69bd23fdff2dcbec4dc77a6956a721540018121fcefd245806fe0836783"
   },
   {
     "name": "The Family Jewels.rsf",
@@ -1059,7 +1059,7 @@
     "resources": 1676,
     "decoded": 1392,
     "raw": 284,
-    "outputs": "3ded9ed4382900e7c2cfc52447e7fe02280409d4ca32c1d479e7bb44d33f2fd3"
+    "outputs": "699e1f36568946d6cf7ea2fca7e4256850daacdbe6a3fc885c1bb796bc764a03"
   },
   {
     "name": "Theldrow Font.rsrc.rsf",
@@ -1077,7 +1077,7 @@
     "resources": 15,
     "decoded": 2,
     "raw": 13,
-    "outputs": "f76b93becb581be8ff9699fa8ff38dab591ec37ef126af2a6abbce82c617004e"
+    "outputs": "ae43d8c1c6a43e2ad1e96ba552424cd43b1786a71083ddcd4df93ff34bb628cc"
   },
   {
     "name": "Times_New_Roman.rsrc",
@@ -1086,7 +1086,7 @@
     "resources": 8,
     "decoded": 2,
     "raw": 6,
-    "outputs": "83c8fed7cdc8c886e2a55c0d25d4544513ad99d8cd55b3a69439fa4e6e33dcf7"
+    "outputs": "0952e0b7df8e4fb6934308c12cbf36dc7f682e2a86d927d1b83903f18072db20"
   },
   {
     "name": "Trebuchet_MS.rsrc",
@@ -1095,7 +1095,7 @@
     "resources": 8,
     "decoded": 2,
     "raw": 6,
-    "outputs": "ac18f1f315304ba59143bc73e98d87e274149c1f4f34a966084e70c0f18b4bcf"
+    "outputs": "85f52262fd1551d9f7db509c5ae353a34eb175856d74a818e45a1fbf8b662a46"
   },
   {
     "name": "Verdana.rsrc",
@@ -1104,7 +1104,7 @@
     "resources": 8,
     "decoded": 2,
     "raw": 6,
-    "outputs": "9732b62856189984dca6cfcaf39ad4946ce728eda81e51698a150d088be43aa4"
+    "outputs": "0b68de0537516f1aa95e86089eb671dddd2fccf1ed29733de8b72bb7272b5b0a"
   },
   {
     "name": "WESTONS DIARY.RSF",
@@ -1113,7 +1113,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "915aa12b16a0a2005f7996d79749d5d2e2a95ef988c36f33347c5eb68a774139"
+    "outputs": "8228266e5a067d40f7528bdbe89804ecc6688a6826c95257ddd2e15e17d19d4b"
   },
   {
     "name": "Webdings.rsrc",
@@ -1122,7 +1122,7 @@
     "resources": 5,
     "decoded": 2,
     "raw": 3,
-    "outputs": "630bf7da359a70afc75a2b7fa3ffa6edb9160a4be80b0a4695949edce0fb0d27"
+    "outputs": "90997d80d07919036110d8d6caede13830c27ab4c05e1a0f37e62e02a50d63e5"
   },
   {
     "name": "a.bin",
@@ -1203,7 +1203,7 @@
     "resources": 293,
     "decoded": 120,
     "raw": 173,
-    "outputs": "256a867cb5720ff9604adef6114d5b34856c7642f862c33d383dea07e587ed6e"
+    "outputs": "843c1f8a84fcc9f92f5950f69a757e737c6762a57bc66991ad36894cd35d7104"
   },
   {
     "name": "dc612.rsrc",
@@ -1212,7 +1212,7 @@
     "resources": 3,
     "decoded": 2,
     "raw": 1,
-    "outputs": "592db0151f736131ac422f957f123535cb0137ba892e759be12d25eeb7df3226"
+    "outputs": "bff9dd2e582e55fcaf979a22e608fa097ec7d0df9edf9451762a78746fb7e6fb"
   },
   {
     "name": "dc65.rsrc",
@@ -1221,7 +1221,7 @@
     "resources": 387,
     "decoded": 139,
     "raw": 248,
-    "outputs": "b579dc13cef5310ce5709d097e071fd462c3e141b57eee126125d8c42271e787"
+    "outputs": "6997b64a58d5c137286e20379c7541696518e1484f0e02faf93ef2e64049c3d7"
   },
   {
     "name": "dcf.image",
@@ -1293,7 +1293,16 @@
     "resources": 107,
     "decoded": 86,
     "raw": 21,
-    "outputs": "5f0731cd196aa0f9b7f06285700cf8a8341a7038d2731c57578194016f1529ed"
+    "outputs": "7b03242dd74e4c7648cc2bf1350adf81aa6c5fdecd4b2d024748d797d127d128"
+  },
+  {
+    "name": "scratch.dsk",
+    "sha256": "a2e3aaf9885cc05bda8e593433e8cf9a3a56e2f2c9fb21c47fd7577bfc29a1ee",
+    "forks": 1,
+    "resources": 1,
+    "decoded": 1,
+    "raw": 0,
+    "outputs": "f87b4aa099b5942879d6bf8a5c5ccc220267400719373f5fb8a7f2ed146f9742"
   },
   {
     "name": "size.r.rsrc.bin",
@@ -1365,7 +1374,7 @@
     "resources": 1,
     "decoded": 1,
     "raw": 0,
-    "outputs": "ade124b5edc775a2b274777fb7832ba02bf2d31a741a4400baaf8ae6c944b775"
+    "outputs": "422bdd1511d938b0d65ed520c113456fd97895cd880811f31c452fa19910c312"
   },
   {
     "name": "uro",

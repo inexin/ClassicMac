@@ -99,7 +99,7 @@ namespace ClassicMac.Resources.Cli
 
     internal sealed record ListResource(string Type, short Id, string? Name, int Size, string Attributes);
 
-    [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSourceGenerationOptions(WriteIndented = true, NewLine = "\n", PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
     [JsonSerializable(typeof(ListOutput))]
     internal sealed partial class CliJsonContext : JsonSerializerContext
     {

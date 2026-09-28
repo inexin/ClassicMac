@@ -77,7 +77,8 @@ namespace ClassicMac.Resources.Export
     public sealed record ManifestDiagnostic(string Severity, string Code, string Message);
 
     /// <summary>Source-generated JSON for the manifest (trimming- and AOT-safe).</summary>
-    [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    // LF on every platform, so manifests and their hashes are the same everywhere.
+    [JsonSourceGenerationOptions(WriteIndented = true, NewLine = "\n", PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never)]
     [JsonSerializable(typeof(ExportManifest))]
     public sealed partial class ExportManifestJson : JsonSerializerContext

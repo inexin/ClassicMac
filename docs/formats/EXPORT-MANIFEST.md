@@ -286,7 +286,8 @@ What ClassicMac writes (a reader must accept any valid JSON with the same conten
 - Fields whose value is null are written as `null`, never left out.
 - Characters outside ASCII, and a few ASCII ones (`<`, `>`, `&`, `'`, `+`, `` ` ``), are written as `\uXXXX` escapes
   (the default of `System.Text.Json`).
-- Line breaks are the host's newline (CRLF on Windows, LF elsewhere), and there is no final line break.
+- Line breaks are LF on every platform, so manifests and their hashes are the same everywhere; there is no final line
+  break.
 
 ### 6.3 The top level
 
