@@ -158,6 +158,7 @@ public class TextDecoderTests
     [InlineData(new byte[] { 0x04, 0x84, 0x80, 0x00 }, "4.8.4", "final")]
     [InlineData(new byte[] { 0x01, 0x00, 0x60, 0x03 }, "1.0b3", "beta")]
     [InlineData(new byte[] { 0x10, 0x25, 0x20, 0x12 }, "10.2.5d12", "development")] // BCD, as in Apple's own files
+    [InlineData(new byte[] { 0x03, 0x00, 0x60, 0x0F }, "3.0b15", "beta")] // not BCD: binary, as some developers wrote it
     [InlineData(new byte[] { 0x02, 0x10, 0x40, 0x01 }, "2.1a1", "alpha")]
     public void Versions_display_in_their_usual_form(byte[] numbers, string display, string stage)
     {

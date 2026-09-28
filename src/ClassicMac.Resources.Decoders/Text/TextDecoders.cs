@@ -94,7 +94,7 @@ namespace ClassicMac.Resources.Decoders.Text
     /// <summary>
     /// <c>'vers'</c> (<i>Inside Macintosh: Macintosh Toolbox Essentials</i>, "Version Resource"): the version as
     /// binary-coded decimal (major; minor and bug fix as nibbles), the release stage ($20 development, $40 alpha, $60
-    /// beta, $80 final) and non-release number (BCD, fitted to Apple's own files), a region code, and short and long version strings — as JSON,
+    /// beta, $80 final) and non-release number (BCD, or binary when it cannot be BCD), a region code, and short and long version strings — as JSON,
     /// with the number in its usual form ("1.0.2b3"). The Finder never shows the number: Get Info shows the long string.
     /// </summary>
     internal sealed class VersionDecoder(DecodeOptions options) : IResourceDecoder, IBuiltInDecoder
@@ -120,7 +120,9 @@ namespace ClassicMac.Resources.Decoders.Text
             }
             int major = Bcd(data[0]), minor = data[1] >> 4, bugFix = data[1] & 0x0F;
             var stage = data[2];
-            var nonRelease = Bcd(data[3]); // BCD, as Apple's own files store it (Disk Copy 6.5b13: $13 for "b13")
+            // No Mac OS code reads this byte. Apple's files store it as BCD (Disk Copy 6.5b13: $13 for "b13"); some other
+            // developers' as binary ($0F for "r15"): BCD when both digits are decimal, else binary (fitted to data).
+            var nonRelease = (data[3] >> 4) <= 9 && (data[3] & 0x0F) <= 9 ? Bcd(data[3]) : data[3];
             var region = BinaryPrimitives.ReadInt16BigEndian(data[4..]);
             var offset = 6;
             var complete = MacText.TryReadPascal(data, ref offset, out var shortText);
