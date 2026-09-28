@@ -31,12 +31,20 @@ internal static class CorpusFolders
     // trailer in its last 512 bytes.
     public static bool IsUnsupported(string path)
     {
-        using var stream = File.OpenRead(path);
-        if (stream.Length < 512) return false;
-        stream.Seek(-512, SeekOrigin.End);
-        Span<byte> magic = stackalloc byte[4];
-        stream.ReadExactly(magic);
-        return magic.SequenceEqual("koly"u8);
+        try
+        {
+            // Shared, as an emulator may hold the image open.
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            if (stream.Length < 512) return false;
+            stream.Seek(-512, SeekOrigin.End);
+            Span<byte> magic = stackalloc byte[4];
+            stream.ReadExactly(magic);
+            return magic.SequenceEqual("koly"u8);
+        }
+        catch (IOException)
+        {
+            return false; // in use; the caller's own read decides
+        }
     }
 
     public static IEnumerable<string> EnumerateDirectories(string pattern, SearchOption option) =>

@@ -54,11 +54,13 @@ namespace ClassicMac.Files.Iso
                 {
                     if ((sector + 1) * (long)Sector > input.Length) return null;
                     var v = input.Slice(sector * (long)Sector, Sector).ToArray();
-                    if (v[0] == 0xFF && v.AsSpan(1, 5).SequenceEqual("CD001"u8)) return null;
                     var id = System.Text.Encoding.ASCII.GetString(v, 1, 5).ToUpperInvariant();
+                    var highSierra = System.Text.Encoding.ASCII.GetString(v, 9, 5).ToUpperInvariant() == "CDROM";
+                    // A terminator ends the search: ISO's at byte 0, High Sierra's at byte 8.
+                    if ((v[0] == 0xFF && id == "CD001") || (v[8] == 0xFF && highSierra)) return null;
                     if (v[0] == 1 && v[6] == 1 && id is "CD001" or "CD-I ")
                         return Iso(input, v, cdI: id == "CD-I ");
-                    if (v[8] == 1 && v[14] == 1 && System.Text.Encoding.ASCII.GetString(v, 9, 5).ToUpperInvariant() == "CDROM")
+                    if (v[8] == 1 && v[14] == 1 && highSierra)
                         return ReadHighSierra(input, v);
                 }
                 return null;
@@ -220,7 +222,7 @@ namespace ClassicMac.Files.Iso
             // sector start, ends the directory.
             private Record? ReadRecord(ref long position, long end)
             {
-                if (position > end) return null;
+                if (position >= end) return null; // a record starts inside its directory's extent
                 var record = RecordAt(position);
                 if (!record.IsValid)
                 {

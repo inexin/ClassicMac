@@ -149,6 +149,31 @@ public class IsoTests
         Assert.Equal(Text("RSRC"), file.ResourceFork.ToArray());
     }
 
+    // A terminator ends the descriptor search, High Sierra's (type 255 at byte 8, "CDROM") as well as ISO's.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Descriptors_after_a_terminator_are_not_read(bool highSierra)
+    {
+        var image = new IsoBuilder(highSierra).Build();
+        var descriptor = image.AsSpan(16 * 2048, 2048).ToArray();
+        var terminator = new byte[2048];
+        if (highSierra)
+        {
+            terminator[8] = 0xFF;
+            "cdrom"u8.CopyTo(terminator.AsSpan(9)); // compared without regard to case, as the identifiers are
+        }
+        else
+        {
+            terminator[0] = 0xFF;
+            "CD001"u8.CopyTo(terminator.AsSpan(1));
+        }
+        terminator.CopyTo(image.AsSpan(16 * 2048));
+        descriptor.CopyTo(image.AsSpan(17 * 2048));
+
+        Assert.False(IsoReader.Instance.CanRead(ForkData.FromBytes(image)));
+    }
+
     [Fact]
     public void Other_data_is_not_an_ISO_volume()
     {
