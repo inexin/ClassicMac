@@ -126,6 +126,23 @@ public class TextDecoderTests
         Assert.Equal((0, 12, "Geneva"), (plain.Runs.Single().Start, plain.Runs.Single().Length, plain.Runs.Single().FontName));
     }
 
+    // Runs apply as TEUseStyleScrap applies them: in stored order, the first from the start, each to the next run's
+    // start (either way round), a later one overwriting; a duplicate start gives an empty run, so the later one wins.
+    [Fact]
+    public void Style_runs_apply_as_TextEdit_applies_them()
+    {
+        var text = MacRoman.Encode("abcdefghij");
+        // Stored order: Times from 4 (but the first run starts at 0), Monaco from 8, Geneva from 2 (out of order), then
+        // Chicago and Courier both from 6 (Courier wins).
+        var styl = Styl((4, 20, 0, 12, 0, 0, 0), (8, 4, 0, 12, 0, 0, 0), (2, 3, 0, 12, 0, 0, 0), (6, 0, 0, 12, 0, 0, 0),
+            (6, 22, 0, 12, 0, 0, 0));
+
+        var runs = Text.StyledText.Read(text, styl).Runs;
+
+        // Times [0,8), then Monaco [2,8) backwards over it, Geneva [2,6), Chicago empty, Courier [6,10).
+        Assert.Equal([(0, 2, "Times"), (2, 4, "Geneva"), (6, 4, "Courier")], runs.Select(r => (r.Start, r.Length, r.FontName)));
+    }
+
     [Fact]
     public void Text_without_styl_is_text_only_and_styl_alone_is_JSON()
     {
@@ -140,9 +157,9 @@ public class TextDecoderTests
     [Theory]
     [InlineData(new byte[] { 0x04, 0x84, 0x80, 0x00 }, "4.8.4", "final")]
     [InlineData(new byte[] { 0x01, 0x00, 0x60, 0x03 }, "1.0b3", "beta")]
-    [InlineData(new byte[] { 0x10, 0x25, 0x20, 0x12 }, "10.2.5d12", "development")]
+    [InlineData(new byte[] { 0x10, 0x25, 0x20, 0x12 }, "10.2.5d12", "development")] // BCD, as in Apple's own files
     [InlineData(new byte[] { 0x02, 0x10, 0x40, 0x01 }, "2.1a1", "alpha")]
-    public void Versions_display_as_the_Finder_shows_them(byte[] numbers, string display, string stage)
+    public void Versions_display_in_their_usual_form(byte[] numbers, string display, string stage)
     {
         byte[] data = [.. numbers, 0x00, 0x00, .. Pascal("4.8.4"), .. Pascal("4.8.4 © 1986-1998 Green Mountain Software")];
 

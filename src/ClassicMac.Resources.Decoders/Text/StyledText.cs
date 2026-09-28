@@ -56,17 +56,29 @@ namespace ClassicMac.Resources.Decoders.Text
             var decoded = MacText.Decode(text, options ?? DecodeOptions.Default);
             var complete = true;
             var styles = styl.IsEmpty ? [] : StyleRuns.Read(styl, out complete);
-            var ordered = styles.Where(r => r.Start >= 0).OrderBy(r => r.Start).ToList();
-            if (ordered.Count == 0 || ordered[0].Start > 0) ordered.Insert(0, new StyleRun(0, 0, 0, 3, 0, 12, 0, 0, 0));
-            var runs = new List<TextRun>(ordered.Count);
-            for (var i = 0; i < ordered.Count; i++)
+            if (styles.Count == 0) styles = [new StyleRun(0, 0, 0, 3, 0, 12, 0, 0, 0)];
+
+            // As TEUseStyleScrap applies a style scrap (disassembly; SimpleText, the Help Manager and DOCMaker all use
+            // it): in stored order, the first run from the start of the text, each to the next run's start (in either
+            // direction when they are out of order), cut to the text, a later run overwriting an earlier one.
+            var styleOf = new int[decoded.Length];
+            for (var i = 0; i < styles.Count; i++)
             {
-                var s = ordered[i];
-                var start = Math.Min(s.Start, decoded.Length);
-                var end = i + 1 < ordered.Count ? Math.Min(ordered[i + 1].Start, decoded.Length) : decoded.Length;
-                if (end <= start) continue;
+                var from = i == 0 ? 0 : styles[i].Start;
+                var to = i + 1 < styles.Count ? styles[i + 1].Start : decoded.Length;
+                var low = Math.Clamp(Math.Min(from, to), 0, decoded.Length);
+                var high = Math.Clamp(Math.Max(from, to), 0, decoded.Length);
+                styleOf.AsSpan(low, high - low).Fill(i);
+            }
+            var runs = new List<TextRun>();
+            for (var start = 0; start < decoded.Length;)
+            {
+                var end = start + 1;
+                while (end < decoded.Length && styleOf[end] == styleOf[start]) end++;
+                var s = styles[styleOf[start]];
                 runs.Add(new TextRun(start, end - start, s.Font, StyleRuns.FontName(s.Font), s.Size > 0 ? s.Size : 12, s.Face,
                     (byte)(s.Red >> 8), (byte)(s.Green >> 8), (byte)(s.Blue >> 8)));
+                start = end;
             }
             return new StyledText(decoded, runs, complete);
         }
