@@ -112,4 +112,30 @@ public class WindowTests
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    [Fact]
+    public void The_document_preview_draws_text_and_pictures()
+    {
+        _ = Started.Value;
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            Pump(model.OpenAsync(DocumentTests.Disk(folder)));
+            model.Selected = model.Roots[0].Children.Single(c => c.Title == "Manual");
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            Capture(window, "document");
+            var pictures = window.GetVisualDescendants().OfType<DocumentPictureView>().ToList();
+            Assert.Equal(3, pictures.Count);
+            Assert.Equal(new Size(260, 65), pictures[2].Bounds.Size); // scaled to the column
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
 }

@@ -254,6 +254,12 @@ The converter is `document.html`, version 1 (`ResourceDecoders.CreateDocumentCon
   §3.2). An existing non-empty output folder is refused unless `--overwrite` is given. It prints one line per document
   (`<Mac path>: <entry page>`), then `<n> documents, to <folder>`, or `No documents in <input>.`; diagnostics and exit
   codes are those of `extract`.
+- **The viewer** previews a DOCMaker document, or a SimpleText document with pictures, a chapter at a time with a
+  chapter menu, laid out by the same flow as the HTML (`DocumentFlow`), at 72 dpi (a point is a pixel) and on the
+  chapter's background. A picture whose action goes to a chapter (1), the next or previous one (14, 15) or back (10)
+  does so when clicked; the others show what they would do as a tooltip. A SimpleText document without pictures is
+  shown as styled text. *Convert Documents* writes the HTML, and *Export Resources* and *Extract All Resources*
+  include `document/` ([EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) §3.3).
 
 ---
 
@@ -278,4 +284,4 @@ The converter is `document.html`, version 1 (`ResourceDecoders.CreateDocumentCon
 - DOCMaker versions other than 4.8.4: nothing shows what 5.x and 6.x changed.
 - SimpleText's printing page breaks (`'form'` resources) and voice annotations.
 - Multi-byte encodings: the anchors are byte offsets, which the model uses as character offsets.
-- The viewer: a document preview and a Convert Document command are planned.
+- The viewer's preview has no table of contents page and scrolls to a chapter's top, not to action 1's paragraph.

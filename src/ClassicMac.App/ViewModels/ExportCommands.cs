@@ -17,12 +17,12 @@ using CommunityToolkit.Mvvm.Input;
 namespace ClassicMac.App.ViewModels
 {
     // Export from the viewer, with the same code as the CLI: a resource saved as a file; a file's resources (or one
-    // type's) exported with a manifest; everything under a node extracted or unpacked. Folder exports go into a new
-    // subfolder named after the item, so nothing is overwritten.
+    // type's) exported with a manifest, a document among them as HTML; everything under a node extracted, unpacked or
+    // its documents converted. Folder exports go into a new subfolder named after the item, so nothing is overwritten.
     public sealed partial class MainViewModel
     {
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand))]
+        [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand), nameof(ConvertDocumentsCommand))]
         private bool isExporting;
 
         /// <summary>The last export's task (tests wait for it).</summary>
@@ -68,7 +68,8 @@ namespace ClassicMac.App.ViewModels
             if (fork is null || await PickFolder("Export resources to") is not { } parent) return;
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(file.Name) + " resources");
             var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
-            var result = await Task.Run(() => ResourceExporter.Export(fork, target, source, ExportOptionsFor(types)));
+            var result = await Task.Run(() => ResourceExporter.Export(fork, target, source, ExportOptionsFor(types),
+                () => file.DataFork.ToArray(ReadOptions.MaxResourceSize)));
             foreach (var d in result.Diagnostics.Skip(fork.Diagnostics.Count)) Report(new DiagnosticEntry(d, fileNode.Source, fileNode));
             Status = $"{result.Manifest.Resources.Count} resources to {target}.";
         });
@@ -95,6 +96,38 @@ namespace ClassicMac.App.ViewModels
             foreach (var (source, d) in diagnostics) Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
             foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
             Status = $"{result.Resources} resources from {result.Files} files to {target}.";
+        });
+
+        [RelayCommand(CanExecute = nameof(CanUnpack))]
+        private Task ConvertDocuments() => Run(async () =>
+        {
+            if (Selected is not { } node || await PickFolder("Convert documents to") is not { } parent) return;
+            var root = Subtree(node);
+            var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
+            var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
+            var (target, result) = await Task.Run(() =>
+            {
+                var forks = new List<ForkToExtract>();
+                foreach (var leaf in root.Leaves())
+                {
+                    var found = MacFileResources.Read(leaf.File, ReadOptions);
+                    if (found.Fork is { Resources.Count: > 0 } fork) forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
+                }
+                var target = ExportFolders.CreateNew(parent, name + " documents");
+                var result = DocumentConverter.Convert(root, forks, target, ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
+                    ReadOptions, overwrite: false, diagnostics);
+                // No documents: the new folder, still empty, is not left behind.
+                if (result.Documents.Count == 0 && result.Failed.Count == 0) Directory.Delete(target);
+                return (target, result);
+            });
+            foreach (var (source, d) in diagnostics) Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
+            foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            Status = result.Documents.Count switch
+            {
+                0 => $"No documents in {NameOf(node)}.",
+                1 => $"1 document to {target}.",
+                var n => $"{n} documents to {target}.",
+            };
         });
 
         [RelayCommand(CanExecute = nameof(CanUnpack))]
@@ -143,7 +176,13 @@ namespace ClassicMac.App.ViewModels
         private async Task<string?> PickFolder(string title) => FilePicker is null ? null : await FilePicker.PickFolderAsync(title);
 
         private ExportOptions ExportOptionsFor(IReadOnlySet<FourCC>? types) =>
-            ExportOptions.Default with { Decoders = ResourceDecoders.Create(CurrentDecodeOptions), Types = types, ReadOptions = ReadOptions };
+            ExportOptions.Default with
+            {
+                Decoders = ResourceDecoders.Create(CurrentDecodeOptions),
+                Documents = ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
+                Types = types,
+                ReadOptions = ReadOptions,
+            };
 
         // The decoded files for a resource, and its data as applications see it.
         private (IReadOnlyList<DecodedFile> Outputs, ReadOnlyMemory<byte> Raw) Decode(ResourceNode node, List<Diagnostic> diagnostics)

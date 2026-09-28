@@ -11,6 +11,7 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
+using ClassicMac.Resources.Decoders.Documents;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
@@ -26,6 +27,7 @@ namespace ClassicMac.App.ViewModels
         Text,
         Json,
         Sound,
+        Document,
     }
 
     /// <summary>One decoded image: PNG bytes, its size, and a caption (a list item's number, a cursor's hotspot).</summary>
@@ -33,9 +35,8 @@ namespace ClassicMac.App.ViewModels
 
     /// <summary>
     /// The preview of a resource or file, made by the same decoders as <c>extract</c>: images (pictures, icons, cursors,
-    /// patterns), text (strings, styled text), JSON (version resources, lone style runs) or sound (<c>snd </c>, drawn and
-    /// played); otherwise a note to look at
-    /// the hex view.
+    /// patterns), text (strings, styled text), JSON (version resources, lone style runs), sound (<c>snd </c>, drawn and
+    /// played) or a document (DOCMaker, SimpleText with pictures); otherwise a note to look at the hex view.
     /// </summary>
     public sealed class PreviewViewModel
     {
@@ -67,7 +68,12 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A sound's rate, channels, sample size, length, format and loop.</summary>
         public string SoundDetails { get; private init; } = "";
 
-        public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound;
+        /// <summary>A DOCMaker or SimpleText document, a chapter at a time.</summary>
+        public DocumentPreview? Document { get; private init; }
+
+        public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document;
+
+        public bool IsDocument => Kind == PreviewKind.Document;
 
         public bool IsSound => Kind == PreviewKind.Sound;
 
@@ -116,10 +122,13 @@ namespace ClassicMac.App.ViewModels
             return FromFiles(files, $"'{type}'");
         }
 
-        // A picture file (type PICT, after its 512-byte header) or a SimpleText document (TEXT, styled by its styl 128).
+        // A picture file (type PICT, after its 512-byte header), a document (DOCMaker, or SimpleText with pictures), or a
+        // SimpleText document's styled text (TEXT, styled by its styl 128).
         private static PreviewViewModel ForFile(MacFile file, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
         {
             var type = file.FinderInfo.Type.ToString();
+            if (DocumentOf(file, options, readOptions, diagnostics) is { } document)
+                return new PreviewViewModel(PreviewKind.Document, "") { Document = DocumentPreview.Create(document, options, diagnostics) };
             if (type == "PICT" && file.DataFork.Length is > 512 + 10 and <= MaxPictureFile)
             {
                 var picture = new Resource(FourCC.FromString("PICT"), 0, file.DataFork.Slice(512, file.DataFork.Length - 512).ToArray());
@@ -136,6 +145,17 @@ namespace ClassicMac.App.ViewModels
                 return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl.Span, options));
             }
             return None;
+        }
+
+        // A DOCMaker document, or a SimpleText document that has pictures (one without is shown as styled text).
+        private static StyledDocument? DocumentOf(MacFile file, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
+        {
+            if (MacFileResources.Read(file, readOptions).Fork is not { } fork) return null;
+            var isText = file.FinderInfo.Type == FourCC.FromString("TEXT") || file.FinderInfo.Type == FourCC.FromString("ttro");
+            if (isText && file.DataFork.Length > MaxTextFile) return null;
+            var text = isText ? file.DataFork.ToArray() : ReadOnlyMemory<byte>.Empty;
+            var document = StyledDocuments.Read(text, fork, file.FinderInfo.Type, file.Name.ToString(), options, readOptions, diagnostics);
+            return document is { Kind: DocumentKind.DocMaker } || document?.Chapters.Any(c => c.Pictures.Count > 0) == true ? document : null;
         }
 
         private static PreviewViewModel SoundPreview(SampledSound sampled)

@@ -30,6 +30,7 @@
         <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
         <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
         <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
+        <MenuItem Header="_Convert Documents…" Command="{Binding ConvertDocumentsCommand}" />
         <Separator />
         <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
         <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
@@ -56,6 +57,7 @@
               <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+S" />
               <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
               <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
+              <MenuItem Header="_Convert Documents…" Command="{Binding ConvertDocumentsCommand}" />
               <Separator />
               <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
               <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
@@ -121,6 +123,41 @@
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
                   <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
                 </ScrollViewer>
+                <DockPanel IsVisible="{Binding Preview.IsDocument}">
+                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8">
+                    <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}" />
+                    <ComboBox ItemsSource="{Binding Preview.Document.ChapterTitles, FallbackValue={x:Null}}" MinWidth="260"
+                              SelectedIndex="{Binding Preview.Document.ChapterIndex, Mode=TwoWay, FallbackValue=0}"
+                              IsVisible="{Binding Preview.Document.HasChapters, FallbackValue=False}" />
+                  </StackPanel>
+                  <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{Binding Preview.Document.Background, FallbackValue={x:Null}}"
+                                Offset="{Binding Preview.Document.Offset, Mode=TwoWay, FallbackValue={x:Static Vector.Zero}}">
+                    <ItemsControl ItemsSource="{Binding Preview.Document.Items, FallbackValue={x:Null}}" Margin="16,12" HorizontalAlignment="Center"
+                                  Width="{Binding Preview.Document.ColumnWidth, FallbackValue=NaN}">
+                      <ItemsControl.DataTemplates>
+                        <DataTemplate DataType="vm:DocumentTextItem">
+                          <views:StyledTextView Styled="{Binding Text}" Scale="1" TextWrapping="Wrap" TextAlignment="{Binding Alignment}" />
+                        </DataTemplate>
+                        <DataTemplate DataType="vm:DocumentRowItem">
+                          <Grid ColumnDefinitions="*,Auto,*">
+                            <ItemsControl ItemsSource="{Binding Left}" HorizontalAlignment="Left">
+                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate><DataTemplate DataType="vm:DocumentPictureItem"><views:DocumentPictureView Item="{Binding}" VerticalAlignment="Top" /></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl Grid.Column="1" ItemsSource="{Binding Center}">
+                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate><DataTemplate DataType="vm:DocumentPictureItem"><views:DocumentPictureView Item="{Binding}" VerticalAlignment="Top" /></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <ItemsControl Grid.Column="2" ItemsSource="{Binding Right}" HorizontalAlignment="Right">
+                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate><DataTemplate DataType="vm:DocumentPictureItem"><views:DocumentPictureView Item="{Binding}" VerticalAlignment="Top" /></DataTemplate></ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
                 <DockPanel IsVisible="{Binding Preview.IsSound}" Margin="12,8">
                   <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
                     <Button Content="Play" Command="{Binding PlaySoundCommand}" />

@@ -74,12 +74,9 @@ namespace ClassicMac.Resources.Decoders.Documents
                 foreach (var entry in document.Contents)
                 {
                     if (document.Chapters.FirstOrDefault(c => c.Number == entry.Chapter) is { } chapter)
-                        targets.Add((entry.Chapter, ParagraphOf(chapter.Text.Text, entry.SelectionStart)));
+                        targets.Add((entry.Chapter, DocumentFlow.ParagraphOf(chapter.Text.Text, entry.SelectionStart)));
                 }
             }
-
-            private static int ParagraphOf(string text, int offset) =>
-                text.AsSpan(0, Math.Clamp(offset, 0, text.Length)).Count('\r');
 
             private string Contents()
             {
@@ -96,7 +93,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                         foreach (var entry in entries)
                         {
                             html.Append(CultureInfo.InvariantCulture,
-                                $"<li><a href=\"{page}#p{ParagraphOf(chapter.Text.Text, entry.SelectionStart)}\">{Escape(entry.Title)}</a></li>\n");
+                                $"<li><a href=\"{page}#p{DocumentFlow.ParagraphOf(chapter.Text.Text, entry.SelectionStart)}\">{Escape(entry.Title)}</a></li>\n");
                         }
                         html.Append("</ul>\n");
                     }
@@ -146,77 +143,17 @@ namespace ClassicMac.Resources.Decoders.Documents
                 return html;
             }
 
-            // The chapter's text with its pictures reflowed (see the class remarks).
+            // The chapter's text with its pictures reflowed (DocumentFlow).
             private void Body(StringBuilder html, DocumentChapter chapter)
             {
-                var text = chapter.Text.Text;
-                var pictures = chapter.Pictures.Where(p => p.Anchor >= 0 && p.Anchor < text.Length).OrderBy(p => p.Anchor).ToList();
                 nextTarget = 0;
-                var position = 0;
-                for (var i = 0; i < pictures.Count;)
+                foreach (var block in DocumentFlow.Blocks(chapter))
                 {
-                    // A row: the anchors on one line with only whitespace between them.
-                    var row = new List<DocumentPicture> { pictures[i++] };
-                    while (i < pictures.Count && Blank(text, row[^1].Anchor + 1, pictures[i].Anchor)) row.Add(pictures[i++]);
-
-                    Paragraphs(html, chapter, position, row[0].Anchor, beforeAnchor: true);
-                    Targets(html, chapter, ParagraphOf(text, row[0].Anchor));
-                    Row(html, chapter, row);
-
-                    // Drop the rest of the anchors' line when it is blank, and the blank lines after it; text after the
-                    // anchors on their line continues without its leading spaces.
-                    position = row[^1].Anchor + 1;
-                    var next = i < pictures.Count ? pictures[i].Anchor : text.Length;
-                    for (var first = true; position < next; first = false)
-                    {
-                        var lineEnd = text.IndexOf('\r', position, next - position);
-                        var stop = lineEnd < 0 ? next : lineEnd;
-                        if (!Blank(text, position, stop))
-                        {
-                            while (first && IsSpace(text[position])) position++;
-                            break;
-                        }
-                        position = lineEnd < 0 ? next : lineEnd + 1;
-                    }
+                    Targets(html, chapter, block.Paragraph);
+                    if (block is DocumentLine line) Paragraph(html, chapter, line.Start, line.End);
+                    else if (block is PictureRow row) Row(html, chapter, row.Pictures);
                 }
-                Paragraphs(html, chapter, position, text.Length, beforeAnchor: false);
                 Targets(html, chapter, int.MaxValue);
-            }
-
-            private static bool IsSpace(char c) => c is ' ' or '\t' or '\u00A0';
-
-            // True when the characters from start to end are spaces, on one line.
-            private static bool Blank(string text, int start, int end)
-            {
-                for (var i = start; i < end; i++)
-                {
-                    if (!IsSpace(text[i])) return false;
-                }
-                return true;
-            }
-
-            // The text from start to end as paragraphs, one per line (CR). Before an anchor, the part of the anchor's line
-            // before it has no line break of its own: its trailing spaces are dropped, and the part too when it is blank.
-            private void Paragraphs(StringBuilder html, DocumentChapter chapter, int start, int end, bool beforeAnchor)
-            {
-                var text = chapter.Text.Text;
-                var number = ParagraphOf(text, start);
-                for (var line = start; line < end; number++)
-                {
-                    var lineEnd = text.IndexOf('\r', line, end - line);
-                    if (lineEnd < 0)
-                    {
-                        var contentEnd = end;
-                        while (beforeAnchor && contentEnd > line && IsSpace(text[contentEnd - 1])) contentEnd--;
-                        if (contentEnd == line) break;
-                        Targets(html, chapter, number);
-                        Paragraph(html, chapter, line, contentEnd);
-                        break;
-                    }
-                    Targets(html, chapter, number);
-                    Paragraph(html, chapter, line, lineEnd);
-                    line = lineEnd + 1;
-                }
             }
 
             // The link anchors of the paragraphs up to this one, including those dropped with the whitespace.
@@ -255,7 +192,7 @@ namespace ClassicMac.Resources.Decoders.Documents
             }
 
             // Pictures side by side: left, centre and right, each in its place across the column.
-            private void Row(StringBuilder html, DocumentChapter chapter, List<DocumentPicture> row)
+            private void Row(StringBuilder html, DocumentChapter chapter, IReadOnlyList<DocumentPicture> row)
             {
                 html.Append("<div class=\"row\">");
                 foreach (var (alignment, name) in new[] { (PictureAlignment.Left, "l"), (PictureAlignment.Center, "c"), (PictureAlignment.Right, "r") })
@@ -316,22 +253,11 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 if (images.TryGetValue(picture.PictureId, out var known)) return known;
                 string? file = null;
-                if (picture.Picture is { } data)
+                if (DocumentPictures.Draw(chapter, picture, options, diagnostics) is { } image)
                 {
-                    try
-                    {
-                        if ((long)picture.Width * picture.Height > options.MaxImagePixels) throw new InvalidDataException("Its frame is over the pixel limit.");
-                        var bitmap = PictureDecoder.Draw(data.ToArray(), options);
-                        var id = picture.PictureId < 0 ? $"m{-picture.PictureId}" : picture.PictureId.ToString(CultureInfo.InvariantCulture);
-                        file = $"images/pict-{id}{options.ImageEncoder.Extension}";
-                        imageFiles.Add(new DocumentFile(file, options.ImageEncoder.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels)));
-                    }
-                    catch (Exception e) when (e is NotSupportedException or EndOfStreamException or ArgumentException
-                        or OverflowException or InvalidDataException or IndexOutOfRangeException)
-                    {
-                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "document.undrawable-picture",
-                            $"Chapter {chapter.Number}'s PICT {picture.PictureId} cannot be drawn: {e.Message}"));
-                    }
+                    var id = picture.PictureId < 0 ? $"m{-picture.PictureId}" : picture.PictureId.ToString(CultureInfo.InvariantCulture);
+                    file = $"images/pict-{id}{options.ImageEncoder.Extension}";
+                    imageFiles.Add(new DocumentFile(file, image));
                 }
                 images[picture.PictureId] = file;
                 return file;
@@ -416,6 +342,36 @@ namespace ClassicMac.Resources.Decoders.Documents
                 });
             }
             return escaped.ToString();
+        }
+    }
+
+    /// <summary>Draws a document's pictures, as the HTML output and the viewer show them.</summary>
+    public static class DocumentPictures
+    {
+        /// <summary>
+        /// The picture drawn by the options' image encoder at their screen depth, or null when it is missing or cannot be
+        /// drawn (reported as <c>document.undrawable-picture</c>, as is a frame over the pixel limit).
+        /// </summary>
+        public static byte[]? Draw(DocumentChapter chapter, DocumentPicture picture, DecodeOptions options, ICollection<Diagnostic> diagnostics)
+        {
+            ArgumentNullException.ThrowIfNull(chapter);
+            ArgumentNullException.ThrowIfNull(picture);
+            ArgumentNullException.ThrowIfNull(options);
+            ArgumentNullException.ThrowIfNull(diagnostics);
+            if (picture.Picture is not { } data) return null;
+            try
+            {
+                if ((long)picture.Width * picture.Height > options.MaxImagePixels) throw new InvalidDataException("Its frame is over the pixel limit.");
+                var bitmap = PictureDecoder.Draw(data.ToArray(), options);
+                return options.ImageEncoder.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels);
+            }
+            catch (Exception e) when (e is NotSupportedException or EndOfStreamException or ArgumentException
+                or OverflowException or InvalidDataException or IndexOutOfRangeException)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "document.undrawable-picture",
+                    $"Chapter {chapter.Number}'s PICT {picture.PictureId} cannot be drawn: {e.Message}"));
+                return null;
+            }
         }
     }
 }

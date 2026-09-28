@@ -6,6 +6,8 @@ using Avalonia.Controls.Documents;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Input;
+using ClassicMac.App.ViewModels;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
 
@@ -40,12 +42,26 @@ namespace ClassicMac.App.Views
         public static readonly StyledProperty<StyledText?> StyledProperty =
             AvaloniaProperty.Register<StyledTextView, StyledText?>(nameof(Styled));
 
-        static StyledTextView() => StyledProperty.Changed.AddClassHandler<StyledTextView>((view, _) => view.Rebuild());
+        /// <summary>Device-independent pixels per point: 4/3 (points at 96 dpi) by default; 1 in a document, at the Mac's 72 dpi.</summary>
+        public static readonly StyledProperty<double> ScaleProperty =
+            AvaloniaProperty.Register<StyledTextView, double>(nameof(Scale), 4.0 / 3.0);
+
+        static StyledTextView()
+        {
+            StyledProperty.Changed.AddClassHandler<StyledTextView>((view, _) => view.Rebuild());
+            ScaleProperty.Changed.AddClassHandler<StyledTextView>((view, _) => view.Rebuild());
+        }
 
         public StyledText? Styled
         {
             get => GetValue(StyledProperty);
             set => SetValue(StyledProperty, value);
+        }
+
+        public double Scale
+        {
+            get => GetValue(ScaleProperty);
+            set => SetValue(ScaleProperty, value);
         }
 
         protected override System.Type StyleKeyOverride => typeof(SelectableTextBlock);
@@ -60,7 +76,7 @@ namespace ClassicMac.App.Views
                 Inlines.Add(new Run(styled.Text.Substring(run.Start, run.Length).Replace('\r', '\n'))
                 {
                     FontFamily = Family(run.FontName),
-                    FontSize = run.Size * 4.0 / 3.0, // points (72 per inch) to device-independent pixels (96)
+                    FontSize = run.Size * Scale,
                     FontWeight = run.Bold ? FontWeight.Bold : FontWeight.Normal,
                     FontStyle = run.Italic ? FontStyle.Italic : FontStyle.Normal,
                     TextDecorations = run.Underline ? Avalonia.Media.TextDecorations.Underline : null,
@@ -74,9 +90,64 @@ namespace ClassicMac.App.Views
         {
             "Monaco" or "Courier" => new FontFamily("Cascadia Mono, Consolas, Menlo, Courier New, monospace"),
             "Times" or "New York" => new FontFamily("Times New Roman, Times, serif"),
+            "Palatino" => new FontFamily("Palatino, Palatino Linotype, Book Antiqua, serif"),
+            "Bookman" => new FontFamily("Bookman, Bookman Old Style, serif"),
+            "New Century Schoolbook" => new FontFamily("New Century Schoolbook, Century Schoolbook, serif"),
+            "Avant Garde" => new FontFamily("Avant Garde, Century Gothic, sans-serif"),
+            "Helvetica Narrow" => new FontFamily("Helvetica Narrow, Arial Narrow, sans-serif"),
+            "Zapf Chancery" => new FontFamily("Zapf Chancery, Monotype Corsiva, cursive"),
             "Helvetica" or "Geneva" or "Chicago" => FontFamily.Default,
             _ => new FontFamily($"{name}, {FontFamily.Default.Name}"),
         };
+    }
+
+    /// <summary>A document's picture at its size, pixels unsmoothed; a dashed box when it was not drawn. A link opens on a click.</summary>
+    internal sealed class DocumentPictureView : Control
+    {
+        public static readonly StyledProperty<DocumentPictureItem?> ItemProperty =
+            AvaloniaProperty.Register<DocumentPictureView, DocumentPictureItem?>(nameof(Item));
+
+        private static readonly Pen Missing = new(new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)), 1, DashStyle.Dash);
+
+        private Bitmap? bitmap;
+
+        static DocumentPictureView()
+        {
+            AffectsMeasure<DocumentPictureView>(ItemProperty);
+            AffectsRender<DocumentPictureView>(ItemProperty);
+            ItemProperty.Changed.AddClassHandler<DocumentPictureView>((view, _) => view.Load());
+        }
+
+        public DocumentPictureView() => RenderOptions.SetBitmapInterpolationMode(this, Avalonia.Media.Imaging.BitmapInterpolationMode.None);
+
+        public DocumentPictureItem? Item
+        {
+            get => GetValue(ItemProperty);
+            set => SetValue(ItemProperty, value);
+        }
+
+        private void Load()
+        {
+            bitmap?.Dispose();
+            bitmap = Item?.Png is { } png ? new Bitmap(new MemoryStream(png)) : null;
+            Cursor = Item?.IsLink == true ? new Cursor(StandardCursorType.Hand) : null;
+            ToolTip.SetTip(this, string.IsNullOrEmpty(Item?.ToolTip) ? null : Item.ToolTip);
+        }
+
+        protected override Size MeasureOverride(Size availableSize) => Item is { } item ? new Size(item.Width, item.Height) : default;
+
+        public override void Render(DrawingContext context)
+        {
+            var rect = new Rect(Bounds.Size);
+            if (bitmap is not null) context.DrawImage(bitmap, rect);
+            else if (rect.Width > 0 && rect.Height > 0) context.DrawRectangle(null, Missing, rect.Deflate(0.5));
+        }
+
+        protected override void OnPointerReleased(PointerReleasedEventArgs e)
+        {
+            base.OnPointerReleased(e);
+            if (e.InitialPressMouseButton == MouseButton.Left && Item?.Open is { } open && open.CanExecute(null)) open.Execute(null);
+        }
     }
 
     /// <summary>A sound's waveform: one lane per channel, the lowest and highest sample under each pixel column.</summary>
