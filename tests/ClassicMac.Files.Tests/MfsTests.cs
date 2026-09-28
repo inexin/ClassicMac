@@ -108,6 +108,20 @@ public class MfsTests
         Assert.Empty(files[1].FolderPath);
     }
 
+    // The File Manager's scan: any nonzero flags byte is an entry (bit 7 or not); a zero one ends the block.
+    [Fact]
+    public void Entries_end_at_a_zero_flags_byte()
+    {
+        var image = Volume(("First", "TEXT", Bytes(10, 1), [3], [], []), ("Second", "TEXT", Bytes(10, 2), [4], [], []));
+        var second = DirectoryStart * Block + 52 + 4; // "First": 51 + 5 name bytes, padded to even
+        image[second] = 0x01; // no bit 7: still an entry
+
+        Assert.Equal(["First", "Second"], Read(image).Files.Select(f => f.Name.ToMacRoman()));
+
+        image[second] = 0;
+        Assert.Equal(["First"], Read(image).Files.Select(f => f.Name.ToMacRoman()));
+    }
+
     [Fact]
     public void A_looping_chain_is_stopped()
     {

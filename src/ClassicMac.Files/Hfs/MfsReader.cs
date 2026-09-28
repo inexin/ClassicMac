@@ -64,8 +64,9 @@ namespace ClassicMac.Files.Hfs
             {
                 var at = block * BlockSize;
                 var end = at + BlockSize;
-                // Entries never cross a block; a zero flags byte ends the block's entries.
-                while (at + 51 <= end && (directory[at] & 0x80) != 0)
+                // Entries never cross a block. As the File Manager scans (disassembly of the ROM's MFS code): an entry is
+                // any nonzero flags byte, a zero one ends the block, and no entry starts at block offset 460 or later.
+                while (at - block * BlockSize < 460 && at + 51 <= end && directory[at] != 0)
                 {
                     var e = directory.AsSpan(at);
                     int nameLength = e[50];
