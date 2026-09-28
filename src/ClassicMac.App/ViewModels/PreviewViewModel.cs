@@ -12,6 +12,7 @@ using ClassicMac.Files;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
 using ClassicMac.Resources.Decoders.Documents;
+using ClassicMac.Resources.Decoders.Interface;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
@@ -28,6 +29,8 @@ namespace ClassicMac.App.ViewModels
         Json,
         Sound,
         Document,
+        Dialog,
+        Menu,
     }
 
     /// <summary>One decoded image: PNG bytes, its size, and a caption (a list item's number, a cursor's hotspot).</summary>
@@ -71,9 +74,23 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A DOCMaker or SimpleText document, a chapter at a time.</summary>
         public DocumentPreview? Document { get; private init; }
 
-        public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document;
+        /// <summary>A dialog, alert or item list, drawn by the viewer.</summary>
+        public DialogPreview? Dialog { get; private init; }
+
+        /// <summary>A menu, drawn pulled down.</summary>
+        public MenuResource? Menu { get; private init; }
+
+        public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document
+            or PreviewKind.Dialog or PreviewKind.Menu;
 
         public bool IsDocument => Kind == PreviewKind.Document;
+
+        public bool IsDialog => Kind == PreviewKind.Dialog;
+
+        public bool IsMenu => Kind == PreviewKind.Menu;
+
+        /// <summary>Whether the zoom applies (images, dialogs and menus).</summary>
+        public bool IsZoomable => Kind is PreviewKind.Image or PreviewKind.Dialog or PreviewKind.Menu;
 
         public bool IsSound => Kind == PreviewKind.Sound;
 
@@ -116,6 +133,10 @@ namespace ClassicMac.App.ViewModels
             }
             if (type == "snd " && SoundResource.Read(data, diagnostics, resource.ToString()) is { Sound: { } sampled })
                 return SoundPreview(sampled);
+            if (InterfacePreviews.Dialog(resource, data, fork, options, readOptions, diagnostics) is { } dialog)
+                return new PreviewViewModel(PreviewKind.Dialog, "") { Dialog = dialog };
+            if (type == "MENU")
+                return new PreviewViewModel(PreviewKind.Menu, "") { Menu = InterfaceResources.ReadMenu(data.Span, options, diagnostics, resource.ToString()) };
             var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(resource.Type));
             if (decoder is null) return Nothing($"'{type}'");
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));

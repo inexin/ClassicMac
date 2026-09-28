@@ -446,7 +446,7 @@ files › resource types › resources, resources read on expand), details of th
 that leads to its node. View-models carry no Avalonia types and are tested; a headless test draws the window.
 **Previews (built):** Details | Preview | Hex tabs. Previews come from the same decoders as `extract`: images
 (zoom, screen depth, nearest-neighbour on a checkerboard), styled `TEXT` drawn with its fonts and colours (through the
-public `StyledText` model), strings, `vers` as JSON, PICT/TEXT files, and documents (DOCMaker, SimpleText with
+public `StyledText` model), strings, `vers` as JSON, PICT/TEXT files, dialogs, alerts and menus drawn in the System 7 style, and documents (DOCMaker, SimpleText with
 pictures) a chapter at a time with their pictures reflowed as in the HTML output, at 72 dpi, picture links followed
 (chapter, next, previous, back); hex over any fork or resource, read on demand. **Export (built):** Export menu and tree context menu, each command enabled for the nodes it applies to —
 Save Resource As (decoded or `.bin`, current screen depth), Export Resources (a file, or one type, with a manifest),

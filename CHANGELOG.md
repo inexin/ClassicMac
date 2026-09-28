@@ -4,7 +4,7 @@
 
 - Interface resources to JSON: menus and menu bars, window, dialog and alert templates, dialog item lists and
   control templates, and their colour tables and Appearance extensions (`ui.*` decoders), specified in
-  `docs/formats/INTERFACE.md`.
+  `docs/formats/INTERFACE.md`. The viewer draws dialogs, alerts, item lists and menus in the System 7 style.
 - DOCMaker stand-alone documents and SimpleText documents with pictures: read into a styled-document model
   (`StyledDocuments`) and converted to an HTML folder (`HtmlDocuments`: a page per chapter, a contents page, the
   pictures as PNG reflowed into the text, picture actions as links). Specified in `docs/formats/DOCUMENTS.md`.

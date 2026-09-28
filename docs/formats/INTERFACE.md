@@ -29,8 +29,9 @@ Contents
 9. [Control templates (CNTL)](#9-control-templates-cntl)
 10. [Colour and extension resources](#10-colour-and-extension-resources)
 11. [JSON output](#11-json-output)
-12. [Diagnostics](#12-diagnostics)
-13. [Not covered yet](#13-not-covered-yet)
+12. [Viewer previews](#12-viewer-previews)
+13. [Diagnostics](#13-diagnostics)
+14. [Not covered yet](#14-not-covered-yet)
 
 ---
 
@@ -43,7 +44,7 @@ native managers unless it names the 68k code. **[ClassicMac]** marks ClassicMac'
 
 The Toolbox checks almost nothing: it never compares a template's counts with its size and reads past the end of
 a short one [Code]. ClassicMac reads short data as far as it goes, with zeros for missing fields, and reports it
-(§12) [ClassicMac].
+(§13) [ClassicMac].
 
 ---
 
@@ -214,7 +215,7 @@ An `i16` count **less one**, then the items [Doc]:
 
 - **Count.** A signed number: −1 ($FFFF) or any negative count is an empty list [Code]. It is never checked against
   the resource's size: a count past the data makes the Dialog Manager read past the end [Code]. ClassicMac stops at the
-  end of the data (§12) [ClassicMac].
+  end of the data (§13) [ClassicMac].
 - **Types.** Mac OS 9 accepts exactly these values of the type less bit 7; any other item draws nothing but still
   takes space and clicks [Code]. The 68k Dialog Manager tested bits in the order control, editable text, static text,
   icon, picture, so combined values took the first that matched [Code: 68k].
@@ -358,7 +359,26 @@ Without its `'DITL'`, an `'ictb'`'s entries are listed without their colours or 
 
 ---
 
-## 12. Diagnostics
+## 12. Viewer previews
+
+The viewer draws dialogs, alerts, lone item lists and menus in the System 7 style [ClassicMac]. It is an approximation
+drawn by the viewer, not by the Toolbox (Mac OS 9 draws them with the Appearance Manager's theme), for seeing a
+resource's layout; the other interface resources preview as their JSON.
+
+- **Dialogs and alerts:** the window frame for the definition ID (a title bar for document and movable windows, the
+  double border of a modal box, altDBox's shadow), filled with the content colour of the `'dctb'` or `'actb'` of the
+  same ID, and the items of the `'DITL'` in their rectangles: buttons (an alert's stage 1 default with its ring),
+  check boxes, radio buttons, controls from their `'CNTL'` (buttons, check boxes, radio buttons, scroll bars, pop-up
+  menus; other definitions as a labelled box), static and editable text (unsubstituted), icons (`'cicn'`, else
+  `'ICON'`), pictures scaled to their rectangle, and user items as a dotted box. A lone `'DITL'` is drawn in a plain box
+  around its items.
+- **Menus:** the title highlighted on a strip of menu bar, then the items with their marks, styles (bold), Command keys,
+  submenu arrows and dividers; disabled items grey. Item icons are not drawn.
+- Text is drawn in Chicago 12 where installed, else a font of similar width; the zoom applies.
+
+---
+
+## 13. Diagnostics
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
@@ -366,8 +386,8 @@ Without its `'DITL'`, an `'ictb'`'s entries are listed without their colours or 
 
 ---
 
-## 13. Not covered yet
+## 14. Not covered yet
 
 - `'dftb'` (Appearance's dialog font table) and `'hdlg'`/`'hrct'` (the Help Manager's).
-- Previews of dialogs, alerts and menus in the viewer.
+- In the previews: `'ictb'` item colours and fonts, menu icons and `'mctb'` colours, and the Appearance look.
 - Writing these resources from JSON (with `pack`).

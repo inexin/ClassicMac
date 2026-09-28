@@ -88,7 +88,7 @@
 
           <TabItem Header="Preview">
             <DockPanel>
-              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8" IsVisible="{Binding Preview.IsImage}">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8" IsVisible="{Binding Preview.IsZoomable}">
                 <TextBlock Text="Zoom" VerticalAlignment="Center" />
                 <ComboBox ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}" />
                 <TextBlock Text="Screen depth" VerticalAlignment="Center" Margin="12,0,0,0" />
@@ -122,6 +122,12 @@
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
                   <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding Preview.IsDialog}" HorizontalScrollBarVisibility="Auto">
+                  <views:DialogView Dialog="{Binding Preview.Dialog}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding Preview.IsMenu}" HorizontalScrollBarVisibility="Auto">
+                  <views:MenuView Menu="{Binding Preview.Menu}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
                 <DockPanel IsVisible="{Binding Preview.IsDocument}">
                   <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8">
