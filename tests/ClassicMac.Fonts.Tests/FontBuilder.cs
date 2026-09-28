@@ -86,8 +86,9 @@ internal static class FontBuilder
 
     public static byte[] BE32(int v) => [(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v];
 
-    // A FOND: family 1024, characters 32–127, fonts 9 and 12 (plain) and an outline font; style extras with a
-    // sign-magnitude negative; a width table, a kerning table and a style-mapping table with two names.
+    // A version 4 FOND: family 1024, characters 32–127, language 2; fonts 9 and 12 (plain) and an outline font; style
+    // extras with a sign-magnitude negative; a bounding box; a width table; a kerning table (one kern sign-magnitude); a
+    // style-mapping table with two names and a two-glyph encoding subtable at an odd offset.
     public static byte[] Family()
     {
         var header = new byte[52];
@@ -103,27 +104,36 @@ internal static class FontBuilder
         W(28, 0);
         W(30, 0x0200);  // bold extra 0.125
         W(32, 0x8100);  // italic −(0x100)/4096, sign-magnitude
-        W(50, 2);
+        W(44, 2);       // language (ffProperty[8], version 4)
+        W(50, 4);
         byte[] associations = [0, 2, .. BE16(0), .. BE16(0), .. BE16(1024), .. BE16(9), .. BE16(0), .. BE16(1033), .. BE16(12), .. BE16(0), .. BE16(1036)];
+        byte[] bounds = [.. BE16(0), .. BE32(6), .. BE16(0), .. BE16(0), .. BE16(-0x0100), .. BE16(-0x0400), .. BE16(0x1100), .. BE16(0x0C00)];
         var entries = 127 - 32 + 3;
         var widths = new List<byte>(BE16(0)); // one table
         widths.AddRange(BE16(0));             // plain
         for (var i = 0; i < entries; i++) widths.AddRange(BE16(0x0800));
-        byte[] kerning = [.. BE16(0), .. BE16(0), .. BE16(2), (byte)'A', (byte)'V', .. BE16(-0x0100), (byte)'T', (byte)'o', .. BE16(-0x0080)];
+        byte[] kerning = [.. BE16(0), .. BE16(0), .. BE16(2), (byte)'A', (byte)'V', .. BE16(-0x0100), (byte)'T', (byte)'o', 0x81, 0x2F];
         var style = new List<byte>(BE16(1));
         style.AddRange(BE32(0));
         style.AddRange(BE32(0));
         style.AddRange(Enumerable.Range(0, 48).Select(i => (byte)(i == 0 ? 1 : 0)));
         style.AddRange(BE16(2));
-        foreach (var name in new[] { "Example", "-Bold" }) style.AddRange([(byte)name.Length, .. Encoding.ASCII.GetBytes(name)]);
+        foreach (var name in new[] { "Example", "Bold" }) style.AddRange([(byte)name.Length, .. Encoding.ASCII.GetBytes(name)]);
+        var encodingAt = style.Count; // 73: odd
+        style.AddRange(BE16(2));
+        foreach (var (code, glyph) in new[] { (0x80, "Adieresis"), (0x81, "Aring") }) style.AddRange([(byte)code, (byte)glyph.Length, .. Encoding.ASCII.GetBytes(glyph)]);
+        style[2] = (byte)(encodingAt >> 24);
+        style[3] = (byte)(encodingAt >> 16);
+        style[4] = (byte)(encodingAt >> 8);
+        style[5] = (byte)encodingAt;
 
-        var widthAt = header.Length + associations.Length;
+        var widthAt = header.Length + associations.Length + bounds.Length;
         var kernAt = widthAt + widths.Count;
         var styleAt = kernAt + kerning.Length;
         header.AsSpan(16).Write32(widthAt);
         header.AsSpan(20).Write32(kernAt);
         header.AsSpan(24).Write32(styleAt);
-        return [.. header, .. associations, .. widths, .. kerning, .. style];
+        return [.. header, .. associations, .. bounds, .. widths, .. kerning, .. style];
     }
 
     // An sfnt with 'name' (a Macintosh Roman family name and a Unicode full name) and an empty 'glyf'.

@@ -98,7 +98,7 @@ namespace ClassicMac.Fonts
             int firstChar = Word(2), lastChar = Word(4);
             if (lastChar < firstChar || firstChar < 0 || lastChar > 255)
                 throw new InvalidDataException($"The font's characters run from {firstChar} to {lastChar}.");
-            var rowWords = Math.Max(0, (int)Word(24));
+            var rowWords = (ushort)Word(24) & 0x7FFF; // Mac OS 9 masks the top bit
             var rectHeight = Math.Max(0, (int)Word(14));
             var depth = 1 << ((fontType >> 2) & 3);
             var strikeLength = rowWords * 2 * depth * rectHeight;
@@ -107,8 +107,8 @@ namespace ClassicMac.Fonts
             data.AsSpan(26, Math.Min(strikeLength, data.Length - 26)).CopyTo(strike);
             if (26 + strikeLength > data.Length) shortData = true;
 
-            // owTLoc is the offset in words from itself (+16) to the offset/width table; a non-negative nDescent (+10) is
-            // its high word (the ROM's Font Manager).
+            // owTLoc is the offset in words from itself (+16) to the offset/width table; a positive nDescent (+10) is its
+            // high word (Mac OS 9; the ROM takes 0 or more).
             long owTLoc = (ushort)Word(16);
             var nDescent = Word(10);
             if (nDescent > 0) owTLoc |= (long)nDescent << 16;
@@ -139,8 +139,15 @@ namespace ClassicMac.Fonts
                 }
                 return BinaryPrimitives.ReadInt16BigEndian(data.AsSpan((int)at));
             }
-            var locations = 26L + strikeLength;
+            // Mac OS 9 finds the location table just before the offset/width table (the ROM, right after the strike;
+            // the same place in a well-formed font).
             var offsetWidths = 16 + owTLoc * 2;
+            var locations = offsetWidths - 2L * entries;
+            if (locations != 26L + strikeLength)
+            {
+                diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Info, "font.location-table",
+                    "The location table is not right after the strike; it is read just before the offset/width table, as Mac OS 9 reads it."));
+            }
             var after = offsetWidths + 2L * entries;
             var widths = font.HasWidthTable ? after : -1;
             if (font.HasWidthTable) after += 2L * entries;

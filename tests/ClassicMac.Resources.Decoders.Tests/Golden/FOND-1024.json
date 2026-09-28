@@ -2,7 +2,8 @@
   "name": "Example",
   "familyId": 1024,
   "flags": 24576,
-  "version": 2,
+  "version": 4,
+  "language": 2,
   "firstChar": 32,
   "lastChar": 127,
   "ascent": 0.75,
@@ -23,20 +24,35 @@
     {
       "size": 0,
       "style": 0,
+      "face": 0,
+      "depth": 1,
       "id": 1024,
       "resource": "sfnt"
     },
     {
       "size": 9,
       "style": 0,
+      "face": 0,
+      "depth": 1,
       "id": 1033,
       "resource": "FONT"
     },
     {
       "size": 12,
       "style": 0,
+      "face": 0,
+      "depth": 1,
       "id": 1036,
       "resource": "NFNT"
+    }
+  ],
+  "bounds": [
+    {
+      "style": 0,
+      "left": -0.0625,
+      "bottom": -0.25,
+      "right": 1.0625,
+      "top": 0.75
     }
   ],
   "widthTables": [
@@ -156,14 +172,14 @@
         {
           "first": "T",
           "second": "o",
-          "kern": -0.03125
+          "kern": -0.073974609375
         }
       ]
     }
   ],
   "styleMapping": {
     "fontClass": 1,
-    "encodingOffset": 0,
+    "encodingOffset": 74,
     "indexes": [
       1,
       0,
@@ -217,6 +233,16 @@
     "names": [
       "Example",
       "-Bold"
+    ],
+    "glyphEncoding": [
+      {
+        "code": 128,
+        "name": "Adieresis"
+      },
+      {
+        "code": 129,
+        "name": "Aring"
+      }
     ]
   }
 }

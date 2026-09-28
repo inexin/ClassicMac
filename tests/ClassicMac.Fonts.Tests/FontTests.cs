@@ -56,16 +56,19 @@ public class FontTests
     {
         var family = FontFamily.Read(Family(), "Example");
 
-        Assert.Equal(("Example", 1024, 32, 127, 2), (family.Name, family.FamilyId, family.FirstChar, family.LastChar, family.Version));
+        Assert.Equal(("Example", 1024, 32, 127, 4, 2), (family.Name, family.FamilyId, family.FirstChar, family.LastChar, family.Version, family.Language));
+        Assert.Equal(new FamilyBounds(0, -0x100 / 4096.0, -0.25, 0x1100 / 4096.0, 0.75), Assert.Single(family.Bounds));
         Assert.Equal((0.75, -0.25, 1.0), (family.Ascent, family.Descent, family.MaxWidth));
         Assert.Equal([0, 0.125, -0x100 / 4096.0], family.StyleExtras.Take(3));
         Assert.Equal([new FontAssociation(0, 0, 1024), new FontAssociation(9, 0, 1033), new FontAssociation(12, 0, 1036)], family.Fonts);
         Assert.Equal([9, 12], family.BitmapSizes);
         Assert.Equal(0.5, Assert.Single(family.WidthTables).Widths['A' - 32]);
         var kerning = Assert.Single(family.KerningTables);
-        Assert.Equal([new KerningPair((byte)'A', (byte)'V', -0x100 / 4096.0), new KerningPair((byte)'T', (byte)'o', -0x80 / 4096.0)], kerning.Pairs);
-        Assert.Equal(["Example", "-Bold"], family.StyleMapping!.Names);
+        Assert.Equal([new KerningPair((byte)'A', (byte)'V', -0x100 / 4096.0), new KerningPair((byte)'T', (byte)'o', -0x12F / 4096.0)], kerning.Pairs); // $812F: sign and magnitude
+        Assert.Equal(["Example", "Bold"], family.StyleMapping!.Names);
         Assert.Equal(1, family.StyleMapping.Indexes[0]);
+        Assert.Equal([((byte)0x80, "Adieresis"), ((byte)0x81, "Aring")], family.StyleMapping.Encoding);
+        Assert.Equal(1, family.StyleMapping.EncodingOffset % 2); // odd
     }
 
     [Fact]

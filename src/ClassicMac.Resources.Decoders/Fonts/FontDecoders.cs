@@ -259,6 +259,7 @@ namespace ClassicMac.Resources.Decoders.Fonts
                 w.WriteNumber("familyId", family.FamilyId);
                 w.WriteNumber("flags", family.Flags);
                 w.WriteNumber("version", family.Version);
+                if (family.Language is { } language) w.WriteNumber("language", language);
                 w.WriteNumber("firstChar", family.FirstChar);
                 w.WriteNumber("lastChar", family.LastChar);
                 w.WriteNumber("ascent", family.Ascent);
@@ -274,11 +275,26 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     w.WriteStartObject();
                     w.WriteNumber("size", font.Size);
                     w.WriteNumber("style", font.Style);
+                    w.WriteNumber("face", font.Face);
+                    w.WriteNumber("depth", font.Depth);
                     w.WriteNumber("id", font.FontId);
-                    var type = font.Size == 0 ? "sfnt" : input.Find(FourCC.FromString("NFNT"), font.FontId) is not null ? "NFNT"
+                    var type = font.Size <= 0 ? (input.Find(FourCC.FromString(font.Kind), font.FontId) is not null ? font.Kind : null)
+                        : input.Find(FourCC.FromString("NFNT"), font.FontId) is not null ? "NFNT"
                         : input.Find(FourCC.FromString("FONT"), font.FontId) is not null ? "FONT" : null;
                     if (type is null) w.WriteNull("resource");
                     else w.WriteString("resource", type);
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+                w.WriteStartArray("bounds");
+                foreach (var box in family.Bounds)
+                {
+                    w.WriteStartObject();
+                    w.WriteNumber("style", box.Style);
+                    w.WriteNumber("left", box.Left);
+                    w.WriteNumber("bottom", box.Bottom);
+                    w.WriteNumber("right", box.Right);
+                    w.WriteNumber("top", box.Top);
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -321,6 +337,15 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     w.WriteEndArray();
                     w.WriteStartArray("names");
                     foreach (var n in mapping.Names) w.WriteStringValue(n);
+                    w.WriteEndArray();
+                    w.WriteStartArray("glyphEncoding");
+                    foreach (var (code, glyph) in mapping.Encoding)
+                    {
+                        w.WriteStartObject();
+                        w.WriteNumber("code", code);
+                        w.WriteString("name", glyph);
+                        w.WriteEndObject();
+                    }
                     w.WriteEndArray();
                     w.WriteEndObject();
                 }
