@@ -177,7 +177,7 @@
     "resources": 289,
     "decoded": 116,
     "raw": 173,
-    "outputs": "c33bc155df62a1cbafb806670f056f112077d69b3be2e9206e527f6d0d763553"
+    "outputs": "500b73f8d4b1b068f1a1a51b58da4684f7019d3e51059ac5b354002105aa290e"
   },
   {
     "name": "Data Caste.rsf",
@@ -267,7 +267,7 @@
     "resources": 289,
     "decoded": 116,
     "raw": 173,
-    "outputs": "26931c9971d65634c9980d2fde9c1913d40dd23ab2b0c6e980b86e3d70e4b8c8"
+    "outputs": "e03ed91572fd4b411c33fd80541e8a0994edd895db54c3eba0ea73242d0ff3fa"
   },
   {
     "name": "Disk Copy 6.1 Manual",
@@ -321,7 +321,7 @@
     "resources": 293,
     "decoded": 120,
     "raw": 173,
-    "outputs": "48d50b7d753cbf9f7658bc70311a465e42b5b260c872bd83ef91babe34fca840"
+    "outputs": "82a142c79fc55a2c94a6de7d5bd1e7d566c70a389179ac2ee8631741e82a260f"
   },
   {
     "name": "Disk Copy 6.1.2.img.rsrc",
@@ -357,7 +357,7 @@
     "resources": 289,
     "decoded": 116,
     "raw": 173,
-    "outputs": "26931c9971d65634c9980d2fde9c1913d40dd23ab2b0c6e980b86e3d70e4b8c8"
+    "outputs": "e03ed91572fd4b411c33fd80541e8a0994edd895db54c3eba0ea73242d0ff3fa"
   },
   {
     "name": "DiskCopy 6.0.rsrc",
@@ -987,7 +987,7 @@
     "resources": 137,
     "decoded": 124,
     "raw": 13,
-    "outputs": "315d9fb671c6dca792c9a6ad600e0cf22a2c1a67e2d3b39914e1fe589cdc7889"
+    "outputs": "1fb6a1c32253745d99a5c60d2941c37d0ab27b4cc99a38c5fc2cc5bb4abab7a2"
   },
   {
     "name": "Scenario.rsf",
@@ -1149,7 +1149,7 @@
     "resources": 1676,
     "decoded": 1392,
     "raw": 284,
-    "outputs": "dc1f90de30f41397f261fce18252af2a6ac96feb5e3161b07c4c89b648ad838a"
+    "outputs": "6432de808a7906b3f3fd4541c1468e1bf80a2129402bfaba1718c6adce5631d1"
   },
   {
     "name": "Theldrow Font.rsrc.rsf",
@@ -1293,7 +1293,7 @@
     "resources": 293,
     "decoded": 120,
     "raw": 173,
-    "outputs": "843c1f8a84fcc9f92f5950f69a757e737c6762a57bc66991ad36894cd35d7104"
+    "outputs": "02fedebd6ceac789200cbf9b5ea6617389f581c53ab0f1cc7ffc7f93a61ac01b"
   },
   {
     "name": "dc612.rsrc",

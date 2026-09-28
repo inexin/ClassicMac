@@ -14,7 +14,10 @@ namespace ClassicMac.Resources.Decoders.Text
     /// <param name="Red">Red, 0–255.</param>
     /// <param name="Green">Green, 0–255.</param>
     /// <param name="Blue">Blue, 0–255.</param>
-    public sealed record TextRun(int Start, int Length, short FontId, string FontName, int Size, byte Face, byte Red, byte Green, byte Blue)
+    /// <param name="LineHeight">The line height the style records, in pixels (0 when there is none).</param>
+    /// <param name="Ascent">The font ascent the style records, in pixels (0 when there is none).</param>
+    public sealed record TextRun(int Start, int Length, short FontId, string FontName, int Size, byte Face, byte Red, byte Green, byte Blue,
+        short LineHeight = 0, short Ascent = 0)
     {
         /// <summary>Bold.</summary>
         public bool Bold => (Face & 0x01) != 0;
@@ -81,7 +84,7 @@ namespace ClassicMac.Resources.Decoders.Text
                 while (end < decoded.Length && styleOf[end] == styleOf[start]) end++;
                 var s = styles[styleOf[start]];
                 runs.Add(new TextRun(start, end - start, s.Font, StyleRuns.FontName(s.Font), s.Size > 0 ? s.Size : 12, s.Face,
-                    (byte)(s.Red >> 8), (byte)(s.Green >> 8), (byte)(s.Blue >> 8)));
+                    (byte)(s.Red >> 8), (byte)(s.Green >> 8), (byte)(s.Blue >> 8), s.Height, s.Ascent));
                 start = end;
             }
             return new StyledText(decoded, runs, complete);

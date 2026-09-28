@@ -65,11 +65,18 @@ namespace ClassicMac.Resources.Decoders.Text
             9 => "Toronto",
             11 => "Cairo",
             12 => "Los Angeles",
+            13 => "Zapf Dingbats", // 13–34: the LaserWriter fonts' standard numbers
+            14 => "Bookman",
+            15 => "Helvetica Narrow",
+            16 => "Palatino",
+            18 => "Zapf Chancery",
             20 => "Times",
             21 => "Helvetica",
             22 => "Courier",
             23 => "Symbol",
             24 => "Mobile",
+            33 => "Avant Garde",
+            34 => "New Century Schoolbook",
             _ => $"Font {id}",
         };
     }

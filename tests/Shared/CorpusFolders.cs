@@ -1,19 +1,23 @@
+using System.IO.Enumeration;
+
 namespace ClassicMac.Tests;
 
-// The real-file corpus lives outside the repo: CLASSICMAC_CORPUS names one folder or several, separated by ';'. The
+// The real-file corpus lives outside the repo: CLASSICMAC_CORPUS names folders or single files, separated by ';'. The
 // tests that use it skip when none of them exists.
 internal static class CorpusFolders
 {
     public static IReadOnlyList<string> Roots { get; } =
         (Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS") ?? "")
             .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(Directory.Exists)
+            .Where(r => Directory.Exists(r) || File.Exists(r))
             .ToList();
 
     public static bool Any => Roots.Count > 0;
 
     public static IEnumerable<string> EnumerateFiles(string pattern, SearchOption option) =>
-        Roots.SelectMany(r => Directory.EnumerateFiles(r, pattern, option));
+        Roots.SelectMany(r => File.Exists(r)
+            ? (FileSystemName.MatchesSimpleExpression(pattern, Path.GetFileName(r)) ? [r] : [])
+            : Directory.EnumerateFiles(r, pattern, option));
 
     // Folders of deliberately damaged inputs (the harness's damage tests): a folder named ndiftest, or one holding a
     // .classicmac-damage-test file. Tests that expect clean reads skip them; the tests written for them read them.
@@ -28,5 +32,5 @@ internal static class CorpusFolders
     }
 
     public static IEnumerable<string> EnumerateDirectories(string pattern, SearchOption option) =>
-        Roots.SelectMany(r => Directory.EnumerateDirectories(r, pattern, option));
+        Roots.Where(Directory.Exists).SelectMany(r => Directory.EnumerateDirectories(r, pattern, option));
 }
