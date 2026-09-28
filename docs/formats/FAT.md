@@ -603,9 +603,9 @@ A folder's name follows the same order, using the folder's record in its parent'
   checked on a volume the Mac sees as locked. An image that was read-only only on the host is no such test: the Mac
   saw it writable, File Exchange made `FINDER.DAT` and records in its cache, the writes failed (the Finder reported
   a problem with the disk), and a `.JPG` file with no record on disk showed `JPEG`/`ogle` [Verified], mapped through
-  a stale cached record [Code], while a file with a `RESOURCE.FRK` fork and no record showed `TEXT`/`dosa`, flags 0, put-away
-  folder 2 [Verified]. The run needs repeating with the image write-protected in the emulator. "Save info" off was
-  not tested.
+  a stale cached record [Code], while a file with a `RESOURCE.FRK` fork and no record showed `TEXT`/`dosa`, flags 0,
+  put-away folder 2 [Verified]. The run needs repeating with the image write-protected in the emulator. "Save info"
+  off was not tested.
 - DOS **hidden** or **system** makes the file invisible: the Finder flag `isInvisible` (`$4000`) is ORed onto the
   stored flags and never cleared, so a record that stores `$4000` keeps the file invisible after the PC clears the
   hidden attribute [Code]. (Making a file invisible on the Mac sets DOS hidden and stores the flags in the record
