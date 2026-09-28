@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "sha256": "614bb81d41216e726e30c2f7987632e84edf018ace3baa6139b582a7f84d6fae",
+    "type": "ppat",
+    "id": 301,
+    "reason": "Harness case: colour table before the pixel data. The Mac draws it; QuickDraw.Pict refuses it (a QuickDraw.Pict gap)."
+  },
+  {
+    "sha256": "614bb81d41216e726e30c2f7987632e84edf018ace3baa6139b582a7f84d6fae",
+    "type": "ppat",
+    "id": 302,
+    "reason": "Harness case: an RGB (type 2) pattern the Mac draws; QuickDraw.Pict reads it as truncated (a QuickDraw.Pict gap)."
+  }
+]

@@ -48,10 +48,12 @@ public class CorpusExportTests : IDisposable
             var inputDiagnostics = new List<Diagnostic>();
             List<ForkToExtract> forks;
             ContainerNode root;
+            IReadOnlyList<string> companions = [];
             try
             {
                 var input = Input.Open(new FileInfo(path), ContainerReadOptions.Default, inputDiagnostics);
                 root = input.Root;
+                companions = input.Host.Companions;
                 forks = Forks(input, inputDiagnostics);
             }
             catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
@@ -63,16 +65,18 @@ public class CorpusExportTests : IDisposable
                 Count(d.Severity == DiagnosticSeverity.Error ? damaged : warnings, d.Code);
             if (forks.Count == 0) continue;
 
-            var sha = Sha256(path);
+            var sha = Sha256([path, .. companions.Order(StringComparer.Ordinal)]); // a fork may be in a companion file
             if (summaries.ContainsKey(sha)) continue;
             var output = Path.Combine(folder, (target++).ToString(System.Globalization.CultureInfo.InvariantCulture));
             var exported = new List<(string Source, Diagnostic Diagnostic)>();
             var result = Unpacker.Extract(root, forks, output, ExportOptions.Default with { Decoders = decoders }, exported);
             var name = Path.GetFileName(path);
+            var damageTest = CorpusFolders.IsDamageTest(path);
             foreach (var failure in result.Failed) failures.Add($"{name}: {failure}");
             foreach (var (source, d) in exported)
             {
-                if (d.Severity == DiagnosticSeverity.Error || d.Code == "export.decoder-failed") failures.Add($"{name} > {source}: {d.Message} [{d.Code}]");
+                if (d.Severity == DiagnosticSeverity.Error && damageTest) Count(damaged, d.Code);
+                else if (d.Severity == DiagnosticSeverity.Error || d.Code == "export.decoder-failed") failures.Add($"{name} > {source}: {d.Message} [{d.Code}]");
                 else Count(warnings, d.Code);
             }
 
@@ -120,11 +124,10 @@ public class CorpusExportTests : IDisposable
             + string.Join('\n', changes.Take(50)));
     }
 
-    // Every file in the corpus folders except companions (.rsrc/.finf folders, ._ files) and empty ones.
+    // Every file in the corpus folders except companions (.rsrc/.finf folders, ._ files); an empty one may have a fork beside it.
     private static IEnumerable<string> Inputs() =>
         CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
             .Where(f => !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') && !Path.GetFileName(f).StartsWith("._", StringComparison.Ordinal))
-            .Where(f => new FileInfo(f).Length > 0)
             .Order(StringComparer.Ordinal);
 
     // The forks extract reads: a plain file that is no container is a raw fork, if it is one; otherwise each file's
@@ -188,6 +191,14 @@ public class CorpusExportTests : IDisposable
     {
         using var stream = File.OpenRead(path);
         return Convert.ToHexStringLower(SHA256.HashData(stream));
+    }
+
+    // One hash over several files' contents, in order (an input and its companions).
+    private static string Sha256(IEnumerable<string> paths)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (var path in paths) hash.AppendData(File.ReadAllBytes(path));
+        return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 
     private static void Count(SortedDictionary<string, int> counts, string code) => counts[code] = counts.GetValueOrDefault(code) + 1;
