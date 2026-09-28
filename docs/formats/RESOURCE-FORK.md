@@ -306,13 +306,14 @@ The byte at reference +$04 [Doc: *More Macintosh Toolbox*, except bit 0]:
   `$FFFFFE` [Code: Mac OS 9.0]; the 68k ROM rejects `$FFFFFF` and beyond [Code: 68k ROM].
 - **The Resource Manager does not grow a fork that far.** AddResource and ChangedResource return `eofErr` (−39)
   when the fork's end + the resource's size + `$118` reaches `$1000000`, and SetResourceSize returns −195 for a size of
-  `$FFFFFF` or more [Code: Mac OS 9.0]. Where an item offset does pass 24 bits, every store keeps `offset & $FFFFFF`
-  and UpdateResFile reports nothing [Code: Mac OS 9.0], but normal calls on a fork that opens cannot get there.
+  `$FFFFFF` or more, and −39 when moving the data would pass that limit [Code: Mac OS 9.0]. Where an item offset
+  does pass 24 bits, every store keeps `offset & $FFFFFF` and UpdateResFile reports nothing [Code: Mac OS 9.0], but
+  normal calls on a fork that opens cannot get there.
 - **The one larger fork seen is corruption.** Mac OS 9 corrupts a fork whose map comes before its data when it
   compacts it: its item offsets are rebased but `dO` is not, and a length read past the end from an uncleared buffer
-  is copied. Adding one 3-byte resource to such a fork produced a 63 MB fork with a garbage data offset, which Mac OS 9
-  then refuses to open (`mapReadErr`) [Code: Mac OS 9.0; Verified]. The 68k ROM rebases the offsets correctly
-  [Code: 68k ROM].
+  is copied. Adding one 3-byte resource to such a fork produced a 63 MB fork with a garbage data offset
+  [Code: Mac OS 9.0; Verified], which Mac OS 9 then refuses to open (`mapReadErr`, check 5 of §8.1)
+  [Code: Mac OS 9.0]. The 68k ROM rebases the offsets correctly [Code: 68k ROM].
 
 **ClassicMac's limits:**
 
@@ -1030,6 +1031,8 @@ decompression diagnostics by `ResourceDecompression.GetData`, their message pref
 
 - The Ind-call size cache for duplicate IDs (§8.4) was read in code only.
 - The 68k ROM's behaviour was traced in code only; it was never run (SheepShaver runs the native Resource Manager).
+- The size limits of §7 were traced in code but not yet run: reopening the 63 MB fork, forks ending at `$FFFFFE`
+  (open) and `$FFFFFF` (`mapReadErr`), and AddResource's `eofErr` near `$1000000`.
 - `'dcmp'` 0–3 of System versions other than 9.0, and the native `'ncmp'` decompressors, which Mac OS 9.0 never uses
   (they differ from `'dcmp'` 0 and 2 only on bad input).
 - The trap patches that extensions install on the Resource Manager (Multiple Users, Apple Menu Options, language

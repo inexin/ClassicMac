@@ -59,16 +59,20 @@ namespace ClassicMac.Resources.Decoders.Text
             if (styles.Count == 0) styles = [new StyleRun(0, 0, 0, 3, 0, 12, 0, 0, 0)];
 
             // As TEUseStyleScrap applies a style scrap (disassembly; SimpleText, the Help Manager and DOCMaker all use
-            // it): in stored order, the first run from the start of the text, each to the next run's start (in either
-            // direction when they are out of order), cut to the text, a later run overwriting an earlier one.
+            // it): in stored order from the start of the text, each run up to where the next run's start says (a run's
+            // own start is never read), in either direction when they are out of order, a later run overwriting an
+            // earlier one. Starts compare unsigned (a negative one is past the end); once a run reaches the end of the
+            // text, the rest are ignored.
             var styleOf = new int[decoded.Length];
-            for (var i = 0; i < styles.Count; i++)
+            var length = (uint)decoded.Length;
+            uint position = 0;
+            for (var i = 0; i < styles.Count && position < length; i++)
             {
-                var from = i == 0 ? 0 : styles[i].Start;
-                var to = i + 1 < styles.Count ? styles[i + 1].Start : decoded.Length;
-                var low = Math.Clamp(Math.Min(from, to), 0, decoded.Length);
-                var high = Math.Clamp(Math.Max(from, to), 0, decoded.Length);
+                var end = i + 1 < styles.Count ? Math.Min((uint)styles[i + 1].Start, length) : length;
+                var low = (int)Math.Min(position, end);
+                var high = (int)Math.Max(position, end);
                 styleOf.AsSpan(low, high - low).Fill(i);
+                position = end;
             }
             var runs = new List<TextRun>();
             for (var start = 0; start < decoded.Length;)

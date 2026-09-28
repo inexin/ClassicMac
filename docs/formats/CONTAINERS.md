@@ -7,10 +7,11 @@ ClassicMac's code. It also describes how ClassicMac unwraps containers nested in
 BinHex file inside an AppleSingle file). The code is in `ClassicMac.Files.Containers` (the readers and the writer) and
 `ClassicMac.Files` (`ContainerUnwrapper`, `ContainerReadOptions`).
 
-None of these formats is read or written by Mac OS itself. MacBinary and BinHex were defined by their authors for
-modem transfers and have no Apple specification; AppleSingle and AppleDouble were defined by Apple for A/UX and foreign
-file systems, but no Apple code in Mac OS 7.1–9 handles them (section 5). So the authors' and Apple's published
-descriptions are the whole reference, and nothing here could be checked in an emulator.
+None of these formats is read by Mac OS itself. MacBinary and BinHex were defined by their authors for modem
+transfers and have no Apple specification. On a Mac OS 9.0 disk no Apple code handles MacBinary, and the only Apple
+BinHex code is an encoder in the Web Sharing Extension (section 4.7). AppleSingle and AppleDouble were defined by
+Apple for A/UX and foreign file systems, but no Apple code in Mac OS 7.1–9 handles them (section 5). So the authors'
+and Apple's published descriptions are the whole reference, and nothing here could be checked in an emulator.
 
 References:
 
@@ -46,9 +47,8 @@ quotes, Mac dates as local-time seconds since 1904, structures as offset/size/ty
 
 - **[Doc]** is the *AppleSingle/AppleDouble Formats for Foreign Files* Developer Note (version 1 or 2, as stated) or
   *Inside Macintosh*. **[Author]** is one of the MacBinary specifications or the BinHex 4.0 description.
-- **[Code]** appears only for the finding that Mac OS does not handle these formats. **[Verified]** does not appear:
-  there is no Apple behaviour to check.
-- **[Fitted?]** marks a rule this document could not trace to a published source and that ClassicMac applies anyway.
+- **[Code]** appears only for the findings that Mac OS does not handle these formats, and for Apple's one BinHex
+  encoder (section 4.7). **[Verified]** does not appear: there is no Apple reader to check against.
 - A tag at the end of a table row or sentence covers that row or sentence.
 - Sentences that begin "ClassicMac …" describe the reader's own choices where the sources leave room: limits, how
   damage is recovered from, diagnostic severities. They are not claims about the format and carry no tag.
@@ -198,7 +198,8 @@ Checks common to all versions:
 3. The name length (byte 1) is 1–63. [Author]
 4. The name contains neither `:` (the HFS path separator, which no Mac name contains) nor a NUL byte. [Fitted]
 5. Both fork lengths are at most `$7FFFFF` (8 MiB − 1). [Author] for MacBinary I; ClassicMac applies the limit to II
-   and III as well [Fitted?].
+   and III as well. No Apple code on the Mac OS 9.0 disk reads or writes MacBinary, so there is no Apple limit to
+   match [Code: Mac OS 9.0 disk]: the limit is ClassicMac's choice, taken from the MacBinary authors'.
 
 Then:
 
@@ -350,6 +351,25 @@ ClassicMac:
 4. Reports a version byte other than 0 as `binhex.version` (Info) and reads on.
 5. Checks the header CRC, then slices the data fork and the resource fork. A fork longer than what was decoded is
    `binhex.fork-truncated` (Error); the decoded part is kept and its CRC is not checked.
+
+### 4.7 Apple's encoder
+
+The only Apple BinHex code on a Mac OS 9.0 disk is an encoder in the Web Sharing Extension 1.5.1, which serves a file
+as BinHex when a client asks for it [Code: Web Sharing Extension 1.5.1]:
+
+- It writes a cache file named after the source (cut to 28 characters) plus `.hqx`, of type `'TEXT'` and creator
+  `'ttxt'`, and rewrites it when the source's modification date is newer.
+- The text is the marker line, then 64-character lines, as in 4.1.
+- The header takes the name from the file's specification (so at most 31 bytes), version 0, the type and creator, and
+  `fdFlags` as stored, with no bits cleared.
+- The fork lengths are the forks' end-of-file values, signed 32-bit, with **no cap**; the data fork, then the
+  resource fork, each followed by its CRC (section 2.3).
+
+It has no decoder. URL Access and the Software Update engine decode `.hqx` and `.bin` files with Aladdin's StuffIt
+code linked into them, not Apple's; Internet Config holds only the file-type mappings [Code: Mac OS 9.0 disk].
+
+ClassicMac reads such files like any other: a 31-byte name is within 1–63, and it limits a fork only by
+`MaxExpandedBytesPerInput` (section 7.3).
 
 ---
 

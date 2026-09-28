@@ -324,6 +324,13 @@ are only logged [Code: 6.3.3]:
 Disk Copy 6.1.2 makes the same checks for versions 2, 10 and 11, except the reserved and segment fields, and returns
 −10 for every error, an unknown type included [Code: 6.1.2].
 
+The `+$48` check applies to types `$80`–`$83`, with `+$48` as stored (not doubled for version 10). Disk Copy 6.3.3
+logs it as "compressed block count exceeds max chunk block count"; 6.5b13 refuses it both in its driver and in its
+Check Image command (−8819) [Code: 6.1.2, 6.3.3, 6.5b13]. No version checks a chunk's stored length; a chunk that
+decodes to the wrong size fails only when read (the codec's error, −8819 or −10) [Code: 6.3.3, 6.5b13, 6.1.2].
+Disk Copy 6.5b13 turns the NDIF map into UDIF runs in memory: `+$48` becomes the buffers-needed value (doubled for
+version 10) and types `$80`–`$83` become `$80000001`–`$80000004` [Code: 6.5b13].
+
 ### 5.6 The checksum (CRC28)
 
 `+$50` holds a CRC-32 of the whole disk [Code: 6.3.3], [Verified: every sample]:
@@ -685,7 +692,7 @@ The last 512 bytes of the data fork [Verified: 6.5b13; the layout agrees with dm
 | `+$000` | 4 | `OSType` | `'koly'` | |
 | `+$004` | 4 | `u32` | Version | 4 |
 | `+$008` | 4 | `u32` | Header size | 512 |
-| `+$00C` | 4 | `u32` | Flags | 1 |
+| `+$00C` | 4 | `u32` | Flags: bit 0 = the resource fork is flattened into the data fork; bit 1 = every data run is raw ([§11.4](#114-checksums)) | 1; 3 for "entire device" |
 | `+$010` | 8 | `u64` | Running data fork offset | 0 |
 | `+$018` | 8 | `u64` | Data fork offset: where the runs' data start | 0 |
 | `+$020` | 8 | `u64` | Data fork length | up to the embedded resource fork |
@@ -706,6 +713,14 @@ The last 512 bytes of the data fork [Verified: 6.5b13; the layout agrees with dm
 | `+$1E8` | 4 | `u32` | Image variant | 1 |
 | `+$1EC` | 8 | `u64` | Sector count of the device | |
 | `+$1F4` | 12 | | Reserved | zeros |
+
+The flags [Code: 6.5b13]:
+
+- **Bit 0**: the resource fork is stored in the data fork, at the resource fork offset (§11.2). Disk Copy's flatten
+  routine sets it, its unflatten routine clears it, and opening an image tests it.
+- **Bit 1**: every data run is raw, so the data fork is a sector-for-sector copy of the device. The image builder
+  starts with it set and clears it at the first run that is not raw; when it is set, Disk Copy skips the run tables
+  and reads the data fork directly. (The name is ClassicMac's; the code only tests the bit.)
 
 ### 11.2 Where the block tables are
 
@@ -786,8 +801,8 @@ With MD5 (the "entire device" image, which stores every sector, free space inclu
 - the `koly` master checksum is the MD5 of the partitions' 16-byte MD5s concatenated in `blkx` order (−1, 0, 1); the
   `vers` text shows it as "MD5 $…".
 
-Its `koly` flags are 3 where the other images have 1; bit 1's meaning is unknown [Verified: 6.5b13; meaning not
-traced].
+Its `koly` flags are 3 where the other images have 1 [Verified: 6.5b13]: bit 1 says every run is raw
+([§11.1](#111-the-koly-trailer)) [Code: 6.5b13].
 
 ### 11.5 Other UDIF files
 
@@ -850,5 +865,9 @@ File Exchange 3.0.3 was active, because that extension installs its own, newer `
   [Fitted?].
 - **Chunk type `$F0` and `+$74`/`+$78`** come only from Aaru; no image with them has been seen [Fitted?].
 - **Disk Copy 4.2's tag checksum** skipping the first 12 bytes was matched on one image, not traced in code [Fitted].
+- **The `+$48` check in an emulator.** The rule of [§5.5](#55-validation) (a compressed chunk covering more sectors
+  than `+$48` is damaged; equal passes) is traced in all three Disk Copy versions but not yet run: a KenCode image
+  whose `+$48` is one below its largest chunk should give −8819 in 6.3.3, −10 in 6.1.2 and message 50 from 6.5b13's
+  Check Image, and mount at equal.
 - **UDIF:** zlib, bzip2, LZFSE, zero and comment runs, the XML property list and later `koly` versions are known only
-  from dmg2img. Bit 1 of the `koly` flags (set in "entire device" images) is not understood.
+  from dmg2img.

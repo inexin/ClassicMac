@@ -12,6 +12,9 @@ References:
   (`StScrpRec`), the standard font family numbers.
 - *Inside Macintosh: Macintosh Toolbox Essentials* (1992), Finder Interface chapter: the version resource.
 - *Inside Macintosh: More Macintosh Toolbox* (1993), Help Manager: styled text kept as a `'TEXT'`/`'styl'` pair.
+- Apple's Rez template for `'vers'` (`SysTypes.r`, MPW).
+- Mac OS 9.0, disassembly: TextEdit's `TEUseStyleScrap` (the ROM and its copy in the System file), the Help Manager
+  (`'PACK'` 14), SimpleText 1.4 and Finder 9.0; and the System 7.1-era Font Manager for default sizes.
 - Unicode's Apple mapping file `VENDORS/APPLE/ROMAN.TXT` (version c02, 2005): Mac OS Roman to Unicode.
 - Microsoft's *Rich Text Format (RTF) Specification*, version 1.9.1 (2008): the RTF output.
 
@@ -147,7 +150,8 @@ A `'STR#'` resource is a count followed by that many Pascal strings, packed with
 | +$02 | … | Pascal strings | The strings, one after another |
 
 - The Toolbox numbers the strings from **1** (`GetIndString`), and returns an empty string for an index past the
-  count [Doc]. ClassicMac's JSON array is 0-based: array element *i* is string *i* + 1 [ClassicMac].
+  count [Doc]; for index 0 or a missing `'STR#'` too (the count compared unsigned) [Code: Mac OS 9.0 Help Manager's
+  copy of the glue]. ClassicMac's JSON array is 0-based: array element *i* is string *i* + 1 [ClassicMac].
 - *Inside Macintosh* declares the count as an integer; ClassicMac reads it unsigned, so a count of $8000 or more is
   read as a large count and the data's end stops the list [ClassicMac].
 - **Cut lists.** When the data ends before the count is reached, the strings read so far are kept; a string whose
@@ -179,6 +183,16 @@ itself has no limit, and ClassicMac reads it whole [ClassicMac].
   items name one ID for both resources [Doc] (*More Macintosh Toolbox*), and DOCMaker's reader loads chapter *k*'s
   `'TEXT'` and `'styl'` from the same ID and passes both to TextEdit [Code] (DOCMaker 4.8.4 stand-alone reader).
 - A compressed `'styl'` is decompressed like any resource (see [RESOURCE-FORK.md](RESOURCE-FORK.md)) [ClassicMac].
+
+The Help Manager's styled items [Code: Mac OS 9.0 `'PACK'` 14]:
+
+- It loads the `'TEXT'` and then the `'styl'` of the **same ID**, with `GetResource` (any open file). No `'TEXT'`: no
+  balloon.
+- It sets the whole text, then applies the `'styl'` with `TEUseStyleScrap` (§6.4) over characters 0 to $7FF only; the
+  text after that is not restyled.
+- With no `'styl'` on a system whose script is not Roman, it sets the script's system font and size (the exact
+  condition was not worked out).
+- A string item (`'STR#'`) that `GetIndString` returns empty is an error to the Help Manager: no balloon (§4).
 
 Example (golden `'TEXT'` 128, 26 bytes):
 
@@ -218,10 +232,12 @@ Each element:
 
 - Runs are stored in order of start, and the first starts at 0 [Doc]. Each run extends to the next run's start; the
   last to the end of the text [Doc].
-- Height and ascent are TextEdit's line metrics for the run. ClassicMac keeps them in the JSON and does not use them
-  for RTF [ClassicMac].
-- A size of 0 means the default size [Doc]; ClassicMac takes it (and any negative size) as 12 points in styled output,
-  and keeps the stored value in the JSON [ClassicMac].
+- Height and ascent are TextEdit's line metrics for the run. `TEUseStyleScrap` ignores them and TextEdit computes its
+  own [Code: Mac OS 9.0 ROM]. ClassicMac keeps them in the JSON and does not use them for RTF [ClassicMac].
+- A size of 0 means the default size [Doc]. TextEdit stores the 0, and the Font Manager picks the size: the system
+  font size for font 0 when that is not 0; else its default size (`FMDefaultSize`, 12 unless changed); else 12
+  [Code: System 7.1-era Font Manager]. ClassicMac takes a size of 0 (and any negative size) as
+  12 points in styled output, and keeps the stored value in the JSON [ClassicMac].
 - ClassicMac reads the count unsigned. When the data ends inside an element, the elements before it are used and
   `text.styl-short` is reported. A 1-byte resource has no count and is reported the same way; an empty one is reported
   when decoded on its own, but styles its `'TEXT'` with the default run silently [ClassicMac].
@@ -268,21 +284,36 @@ names ClassicMac gives them [ClassicMac]:
 
 ### 6.4 How runs map onto the text
 
-For styled output (RTF, the app's preview) ClassicMac turns the stored elements into runs that cover the whole text
-[ClassicMac]:
+A `'styl'` reaches TextEdit through `TEUseStyleScrap` (`SetStylScrap`), which applies it over a range of the text;
+SimpleText (§7), the Help Manager (§5) and DOCMaker all use it. It checks nothing and returns no error
+[Code: Mac OS 9.0 ROM; the System file's copy is byte-identical]:
 
-1. Decode the text (§2). Drop elements whose start is negative; sort the rest by start, keeping stored order among
-   equal starts.
-2. If no element is left, or the first starts after 0, put a default run in front: font 3 (Geneva), size 12, face 0,
-   black.
-3. Run *i* covers `[min(start_i, L), min(start_{i+1}, L))`, the last one to *L*, where *L* is the text length. Runs
-   that cover nothing (equal starts, starts past the end) are dropped, so of several elements with the same start the
-   last one wins.
-4. Colours become 8-bit by taking each component's high byte (`$8000` → 128, `$FFFF` → 255).
-5. A size of 0 or less becomes 12.
+```
+rs, re = the range, sorted, each pinned to the text length L
+pos = rs
+for i = 0 … n − 1:
+    if pos >= re: stop                                        (unsigned)
+    end = (i == n − 1) ? re : min(rs + start[i + 1], re)      (32-bit add, unsigned compare)
+    style [min(pos, end), max(pos, end)) with element i       (font, face, size, colour; empty: skipped)
+    pos = end
+```
 
-TextEdit's own handling of unsorted, overlapping or out-of-range starts has not been traced; the rules above only
-make any input give a covering, ordered set of runs.
+- An element's own `scrpStartChar` is never read: run 0 starts at the range start, and each start only ends the run
+  before it.
+- **Unsorted** starts: a run is applied backwards over `[end, pos)`, and later runs restyle text already styled; the
+  last write wins.
+- **Equal** starts give an empty run, which is skipped: of duplicates, the later one wins.
+- **Past the text**: ends are pinned to the range end, and once a run reaches it the later elements are ignored. The
+  compare is unsigned, so a negative start counts as past the end.
+- `TESetStyleHandle` installs TextEdit's internal style record, not a `'styl'`, and `TEStyleNew` never reads one.
+
+For styled output (RTF, the app's preview) ClassicMac applies the elements exactly this way over the whole text
+(the range 0 to *L*) [ClassicMac: the range]. With no element (no `'styl'`, or an empty one), one default run covers
+the text: font 3 (Geneva), size 12, face 0, black [ClassicMac].
+
+Then adjacent characters styled by the same element form one run; colours become 8-bit by taking each component's
+high byte (`$8000` → 128, `$FFFF` → 255), and a size of 0 or less becomes 12 [ClassicMac]. A sorted `'styl'` whose
+starts lie within the text gives TextEdit's result.
 
 Example (golden `'styl'` 128 with `'TEXT'` 128, 26 characters):
 
@@ -300,15 +331,33 @@ gives three runs: `Title␍` (0–6), `Body ` (6–11) and `text, “quoted”.`
 ## 7. SimpleText documents
 
 SimpleText (and TeachText before it) keeps a document's text in the **data fork** of a file of type `'TEXT'` (creator
-`'ttxt'`; read-only documents are type `'ttro'`), and its styles in `'styl'` resource **128** of the same file's
-resource fork [Fitted]. The data fork is plain Mac text (§2), with no header; the `'styl'` is the record of §6 applied
-to it [Fitted]. Pictures are `'PICT'` resources from 1000 up, drawn at option-space ($CA) characters in the text
-[Fitted].
+`'ttxt'`; read-only documents are type `'ttro'`, read by the same code), and its styles in `'styl'` resource **128**
+of the same file's resource fork. SimpleText 1.4 (Mac OS 9.0) [Code: SimpleText 1.4]:
 
-- ClassicMac's viewer shows such files as styled text (§6.4), with the `'styl'` 128 when there is one and one default
-  run when there is not; it reads data forks up to 4 MB for this [ClassicMac].
+- **Text.** A data fork over **$7C00** (31,744) bytes is refused (error 200). Otherwise the whole data fork is the
+  text: plain Mac text (§2), no header.
+- **Styles.** `'styl'` 128 from the document's own resource fork (`Get1Resource`) is applied over characters 0 to
+  $7FFF with `TEUseStyleScrap`, so the rules of §6.4 hold. Saving removes the old `'styl'` 128 (and `'snd '` 10000,
+  the document's voice annotation) and writes the current styles back as `'styl'` 128.
+- **Pictures** are looked for only when the document's resource fork holds at least one `'PICT'`. Then **every** $CA
+  (option-space) in the text counts, not only one at a line start (the search string is `'STR#'` 600 item 7): the
+  *k*-th, counting from 0 in text order, shows **`'PICT'` 1000 + *k*** from the document's own fork. *k* advances
+  even when that picture is missing, so a missing one leaves a gap in the numbering.
+- **Placement.** The picture's frame comes from its header, scaled to 72 dpi (by its horizontal and vertical
+  resolution) for an extended version 2 header (the word at +$0A is $0011 and the word at +$10 is −2). The frame is
+  centred on the view's width, (right − left)/2 − width/2, with the view's left edge not added. Its top is the
+  vertical position `TEGetPoint` gives for the $CA (the bottom of its line) less the height of the **first** line.
+  It is drawn over the text, with no wrap, clipped to the view.
+- **Printing.** When the document has `'form'` resources, `'form'` $726D + *k* belongs to the *k*-th $CA: bit 0 of its
+  first long set ends the page after that $CA's line.
+
+What ClassicMac does [ClassicMac]:
+
+- Its viewer shows such files as styled text (§6.4), with the `'styl'` 128 when there is one and one default run when
+  there is not. It reads data forks up to 4 MB for this, past SimpleText's limit.
+- It does not draw the pictures.
 - `extract` writes the `'styl'` 128 like any resource (JSON); `unpack` writes the data fork unchanged. A document
-  output (text with its pictures) is planned, not built [ClassicMac].
+  output (text with its pictures) is planned, not built.
 
 ---
 
@@ -316,9 +365,15 @@ to it [Fitted]. Pictures are `'PICT'` resources from 1000 up, drawn at option-sp
 
 ### 8.1 Layout
 
-A `'vers'` resource describes the version of a file (ID 1) or of the product it belongs to (ID 2); the Finder shows
-the long version string of `'vers'` 1 in the Get Info window, and that of `'vers'` 2 under it [Doc]
-(*Inside Macintosh: Macintosh Toolbox Essentials*, Finder Interface).
+A `'vers'` resource describes the version of a file (ID 1) or of the product it belongs to (ID 2) [Doc]
+(*Inside Macintosh: Macintosh Toolbox Essentials*, Finder Interface). The Finder shows only the strings
+[Code: Finder 9.0]:
+
+- `'vers'` 1's **long** string is Get Info's "Version:" field. With no `'vers'` 1 the Finder uses the string of the
+  file's owner resource (the creator code, ID 0), and when that is empty, "n/a".
+- `'vers'` 1's **short** string is the list view's Version column (and AppleScript's `version` property).
+- `'vers'` 2's **long** string is shown at the top of the Get Info window.
+- The numbers are never shown; the Finder only compares the first word of `'vers'` 1 as a number in places.
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
@@ -344,8 +399,12 @@ The first four bytes are the `NumVersion` record [Doc]. Stages [Doc]:
 - The major version is read as BCD: `(high nibble × 10) + low nibble` [Doc]. Nibbles above 9 are not rejected; they
   simply add (`$1A` → 20) [ClassicMac].
 - Minor and bug-fix are the two nibbles of byte 1 [Doc].
-- The non-release number is read as BCD too (`$12` → 12) [ClassicMac]. *Inside Macintosh* does not say plainly
-  whether this byte is BCD; this reading has no Apple source yet.
+- The non-release byte has no Apple reading: no Mac OS 9.0 code interprets it, since the Finder copies only the
+  strings [Code: Finder 9.0]. *Inside Macintosh* does not say whether it is BCD, and Apple's Rez template marks the
+  two bytes before it "in BCD" but this one only as a hex byte [Doc] (`SysTypes.r`), which suggests binary. Apple's
+  own files store BCD, though (Disk Copy 6.5b13: $13 for "6.5b13"), and some other developers' binary ($0F for
+  15). ClassicMac reads it as BCD when both nibbles are 0–9 (`$12` → 12), and as binary otherwise (`$0F` → 15)
+  [Fitted: Apple's and others' files].
 - The region code is a signed integer, kept as a number [Doc].
 - Strings are Mac OS Roman (§2). Long version strings may hold a CR: Disk Copy writes the image checksum on a second
   line (`…image␍CRC: $…`) [Fitted].
@@ -370,6 +429,8 @@ An unknown stage byte uses the letter `?` and the stage name `unknown ($XX)` (tw
 | --- | --- | --- |
 | `04 84 80 00` | 4.8.4 | final |
 | `01 00 60 03` | 1.0b3 | beta |
+| `06 50 60 13` | 6.5b13 | beta |
+| `03 00 60 0F` | 3.0b15 | beta |
 | `10 25 20 12` | 10.2.5d12 | development |
 | `02 10 40 01` | 2.1a1 | alpha |
 | `01 20 80 00` | 1.2 | final |
@@ -473,7 +534,7 @@ A `'styl'` is written as JSON whether or not a `'TEXT'` of the same ID exists [C
 | `minor` | integer | Minor version (0–15) |
 | `bugFix` | integer | Bug-fix version (0–15) |
 | `stage` | string | `development`, `alpha`, `beta`, `final` or `unknown ($XX)` |
-| `nonRelease` | integer | Non-release number (BCD decoded, §8.2) |
+| `nonRelease` | integer | Non-release number (BCD, or binary when not BCD; §8.2) |
 | `region` | integer | Region code |
 | `shortVersion` | string | Short version string |
 | `longVersion` | string | Long version string, with LineEndings applied |
@@ -583,8 +644,8 @@ The golden `'TEXT'` 128 with `'styl'` 128 (§5, §6.4) gives:
 ## 12. Diagnostics
 
 All are warnings: the output is still written from what could be read, except where noted [ClassicMac]. On the Mac,
-`GetIndString` returns an empty string for an index past a list's count [Doc]; what the Toolbox does with the other
-damaged cases below has not been traced.
+`GetIndString` returns an empty string for an index past a list's count (§4), and TextEdit applies any `'styl'`
+without complaint (§6.4); what the Toolbox does with the other damaged cases below has not been traced.
 
 | Code | Severity | Emitted by | Meaning |
 | --- | --- | --- | --- |

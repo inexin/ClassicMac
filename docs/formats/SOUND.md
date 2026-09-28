@@ -21,8 +21,9 @@ References:
   - the Sound Manager's 68k code in the System file (`gpch` 666, a relinked copy of the ROM's): `SndPlay`,
     `GetSoundHeaderOffset`, `SetSoundHeader`, `GetCompressionInfo`, `ParseSndHeader`;
   - SoundLib (`nlib` 666), the PowerPC code a PowerPC Mac runs: `Exp1to3` and `Exp1to6`, the MACE expanders;
-  - the `sdec` decompressor components: `ima4` (`thng`/`sift`/`nift` −16589) and the `MAC3`/`MAC6` wrappers
-    (−16566, −16567);
+  - the `sdec` decompressor components, the only five in the System file: `ima4` (`thng`/`sift`/`nift` −16589),
+    `ulaw` (−16593), `sowt` (−20027) and the `MAC3`/`MAC6` wrappers (−16566, −16567); and the `conv` sifter
+    (−16559), which converts between sample sizes;
   - the NewWorld Mac OS ROM's 68k Sound Manager (3.2) and its MACE code, where the 68k behaviour differs.
 - ITU-T Recommendation G.711 (µ-law).
 - IMA Digital Audio Focus and Technical Working Groups, *Recommended Practices for Enhancing Digital Audio
@@ -51,8 +52,8 @@ Contents
 ## 1. Conventions
 
 - The conventions and source tags of [README.md](README.md) apply: big-endian values, `$` hex offsets, and one of
-  **[Doc]**, **[Code]**, **[Verified]**, **[Author]**, **[Fitted]** on every rule. A tag with a question mark
-  (**[Fitted?]**) marks a rule whose source is not settled.
+  **[Doc]**, **[Code]**, **[Verified]**, **[Author]**, **[Fitted]** on every rule; **[ClassicMac]** marks
+  ClassicMac's own choice where a table needs a tag.
 - In this document:
   - **[Doc]** is *Inside Macintosh: Sound* and Apple's `Sound.h`;
   - **[Code]** is Sound Manager 3.5.1 on Mac OS 9.0 (the System file's 68k Sound Manager, SoundLib, the `sdec`
@@ -132,8 +133,9 @@ mono, $03C0 for MACE 3 stereo, $0480 for MACE 6 mono, and $0080 or $00C0 for IMA
 - Format 1: only the first synthesizer's ID is used. Its init options, and any further synthesizers, do not change
   how the resource is read [Code].
 - Format 1 with no synthesizer: the channel gets the note synthesizer, and a `bufferCmd` then fails with −205 [Code].
-- Format 2: `refCount` is ignored [Code].
-- All commands run in order [Code].
+- Format 1: all commands run in order [Code].
+- Format 2: `SndPlay` never reads the command list, its flags or `refCount`. It makes the channel a sampled-sound
+  channel itself (`SetChannelType` 5) and issues its own `bufferCmd` for the header after the commands (§4) [Code].
 - No other resource type holds sounds: the Sound Manager fetches only `'snd '` (`SysBeep`, falling back to ID 1, and
   `SndStartFilePlay`). There is no `'csnd'` anywhere in the System file or the ROM [Code].
 
@@ -204,8 +206,9 @@ The Sound Manager has two ways of finding a resource's header, and they disagree
 
 - **`SndPlay`**, format 1: runs the commands; a `bufferCmd` or `soundCmd` with the data-offset flag finds its header
   at `param2` [Doc][Code].
-- **`SndPlay`**, format 2: computes the header itself, at **6 + 8 × `numCommands`**, right after the commands, and
-  never reads `param2` [Code].
+- **`SndPlay`**, format 2: never reads the commands. It builds its own `bufferCmd` ($0051, `param1` 0) for the header
+  at **6 + 8 × `numCommands`**, right after the commands, and plays it once, whatever the list holds: no command, a
+  `soundCmd` or garbage [Code].
 - **`GetSoundHeaderOffset`** (used by `ParseSndHeader` and by `SndStartFilePlay`), both formats: takes the first
   command that is exactly $8050 or $8051 and returns its `param2` unchecked. A $0051 command is missed
   [Code][Verified].
@@ -218,17 +221,20 @@ ClassicMac follows `SndPlay`:
 
 ```
 players = commands whose cmd has bit 15 set and whose code (cmd & $7FFF) is 80 or 81
-if players is empty: no sampled sound (the JSON alone, §11.1)
-offset = players[0].param2
-if format == 2 and offset >= 0 and offset != 6 + 8 × numCommands:
-    offset = 6 + 8 × numCommands                       # diagnostic sound.header-offset
+if format == 2:
+    offset = 6 + 8 × numCommands      # sound.header-offset when players[0].param2 >= 0 points elsewhere
+else if players is empty:
+    no sampled sound (the JSON alone, §11.1)
+else:
+    offset = players[0].param2
 read the header at offset (§5)
 ```
 
-- With several such commands the first is decoded (diagnostic `sound.several-sounds`); `SndPlay` would play each in
-  turn [Code].
-- The selection (first flagged command with code 80 or 81) is the same as `GetSoundHeaderOffset`'s [Code]. Whether
-  `SndPlay`'s format 2 path needs such a command at all was not traced [Fitted?].
+- With several such commands the first is decoded (diagnostic `sound.several-sounds`); in format 1 `SndPlay` would
+  play each in turn [Code].
+- The format 1 selection (first flagged command with code 80 or 81) is the same as `GetSoundHeaderOffset`'s [Code].
+- A format 2 sound plays once at its recorded rate: the command `SndPlay` builds ignores the loop and the base note
+  (§3.4) [Code].
 
 ---
 
@@ -287,9 +293,10 @@ Layout [Doc]; which fields are read [Code].
   same.
 - More than 2 channels fails with −206 [Code]. ClassicMac accepts 1 to 64 and refuses 0 or more
   (`sound.bad-header`).
-- `SetSoundHeader` raises a `sampleSize` below 8 to 8; `ParseSndHeader` does not [Code]. ClassicMac accepts 8, 16, 24
-  and 32 and refuses any other size (`sound.bad-header`).
-- 8-bit samples are offset binary (`'raw '`), larger ones big-endian two's complement (`'twos'`) [Code].
+- `SetSoundHeader` raises a `sampleSize` below 8 to 8; `ParseSndHeader` does not. Nothing else is checked: every size
+  other than 8 is read as 16-bit, so 24- and 32-bit samples are misread [Code]. ClassicMac accepts 8 and 16 and
+  refuses any other size (`sound.bad-header`) rather than reproduce the misreading.
+- 8-bit samples are offset binary (`'raw '`), 16-bit ones big-endian two's complement (`'twos'`) [Code].
 - Channels are interleaved by frame; a frame is `numChannels` × `sampleSize`/8 bytes [Doc][Code].
 - The samples take `numFrames` × `numChannels` × `sampleSize`/8 bytes.
 
@@ -341,13 +348,14 @@ is a common mistake.
 
 | Format | Samples per packet | Bytes per packet per channel | Output of the Sound Manager's decoder |
 | --- | --- | --- | --- |
-| `'raw '`, `'twos'` | 1 | `sampleSize`/8 | as stored |
+| `'raw '`, `'twos'` | 1 | 1 for a `sampleSize` of 8, else 2 (§6) | as stored |
+| `'sowt'` | 1 | 2 | 16-bit `'twos'` |
 | `'MAC3'` | 6 | 2 | 8-bit offset binary |
 | `'MAC6'` | 6 | 1 | 8-bit offset binary |
 | `'ima4'` | 64 | 34 | 16-bit `'twos'` (or 8-bit on request) |
 | `'ulaw'` | 1 | 1 | 16-bit `'twos'` |
 
-MACE and IMA 4:1 [Code]; µ-law's counts [Verified].
+MACE, IMA 4:1, `'sowt'` and µ-law [Code]; µ-law's counts also [Verified].
 
 ClassicMac reads `compressionID` as the table says (an ID it refuses gives `sound.bad-header`), then takes the
 samples:
@@ -366,24 +374,31 @@ Where the resource holds fewer bytes than that, the samples are cut to what it h
 
 | `format` | Meaning | Source |
 | --- | --- | --- |
-| `'raw '` | 8-bit offset binary: $80 is silence, $00 the most negative value | [Doc][Code] |
-| `'twos'` | two's complement, big-endian, 8 or 16 bits (24 and 32 in an extended header, §5.3) | [Doc][Code] |
-| `'sowt'` | 16-bit two's complement, little-endian (an `sdec` component in Mac OS 9.0) | [Code] |
-| `'in24'` | 24-bit two's complement, big-endian | [Fitted?] |
-| `'in32'` | 32-bit two's complement, big-endian | [Fitted?] |
-| `'fl32'` | 32-bit IEEE 754 float, big-endian, ±1.0 full scale | [Fitted?] |
-| `'fl64'` | 64-bit IEEE 754 float, big-endian | [Fitted?] |
+| `'raw '` | 8-bit offset binary: $80 is silence, $00 the most negative value; 16-bit: as `'twos'` | [Doc][Code] |
+| `'twos'` | two's complement, big-endian, 8 or 16 bits | [Doc][Code] |
+| `'sowt'` | 16-bit two's complement, little-endian, whatever `sampleSize` says (`sdec` −20027) | [Code] |
+| `'in24'` | 24-bit two's complement, big-endian | [ClassicMac] |
+| `'in32'` | 32-bit two's complement, big-endian | [ClassicMac] |
+| `'fl32'` | 32-bit IEEE 754 float, big-endian, ±1.0 full scale | [ClassicMac] |
+| `'fl64'` | 64-bit IEEE 754 float, big-endian | [ClassicMac] |
 | `'MAC3'` | MACE 3:1 (§8) | [Code] |
 | `'MAC6'` | MACE 6:1 (§8) | [Code] |
 | `'ima4'` | IMA 4:1 ADPCM (§9) | [Code] |
 | `'ulaw'` | µ-law (§10) | [Code] |
 
 - Multi-channel samples are interleaved by frame (by packet, for the codecs) [Doc][Code].
-- Stock Mac OS 9.0 plays `'raw '`, `'twos'`, `'sowt'`, `'ulaw'`, `'ima4'`, `'MAC3'` and `'MAC6'` [Code]. `'in24'`,
-  `'in32'`, `'fl32'`, `'fl64'` and `'alaw'` are not in the System file; they come with QuickTime [Code]. ClassicMac
-  reads the first four as the table says; `'alaw'` and any other codec are not decoded (`sound.codec`).
-- ClassicMac takes `'raw '`, `'twos'` and `'sowt'` with a `sampleSize` of 16, 24 or 32 as that many bits, and any
-  other size as 8 bits; a `'raw '` sample wider than 8 bits is read as big-endian offset binary [Fitted?].
+- The Sound Manager decodes `'raw '`, `'twos'`, `'MAC3'` and `'MAC6'` itself; any other format needs an `sdec`
+  component, and the System file has only `'MAC3'`, `'MAC6'`, `'ima4'`, `'ulaw'` and `'sowt'` [Code]. So stock
+  Mac OS 9.0 plays those seven.
+- `'in24'`, `'in32'`, `'fl32'`, `'fl64'` and `'alaw'` appear nowhere in the System file (either fork) or the ROM: the
+  Sound Manager fails them with −223 [Code]. QuickTime may register components for them; that was not checked.
+  ClassicMac reads the first four anyway, as QuickTime formats with the layouts above (its own choice; no Apple code
+  for them was traced). `'alaw'` and any other codec are not decoded (`sound.codec`).
+- The Sound Manager treats `'raw '` and `'twos'` alike past 8 bits: every `sampleSize` other than 8 is read as 16-bit
+  signed big-endian, so 16-bit `'raw '` is **not** offset binary, and 24- or 32-bit samples are misread as 16-bit
+  [Code]. ClassicMac reads 8- and 16-bit `'raw '` and `'twos'` and refuses other sizes (`sound.bad-header`).
+- `'sowt'` ignores `sampleSize`: its component always reports 2 bytes per sample [Code]. ClassicMac reads it as
+  16-bit.
 - A trailing partial frame is dropped.
 
 ---
@@ -393,14 +408,15 @@ Where the resource holds fewer bytes than that, the samples are cut to what it h
 The loop points and the base note are used **only for instrument playback** (`soundCmd` followed by note commands),
 never by `bufferCmd` [Code]:
 
-- A note plays at 2^((note − `baseFrequency`)/12) × the recorded rate [Code].
+- A note plays at 2^((note − `baseFrequency`)/12) × the recorded rate, the difference clamped to ±127 semitones
+  [Code]. A `baseFrequency` of 0 has **no special case**: base 0 with note 60 plays 32 times faster [Code].
 - A loop exists only if `loopEnd` > `loopStart` and `loopEnd` − `loopStart` > 2 [Code].
 - With a loop, the attack plays frames [0, `loopEnd`), the sustain repeats [`loopStart`, `loopEnd`) while the note
   lasts, and the release plays from `loopEnd` + 1 for `numFrames` − `loopEnd` frames [Code].
 - Loop points count frames [Doc].
 
-ClassicMac keeps them as information in the WAV's `smpl` chunk (§11.2) and the JSON. It takes a `baseFrequency` of 0
-as 60 [Fitted?].
+ClassicMac keeps them as information in the WAV's `smpl` chunk (§11.2) and the JSON, the base note as stored (0 is
+note 0).
 
 ---
 
@@ -903,7 +919,7 @@ INDEX = [ -1, -1, -1, -1, 2, 4, 6, 8,  -1, -1, -1, -1, 2, 4, 6, 8 ]           ni
 
 ## 10. µ-law
 
-`'ulaw'` is G.711 µ-law [Author], one byte per sample, decoded by an `sdec` component to 16-bit [Code]:
+`'ulaw'` is G.711 µ-law [Author], one byte per sample, decoded by the `sdec` component −16593 to 16-bit [Code]:
 
 ```
 u = (NOT code) & $FF
@@ -911,10 +927,12 @@ t = (((u & $0F) << 3) + $84) << ((u >> 4) & 7)
 sample = (u & $80) ? ($84 - t) : (t - $84)
 ```
 
-[Author][Verified]. The samples range over ±32 124; $FF and $7F give 0.
+[Author][Code][Verified]. The component's table is the standard G.711 one, all 256 entries [Code]. The samples range
+over ±32 124; $FF and $7F give 0.
 
-- `numFrames` counts samples [Verified].
-- Channels interleave by sample [Fitted?] (only mono was verified).
+- `numFrames` counts samples [Code][Verified].
+- Channels interleave **by byte**: L, R, L, R … (68k `sift` and PowerPC `nift` alike) [Code]. Only mono was verified.
+- Asked for 8-bit output, the component gives the sample's high byte XOR $80 [Code]. ClassicMac writes 16-bit.
 
 ---
 
@@ -925,7 +943,7 @@ sample = (u & $80) ? ($84 - t) : (t - $84)
 | Resource | Output |
 | --- | --- |
 | A sampled sound ClassicMac decodes | `.wav` (§11.2) and `.json` (§11.3) |
-| Commands only (no flagged `bufferCmd`/`soundCmd`), or a header that cannot be read | `.json` alone |
+| Format 1 with commands only (no flagged `bufferCmd`/`soundCmd`), or a header that cannot be read | `.json` alone |
 | A sampled sound in a format not decoded | nothing from the decoder (`sound.codec`); the exporter writes the resource's data as `.bin` |
 | Not a `'snd '` (format neither 1 nor 2, or too short for its lists) | nothing from the decoder; exported as `.bin` |
 
@@ -939,10 +957,9 @@ Samples:
 | Source | WAV samples |
 | --- | --- |
 | 8-bit `'raw '` | copied (WAV's 8-bit samples are offset binary too) |
-| 8-bit `'twos'`, `'sowt'` | each byte XOR $80 |
-| 16/24/32-bit `'twos'`, `'in24'`, `'in32'` | byte order reversed |
-| 16-bit `'sowt'` | copied |
-| 16/24/32-bit `'raw '` | byte order reversed, then the sign bit flipped |
+| 8-bit `'twos'` | each byte XOR $80 |
+| 16-bit `'raw '` and `'twos'`, `'in24'`, `'in32'` | byte order reversed |
+| `'sowt'` | copied |
 | `'fl32'`, `'fl64'` | byte order reversed; IEEE float |
 | MACE | 8-bit, as the Sound Manager gives it (§8.5) |
 | IMA 4:1, µ-law | 16-bit |
@@ -968,7 +985,7 @@ is in the JSON.
 `fact` chunk (float only): 4 bytes, the number of frames.
 
 `smpl` chunk, written when the loop lies inside the sound (a loop as the Sound Manager counts one, §7, and `loopEnd`
-≤ the decoded frame count) or the base note is not 60 (a base note of 0 counts as 60):
+≤ the decoded frame count) or the base note is not 60 (0 included):
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
@@ -1037,15 +1054,16 @@ sound on both sides; of more than two channels, the first two).
 | `sound.short` | Error | the resource ends inside a 64-byte extended or compressed header; no sound | not traced |
 | `sound.short` | Warning | the header counts more sample bytes than the resource holds; the samples are cut | not traced |
 | `sound.several-sounds` | Info | more than one flagged `bufferCmd`/`soundCmd`; the first is decoded | `SndPlay` runs every command in order [Code] |
-| `sound.header-offset` | Info | a format 2 command points elsewhere than 6 + 8 × `numCommands`; the header there is read | `SndPlay` does the same; `GetSoundHeaderOffset` trusts `param2` [Code] |
+| `sound.header-offset` | Info | a format 2 command points elsewhere than 6 + 8 × `numCommands`; the header there is read | `SndPlay` never reads the commands and plays that header; `GetSoundHeaderOffset` trusts `param2` [Code] |
 | `sound.bad-offset` | Error | the header's offset is negative or leaves fewer than 22 bytes in the resource; no sound | not traced |
 | `sound.sample-pointer` | Warning | `samplePtr` is not 0; the samples after the header are read | takes `samplePtr` as the samples' address [Code] |
 | `sound.no-rate` | Warning | the rate is 0; the WAV says 1 Hz | not traced |
 | `sound.bad-header` | Error | `encode` is not $00, $FE or $FF; no sound | −206 [Code] |
 | `sound.bad-header` | Error | 0 or more than 64 channels; no sound | more than 2 channels in an extended header: −206 [Code] |
-| `sound.bad-header` | Error | an extended header's `sampleSize` is not 8, 16, 24 or 32; no sound | a size below 8 is raised to 8 by `SetSoundHeader` [Code] |
+| `sound.bad-header` | Error | an extended header's `sampleSize` is not 8 or 16; no sound | a size below 8 is raised to 8 by `SetSoundHeader`; any other is read as 16-bit [Code] |
+| `sound.bad-header` | Error | a compressed header's `'raw '` or `'twos'` samples (`compressionID` 0 included) are not 8 or 16 bits; no sound | read as 16-bit [Code] |
 | `sound.bad-header` | Error | a `compressionID` other than 0, 3, 4, −1, −2; no sound | −223 [Code] |
-| `sound.codec` | Warning | the samples are in a format ClassicMac does not decode (`'alaw'`, `'QDM2'`, …); exported raw | an `sdec` component for it, or −223 [Code] |
+| `sound.codec` | Warning | the samples are in a format ClassicMac does not decode (`'alaw'`, `'QDM2'`, …); exported raw | an `sdec` component for it (Mac OS 9.0's System file has none for these), or −223 [Code] |
 
 A sound whose header cannot be read still gives its JSON (§11.1).
 

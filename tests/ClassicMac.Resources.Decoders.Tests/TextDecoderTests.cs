@@ -141,6 +141,14 @@ public class TextDecoderTests
 
         // Times [0,8), then Monaco [2,8) backwards over it, Geneva [2,6), Chicago empty, Courier [6,10).
         Assert.Equal([(0, 2, "Times"), (2, 4, "Geneva"), (6, 4, "Courier")], runs.Select(r => (r.Start, r.Length, r.FontName)));
+
+        // A run reaching the end stops the rest: here Times runs to a start past the text (and a negative start is past
+        // it too, compared unsigned), so Monaco and Geneva are never applied.
+        foreach (var past in new[] { 20, -1 })
+        {
+            var cut = Styl((0, 20, 0, 12, 0, 0, 0), (past, 4, 0, 12, 0, 0, 0), (3, 3, 0, 12, 0, 0, 0));
+            Assert.Equal([(0, 10, "Times")], Text.StyledText.Read(text, cut).Runs.Select(r => (r.Start, r.Length, r.FontName)));
+        }
     }
 
     [Fact]
