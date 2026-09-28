@@ -32,7 +32,7 @@ Contents
 3. [MacBinary I, II and III](#3-macbinary-i-ii-and-iii)
 4. [BinHex 4.0](#4-binhex-40)
 5. [AppleSingle and AppleDouble](#5-applesingle-and-appledouble)
-6. [Writing AppleDouble](#6-writing-appledouble)
+6. [Writing containers](#6-writing-containers)
 7. [Unwrapping nested containers](#7-unwrapping-nested-containers)
 8. [Diagnostics](#8-diagnostics)
 9. [Not covered](#9-not-covered)
@@ -521,7 +521,9 @@ own gives the same with an empty data fork; joining it with its data file is the
 
 ---
 
-## 6. Writing AppleDouble
+## 6. Writing containers
+
+### 6.1 AppleDouble
 
 ClassicMac writes AppleDouble version 2 header files (`AppleDoubleWriter`), which `unpack` puts beside each data file
 as `._name` ([HOST-FOLDERS.md](HOST-FOLDERS.md)). The layout follows the version 2 Developer Note [Doc]; the choice of
@@ -563,6 +565,38 @@ resource fork unchanged.
 
 Example: a file named `Read Me` (7 bytes) with a 300-byte resource fork gives entries at 74 (7 bytes), 81 (16),
 97 (32) and 129 (300): a 429-byte header file.
+
+### 6.2 AppleSingle
+
+`AppleDoubleWriter.WriteAppleSingle` writes version 2 AppleSingle files [ClassicMac]: the AppleDouble layout of 6.1
+with the magic number `$00051600`, five entries, and a Data Fork entry (1) before the Resource Fork entry; both forks
+follow the header, the data fork first. Dates, Finder info and name as in 6.1.
+
+### 6.3 MacBinary III
+
+`MacBinaryWriter` writes MacBinary III [Author], with ClassicMac's choices marked:
+
+- The header of section 3.2: name (cut to 63 bytes; an empty name is written as `?` [ClassicMac]), type, creator,
+  Finder flags (high byte at 73, low byte at 101), location, folder, both fork lengths, creation and modification dates
+  (0 when unknown), `'mBIN'`, `fdScript` and `fdXFlags` from `FXInfo` +8 and +9, writer version 130, reader version 129,
+  and the CRC-16 of bytes 0–123. Everything else is zero: no protected flag, secondary header, comment or unpacked
+  length.
+- The data fork, then the resource fork, each padded with zeros to a multiple of 128, the last one too.
+- A fork over `$7FFFFF` bytes is refused (an argument error, nothing written) [ClassicMac, as the reader's limit].
+
+### 6.4 BinHex 4.0
+
+`BinHexWriter` writes BinHex 4.0 [Author]:
+
+- The binary stream of section 4.4: name (cut to 63 bytes; `?` when empty [ClassicMac]), version 0, type, creator,
+  Finder flags, fork lengths and the header CRC; the data fork and its CRC; the resource fork and its CRC.
+- Run-length encoded (section 4.3): a `$90` byte as `$90 $00`, and a byte that appears 3 to 255 times in a row as the
+  byte, `$90` and the count [ClassicMac: any run length decodes the same].
+- Six bits per character (section 4.2), the last character zero-filled.
+- The text: `(This file must be converted with BinHex 4.0)`, CR, then `:`, the characters in lines of 64 (the first
+  line counting the colon), and `:` and CR at the end [ClassicMac: CR line ends, as on the Mac].
+
+Reading each file with the matching reader gives back its name, Finder info, dates (MacBinary, AppleSingle) and forks.
 
 ---
 
@@ -671,7 +705,7 @@ produce no diagnostic: they are not recognised, and stay plain files (section 3.
 
 ## 9. Not covered
 
-- **Writing** MacBinary, BinHex and AppleSingle (planned for `pack`) and writing AppleDouble version 1.
+- Writing AppleDouble or AppleSingle version 1, MacBinary I or II, and MacBinary's secondary header and comment.
 - The MacBinary Get Info comment, the protected flag and the unpacked-length field (bytes 99, 81, 116): not read.
 - The AppleSingle Comment, icon, Macintosh, ProDOS, MS-DOS and AFP entries: not read. Version 1 File Info for home
   file systems other than `Macintosh`: not read.

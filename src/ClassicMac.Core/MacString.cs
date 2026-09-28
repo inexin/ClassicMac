@@ -30,6 +30,30 @@ namespace ClassicMac.Core
         public string ToMacRoman() => MacRoman.Decode(Bytes);
 
         /// <summary>
+        /// The string <see cref="ToString"/> gave: Mac OS Roman characters, and <c>\xHH</c> for a byte written as its hex
+        /// code (control characters, DEL, backslash). Throws for a character Mac OS Roman cannot encode.
+        /// </summary>
+        public static MacString Parse(string text)
+        {
+            ArgumentNullException.ThrowIfNull(text);
+            var bytes = new System.Collections.Generic.List<byte>(text.Length);
+            for (var i = 0; i < text.Length; i++)
+            {
+                if (text[i] == '\\' && i + 3 < text.Length && text[i + 1] == 'x'
+                    && byte.TryParse(text.AsSpan(i + 2, 2), System.Globalization.NumberStyles.HexNumber, null, out var escaped))
+                {
+                    bytes.Add(escaped);
+                    i += 3;
+                }
+                else
+                {
+                    bytes.AddRange(MacRoman.Encode(text[i].ToString()));
+                }
+            }
+            return new MacString(bytes.ToArray());
+        }
+
+        /// <summary>
         /// Display text: Mac OS Roman, with control characters and backslash as <c>\xHH</c>. Other Mac encodings need the
         /// file's script and come with the text encodings.
         /// </summary>

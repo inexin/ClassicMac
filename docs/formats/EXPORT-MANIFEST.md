@@ -27,6 +27,7 @@ Contents
 10. [The extract command](#10-the-extract-command)
 11. [Diagnostics](#11-diagnostics)
 12. [Reading and producing an export](#12-reading-and-producing-an-export)
+13. [The pack command](#13-the-pack-command)
 
 ---
 
@@ -776,17 +777,27 @@ manifest.
 `sha256` against the file, `storedSha256` against the `raw/` copy when there is one. Files in the folder that the
 manifest does not list are not part of the export (section 3.1).
 
-**Rebuilding a fork.** The manifest is designed so a fork can be rebuilt from an export (the planned `pack` command;
-not built yet):
+**Rebuilding a fork** (`ResourcePacker.Pack`, the `pack` command, section 13) [ClassicMac]:
 
-- The type comes from `typeBytes`, the ID from `id`, the name from `name` (unescape `\xHH`, then encode as Mac OS
-  Roman; `null` means no name), the attribute byte from `attributes`, and the map's bytes from `fork`.
-- The data comes from `rawPath` when present: the stored bytes, byte for byte, compressed or not.
-- Without it, a `raw` resource's main file is its data **after** decompression; written back as it is, its
-  compressed attribute (`$01`) no longer matches the data.
-- A decoded resource's files are not the stored data. The plan is that a file whose hash is unchanged takes the
-  original stored data (from `raw/` or from the original fork), and a changed file is re-encoded by an encoder for its
-  decoder; `decoder` and `decoderVersion` say which.
+- A manifest whose major version is not 1 is refused.
+- The fork's attribute and map-flag bytes come from `fork`; the resources, in the manifest's order, take their type from
+  `typeBytes`, ID from `id`, name from `name` (`\xHH` unescaped, the rest encoded as Mac OS Roman; `null`: no name)
+  and attribute byte from `attributes`.
+- **Unchanged** (the main file's SHA-256 equals `sha256`): the stored data, byte for byte, compressed or not, from
+  the `raw/` copy (`rawPath`), else from the base fork's resource of the same type and ID when its hash equals
+  `storedSha256`. A `raw/` copy that no longer matches `storedSha256` is packed as it is, with a warning. Changes to
+  `otherFiles` are ignored, with a warning.
+- **A `raw` resource** with neither (or whose file changed) takes its main file as the data. That is the data after
+  decompression, so a compressed resource loses its compressed attribute ($01), with a warning.
+- **A decoded resource** whose main file changed needs an encoder for its decoder; none of the built-in decoders has
+  one yet, so it is an error. One with no stored data (no `raw/` copy, no base) is an error too.
+- **A missing main file** is an error, or with `AllowDeletes` the resource is left out.
+- Files in the folder the manifest does not list are ignored: resources are not added this way.
+
+With `raw/` copies (`extract --keep-raw`), every export of the corpus packs back with each resource's stored bytes and
+attributes unchanged (the corpus test). The fork itself is laid out anew by the fork writer
+([RESOURCE-FORK.md](RESOURCE-FORK.md)), so its bytes can differ from the original's where the original's layout was
+not canonical.
 
 **What the viewer records differently.** Exports from the viewer follow this specification, with two differences in
 `source.formats`: *Export Resources* writes an empty list, and *Extract All Resources* only the format of the file's
@@ -796,3 +807,39 @@ own node, not the chain above it.
 schema, with `formatVersion` `1.2` (or an earlier 1.x without the later fields), and files where the manifest says. The folder and
 file names of sections 3 and 4 are ClassicMac's choice and are not required: a reader finds files through the
 manifest's paths.
+
+---
+
+## 13. The pack command
+
+```
+classicmac pack <folder> -o <file> [--base <file>] [--data <file>] [--container raw|appledouble|applesingle|macbinary|binhex]
+    [--allow-deletes] [--overwrite]
+```
+
+| Option | Meaning |
+| --- | --- |
+| `<folder>` | An export folder with its `manifest.json` (one fork's: with several forks, each file's folder) |
+| `-o`, `--output <file>` | The file to write (required). An existing file is refused unless `--overwrite` is given |
+| `--base <file>` | The file the export was made from (any input `extract` reads, holding one resource fork): `PackOptions.Base` |
+| `--data <file>` | A data fork for AppleSingle, MacBinary and BinHex (default empty; an export holds no data fork) |
+| `--container` | `raw` (default): the resource fork itself; `appledouble`: an AppleDouble header file; `applesingle`, `macbinary` (III), `binhex` (4.0): see [CONTAINERS.md](CONTAINERS.md) §6. The container's name, type, creator and Finder flags come from the manifest's `source` |
+| `--allow-deletes` | `PackOptions.AllowDeletes` |
+
+**Output.** One line on stdout: `<n> resources (<bytes> bytes of resource fork), to <file>`. Diagnostics go to stderr
+as for `extract`. When the pack has an error, nothing is written ("Nothing written: …").
+
+**Exit codes.** 0 packed; 1 an error diagnostic (nothing written), or a warning with `--strict` (written); 2 a wrong
+command line, or a base holding no resource fork or several; 3 no readable manifest (or a newer major format); 4 the
+output exists without `--overwrite`, or cannot be written.
+
+| Code | Severity | Meaning |
+| --- | --- | --- |
+| `pack.missing-file` | Error | A resource's main file is gone (without `--allow-deletes`) |
+| `pack.deleted` | Info | A resource's main file is gone; left out (`--allow-deletes`) |
+| `pack.no-encoder` | Error | A decoded resource's main file changed, and its decoder has no encoder |
+| `pack.no-stored-data` | Error | An unchanged decoded resource has no `raw/` copy and no matching resource in the base |
+| `pack.decompressed` | Warning | A compressed `raw` resource is written from its decompressed file, its compressed attribute cleared |
+| `pack.raw-changed` | Warning | A `raw/` copy no longer matches `storedSha256`; packed as it is |
+| `pack.base-differs` | Warning | The base's resource of that type and ID is not the one exported; not used |
+| `pack.other-changed` | Warning | A decoder's other file changed; only the main file counts |

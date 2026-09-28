@@ -12,7 +12,8 @@ using ClassicMac.Tests;
 namespace ClassicMac.Resources.Cli.Tests;
 
 // Phase 3's exit check: every input in the corpus (CLASSICMAC_CORPUS, one or more folders) exports with the built-in
-// decoders and no decoder fails. Failures: a decoder error or exception, a resource of a decoded type left raw, a
+// decoders and no decoder fails. Phase 5's: every export (made with raw/ copies) packs back with each resource's stored
+// bytes and attributes unchanged. Failures: a decoder error or exception, a resource of a decoded type left raw, a
 // manifest hash that does not match its file. Damaged inputs (containers, volumes or forks the Mac would refuse, the
 // harness's damage tests) and warnings are reported, not failed. Known, explained cases are listed in
 // Corpus/allowlist.json. Corpus/baseline.json holds, per input (by name and SHA-256, wherever the corpus lives), its
@@ -72,7 +73,7 @@ public class CorpusExportTests : IDisposable
             if (summaries.ContainsKey(sha)) continue;
             var output = Path.Combine(folder, (target++).ToString(System.Globalization.CultureInfo.InvariantCulture));
             var exported = new List<(string Source, Diagnostic Diagnostic)>();
-            var result = Unpacker.Extract(root, forks, output, ExportOptions.Default with { Decoders = decoders, Documents = converters }, exported);
+            var result = Unpacker.Extract(root, forks, output, ExportOptions.Default with { Decoders = decoders, Documents = converters, KeepRaw = true }, exported);
             var name = Path.GetFileName(path);
             var damageTest = CorpusFolders.IsDamageTest(path);
             foreach (var failure in result.Failed) failures.Add($"{name}: {failure}");
@@ -95,6 +96,19 @@ public class CorpusExportTests : IDisposable
                 var directory = Path.GetDirectoryName(manifestPath)!;
                 var relative = Path.GetRelativePath(output, directory).Replace('\\', '/');
                 using var manifest = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+
+                // Phase 5's exit check: the export packs back into a fork with every resource's stored bytes unchanged.
+                var packed = ResourcePacker.Pack(directory);
+                foreach (var d in packed.Diagnostics.Where(d => d.Severity != DiagnosticSeverity.Info))
+                    failures.Add($"{name} > {relative}: pack: {d.Message} [{d.Code}]");
+                var entries = manifest.RootElement.GetProperty("resources").EnumerateArray().ToList();
+                for (var i = 0; i < Math.Min(entries.Count, packed.Fork.Resources.Count); i++)
+                {
+                    var r = packed.Fork.Resources[i];
+                    if (Convert.ToHexStringLower(SHA256.HashData(r.GetData().Span)) != entries[i].GetProperty("storedSha256").GetString()
+                        || (int)r.Attributes != entries[i].GetProperty("attributes").GetInt32())
+                        failures.Add($"{name} > {relative}: '{r.Type}' {r.Id} does not pack back as it was stored");
+                }
                 foreach (var r in manifest.RootElement.GetProperty("resources").EnumerateArray())
                 {
                     resources++;

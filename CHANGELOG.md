@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `pack`: an export folder back into a resource fork, raw or in an AppleDouble, AppleSingle, MacBinary III or
+  BinHex 4.0 file (new writers for the last three); unchanged resources come back byte for byte from `raw/` or a
+  base fork. The corpus test now packs every export back.
 - Finder resources (`BNDL`, `FREF`, `SIZE`) to JSON, a bundle with each file type's icon, specified in
   `docs/formats/FINDER.md`.
 - Colour tables (`clut`) and palettes (`pltt`) to JSON and Adobe `.act`, specified in `docs/formats/PALETTES.md`;

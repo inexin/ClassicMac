@@ -10,8 +10,7 @@ using ClassicMac.Files;
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c> and <c>convert</c>; <c>pack</c> joins
-    /// in phase 5. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
+    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c> and <c>pack</c>. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
     /// </summary>
     internal sealed class CommandLine(TextWriter output, TextWriter error)
     {
@@ -102,6 +101,7 @@ namespace ClassicMac.Resources.Cli
             root.Subcommands.Add(UnpackCommand());
             root.Subcommands.Add(ExtractCommand());
             root.Subcommands.Add(ConvertCommand());
+            root.Subcommands.Add(PackCommand());
             return root;
         }
 
@@ -238,6 +238,33 @@ namespace ClassicMac.Resources.Cli
                 result.GetRequiredValue(input), result.GetValue(outputDir),
                 Decoders.ResourceDecoders.CreateDocumentConverters(DecodeOptionsFrom(result, screenDepth)), ReadOptionsFrom(result),
                 ContainerOptionsFrom(result), result.GetValue(overwrite), result.GetValue(strict), result.GetValue(quiet)));
+            return command;
+        }
+
+        private Command PackCommand()
+        {
+            var folder = new Argument<DirectoryInfo>("folder") { Description = "An export folder made by extract (with its manifest.json)" }.AcceptExistingOnly();
+            var outputFile = new Option<FileInfo>("--output", "-o") { Description = "The file to write", Required = true };
+            var baseFork = new Option<FileInfo>("--base")
+            {
+                Description = "The file the export was made from, for unchanged resources' stored data when the export has no raw/ copies",
+            }.AcceptExistingOnly();
+            var dataFork = new Option<FileInfo>("--data") { Description = "A data fork for the container (default: empty)" }.AcceptExistingOnly();
+            var container = new Option<PackCommand.Container>("--container")
+            {
+                Description = "What to write: the raw resource fork, or an AppleDouble header file, AppleSingle, MacBinary III or BinHex 4.0 file",
+                DefaultValueFactory = _ => Cli.PackCommand.Container.Raw,
+            };
+            var allowDeletes = new Option<bool>("--allow-deletes") { Description = "Leave out resources whose files are gone, instead of failing" };
+            var overwrite = new Option<bool>("--overwrite") { Description = "Replace the output file" };
+            var command = new Command("pack", "Rebuild a resource fork (or a container holding it) from an export folder")
+            {
+                folder, outputFile, baseFork, dataFork, container, allowDeletes, overwrite,
+            };
+            command.SetAction(result => new PackCommand(output, error).Run(
+                result.GetRequiredValue(folder), result.GetRequiredValue(outputFile), result.GetValue(baseFork), result.GetValue(dataFork),
+                result.GetValue(container), result.GetValue(allowDeletes), result.GetValue(overwrite), ReadOptionsFrom(result),
+                ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
             return command;
         }
 
