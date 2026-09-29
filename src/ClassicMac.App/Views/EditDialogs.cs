@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -51,6 +52,27 @@ namespace ClassicMac.App.Views
             for (var i = 0; i < Flags.Length; i++)
                 if (boxes[i].IsChecked == true) attributes |= Flags[i].Flag;
             return new ResourceInfo(type.Text ?? "", (short)Math.Clamp(id.Value ?? 0, short.MinValue, short.MaxValue), name.Text ?? "", attributes);
+        }
+
+        public async Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial)
+        {
+            var type = new ComboBox { ItemsSource = types, SelectedItem = initial.Type, MinWidth = 300 };
+            var id = new NumericUpDown { Value = initial.Id, Minimum = short.MinValue, Maximum = short.MaxValue, Increment = 1, FormatString = "0", Width = 160, HorizontalAlignment = HorizontalAlignment.Left };
+            var name = new TextBox { Text = initial.Name, Width = 300, HorizontalAlignment = HorizontalAlignment.Left };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("90,*"), RowDefinitions = new RowDefinitions("Auto,Auto,Auto"), RowSpacing = 8 };
+            var rows = new (string Label, Control Control)[] { ("Make", type), ("ID", id), ("Name", name) };
+            for (var row = 0; row < rows.Length; row++)
+            {
+                var text = new TextBlock { Text = rows[row].Label, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetRow(text, row);
+                Grid.SetRow(rows[row].Control, row);
+                Grid.SetColumn(rows[row].Control, 1);
+                grid.Children.Add(text);
+                grid.Children.Add(rows[row].Control);
+            }
+            var note = new TextBlock { Opacity = 0.65, Text = "A resource of that type and ID has its data replaced.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
+            if (!await Show($"Import “{fileName}”", new StackPanel { Spacing = 10, Children = { grid, note } }, "Import")) return null;
+            return new ImportChoice(type.SelectedItem as string ?? initial.Type, (short)Math.Clamp(id.Value ?? 0, short.MinValue, short.MaxValue), name.Text ?? "");
         }
 
         public async Task<SaveChanges> AskSaveChangesAsync(string fileName)

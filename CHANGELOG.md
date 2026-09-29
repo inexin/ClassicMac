@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Editor II, import: Resource ▸ Import Image or Sound makes a `PICT`, `cicn`, icon, icon family or cursor from an image
+  (PNG, JPEG, …) and a `snd ` from a WAV file, as an undoable edit; `ImageImport` and `SoundImport` in the decoders
+  library (ICONS.md, PICT.md section 9, SOUND.md section 12).
 - Editor II, UI templates: forms for `DLOG`, `ALRT`, `WIND`, `DITL`, `MENU` and `CNTL` in the Edit tab, the dialog or
   menu preview beside them redrawn as they change; `InterfaceWriter` writes the templates (INTERFACE.md section 13).
 - Editor II, first part: an Edit tab with forms for `STR `, `STR#`, `TEXT` (its `styl` runs kept in step) and `vers`,

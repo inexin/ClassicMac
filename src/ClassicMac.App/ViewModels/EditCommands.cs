@@ -37,6 +37,9 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Edits bytes as hex: the new bytes, or null when cancelled.</summary>
         Task<byte[]?> EditHexAsync(string title, byte[] data);
+
+        /// <summary>Import: the type (one of <paramref name="types"/>), ID and name to make from <paramref name="fileName"/>, or null when cancelled.</summary>
+        Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial);
     }
 
     /// <summary>The edits made to one file's resources, and where they save to.</summary>
@@ -127,7 +130,7 @@ namespace ClassicMac.App.ViewModels
         private void NotifyEditCommands()
         {
             foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
-                ReplaceDataCommand, EditHexCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand })
+                ReplaceDataCommand, EditHexCommand, ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand })
                 command.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(UndoTitle));
             OnPropertyChanged(nameof(RedoTitle));

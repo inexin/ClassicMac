@@ -255,6 +255,32 @@ row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour
 - **ClassicMac** exports each image member of an `icns` through the mask its own size selects, the 8-bit mask as the
   image's alpha, as [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) section 8.3 lists.
 
+## Writing icons and cursors (import)
+
+ClassicMac's editor makes these resources from an RGBA image, a PNG for example (`ImageImport`), in the layouts
+above. No Mac OS code imports an image, so the conversion rules are ClassicMac's [ClassicMac]:
+
+- **Size:** an image of another size is scaled to fit the resource's (area average of premultiplied colour), its
+  aspect kept and centred on a transparent field. `cicn` keeps the image's size (up to 256 × 256).
+- **Mask:** a pixel is in the mask when its alpha is at least 128.
+- **1-bit data** (`ICON`, the icon lists, a `cicn`'s BitMap, a cursor's data): black where the pixel is in the mask
+  and its luminance `(299 R + 587 G + 114 B) / 1000` is below 128.
+- **Standard-table icons** (`icl4`, `icl8`, `ics4`, …): each pixel the nearest entry of the standard 4- or 8-bit
+  table by RGB distance (the lowest index on a tie), no dithering; pixels outside the mask are white (index 0).
+- **An icon family** makes `ICN#`, `icl4`, `icl8`, `ics#`, `ics4` and `ics8` of one ID, the small ones from the image
+  scaled to 16 × 16.
+- **`cicn`, `crsr`:** a colour table of exactly the image's colours (for `crsr`, white first), at the smallest depth
+  of 1, 2, 4 or 8 bits that holds them; beyond 256 colours the standard 8-bit table, nearest colours. `ctSeed` and
+  `ctFlags` are 0 and each entry's value is its index. Pixels outside the mask are white, which leaves the screen
+  under a colour cursor.
+  - `cicn`: the PixMap (pmTable 0), mask and icon BitMaps (rowBytes even), a zero icon data handle, the mask, the
+    1-bit icon, the colour table and the pixels.
+  - `crsr`: type `$8001`, the PixMap at 96, the pixels at 146, the colour table after them (pmTable its offset); the
+    extra fields (`crsrXData`, `crsrXValid`, `crsrXHandle`, `crsrXTable`, `crsrID`) are 0.
+- **`CURS`, `crsr` hotspot:** the centre (8, 8) unless given; clamped to 0–15.
+- Read back by `QuickDrawResources`, a `cicn` or `crsr` gives the image's opaque pixels exactly [Verified:
+  ClassicMac's tests].
+
 ## Not covered
 
 - The export decoders take one resource at a time and do not draw suites; `IconSuite.Plot` does.

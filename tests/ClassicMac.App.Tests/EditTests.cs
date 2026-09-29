@@ -3,6 +3,7 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Containers;
 using ClassicMac.Files.Editing;
+using ClassicMac.Graphics;
 using ClassicMac.Resources;
 
 namespace ClassicMac.App.Tests;
@@ -45,6 +46,15 @@ public sealed class EditTests : IDisposable
         public Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(Confirm);
 
         public Task<byte[]?> EditHexAsync(string title, byte[] data) => Task.FromResult(Hex);
+
+        public Func<ImportChoice, ImportChoice?> Import { get; set; } = c => c;
+        public IReadOnlyList<string> ImportTypes { get; private set; } = [];
+
+        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial)
+        {
+            ImportTypes = types;
+            return Task.FromResult(Import(initial));
+        }
     }
 
     private static readonly FourCC Str = FourCC.FromString("STR ");
@@ -128,6 +138,50 @@ public sealed class EditTests : IDisposable
         await model.NewResourceCommand.ExecuteAsync(null);
         var added = (ResourceNode)model.Selected!;
         Assert.Equal(("TEXT", 130, 0), (added.Resource.Type.ToString(), (int)added.Resource.Id, added.Resource.Length));
+    }
+
+    [Fact]
+    public async Task Images_and_sounds_are_imported_as_undoable_edits()
+    {
+        var (model, file, dialogs, picker, _) = await Open();
+        var image = new RgbaBitmap(32, 32);
+        for (int i = 0; i < 32 * 16 * 4; i += 4) (image.Pixels[i], image.Pixels[i + 3]) = (200, 255);   // red top half
+        model.LoadImage = _ => image;
+        picker.Open = Path.Combine(folder, "art.png");
+
+        // A picture, at the next free ID, named.
+        model.Selected = file;
+        dialogs.Import = c => c with { Name = "art" };
+        await model.ImportCommand.ExecuteAsync(null);
+        var pict = ((ResourceNode)model.Selected!).Resource;
+        Assert.Equal(("PICT", (short)128, "art"), (pict.Type.ToString(), pict.Id, pict.Name?.ToMacRoman()));
+        Assert.Contains(MainViewModel.IconFamily, dialogs.ImportTypes);
+
+        // An icon family: six resources in one edit; again with the ICN# selected, its data replaced after asking.
+        dialogs.Import = c => c with { Type = MainViewModel.IconFamily, Id = 200 };
+        await model.ImportCommand.ExecuteAsync(null);
+        var fork = file.Editing!.Session.Fork;
+        Assert.All(new[] { "ICN#", "icl4", "icl8", "ics#", "ics4", "ics8" }, t => Assert.NotNull(fork.Find(FourCC.FromString(t), 200)));
+        Assert.Equal("_Undo Import art.png", model.UndoTitle);
+        dialogs.Confirm = false;
+        await model.ImportCommand.ExecuteAsync(null);
+        Assert.Equal("_Undo Import art.png", model.UndoTitle);                          // declined: nothing done
+        model.UndoCommand.Execute(null);
+        Assert.Null(fork.Find(FourCC.FromString("icl8"), 200));
+
+        // A WAV file becomes a 'snd '; a file that is not one is refused.
+        picker.Open = Path.Combine(folder, "beep.wav");
+        File.WriteAllBytes(picker.Open, [.. "RIFF"u8, 36, 0, 0, 0, .. "WAVEfmt "u8, 16, 0, 0, 0, 1, 0, 1, 0, 0x11, 0x2B, 0, 0, 0x11, 0x2B, 0, 0, 1, 0, 8, 0,
+            .. "data"u8, 4, 0, 0, 0, 128, 200, 128, 50]);
+        dialogs.Import = c => c;
+        await model.ImportCommand.ExecuteAsync(null);
+        Assert.Equal(["snd "], dialogs.ImportTypes);
+        var snd = ((ResourceNode)model.Selected!).Resource;
+        Assert.Equal("snd ", snd.Type.ToString());
+        Assert.Equal(new byte[] { 128, 200, 128, 50 }, snd.GetData()[^4..].ToArray());
+        File.WriteAllBytes(picker.Open, [1, 2, 3]);
+        await model.ImportCommand.ExecuteAsync(null);
+        Assert.StartsWith("“beep.wav” could not be imported", model.Status);
     }
 
     [Fact]

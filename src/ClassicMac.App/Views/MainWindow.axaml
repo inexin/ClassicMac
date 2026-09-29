@@ -50,6 +50,7 @@
         <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" HotKey="Ctrl+I" />
         <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" HotKey="Ctrl+H" />
         <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
+        <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportCommand}" />
       </MenuItem>
       <MenuItem Header="E_xport">
         <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
@@ -88,6 +89,7 @@
               <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" />
               <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" />
               <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
+              <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportCommand}" />
               <Separator />
               <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" />
               <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />

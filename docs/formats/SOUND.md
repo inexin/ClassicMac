@@ -44,8 +44,9 @@ Contents
 9. [IMA 4:1](#9-ima-41)
 10. [µ-law](#10-µ-law)
 11. [ClassicMac's output](#11-classicmacs-output)
-12. [Diagnostics](#12-diagnostics)
-13. [Not covered](#13-not-covered)
+12. [Writing sounds](#12-writing-sounds)
+13. [Diagnostics](#13-diagnostics)
+14. [Not covered](#14-not-covered)
 
 ---
 
@@ -1044,7 +1045,27 @@ sound on both sides; of more than two channels, the first two).
 
 ---
 
-## 12. Diagnostics
+## 12. Writing sounds
+
+ClassicMac's editor makes a `snd ` resource from samples or a WAV file (`SoundImport`), in the layout of §2 and §5
+[ClassicMac]:
+
+- **Resource:** format 1, one synthesizer (5, sampled sound; init options `initMono` $80, or `initStereo` $C0 for two
+  channels), one command: `bufferCmd` with the data-offset bit ($8051), param1 0, param2 20, the header's offset.
+- **Header:** samplePtr 0, the samples right after it.
+  - Mono 8-bit: a standard header (encode $00, length in frames).
+  - Otherwise an extended header (encode $FF): numChannels, numFrames, the rate again as an 80-bit extended
+    (AIFFSampleRate), markerChunk/instrumentChunks/AESRecording 0, sampleSize 8 or 16, the future-use fields 0.
+  - sampleRate: the rate as Fixed (rounded), so below 65536 Hz. baseFrequency 60 (middle C) unless given.
+- **From WAV** (RIFF `fmt `, `data`, `smpl`; `WAVE_FORMAT_EXTENSIBLE` read by its sub-format):
+  - 8-bit PCM is kept as it is (both are offset binary);
+  - 16-, 24- and 32-bit PCM become 16-bit (the top 16 bits), float becomes 16-bit (× 32768, rounded and clamped);
+    16-bit samples are written big-endian;
+  - the `smpl` chunk's unity note becomes the base note, its first loop the loop (its inclusive end + 1 is loopEnd);
+  - other chunks are ignored; a file without `fmt ` and `data`, or with samples of another format, is refused.
+- Read back, the samples, rate, loop and base note are those written [Verified: ClassicMac's tests].
+
+## 13. Diagnostics
 
 | Code | Severity | Meaning | The Sound Manager |
 | --- | --- | --- | --- |
@@ -1069,7 +1090,7 @@ A sound whose header cannot be read still gives its JSON (§11.1).
 
 ---
 
-## 13. Not covered
+## 14. Not covered
 
 - **AIFF and AIFC files.** `SndStartFilePlay` parses them itself and plays them through the same `sdec`
   decompressors [Code]; ClassicMac will read them later with the codecs above.

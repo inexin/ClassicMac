@@ -604,6 +604,10 @@ A picture that every PICT reader, and the ROM, decodes identically:
 
 ---
 
+**Importing an image** (`ImageImport.WritePicture`, ClassicMac's editor) [ClassicMac]: the image is composited over
+white (a `PICT` has no transparency), then written as above without the file header: indexed at the smallest depth
+(1, 2, 4 or 8 bits) that holds its colours, else 32-bit direct (`Rgb888`).
+
 ## 10. Mac OS 9 differences
 
 Mac OS 9's native QuickDraw is a rewrite, not a port. Where it differs from sections 2–9, a picture shown on Mac OS 9

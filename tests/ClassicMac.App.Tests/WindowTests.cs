@@ -104,7 +104,8 @@ public class WindowTests
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
             var items = menu.Items.OfType<MenuItem>().ToList();
-            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "_Save Resource As…"],
+            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…",
+                "_Save Resource As…"],
                 items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
             Capture(window, "context-menu");
             menu.Close();
@@ -183,6 +184,28 @@ public class WindowTests
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    [Fact]
+    public void Imported_images_are_read_as_unpremultiplied_rgba() => OnUiThread(() =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cm-import-{Guid.NewGuid():N}.png");
+        byte[] rgba = [255, 0, 0, 255, 0, 0, 255, 128, 9, 9, 9, 0, 10, 200, 30, 255];
+        File.WriteAllBytes(path, ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(2, 2, rgba));
+        try
+        {
+            var image = new MainViewModel().LoadImage(path);
+            Assert.Equal((2, 2), (image.Width, image.Height));
+            Assert.Equal(new byte[] { 255, 0, 0, 255 }, image.Pixels[..4]);
+            Assert.Equal(new byte[] { 10, 200, 30, 255 }, image.Pixels[12..]);
+            Assert.Equal(128, image.Pixels[7]);
+            Assert.InRange(image.Pixels[6], 253, 255);                                  // premultiplied and back
+            Assert.Equal(0, image.Pixels[11]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    });
 
     [Fact]
     public void The_edit_tab_shows_a_form_for_text_resources() => OnUiThread(() =>
