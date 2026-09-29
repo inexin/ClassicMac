@@ -64,7 +64,7 @@ public class LayeringTests
     private static string FindRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
-            if (File.Exists(Path.Combine(dir.FullName, "QuickDraw.Pict.slnx"))) return dir.FullName;
-        throw new DirectoryNotFoundException("QuickDraw.Pict.slnx not found above the test output.");
+            if (File.Exists(Path.Combine(dir.FullName, "ClassicMac.slnx"))) return dir.FullName;
+        throw new DirectoryNotFoundException("ClassicMac.slnx not found above the test output.");
     }
 }

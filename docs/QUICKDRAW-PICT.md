@@ -1,5 +1,7 @@
 # QuickDraw.Pict
 
+*Moved into ClassicMac on 2026-09-29; the packages are to be split and renamed (see [PLAN.md](PLAN.md), phase 9).*
+
 Reader and writer for Apple QuickDraw PICT pictures (version 1, version 2 and extended version 2), aiming to draw
 exactly the pixels a Macintosh draws.
 
@@ -103,13 +105,13 @@ pixel for pixel against it, in both modes. The QuickTime codecs match ffmpeg's d
 Not modelled: TrueType text (it goes to the outline fallback), and QuickTime codecs' own dithering on indexed
 screens.
 
-The format and every rendering rule the library follows are specified in [docs/PICT-FORMAT.md](docs/PICT-FORMAT.md),
+The format and every rendering rule the library follows are specified in [formats/PICT-FORMAT.md](formats/PICT-FORMAT.md),
 in enough detail to write a compatible decoder and encoder without reading the source.
 
 ## Build
 
 ```
-dotnet test QuickDraw.Pict.slnx
+dotnet test --solution ClassicMac.slnx
 ```
 
 ## Licence

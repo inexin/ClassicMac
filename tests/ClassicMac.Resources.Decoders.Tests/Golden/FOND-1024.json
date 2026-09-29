@@ -179,7 +179,7 @@
   ],
   "styleMapping": {
     "fontClass": 1,
-    "encodingOffset": 74,
+    "encodingOffset": 73,
     "indexes": [
       1,
       0,
@@ -232,7 +232,7 @@
     ],
     "names": [
       "Example",
-      "-Bold"
+      "Bold"
     ],
     "glyphEncoding": [
       {

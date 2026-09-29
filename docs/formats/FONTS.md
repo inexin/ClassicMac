@@ -11,7 +11,7 @@ The reader is the `ClassicMac.Fonts` package (on `ClassicMac.Core` only); the de
 References:
 
 - *Inside Macintosh: Text* (1993), Font Manager: the bitmapped font resource, the font family resource and its tables.
-- The 68k ROM's Font Manager, disassembly (as traced for QuickDraw.Pict's `PICT-FORMAT.md` §12): the offset of the
+- The 68k ROM's Font Manager, disassembly (as traced for [PICT-FORMAT.md](PICT-FORMAT.md) §12): the offset of the
   offset/width table, the style extra widths, the width tables' stepping.
 - Mac OS 9.0, disassembly: the native Font Manager, FontObjects, QuickDraw's text drawing and ScriptUtils in the System
   file's data fork: which fields and tables are read, and how. **[Code]** below is Mac OS 9.0 unless it names the ROM.

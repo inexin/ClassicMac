@@ -8,4 +8,7 @@
 *.nupkg
 
 *.snupkg
+
+# Apple fonts for QuickDraw.Pict's golden text test are user-supplied
+tests/golden/fonts/
 *.bak

@@ -15,7 +15,7 @@ public class GoldenTests
     private static string FindRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
-            if (File.Exists(Path.Combine(dir.FullName, "QuickDraw.Pict.slnx"))) return Path.Combine(dir.FullName, "tests", "golden");
+            if (File.Exists(Path.Combine(dir.FullName, "ClassicMac.slnx"))) return Path.Combine(dir.FullName, "tests", "golden");
         return Path.Combine(AppContext.BaseDirectory, "golden");
     }
 

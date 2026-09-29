@@ -81,7 +81,7 @@ namespace ClassicMac.App.ViewModels
             var root = Subtree(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
             var total = root.Leaves().Count();
-            var progress = new Progress<int>(n => Status = $"Extracting {n} of {total} files…");
+            var progress = new StatusProgress(this, n => $"Extracting {n} of {total} files…");
             var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
             var result = await Task.Run(() =>
             {
@@ -95,7 +95,7 @@ namespace ClassicMac.App.ViewModels
             });
             foreach (var (source, d) in diagnostics) Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
             foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
-            Status = $"{result.Resources} resources from {result.Files} files to {target}.";
+            progress.Finish($"{result.Resources} resources from {result.Files} files to {target}.");
         });
 
         [RelayCommand(CanExecute = nameof(CanUnpack))]
@@ -142,13 +142,46 @@ namespace ClassicMac.App.ViewModels
             var root = Subtree(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
             var total = root.Leaves().Count();
-            var progress = new Progress<int>(n => Status = $"Unpacking {n} of {total} files…");
+            var progress = new StatusProgress(this, n => $"Unpacking {n} of {total} files…");
             var diagnostics = new List<Diagnostic>();
             var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout }, diagnostics, progress));
             foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
             foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
-            Status = $"{result.Files} files ({result.Bytes:N0} bytes) to {target}.";
+            progress.Finish($"{result.Files} files ({result.Bytes:N0} bytes) to {target}.");
         });
+
+        // Progress in the status line. Progress<T> posts its reports, so one can arrive after the export has finished; the
+        // final message is set under the same lock, and reports after it are dropped.
+        private sealed class StatusProgress : IProgress<int>
+        {
+            private readonly object gate = new();
+            private readonly MainViewModel model;
+            private readonly Progress<int> inner;
+            private bool finished;
+
+            public StatusProgress(MainViewModel model, Func<int, string> text)
+            {
+                this.model = model;
+                inner = new Progress<int>(n =>
+                {
+                    lock (gate)
+                    {
+                        if (!finished) model.Status = text(n);
+                    }
+                });
+            }
+
+            public void Report(int value) => ((IProgress<int>)inner).Report(value);
+
+            public void Finish(string status)
+            {
+                lock (gate)
+                {
+                    finished = true;
+                    model.Status = status;
+                }
+            }
+        }
 
         // One export at a time; failures to write are reported, not thrown.
         private Task Run(Func<Task> export)

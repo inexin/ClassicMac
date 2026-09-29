@@ -18,9 +18,8 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Core`, `ClassicMac.Files`,
 `ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Fonts`, `ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app
-carries the same name. QuickDraw.Pict stays a
-separate repo and package for now; merging it into ClassicMac (as `ClassicMac.QuickDraw` and `ClassicMac.Pict`) is the
-long-term intent.
+carries the same name. QuickDraw.Pict moved into this repo with its history on 2026-09-29 (`src/QuickDraw.Pict*`);
+it is being split into the target layering below.
 
 ## Inputs
 
@@ -325,7 +324,7 @@ flowchart LR
     M --> F
     M --> D
     F & D --> E
-    Q["QuickDraw.Pict<br/>PICT and icon drawing"] --> D
+    Q["QuickDraw.Pict (in this repo)<br/>PICT and icon drawing"] --> D
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
@@ -733,7 +732,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 8. **Editor III** — writing HFS disk images.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
-   package); the old packages are deprecated.
+   package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
+   2026-09-29)**, the decoders using it directly; 2. split into the `ClassicMac.*` layer projects and namespaces;
+   3. shared types (Core's geometry, `ClassicMac.Fonts`, icons as resource decoders). The old repo is archived and the
+   NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
@@ -742,7 +744,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 ## Decisions
 
 - **Name:** ClassicMac (see Purpose and goals).
-- **Repository:** a new repo, `inexin/ClassicMac`; QuickDraw.Pict stays separate for now, to be merged in later.
+- **Repository:** a new repo, `inexin/ClassicMac`; QuickDraw.Pict moved in with its history (2026-09-29), ahead of
+  the editors, instead of publishing a QuickDraw.Pict 0.1.1.
 - **UI framework:** Avalonia (see Viewer app); view-models with CommunityToolkit.Mvvm (source-generated, AOT-safe).
 - **Own core:** written here rather than built on ResourceForkReader/HfsReader, which are read-only; they serve as
   cross-checks.

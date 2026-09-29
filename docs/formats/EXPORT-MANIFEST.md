@@ -10,7 +10,7 @@ without reading ClassicMac's code. The writer is `ResourceExporter` (`ClassicMac
 Unlike the other documents in this folder, this one describes a format ClassicMac defines itself. Mac data appears in
 it only as the values the manifest records (types, IDs, attributes, Finder flags); how that data is read is specified
 in [RESOURCE-FORK.md](RESOURCE-FORK.md), [CONTAINERS.md](CONTAINERS.md) and [HOST-FOLDERS.md](HOST-FOLDERS.md). How
-icons, cursors, patterns and pictures are drawn is specified by QuickDraw.Pict's `docs/PICT-FORMAT.md` (sections 1–19,
+icons, cursors, patterns and pictures are drawn is specified by QuickDraw.Pict's [PICT-FORMAT.md](PICT-FORMAT.md) (sections 1–19,
 section 18 for icons, cursors and patterns); this document covers only what ClassicMac adds on top.
 
 Contents
@@ -567,7 +567,7 @@ The image extensions are those of the configured image encoder (`.png` by defaul
 
 The image decoders hand each resource to QuickDraw.Pict (`PictReader` for pictures, `QuickDrawResources` for icons,
 cursors and patterns), which draws it as the Mac would into a width × height grid of 8-bit RGBA pixels. How each
-resource is laid out and drawn is QuickDraw.Pict's specification (`docs/PICT-FORMAT.md`, section 18 for icons, cursors
+resource is laid out and drawn is QuickDraw.Pict's specification ([PICT-FORMAT.md](PICT-FORMAT.md), section 18 for icons, cursors
 and patterns, section 19 for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
 masks for colour icons, the cursor JSON, numbered list outputs and a size limit.
 

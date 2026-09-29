@@ -3,7 +3,7 @@
 This document describes the resources an application gives the Finder and the Process Manager: its bundle
 (`'BNDL'`), file references (`'FREF'`) and size resource (`'SIZE'`), completely enough to write a reader without
 reading ClassicMac's code, and it specifies the JSON ClassicMac writes for them. Version resources (`'vers'`) are in
-[TEXT.md](TEXT.md) §8; icons in QuickDraw.Pict's `PICT-FORMAT.md` §18.
+[TEXT.md](TEXT.md) §8; icons in [PICT-FORMAT.md](PICT-FORMAT.md) §18.
 
 References:
 

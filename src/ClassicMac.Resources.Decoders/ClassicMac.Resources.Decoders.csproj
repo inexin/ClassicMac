@@ -9,7 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
     <ProjectReference Include="..\ClassicMac.Fonts\ClassicMac.Fonts.csproj" />
-    <PackageReference Include="QuickDraw.Pict" />
+    <ProjectReference Include="..\QuickDraw.Pict\QuickDraw.Pict.csproj" />
   </ItemGroup>
 
   <ItemGroup>
