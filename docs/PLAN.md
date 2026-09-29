@@ -478,6 +478,34 @@ stereo); playback stops when the selection changes. **Next:** drag and drop out 
 3. **Writing disk images:** add, replace and delete files in HFS images, with type/creator, dates and both forks.
    Archives (StuffIt, Compact Pro) stay read-only.
 
+**Editor I design (proposed, to confirm):**
+
+- **Edits live in the library.** `ClassicMac.Resources.Editing`: each edit is a command on a `ResourceFork` that can be
+  applied and undone (add, delete, duplicate, rename, renumber, set attributes, set data, set the fork's attributes), and
+  an `EditSession` holds them with undo and redo stacks and a dirty flag. The app's view-models wrap it, so the rules are
+  tested without a UI and the CLI can use them later.
+- **Rules** [ClassicMac, checked against the Resource Manager where it has one]: a type and ID already in the fork is
+  refused (the Resource Manager's `AddResource` does not check; ResEdit does); names are at most 255 bytes of Mac OS
+  Roman; IDs below 128 get a warning (reserved for the system); the compressed attribute ($01) cannot be set by hand, and
+  new data clears it; duplicating gives the next free ID from 128 up, with the same name.
+- **Hex editing:** overwrite, insert and delete bytes in the hex view, as ResEdit's hex editor; replacing the data from a
+  file for anything larger.
+- **What can be saved:** a raw fork file; a data file with its AppleDouble `._` file or its Basilisk II `.rsrc`/`.finf`
+  companions; AppleSingle; MacBinary (written as MacBinary III); BinHex. Only the resource fork changes; the data fork,
+  name and Finder info are written back as read. Files inside disk images and archives are read-only until Editor III:
+  for them only *Save As*.
+- **Saving:** the new file is written beside the original under a temporary name, read back with the same reader and
+  compared with the session's fork (every resource's type, ID, name, attributes and data, the fork's attributes; the
+  container's name, Finder info and data fork), then swapped in with `File.Replace`. The first save of a session keeps
+  the original as `<name>.orig` (unless one exists); a save that fails verification leaves the original untouched and
+  says why. A file changed on disk since it was opened (size or modification time) is not overwritten without asking.
+- **Save As** writes to a new file in a chosen form: raw fork, AppleDouble pair, AppleSingle, MacBinary III, BinHex, or a
+  Basilisk II folder entry.
+- **Undo** keeps working across saves within the session; *Revert* reloads the file from disk.
+- **UI:** a Resource menu and the tree's context menu — New Resource…, Duplicate, Delete, Get Info (type, ID, name,
+  attributes), Replace Data from File…, and hex editing; File ▸ Save (Ctrl+S; *Save Resource As* moves to Ctrl+E), Save
+  As…, Revert. A changed file is marked in the tree, and closing it or quitting with unsaved changes asks first.
+
 ## Ground truth and licensing
 
 Apple's documentation decides first; where it is silent or ambiguous, the answer comes from disassembling the Mac OS
