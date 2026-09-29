@@ -10,8 +10,8 @@ without reading ClassicMac's code. The writer is `ResourceExporter` (`ClassicMac
 Unlike the other documents in this folder, this one describes a format ClassicMac defines itself. Mac data appears in
 it only as the values the manifest records (types, IDs, attributes, Finder flags); how that data is read is specified
 in [RESOURCE-FORK.md](RESOURCE-FORK.md), [CONTAINERS.md](CONTAINERS.md) and [HOST-FOLDERS.md](HOST-FOLDERS.md). How
-icons, cursors, patterns and pictures are drawn is specified by [PICT-FORMAT.md](PICT-FORMAT.md) (sections 1–19,
-section 18 for icons, cursors and patterns); this document covers only what ClassicMac adds on top.
+icons, cursors, patterns and pictures are drawn is specified by [PICT.md](PICT.md), [QUICKDRAW.md](QUICKDRAW.md),
+[QUICKTIME.md](QUICKTIME.md) and [ICONS.md](ICONS.md); this document covers only what ClassicMac adds on top.
 
 Contents
 
@@ -567,8 +567,8 @@ The image extensions are those of the configured image encoder (`.png` by defaul
 
 The image decoders hand each resource to `ClassicMac.Graphics` (`PictReader` for pictures, `QuickDrawResources` for icons,
 cursors and patterns), which draws it as the Mac would into a width × height grid of 8-bit RGBA pixels. How each
-resource is laid out and drawn is specified in [PICT-FORMAT.md](PICT-FORMAT.md) (section 18 for icons, cursors
-and patterns, section 19 for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
+resource is laid out and drawn is specified in [PICT.md](PICT.md), [ICONS.md](ICONS.md) (icons, cursors
+and patterns) and [QUICKDRAW.md](QUICKDRAW.md) (section 8 for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
 masks for colour icons, the cursor JSON, numbered list outputs and a size limit.
 
 `ClassicMac.Graphics` reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
@@ -599,32 +599,32 @@ message, and the resource is written raw. **[ClassicMac]**
 
 - A `PICT` is drawn by `PictReader.Decode` at its native resolution, with `ClassicMac.Graphics`'s default options otherwise.
 - **Screen depth:** `DecodeOptions.ScreenDepth` (32 by default; 1, 2, 4, 8 or 16) is the depth of the screen the
-  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([PICT-FORMAT.md](PICT-FORMAT.md)
-  section 19); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
+  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([QUICKDRAW.md](QUICKDRAW.md)
+  section 8); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
 - **QuickDraw model:** Mac OS 9's QuickDraw by default, or the 68k ROM's when `DecodeOptions.QuickDraw` is
-  `Rom68k` ([PICT-FORMAT.md](PICT-FORMAT.md) section 17 lists the differences).
+  `Rom68k` ([QUICKDRAW.md](QUICKDRAW.md) section 9 and [PICT.md](PICT.md) section 10 list the differences).
 - **Pixel limit:** before drawing, the picture frame (`picFrame`, the `Rect` at bytes 2–9 of the resource) gives the
   canvas size. If width × height exceeds `DecodeOptions.MaxImagePixels` (64 Mi pixels, 67,108,864, by default), the
   picture is not drawn: `image.too-large`, and the resource is written raw. The check needs at least 10 bytes; shorter
   data goes to `ClassicMac.Graphics`, which rejects it. **[ClassicMac]**
-- Parts of the canvas the picture does not draw on are transparent ([PICT-FORMAT.md](PICT-FORMAT.md) section 2.4).
+- Parts of the canvas the picture does not draw on are transparent ([PICT.md](PICT.md) section 2.4).
 
 ### 8.3 Icons and their masks
 
 | Types | Output |
 | --- | --- |
 | `ICON` | 32 × 32, black on white, opaque |
-| `ICN#`, `ics#`, `icm#` | the first icon of the list, with the list's mask as transparency (mask bit 0 → alpha 0); a list without a mask half gets a computed mask ([PICT-FORMAT.md](PICT-FORMAT.md) section 18) |
+| `ICN#`, `ics#`, `icm#` | the first icon of the list, with the list's mask as transparency (mask bit 0 → alpha 0); a list without a mask half gets a computed mask ([ICONS.md](ICONS.md)) |
 | `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8` | the colour icon, masked by the icon list of the **same ID and size** in the same fork: `icl*` by `ICN#`, `ics*` by `ics#`, `icm*` by `icm#` |
 | `cicn` | the colour icon with its own mask |
 | `SICN` | one image per 16 × 16 icon, numbered (section 8.4), unmasked |
 
-- The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID ([PICT-FORMAT.md](PICT-FORMAT.md)
-  section 18). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
+- The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID
+  ([ICONS.md](ICONS.md)). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
   reported against the colour icon.
 - **No list:** when the fork has no such list, the colour icon is drawn fully opaque and `image.no-mask` (info) is
   reported; the icon is still decoded. The Mac's Icon Utilities draw nothing in that case (noMaskFoundErr, per
-  [PICT-FORMAT.md](PICT-FORMAT.md) section 18); ClassicMac prefers a visible image. **[ClassicMac]**
+  [ICONS.md](ICONS.md)); ClassicMac prefers a visible image. **[ClassicMac]**
 
 ### 8.4 Numbered list outputs
 
@@ -642,7 +642,7 @@ A cursor (`CURS`, `crsr`) gives two files, **[ClassicMac]**:
 - `<stem>.json`, what a PNG cannot hold, described below.
 
 On the Mac a cursor is drawn as `screen = (screen AND NOT mask) XOR image`: where the mask is 0, a `CURS` data bit 1
-inverts the screen, and a `crsr` pixel XORs the screen with its complement ([PICT-FORMAT.md](PICT-FORMAT.md) section 18). The JSON
+inverts the screen, and a `crsr` pixel XORs the screen with its complement ([ICONS.md](ICONS.md)). The JSON
 records that as follows:
 
 | Name | Type | Meaning | Example |

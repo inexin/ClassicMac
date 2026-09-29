@@ -418,9 +418,9 @@ the new packages.
 grew up together, but other parts need the renderer without PICT: dialog previews drawn from `DLOG`/`DITL` the way the
 Dialog Manager draws them, icons scaled with CopyBits, `cicn` masks, cursors and patterns at a screen depth, and any
 later QuickDraw GX or 3DMF work reusing regions and colour. Exposing the renderer's drawing API (today internal and
-shaped around PICT playback) is part of the merge work. The specification splits the same way: QuickDraw.Pict's
-`PICT-FORMAT.md` becomes `docs/formats/PICT.md` (opcodes and operands) and `docs/formats/QUICKDRAW.md` (the drawing
-rules), with one spec per format under `docs/formats/`.
+shaped around PICT playback) is part of the merge work. The specification is split the same way (done, 2026-09-29): QuickDraw.Pict's
+`PICT-FORMAT.md` became `docs/formats/PICT.md` (opcodes, operands, play state) and `docs/formats/QUICKDRAW.md` (the
+drawing rules), with `QUICKTIME.md`, `MACPAINT.md` and `ICONS.md` beside them, one spec per format.
 
 **Where icons live (settled by this layering):** icons, cursors and patterns are resources, so their decoders go in
 `ClassicMac.Resources.Decoders`. Plain decoding (`ICN#`, `icl8`, `cicn`, …) needs only Graphics (colour tables,

@@ -41,7 +41,7 @@ A `ColorTable` [Doc] (*Imaging With QuickDraw*):
 In a pixel map's table (bit 15 clear) each entry's value is the pixel value it stands for. In a device's table (bit 15
 set) the entries are in pixel-value order, and the value field holds other information [Doc].
 
-The same structure appears inside pictures, colour icons and pixel patterns ([PICT-FORMAT.md](PICT-FORMAT.md)),
+The same structure appears inside pictures, colour icons and pixel patterns ([PICT.md](PICT.md), [ICONS.md](ICONS.md)),
 and as the window, dialog and control colour tables of [INTERFACE.md](INTERFACE.md) §10, where the value is a part
 code.
 

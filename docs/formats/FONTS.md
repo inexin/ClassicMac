@@ -11,7 +11,7 @@ The reader is `ClassicMac.Graphics.Fonts` (in the `ClassicMac.Graphics` package,
 References:
 
 - *Inside Macintosh: Text* (1993), Font Manager: the bitmapped font resource, the font family resource and its tables.
-- The 68k ROM's Font Manager, disassembly (as traced for [PICT-FORMAT.md](PICT-FORMAT.md) §12): the offset of the
+- The 68k ROM's Font Manager, disassembly (as traced for [QUICKDRAW.md](QUICKDRAW.md) §7): the offset of the
   offset/width table, the style extra widths, the width tables' stepping.
 - Mac OS 9.0, disassembly: the native Font Manager, FontObjects, QuickDraw's text drawing and ScriptUtils in the System
   file's data fork: which fields and tables are read, and how. **[Code]** below is Mac OS 9.0 unless it names the ROM.
@@ -228,5 +228,5 @@ All decoders are version 1. The viewer shows a strike's glyph sheet.
 
 - Drawing text with a family (the Font Manager's choice of size and style, scaling, synthesized styles) in the font
   exports. The renderer (`ClassicMac.Graphics.QuickDraw`) draws a picture's text with the fonts read here, by the
-  ROM's or Mac OS 9's rules ([PICT-FORMAT.md](PICT-FORMAT.md) section 12), but the font decoders write no specimen.
+  ROM's or Mac OS 9's rules ([QUICKDRAW.md](QUICKDRAW.md) section 7), but the font decoders write no specimen.
 - Writing fonts (BDF or TrueType back into resources).

@@ -27,11 +27,11 @@ it in the same change when a decision changes.
 QuickDraw.Pict (formerly <https://github.com/inexin/QuickDraw.Pict>) moved into this repo with its history on
 2026-09-29 and became one package, `ClassicMac.Graphics`, in layers (a folder and namespace each), with the
 `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` adapters. It decodes and encodes QuickDraw PICT pictures and draws
-**exactly the pixels a Macintosh draws**. The plan's merge phase continues with Core's geometry and a public drawing API
-for the renderer.
+**exactly the pixels a Macintosh draws**. The public drawing API is `QuickDrawPort` ([docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)).
 
-- `docs/formats/PICT-FORMAT.md` is the full format and rendering spec; update the matching section in the same change
-  as any behaviour change (§16 what isn't covered, §17 the Mac OS 9 differences, §19 screen depths).
+- The specs: `docs/formats/PICT.md` (the picture format and playback), `docs/formats/QUICKDRAW.md` (the drawing
+  rules), `QUICKTIME.md`, `MACPAINT.md`, `ICONS.md`. Update the matching section in the same change as any behaviour
+  change (each has a "Not covered" and a "Mac OS 9 differences" section; screen depths are QUICKDRAW.md §8).
 - **Two QuickDraws:** `PictDecodeOptions.QuickDraw` selects `MacOS9` (default) or `MacRom` (the 68k ROM $077D). Any
   behaviour change must keep **both** correct.
 - Match QuickDraw's integer behaviour exactly: signed 16-bit wraps, truncating versus rounding divides, Fixed maths.

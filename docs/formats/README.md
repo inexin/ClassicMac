@@ -21,11 +21,15 @@ behaviour of Apple's own code decides, as traced in disassembly and checked on r
 | [FINDER.md](FINDER.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
 | [FONTS.md](FONTS.md) | `NFNT`/`FONT` strikes, `FOND` families, `fctb`, `sfnt`; the glyph sheet, BDF and JSON output | `ClassicMac.Graphics.Fonts`, `ClassicMac.Resources.Decoders.Fonts` |
 | [DOCUMENTS.md](DOCUMENTS.md) | DOCMaker stand-alone documents and SimpleText documents with pictures; the HTML output | `ClassicMac.Resources.Decoders.Documents` |
-| [PICT-FORMAT.md](PICT-FORMAT.md) | QuickDraw pictures (PICT v1, v2, extended v2), how QuickDraw draws them (Mac OS 9 and the 68k ROM), QuickTime images, MacPaint, icons, cursors and patterns | `ClassicMac.Graphics`, `.QuickTime`, `.QuickDraw`, `.Pict` |
+| [PICT.md](PICT.md) | QuickDraw pictures (PICT v1, v2, extended v2): container, opcodes, operands, DrawPicture's play state; writing pictures | `ClassicMac.Graphics.Pict` |
+| [QUICKDRAW.md](QUICKDRAW.md) | How QuickDraw draws (Mac OS 9 and the 68k ROM): shapes, patterns, transfer modes, CopyBits, bitmap text and the Font Manager, screen depths | `ClassicMac.Graphics.QuickDraw` |
+| [QUICKTIME.md](QUICKTIME.md) | QuickTime still images in pictures, the codecs, QTIF files | `ClassicMac.Graphics.QuickTime` |
+| [MACPAINT.md](MACPAINT.md) | MacPaint documents | `ClassicMac.Graphics` |
+| [ICONS.md](ICONS.md) | Icon, cursor and pattern resources | `ClassicMac.Resources.Decoders.Images` |
 | [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 
 Pictures, icons, cursors and patterns are drawn by `ClassicMac.Graphics` (`.QuickDraw`, `.Pict`), which
-[PICT-FORMAT.md](PICT-FORMAT.md) specifies (section 18 for icons, cursors and patterns).
+[PICT.md](PICT.md) and [QUICKDRAW.md](QUICKDRAW.md) specify ([ICONS.md](ICONS.md) for icons, cursors and patterns).
 [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) covers what ClassicMac adds: masks, cursor JSON and numbered list outputs.
 
 ## Conventions

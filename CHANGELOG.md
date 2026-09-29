@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The PICT specification is split into `docs/formats/PICT.md` (the format and playback), `QUICKDRAW.md` (the drawing
+  rules), `QUICKTIME.md`, `MACPAINT.md` and `ICONS.md`.
 - `QuickDrawPort`: the renderer as a public colour QuickDraw port (shapes, lines, regions, patterns, CopyBits, text)
   with QuickDraw's names, drawing exactly what the picture player draws, which now runs on it. Public `RgbColor`,
   `TransferMode`, `QuickDrawStyle`, `QuickDrawPattern`, `QuickDrawOptions`, `Region` and `PixMap`

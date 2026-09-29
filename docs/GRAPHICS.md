@@ -130,7 +130,9 @@ pixel for pixel against it, in both modes. The QuickTime codecs match ffmpeg's d
 Not modelled: TrueType text (it goes to the outline fallback), and QuickTime codecs' own dithering on indexed
 screens.
 
-The format and every rendering rule the library follows are specified in [formats/PICT-FORMAT.md](formats/PICT-FORMAT.md),
+The format and every rendering rule the library follows are specified in [formats/PICT.md](formats/PICT.md) and
+[formats/QUICKDRAW.md](formats/QUICKDRAW.md) (with [QUICKTIME.md](formats/QUICKTIME.md), [MACPAINT.md](formats/MACPAINT.md)
+and [ICONS.md](formats/ICONS.md)),
 in enough detail to write a compatible decoder and encoder without reading the source.
 
 ## Build
