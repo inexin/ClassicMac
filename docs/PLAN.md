@@ -762,6 +762,19 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
     (RLE81 + LZH); then DiskDoubler, PackIt and segmented archives. Anything from row 5 of Inputs only on request.
 
+### Todo (not in a phase)
+
+- [ ] **Template toggle:** show a resource that has a typed form (`DLOG`, `MENU`, …) through its `TMPL` as well.
+- [ ] **Hex editing in the hex view** (overwrite, insert, delete), instead of the dialog.
+- [ ] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager).
+- [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
+- [ ] **8-bit icon masks in icon suites.**
+- [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
+- [ ] **Viewer drag-out** of files and resources.
+- [ ] **CD images: multisession.**
+- [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
+  (a damaged fork opened and saved already comes out clean).
+
 ## Decisions
 
 - **Name:** ClassicMac (see Purpose and goals).
