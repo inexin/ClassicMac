@@ -157,11 +157,17 @@ namespace ClassicMac.App.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanClose))]
-        private void Close()
+        private async Task Close()
         {
             if (Selected?.Input is not { } input) return;
+            if (!await ConfirmCloseAsync([input])) return;
+            RemoveInput(input);
+        }
+
+        private void RemoveInput(InputNode input)
+        {
             Roots.Remove(input);
-            allDiagnostics.RemoveAll(d => d.Node?.Input == input || d.Source == input.Title && d.Node is null);
+            allDiagnostics.RemoveAll(d => d.Node?.Input == input || d.Source == input.BaseTitle && d.Node is null);
             RefreshDiagnostics();
             Selected = null;
         }

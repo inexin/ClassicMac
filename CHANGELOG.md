@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Editing (Editor I): the app adds, duplicates, deletes and renumbers resources, changes their names and attributes,
+  edits their bytes as hex or replaces them from a file, with undo and redo, and saves back into the file (raw fork,
+  AppleDouble, Basilisk II, MacBinary as III, BinHex, AppleSingle), verified, keeping the original as `.orig`; Save As
+  writes any of those forms. Ctrl+S is Save; Save Resource As moved to Ctrl+E. Library: `ClassicMac.Resources.Editing`
+  (`EditSession`) and `ClassicMac.Files.Editing` (`ForkSaver`).
 - `IconSuite.Plot` draws icon suites into a `QuickDrawPort` as PlotIconSuite/PlotIconID do: member choice by rect
   and depth, alignment, the selected/disabled/offline/open transforms and labels, for Mac OS 9 or the ROM.
   `QuickDrawPort.CopyMask` and `Region.FromBitMap` (BitMapToRegion) are new.

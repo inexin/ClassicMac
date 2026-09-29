@@ -95,13 +95,14 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             Capture(window, "hex");
 
-            // The tree's context menu, on a resource: only Save Resource As applies.
+            // The tree's context menu, on a resource: the Resource commands and Save Resource As apply, not the file's.
             var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
             var menu = tree.ContextMenu!;
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
             var items = menu.Items.OfType<MenuItem>().ToList();
-            Assert.Equal(["_Save Resource As…"], items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
+            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "_Save Resource As…"],
+                items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
             Capture(window, "context-menu");
             menu.Close();
 

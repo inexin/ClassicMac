@@ -484,7 +484,7 @@ stereo); playback stops when the selection changes. **Next:** drag and drop out 
 3. **Writing disk images:** add, replace and delete files in HFS images, with type/creator, dates and both forks.
    Archives (StuffIt, Compact Pro) stay read-only.
 
-**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** the library part is built (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified).
+**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** **built** (2026-09-29): the library (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified; [formats/CONTAINERS.md](formats/CONTAINERS.md) §6.5) and the app (Edit and Resource menus, Save/Save As/Revert, prompts for unsaved edits). Hex editing is a dialog (the bytes as editable hex) for now; editing in the hex view itself is later.
 
 - **Edits live in the library.** `ClassicMac.Resources.Editing`: each edit is a command on a `ResourceFork` that can be
   applied and undone (add, delete, duplicate, rename, renumber, set attributes, set data, set the fork's attributes), and
@@ -734,7 +734,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    palettes, Finder resources, and `pack` with MacBinary III, BinHex 4.0 and AppleSingle writers; the exit check passes
    on the whole corpus (the corpus test packs every export back); fonts through the new `ClassicMac.Graphics.Fonts`
    ([formats/FONTS.md](formats/FONTS.md)).
-6. **Editor I** — resource-level edits and saving back into forks and single-file containers.
+6. **Editor I** — resource-level edits and saving back into forks and single-file containers. **Built** (2026-09-29).
 7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders).
 8. **Editor III** — writing HFS disk images.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,

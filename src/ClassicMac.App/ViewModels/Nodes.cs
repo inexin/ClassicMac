@@ -32,12 +32,18 @@ namespace ClassicMac.App.ViewModels
 
         protected NodeViewModel(string title, NodeKind kind, NodeViewModel? parent)
         {
-            Title = title;
+            this.title = title;
+            BaseTitle = title;
             Kind = kind;
             Parent = parent;
         }
 
-        public string Title { get; }
+        /// <summary>The title shown: the name, marked while the node has unsaved edits.</summary>
+        [ObservableProperty]
+        private string title;
+
+        /// <summary>The title without the unsaved-edits mark.</summary>
+        public string BaseTitle { get; }
 
         public NodeKind Kind { get; }
 
@@ -98,6 +104,9 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The resources of a plain input read as a fork of its own, once loaded.</summary>
         public FileResources? RawResources { get; internal set; }
 
+        /// <summary>The edits made to the input's own resources, once any are.</summary>
+        public EditState? Editing { get; internal set; }
+
         // A plain file that is no container may itself be a resource fork (a .rsrc file).
         protected override Task LoadAsync() =>
             Root.Children.Count > 0 ? Task.CompletedTask : FileNode.LoadResourcesAsync(this, Root.File, raw: Host.Layout == HostLayout.Plain);
@@ -140,7 +149,10 @@ namespace ClassicMac.App.ViewModels
 
         public MacFile File => Node.File;
 
-        public FileResources? Resources { get; private set; }
+        public FileResources? Resources { get; internal set; }
+
+        /// <summary>The edits made to the file's resources, once any are.</summary>
+        public EditState? Editing { get; internal set; }
 
         public override string Source => Parent is FolderNode ? $"{Parent.Source}:{Title}" : $"{Parent!.Source} › {Title}";
 
@@ -173,12 +185,17 @@ namespace ClassicMac.App.ViewModels
             if (node is FileNode fileNode) fileNode.Resources = found;
             else if (node is InputNode input) input.RawResources = found;
             node.Children.Clear();
-            if (found.Fork is { } fork)
-            {
-                foreach (var type in fork.Types.OrderBy(t => t.ToString(), StringComparer.Ordinal))
-                    node.Children.Add(new ResourceTypeNode(node, fork, type));
-            }
+            if (found.Fork is { } fork) ShowTypes(node, fork);
             foreach (var d in diagnostics) node.Input.Report(new DiagnosticEntry(d, node.Source, node));
+        }
+
+        // (Re)builds a file node's type nodes from its fork, keeping which types were open.
+        internal static void ShowTypes(NodeViewModel node, ResourceFork fork)
+        {
+            var open = node.Children.OfType<ResourceTypeNode>().Where(t => t.IsExpanded).Select(t => t.Type).ToHashSet();
+            node.Children.Clear();
+            foreach (var type in fork.Types.OrderBy(t => t.ToString(), StringComparer.Ordinal))
+                node.Children.Add(new ResourceTypeNode(node, fork, type) { IsExpanded = open.Contains(type) });
         }
     }
 

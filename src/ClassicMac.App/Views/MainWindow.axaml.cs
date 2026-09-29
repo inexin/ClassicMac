@@ -21,9 +21,23 @@ namespace ClassicMac.App.Views
             {
                 if (DataContext is not MainViewModel model) return;
                 model.FilePicker = this;
+                model.EditDialogs ??= new EditDialogs(this);
                 model.AudioPlayer ??= audio;
             };
+            Closing += OnClosing;
             Closed += (_, _) => audio.Dispose();
+        }
+
+        private bool quitting;
+
+        // Unsaved edits: the window stays open while the user decides, then closes when they are saved or discarded.
+        private async void OnClosing(object? sender, WindowClosingEventArgs e)
+        {
+            if (quitting || DataContext is not MainViewModel { HasUnsavedChanges: true } model) return;
+            e.Cancel = true;
+            if (!await model.ConfirmQuitAsync()) return;
+            quitting = true;
+            Close();
         }
 
         private readonly SoundFlowPlayer audio = new();

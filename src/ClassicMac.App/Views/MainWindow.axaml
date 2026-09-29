@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ClassicMac.App.ViewModels"
         xmlns:views="using:ClassicMac.App.Views"
+        xmlns:editing="using:ClassicMac.Files.Editing"
         x:Class="ClassicMac.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="ClassicMac"
@@ -24,10 +25,34 @@
         <MenuItem Header="_Open…" Command="{Binding OpenCommand}" InputGesture="Ctrl+O" HotKey="Ctrl+O" />
         <MenuItem Header="_Close" Command="{Binding CloseCommand}" InputGesture="Ctrl+W" HotKey="Ctrl+W" />
         <Separator />
+        <MenuItem Header="_Save" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
+        <MenuItem Header="Save _As">
+          <MenuItem Header="_MacBinary III…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.MacBinary}" />
+          <MenuItem Header="_BinHex 4.0…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BinHex}" />
+          <MenuItem Header="Apple_Single…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleSingle}" />
+          <MenuItem Header="Apple_Double Pair…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleDoublePair}" />
+          <MenuItem Header="Basilisk _II Folder Entry…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BasiliskEntry}" />
+          <MenuItem Header="_Resource Fork Only…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.RawFork}" />
+        </MenuItem>
+        <MenuItem Header="_Revert" Command="{Binding RevertCommand}" />
+        <Separator />
         <MenuItem Header="_Quit" Click="OnQuit" />
       </MenuItem>
-      <MenuItem Header="_Export">
-        <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+S" HotKey="Ctrl+S" />
+      <MenuItem Header="_Edit">
+        <MenuItem Header="{Binding UndoTitle}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" HotKey="Ctrl+Z" />
+        <MenuItem Header="{Binding RedoTitle}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" />
+      </MenuItem>
+      <MenuItem Header="_Resource">
+        <MenuItem Header="_New Resource…" Command="{Binding NewResourceCommand}" InputGesture="Ctrl+K" HotKey="Ctrl+K" />
+        <MenuItem Header="_Duplicate" Command="{Binding DuplicateResourceCommand}" InputGesture="Ctrl+D" HotKey="Ctrl+D" />
+        <MenuItem Header="De_lete" Command="{Binding DeleteResourceCommand}" InputGesture="Delete" />
+        <Separator />
+        <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" HotKey="Ctrl+I" />
+        <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" HotKey="Ctrl+H" />
+        <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
+      </MenuItem>
+      <MenuItem Header="E_xport">
+        <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
         <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
         <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
         <MenuItem Header="_Convert Documents…" Command="{Binding ConvertDocumentsCommand}" />
@@ -44,6 +69,9 @@
     <Grid RowDefinitions="*,5,180">
       <Grid ColumnDefinitions="380,5,*">
         <TreeView ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
+          <TreeView.KeyBindings>
+            <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
+          </TreeView.KeyBindings>
           <TreeView.ItemTemplate>
             <TreeDataTemplate DataType="vm:NodeViewModel" ItemsSource="{Binding Children}">
               <StackPanel Orientation="Horizontal" Spacing="6">
@@ -54,7 +82,14 @@
           </TreeView.ItemTemplate>
           <TreeView.ContextMenu>
             <ContextMenu>
-              <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+S" />
+              <MenuItem Header="_New Resource…" Command="{Binding NewResourceCommand}" InputGesture="Ctrl+K" />
+              <MenuItem Header="_Duplicate" Command="{Binding DuplicateResourceCommand}" InputGesture="Ctrl+D" />
+              <MenuItem Header="De_lete" Command="{Binding DeleteResourceCommand}" InputGesture="Delete" />
+              <MenuItem Header="Get _Info…" Command="{Binding GetInfoCommand}" InputGesture="Ctrl+I" />
+              <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" />
+              <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
+              <Separator />
+              <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" />
               <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
               <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
               <MenuItem Header="_Convert Documents…" Command="{Binding ConvertDocumentsCommand}" />
