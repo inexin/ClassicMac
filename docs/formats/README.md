@@ -28,6 +28,22 @@ claimed for them. The native code is in the System file's data fork:
 Access 5.3.) "The ROM" or "the 68k ROM" means the 68k code in the Mac OS ROM image with ROM version `$077D`, the classic
 QuickDraw and Toolbox every Mac before Mac OS 9 used in some revision.
 
+**Mac OS 9.2.2** (System `'vers'` 9.2.2) was compared with 9.0 from the code only; it does not run in SheepShaver, so
+nothing was verified on it. Every fragment above is a newer version there (NQD cfrg 8, IconUtils 3, IconServicesLib 4,
+FontManager 598020), yet almost every rule these documents give is unchanged, including Mac OS 9.0's bugs such as the
+scaled CopyMask on a 1-bit screen. The differences found [Code: 9.2.2]:
+
+- icons: a 16-bit screen takes the 32-bit members (`il32`, `is32`, `ih32`) instead of `icl8`; an `icns` element over
+  $18FFF bytes fails the whole family; the open transform on a one-row mask draws an empty row;
+- QuickDraw: a hidden pen (pnVis < 0) also stops CopyMask and CopyDeepMask into the port's own pixels;
+- menus: a `MENU` item's icon byte is sign-extended into its text encoding; items of height 0, separators included, are
+  not drawn; an item under 32 counts as enabled by its enableFlags bit alone;
+- fonts: a `FOND`'s language word is kept only when ffVersion ≥ 4; the System's bitmap fonts were renumbered (Geneva
+  9 and 12 are `NFNT` 1025 and 1026, Monaco 9 is 1027, the bitmaps unchanged);
+- Appearance: utility window titles use the application's script font.
+
+ClassicMac follows 9.0; a 9.2.2 mode would take these differences.
+
 | Document | Formats | Code |
 | --- | --- | --- |
 | [RESOURCE-FORK.md](RESOURCE-FORK.md) | Resource forks: header, map, attributes; how Mac OS 9 and the 68k ROM open them; compressed resources (`dcmp` 0–3) | `ClassicMac.Resources` |
