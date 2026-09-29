@@ -425,6 +425,34 @@
       "encoding": null
     },
     {
+      "type": "icns",
+      "typeBytes": "69636E73",
+      "id": 128,
+      "name": null,
+      "attributes": 0,
+      "size": 416,
+      "storedSize": 4660,
+      "dcmp": null,
+      "decoder": "image.icon-family",
+      "decoderVersion": 1,
+      "path": "icns/128.il32.png",
+      "sha256": "57575eba75c5ad2333c03a32e7d9fb9f97b30320a85ddfd6e04d2b75ad2b68f0",
+      "storedSha256": "894fa19d40a371747326b533fbfea3fd5f6c19c2b1ca1cc09bd562ef3962afc5",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [
+        {
+          "path": "icns/128.ICN.png",
+          "sha256": "286d62c976cfa17fe97ddbdb5834cf635af20dd94b9ac7d5b433ad08962c7386"
+        },
+        {
+          "path": "icns/128.is32.png",
+          "sha256": "bd29c19ae68dc6ba657f67b576917f497859b493600bf7008655c5196b7c5b51"
+        }
+      ],
+      "encoding": null
+    },
+    {
       "type": "CURS",
       "typeBytes": "43555253",
       "id": 128,

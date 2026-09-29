@@ -33,6 +33,19 @@ internal static class GoldenFixtures
         return fixtures;
     }
 
+    // An icon family: ICN#, a raw il32 ramp, a compressed is32 (runs per plane) and an s8mk alpha ramp.
+    private static byte[] IconFamilyData()
+    {
+        static byte[] Element(string type, byte[] data) =>
+            [.. System.Text.Encoding.ASCII.GetBytes(type), (byte)((data.Length + 8) >> 24), (byte)((data.Length + 8) >> 16),
+                (byte)((data.Length + 8) >> 8), (byte)(data.Length + 8), .. data];
+        byte[] is32 = [0xFF, 0xC0, 0xFB, 0x40, 0xFF, 0x20, 0xFB, 0xE0, 0xFF, 0x80, 0xFB, 0x10];   // 130 + 126 per plane
+        byte[] body = [.. Element("ICN#", [.. Checker(32, 32), .. Circle(32, 32)]), .. Element("il32", Ramp(32 * 32 * 4)),
+            .. Element("is32", is32), .. Element("s8mk", Ramp(16 * 16))];
+        int length = body.Length + 8;
+        return [.. "icns"u8, (byte)(length >> 24), (byte)(length >> 16), (byte)(length >> 8), (byte)length, .. body];
+    }
+
     private static Resource Res(string type, short id, byte[] data, string? name = null)
     {
         var r = new Resource(FourCC.FromString(type), id, data);
@@ -68,6 +81,7 @@ internal static class GoldenFixtures
         yield return Res("icm8", 128, Ramp(16 * 12));
         yield return Res("cicn", 128, ColourIcon());
         yield return Res("SICN", 128, [.. Checker(16, 16), .. Circle(16, 16)]);
+        yield return Res("icns", 128, IconFamilyData());
 
         // Cursors and patterns.
         yield return Res("CURS", 128, [.. Checker(16, 16), .. Circle(16, 16), 0, 7, 0, 8]);

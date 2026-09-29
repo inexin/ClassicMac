@@ -25,7 +25,7 @@ behaviour of Apple's own code decides, as traced in disassembly and checked on r
 | [QUICKDRAW.md](QUICKDRAW.md) | How QuickDraw draws (Mac OS 9 and the 68k ROM): shapes, patterns, transfer modes, CopyBits, bitmap text and the Font Manager, screen depths | `ClassicMac.Graphics.QuickDraw` |
 | [QUICKTIME.md](QUICKTIME.md) | QuickTime still images in pictures, the codecs, QTIF files | `ClassicMac.Graphics.QuickTime` |
 | [MACPAINT.md](MACPAINT.md) | MacPaint documents | `ClassicMac.Graphics` |
-| [ICONS.md](ICONS.md) | Icon, cursor and pattern resources | `ClassicMac.Resources.Decoders.Images` |
+| [ICONS.md](ICONS.md) | Icon, cursor and pattern resources; icon families (`icns`, 48 × 48, 32-bit, 8-bit masks) | `ClassicMac.Resources.Decoders.Images` |
 | [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 
 Pictures, icons, cursors and patterns are drawn by `ClassicMac.Graphics` (`.QuickDraw`, `.Pict`), which

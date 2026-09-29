@@ -549,6 +549,7 @@ version 1.
 | `text.version` | `vers` | `.json` | — | `macintosh` | [TEXT.md](TEXT.md) |
 | `image.picture` | `PICT` | `.png` | — | null | section 8.2 |
 | `image.icon` | `ICON`, `ICN#`, `ics#`, `icm#`, `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8`, `cicn`; `SICN` | `.png`; `SICN`: `.1.png` | `SICN`: `.2.png`, … | null | section 8.3 |
+| `image.icon-family` | `icns` | the largest, deepest member (section 8.3) | the other members, largest and deepest first | null | section 8.3 |
 | `image.cursor` | `CURS`, `crsr` | `.png` | `.json` (section 8.5) | null | section 8.5 |
 | `image.pattern` | `PAT `, `ppat`; `PAT#`, `ppt#` | `.png`; lists: `.1.png` | lists: `.2.png`, … | null | section 8.6 |
 | `sound.snd` | `snd ` | `.wav`, or `.json` for a sound of commands only | `.json` after a `.wav` | null | [SOUND.md](SOUND.md) |
@@ -618,6 +619,7 @@ message, and the resource is written raw. **[ClassicMac]**
 | `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8` | the colour icon, masked by the icon list of the **same ID and size** in the same fork: `icl*` by `ICN#`, `ics*` by `ics#`, `icm*` by `icm#` |
 | `cicn` | the colour icon with its own mask |
 | `SICN` | one image per 16 × 16 icon, numbered (section 8.4), unmasked |
+| `icns` | one image per image member, named by it: `.it32.png`, `.ih32.png`, `.ich8.png`, `.ich4.png`, `.ich.png`, `.il32.png`, `.icl8.png`, `.icl4.png`, `.ICN.png`, `.is32.png`, `.ics8.png`, `.ics4.png`, `.ics.png`, `.icm8.png`, `.icm4.png`, `.icm.png`, in that order (the 1-bit members drop their `#`); each through the mask Icon Services picks for its size ([ICONS.md](ICONS.md)): an 8-bit mask of the same size as alpha, any other as a hard edge |
 
 - The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID
   ([ICONS.md](ICONS.md)). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
@@ -754,7 +756,10 @@ the manifest's `diagnostics`, and is printed by the CLI.
 | `export.not-decoded` | Info | `ResourceExporter` | The decoder returned no files and nothing had been reported for the resource (neither by decompression nor by the decoder). The resource is written raw |
 | `image.undecodable` | Warning | image decoders | `ClassicMac.Graphics` rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
 | `image.too-large` | Warning | `image.picture` | The picture's frame is over `MaxImagePixels` (section 8.2). The resource is written raw |
-| `image.no-mask` | Info | `image.icon` | A colour icon has no 1-bit icon list of the same ID for its mask; it is drawn opaque (section 8.3). The resource is still decoded |
+| `image.no-mask` | Info | `image.icon`, `image.icon-family` | A colour icon has no 1-bit icon list of the same ID for its mask, or an icon family has no mask at all; it is drawn opaque (section 8.3). The resource is still decoded |
+| `icon.family-header`, `icon.family-length` | Warning | `image.icon-family` | The data is not an `icns`, or its length word differs from its size (Mac OS 9 then treats the family as empty); nothing is written but the raw resource |
+| `icon.member-size` | Info | `image.icon-family` | A 1-, 4- or 8-bit member or an 8-bit mask is not its exact size; Mac OS 9 drops it, and so does the decoder |
+| `icon.family-ignored` | Info | `image.icon-family` | Elements Mac OS 9 does not know (`TOC `, `info`, `icnV`, `name`, …) were skipped |
 
 Other codes reach the manifest from the code the exporter calls:
 

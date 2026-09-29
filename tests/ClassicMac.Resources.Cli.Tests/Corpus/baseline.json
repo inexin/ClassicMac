@@ -441,6 +441,16 @@
   },
   {
     "name": "FLOP1440.dsk",
+    "sha256": "078f3d1d00536ade73f1eee0c1cbb43f0901c06ac5f1a0f7e0fb9711a4fcfe8d",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80",
+    "documents": 0
+  },
+  {
+    "name": "FLOP1440.dsk",
     "sha256": "e12cd9870d03ede48364e7553710137817d02f72faf76b35d4d2903e9200e7dd",
     "forks": 2,
     "resources": 4,
@@ -471,6 +481,16 @@
   },
   {
     "name": "FLOP400.dsk",
+    "sha256": "6f85686c9fc45f972b61c7811e62ad912ae73b3d17df3b9ba1d3fb213bfc6dec",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80",
+    "documents": 0
+  },
+  {
+    "name": "FLOP400.dsk",
     "sha256": "a560d418452ae30f136b401cd917bcb1706e525a343fb8af9f282d9aa90f1f3f",
     "forks": 2,
     "resources": 4,
@@ -492,6 +512,16 @@
   {
     "name": "FLOP400_orig.dsk",
     "sha256": "02a399b0dd0b8b11dc5793f8b1875bc022ffaafdeab0fc5b54a8830685298163",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80",
+    "documents": 0
+  },
+  {
+    "name": "FLOP800.dsk",
+    "sha256": "a073999d73337747ade48997ba6401a26d38d2761ad6a5af6f48d640d1041827",
     "forks": 2,
     "resources": 4,
     "decoded": 1,
@@ -697,6 +727,16 @@
     "decoded": 126,
     "raw": 0,
     "outputs": "56445131f3dc133b4ef4d75bf0f0ce960bcd85670a41bed6a97e45ac3eb62f3b",
+    "documents": 0
+  },
+  {
+    "name": "QDHarness",
+    "sha256": "081c0912593d09a3c8867bb059d62fecfc95ad9681be10c15192776feebb0cc7",
+    "forks": 1,
+    "resources": 20,
+    "decoded": 1,
+    "raw": 19,
+    "outputs": "d21ba877403ae0dc4ac9e3e23b4e719f89faecd6eb069d1b75544a224d290a4d",
     "documents": 0
   },
   {
@@ -1110,6 +1150,16 @@
     "documents": 0
   },
   {
+    "name": "SRC5M.dsk",
+    "sha256": "52d549e32bb6b8a0721da168b95f3aa7f1ad40e7efb5f4516d91ee7f225f131a",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80",
+    "documents": 0
+  },
+  {
     "name": "SRC5M_orig.dsk",
     "sha256": "bf75b2608a4a9c34bb35a9a29cb7a25d46df04d25b82a3542af98aab044ddcdb",
     "forks": 2,
@@ -1122,6 +1172,16 @@
   {
     "name": "SRC800.dsk",
     "sha256": "0f29155aa3c31b8a758b674d48881e69605eb87cbe6cc653e58833950f450122",
+    "forks": 2,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "317c7dbfada4d56dde30c3a29b877aac76f0163addfc8912c0de28fb749eab80",
+    "documents": 0
+  },
+  {
+    "name": "SRC800.dsk",
+    "sha256": "1285c8b136fd07270f600c03c7d58ede1a6f9d78e3fda4f56244fb8c8e444360",
     "forks": 2,
     "resources": 4,
     "decoded": 1,
@@ -1374,9 +1434,9 @@
     "sha256": "9ea76d1b5eabd8b62f376133825847fc7be3ce23f38af34acc5549f2bd5e7c13",
     "forks": 1,
     "resources": 2188,
-    "decoded": 1052,
-    "raw": 1136,
-    "outputs": "2ecdfc30834b6b0bfaa2482c31700068d3ca771aa880fb57f7cc875a652f9d62",
+    "decoded": 1059,
+    "raw": 1129,
+    "outputs": "e246973928b19d1db136aee57788e1066335c80884984440b742089fc52d2449",
     "documents": 0
   },
   {
@@ -2842,6 +2902,16 @@
   {
     "name": "scratch.dsk",
     "sha256": "dbabf9408db09744ca36b8d21c0fcb30df03d4af5f88f1c26513750a22212e6d",
+    "forks": 13,
+    "resources": 25,
+    "decoded": 7,
+    "raw": 18,
+    "outputs": "b4e1298b18438731d07131952ac226eaf95e3c5492d0542374eb5fd643091e7b",
+    "documents": 0
+  },
+  {
+    "name": "scratch.dsk",
+    "sha256": "ee69aa4db8ddf1ac1ab0bc4354d292091b34aaa35dbbca3d364f1e8318171b3e",
     "forks": 13,
     "resources": 25,
     "decoded": 7,

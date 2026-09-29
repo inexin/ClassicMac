@@ -75,6 +75,7 @@ namespace ClassicMac.Resources.Decoders
                 new VersionDecoder(options),
                 new Images.PictureDecoder(options),
                 new Images.IconDecoder(options),
+                new Images.IconFamilyDecoder(options),
                 new Images.CursorDecoder(options),
                 new Images.PatternDecoder(options),
                 new Sound.SoundDecoder(),

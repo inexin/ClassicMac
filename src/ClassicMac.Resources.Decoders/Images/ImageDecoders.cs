@@ -123,6 +123,32 @@ namespace ClassicMac.Resources.Decoders.Images
     }
 
     /// <summary>
+    /// Icon families (<c>icns</c>): one image per image member, largest and deepest first, each through the mask Icon
+    /// Services picks for its size (an 8-bit mask as alpha). Named by member: <c>.il32.png</c>, <c>.icl8.png</c>,
+    /// <c>.ICN.png</c> (the 1-bit members without their <c>#</c>).
+    /// </summary>
+    internal sealed class IconFamilyDecoder(DecodeOptions options) : ImageDecoder(options, "image.icon-family", "icns")
+    {
+        private static readonly string[] Order =
+            ["it32", "ih32", "ich8", "ich4", "ich#", "il32", "icl8", "icl4", "ICN#", "is32", "ics8", "ics4", "ics#", "icm8", "icm4", "icm#"];
+
+        protected override IReadOnlyList<DecodedFile> DecodeImages(DecodeInput input)
+        {
+            var family = IconFamily.ReadIcns(input.Data.Span, input.Diagnostics);
+            var files = new List<DecodedFile>();
+            foreach (var type in Order)
+            {
+                if (family.Masked(type) is not { } image) continue;
+                if (family.MaskFor(image.Height) is null && files.Count == 0)
+                    input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Info, "image.no-mask",
+                        $"{input.Resource}: the family has no mask; its images are drawn opaque."));
+                files.Add(Image(image, "." + type.TrimEnd('#')));
+            }
+            return files;
+        }
+    }
+
+    /// <summary>
     /// Cursors (<c>CURS</c>, <c>crsr</c>): the image (mask as transparency) and a JSON file with the hotspot, the pixels
     /// the cursor inverts where its mask is clear, and, for colour cursors, any other colour it XORs there.
     /// </summary>

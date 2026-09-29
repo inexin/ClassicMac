@@ -126,8 +126,75 @@ the same structures. All are big-endian.
 - **`ppt#`:** a u16 count, then that many u32 offsets from the resource start. Each element is a complete flattened
   `ppat`, whose own offsets are relative to the element's start; element i ends where element i+1 begins.
 
+## Icon families (Mac OS 9 Icon Services)
+
+Mac OS 9's Icon Services knows 20 members, and nothing else [Code]:
+
+| Size | 1-bit (image + mask) | 4-bit | 8-bit | 32-bit | 8-bit mask |
+|---|---|---|---|---|---|
+| 16 × 12 | `icm#` (48) | `icm4` (96) | `icm8` (192) | — | — |
+| 16 × 16 | `ics#` (64) | `ics4` (128) | `ics8` (256) | `is32` (1024) | `s8mk` (256) |
+| 32 × 32 | `ICN#` (256) | `icl4` (512) | `icl8` (1024) | `il32` (4096) | `l8mk` (1024) |
+| 48 × 48 | `ich#` (576) | `ich4` (1152) | `ich8` (2304) | `ih32` (9216) | `h8mk` (2304) |
+| 128 × 128 | — | — | — | `it32` (65536) | `t8mk` (16384) |
+
+(Raw sizes in bytes.) Rows run top down without padding: 1-bit members are the image then the mask, `w/8` bytes a
+row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour tables 4 and 8 [Code].
+
+- **8-bit masks** (`s8mk`, `l8mk`, `h8mk`, `t8mk`): one byte a pixel, drawn as a deep mask through the grey table 40,
+  so the value is the alpha: 0 transparent, $FF opaque. Most real ones have partial alpha [Code] [Verified].
+- **32-bit members:** a payload of exactly the raw size is raw ARGB (A first; the alpha is not used). Any other size is
+  compressed [Code]:
+  - three planes, red, green, blue, each one byte per pixel, into bytes 1, 2 and 3 of each pixel (alpha stays 0);
+  - a control byte under $80 copies that many plus one literal bytes; $80 and over repeats the next byte
+    (control − 125) times (3 to 130);
+  - a count stops at the end of its plane (the excess literal bytes are skipped, a run is cut short); nothing
+    carries into the next plane, which begins only when the current one is full; bytes after the blue plane are
+    ignored, and short data leaves zeros;
+  - **`it32` only** starts with a 4-byte compression-format word, which must be 0: otherwise the whole family fails
+    (paramErr). Mac OS 9 writes it as 0.
+- **Other members** (1-, 4-, 8-bit and the 8-bit masks) must be exactly their raw size; otherwise the member is
+  dropped without an error [Code]. So a mask-less `ICN#` counts here as absent (unlike the Icon Utilities' CalcMask).
+
+**`icns`** (IconFamilyResource) [Code]:
+
+- A header: the type (`icns`, or a variant: `tile`, `over`, `drop`, `open`, `odrp`) and a u32 length including the
+  header. The length must be at least 9 and equal the resource's size exactly; otherwise the family is empty
+  (noIconDataAvailableErr, which callers tolerate).
+- Then elements, packed without alignment and in any order: a type, a u32 size including its 8-byte header, the
+  data. A size under 1 fails the whole family; an element running past the end is skipped; a known member is stored
+  (the last of a type wins); a variant type nests a family; anything else (`TOC `, `info`, `icnV`, `name`, `ic07`, …)
+  is ignored.
+- Mac OS 9 writes the known members only, in table order (`icm#` … `t8mk`), 32-bit ones always compressed.
+- **Which resources make a family:** an `icns` of the ID is used alone. Without one, the classic resources of the ID
+  (`icm#`/`4`/`8`, `ics#`/`4`/`8`, `ICN#`, `icl4`, `icl8`) are read, each only at its exact size. 32-bit members, 8-bit
+  masks and the 48 × 48 members come only from an `icns`.
+
+**Mask and data choice** (PlotIconRefFast) [Code]:
+
+- The size group comes from the destination rect's height: ≤ 12 mini, ≤ 20 small, ≤ 40 large, ≤ 56 huge, ≥ 57
+  thumbnail. The first mask present in the group's list wins:
+  - mini: `icm#` `ics#` `ICN#` `ich#` (never an 8-bit mask);
+  - small: `s8mk` `l8mk` `h8mk` `ics#` `ICN#` `icm#` `ich#`;
+  - large: `l8mk` `s8mk` `h8mk` `ICN#` `ics#` `icm#` `ich#`;
+  - huge: `h8mk` `l8mk` `s8mk` `ich#` `ICN#` `ics#` `icm#`;
+  - thumbnail: `t8mk` `h8mk` `l8mk` `s8mk` `ich#` `ICN#` `ics#` `icm#`.
+- So an 8-bit mask wins over any 1-bit mask, even one of another size, and the two are never combined. The 1-bit
+  and 8-bit masks of real families differ by a few pixels; neither is derived from the other [Verified].
+- Data by screen depth (large group shown; the other groups start with their own size): 32 bits `il32` `icl8`
+  `icl4` `is32` `ics8` `ics4` `ih32` `ich8` `ich4` `icm8` `icm4` `ICN#` …; 8 or 16 bits `icl8` `icl4` `ics8` `ics4`
+  `ich8` `ich4` `icm8` `icm4` `ICN#` … (no 32-bit data, so a 16-bit screen gets `icl8`); 4 bits `icl4` `ICN#` …;
+  1 bit `ICN#` `ics#` `icm#` `ich#`. The thumbnail list, at any depth: `it32` `ih32` `ich8` `il32` `icl8` `is32`
+  `ics8` `icm8` `ich#` `ICN#` `ics#` `icm#`.
+- Drawing: a mask the same size as the data → CopyDeepMask with srcCopy (an 8-bit mask blends as alpha); otherwise
+  the mask becomes a region (8-bit: a pixel is in when its byte is not 0), MapRgn'd to the rect, and CopyBits
+  srcCopy draws through it (a hard edge). A family without any mask falls back to the Icon Utilities.
+- **ClassicMac** exports each image member of an `icns` through the mask its own size selects, the 8-bit mask as the
+  image's alpha, as [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) section 8.3 lists.
+
 ## Not covered
 
 - Icon suites: choosing a member by rect size and screen depth, and the selected, disabled, label, offline and open
   transforms, are described but not implemented. The decoders take one resource at a time.
-- The 48 × 48 and 32-bit icon types (`ich#`, `il32`, `l8mk` and relatives) and `icns` are not decoded.
+- `icns` variants (`tile`, `over`, `drop`, `open`, `odrp`) are read but not exported; standalone 32-bit, 48 × 48 and
+  8-bit mask resources are not decoded (Icon Services never reads them outside an `icns`).

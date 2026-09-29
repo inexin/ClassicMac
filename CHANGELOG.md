@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Icon families: `IconFamily` reads `icns` resources as Mac OS 9's Icon Services does (all 20 members: 48 × 48,
+  32-bit with its RLE, 8-bit masks) and builds families from classic icon resources; the `image.icon-family` decoder
+  exports each member through the mask Icon Services picks for its size.
 - `QuickDrawPort`: `SetOrigin`, `HidePen`/`ShowPen`, `CharExtra`, `TextWidth`/`StringWidth`/`CharWidth`, `GetFontInfo`,
   and `DrawPicture` onto a port (saving and restoring its state, clipped to nothing until the picture's ClipRgn, as
   the Mac does). Pictures now start with the pen ScalePt((1, 1)) to the destination, as DrawPicture does.

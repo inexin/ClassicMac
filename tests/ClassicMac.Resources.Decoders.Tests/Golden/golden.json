@@ -279,6 +279,28 @@
       ]
     },
     {
+      "key": "icns-128",
+      "decoder": "image.icon-family 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".il32.png",
+          "sha256": "57575eba75c5ad2333c03a32e7d9fb9f97b30320a85ddfd6e04d2b75ad2b68f0",
+          "length": 416
+        },
+        {
+          "extension": ".ICN.png",
+          "sha256": "286d62c976cfa17fe97ddbdb5834cf635af20dd94b9ac7d5b433ad08962c7386",
+          "length": 146
+        },
+        {
+          "extension": ".is32.png",
+          "sha256": "bd29c19ae68dc6ba657f67b576917f497859b493600bf7008655c5196b7c5b51",
+          "length": 717
+        }
+      ]
+    },
+    {
       "key": "CURS-128",
       "decoder": "image.cursor 1",
       "diagnostics": [],
