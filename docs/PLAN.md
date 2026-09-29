@@ -707,6 +707,24 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 
 Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
+**Status (2026-09-29):**
+
+| # | Phase | Status |
+|---|---|---|
+| 1 | Core | Done |
+| 2 | Disk images | Done except CD multisession (Todo) |
+| 3 | Decoders I | Done (exit passed; DOCMaker and SimpleText built after) |
+| 4 | Viewer app | Built except drag-out (Todo) |
+| 5 | Decoders II | Done (exit passed) |
+| 6 | Editor I | Done |
+| 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
+| 8 | Editor III (HFS writing) | Not started |
+| 9 | Code (`ClassicMac.Code`) | Planned, not started |
+| 9 | Merge (QuickDraw.Pict) | Done except `DrawPicture` onto a port and the spec split; NuGet publishing is the owner's step |
+| 10 | Later (HFS+, archives) | Not started |
+
+Phase numbers 9 (Code and Merge) are duplicated in the list below; kept as written.
+
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
    `ClassicMac.Files`: Finder info, AppleDouble/AppleSingle, MacBinary, BinHex, Basilisk II shared folders; raw forks;
    CLI `list` and raw `extract`. *Exit:* read → write → read gives the same model on every corpus fork, and canonical
