@@ -70,6 +70,23 @@ PictWriter.Write(stream, bitmap, new PictWriteOptions { Format = PictPixelFormat
     HorizontalResolution = 144, VerticalResolution = 144, IccProfile = icc });
 ```
 
+## Drawing
+
+`QuickDrawPort` is QuickDraw itself, without a picture: a colour port on an `RgbaBitmap`, drawing what the chosen
+QuickDraw draws. Its members carry QuickDraw's names ([QUICKDRAW-API.md](QUICKDRAW-API.md)).
+
+```csharp
+var port = new QuickDrawPort(new RgbaBitmap(200, 100), new QuickDrawOptions { Fonts = library, ScreenDepth = 8 });
+port.PenSize = new MacPoint(2, 2);
+port.FrameRoundRect(new MacRect(10, 10, 60, 110), 16, 16);
+port.FillOval(new MacRect(20, 120, 80, 190), QuickDrawPattern.Gray);
+port.TextFont = 3; port.TextSize = 12;
+port.MoveTo(20, 90);
+port.DrawString("Hello");
+port.CopyBits(PixMap.FromBitMap(icon, 4, new MacRect(0, 0, 32, 32)), new MacRect(0, 0, 32, 32),
+    new MacRect(10, 150, 42, 182), TransferMode.SrcOr);
+```
+
 ## What is drawn
 
 - **Shapes**: rects, round rects, ovals, arcs and wedges, lines, polygons and regions, framed, painted, erased,

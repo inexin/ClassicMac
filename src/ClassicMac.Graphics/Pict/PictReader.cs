@@ -225,12 +225,12 @@ namespace ClassicMac.Graphics.Pict
             switch (op)
             {
                 case 0x0001: port.SetClip(Region.Read(b)); return true;                  // ClipRgn
-                case 0x0002: port.BkPat = Pattern.FromMono(b.ReadExactly(8)); return true;    // BkPat
-                case 0x0009: port.PnPat = Pattern.FromMono(b.ReadExactly(8)); return true;    // PnPat
-                case 0x000A: port.FillPat = Pattern.FromMono(b.ReadExactly(8)); return true;  // FillPat
-                case 0x0012: port.BkPat = Pattern.Read(b, macOS9); return true;          // BkPixPat
-                case 0x0013: port.PnPat = Pattern.Read(b, macOS9); return true;          // PnPixPat
-                case 0x0014: port.FillPat = Pattern.Read(b, macOS9); return true;        // FillPixPat
+                case 0x0002: port.BkPat = QuickDrawPattern.FromMono(b.ReadExactly(8)); return true;    // BkPat
+                case 0x0009: port.PnPat = QuickDrawPattern.FromMono(b.ReadExactly(8)); return true;    // PnPat
+                case 0x000A: port.FillPat = QuickDrawPattern.FromMono(b.ReadExactly(8)); return true;  // FillPat
+                case 0x0012: port.BkPat = QuickDrawPattern.Read(b, macOS9); return true;          // BkPixPat
+                case 0x0013: port.PnPat = QuickDrawPattern.Read(b, macOS9); return true;          // PnPixPat
+                case 0x0014: port.FillPat = QuickDrawPattern.Read(b, macOS9); return true;        // FillPixPat
                 case 0x0003: port.TextFont(b.ReadU16BE()); return true;                  // TxFont
                 case 0x0004: port.TextFace = b.ReadByte(); return true;                  // TxFace
                 case 0x0005: port.TextMode = b.ReadU16BE(); return true;                 // TxMode

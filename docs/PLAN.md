@@ -742,7 +742,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
    2026-09-29)**, the decoders using it directly; **2. layered as one `ClassicMac.Graphics` package with a namespace per
    layer (done, 2026-09-29)**; 3. shared types (Core's geometry; the renderer on `.Fonts`, done 2026-09-29, pixel-identical
-   on the corpus's fonts; icons as resource decoders) and a public drawing API. The old repo is archived and the
+   on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port and the spec split to do, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),

@@ -53,7 +53,7 @@ and may use only the layers below it, which `LayeringTests` checks. The adapters
 | root, `MacPaint/` (`ClassicMac.Graphics`) | `RgbaBitmap`, `RgbaColor`, `PixMap` records, standard colour tables, PackBits, `MacPaintFile` (also QuickTime's `PNTG` codec) | Core |
 | `Fonts/` (`.Fonts`) | The Font Manager's resources: `BitmapFont` (`NFNT`/`FONT`), `FontFamily` (`FOND`), `fctb`, `OutlineFont` (`sfnt`) | base |
 | `QuickTime/` (`.QuickTime`) | Image descriptions, the codecs, `IPictImageCodec`, QTIF files | base |
-| `QuickDraw/` (`.QuickDraw`) | The renderer: `Engine/`, `Regions/`, `Text/`, `Pattern`, `FontLibrary` | base, Fonts |
+| `QuickDraw/` (`.QuickDraw`) | The renderer: the public `QuickDrawPort` (state and verbs, [docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)) over `Engine/`, `Regions/`, `Text/`; `QuickDrawPattern`, `Region`, `FontLibrary`, `QuickDrawOptions` | base, Fonts |
 | `Pict/` (`.Pict`) | The PICT format: `PictReader` (`Decode`, or `Read` with the `PictInfo`), `GrafPort`, `PictWriter`, `PictHeader`/`PictInfo`, options, the `$8200` opcode | all of the above |
 
 `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are separate packages (the ImageSharp format plugin and the
@@ -62,8 +62,9 @@ SkiaSharp adapter) on `ClassicMac.Graphics`.
 Icons, cursors and patterns (`QuickDrawResources`) are in `ClassicMac.Resources.Decoders` (`Images/`).
 
 **Decoding pipeline**
-- `PictReader` parses the opcode stream and drives a `GrafPort`. The port holds the play state: pen, patterns,
-  fore/back/op/hilite colours, clip, text state, and picture-to-canvas mapping.
+- `PictReader` parses the opcode stream and drives a `GrafPort`: DrawPicture's play state (picture-space pen, text
+  origin, "same shape" operands, font-name map) and the picture-to-canvas mapping, on top of a `QuickDrawPort` that
+  holds the drawing state (pen, patterns, fore/back/op/hilite colours, clip, text state) and draws.
 - The port draws onto a `RgbaBitmap` (RGBA canvas) through the renderer in `ClassicMac.Graphics/QuickDraw/Engine/`:
   - `Painter`: region + pattern fills.
   - `Bits`: CopyBits/StretchBits, including the row and column DDAs and colorizing.

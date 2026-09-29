@@ -66,6 +66,13 @@ namespace ClassicMac.Graphics.Pict
                 : throw new System.ArgumentOutOfRangeException(nameof(ScreenDepth), value, "The screen depth must be 1, 2, 4, 8, 16 or 32.");
         }
         private readonly int screenDepth = 32;
+
+        // The drawing half of these options, for the port a picture is played into.
+        internal QuickDrawOptions ToQuickDrawOptions() => new()
+        {
+            Version = QuickDraw, ScreenDepth = ScreenDepth, Fonts = Fonts, TextFallback = TextFallback,
+            HiliteColor = HiliteColor is { } hilite ? RgbColor.FromRgba(hilite) : null, PreserveAlpha = PreserveAlpha,
+        };
     }
 
     /// <summary>The size a picture is drawn at.</summary>

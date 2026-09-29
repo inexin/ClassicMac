@@ -14,7 +14,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // viaStretchBits: the verb draws through StretchBits (rects, regions, polygons, horizontal and vertical lines),
         // not DrawArc / DrawLine's own slab code (ovals, round rects, arcs, slanted lines).
-        public static void FillRegion(RgbaBitmap canvas, Region region, Region? clip, Pattern pattern, (int h, int v) align,
+        public static void FillRegion(RgbaBitmap canvas, Region region, Region? clip, QuickDrawPattern pattern, (int h, int v) align,
             int mode, bool hilitePending, in PortColors colors, bool viaStretchBits)
         {
             var area = Visible(canvas, region, clip);
@@ -32,7 +32,7 @@ namespace ClassicMac.Graphics.QuickDraw
             // (ROM only: Mac OS 9 hilites through the pattern everywhere.)
             if (m == TransferModes.Hilite && !colors.MacOS9 && !colorPattern && viaStretchBits && !IsRectangle(area) &&
                 Array.TrueForAll(pattern.Mono, row => row == 0 || row == 0xFF) && Array.IndexOf(pattern.Mono, (byte)0xFF) >= 0)
-                pattern = Pattern.Black;
+                pattern = QuickDrawPattern.Black;
 
             foreach (var r in area.Rectangles())
                 for (int y = r.Top; y < r.Bottom; y++)
@@ -95,7 +95,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // On an indexed or 16-bit screen: 1-bit patterns draw fg / bk indices; a pixel pattern's colors become device
         // values (Color2Index for indexed patterns, the inverse table for direct ones; an RGB pattern is PatDither's 2 x 2
         // cell, solid only at 32 bits) drawn with fg all ones and bk 0.
-        private static void FillRegionOnDevice(RgbaBitmap canvas, Region area, Pattern pattern, (int h, int v) align, int m,
+        private static void FillRegionOnDevice(RgbaBitmap canvas, Region area, QuickDrawPattern pattern, (int h, int v) align, int m,
             in PortColors colors)
         {
             var device = colors.Device!;

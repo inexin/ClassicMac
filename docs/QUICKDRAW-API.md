@@ -1,7 +1,8 @@
 # The public QuickDraw drawing API (design)
 
-*Status: decided, 2026-09-29 (the three decisions at the end, as proposed); being built. Stage 3 of the QuickDraw.Pict
-merge ([PLAN.md](PLAN.md), phase 9).*
+*Status: decided 2026-09-29 (the decisions at the end); steps 1 and 2 built (the types and `QuickDrawPort`, with the
+picture player on it), step 3 (`DrawPicture` onto a port) and step 4 (the spec split) to do. Stage 3 of the
+QuickDraw.Pict merge ([PLAN.md](PLAN.md), phase 9).*
 
 ## Why
 
@@ -21,28 +22,35 @@ QuickDraw* documents it. Names follow QuickDraw's own (`FrameRect`, `PaintOval`,
 current port as the instance instead of `SetPort`.
 
 ```csharp
-var canvas = new RgbaBitmap(320, 200);                    // today's RgbaBitmap (see Names)
+var canvas = new RgbaBitmap(320, 200);
 var port = new QuickDrawPort(canvas, new QuickDrawOptions { Version = QuickDrawVersion.MacOS9, Fonts = fonts });
-port.PenSize(2, 2);
-port.ForeColor = RgbColor.Red;
+port.PenSize = new MacPoint(2, 2);
+port.ForeColor = new RgbColor(0xFFFF, 0, 0);
 port.FrameRoundRect(new MacRect(10, 10, 60, 110), 16, 16);
-port.TextFont(3); port.TextSize(12); port.TextFace(QuickDrawStyle.Bold);
+port.TextFont = 3; port.TextSize = 12; port.TextFace = QuickDrawStyle.Bold;
 port.MoveTo(20, 90);
 port.DrawString("Hello");
-port.CopyBits(icon, icon.Bounds, new MacRect(100, 100, 132, 132), TransferMode.SrcCopy, mask: null);
+port.CopyBits(icon, icon.BoundsRect, new MacRect(100, 100, 132, 132), TransferMode.SrcCopy);
 ```
+
+QuickDraw's setter routines (`PenSize`, `TextFont`, `RGBForeColor`, …) are properties of the same name.
 
 ### The port (`ClassicMac.Graphics.QuickDraw.QuickDrawPort`)
 
 | Group | Members |
 | --- | --- |
-| Setup | `QuickDrawPort(RgbaBitmap canvas, QuickDrawOptions? options)`; `PortRect`; `SetOrigin(h, v)`; `Clip` (a `Region`, null for none) |
-| Pen | `PenSize`, `PenMode`, `PenPattern`, `PenLocation`, `MoveTo`/`Move`, `LineTo`/`Line`, `PenNormal`, `HidePen`/`ShowPen` |
+| Setup | `QuickDrawPort(RgbaBitmap canvas, QuickDrawOptions? options)`; `Canvas`, `Options`, `PortRect`; `Clip` (a `Region`, null for none) |
+| Pen | `PenSize`, `PenMode`, `PenPattern`, `PenLocation`, `MoveTo`/`Move`, `LineTo`/`Line`, `PenNormal` |
 | Colour | `ForeColor`, `BackColor`, `OpColor`, `HiliteColor` (16-bit `RgbColor`); `BackPattern`, `FillPattern`; `HiliteMode()` |
 | Shapes | `Frame`/`Paint`/`Erase`/`Invert`/`Fill` × `Rect`, `RoundRect`, `Oval`, `Arc`, `Poly`, `Rgn` (`Fill…` takes a pattern) |
 | Bits | `CopyBits(PixMap source, MacRect src, MacRect dst, TransferMode mode, Region? mask)` |
-| Text | `TextFont`, `TextFace`, `TextSize`, `TextMode`, `SpaceExtra`, `CharExtra`, `FractionalWidths`, `ScaleDisable`; `DrawString`, `DrawText`, `DrawChar`; `StringWidth`, `TextWidth`, `GetFontInfo` |
-| Pictures | `DrawPicture(byte[] picture, MacRect destination)`: a PICT played into this port (the PICT reader's own path) |
+| Text | `TextFont`, `TextFace` (`QuickDrawStyle`), `TextSize`, `TextMode`, `SpaceExtra`, `FractionalWidths`, `ScaleDisable`; `DrawString`, `DrawText`, `DrawChar` (each moves the pen past the text) |
+| Pictures (step 3) | `DrawPicture(byte[] picture, MacRect destination)`: a PICT played into this port (the PICT reader's own path) |
+
+Left out until their rules are read from the code (not guessed): `SetOrigin` (how it moves the pattern alignment),
+`HidePen`/`ShowPen` (which drawing they hide), `CharExtra` (how the Fixed argument becomes the port's 4.12 word) and
+measuring (`StringWidth`, `TextWidth`, `GetFontInfo`: their rounding and scaling). Moving the pen resets its text
+fraction to ½ [ClassicMac: not yet checked against the ROM].
 
 - **Coordinates** are `MacRect`/`MacPoint` from Core: 16-bit, as QuickDraw's are. The engine keeps its internal
   32-bit `PictRect` for intermediate results; nothing public uses it.
@@ -56,12 +64,12 @@ port.CopyBits(icon, icon.Bounds, new MacRect(100, 100, 132, 132), TransferMode.S
 | Type | What | From |
 | --- | --- | --- |
 | `QuickDrawOptions` | `Version`, `ScreenDepth`, `Fonts`, `TextFallback`, `HiliteColor`, `PreserveAlpha` | the drawing half of `PictDecodeOptions`, which then holds these plus picture-only settings |
-| `QuickDrawVersion` | `MacOS9`, `MacRom` | `QuickDrawVersion`, renamed and moved down |
+| `QuickDrawVersion` | `MacOS9`, `MacRom` | `PictQuickDraw`, renamed and moved down |
 | `RgbColor` | QuickDraw's `RGBColor`: three 16-bit components (the engine already keeps them exactly) | new |
 | `TransferMode` | `SrcCopy` … `PatCopy` … `Blend` … `Hilite`, `GrayishTextOr`, `DitherCopy`; any 16-bit value, since the engine models odd modes too | the engine's constants |
-| `QuickDrawPattern` | an 8×8 1-bit pattern (`Black`, `Gray`, …, or 8 bytes), or a colour `'ppat'` | `Pattern`, made public read-only |
-| `Region` | immutable; `FromRect`, from `'RGN '`-format data, set operations, `Offset`, `Inset`, `Contains`; shape regions (`Oval`, `RoundRect`, `Arc`, `Poly`) as the port's version draws them | `Region` + `RegionShapes`, made public |
-| `PixMap` | a CopyBits source: 1-bit bitmap, indexed with a colour table, direct; or a view of an `RgbaBitmap` | `PixMap`, made public read-only with factory methods |
+| `QuickDrawPattern` | an 8×8 1-bit pattern (`Black`, `White`, `Gray`, `LightGray`, `DarkGray`, `FromBits`); colour patterns come from pictures (a `'ppat'` reader later) | `Pattern`, made public read-only |
+| `Region` | immutable; `FromRect`, `FromRgnData`/`ToRgnData` (the `'RGN '` form), `Union`/`Intersect`/`Difference`/`Xor`, `Offset`, `Inset`, `Contains`, `BoundingBox`; shape regions `Oval`, `RoundRect`, `Arc` (per version), `Polygon` | `Region` + `RegionShapes`, made public |
+| `PixMap` | a CopyBits source: `FromBitMap` (1-bit), `Indexed` (with its colour table), `Direct` (16 or 32 bits), `FromBitmap` (an `RgbaBitmap`) | `PixMap`, made public read-only with factory methods |
 | `FontLibrary` | families and strikes the text draws with | `FontLibrary`, renamed |
 | `ITextFallback` | outline text when no bitmap strike fits | `ITextFallback`, renamed |
 
@@ -75,10 +83,11 @@ proof the API draws what the engine drew.
 
 ## Order of work
 
-1. The public types (`RgbColor`, `TransferMode`, `QuickDrawPattern`, `Region`, `PixMap`, `QuickDrawOptions`,
-   `QuickDrawVersion`, `FontLibrary`, `ITextFallback`) and the renames.
+1. The public types (`RgbColor`, `TransferMode`, `QuickDrawStyle`, `QuickDrawPattern`, `Region`, `PixMap`,
+   `QuickDrawOptions`, `QuickDrawVersion`, `FontLibrary`, `ITextFallback`) and the renames. **Done.**
 2. `QuickDrawPort` over the engine; `Pict/GrafPort` rebuilt on it. Tests: each verb through the port and through an
-   equivalent PICT gives identical pixels.
+   equivalent PICT gives identical pixels (`PortTests`, both QuickDraws); every existing test and the corpus's
+   pictures and font renders unchanged. **Done.**
 3. `DrawPicture` onto a port; the ImageSharp and SkiaSharp adapters unchanged apart from the renames.
 4. Docs: `docs/GRAPHICS.md` gains a drawing section; `PICT-FORMAT.md` splits into `PICT.md` (opcodes) and
    `QUICKDRAW.md` (drawing rules), as the plan has it, so the API's documentation points at the drawing rules.

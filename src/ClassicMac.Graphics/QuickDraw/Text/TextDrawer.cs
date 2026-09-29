@@ -28,14 +28,16 @@ namespace ClassicMac.Graphics.QuickDraw
     // txMode: the pattern bit (8) is cleared; bit 6 (mask) makes the glyph bits a mask for the transfer.
     internal static class TextDrawer
     {
-        // Draws the text with the pen at (penH, penV) + penFrac / 65536; returns the pen's new fraction.
+        // Draws the text with the pen at (penH, penV) + penFrac / 65536; returns the pen's new fraction, and in advance
+        // how far the pen moves (Fixed, scaled with the strike).
         public static int Draw(RgbaBitmap canvas, FontSelection s, ReadOnlySpan<byte> text, int penH, int penV,
-            int penFrac, int charExtra, int textMode, Region? clip, bool hilitePending, in PortColors colors)
+            int penFrac, int charExtra, int textMode, Region? clip, bool hilitePending, in PortColors colors, out int advance)
         {
             penFrac &= 0xFFFF;
+            advance = 0;
             if (text.Length == 0) return penFrac;
             if (s.MacOS9 && text.Length == 1 && text[0] == '\r') return penFrac;   // Mac OS 9: a lone CR draws nothing
-            if (s.Palette != null) return DrawColorFont(canvas, s, text, penH, penV, penFrac, charExtra, clip, hilitePending, colors);
+            if (s.Palette != null) return DrawColorFont(canvas, s, text, penH, penV, penFrac, charExtra, clip, hilitePending, colors, out advance);
             var f = s.Font;
 
             int cx = CharExtra(s, charExtra);
@@ -94,7 +96,7 @@ namespace ClassicMac.Graphics.QuickDraw
             // Scaling: the whole buffer is stretched once from (pen + denom) to (pen + numer).
             bool stretch = s.Numer != s.Denom;
             PictRect fromRect = default, toRect = default, dstRect = textRect;
-            int advance = width;
+            advance = width;
             if (stretch)
             {
                 advance = s.MacOS9
@@ -186,7 +188,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // and the box width scale (width rounded half up; the offsets stay unscaled; verified against Mac OS 9 at
         // 3/2, 4/3 and 1/3). The text mode, styles and missing-glyph handling are ignored.
         private static int DrawColorFont(RgbaBitmap canvas, FontSelection s, ReadOnlySpan<byte> text, int penH, int penV,
-            int penFrac, int charExtra, Region? clip, bool hilitePending, in PortColors colors)
+            int penFrac, int charExtra, Region? clip, bool hilitePending, in PortColors colors, out int advance)
         {
             var f = s.Font;
             var strike = f.StrikeMap(s.Palette!);
@@ -223,7 +225,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 }
                 advanced = unchecked(advanced + step);
             }
-            int advance = !stretch ? width : s.MacOS9
+            advance = !stretch ? width : s.MacOS9
                 ? FixedMath.FixMulHalfUp(width, FixedMath.FixRatio((short)s.Numer.h, (short)s.Denom.h))
                 : (int)((ulong)(uint)width * (ushort)s.Numer.h / (ushort)s.Denom.h);
             return (penFrac + advance) & 0xFFFF;

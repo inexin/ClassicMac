@@ -17,6 +17,12 @@ namespace ClassicMac.Graphics
 
         /// <summary>True when the rectangle encloses no pixels (QuickDraw <c>EmptyRect</c>).</summary>
         public bool IsEmpty => Bottom <= Top || Right <= Left;
+
+        /// <summary>A public 16-bit rectangle as the engine's.</summary>
+        public static PictRect From(ClassicMac.Core.MacRect r) => new(r.Top, r.Left, r.Bottom, r.Right);
+
+        /// <summary>The rectangle as a 16-bit <c>MacRect</c> (each side truncated to 16 bits).</summary>
+        public ClassicMac.Core.MacRect ToMacRect() => new((short)Top, (short)Left, (short)Bottom, (short)Right);
     }
 
     /// <summary>A picture comment (opcodes 0x00A0 / 0x00A1); <see cref="Data"/> is empty for short comments.</summary>

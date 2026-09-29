@@ -7,37 +7,37 @@ namespace ClassicMac.Graphics
     // rows of RowBytes bytes; indexed pixels MSB-first; 16-bit big-endian xRRRRRGGGGGBBBBB; 32-bit chunky
     // (alpha/pad, R, G, B). Layout rules follow Inside Macintosh: Imaging With QuickDraw, Appendix A (PixData
     // pseudocode, packing types) and Executor's eatpixdata/eatbitdata (qPicstuff.cpp, MIT).
-    internal sealed class PixMap
+    public sealed partial class PixMap
     {
         private const int RowBytesMask = 0x3FFF;     // high bits of rowBytes are flags (Executor ROWBYTES_VALUE_BITS)
 
-        public PictRect Bounds;
-        public int RowBytes;
-        public int PixelSize = 1;
-        public int CmpCount = 1;
-        public int PackType;
-        public int PixelType;                        // 0 indexed, 16 direct (RGBDirect)
-        public bool IsPixMap;
-        public bool MacOS9;                          // read the pixel data as Mac OS 9's QuickDraw does
-        public RgbaColor[] Palette = Array.Empty<RgbaColor>();
+        internal PictRect Bounds;
+        internal int RowBytes;
+        internal int PixelSize = 1;
+        internal int CmpCount = 1;
+        internal int PackType;
+        internal int PixelType;                        // 0 indexed, 16 direct (RGBDirect)
+        internal bool IsPixMap;
+        internal bool MacOS9;                          // read the pixel data as Mac OS 9's QuickDraw does
+        internal RgbaColor[] Palette = Array.Empty<RgbaColor>();
         // The color table's exact 16-bit components, when read from one (else empty: the palette's bytes replicated).
-        public (ushort r, ushort g, ushort b)[] Palette16 = Array.Empty<(ushort, ushort, ushort)>();
+        internal (ushort r, ushort g, ushort b)[] Palette16 = Array.Empty<(ushort, ushort, ushort)>();
 
         // A palette entry's 16-bit components.
-        public (int r, int g, int b) Exact(int index)
+        internal (int r, int g, int b) Exact(int index)
         {
             if (index < Palette16.Length) return Palette16[index];
             var c = index < Palette.Length ? Palette[index] : new RgbaColor(0, 0, 0);
             return (c.R * 257, c.G * 257, c.B * 257);
         }
-        public byte[] Data = Array.Empty<byte>();
+        internal byte[] Data = Array.Empty<byte>();
 
-        public int Width => Bounds.Width;
-        public int Height => Bounds.Height;
-        public bool IsDirect => PixelSize == 16 || PixelSize == 32;
+        internal int Width => Bounds.Width;
+        internal int Height => Bounds.Height;
+        internal bool IsDirect => PixelSize == 16 || PixelSize == 32;
 
         // The color of pixel (x, y), relative to Bounds' top-left. Alpha is always opaque (QuickDraw ignores it).
-        public RgbaColor GetPixel(int x, int y)
+        internal RgbaColor GetPixel(int x, int y)
         {
             int row = y * RowBytes;
             switch (PixelSize)
@@ -68,7 +68,7 @@ namespace ClassicMac.Graphics
         }
 
         // The raw index of a pixel of an indexed map (1-8 bits).
-        public int GetIndex(int x, int y)
+        internal int GetIndex(int x, int y)
         {
             int bit = x * PixelSize, value = 0, row = y * RowBytes;
             for (int i = 0; i < PixelSize; i++, bit++)
@@ -77,7 +77,7 @@ namespace ClassicMac.Graphics
         }
 
         // The components of a direct pixel at its own depth: 5-bit fields for 16-bit, 8-bit bytes for 32-bit.
-        public (int r, int g, int b) GetComponents(int x, int y)
+        internal (int r, int g, int b) GetComponents(int x, int y)
         {
             int row = y * RowBytes;
             if (PixelSize == 16)
@@ -90,12 +90,12 @@ namespace ClassicMac.Graphics
         }
 
         // The alpha byte of a 32-bit pixel (the first of its four; meaningful only when CmpCount is 4).
-        public byte GetAlpha(int x, int y) => PixelSize == 32 ? Data[y * RowBytes + 4 * x] : (byte)255;
+        internal byte GetAlpha(int x, int y) => PixelSize == 32 ? Data[y * RowBytes + 4 * x] : (byte)255;
 
         // BitsRect/BitsRgn/PackBitsRect/PackBitsRgn operands up to (not including) srcRect: a 1-bit BitMap, or a
         // PixMap + ColorTable when rowBytes has its high bit set.
         // Mac OS 9 reads a color table whenever pixelSize < 9, whatever the opcode; the ROM by the opcode.
-        public static PixMap ReadIndexedHeader(BinaryReader b, bool macOS9)
+        internal static PixMap ReadIndexedHeader(BinaryReader b, bool macOS9)
         {
             int rawRowBytes = b.ReadU16BE();
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = (rawRowBytes & 0x8000) != 0, MacOS9 = macOS9 };
@@ -113,7 +113,7 @@ namespace ClassicMac.Graphics
         }
 
         // DirectBitsRect/DirectBitsRgn operands up to srcRect: baseAddr (always $000000FF), then a PixMap.
-        public static PixMap ReadDirectHeader(BinaryReader b, bool macOS9)
+        internal static PixMap ReadDirectHeader(BinaryReader b, bool macOS9)
         {
             b.ReadU32BE();                                           // baseAddr
             int rawRowBytes = b.ReadU16BE();
@@ -125,7 +125,7 @@ namespace ClassicMac.Graphics
         }
 
         // BkPixPat/PnPixPat/FillPixPat full pattern (type 1): PixMap (rowBytes first, no baseAddr) + ColorTable + PixData.
-        public static PixMap ReadPatternPixMap(BinaryReader b, bool macOS9)
+        internal static PixMap ReadPatternPixMap(BinaryReader b, bool macOS9)
         {
             int rawRowBytes = b.ReadU16BE();
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = true, MacOS9 = macOS9 };
@@ -188,7 +188,7 @@ namespace ClassicMac.Graphics
         // dispatched on packType whatever its pixel size (ReadDirect); everything else - BitMaps and indexed PixMaps,
         // with any packType and under any bitmap opcode - is one PackBits scan line per row, preceded by a byte count
         // (a word when rowBytes > 250).
-        public void ReadPixData(BinaryReader b)
+        internal void ReadPixData(BinaryReader b)
         {
             int height = Math.Max(0, Height);
             Data = new byte[RowBytes * height];

@@ -12,7 +12,11 @@ namespace ClassicMac.Graphics.QuickDraw
     // QuickDraw stores regions as inversion points: a pixel is inside when the number of points (x', y') with
     // x' <= x and y' <= y is odd. That representation is linear under XOR, which is how QuickDraw records polygon
     // edges into an open region (see RegionShapes.Polygon); set operations here work on the equivalent band form.
-    internal sealed class Region
+    /// <summary>
+    /// A QuickDraw region: an immutable set of pixels, as QuickDraw's regions describe them (<i>Inside Macintosh: Imaging
+    /// With QuickDraw</i>, "Regions"). Coordinates are the port's pixels.
+    /// </summary>
+    public sealed partial class Region
     {
         internal readonly struct Band
         {
@@ -25,13 +29,15 @@ namespace ClassicMac.Graphics.QuickDraw
 
         private Region(Band[] bands) { this.bands = bands; }
 
+        /// <summary>The empty region.</summary>
         public static readonly Region Empty = new Region(Array.Empty<Band>());
 
+        /// <summary>Whether the region holds no pixels (QuickDraw <c>EmptyRgn</c>).</summary>
         public bool IsEmpty => bands.Length == 0;
 
         internal IReadOnlyList<Band> Bands => bands;
 
-        public PictRect Bounds
+        internal PictRect Bounds
         {
             get
             {
@@ -46,12 +52,12 @@ namespace ClassicMac.Graphics.QuickDraw
             }
         }
 
-        public static Region FromRect(PictRect r) =>
+        internal static Region FromRect(PictRect r) =>
             r.IsEmpty ? Empty : new Region(new[] { new Band(r.Top, r.Bottom, new[] { r.Left, r.Right }) });
 
         // QuickDraw region data after rgnSize and rgnBBox: rows of (y, x..., 0x7FFF) inversion points, ended by
         // 0x7FFF. A region with no rows is its bounding rectangle.
-        public static Region FromQuickDrawData(PictRect bbox, ReadOnlySpan<short> data)
+        internal static Region FromQuickDrawData(PictRect bbox, ReadOnlySpan<short> data)
         {
             if (data.Length == 0 || data[0] == 0x7FFF) return FromRect(bbox);
             var rows = new List<(int y, List<int> xs)>();
@@ -69,9 +75,9 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A Region operand in a picture: u16 rgnSize (bytes, including itself and the bounding box), Rect rgnBBox,
         // then (rgnSize - 10) / 2 words of inversion-point data. A 10-byte region is its bounding rectangle.
-        public static Region Read(System.IO.BinaryReader b) => Read(b, out _);
+        internal static Region Read(System.IO.BinaryReader b) => Read(b, out _);
 
-        public static Region Read(System.IO.BinaryReader b, out PictRect bbox)
+        internal static Region Read(System.IO.BinaryReader b, out PictRect bbox)
         {
             int size = b.ReadU16BE() & 0x7FFF;
             bbox = b.ReadRectBE();
@@ -84,7 +90,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // Builds a region from inversion-point rows (any order; points toggle, so duplicates cancel).
-        public static Region FromInversionRows(IEnumerable<(int y, List<int> xs)> rows)
+        internal static Region FromInversionRows(IEnumerable<(int y, List<int> xs)> rows)
         {
             var byY = new SortedDictionary<int, HashSet<int>>();
             foreach (var (y, xs) in rows)
@@ -107,7 +113,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // Builds a region from one-pixel-high scan lines: rows[y] holds [x0, x1) runs in any order, possibly overlapping.
-        public static Region FromScanlines(SortedDictionary<int, List<int>> rows)
+        internal static Region FromScanlines(SortedDictionary<int, List<int>> rows)
         {
             var result = new List<Band>();
             var pairs = new List<(int x0, int x1)>();
@@ -132,7 +138,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // Canonical QuickDraw region data (without rgnSize/rgnBBox): empty for a rectangular region.
-        public short[] ToQuickDrawData()
+        internal short[] ToQuickDrawData()
         {
             if (bands.Length == 0 || (bands.Length == 1 && bands[0].Spans.Length == 2)) return Array.Empty<short>();
             var data = new List<short>();
@@ -156,7 +162,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // The region's inversion points (x, y): where a pixel's inside-ness differs from the XOR of its left, upper
         // and upper-left neighbours.
-        public IEnumerable<(int x, int y)> InversionPoints()
+        internal IEnumerable<(int x, int y)> InversionPoints()
         {
             int[] previous = Array.Empty<int>();
             int previousBottom = int.MinValue;
@@ -193,6 +199,7 @@ namespace ClassicMac.Graphics.QuickDraw
             data.Add(0x7FFF);
         }
 
+        /// <summary>Whether pixel (<paramref name="x"/>, <paramref name="y"/>) is in the region (QuickDraw <c>PtInRgn</c>).</summary>
         public bool Contains(int x, int y)
         {
             foreach (var b in bands)
@@ -207,27 +214,33 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // The region as disjoint rectangles, top to bottom then left to right.
-        public IEnumerable<PictRect> Rectangles()
+        internal IEnumerable<PictRect> Rectangles()
         {
             foreach (var b in bands)
                 for (int i = 0; i < b.Spans.Length; i += 2)
                     yield return new PictRect(b.Top, b.Spans[i], b.Bottom, b.Spans[i + 1]);
         }
 
+        /// <summary>The region moved by (<paramref name="dh"/>, <paramref name="dv"/>) (QuickDraw <c>OffsetRgn</c>).</summary>
         public Region Offset(int dh, int dv)
         {
             if (dh == 0 && dv == 0) return this;
             return new Region(bands.Select(b => new Band(b.Top + dv, b.Bottom + dv, b.Spans.Select(x => x + dh).ToArray())).ToArray());
         }
 
+        /// <summary>The pixels in either region (<c>UnionRgn</c>).</summary>
         public Region Union(Region other) => Combine(this, other, (a, b) => a || b);
+        /// <summary>The pixels in both regions (<c>SectRgn</c>).</summary>
         public Region Intersect(Region other) => Combine(this, other, (a, b) => a && b);
+        /// <summary>The pixels in this region and not in <paramref name="other"/> (<c>DiffRgn</c>).</summary>
         public Region Difference(Region other) => Combine(this, other, (a, b) => a && !b);
+        /// <summary>The pixels in exactly one of the regions (<c>XorRgn</c>).</summary>
         public Region Xor(Region other) => Combine(this, other, (a, b) => a != b);
 
         // QuickDraw InsetRgn: every span shrinks by dh at both ends (grows when negative, merging), then every
         // vertical run by dv — a separable erosion/dilation (Executor rhtopandinseth + hinset). A region inset to
         // nothing is empty.
+        /// <summary>The region shrunk by <paramref name="dh"/> and <paramref name="dv"/> on every side, or grown when negative (<c>InsetRgn</c>).</summary>
         public Region Inset(int dh, int dv)
         {
             if (IsEmpty) return this;
@@ -338,6 +351,7 @@ namespace ClassicMac.Graphics.QuickDraw
             bands.Add(new Band(top, bottom, spans));
         }
 
+        /// <inheritdoc/>
         public override string ToString() => IsEmpty ? "Region(empty)" : $"Region({Bounds}, {bands.Length} bands)";
     }
 }
