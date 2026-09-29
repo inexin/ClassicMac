@@ -55,6 +55,27 @@ namespace ClassicMac.Graphics.QuickDraw
         public static Region Arc(MacRect rect, int startAngle, int arcAngle, QuickDrawVersion version = QuickDrawVersion.MacOS9) =>
             rect.IsEmpty ? Empty : RegionShapes.Arc(PictRect.From(rect), startAngle, arcAngle, version == QuickDrawVersion.MacOS9);
 
+        /// <summary>
+        /// The set pixels of a 1-bit bitmap, in its own coordinates (<c>BitMapToRegion</c>). For a deeper pixel map, the
+        /// pixels whose value is not 0.
+        /// </summary>
+        public static Region FromBitMap(PixMap bitmap)
+        {
+            ArgumentNullException.ThrowIfNull(bitmap);
+            var bounds = bitmap.Bounds;
+            var region = Empty;
+            for (int y = 0; y < bitmap.Height; y++)
+                for (int x = 0; x < bitmap.Width; x++)
+                {
+                    if (bitmap.GetIndex(x, y) == 0) continue;
+                    int end = x;
+                    while (end < bitmap.Width && bitmap.GetIndex(end, y) != 0) end++;
+                    region = region.Union(FromRect(new PictRect(bounds.Top + y, bounds.Left + x, bounds.Top + y + 1, bounds.Left + end)));
+                    x = end;
+                }
+            return region;
+        }
+
         /// <summary>The pixels a polygon through <paramref name="points"/> encloses, as <c>PaintPoly</c> paints it.</summary>
         public static Region Polygon(IReadOnlyList<MacPoint> points)
         {

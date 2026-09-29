@@ -304,6 +304,72 @@ namespace ClassicMac.Graphics.QuickDraw
             CopyBits(source, PictRect.From(sourceRect), ToCanvas(destinationRect), (int)mode, mask == null ? null : ToCanvas(mask));
         }
 
+        /// <summary>
+        /// Copies <paramref name="sourceRect"/> of <paramref name="source"/> to <paramref name="destinationRect"/> (local)
+        /// where the 1-bit <paramref name="mask"/>'s <paramref name="maskRect"/> is set, both stretched to the destination
+        /// (<c>CopyMask</c>): srcCopy with the port's colours, inside the clip region. A hidden pen does not stop it.
+        /// </summary>
+        public void CopyMask(PixMap source, PixMap mask, MacRect sourceRect, MacRect maskRect, MacRect destinationRect)
+        {
+            ArgumentNullException.ThrowIfNull(source);
+            ArgumentNullException.ThrowIfNull(mask);
+            var destination = ToCanvas(destinationRect);
+            // [ClassicMac: the mask is stretched by its own StretchBits, as the ROM's fallback stretches it; CopyMask's
+            // single pass is taken to sample both alike.]
+            var region = StretchedMask(mask, PictRect.From(maskRect), destination);
+            if (ClipRegion != null) region = region.Intersect(ClipRegion);
+            Bits.CopyBits(canvas, source, PictRect.From(sourceRect), destination, TransferModes.SrcCopy, region, HilitePending, Colors,
+                Options.PreserveAlpha);
+            Done();
+        }
+
+        // A 1-bit mask's rect stretched to the destination (canvas pixels) as a region of its set pixels.
+        private Region StretchedMask(PixMap mask, PictRect maskRect, PictRect destination)
+        {
+            int w = destination.Width, h = destination.Height;
+            if (w <= 0 || h <= 0) return Region.Empty;
+            var scratch = new RgbaBitmap(w, h);
+            var colors = new PortColors(new RgbaColor(0, 0, 0), new RgbaColor(255, 255, 255), (0, 0, 0), new RgbaColor(0, 0, 0), macOS9);
+            Bits.CopyBits(scratch, mask, maskRect, new PictRect(0, 0, h, w), TransferModes.SrcCopy, null, false, colors, false);
+            var set = new bool[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    var c = scratch[x, y];
+                    set[y * w + x] = c.A != 0 && c.R == 0 && c.G == 0 && c.B == 0;
+                }
+            var region = Region.Empty;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    if (!set[y * w + x]) continue;
+                    int end = x;
+                    while (end < w && set[y * w + end]) end++;
+                    region = region.Union(Region.FromRect(new PictRect(destination.Top + y, destination.Left + x, destination.Top + y + 1, destination.Left + end)));
+                    x = end;
+                }
+            return region;
+        }
+
+        // GetGray: the realized midpoint of the background and foreground (16-bit components averaged, + 2 below $8000),
+        // good when it is nearer the midpoint than half its distance to either colour; the colours are first realized
+        // on the screen (Color2Index, Index2Color).
+        internal bool GetGray(RgbColor back, RgbColor fore, out RgbColor gray)
+        {
+            (int r, int g, int b) Realize((int r, int g, int b) c) => device == null
+                ? ((c.r >> 8) * 257, (c.g >> 8) * 257, (c.b >> 8) * 257)
+                : device.Index2Color16(device.Color2Index(c.r, c.g, c.b));
+            var bk = Realize((back.Red, back.Green, back.Blue));
+            var fg = Realize((fore.Red, fore.Green, fore.Blue));
+            int Mid(int a, int b) { int m = (a + b) >> 1; return m < 0x8000 ? m + 2 : m; }
+            (int r, int g, int b) mid = (Mid(fg.r, bk.r), Mid(fg.g, bk.g), Mid(fg.b, bk.b));
+            var real = Realize(mid);
+            int Distance((int r, int g, int b) a, (int r, int g, int b) b) =>
+                Math.Max(Math.Abs(a.r - b.r), Math.Max(Math.Abs(a.g - b.g), Math.Abs(a.b - b.b)));
+            gray = new RgbColor((ushort)real.r, (ushort)real.g, (ushort)real.b);
+            return Distance(real, mid) < Distance(real, bk) / 2 && Distance(real, mid) < Distance(real, fg) / 2;
+        }
+
         // ---- text ----
 
         internal int FontId, Face, Size, TxMode = TransferModes.SrcOr;

@@ -35,22 +35,7 @@ the same structures. All are big-endian.
 - **An icon list without its mask half** (the resource is only the icon) gets a computed mask, CalcMask:
   - flood-fill the white pixels 4-connected to the edges;
   - the mask is every pixel the flood did not reach, which is the icon's silhouette including enclosed holes.
-- **Which icon is drawn** (PlotIconID and the icon suites, Mac OS 9; described, not implemented; see Not covered):
-  - The mask group depends on the rect size:
-    - 48 or more: `ich#`.
-    - Under 32 and taller than 12: `ics#`, then `ICN#`, then `icm#`.
-    - Under 32 otherwise: `icm#`, `ics#`, `ICN#`.
-    - Otherwise: `ICN#` first.
-  - The colour data comes only from the mask's group, by screen depth:
-    - 16/32 bits: `il32`, `icl8`, `icl4`, `ICN#`;
-    - 8 bits: `icl8`, `il32`, `icl4`, `ICN#`;
-    - 4 bits: `icl4`, `ICN#`;
-    - 1–2 bits: `ICN#`.
-  - Plain drawing copies the data through the mask, with no transform.
-  - Transforms:
-    - selected: Darken halves each component, then halves the smallest, then the smaller of the other two unless they
-      are equal (±$200);
-    - disabled: `(c + $FFFF) >> 1`.
+- **Which icon is drawn:** see "Drawing an icon suite" below.
 - **`cicn`** (PlotCIcon):
   - fore/back are forced to black/white;
   - the 1-bit BitMap is drawn if it exists and the screen depth is at most 2, else the PixMap;
@@ -126,6 +111,76 @@ the same structures. All are big-endian.
 - **`ppt#`:** a u16 count, then that many u32 offsets from the resource start. Each element is a complete flattened
   `ppat`, whose own offsets are relative to the element's start; element i ends where element i+1 begins.
 
+## Drawing an icon suite (PlotIconID, PlotIconSuite)
+
+The Icon Utilities draw a suite (the `ICN#`/`icl4`/`icl8`, `ics#`/`ics4`/`ics8` and `icm#`/`icm4`/`icm8` of one ID;
+on Mac OS 9 a suite may also hold the 48 × 48 and 32-bit members) into a port. Mac OS 9's native Icon Utilities and the
+ROM's differ where noted [Code]. PlotIconID never reads `ICON` or `SICN`.
+
+1. **The mask group** comes from the rect's size (before alignment); the first 1-bit member in the list is used, and
+   the group sets the source size:
+   - Mac OS 9: width or height ≥ 48 → `ich#` `ICN#` `ics#` `icm#`; both under 32 and height > 12 → `ics#` `ICN#`
+     `icm#` `ich#`; both under 32 → `icm#` `ics#` `ICN#` `ich#`; otherwise `ICN#` `ich#` `ics#` `icm#`.
+   - ROM: width or height ≥ 32 → `ICN#` `ics#` `icm#`; height > 12 → `ics#` `icm#` `ICN#`; else `icm#` `ics#` `ICN#`.
+   - No 1-bit member → noMaskFoundErr (−1000), nothing drawn. The mask is never taken from colour data.
+   - The mask is the member's second half; a member without it gets CalcMask of its image (Mac OS 9 fails the call for
+     a short `ich#`). An `icm#` longer than one icon and its mask is treated as SICNs: the rect is re-centred to 16
+     rows (`c = (top + bottom) >> 1`, top `c − 8`), the source is 16 tall, and the mask is its second half (or
+     CalcMask for one SICN).
+   - An all-zero mask draws nothing (noErr).
+2. **Alignment** never resizes: the member always fills the rect, however unevenly. With an alignment, the mask's
+   bounding box is mapped into the rect (MapPt: `(|v − from| × toSize + fromSize / 2) / fromSize`, sign restored; no
+   scaling when the sizes are equal), and the rect is moved so the box is centred (`((a + b) − (box a + box b)) >> 1`,
+   a floor) or on the chosen edge. An off-centre mask moves even at 1:1.
+3. **Colour or 1-bit:** colour data when (depth > 4 and not open) or (depth 4, not selected, none or offline); the
+   colour member comes only from the mask's group:
+   - Mac OS 9 (by the port's depth): 16/32 bits `il32` `icl8` `icl4` (then the 1-bit member); 8 bits `icl8` `il32`
+     `icl4`; 4 bits `icl4`; 1–2 bits none (the small, mini and huge groups likewise with their own members).
+   - ROM: `icl8` at 8 bits and more, else `icl4` at 4 bits and more.
+   - Otherwise, or with no colour member, the 1-bit path.
+4. **Colour data** (PlotDeep): fore- and background forced black and white; the data drawn through the mask with
+   CopyMask (both stretched to the rect). Label, selection and dimming are baked into a copy of the system colour
+   table, per entry in that order (the ROM changes only the entries its `indl` resources −16392 and −16391 list; Mac OS
+   9 every entry):
+   - label, 8-bit table: `L = Brighten(label colour)`; entry 0 becomes `(c + L) >> 1`, the others `(c × L) >> 16`;
+     4-bit table: entry 15 (black) becomes the raw label colour;
+   - selected: Darken (halve every component; unless all three are then equal within $200, halve the smallest, then
+     the smaller of the other two unless they are equal);
+   - disabled: `(c + $FFFF) >> 1`, and no pattern.
+   - 32-bit data is transformed on a copy: label `c × Brighten(L) >> 16` per channel, selected halves each channel,
+     disabled `(c + 255) >> 1`.
+   - Brighten: white for black; else each component scaled up so the largest is $FFFF, then
+     `c × lum′ / $FFFF + ($FFFF − lum′)`, with `lum = (5r + 9g + 2b) >> 4` and `lum′ = (lum >> 1) + (lum >> 3) + $6000`.
+   - Offline then adds 25% black dots inside the mask (step 6).
+5. **1-bit data** (PlotShallow):
+   - At depth 2 and more: the foreground is the raw label colour (depth > 2 and a label) or the port's; the
+     background is `$CC2A $CC2A $FF2A` for open, else the port's; disabled, when depth > 4 or there is no label, takes
+     GetGray's colour as the foreground and drops the transform if GetGray succeeds; selected Darkens the foreground
+     (depth > 4) and always the background (so white becomes $7FFF grey).
+   - At depth 1: selected swaps the port's colours; no label, grey or Darken.
+   - None: the image through the mask with CopyMask (image 1 = foreground, 0 = background, inside the mask).
+6. **Transforms (offline, open, disabled on 1-bit):**
+   - **Bitmap path** (Mac OS 9: only a rect of exactly 32 × 32; ROM: any rect up to 32 × 32, the mask first stretched
+     to the rect when the sizes differ), patterns aligned to the icon: T = the image (the outline for open: the mask
+     less every pixel whose four neighbours are set); disabled: even rows AND $AAAAAAAA, odd rows AND $55555555;
+     offline and open: even rows OR `mask & $88888888`, odd rows OR `mask & $22222222`. T goes through the mask with
+     CopyMask, or when the mask was stretched: the ROM paints the mask srcBic then T srcOr, Mac OS 9 copies T srcCopy
+     through the mask's region. For colour data, T (the dots alone) is ORed on in black.
+   - **Region path** (otherwise), patterns aligned to the port: the mask's region (BitMapToRegion, MapRgn'd to the
+     rect); disabled: the image drawn, then PaintRgn with gray in patBic; offline: the image (1-bit) drawn, then
+     PaintRgn with ltGray in patOr; open: FillRgn black, InsetRgn(1, 1), FillRgn ltGray.
+   - The ROM's pattern loop never ends for an odd mask height (a crash); Mac OS 9 fixed it.
+7. **Labels:** 0 none to 7, from the transform's bits 8–11, or PlotIconSuite's suite label when the transform has none;
+   8–15 make GetLabel fail. The colours are the System's `'rgb '` −16392 + n (Mac OS 9's defaults: 1 $5600 $2C9D $0524
+   Project 2, 2 $0000 $64AF $11B0 Project 1, 3 $0000 $0000 $D400 Personal, 4 $0241 $AB54 $EAFF Cool, 5 $F2D7 $0856
+   $84EC In Progress, 6 $DD6B $08C2 $06A2 Hot, 7 $FFFF $648A $028C Essential); the Finder's Labels settings change them.
+8. **Other routines:** PlotIconHandle draws an `ICON` or `ICN#` as the 32 × 32 member (a 128-byte `ICON` gets
+   CalcMask); PlotSICNHandle a `SICN` list as the small or mini member (a list of two or more: the second is the mask);
+   PlotIcon copies an `ICON` unmasked with CopyBits srcCopy, stretched, in the port's colours.
+
+ClassicMac draws suites with `IconSuite.Plot` into a `QuickDrawPort` (the port's depth is the screen depth; a port is
+never a picture or printer, so CopyMask is always used), for either QuickDraw.
+
 ## Icon families (Mac OS 9 Icon Services)
 
 Mac OS 9's Icon Services knows 20 members, and nothing else [Code]:
@@ -194,7 +249,10 @@ row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour
 
 ## Not covered
 
-- Icon suites: choosing a member by rect size and screen depth, and the selected, disabled, label, offline and open
-  transforms, are described but not implemented. The decoders take one resource at a time.
+- The export decoders take one resource at a time and do not draw suites; `IconSuite.Plot` does.
+- Not reproduced by `IconSuite.Plot`: the 8-bit masks of an extended suite (Mac OS 9's deep CopyMask), several
+  screens (DeviceLoop), PlotIconHandle, PlotSICNHandle and PlotIcon, a gray-scale device's label rule, and the ROM's
+  endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac]. Not yet
+  compared with the harness.
 - `icns` variants (`tile`, `over`, `drop`, `open`, `odrp`) are read but not exported; standalone 32-bit, 48 × 48 and
   8-bit mask resources are not decoded (Icon Services never reads them outside an `icns`).

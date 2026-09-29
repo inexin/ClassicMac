@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `IconSuite.Plot` draws icon suites into a `QuickDrawPort` as PlotIconSuite/PlotIconID do: member choice by rect
+  and depth, alignment, the selected/disabled/offline/open transforms and labels, for Mac OS 9 or the ROM.
+  `QuickDrawPort.CopyMask` and `Region.FromBitMap` (BitMapToRegion) are new.
 - Icon families: `IconFamily` reads `icns` resources as Mac OS 9's Icon Services does (all 20 members: 48 × 48,
   32-bit with its RLE, 8-bit masks) and builds families from classic icon resources; the `image.icon-family` decoder
   exports each member through the mask Icon Services picks for its size.

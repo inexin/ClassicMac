@@ -39,7 +39,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 return;
             }
             Clut = StandardColorTables.ForId(depth)!;
-            Clut16 = depth == 4 ? FourBit16 : Array.ConvertAll(Clut, c => ((ushort)(c.R * 257), (ushort)(c.G * 257), (ushort)(c.B * 257)));
+            Clut16 = StandardColorTables.Exact(depth) ?? Array.ConvertAll(Clut, c => ((ushort)(c.R * 257), (ushort)(c.G * 257), (ushort)(c.B * 257)));
             for (int i = Clut.Length - 1; i >= 0; i--) indexOfColor[Key(Clut[i])] = i;
             bool isGrey = Array.TrueForAll(Clut, c => c.R == c.G && c.G == c.B);
             if (isGrey) grey = GreyLinks(Clut);
@@ -58,14 +58,6 @@ namespace ClassicMac.Graphics.QuickDraw
         public RgbaColor[] Clut { get; }
         // The table's exact 16-bit components (clut 4's are not byte-replicated).
         public (ushort r, ushort g, ushort b)[] Clut16 { get; }
-
-        private static readonly (ushort, ushort, ushort)[] FourBit16 =
-        {
-            (0xFFFF, 0xFFFF, 0xFFFF), (0xFC00, 0xF37D, 0x052F), (0xFFFF, 0x648A, 0x028C), (0xDD6B, 0x08C2, 0x06A2),
-            (0xF2D7, 0x0856, 0x84EC), (0x46E3, 0x0000, 0xA53E), (0x0000, 0x0000, 0xD400), (0x0241, 0xAB54, 0xEAFF),
-            (0x1F21, 0xB793, 0x1431), (0x0000, 0x64AF, 0x11B0), (0x5600, 0x2C9D, 0x0524), (0x90D7, 0x7160, 0x3A34),
-            (0xC000, 0xC000, 0xC000), (0x8000, 0x8000, 0x8000), (0x4000, 0x4000, 0x4000), (0x0000, 0x0000, 0x0000),
-        };
 
         // Index2Color: the table entry, or on a 16-bit screen each 5-bit field replicated to 16 bits.
         public (int r, int g, int b) Index2Color16(int value)

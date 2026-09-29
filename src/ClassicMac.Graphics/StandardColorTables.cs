@@ -22,6 +22,22 @@ namespace ClassicMac.Graphics
             _ => null,
         };
 
+        // The exact 16-bit components of clut 4 (not byte-replicated) and clut 8 (each byte repeated); null for others.
+        public static (ushort r, ushort g, ushort b)[]? Exact(int id) => id switch
+        {
+            4 => FourBit16,
+            8 => System.Array.ConvertAll(EightBit, c => ((ushort)(c.R * 257), (ushort)(c.G * 257), (ushort)(c.B * 257))),
+            _ => null,
+        };
+
+        private static readonly (ushort r, ushort g, ushort b)[] FourBit16 =
+        {
+            (0xFFFF, 0xFFFF, 0xFFFF), (0xFC00, 0xF37D, 0x052F), (0xFFFF, 0x648A, 0x028C), (0xDD6B, 0x08C2, 0x06A2),
+            (0xF2D7, 0x0856, 0x84EC), (0x46E3, 0x0000, 0xA53E), (0x0000, 0x0000, 0xD400), (0x0241, 0xAB54, 0xEAFF),
+            (0x1F21, 0xB793, 0x1431), (0x0000, 0x64AF, 0x11B0), (0x5600, 0x2C9D, 0x0524), (0x90D7, 0x7160, 0x3A34),
+            (0xC000, 0xC000, 0xC000), (0x8000, 0x8000, 0x8000), (0x4000, 0x4000, 0x4000), (0x0000, 0x0000, 0x0000),
+        };
+
         private static RgbaColor Rgb(int r, int g, int b) => new RgbaColor((byte)r, (byte)g, (byte)b);
 
         private static readonly RgbaColor[] FourBit =

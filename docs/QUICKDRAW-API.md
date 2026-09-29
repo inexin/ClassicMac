@@ -42,7 +42,7 @@ QuickDraw's setter routines (`PenSize`, `TextFont`, `RGBForeColor`, …) are pro
 | Pen | `PenSize`, `PenMode`, `PenPattern`, `PenLocation`, `MoveTo`/`Move`, `LineTo`/`Line`, `PenNormal`, `HidePen`/`ShowPen` |
 | Colour | `ForeColor`, `BackColor`, `OpColor`, `HiliteColor` (16-bit `RgbColor`); `BackPattern`, `FillPattern`; `HiliteMode()` |
 | Shapes | `Frame`/`Paint`/`Erase`/`Invert`/`Fill` × `Rect`, `RoundRect`, `Oval`, `Arc`, `Poly`, `Rgn` (`Fill…` takes a pattern) |
-| Bits | `CopyBits(PixMap source, MacRect src, MacRect dst, TransferMode mode, Region? mask)` |
+| Bits | `CopyBits(PixMap source, MacRect src, MacRect dst, TransferMode mode, Region? mask)`; `CopyMask(PixMap source, PixMap mask, MacRect src, MacRect maskRect, MacRect dst)` |
 | Text | `TextFont`, `TextFace` (`QuickDrawStyle`), `TextSize`, `TextMode`, `SpaceExtra`, `CharExtra(Fixed)`, `FractionalWidths`, `ScaleDisable`; `DrawString`, `DrawText`, `DrawChar` (each moves the pen past the text); `StringWidth`, `TextWidth`, `CharWidth`, `GetFontInfo` |
 | Pictures | `port.DrawPicture(byte[] picture, MacRect destination)` (an extension in `ClassicMac.Graphics.Pict`, the layer above): a PICT played into this port, its state saved and restored as DrawPicture does |
 
