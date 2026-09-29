@@ -318,6 +318,20 @@ namespace ClassicMac.Graphics.QuickDraw
             // single pass is taken to sample both alike.]
             var region = StretchedMask(mask, PictRect.From(maskRect), destination);
             if (ClipRegion != null) region = region.Intersect(ClipRegion);
+            var source1 = PictRect.From(sourceRect);
+            var colors = Colors;
+            // Mac OS 9's general stretch path (a scaled 1-bit source onto a 1-bit screen, with a 1-bit mask) applies its
+            // pixel-value colorizing op in RGB and maps the result back, so with any colours but black on white every
+            // masked pixel comes out black [Code] [Verified]. The ROM colorizes on pixel values.
+            if (macOS9 && device is { Depth: 1 } && source.PixelSize == 1 && mask.PixelSize == 1
+                && (source1.Width != destination.Width || source1.Height != destination.Height)
+                && (colors.FgIndex != 1 || colors.BkIndex != 0))
+            {
+                var black = new PortColors(new RgbaColor(0, 0, 0), new RgbaColor(255, 255, 255), (0, 0, 0), Hilite, macOS9, device);
+                Painter.FillRegion(canvas, region, null, QuickDrawPattern.Black, Align, TransferModes.PatCopy, false, black, true, OriginV);
+                Done();
+                return;
+            }
             Bits.CopyBits(canvas, source, PictRect.From(sourceRect), destination, TransferModes.SrcCopy, region, HilitePending, Colors,
                 Options.PreserveAlpha);
             Done();

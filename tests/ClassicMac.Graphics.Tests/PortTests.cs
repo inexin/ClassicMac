@@ -312,6 +312,27 @@ public class PortTests
         Assert.Equal(0, port.Canvas[3, 2].A);
     }
 
+    // Mac OS 9's scaled CopyMask onto a 1-bit screen with colours other than black on white: every masked pixel black.
+    [Theory]
+    [InlineData(QuickDrawVersion.MacOS9, 16, false)]
+    [InlineData(QuickDrawVersion.MacOS9, 8, true)]
+    [InlineData(QuickDrawVersion.MacRom, 16, true)]
+    public void CopyMask_on_a_one_bit_screen(QuickDrawVersion version, int size, bool imageKept)
+    {
+        byte[] image = [0xF0, 0xF0, 0xF0, 0xF0, 0x0F, 0x0F, 0x0F, 0x0F];
+        byte[] mask = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];
+        var port = new QuickDrawPort(new RgbaBitmap(Width, Height), new QuickDrawOptions { Version = version, ScreenDepth = 1 })
+        {
+            ForeColor = RgbColor.White,
+            BackColor = RgbColor.Black,
+        };
+        port.CopyMask(PixMap.FromBitMap(image, 1, R(0, 0, 8, 8)), PixMap.FromBitMap(mask, 1, R(0, 0, 8, 8)), R(0, 0, 8, 8), R(0, 0, 8, 8),
+            R(0, 0, size, size));
+        var colours = Enumerable.Range(0, size).Select(x => port.Canvas[x, 0]).Distinct().ToList();
+        Assert.Equal(imageKept ? 2 : 1, colours.Count);
+        if (!imageKept) Assert.Equal(new RgbaColor(0, 0, 0), colours[0]);
+    }
+
     [Fact]
     public void Regions_round_trip_through_their_stored_form()
     {

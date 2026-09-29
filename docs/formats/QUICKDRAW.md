@@ -1102,6 +1102,14 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
 - **Pattern hilite:** follows the pattern everywhere. There is none of the ROM's whole-area quirk.
 - **Pixel patterns:** use the vertical alignment too, which is always 0, since Origin does not move it.
 
+- **Scaled CopyMask onto a 1-bit screen:** with a 1-bit source and mask, a 1-bit destination and the general stretch
+  path (source and destination sizes differ, a deeper mask, or ditherCopy), Mac OS 9 applies its pixel-value colorizing
+  op to RGB values and maps them back, so under the mask srcCopy with any colours but black on white paints every pixel
+  black; srcOr and notSrcOr set pixels black; srcBic and notSrcBic also set pixels black (not white); srcXor inverts
+  the clear pixels; notSrcCopy paints black. Unscaled CopyMask, CopyBits (with or without a mask region) and deeper
+  sources or destinations are not affected [Code] [Verified]. ClassicMac reproduces the srcCopy case, the one CopyMask
+  uses.
+
 ### 9.2 Shapes
 
 - **Arc slopes** use a half-up fixed multiply, `(a·b + $8000) >> 16`. This rarely moves an arc edge by one pixel.
