@@ -719,7 +719,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 6 | Editor I | Done |
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
 | 8 | Editor III (HFS writing) | Not started |
-| 9 | Merge (QuickDraw.Pict) | Done except `DrawPicture` onto a port and the spec split; NuGet publishing is the owner's step |
+| 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | Later (HFS+, archives) | Not started |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
 
@@ -760,7 +760,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
    2026-09-29)**, the decoders using it directly; **2. layered as one `ClassicMac.Graphics` package with a namespace per
    layer (done, 2026-09-29)**; 3. shared types (Core's geometry; the renderer on `.Fonts`, done 2026-09-29, pixel-identical
-   on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port and the spec split to do, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
+   on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
@@ -784,7 +784,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
 - [ ] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager).
 - [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
-- [ ] **8-bit icon masks in icon suites.**
+- [ ] **8-bit icon masks in icon suites** (Mac OS 9's deep CopyMask in `IconSuite.Plot`): needs a Mac OS 9 oracle run for 8-bit-mask cases first.
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
 - [ ] **Viewer drag-out** of files and resources.
 - [ ] **CD images: multisession.**

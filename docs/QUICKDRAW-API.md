@@ -87,7 +87,7 @@ proof the API draws what the engine drew.
 2. `QuickDrawPort` over the engine; `Pict/GrafPort` rebuilt on it. Tests: each verb through the port and through an
    equivalent PICT gives identical pixels (`PortTests`, both QuickDraws); every existing test and the corpus's
    pictures and font renders unchanged. **Done.**
-3. `DrawPicture` onto a port; the ImageSharp and SkiaSharp adapters unchanged apart from the renames.
+3. `DrawPicture` onto a port; the ImageSharp and SkiaSharp adapters unchanged apart from the renames. **Done.**
 4. **Done.** Docs: `docs/GRAPHICS.md` gains a drawing section; `PICT-FORMAT.md` splits into `PICT.md` (opcodes) and
    `QUICKDRAW.md` (drawing rules), as the plan has it, so the API's documentation points at the drawing rules.
 
