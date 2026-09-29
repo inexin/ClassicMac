@@ -9,7 +9,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     // Rasterizes picture text with SixLabors.Fonts into an aliased 1-bit mask (QuickDraw text is not anti-aliased).
     // Classic Mac bitmap fonts are unavailable here, so the family comes from the resolver or an installed system font

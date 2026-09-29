@@ -6,7 +6,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.SkiaSharp
+namespace ClassicMac.Graphics.SkiaSharp
 {
     /// <summary>
     /// Decodes QuickTime-compressed picture images with Skia's codecs: <c>jpeg</c>, <c>png </c>, <c>gif </c>,

@@ -8,8 +8,8 @@ using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
-using ClassicMac.ImageSharp;
-using ClassicMac.SkiaSharp;
+using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
 
 namespace ClassicMac.Graphics.Tests;

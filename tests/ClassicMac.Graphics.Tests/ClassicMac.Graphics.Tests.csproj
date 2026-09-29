@@ -19,8 +19,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
-    <ProjectReference Include="..\..\src\ClassicMac.ImageSharp\ClassicMac.ImageSharp.csproj" />
-    <ProjectReference Include="..\..\src\ClassicMac.SkiaSharp\ClassicMac.SkiaSharp.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.Graphics.ImageSharp\ClassicMac.Graphics.ImageSharp.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.Graphics.SkiaSharp\ClassicMac.Graphics.SkiaSharp.csproj" />
     <ProjectReference Include="..\..\src\ClassicMac.Resources.Decoders\ClassicMac.Resources.Decoders.csproj" />
   </ItemGroup>
 

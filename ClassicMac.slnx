@@ -7,8 +7,8 @@
     <Project Path="src/ClassicMac.Resources.Decoders/ClassicMac.Resources.Decoders.csproj" />
     <Project Path="src/ClassicMac.Resources/ClassicMac.Resources.csproj" />
     <Project Path="src/ClassicMac.Graphics/ClassicMac.Graphics.csproj" />
-    <Project Path="src/ClassicMac.ImageSharp/ClassicMac.ImageSharp.csproj" />
-    <Project Path="src/ClassicMac.SkiaSharp/ClassicMac.SkiaSharp.csproj" />
+    <Project Path="src/ClassicMac.Graphics.ImageSharp/ClassicMac.Graphics.ImageSharp.csproj" />
+    <Project Path="src/ClassicMac.Graphics.SkiaSharp/ClassicMac.Graphics.SkiaSharp.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ClassicMac.App.Tests/ClassicMac.App.Tests.csproj" />

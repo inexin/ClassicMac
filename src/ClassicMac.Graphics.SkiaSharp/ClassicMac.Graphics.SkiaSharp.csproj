@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <PackageId>ClassicMac.SkiaSharp</PackageId>
+    <PackageId>ClassicMac.Graphics.SkiaSharp</PackageId>
     <Description>SkiaSharp integration for ClassicMac.Graphics: decode Apple QuickDraw PICT pictures, QuickTime image files (QTIF) and MacPaint documents to SKBitmap/SKImage with ClassicMac.Graphics's Macintosh-exact engine (JPEG/PNG/GIF/WebP/BMP QuickTime images through Skia's codecs, outline-font text through Skia when no bitmap font is supplied), and encode SKBitmap/SKPixmap as PICT (indexed, 16-bit, 32-bit with alpha, resolution, ICC).</Description>
     <PackageTags>skiasharp;skia;pict;quickdraw;macintosh;image;decoder;encoder</PackageTags>
   </PropertyGroup>

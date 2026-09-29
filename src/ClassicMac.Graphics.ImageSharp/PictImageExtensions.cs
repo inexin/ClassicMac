@@ -7,7 +7,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary><c>SaveAsPict</c> extensions, mirroring ImageSharp's built-in <c>SaveAsPng</c> etc.</summary>
     public static class PictImageExtensions

@@ -5,7 +5,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>The Apple QuickDraw PICT image format.</summary>
     public sealed class PictFormat : IImageFormat

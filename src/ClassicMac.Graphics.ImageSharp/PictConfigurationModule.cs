@@ -5,7 +5,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>
     /// Registers the PICT format (detector, decoder and encoder) and the QuickTime image (QTIF) and MacPaint (PNTG)

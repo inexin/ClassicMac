@@ -13,7 +13,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>
     /// Encodes the root frame as a PICT version 2 file (or bare picture): 24-bit by default, or indexed (1, 2, 4, 8

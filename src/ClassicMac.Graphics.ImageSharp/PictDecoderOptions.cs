@@ -6,7 +6,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>PICT-specific decoder options.</summary>
     public sealed class PictDecoderOptions : ISpecializedDecoderOptions

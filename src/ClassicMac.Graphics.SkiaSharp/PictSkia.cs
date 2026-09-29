@@ -7,7 +7,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.SkiaSharp
+namespace ClassicMac.Graphics.SkiaSharp
 {
     /// <summary>Options for decoding with SkiaSharp.</summary>
     public sealed class PictSkiaOptions

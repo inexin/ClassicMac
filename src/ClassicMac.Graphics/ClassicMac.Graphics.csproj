@@ -12,8 +12,8 @@
 
   <!-- Until the renderer has a public drawing API, the decoders and the adapters share its internals. -->
   <ItemGroup>
-    <InternalsVisibleTo Include="ClassicMac.ImageSharp" />
-    <InternalsVisibleTo Include="ClassicMac.SkiaSharp" />
+    <InternalsVisibleTo Include="ClassicMac.Graphics.ImageSharp" />
+    <InternalsVisibleTo Include="ClassicMac.Graphics.SkiaSharp" />
     <InternalsVisibleTo Include="ClassicMac.Resources.Decoders" />
     <InternalsVisibleTo Include="ClassicMac.Graphics.Tests" />
   </ItemGroup>

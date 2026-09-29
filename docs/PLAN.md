@@ -17,7 +17,7 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Core`, `ClassicMac.Files`,
-`ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Graphics`, `ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp`,
+`ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Graphics`, `ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp`,
 `ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app carries the same name. QuickDraw.Pict moved into
 this repo with its history on 2026-09-29 and became `ClassicMac.Graphics` (QuickDraw, PICT, QuickTime images,
 MacPaint, fonts) with the two adapters (the layering below).
@@ -351,7 +351,7 @@ flowchart LR
   glyphs as plain pixel arrays and metrics. They find a family's strikes through a small lookup (type and ID to bytes)
   rather than `ClassicMac.Resources`, so the renderer can use them too. The decoders use them for font export; in the
   merge's stage 3 the renderer uses them for text and its own parser (inherited from QuickDraw.Pict) goes. Until then
-  the two parsers are checked against the same fonts. `ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp` are the
+  the two parsers are checked against the same fonts. `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are the
   host-library adapters.
 - **ClassicMac.Resources.Decoders** — the built-in decoders, one package with a namespace per area (text, images,
   sound; decided, like the file layer); depends on Resources and `ClassicMac.Graphics`.
@@ -406,7 +406,7 @@ renderer's drawing API is public. **Stage 3** (below) is what the table still de
 | `.Pict` | The PICT file format: the opcode reader that replays a picture into the renderer, and the writer | QuickDraw, QuickTime |
 | `ClassicMac.Core`, `ClassicMac.Files` | The shared base and the file layer (unchanged by the merge) | nothing; Files on Core |
 | `ClassicMac.Resources` (+ `.Decoders`) | Resource forks; icons, cursors and patterns become resource decoders here | Core; the decoders on Graphics, QuickDraw |
-| `ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp` | One integration package per host library, covering every image format (PICT, QTIF, MacPaint, icons) | `ClassicMac.Graphics` |
+| `ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp` | One integration package per host library, covering every image format (PICT, QTIF, MacPaint, icons) | `ClassicMac.Graphics` |
 
 Colour tables and PixMaps sit in the base because QuickTime's codecs and QuickDraw both need them. QuickDraw.Pict's
 own geometry (`PictRect`, points, fixed-point values) is replaced by Core's `MacRect`, `MacPoint` and `Fixed`, so the
@@ -777,7 +777,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   hard-coded.
 - **Renderer and file format:** the QuickDraw renderer (`ClassicMac.Graphics.QuickDraw`) and the PICT format
   (`ClassicMac.Graphics.Pict`) are separate layers of one package (see the layering).
-- **Integrations:** one package per host library (`ClassicMac.ImageSharp`, `ClassicMac.SkiaSharp`) covering every
+- **Integrations:** one package per host library (`ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp`) covering every
   image format, instead of one per format.
 - **Package naming:** `ClassicMac.<Area>`, named after the Apple technology (QuickDraw, QuickTime); namespaces start
   with the package name, and areas inside a package get sub-namespaces (`ClassicMac.Files.Hfs`); format specs live

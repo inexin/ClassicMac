@@ -3,8 +3,8 @@
 ## Unreleased
 
 - The graphics package: QuickDraw.Pict becomes `ClassicMac.Graphics`, one package in layers with a namespace each
-  (`ClassicMac.Graphics`, `.Fonts`, `.QuickTime`, `.QuickDraw`, `.Pict`), plus `ClassicMac.ImageSharp` and
-  `ClassicMac.SkiaSharp`. `PictInfo`'s frame and bounds are Core's `MacRect`. `PictBitmap.Info` is gone: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` is part of
+  (`ClassicMac.Graphics`, `.Fonts`, `.QuickTime`, `.QuickDraw`, `.Pict`), plus `ClassicMac.Graphics.ImageSharp` and
+  `ClassicMac.Graphics.SkiaSharp`. `PictInfo`'s frame and bounds are Core's `MacRect`. `PictBitmap.Info` is gone: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` is part of
   `ClassicMac.Resources.Decoders`. Usage in `docs/GRAPHICS.md`.
 - QuickDraw.Pict moved into this repository with its history: the picture renderer and PICT reader/writer
   (`src/QuickDraw.Pict`), its ImageSharp and SkiaSharp packages, tests and golden tools. The decoders use it directly

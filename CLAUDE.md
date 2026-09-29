@@ -26,7 +26,7 @@ it in the same change when a decision changes.
 
 QuickDraw.Pict (formerly <https://github.com/inexin/QuickDraw.Pict>) moved into this repo with its history on
 2026-09-29 and became one package, `ClassicMac.Graphics`, in layers (a folder and namespace each), with the
-`ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp` adapters. It decodes and encodes QuickDraw PICT pictures and draws
+`ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` adapters. It decodes and encodes QuickDraw PICT pictures and draws
 **exactly the pixels a Macintosh draws**. The plan's merge phase continues with the renderer drawing text through
 `Fonts/` and a public drawing API for the renderer.
 
@@ -56,7 +56,7 @@ and may use only the layers below it, which `LayeringTests` checks. The adapters
 | `QuickDraw/` (`.QuickDraw`) | The renderer: `Engine/`, `Regions/`, `Text/`, `Pattern`, `PictFontLibrary` | base, Fonts |
 | `Pict/` (`.Pict`) | The PICT format: `PictReader` (`Decode`, or `Read` with the `PictInfo`), `GrafPort`, `PictWriter`, `PictHeader`/`PictInfo`, options, the `$8200` opcode | all of the above |
 
-`ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp` are separate packages (the ImageSharp format plugin and the
+`ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are separate packages (the ImageSharp format plugin and the
 SkiaSharp adapter) on `ClassicMac.Graphics`.
 
 Icons, cursors and patterns (`QuickDrawResources`) are in `ClassicMac.Resources.Decoders` (`Images/`).

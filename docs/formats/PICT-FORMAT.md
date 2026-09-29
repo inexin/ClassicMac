@@ -2,7 +2,7 @@
 
 This document describes the Macintosh QuickDraw picture format (PICT) completely enough to write a decoder that
 renders pictures pixel for pixel as a Macintosh does, and an encoder whose output a Macintosh reads. It is the
-behaviour implemented by ClassicMac.Graphics and ClassicMac.ImageSharp, written so that the code never has to be read.
+behaviour implemented by ClassicMac.Graphics and ClassicMac.Graphics.ImageSharp, written so that the code never has to be read.
 
 There are two reference implementations, and they differ in details:
 

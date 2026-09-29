@@ -13,7 +13,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>The QuickTime image file format (<c>QTIF</c>).</summary>
     public sealed class QuickTimeImageFormat : IImageFormat

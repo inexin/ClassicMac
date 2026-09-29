@@ -5,7 +5,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.SkiaSharp
+namespace ClassicMac.Graphics.SkiaSharp
 {
     /// <summary>
     /// Rasterizes picture text with Skia into an aliased 1-bit mask (QuickDraw text is not anti-aliased), for text that

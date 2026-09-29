@@ -6,7 +6,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     // Detects PICT data. ImageSharp only consults a detector when the stream holds at least HeaderSize bytes and
     // passes it no more than the largest HeaderSize registered, so two instances are needed: one sized to reach a

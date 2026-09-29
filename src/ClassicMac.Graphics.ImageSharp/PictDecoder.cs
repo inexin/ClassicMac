@@ -10,7 +10,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>
     /// Decodes QuickDraw PICT (v1/v2) pictures, bare or with a <c>.pict</c> file header. Bitmap opcodes are decoded

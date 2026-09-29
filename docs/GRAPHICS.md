@@ -16,8 +16,8 @@ packages.
 | `ClassicMac.Graphics.QuickTime` | QuickTime still images: the codecs, the codec hook, QTIF files. |
 | `ClassicMac.Graphics.QuickDraw` | The software QuickDraw that draws everything (Mac OS 9 or the 68k ROM), text, screen depths. |
 | `ClassicMac.Graphics.Pict` | `PictReader` decodes to an RGBA `PictBitmap` (`Read` also gives the `PictInfo`); `PictWriter` writes pictures; `PictHeader` detects pictures and reads their header. |
-| `ClassicMac.ImageSharp` | [ImageSharp](https://github.com/SixLabors/ImageSharp) format plugin on top of the core: detection, decoding, encoding, `SaveAsPict`. |
-| `ClassicMac.SkiaSharp` | [SkiaSharp](https://github.com/mono/SkiaSharp) integration: decode to `SKBitmap`/`SKImage`, encode `SKBitmap`/`SKPixmap`, `SaveAsPict`. |
+| `ClassicMac.Graphics.ImageSharp` | [ImageSharp](https://github.com/SixLabors/ImageSharp) format plugin on top of the core: detection, decoding, encoding, `SaveAsPict`. |
+| `ClassicMac.Graphics.SkiaSharp` | [SkiaSharp](https://github.com/mono/SkiaSharp) integration: decode to `SKBitmap`/`SKImage`, encode `SKBitmap`/`SKPixmap`, `SaveAsPict`. |
 
 ## ImageSharp
 

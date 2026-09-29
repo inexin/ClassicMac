@@ -9,7 +9,7 @@ using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
 
-namespace ClassicMac.ImageSharp
+namespace ClassicMac.Graphics.ImageSharp
 {
     /// <summary>
     /// Decodes QuickTime-compressed picture images with ImageSharp's decoders: <c>jpeg</c>, <c>png </c>,
