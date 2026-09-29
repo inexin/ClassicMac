@@ -26,6 +26,11 @@
     <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
+  <!-- Tests find their Golden/ and Corpus/ folders through [CallerFilePath], which CI's path mapping (/_/) would break. -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\', '/').Contains('/tests/'))">
+    <DeterministicSourcePaths>false</DeterministicSourcePaths>
+  </PropertyGroup>
+
   <!-- Libraries and tools under src/: documented, trimmable and AOT-safe so the CLI can publish natively. -->
   <PropertyGroup Condition="$(MSBuildProjectDirectory.Replace('\', '/').Contains('/src/'))">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
