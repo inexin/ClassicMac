@@ -7,6 +7,9 @@ using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
 using ClassicMac.Files.Tests;
+using ClassicMac.Resources.Decoders.Interface;
+using MenuItem = Avalonia.Controls.MenuItem;
+using MacMenuItem = ClassicMac.Resources.Decoders.Interface.MenuItem;
 
 namespace ClassicMac.App.Tests;
 
@@ -186,8 +189,14 @@ public class WindowTests
     {
         var path = Path.Combine(Path.GetTempPath(), $"cm-forms-{Guid.NewGuid():N}.rsrc");
         byte[] vers = [0x01, 0x20, 0x60, 0x03, 0, 0, 5, .. "1.2b3"u8, 9, .. "1.2b3 (c)"u8];
+        var items = InterfaceWriter.WriteDialogItems([
+            new DialogItem(new MacRect(70, 150, 90, 220), 4, true, "OK", null, ReadOnlyMemory<byte>.Empty),
+            new DialogItem(new MacRect(10, 10, 50, 220), 8, false, "Hello there", null, ReadOnlyMemory<byte>.Empty)]);
+        var dialog = InterfaceWriter.WriteWindow(new WindowTemplate(new MacRect(40, 40, 140, 280), 1, true, false, 0, "", 128, null), dialog: true);
+        var menu = InterfaceWriter.WriteMenu(new MenuResource(128, 0, 0, 0, 0xFFFFFFFF, "File",
+            [new MacMenuItem("Open…", 0, (byte)'O', 0, 0, true), new MacMenuItem("-", 0, 0, 0, 0, false), new MacMenuItem("Quit", 0, (byte)'Q', 0, 0, true)]));
         File.WriteAllBytes(path, PreviewTests.Fork(("STR#", 128, null, [0, 2, 3, .. "one"u8, 3, .. "two"u8]), ("vers", 1, null, vers),
-            ("TEXT", 128, null, "Some text"u8.ToArray())));
+            ("TEXT", 128, null, "Some text"u8.ToArray()), ("DITL", 128, null, items), ("DLOG", 128, null, dialog), ("MENU", 128, null, menu)));
         try
         {
             var model = new MainViewModel();
@@ -197,7 +206,8 @@ public class WindowTests
             Pump(open);
             var input = open.Result!;
             Pump(input.EnsureLoadedAsync());
-            foreach (var (type, form) in new[] { ("STR#", typeof(StringListForm)), ("vers", typeof(VersionForm)), ("TEXT", typeof(TextForm)) })
+            foreach (var (type, form) in new[] { ("STR#", typeof(StringListForm)), ("vers", typeof(VersionForm)), ("TEXT", typeof(TextForm)),
+                ("DLOG", typeof(WindowForm)), ("DITL", typeof(DialogItemsForm)), ("MENU", typeof(MenuForm)) })
             {
                 model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
                 Pump(model.PreviewTask);
@@ -207,6 +217,15 @@ public class WindowTests
                 Capture(window, "edit-" + type.TrimEnd('#'));
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
             }
+
+            // The item list's preview follows its form before Apply.
+            model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "DITL").Children[0];
+            Pump(model.PreviewTask);
+            var ditl = Assert.IsType<DialogItemsForm>(model.Form);
+            ditl.Items[1].Text = "Changed";
+            Assert.Equal("Changed", model.FormDialog!.Items[1].Item.Text);
+            ditl.Items[0].Text = "日本";
+            Assert.Contains("Mac OS Roman", model.FormError);
             window.Close();
         }
         finally

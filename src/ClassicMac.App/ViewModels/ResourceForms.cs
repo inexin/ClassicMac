@@ -4,6 +4,7 @@ using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
+using ClassicMac.Resources.Decoders.Interface;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Editing;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -33,6 +34,12 @@ namespace ClassicMac.App.ViewModels
                     ? (styl, ResourceDecompression.Default.GetData(styl, fork, readOptions, []).ToArray())
                     : null),
                 "vers" when VersionResource.Read(data) is { } version => new VersionForm(resource, version),
+                "WIND" => new WindowForm(resource, InterfaceResources.ReadWindow(data, false, DecodeOptions.Default, [], ""), false),
+                "DLOG" => new WindowForm(resource, InterfaceResources.ReadWindow(data, true, DecodeOptions.Default, [], ""), true),
+                "ALRT" => new AlertForm(resource, InterfaceResources.ReadAlert(data, [], "")),
+                "DITL" => new DialogItemsForm(resource, InterfaceResources.ReadDialogItems(data, DecodeOptions.Default, [], "")),
+                "MENU" => new MenuForm(resource, InterfaceResources.ReadMenu(data, DecodeOptions.Default, [], "")),
+                "CNTL" => new ControlForm(resource, InterfaceResources.ReadControl(data, DecodeOptions.Default, [], "")),
                 _ => null,
             };
         }
@@ -139,8 +146,11 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnFormChanged(ResourceForm? value) => OnPropertyChanged(nameof(HasForm));
 
-        private void UpdateForm(NodeViewModel? node) =>
+        private void UpdateForm(NodeViewModel? node)
+        {
             Form = node is ResourceNode r && FileOwner(r) is not null ? ResourceForm.For(r.Resource, r.Fork, ReadOptions) : null;
+            WatchForm(Form, node as ResourceNode);
+        }
 
         private bool CanApplyForm() => Form is not null && Selected is ResourceNode;
 

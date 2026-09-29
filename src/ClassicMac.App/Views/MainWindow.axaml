@@ -241,7 +241,16 @@
               <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
                 <Button Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" />
                 <TextBlock Text="Apply makes an undoable edit; File ▸ Save writes the file." Opacity="0.6" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding FormError}" Foreground="#C0392B" VerticalAlignment="Center" />
               </StackPanel>
+              <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="560"
+                            IsVisible="{Binding FormDialog, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <views:DialogView Dialog="{Binding FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
+              </ScrollViewer>
+              <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="400"
+                            IsVisible="{Binding FormMenu, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <views:MenuView Menu="{Binding FormMenu}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
+              </ScrollViewer>
               <ContentControl Content="{Binding Form}">
                 <ContentControl.DataTemplates>
                   <DataTemplate DataType="vm:StringForm">
@@ -297,6 +306,178 @@
                       <TextBlock Grid.Row="7" Text="Long version" VerticalAlignment="Center" />
                       <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding LongVersion}" />
                     </Grid>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:WindowForm">
+                    <ScrollViewer>
+                      <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="Bounds (top, left, bottom, right)" VerticalAlignment="Center" Width="210" />
+                          <NumericUpDown Value="{Binding Top}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                          <NumericUpDown Value="{Binding Left}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                          <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                          <NumericUpDown Value="{Binding Right}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="Title" VerticalAlignment="Center" Width="210" />
+                          <TextBox Text="{Binding Title}" Width="300" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="Definition (WDEF × 16 + variation)" VerticalAlignment="Center" Width="210" />
+                          <NumericUpDown Value="{Binding Definition}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsDialog}">
+                          <TextBlock Text="Item list (DITL) ID" VerticalAlignment="Center" Width="210" />
+                          <NumericUpDown Value="{Binding ItemsId}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                          <CheckBox Content="Visible" IsChecked="{Binding Visible}" />
+                          <CheckBox Content="Close box" IsChecked="{Binding GoAway}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="Reference value" VerticalAlignment="Center" Width="210" />
+                          <NumericUpDown Value="{Binding RefCon}" FormatString="0" Width="160" Minimum="-2147483648" Maximum="2147483647" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <CheckBox Content="Positioning word" IsChecked="{Binding HasPosition}" Width="210" />
+                          <NumericUpDown Value="{Binding Position}" FormatString="0" Width="110" Minimum="0" Maximum="65535" IsEnabled="{Binding HasPosition}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:AlertForm">
+                    <StackPanel Spacing="8">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Bounds (top, left, bottom, right)" VerticalAlignment="Center" Width="210" />
+                        <NumericUpDown Value="{Binding Top}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Left}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Right}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Item list (DITL) ID" VerticalAlignment="Center" Width="210" />
+                        <NumericUpDown Value="{Binding ItemsId}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                      </StackPanel>
+                      <ItemsControl ItemsSource="{Binding Stages}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:AlertStage">
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,2">
+                              <TextBlock Text="{Binding Number, StringFormat=Stage {0}}" VerticalAlignment="Center" Width="70" />
+                              <TextBlock Text="default button" VerticalAlignment="Center" />
+                              <NumericUpDown Value="{Binding BoldItem}" FormatString="0" Minimum="1" Maximum="2" Width="100" />
+                              <CheckBox Content="drawn" IsChecked="{Binding Drawn}" />
+                              <TextBlock Text="sound" VerticalAlignment="Center" />
+                              <NumericUpDown Value="{Binding Sound}" FormatString="0" Minimum="0" Maximum="3" Width="100" />
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <CheckBox Content="Positioning word" IsChecked="{Binding HasPosition}" Width="210" />
+                        <NumericUpDown Value="{Binding Position}" FormatString="0" Width="110" Minimum="0" Maximum="65535" IsEnabled="{Binding HasPosition}" />
+                      </StackPanel>
+                    </StackPanel>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:DialogItemsForm">
+                    <DockPanel>
+                      <Button DockPanel.Dock="Bottom" Content="Add Item" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                      <ScrollViewer HorizontalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:DialogItemRow">
+                              <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" Padding="0,4">
+                                <StackPanel Spacing="4">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ComboBox ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" Width="150" />
+                                    <CheckBox Content="enabled" IsChecked="{Binding Enabled}" />
+                                    <Button Content="↑" Command="{Binding $parent[ItemsControl].((vm:DialogItemsForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                                    <Button Content="Remove" Command="{Binding $parent[ItemsControl].((vm:DialogItemsForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                                    <NumericUpDown Value="{Binding Top}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
+                                    <NumericUpDown Value="{Binding Left}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
+                                    <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
+                                    <NumericUpDown Value="{Binding Right}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
+                                  </StackPanel>
+                                  <TextBox Text="{Binding Text}" IsVisible="{Binding HasText}" AcceptsReturn="True" TextWrapping="Wrap" />
+                                  <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasResource}">
+                                    <TextBlock Text="Resource ID" VerticalAlignment="Center" />
+                                    <NumericUpDown Value="{Binding ResourceId}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                                  </StackPanel>
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </DockPanel>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:MenuForm">
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="Title" VerticalAlignment="Center" Width="120" />
+                          <TextBox Text="{Binding Title}" Width="200" />
+                          <CheckBox Content="Menu enabled" IsChecked="{Binding Enabled}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="Menu ID" VerticalAlignment="Center" Width="120" />
+                          <NumericUpDown Value="{Binding Id}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                          <TextBlock Text="MDEF" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding Definition}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        </StackPanel>
+                      </StackPanel>
+                      <Button DockPanel.Dock="Bottom" Content="Add Item" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                      <ScrollViewer HorizontalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Items}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate DataType="vm:MenuItemRow">
+                              <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2">
+                                <TextBox Text="{Binding Text}" Width="200" />
+                                <CheckBox Content="enabled" IsChecked="{Binding Enabled}" />
+                                <TextBlock Text="key" VerticalAlignment="Center" />
+                                <TextBox Text="{Binding Key}" Width="50" />
+                                <TextBlock Text="mark" VerticalAlignment="Center" />
+                                <TextBox Text="{Binding Mark}" Width="80" />
+                                <TextBlock Text="icon" VerticalAlignment="Center" />
+                                <NumericUpDown Value="{Binding Icon}" FormatString="0" Width="56" ShowButtonSpinner="False" Minimum="0" Maximum="255" />
+                                <TextBlock Text="style" VerticalAlignment="Center" />
+                                <NumericUpDown Value="{Binding Face}" FormatString="0" Width="56" ShowButtonSpinner="False" Minimum="0" Maximum="127" />
+                                <Button Content="↑" Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                                <Button Content="Remove" Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </ScrollViewer>
+                    </DockPanel>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:ControlForm">
+                    <StackPanel Spacing="8">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Bounds (top, left, bottom, right)" VerticalAlignment="Center" Width="210" />
+                        <NumericUpDown Value="{Binding Top}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Left}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Right}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Title" VerticalAlignment="Center" Width="210" />
+                        <TextBox Text="{Binding Title}" Width="300" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Definition (CDEF × 16 + variation)" VerticalAlignment="Center" Width="210" />
+                        <NumericUpDown Value="{Binding Definition}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Value, minimum, maximum" VerticalAlignment="Center" Width="210" />
+                        <NumericUpDown Value="{Binding Value}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Minimum}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                        <NumericUpDown Value="{Binding Maximum}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
+                      </StackPanel>
+                      <CheckBox Content="Visible" IsChecked="{Binding Visible}" />
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="Reference value" VerticalAlignment="Center" Width="210" />
+                        <NumericUpDown Value="{Binding RefCon}" FormatString="0" Width="160" Minimum="-2147483648" Maximum="2147483647" />
+                      </StackPanel>
+                    </StackPanel>
                   </DataTemplate>
                 </ContentControl.DataTemplates>
               </ContentControl>
