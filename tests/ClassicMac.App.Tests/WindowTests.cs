@@ -180,4 +180,38 @@ public class WindowTests
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    [Fact]
+    public void The_edit_tab_shows_a_form_for_text_resources() => OnUiThread(() =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cm-forms-{Guid.NewGuid():N}.rsrc");
+        byte[] vers = [0x01, 0x20, 0x60, 0x03, 0, 0, 5, .. "1.2b3"u8, 9, .. "1.2b3 (c)"u8];
+        File.WriteAllBytes(path, PreviewTests.Fork(("STR#", 128, null, [0, 2, 3, .. "one"u8, 3, .. "two"u8]), ("vers", 1, null, vers),
+            ("TEXT", 128, null, "Some text"u8.ToArray())));
+        try
+        {
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            var input = open.Result!;
+            Pump(input.EnsureLoadedAsync());
+            foreach (var (type, form) in new[] { ("STR#", typeof(StringListForm)), ("vers", typeof(VersionForm)), ("TEXT", typeof(TextForm)) })
+            {
+                model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
+                Pump(model.PreviewTask);
+                Assert.IsType(form, model.Form);
+                model.SelectedTab = 3;
+                Dispatcher.UIThread.RunJobs();
+                Capture(window, "edit-" + type.TrimEnd('#'));
+                Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
+            }
+            window.Close();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    });
 }

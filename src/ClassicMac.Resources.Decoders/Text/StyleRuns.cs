@@ -49,6 +49,28 @@ namespace ClassicMac.Resources.Decoders.Text
             return runs;
         }
 
+        // The runs as a style scrap: a count, then 20-byte elements.
+        public static byte[] Write(IReadOnlyList<StyleRun> runs)
+        {
+            var data = new byte[2 + runs.Count * ElementLength];
+            BinaryPrimitives.WriteUInt16BigEndian(data, (ushort)runs.Count);
+            for (var i = 0; i < runs.Count; i++)
+            {
+                var e = data.AsSpan(2 + i * ElementLength, ElementLength);
+                var r = runs[i];
+                BinaryPrimitives.WriteInt32BigEndian(e, r.Start);
+                BinaryPrimitives.WriteInt16BigEndian(e[4..], r.Height);
+                BinaryPrimitives.WriteInt16BigEndian(e[6..], r.Ascent);
+                BinaryPrimitives.WriteInt16BigEndian(e[8..], r.Font);
+                e[10] = r.Face;
+                BinaryPrimitives.WriteInt16BigEndian(e[12..], r.Size);
+                BinaryPrimitives.WriteUInt16BigEndian(e[14..], r.Red);
+                BinaryPrimitives.WriteUInt16BigEndian(e[16..], r.Green);
+                BinaryPrimitives.WriteUInt16BigEndian(e[18..], r.Blue);
+            }
+            return data;
+        }
+
         // The standard font family numbers of Inside Macintosh: Text ("Font Family Numbers"); others are the system's
         // own and have no fixed name.
         public static string FontName(short id) => id switch

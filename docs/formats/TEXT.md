@@ -31,8 +31,9 @@ Contents
 9. [Text output](#9-text-output)
 10. [JSON output](#10-json-output)
 11. [RTF output](#11-rtf-output)
-12. [Diagnostics](#12-diagnostics)
-13. [Not covered yet](#13-not-covered-yet)
+12. [Writing text resources](#12-writing-text-resources)
+13. [Diagnostics](#13-diagnostics)
+14. [Not covered yet](#14-not-covered-yet)
 
 ---
 
@@ -640,7 +641,24 @@ The golden `'TEXT'` 128 with `'styl'` 128 (§5, §6.4) gives:
 
 ---
 
-## 12. Diagnostics
+## 12. Writing text resources
+
+ClassicMac's editor (`TextResources`, `VersionResource`) writes these resources back [ClassicMac, following the formats
+above]:
+
+- **Text** is Mac OS Roman (section 2); a line break is written as a carriage return. Text that Mac OS Roman cannot hold
+  is refused, not approximated.
+- **`STR `:** one Pascal string, at most 255 bytes; nothing after it.
+- **`STR#`:** the count (at most 65535), then the strings as Pascal strings.
+- **`vers`:** the fixed part with the major version in BCD (0–99), minor and bug fix as nibbles (0–15), the stage byte,
+  the non-release number in BCD (0–99, as Apple's own files store it) and the region code, then the short and long
+  version strings as Pascal strings.
+- **`TEXT` with a `styl` of its ID:** the style runs follow the edit. Text before and after the change keeps its runs
+  (their starts moved by the change's length); text inserted takes the style of the run the change starts in, as
+  typing does in TextEdit; a run whose text is all deleted is dropped, and two runs at one position keep the later.
+  The runs' other fields (height, ascent, font, face, size, colour) are unchanged. A `TEXT` without a `styl` gets none.
+
+## 13. Diagnostics
 
 All are warnings: the output is still written from what could be read, except where noted [ClassicMac]. On the Mac,
 `GetIndString` returns an empty string for an index past a list's count (§4), and TextEdit applies any `'styl'`
@@ -662,7 +680,7 @@ The decoders' names and versions, recorded in the manifest: `text.string`, `text
 
 ---
 
-## 13. Not covered yet
+## 14. Not covered yet
 
 - **Other Mac encodings** (§2.4).
 - **Writing** text resources: planned with the editors.

@@ -136,6 +136,25 @@ namespace ClassicMac.Resources.Editing
         }
     }
 
+    /// <summary>Several edits made and undone as one (a <c>'TEXT'</c> with its <c>'styl'</c>).</summary>
+    public sealed class CompoundEdit(string description, params IResourceEdit[] edits) : IResourceEdit
+    {
+        /// <inheritdoc/>
+        public string Description => description;
+
+        /// <inheritdoc/>
+        public void Apply(ResourceFork fork)
+        {
+            foreach (var edit in edits) edit.Apply(fork);
+        }
+
+        /// <inheritdoc/>
+        public void Undo(ResourceFork fork)
+        {
+            for (var i = edits.Length - 1; i >= 0; i--) edits[i].Undo(fork);
+        }
+    }
+
     /// <summary>Changes the resource map's attributes.</summary>
     public sealed class SetForkAttributes(ResourceForkAttributes attributes) : IResourceEdit
     {

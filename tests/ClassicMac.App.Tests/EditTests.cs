@@ -169,4 +169,29 @@ public sealed class EditTests : IDisposable
         Assert.Equal(2, reopened.Resources!.Fork!.Resources.Count);
         Assert.False(File.Exists(path + ".orig"));
     }
+
+    [Fact]
+    public async Task Forms_apply_as_undoable_edits()
+    {
+        var (model, file, _, _, path) = await Open();
+        model.Selected = Resource(file, 128);
+        var form = Assert.IsType<StringForm>(model.Form);
+        Assert.Equal("hello", form.Text);
+
+        form.Text = "hello, world";
+        model.ApplyFormCommand.Execute(null);
+        Assert.Equal("hello, world"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
+        Assert.Equal("hello, world", Assert.IsType<StringForm>(model.Form).Text);   // the form reads the new data
+
+        Assert.IsType<StringForm>(model.Form).Text = "日本";               // not Mac OS Roman: refused
+        model.ApplyFormCommand.Execute(null);
+        Assert.Contains("Mac OS Roman", model.Status);
+
+        model.UndoCommand.Execute(null);
+        model.Selected = Resource(file, 128);
+        Assert.Equal("hello", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.False(model.HasUnsavedChanges);
+        await Task.CompletedTask;
+        _ = path;
+    }
 }

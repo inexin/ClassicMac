@@ -133,7 +133,11 @@ namespace ClassicMac.App.ViewModels
             OnPropertyChanged(nameof(RedoTitle));
         }
 
-        partial void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue) => NotifyEditCommands();
+        partial void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
+        {
+            NotifyEditCommands();
+            UpdateForm(newValue);
+        }
 
         // Makes an edit in the selection's file and selects the resource it concerns.
         private void Execute(NodeViewModel owner, IResourceEdit edit, Func<Resource?> select)
