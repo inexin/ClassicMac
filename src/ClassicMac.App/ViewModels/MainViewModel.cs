@@ -197,10 +197,12 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnSelectedChanged(NodeViewModel? value)
         {
+            var pendingHexEdit = TakeHexEdit();
             Details = DetailsViewModel.For(value);
             Hex = HexViewModel.For(value);
             HexSource = Hex.Sources.FirstOrDefault();
             PreviewTask = MakePreviewAsync(value);
+            if (pendingHexEdit is { } pending) CommitHexEdit(pending, value);
         }
 
         partial void OnScreenDepthChanged(int value) => PreviewTask = MakePreviewAsync(Selected);

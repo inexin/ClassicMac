@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Globalization;
 using System.Text;
 using ClassicMac.Core;
@@ -9,16 +10,31 @@ using ClassicMac.Files;
 namespace ClassicMac.App.ViewModels
 {
     /// <summary>One line of the hex view: offset, 16 bytes in hex, and those bytes as Mac Roman characters.</summary>
-    public sealed record HexLine(string Offset, string Hex, string Characters);
+    /// <param name="CursorColumn">The character column of the byte the edit cursor is on (in <see cref="Hex"/>), or -1.</param>
+    public sealed record HexLine(string Offset, string Hex, string Characters, int CursorColumn = -1)
+    {
+        private string Padded => Hex.PadRight(CursorColumn + 2);
+
+        /// <summary>The hex text before the cursor byte (all of it when the cursor is elsewhere).</summary>
+        public string Before => CursorColumn < 0 ? Hex : Padded[..CursorColumn];
+
+        /// <summary>The cursor byte's two digits (blank at the end of the data), or nothing.</summary>
+        public string At => CursorColumn < 0 ? "" : Padded.Substring(CursorColumn, 2);
+
+        /// <summary>The hex text after the cursor byte.</summary>
+        public string After => CursorColumn < 0 ? "" : Padded[(CursorColumn + 2)..];
+    }
 
     /// <summary>
     /// The hex view of some data: a list of 16-byte lines made when shown, read 64 KB at a time, so a disk image's whole
     /// data fork scrolls without being loaded. (A non-generic <see cref="IList"/>, so list controls can virtualise it.)
     /// </summary>
-    public sealed class HexLines : IReadOnlyList<HexLine>, IList
+    public sealed class HexLines : IReadOnlyList<HexLine>, IList, INotifyCollectionChanged
     {
         private const int BytesPerLine = 16, Block = 64 * 1024;
-        private readonly ForkData data;
+        private ForkData data;
+        private bool editing;
+        private int cursor = -1;
         private long cachedBlock = -1;
         private byte[] cache = [];
 
@@ -28,7 +44,21 @@ namespace ClassicMac.App.ViewModels
             Count = (int)Math.Min(int.MaxValue, (data.Length + BytesPerLine - 1) / BytesPerLine);
         }
 
-        public int Count { get; }
+        public int Count { get; private set; }
+
+        public event NotifyCollectionChangedEventHandler? CollectionChanged;
+
+        /// <summary>Shows edited bytes, with the edit cursor on byte <paramref name="cursorOffset"/> (which may be the
+        /// length, to append). There is always a line for the cursor at the end.</summary>
+        public void Reload(ForkData newData, int cursorOffset)
+        {
+            data = newData;
+            editing = true;
+            cursor = cursorOffset;
+            cachedBlock = -1;
+            Count = (int)Math.Min(int.MaxValue, data.Length / BytesPerLine + 1);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
 
         /// <summary>How many bytes have been read so far (for tests).</summary>
         public long BytesRead { get; private set; }
@@ -63,7 +93,8 @@ namespace ClassicMac.App.ViewModels
                     }
                     else hex.Append("   ");
                 }
-                return new HexLine(offset.ToString("X8", CultureInfo.InvariantCulture), hex.ToString().TrimEnd(), text.ToString());
+                var column = cursor >= offset && cursor < offset + BytesPerLine ? (int)(cursor - offset) * 3 + (cursor - offset >= 8 ? 1 : 0) : -1;
+                return new HexLine(offset.ToString("X8", CultureInfo.InvariantCulture), hex.ToString().TrimEnd(), text.ToString(), editing ? column : -1);
             }
         }
 

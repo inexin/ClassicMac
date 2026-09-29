@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -130,7 +131,7 @@ namespace ClassicMac.App.ViewModels
         private void NotifyEditCommands()
         {
             foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
-                ReplaceDataCommand, EditHexCommand, ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand })
+                ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand })
                 command.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(UndoTitle));
             OnPropertyChanged(nameof(RedoTitle));
@@ -255,6 +256,59 @@ namespace ClassicMac.App.ViewModels
             if (await EditDialogs.EditHexAsync($"Edit {resource}", resource.GetData().ToArray()) is not { } data) return;
             if (data.AsSpan().SequenceEqual(resource.GetData().Span)) return;
             Execute(owner, new SetResourceData(resource, data, $"Edit {resource}"), () => resource);
+        }
+
+        /// <summary>The bytes being edited in the hex view, or null.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsHexEditing))]
+        [NotifyCanExecuteChangedFor(nameof(BeginHexEditCommand))]
+        private HexEditor? hexEdit;
+
+        private (Resource Resource, NodeViewModel Owner)? hexEditTarget;
+
+        public bool IsHexEditing => HexEdit is not null;
+
+        [RelayCommand(CanExecute = nameof(CanBeginHexEdit))]
+        private void BeginHexEdit()
+        {
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
+            hexEditTarget = (node.Resource, owner);
+            HexEdit = new HexEditor(node.Resource.GetData());
+            HexLines = HexEdit.Lines;
+            SelectedTab = 2;
+        }
+
+        private bool CanBeginHexEdit() => CanEditResource() && !IsHexEditing;
+
+        [RelayCommand]
+        private void ApplyHexEdit()
+        {
+            if (TakeHexEdit() is not var (resource, owner, data)) return;
+            Execute(owner, new SetResourceData(resource, data, $"Edit {resource}"), () => resource);
+        }
+
+        [RelayCommand]
+        private void DiscardHexEdit()
+        {
+            TakeHexEdit();
+            HexLines = HexSource is null ? null : new HexLines(HexSource.Data);
+        }
+
+        // Ends hex editing; the edited bytes when they differ from the resource's.
+        private (Resource Resource, NodeViewModel Owner, byte[] Data)? TakeHexEdit()
+        {
+            if (HexEdit is not { } editor || hexEditTarget is not { } target) return null;
+            HexEdit = null;
+            hexEditTarget = null;
+            return editor.IsModified ? (target.Resource, target.Owner, editor.ToArray()) : null;
+        }
+
+        // The selection moved while bytes were being edited: they are applied as an undoable edit, then the selection goes where the user clicked.
+        private void CommitHexEdit((Resource Resource, NodeViewModel Owner, byte[] Data) pending, NodeViewModel? clicked)
+        {
+            Execute(pending.Owner, new SetResourceData(pending.Resource, pending.Data, $"Edit {pending.Resource}"), () => pending.Resource);
+            if (clicked is ResourceNode other && ReferenceEquals(FileOwner(other), pending.Owner)) SelectResource(pending.Owner, other.Resource);
+            else if (clicked is not null && FileOwner(clicked) is { } owner && !ReferenceEquals(owner, pending.Owner)) Selected = clicked;
         }
 
         private EditState? SelectedState => FileOwner(Selected) is { } owner ? EditingOf(owner) : null;

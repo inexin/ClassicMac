@@ -25,7 +25,16 @@ namespace ClassicMac.App.Views
                 model.AudioPlayer ??= audio;
             };
             Closing += OnClosing;
+            HexList.KeyDown += OnHexKeyDown;
             Closed += (_, _) => audio.Dispose();
+        }
+
+        // Keys of the hex view go to the byte editor while it is on; the cursor's line is kept in view.
+        private void OnHexKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (DataContext is not MainViewModel { HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers)) return;
+            e.Handled = true;
+            HexList.ScrollIntoView(editor.CursorLine);
         }
 
         private bool quitting;

@@ -225,12 +225,22 @@
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-              <ListBox Classes="hex" ItemsSource="{Binding HexLines}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,0,12,8">
+                <Button Content="Edit Bytes" Command="{Binding BeginHexEditCommand}" IsVisible="{Binding !IsHexEditing}" />
+                <Button Content="Apply" Command="{Binding ApplyHexEditCommand}" IsVisible="{Binding IsHexEditing}" />
+                <Button Content="Discard" Command="{Binding DiscardHexEditCommand}" IsVisible="{Binding IsHexEditing}" />
+                <TextBlock Text="{Binding HexEdit.Status}" IsVisible="{Binding IsHexEditing}" VerticalAlignment="Center" Opacity="0.7" />
+                <TextBlock Text="Hex digits type; Insert toggles insert; Delete, Backspace remove." IsVisible="{Binding IsHexEditing}"
+                           VerticalAlignment="Center" Opacity="0.5" />
+              </StackPanel>
+              <ListBox x:Name="HexList" Classes="hex" ItemsSource="{Binding HexLines}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="vm:HexLine">
                     <StackPanel Orientation="Horizontal" Spacing="16">
                       <TextBlock Text="{Binding Offset}" Opacity="0.55" />
-                      <TextBlock Text="{Binding Hex}" />
+                      <TextBlock>
+                        <Run Text="{Binding Before}" /><Run Text="{Binding At}" Background="#5A80B0FF" /><Run Text="{Binding After}" />
+                      </TextBlock>
                       <TextBlock Text="{Binding Characters}" Opacity="0.8" />
                     </StackPanel>
                   </DataTemplate>

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Hex editing in the hex view: Edit Bytes types hex digits over or into a resource's bytes, with Delete, Backspace and
+  cursor keys, applied as one undoable edit.
 - Resource forks: a map offset past the end of the fork is recovered from the end of the data area, as ResEdit does
   (`fork.map-recovered`; RESOURCE-FORK.md section 9). A damaged fork opened this way saves as a clean one.
 - Templates: resources without a form of their own are edited through a `TMPL` from their file or any other open

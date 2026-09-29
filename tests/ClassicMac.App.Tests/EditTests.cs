@@ -90,6 +90,78 @@ public sealed class EditTests : IDisposable
         ResourceFork.Read(MacBinaryReader.III.Read(ForkData.FromFile(path), new ContainerContext())[0].ResourceFork.ToArray());
 
     [Fact]
+    public void The_hex_editor_overwrites_inserts_and_deletes()
+    {
+        var editor = new HexEditor(new byte[] { 0x01, 0x02, 0x03 });
+        editor.TypeDigit(0xA);
+        Assert.Equal(new byte[] { 0xA1, 2, 3 }, editor.ToArray());          // first digit: high nibble
+        editor.TypeDigit(0xB);
+        Assert.Equal(new byte[] { 0xAB, 2, 3 }, editor.ToArray());
+        Assert.Equal(1, editor.Cursor);
+        editor.ToggleInsert();
+        editor.TypeDigit(0xC);
+        editor.TypeDigit(0xD);
+        Assert.Equal(new byte[] { 0xAB, 0xCD, 2, 3 }, editor.ToArray());
+        editor.MoveTo(99);                                                    // kept at the end
+        Assert.Equal(4, editor.Cursor);
+        editor.InsertMode = false;
+        editor.TypeDigit(1);
+        editor.TypeDigit(2);                                                  // at the end: appends
+        Assert.Equal(new byte[] { 0xAB, 0xCD, 2, 3, 0x12 }, editor.ToArray());
+        editor.Backspace();
+        editor.MoveTo(0);
+        editor.Delete();
+        Assert.Equal(new byte[] { 0xCD, 2, 3 }, editor.ToArray());
+        Assert.True(editor.IsModified);
+        Assert.Equal("00000000", editor.Lines[0].Offset);
+        Assert.Equal(("", "CD", " 02 03"), (editor.Lines[0].Before, editor.Lines[0].At, editor.Lines[0].After));
+
+        Assert.True(editor.OnKey(Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.None));
+        Assert.False(editor.OnKey(Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.None));
+        Assert.False(editor.OnKey(Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.Control));
+        Assert.Equal(2, new HexEditor(new byte[16]).Lines.Count);             // a line to append on
+    }
+
+    [Fact]
+    public async Task Bytes_edited_in_the_hex_view_are_an_undoable_edit()
+    {
+        var (model, file, _, _, _) = await Open();
+        model.Selected = Resource(file, 129);
+        Assert.True(model.BeginHexEditCommand.CanExecute(null));
+        model.BeginHexEditCommand.Execute(null);
+        Assert.False(model.BeginHexEditCommand.CanExecute(null));
+        Assert.True(model.IsHexEditing);
+        Assert.Same(model.HexEdit!.Lines, model.HexLines);
+
+        model.HexEdit.MoveTo(1);
+        model.HexEdit.TypeDigit(4);
+        model.HexEdit.TypeDigit(1);                                           // 'A'
+        model.ApplyHexEditCommand.Execute(null);
+        Assert.False(model.IsHexEditing);
+        Assert.Equal("Ai"u8.ToArray(), Resource(file, 129).Resource.GetData().ToArray());
+        Assert.Equal("_Undo Edit 'STR ' 129", model.UndoTitle);
+
+        // Clicking another resource applies the edit instead of losing it.
+        model.Selected = Resource(file, 129);
+        model.BeginHexEditCommand.Execute(null);
+        model.HexEdit!.Delete();
+        model.Selected = Resource(file, 128);
+        Assert.False(model.IsHexEditing);
+        Assert.Equal(2, Resource(file, 129).Resource.Length);
+        Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
+
+        // Discard leaves the resource alone.
+        model.BeginHexEditCommand.Execute(null);
+        model.HexEdit!.Delete();
+        model.DiscardHexEditCommand.Execute(null);
+        Assert.False(model.IsHexEditing);
+        Assert.Equal(6, Resource(file, 128).Resource.Length);
+        model.UndoCommand.Execute(null);
+        model.UndoCommand.Execute(null);
+        Assert.Equal(3, Resource(file, 129).Resource.Length);
+    }
+
+    [Fact]
     public async Task Edits_undo_redo_and_save_back_into_the_file()
     {
         var (model, file, dialogs, _, path) = await Open();

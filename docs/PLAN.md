@@ -494,8 +494,10 @@ stereo); playback stops when the selection changes. **Icons (built):** an icon r
   refused (the Resource Manager's `AddResource` does not check; ResEdit does); names are at most 255 bytes of Mac OS
   Roman; IDs below 128 get a warning (reserved for the system); the compressed attribute ($01) cannot be set by hand, and
   new data clears it; duplicating gives the next free ID from 128 up, with the same name.
-- **Hex editing:** overwrite, insert and delete bytes in the hex view, as ResEdit's hex editor; replacing the data from a
-  file for anything larger.
+- **Hex editing** (built 2026-09-29): Edit Bytes in the hex tab; hex digits overwrite the byte under the cursor two
+  digits at a time (insert mode inserts; at the end they append), Delete and Backspace remove bytes, arrows, Home, End and
+  Page keys move; Apply (or selecting another item) makes one undoable edit, Discard drops it. Editing the text column is
+  not done. Replacing the data from a file is for anything larger.
 - **What can be saved:** a raw fork file; a data file with its AppleDouble `._` file or its Basilisk II `.rsrc`/`.finf`
   companions; AppleSingle; MacBinary (written as MacBinary III); BinHex. Only the resource fork changes; the data fork,
   name and Finder info are written back as read. Files inside disk images and archives are read-only until Editor III:
@@ -765,7 +767,6 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 ### Todo (not in a phase)
 
 - [ ] **Template toggle:** show a resource that has a typed form (`DLOG`, `MENU`, …) through its `TMPL` as well.
-- [ ] **Hex editing in the hex view** (overwrite, insert, delete), instead of the dialog.
 - [ ] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager).
 - [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
 - [ ] **8-bit icon masks in icon suites.**

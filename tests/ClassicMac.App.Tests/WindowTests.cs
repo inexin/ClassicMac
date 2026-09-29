@@ -259,4 +259,38 @@ public class WindowTests
             File.Delete(path);
         }
     });
+
+    [Fact]
+    public void The_hex_tab_edits_bytes_with_the_keyboard() => OnUiThread(() =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cm-hexedit-{Guid.NewGuid():N}.rsrc");
+        File.WriteAllBytes(path, PreviewTests.Fork(("TEXT", 128, null, "Hello, hex editing works across lines"u8.ToArray())));
+        try
+        {
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            var input = open.Result!;
+            Pump(input.EnsureLoadedAsync());
+            model.Selected = input.Children.OfType<ResourceTypeNode>().Single().Children[0];
+            Pump(model.PreviewTask);
+            model.BeginHexEditCommand.Execute(null);
+            model.SelectedTab = 2;
+            Dispatcher.UIThread.RunJobs();
+            var list = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "HexList");
+            list.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.D4 });
+            list.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.D8 });
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal((byte)'H', model.HexEdit!.ToArray()[0]);
+            Assert.Equal(1, model.HexEdit.Cursor);
+            Capture(window, "hex-edit");
+            window.Close();
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    });
 }
