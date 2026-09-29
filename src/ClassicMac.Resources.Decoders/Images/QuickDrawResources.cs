@@ -17,7 +17,7 @@ namespace ClassicMac.Resources.Decoders.Images
     /// On a screen the cursor is drawn as <c>screen = (screen AND NOT mask) XOR image</c>. Where the mask is 0 the
     /// screen's RGB is XORed with <see cref="Xor"/>: 0 leaves it, $FFFFFF inverts it (<see cref="Inverted"/>).
     /// </remarks>
-    public sealed record MacCursor(PictBitmap Image, bool[] Inverted, int HotspotH, int HotspotV)
+    public sealed record MacCursor(RgbaBitmap Image, bool[] Inverted, int HotspotH, int HotspotV)
     {
         /// <summary>Width × height RGB values (0xRRGGBB) XORed into the screen where the mask is 0, row-major. On a
         /// 32-bit screen a color cursor's unmasked pixel p XORs NOT p: white leaves the screen, black inverts it, other
@@ -39,12 +39,12 @@ namespace ClassicMac.Resources.Decoders.Images
     /// </remarks>
     public static class QuickDrawResources
     {
-        private static readonly PictColor White = new PictColor(255, 255, 255);
-        private static readonly PictColor Black = new PictColor(0, 0, 0);
+        private static readonly RgbaColor White = new RgbaColor(255, 255, 255);
+        private static readonly RgbaColor Black = new RgbaColor(0, 0, 0);
 
         /// <summary>Decodes any single-image resource by type (<c>ICON</c>, the icon lists, the 4/8-bit icons without
         /// masks, <c>cicn</c>, <c>PAT </c>, <c>ppat</c>, and the image of <c>CURS</c> / <c>crsr</c>); null for other types.</summary>
-        public static PictBitmap? Decode(string type, byte[] data)
+        public static RgbaBitmap? Decode(string type, byte[] data)
         {
             ArgumentNullException.ThrowIfNull(type);
             ArgumentNullException.ThrowIfNull(data);
@@ -63,14 +63,14 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         /// <summary><c>ICON</c>: a 32 × 32 1-bit icon (128 bytes), unmasked.</summary>
-        public static PictBitmap DecodeIcon(byte[] data) => Mono(data, 0, 32, 32, null, 0);
+        public static RgbaBitmap DecodeIcon(byte[] data) => Mono(data, 0, 32, 32, null, 0);
 
         /// <summary>
         /// An icon list: <c>ICN#</c> (32 × 32), <c>ics#</c> (16 × 16) or <c>icm#</c> (16 × 12) — a 1-bit icon followed
         /// by its mask. Without the mask half the Icon Utilities compute one with CalcMask (the icon's silhouette:
         /// every pixel not reachable from the edges through white pixels).
         /// </summary>
-        public static PictBitmap DecodeIconList(string type, byte[] data)
+        public static RgbaBitmap DecodeIconList(string type, byte[] data)
         {
             var (w, h) = IconSize(type);
             Require(data, w / 8 * h, type);
@@ -84,7 +84,7 @@ namespace ClassicMac.Resources.Decoders.Images
         /// when the list has no mask half). Without a list the icon is returned opaque; the Icon Utilities draw
         /// nothing then (noMaskFoundErr).
         /// </summary>
-        public static PictBitmap DecodeColorIcon(string type, byte[] data, byte[]? iconList = null)
+        public static RgbaBitmap DecodeColorIcon(string type, byte[] data, byte[]? iconList = null)
         {
             var (w, h) = IconSize(type);
             int depth = type[3] == '4' ? 4 : 8;
@@ -100,10 +100,10 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         /// <summary><c>SICN</c>: a list of 16 × 16 1-bit icons (32 bytes each), unmasked.</summary>
-        public static IReadOnlyList<PictBitmap> DecodeSmallIcons(byte[] data)
+        public static IReadOnlyList<RgbaBitmap> DecodeSmallIcons(byte[] data)
         {
             ArgumentNullException.ThrowIfNull(data);
-            var icons = new List<PictBitmap>();
+            var icons = new List<RgbaBitmap>();
             for (int o = 0; o + 32 <= data.Length; o += 32) icons.Add(Mono(data, o, 16, 16, null, 0));
             return icons;
         }
@@ -112,7 +112,7 @@ namespace ClassicMac.Resources.Decoders.Images
         /// <c>cicn</c>: a color icon — a PixMap, mask and 1-bit BitMap (each with its base address), the icon data
         /// handle, then the mask bits, the BitMap bits, a color table and the pixels.
         /// </summary>
-        public static PictBitmap DecodeCicn(byte[] data)
+        public static RgbaBitmap DecodeCicn(byte[] data)
         {
             Require(data, 82, "cicn");
             var pm = ReadPixMap(data, 0, out _);
@@ -162,13 +162,13 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         /// <summary><c>PAT </c>: an 8 × 8 1-bit pattern (8 bytes).</summary>
-        public static PictBitmap DecodePattern(byte[] data) => Mono(Require(data, 8, "PAT "), 0, 8, 8, null, 0);
+        public static RgbaBitmap DecodePattern(byte[] data) => Mono(Require(data, 8, "PAT "), 0, 8, 8, null, 0);
 
         /// <summary><c>PAT#</c>: a count, then 8-byte patterns.</summary>
-        public static IReadOnlyList<PictBitmap> DecodePatternList(byte[] data)
+        public static IReadOnlyList<RgbaBitmap> DecodePatternList(byte[] data)
         {
             Require(data, 2, "PAT#");
-            var list = new List<PictBitmap>();
+            var list = new List<RgbaBitmap>();
             int count = U16(data, 0);
             for (int i = 0, o = 2; i < count && o + 8 <= data.Length; i++, o += 8) list.Add(Mono(data, o, 8, 8, null, 0));
             return list;
@@ -180,17 +180,17 @@ namespace ClassicMac.Resources.Decoders.Images
         /// as a 1-bit pattern; type 2 (RGB) is an 8 × 8 solid of the color in the table's entry 4, as a 32-bit screen
         /// draws it (the resource's pixels are ignored).
         /// </summary>
-        public static PictBitmap DecodePixelPattern(byte[] data) => PixelPattern(data, 0, data.Length);
+        public static RgbaBitmap DecodePixelPattern(byte[] data) => PixelPattern(data, 0, data.Length);
 
         /// <summary><c>ppt#</c>: a count, that many offsets from the resource start, then the <c>ppat</c> data each offset
         /// points to — complete flattened <c>ppat</c>s whose own offsets are relative to their start.</summary>
-        public static IReadOnlyList<PictBitmap> DecodePixelPatternList(byte[] data)
+        public static IReadOnlyList<RgbaBitmap> DecodePixelPatternList(byte[] data)
         {
             Require(data, 2, "ppt#");
             int count = U16(data, 0);
             var offsets = new List<int>();
             for (int i = 0; i < count && 2 + 4 * i + 4 <= data.Length; i++) offsets.Add((int)U32(data, 2 + 4 * i));
-            var list = new List<PictBitmap>();
+            var list = new List<RgbaBitmap>();
             for (int i = 0; i < offsets.Count; i++)
             {
                 int end = i + 1 < offsets.Count ? offsets[i + 1] : data.Length;
@@ -205,7 +205,7 @@ namespace ClassicMac.Resources.Decoders.Images
         // table is read unless the PixMap is RGB direct (pixelType 16). Type 0 draws the first 8 bytes of the pixel
         // data as a 1-bit pattern; types 1 and 3 the PixMap; type 2 the RGB of table entry 4 (table + $2A), solid on a
         // 32-bit screen. Other types fail to load (Mac OS 9).
-        private static PictBitmap PixelPattern(byte[] data, int start, int end)
+        private static RgbaBitmap PixelPattern(byte[] data, int start, int end)
         {
             if (start < 0 || end > data.Length || end - start < 28) throw Truncated("ppat");
             int type = U16(data, start);
@@ -221,8 +221,8 @@ namespace ClassicMac.Resources.Decoders.Images
             if (type == 2)
             {
                 if (tableAt + 0x30 > data.Length) throw Truncated("ppat");
-                var solid = new PictBitmap(8, 8);
-                var rgb = new PictColor(data[tableAt + 0x2A], data[tableAt + 0x2C], data[tableAt + 0x2E]);
+                var solid = new RgbaBitmap(8, 8);
+                var rgb = new RgbaColor(data[tableAt + 0x2A], data[tableAt + 0x2C], data[tableAt + 0x2E]);
                 for (int y = 0; y < 8; y++)
                     for (int x = 0; x < 8; x++) Set(solid, x, y, rgb);
                 return solid;
@@ -260,10 +260,10 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         // A pixel map's colors with an optional 1-bit mask (maskRowBytes per row at maskAt in maskData).
-        private static PictBitmap Render(PixMap pm, byte[]? maskData, int maskAt, int maskRowBytes)
+        private static RgbaBitmap Render(PixMap pm, byte[]? maskData, int maskAt, int maskRowBytes)
         {
             int w = Math.Max(1, pm.Width), h = Math.Max(1, pm.Height);
-            var bmp = new PictBitmap(w, h);
+            var bmp = new RgbaBitmap(w, h);
             for (int y = 0; y < pm.Height; y++)
                 for (int x = 0; x < pm.Width; x++)
                 {
@@ -277,10 +277,10 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         // 1-bit image at `at` (w/8 bytes per row), masked by the bits at maskAt of maskData when given.
-        private static PictBitmap Mono(byte[] data, int at, int w, int h, byte[]? maskData, int maskAt)
+        private static RgbaBitmap Mono(byte[] data, int at, int w, int h, byte[]? maskData, int maskAt)
         {
             Require(data, at + w / 8 * h, "icon");
-            var bmp = new PictBitmap(w, h);
+            var bmp = new RgbaBitmap(w, h);
             for (int y = 0; y < h; y++)
                 for (int x = 0; x < w; x++)
                 {
@@ -295,14 +295,14 @@ namespace ClassicMac.Resources.Decoders.Images
         // the pixel, mask 0 XORs its complement (pixels outside the PixMap read as black).
         private static MacCursor CursorBits(byte[] data, int at, PixMap? color, int hotH, int hotV)
         {
-            var bmp = new PictBitmap(16, 16);
+            var bmp = new RgbaBitmap(16, 16);
             var inverted = new bool[256];
             var xor = new int[256];
             for (int y = 0; y < 16; y++)
                 for (int x = 0; x < 16; x++)
                 {
                     bool mask = Bit(data, at + 32 + 2 * y, x);
-                    PictColor c;
+                    RgbaColor c;
                     if (color != null)
                         c = x < color.Width && y < color.Height ? color.GetPixel(x, y) : Black;
                     else
@@ -361,7 +361,7 @@ namespace ClassicMac.Resources.Decoders.Images
         private static bool Bit(byte[] data, int rowStart, int x) =>
             ((data[rowStart + (x >> 3)] >> (7 - (x & 7))) & 1) != 0;
 
-        private static void Set(PictBitmap bmp, int x, int y, PictColor c)
+        private static void Set(RgbaBitmap bmp, int x, int y, RgbaColor c)
         {
             int i = (y * bmp.Width + x) * 4;
             bmp.Pixels[i] = c.R; bmp.Pixels[i + 1] = c.G; bmp.Pixels[i + 2] = c.B; bmp.Pixels[i + 3] = 255;

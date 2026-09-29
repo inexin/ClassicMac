@@ -14,7 +14,7 @@ namespace ClassicMac.Graphics.ImageSharp
     // Rasterizes picture text with SixLabors.Fonts into an aliased 1-bit mask (QuickDraw text is not anti-aliased).
     // Classic Mac bitmap fonts are unavailable here, so the family comes from the resolver or an installed system font
     // resembling the classic one; the result approximates the original text.
-    internal sealed class ImageSharpTextFallback : IPictTextFallback
+    internal sealed class ImageSharpTextFallback : ITextFallback
     {
         private static readonly DrawingOptions Aliased =
             new DrawingOptions { GraphicsOptions = new GraphicsOptions { Antialias = false } };
@@ -28,7 +28,7 @@ namespace ClassicMac.Graphics.ImageSharp
             this.fontResolver = fontResolver;
         }
 
-        public PictTextMask? Render(string text, PictTextStyle style)
+        public TextFallbackMask? Render(string text, TextFallbackStyle style)
         {
             var family = ResolveFontFamily(style.FontId);
             if (family == null) return null;
@@ -54,7 +54,7 @@ namespace ClassicMac.Graphics.ImageSharp
                         bits[y * width + x] = row[x].PackedValue >= 128 ? (byte)1 : (byte)0;
                 }
             });
-            return new PictTextMask(width, height, pad, ascent, bits, advance);
+            return new TextFallbackMask(width, height, pad, ascent, bits, advance);
         }
 
         private static FontStyle FaceToStyle(int face)

@@ -9,7 +9,7 @@ namespace ClassicMac.Graphics.QuickTime
     // bits, 8 at 4 bits, 4 at 8 bits, else one pixel (RGB 555, RGB, ARGB).
     internal static class AnimationCodec
     {
-        public static PictBitmap? Decode(PictImageDescription d, byte[] data)
+        public static RgbaBitmap? Decode(PictImageDescription d, byte[] data)
         {
             int depth = d.Depth > 32 ? d.Depth - 32 : d.Depth;
             int unitBytes, unitPixels;
@@ -24,7 +24,7 @@ namespace ClassicMac.Graphics.QuickTime
                 case 32: unitBytes = 4; unitPixels = 1; break;
                 default: return null;
             }
-            var img = new PictBitmap(d.Width, d.Height);
+            var img = new RgbaBitmap(d.Width, d.Height);
             if (data.Length < 8) return img;
             int p = 4;
             int header = (data[p] << 8) | data[p + 1];
@@ -46,7 +46,7 @@ namespace ClassicMac.Graphics.QuickTime
                 {
                     int px = x + k;
                     if (px >= d.Width) break;
-                    var c = depth == 32 ? new PictColor(unit[1], unit[2], unit[3])
+                    var c = depth == 32 ? new RgbaColor(unit[1], unit[2], unit[3])
                         : QuickTimeCodecs.Pixel(unit, k, d.Depth, palette);
                     QuickTimeCodecs.Set(img, px, y, c);
                 }
@@ -93,10 +93,10 @@ namespace ClassicMac.Graphics.QuickTime
     // takes 2-bit indices, most significant first, one byte per row.
     internal static class RoadPizzaCodec
     {
-        public static PictBitmap? Decode(PictImageDescription d, byte[] data)
+        public static RgbaBitmap? Decode(PictImageDescription d, byte[] data)
         {
             if (data.Length < 4 || data[0] != 0xE1) return null;
-            var img = new PictBitmap(d.Width, d.Height);
+            var img = new RgbaBitmap(d.Width, d.Height);
             int blocksWide = (d.Width + 3) / 4, total = blocksWide * ((d.Height + 3) / 4);
             int p = 4, block = 0;
             int Word() { int v = (data[p] << 8) | data[p + 1]; p += 2; return v & 0x7FFF; }
@@ -171,7 +171,7 @@ namespace ClassicMac.Graphics.QuickTime
     // raster order, with 256-entry circular caches of 2-, 4- and 8-color sets.
     internal static class GraphicsCodec
     {
-        public static PictBitmap? Decode(PictImageDescription d, byte[] data)
+        public static RgbaBitmap? Decode(PictImageDescription d, byte[] data)
         {
             int blocksWide = (d.Width + 3) / 4, total = blocksWide * ((d.Height + 3) / 4);
             var indices = new byte[total * 16];
@@ -310,7 +310,7 @@ namespace ClassicMac.Graphics.QuickTime
             }
 
             var palette = QuickTimeCodecs.Palette(d);
-            var img = new PictBitmap(d.Width, d.Height);
+            var img = new RgbaBitmap(d.Width, d.Height);
             for (int b = 0; b < total; b++)
             {
                 int bx = b % blocksWide * 4, by = b / blocksWide * 4;

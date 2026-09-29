@@ -56,7 +56,7 @@ namespace ClassicMac.Graphics.QuickTime
         /// <param name="data">The file's bytes.</param>
         /// <param name="codec">Decoder for codecs the core lacks (e.g. JPEG); null for built-in codecs only.</param>
         /// <exception cref="NotSupportedException">The file has no image, or its codec is not supported.</exception>
-        public static PictBitmap Decode(byte[] data, IPictImageCodec? codec = null)
+        public static RgbaBitmap Decode(byte[] data, IPictImageCodec? codec = null)
         {
             var description = ReadDescription(data);
             byte[]? image = null;

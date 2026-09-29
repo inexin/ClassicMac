@@ -10,7 +10,7 @@ namespace ClassicMac.Graphics.Pict
     /// <summary>A decoded picture: its pixels, and its header and metadata.</summary>
     /// <param name="Bitmap">The pixels.</param>
     /// <param name="Info">The header and metadata.</param>
-    public sealed record PictPicture(PictBitmap Bitmap, PictInfo Info);
+    public sealed record PictPicture(RgbaBitmap Bitmap, PictInfo Info);
 
     /// <summary>Header and metadata of a picture.</summary>
     public sealed class PictInfo

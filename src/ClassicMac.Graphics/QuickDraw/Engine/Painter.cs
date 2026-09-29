@@ -10,11 +10,11 @@ namespace ClassicMac.Graphics.QuickDraw
     // (alpha 0) reads as white, the erased background of a fresh port; pixels a mode leaves alone keep their alpha.
     internal static class Painter
     {
-        private static readonly PictColor White = new PictColor(255, 255, 255);
+        private static readonly RgbaColor White = new RgbaColor(255, 255, 255);
 
         // viaStretchBits: the verb draws through StretchBits (rects, regions, polygons, horizontal and vertical lines),
         // not DrawArc / DrawLine's own slab code (ovals, round rects, arcs, slanted lines).
-        public static void FillRegion(PictBitmap canvas, Region region, Region? clip, Pattern pattern, (int h, int v) align,
+        public static void FillRegion(RgbaBitmap canvas, Region region, Region? clip, Pattern pattern, (int h, int v) align,
             int mode, bool hilitePending, in PortColors colors, bool viaStretchBits)
         {
             var area = Visible(canvas, region, clip);
@@ -40,7 +40,7 @@ namespace ClassicMac.Graphics.QuickDraw
                     {
                         var dst = ReadPixel(canvas, x, y);
                         bool write;
-                        PictColor result;
+                        RgbaColor result;
                         if (colorPattern)
                         {
                             // Pixel patterns in Boolean modes act as pixel values with fore = all ones, back = 0:
@@ -54,9 +54,9 @@ namespace ClassicMac.Graphics.QuickDraw
                                 result = (m & 3) switch
                                 {
                                     0 => src,
-                                    1 => new PictColor((byte)(dst.R | src.R), (byte)(dst.G | src.G), (byte)(dst.B | src.B)),
-                                    2 => new PictColor((byte)(dst.R ^ src.R), (byte)(dst.G ^ src.G), (byte)(dst.B ^ src.B)),
-                                    _ => new PictColor((byte)(dst.R & ~src.R), (byte)(dst.G & ~src.G), (byte)(dst.B & ~src.B)),
+                                    1 => new RgbaColor((byte)(dst.R | src.R), (byte)(dst.G | src.G), (byte)(dst.B | src.B)),
+                                    2 => new RgbaColor((byte)(dst.R ^ src.R), (byte)(dst.G ^ src.G), (byte)(dst.B ^ src.B)),
+                                    _ => new RgbaColor((byte)(dst.R & ~src.R), (byte)(dst.G & ~src.G), (byte)(dst.B & ~src.B)),
                                 };
                                 write = true;
                             }
@@ -71,7 +71,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // A 1-bit mask (text) placed with its top-left at (left, top), transferred with a source mode.
-        public static void FillMask(PictBitmap canvas, int left, int top, int width, int height, byte[] bits,
+        public static void FillMask(RgbaBitmap canvas, int left, int top, int width, int height, byte[] bits,
             Region? clip, int mode, bool hilitePending, in PortColors colors)
         {
             var area = Visible(canvas, Region.FromRect(new PictRect(top, left, top + height, left + width)), clip);
@@ -95,7 +95,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // On an indexed or 16-bit screen: 1-bit patterns draw fg / bk indices; a pixel pattern's colors become device
         // values (Color2Index for indexed patterns, the inverse table for direct ones; an RGB pattern is PatDither's 2 x 2
         // cell, solid only at 32 bits) drawn with fg all ones and bk 0.
-        private static void FillRegionOnDevice(PictBitmap canvas, Region area, Pattern pattern, (int h, int v) align, int m,
+        private static void FillRegionOnDevice(RgbaBitmap canvas, Region area, Pattern pattern, (int h, int v) align, int m,
             in PortColors colors)
         {
             var device = colors.Device!;
@@ -133,26 +133,26 @@ namespace ClassicMac.Graphics.QuickDraw
             return e.MoveNext() && !e.MoveNext();
         }
 
-        private static Region Visible(PictBitmap canvas, Region region, Region? clip)
+        private static Region Visible(RgbaBitmap canvas, Region region, Region? clip)
         {
             var area = region.Intersect(Region.FromRect(new PictRect(0, 0, canvas.Height, canvas.Width)));
             return clip == null ? area : area.Intersect(clip);
         }
 
-        private static PictColor PatternPixel(PixMap pm, int x, int y)
+        private static RgbaColor PatternPixel(PixMap pm, int x, int y)
         {
             int w = Math.Max(1, pm.Width), h = Math.Max(1, pm.Height);
             return pm.GetPixel(((x % w) + w) % w, ((y % h) + h) % h);
         }
 
-        public static PictColor ReadPixel(PictBitmap canvas, int x, int y)
+        public static RgbaColor ReadPixel(RgbaBitmap canvas, int x, int y)
         {
             int i = (y * canvas.Width + x) * 4;
             var p = canvas.Pixels;
-            return p[i + 3] == 0 ? White : new PictColor(p[i], p[i + 1], p[i + 2], p[i + 3]);
+            return p[i + 3] == 0 ? White : new RgbaColor(p[i], p[i + 1], p[i + 2], p[i + 3]);
         }
 
-        public static void WritePixel(PictBitmap canvas, int x, int y, PictColor c, byte alpha = 255)
+        public static void WritePixel(RgbaBitmap canvas, int x, int y, RgbaColor c, byte alpha = 255)
         {
             int i = (y * canvas.Width + x) * 4;
             var p = canvas.Pixels;

@@ -24,7 +24,7 @@ namespace ClassicMac.Graphics.ImageSharp
             this.configuration = configuration ?? Configuration.Default;
 
         /// <inheritdoc/>
-        public PictBitmap? Decode(PictImageDescription description, byte[] data)
+        public RgbaBitmap? Decode(PictImageDescription description, byte[] data)
         {
             ArgumentNullException.ThrowIfNull(description);
             ArgumentNullException.ThrowIfNull(data);
@@ -49,7 +49,7 @@ namespace ClassicMac.Graphics.ImageSharp
                 using var image = Image.Load<Rgba32>(new DecoderOptions { Configuration = configuration }, new MemoryStream(bytes));
                 var pixels = new byte[image.Width * image.Height * 4];
                 image.CopyPixelDataTo(pixels);
-                return new PictBitmap(image.Width, image.Height, pixels);
+                return new RgbaBitmap(image.Width, image.Height, pixels);
             }
             catch (Exception e) when (e is ImageFormatException or UnknownImageFormatException or InvalidImageContentException
                                           or NotSupportedException)

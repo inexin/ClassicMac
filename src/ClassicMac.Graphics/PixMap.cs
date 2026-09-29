@@ -19,7 +19,7 @@ namespace ClassicMac.Graphics
         public int PixelType;                        // 0 indexed, 16 direct (RGBDirect)
         public bool IsPixMap;
         public bool MacOS9;                          // read the pixel data as Mac OS 9's QuickDraw does
-        public PictColor[] Palette = Array.Empty<PictColor>();
+        public RgbaColor[] Palette = Array.Empty<RgbaColor>();
         // The color table's exact 16-bit components, when read from one (else empty: the palette's bytes replicated).
         public (ushort r, ushort g, ushort b)[] Palette16 = Array.Empty<(ushort, ushort, ushort)>();
 
@@ -27,7 +27,7 @@ namespace ClassicMac.Graphics
         public (int r, int g, int b) Exact(int index)
         {
             if (index < Palette16.Length) return Palette16[index];
-            var c = index < Palette.Length ? Palette[index] : new PictColor(0, 0, 0);
+            var c = index < Palette.Length ? Palette[index] : new RgbaColor(0, 0, 0);
             return (c.R * 257, c.G * 257, c.B * 257);
         }
         public byte[] Data = Array.Empty<byte>();
@@ -37,7 +37,7 @@ namespace ClassicMac.Graphics
         public bool IsDirect => PixelSize == 16 || PixelSize == 32;
 
         // The color of pixel (x, y), relative to Bounds' top-left. Alpha is always opaque (QuickDraw ignores it).
-        public PictColor GetPixel(int x, int y)
+        public RgbaColor GetPixel(int x, int y)
         {
             int row = y * RowBytes;
             switch (PixelSize)
@@ -46,12 +46,12 @@ namespace ClassicMac.Graphics
                 {
                     int p = (Data[row + 2 * x] << 8) | Data[row + 2 * x + 1];
                     int r5 = (p >> 10) & 0x1F, g5 = (p >> 5) & 0x1F, b5 = p & 0x1F;
-                    return new PictColor((byte)((r5 << 3) | (r5 >> 2)), (byte)((g5 << 3) | (g5 >> 2)), (byte)((b5 << 3) | (b5 >> 2)));
+                    return new RgbaColor((byte)((r5 << 3) | (r5 >> 2)), (byte)((g5 << 3) | (g5 >> 2)), (byte)((b5 << 3) | (b5 >> 2)));
                 }
                 case 32:
                 {
                     int i = row + 4 * x;
-                    return new PictColor(Data[i + 1], Data[i + 2], Data[i + 3]);
+                    return new RgbaColor(Data[i + 1], Data[i + 2], Data[i + 3]);
                 }
                 default:
                 {
@@ -62,7 +62,7 @@ namespace ClassicMac.Graphics
                         int bit = bitPos + i;
                         value = (value << 1) | ((Data[row + (bit >> 3)] >> (7 - (bit & 7))) & 1);
                     }
-                    return value < Palette.Length ? Palette[value] : new PictColor(0, 0, 0);
+                    return value < Palette.Length ? Palette[value] : new RgbaColor(0, 0, 0);
                 }
             }
         }
@@ -107,7 +107,7 @@ namespace ClassicMac.Graphics
             }
             else
             {
-                pm.Palette = new[] { new PictColor(255, 255, 255), new PictColor(0, 0, 0) };
+                pm.Palette = new[] { new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0) };
             }
             return pm;
         }
@@ -158,17 +158,17 @@ namespace ClassicMac.Graphics
 
         // ColorTable: ctSeed, ctFlags, ctSize (entries - 1), then (value, RGB) entries. A device table (ctFlags bit 15)
         // is indexed by position; otherwise each entry's value is its pixel index. Unlisted indices are black.
-        internal static PictColor[] ReadColorTable(BinaryReader b, int pixelSize) => ReadColorTableExact(b, pixelSize).palette;
+        internal static RgbaColor[] ReadColorTable(BinaryReader b, int pixelSize) => ReadColorTableExact(b, pixelSize).palette;
 
-        internal static (PictColor[] palette, (ushort r, ushort g, ushort b)[] exact) ReadColorTableExact(BinaryReader b, int pixelSize)
+        internal static (RgbaColor[] palette, (ushort r, ushort g, ushort b)[] exact) ReadColorTableExact(BinaryReader b, int pixelSize)
         {
             b.ReadU32BE();                                           // ctSeed
             int ctFlags = b.ReadU16BE();
             int ctSize = b.ReadU16BE();
             bool positional = (ctFlags & 0x8000) != 0;
-            var palette = new PictColor[1 << Math.Min(pixelSize, 8)];
+            var palette = new RgbaColor[1 << Math.Min(pixelSize, 8)];
             var exact = new (ushort r, ushort g, ushort b)[palette.Length];
-            for (int i = 0; i < palette.Length; i++) palette[i] = new PictColor(0, 0, 0);
+            for (int i = 0; i < palette.Length; i++) palette[i] = new RgbaColor(0, 0, 0);
             for (int i = 0; i <= ctSize; i++)
             {
                 int value = b.ReadU16BE();
@@ -176,7 +176,7 @@ namespace ClassicMac.Graphics
                 int index = positional ? i : value;
                 if (index >= 0 && index < palette.Length)
                 {
-                    palette[index] = new PictColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8));
+                    palette[index] = new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8));
                     exact[index] = ((ushort)r, (ushort)g, (ushort)bl);
                 }
             }

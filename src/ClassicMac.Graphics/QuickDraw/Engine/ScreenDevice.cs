@@ -34,7 +34,7 @@ namespace ClassicMac.Graphics.QuickDraw
             MacOS9 = macOS9;
             if (depth == 16)
             {
-                Clut = Array.Empty<PictColor>();
+                Clut = Array.Empty<RgbaColor>();
                 Clut16 = Array.Empty<(ushort, ushort, ushort)>();
                 return;
             }
@@ -55,7 +55,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         public int Depth { get; }
         public bool MacOS9 { get; }
-        public PictColor[] Clut { get; }
+        public RgbaColor[] Clut { get; }
         // The table's exact 16-bit components (clut 4's are not byte-replicated).
         public (ushort r, ushort g, ushort b)[] Clut16 { get; }
 
@@ -86,7 +86,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // ---- conversions ----
 
         // The blitters' conversion of an 8-bit RGB color (no hidden-color search).
-        public int Lookup(PictColor c)
+        public int Lookup(RgbaColor c)
         {
             if (Depth == 16) return ((c.R >> 3) << 10) | ((c.G >> 3) << 5) | (c.B >> 3);
             if (Grey) return grey[(5 * c.R + 9 * c.G + 2 * c.B) >> 4];
@@ -95,21 +95,21 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // The inverse table itself (arithmetic results): as Lookup, except that a grey table quantises first — each
         // component's top 4 bits, the luminance of the cell's low corner.
-        public int TableLookup(PictColor c)
+        public int TableLookup(RgbaColor c)
         {
             if (!Grey) return Lookup(c);
             return grey[(5 * (c.R & 0xF0) + 9 * (c.G & 0xF0) + 2 * (c.B & 0xF0)) >> 4];
         }
 
         // Color2Index (Mac OS 9): the table, then the hidden-color chain.
-        public int Color2Index(PictColor c) => Color2Index(c.R * 257, c.G * 257, c.B * 257);
+        public int Color2Index(RgbaColor c) => Color2Index(c.R * 257, c.G * 257, c.B * 257);
 
         public int Color2Index(int r, int g, int b)
         {
             if (Depth == 16) return ((r >> 11) << 10) | ((g >> 11) << 5) | (b >> 11);
             // Grey tables: Mac OS 9 weighs (5R + 9G + 2B) / 16, the ROM halves its way to ((((R + G)/2 + B)/2 + R)/2 + G)/2.
             if (Grey) return grey[MacOS9 ? (5 * r + 9 * g + 2 * b) >> 12 : ((((((r + g) >> 1) + b) >> 1) + r >> 1) + g >> 1) >> 8];
-            int idx = Lookup(new PictColor((byte)(r >> 8), (byte)(g >> 8), (byte)(b >> 8)));
+            int idx = Lookup(new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(b >> 8)));
             if (hidden == 0 || links[idx] == idx) return idx;
             int best = idx, bestDistance = int.MaxValue, cur = idx;
             for (int n = 256; n >= 1; n--)
@@ -124,32 +124,32 @@ namespace ClassicMac.Graphics.QuickDraw
             return best;
         }
 
-        public PictColor ColorOf(int value)
+        public RgbaColor ColorOf(int value)
         {
             if (Depth == 16)
-                return new PictColor(Expand5((value >> 10) & 31), Expand5((value >> 5) & 31), Expand5(value & 31));
-            return value < Clut.Length ? Clut[value] : new PictColor(0, 0, 0);
+                return new RgbaColor(Expand5((value >> 10) & 31), Expand5((value >> 5) & 31), Expand5(value & 31));
+            return value < Clut.Length ? Clut[value] : new RgbaColor(0, 0, 0);
         }
 
         private static byte Expand5(int c) => (byte)((c << 3) | (c >> 2));
 
         // A canvas pixel's value; pixels never drawn are the erased port's white.
-        public int Read(PictBitmap canvas, int x, int y)
+        public int Read(RgbaBitmap canvas, int x, int y)
         {
             int i = (y * canvas.Width + x) * 4;
             var p = canvas.Pixels;
-            var c = p[i + 3] == 0 ? new PictColor(255, 255, 255) : new PictColor(p[i], p[i + 1], p[i + 2]);
+            var c = p[i + 3] == 0 ? new RgbaColor(255, 255, 255) : new RgbaColor(p[i], p[i + 1], p[i + 2]);
             if (Depth == 16) return Lookup(c);
             return indexOfColor.TryGetValue(Key(c), out int index) ? index : Lookup(c);
         }
 
-        public void Write(PictBitmap canvas, int x, int y, int value) => Painter.WritePixel(canvas, x, y, ColorOf(value & Mask));
+        public void Write(RgbaBitmap canvas, int x, int y, int value) => Painter.WritePixel(canvas, x, y, ColorOf(value & Mask));
 
-        private static int Key(PictColor c) => (c.R << 16) | (c.G << 8) | c.B;
+        private static int Key(RgbaColor c) => (c.R << 16) | (c.G << 8) | c.B;
 
         // ---- inverse tables ----
 
-        private static (byte[] table, int hidden) MakeInverseTable(PictColor[] clut, int[] links)
+        private static (byte[] table, int hidden) MakeInverseTable(RgbaColor[] clut, int[] links)
         {
             const int n = 1 << Res, S = n + 2;
             const int Bound = 0x7FFF, Undefined = 0x8000;
@@ -202,7 +202,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // MakeGrayITab's luminance -> index map: each table entry at its red, the gaps filled alternately from the left
         // and the right until none is left (nearest luminance, exact ties to the darker entry).
-        private static int[] GreyLinks(PictColor[] clut)
+        private static int[] GreyLinks(RgbaColor[] clut)
         {
             var t = new int[256];
             Array.Fill(t, -1);
@@ -285,7 +285,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // A color source pixel. Direct sources go through the 32-bit rules on RGB and then the inverse table; indexed
         // sources are converted with Color2Index and combined as indices (or: (s & fg) | (~s & d); bic: (s & bk) |
         // (~s & d); xor: d ^ s; the not modes invert s); an indexed copy maps (rgb & bk) | (~rgb & fg).
-        public static bool Source(int m, PictColor s, bool direct, int dst, in PortColors c, out int result,
+        public static bool Source(int m, RgbaColor s, bool direct, int dst, in PortColors c, out int result,
             (int r, int g, int b)? exact = null)
         {
             var d = c.Device!;
@@ -304,7 +304,7 @@ namespace ClassicMac.Graphics.QuickDraw
             if (direct || d.Depth == 16)
             {
                 var dstColor = d.ColorOf(dst);
-                if (c.MacOS9 && TransferModes.ColorizeBlend(m, s, dstColor, c, direct) is PictColor blended)
+                if (c.MacOS9 && TransferModes.ColorizeBlend(m, s, dstColor, c, direct) is RgbaColor blended)
                     result = d.TableLookup(blended);
                 else
                     result = d.Lookup(TransferModes.ApplyBoolean(m, s, dstColor, c));
@@ -342,7 +342,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A pixel pattern's value (already a device value): drawn with fg all ones and bk 0 — copy p, or d | p,
         // xor d ^ p, bic d & ~p (p inverted for the not modes).
-        public static bool PatternValue(int m, int p, PictColor rgb, int dst, in PortColors c, out int result)
+        public static bool PatternValue(int m, int p, RgbaColor rgb, int dst, in PortColors c, out int result)
         {
             var d = c.Device!;
             m = ForDevice(m, d);
@@ -359,7 +359,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // Arithmetic, transparent and hilite with a source color s (value si).
-        private static bool Colored(int m, PictColor s, int si, int dst, in PortColors c, out int result)
+        private static bool Colored(int m, RgbaColor s, int si, int dst, in PortColors c, out int result)
         {
             var d = c.Device!;
             switch (m)
@@ -386,7 +386,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // Mac OS 9's colorizing on a 16-bit screen, on 5-bit fields: copy ((32 - s) F + (s + 1) B) >> 5 (direct
         // sources only), or / bic ((32 - s) C + (s + 1) d) >> 5; null where no colorizing applies (as ColorizeBlend).
-        private static int? Colorize16(int m, PictColor src, int dst, in PortColors c, bool direct)
+        private static int? Colorize16(int m, RgbaColor src, int dst, in PortColors c, bool direct)
         {
             if (TransferModes.ColorizeBlend(m, src, default, c, direct) == null) return null;
             int op = m & 3;
@@ -404,7 +404,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // 5-bit fields: blend (s w + d (65536 - w) + $8000) >> 16 (the average when all weights are $7F80..$807F), pins at the
         // OpColor's top 5 bits, addOver / subOver modulo 32, addMax / adMin.
-        private static int Arithmetic16(int m, PictColor src, int dst, in PortColors c)
+        private static int Arithmetic16(int m, RgbaColor src, int dst, in PortColors c)
         {
             static bool Half(int w) => w >= 0x7F80 && w <= 0x807F;
             bool half = Half(Math.Max(1, (int)c.Op.r)) && Half(Math.Max(1, (int)c.Op.g)) && Half(Math.Max(1, (int)c.Op.b));
@@ -439,8 +439,8 @@ namespace ClassicMac.Graphics.QuickDraw
         // min(c + D[row & 3][x & 3], 255) >> 3 with rows counted from the first visible one and x from the rect's left.
         private static readonly int[,] Ordered = { { 0, 5, 1, 4 }, { 6, 3, 7, 2 }, { 1, 4, 0, 5 }, { 7, 2, 6, 3 } };
 
-        public static void Dither(PictBitmap canvas, ScreenDevice d, int top, int bottom, int left, int right,
-            Func<int, int, PictColor?> source, Func<int, int, bool> visible)
+        public static void Dither(RgbaBitmap canvas, ScreenDevice d, int top, int bottom, int left, int right,
+            Func<int, int, RgbaColor?> source, Func<int, int, bool> visible)
         {
             int w = right - left;
             if (w <= 0) return;
@@ -454,7 +454,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 {
                     int i = leftToRight ? k : w - 1 - k, x = left + i;
                     bool shown = visible(x, y);
-                    if ((!shown && !rom) || source(x, y) is not PictColor c)
+                    if ((!shown && !rom) || source(x, y) is not RgbaColor c)
                     {
                         err[i, 0] = err[i, 1] = err[i, 2] = 0;
                         cr = cg = cb = 0;
@@ -501,7 +501,7 @@ namespace ClassicMac.Graphics.QuickDraw
                     }
                     int vr = Math.Clamp(c.R + cr + err[i, 0], 0, 255), vg = Math.Clamp(c.G + cg + err[i, 1], 0, 255),
                         vb = Math.Clamp(c.B + cb + err[i, 2], 0, 255);
-                    var v3 = new PictColor((byte)vr, (byte)vg, (byte)vb);
+                    var v3 = new RgbaColor((byte)vr, (byte)vg, (byte)vb);
                     int value = d.Lookup(v3);
                     int ar, ag, ab;
                     if (d.Depth == 16) (ar, ag, ab) = (vr & 0xF8, vg & 0xF8, vb & 0xF8);
@@ -527,6 +527,6 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         private static int GreyIndex(ScreenDevice d, int luminance) =>
-            d.Lookup(new PictColor((byte)luminance, (byte)luminance, (byte)luminance));
+            d.Lookup(new RgbaColor((byte)luminance, (byte)luminance, (byte)luminance));
     }
 }

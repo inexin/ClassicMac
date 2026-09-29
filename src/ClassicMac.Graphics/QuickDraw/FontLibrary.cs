@@ -16,7 +16,7 @@ namespace ClassicMac.Graphics.QuickDraw
     /// (family × 128 + size). Text in a family the library lacks falls back to
     /// the picture decoder's text fallback (<c>PictDecodeOptions.TextFallback</c>).
     /// </remarks>
-    public sealed class PictFontLibrary
+    public sealed class FontLibrary
     {
         private readonly Dictionary<int, FontFamily> families = new Dictionary<int, FontFamily>();
         private readonly Dictionary<string, int> familyNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -122,7 +122,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // A color font's palette: its fctb (same id), else the standard table of its depth.
-        internal PictColor[] ColorFontPalette(int resourceId, int depth)
+        internal RgbaColor[] ColorFontPalette(int resourceId, int depth)
         {
             if (colorTables.TryGetValue(resourceId, out var fctb) && fctb.Length >= 8)
             {

@@ -390,7 +390,7 @@ QuickTime for its embedded images (`$8200`/`$8201`), and the QuickDraw renderer 
 format. **Done (stage 2, 2026-09-29):** the layers are folders and namespaces of one package, `ClassicMac.Graphics`
 (decided 2026-09-29, revising a first split into four projects and a separate fonts package: users want PICT,
 QuickDraw or fonts together, and one package is simpler to publish and version). `LayeringTests` fails on any
-namespace used against the layering. `PictBitmap.Info`, the one upward reference, went: `PictReader.Read` returns the
+namespace used against the layering. `RgbaBitmap.Info`, the one upward reference, went: `PictReader.Read` returns the
 bitmap with its `PictInfo`, whose frame and bounds are Core's `MacRect`. `QuickDrawResources` moved into
 `ClassicMac.Resources.Decoders`. The adapters and the decoders share internals (`InternalsVisibleTo`) until the
 renderer's drawing API is public. **Stage 3** (below) is what the table still describes: Core's geometry,
@@ -777,6 +777,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   hard-coded.
 - **Renderer and file format:** the QuickDraw renderer (`ClassicMac.Graphics.QuickDraw`) and the PICT format
   (`ClassicMac.Graphics.Pict`) are separate layers of one package (see the layering).
+- **Drawing API (2026-09-29):** a public `QuickDrawPort` with QuickDraw's own names over the renderer, everything the
+  engine already draws; `RgbaBitmap`/`RgbaColor` (formerly `PictBitmap`/`PictColor`) as the base image and pixel
+  colour, 16-bit `RgbColor` on the port; design in [QUICKDRAW-API.md](QUICKDRAW-API.md).
 - **Integrations:** one package per host library (`ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp`) covering every
   image format, instead of one per format.
 - **Package naming:** `ClassicMac.<Area>`, named after the Apple technology (QuickDraw, QuickTime); namespaces start

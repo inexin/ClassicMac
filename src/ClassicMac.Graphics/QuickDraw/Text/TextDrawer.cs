@@ -29,7 +29,7 @@ namespace ClassicMac.Graphics.QuickDraw
     internal static class TextDrawer
     {
         // Draws the text with the pen at (penH, penV) + penFrac / 65536; returns the pen's new fraction.
-        public static int Draw(PictBitmap canvas, FontSelection s, ReadOnlySpan<byte> text, int penH, int penV,
+        public static int Draw(RgbaBitmap canvas, FontSelection s, ReadOnlySpan<byte> text, int penH, int penV,
             int penFrac, int charExtra, int textMode, Region? clip, bool hilitePending, in PortColors colors)
         {
             penFrac &= 0xFFFF;
@@ -185,7 +185,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // the pen (with its fraction) + the advance so far + kernMax + the glyph's offset. Stretched, only the advance
         // and the box width scale (width rounded half up; the offsets stay unscaled; verified against Mac OS 9 at
         // 3/2, 4/3 and 1/3). The text mode, styles and missing-glyph handling are ignored.
-        private static int DrawColorFont(PictBitmap canvas, FontSelection s, ReadOnlySpan<byte> text, int penH, int penV,
+        private static int DrawColorFont(RgbaBitmap canvas, FontSelection s, ReadOnlySpan<byte> text, int penH, int penV,
             int penFrac, int charExtra, Region? clip, bool hilitePending, in PortColors colors)
         {
             var f = s.Font;
@@ -314,7 +314,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // StretchBits with the text mode; a masked mode uses the bits themselves as the mask (so only the glyphs'
         // pixels are touched).
-        private static void Blit(PictBitmap canvas, PixMap bits, PictRect srcRect, PictRect dstRect, int mode, bool masked,
+        private static void Blit(RgbaBitmap canvas, PixMap bits, PictRect srcRect, PictRect dstRect, int mode, bool masked,
             Region? clip, bool hilitePending, in PortColors colors)
         {
             if (masked)
@@ -328,10 +328,10 @@ namespace ClassicMac.Graphics.QuickDraw
         private static Region MaskRegion(PixMap bits, PictRect srcRect, PictRect dstRect, bool macOS9)
         {
             if (dstRect.IsEmpty) return Region.Empty;
-            var scratch = new PictBitmap(dstRect.Width, dstRect.Height);
-            var black = new PictColor(0, 0, 0);
+            var scratch = new RgbaBitmap(dstRect.Width, dstRect.Height);
+            var black = new RgbaColor(0, 0, 0);
             Bits.CopyBits(scratch, bits, srcRect, new PictRect(0, 0, dstRect.Height, dstRect.Width), TransferModes.SrcCopy,
-                null, false, new PortColors(black, new PictColor(255, 255, 255), default, default, macOS9), false);
+                null, false, new PortColors(black, new RgbaColor(255, 255, 255), default, default, macOS9), false);
             var rows = new SortedDictionary<int, List<int>>();
             for (int y = 0; y < scratch.Height; y++)
                 for (int x = 0; x < scratch.Width; x++)
@@ -401,7 +401,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 Bounds = bounds,
                 RowBytes = rowBytes,
                 PixelSize = 1,
-                Palette = new[] { new PictColor(255, 255, 255), new PictColor(0, 0, 0) },
+                Palette = new[] { new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0) },
                 Data = data,
             };
         }

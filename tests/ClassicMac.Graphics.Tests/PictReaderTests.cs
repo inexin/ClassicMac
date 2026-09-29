@@ -13,18 +13,18 @@ namespace ClassicMac.Graphics.Tests;
 public class PictReaderTests
 {
     // Opaque test card: a flat left half (PackBits repeat runs) and a noisy right half (literal runs).
-    internal static PictBitmap TestCard(int width, int height)
+    internal static RgbaBitmap TestCard(int width, int height)
     {
-        var bmp = new PictBitmap(width, height);
+        var bmp = new RgbaBitmap(width, height);
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)
                 bmp[x, y] = x < width / 2
-                    ? new PictColor(10, 200, 30)
-                    : new PictColor((byte)(x * 37 + y), (byte)(x * 11 + y * 7), (byte)(x ^ y));
+                    ? new RgbaColor(10, 200, 30)
+                    : new RgbaColor((byte)(x * 37 + y), (byte)(x * 11 + y * 7), (byte)(x ^ y));
         return bmp;
     }
 
-    internal static byte[] Write(PictBitmap bmp)
+    internal static byte[] Write(RgbaBitmap bmp)
     {
         using var ms = new MemoryStream();
         PictWriter.Write(ms, bmp);
@@ -77,8 +77,8 @@ public class PictReaderTests
 
         var bmp = PictReader.Decode(pict);
 
-        var black = new PictColor(0, 0, 0);
-        var white = new PictColor(255, 255, 255);
+        var black = new RgbaColor(0, 0, 0);
+        var white = new RgbaColor(255, 255, 255);
         Assert.Equal(new[] { black, white, black, white, white, white, white, white }, Row(bmp, 0));
         Assert.Equal(new[] { white, black, white, black, white, white, white, white }, Row(bmp, 1));
     }
@@ -94,10 +94,10 @@ public class PictReaderTests
 
         var bmp = PictReader.Decode(pict);
 
-        Assert.Equal(new PictColor(0, 0, 0, 0), bmp[0, 0]);
-        Assert.Equal(new PictColor(255, 0, 128), bmp[1, 1]);
-        Assert.Equal(new PictColor(255, 0, 128), bmp[2, 2]);
-        Assert.Equal(new PictColor(0, 0, 0, 0), bmp[3, 3]);
+        Assert.Equal(new RgbaColor(0, 0, 0, 0), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(255, 0, 128), bmp[1, 1]);
+        Assert.Equal(new RgbaColor(255, 0, 128), bmp[2, 2]);
+        Assert.Equal(new RgbaColor(0, 0, 0, 0), bmp[3, 3]);
     }
 
     [Fact]
@@ -114,21 +114,21 @@ public class PictReaderTests
 
         PictReader.Decode(pict, new PictDecodeOptions { TextFallback = fallback });
 
-        var style = new PictTextStyle(21, 1, 9);
+        var style = new TextFallbackStyle(21, 1, 9);
         Assert.Equal(new[] { ("Hi", style), ("!", style) }, fallback.Calls);
     }
 
-    private static PictColor[] Row(PictBitmap bmp, int y) =>
+    private static RgbaColor[] Row(RgbaBitmap bmp, int y) =>
         Enumerable.Range(0, bmp.Width).Select(x => bmp[x, y]).ToArray();
 
-    private sealed class RecordingFallback : IPictTextFallback
+    private sealed class RecordingFallback : ITextFallback
     {
-        public readonly List<(string Text, PictTextStyle Style)> Calls = new();
+        public readonly List<(string Text, TextFallbackStyle Style)> Calls = new();
 
-        public PictTextMask? Render(string text, PictTextStyle style)
+        public TextFallbackMask? Render(string text, TextFallbackStyle style)
         {
             Calls.Add((text, style));
-            return new PictTextMask(1, 1, 0, 1, new byte[] { 1 }, 10.4f);
+            return new TextFallbackMask(1, 1, 0, 1, new byte[] { 1 }, 10.4f);
         }
     }
 }

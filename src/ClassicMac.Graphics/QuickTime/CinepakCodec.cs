@@ -17,7 +17,7 @@ namespace ClassicMac.Graphics.QuickTime
             public sbyte U, V;
         }
 
-        public static PictBitmap? Decode(PictImageDescription d, byte[] data)
+        public static RgbaBitmap? Decode(PictImageDescription d, byte[] data)
         {
             if (data.Length < 10) return null;
             int strips = (data[8] << 8) | data[9];
@@ -25,7 +25,7 @@ namespace ClassicMac.Graphics.QuickTime
             var v1 = new Entry[256];
             bool palette = d.Depth <= 8, gray = d.Depth > 32;
             var colors = palette ? QuickTimeCodecs.Palette(d) : null;
-            var img = new PictBitmap(d.Width, d.Height);
+            var img = new RgbaBitmap(d.Width, d.Height);
             int p = 10, top = 0;
             for (int s = 0; s < strips && p + 12 <= data.Length; s++)
             {
@@ -83,8 +83,8 @@ namespace ClassicMac.Graphics.QuickTime
             }
         }
 
-        private static void Vectors(PictBitmap img, ReadOnlySpan<byte> chunk, int id, Entry[] v4, Entry[] v1, int top,
-            int height, int width, PictColor[]? palette, bool gray)
+        private static void Vectors(RgbaBitmap img, ReadOnlySpan<byte> chunk, int id, Entry[] v4, Entry[] v1, int top,
+            int height, int width, RgbaColor[]? palette, bool gray)
         {
             int blocksWide = (width + 3) / 4, blocks = blocksWide * ((height + 3) / 4);
             int p = 0, block = 0;
@@ -138,16 +138,16 @@ namespace ClassicMac.Graphics.QuickTime
             }
         }
 
-        private static void Put2x2(PictBitmap img, int x, int y, Entry e, PictColor[]? palette, bool gray)
+        private static void Put2x2(RgbaBitmap img, int x, int y, Entry e, RgbaColor[]? palette, bool gray)
         {
             for (int k = 0; k < 4; k++)
             {
                 int lum = k switch { 0 => e.Y0, 1 => e.Y1, 2 => e.Y2, _ => e.Y3 };
-                PictColor c;
+                RgbaColor c;
                 if (palette != null) c = palette[lum % palette.Length];
-                else if (gray) c = new PictColor((byte)lum, (byte)lum, (byte)lum);
+                else if (gray) c = new RgbaColor((byte)lum, (byte)lum, (byte)lum);
                 else
-                    c = new PictColor(Clamp(lum + 2 * e.V), Clamp(lum - e.U / 2 - e.V), Clamp(lum + 2 * e.U));
+                    c = new RgbaColor(Clamp(lum + 2 * e.V), Clamp(lum - e.U / 2 - e.V), Clamp(lum + 2 * e.U));
                 QuickTimeCodecs.Set(img, x + (k & 1), y + (k >> 1), c);
             }
         }
@@ -159,7 +159,7 @@ namespace ClassicMac.Graphics.QuickTime
     // or run-length encoded, 8/15/16/24/32 bits, bottom-up unless the descriptor's bit 5 says top-down.
     internal static class TargaCodec
     {
-        public static PictBitmap? Decode(byte[] data)
+        public static RgbaBitmap? Decode(byte[] data)
         {
             if (data.Length < 18) return null;
             int idLength = data[0], mapType = data[1], type = data[2];
@@ -167,35 +167,35 @@ namespace ClassicMac.Graphics.QuickTime
             int width = data[12] | (data[13] << 8), height = data[14] | (data[15] << 8), bits = data[16], descriptor = data[17];
             if (width == 0 || height == 0) return null;
             int p = 18 + idLength;
-            var map = new PictColor[mapType == 1 ? mapFirst + mapLength : 0];
+            var map = new RgbaColor[mapType == 1 ? mapFirst + mapLength : 0];
             for (int i = 0; i < mapLength && mapType == 1; i++)
             {
                 map[mapFirst + i] = ReadColor(data, ref p, mapBits);
             }
             int baseType = type & 7;
             bool rle = (type & 8) != 0;
-            var img = new PictBitmap(width, height);
+            var img = new RgbaBitmap(width, height);
             bool topDown = (descriptor & 0x20) != 0;
             int pixel = 0, count = width * height;
 
-            PictColor Next()
+            RgbaColor Next()
             {
                 if (baseType == 1)
                 {
                     int idx = bits == 16 ? data[p] | (data[p + 1] << 8) : data[p];
                     p += bits / 8;
-                    return idx < map.Length ? map[idx] : new PictColor(0, 0, 0);
+                    return idx < map.Length ? map[idx] : new RgbaColor(0, 0, 0);
                 }
                 if (baseType == 3)
                 {
                     byte g = data[p];
                     p += bits / 8;
-                    return new PictColor(g, g, g);
+                    return new RgbaColor(g, g, g);
                 }
                 return ReadColor(data, ref p, bits);
             }
 
-            void Put(PictColor c)
+            void Put(RgbaColor c)
             {
                 int x = pixel % width, y = pixel / width;
                 QuickTimeCodecs.Set(img, x, topDown ? y : height - 1 - y, c);
@@ -218,7 +218,7 @@ namespace ClassicMac.Graphics.QuickTime
             return img;
         }
 
-        private static PictColor ReadColor(byte[] data, ref int p, int bits)
+        private static RgbaColor ReadColor(byte[] data, ref int p, int bits)
         {
             switch (bits)
             {
@@ -231,13 +231,13 @@ namespace ClassicMac.Graphics.QuickTime
                 }
                 case 24:
                     p += 3;
-                    return new PictColor(data[p - 1], data[p - 2], data[p - 3]);
+                    return new RgbaColor(data[p - 1], data[p - 2], data[p - 3]);
                 case 32:
                     p += 4;
-                    return new PictColor(data[p - 2], data[p - 3], data[p - 4], data[p - 1]);
+                    return new RgbaColor(data[p - 2], data[p - 3], data[p - 4], data[p - 1]);
                 default:
                     p += Math.Max(1, bits / 8);
-                    return new PictColor(0, 0, 0);
+                    return new RgbaColor(0, 0, 0);
             }
         }
     }

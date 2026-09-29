@@ -18,22 +18,22 @@ namespace ClassicMac.Graphics.Tests;
 // ImageSharp encoder's options. Everything round-trips through PictReader.
 public class WriterTests
 {
-    private static PictBitmap Card(int w, int h, Func<int, int, PictColor> color)
+    private static RgbaBitmap Card(int w, int h, Func<int, int, RgbaColor> color)
     {
-        var bmp = new PictBitmap(w, h);
+        var bmp = new RgbaBitmap(w, h);
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++) bmp[x, y] = color(x, y);
         return bmp;
     }
 
-    private static byte[] Save(PictBitmap bmp, PictWriteOptions options)
+    private static byte[] Save(RgbaBitmap bmp, PictWriteOptions options)
     {
         using var ms = new MemoryStream();
         PictWriter.Write(ms, bmp, options);
         return ms.ToArray();
     }
 
-    private static void AssertSame(PictBitmap expected, PictBitmap actual, Func<PictColor, PictColor>? expect = null)
+    private static void AssertSame(RgbaBitmap expected, RgbaBitmap actual, Func<RgbaColor, RgbaColor>? expect = null)
     {
         Assert.Equal((expected.Width, expected.Height), (actual.Width, actual.Height));
         for (int y = 0; y < expected.Height; y++)
@@ -44,7 +44,7 @@ public class WriterTests
             }
     }
 
-    private static readonly PictColor[] Four = { new(255, 255, 255), new(255, 0, 0), new(0, 0, 255), new(0, 0, 0) };
+    private static readonly RgbaColor[] Four = { new(255, 255, 255), new(255, 0, 0), new(0, 0, 255), new(0, 0, 0) };
 
     // Widths cover unpacked rows (rowBytes < 8), byte counts and word counts (rowBytes > 250).
     [Theory]
@@ -60,19 +60,19 @@ public class WriterTests
         bool indexed = format <= PictPixelFormat.Indexed8;
         int colors = format switch { PictPixelFormat.Indexed1 => 2, PictPixelFormat.Indexed2 => 4, PictPixelFormat.Indexed4 => 16, _ => 256 };
         // Indexed: exactly `colors` distinct colors (black and white for 1 bit); direct: arbitrary RGBA.
-        PictColor IndexedColor(int i) => colors == 2
-            ? (i % 2 == 0 ? new PictColor(0, 0, 0) : new PictColor(255, 255, 255))
-            : new PictColor((byte)(i * 255 / (colors - 1)), (byte)(255 - i), (byte)(i * 7 % 256));
+        RgbaColor IndexedColor(int i) => colors == 2
+            ? (i % 2 == 0 ? new RgbaColor(0, 0, 0) : new RgbaColor(255, 255, 255))
+            : new RgbaColor((byte)(i * 255 / (colors - 1)), (byte)(255 - i), (byte)(i * 7 % 256));
         var src = Card(width, 3, (x, y) => indexed
             ? IndexedColor((x * 37 + y * 11) % colors)
-            : new PictColor((byte)(x * 5), (byte)(y * 90 + x), (byte)(255 - x), (byte)(x * 3 + 1)));
+            : new RgbaColor((byte)(x * 5), (byte)(y * 90 + x), (byte)(255 - x), (byte)(x * 3 + 1)));
         var bytes = Save(src, new PictWriteOptions { Format = format });
         var back = PictReader.Decode(bytes, new PictDecodeOptions { PreserveAlpha = true });
-        Func<PictColor, PictColor>? expect = format switch
+        Func<RgbaColor, RgbaColor>? expect = format switch
         {
-            PictPixelFormat.Rgb555 => c => new PictColor(Five(c.R), Five(c.G), Five(c.B)),
+            PictPixelFormat.Rgb555 => c => new RgbaColor(Five(c.R), Five(c.G), Five(c.B)),
             PictPixelFormat.Argb8888 => null,
-            _ => c => new PictColor(c.R, c.G, c.B),
+            _ => c => new RgbaColor(c.R, c.G, c.B),
         };
         AssertSame(src, back, expect);
     }
@@ -84,7 +84,7 @@ public class WriterTests
     {
         // 32 distinct pixels per row pack to more bytes than Mac OS 9's plane buffer holds, so the strip is written
         // unpacked (packType 1); both QuickDraws read it back exactly.
-        var bmp = new PictBitmap(32, 2);
+        var bmp = new RgbaBitmap(32, 2);
         for (int i = 0; i < 64; i++)
         {
             bmp.Pixels[4 * i] = (byte)(i * 7); bmp.Pixels[4 * i + 1] = (byte)(i * 13 + 1);
@@ -92,14 +92,14 @@ public class WriterTests
         }
         using var ms = new MemoryStream();
         PictWriter.Write(ms, bmp, new PictWriteOptions { FileHeader = false });
-        foreach (var quickDraw in new[] { PictQuickDraw.MacOS9, PictQuickDraw.MacRom })
+        foreach (var quickDraw in new[] { QuickDrawVersion.MacOS9, QuickDrawVersion.MacRom })
             Assert.Equal(bmp.Pixels, PictReader.Decode(ms.ToArray(), new PictDecodeOptions { QuickDraw = quickDraw }).Pixels);
     }
 
     [Fact]
     public void Indexed1_WhiteAndBlack_IsWrittenAsAPlainBitMap()
     {
-        var bytes = Save(Card(80, 1, (x, _) => x % 2 == 0 ? new PictColor(0, 0, 0) : new PictColor(255, 255, 255)),
+        var bytes = Save(Card(80, 1, (x, _) => x % 2 == 0 ? new RgbaColor(0, 0, 0) : new RgbaColor(255, 255, 255)),
             new PictWriteOptions { Format = PictPixelFormat.Indexed1, FileHeader = false });
         int op = FindOpcode(bytes, 0x0098);
         Assert.Equal(10, (bytes[op + 2] << 8) | bytes[op + 3]);                           // rowBytes 10, no PixMap flag
@@ -109,7 +109,7 @@ public class WriterTests
     public void Indexed_WithAPalette_MapsToNearestColors()
     {
         // (0,0,0), (80,0,0), (160,0,0), (240,0,0) against white, red, blue, black.
-        var src = Card(4, 1, (x, _) => new PictColor((byte)(x * 80), 0, 0));
+        var src = Card(4, 1, (x, _) => new RgbaColor((byte)(x * 80), 0, 0));
         var back = PictReader.Decode(Save(src, new PictWriteOptions { Format = PictPixelFormat.Indexed2, Palette = Four }));
         Assert.Equal(new[] { Four[3], Four[3], Four[1], Four[1] }, new[] { back[0, 0], back[1, 0], back[2, 0], back[3, 0] });
     }
@@ -117,14 +117,14 @@ public class WriterTests
     [Fact]
     public void Indexed_TooManyColorsWithoutAPalette_Throws()
     {
-        var src = Card(5, 1, (x, _) => new PictColor((byte)x, 0, 0));
+        var src = Card(5, 1, (x, _) => new RgbaColor((byte)x, 0, 0));
         Assert.Throws<ArgumentException>(() => Save(src, new PictWriteOptions { Format = PictPixelFormat.Indexed2 }));
     }
 
     [Fact]
     public void Resolution_IsStoredWithAPictureFrameOfThePhysicalSize()
     {
-        var src = Card(40, 20, (x, y) => new PictColor((byte)x, (byte)y, 0));
+        var src = Card(40, 20, (x, y) => new RgbaColor((byte)x, (byte)y, 0));
         var bytes = Save(src, new PictWriteOptions { HorizontalResolution = 144, VerticalResolution = 144 });
         var (back, backInfo) = PictReader.Read(bytes);
         Assert.Equal((144.0, 144.0), (backInfo.HorizontalResolution, backInfo.VerticalResolution));
@@ -137,7 +137,7 @@ public class WriterTests
     public void IccProfile_RoundTripsAcrossSeveralComments()
     {
         var icc = Enumerable.Range(0, 70000).Select(i => (byte)(i * 7)).ToArray();
-        var (back, backInfo) = PictReader.Read(Save(Card(2, 2, (_, _) => new PictColor(1, 2, 3)), new PictWriteOptions { IccProfile = icc }));
+        var (back, backInfo) = PictReader.Read(Save(Card(2, 2, (_, _) => new RgbaColor(1, 2, 3)), new PictWriteOptions { IccProfile = icc }));
         Assert.Equal(icc, backInfo.IccProfile);
     }
 
@@ -148,16 +148,16 @@ public class WriterTests
     public void WideImages_AreSplitIntoStrips(PictPixelFormat format, int width)
     {
         var src = Card(width, 2, (x, y) => format == PictPixelFormat.Indexed8
-            ? (x % 2 == 0 ? new PictColor(255, 0, 0) : new PictColor(0, 0, 255))
-            : new PictColor((byte)(x & 0xF8), (byte)((x >> 8) << 3), (byte)(y * 8)));
+            ? (x % 2 == 0 ? new RgbaColor(255, 0, 0) : new RgbaColor(0, 0, 255))
+            : new RgbaColor((byte)(x & 0xF8), (byte)((x >> 8) << 3), (byte)(y * 8)));
         var back = PictReader.Decode(Save(src, new PictWriteOptions { Format = format }));
-        AssertSame(src, back, format == PictPixelFormat.Rgb555 ? c => new PictColor(Five(c.R), Five(c.G), Five(c.B)) : null);
+        AssertSame(src, back, format == PictPixelFormat.Rgb555 ? c => new RgbaColor(Five(c.R), Five(c.G), Five(c.B)) : null);
     }
 
     [Fact]
     public void BarePicture_WithoutTheFileHeader_Decodes()
     {
-        var src = Card(3, 2, (x, _) => new PictColor((byte)(x * 40), 7, 9));
+        var src = Card(3, 2, (x, _) => new RgbaColor((byte)(x * 40), 7, 9));
         var bytes = Save(src, new PictWriteOptions { FileHeader = false });
         Assert.True(PictHeader.IsPicture(bytes));
         AssertSame(src, PictReader.Decode(bytes));

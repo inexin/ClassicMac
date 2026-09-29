@@ -18,7 +18,7 @@ namespace ClassicMac.Graphics.ImageSharp
         /// Classic Mac bitmap fonts (FOND/NFNT/FONT resources you supply) to draw text with exactly as QuickDraw does.
         /// Text in a font the library lacks is drawn with an outline font instead (see <see cref="FontResolver"/>).
         /// </summary>
-        public PictFontLibrary? BitmapFonts { get; init; }
+        public FontLibrary? BitmapFonts { get; init; }
 
         /// <summary>
         /// Maps a QuickDraw font number (the picture's TxFont) to the outline font family used for text that no
@@ -40,7 +40,7 @@ namespace ClassicMac.Graphics.ImageSharp
         /// Which Macintosh QuickDraw to reproduce: Mac OS 9's (default) or the classic ROM's; see
         /// <see cref="PictDecodeOptions.QuickDraw"/>.
         /// </summary>
-        public PictQuickDraw QuickDraw { get; init; } = PictQuickDraw.MacOS9;
+        public QuickDrawVersion QuickDraw { get; init; } = QuickDrawVersion.MacOS9;
 
         /// <summary>
         /// The depth of the screen to draw on (1, 2, 4, 8, 16 or 32, the default), for the look of the picture on an

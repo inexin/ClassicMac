@@ -83,8 +83,8 @@ namespace ClassicMac.Graphics.ImageSharp
             var source = indexed.Palette.Span;
             var rgba = new Rgba32[source.Length];
             PixelOperations<TPixel>.Instance.ToRgba32(configuration, source, rgba);
-            var palette = new PictColor[rgba.Length];
-            for (int i = 0; i < rgba.Length; i++) palette[i] = new PictColor(rgba[i].R, rgba[i].G, rgba[i].B);
+            var palette = new RgbaColor[rgba.Length];
+            for (int i = 0; i < rgba.Length; i++) palette[i] = new RgbaColor(rgba[i].R, rgba[i].G, rgba[i].B);
             var (ordered, remap) = WhiteBlackOrder(palette, format);
 
             var indexedWriter = new PictWriter(stream, image.Width, image.Height, new PictWriteOptions
@@ -104,12 +104,12 @@ namespace ClassicMac.Graphics.ImageSharp
         }
 
         // A black-and-white 1-bit palette is reordered white, black so it is stored as a classic BitMap.
-        private static (PictColor[] palette, byte[] remap) WhiteBlackOrder(PictColor[] palette, PictPixelFormat format)
+        private static (RgbaColor[] palette, byte[] remap) WhiteBlackOrder(RgbaColor[] palette, PictPixelFormat format)
         {
             var remap = new byte[Math.Max(palette.Length, 1)];
             for (int i = 0; i < remap.Length; i++) remap[i] = (byte)i;
-            var white = new PictColor(255, 255, 255);
-            var black = new PictColor(0, 0, 0);
+            var white = new RgbaColor(255, 255, 255);
+            var black = new RgbaColor(0, 0, 0);
             if (format == PictPixelFormat.Indexed1 && palette.Length == 2 && palette[0] == black && palette[1] == white)
                 return (new[] { white, black }, new byte[] { 1, 0 });
             return (palette, remap);

@@ -57,8 +57,8 @@ public class MacImageFileTests
         Assert.True(QuickTimeImageFile.IsQuickTimeImageFile(data));
         var bmp = QuickTimeImageFile.Decode(data);
         Assert.Equal((2, 1), (bmp.Width, bmp.Height));
-        Assert.Equal(new PictColor(255, 0, 0), bmp[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 255), bmp[1, 0]);
+        Assert.Equal(new RgbaColor(255, 0, 0), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 255), bmp[1, 0]);
         Assert.Equal(144, QuickTimeImageFile.ReadDescription(data).HorizontalResolution);
         Assert.Equal(new byte[] { 1, 2, 3 }, QuickTimeImageFile.ReadIccProfile(data));
     }
@@ -102,9 +102,9 @@ public class MacImageFileTests
         Assert.True(MacPaintFile.IsMacPaintFile(data));
         var bmp = MacPaintFile.Decode(data);
         Assert.Equal((576, 720), (bmp.Width, bmp.Height));
-        Assert.Equal(new PictColor(0, 0, 0), bmp[63, 0]);
-        Assert.Equal(new PictColor(255, 255, 255), bmp[64, 0]);
-        Assert.Equal(new PictColor(255, 255, 255), bmp[0, 1]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[63, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), bmp[64, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), bmp[0, 1]);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class MacImageFileTests
         header[85] = (byte)(paint.Length >> 8); header[86] = (byte)paint.Length;
         var data = header.Concat(paint).ToArray();
         Assert.True(MacPaintFile.IsMacPaintFile(data));
-        Assert.Equal(new PictColor(0, 0, 0), MacPaintFile.Decode(data)[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), MacPaintFile.Decode(data)[0, 0]);
     }
 
     [Fact]

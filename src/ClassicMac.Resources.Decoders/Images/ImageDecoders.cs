@@ -10,6 +10,7 @@ using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
 
 namespace ClassicMac.Resources.Decoders.Images
 {
@@ -46,11 +47,11 @@ namespace ClassicMac.Resources.Decoders.Images
 
         protected abstract IReadOnlyList<DecodedFile> DecodeImages(DecodeInput input);
 
-        protected DecodedFile Image(PictBitmap bitmap, string? suffix = null) =>
+        protected DecodedFile Image(RgbaBitmap bitmap, string? suffix = null) =>
             new((suffix ?? "") + Options.ImageEncoder.Extension, Options.ImageEncoder.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels));
 
         // Lists (SICN, PAT#, ppt#): one file per item, ".1.png", ".2.png", ….
-        protected IReadOnlyList<DecodedFile> Numbered(IReadOnlyList<PictBitmap> bitmaps) =>
+        protected IReadOnlyList<DecodedFile> Numbered(IReadOnlyList<RgbaBitmap> bitmaps) =>
             bitmaps.Select((b, i) => Image(b, "." + (i + 1).ToString(CultureInfo.InvariantCulture))).ToList();
 
         protected static string TypeName(DecodeInput input) => input.Resource.Type.ToString();
@@ -79,11 +80,11 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         // A picture drawn at the options' screen depth, as the Mac they choose draws it.
-        internal static PictBitmap Draw(byte[] data, DecodeOptions options) =>
+        internal static RgbaBitmap Draw(byte[] data, DecodeOptions options) =>
             PictReader.Decode(data, new PictDecodeOptions
             {
                 ScreenDepth = options.ScreenDepth,
-                QuickDraw = options.QuickDraw == ResourceManagerModel.Rom68k ? PictQuickDraw.MacRom : PictQuickDraw.MacOS9,
+                QuickDraw = options.QuickDraw == ResourceManagerModel.Rom68k ? QuickDrawVersion.MacRom : QuickDrawVersion.MacOS9,
             });
     }
 

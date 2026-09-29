@@ -19,7 +19,7 @@ namespace ClassicMac.Graphics.QuickDraw
         public (int h, int v) InNumer, InDenom;            // the text scale it was asked for
         public int Ascent, Descent;                        // FMOutput's metrics (bytes; scaled with FScaleDisable)
         public bool MacOS9;                                // drawn by Mac OS 9's text code
-        public PictColor[]? Palette;                       // a color font's colors (fctb or the standard table)
+        public RgbaColor[]? Palette;                       // a color font's colors (fctb or the standard table)
     }
 
     // The Macintosh ROM's Font Manager (FMSwapFont, System 7 bitmap path; screen device, 80 dpi).
@@ -63,7 +63,7 @@ namespace ClassicMac.Graphics.QuickDraw
             public int FontId { get; init; }
         }
 
-        public static FontSelection? Swap(PictFontLibrary library, int family, int size, int face,
+        public static FontSelection? Swap(FontLibrary library, int family, int size, int face,
             (int h, int v) numer, (int h, int v) denom, int spaceExtra, bool fractEnable, bool fScaleDisable, bool macOS9)
         {
             if (size == 0) size = 12;
@@ -103,7 +103,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // The family (0 = system font, 1 = application font), then the fallbacks: for script families (0x4000 and
         // up) the system font, else the application font, Geneva and the system font.
-        private static IEnumerable<int> Families(PictFontLibrary library, int family, bool macOS9)
+        private static IEnumerable<int> Families(FontLibrary library, int family, bool macOS9)
         {
             int mapped = family == 0 ? library.SystemFontId : family == 1 ? library.ApplicationFontId : family;
             var seen = new HashSet<int>();
@@ -116,7 +116,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (seen.Add(f)) yield return f;
         }
 
-        private static Found? FromFamily(PictFontLibrary library, FontFamily fond, int searchSize, int face,
+        private static Found? FromFamily(FontLibrary library, FontFamily fond, int searchSize, int face,
             bool fScaleDisable, bool macOS9, out bool trueType)
         {
             trueType = false;
@@ -172,7 +172,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // Old-style FONTs (resource id family * 128 + size); nothing of the style is intrinsic.
-        private static Found? FromOldFonts(PictFontLibrary library, int family, int searchSize, int face, bool fScaleDisable, bool rom)
+        private static Found? FromOldFonts(FontLibrary library, int family, int searchSize, int face, bool fScaleDisable, bool rom)
         {
             int size = (searchSize == 0 ? 1 : searchSize) & 0x7F;
             var order = new List<int> { size };

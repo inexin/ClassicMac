@@ -35,10 +35,10 @@ namespace ClassicMac.Graphics.Pict
 
         /// <summary>
         /// The palette of an indexed format (at most 2^bits colors). Rows are then written as palette indices. When
-        /// null, <see cref="PictWriter.Write(Stream, PictBitmap, PictWriteOptions?)"/> builds one from the bitmap's
+        /// null, <see cref="PictWriter.Write(Stream, RgbaBitmap, PictWriteOptions?)"/> builds one from the bitmap's
         /// colors, which must fit.
         /// </summary>
-        public IReadOnlyList<PictColor>? Palette { get; init; }
+        public IReadOnlyList<RgbaColor>? Palette { get; init; }
 
         /// <summary>Horizontal resolution in dpi. Defaults to 72; other values write a 72 dpi picture frame of the
         /// image's physical size (an extended version 2 header).</summary>
@@ -66,7 +66,7 @@ namespace ClassicMac.Graphics.Pict
         private readonly Stream stream;
         private readonly int width, height;
         private readonly PictWriteOptions options;
-        private readonly PictColor[] palette;
+        private readonly RgbaColor[] palette;
         private readonly int bits;                       // pixel depth as stored
         private readonly bool bitMap;                    // plain 1-bit BitMap (white/black palette)
         private readonly List<byte[]>? buffered;         // rows kept for a multi-strip image
@@ -94,15 +94,15 @@ namespace ClassicMac.Graphics.Pict
                 PictPixelFormat.Rgb555 => 16,
                 _ => 32,
             };
-            palette = Array.Empty<PictColor>();
+            palette = Array.Empty<RgbaColor>();
             if (bits <= 8)
             {
                 var p = this.options.Palette ?? throw new ArgumentException("An indexed format needs a palette.", nameof(options));
                 if (p.Count == 0 || p.Count > 1 << bits) throw new ArgumentException($"The palette must have 1..{1 << bits} colors.", nameof(options));
-                palette = new PictColor[p.Count];
+                palette = new RgbaColor[p.Count];
                 for (int i = 0; i < p.Count; i++) palette[i] = p[i];
-                bitMap = bits == 1 && palette.Length == 2 && TransferModes.SameRgb(palette[0], new PictColor(255, 255, 255)) &&
-                    TransferModes.SameRgb(palette[1], new PictColor(0, 0, 0));
+                bitMap = bits == 1 && palette.Length == 2 && TransferModes.SameRgb(palette[0], new RgbaColor(255, 255, 255)) &&
+                    TransferModes.SameRgb(palette[1], new RgbaColor(0, 0, 0));
             }
             // 32-bit strips are buffered to choose between packed and unpacked rows (see StripFitsMacOS9).
             if (width > StripWidth || bits == 32) buffered = new List<byte[]>(height);
@@ -118,7 +118,7 @@ namespace ClassicMac.Graphics.Pict
 
         /// <summary>Writes a whole bitmap as a picture. For an indexed format without a palette, the bitmap's own
         /// colors form the palette (they must fit); with a palette, each pixel takes its nearest palette color.</summary>
-        public static void Write(Stream stream, PictBitmap bitmap, PictWriteOptions? options = null)
+        public static void Write(Stream stream, RgbaBitmap bitmap, PictWriteOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             options ??= new PictWriteOptions();
@@ -129,7 +129,7 @@ namespace ClassicMac.Graphics.Pict
                 int max = 1 << (options.Format switch { PictPixelFormat.Indexed1 => 1, PictPixelFormat.Indexed2 => 2, PictPixelFormat.Indexed4 => 4, _ => 8 });
                 if (options.Palette == null)
                 {
-                    var colors = new List<PictColor>();
+                    var colors = new List<RgbaColor>();
                     lookup = new Dictionary<int, int>();
                     for (int i = 0; i < bitmap.Width * bitmap.Height; i++)
                     {
@@ -138,7 +138,7 @@ namespace ClassicMac.Graphics.Pict
                         if (colors.Count == max)
                             throw new ArgumentException($"The bitmap has more than {max} colors; supply a palette.", nameof(bitmap));
                         lookup[key] = colors.Count;
-                        colors.Add(new PictColor(bitmap.Pixels[4 * i], bitmap.Pixels[4 * i + 1], bitmap.Pixels[4 * i + 2]));
+                        colors.Add(new RgbaColor(bitmap.Pixels[4 * i], bitmap.Pixels[4 * i + 1], bitmap.Pixels[4 * i + 2]));
                     }
                     if (options.Format == PictPixelFormat.Indexed1 && colors.Count <= 2)
                         colors = OrderAsWhiteBlack(colors, lookup);
@@ -178,19 +178,19 @@ namespace ClassicMac.Graphics.Pict
         private static int Key(byte[] px, int i) => (px[4 * i] << 16) | (px[4 * i + 1] << 8) | px[4 * i + 2];
 
         // A two-color 1-bit palette as white then black when those are its colors (so it is written as a BitMap).
-        private static List<PictColor> OrderAsWhiteBlack(List<PictColor> colors, Dictionary<int, int> lookup)
+        private static List<RgbaColor> OrderAsWhiteBlack(List<RgbaColor> colors, Dictionary<int, int> lookup)
         {
-            var white = new PictColor(255, 255, 255);
-            var black = new PictColor(0, 0, 0);
+            var white = new RgbaColor(255, 255, 255);
+            var black = new RgbaColor(0, 0, 0);
             bool onlyWhiteBlack = colors.TrueForAll(c => TransferModes.SameRgb(c, white) || TransferModes.SameRgb(c, black));
             if (!onlyWhiteBlack) return colors;
             lookup.Clear();
             lookup[0xFFFFFF] = 0;
             lookup[0] = 1;
-            return new List<PictColor> { white, black };
+            return new List<RgbaColor> { white, black };
         }
 
-        private static int Nearest(PictColor[] palette, int r, int g, int b)
+        private static int Nearest(RgbaColor[] palette, int r, int g, int b)
         {
             int best = 0, bestDistance = int.MaxValue;
             for (int k = 0; k < palette.Length; k++)

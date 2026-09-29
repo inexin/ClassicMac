@@ -14,15 +14,15 @@ namespace ClassicMac.Graphics.Tests;
 // Executor C_StdRgn / C_StdLine / qIMVxfer.cpp). Untouched pixels stay transparent.
 public class DrawingTests
 {
-    private static readonly PictColor Black = new(0, 0, 0);
-    private static readonly PictColor White = new(255, 255, 255);
-    private static readonly PictColor Clear = new(0, 0, 0, 0);
-    private static readonly PictColor Red = new(255, 0, 0);
-    private static readonly PictColor Blue = new(0, 0, 255);
+    private static readonly RgbaColor Black = new(0, 0, 0);
+    private static readonly RgbaColor White = new(255, 255, 255);
+    private static readonly RgbaColor Clear = new(0, 0, 0, 0);
+    private static readonly RgbaColor Red = new(255, 0, 0);
+    private static readonly RgbaColor Blue = new(0, 0, 255);
 
-    private static readonly PictDecodeOptions Rom = new() { QuickDraw = PictQuickDraw.MacRom };
+    private static readonly PictDecodeOptions Rom = new() { QuickDraw = QuickDrawVersion.MacRom };
 
-    private static PictBitmap Draw(int width, int height, Action<PictBuilder> ops, PictDecodeOptions? options = null)
+    private static RgbaBitmap Draw(int width, int height, Action<PictBuilder> ops, PictDecodeOptions? options = null)
     {
         var b = PictBuilder.V2(0, 0, height, width);
         ops(b);
@@ -31,7 +31,7 @@ public class DrawingTests
     }
 
     // '#' = black, '.' = untouched, 'w' = white, 'r' = red, 'b' = blue, '?' = anything else.
-    private static string[] Picture(PictBitmap bmp) =>
+    private static string[] Picture(RgbaBitmap bmp) =>
         Enumerable.Range(0, bmp.Height).Select(y => new string(Enumerable.Range(0, bmp.Width).Select(x =>
         {
             var c = bmp[x, y];
@@ -160,7 +160,7 @@ public class DrawingTests
     {
         var bmp = Draw(3, 1, b => b.U16(0x001A).Rgb(0xFFFF, 0, 0).U16(0x0031).Rect(0, 0, 1, 3)
             .U16(0x001A).Rgb(0, 0, 0).U16(0x0008).U16(10).U16(0x0031).Rect(0, 1, 1, 2));
-        Assert.Equal(new PictColor(0, 255, 255), bmp[1, 0]);
+        Assert.Equal(new RgbaColor(0, 255, 255), bmp[1, 0]);
         Assert.Equal(Red, bmp[0, 0]);
     }
 
@@ -215,13 +215,13 @@ public class DrawingTests
     [Fact]
     public void HiliteMode_SwapsBackgroundAndHiliteColorForTheNextInvert()
     {
-        var hilite = new PictColor(0xCC, 0xCC, 0xFF);                    // Mac OS 9's default highlight color
+        var hilite = new RgbaColor(0xCC, 0xCC, 0xFF);                    // Mac OS 9's default highlight color
         var bmp = Draw(3, 1, b => b.U16(0x0032).Rect(0, 0, 1, 3)        // erase: white background
             .U16(0x0031).Rect(0, 2, 1, 3)                                  // black pixel stays black under hilite
             .U16(0x001C).U16(0x0033).Rect(0, 0, 1, 3)                      // hilited invert
             .U16(0x0033).Rect(0, 1, 1, 2));                                // plain invert again: hilite bit reset
         Assert.Equal(hilite, bmp[0, 0]);
-        Assert.Equal(new PictColor(255 - 0xCC, 255 - 0xCC, 255 - 0xFF), bmp[1, 0]);
+        Assert.Equal(new RgbaColor(255 - 0xCC, 255 - 0xCC, 255 - 0xFF), bmp[1, 0]);
         Assert.Equal(Black, bmp[2, 0]);
     }
 
@@ -237,7 +237,7 @@ public class DrawingTests
             b.U16(0x0008).U16(mode);
             b.U16(0x0031).Rect(0, 0, 1, 2);
         });
-        if (mode == 11) Assert.Equal(new PictColor(255, 255, 0), bmp[0, 0]);
+        if (mode == 11) Assert.Equal(new RgbaColor(255, 255, 0), bmp[0, 0]);
         else Assert.Equal(new[] { expected }, Picture(bmp));
     }
 
@@ -248,7 +248,7 @@ public class DrawingTests
         var bmp = Draw(1, 1, b => b.U16(0x001A).Rgb(0xFFFF, 0, 0).U16(0x0031).Rect(0, 0, 1, 1)
             .U16(0x001F).Rgb(0x8000, 0x8000, 0x8000).U16(0x001A).Rgb(0, 0, 0xFFFF)
             .U16(0x0008).U16(32).U16(0x0031).Rect(0, 0, 1, 1));
-        Assert.Equal(new PictColor(0x7F, 0, 0x7F), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0x7F, 0, 0x7F), bmp[0, 0]);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class DrawingTests
         var bmp = Draw(1, 1, b => b.U16(0x001A).Rgb(0, 0, 0).U16(0x0031).Rect(0, 0, 1, 1)
             .U16(0x001F).Rgb(0xFFFF, 0x4000, 0x8000).U16(0x001A).Rgb(0xFFFF, 0xFFFF, 0xFFFF)
             .U16(0x0008).U16(32).U16(0x0031).Rect(0, 0, 1, 1), Rom);
-        Assert.Equal(new PictColor(254, 63, 127), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(254, 63, 127), bmp[0, 0]);
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class DrawingTests
         var bmp = Draw(1, 1, b => b.U16(0x001A).Rgb(0, 0, 0).U16(0x0031).Rect(0, 0, 1, 1)
             .U16(0x001F).Rgb(0xFFFF, 0x4000, 0x8000).U16(0x001A).Rgb(0xFFFF, 0xFFFF, 0xFFFF)
             .U16(0x0008).U16(32).U16(0x0031).Rect(0, 0, 1, 1));
-        Assert.Equal(new PictColor(255, 64, 128), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(255, 64, 128), bmp[0, 0]);
     }
 
     [Fact]
@@ -278,7 +278,7 @@ public class DrawingTests
         var bmp = Draw(1, 1, b => b.U16(0x001A).Rgb(0xC0C0, 0xC0C0, 0xC0C0).U16(0x0031).Rect(0, 0, 1, 1)
             .U16(0x001F).Rgb(0x9000, 0x1000, 0x1000).U16(0x001A).Rgb(0x4040, 0x4040, 0xFFFF)
             .U16(0x0008).U16(35).U16(0x0031).Rect(0, 0, 1, 1));
-        Assert.Equal(new PictColor(0x90, 0x80, 0x10), bmp[0, 0]);   // blue: 0xC0 - 0xFF borrows -> pin
+        Assert.Equal(new RgbaColor(0x90, 0x80, 0x10), bmp[0, 0]);   // blue: 0xC0 - 0xFF borrows -> pin
     }
 
     [Fact]
@@ -286,7 +286,7 @@ public class DrawingTests
     {
         var bmp = Draw(1, 1, b => b.U16(0x001A).Rgb(0x8000, 0x8000, 0x8000).U16(0x0031).Rect(0, 0, 1, 1)
             .U16(0x001F).Rgb(0xC000, 0xFFFF, 0x4000).U16(0x0008).U16(33).U16(0x0031).Rect(0, 0, 1, 1));
-        Assert.Equal(new PictColor(0xC0, 0xFF, 0x40), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0xC0, 0xFF, 0x40), bmp[0, 0]);
     }
 
     [Fact]
@@ -301,21 +301,21 @@ public class DrawingTests
 
         var bmp = PictReader.Decode(pict, new PictDecodeOptions { TextFallback = fallback });
 
-        Assert.Equal(new PictTextStyle(21, 0, 9), fallback.Styles.Single());
+        Assert.Equal(new TextFallbackStyle(21, 0, 9), fallback.Styles.Single());
         // Each glyph is a 2x2 box sitting on the baseline (v=3) starting at the pen (h=1); srcOr leaves 0 bits alone.
         Assert.Equal(new[] { "......", ".rrrr.", ".rrrr.", "......" }, Picture(bmp));
     }
 
-    private sealed class BoxFont : IPictTextFallback
+    private sealed class BoxFont : ITextFallback
     {
-        public readonly List<PictTextStyle> Styles = new();
+        public readonly List<TextFallbackStyle> Styles = new();
 
-        public PictTextMask? Render(string text, PictTextStyle style)
+        public TextFallbackMask? Render(string text, TextFallbackStyle style)
         {
             Styles.Add(style);
             int w = 2 * text.Length;
             var bits = Enumerable.Repeat((byte)1, w * 2).ToArray();
-            return new PictTextMask(w, 2, originX: 0, originY: 2, bits, advance: w);
+            return new TextFallbackMask(w, 2, originX: 0, originY: 2, bits, advance: w);
         }
     }
 }

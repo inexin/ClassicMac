@@ -7,7 +7,7 @@ namespace ClassicMac.Graphics.QuickDraw
     // (and which QuickDraw's rounding rules the blitters follow).
     internal readonly struct PortColors
     {
-        public PortColors(PictColor fore, PictColor back, (ushort r, ushort g, ushort b) op, PictColor hilite, bool macOS9,
+        public PortColors(RgbaColor fore, RgbaColor back, (ushort r, ushort g, ushort b) op, RgbaColor hilite, bool macOS9,
             ScreenDevice? device = null, (ushort r, ushort g, ushort b)? fore16 = null, (ushort r, ushort g, ushort b)? back16 = null)
         {
             Fore = fore; Back = back; Op = op; Hilite = hilite; MacOS9 = macOS9; Device = device;
@@ -24,7 +24,7 @@ namespace ClassicMac.Graphics.QuickDraw
             HiliteIndex = device.Color2Index(hilite);
             if (HiliteIndex == BkIndex) HiliteIndex = device.Color2Index(TransferModes.Invert(hilite));
         }
-        public readonly PictColor Fore, Back, Hilite;
+        public readonly RgbaColor Fore, Back, Hilite;
         public readonly (ushort r, ushort g, ushort b) Op;
         public readonly bool MacOS9;
         public readonly ScreenDevice? Device;                 // null: the 32-bit canvas
@@ -60,7 +60,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A 1-bit source or pattern pixel (bit = black/on) under a normalized mode. For Boolean modes the "not"
         // variants swap which bit value acts; arithmetic, transparent and hilite modes use the colorized pixel.
-        public static bool ApplyBit(int mode, bool bit, PictColor dst, in PortColors c, out PictColor result)
+        public static bool ApplyBit(int mode, bool bit, RgbaColor dst, in PortColors c, out RgbaColor result)
         {
             if (mode >= Blend)
                 return ApplyColor(mode, bit ? c.Fore : c.Back, dst, c, out result);
@@ -87,7 +87,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // (s * w + d * (65536 - w)) >> 16 truncating, with the exact average (s + d) >> 1 when all three weights are
         // $7FFF or $8000; addPin / subPin (d - s) pinned to the OpColor's high byte on overflow or past it;
         // addOver / subOver modulo 256; addMax / adMin. A zero OpColor component counts as 1.
-        public static bool ApplyColor(int mode, PictColor src, PictColor dst, in PortColors c, out PictColor result)
+        public static bool ApplyColor(int mode, RgbaColor src, RgbaColor dst, in PortColors c, out RgbaColor result)
         {
             switch (mode)
             {
@@ -106,7 +106,7 @@ namespace ClassicMac.Graphics.QuickDraw
             bool average = mode == Blend && (c.MacOS9
                 ? Half(wr) && Half(wg) && Half(wb)
                 : wr == wg && wg == wb && ((wr + 1) & ~1) == 0x8000);
-            result = new PictColor(
+            result = new RgbaColor(
                 Arithmetic(mode, src.R, dst.R, wr, average, c.MacOS9),
                 Arithmetic(mode, src.G, dst.G, wg, average, c.MacOS9),
                 Arithmetic(mode, src.B, dst.B, wb, average, c.MacOS9));
@@ -137,7 +137,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // destination works on inverted values, so with the default black/white colors srcOr is an AND):
         //   srcCopy (s & B) | (~s & F)     srcOr (~s & F) | (s & d)     srcXor d ^ ~s     srcBic (~s & B) | (s & d)
         //   notSrcCopy (~s & B) | (s & F)  notSrcOr (s & F) | (~s & d)  notSrcXor d ^ s   notSrcBic (s & B) | (~s & d)
-        public static PictColor ApplyBoolean(int mode, PictColor src, PictColor dst, in PortColors c)
+        public static RgbaColor ApplyBoolean(int mode, RgbaColor src, RgbaColor dst, in PortColors c)
         {
             int s = Rgb(src), d = Rgb(dst), f = Rgb(c.Fore), b = Rgb(c.Back), r;
             switch (mode & 7)
@@ -151,7 +151,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 case 6: r = d ^ s; break;
                 default: r = (s & b) | (~s & d); break;
             }
-            return new PictColor((byte)(r >> 16), (byte)(r >> 8), (byte)r);
+            return new RgbaColor((byte)(r >> 16), (byte)(r >> 8), (byte)r);
         }
 
         // Mac OS 9's colorizing blend, or null where it does not apply. Colorizing happens for copy modes when fore is not
@@ -160,11 +160,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // each channel s with weights 256 - s and s + 1:
         //   copy (direct sources) ((256 - s) F + (s + 1) B) >> 8        notCopy ((256 - s) B + (s + 1) F) >> 8
         //   or / bic              ((256 - s) C + (s + 1) d) >> 8        with C = F (or) or B (bic), s = 255 - s for not
-        public static PictColor? ColorizeBlend(int mode, PictColor src, PictColor dst, in PortColors c, bool directSource)
+        public static RgbaColor? ColorizeBlend(int mode, RgbaColor src, RgbaColor dst, in PortColors c, bool directSource)
         {
             int op = mode & 3;
             bool not = (mode & 4) != 0;
-            bool foreBlack = SameRgb(c.Fore, new PictColor(0, 0, 0)), backWhite = SameRgb(c.Back, new PictColor(255, 255, 255));
+            bool foreBlack = SameRgb(c.Fore, new RgbaColor(0, 0, 0)), backWhite = SameRgb(c.Back, new RgbaColor(255, 255, 255));
             bool colorize = op switch { 0 => !foreBlack || !backWhite, 1 => !foreBlack, 3 => !backWhite, _ => false };
             if (!colorize || (op == 0 && !directSource)) return null;
             var fore = c.Fore;
@@ -176,14 +176,14 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (not) s = 255 - s;
                 return (byte)(((256 - s) * color + (s + 1) * d) >> 8);
             }
-            return new PictColor(Channel(src.R, fore.R, back.R, dst.R), Channel(src.G, fore.G, back.G, dst.G),
+            return new RgbaColor(Channel(src.R, fore.R, back.R, dst.R), Channel(src.G, fore.G, back.G, dst.G),
                 Channel(src.B, fore.B, back.B, dst.B));
         }
 
-        private static int Rgb(PictColor c) => (c.R << 16) | (c.G << 8) | c.B;
+        private static int Rgb(RgbaColor c) => (c.R << 16) | (c.G << 8) | c.B;
 
-        public static PictColor Invert(PictColor c) => new PictColor((byte)(255 - c.R), (byte)(255 - c.G), (byte)(255 - c.B));
+        public static RgbaColor Invert(RgbaColor c) => new RgbaColor((byte)(255 - c.R), (byte)(255 - c.G), (byte)(255 - c.B));
 
-        public static bool SameRgb(PictColor a, PictColor b) => a.R == b.R && a.G == b.G && a.B == b.B;
+        public static bool SameRgb(RgbaColor a, RgbaColor b) => a.R == b.R && a.G == b.G && a.B == b.B;
     }
 }

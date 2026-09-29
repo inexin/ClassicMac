@@ -12,7 +12,7 @@ namespace ClassicMac.Graphics.SkiaSharp
     /// no bitmap font in <see cref="PictDecodeOptions.Fonts"/> covers. The typeface comes from the resolver, or an
     /// installed font resembling the classic Mac family; the result approximates the original text.
     /// </summary>
-    public sealed class SkiaTextFallback : IPictTextFallback
+    public sealed class SkiaTextFallback : ITextFallback
     {
         private readonly Func<int, SKTypeface?>? typefaceResolver;
 
@@ -22,7 +22,7 @@ namespace ClassicMac.Graphics.SkiaSharp
         public SkiaTextFallback(Func<int, SKTypeface?>? typefaceResolver = null) => this.typefaceResolver = typefaceResolver;
 
         /// <inheritdoc/>
-        public PictTextMask? Render(string text, PictTextStyle style)
+        public TextFallbackMask? Render(string text, TextFallbackStyle style)
         {
             ArgumentNullException.ThrowIfNull(text);
             var typeface = Resolve(style.FontId, style.Face);
@@ -49,7 +49,7 @@ namespace ClassicMac.Graphics.SkiaSharp
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                     bits[y * width + x] = pixels[y * bitmap.RowBytes + x] >= 128 ? (byte)1 : (byte)0;
-            return new PictTextMask(width, height, pad, ascent, bits, advance);
+            return new TextFallbackMask(width, height, pad, ascent, bits, advance);
         }
 
         private SKTypeface? Resolve(int fontId, int face)

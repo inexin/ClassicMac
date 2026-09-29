@@ -6,16 +6,16 @@ namespace ClassicMac.Graphics
     /// A decoded picture: 8-bit RGBA pixels, row-major, no row padding (stride = <see cref="Width"/> × 4).
     /// Pixels a picture never draws stay transparent black.
     /// </summary>
-    public sealed class PictBitmap
+    public sealed class RgbaBitmap
     {
         /// <summary>Creates a transparent bitmap.</summary>
-        public PictBitmap(int width, int height)
+        public RgbaBitmap(int width, int height)
             : this(width, height, new byte[checked(width * height * 4)])
         {
         }
 
         /// <summary>Wraps an existing RGBA buffer of exactly <paramref name="width"/> × <paramref name="height"/> × 4 bytes.</summary>
-        public PictBitmap(int width, int height, byte[] pixels)
+        public RgbaBitmap(int width, int height, byte[] pixels)
         {
             if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
@@ -37,12 +37,12 @@ namespace ClassicMac.Graphics
         public byte[] Pixels { get; }
 
         /// <summary>Gets or sets the pixel at (<paramref name="x"/>, <paramref name="y"/>).</summary>
-        public PictColor this[int x, int y]
+        public RgbaColor this[int x, int y]
         {
             get
             {
                 int i = Offset(x, y);
-                return new PictColor(Pixels[i], Pixels[i + 1], Pixels[i + 2], Pixels[i + 3]);
+                return new RgbaColor(Pixels[i], Pixels[i + 1], Pixels[i + 2], Pixels[i + 3]);
             }
             set
             {

@@ -16,7 +16,7 @@ namespace ClassicMac.Graphics.SkiaSharp
     public sealed class SkiaImageCodec : IPictImageCodec
     {
         /// <inheritdoc/>
-        public PictBitmap? Decode(PictImageDescription description, byte[] data)
+        public RgbaBitmap? Decode(PictImageDescription description, byte[] data)
         {
             ArgumentNullException.ThrowIfNull(description);
             ArgumentNullException.ThrowIfNull(data);
@@ -36,7 +36,7 @@ namespace ClassicMac.Graphics.SkiaSharp
                     return null;
             }
             using var bitmap = SKBitmap.Decode(bytes);
-            return bitmap == null ? null : PictSkia.ToPictBitmap(bitmap);
+            return bitmap == null ? null : PictSkia.ToRgbaBitmap(bitmap);
         }
 
         // QuickTime stores BMP pixel data without the file header and with only an OS/2 core header's worth of

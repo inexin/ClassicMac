@@ -12,7 +12,7 @@ namespace ClassicMac.Graphics.Tests;
 // Drawing on 1-16 bit screens (PictDecodeOptions.ScreenDepth). Expected values follow the SheepShaver-verified rules.
 public class ScreenDepthTests
 {
-    private static PictBitmap Decode(PictBuilder b, int depth, PictQuickDraw quickDraw = PictQuickDraw.MacOS9) =>
+    private static RgbaBitmap Decode(PictBuilder b, int depth, QuickDrawVersion quickDraw = QuickDrawVersion.MacOS9) =>
         PictReader.Decode(b.ToArray(), new PictDecodeOptions { ScreenDepth = depth, QuickDraw = quickDraw });
 
     private static PictBuilder PaintRect(int r, int g, int b) =>
@@ -32,8 +32,8 @@ public class ScreenDepthTests
     public void EightBit_ForegroundTakesItsInverseTableEntry()
     {
         // $FFFF $3333 $0000 is itself in the standard table; $F000 $4000 $1000 falls in the cell of $FFFF $3333 $0000.
-        Assert.Equal(new PictColor(0xFF, 0x33, 0x00), Decode(PaintRect(0xFFFF, 0x3333, 0).U16(0x00FF), 8)[1, 1]);
-        Assert.Equal(new PictColor(0xFF, 0x33, 0x00), Decode(PaintRect(0xF000, 0x4000, 0x1000).U16(0x00FF), 8)[1, 1]);
+        Assert.Equal(new RgbaColor(0xFF, 0x33, 0x00), Decode(PaintRect(0xFFFF, 0x3333, 0).U16(0x00FF), 8)[1, 1]);
+        Assert.Equal(new RgbaColor(0xFF, 0x33, 0x00), Decode(PaintRect(0xF000, 0x4000, 0x1000).U16(0x00FF), 8)[1, 1]);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public class ScreenDepthTests
     {
         // $12 $34 $56 -> 2, 6, 10 -> $10 $31 $52.
         var bmp = Decode(Direct32(1, 1, 0, (0x12, 0x34, 0x56)), 16);
-        Assert.Equal(new PictColor(0x10, 0x31, 0x52), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0x10, 0x31, 0x52), bmp[0, 0]);
     }
 
     [Fact]
@@ -49,10 +49,10 @@ public class ScreenDepthTests
     {
         // (5R + 9G + 2B) / 16 below 128 is black: pure red (79) is black; yellow (223) is white on a black background,
         // but on white it would share white's index, so it takes its inverse's (blue: black).
-        Assert.Equal(new PictColor(0, 0, 0), Decode(PaintRect(0xFFFF, 0, 0).U16(0x00FF), 1)[0, 0]);
-        Assert.Equal(new PictColor(255, 255, 255), Decode(PaintRect(0xFFFF, 0xFFFF, 0).U16(0x001B).Rgb(0, 0, 0)
+        Assert.Equal(new RgbaColor(0, 0, 0), Decode(PaintRect(0xFFFF, 0, 0).U16(0x00FF), 1)[0, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), Decode(PaintRect(0xFFFF, 0xFFFF, 0).U16(0x001B).Rgb(0, 0, 0)
             .U16(0x0031).Rect(0, 0, 2, 2).U16(0x00FF), 1)[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 0), Decode(PaintRect(0xFFFF, 0xFFFF, 0).U16(0x00FF), 1)[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), Decode(PaintRect(0xFFFF, 0xFFFF, 0).U16(0x00FF), 1)[0, 0]);
     }
 
     [Fact]
@@ -60,19 +60,19 @@ public class ScreenDepthTests
     {
         // 1 bit, mid grey 128: the first pixel is white (error -127: -64 to the next pixel), the second (64) black.
         var bmp = Decode(Direct32(2, 1, 64, (128, 128, 128), (128, 128, 128)), 1);
-        Assert.Equal(new PictColor(255, 255, 255), bmp[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[1, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[1, 0]);
         // Without ditherCopy both are white.
-        Assert.Equal(new PictColor(255, 255, 255), Decode(Direct32(2, 1, 0, (128, 128, 128), (128, 128, 128)), 1)[1, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), Decode(Direct32(2, 1, 0, (128, 128, 128), (128, 128, 128)), 1)[1, 0]);
     }
 
     [Fact]
     public void SixteenBit_RomDitherIsOrdered()
     {
         // ROM ditherCopy to 16 bits: min(c + D, 255) >> 3 with D = 0, 5 on row 0: 3 -> 0, then 3 + 5 = 8 -> 1.
-        var bmp = Decode(Direct32(2, 1, 64, (3, 3, 3), (3, 3, 3)), 16, PictQuickDraw.MacRom);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[0, 0]);
-        Assert.Equal(new PictColor(8, 8, 8), bmp[1, 0]);
+        var bmp = Decode(Direct32(2, 1, 64, (3, 3, 3), (3, 3, 3)), 16, QuickDrawVersion.MacRom);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(8, 8, 8), bmp[1, 0]);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class ScreenDepthTests
     {
         // 4 bits: InvertRect over white (index 0) gives index 15, black.
         var b = PictBuilder.V2(0, 0, 2, 2).U16(0x0033).Rect(0, 0, 2, 2).U16(0x00FF);
-        Assert.Equal(new PictColor(0, 0, 0), Decode(b, 4)[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), Decode(b, 4)[0, 0]);
     }
 
     [Fact]

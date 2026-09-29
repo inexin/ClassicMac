@@ -11,11 +11,11 @@ packages.
 
 | Package or namespace | What it is |
 |---|---|
-| `ClassicMac.Graphics` | The base: the RGBA `PictBitmap`, colours, PixMaps, standard colour tables, PackBits, MacPaint documents. |
+| `ClassicMac.Graphics` | The base: the RGBA `RgbaBitmap`, colours, PixMaps, standard colour tables, PackBits, MacPaint documents. |
 | `ClassicMac.Graphics.Fonts` | Bitmap strikes (`NFNT`/`FONT`), families (`FOND`), font colour tables, TrueType `sfnt` data ([formats/FONTS.md](formats/FONTS.md)). |
 | `ClassicMac.Graphics.QuickTime` | QuickTime still images: the codecs, the codec hook, QTIF files. |
 | `ClassicMac.Graphics.QuickDraw` | The software QuickDraw that draws everything (Mac OS 9 or the 68k ROM), text, screen depths. |
-| `ClassicMac.Graphics.Pict` | `PictReader` decodes to an RGBA `PictBitmap` (`Read` also gives the `PictInfo`); `PictWriter` writes pictures; `PictHeader` detects pictures and reads their header. |
+| `ClassicMac.Graphics.Pict` | `PictReader` decodes to an RGBA `RgbaBitmap` (`Read` also gives the `PictInfo`); `PictWriter` writes pictures; `PictHeader` detects pictures and reads their header. |
 | `ClassicMac.Graphics.ImageSharp` | [ImageSharp](https://github.com/SixLabors/ImageSharp) format plugin on top of the core: detection, decoding, encoding, `SaveAsPict`. |
 | `ClassicMac.Graphics.SkiaSharp` | [SkiaSharp](https://github.com/mono/SkiaSharp) integration: decode to `SKBitmap`/`SKImage`, encode `SKBitmap`/`SKPixmap`, `SaveAsPict`. |
 
@@ -33,7 +33,7 @@ Options go through `PictDecoderOptions` with `PictDecoder.Instance.Decode(...)`:
 
 | Option | Effect |
 |---|---|
-| `BitmapFonts` | Classic Mac bitmap fonts (`PictFontLibrary`) for exact text. |
+| `BitmapFonts` | Classic Mac bitmap fonts (`FontLibrary`) for exact text. |
 | `FontResolver` | Outline font family per QuickDraw font number, for text no bitmap font covers (default: an installed system font). |
 | `Resolution` | `Native` (default) or `PictureFrame` (72 dpi). |
 | `PreserveAlpha` | Keep the alpha channel of 32-bit pixel maps that have one. |
@@ -62,9 +62,9 @@ own codecs (Skia has no TIFF decoder). On Linux, add a SkiaSharp native-assets p
 ## Core
 
 ```csharp
-PictBitmap bitmap = PictReader.Decode(bytes);
-PictBitmap exact  = PictReader.Decode(bytes, new PictDecodeOptions { Fonts = library, ImageCodec = myJpegCodec });
-PictBitmap screen = PictReader.Decode(bytes, new PictDecodeOptions { ScreenDepth = 8 });  // as on an 8-bit screen
+RgbaBitmap bitmap = PictReader.Decode(bytes);
+RgbaBitmap exact  = PictReader.Decode(bytes, new PictDecodeOptions { Fonts = library, ImageCodec = myJpegCodec });
+RgbaBitmap screen = PictReader.Decode(bytes, new PictDecodeOptions { ScreenDepth = 8 });  // as on an 8-bit screen
 PictWriter.Write(stream, bitmap);                                       // 24-bit, 72 dpi
 PictWriter.Write(stream, bitmap, new PictWriteOptions { Format = PictPixelFormat.Indexed8, Palette = colors,
     HorizontalResolution = 144, VerticalResolution = 144, IccProfile = icc });
@@ -79,11 +79,11 @@ PictWriter.Write(stream, bitmap, new PictWriteOptions { Format = PictPixelFormat
   subOver, addMax, adMin), transparent and hilite.
 - **Bitmaps** (CopyBits): 1/2/4/8-bit indexed and 16/32-bit direct pixel maps in every packing, stretched or shrunk from
   the source to the destination rect like QuickDraw's StretchBits, with mask regions and fore/back colorizing.
-- **Text**: with a `PictFontLibrary` of `FOND` / `NFNT` / `FONT` / `fctb` resources (from a font suitcase, the System
+- **Text**: with a `FontLibrary` of `FOND` / `NFNT` / `FONT` / `fctb` resources (from a font suitcase, the System
   file or an application), text is drawn by the Font Manager and character generator: font and size substitution,
   bold, italic, underline, outline, shadow, condense, extend, space and character extra, fractional widths, text
   ratios, font-name mapping, pen fractions, and color bitmap fonts. No Apple fonts are included; without a matching font (or for
-  TrueType-only families), text goes to an `IPictTextFallback` (the ImageSharp plugin renders it with SixLabors.Fonts).
+  TrueType-only families), text goes to an `ITextFallback` (the ImageSharp plugin renders it with SixLabors.Fonts).
 - **QuickTime images**: `raw `, `rle ` (Animation), `rpza` (Road Pizza), `smc ` (Graphics), `cvid` (Cinepak), `8BPS`,
   `yuv2`, `YVU9`, `tga ` and `PNTG` are decoded by the core; others go to an `IPictImageCodec`. A decoded image skips
   the picture's "QuickTime is required" fallback.
@@ -106,7 +106,7 @@ ICC profile, as a `.pict` file or a bare picture, splitting images too wide for 
 ## Accuracy
 
 Pictures are drawn as Mac OS 9's QuickDraw draws them (the default), or with
-`QuickDraw = PictQuickDraw.MacRom` as the classic 68k QuickDraw of the Macintosh ROM (Mac OS ROM $077D). Picture
+`QuickDraw = QuickDrawVersion.MacRom` as the classic 68k QuickDraw of the Macintosh ROM (Mac OS ROM $077D). Picture
 playback, shape rasterization, regions, CopyBits scaling and transfer modes, pixel data, the Font Manager, the text
 character generator and drawing on indexed and 16-bit screens are reproduced from the system's own code and checked
 pixel for pixel against it, in both modes. The QuickTime codecs match ffmpeg's decoders on real and generated samples.

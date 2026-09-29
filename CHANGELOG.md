@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Renamed for the public drawing API ([docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)): `PictBitmap` → `RgbaBitmap`,
+  `PictColor` → `RgbaColor`, `PictQuickDraw` → `QuickDrawVersion`, `PictFontLibrary` → `FontLibrary`,
+  `IPictTextFallback` → `ITextFallback` (with `TextFallbackMask`, `TextFallbackStyle`); the last four are in
+  `ClassicMac.Graphics.QuickDraw`.
 - The QuickDraw renderer reads fonts with `ClassicMac.Graphics.Fonts` instead of its own parser. In Mac OS 9 mode a
   strike is now read by Mac OS 9's rules (depth in fontType bits 2–3, rowWords' top bit ignored, the location table
   just before the offset/width table); only damaged or unusual fonts draw differently. A strike whose characters do not

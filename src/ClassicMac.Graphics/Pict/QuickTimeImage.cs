@@ -76,7 +76,7 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // The decoded image as a 32-bit pixel map for CopyBits (alpha kept in the pad byte).
-        public static PixMap ToPixMap(PictBitmap image)
+        public static PixMap ToPixMap(RgbaBitmap image)
         {
             var data = new byte[image.Width * image.Height * 4];
             var px = image.Pixels;

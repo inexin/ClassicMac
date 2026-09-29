@@ -16,7 +16,7 @@ namespace ClassicMac.Graphics.Tests;
 // built-in decompressors on hand-assembled data (the samples in the corpora are checked against ffmpeg separately).
 public class QuickTimeTests
 {
-    private static readonly PictColor Red = new(255, 0, 0), Green = new(0, 255, 0), Blue = new(0, 0, 255);
+    private static readonly RgbaColor Red = new(255, 0, 0), Green = new(0, 255, 0), Blue = new(0, 0, 255);
 
     // 0x8200 block: version, matrix (scale sx/sy, translate tx/ty), no matte, mode, srcRect, no mask, image description.
     private static byte[] QuickTimeOpcode(string codec, int width, int height, int depth, byte[] data,
@@ -38,7 +38,7 @@ public class QuickTimeTests
         return new PictBuilder().U16(0x8200).U16(block.Length >> 16).U16(block.Length & 0xFFFF).Bytes(block).ToArray();
     }
 
-    private static PictBitmap Draw(int width, int height, Action<PictBuilder> ops, PictDecodeOptions? options = null)
+    private static RgbaBitmap Draw(int width, int height, Action<PictBuilder> ops, PictDecodeOptions? options = null)
     {
         var b = PictBuilder.V2(0, 0, height, width);
         ops(b);
@@ -46,7 +46,7 @@ public class QuickTimeTests
         return PictReader.Decode(b.ToArray(), options);
     }
 
-    private static byte[] Raw32(params PictColor[] pixels) =>
+    private static byte[] Raw32(params RgbaColor[] pixels) =>
         pixels.SelectMany(c => new byte[] { 0, c.R, c.G, c.B }).ToArray();
 
     // An UncompressedQuickTime block: version, matrix (a, d as given; w = 1.0 in 2.30), no matte, then a 16 x 1
@@ -68,7 +68,7 @@ public class QuickTimeTests
             .U16(0x00FF).ToArray();
         var bmp = PictReader.Decode(pict);
         Assert.Equal("####wwwwwwww####", string.Concat(Enumerable.Range(0, 16).Select(x =>
-            bmp[x, 0] == new PictColor(0, 0, 0) ? '#' : bmp[x, 0] == new PictColor(255, 255, 255) ? 'w' : '?')));
+            bmp[x, 0] == new RgbaColor(0, 0, 0) ? '#' : bmp[x, 0] == new RgbaColor(255, 255, 255) ? 'w' : '?')));
     }
 
     [Fact]
@@ -78,9 +78,9 @@ public class QuickTimeTests
         var pict = PictBuilder.V2(0, 0, 1, 32).U16(0x8201).U16(0).U16(block.Length).Bytes(block).Align()
             .U16(0x00FF).ToArray();
         var bmp = PictReader.Decode(pict);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[7, 0]);
-        Assert.Equal(new PictColor(255, 255, 255), bmp[8, 0]);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[24, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[7, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), bmp[8, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[24, 0]);
     }
 
     [Fact]
@@ -117,14 +117,14 @@ public class QuickTimeTests
             .U16(0x0031).Rect(0, 0, 1, 2), new PictDecodeOptions { ImageCodec = codec });
         Assert.Equal("zzzz", codec.Seen?.CodecType);
         Assert.Equal(new byte[] { 1, 2, 3 }, codec.Data);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[0, 0]);                     // the picture's own drawing
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[0, 0]);                     // the picture's own drawing
     }
 
     private sealed class RecordingCodec : IPictImageCodec
     {
         public PictImageDescription? Seen;
         public byte[]? Data;
-        public PictBitmap? Decode(PictImageDescription description, byte[] data) { Seen = description; Data = data; return null; }
+        public RgbaBitmap? Decode(PictImageDescription description, byte[] data) { Seen = description; Data = data; return null; }
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class QuickTimeTests
 
     // ---- built-in codecs ----
 
-    private static PictBitmap Decode(string codec, int w, int h, int depth, byte[] data, int clutId = -1)
+    private static RgbaBitmap Decode(string codec, int w, int h, int depth, byte[] data, int clutId = -1)
     {
         var d = new PictImageDescription(codec, w, h, depth, clutId, 72, 72, "")
         { ColorTable = StandardColorTables.ForId(clutId) ?? StandardColorTables.ForDepth(depth) };
@@ -153,19 +153,19 @@ public class QuickTimeTests
     public void StandardColorTables_EightBitIsTheCubeThenRampsThenBlack()
     {
         var t = StandardColorTables.ForId(8)!;
-        Assert.Equal(new PictColor(255, 255, 255), t[0]);
-        Assert.Equal(new PictColor(255, 255, 204), t[1]);
-        Assert.Equal(new PictColor(0, 0, 51), t[214]);
-        Assert.Equal(new PictColor(0xEE, 0, 0), t[215]);
-        Assert.Equal(new PictColor(0x11, 0x11, 0x11), t[254]);
-        Assert.Equal(new PictColor(0, 0, 0), t[255]);
+        Assert.Equal(new RgbaColor(255, 255, 255), t[0]);
+        Assert.Equal(new RgbaColor(255, 255, 204), t[1]);
+        Assert.Equal(new RgbaColor(0, 0, 51), t[214]);
+        Assert.Equal(new RgbaColor(0xEE, 0, 0), t[215]);
+        Assert.Equal(new RgbaColor(0x11, 0x11, 0x11), t[254]);
+        Assert.Equal(new RgbaColor(0, 0, 0), t[255]);
     }
 
     [Fact]
     public void Raw8_UsesTheStandardColorTable()
     {
         var img = Decode("raw ", 2, 1, 8, new byte[] { 0, 255 });
-        Assert.Equal(new[] { new PictColor(255, 255, 255), new PictColor(0, 0, 0) }, new[] { img[0, 0], img[1, 0] });
+        Assert.Equal(new[] { new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0) }, new[] { img[0, 0], img[1, 0] });
     }
 
     [Fact]
@@ -175,9 +175,9 @@ public class QuickTimeTests
         var data = new byte[] { 0xE1, 0, 0, 16, 0xA0, 0x7C, 0x00, 0xC0, 0x00, 0x1F, 0x7C, 0x00, 0xC6, 0, 0, 0 };
         var img = Decode("rpza", 8, 4, 16, data);
         Assert.Equal(Red, img[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 255), img[4, 0]);                  // index 3 = A
+        Assert.Equal(new RgbaColor(0, 0, 255), img[4, 0]);                  // index 3 = A
         Assert.Equal(Red, img[5, 0]);                                       // index 0 = B
-        Assert.Equal(new PictColor(165, 0, 82), img[6, 0]);                 // (11A + 21B) >> 5: r 20, b 10 (5-bit)
+        Assert.Equal(new RgbaColor(165, 0, 82), img[6, 0]);                 // (11A + 21B) >> 5: r 20, b 10 (5-bit)
         Assert.Equal(Red, img[4, 1]);
     }
 
@@ -187,9 +187,9 @@ public class QuickTimeTests
         // 8x4 smc: block 0 two colors (0 white, 255 black) with flags 0x8000 (first pixel black), block 1 repeats it.
         var data = new byte[] { 0x80, 0, 0, 12, 0x80, 0, 255, 0x80, 0x00, 0x20 };
         var img = Decode("smc ", 8, 4, 8, data, clutId: 8);
-        Assert.Equal(new PictColor(0, 0, 0), img[0, 0]);
-        Assert.Equal(new PictColor(255, 255, 255), img[1, 0]);
-        Assert.Equal(new PictColor(0, 0, 0), img[4, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), img[0, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), img[1, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), img[4, 0]);
     }
 
     [Fact]
@@ -208,7 +208,7 @@ public class QuickTimeTests
         // 2x1: row counts for R, G, B planes (2 bytes each: repeat), then the planes.
         var data = new byte[] { 0, 2, 0, 2, 0, 2, 0xFF, 200, 0xFF, 100, 0xFF, 50 };
         var img = Decode("8BPS", 2, 1, 24, data);
-        Assert.Equal(new PictColor(200, 100, 50), img[1, 0]);
+        Assert.Equal(new RgbaColor(200, 100, 50), img[1, 0]);
     }
 
     [Fact]
@@ -219,6 +219,6 @@ public class QuickTimeTests
         var data = header.Concat(new byte[] { 255, 0, 0, 0, 0, 255 }).ToArray();   // BGR: bottom blue, top red
         var img = Decode("tga ", 1, 2, 24, data);
         Assert.Equal(Red, img[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 255), img[0, 1]);
+        Assert.Equal(new RgbaColor(0, 0, 255), img[0, 1]);
     }
 }

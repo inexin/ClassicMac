@@ -47,7 +47,7 @@ public class SkiaSharpPluginTests
         var codec = new SkiaImageCodec();
         var decoded = codec.Decode(new PictImageDescription("png ", 2, 1, 32, -1, 72, 72, "PNG"), png);
         Assert.NotNull(decoded);
-        Assert.Equal(new PictColor(1, 2, 3), decoded![1, 0]);
+        Assert.Equal(new RgbaColor(1, 2, 3), decoded![1, 0]);
         Assert.Null(codec.Decode(new PictImageDescription("tiff", 2, 1, 32, -1, 72, 72, "TIFF"), png));
     }
 }

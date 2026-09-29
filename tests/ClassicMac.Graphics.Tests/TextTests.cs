@@ -25,16 +25,16 @@ public class TextTests
         new Glyph('g', 3, 0, "..", "##", "##", "##", "##"),
     }, missing: new Glyph('\0', 2, 0, "#", "#", "#"));
 
-    private static PictFontLibrary Library()
+    private static FontLibrary Library()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Font9);
         return lib;
     }
 
     private static string[] Text(string s, int face = 0, int spExtra = 0, int width = 10, int height = 7,
-        PictFontLibrary? fonts = null, Action<PictBuilder>? before = null, Action<PictBuilder>? beforeFont = null,
-        PictQuickDraw quickDraw = PictQuickDraw.MacOS9)
+        FontLibrary? fonts = null, Action<PictBuilder>? before = null, Action<PictBuilder>? beforeFont = null,
+        QuickDrawVersion quickDraw = QuickDrawVersion.MacOS9)
     {
         var b = PictBuilder.V2(0, 0, height, width);
         beforeFont?.Invoke(b);
@@ -46,7 +46,7 @@ public class TextTests
         return Enumerable.Range(0, bmp.Height).Select(y => new string(Enumerable.Range(0, bmp.Width).Select(x =>
         {
             var c = bmp[x, y];
-            return c.A == 0 ? '.' : c == new PictColor(0, 0, 0) ? '#' : c == new PictColor(255, 255, 255) ? 'w' : '?';
+            return c.A == 0 ? '.' : c == new RgbaColor(0, 0, 0) ? '#' : c == new RgbaColor(255, 255, 255) ? 'w' : '?';
         }).ToArray())).ToArray();
     }
 
@@ -90,7 +90,7 @@ public class TextTests
     [Fact]
     public void Text_Italic_SlantsHalfAPixelPerRowAboveTheBottom()
     {
-        var rows = Text("A", face: 2, quickDraw: PictQuickDraw.MacRom);
+        var rows = Text("A", face: 2, quickDraw: QuickDrawVersion.MacRom);
         Assert.Equal(new[] { "....##....", "...##.....", "...##....." }, rows[1..4]);
     }
 
@@ -125,15 +125,15 @@ public class TextTests
     public void Text_InkPastTheFinalPenPosition_IsClipped()
     {
         // 'W' advances 2 but its image is 4 wide: textRect ends at the pen + width (no slop), so columns 4-5 are cut.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Build(3, 2, 0, 1, new[] { new Glyph('W', 2, 0, "####", "####", "####") }));
-        Assert.Equal("..##......", Text("W", fonts: lib, quickDraw: PictQuickDraw.MacRom)[1]);
+        Assert.Equal("..##......", Text("W", fonts: lib, quickDraw: QuickDrawVersion.MacRom)[1]);
     }
 
     [Fact]
     public void Text_InkPastTheFinalPenPosition_IsDrawnOnMacOS9()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Build(3, 2, 0, 1, new[] { new Glyph('W', 2, 0, "####", "####", "####") }));
         Assert.Equal("..####....", Text("W", fonts: lib)[1]);
     }
@@ -141,7 +141,7 @@ public class TextTests
     [Fact]
     public void Text_LoneCarriageReturn_DrawsNothingOnMacOS9()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Build(3, 2, 0, 1, new[] { new Glyph('\r', 2, 0, "##", "##", "##") }));
         Assert.All(Text("\r", face: 2, fonts: lib), row => Assert.Equal("..........", row));
     }
@@ -160,9 +160,9 @@ public class TextTests
         // ChExtra 0xE4 x 9 = 0.501 pixel per character. From the default half pixel the second 'A' lands at
         // 2.5 + 3.501 -> 6; from PnLocHFrac 0x7F00 (0.496) at 5.997 -> 5.
         Action<PictBuilder> extra = b => b.Align().U16(0x0016).U16(0x00E4);
-        Assert.Equal("..##..##..", Text("AA", before: extra, quickDraw: PictQuickDraw.MacRom)[1]);
+        Assert.Equal("..##..##..", Text("AA", before: extra, quickDraw: QuickDrawVersion.MacRom)[1]);
         Assert.Equal("..##.##...", Text("AA", before: b => { extra(b); b.Align().U16(0x0015).U16(0x7F00); },
-            quickDraw: PictQuickDraw.MacRom)[1]);
+            quickDraw: QuickDrawVersion.MacRom)[1]);
         // Mac OS 9 places glyphs from 1/2 whatever the pen's fraction: PnLocHFrac changes nothing here.
         Assert.Equal("..##..##..", Text("AA", before: b => { extra(b); b.Align().U16(0x0015).U16(0x7F00); })[1]);
     }
@@ -172,7 +172,7 @@ public class TextTests
     {
         // numer 2/1 (x frame 10 / 10): 9 pt asks for 18, the 9 pt strike stretched x2 about the pen (2, 4).
         var rows = Text("A", width: 10, height: 12, before: b => b.Align().U16(0x0010).Point(2, 2).Point(1, 1),
-            quickDraw: PictQuickDraw.MacRom);
+            quickDraw: QuickDrawVersion.MacRom);
         Assert.Equal("..####....", rows[0]);
         Assert.Equal("..####....", rows[3]);
         Assert.Equal("..........", rows[4]);
@@ -184,7 +184,7 @@ public class TextTests
         // Vertical 3/2 about the pen (v 4), glyph rows ".." "#." ".#" "##" "#." (ascent 3, descent 2). srcOr's rect is
         // the ink rows (-2..2 about the baseline: rows 2..5), mapped to 1..7, and the ordinary DDA picks source rows
         // 0, 0, 1, 2, 2, 3 of it; a copy mode's rect would be the whole font rect (-3..2 -> -1..7).
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Build(3, 2, 0, 1, new[] { new Glyph('B', 3, 0, "..", "#.", ".#", "##", "#.") }));
         var rows = Text("B", fonts: lib, height: 9, before: b => b.Align().U16(0x0010).Point(3, 1).Point(2, 1));
         Assert.Equal(new[] { "....", "..#.", "..#.", "...#", "..##", "..##", "..#.", "...." },
@@ -197,16 +197,16 @@ public class TextTests
         // 18 pt from the 9 pt strike: doubled about the pen (2, 8): 'A' (x 2-3, rows 5-7 at 9 pt) covers x 2-5, rows 2-7.
         var pict = PictBuilder.V2(0, 0, 12, 10).U16(0x0003).U16(Family).U16(0x000D).U16(18)
             .U16(0x0028).Point(8, 2).Text("A").Align().U16(0x00FF).ToArray();
-        var bmp = PictReader.Decode(pict, new PictDecodeOptions { Fonts = Library(), QuickDraw = PictQuickDraw.MacRom });
+        var bmp = PictReader.Decode(pict, new PictDecodeOptions { Fonts = Library(), QuickDraw = QuickDrawVersion.MacRom });
         for (int y = 0; y < 12; y++)
             for (int x = 0; x < 10; x++)
-                Assert.Equal(y >= 2 && y <= 7 && x >= 2 && x <= 5, bmp[x, y] == new PictColor(0, 0, 0));
+                Assert.Equal(y >= 2 && y <= 7 && x >= 2 && x <= 5, bmp[x, y] == new RgbaColor(0, 0, 0));
     }
 
     [Fact]
     public void Text_FontNameOpcode_MapsTheFontNumberByFamilyName()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(7, "Test Font", Family(7, (9, 0, 1234)));
         lib.AddNfnt(1234, Font9);
         // The picture names its font 400 "Test Font"; the library knows that family as 7. The map applies to TxFont
@@ -214,7 +214,7 @@ public class TextTests
         var rows = Text("A", fonts: lib, beforeFont: b => b.Align().U16(0x002C).U16(12).U16(Family).Text("Test Font").Align());
         Assert.Equal("..##......", rows[1]);
         rows = Text("A", fonts: lib, before: b => b.Align().U16(0x002C).U16(12).U16(Family).Text("Test Font").Align(),
-            quickDraw: PictQuickDraw.MacRom);
+            quickDraw: QuickDrawVersion.MacRom);
         Assert.Equal("..........", rows[1]);
     }
 
@@ -222,7 +222,7 @@ public class TextTests
     public void FontManager_OnMacOS9_FallsBackToTheLowestNumberedFamily()
     {
         // Family 400 is missing; Mac OS 9 tries the application font (absent here), then the lowest family, 7.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(7, "Test Font", Family(7, (9, 0, 1234)));
         lib.AddNfnt(1234, Font9);
         Assert.NotNull(FontManager.Swap(lib, Family, 9, 0, (1, 1), (1, 1), 0, false, false, macOS9: true));
@@ -233,7 +233,7 @@ public class TextTests
     public void FontManager_OnMacOS9_MatchesStyleVariantsWithoutUnderlineCondenseExtend()
     {
         // Underline asked, plain and underline strikes: Mac OS 9 matches face & $9B = plain and synthesizes it.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (9, 4, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Font9);
@@ -246,7 +246,7 @@ public class TextTests
     {
         // FOND range 31..103, strike 32..103: 'A' takes FOND word 'A' - 31 = 34 (value 35).
         var words = Enumerable.Range(1, 75).ToArray();
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, 0, 31, 103, new[] { (0, words) }, (9, 0, 1)));
         lib.AddNfnt(1, Font9);
         var s = FontManager.Swap(lib, Family, 9, 0, (1, 1), (1, 1), 0, fractEnable: true, fScaleDisable: false, macOS9: true)!;
@@ -258,7 +258,7 @@ public class TextTests
     {
         var fork = ResourceFork(("FOND", 7, "Suitcase Font", Family(7, (9, 0, 5000))), ("NFNT", 5000, null, Font9),
             ("STR ", 1, null, new byte[] { 0 }));
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         Assert.Equal(2, lib.AddResourceFork(fork));
         var rows = Text("A", fonts: lib, beforeFont: b => b.Align().U16(0x002C).U16(16).U16(Family).Text("Suitcase Font").Align());
         Assert.Equal("..##......", rows[1]);
@@ -267,7 +267,7 @@ public class TextTests
     [Fact]
     public void FontLibrary_RejectsDataThatIsNotAResourceFork()
     {
-        Assert.Throws<ArgumentException>(() => new PictFontLibrary().AddResourceFork(new byte[8]));
+        Assert.Throws<ArgumentException>(() => new FontLibrary().AddResourceFork(new byte[8]));
     }
 
     [Fact]
@@ -275,20 +275,20 @@ public class TextTests
     {
         var fallback = new RecordingFallback();
         var pict = PictBuilder.V2(0, 0, 4, 4).U16(0x0003).U16(99).U16(0x0028).Point(2, 0).Text("x").Align().U16(0x00FF).ToArray();
-        PictReader.Decode(pict, new PictDecodeOptions { Fonts = new PictFontLibrary(), TextFallback = fallback });
+        PictReader.Decode(pict, new PictDecodeOptions { Fonts = new FontLibrary(), TextFallback = fallback });
         Assert.Equal("x", fallback.Last);
     }
 
-    private sealed class RecordingFallback : IPictTextFallback
+    private sealed class RecordingFallback : ITextFallback
     {
         public string? Last;
-        public PictTextMask? Render(string text, PictTextStyle style) { Last = text; return null; }
+        public TextFallbackMask? Render(string text, TextFallbackStyle style) { Last = text; return null; }
     }
 
     [Fact]
     public void FontManager_PicksTheExactSizeElseDoubleOrHalfElseTheNearest()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (12, 0, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
@@ -305,7 +305,7 @@ public class TextTests
     [Fact]
     public void FontManager_UsesAStyledStrikeInsteadOfSynthesizingTheStyle()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (9, 1, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Font9);
@@ -320,7 +320,7 @@ public class TextTests
     public void FontManager_StyleVariant_ScoresSubsetsItalicOverBold()
     {
         // Bold + italic asked, plain / bold / italic strikes: italic scores 8, bold 4, so bold is synthesized.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (9, 1, 2), (9, 2, 3)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Font9);
@@ -332,7 +332,7 @@ public class TextTests
     [Fact]
     public void FontManager_ScalingDisabled_TakesTheNearestSmallerSizeAndScalesWidthsByTheRest()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (12, 0, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
@@ -345,7 +345,7 @@ public class TextTests
     [Fact]
     public void FontManager_ScalingDisabled_CutsTheStretchToAPowerOfTwoOrThreeQuarters()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1)));
         lib.AddNfnt(1, Font9);
         // 7 pt: no smaller size, so 9; 7/9 = $C7 becomes 3/4 ($C0) with the factor $C7 * 4 / 3 = $109.
@@ -361,7 +361,7 @@ public class TextTests
     [Fact]
     public void FontManager_ScalingDisabled_ScansOldStyleSizesDownwardFirst()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Font9);
         lib.AddFont(Family * 128 + 12, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
         Assert.Equal(3, FontManager.Swap(lib, Family, 10, 0, (1, 1), (1, 1), 0, false, fScaleDisable: true, macOS9: false)!.Font.Ascent);
@@ -384,7 +384,7 @@ public class TextTests
         Assert.Equal((11, (262, 209), (256, 256)), FontManager.Fold(9, (5, 1), (4, 1)));
         Assert.Equal(12, FontManager.Fold(12, (1, 1), (3, 1)).size);                  // under 4 points: no fold
         // 9 pt at 4/3 wide: the 12 pt strike, squeezed vertically to 3/4.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (12, 0, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
@@ -417,7 +417,7 @@ public class TextTests
     {
         // An 8-bit color variant (FOND style $0300) with an fctb: 0 = white box, 7 = green ink; drawn srcCopy whatever
         // the text mode (srcOr here), the whole glyph box opaque.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0x0300, 500)));
         lib.AddNfnt(500, Deep8(Font9, 7));
         var fctb = new PictBuilder().U16(0).U16(0).U16(0).U16(7);
@@ -426,8 +426,8 @@ public class TextTests
         var b = PictBuilder.V2(0, 0, 7, 10).U16(0x0003).U16(Family).U16(0x000D).U16(9).U16(0x0005).U16(1)
             .U16(0x0028).Point(4, 2).Text("A").Align().U16(0x00FF);
         var bmp = PictReader.Decode(b.ToArray(), new PictDecodeOptions { Fonts = lib });
-        Assert.Equal(new PictColor(0, 255, 0), bmp[2, 1]);                // ink
-        Assert.Equal(new PictColor(255, 255, 255), bmp[2, 4]);            // the box's background, drawn opaque
+        Assert.Equal(new RgbaColor(0, 255, 0), bmp[2, 1]);                // ink
+        Assert.Equal(new RgbaColor(255, 255, 255), bmp[2, 4]);            // the box's background, drawn opaque
         Assert.Equal(0, bmp.Pixels[(1 * 10 + 5) * 4 + 3]);               // outside the box: untouched
     }
 
@@ -442,7 +442,7 @@ public class TextTests
     public void FontManager_OutlineEntry_TakesOverWhenNoExactBitmapSize()
     {
         // A size-0 (TrueType) entry anywhere: the exact bitmap still wins; otherwise TrueType, never double/half.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (0, 0, 2)));
         lib.AddNfnt(1, Font9);
         Assert.NotNull(FontManager.Swap(lib, Family, 9, 0, (1, 1), (1, 1), 0, false, false, macOS9: false));
@@ -453,7 +453,7 @@ public class TextTests
     public void FontManager_NearestSizeWithoutItsResource_FallsBackToOldStyleFonts()
     {
         // 11 pt: nearest listed 12 has no NFNT; the 9 pt NFNT is not tried - the FONT-id path finds 400/9 instead.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (12, 0, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddFont(Family * 128 + 9, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
@@ -467,7 +467,7 @@ public class TextTests
         // missing symbol word 72; 0xFFFF means missing. Width = word x 9 pt << 4.
         var words = Enumerable.Range(1, 75).ToArray();
         words['g' - ' '] = 0xFFFF;
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, 0, 31, 103, new[] { (0, words) }, (9, 0, 1)));
         lib.AddNfnt(1, Font9);
         var s = FontManager.Swap(lib, Family, 9, 0, (1, 1), (1, 1), 0, fractEnable: true, fScaleDisable: false, macOS9: false)!;
@@ -481,16 +481,16 @@ public class TextTests
     {
         var b = PictBuilder.V2(0, 0, 7, 10).U16(0x0003).U16(Family).U16(0x000D).U16(9).U16(0x0005).U16(49)
             .U16(0x0028).Point(4, 2).Text("A").Align().U16(0x00FF);
-        var bmp = PictReader.Decode(b.ToArray(), new PictDecodeOptions { Fonts = Library(), QuickDraw = PictQuickDraw.MacRom });
-        Assert.Equal(new PictColor(0x80, 0x80, 0x80), bmp[2, 1]);
+        var bmp = PictReader.Decode(b.ToArray(), new PictDecodeOptions { Fonts = Library(), QuickDraw = QuickDrawVersion.MacRom });
+        Assert.Equal(new RgbaColor(0x80, 0x80, 0x80), bmp[2, 1]);
         // Mac OS 9 too (srcOr in the gray GetGray finds).
-        Assert.Equal(new PictColor(0x80, 0x80, 0x80), PictReader.Decode(b.ToArray(), new PictDecodeOptions { Fonts = Library() })[2, 1]);
+        Assert.Equal(new RgbaColor(0x80, 0x80, 0x80), PictReader.Decode(b.ToArray(), new PictDecodeOptions { Fonts = Library() })[2, 1]);
     }
 
     [Fact]
     public void FontManager_NearestSize_TiesGoToTheLarger()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFamily(Family, null, Family(Family, (9, 0, 1), (13, 0, 2)));
         lib.AddNfnt(1, Font9);
         lib.AddNfnt(2, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
@@ -501,7 +501,7 @@ public class TextTests
     public void FontManager_OldStyleFonts_ScanUpwardBeforeDownward()
     {
         // No FOND: 10 pt is not 9 pt's neighbour first - the scan goes 11, 12 before 9.
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Font9);
         lib.AddFont(Family * 128 + 12, Build(4, 2, 0, 0, new[] { new Glyph('A', 4, 0, "###") }));
         var s = FontManager.Swap(lib, Family, 10, 0, (1, 1), (1, 1), 0, false, false, macOS9: false)!;
@@ -512,7 +512,7 @@ public class TextTests
     [Fact]
     public void FontManager_Widths_ExtraOnNonZeroWidthsAndCarriageReturnZero()
     {
-        var lib = new PictFontLibrary();
+        var lib = new FontLibrary();
         lib.AddFont(Family * 128 + 9, Build(3, 2, 0, 1, new[]
         {
             new Glyph('\r', 5, 0, "#"), new Glyph(' ', 2, 0), new Glyph('A', 3, 0, "##"), new Glyph('B', 0, 0, "#"),

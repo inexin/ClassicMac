@@ -13,7 +13,7 @@ namespace ClassicMac.Graphics.QuickTime
         /// </summary>
         /// <param name="description">The QuickTime image description.</param>
         /// <param name="data">The compressed image data.</param>
-        PictBitmap? Decode(PictImageDescription description, byte[] data);
+        RgbaBitmap? Decode(PictImageDescription description, byte[] data);
     }
 
     /// <summary>A QuickTime image description (<c>ImageDescription</c>) of an image embedded in a picture.</summary>
@@ -29,6 +29,6 @@ namespace ClassicMac.Graphics.QuickTime
         double HorizontalResolution, double VerticalResolution, string CompressorName)
     {
         /// <summary>The image's color table (standard or stored), for depths up to 8 and grayscale; else null.</summary>
-        public PictColor[]? ColorTable { get; init; }
+        public RgbaColor[]? ColorTable { get; init; }
     }
 }

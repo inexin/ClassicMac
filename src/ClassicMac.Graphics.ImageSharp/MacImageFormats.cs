@@ -189,7 +189,7 @@ namespace ClassicMac.Graphics.ImageSharp
             return ms.ToArray();
         }
 
-        public static Image<TPixel> ToImage<TPixel>(DecoderOptions options, PictBitmap bitmap)
+        public static Image<TPixel> ToImage<TPixel>(DecoderOptions options, RgbaBitmap bitmap)
             where TPixel : unmanaged, IPixel<TPixel>
         {
             var rgba = Image.LoadPixelData<Rgba32>(options.Configuration, bitmap.Pixels, bitmap.Width, bitmap.Height);

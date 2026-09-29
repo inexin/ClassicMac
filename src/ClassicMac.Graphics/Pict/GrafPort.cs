@@ -14,7 +14,7 @@ namespace ClassicMac.Graphics.Pict
     // 2 erase, 3 invert, 4 fill.
     internal sealed class GrafPort
     {
-        private readonly PictBitmap canvas;
+        private readonly RgbaBitmap canvas;
         private readonly PictDecodeOptions options;
         private PictRect fromRect;
         private readonly PictRect toRect;
@@ -22,11 +22,11 @@ namespace ClassicMac.Graphics.Pict
 
         // Port state as DrawPicture initializes it: black on white, pen 1x1 patCopy with a black pen and fill pattern
         // and a white background pattern, text mode srcOr, OpColor black.
-        public PictColor ForeColor = new PictColor(0, 0, 0);
-        public PictColor BackColor = new PictColor(255, 255, 255);
+        public RgbaColor ForeColor = new RgbaColor(0, 0, 0);
+        public RgbaColor BackColor = new RgbaColor(255, 255, 255);
         public (ushort r, ushort g, ushort b) Fore16, Back16 = (0xFFFF, 0xFFFF, 0xFFFF);   // their exact components
         public (ushort r, ushort g, ushort b) OpColor;
-        public PictColor HiliteColor;
+        public RgbaColor HiliteColor;
         private bool hilitePending;
 
         public Pattern BkPat = Pattern.White;
@@ -56,13 +56,13 @@ namespace ClassicMac.Graphics.Pict
         private readonly Dictionary<int, string> fontNames = new Dictionary<int, string>();
         private readonly Dictionary<int, int> fontMap = new Dictionary<int, int>();
 
-        public GrafPort(PictBitmap canvas, PictRect pictureFrame, PictDecodeOptions options)
+        public GrafPort(RgbaBitmap canvas, PictRect pictureFrame, PictDecodeOptions options)
         {
             this.canvas = canvas;
             this.options = options;
             fromRect = pictureFrame;
             toRect = new PictRect(0, 0, canvas.Height, canvas.Width);
-            macOS9 = options.QuickDraw == PictQuickDraw.MacOS9;
+            macOS9 = options.QuickDraw == QuickDrawVersion.MacOS9;
             device = ScreenDevice.For(options.ScreenDepth, macOS9);
             HiliteColor = SystemHilite;
             textNumer = (toRect.Width, toRect.Height);
@@ -130,8 +130,8 @@ namespace ClassicMac.Graphics.Pict
 
         public void DefaultHilite() => HiliteColor = SystemHilite;
 
-        private PictColor SystemHilite =>
-            options.HiliteColor ?? (macOS9 ? new PictColor(0xCC, 0xCC, 0xFF) : new PictColor(0x99, 0xCC, 0xCC));
+        private RgbaColor SystemHilite =>
+            options.HiliteColor ?? (macOS9 ? new RgbaColor(0xCC, 0xCC, 0xFF) : new RgbaColor(0x99, 0xCC, 0xCC));
 
         // TxFont goes through the font map the fontName opcodes build.
         public void TextFont(int fontId)
@@ -397,7 +397,7 @@ namespace ClassicMac.Graphics.Pict
             }
             var fallback = options.TextFallback;
             if (fallback == null) { Done(); return; }
-            var mask = fallback.Render(PictReader.MacRomanString(text), new PictTextStyle(pictureFontId, TextFace, TextSize, name));
+            var mask = fallback.Render(PictReader.MacRomanString(text), new TextFallbackStyle(pictureFontId, TextFace, TextSize, name));
             if (mask != null && mask.Width > 0 && mask.Height > 0)
                 Painter.FillMask(canvas, x - mask.OriginX, y - mask.OriginY, mask.Width, mask.Height, mask.Bits,
                     clip, mode, hilitePending, colors);
@@ -431,12 +431,12 @@ namespace ClassicMac.Graphics.Pict
         // text, scaled by the Font Manager's stretch (rounded half up) but not by the text ratio.
         private void GrayishText(FontSelection font, byte[] text, int x, int y, int charExtra)
         {
-            (int r, int g, int b) Wide(PictColor c) => (c.R * 257, c.G * 257, c.B * 257);
+            (int r, int g, int b) Wide(RgbaColor c) => (c.R * 257, c.G * 257, c.B * 257);
             var fg = Wide(ForeColor);
             var bk = Wide(BackColor);
             int Mid(int a, int b) { int m = (a + b) >> 1; return m < 0x8000 ? m + 2 : m; }
             (int r, int g, int b) mid = (Mid(fg.r, bk.r), Mid(fg.g, bk.g), Mid(fg.b, bk.b));
-            var gray = new PictColor((byte)(mid.r >> 8), (byte)(mid.g >> 8), (byte)(mid.b >> 8));
+            var gray = new RgbaColor((byte)(mid.r >> 8), (byte)(mid.g >> 8), (byte)(mid.b >> 8));
             var grayWide = Wide(gray);
             int Distance((int r, int g, int b) a, (int r, int g, int b) b) =>
                 Math.Max(Math.Abs(a.r - b.r), Math.Max(Math.Abs(a.g - b.g), Math.Abs(a.b - b.b)));

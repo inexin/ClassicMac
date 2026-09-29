@@ -22,7 +22,7 @@ namespace ClassicMac.Graphics.QuickDraw
     // colorizing through srcOr/srcBic (or any colorizing copy of a direct source) blends each channel linearly.
     internal static class Bits
     {
-        public static void CopyBits(PictBitmap canvas, PixMap src, PictRect srcRect, PictRect dstRect, int mode,
+        public static void CopyBits(RgbaBitmap canvas, PixMap src, PictRect srcRect, PictRect dstRect, int mode,
             Region? mask, bool hilitePending, in PortColors colors, bool preserveAlpha)
         {
             if (srcRect.IsEmpty || dstRect.IsEmpty) return;
@@ -82,7 +82,7 @@ namespace ClassicMac.Graphics.QuickDraw
                     int[]? group = rowsCopy == null ? new[] { srcTop + dy } : rowsCopy[dy];
                     if (group == null) return null;
                     var (first, end) = colsCopy == null ? (dx, dx + 1) : colsCopy[dx];
-                    PictColor color;
+                    RgbaColor color;
                     if (!scaled)
                     {
                         int sy = group[0], sx = srcLeft + first;
@@ -90,7 +90,7 @@ namespace ClassicMac.Graphics.QuickDraw
                         color = src.GetPixel(sx, sy);
                     }
                     else if (!TryDeep(src, group, srcLeft, first, end, macOS9, out color, out _, out _)) return null;
-                    return ApplyColorSource(TransferModes.SrcCopy, false, color, new PictColor(255, 255, 255), copyColors, true,
+                    return ApplyColorSource(TransferModes.SrcCopy, false, color, new RgbaColor(255, 255, 255), copyColors, true,
                         out var copied) ? copied : null;
                 }, (x, y) => visible.Contains(x, y));
                 return;
@@ -114,7 +114,7 @@ namespace ClassicMac.Graphics.QuickDraw
                         }
                         var dst = Painter.ReadPixel(canvas, x, y);
                         bool write;
-                        PictColor result;
+                        RgbaColor result;
                         byte alpha = 255;
                         if (src.PixelSize == 1)
                         {
@@ -143,7 +143,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // One destination pixel on an indexed or 16-bit screen.
-        private static void CopyPixelOnDevice(PictBitmap canvas, ScreenDevice device, PixMap src, int[] group, int srcLeft,
+        private static void CopyPixelOnDevice(RgbaBitmap canvas, ScreenDevice device, PixMap src, int[] group, int srcLeft,
             int first, int end, bool scaled, int bitCap, bool bilevel, int x, int y, int mode, bool hilitePending,
             in PortColors colors)
         {
@@ -159,7 +159,7 @@ namespace ClassicMac.Graphics.QuickDraw
             }
             else
             {
-                PictColor color;
+                RgbaColor color;
                 int index = -1;
                 if (!scaled)
                 {
@@ -175,9 +175,9 @@ namespace ClassicMac.Graphics.QuickDraw
             if (write) device.Write(canvas, x, y, value);
         }
 
-        private static bool IsBlackAndWhite(PictColor[] palette) =>
-            palette.Length >= 2 && TransferModes.SameRgb(palette[0], new PictColor(255, 255, 255)) &&
-            TransferModes.SameRgb(palette[1], new PictColor(0, 0, 0));
+        private static bool IsBlackAndWhite(RgbaColor[] palette) =>
+            palette.Length >= 2 && TransferModes.SameRgb(palette[0], new RgbaColor(255, 255, 255)) &&
+            TransferModes.SameRgb(palette[1], new RgbaColor(0, 0, 0));
 
         // OR of the 1-bit source over the merged rows and columns [first, end) (relative to srcRect's left). Scaled
         // copies read the source's memory linearly the way StretchBits' row buffer does, zero past `cap` columns;
@@ -201,10 +201,10 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A scaled deep pixel: the rows then columns of its group merged at the source depth (largest index for 2-8
         // bits; truncated per-component average of 5-bit or 8-bit components for 16 and 32 bits), then converted.
-        private static bool TryDeep(PixMap src, int[] rows, int srcLeft, int first, int end, bool macOS9, out PictColor color,
+        private static bool TryDeep(PixMap src, int[] rows, int srcLeft, int first, int end, bool macOS9, out RgbaColor color,
             out bool averaged, out byte alpha) => TryDeep(src, rows, srcLeft, first, end, macOS9, out color, out averaged, out alpha, out _);
 
-        private static bool TryDeep(PixMap src, int[] rows, int srcLeft, int first, int end, bool macOS9, out PictColor color,
+        private static bool TryDeep(PixMap src, int[] rows, int srcLeft, int first, int end, bool macOS9, out RgbaColor color,
             out bool averaged, out byte alpha, out int index)
         {
             index = -1;
@@ -246,21 +246,21 @@ namespace ClassicMac.Graphics.QuickDraw
             if (src.PixelSize <= 8)
             {
                 index = maxIndex;
-                color = maxIndex < src.Palette.Length ? src.Palette[maxIndex] : new PictColor(0, 0, 0);
+                color = maxIndex < src.Palette.Length ? src.Palette[maxIndex] : new RgbaColor(0, 0, 0);
                 return true;
             }
             if (columns > 1) averaged = true;
             if (macOS9)
             {
                 int half = columns / 2;
-                color = new PictColor((byte)((sumR + half) / columns), (byte)((sumG + half) / columns), (byte)((sumB + half) / columns));
+                color = new RgbaColor((byte)((sumR + half) / columns), (byte)((sumG + half) / columns), (byte)((sumB + half) / columns));
                 return true;
             }
             int R = columns == 2 ? sumR >> 1 : sumR / columns, G = columns == 2 ? sumG >> 1 : sumG / columns,
                 B = columns == 2 ? sumB >> 1 : sumB / columns;
             color = src.PixelSize == 16
-                ? new PictColor(Expand5(R), Expand5(G), Expand5(B))
-                : new PictColor((byte)R, (byte)G, (byte)B);
+                ? new RgbaColor(Expand5(R), Expand5(G), Expand5(B))
+                : new RgbaColor((byte)R, (byte)G, (byte)B);
             return true;
         }
 
@@ -268,13 +268,13 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A full-color source pixel through the mode (TransferModes.ApplyBoolean / ApplyColor). Mac OS 9 colorizes
         // srcOr / srcBic / notSrcOr / notSrcBic sources, and copies of direct sources, by a per-channel blend.
-        private static bool ApplyColorSource(int mode, bool hilitePending, PictColor s, PictColor d, in PortColors c,
-            bool direct, out PictColor result)
+        private static bool ApplyColorSource(int mode, bool hilitePending, RgbaColor s, RgbaColor d, in PortColors c,
+            bool direct, out RgbaColor result)
         {
             int m = TransferModes.Normalize(mode, hilitePending);
             if (m >= TransferModes.Blend)
                 return TransferModes.ApplyColor(m, s, d, c, out result);
-            if (c.MacOS9 && TransferModes.ColorizeBlend(m, s, d, c, direct) is PictColor blended)
+            if (c.MacOS9 && TransferModes.ColorizeBlend(m, s, d, c, direct) is RgbaColor blended)
             {
                 result = blended;
                 return true;

@@ -29,7 +29,7 @@ namespace ClassicMac.Graphics.QuickTime
             string name = Encoding.Latin1.GetString(block, p + 1, nameLength);
             p += 32;
             int depth = I16(), clutId = I16();
-            PictColor[]? table = StandardColorTables.ForId(clutId);
+            RgbaColor[]? table = StandardColorTables.ForId(clutId);
             if (clutId == 0 && idSize > 86 && p + 8 <= block.Length)
                 table = ReadColorTable(block, p, idStart + idSize);
             table ??= StandardColorTables.ForDepth(depth);
@@ -37,14 +37,14 @@ namespace ClassicMac.Graphics.QuickTime
         }
 
         // A ColorTable stored after the image description: ctSeed, ctFlags, ctSize, then (value, r, g, b) entries.
-        private static PictColor[]? ReadColorTable(byte[] block, int p, int end)
+        private static RgbaColor[]? ReadColorTable(byte[] block, int p, int end)
         {
             int size = BinaryPrimitives.ReadInt16BigEndian(block.AsSpan(p + 6)) + 1;
             if (size <= 0 || size > 256) return null;
-            var table = new PictColor[size];
+            var table = new RgbaColor[size];
             p += 8;
             for (int i = 0; i < size && p + 8 <= Math.Min(end, block.Length); i++, p += 8)
-                table[i] = new PictColor(block[p + 2], block[p + 4], block[p + 6]);
+                table[i] = new RgbaColor(block[p + 2], block[p + 4], block[p + 6]);
             return table;
         }
     }

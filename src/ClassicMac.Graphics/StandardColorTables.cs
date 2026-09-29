@@ -4,7 +4,7 @@ namespace ClassicMac.Graphics
     // image descriptions refer to by id. Index 0 is white and the last entry black.
     internal static class StandardColorTables
     {
-        public static PictColor[]? ForId(int id) => id switch
+        public static RgbaColor[]? ForId(int id) => id switch
         {
             1 => Gray(1),
             2 => new[] { Rgb(0xFF, 0xFF, 0xFF), Rgb(0xAC, 0xAC, 0xAC), Rgb(0x55, 0x55, 0x55), Rgb(0, 0, 0) },
@@ -15,16 +15,16 @@ namespace ClassicMac.Graphics
         };
 
         // The default table for an image depth without a table id.
-        public static PictColor[]? ForDepth(int depth) => depth switch
+        public static RgbaColor[]? ForDepth(int depth) => depth switch
         {
             1 or 2 or 4 or 8 => ForId(depth),
             >= 33 and <= 40 => Gray(depth - 32),
             _ => null,
         };
 
-        private static PictColor Rgb(int r, int g, int b) => new PictColor((byte)r, (byte)g, (byte)b);
+        private static RgbaColor Rgb(int r, int g, int b) => new RgbaColor((byte)r, (byte)g, (byte)b);
 
-        private static readonly PictColor[] FourBit =
+        private static readonly RgbaColor[] FourBit =
         {
             Rgb(0xFF, 0xFF, 0xFF), Rgb(0xFC, 0xF3, 0x05), Rgb(0xFF, 0x64, 0x02), Rgb(0xDD, 0x08, 0x06),
             Rgb(0xF2, 0x08, 0x84), Rgb(0x46, 0x00, 0xA5), Rgb(0x00, 0x00, 0xD4), Rgb(0x02, 0xAB, 0xEA),
@@ -35,11 +35,11 @@ namespace ClassicMac.Graphics
         // 8-bit: the 6x6x6 cube of 0xFF..0x00 in steps of 0x33 (red slowest, from white), then red, green, blue
         // and gray ramps of the ten levels between (0xEE, 0xDD, 0xBB, 0xAA, 0x88, 0x77, 0x55, 0x44, 0x22, 0x11),
         // then black.
-        private static readonly PictColor[] EightBit = BuildEightBit();
+        private static readonly RgbaColor[] EightBit = BuildEightBit();
 
-        private static PictColor[] BuildEightBit()
+        private static RgbaColor[] BuildEightBit()
         {
-            var table = new PictColor[256];
+            var table = new RgbaColor[256];
             int i = 0;
             for (int r = 5; r >= 0; r--)
                 for (int g = 5; g >= 0; g--)
@@ -54,10 +54,10 @@ namespace ClassicMac.Graphics
             return table;
         }
 
-        private static PictColor[] Gray(int bits)
+        private static RgbaColor[] Gray(int bits)
         {
             int n = 1 << bits;
-            var table = new PictColor[n];
+            var table = new RgbaColor[n];
             for (int k = 0; k < n; k++)
             {
                 int v = 255 - k * 255 / (n - 1);

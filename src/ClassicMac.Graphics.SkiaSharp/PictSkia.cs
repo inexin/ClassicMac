@@ -13,7 +13,7 @@ namespace ClassicMac.Graphics.SkiaSharp
     public sealed class PictSkiaOptions
     {
         /// <summary>Classic Mac bitmap fonts (FOND/NFNT/FONT resources you supply) to draw text with exactly as QuickDraw does.</summary>
-        public PictFontLibrary? BitmapFonts { get; init; }
+        public FontLibrary? BitmapFonts { get; init; }
 
         /// <summary>
         /// Maps a QuickDraw font number (the picture's TxFont) to the typeface used for text that no bitmap font covers.
@@ -28,7 +28,7 @@ namespace ClassicMac.Graphics.SkiaSharp
         public bool PreserveAlpha { get; init; }
 
         /// <summary>Which Macintosh QuickDraw to reproduce; see <see cref="PictDecodeOptions.QuickDraw"/>.</summary>
-        public PictQuickDraw QuickDraw { get; init; } = PictQuickDraw.MacOS9;
+        public QuickDrawVersion QuickDraw { get; init; } = QuickDrawVersion.MacOS9;
 
         /// <summary>The depth of the screen to draw on (1, 2, 4, 8, 16 or 32); see <see cref="PictDecodeOptions.ScreenDepth"/>.</summary>
         public int ScreenDepth { get; init; } = 32;
@@ -80,7 +80,7 @@ namespace ClassicMac.Graphics.SkiaSharp
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             ArgumentNullException.ThrowIfNull(stream);
-            PictWriter.Write(stream, ToPictBitmap(bitmap), options);
+            PictWriter.Write(stream, ToRgbaBitmap(bitmap), options);
         }
 
         /// <summary>Encodes pixels as a picture.</summary>
@@ -104,7 +104,7 @@ namespace ClassicMac.Graphics.SkiaSharp
         }
 
         /// <summary>Wraps decoded pixels in an unpremultiplied RGBA <see cref="SKBitmap"/> (the pixels are copied).</summary>
-        public static SKBitmap ToSKBitmap(PictBitmap bitmap)
+        public static SKBitmap ToSKBitmap(RgbaBitmap bitmap)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             var result = new SKBitmap(new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
@@ -116,7 +116,7 @@ namespace ClassicMac.Graphics.SkiaSharp
         }
 
         /// <summary>Converts a bitmap of any colour type to QuickDraw.Pict's unpremultiplied RGBA pixels.</summary>
-        public static PictBitmap ToPictBitmap(SKBitmap bitmap)
+        public static RgbaBitmap ToRgbaBitmap(SKBitmap bitmap)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
             var info = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
@@ -132,7 +132,7 @@ namespace ClassicMac.Graphics.SkiaSharp
             {
                 handle.Free();
             }
-            return new PictBitmap(info.Width, info.Height, pixels);
+            return new RgbaBitmap(info.Width, info.Height, pixels);
         }
 
         private static PictDecodeOptions CoreOptions(PictSkiaOptions? options)

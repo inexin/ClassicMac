@@ -13,13 +13,13 @@ namespace ClassicMac.Graphics.Tests;
 // StretchBits scaling, mask regions, source transfer modes, colorizing and alpha.
 public class CopyBitsTests
 {
-    private static readonly PictColor Black = new(0, 0, 0);
-    private static readonly PictColor White = new(255, 255, 255);
-    private static readonly PictColor Red = new(255, 0, 0);
-    private static readonly PictColor Green = new(0, 255, 0);
-    private static readonly PictColor Blue = new(0, 0, 255);
+    private static readonly RgbaColor Black = new(0, 0, 0);
+    private static readonly RgbaColor White = new(255, 255, 255);
+    private static readonly RgbaColor Red = new(255, 0, 0);
+    private static readonly RgbaColor Green = new(0, 255, 0);
+    private static readonly RgbaColor Blue = new(0, 0, 255);
 
-    private static PictBitmap Draw(int width, int height, Action<PictBuilder> ops, PictDecodeOptions? options = null)
+    private static RgbaBitmap Draw(int width, int height, Action<PictBuilder> ops, PictDecodeOptions? options = null)
     {
         var b = PictBuilder.V2(0, 0, height, width);
         ops(b);
@@ -28,7 +28,7 @@ public class CopyBitsTests
     }
 
     // '#' black, 'w' white, 'r' red, 'g' green, 'b' blue, '.' untouched, '?' other.
-    private static string[] Picture(PictBitmap bmp) =>
+    private static string[] Picture(RgbaBitmap bmp) =>
         Enumerable.Range(0, bmp.Height).Select(y => new string(Enumerable.Range(0, bmp.Width).Select(x =>
         {
             var c = bmp[x, y];
@@ -222,7 +222,7 @@ public class CopyBitsTests
         // dst (0xB0, 0xB0, 0xB0), src (0xC0, 0x30, 0xD0), default black fore / white back.
         var bmp = Draw(1, 1, p => Direct32(p.U16(0x001A).Rgb(0xB0B0, 0xB0B0, 0xB0B0).U16(0x0031).Rect(0, 0, 1, 1).U16(0x001A).Rgb(0, 0, 0),
             1, 1, (0, 0, 1, 1), mode, 3, (0, 0xC0, 0x30, 0xD0)));
-        Assert.Equal(new PictColor((byte)r, (byte)g, (byte)b), bmp[0, 0]);
+        Assert.Equal(new RgbaColor((byte)r, (byte)g, (byte)b), bmp[0, 0]);
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public class CopyBitsTests
     {
         var bmp = Draw(1, 1, b => Direct32(b, 1, 1, (0, 0, 1, 1), 0, 4, (0x80, 10, 20, 30)),
             new PictDecodeOptions { PreserveAlpha = preserve });
-        Assert.Equal(new PictColor(10, 20, 30, (byte)expectedAlpha), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(10, 20, 30, (byte)expectedAlpha), bmp[0, 0]);
     }
 
     // ---- StretchBits geometry ----
@@ -279,9 +279,9 @@ public class CopyBitsTests
     {
         // 32-bit 2x2 shrunk to 1x1: rows averaged per column, then the two columns: (10+21)/2=15, (15+30)/2=22 ... per component.
         var bmp = Draw(1, 1, b => Direct32(b, 2, 2, (0, 0, 1, 1), 0, 3,
-            (0, 10, 0, 255), (0, 21, 1, 0), (0, 30, 3, 0), (0, 40, 4, 255)), new PictDecodeOptions { QuickDraw = PictQuickDraw.MacRom });
+            (0, 10, 0, 255), (0, 21, 1, 0), (0, 30, 3, 0), (0, 40, 4, 255)), new PictDecodeOptions { QuickDraw = QuickDrawVersion.MacRom });
         // column 0: (10+30)/2 = 20, (0+3)/2 = 1, (255+0)/2 = 127; column 1: (21+40)/2 = 30, (1+4)/2 = 2, (0+255)/2 = 127
-        Assert.Equal(new PictColor(25, 1, 127), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(25, 1, 127), bmp[0, 0]);
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public class CopyBitsTests
         // column 0: (10+30+1)/2 = 20, (0+3+1)/2 = 2, (255+0+1)/2 = 128; column 1: 31, 3, 128; then (20+31+1)/2 = 26 ...
         var bmp = Draw(1, 1, b => Direct32(b, 2, 2, (0, 0, 1, 1), 0, 3,
             (0, 10, 0, 255), (0, 21, 1, 0), (0, 30, 3, 0), (0, 40, 4, 255)));
-        Assert.Equal(new PictColor(26, 3, 128), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(26, 3, 128), bmp[0, 0]);
     }
 
     [Fact]
@@ -321,10 +321,10 @@ public class CopyBitsTests
             .U16(0).U16(0).U16(0).U16(1).U16(0).Rgb(0, 0, 0).U16(1).Rgb(0x4000, 0x8000, 0xC000)
             .Rect(0, 0, 1, 1).Rect(0, 0, 1, 1).U16(1).U8(1).U8(0).U16(0x00FF).ToArray();
         int C(int s, int c, int d) => ((256 - s) * c + (s + 1) * d) >> 8;
-        Assert.Equal(new PictColor((byte)C(64, 255, 255), (byte)C(128, 0, 255), (byte)C(192, 0, 255)), PictReader.Decode(pict)[0, 0]);
+        Assert.Equal(new RgbaColor((byte)C(64, 255, 255), (byte)C(128, 0, 255), (byte)C(192, 0, 255)), PictReader.Decode(pict)[0, 0]);
         // The ROM's is bitwise: (~s & F) | (s & d).
-        Assert.Equal(new PictColor(255, 128, 192),
-            PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = PictQuickDraw.MacRom })[0, 0]);
+        Assert.Equal(new RgbaColor(255, 128, 192),
+            PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = QuickDrawVersion.MacRom })[0, 0]);
     }
 
     [Fact]

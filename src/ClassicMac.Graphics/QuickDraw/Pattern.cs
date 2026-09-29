@@ -10,7 +10,7 @@ namespace ClassicMac.Graphics.QuickDraw
     {
         public byte[] Mono = new byte[8];
         public PixMap? Pixels;          // PixPat type 1
-        public PictColor? Rgb;          // PixPat type 2 (ditherPat)
+        public RgbaColor? Rgb;          // PixPat type 2 (ditherPat)
         public (ushort r, ushort g, ushort b) Rgb16;   // its exact 16-bit components
 
         public static Pattern Black => FromMono(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF });
@@ -28,7 +28,7 @@ namespace ClassicMac.Graphics.QuickDraw
             if (macOS9 ? patType != 1 && patType != 3 : patType == 2)
             {
                 int r = b.ReadU16BE(), g = b.ReadU16BE(), bl = b.ReadU16BE();
-                pattern.Rgb = new PictColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8));
+                pattern.Rgb = new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8));
                 pattern.Rgb16 = ((ushort)r, (ushort)g, (ushort)bl);
             }
             else

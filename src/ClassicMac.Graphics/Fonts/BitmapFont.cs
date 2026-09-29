@@ -249,7 +249,7 @@ namespace ClassicMac.Graphics.Fonts
         }
 
         // The strike as a pixel map of its depth (a colour font), with the given palette.
-        internal PixMap StrikeMap(PictColor[] palette) => new()
+        internal PixMap StrikeMap(RgbaColor[] palette) => new()
         {
             Bounds = new PictRect(0, 0, RectHeight, RowWords * 16), RowBytes = RowBytes, PixelSize = Depth,
             IsPixMap = true, Palette = palette, Data = strike,

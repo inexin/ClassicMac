@@ -12,10 +12,10 @@ namespace ClassicMac.Graphics.Tests;
 // Icon, cursor and pattern resources (QuickDrawResources).
 public class QuickDrawResourceTests
 {
-    private static readonly PictColor Black = new(0, 0, 0);
-    private static readonly PictColor White = new(255, 255, 255);
+    private static readonly RgbaColor Black = new(0, 0, 0);
+    private static readonly RgbaColor White = new(255, 255, 255);
 
-    private static byte A(PictBitmap b, int x, int y) => b.Pixels[(y * b.Width + x) * 4 + 3];
+    private static byte A(RgbaBitmap b, int x, int y) => b.Pixels[(y * b.Width + x) * 4 + 3];
 
     [Fact]
     public void IconList_MasksTheIcon()
@@ -42,7 +42,7 @@ public class QuickDrawResourceTests
         var list = new byte[256];
         list[128] = 0xE0;
         var icon = QuickDrawResources.DecodeColorIcon("icl8", data, list);
-        Assert.Equal(new PictColor(0xEE, 0, 0), icon[0, 0]);
+        Assert.Equal(new RgbaColor(0xEE, 0, 0), icon[0, 0]);
         Assert.Equal(Black, icon[1, 0]);
         Assert.Equal(White, icon[2, 0]);
         Assert.Equal(0, A(icon, 3, 0));
@@ -82,8 +82,8 @@ public class QuickDrawResourceTests
             .U16(0).U16(0).U16(0).U16(1).U16(1).Rgb(0xFFFF, 0, 0).U16(2).Rgb(0, 0, 0xFFFF)
             .Bytes(1, 2, 1, 2, 1, 2, 1, 2);
         var icon = QuickDrawResources.DecodeCicn(b.ToArray());
-        Assert.Equal(new PictColor(255, 0, 0), icon[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 255), icon[3, 0]);
+        Assert.Equal(new RgbaColor(255, 0, 0), icon[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 255), icon[3, 0]);
         Assert.Equal(0, A(icon, 4, 0));
     }
 
@@ -97,7 +97,7 @@ public class QuickDrawResourceTests
         var pattern = QuickDrawResources.DecodePixelPattern(b.ToArray());
         Assert.Equal((8, 1), (pattern.Width, pattern.Height));
         Assert.Equal(White, pattern[0, 0]);
-        Assert.Equal(new PictColor(0, 0x80, 0), pattern[1, 0]);
+        Assert.Equal(new RgbaColor(0, 0x80, 0), pattern[1, 0]);
         // A table before the pixels (pmTable 0 here) fails to load, as GetPixPat does.
         var bad = b.ToArray();
         bad[28 + 42] = bad[28 + 43] = bad[28 + 44] = bad[28 + 45] = 0;
@@ -126,7 +126,7 @@ public class QuickDrawResourceTests
         b.U16(4).Rgb(0x1299, 0x3499, 0x5699);
         var pattern = QuickDrawResources.DecodePixelPattern(b.ToArray());
         Assert.Equal((8, 8), (pattern.Width, pattern.Height));
-        Assert.Equal(new PictColor(0x12, 0x34, 0x56), pattern[5, 7]);
+        Assert.Equal(new RgbaColor(0x12, 0x34, 0x56), pattern[5, 7]);
     }
 
     [Fact]

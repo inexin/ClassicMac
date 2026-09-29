@@ -15,14 +15,14 @@ namespace ClassicMac.Graphics.Tests;
 // 1-bit bitmap draw; a wrong operand size desyncs the stream and the marker pixel goes missing.
 public class PictParserTests
 {
-    private static readonly PictColor Black = new(0, 0, 0);
-    private static readonly PictColor White = new(255, 255, 255);
+    private static readonly RgbaColor Black = new(0, 0, 0);
+    private static readonly RgbaColor White = new(255, 255, 255);
 
     // v2 BitsRect: 8x1 1-bit bitmap (rowBytes 2 < 8, so unpacked) at the frame origin, leftmost pixel set.
     private static PictBuilder MarkerBits(PictBuilder b) =>
         b.Align().U16(0x0090).U16(2).Rect(0, 0, 1, 8).Rect(0, 0, 1, 8).Rect(0, 0, 1, 8).U16(0).U8(0x80).U8(0);
 
-    private static PictBitmap DecodeWith(Action<PictBuilder> opcodes) => ReadWith(opcodes).Bitmap;
+    private static RgbaBitmap DecodeWith(Action<PictBuilder> opcodes) => ReadWith(opcodes).Bitmap;
 
     private static PictPicture ReadWith(Action<PictBuilder> opcodes)
     {
@@ -209,14 +209,14 @@ public class PictParserTests
             .U8(0).U8(10).U8(20).U8(30)
             .U16(0x00FF).ToArray();
 
-        Assert.Equal(new PictColor(10, 20, 30), PictReader.Decode(pict)[0, 0]);
+        Assert.Equal(new RgbaColor(10, 20, 30), PictReader.Decode(pict)[0, 0]);
     }
 
     // 32-bit direct pixels, 3 pixels wide (rowBytes 12, packed since >= 8) with the given packType and cmpCount.
-    private static PictBitmap Direct32Row(int packType, int cmpCount, params byte[] pixData) =>
-        Direct32Row(packType, cmpCount, PictQuickDraw.MacOS9, pixData);
+    private static RgbaBitmap Direct32Row(int packType, int cmpCount, params byte[] pixData) =>
+        Direct32Row(packType, cmpCount, QuickDrawVersion.MacOS9, pixData);
 
-    private static PictBitmap Direct32Row(int packType, int cmpCount, PictQuickDraw quickDraw, params byte[] pixData) =>
+    private static RgbaBitmap Direct32Row(int packType, int cmpCount, QuickDrawVersion quickDraw, params byte[] pixData) =>
         PictReader.Decode(PictBuilder.V2(0, 0, 1, 3)
             .U16(0x009A).U16(0).U16(0xFF).U16(0x800C).Rect(0, 0, 1, 3)
             .U16(0).U16(packType).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0)
@@ -236,7 +236,7 @@ public class PictParserTests
             .Rect(0, 0, 1, 1).Rect(0, 0, 1, 1).U16(0)
             .U8(0).U8(10).U8(20).U8(30)
             .U16(0x00FF).ToArray();
-        Assert.Equal(new PictColor(10, 20, 30), PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = PictQuickDraw.MacRom })[0, 0]);
+        Assert.Equal(new RgbaColor(10, 20, 30), PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = QuickDrawVersion.MacRom })[0, 0]);
     }
 
     [Fact]
@@ -253,8 +253,8 @@ public class PictParserTests
             .U8(97).U8(95);
         for (int i = 1; i <= 96; i++) b.U8(i);
         var pict = b.Align().U16(0x00FF).ToArray();
-        Assert.Equal(new PictColor(32, 64, 1), PictReader.Decode(pict)[31, 0]);
-        Assert.Equal(new PictColor(32, 64, 96), PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = PictQuickDraw.MacRom })[31, 0]);
+        Assert.Equal(new RgbaColor(32, 64, 1), PictReader.Decode(pict)[31, 0]);
+        Assert.Equal(new RgbaColor(32, 64, 96), PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = QuickDrawVersion.MacRom })[31, 0]);
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public class PictParserTests
     {
         // Skipped as a word length + data; the PaintRect after it draws.
         var pict = PictBuilder.V2(0, 0, 1, 1).U16(0x0092).U16(4).Zeros(4).U16(0x0031).Rect(0, 0, 1, 1).U16(0x00FF).ToArray();
-        Assert.Equal(new PictColor(0, 0, 0), PictReader.Decode(pict)[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), PictReader.Decode(pict)[0, 0]);
     }
 
     [Fact]
@@ -272,8 +272,8 @@ public class PictParserTests
         var pict = PictBuilder.V2(0, 0, 1, 1040).U16(0x0090).U16(130).Rect(0, 0, 1, 1040).Rect(0, 0, 1, 1040)
             .Rect(0, 0, 1, 1040).U16(0).U8(4).U8(0x80).U8(0xFF).U8(0x00).U8(0x00).Align().U16(0x00FF).ToArray();
         var bmp = PictReader.Decode(pict);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[1031, 0]);
-        Assert.Equal(new PictColor(255, 255, 255), bmp[1032, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[1031, 0]);
+        Assert.Equal(new RgbaColor(255, 255, 255), bmp[1032, 0]);
     }
 
     [Fact]
@@ -283,7 +283,7 @@ public class PictParserTests
         var pict = PictBuilder.V2(0, 0, 1, 64).U16(0x0090).U16(8).Rect(0, 0, 1, 64).Rect(0, 0, 1, 64).Rect(0, 0, 1, 64)
             .U16(0).U8(2).U8(0xF9).U8(0xFF).Align().U16(0x00FF).ToArray();
         var bmp = PictReader.Decode(pict);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[63, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[63, 0]);
     }
 
     [Fact]
@@ -295,7 +295,7 @@ public class PictParserTests
             .U16(0).U16(0).U16(0).U16(1).U16(0).Rgb(0xFFFF, 0, 0).U16(1).Rgb(0, 0, 0xFFFF)   // ctab: 0 red, 1 blue
             .Rect(0, 0, 1, 8).Rect(0, 0, 1, 8).U16(0)
             .U8(2).U8(0xF9).U8(1).Align().U16(0x00FF);                                      // 8 x index 1
-        Assert.Equal(new PictColor(0, 0, 255), PictReader.Decode(b.ToArray())[7, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 255), PictReader.Decode(b.ToArray())[7, 0]);
     }
 
     [Fact]
@@ -309,10 +309,10 @@ public class PictParserTests
             .Rect(0, 0, 1, 4).Rect(0, 0, 1, 4).U16(0)
             .Bytes(0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC).Align()
             .U16(0x00FF).ToArray();
-        var bmp = PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = PictQuickDraw.MacRom });
+        var bmp = PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = QuickDrawVersion.MacRom });
         // Data = 00 12 34 56 | 00 78 9A BC read as 16-bit pixels 0x0012, 0x3456, 0x0078, 0x9ABC.
-        Assert.Equal(new PictColor(0, 0, 0x94), bmp[0, 0]);
-        Assert.Equal(new PictColor(0x6B, 0x10, 0xB5), bmp[1, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0x94), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0x6B, 0x10, 0xB5), bmp[1, 0]);
     }
 
     [Fact]
@@ -327,15 +327,15 @@ public class PictParserTests
             .U8(9).U8(3).U16(0x7C00).U16(0x03E0).U16(0x001F).U16(0x7FFF).Align()
             .U16(0x00FF).ToArray();
         var bmp = PictReader.Decode(pict);
-        Assert.Equal(new PictColor(255, 0, 0), bmp[0, 0]);
-        Assert.Equal(new PictColor(0, 0, 255), bmp[2, 0]);
+        Assert.Equal(new RgbaColor(255, 0, 0), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 255), bmp[2, 0]);
     }
 
     [Fact]
     public void DirectBits32_PackType0_IsThreeBytesPerPixelLikePackType2()
     {
         var bmp = Direct32Row(0, 3, 1, 2, 3, 4, 5, 6, 7, 8, 9);
-        Assert.Equal(new[] { new PictColor(1, 2, 3), new PictColor(4, 5, 6), new PictColor(7, 8, 9) },
+        Assert.Equal(new[] { new RgbaColor(1, 2, 3), new RgbaColor(4, 5, 6), new RgbaColor(7, 8, 9) },
             new[] { bmp[0, 0], bmp[1, 0], bmp[2, 0] });
     }
 
@@ -344,22 +344,22 @@ public class PictParserTests
     {
         // Count 7: flag 0xFB repeats the next word 6 times → 12 bytes of 0x0A0B.
         var bmp = Direct32Row(3, 3, 7 - 3, 0xFB, 0x0A, 0x0B);
-        Assert.Equal(new PictColor(0x0B, 0x0A, 0x0B), bmp[0, 0]);
+        Assert.Equal(new RgbaColor(0x0B, 0x0A, 0x0B), bmp[0, 0]);
     }
 
     [Fact]
     public void DirectBits32_PackType5AndUp_DiscardsTheRowsAndLeavesPixelsZero()
     {
         var bmp = Direct32Row(5, 3, 2, 0x01, 0x02);
-        Assert.Equal(new PictColor(0, 0, 0), bmp[1, 0]);
+        Assert.Equal(new RgbaColor(0, 0, 0), bmp[1, 0]);
     }
 
     [Fact]
     public void DirectBits32_PackType4_OnePlaneLandsOnTheBlueByte()
     {
         // cmpCount 1: the single plane is pixel byte 3 (the ROM; Mac OS 9 always reads 3 or 4 planes).
-        var bmp = Direct32Row(4, 1, PictQuickDraw.MacRom, 4, 0x02, 0x10, 0x20, 0x30);
-        Assert.Equal(new[] { new PictColor(0, 0, 0x10), new PictColor(0, 0, 0x20), new PictColor(0, 0, 0x30) },
+        var bmp = Direct32Row(4, 1, QuickDrawVersion.MacRom, 4, 0x02, 0x10, 0x20, 0x30);
+        Assert.Equal(new[] { new RgbaColor(0, 0, 0x10), new RgbaColor(0, 0, 0x20), new RgbaColor(0, 0, 0x30) },
             new[] { bmp[0, 0], bmp[1, 0], bmp[2, 0] });
     }
 
@@ -376,7 +376,7 @@ public class PictParserTests
             .U16(0x00FF).ToArray();
 
         var bmp = PictReader.Decode(pict);
-        Assert.Equal(new[] { new PictColor(1, 2, 3), new PictColor(4, 5, 6), new PictColor(7, 8, 9) },
+        Assert.Equal(new[] { new RgbaColor(1, 2, 3), new RgbaColor(4, 5, 6), new RgbaColor(7, 8, 9) },
             new[] { bmp[0, 0], bmp[1, 0], bmp[2, 0] });
     }
 
@@ -394,7 +394,7 @@ public class PictParserTests
             .Align().U16(0x00FF).ToArray();
 
         var bmp = PictReader.Decode(pict);
-        Assert.Equal(new[] { new PictColor(10, 20, 30), new PictColor(11, 21, 31), new PictColor(12, 22, 32) },
+        Assert.Equal(new[] { new RgbaColor(10, 20, 30), new RgbaColor(11, 21, 31), new RgbaColor(12, 22, 32) },
             new[] { bmp[0, 0], bmp[1, 0], bmp[2, 0] });
     }
 
@@ -411,7 +411,7 @@ public class PictParserTests
             .Align().U16(0x00FF).ToArray();
 
         var bmp = PictReader.Decode(pict);
-        Assert.All(Enumerable.Range(0, 4), x => Assert.Equal(new PictColor(255, 0, 0), bmp[x, 0]));
+        Assert.All(Enumerable.Range(0, 4), x => Assert.Equal(new RgbaColor(255, 0, 0), bmp[x, 0]));
     }
 
     [Fact]

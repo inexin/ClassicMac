@@ -9,10 +9,10 @@ using ClassicMac.Graphics.QuickDraw;
 namespace ClassicMac.Graphics.Pict
 {
     /// <summary>
-    /// Decodes a QuickDraw PICT (v1 / v2 / extended v2) to a <see cref="PictBitmap"/>, drawing it the way QuickDraw's
+    /// Decodes a QuickDraw PICT (v1 / v2 / extended v2) to a <see cref="RgbaBitmap"/>, drawing it the way QuickDraw's
     /// DrawPicture does: shapes are rasterized as QuickDraw regions and transferred through the port's patterns and
     /// transfer modes, bitmaps are decoded from every PixMap layout, and text is rasterized by an optional
-    /// <see cref="IPictTextFallback"/>. Every opcode in Inside Macintosh: Imaging With QuickDraw, Appendix A,
+    /// <see cref="ITextFallback"/>. Every opcode in Inside Macintosh: Imaging With QuickDraw, Appendix A,
     /// Table A-2 is parsed or skipped by its specified operand size; only malformed data and unsupported pixel depths
     /// throw.
     /// </summary>
@@ -28,7 +28,7 @@ namespace ClassicMac.Graphics.Pict
 
         /// <summary>Decodes the picture read from the current position to the end of <paramref name="stream"/>.</summary>
         /// <inheritdoc cref="Decode(byte[], PictDecodeOptions?, CancellationToken)"/>
-        public static PictBitmap Decode(Stream stream, PictDecodeOptions? options = null,
+        public static RgbaBitmap Decode(Stream stream, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default) => Read(stream, options, cancellationToken).Bitmap;
 
         /// <summary>Decodes the picture read from the current position to the end of <paramref name="stream"/>, with its header and metadata.</summary>
@@ -53,7 +53,7 @@ namespace ClassicMac.Graphics.Pict
         /// <param name="cancellationToken">Cancels decoding between opcodes.</param>
         /// <exception cref="NotSupportedException">The picture uses an unsupported pixel format.</exception>
         /// <exception cref="EndOfStreamException">The picture data is truncated.</exception>
-        public static PictBitmap Decode(byte[] data, PictDecodeOptions? options = null,
+        public static RgbaBitmap Decode(byte[] data, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default) => Read(data, options, cancellationToken).Bitmap;
 
         /// <summary>Decodes a picture as <see cref="Decode(byte[], PictDecodeOptions?, CancellationToken)"/> does, with its header and metadata.</summary>
@@ -69,9 +69,9 @@ namespace ClassicMac.Graphics.Pict
             var info = PictHeader.Parse(b, data.Length, out bool v1);
             var bounds = info.BoundsRect;
             var canvasRect = options.Resolution == PictResolution.PictureFrame ? info.FrameRect : bounds;
-            var canvas = new PictBitmap(Math.Max(1, canvasRect.Width), Math.Max(1, canvasRect.Height));
+            var canvas = new RgbaBitmap(Math.Max(1, canvasRect.Width), Math.Max(1, canvasRect.Height));
             var port = new GrafPort(canvas, bounds, options);
-            bool macOS9 = options.QuickDraw == PictQuickDraw.MacOS9;
+            bool macOS9 = options.QuickDraw == QuickDrawVersion.MacOS9;
             {
                 PictRect? quickTimeRect = null;           // destination of a QuickTime image drawn by the last opcode
                 while (b.BaseStream.Position < b.BaseStream.Length)
@@ -309,20 +309,20 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // RGBColor: three 16-bit channels (use the high byte).
-        internal static PictColor ReadRgb(BinaryReader b)
+        internal static RgbaColor ReadRgb(BinaryReader b)
         {
             int r = b.ReadU16BE(), g = b.ReadU16BE(), bl = b.ReadU16BE();
-            return new PictColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255);
+            return new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255);
         }
 
-        private static (PictColor, (ushort, ushort, ushort)) ReadRgbExact(BinaryReader b)
+        private static (RgbaColor, (ushort, ushort, ushort)) ReadRgbExact(BinaryReader b)
         {
             int r = b.ReadU16BE(), g = b.ReadU16BE(), bl = b.ReadU16BE();
-            return (new PictColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255), ((ushort)r, (ushort)g, (ushort)bl));
+            return (new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255), ((ushort)r, (ushort)g, (ushort)bl));
         }
 
         // Classic 1-bit-era color constants (FgColor/BkColor longs): on a color port, the QDColors table (clut 127).
-        private static (PictColor, (ushort, ushort, ushort)) ClassicColor(int value, bool fore)
+        private static (RgbaColor, (ushort, ushort, ushort)) ClassicColor(int value, bool fore)
         {
             (int r, int g, int b) c = value switch
             {
@@ -336,7 +336,7 @@ namespace ClassicMac.Graphics.Pict
                 409 => (0x0000, 0x0000, 0xD400),    // blueColor
                 _ => fore ? (0, 0, 0) : (0xFFFF, 0xFFFF, 0xFFFF),
             };
-            return (new PictColor((byte)(c.r >> 8), (byte)(c.g >> 8), (byte)(c.b >> 8), 255), ((ushort)c.r, (ushort)c.g, (ushort)c.b));
+            return (new RgbaColor((byte)(c.r >> 8), (byte)(c.g >> 8), (byte)(c.b >> 8), 255), ((ushort)c.r, (ushort)c.g, (ushort)c.b));
         }
 
         // A Polygon: u16 polySize + bounding Rect + (polySize - 10) / 4 Points, returned as (h, v) picture points.

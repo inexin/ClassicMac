@@ -81,11 +81,11 @@ public class GoldenTests
         return null;
     }
 
-    private static PictFontLibrary? Fonts()
+    private static FontLibrary? Fonts()
     {
         var dir = Path.Combine(Root, "fonts");
         if (!Directory.Exists(dir)) return null;
-        var library = new PictFontLibrary();
+        var library = new FontLibrary();
         foreach (var file in Directory.GetFiles(dir))
         {
             try { library.AddResourceFork(File.ReadAllBytes(file)); }

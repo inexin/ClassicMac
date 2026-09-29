@@ -40,7 +40,7 @@ namespace ClassicMac.Graphics
 
         /// <summary>Decodes the image: black on white, opaque. Rows missing from a truncated file stay white.</summary>
         /// <exception cref="NotSupportedException">The data is too short to hold a MacPaint image.</exception>
-        public static PictBitmap Decode(byte[] data)
+        public static RgbaBitmap Decode(byte[] data)
         {
             ArgumentNullException.ThrowIfNull(data);
             ReadOnlySpan<byte> span = data;
@@ -56,13 +56,13 @@ namespace ClassicMac.Graphics
 
         // The image rows (after any header), PackBits-compressed back to back; 1 = black; rows missing from the data stay
         // white. Also QuickTime's 'PNTG' codec.
-        internal static PictBitmap? DecodeRows(ReadOnlySpan<byte> data)
+        internal static RgbaBitmap? DecodeRows(ReadOnlySpan<byte> data)
         {
             const int rowBytes = Width / 8;
             var bits = new byte[rowBytes * Height];
             int consumed = PackBits.Unpack(data, bits);
             if (consumed == 0) return null;
-            var img = new PictBitmap(Width, Height);
+            var img = new RgbaBitmap(Width, Height);
             var px = img.Pixels;
             for (int y = 0; y < Height; y++)
                 for (int x = 0; x < Width; x++)
