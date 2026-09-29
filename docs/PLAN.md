@@ -737,6 +737,19 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers. **Built** (2026-09-29).
 7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders). **Built** (2026-09-29): the Edit tab's forms for `STR `, `STR#`, `TEXT` (its `styl` kept in step), `vers` and the UI templates (`DLOG`, `DITL`, `ALRT`, `MENU`, `WIND`, `CNTL`, with the dialog or menu preview redrawn as the form changes), applied as undoable edits; and import (Resource ▸ Import Image or Sound): an image (PNG, JPEG, BMP, GIF, through Avalonia) becomes a `PICT`, `cicn`, icon (`ICON`, `ICN#`, `icl4`/`icl8`, the small and mini icons, or a whole icon family) or cursor (`CURS`, `crsr`), a WAV file a `snd ` (`ImageImport`, `SoundImport`; [formats/ICONS.md](formats/ICONS.md), [formats/PICT.md](formats/PICT.md) §9, [formats/SOUND.md](formats/SOUND.md) §12), replacing the data of a resource of that type and ID after asking. **Templates** (2026-09-29): a resource with no form of its own is edited through a `TMPL` found by name in its own file or any other open file (so a user's copy of ResEdit supplies ResEdit's templates; ClassicMac ships none), read and written as ResEdit 2.1.3's template editor does ([formats/TEMPLATES.md](formats/TEMPLATES.md); all 471 templated resources in ResEdit's own fork read and write back byte for byte).
 8. **Editor III** — writing HFS disk images.
+9. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
+   - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's
+     single segment with `DATA 0` relocations, Retro68's relocation stream, Apple's `dcmp` jump-table shim).
+   - Code resources: the standard header, `DRVR`, components, and fat `CDEF`/`WDEF`/`MDEF`/`MBDF`/`LDEF` whose routine
+     descriptor ($AAFE) points at an embedded PEF.
+   - `cfrg` and the PEF container: sections, pattern-data unpacking, imports, all relocation opcodes, the export hash.
+   - Disassembly: 68000/020 with A-traps and MacsBug names; PowerPC with traceback-table names and cross-TOC glue
+     resolved to import names.
+   - Licensing: any MIT-licensed project may be used or ported, with a notice in `THIRD-PARTY-NOTICES.md`
+     (`resource_dasm` is the candidate); GPL projects stay reference only.
+   - Testing: hand-built vectors and, where a corpus is at hand, a comparison with `resource_dasm`'s output (syntax
+     normalised). Real binaries and the tool's outputs are not committed; private analysis material is not cited.
+   - Order: PEF and `cfrg` first (self-contained), then 68k segments and the jump table, then the disassemblers.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
