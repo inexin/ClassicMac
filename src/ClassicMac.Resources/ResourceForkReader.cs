@@ -37,6 +37,19 @@ namespace ClassicMac.Resources
             long dataLength = BinaryPrimitives.ReadUInt32BigEndian(bytes[8..]);
             long mapLength = BinaryPrimitives.ReadUInt32BigEndian(bytes[12..]);
 
+            // ResEdit's recovery [ClassicMac, from ResEdit's behaviour]: a map offset past the end is replaced by the end of the data area
+            // when a map with a sane type-list offset sits there.
+            var guess = dataOffset + dataLength;
+            if (mapOffset + MapHeaderLength > bytes.Length && guess + MapHeaderLength <= bytes.Length
+                && BinaryPrimitives.ReadUInt16BigEndian(bytes[((int)guess + MapTypeListOffsetOffset)..]) is var guessTypes
+                && guessTypes >= MapHeaderLength && guess + guessTypes + TypeCountLength <= bytes.Length)
+            {
+                fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "fork.map-recovered",
+                    $"The map offset {mapOffset} lies outside the {bytes.Length}-byte fork; using the map found right after the data area, at {guess}.", 4));
+                mapOffset = guess;
+                mapLength = bytes.Length - guess;
+            }
+
             if (mapOffset + MapHeaderLength > bytes.Length)
                 throw new InvalidDataException($"The resource map at {mapOffset} lies outside the {bytes.Length}-byte fork. {verdict}".TrimEnd());
 

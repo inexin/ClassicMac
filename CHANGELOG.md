@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Resource forks: a map offset past the end of the fork is recovered from the end of the data area, as ResEdit does
+  (`fork.map-recovered`; RESOURCE-FORK.md section 9). A damaged fork opened this way saves as a clean one.
 - Templates: resources without a form of their own are edited through a `TMPL` from their file or any other open
   file, as ResEdit 2.1.3 reads and writes them; `ResourceTemplate` in the decoders library (TEMPLATES.md).
 - Editor II, import: Resource ▸ Import Image or Sound makes a `PICT`, `cicn`, icon, icon family or cursor from an image

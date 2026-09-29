@@ -423,7 +423,9 @@ The reader is tolerant: it reads what it can, reports every problem as a diagnos
    `fork.mac-rejects` ("Mac OS 9 would not open this fork (mapReadErr −199): …. Read anyway."); a ROM case that opens
    but reads past the map adds `fork.mac-misreads`. Reading continues either way, and the verdict is appended to any
    exception thrown later.
-4. **Map header.** `mO` + 28 > `EOF` throws. If `mL` < 28 or `mO` + `mL` > `EOF`, `fork.map-length` is reported and the
+4. **Map header.** `mO` + 28 > `EOF` first tries the recovery ResEdit applies [ClassicMac]: if a map with a type-list
+   offset of 28 or more, inside the fork, sits at `dO` + `dL`, that is taken as the map (to the end of the fork) and
+   `fork.map-recovered` is reported; otherwise it throws. If `mL` < 28 or `mO` + `mL` > `EOF`, `fork.map-length` is reported and the
    map is taken to run to the end of the fork.
 5. **Data area.** If `dO` + `dL` > `EOF`, `fork.data-length` is reported and the data area is taken to end at `EOF`.
 6. **Reserved areas and header copy.** Bytes 16–255 are kept (when `EOF` ≥ 256). A header copy that is neither all
@@ -1000,6 +1002,7 @@ decompression diagnostics by `ResourceDecompression.GetData`, their message pref
 | `fork.mac-misreads` | Warning | (68k ROM model) the ROM would open the fork but read memory past its map | opens; later calls see garbage (§8.2) |
 | `fork.mac-hangs` | Warning | (Mac OS 9 model) a type's count − 1 is `$7FFF` or more | at `$FFFF` the fork opens and Preload loops forever; other such counts fail check 11 (§8.1) |
 | `fork.map-length` | Warning | `mL` is under 28 or runs past the fork; the map is taken to run to the end | Mac OS 9: `mapReadErr`; 68k ROM: `eofErr`, or a misread map |
+| `fork.map-recovered` | Warning | the map offset lies outside the fork and a map was found right after the data area; that one is used [ClassicMac] | Mac OS 9: `mapReadErr`; 68k ROM: `eofErr` |
 | `fork.data-length` | Warning | the data area runs past the fork; it is cut at the end | Mac OS 9: `mapReadErr`; 68k ROM: opens, loads fail at `EOF` |
 | `fork.header-mismatch` | Info | the map's header copy is neither zero nor equal to the header | ignored |
 | `fork.type-list-truncated` | Error | the type count promises more types than the map holds; the rest are dropped | Mac OS 9: `mapReadErr`; 68k ROM: reads past the map |

@@ -171,6 +171,7 @@ public class ResourceForkReadWriteTests
 
         var mapOutside = Canonical();
         BinaryPrimitives.WriteUInt32BigEndian(mapOutside.AsSpan(4), 5000);
+        BinaryPrimitives.WriteUInt32BigEndian(mapOutside.AsSpan(8), 5000);
         Assert.Throws<InvalidDataException>(() => ResourceFork.Read(mapOutside));
 
         var typeListOutside = Canonical();
@@ -188,6 +189,17 @@ public class ResourceForkReadWriteTests
 
         Assert.Equal(3, fork.Resources.Count);
         AssertCodes(fork, "fork.data-length", "fork.map-length", "fork.header-mismatch", "fork.mac-rejects");
+    }
+
+    [Fact]
+    public void A_map_offset_past_the_end_is_recovered_from_the_end_of_the_data()
+    {
+        var bytes = Canonical();
+        BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(4), 5000);
+        var fork = ResourceFork.Read(bytes);
+
+        Assert.Equal(3, fork.Resources.Count);
+        Assert.Contains(fork.Diagnostics, d => d.Code == "fork.map-recovered");
     }
 
     [Fact]
