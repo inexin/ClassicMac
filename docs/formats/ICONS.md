@@ -252,7 +252,10 @@ row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour
 - The export decoders take one resource at a time and do not draw suites; `IconSuite.Plot` does.
 - Not reproduced by `IconSuite.Plot`: the 8-bit masks of an extended suite (Mac OS 9's deep CopyMask), several
   screens (DeviceLoop), PlotIconHandle, PlotSICNHandle and PlotIcon, a gray-scale device's label rule, and the ROM's
-  endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac]. Not yet
-  compared with the harness.
+  endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac].
+- **Checked against Mac OS 9** [Verified]: 430 of 451 PlotIconID/PlotIconSuite cases (alignments, rect sizes 16–52,
+  every transform, labels, member choice, missing masks, colour pairs, depths 1/4/8/32, a moved origin) match pixel
+  for pixel. The rest are all selected icons at depth 1 in a rect other than 32 × 32, where Mac OS 9 fills the whole
+  mask black; not yet explained or reproduced. The ROM column is from the code only.
 - `icns` variants (`tile`, `over`, `drop`, `open`, `odrp`) are read but not exported; standalone 32-bit, 48 × 48 and
   8-bit mask resources are not decoded (Icon Services never reads them outside an `icns`).
