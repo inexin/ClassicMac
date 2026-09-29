@@ -6,6 +6,10 @@
     <PackageTags>macintosh;classic-mac;quickdraw;pixmap;macpaint;image</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Core\ClassicMac.Core.csproj" />
+  </ItemGroup>
+
   <!-- Until the renderer has a public drawing API (the merge's stage 3), the layers above share internals. -->
   <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.QuickTime" />

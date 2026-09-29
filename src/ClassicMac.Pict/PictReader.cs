@@ -67,8 +67,8 @@ namespace ClassicMac.Pict
 
             options ??= PictDecodeOptions.Default;
             var info = PictHeader.Parse(b, data.Length, out bool v1);
-            var bounds = info.Bounds;
-            var canvasRect = options.Resolution == PictResolution.PictureFrame ? info.PictureFrame : bounds;
+            var bounds = info.BoundsRect;
+            var canvasRect = options.Resolution == PictResolution.PictureFrame ? info.FrameRect : bounds;
             var canvas = new PictBitmap(Math.Max(1, canvasRect.Width), Math.Max(1, canvasRect.Height));
             var port = new GrafPort(canvas, bounds, options);
             bool macOS9 = options.QuickDraw == PictQuickDraw.MacOS9;

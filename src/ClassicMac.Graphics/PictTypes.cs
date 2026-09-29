@@ -3,8 +3,11 @@ namespace ClassicMac.Graphics
     /// <summary>An 8-bit RGBA color.</summary>
     public readonly record struct PictColor(byte R, byte G, byte B, byte A = 255);
 
-    /// <summary>A QuickDraw rectangle in picture coordinates: <see cref="Right"/> and <see cref="Bottom"/> are exclusive.</summary>
-    public readonly record struct PictRect(int Top, int Left, int Bottom, int Right)
+    /// <summary>
+    /// A QuickDraw rectangle as the engine computes with it (32-bit; Core's <c>MacRect</c> is the 16-bit Rect of the
+    /// public API): <see cref="Right"/> and <see cref="Bottom"/> are exclusive.
+    /// </summary>
+    internal readonly record struct PictRect(int Top, int Left, int Bottom, int Right)
     {
         /// <summary>Right − Left.</summary>
         public int Width => Right - Left;

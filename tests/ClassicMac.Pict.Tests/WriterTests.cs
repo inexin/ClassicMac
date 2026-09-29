@@ -1,3 +1,4 @@
+using ClassicMac.Core;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Metadata.Profiles.Icc;
@@ -127,7 +128,7 @@ public class WriterTests
         var bytes = Save(src, new PictWriteOptions { HorizontalResolution = 144, VerticalResolution = 144 });
         var (back, backInfo) = PictReader.Read(bytes);
         Assert.Equal((144.0, 144.0), (backInfo.HorizontalResolution, backInfo.VerticalResolution));
-        Assert.Equal(new PictRect(0, 0, 10, 20), backInfo.PictureFrame);
+        Assert.Equal(new MacRect(0, 0, 10, 20), backInfo.PictureFrame);
         AssertSame(src, back);
         Assert.Equal(20, PictReader.Decode(bytes, new PictDecodeOptions { Resolution = PictResolution.PictureFrame }).Width);
     }

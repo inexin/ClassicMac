@@ -1,3 +1,4 @@
+using ClassicMac.Core;
 using Xunit;
 using ClassicMac.Graphics;
 using ClassicMac.QuickTime;
@@ -129,8 +130,8 @@ public class PictParserTests
         Assert.Equal(Black, bmp[0, 0]);
         Assert.Equal(144.0, bmpInfo.HorizontalResolution);
         Assert.Equal(144.0, bmpInfo.VerticalResolution);
-        Assert.Equal(new PictRect(0, 0, 5, 4), bmpInfo.PictureFrame);
-        Assert.Equal(new PictRect(100, 200, 110, 208), bmpInfo.Bounds);
+        Assert.Equal(new MacRect(0, 0, 5, 4), bmpInfo.PictureFrame);
+        Assert.Equal(new MacRect(100, 200, 110, 208), bmpInfo.Bounds);
         Assert.True(bmpInfo.IsExtendedVersion2);
     }
 
@@ -436,7 +437,7 @@ public class PictParserTests
         using var ms = new MemoryStream(PictReaderTests.Write(PictReaderTests.TestCard(40, 20)));
         var info = PictHeader.ReadInfo(ms);
 
-        Assert.Equal(new PictRect(0, 0, 20, 40), info.Bounds);
+        Assert.Equal(new MacRect(0, 0, 20, 40), info.Bounds);
         Assert.Equal(2, info.Version);
         Assert.True(info.IsExtendedVersion2);
         Assert.Equal(72.0, info.HorizontalResolution);

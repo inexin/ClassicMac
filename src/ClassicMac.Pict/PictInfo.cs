@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 using System.Collections.Generic;
 using ClassicMac.Graphics;
 using ClassicMac.QuickTime;
@@ -19,8 +20,8 @@ namespace ClassicMac.Pict
         {
             Version = version;
             IsExtendedVersion2 = extendedVersion2;
-            PictureFrame = pictureFrame;
-            Bounds = bounds;
+            FrameRect = pictureFrame;
+            BoundsRect = bounds;
             HorizontalResolution = horizontalResolution;
             VerticalResolution = verticalResolution;
         }
@@ -34,13 +35,20 @@ namespace ClassicMac.Pict
         public bool IsExtendedVersion2 { get; }
 
         /// <summary>The picture's <c>picFrame</c>: its bounding rectangle at 72 dpi.</summary>
-        public PictRect PictureFrame { get; }
+        public MacRect PictureFrame => ToMacRect(FrameRect);
 
         /// <summary>
         /// The rectangle the picture's opcodes draw in, which the decoded canvas covers: the header's optimal source
         /// rectangle for an extended version 2 picture, otherwise <see cref="PictureFrame"/>.
         /// </summary>
-        public PictRect Bounds { get; }
+        public MacRect Bounds => ToMacRect(BoundsRect);
+
+        // The engine's copies (32-bit, as it computes with them); the picture stores them as 16-bit Rects.
+        internal PictRect FrameRect { get; }
+
+        internal PictRect BoundsRect { get; }
+
+        private static MacRect ToMacRect(PictRect r) => new((short)r.Top, (short)r.Left, (short)r.Bottom, (short)r.Right);
 
         /// <summary>Horizontal resolution of <see cref="Bounds"/> in dpi (72 unless an extended header says otherwise).</summary>
         public double HorizontalResolution { get; }
