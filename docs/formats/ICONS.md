@@ -253,11 +253,11 @@ row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour
 - Not reproduced by `IconSuite.Plot`: the 8-bit masks of an extended suite (Mac OS 9's deep CopyMask), several
   screens (DeviceLoop), PlotIconHandle, PlotSICNHandle and PlotIcon, a gray-scale device's label rule, and the ROM's
   endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac].
-- **Checked against Mac OS 9** [Verified]: all 451 PlotIconID/PlotIconSuite cases (alignments, rect sizes 16–52,
+- **Checked against Mac OS 9.0** ([README.md](README.md#reference-builds)) [Verified]: all 451 PlotIconID/PlotIconSuite cases (alignments, rect sizes 16–52,
   every transform, labels, member choice, missing masks, colour pairs, depths 1/4/8/32, a moved origin) match pixel
   for pixel. The ROM column is from the code only.
 - **Mac OS 9 on a 1-bit screen:** a selected icon (or any drawn with colours other than black on white) whose member
-  is scaled comes out as a solid black mask, because of Mac OS 9's scaled CopyMask ([QUICKDRAW.md](QUICKDRAW.md) §9.1);
+  is scaled comes out as a solid black mask, because of Mac OS 9.0's scaled CopyMask (a bug; later 9.x releases may have fixed it) ([QUICKDRAW.md](QUICKDRAW.md) §9.1);
   offline then adds white dots, and disabled changes nothing. The ROM draws it white on black at every size.
 - `icns` variants (`tile`, `over`, `drop`, `open`, `odrp`) are read but not exported; standalone 32-bit, 48 × 48 and
   8-bit mask resources are not decoded (Icon Services never reads them outside an `icns`).

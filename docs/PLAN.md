@@ -763,6 +763,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Fonts package:** part of `ClassicMac.Graphics` (`ClassicMac.Graphics.Fonts`), on Core only (2026-09-29, revising
   a standalone `ClassicMac.Fonts` of 2026-09-28); see Architecture.
 - **Image output:** 32-bit RGBA PNG by default; other screen depths on request.
+- **Reference Mac OS 9 (2026-09-29):** "Mac OS 9" means Mac OS 9.0, the build analysed and tested (component versions
+  in [formats/README.md](formats/README.md#reference-builds)). Its quirks and bugs are reproduced, since the goal is
+  the pixels that Mac shows; the ROM mode draws the classic 68k behaviour. Should a later 9.x differ, the version
+  setting names builds (for example 9.0 and 9.2.2) rather than one "Mac OS 9".
 - **Editing order:** resource-level edits, typed editors, then writing disk images.
 - **Names on disk:** `%XX` escaping, reserved-name escaping, hex suffix on case collisions; the manifest is the
   authority (see Names on disk).

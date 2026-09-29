@@ -9,7 +9,7 @@ adapters.
 
 There are two reference implementations, and they differ in details:
 
-- **Mac OS 9** replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
+- **Mac OS 9** (9.0; see [README.md](README.md#reference-builds)) replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
   with a native PowerPC rewrite. This is what current Macs-in-emulation (SheepShaver, and anything running Mac OS 9)
   show, and it is the **default** of ClassicMac.
 - **The Macintosh ROM** (Mac OS ROM 1.6, `$077D`) holds the last Apple revision of the classic 68k QuickDraw, which

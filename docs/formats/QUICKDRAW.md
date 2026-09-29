@@ -8,7 +8,7 @@ rules, implemented in `ClassicMac.Graphics.QuickDraw`.
 
 There are two reference implementations, and they differ in details:
 
-- **Mac OS 9** replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
+- **Mac OS 9** (9.0; see [README.md](README.md#reference-builds)) replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
   with a native PowerPC rewrite. This is what current Macs-in-emulation (SheepShaver, and anything running Mac OS 9)
   show, and it is the **default** of ClassicMac.
 - **The Macintosh ROM** (Mac OS ROM 1.6, `$077D`) holds the last Apple revision of the classic 68k QuickDraw, which
@@ -1107,8 +1107,8 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
   op to RGB values and maps them back, so under the mask srcCopy with any colours but black on white paints every pixel
   black; srcOr and notSrcOr set pixels black; srcBic and notSrcBic also set pixels black (not white); srcXor inverts
   the clear pixels; notSrcCopy paints black. Unscaled CopyMask, CopyBits (with or without a mask region) and deeper
-  sources or destinations are not affected [Code] [Verified]. ClassicMac reproduces the srcCopy case, the one CopyMask
-  uses.
+  sources or destinations are not affected [Code] [Verified: 9.0]. A bug, possibly fixed after 9.0; ClassicMac
+  reproduces the srcCopy case, the one CopyMask uses, as it reproduces Mac OS 9.0's other quirks.
 
 ### 9.2 Shapes
 

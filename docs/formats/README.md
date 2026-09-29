@@ -5,6 +5,29 @@ enough to write a reader (and, where ClassicMac writes the format, a writer) wit
 says where every rule comes from. They describe what classic Mac OS does: where Apple's documentation is silent, the
 behaviour of Apple's own code decides, as traced in disassembly and checked on real software in an emulator.
 
+## Reference builds
+
+"Mac OS 9" in these documents means **Mac OS 9.0** (System and Finder `'vers'` 9.0, 1999; not 9.0.4 or later), the
+build every [Code] rule was read from and every [Verified] result was checked on, run in SheepShaver on the NewWorld
+"Mac OS ROM" file. Later 9.x releases changed native code and may differ, bugs included; a rule confirmed on 9.0 is not
+claimed for them. The native code is in the System file's data fork:
+
+| Fragment | Version (cfrg) | Size (bytes) | MD5 |
+| --- | --- | --- | --- |
+| NQD (native QuickDraw) | 2 | 272110 | 707386184e1116e90eac98dee8a68346 |
+| FontManager | 3 | 196388 | e8c26caabcf4899e3a4c46c0b9760f9e |
+| IconUtils | 1 | 22572 | fcb1fb8b24b305463beeb5d1dd1f7084 |
+| IconServicesLib | 1 | 102295 | b4cc469f96a37304c5885150f1e1ab74 |
+| MacDialogsLib | 0 | 65339 | 241bc9791802c86e29897e7814bb162d |
+| MenusLib | 0 | 101770 | 00e2e2f43ec91287f4c6bb1150cef4d4 |
+| ControlsLib | 0 | 59769 | f64fadc010d3c8d0d580be2f5adc9f43 |
+| WindowsLib | 1 | 134885 | d0fb8648a2c6c7f46b5ad3cc4d00a6a6 |
+| AppearanceLib | 1 | 317505 | 3f0f0d3a8afb7676a3bffd130e1f73f8 |
+
+(Other components: Sound Manager 3.5.1, Appearance 1.1.4, File Exchange 3.0.3, Text Encoding Converter 1.5, Foreign File
+Access 5.3.) "The ROM" or "the 68k ROM" means the 68k code in the Mac OS ROM image with ROM version `$077D`, the classic
+QuickDraw and Toolbox every Mac before Mac OS 9 used in some revision.
+
 | Document | Formats | Code |
 | --- | --- | --- |
 | [RESOURCE-FORK.md](RESOURCE-FORK.md) | Resource forks: header, map, attributes; how Mac OS 9 and the 68k ROM open them; compressed resources (`dcmp` 0–3) | `ClassicMac.Resources` |
