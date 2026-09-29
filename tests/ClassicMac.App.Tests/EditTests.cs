@@ -184,6 +184,59 @@ public sealed class EditTests : IDisposable
         Assert.StartsWith("“beep.wav” could not be imported", model.Status);
     }
 
+    // A TMPL's data from (label, type) pairs.
+    internal static byte[] Tmpl(params (string Label, string Type)[] fields) =>
+        [.. fields.SelectMany(f => (byte[])[(byte)f.Label.Length, .. MacRoman.Encode(f.Label), .. MacRoman.Encode(f.Type)])];
+
+    [Fact]
+    public async Task Resources_without_a_form_are_edited_through_a_template()
+    {
+        var data = Path.Combine(folder, "Data.rsrc");
+        var templates = Path.Combine(folder, "Templates.rsrc");
+        var rsrc = FourCC.FromString("Rsrc");
+        var fork = new ResourceFork();
+        fork.Add(new Resource(rsrc, 128, new byte[] { 0, 7, 0, 1, 0, 2, 0, 0 }));                          // id, ZCNT 1 (two items), the items
+        File.WriteAllBytes(data, fork.ToArray());
+        var tmpl = new ResourceFork();
+        tmpl.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("ID", "DWRD"), ("Count", "ZCNT"), ("*****", "LSTC"), ("Value", "HWRD"), ("*****", "LSTE")))
+            { Name = MacString.FromMacRoman("Rsrc") });
+        File.WriteAllBytes(templates, tmpl.ToArray());
+
+        var model = new MainViewModel { EditDialogs = new Dialogs() };
+        var input = (await model.OpenAsync(data))!;
+        await input.EnsureLoadedAsync();
+        ResourceNode Node() => (ResourceNode)input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == rsrc).Children[0];
+        model.Selected = Node();
+        Assert.Null(model.Form);                                                             // no template open yet
+
+        // A template in another open file is used, as ResEdit uses templates in any open file.
+        await (await model.OpenAsync(templates))!.EnsureLoadedAsync();
+        model.Selected = null;
+        model.Selected = Node();
+        var form = Assert.IsType<TemplateForm>(model.Form);
+        Assert.Contains("TMPL 1000", form.Source);
+        var id = Assert.IsType<TemplateScalarRow>(form.Fields[0]);
+        var count = Assert.IsType<TemplateScalarRow>(form.Fields[1]);
+        var list = Assert.IsType<TemplateListRow>(form.Fields[2]);
+        Assert.Equal(("7", "1", 2), (id.Text, count.Text, list.Items.Count));
+        Assert.Equal("$0002", ((TemplateScalarRow)list.Items[0].Fields[0]).Text);
+
+        id.Text = "$10";
+        list.AddCommand.Execute(null);
+        Assert.Equal("2", count.Text);                                                       // kept in step
+        ((TemplateScalarRow)list.Items[2].Fields[0]).Text = "$ABCD";
+        list.RemoveCommand.Execute(list.Items[0]);
+        model.ApplyFormCommand.Execute(null);
+        Assert.Equal(new byte[] { 0, 16, 0, 1, 0, 0, 0xAB, 0xCD }, Node().Resource.GetData().ToArray());
+
+        var edited = Assert.IsType<TemplateForm>(model.Form);
+        ((TemplateScalarRow)edited.Fields[0]).Text = "70000";
+        model.ApplyFormCommand.Execute(null);
+        Assert.Contains("does not fit", model.Status);
+        model.UndoCommand.Execute(null);
+        Assert.Equal(8, Node().Resource.Length);
+    }
+
     [Fact]
     public async Task Closing_with_unsaved_edits_asks_and_can_save()
     {

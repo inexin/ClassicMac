@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Templates: resources without a form of their own are edited through a `TMPL` from their file or any other open
+  file, as ResEdit 2.1.3 reads and writes them; `ResourceTemplate` in the decoders library (TEMPLATES.md).
 - Editor II, import: Resource ▸ Import Image or Sound makes a `PICT`, `cicn`, icon, icon family or cursor from an image
   (PNG, JPEG, …) and a `snd ` from a WAV file, as an undoable edit; `ImageImport` and `SoundImport` in the decoders
   library (ICONS.md, PICT.md section 9, SOUND.md section 12).

@@ -219,7 +219,9 @@ public class WindowTests
         var menu = InterfaceWriter.WriteMenu(new MenuResource(128, 0, 0, 0, 0xFFFFFFFF, "File",
             [new MacMenuItem("Open…", 0, (byte)'O', 0, 0, true), new MacMenuItem("-", 0, 0, 0, 0, false), new MacMenuItem("Quit", 0, (byte)'Q', 0, 0, true)]));
         File.WriteAllBytes(path, PreviewTests.Fork(("STR#", 128, null, [0, 2, 3, .. "one"u8, 3, .. "two"u8]), ("vers", 1, null, vers),
-            ("TEXT", 128, null, "Some text"u8.ToArray()), ("DITL", 128, null, items), ("DLOG", 128, null, dialog), ("MENU", 128, null, menu)));
+            ("TEXT", 128, null, "Some text"u8.ToArray()), ("DITL", 128, null, items), ("DLOG", 128, null, dialog), ("MENU", 128, null, menu),
+            ("TMPL", 128, "Rsrc", EditTests.Tmpl(("Name", "PSTR"), ("Count", "OCNT"), ("*****", "LSTC"), ("Flag", "BOOL"), ("*****", "LSTE"))),
+            ("Rsrc", 128, null, [2, .. "ab"u8, 0, 1, 1, 0])));
         try
         {
             var model = new MainViewModel();
@@ -230,7 +232,8 @@ public class WindowTests
             var input = open.Result!;
             Pump(input.EnsureLoadedAsync());
             foreach (var (type, form) in new[] { ("STR#", typeof(StringListForm)), ("vers", typeof(VersionForm)), ("TEXT", typeof(TextForm)),
-                ("DLOG", typeof(WindowForm)), ("DITL", typeof(DialogItemsForm)), ("MENU", typeof(MenuForm)) })
+                ("DLOG", typeof(WindowForm)), ("DITL", typeof(DialogItemsForm)), ("MENU", typeof(MenuForm)),
+                ("Rsrc", typeof(TemplateForm)) })
             {
                 model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
                 Pump(model.PreviewTask);

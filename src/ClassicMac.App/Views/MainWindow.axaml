@@ -481,6 +481,46 @@
                       </StackPanel>
                     </StackPanel>
                   </DataTemplate>
+                  <DataTemplate DataType="vm:TemplateForm">
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,8">
+                        <TextBlock Text="{Binding Source}" Opacity="0.65" />
+                        <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap" Foreground="#B9770E" />
+                      </StackPanel>
+                      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding Fields}" />
+                      </ScrollViewer>
+                    </DockPanel>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:TemplateScalarRow">
+                    <Grid ColumnDefinitions="220,*" Margin="0,2">
+                      <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Type}" Margin="0,0,8,0" />
+                      <TextBox Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsText}" IsReadOnly="{Binding IsReadOnly}" Opacity="{Binding TextOpacity}" TextWrapping="Wrap" />
+                      <CheckBox Grid.Column="1" IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" />
+                    </Grid>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:TemplateListRow">
+                    <StackPanel Margin="0,4" Spacing="4">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Summary}" Opacity="0.65" VerticalAlignment="Center" />
+                        <Button Content="Add Item" Command="{Binding AddCommand}" />
+                      </StackPanel>
+                      <ItemsControl ItemsSource="{Binding Items}" Margin="16,0,0,0" />
+                    </StackPanel>
+                  </DataTemplate>
+                  <DataTemplate DataType="vm:TemplateItemRow">
+                    <Border BorderThickness="1,0,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" Padding="8,2,0,2" Margin="0,2">
+                      <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Title}" Opacity="0.65" VerticalAlignment="Center" />
+                          <Button Content="Insert Before" Command="{Binding List.InsertCommand}" CommandParameter="{Binding}" />
+                          <Button Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding Fields}" />
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
                 </ContentControl.DataTemplates>
               </ContentControl>
             </DockPanel>

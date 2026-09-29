@@ -57,6 +57,7 @@ ClassicMac follows 9.0; a 9.2.2 mode would take these differences.
 | [TEXT.md](TEXT.md) | `STR `, `STR#`, `TEXT` and `styl`, `vers`; the text, RTF and JSON output | `ClassicMac.Resources.Decoders.Text` |
 | [INTERFACE.md](INTERFACE.md) | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL`, their colour tables and Appearance extensions; the JSON output | `ClassicMac.Resources.Decoders.Interface` |
 | [PALETTES.md](PALETTES.md) | `clut` colour tables and `pltt` palettes; the JSON and `.act` output | `ClassicMac.Resources.Decoders.Colors` |
+| [TEMPLATES.md](TEMPLATES.md) | `TMPL` resource templates, as ResEdit 2.1.3 reads and writes resources through them | `ClassicMac.Resources.Decoders.Templates` |
 | [FINDER.md](FINDER.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
 | [FONTS.md](FONTS.md) | `NFNT`/`FONT` strikes, `FOND` families, `fctb`, `sfnt`; the glyph sheet, BDF and JSON output | `ClassicMac.Graphics.Fonts`, `ClassicMac.Resources.Decoders.Fonts` |
 | [DOCUMENTS.md](DOCUMENTS.md) | DOCMaker stand-alone documents and SimpleText documents with pictures; the HTML output | `ClassicMac.Resources.Decoders.Documents` |

@@ -148,7 +148,9 @@ namespace ClassicMac.App.ViewModels
 
         private void UpdateForm(NodeViewModel? node)
         {
-            Form = node is ResourceNode r && FileOwner(r) is not null ? ResourceForm.For(r.Resource, r.Fork, ReadOptions) : null;
+            Form = node is ResourceNode r && FileOwner(r) is { } owner
+                ? ResourceForm.For(r.Resource, r.Fork, ReadOptions) ?? TemplateFormFor(r, owner)
+                : null;
             WatchForm(Form, node as ResourceNode);
         }
 
