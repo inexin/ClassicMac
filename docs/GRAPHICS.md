@@ -1,17 +1,21 @@
-# The graphics packages
+# The graphics package
 
-*These were ClassicMac.Pict until 2026-09-29, when they moved into ClassicMac and were split (see [PLAN.md](PLAN.md),
-phase 9).*
+*This was QuickDraw.Pict until 2026-09-29, when it moved into ClassicMac as `ClassicMac.Graphics` (see
+[PLAN.md](PLAN.md), phase 9).*
 
 Reader and writer for Apple QuickDraw PICT pictures (version 1, version 2 and extended version 2), aiming to draw
 exactly the pixels a Macintosh draws.
 
-| Package | What it is |
+`ClassicMac.Graphics` is one package on `ClassicMac.Core`, with a namespace per layer; the adapters are separate
+packages.
+
+| Package or namespace | What it is |
 |---|---|
-| `ClassicMac.Graphics` | The base, with no dependencies: the RGBA `PictBitmap`, colours, rectangles, PixMaps, standard colour tables, PackBits, MacPaint documents. |
-| `ClassicMac.QuickTime` | QuickTime still images: the codecs, the codec hook, QTIF files. |
-| `ClassicMac.QuickDraw` | The software QuickDraw that draws everything (Mac OS 9 or the 68k ROM), fonts, screen depths. |
-| `ClassicMac.Pict` | `PictReader` decodes to an RGBA `PictBitmap` (`Read` also gives the `PictInfo`); `PictWriter` writes pictures; `PictHeader` detects pictures and reads their header. |
+| `ClassicMac.Graphics` | The base: the RGBA `PictBitmap`, colours, PixMaps, standard colour tables, PackBits, MacPaint documents. |
+| `ClassicMac.Graphics.Fonts` | Bitmap strikes (`NFNT`/`FONT`), families (`FOND`), font colour tables, TrueType `sfnt` data ([formats/FONTS.md](formats/FONTS.md)). |
+| `ClassicMac.Graphics.QuickTime` | QuickTime still images: the codecs, the codec hook, QTIF files. |
+| `ClassicMac.Graphics.QuickDraw` | The software QuickDraw that draws everything (Mac OS 9 or the 68k ROM), text, screen depths. |
+| `ClassicMac.Graphics.Pict` | `PictReader` decodes to an RGBA `PictBitmap` (`Read` also gives the `PictInfo`); `PictWriter` writes pictures; `PictHeader` detects pictures and reads their header. |
 | `ClassicMac.ImageSharp` | [ImageSharp](https://github.com/SixLabors/ImageSharp) format plugin on top of the core: detection, decoding, encoding, `SaveAsPict`. |
 | `ClassicMac.SkiaSharp` | [SkiaSharp](https://github.com/mono/SkiaSharp) integration: decode to `SKBitmap`/`SKImage`, encode `SKBitmap`/`SKPixmap`, `SaveAsPict`. |
 

@@ -3,9 +3,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
 using ClassicMac.Graphics;
-using ClassicMac.QuickTime;
-using ClassicMac.QuickDraw;
-using ClassicMac.Pict;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.ImageSharp
 {

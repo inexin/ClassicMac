@@ -9,7 +9,7 @@ using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
 using ClassicMac.Graphics;
-using ClassicMac.Pict;
+using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.Resources.Decoders.Images
 {

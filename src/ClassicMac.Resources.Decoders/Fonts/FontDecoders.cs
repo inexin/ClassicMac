@@ -5,14 +5,14 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
-using ClassicMac.Fonts;
+using ClassicMac.Graphics.Fonts;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Decoders.Fonts
 {
     /// <summary>
-    /// The Font Manager's resources through <c>ClassicMac.Fonts</c>: bitmap strikes (<c>NFNT</c>, <c>FONT</c>) as a glyph
+    /// The Font Manager's resources through <c>ClassicMac.Graphics.Fonts</c>: bitmap strikes (<c>NFNT</c>, <c>FONT</c>) as a glyph
     /// sheet image, a BDF font and metrics JSON; families (<c>FOND</c>) and font colour tables (<c>fctb</c>) as JSON;
     /// outline fonts (<c>sfnt</c>) as a <c>.ttf</c> file and JSON.
     /// </summary>

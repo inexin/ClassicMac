@@ -3,7 +3,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Graphics;
-using ClassicMac.QuickDraw;
+using ClassicMac.Graphics.QuickDraw;
 
 namespace ClassicMac.Resources.Decoders.Images
 {

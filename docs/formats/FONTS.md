@@ -5,7 +5,7 @@ families (`'FOND'`), font colour tables (`'fctb'`) and outline fonts (`'sfnt'`),
 without reading ClassicMac's code. It also specifies what ClassicMac writes for them: a glyph sheet image, a BDF font
 and JSON for strikes, JSON for families and colours, and the TrueType file for outline fonts.
 
-The reader is the `ClassicMac.Fonts` package (on `ClassicMac.Core` only); the decoders are in
+The reader is `ClassicMac.Graphics.Fonts` (in the `ClassicMac.Graphics` package, on `ClassicMac.Core` only); the decoders are in
 `ClassicMac.Resources.Decoders.Fonts`.
 
 References:
@@ -149,7 +149,7 @@ For a font association of size *s* > 0, the strike is the `'NFNT'` of its resour
 [Doc] [Code]. The ROM treats a `'FONT'` under $24 bytes as missing; Mac OS 9 does not check [Code]. Old-style fonts
 with no family record are `'FONT'` resources numbered family × 128 + size (the ROM only for families under $200);
 `'FONT'` family × 128 + 0 is empty and carries the family's name as its resource name [Doc] [Code]. Mac OS 9 makes a
-family record for them in memory [Code]. `ClassicMac.Fonts` takes a lookup (type and ID to bytes) for this, so any
+family record for them in memory [Code]. `ClassicMac.Graphics.Fonts` takes a lookup (type and ID to bytes) for this, so any
 source of resources can supply the fonts [ClassicMac].
 
 IDs are not range-checked. The Script Manager maps family IDs $4000–$BFFF to scripts, ((ID − $4000) >> 9) + 1, 512
@@ -227,5 +227,5 @@ All decoders are version 1. The viewer shows a strike's glyph sheet.
 ## 9. Not covered yet
 
 - Drawing text with a family (the Font Manager's choice of size and style, scaling, synthesized styles): with the
-  renderer, when `ClassicMac.QuickDraw` moves to `ClassicMac.Fonts` (the merge's stage 3).
+  renderer, when `ClassicMac.Graphics.QuickDraw` moves to `.Fonts` (the merge's stage 3).
 - Writing fonts (BDF or TrueType back into resources).

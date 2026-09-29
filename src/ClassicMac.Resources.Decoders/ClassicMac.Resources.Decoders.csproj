@@ -8,13 +8,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
-    <ProjectReference Include="..\ClassicMac.Fonts\ClassicMac.Fonts.csproj" />
-    <ProjectReference Include="..\ClassicMac.Pict\ClassicMac.Pict.csproj" />
+    <ProjectReference Include="..\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.Resources.Decoders.Tests" />
-    <InternalsVisibleTo Include="ClassicMac.Pict.Tests" />
+    <InternalsVisibleTo Include="ClassicMac.Graphics.Tests" />
   </ItemGroup>
 
 </Project>

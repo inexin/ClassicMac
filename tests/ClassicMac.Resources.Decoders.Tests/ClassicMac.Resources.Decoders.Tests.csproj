@@ -19,6 +19,6 @@
 
   <ItemGroup>
     <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
-    <Compile Include="..\ClassicMac.Fonts.Tests\FontBuilder.cs" Link="Builders\FontBuilder.cs" />
+    <Compile Include="..\ClassicMac.Graphics.Tests\Fonts\FontBuilder.cs" Link="Builders\FontBuilder.cs" />
   </ItemGroup>
 </Project>

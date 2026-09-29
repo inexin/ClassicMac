@@ -2,14 +2,14 @@
 
 ## Unreleased
 
-- The graphics packages: QuickDraw.Pict is split into `ClassicMac.Graphics` (with MacPaint), `ClassicMac.QuickTime`,
-  `ClassicMac.QuickDraw`, `ClassicMac.Pict`, `ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp`, namespaces to match.
-  `PictBitmap.Info` is gone: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` is part of
+- The graphics package: QuickDraw.Pict becomes `ClassicMac.Graphics`, one package in layers with a namespace each
+  (`ClassicMac.Graphics`, `.Fonts`, `.QuickTime`, `.QuickDraw`, `.Pict`), plus `ClassicMac.ImageSharp` and
+  `ClassicMac.SkiaSharp`. `PictInfo`'s frame and bounds are Core's `MacRect`. `PictBitmap.Info` is gone: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` is part of
   `ClassicMac.Resources.Decoders`. Usage in `docs/GRAPHICS.md`.
 - QuickDraw.Pict moved into this repository with its history: the picture renderer and PICT reader/writer
   (`src/QuickDraw.Pict`), its ImageSharp and SkiaSharp packages, tests and golden tools. The decoders use it directly
   instead of the NuGet package, so the Origin fix (below) reaches them; its spec is `docs/formats/PICT-FORMAT.md`.
-- `ClassicMac.Fonts`, a new package on Core only: bitmap strikes (`NFNT`, `FONT`), families (`FOND`) with their width,
+- Fonts (`ClassicMac.Graphics.Fonts`): bitmap strikes (`NFNT`, `FONT`), families (`FOND`) with their width,
   kerning and style-mapping tables, font colour tables and TrueType `sfnt` data. Font decoders: strikes to a glyph
   sheet PNG, BDF and metrics JSON; families and font colours to JSON; `sfnt` to `.ttf`. Specified in
   `docs/formats/FONTS.md`.

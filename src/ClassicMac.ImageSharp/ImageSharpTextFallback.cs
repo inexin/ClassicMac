@@ -5,9 +5,9 @@ using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using ClassicMac.Graphics;
-using ClassicMac.QuickTime;
-using ClassicMac.QuickDraw;
-using ClassicMac.Pict;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.ImageSharp
 {

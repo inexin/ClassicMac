@@ -17,8 +17,8 @@ dotnet run --project src/ClassicMac.Resources.Cli -- convert "Manual" -o manual
 dotnet run --project src/ClassicMac.Resources.Cli -- pack out -o "App.rsrc"
 ```
 
-The graphics packages (`ClassicMac.Graphics`, `.QuickTime`, `.QuickDraw`, `.Pict`, `.ImageSharp`, `.SkiaSharp`; formerly
-QuickDraw.Pict) draw PICT pictures and QuickDraw images exactly as a Macintosh does: usage in
+The graphics package `ClassicMac.Graphics` (QuickDraw, PICT, QuickTime images, MacPaint and fonts; formerly
+QuickDraw.Pict), with the `ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp` adapters, draws PICT pictures and QuickDraw images exactly as a Macintosh does: usage in
 [docs/GRAPHICS.md](docs/GRAPHICS.md), spec in [docs/formats/PICT-FORMAT.md](docs/formats/PICT-FORMAT.md).
 
 ## Licence

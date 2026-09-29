@@ -565,13 +565,13 @@ The image extensions are those of the configured image encoder (`.png` by defaul
 
 ## 8. Image outputs
 
-The image decoders hand each resource to the graphics packages (`PictReader` for pictures, `QuickDrawResources` for icons,
+The image decoders hand each resource to `ClassicMac.Graphics` (`PictReader` for pictures, `QuickDrawResources` for icons,
 cursors and patterns), which draws it as the Mac would into a width × height grid of 8-bit RGBA pixels. How each
 resource is laid out and drawn is specified in [PICT-FORMAT.md](PICT-FORMAT.md) (section 18 for icons, cursors
 and patterns, section 19 for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
 masks for colour icons, the cursor JSON, numbered list outputs and a size limit.
 
-`ClassicMac.Pict` reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
+`ClassicMac.Graphics` reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
 end-of-stream, argument, overflow, invalid-data, index-out-of-range) into `image.undecodable` with the library's
 message, and the resource is written raw. **[ClassicMac]**
 
@@ -587,7 +587,7 @@ message, and the resource is written raw. **[ClassicMac]**
 | `IEND` | empty |
 
 - There are no other chunks: no gamma, colour profile, resolution or time. The pixels are exact: every value is the
-  one `ClassicMac.Pict` drew. Alpha is straight (not premultiplied).
+  one `ClassicMac.Graphics` drew. Alpha is straight (not premultiplied).
 - The output depends only on the pixels and on the zlib implementation (.NET's `ZLibStream`, optimal level): the same
   image always gives the same bytes on one runtime, but a runtime with another zlib may compress differently. Compare
   decoded pixels, not file hashes, across runtimes.
@@ -597,7 +597,7 @@ message, and the resource is written raw. **[ClassicMac]**
 
 ### 8.2 Pictures (PICT)
 
-- A `PICT` is drawn by `PictReader.Decode` at its native resolution, with `ClassicMac.Pict`'s default options otherwise.
+- A `PICT` is drawn by `PictReader.Decode` at its native resolution, with `ClassicMac.Graphics`'s default options otherwise.
 - **Screen depth:** `DecodeOptions.ScreenDepth` (32 by default; 1, 2, 4, 8 or 16) is the depth of the screen the
   picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([PICT-FORMAT.md](PICT-FORMAT.md)
   section 19); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
@@ -606,7 +606,7 @@ message, and the resource is written raw. **[ClassicMac]**
 - **Pixel limit:** before drawing, the picture frame (`picFrame`, the `Rect` at bytes 2–9 of the resource) gives the
   canvas size. If width × height exceeds `DecodeOptions.MaxImagePixels` (64 Mi pixels, 67,108,864, by default), the
   picture is not drawn: `image.too-large`, and the resource is written raw. The check needs at least 10 bytes; shorter
-  data goes to `ClassicMac.Pict`, which rejects it. **[ClassicMac]**
+  data goes to `ClassicMac.Graphics`, which rejects it. **[ClassicMac]**
 - Parts of the canvas the picture does not draw on are transparent ([PICT-FORMAT.md](PICT-FORMAT.md) section 2.4).
 
 ### 8.3 Icons and their masks
@@ -752,7 +752,7 @@ the manifest's `diagnostics`, and is printed by the CLI.
 | `export.decoder-failed` | Warning | `ResourceExporter` | The decoder threw a data error (section 5.2); the message gives the decoder and the error. The resource is written raw |
 | `export.converter-failed` | Warning | `ResourceExporter`, `convert` | A document converter threw a data error; no document is written, and the next converter is tried |
 | `export.not-decoded` | Info | `ResourceExporter` | The decoder returned no files and nothing had been reported for the resource (neither by decompression nor by the decoder). The resource is written raw |
-| `image.undecodable` | Warning | image decoders | `ClassicMac.Pict` rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
+| `image.undecodable` | Warning | image decoders | `ClassicMac.Graphics` rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
 | `image.too-large` | Warning | `image.picture` | The picture's frame is over `MaxImagePixels` (section 8.2). The resource is written raw |
 | `image.no-mask` | Info | `image.icon` | A colour icon has no 1-bit icon list of the same ID for its mask; it is drawn opaque (section 8.3). The resource is still decoded |
 

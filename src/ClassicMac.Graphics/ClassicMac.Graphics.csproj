@@ -2,23 +2,20 @@
 
   <PropertyGroup>
     <PackageId>ClassicMac.Graphics</PackageId>
-    <Description>The base of the ClassicMac graphics stack: the RGBA bitmap, colours and rectangles, PixMap layouts and their unpacking, the standard colour tables, PackBits, and MacPaint documents. No dependencies.</Description>
-    <PackageTags>macintosh;classic-mac;quickdraw;pixmap;macpaint;image</PackageTags>
+    <Description>Classic Mac OS graphics that draw exactly the pixels a Macintosh draws: a software QuickDraw (Mac OS 9 or the 68k ROM: regions, shapes, patterns, transfer modes, CopyBits scaling, text, 1-16 bit screen depths), the PICT reader and writer, QuickTime still images and their codecs, QTIF and MacPaint files, and the Font Manager's resources (NFNT, FONT, FOND, fctb, sfnt). No dependencies beyond ClassicMac.Core.</Description>
+    <PackageTags>macintosh;classic-mac;quickdraw;pict;quicktime;macpaint;font;image;decoder;encoder</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Core\ClassicMac.Core.csproj" />
   </ItemGroup>
 
-  <!-- Until the renderer has a public drawing API (the merge's stage 3), the layers above share internals. -->
+  <!-- Until the renderer has a public drawing API, the decoders and the adapters share its internals. -->
   <ItemGroup>
-    <InternalsVisibleTo Include="ClassicMac.QuickTime" />
-    <InternalsVisibleTo Include="ClassicMac.QuickDraw" />
-    <InternalsVisibleTo Include="ClassicMac.Pict" />
     <InternalsVisibleTo Include="ClassicMac.ImageSharp" />
     <InternalsVisibleTo Include="ClassicMac.SkiaSharp" />
     <InternalsVisibleTo Include="ClassicMac.Resources.Decoders" />
-    <InternalsVisibleTo Include="ClassicMac.Pict.Tests" />
+    <InternalsVisibleTo Include="ClassicMac.Graphics.Tests" />
   </ItemGroup>
 
 </Project>

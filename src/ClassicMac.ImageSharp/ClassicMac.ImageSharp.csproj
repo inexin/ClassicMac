@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <PackageId>ClassicMac.ImageSharp</PackageId>
-    <Description>SixLabors.ImageSharp format plugin for Apple QuickDraw PICT pictures, QuickTime image files (QTIF) and MacPaint documents: detection, Macintosh-exact decoding with ClassicMac.Pict (JPEG/PNG/GIF/TIFF/WebP/BMP QuickTime images through ImageSharp, outline-font text through SixLabors.Fonts when no bitmap font is supplied) and PICT encoding (indexed, 16-bit, 32-bit with alpha, resolution, ICC).</Description>
+    <Description>SixLabors.ImageSharp format plugin for Apple QuickDraw PICT pictures, QuickTime image files (QTIF) and MacPaint documents: detection, Macintosh-exact decoding with ClassicMac.Graphics (JPEG/PNG/GIF/TIFF/WebP/BMP QuickTime images through ImageSharp, outline-font text through SixLabors.Fonts when no bitmap font is supplied) and PICT encoding (indexed, 16-bit, 32-bit with alpha, resolution, ICC).</Description>
     <PackageTags>imagesharp;pict;quickdraw;macintosh;image;decoder;encoder</PackageTags>
   </PropertyGroup>
 
@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ClassicMac.Pict\ClassicMac.Pict.csproj" />
+    <ProjectReference Include="..\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
   </ItemGroup>
 
 </Project>

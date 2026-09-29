@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+    <!-- The decoders take an optional cancellation token; the tests' pictures are small, so they pass none. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <!-- Skia's native library for Linux CI runners (Windows and macOS assets come with SkiaSharp). -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.ImageSharp\ClassicMac.ImageSharp.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.SkiaSharp\ClassicMac.SkiaSharp.csproj" />
+    <ProjectReference Include="..\..\src\ClassicMac.Resources.Decoders\ClassicMac.Resources.Decoders.csproj" />
+  </ItemGroup>
+
+</Project>
