@@ -953,11 +953,12 @@ by rendering an outline font at the same position.
 
 ### 12.1 Font resources
 
-**`FONT` / `NFNT`** (a bitmap strike; both have the same layout):
+**`FONT` / `NFNT`** (a bitmap strike; both have the same layout). The two QuickDraws read three fields differently,
+each marked below; [FONTS.md](FONTS.md) specifies the resource in full.
 
 | Offset | Type | Field |
 |---|---|---|
-| 0 | u16 | fontType. Bit 0: has a glyph height table. Bit 1: has a glyph width table. Bits 2–4: log₂ depth (colour fonts). Bit 9: colour. |
+| 0 | u16 | fontType. Bit 0: has a glyph height table. Bit 1: has a glyph width table. Bits 2–4 (ROM) or 2–3 (Mac OS 9): log₂ depth (colour fonts). Bit 9: colour. |
 | 2 | i16 | firstChar |
 | 4 | i16 | lastChar |
 | 6 | i16 | widMax |
@@ -969,15 +970,16 @@ by rendering an outline font at the same position.
 | 18 | i16 | ascent |
 | 20 | i16 | descent |
 | 22 | i16 | leading |
-| 24 | i16 | rowWords: the strike's row length in words |
-| 26 | — | strike: `rowWords × 2 × fRectHeight` bytes, 1 bit per pixel, MSB first |
-| — | u16[] | location table: `lastChar − firstChar + 3` entries (the characters, the missing symbol, a sentinel); glyph k occupies strike columns `[loc[k], loc[k+1])` |
+| 24 | i16 | rowWords: the strike's row length in words. Mac OS 9 ignores the top bit; with it set, the ROM's strike is unusable (ClassicMac treats the font as missing) |
+| 26 | — | strike: `rowWords × 2 × depth × fRectHeight` bytes, MSB first |
+| — | u16[] | location table: `lastChar − firstChar + 3` entries (the characters, the missing symbol, a sentinel); glyph k occupies strike columns `[loc[k], loc[k+1])`. The ROM reads it right after the strike, Mac OS 9 just before the offset/width table (the same place in a well-formed font) |
 | 16 + 2·owTLoc | i16[] | offset/width table, same count. Each entry is `offset << 8 \| width`, or **−1 for a missing character**. `offset` is the image's shift relative to kernMax; `width` is the advance. |
 | — | u16[] | optional glyph-width table (fontType bit 1): 8.8 fixed widths |
 | — | u16[] | optional height table (fontType bit 0): `top << 8 \| rows` per glyph |
 
 Character c uses table slot `c − firstChar`. Characters outside [firstChar, lastChar], or with an offset/width of
-−1, use the **missing symbol**, slot `lastChar − firstChar + 1`.
+−1, use the **missing symbol**, slot `lastChar − firstChar + 1`. A strike whose characters do not run within 0–255
+(lastChar before firstChar included) is treated as missing [ClassicMac].
 
 **`FOND`** (a font family):
 

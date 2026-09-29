@@ -349,9 +349,9 @@ flowchart LR
   Core only (see the layering below). Its fonts (`ClassicMac.Graphics.Fonts`) are the Font Manager's resources: bitmap
   strikes (`NFNT`, `FONT`), families (`FOND`), font colour tables (`fctb`) and TrueType `sfnt` data, parsed into
   glyphs as plain pixel arrays and metrics. They find a family's strikes through a small lookup (type and ID to bytes)
-  rather than `ClassicMac.Resources`, so the renderer can use them too. The decoders use them for font export; in the
-  merge's stage 3 the renderer uses them for text and its own parser (inherited from QuickDraw.Pict) goes. Until then
-  the two parsers are checked against the same fonts. `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are the
+  rather than `ClassicMac.Resources`, so the renderer can use them too. The decoders use them for font export and the renderer
+  for text (its own parser, inherited from QuickDraw.Pict, went in stage 3; the ROM's reading rules are an internal
+  option). `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are the
   host-library adapters.
 - **ClassicMac.Resources.Decoders** — the built-in decoders, one package with a namespace per area (text, images,
   sound; decided, like the file layer); depends on Resources and `ClassicMac.Graphics`.
@@ -393,8 +393,8 @@ QuickDraw or fonts together, and one package is simpler to publish and version).
 namespace used against the layering. `PictBitmap.Info`, the one upward reference, went: `PictReader.Read` returns the
 bitmap with its `PictInfo`, whose frame and bounds are Core's `MacRect`. `QuickDrawResources` moved into
 `ClassicMac.Resources.Decoders`. The adapters and the decoders share internals (`InternalsVisibleTo`) until the
-renderer's drawing API is public. **Stage 3** (below) is what the table still describes: the renderer on
-`.Fonts` and Core's geometry, the public drawing API, icons as full resource decoders.
+renderer's drawing API is public. **Stage 3** (below) is what the table still describes: Core's geometry,
+the public drawing API, icons as full resource decoders; the renderer draws text with `.Fonts` (done, 2026-09-29).
 
 | Layer (namespace) | Contains | Depends on |
 | --- | --- | --- |
@@ -741,8 +741,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
    2026-09-29)**, the decoders using it directly; **2. layered as one `ClassicMac.Graphics` package with a namespace per
-   layer (done, 2026-09-29)**; 3. shared types (Core's geometry, the renderer on `.Fonts`, icons as resource decoders)
-   and a public drawing API. The old repo is archived and the
+   layer (done, 2026-09-29)**; 3. shared types (Core's geometry; the renderer on `.Fonts`, done 2026-09-29, pixel-identical
+   on the corpus's fonts; icons as resource decoders) and a public drawing API. The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
@@ -800,4 +800,4 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 ## Open questions
 
 - [x] **Fonts package:** decided: `ClassicMac.Graphics.Fonts`, inside the graphics package on Core only, used by the
-  decoders and, from stage 3, by the renderer (see Architecture).
+  decoders and the renderer (see Architecture).

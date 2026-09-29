@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The QuickDraw renderer reads fonts with `ClassicMac.Graphics.Fonts` instead of its own parser. In Mac OS 9 mode a
+  strike is now read by Mac OS 9's rules (depth in fontType bits 2–3, rowWords' top bit ignored, the location table
+  just before the offset/width table); only damaged or unusual fonts draw differently. A strike whose characters do not
+  run within 0–255 is treated as missing.
 - The graphics package: QuickDraw.Pict becomes `ClassicMac.Graphics`, one package in layers with a namespace each
   (`ClassicMac.Graphics`, `.Fonts`, `.QuickTime`, `.QuickDraw`, `.Pict`), plus `ClassicMac.Graphics.ImageSharp` and
   `ClassicMac.Graphics.SkiaSharp`. `PictInfo`'s frame and bounds are Core's `MacRect`. `PictBitmap.Info` is gone: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` is part of

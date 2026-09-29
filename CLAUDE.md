@@ -27,8 +27,8 @@ it in the same change when a decision changes.
 QuickDraw.Pict (formerly <https://github.com/inexin/QuickDraw.Pict>) moved into this repo with its history on
 2026-09-29 and became one package, `ClassicMac.Graphics`, in layers (a folder and namespace each), with the
 `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` adapters. It decodes and encodes QuickDraw PICT pictures and draws
-**exactly the pixels a Macintosh draws**. The plan's merge phase continues with the renderer drawing text through
-`Fonts/` and a public drawing API for the renderer.
+**exactly the pixels a Macintosh draws**. The plan's merge phase continues with Core's geometry and a public drawing API
+for the renderer.
 
 - `docs/formats/PICT-FORMAT.md` is the full format and rendering spec; update the matching section in the same change
   as any behaviour change (§16 what isn't covered, §17 the Mac OS 9 differences, §19 screen depths).
@@ -85,8 +85,10 @@ correct.
   `Painter.FillRegion`/`FillMask` and `Bits.CopyBits`.
 
 **Text** (`ClassicMac.Graphics/QuickDraw/Text/`)
-- `PictFontLibrary` holds caller-supplied `FOND`/`NFNT`/`FONT`/`fctb` resources, parsed from resource forks by
-  `ResourceFork`.
+- `PictFontLibrary` holds caller-supplied `FOND`/`NFNT`/`FONT`/`fctb` resources (split out of resource forks by
+  `ResourceFork`), read by `Fonts/` (`FontFamily`, `BitmapFont`). The renderer uses their internal raw tables; a
+  strike is read by the ROM's rules in `MacRom` mode (`BitmapFont.Read(..., rom: true)`: depth bits 2–4, the location
+  table right after the strike).
 - `FontManager.Swap` reproduces the Font Manager's font choice and outputs a `FontSelection`: widths, style extras
   and stretch.
 - `TextDrawer` is the character generator. It draws into a 1-bit buffer, then does one StretchBits. It also has a

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Graphics;
+using ClassicMac.Graphics.Fonts;
 
 namespace ClassicMac.Graphics.QuickDraw
 {
@@ -70,11 +71,11 @@ namespace ClassicMac.Graphics.QuickDraw
             else
             {
                 int kern = 0;
-                if (f.KernMax < 0)
+                if (f.MaxKern < 0)
                 {
                     int ow = f.RawOffsetWidth(text[0]);
                     if (ow == -1) ow = f.RawOffsetWidth(0);
-                    int offset = ((ow >> 8) & 0xFF) + f.KernMax;
+                    int offset = ((ow >> 8) & 0xFF) + f.MaxKern;
                     if (offset <= 0) kern = offset;
                 }
                 int penFixed = unchecked((penH << 16) | penFrac);
@@ -115,7 +116,7 @@ namespace ClassicMac.Graphics.QuickDraw
             var buffer = new bool[length + 32];
 
             // Characters start at the pen's own fraction (the ROM) or at 1/2, the pen's fraction ignored (Mac OS 9).
-            int charLoc = unchecked(((penH + f.KernMax - bufLeft) << 16) | (s.MacOS9 ? 0x8000 : penFrac));
+            int charLoc = unchecked(((penH + f.MaxKern - bufLeft) << 16) | (s.MacOS9 ? 0x8000 : penFrac));
             int span = f.LastChar - f.FirstChar;
             foreach (byte c in text)
             {
@@ -207,7 +208,7 @@ namespace ClassicMac.Graphics.QuickDraw
                     if (bits > 0)
                     {
                         long scaled = stretch ? (long)advanced * (ushort)s.Numer.h / (ushort)s.Denom.h : advanced;
-                        int x = (short)((penFixed + scaled) >> 16) + f.KernMax + ((ow >> 8) & 0xFF);
+                        int x = (short)((penFixed + scaled) >> 16) + f.MaxKern + ((ow >> 8) & 0xFF);
                         int w = stretch ? (int)((2L * bits * (ushort)s.Numer.h + (ushort)s.Denom.h) / (2L * (ushort)s.Denom.h)) : bits;
                         var box = new PictRect(top, x, top + f.RectHeight, x + w);
                         if (stretch)
@@ -276,7 +277,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 advance = unchecked(advance + s.Widths[c] + (s.Widths[c] <= 0 ? 0 : cx));
                 int bits = (short)(f.Locations[index + 1] - f.Locations[index]);
                 if (bits <= 0) continue;
-                int x = origin + ((ow >> 8) & 0xFF) + f.KernMax;
+                int x = origin + ((ow >> 8) & 0xFF) + f.MaxKern;
                 (left, right) = (Math.Min(left, x), Math.Max(right, x + bits));
                 int srcLeft = f.Locations[index];
                 for (int y = 0; y < f.RectHeight; y++)

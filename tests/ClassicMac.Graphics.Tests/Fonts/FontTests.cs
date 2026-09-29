@@ -50,6 +50,32 @@ public class FontTests
         Assert.Throws<InvalidDataException>(() => BitmapFont.Read(new byte[20]));
     }
 
+    [Fact]
+    public void The_ROM_reads_a_strike_by_its_own_rules()
+    {
+        // Four bytes between the strike and the location table: Mac OS 9 finds the table before the offset/width table,
+        // the ROM right after the strike (the junk).
+        var sample = Sample();
+        int rowWords = (sample[24] << 8) | sample[25], strikeEnd = 26 + rowWords * 2 * 5;
+        var gap = sample[..strikeEnd].Concat(new byte[] { 0x7F, 0x7F, 0x7F, 0x7F }).Concat(sample[strikeEnd..]).ToArray();
+        gap.AsSpan(16).Write16(((gap[16] << 8) | gap[17]) + 2);
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(3, BitmapFont.Read(gap, diagnostics, rom: false).Locations[1]);
+        Assert.Equal(["font.location-table"], diagnostics.Select(d => d.Code));
+        Assert.Equal(0x7F7F, BitmapFont.Read(gap, null, rom: true).Locations[0]);
+
+        // fontType bit 4: a depth code of 4 (16 bits) to the ROM, 0 to Mac OS 9.
+        var deep = Sample();
+        deep[1] |= 0x10;
+        Assert.Equal((1, 16), (BitmapFont.Read(deep).Depth, BitmapFont.Read(deep, null, rom: true).Depth));
+
+        // rowWords' top bit: masked by Mac OS 9, a rejected strike to the ROM.
+        var high = Sample();
+        high[24] |= 0x80;
+        Assert.Equal(rowWords, BitmapFont.Read(high).RowWords);
+        Assert.Throws<InvalidDataException>(() => BitmapFont.Read(high, null, rom: true));
+    }
+
     private static string Pixels(byte[] pixels) => string.Concat(pixels.Select(p => p == 0 ? '.' : '#'));
 
     [Fact]

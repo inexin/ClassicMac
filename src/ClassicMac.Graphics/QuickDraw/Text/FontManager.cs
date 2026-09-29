@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Graphics;
+using ClassicMac.Graphics.Fonts;
 
 namespace ClassicMac.Graphics.QuickDraw
 {
@@ -57,7 +58,7 @@ namespace ClassicMac.Graphics.QuickDraw
         private static readonly int[] WidthTableScore = { 1, 3, 5, 4, 4, 2, 2, 0 };   // ROM $FFCBF6EA
         private const int Geneva = 3;
 
-        private readonly record struct Found(BitmapFont Font, int ActualSize, int Remaining, FontFamilyRecord? Fond)
+        private readonly record struct Found(BitmapFont Font, int ActualSize, int Remaining, FontFamily? Fond)
         {
             public int FontId { get; init; }
         }
@@ -82,7 +83,7 @@ namespace ClassicMac.Graphics.QuickDraw
             foreach (int candidate in Families(library, family, macOS9))
             {
                 var fond = library.Family(candidate);
-                if (fond != null && fond.Associations.Length > 0)
+                if (fond != null && fond.Fonts.Count > 0)
                 {
                     var found = FromFamily(library, fond, searchSize, face, fScaleDisable, macOS9, out bool trueType);
                     if (found != null)
@@ -94,7 +95,7 @@ namespace ClassicMac.Graphics.QuickDraw
                     }
                     if (trueType) return null;
                 }
-                if (candidate < 0x200 && FromOldFonts(library, candidate, searchSize, face, fScaleDisable) is { } old)
+                if (candidate < 0x200 && FromOldFonts(library, candidate, searchSize, face, fScaleDisable, !macOS9) is { } old)
                     return Build(old, size, face, numer, denom, spaceExtra, fractEnable, fScaleDisable, macOS9, fold);
             }
             return null;
@@ -115,20 +116,20 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (seen.Add(f)) yield return f;
         }
 
-        private static Found? FromFamily(PictFontLibrary library, FontFamilyRecord fond, int searchSize, int face,
+        private static Found? FromFamily(PictFontLibrary library, FontFamily fond, int searchSize, int face,
             bool fScaleDisable, bool macOS9, out bool trueType)
         {
             trueType = false;
             int match = macOS9 ? face & 0x9B : face;
             // Depth variants (style high byte = log2 depth) take part too: at a chosen size and style the last
             // variant of depth 2-16 bits is used on a 32-bit screen ($FFCBE6EA), else the plain one.
-            var entries = new List<FontFamilyRecord.Association>(fond.Associations);
+            var entries = new List<FontAssociation>(fond.Fonts);
             bool Has(int s) => s > 0 && entries.Exists(a => a.Size == s);
 
             // The style variant of a size, loaded (null when its resource is missing).
             Found? Load(int size)
             {
-                FontFamilyRecord.Association? chosen = null;
+                FontAssociation? chosen = null;
                 int bestScore = int.MinValue;
                 foreach (var a in entries)
                 {
@@ -142,7 +143,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 foreach (var a in entries)
                     if (a.Size == size && (a.Style & 0xFF) == (entry.Style & 0xFF) && (a.Style >> 8) is >= 1 and <= 4)
                         entry = a;
-                if (library.Strike(entry.FontId) is not { } strike) return null;
+                if (library.Strike(entry.FontId, !macOS9) is not { } strike) return null;
                 return new Found(strike, entry.Size, face & ~(entry.Style & 0xFF), fond) { FontId = entry.FontId };
             }
 
@@ -171,7 +172,7 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // Old-style FONTs (resource id family * 128 + size); nothing of the style is intrinsic.
-        private static Found? FromOldFonts(PictFontLibrary library, int family, int searchSize, int face, bool fScaleDisable)
+        private static Found? FromOldFonts(PictFontLibrary library, int family, int searchSize, int face, bool fScaleDisable, bool rom)
         {
             int size = (searchSize == 0 ? 1 : searchSize) & 0x7F;
             var order = new List<int> { size };
@@ -184,7 +185,7 @@ namespace ClassicMac.Graphics.QuickDraw
             order.AddRange(fScaleDisable ? down : up);
             order.AddRange(fScaleDisable ? up : down);
             foreach (int s in order)
-                if (library.OldStyleStrike(family, s) is { } strike)
+                if (library.OldStyleStrike(family, s, rom) is { } strike)
                     return new Found(strike, s, face, null);
             return null;
         }
@@ -239,7 +240,7 @@ namespace ClassicMac.Graphics.QuickDraw
 
             // Width source: with fractional widths, the NFNT's width table, else the family's (flags bit 14 clear).
             var fond = found.Fond;
-            FontFamilyRecord.WidthTable? fondWidths = null;
+            FontFamily.RawWidthTable? fondWidths = null;
             bool nfntWidths = fractEnable && f.FractionalWidths != null;
             if (fractEnable && !nfntWidths && fond != null && (fond.Flags & 0x4000) == 0)
                 fondWidths = MatchWidthTable(fond, face);
@@ -273,8 +274,8 @@ namespace ClassicMac.Graphics.QuickDraw
                     // Mac OS 9 indexes the table by the family's own range.
                     int fondMissing = macOS9 ? fond!.LastChar - fond.FirstChar + 1 : missing;
                     int i = !macOS9 ? index : index == missing ? fondMissing : index + f.FirstChar - fond!.FirstChar;
-                    int word = fond!.WidthWord(fondWidths, i);
-                    if (word == 0xFFFF && i != fondMissing) word = fond.WidthWord(fondWidths, fondMissing);
+                    int word = fond!.WidthWord(fondWidths.Value, i);
+                    if (word == 0xFFFF && i != fondMissing) word = fond.WidthWord(fondWidths.Value, fondMissing);
                     return unchecked((int)((uint)word * (uint)actual << 4));
                 }
                 if (nfntWidths)
@@ -345,11 +346,11 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         // The family width table for a style: the exact one, else the best-scoring subset.
-        private static FontFamilyRecord.WidthTable? MatchWidthTable(FontFamilyRecord fond, int face)
+        private static FontFamily.RawWidthTable? MatchWidthTable(FontFamily fond, int face)
         {
-            FontFamilyRecord.WidthTable? best = null;
+            FontFamily.RawWidthTable? best = null;
             int bestScore = -1;
-            foreach (var t in fond.WidthTables)
+            foreach (var t in fond.RawWidthTables)
             {
                 int style = t.Style & 0xFF;
                 if (style == face) return t;

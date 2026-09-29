@@ -54,6 +54,41 @@ namespace ClassicMac.Graphics.Fonts
     /// </summary>
     public sealed class FontFamily
     {
+        private byte[] data = [];
+
+        // A family width table as the Font Manager reads it: its style and the offset of its first width.
+        internal readonly record struct RawWidthTable(int Style, int Start);
+
+        // ffProperty's nine words as stored.
+        internal IReadOnlyList<int> Property { get; private init; } = [];
+
+        // The width tables as the Font Manager finds them: stepped by the family's range, a table whose widths run past
+        // the data kept (its words read as 0 there), unlike WidthTables.
+        internal IReadOnlyList<RawWidthTable> RawWidthTables { get; private init; } = [];
+
+        // Width word i of a width table, read on from its start wherever that lands (0 past the resource).
+        internal int WidthWord(RawWidthTable table, int i)
+        {
+            var at = table.Start + 2L * i;
+            return i >= 0 && at + 2 <= data.Length ? BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan((int)at)) : 0;
+        }
+
+        private static RawWidthTable[] ReadRawWidthTables(byte[] data, int offset, int firstChar, int lastChar)
+        {
+            if (offset <= 0 || lastChar == 0 || offset + 2 > data.Length) return [];
+            var count = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset)) + 1;
+            var entries = lastChar - firstChar + 3;
+            if (count <= 0 || entries <= 0) return [];
+            var tables = new List<RawWidthTable>();
+            var at = offset + 2;
+            for (var t = 0; t < count && at + 2 <= data.Length; t++)
+            {
+                tables.Add(new RawWidthTable(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(at)), at + 2));
+                at += 2 + 2 * entries;
+            }
+            return [.. tables];
+        }
+
         /// <summary>The family's name (the <c>'FOND'</c>'s resource name).</summary>
         public string Name { get; private init; } = "";
 
@@ -288,8 +323,13 @@ namespace ClassicMac.Graphics.Fonts
 
             if (shortData)
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The family record's tables run past its data; read as far as they go."));
+            var property = new int[9];
+            for (var i = 0; i < 9; i++) property[i] = (ushort)Word(28 + 2 * i);
             return new FontFamily
             {
+                data = data,
+                Property = property,
+                RawWidthTables = ReadRawWidthTables(data, widthOffset, firstChar, lastChar),
                 Name = name,
                 Flags = (ushort)Word(0),
                 FamilyId = (ushort)Word(2),

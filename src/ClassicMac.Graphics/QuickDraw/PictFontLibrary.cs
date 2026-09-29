@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Graphics;
+using ClassicMac.Graphics.Fonts;
 
 namespace ClassicMac.Graphics.QuickDraw
 {
@@ -17,11 +18,11 @@ namespace ClassicMac.Graphics.QuickDraw
     /// </remarks>
     public sealed class PictFontLibrary
     {
-        private readonly Dictionary<int, FontFamilyRecord> families = new Dictionary<int, FontFamilyRecord>();
+        private readonly Dictionary<int, FontFamily> families = new Dictionary<int, FontFamily>();
         private readonly Dictionary<string, int> familyNames = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<int, byte[]> nfnt = new Dictionary<int, byte[]>();
         private readonly Dictionary<int, byte[]> font = new Dictionary<int, byte[]>();
-        private readonly Dictionary<(bool nfnt, int id), BitmapFont?> parsed = new Dictionary<(bool, int), BitmapFont?>();
+        private readonly Dictionary<(bool nfnt, int id, bool rom), BitmapFont?> parsed = new Dictionary<(bool, int, bool), BitmapFont?>();
         private readonly Dictionary<int, byte[]> colorTables = new Dictionary<int, byte[]>();
 
         /// <summary>The family used for font number 0 (the system font). Defaults to 0 (Chicago).</summary>
@@ -36,7 +37,9 @@ namespace ClassicMac.Graphics.QuickDraw
         public void AddFamily(int familyId, string? name, byte[] fond)
         {
             ArgumentNullException.ThrowIfNull(fond);
-            families[familyId] = FontFamilyRecord.Parse(familyId, fond);
+            // A record too short for its header and association count has no fonts.
+            try { families[familyId] = FontFamily.Read(fond, name ?? ""); }
+            catch (System.IO.InvalidDataException) { families.Remove(familyId); }
             if (!string.IsNullOrEmpty(name)) familyNames[name] = familyId;
         }
 
@@ -92,20 +95,20 @@ namespace ClassicMac.Graphics.QuickDraw
 
         internal bool TryGetFamilyByName(string name, out int familyId) => familyNames.TryGetValue(name, out familyId);
 
-        internal FontFamilyRecord? Family(int familyId) => families.TryGetValue(familyId, out var f) ? f : null;
+        internal FontFamily? Family(int familyId) => families.TryGetValue(familyId, out var f) ? f : null;
 
         // The lowest-numbered Roman family (under 0x4000) with a family record, or null.
         internal int? LowestFamily()
         {
             int? lowest = null;
             foreach (var (id, fond) in families)
-                if (id < 0x4000 && fond.Associations.Length > 0 && (lowest == null || id < lowest)) lowest = id;
+                if (id < 0x4000 && fond.Fonts.Count > 0 && (lowest == null || id < lowest)) lowest = id;
             return lowest;
         }
 
         internal bool HasFamily(int familyId)
         {
-            if (families.TryGetValue(familyId, out var fond) && fond.Associations.Length > 0) return true;
+            if (families.TryGetValue(familyId, out var fond) && fond.Fonts.Count > 0) return true;
             foreach (var id in font.Keys)
                 if ((id >> 7) == familyId && (id & 127) != 0) return true;
             return false;
@@ -133,32 +136,34 @@ namespace ClassicMac.Graphics.QuickDraw
             return StandardColorTables.ForId(depth) ?? StandardColorTables.ForId(8)!;
         }
 
-        // A strike by resource id: NFNT first, then FONT, as the Font Manager looks them up.
-        internal BitmapFont? Strike(int resourceId) => Load(true, resourceId) ?? Load(false, resourceId);
+        // A strike by resource id: NFNT first, then FONT, as the Font Manager looks them up; read as the ROM or Mac OS 9
+        // reads it.
+        internal BitmapFont? Strike(int resourceId, bool rom) => Load(true, resourceId, rom) ?? Load(false, resourceId, rom);
 
         // An old-style FONT by family and size; the Font Manager treats a FONT under 0x24 bytes as missing.
-        internal BitmapFont? OldStyleStrike(int familyId, int size)
+        internal BitmapFont? OldStyleStrike(int familyId, int size, bool rom)
         {
             int id = familyId * 128 + size;
-            return font.TryGetValue(id, out var data) && data.Length >= 0x24 ? Load(false, id) : null;
+            return font.TryGetValue(id, out var data) && data.Length >= 0x24 ? Load(false, id, rom) : null;
         }
 
-        private BitmapFont? Load(bool isNfnt, int id)
+        private BitmapFont? Load(bool isNfnt, int id, bool rom)
         {
             lock (parsed)
-                return LoadLocked(isNfnt, id);
+                return LoadLocked(isNfnt, id, rom);
         }
 
-        private BitmapFont? LoadLocked(bool isNfnt, int id)
+        private BitmapFont? LoadLocked(bool isNfnt, int id, bool rom)
         {
-            if (parsed.TryGetValue((isNfnt, id), out var cached)) return cached;
+            if (parsed.TryGetValue((isNfnt, id, rom), out var cached)) return cached;
             BitmapFont? result = null;
             if ((isNfnt ? nfnt : font).TryGetValue(id, out var data))
             {
-                try { result = BitmapFont.Parse(data); }
-                catch (ArgumentException) { }
+                // A strike the reader rejects (a short header, a bad character range or row length) is missing.
+                try { result = BitmapFont.Read(data, null, rom); }
+                catch (System.IO.InvalidDataException) { }
             }
-            parsed[(isNfnt, id)] = result;
+            parsed[(isNfnt, id, rom)] = result;
             return result;
         }
     }
