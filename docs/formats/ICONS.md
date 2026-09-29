@@ -170,6 +170,13 @@ ROM's differ where noted [Code]. PlotIconID never reads `ICON` or `SICN`.
      rect); disabled: the image drawn, then PaintRgn with gray in patBic; offline: the image (1-bit) drawn, then
      PaintRgn with ltGray in patOr; open: FillRgn black, InsetRgn(1, 1), FillRgn ltGray.
    - The ROM's pattern loop never ends for an odd mask height (a crash); Mac OS 9 fixed it.
+   - **Mac OS 9's prescaled mask:** with any transform, a rect of exactly 32 × 32 and a smaller 1-bit member, the mask
+     is first copied (doubled) into a 32 × 32 1-bit buffer with CopyBits in the caller's colours, realised on a 1-bit
+     device: a set pixel becomes the foreground's index and a clear one the background's (the nearer of black, 1, and
+     white, 0, at 4 bits a component); when the two collide and the colours differ, the foreground takes its inverse's
+     index. Black on white copies the mask unchanged; red on blue, for example, inverts it. Every later step (the
+     rendering, even when GetGray then drops a disabled transform, and the bitmap transform) goes through that
+     buffer's region with CopyBits srcCopy, never CopyMask [Code] [Verified].
 7. **Labels:** 0 none to 7, from the transform's bits 8–11, or PlotIconSuite's suite label when the transform has none;
    8–15 make GetLabel fail. The colours are the System's `'rgb '` −16392 + n (Mac OS 9's defaults: 1 $5600 $2C9D $0524
    Project 2, 2 $0000 $64AF $11B0 Project 1, 3 $0000 $0000 $D400 Personal, 4 $0241 $AB54 $EAFF Cool, 5 $F2D7 $0856
@@ -254,10 +261,9 @@ row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour
 - Not reproduced by `IconSuite`: the 8-bit masks of an extended suite (Mac OS 9's deep CopyMask), several screens
   (DeviceLoop), a gray-scale device's label rule, and the ROM's endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac].
 - **Checked against Mac OS 9.0** ([README.md](README.md#reference-builds)) [Verified]: 625 of 628 cases match pixel for
-  pixel: every PlotIconID/PlotIconSuite case (alignments, rect sizes 16–52, every transform, labels, member choice,
-  missing masks, colour pairs, depths 1/4/8/32, a moved origin), IconIDToRgn, PlotIconHandle, PlotIcon and all but three
-  PlotSICNHandle cases. Those three (a SICN disabled in red on blue, where GetGray fails) draw differently on the Mac;
-  not yet explained. The ROM column is from the code only.
+  pixel (all 628): every PlotIconID/PlotIconSuite case (alignments, rect sizes 16–52, every transform, labels, member choice,
+  missing masks, colour pairs, depths 1/4/8/32, a moved origin), IconIDToRgn, PlotIconHandle, PlotSICNHandle and
+  PlotIcon. The ROM column is from the code only.
 - **Mac OS 9 on a 1-bit screen:** a selected icon (or any drawn with colours other than black on white) whose member
   is scaled comes out as a solid black mask, because of Mac OS 9.0's scaled CopyMask (a bug; later 9.x releases may have fixed it) ([QUICKDRAW.md](QUICKDRAW.md) §9.1);
   offline then adds white dots, and disabled changes nothing. The ROM draws it white on black at every size.

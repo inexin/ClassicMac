@@ -140,11 +140,15 @@ namespace ClassicMac.Resources.Decoders.Images
                 bool colour = (depth > 4 && tf != 3) || (depth == 4 && !selected && tf is 0 or 2);
                 string? data = colour ? ColourData(group, depth, native) : null;
                 var maskMap = PixMap.FromBitMap(mask, rowBytes, new MacRect(0, 0, (short)gh, (short)gw));
-                if (data != null) PlotDeep(port, data, maskMap, place, tf, label, selected, labelColors, native, gw, gh);
+                // Mac OS 9 prescales the mask for a transform into an exactly 32 x 32 rect, in the caller's colours.
+                var m32 = native && tf != 0 && place.Width == 32 && place.Height == 32 && (gw != 32 || gh != 32)
+                    ? PrescaleNative(maskMap, gw, gh, port.ForeColor, port.BackColor)
+                    : null;
+                if (data != null) PlotDeep(port, data, maskMap, place, tf, label, selected, labelColors, native, gw, gh, m32);
                 else
                 {
                     var imageMap = PixMap.FromBitMap(image, rowBytes, new MacRect(0, 0, (short)gh, (short)gw));
-                    PlotShallow(port, imageMap, maskMap, mask, place, tf, label, selected, depth, labelColors, native, gw, gh);
+                    PlotShallow(port, imageMap, maskMap, mask, place, tf, label, selected, depth, labelColors, native, gw, gh, m32);
                 }
             }
             finally
@@ -272,7 +276,7 @@ namespace ClassicMac.Resources.Decoders.Images
         // ---- colour data (PlotDeep) ----
 
         private void PlotDeep(QuickDrawPort port, string type, PixMap maskMap, PictRect place, int tf, int label, bool selected,
-            IReadOnlyList<RgbColor> labelColors, bool native, int gw, int gh)
+            IReadOnlyList<RgbColor> labelColors, bool native, int gw, int gh, bool[]? m32)
         {
             var member = IconFamily.MemberType(type)!;
             port.ForeColor = RgbColor.Black;
@@ -283,8 +287,8 @@ namespace ClassicMac.Resources.Decoders.Images
                 : PixMap.Indexed(members[type], gw * member.Depth / 8, new MacRect(0, 0, (short)gh, (short)gw), member.Depth,
                     Clut(member.Depth, label, selected, disabled, labelColors, native));
             var bounds = new MacRect(0, 0, (short)gh, (short)gw);
-            port.CopyMask(dataMap, maskMap, bounds, bounds, place.ToMacRect());
-            if (tf == 2) Transform(port, null, maskMap, place, tf, native, gw, gh, onePass: false);
+            Render(port, dataMap, maskMap, bounds, place, m32);
+            if (tf == 2) Transform(port, null, maskMap, place, tf, native, gw, gh, onePass: false, m32);
         }
 
         // 32-bit data transformed on a copy: label c * Brighten(L) >> 16 per channel, selected halves every channel,
@@ -345,7 +349,7 @@ namespace ClassicMac.Resources.Decoders.Images
         // ---- 1-bit data (PlotShallow) ----
 
         private static void PlotShallow(QuickDrawPort port, PixMap imageMap, PixMap maskMap, byte[] mask, PictRect place, int tf, int label,
-            bool selected, int depth, IReadOnlyList<RgbColor> labelColors, bool native, int gw, int gh)
+            bool selected, int depth, IReadOnlyList<RgbColor> labelColors, bool native, int gw, int gh, bool[]? m32)
         {
             if (depth >= 2)
             {
@@ -365,10 +369,42 @@ namespace ClassicMac.Resources.Decoders.Images
             var bounds = new MacRect(0, 0, (short)gh, (short)gw);
             if (tf == 0)
             {
-                port.CopyMask(imageMap, maskMap, bounds, bounds, place.ToMacRect());
+                Render(port, imageMap, maskMap, bounds, place, m32);
                 return;
             }
-            Transform(port, imageMap, maskMap, place, tf, native, gw, gh, onePass: true);
+            Transform(port, imageMap, maskMap, place, tf, native, gw, gh, onePass: true, m32);
+        }
+
+        // Render: CopyMask of the data through the mask; with a prescaled mask (whose bounds no longer match the data's)
+        // Mac OS 9 copies the data srcCopy through the mask's region instead.
+        private static void Render(QuickDrawPort port, PixMap dataMap, PixMap maskMap, MacRect bounds, PictRect place, bool[]? m32)
+        {
+            var rect = place.ToMacRect();
+            if (m32 == null)
+            {
+                port.CopyMask(dataMap, maskMap, bounds, bounds, rect);
+                return;
+            }
+            var region = Region.FromBitMap(ToBitMap(m32, 32, 32)).Offset(rect.Left, rect.Top);
+            port.CopyBits(dataMap, bounds, rect, TransferMode.SrcCopy, region);
+        }
+
+        // PrescaleMask on Mac OS 9: CopyBits of the mask to a 32 x 32 1-bit buffer in the caller's colours, realised on a
+        // 1-bit device, so a set mask pixel becomes the foreground's index and a clear one the background's (1 black, 0
+        // white, each the nearer at the inverse table's 4 bits a component). When the two collide but the colours differ,
+        // the foreground takes its inverse's index; black on white copies the mask as it is [Code] [Verified].
+        private static bool[] PrescaleNative(PixMap maskMap, int gw, int gh, RgbColor fore, RgbColor back)
+        {
+            static int Index1(RgbColor c)
+            {
+                int r = c.Red >> 12, g = c.Green >> 12, b = c.Blue >> 12;
+                int toBlack = r * r + g * g + b * b, toWhite = (15 - r) * (15 - r) + (15 - g) * (15 - g) + (15 - b) * (15 - b);
+                return toBlack <= toWhite ? 1 : 0;              // [I: the tie rule, for greys near 50%]
+            }
+            int f = Index1(fore), b = Index1(back);
+            if (f == b && fore != back) f = Index1(new RgbColor((ushort)~fore.Red, (ushort)~fore.Green, (ushort)~fore.Blue));
+            var stretched = Stretch(maskMap, gw, gh, 32, 32);
+            return stretched.Select(m => (m ? f : b) == 1).ToArray();
         }
 
         // ---- transforms ----
@@ -377,7 +413,7 @@ namespace ClassicMac.Resources.Decoders.Images
         // ones. Mac OS 9 takes the bitmap path only for a rect of exactly 32 x 32; the ROM for any rect up to 32 x 32,
         // prescaling the mask to the rect when the sizes differ.
         private static void Transform(QuickDrawPort port, PixMap? imageMap, PixMap maskMap, PictRect place, int tf, bool native,
-            int gw, int gh, bool onePass)
+            int gw, int gh, bool onePass, bool[]? m32)
         {
             int w = place.Width, h = place.Height;
             bool useRegions = native ? !(w == 32 && h == 32) : w > 32 || h > 32;
@@ -402,7 +438,7 @@ namespace ClassicMac.Resources.Decoders.Images
             // Bitmap path: T (and the mask) at the member's size, or prescaled to the rect's.
             bool prescale = w != gw || h != gh;
             int tw = prescale ? w : gw, th = prescale ? h : gh;
-            var maskBits = prescale ? Stretch(maskMap, gw, gh, tw, th) : Bits(maskMap, gw, gh);
+            var maskBits = m32 ?? (prescale ? Stretch(maskMap, gw, gh, tw, th) : Bits(maskMap, gw, gh));
             var imageBits = imageMap == null ? new bool[tw * th] : prescale ? Stretch(imageMap, gw, gh, tw, th) : Bits(imageMap, gw, gh);
             var t = new bool[tw * th];
             for (int y = 0; y < th; y++)
