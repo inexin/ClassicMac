@@ -484,7 +484,7 @@ stereo); playback stops when the selection changes. **Next:** drag and drop out 
 3. **Writing disk images:** add, replace and delete files in HFS images, with type/creator, dates and both forks.
    Archives (StuffIt, Compact Pro) stay read-only.
 
-**Editor I design (proposed, to confirm):**
+**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** the library part is built (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified).
 
 - **Edits live in the library.** `ClassicMac.Resources.Editing`: each edit is a command on a `ResourceFork` that can be
   applied and undone (add, delete, duplicate, rename, renumber, set attributes, set data, set the fork's attributes), and

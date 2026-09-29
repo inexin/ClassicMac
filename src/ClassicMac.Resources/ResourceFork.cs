@@ -138,6 +138,14 @@ namespace ClassicMac.Resources
             resource.Owner = this;
         }
 
+        /// <summary>Adds a resource at a position in <see cref="Resources"/> (as <see cref="Add"/> otherwise), to put back one removed.</summary>
+        public void Insert(int position, Resource resource)
+        {
+            Add(resource);
+            resources.RemoveAt(resources.Count - 1);
+            resources.Insert(Math.Clamp(position, 0, resources.Count), resource);
+        }
+
         /// <summary>Removes a resource; returns whether it was in this fork.</summary>
         public bool Remove(Resource resource)
         {
