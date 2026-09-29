@@ -467,7 +467,8 @@ up and left. It also:
 ### 6.5 Clip
 
 - DrawPicture replaces the port's clip with an **empty** region until the picture's ClipRgn opcode, so a picture without
-  one draws nothing; from then on the clip is the mapped picture clip intersected with the caller's clip [Code].
+  one draws nothing, and one arriving mid-picture limits only what follows; from then on the clip is the mapped picture
+  clip intersected with the caller's clip [Code] [Verified: Mac OS 9].
   ClassicMac's decoder (a fresh canvas, no caller) draws such a picture anyway [ClassicMac]; `DrawPicture` onto a
   `QuickDrawPort` follows the Mac.
 - The clip region is stored in picture coordinates and mapped (§6.3), then intersected with the caller's clip, whenever
@@ -478,7 +479,7 @@ up and left. It also:
 
 DrawPicture copies the whole port record at entry and restores it at exit, so the pen (location, fraction, size,
 mode, visibility), the patterns, the text font, face, size and mode, the space and character extras, the colours and
-the clip come back unchanged, and the pen does not move. patAlign, the picture's LineJustify spacing, FractEnable and
+the clip come back unchanged, and the pen does not move ([Verified: Mac OS 9] for the pen and its fraction). patAlign, the picture's LineJustify spacing, FractEnable and
 FScaleDisable are saved and restored too. The ROM writes OpColor (black) and the highlight colour, and the `$1D`–`$1F`
 opcodes, into the real port's colour state and does not restore them; Mac OS 9 plays those into a copy but still
 leaves OpColor black [Code]. pnVis is not reset, so a hidden pen hides the picture.
@@ -507,7 +508,7 @@ result = d + (toLo << 16)
     - **version 1:** MapPt. The pen fraction keeps whatever the previous text left.
   - pendingFrac resets to ½ at every text opcode.
 - **PnLocHFrac:** sets pendingFrac for the **next** text opcode only.
-- **ChExtra:** stored as it is (4.12 per point). **LineJustify:** `interCharSpacing` (Fixed per point) is stored.
+- **ChExtra:** stored as it is (4.12 per point; colour ports only), not through CharExtra [Code]. **LineJustify:** `interCharSpacing` (Fixed per point) is stored.
   The character extra of [QUICKDRAW.md](QUICKDRAW.md) §7.5 is `(ChExtra << 4) + interCharSpacing`, scaled there.
 - **SpExtra:** the space extra (Fixed), scaled by the Font Manager ([QUICKDRAW.md](QUICKDRAW.md) §7.4).
 - **glyphState:** the third byte turns fractional widths on or off, and the fourth turns scaling off or on ([QUICKDRAW.md](QUICKDRAW.md) §7.3,
@@ -526,7 +527,8 @@ result = d + (toLo << 16)
   - If it exists, is not family 0, and differs from the picture's number, then **later** TxFont opcodes with the
     picture's number select the named family. The first mapping for a number wins.
   - Recorders write fontName **before** its TxFont.
-- **TxMode / TxSize / TxFace / TxFont** are stored as they are.
+- **TxMode / TxSize / TxFace / TxFont** are stored as they are. TxSize writes txSize directly, not through TextSize, so
+  it does not clear the character extra: ChExtra then TxSize keeps the extra [Code] [Verified: Mac OS 9].
 
 ---
 
@@ -611,7 +613,9 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
 - **Text positions (MapFixPt):** each axis multiplies by the truncated ratio `(toSize << 16) / fromSize`, rounding
   half up and saturating: `(d × ratio + $8000) >> 16`. The ROM divides exactly. For example, with a 3 → 1 scale, h = 3.0
   maps to 0.99998, so the pen is 0 with fraction `$FFFF`, not 1.0.
-- **Origin** does not shift the pattern alignment, so patterns stay fixed to the canvas.
+- **Origin** does not shift the pattern alignment, so patterns stay fixed to the canvas [Code] [Verified]. The opcode
+  `$0200` (QDSetPatternOrigin) sets the port's pattern origin, which only pixel patterns use; 1-bit patterns
+  are unchanged [Verified]. The ROM skips it.
 - **`$92`/`$93`** are reserved (a word length and data). Only `$90`, `$91` and `$98`–`$9B` draw.
 - **Colour tables** are read whenever pixelSize < 9, whatever the opcode, including for a direct opcode and for
   pixel patterns.

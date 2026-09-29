@@ -50,6 +50,20 @@ public class TextTests
         }).ToArray())).ToArray();
     }
 
+    // DrawPicture's TxSize writes txSize directly (not TextSize), so a ChExtra before it survives [Code, Verified OS 9].
+    [Theory]
+    [InlineData(QuickDrawVersion.MacOS9)]
+    [InlineData(QuickDrawVersion.MacRom)]
+    public void TxSize_keeps_the_character_extra(QuickDrawVersion version)
+    {
+        var plain = Text("AA", width: 14, quickDraw: version);
+        var extra = Text("AA", width: 14, quickDraw: version, before: b => b.U16(0x0016).U16(0x0400));
+        var extraThenSize = Text("AA", width: 14, quickDraw: version, before: b => b.U16(0x0016).U16(0x0400).U16(0x000D).U16(9));
+
+        Assert.NotEqual(plain, extra);
+        Assert.Equal(extra, extraThenSize);
+    }
+
     [Fact]
     public void BitmapFont_ParsesTheStrikeAndTables()
     {
