@@ -227,5 +227,5 @@ All decoders are version 1. The viewer shows a strike's glyph sheet.
 ## 9. Not covered yet
 
 - Drawing text with a family (the Font Manager's choice of size and style, scaling, synthesized styles): with the
-  renderer, after the QuickDraw.Pict merge.
+  renderer, when `ClassicMac.QuickDraw` moves to `ClassicMac.Fonts` (the merge's stage 3).
 - Writing fonts (BDF or TrueType back into resources).

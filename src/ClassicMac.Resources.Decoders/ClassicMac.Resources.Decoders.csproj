@@ -9,11 +9,12 @@
   <ItemGroup>
     <ProjectReference Include="..\ClassicMac.Resources\ClassicMac.Resources.csproj" />
     <ProjectReference Include="..\ClassicMac.Fonts\ClassicMac.Fonts.csproj" />
-    <ProjectReference Include="..\QuickDraw.Pict\QuickDraw.Pict.csproj" />
+    <ProjectReference Include="..\ClassicMac.Pict\ClassicMac.Pict.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.Resources.Decoders.Tests" />
+    <InternalsVisibleTo Include="ClassicMac.Pict.Tests" />
   </ItemGroup>
 
 </Project>

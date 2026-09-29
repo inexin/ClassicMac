@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>ClassicMac.QuickTime</PackageId>
+    <Description>QuickTime still images: image descriptions, the built-in codecs (raw, Animation, Road Pizza, Graphics, Cinepak, 8BPS, YUV2, YVU9, Targa, MacPaint), a codec plug-in hook, and QTIF files.</Description>
+    <PackageTags>macintosh;classic-mac;quicktime;qtif;codec;image</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
+  </ItemGroup>
+
+  <!-- Until the renderer has a public drawing API (the merge's stage 3), the layers above share internals. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Pict" />
+    <InternalsVisibleTo Include="ClassicMac.ImageSharp" />
+    <InternalsVisibleTo Include="ClassicMac.SkiaSharp" />
+    <InternalsVisibleTo Include="ClassicMac.Pict.Tests" />
+  </ItemGroup>
+
+</Project>

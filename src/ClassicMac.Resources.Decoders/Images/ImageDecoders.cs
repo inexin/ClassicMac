@@ -8,7 +8,8 @@ using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Text;
 using ClassicMac.Resources.Export;
-using QuickDraw.Pict;
+using ClassicMac.Graphics;
+using ClassicMac.Pict;
 
 namespace ClassicMac.Resources.Decoders.Images
 {

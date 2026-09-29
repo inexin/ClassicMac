@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- The graphics packages: QuickDraw.Pict is split into `ClassicMac.Graphics` (with MacPaint), `ClassicMac.QuickTime`,
+  `ClassicMac.QuickDraw`, `ClassicMac.Pict`, `ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp`, namespaces to match.
+  `PictBitmap.Info` is gone: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` is part of
+  `ClassicMac.Resources.Decoders`. Usage in `docs/GRAPHICS.md`.
 - QuickDraw.Pict moved into this repository with its history: the picture renderer and PICT reader/writer
   (`src/QuickDraw.Pict`), its ImageSharp and SkiaSharp packages, tests and golden tools. The decoders use it directly
   instead of the NuGet package, so the Origin fix (below) reaches them; its spec is `docs/formats/PICT-FORMAT.md`.

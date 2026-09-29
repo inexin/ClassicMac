@@ -18,8 +18,9 @@ they are wrapped in — and turns them into modern files with a manifest, and la
 **Name and repository (decided):** the project is **ClassicMac**, in its own GitHub repo `inexin/ClassicMac` holding
 the libraries, the CLI and the viewer/editor app. Packages: `ClassicMac.Core`, `ClassicMac.Files`,
 `ClassicMac.Resources`, `ClassicMac.Encodings`, `ClassicMac.Fonts`, `ClassicMac.Resources.Decoders`, `ClassicMac.Resources.Cli`; the app
-carries the same name. QuickDraw.Pict moved into this repo with its history on 2026-09-29 (`src/QuickDraw.Pict*`);
-it is being split into the target layering below.
+carries the same name. QuickDraw.Pict moved into this repo with its history on 2026-09-29 and is split into the
+graphics packages `ClassicMac.Graphics`, `.QuickTime`, `.QuickDraw`, `.Pict`, `.ImageSharp` and `.SkiaSharp` (the
+layering below).
 
 ## Inputs
 
@@ -324,7 +325,7 @@ flowchart LR
     M --> F
     M --> D
     F & D --> E
-    Q["QuickDraw.Pict (in this repo)<br/>PICT and icon drawing"] --> D
+    Q["ClassicMac.Graphics · .QuickTime ·<br/>.QuickDraw · .Pict<br/>PICT and icon drawing"] --> D
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
@@ -349,11 +350,11 @@ flowchart LR
 - **ClassicMac.Fonts** (decided) — the Font Manager's resources: bitmap strikes (`NFNT`, `FONT`), families
   (`FOND`), font colour tables (`fctb`) and TrueType `sfnt` data, parsed into glyphs as plain pixel arrays and metrics;
   depends on Core only. It finds a family's strikes through a small lookup (type and ID to bytes) rather than
-  `ClassicMac.Resources`, so the renderer can use it too. The decoders use it for font export; after the QuickDraw.Pict
-  merge `ClassicMac.QuickDraw` uses it for text and QuickDraw.Pict's own parser goes. Until then QuickDraw.Pict keeps
-  its parser, and the two are checked against the same fonts.
+  `ClassicMac.Resources`, so the renderer can use it too. The decoders use it for font export; in the merge's stage 3
+  `ClassicMac.QuickDraw` uses it for text and its own parser (inherited from QuickDraw.Pict) goes. Until then the two
+  parsers are checked against the same fonts.
 - **ClassicMac.Resources.Decoders** — the built-in decoders, one package with a namespace per area (text, images,
-  sound; decided, like the file layer); depends on Resources, and on QuickDraw.Pict once images arrive.
+  sound; decided, like the file layer); depends on Resources, Fonts and the graphics packages (`ClassicMac.Pict`).
 - **CLI** — a `dotnet tool` with `info`, `list`, `extract` and `pack`; references the file and resource packages.
 - **Viewer app** — a cross-platform desktop app on the same packages (below).
 - **Extension points:** an `IContainerReader` per container format and an `IResourceDecoder` per resource type, so
@@ -382,13 +383,17 @@ tools/                      fixture and table generators; never packed
 - **Packages** are referenced without versions; `Directory.Packages.props` holds them.
 - **CI:** `dotnet test` on Windows, Linux and macOS for every push; fuzzing and the Rez hash check join as they arrive.
 
-### Target layering after the QuickDraw.Pict merge
+### Layering of the graphics packages (the QuickDraw.Pict merge)
 
-When QuickDraw.Pict moves into ClassicMac, it is split so every dependency points down: QuickTime and MacPaint stop
-living inside PICT, PICT calls QuickTime for its embedded images (`$8200`/`$8201`), and the QuickDraw renderer is
-separated from the PICT file format. Until the merge, QuickDraw.Pict stays one package, but its code already
-follows this split in layer folders (`Graphics/`, `MacPaint/`, `QuickTime/`, `QuickDraw/`, `Pict/`, `Resources/`),
-with a test that fails on any dependency pointing up; the merge moves those folders into projects.
+QuickDraw.Pict is split so every dependency points down: QuickTime and MacPaint stop living inside PICT, PICT calls
+QuickTime for its embedded images (`$8200`/`$8201`), and the QuickDraw renderer is separated from the PICT file
+format. **Done (stage 2, 2026-09-29):** its layer folders became the projects `ClassicMac.Graphics` (with MacPaint:
+one file did not warrant a package), `ClassicMac.QuickTime`, `ClassicMac.QuickDraw`, `ClassicMac.Pict`,
+`ClassicMac.ImageSharp` and `ClassicMac.SkiaSharp`; project references now enforce the layering. `PictBitmap.Info`,
+the one upward reference, went: `PictReader.Read` returns the bitmap with its `PictInfo`. `QuickDrawResources` moved
+into `ClassicMac.Resources.Decoders`. Lower layers share internals with the ones above (`InternalsVisibleTo`) until
+the renderer's drawing API is public. **Stage 3** (below) is what the table still describes: Core's geometry,
+`ClassicMac.Fonts`, the public drawing API, icons as full resource decoders.
 
 | Layer | Contains | Depends on |
 | --- | --- | --- |
@@ -733,8 +738,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
-   2026-09-29)**, the decoders using it directly; 2. split into the `ClassicMac.*` layer projects and namespaces;
-   3. shared types (Core's geometry, `ClassicMac.Fonts`, icons as resource decoders). The old repo is archived and the
+   2026-09-29)**, the decoders using it directly; **2. split into the `ClassicMac.*` layer projects and namespaces
+   (done, 2026-09-29)**; 3. shared types (Core's geometry, `ClassicMac.Fonts`, icons as resource decoders) and a
+   public drawing API. The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),

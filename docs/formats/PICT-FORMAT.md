@@ -2,13 +2,13 @@
 
 This document describes the Macintosh QuickDraw picture format (PICT) completely enough to write a decoder that
 renders pictures pixel for pixel as a Macintosh does, and an encoder whose output a Macintosh reads. It is the
-behaviour implemented by QuickDraw.Pict and QuickDraw.Pict.ImageSharp, written so that the code never has to be read.
+behaviour implemented by ClassicMac.Pict and ClassicMac.ImageSharp, written so that the code never has to be read.
 
 There are two reference implementations, and they differ in details:
 
 - **Mac OS 9** replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
   with a native PowerPC rewrite. This is what current Macs-in-emulation (SheepShaver, and anything running Mac OS 9)
-  show, and it is the **default** of QuickDraw.Pict.
+  show, and it is the **default** of ClassicMac.Pict.
 - **The Macintosh ROM** (Mac OS ROM 1.6, `$077D`) holds the last Apple revision of the classic 68k QuickDraw, which
   every Mac before Mac OS 9 used.
 
@@ -1133,7 +1133,7 @@ if n < $100:     numer = (short)(numer * 3) >> 2; n = (n << 2) / 3     // 3/4 of
 FOutNumer = numer;  factor = n << 8            // Fixed, 1.0 ≤ factor < 2.0
 ```
 
-- The ROM never returns when n is 0 or ≥ `$8000` (the loops cannot end). A decoder must stop there; QuickDraw.Pict
+- The ROM never returns when n is 0 or ≥ `$8000` (the loops cannot end). A decoder must stop there; ClassicMac.Pict
   leaves the stretch uncut.
 - The horizontal factor multiplies every non-zero width **after** its style extra: `FixMul(width, hFactor)`, skipped
   when the factor is exactly 1.0. The space extra is added afterwards and is not scaled.
@@ -1641,7 +1641,7 @@ A picture that every PICT reader, and the ROM, decodes identically:
 
 ## 16. Not covered
 
-Everything this document knows about but QuickDraw.Pict does not reproduce, in one place.
+Everything this document knows about but ClassicMac.Pict does not reproduce, in one place.
 
 **Text**
 - **TrueType (`sfnt`) text.** It goes to the outline fallback. On Mac OS 9 this includes stretched text whose folded
@@ -1828,7 +1828,7 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
 
 ### 17.5 Not yet pinned down
 
-These Mac OS 9 differences are known but not yet exactly specified or verified. QuickDraw.Pict draws them the ROM way
+These Mac OS 9 differences are known but not yet exactly specified or verified. ClassicMac.Pict draws them the ROM way
 in both modes:
 
 - **Quirks found by reading code but not reproduced:**

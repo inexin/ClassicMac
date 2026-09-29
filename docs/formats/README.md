@@ -21,10 +21,10 @@ behaviour of Apple's own code decides, as traced in disassembly and checked on r
 | [FINDER.md](FINDER.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
 | [FONTS.md](FONTS.md) | `NFNT`/`FONT` strikes, `FOND` families, `fctb`, `sfnt`; the glyph sheet, BDF and JSON output | `ClassicMac.Fonts`, `ClassicMac.Resources.Decoders.Fonts` |
 | [DOCUMENTS.md](DOCUMENTS.md) | DOCMaker stand-alone documents and SimpleText documents with pictures; the HTML output | `ClassicMac.Resources.Decoders.Documents` |
-| [PICT-FORMAT.md](PICT-FORMAT.md) | QuickDraw pictures (PICT v1, v2, extended v2), how QuickDraw draws them (Mac OS 9 and the 68k ROM), QuickTime images, MacPaint, icons, cursors and patterns | `QuickDraw.Pict` |
+| [PICT-FORMAT.md](PICT-FORMAT.md) | QuickDraw pictures (PICT v1, v2, extended v2), how QuickDraw draws them (Mac OS 9 and the 68k ROM), QuickTime images, MacPaint, icons, cursors and patterns | `ClassicMac.Graphics`, `.QuickTime`, `.QuickDraw`, `.Pict` |
 | [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 
-Pictures, icons, cursors and patterns are drawn by QuickDraw.Pict (`src/QuickDraw.Pict`), which
+Pictures, icons, cursors and patterns are drawn by the graphics packages (`ClassicMac.QuickDraw`, `ClassicMac.Pict`), which
 [PICT-FORMAT.md](PICT-FORMAT.md) specifies (section 18 for icons, cursors and patterns).
 [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) covers what ClassicMac adds: masks, cursor JSON and numbered list outputs.
 

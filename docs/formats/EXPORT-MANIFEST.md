@@ -10,7 +10,7 @@ without reading ClassicMac's code. The writer is `ResourceExporter` (`ClassicMac
 Unlike the other documents in this folder, this one describes a format ClassicMac defines itself. Mac data appears in
 it only as the values the manifest records (types, IDs, attributes, Finder flags); how that data is read is specified
 in [RESOURCE-FORK.md](RESOURCE-FORK.md), [CONTAINERS.md](CONTAINERS.md) and [HOST-FOLDERS.md](HOST-FOLDERS.md). How
-icons, cursors, patterns and pictures are drawn is specified by QuickDraw.Pict's [PICT-FORMAT.md](PICT-FORMAT.md) (sections 1–19,
+icons, cursors, patterns and pictures are drawn is specified by [PICT-FORMAT.md](PICT-FORMAT.md) (sections 1–19,
 section 18 for icons, cursors and patterns); this document covers only what ClassicMac adds on top.
 
 Contents
@@ -565,13 +565,13 @@ The image extensions are those of the configured image encoder (`.png` by defaul
 
 ## 8. Image outputs
 
-The image decoders hand each resource to QuickDraw.Pict (`PictReader` for pictures, `QuickDrawResources` for icons,
+The image decoders hand each resource to the graphics packages (`PictReader` for pictures, `QuickDrawResources` for icons,
 cursors and patterns), which draws it as the Mac would into a width × height grid of 8-bit RGBA pixels. How each
-resource is laid out and drawn is QuickDraw.Pict's specification ([PICT-FORMAT.md](PICT-FORMAT.md), section 18 for icons, cursors
+resource is laid out and drawn is specified in [PICT-FORMAT.md](PICT-FORMAT.md) (section 18 for icons, cursors
 and patterns, section 19 for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
 masks for colour icons, the cursor JSON, numbered list outputs and a size limit.
 
-QuickDraw.Pict reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
+`ClassicMac.Pict` reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
 end-of-stream, argument, overflow, invalid-data, index-out-of-range) into `image.undecodable` with the library's
 message, and the resource is written raw. **[ClassicMac]**
 
@@ -587,7 +587,7 @@ message, and the resource is written raw. **[ClassicMac]**
 | `IEND` | empty |
 
 - There are no other chunks: no gamma, colour profile, resolution or time. The pixels are exact: every value is the
-  one QuickDraw.Pict drew. Alpha is straight (not premultiplied).
+  one `ClassicMac.Pict` drew. Alpha is straight (not premultiplied).
 - The output depends only on the pixels and on the zlib implementation (.NET's `ZLibStream`, optimal level): the same
   image always gives the same bytes on one runtime, but a runtime with another zlib may compress differently. Compare
   decoded pixels, not file hashes, across runtimes.
@@ -597,34 +597,34 @@ message, and the resource is written raw. **[ClassicMac]**
 
 ### 8.2 Pictures (PICT)
 
-- A `PICT` is drawn by `PictReader.Decode` at its native resolution, with QuickDraw.Pict's default options otherwise.
+- A `PICT` is drawn by `PictReader.Decode` at its native resolution, with `ClassicMac.Pict`'s default options otherwise.
 - **Screen depth:** `DecodeOptions.ScreenDepth` (32 by default; 1, 2, 4, 8 or 16) is the depth of the screen the
-  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply (QuickDraw.Pict
+  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([PICT-FORMAT.md](PICT-FORMAT.md)
   section 19); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
 - **QuickDraw model:** Mac OS 9's QuickDraw by default, or the 68k ROM's when `DecodeOptions.QuickDraw` is
-  `Rom68k` (QuickDraw.Pict section 17 lists the differences).
+  `Rom68k` ([PICT-FORMAT.md](PICT-FORMAT.md) section 17 lists the differences).
 - **Pixel limit:** before drawing, the picture frame (`picFrame`, the `Rect` at bytes 2–9 of the resource) gives the
   canvas size. If width × height exceeds `DecodeOptions.MaxImagePixels` (64 Mi pixels, 67,108,864, by default), the
   picture is not drawn: `image.too-large`, and the resource is written raw. The check needs at least 10 bytes; shorter
-  data goes to QuickDraw.Pict, which rejects it. **[ClassicMac]**
-- Parts of the canvas the picture does not draw on are transparent (QuickDraw.Pict section 2.4).
+  data goes to `ClassicMac.Pict`, which rejects it. **[ClassicMac]**
+- Parts of the canvas the picture does not draw on are transparent ([PICT-FORMAT.md](PICT-FORMAT.md) section 2.4).
 
 ### 8.3 Icons and their masks
 
 | Types | Output |
 | --- | --- |
 | `ICON` | 32 × 32, black on white, opaque |
-| `ICN#`, `ics#`, `icm#` | the first icon of the list, with the list's mask as transparency (mask bit 0 → alpha 0); a list without a mask half gets a computed mask (QuickDraw.Pict section 18) |
+| `ICN#`, `ics#`, `icm#` | the first icon of the list, with the list's mask as transparency (mask bit 0 → alpha 0); a list without a mask half gets a computed mask ([PICT-FORMAT.md](PICT-FORMAT.md) section 18) |
 | `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8` | the colour icon, masked by the icon list of the **same ID and size** in the same fork: `icl*` by `ICN#`, `ics*` by `ics#`, `icm*` by `icm#` |
 | `cicn` | the colour icon with its own mask |
 | `SICN` | one image per 16 × 16 icon, numbered (section 8.4), unmasked |
 
-- The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID (QuickDraw.Pict
+- The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID ([PICT-FORMAT.md](PICT-FORMAT.md)
   section 18). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
   reported against the colour icon.
 - **No list:** when the fork has no such list, the colour icon is drawn fully opaque and `image.no-mask` (info) is
   reported; the icon is still decoded. The Mac's Icon Utilities draw nothing in that case (noMaskFoundErr, per
-  QuickDraw.Pict section 18); ClassicMac prefers a visible image. **[ClassicMac]**
+  [PICT-FORMAT.md](PICT-FORMAT.md) section 18); ClassicMac prefers a visible image. **[ClassicMac]**
 
 ### 8.4 Numbered list outputs
 
@@ -642,7 +642,7 @@ A cursor (`CURS`, `crsr`) gives two files, **[ClassicMac]**:
 - `<stem>.json`, what a PNG cannot hold, described below.
 
 On the Mac a cursor is drawn as `screen = (screen AND NOT mask) XOR image`: where the mask is 0, a `CURS` data bit 1
-inverts the screen, and a `crsr` pixel XORs the screen with its complement (QuickDraw.Pict section 18). The JSON
+inverts the screen, and a `crsr` pixel XORs the screen with its complement ([PICT-FORMAT.md](PICT-FORMAT.md) section 18). The JSON
 records that as follows:
 
 | Name | Type | Meaning | Example |
@@ -752,7 +752,7 @@ the manifest's `diagnostics`, and is printed by the CLI.
 | `export.decoder-failed` | Warning | `ResourceExporter` | The decoder threw a data error (section 5.2); the message gives the decoder and the error. The resource is written raw |
 | `export.converter-failed` | Warning | `ResourceExporter`, `convert` | A document converter threw a data error; no document is written, and the next converter is tried |
 | `export.not-decoded` | Info | `ResourceExporter` | The decoder returned no files and nothing had been reported for the resource (neither by decompression nor by the decoder). The resource is written raw |
-| `image.undecodable` | Warning | image decoders | QuickDraw.Pict rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
+| `image.undecodable` | Warning | image decoders | `ClassicMac.Pict` rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
 | `image.too-large` | Warning | `image.picture` | The picture's frame is over `MaxImagePixels` (section 8.2). The resource is written raw |
 | `image.no-mask` | Info | `image.icon` | A colour icon has no 1-bit icon list of the same ID for its mask; it is drawn opaque (section 8.3). The resource is still decoded |
 

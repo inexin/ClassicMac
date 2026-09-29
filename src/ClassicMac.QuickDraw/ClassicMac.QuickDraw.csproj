@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>ClassicMac.QuickDraw</PackageId>
+    <Description>A software QuickDraw that draws exactly the pixels a Macintosh draws (Mac OS 9 or the 68k ROM): regions, shapes, patterns, transfer modes, CopyBits scaling, bitmap and colour-bitmap-font text through a Font Manager model, and 1-16 bit screen depths with colour matching and dithering.</Description>
+    <PackageTags>macintosh;classic-mac;quickdraw;renderer;graphics</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ClassicMac.Graphics\ClassicMac.Graphics.csproj" />
+  </ItemGroup>
+
+  <!-- Until the renderer has a public drawing API (the merge's stage 3), the layers above share internals. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ClassicMac.Pict" />
+    <InternalsVisibleTo Include="ClassicMac.ImageSharp" />
+    <InternalsVisibleTo Include="ClassicMac.SkiaSharp" />
+    <InternalsVisibleTo Include="ClassicMac.Resources.Decoders" />
+    <InternalsVisibleTo Include="ClassicMac.Pict.Tests" />
+  </ItemGroup>
+
+</Project>
