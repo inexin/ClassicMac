@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Editor II, UI templates: forms for `DLOG`, `ALRT`, `WIND`, `DITL`, `MENU` and `CNTL` in the Edit tab, the dialog or
+  menu preview beside them redrawn as they change; `InterfaceWriter` writes the templates (INTERFACE.md section 13).
 - Editor II, first part: an Edit tab with forms for `STR `, `STR#`, `TEXT` (its `styl` runs kept in step) and `vers`,
   applied as undoable edits; the library writes them (`TextResources`, `VersionResource`; TEXT.md section 12).
 - The viewer shows an icon's suite as the Finder draws it: each size, plain, selected, disabled, offline and open, and

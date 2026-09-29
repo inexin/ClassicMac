@@ -735,7 +735,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    on the whole corpus (the corpus test packs every export back); fonts through the new `ClassicMac.Graphics.Fonts`
    ([formats/FONTS.md](formats/FONTS.md)).
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers. **Built** (2026-09-29).
-7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders). **Started** (2026-09-29): the Edit tab's forms for `STR `, `STR#`, `TEXT` (its `styl` kept in step) and `vers`, applied as undoable edits; next the UI templates (`DLOG`, `DITL`, `ALRT`, `MENU`, `WIND`, `CNTL`), then PNG and WAV import.
+7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders). **Started** (2026-09-29): the Edit tab's forms for `STR `, `STR#`, `TEXT` (its `styl` kept in step), `vers` and the UI templates (`DLOG`, `DITL`, `ALRT`, `MENU`, `WIND`, `CNTL`, with the dialog or menu preview redrawn as the form changes), applied as undoable edits; next PNG and WAV import.
 8. **Editor III** — writing HFS disk images.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp

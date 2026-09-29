@@ -30,8 +30,9 @@ Contents
 10. [Colour and extension resources](#10-colour-and-extension-resources)
 11. [JSON output](#11-json-output)
 12. [Viewer previews](#12-viewer-previews)
-13. [Diagnostics](#13-diagnostics)
-14. [Not covered yet](#14-not-covered-yet)
+13. [Writing templates](#13-writing-templates)
+14. [Diagnostics](#14-diagnostics)
+15. [Not covered yet](#15-not-covered-yet)
 
 ---
 
@@ -44,7 +45,7 @@ native managers unless it names the 68k code. **[ClassicMac]** marks ClassicMac'
 
 The Toolbox checks almost nothing: it never compares a template's counts with its size and reads past the end of
 a short one [Code]. ClassicMac reads short data as far as it goes, with zeros for missing fields, and reports it
-(§13) [ClassicMac].
+(§14) [ClassicMac].
 
 ---
 
@@ -215,7 +216,7 @@ An `i16` count **less one**, then the items [Doc]:
 
 - **Count.** A signed number: −1 ($FFFF) or any negative count is an empty list [Code]. It is never checked against
   the resource's size: a count past the data makes the Dialog Manager read past the end [Code]. ClassicMac stops at the
-  end of the data (§13) [ClassicMac].
+  end of the data (§14) [ClassicMac].
 - **Types.** Mac OS 9 accepts exactly these values of the type less bit 7; any other item draws nothing but still
   takes space and clicks [Code]. The 68k Dialog Manager tested bits in the order control, editable text, static text,
   icon, picture, so combined values took the first that matched [Code: 68k].
@@ -378,7 +379,27 @@ resource's layout; the other interface resources preview as their JSON.
 
 ---
 
-## 13. Diagnostics
+## 13. Writing templates
+
+ClassicMac's editor writes `MENU`, `WIND`, `DLOG`, `ALRT`, `DITL` and `CNTL` back from their fields
+(`InterfaceWriter`), in the layouts above [ClassicMac]:
+
+- Text is Mac OS Roman (a line break in item text is a carriage return); text it cannot hold, and a string over 255
+  bytes, are refused.
+- Filler fields (the `MENU` word after the MDEF ID, the bytes after `WIND`/`DLOG`'s visible and close-box flags,
+  a `DITL` item's placeholder long and the pad byte after odd-length data, the pad before a `DLOG`'s positioning
+  word) are written as 0; the Toolbox does not read them.
+- **`MENU`:** the enable flags are those read, with the bits of items 1–31 set from each item's enabled state, except
+  for dividers (which are read as disabled whatever their bit) and for items the menu does not have, whose stored bits
+  are kept. An item must have text: a zero length byte ends the item list.
+- **`DITL`:** an item's data is made from its kind: the text of buttons, check boxes, radio buttons, static and
+  editable text; the resource ID of controls, icons and pictures; help and user items keep their data as stored.
+- **`DLOG`/`WIND`/`ALRT`:** the positioning word is written when the template had one (or the editor adds it), at the
+  next even offset for `WIND` and `DLOG`.
+- Read back and written again, every `WIND`, `ALRT` and `CNTL` of the test corpus comes out byte for byte, and every
+  `MENU` but one; `DLOG` and `DITL` differ only in their filler and pad bytes [Verified: ClassicMac's corpus].
+
+## 14. Diagnostics
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
@@ -386,7 +407,7 @@ resource's layout; the other interface resources preview as their JSON.
 
 ---
 
-## 14. Not covered yet
+## 15. Not covered yet
 
 - `'dftb'` (Appearance's dialog font table) and `'hdlg'`/`'hrct'` (the Help Manager's).
 - In the previews: `'ictb'` item colours and fonts, menu icons and `'mctb'` colours, and the Appearance look.
