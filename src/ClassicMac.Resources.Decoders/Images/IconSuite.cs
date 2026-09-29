@@ -129,41 +129,10 @@ namespace ClassicMac.Resources.Decoders.Images
             bool selected = (t & 0x4000) != 0;
             if (label >= 8) label = 0;                            // GetLabel fails for 8-15 [ClassicMac: the colour is undefined there]
 
-            // The mask group: the first 1-bit member of the rect size's list.
-            int w = rect.Width, h = rect.Height;
-            string[] groups = native
-                ? w >= 48 || h >= 48 ? ["ich#", "ICN#", "ics#", "icm#"]
-                  : w < 32 && h < 32 && h > 12 ? ["ics#", "ICN#", "icm#", "ich#"]
-                  : w < 32 && h < 32 ? ["icm#", "ics#", "ICN#", "ich#"]
-                  : ["ICN#", "ich#", "ics#", "icm#"]
-                : w >= 32 || h >= 32 ? ["ICN#", "ics#", "icm#"]
-                  : h > 12 ? ["ics#", "icm#", "ICN#"]
-                  : ["icm#", "ics#", "ICN#"];
-            if (groups.FirstOrDefault(members.ContainsKey) is not { } group) return false;
-            var (gw, gh) = group switch { "ICN#" => (32, 32), "ics#" => (16, 16), "icm#" => (16, 12), _ => (48, 48) };
-            var list = members[group];
+            if (Prepare(rect, alignment, native) is not { } p) return false;
+            if (p.Empty) return true;
+            var (group, gw, gh, image, mask, place) = (p.Group, p.Width, p.Height, p.Image, p.Mask, p.Place);
             int rowBytes = gw / 8;
-            var place = PictRect.From(rect);
-
-            // An icm# longer than one icon and its mask is taken for SICNs: 16 rows, the rect re-centred to 16 tall.
-            int size = list.Length;
-            if (group == "icm#" && (size > 48 || (size < 48 && size > 24)))
-            {
-                int c = (place.Top + place.Bottom) >> 1;
-                place = new PictRect(c - 8, place.Left, c + 8, place.Right);
-                gh = 16;
-            }
-            int bytes = rowBytes * gh;
-            if (group == "ich#" && native && size < 2 * bytes) return false;   // a short ich# fails the call
-            var image = Pad(list, 0, bytes);
-            var mask = size >= 2 * bytes ? Pad(list, bytes, bytes)
-                : group == "icm#" && gh == 16 && size >= 64 ? Pad(list, size / 2, bytes)
-                : QuickDrawResources.CalcMask(image, gw, gh);
-
-            // MakeBoundary: nothing is drawn for an empty mask.
-            var boundary = Boundary(mask, gw, gh);
-            if (boundary.IsEmpty) return true;
-            if (alignment != IconAlignment.None) place = Align(place, boundary, gw, gh, (int)alignment);
 
             var saved = (port.ForeColor, port.BackColor, port.PenPattern, port.PenMode, port.FillPattern);
             try
@@ -183,6 +152,101 @@ namespace ClassicMac.Resources.Decoders.Images
                 (port.ForeColor, port.BackColor, port.PenPattern, port.PenMode, port.FillPattern) = saved;
             }
             return true;
+        }
+
+        /// <summary>
+        /// The region the suite's mask covers when plotted in <paramref name="rect"/> (<c>IconSuiteToRgn</c>,
+        /// <c>IconIDToRgn</c>): the member the rect selects, aligned, its mask mapped to the placed rect. Null when the
+        /// suite has no 1-bit member.
+        /// </summary>
+        public Region? ToRegion(MacRect rect, IconAlignment alignment = IconAlignment.None, QuickDrawVersion version = QuickDrawVersion.MacOS9)
+        {
+            if (Prepare(rect, alignment, version == QuickDrawVersion.MacOS9) is not { } p) return null;
+            if (p.Empty) return Region.Empty;
+            var region = Region.FromBitMap(PixMap.FromBitMap(p.Mask, p.Width / 8, new MacRect(0, 0, (short)p.Height, (short)p.Width)));
+            return MapRegion(region, p.Width, p.Height, p.Place);
+        }
+
+        /// <summary>
+        /// Draws an <c>ICON</c> or <c>ICN#</c> (<c>PlotIconHandle</c>): always as the 32 × 32 member, stretched to the rect,
+        /// by the 1-bit rules (an <c>ICON</c>, having no mask half, gets CalcMask's silhouette).
+        /// </summary>
+        public static bool PlotIconHandle(QuickDrawPort port, MacRect rect, byte[] icon, IconAlignment alignment = IconAlignment.None,
+            IconTransform transform = IconTransform.None, IReadOnlyList<RgbColor>? labelColors = null)
+        {
+            ArgumentNullException.ThrowIfNull(icon);
+            var suite = new IconSuite();
+            suite.members["ICN#"] = icon;
+            return suite.Plot(port, rect, alignment, transform, labelColors);
+        }
+
+        /// <summary>
+        /// Draws a <c>SICN</c> list (<c>PlotSICNHandle</c>) as the small or mini member: one entry gets CalcMask, two or
+        /// more take the data from the list's second half as the mask; a mini rect re-centres it 16 rows tall.
+        /// </summary>
+        public static bool PlotSICNHandle(QuickDrawPort port, MacRect rect, byte[] sicn, IconAlignment alignment = IconAlignment.None,
+            IconTransform transform = IconTransform.None, IReadOnlyList<RgbColor>? labelColors = null)
+        {
+            ArgumentNullException.ThrowIfNull(sicn);
+            var suite = new IconSuite();
+            suite.members["ics#"] = sicn;
+            suite.members["icm#"] = sicn;
+            return suite.Plot(port, rect, alignment, transform, labelColors);
+        }
+
+        /// <summary>
+        /// Draws an <c>ICON</c> as <c>PlotIcon</c> does: CopyBits srcCopy of its 32 × 32 bits, unmasked, stretched to
+        /// <paramref name="rect"/>, in the port's colours; no alignment or transform.
+        /// </summary>
+        public static void PlotIcon(QuickDrawPort port, MacRect rect, byte[] icon)
+        {
+            ArgumentNullException.ThrowIfNull(port);
+            ArgumentNullException.ThrowIfNull(icon);
+            var bounds = new MacRect(0, 0, 32, 32);
+            port.CopyBits(PixMap.FromBitMap(Pad(icon, 0, 128), 4, bounds), bounds, rect, TransferMode.SrcCopy);
+        }
+
+        private sealed record Prepared(string Group, int Width, int Height, byte[] Image, byte[] Mask, PictRect Place, bool Empty);
+
+        // SetupParamBlock, MakeBoundary and PerformAlignment: the member, its image and mask, and where it goes.
+        private Prepared? Prepare(MacRect rect, IconAlignment alignment, bool native)
+        {
+            // The mask group: the first 1-bit member of the rect size's list.
+            int w = rect.Width, h = rect.Height;
+            string[] groups = native
+                ? w >= 48 || h >= 48 ? ["ich#", "ICN#", "ics#", "icm#"]
+                  : w < 32 && h < 32 && h > 12 ? ["ics#", "ICN#", "icm#", "ich#"]
+                  : w < 32 && h < 32 ? ["icm#", "ics#", "ICN#", "ich#"]
+                  : ["ICN#", "ich#", "ics#", "icm#"]
+                : w >= 32 || h >= 32 ? ["ICN#", "ics#", "icm#"]
+                  : h > 12 ? ["ics#", "icm#", "ICN#"]
+                  : ["icm#", "ics#", "ICN#"];
+            if (groups.FirstOrDefault(members.ContainsKey) is not { } group) return null;
+            var (gw, gh) = group switch { "ICN#" => (32, 32), "ics#" => (16, 16), "icm#" => (16, 12), _ => (48, 48) };
+            var list = members[group];
+            int rowBytes = gw / 8;
+            var place = PictRect.From(rect);
+
+            // An icm# longer than one icon and its mask is taken for SICNs: 16 rows, the rect re-centred to 16 tall.
+            int size = list.Length;
+            if (group == "icm#" && (size > 48 || (size < 48 && size > 24)))
+            {
+                int c = (place.Top + place.Bottom) >> 1;
+                place = new PictRect(c - 8, place.Left, c + 8, place.Right);
+                gh = 16;
+            }
+            int bytes = rowBytes * gh;
+            if (group == "ich#" && native && size < 2 * bytes) return null;   // a short ich# fails the call
+            var image = Pad(list, 0, bytes);
+            // The mask is the member's second half (at half its size, so a list of SICNs gives the rows from there), or
+            // CalcMask of the image when the member is too short for one.
+            var mask = size >= 2 * bytes ? Pad(list, size / 2, bytes) : QuickDrawResources.CalcMask(image, gw, gh);
+
+            // MakeBoundary: nothing is drawn for an empty mask.
+            var boundary = Boundary(mask, gw, gh);
+            if (boundary.IsEmpty) return new Prepared(group, gw, gh, image, mask, place, Empty: true);
+            if (alignment != IconAlignment.None) place = Align(place, boundary, gw, gh, (int)alignment);
+            return new Prepared(group, gw, gh, image, mask, place, Empty: false);
         }
 
         // ---- choosing the colour member ----
