@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `QuickDrawPort`: `SetOrigin`, `HidePen`/`ShowPen`, `CharExtra`, `TextWidth`/`StringWidth`/`CharWidth`, `GetFontInfo`,
+  and `DrawPicture` onto a port (saving and restoring its state, clipped to nothing until the picture's ClipRgn, as
+  the Mac does). Pictures now start with the pen ScalePt((1, 1)) to the destination, as DrawPicture does.
 - The PICT specification is split into `docs/formats/PICT.md` (the format and playback), `QUICKDRAW.md` (the drawing
   rules), `QUICKTIME.md`, `MACPAINT.md` and `ICONS.md`.
 - `QuickDrawPort`: the renderer as a public colour QuickDraw port (shapes, lines, regions, patterns, CopyBits, text)

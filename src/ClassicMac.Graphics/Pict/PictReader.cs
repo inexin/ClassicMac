@@ -70,7 +70,15 @@ namespace ClassicMac.Graphics.Pict
             var bounds = info.BoundsRect;
             var canvasRect = options.Resolution == PictResolution.PictureFrame ? info.FrameRect : bounds;
             var canvas = new RgbaBitmap(Math.Max(1, canvasRect.Width), Math.Max(1, canvasRect.Height));
-            var port = new GrafPort(canvas, bounds, options);
+            var port = new GrafPort(canvas, info.FrameRect, bounds, options);
+            Play(b, info, v1, port, options, cancellationToken);
+            return new PictPicture(canvas, info);
+        }
+
+        // Plays the opcodes after the header into the play state, to the end opcode or the end of the data.
+        internal static void Play(BinaryReader b, PictInfo info, bool v1, GrafPort port, PictDecodeOptions options,
+            CancellationToken cancellationToken)
+        {
             bool macOS9 = options.QuickDraw == QuickDrawVersion.MacOS9;
             {
                 PictRect? quickTimeRect = null;           // destination of a QuickTime image drawn by the last opcode
@@ -115,7 +123,7 @@ namespace ClassicMac.Graphics.Pict
                             break;
                         }
                         case 0x00FF:                        // end of picture
-                            return new PictPicture(canvas, info);
+                            return;
                         case 0x8200:                        // CompressedQuickTime
                         {
                             // A decoded image skips the picture's fallback for systems without QuickTime: the drawing
@@ -146,7 +154,6 @@ namespace ClassicMac.Graphics.Pict
                             break;
                     }
                 }
-                return new PictPicture(canvas, info);
             }
         }
 

@@ -1,8 +1,7 @@
 # The public QuickDraw drawing API (design)
 
-*Status: decided 2026-09-29 (the decisions at the end); steps 1 and 2 built (the types and `QuickDrawPort`, with the
-picture player on it), step 3 (`DrawPicture` onto a port) and step 4 (the spec split) to do. Stage 3 of the
-QuickDraw.Pict merge ([PLAN.md](PLAN.md), phase 9).*
+*Status: decided 2026-09-29 (the decisions at the end); built (steps 1–4). Stage 3 of the QuickDraw.Pict merge
+([PLAN.md](PLAN.md), phase 9).*
 
 ## Why
 
@@ -39,18 +38,18 @@ QuickDraw's setter routines (`PenSize`, `TextFont`, `RGBForeColor`, …) are pro
 
 | Group | Members |
 | --- | --- |
-| Setup | `QuickDrawPort(RgbaBitmap canvas, QuickDrawOptions? options)`; `Canvas`, `Options`, `PortRect`; `Clip` (a `Region`, null for none) |
-| Pen | `PenSize`, `PenMode`, `PenPattern`, `PenLocation`, `MoveTo`/`Move`, `LineTo`/`Line`, `PenNormal` |
+| Setup | `QuickDrawPort(RgbaBitmap canvas, QuickDrawOptions? options)`; `Canvas`, `Options`, `PortRect`, `SetOrigin`; `Clip` (a `Region`, null for none) |
+| Pen | `PenSize`, `PenMode`, `PenPattern`, `PenLocation`, `MoveTo`/`Move`, `LineTo`/`Line`, `PenNormal`, `HidePen`/`ShowPen` |
 | Colour | `ForeColor`, `BackColor`, `OpColor`, `HiliteColor` (16-bit `RgbColor`); `BackPattern`, `FillPattern`; `HiliteMode()` |
 | Shapes | `Frame`/`Paint`/`Erase`/`Invert`/`Fill` × `Rect`, `RoundRect`, `Oval`, `Arc`, `Poly`, `Rgn` (`Fill…` takes a pattern) |
 | Bits | `CopyBits(PixMap source, MacRect src, MacRect dst, TransferMode mode, Region? mask)` |
-| Text | `TextFont`, `TextFace` (`QuickDrawStyle`), `TextSize`, `TextMode`, `SpaceExtra`, `FractionalWidths`, `ScaleDisable`; `DrawString`, `DrawText`, `DrawChar` (each moves the pen past the text) |
-| Pictures (step 3) | `DrawPicture(byte[] picture, MacRect destination)`: a PICT played into this port (the PICT reader's own path) |
+| Text | `TextFont`, `TextFace` (`QuickDrawStyle`), `TextSize`, `TextMode`, `SpaceExtra`, `CharExtra(Fixed)`, `FractionalWidths`, `ScaleDisable`; `DrawString`, `DrawText`, `DrawChar` (each moves the pen past the text); `StringWidth`, `TextWidth`, `CharWidth`, `GetFontInfo` |
+| Pictures | `port.DrawPicture(byte[] picture, MacRect destination)` (an extension in `ClassicMac.Graphics.Pict`, the layer above): a PICT played into this port, its state saved and restored as DrawPicture does |
 
-Left out until their rules are read from the code (not guessed): `SetOrigin` (how it moves the pattern alignment),
-`HidePen`/`ShowPen` (which drawing they hide), `CharExtra` (how the Fixed argument becomes the port's 4.12 word) and
-measuring (`StringWidth`, `TextWidth`, `GetFontInfo`: their rounding and scaling). Moving the pen resets its text
-fraction to ½ [ClassicMac: not yet checked against the ROM].
+The routines follow the ROM's and Mac OS 9's code ([formats/QUICKDRAW.md](formats/QUICKDRAW.md) §3.4, §5.6, §7.8;
+[formats/PICT.md](formats/PICT.md) §6). Not modelled: Mac OS 9's per-port pattern origin for pixel patterns, its
+TextWidth cache, and GetFontInfo's double FScaleDisable factor; widMax's FScaleDisable scaling, FixDiv's tie rule and
+the system font size (taken as 12) are not checked [ClassicMac].
 
 - **Coordinates** are `MacRect`/`MacPoint` from Core: 16-bit, as QuickDraw's are. The engine keeps its internal
   32-bit `PictRect` for intermediate results; nothing public uses it.

@@ -187,6 +187,131 @@ public class PortTests
         Assert.Equal(new MacPoint(8, 2 + 3 + 3 + 2), port.PenLocation);
     }
 
+    private static QuickDrawPort Port(QuickDrawVersion version = QuickDrawVersion.MacOS9) =>
+        new(new RgbaBitmap(Width, Height), new QuickDrawOptions { Version = version, Fonts = Fonts() }) { TextFont = Family, TextSize = 9 };
+
+    [Theory]
+    [InlineData(QuickDrawVersion.MacOS9)]
+    [InlineData(QuickDrawVersion.MacRom)]
+    public void SetOrigin_moves_drawing_and_the_pattern_phase_but_keeps_the_clip_local(QuickDrawVersion version)
+    {
+        var plain = Port(version);
+        plain.FillRect(R(2, 2, 12, 12), QuickDrawPattern.Gray);
+
+        var moved = Port(version);
+        moved.SetOrigin(1, 10);
+        Assert.Equal(R(10, 1, 10 + Height, 1 + Width), moved.PortRect);
+        moved.FillRect(R(12, 3, 22, 13), QuickDrawPattern.Gray);   // the same canvas pixels, one column later in local h
+
+        // Same pixels covered, pattern phase shifted by one column (h 1; v 10 is a whole pattern period plus 2 rows).
+        Assert.Equal(plain.Canvas[2, 2].A, moved.Canvas[2, 2].A);
+        Assert.NotEqual(plain.Canvas[2, 2], moved.Canvas[2, 2]);
+        Assert.Equal(plain.Canvas[3, 2], moved.Canvas[2, 4]);
+
+        var clipped = Port(version);
+        clipped.Clip = Region.FromRect(R(0, 0, 5, 5));
+        clipped.SetOrigin(-5, 0);                                   // the clip's local (0, 0) is now canvas (5, 0)
+        clipped.PaintRect(R(0, -5, 30, 35));
+        Assert.Equal(0, clipped.Canvas[0, 0].A);
+        Assert.Equal(255, clipped.Canvas[5, 0].A);
+        Assert.Equal(R(0, 0, 5, 5), clipped.Clip!.BoundingBox);
+    }
+
+    [Fact]
+    public void A_hidden_pen_draws_nothing_but_still_moves()
+    {
+        var port = Port();
+        port.HidePen();
+        port.PaintRect(R(0, 0, 30, 40));
+        port.MoveTo(2, 8);
+        port.DrawString("AA ");
+        Assert.Equal(new MacPoint(8, 10), port.PenLocation);
+        port.LineTo(30, 20);
+        Assert.All(Enumerable.Range(0, Width * Height), i => Assert.Equal(0, port.Canvas.Pixels[4 * i + 3]));
+
+        port.ShowPen();
+        port.PaintRect(R(0, 0, 2, 2));
+        Assert.Equal(255, port.Canvas[0, 0].A);
+    }
+
+    [Theory]
+    [InlineData(QuickDrawVersion.MacOS9)]
+    [InlineData(QuickDrawVersion.MacRom)]
+    public void Text_is_measured_as_the_Font_Manager_measures_it(QuickDrawVersion version)
+    {
+        var port = Port(version);
+        Assert.Equal(3 + 3 + 2 + 3, port.StringWidth("Ag A"));
+        Assert.Equal(3, port.CharWidth((byte)'g'));
+        Assert.Equal(new FontInfo(3, 2, 3, 1), port.GetFontInfo());
+
+        port.TextFace = QuickDrawStyle.Bold | QuickDrawStyle.Shadow;   // extra 1 + 2 per character; shadow grows the metrics
+        Assert.Equal(new FontInfo(4, 4, 6, 1), port.GetFontInfo());
+        Assert.Equal((3 + 3) * 2, port.StringWidth("AA"));
+
+        // CharExtra: 2 pixels at 9 points is kept per point, so each character gets 1.9995 more and the width truncates.
+        port.TextFace = QuickDrawStyle.Plain;
+        port.CharExtra(new Fixed(2 << 16));
+        Assert.Equal(9, port.StringWidth("AA"));
+        port.TextSize = version == QuickDrawVersion.MacRom ? 9 : 10;    // the ROM clears it on any TextSize, Mac OS 9 on a change
+        port.TextSize = 9;
+        Assert.Equal(6, port.StringWidth("AA"));
+    }
+
+    private static byte[] Picture(bool clip, params (int top, int left, int bottom, int right)[] paints)
+    {
+        var b = PictBuilder.V2(0, 0, Height, Width);
+        if (clip) b.Align().U16(0x0001).U16(10).Rect(0, 0, Height, Width);
+        b.U16(0x001A).Rgb(0, 0, 0xFFFF);
+        foreach (var (top, left, bottom, right) in paints) b.U16(0x0031).Rect(top, left, bottom, right);
+        return b.Align().U16(0x00FF).ToArray();
+    }
+
+    [Theory]
+    [InlineData(QuickDrawVersion.MacOS9)]
+    [InlineData(QuickDrawVersion.MacRom)]
+    public void DrawPicture_plays_the_picture_and_restores_the_port(QuickDrawVersion version)
+    {
+        var picture = Picture(clip: true, (2, 2, 20, 30), (10, 15, 28, 38));
+        var port = Port(version);
+        port.ForeColor = new RgbColor(0xFFFF, 0, 0);
+        port.PenSize = new MacPoint(3, 3);
+        port.TextFace = QuickDrawStyle.Italic;
+        port.OpColor = new RgbColor(0x8000, 0x8000, 0x8000);
+        port.MoveTo(7, 9);
+
+        port.DrawPicture(picture, R(0, 0, Height, Width));
+
+        Assert.Equal(PictReader.Decode(picture, new PictDecodeOptions { QuickDraw = version }).Pixels, port.Canvas.Pixels);
+        Assert.Equal((new RgbColor(0xFFFF, 0, 0), new MacPoint(3, 3), QuickDrawStyle.Italic, new MacPoint(9, 7), (Region?)null),
+            (port.ForeColor, port.PenSize, port.TextFace, port.PenLocation, port.Clip));
+        Assert.Equal(RgbColor.Black, port.OpColor);
+    }
+
+    [Fact]
+    public void DrawPicture_draws_nothing_before_a_clip_and_stays_inside_the_ports_clip()
+    {
+        var port = Port();
+        port.DrawPicture(Picture(clip: false, (0, 0, Height, Width)), R(0, 0, Height, Width));
+        Assert.All(Enumerable.Range(0, Width * Height), i => Assert.Equal(0, port.Canvas.Pixels[4 * i + 3]));
+
+        port.Clip = Region.FromRect(R(0, 0, Height, 10));
+        port.DrawPicture(Picture(clip: true, (0, 0, Height, Width)), R(0, 0, Height, Width));
+        Assert.Equal(255, port.Canvas[9, 5].A);
+        Assert.Equal(0, port.Canvas[10, 5].A);
+    }
+
+    [Fact]
+    public void DrawPicture_scales_to_the_destination()
+    {
+        var port = Port();
+        port.SetOrigin(-4, -2);
+        port.DrawPicture(Picture(clip: true, (0, 0, Height, Width)), R(0, 0, Height / 2, Width / 2));
+        Assert.Equal(255, port.Canvas[4, 2].A);
+        Assert.Equal(255, port.Canvas[4 + Width / 2 - 1, 2 + Height / 2 - 1].A);
+        Assert.Equal(0, port.Canvas[4 + Width / 2, 2].A);
+        Assert.Equal(0, port.Canvas[3, 2].A);
+    }
+
     [Fact]
     public void Regions_round_trip_through_their_stored_form()
     {

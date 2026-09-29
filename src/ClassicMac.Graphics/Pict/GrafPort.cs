@@ -51,17 +51,52 @@ namespace ClassicMac.Graphics.Pict
         private int textH, textV;                                 // text origin, picture space
         private readonly Dictionary<int, string> fontNames = new Dictionary<int, string>();
         private readonly Dictionary<int, int> fontMap = new Dictionary<int, int>();
+        private readonly bool intoPort;                           // drawn into a caller's port (DrawPicture), not a fresh canvas
+        private readonly Region? callerClip;                      // that port's clip, canvas pixels
 
-        public GrafPort(RgbaBitmap canvas, PictRect pictureFrame, PictDecodeOptions options)
+        // A picture decoded onto a fresh canvas: picFrame and the drawing rectangle (the header's srcRect for an extended
+        // version 2 picture, else picFrame) mapped to the whole canvas. Unlike DrawPicture, which starts with an empty
+        // clip until the picture's ClipRgn, a picture without one still draws [ClassicMac].
+        public GrafPort(RgbaBitmap canvas, PictRect pictureFrame, PictRect drawingRect, PictDecodeOptions options)
+            : this(new QuickDrawPort(canvas, options.ToQuickDrawOptions()), pictureFrame, drawingRect,
+                new PictRect(0, 0, canvas.Height, canvas.Width), options, intoPort: false)
+        {
+        }
+
+        // DrawPicture into a caller's port: its state reset as DrawPicture resets it (the caller saves and restores it),
+        // the picture mapped to destination (canvas pixels), drawing clipped to nothing until the picture's ClipRgn,
+        // then to that region within the port's own clip.
+        public GrafPort(QuickDrawPort port, PictRect pictureFrame, PictRect drawingRect, PictRect destination, PictDecodeOptions options)
+            : this(port, pictureFrame, drawingRect, destination, options, intoPort: true)
+        {
+        }
+
+        private GrafPort(QuickDrawPort port, PictRect pictureFrame, PictRect drawingRect, PictRect destination,
+            PictDecodeOptions options, bool intoPort)
         {
             this.options = options;
-            port = new QuickDrawPort(canvas, options.ToQuickDrawOptions());
-            fromRect = pictureFrame;
-            toRect = new PictRect(0, 0, canvas.Height, canvas.Width);
+            this.port = port;
+            this.intoPort = intoPort;
+            fromRect = drawingRect;
+            toRect = destination;
             macOS9 = port.MacOS9;
-            // Text scaling, as DrawPicture's play state: the canvas over the picture frame.
+            if (intoPort)
+            {
+                callerClip = port.ClipRegion;
+                port.ResetForPicture(SystemHilite);
+                port.ClipRegion = Region.Empty;
+            }
+            // Text scaling: the destination over the drawing rectangle. The pen starts ScalePt((1, 1)) from picFrame
+            // (not the extended header's srcRect) to the destination.
             port.TextNumer = (toRect.Width, toRect.Height);
             port.TextDenom = (fromRect.Width, fromRect.Height);
+            (port.PenWidth, port.PenHeight) = PictureMapping.ScaleSize(1, 1, pictureFrame, toRect);
+        }
+
+        private Region Clipped(Region pictureClip)
+        {
+            var mapped = MapRegion(pictureClip);
+            return intoPort && callerClip != null ? mapped.Intersect(callerClip) : mapped;
         }
 
         // ---- coordinate mapping ----
@@ -77,7 +112,7 @@ namespace ClassicMac.Graphics.Pict
         {
             fromRect = new PictRect(fromRect.Top + dv, fromRect.Left + dh, fromRect.Bottom + dv, fromRect.Right + dh);
             if (!macOS9) port.PatternAlign = (port.PatternAlign.h + dh, port.PatternAlign.v + dv);
-            if (pictureClip != null) port.ClipRegion = MapRegion(pictureClip);
+            if (pictureClip != null) port.ClipRegion = Clipped(pictureClip);
         }
 
         // ---- state ----
@@ -85,7 +120,7 @@ namespace ClassicMac.Graphics.Pict
         public void SetClip(Region pictureRegion)
         {
             pictureClip = pictureRegion;
-            port.ClipRegion = MapRegion(pictureRegion);
+            port.ClipRegion = Clipped(pictureRegion);
         }
 
         public void PenSize(int h, int v) => (port.PenWidth, port.PenHeight) = PictureMapping.ScaleSize(h, v, fromRect, toRect);

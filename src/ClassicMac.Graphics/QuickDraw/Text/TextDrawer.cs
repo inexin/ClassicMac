@@ -241,6 +241,17 @@ namespace ClassicMac.Graphics.QuickDraw
                 FixedMath.FixRatio((short)s.InNumer.h, (short)s.InDenom.h), FixedMath.FixRatio((short)s.Denom.h, (short)s.Numer.h)));
         }
 
+        // How far drawing the text moves the pen (Fixed): the measured width, stretched as Draw stretches it.
+        public static int Advance(FontSelection s, ReadOnlySpan<byte> text, int charExtra)
+        {
+            if (text.Length == 0 || (s.MacOS9 && text.Length == 1 && text[0] == '\r')) return 0;
+            int width = Measure(s, text, charExtra);
+            if (s.Numer == s.Denom) return width;
+            return s.MacOS9
+                ? FixedMath.FixMulHalfUp(width, FixedMath.FixRatio((short)s.Numer.h, (short)s.Denom.h))
+                : (int)((ulong)(uint)width * (ushort)s.Numer.h / (ushort)s.Denom.h);
+        }
+
         // StdTxMeas's FixTxWid: the widths plus the character extra on everything but spaces (unscaled, Fixed); Mac
         // OS 9 adds the extra only to characters with a width.
         public static int Measure(FontSelection s, ReadOnlySpan<byte> text, int charExtra)

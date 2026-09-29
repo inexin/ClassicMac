@@ -27,6 +27,9 @@ namespace ClassicMac.Graphics.QuickDraw
         Extend = 64,
     }
 
+    /// <summary>A font's metrics as <c>GetFontInfo</c> gives them, in pixels.</summary>
+    public readonly record struct FontInfo(int Ascent, int Descent, int WidMax, int Leading);
+
     /// <summary>
     /// A colour QuickDraw graphics port drawing into an <see cref="RgbaBitmap"/>, pixel for pixel as the chosen Macintosh
     /// QuickDraw draws (<i>Inside Macintosh: Imaging With QuickDraw</i>). Its members are QuickDraw's routines on this
@@ -56,8 +59,27 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <summary>How the port draws.</summary>
         public QuickDrawOptions Options { get; }
 
-        /// <summary>The port's rectangle: the canvas, (0, 0) to its size.</summary>
-        public MacRect PortRect => new(0, 0, (short)Math.Min(canvas.Height, short.MaxValue), (short)Math.Min(canvas.Width, short.MaxValue));
+        /// <summary>The port's rectangle in its own coordinates: the canvas, its top-left at the origin (<c>portRect</c>).</summary>
+        public MacRect PortRect => new((short)OriginV, (short)OriginH, (short)(OriginV + Math.Min(canvas.Height, short.MaxValue)),
+            (short)(OriginH + Math.Min(canvas.Width, short.MaxValue)));
+
+        // The local coordinates of the canvas's top-left pixel (SetOrigin). The public routines take local coordinates;
+        // the engine below works in canvas pixels.
+        internal int OriginH, OriginV;
+
+        /// <summary>
+        /// Gives the canvas's top-left pixel the local coordinates (<paramref name="h"/>, <paramref name="v"/>)
+        /// (<c>SetOrigin</c>). The clip region, the pen and the pattern alignment keep their local coordinates, so on the
+        /// canvas they move, and patterns shift with the origin.
+        /// </summary>
+        public void SetOrigin(int h, int v)
+        {
+            ClipRegion = ClipRegion?.Offset(OriginH - h, OriginV - v);   // the same local region, elsewhere on the canvas
+            (OriginH, OriginV) = (h, v);
+        }
+
+        internal PictRect ToCanvas(MacRect r) => new(r.Top - OriginV, r.Left - OriginH, r.Bottom - OriginV, r.Right - OriginH);
+        private Region ToCanvas(Region r) => r.Offset(-OriginH, -OriginV);
 
         internal bool MacOS9 => macOS9;
         internal ScreenDevice? Device => device;
@@ -113,9 +135,10 @@ namespace ClassicMac.Graphics.QuickDraw
         internal QuickDrawPattern PnPat = QuickDrawPattern.Black, BkPat = QuickDrawPattern.White, FillPat = QuickDrawPattern.Black;
         internal int Mode = TransferModes.PatCopy;
         internal int PenWidth = 1, PenHeight = 1;
-        internal int PenH, PenV, PenFrac = 0x8000;
-        internal Region? ClipRegion;
-        internal (int h, int v) PatternAlign;
+        internal int PenH, PenV, PenFrac = 0x8000;                // local coordinates; the fraction is pnLocHFrac
+        internal int PenVis;                                      // pnVis: drawing is hidden while negative
+        internal Region? ClipRegion;                              // canvas pixels (local clip less the origin)
+        internal (int h, int v) PatternAlign;                     // patAlign
 
         /// <summary>The pen pattern (<c>PenPat</c>).</summary>
         public QuickDrawPattern PenPattern { get => PnPat; set => PnPat = value ?? throw new ArgumentNullException(nameof(value)); }
@@ -139,13 +162,26 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <summary>Where the pen is (<c>GetPen</c>).</summary>
         public MacPoint PenLocation => new((short)PenV, (short)PenH);
 
-        /// <summary>The clip region; null draws everywhere on the canvas (<c>SetClip</c>, <c>ClipRect</c>).</summary>
-        public Region? Clip { get => ClipRegion; set => ClipRegion = value; }
+        /// <summary>The clip region, in local coordinates; null draws everywhere on the canvas (<c>SetClip</c>, <c>ClipRect</c>).</summary>
+        public Region? Clip
+        {
+            get => ClipRegion?.Offset(OriginH, OriginV);
+            set => ClipRegion = value == null ? null : ToCanvas(value);
+        }
+
+        /// <summary>
+        /// Hides the pen (<c>HidePen</c>): until as many <see cref="ShowPen"/> calls, lines, shapes, text and CopyBits
+        /// into the port draw nothing, though the pen still moves.
+        /// </summary>
+        public void HidePen() => PenVis--;
+
+        /// <summary>Undoes one <see cref="HidePen"/> (<c>ShowPen</c>).</summary>
+        public void ShowPen() => PenVis++;
 
         /// <summary>The pen back to 1 × 1, patCopy, black (<c>PenNormal</c>).</summary>
         public void PenNormal() => (PenWidth, PenHeight, Mode, PnPat) = (1, 1, TransferModes.PatCopy, QuickDrawPattern.Black);
 
-        // The pen's fraction is kept for text; moving the pen resets it to 1/2 [ClassicMac: not yet checked against the ROM].
+        // The pen's fraction (pnLocHFrac) is kept for text; MoveTo, Move and the line routines reset it to 1/2 (ROM, Mac OS 9).
 
         /// <summary>Moves the pen to (<paramref name="h"/>, <paramref name="v"/>) without drawing (<c>MoveTo</c>).</summary>
         public void MoveTo(int h, int v) => (PenH, PenV, PenFrac) = (h, v, 0x8000);
@@ -156,7 +192,7 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <summary>Draws a line from the pen to (<paramref name="h"/>, <paramref name="v"/>) and moves the pen there (<c>LineTo</c>).</summary>
         public void LineTo(int h, int v)
         {
-            PaintLine(PenH, PenV, h, v);
+            PaintLine(PenH - OriginH, PenV - OriginV, h - OriginH, v - OriginV);
             MoveTo(h, v);
             Done();
         }
@@ -167,59 +203,63 @@ namespace ClassicMac.Graphics.QuickDraw
         // ---- shapes ----
 
         /// <summary>Outlines a rectangle with the pen (<c>FrameRect</c>).</summary>
-        public void FrameRect(MacRect rect) => RectShape(PictRect.From(rect), 0);
+        public void FrameRect(MacRect rect) => RectShape(ToCanvas(rect), 0);
         /// <summary>Fills a rectangle with the pen pattern and mode (<c>PaintRect</c>).</summary>
-        public void PaintRect(MacRect rect) => RectShape(PictRect.From(rect), 1);
+        public void PaintRect(MacRect rect) => RectShape(ToCanvas(rect), 1);
         /// <summary>Fills a rectangle with the background pattern (<c>EraseRect</c>).</summary>
-        public void EraseRect(MacRect rect) => RectShape(PictRect.From(rect), 2);
+        public void EraseRect(MacRect rect) => RectShape(ToCanvas(rect), 2);
         /// <summary>Inverts a rectangle's pixels (<c>InvertRect</c>).</summary>
-        public void InvertRect(MacRect rect) => RectShape(PictRect.From(rect), 3);
+        public void InvertRect(MacRect rect) => RectShape(ToCanvas(rect), 3);
         /// <summary>Fills a rectangle with <paramref name="pattern"/> (<c>FillRect</c>).</summary>
-        public void FillRect(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; RectShape(PictRect.From(rect), 4); }
+        public void FillRect(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; RectShape(ToCanvas(rect), 4); }
 
         /// <summary>Outlines the oval inscribed in a rectangle (<c>FrameOval</c>).</summary>
-        public void FrameOval(MacRect rect) => OvalShape(PictRect.From(rect), 0);
+        public void FrameOval(MacRect rect) => OvalShape(ToCanvas(rect), 0);
         /// <summary>Paints an oval (<c>PaintOval</c>).</summary>
-        public void PaintOval(MacRect rect) => OvalShape(PictRect.From(rect), 1);
+        public void PaintOval(MacRect rect) => OvalShape(ToCanvas(rect), 1);
         /// <summary>Erases an oval (<c>EraseOval</c>).</summary>
-        public void EraseOval(MacRect rect) => OvalShape(PictRect.From(rect), 2);
+        public void EraseOval(MacRect rect) => OvalShape(ToCanvas(rect), 2);
         /// <summary>Inverts an oval (<c>InvertOval</c>).</summary>
-        public void InvertOval(MacRect rect) => OvalShape(PictRect.From(rect), 3);
+        public void InvertOval(MacRect rect) => OvalShape(ToCanvas(rect), 3);
         /// <summary>Fills an oval with <paramref name="pattern"/> (<c>FillOval</c>).</summary>
-        public void FillOval(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; OvalShape(PictRect.From(rect), 4); }
+        public void FillOval(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; OvalShape(ToCanvas(rect), 4); }
 
         /// <summary>Outlines a rounded rectangle with corner ovals <paramref name="ovalWidth"/> × <paramref name="ovalHeight"/> (<c>FrameRoundRect</c>).</summary>
-        public void FrameRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(PictRect.From(rect), ovalWidth, ovalHeight, 0);
+        public void FrameRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 0);
         /// <summary>Paints a rounded rectangle (<c>PaintRoundRect</c>).</summary>
-        public void PaintRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(PictRect.From(rect), ovalWidth, ovalHeight, 1);
+        public void PaintRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 1);
         /// <summary>Erases a rounded rectangle (<c>EraseRoundRect</c>).</summary>
-        public void EraseRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(PictRect.From(rect), ovalWidth, ovalHeight, 2);
+        public void EraseRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 2);
         /// <summary>Inverts a rounded rectangle (<c>InvertRoundRect</c>).</summary>
-        public void InvertRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(PictRect.From(rect), ovalWidth, ovalHeight, 3);
+        public void InvertRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 3);
         /// <summary>Fills a rounded rectangle with <paramref name="pattern"/> (<c>FillRoundRect</c>).</summary>
         public void FillRoundRect(MacRect rect, int ovalWidth, int ovalHeight, QuickDrawPattern pattern)
         {
             FillPattern = pattern;
-            RoundRectShape(PictRect.From(rect), ovalWidth, ovalHeight, 4);
+            RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 4);
         }
 
         /// <summary>Outlines an arc of the oval in <paramref name="rect"/>, from <paramref name="startAngle"/> (degrees clockwise from 12 o'clock) through <paramref name="arcAngle"/> (<c>FrameArc</c>).</summary>
-        public void FrameArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(PictRect.From(rect), startAngle, arcAngle, 0);
+        public void FrameArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 0);
         /// <summary>Paints a wedge of an oval (<c>PaintArc</c>).</summary>
-        public void PaintArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(PictRect.From(rect), startAngle, arcAngle, 1);
+        public void PaintArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 1);
         /// <summary>Erases a wedge of an oval (<c>EraseArc</c>).</summary>
-        public void EraseArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(PictRect.From(rect), startAngle, arcAngle, 2);
+        public void EraseArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 2);
         /// <summary>Inverts a wedge of an oval (<c>InvertArc</c>).</summary>
-        public void InvertArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(PictRect.From(rect), startAngle, arcAngle, 3);
+        public void InvertArc(MacRect rect, int startAngle, int arcAngle) => ArcShape(ToCanvas(rect), startAngle, arcAngle, 3);
         /// <summary>Fills a wedge of an oval with <paramref name="pattern"/> (<c>FillArc</c>).</summary>
         public void FillArc(MacRect rect, int startAngle, int arcAngle, QuickDrawPattern pattern)
         {
             FillPattern = pattern;
-            ArcShape(PictRect.From(rect), startAngle, arcAngle, 4);
+            ArcShape(ToCanvas(rect), startAngle, arcAngle, 4);
         }
 
         /// <summary>Draws lines from each point of a polygon to the next, not closing it (<c>FramePoly</c>).</summary>
-        public void FramePoly(IReadOnlyList<MacPoint> points) => PolyShape(Points(points), 0);
+        public void FramePoly(IReadOnlyList<MacPoint> points)
+        {
+            PolyShape(Points(points), 0);
+            PenFrac = 0x8000;                                     // the line routine's reset
+        }
         /// <summary>Paints a polygon (<c>PaintPoly</c>).</summary>
         public void PaintPoly(IReadOnlyList<MacPoint> points) => PolyShape(Points(points), 1);
         /// <summary>Erases a polygon (<c>ErasePoly</c>).</summary>
@@ -230,38 +270,38 @@ namespace ClassicMac.Graphics.QuickDraw
         public void FillPoly(IReadOnlyList<MacPoint> points, QuickDrawPattern pattern) { FillPattern = pattern; PolyShape(Points(points), 4); }
 
         /// <summary>Outlines a region with the pen, inside its edge (<c>FrameRgn</c>).</summary>
-        public void FrameRgn(Region region) => RgnShape(region ?? throw new ArgumentNullException(nameof(region)), 0);
+        public void FrameRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 0);
         /// <summary>Paints a region (<c>PaintRgn</c>).</summary>
-        public void PaintRgn(Region region) => RgnShape(region ?? throw new ArgumentNullException(nameof(region)), 1);
+        public void PaintRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 1);
         /// <summary>Erases a region (<c>EraseRgn</c>).</summary>
-        public void EraseRgn(Region region) => RgnShape(region ?? throw new ArgumentNullException(nameof(region)), 2);
+        public void EraseRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 2);
         /// <summary>Inverts a region (<c>InvertRgn</c>).</summary>
-        public void InvertRgn(Region region) => RgnShape(region ?? throw new ArgumentNullException(nameof(region)), 3);
+        public void InvertRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 3);
         /// <summary>Fills a region with <paramref name="pattern"/> (<c>FillRgn</c>).</summary>
         public void FillRgn(Region region, QuickDrawPattern pattern)
         {
             ArgumentNullException.ThrowIfNull(region);
             FillPattern = pattern;
-            RgnShape(region, 4);
+            RgnShape(ToCanvas(region), 4);
         }
 
-        private static (int h, int v)[] Points(IReadOnlyList<MacPoint> points)
+        private (int h, int v)[] Points(IReadOnlyList<MacPoint> points)
         {
             ArgumentNullException.ThrowIfNull(points);
-            return points.Select(p => ((int)p.H, (int)p.V)).ToArray();
+            return points.Select(p => (p.H - OriginH, p.V - OriginV)).ToArray();
         }
 
         // ---- bits ----
 
         /// <summary>
-        /// Copies <paramref name="sourceRect"/> of <paramref name="source"/> to <paramref name="destinationRect"/>,
-        /// scaling to fit, through <paramref name="mode"/>, the optional <paramref name="mask"/> and the clip region
-        /// (<c>CopyBits</c>).
+        /// Copies <paramref name="sourceRect"/> of <paramref name="source"/> (in the source's coordinates) to
+        /// <paramref name="destinationRect"/> (local), scaling to fit, through <paramref name="mode"/>, the optional
+        /// <paramref name="mask"/> (local) and the clip region (<c>CopyBits</c>).
         /// </summary>
         public void CopyBits(PixMap source, MacRect sourceRect, MacRect destinationRect, TransferMode mode, Region? mask = null)
         {
             ArgumentNullException.ThrowIfNull(source);
-            CopyBits(source, PictRect.From(sourceRect), PictRect.From(destinationRect), (int)mode, mask);
+            CopyBits(source, PictRect.From(sourceRect), ToCanvas(destinationRect), (int)mode, mask == null ? null : ToCanvas(mask));
         }
 
         // ---- text ----
@@ -277,8 +317,38 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <summary>The text style (<c>TextFace</c>).</summary>
         public QuickDrawStyle TextFace { get => (QuickDrawStyle)Face; set => Face = (int)value; }
 
-        /// <summary>The point size (<c>TextSize</c>); 0 is the font's default, 12.</summary>
-        public int TextSize { get => Size; set => Size = value; }
+        /// <summary>
+        /// The point size (<c>TextSize</c>); 0 is the font's default, 12. Setting it clears the character extra (the ROM
+        /// always; Mac OS 9 when the size changes).
+        /// </summary>
+        public int TextSize
+        {
+            get => Size;
+            set
+            {
+                if (!macOS9 || value != Size) ChExtra = 0;
+                Size = value;
+            }
+        }
+
+        /// <summary>
+        /// Extra width after each character but spaces, <paramref name="extra"/> pixels at the current size (<c>CharExtra</c>).
+        /// The port keeps it per point (4.12), so a later size scales it; <see cref="TextSize"/> clears it.
+        /// </summary>
+        public void CharExtra(Fixed extra)
+        {
+            // chExtra = FixDiv(extra, size) >> 4 (the ROM rounds the divide; Mac OS 9 truncates it and clamps to
+            // +-$7FFF). Size 0 is the system font size, 12 [ClassicMac: the system font size is taken as 12].
+            long size = (Size != 0 ? Size : 12) << 16;
+            long quotient = ((long)extra.Raw << 16) / size;
+            if (!macOS9)
+            {
+                long remainder = ((long)extra.Raw << 16) % size;
+                if (Math.Abs(remainder) * 2 >= size) quotient += Math.Sign(remainder);   // [ClassicMac: FixDiv's tie rule not checked]
+                ChExtra = (short)(quotient >> 4);
+            }
+            else ChExtra = (int)Math.Clamp(quotient >> 4, -0x7FFF, 0x7FFF);
+        }
 
         /// <summary>The text's transfer mode (<c>TextMode</c>).</summary>
         public TransferMode TextMode { get => (TransferMode)TxMode; set => TxMode = (int)value; }
@@ -300,10 +370,99 @@ namespace ClassicMac.Graphics.QuickDraw
         }
 
         /// <summary>Draws Mac OS Roman text at the pen, and moves the pen past it (<c>DrawText</c>).</summary>
-        public void DrawText(ReadOnlySpan<byte> text) => DrawTextAt(text, PenH, PenV, FontId, FontId, null, movePen: true);
+        public void DrawText(ReadOnlySpan<byte> text) => DrawTextAt(text, PenH - OriginH, PenV - OriginV, FontId, FontId, null, movePen: true);
 
         /// <summary>Draws one character at the pen, and moves the pen past it (<c>DrawChar</c>).</summary>
         public void DrawChar(byte character) => DrawText([character]);
+
+        /// <summary>
+        /// The width of Mac OS Roman text in the port's font, in whole pixels (<c>TextWidth</c>): the characters' widths,
+        /// with style, space and character extras, truncated, then stretched by the Font Manager to the requested size and
+        /// truncated again. 0 when no bitmap font draws the text.
+        /// </summary>
+        public int TextWidth(ReadOnlySpan<byte> text)
+        {
+            if (Select((1, 1), (1, 1)) is not { } font) return 0;
+            int width = TextDrawer.Measure(font, text, unchecked(((short)ChExtra << 4) + InterCharSpacing)) >> 16;
+            if (font.Numer == font.Denom) return width;
+            // The ROM multiplies and divides unsigned (MULU, DIVU); Mac OS 9 signed.
+            return macOS9
+                ? (int)((long)width * font.Numer.h / font.Denom.h)
+                : (short)((uint)(ushort)width * (ushort)font.Numer.h / (ushort)font.Denom.h);
+        }
+
+        /// <summary>The width of a string (<c>StringWidth</c>); see <see cref="TextWidth"/>.</summary>
+        public int StringWidth(string text)
+        {
+            ArgumentNullException.ThrowIfNull(text);
+            return TextWidth(MacRoman.Encode(text));
+        }
+
+        /// <summary>The width of one character (<c>CharWidth</c>); see <see cref="TextWidth"/>.</summary>
+        public int CharWidth(byte character) => TextWidth([character]);
+
+        /// <summary>
+        /// The port font's metrics (<c>GetFontInfo</c>), from the Font Manager's output: widMax with the style's extra
+        /// width, ascent and descent grown for shadow and outline, all stretched to the requested size (rounded).
+        /// Zeros when no bitmap font draws the port's font.
+        /// </summary>
+        public FontInfo GetFontInfo()
+        {
+            if (Select((1, 1), (1, 1)) is not { } font) return default;
+            int ascent = font.Ascent, descent = font.Descent, widMax = font.WidMax + (sbyte)font.Extra, leading = font.Leading;
+            if (font.Shadow != 0) (ascent, descent) = (ascent + 1, descent + (byte)font.Shadow);
+            if (font.Numer != font.Denom)
+            {
+                int Scale(int value, int numer, int denom) =>
+                    (int)(((uint)value * (ushort)numer + (uint)(ushort)denom / 2) / (ushort)denom);
+                (ascent, descent, leading) = (Scale(ascent, font.Numer.v, font.Denom.v), Scale(descent, font.Numer.v, font.Denom.v),
+                    Scale(leading, font.Numer.v, font.Denom.v));
+                widMax = Scale(widMax, font.Numer.h, font.Denom.h);
+            }
+            return new FontInfo(ascent, descent, widMax, leading);
+        }
+
+        // The Font Manager's choice for the port's text state at a text scale.
+        private FontSelection? Select((int h, int v) numer, (int h, int v) denom) =>
+            Options.Fonts is { } library
+                ? FontManager.Swap(library, FontId, Size, Face, numer, denom, SpaceExtraFixed, FractEnable, FScaleDisable, macOS9)
+                : null;
+
+        // ---- DrawPicture's save and restore ----
+
+        // Everything DrawPicture saves at entry and restores at exit: the whole port record (pen, patterns, text, colours,
+        // clip), patAlign, the character extras and the Font Manager's two settings. Not the highlight bit.
+        internal sealed record State(RgbaColor Fore, RgbaColor Back, (ushort, ushort, ushort) Fore16, (ushort, ushort, ushort) Back16,
+            QuickDrawPattern PnPat, QuickDrawPattern BkPat, QuickDrawPattern FillPat, int Mode, int PenWidth, int PenHeight,
+            int PenH, int PenV, int PenFrac, int PenVis, Region? Clip, (int, int) PatternAlign, int FontId, int Face, int Size,
+            int TxMode, int SpaceExtra, int ChExtra, int InterCharSpacing, bool FractEnable, bool FScaleDisable,
+            (int, int) TextNumer, (int, int) TextDenom, RgbaColor Hilite, RgbColor Hilite16);
+
+        internal State Save() => new(Fore, Back, Fore16, Back16, PnPat, BkPat, FillPat, Mode, PenWidth, PenHeight, PenH, PenV,
+            PenFrac, PenVis, ClipRegion, PatternAlign, FontId, Face, Size, TxMode, SpaceExtraFixed, ChExtra, InterCharSpacing,
+            FractEnable, FScaleDisable, TextNumer, TextDenom, Hilite, hilite16);
+
+        internal void Restore(State s, bool hilite)
+        {
+            (Fore, Back, Fore16, Back16, PnPat, BkPat, FillPat, Mode) = (s.Fore, s.Back, s.Fore16, s.Back16, s.PnPat, s.BkPat, s.FillPat, s.Mode);
+            (PenWidth, PenHeight, PenH, PenV, PenFrac, PenVis, ClipRegion, PatternAlign) =
+                (s.PenWidth, s.PenHeight, s.PenH, s.PenV, s.PenFrac, s.PenVis, s.Clip, s.PatternAlign);
+            (FontId, Face, Size, TxMode, SpaceExtraFixed, ChExtra, InterCharSpacing) =
+                (s.FontId, s.Face, s.Size, s.TxMode, s.SpaceExtra, s.ChExtra, s.InterCharSpacing);
+            (FractEnable, FScaleDisable, TextNumer, TextDenom) = (s.FractEnable, s.FScaleDisable, s.TextNumer, s.TextDenom);
+            if (hilite) (Hilite, hilite16) = (s.Hilite, s.Hilite16);
+        }
+
+        // DrawPicture's starting state (the pen visibility and the Font Manager's settings are kept).
+        internal void ResetForPicture(RgbaColor systemHilite)
+        {
+            (PnPat, FillPat, BkPat, Mode, PenH, PenV, PenFrac) =
+                (QuickDrawPattern.Black, QuickDrawPattern.Black, QuickDrawPattern.White, TransferModes.PatCopy, 0, 0, 0x8000);
+            (FontId, Face, Size, TxMode, SpaceExtraFixed, ChExtra, InterCharSpacing) = (0, 0, 0, TransferModes.SrcOr, 0, 0, 0);
+            (Fore, Back, Fore16, Back16, Op) = (new RgbaColor(0, 0, 0), new RgbaColor(255, 255, 255), (0, 0, 0), (0xFFFF, 0xFFFF, 0xFFFF), (0, 0, 0));
+            (PatternAlign, HilitePending) = ((0, 0), false);
+            SetHilite(systemHilite);
+        }
 
         // ---- the engine, in canvas pixels (the picture player maps its coordinates first) ----
 
@@ -370,6 +529,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // viaStretchBits: rects, regions and polygons (not ovals, round rects and arcs, which DrawArc draws itself).
         private void Shape(int verb, Func<Region> interior, Func<Region[]> frame, bool viaStretchBits)
         {
+            if (PenVis < 0) { Done(); return; }
             var colors = Colors;
             // DrawArc (ovals, round rects, arcs) takes the pen mode with bit 3 forced and draws only pattern modes
             // 8-15, arithmetic modes 40-47 and hilite 58; any other mode (16-31, 49, 64 and up, ...) draws nothing
@@ -384,27 +544,32 @@ namespace ClassicMac.Graphics.QuickDraw
                 case 0:
                     // (Mac OS 9 paints a crossed frame's two slabs one after the other.)
                     foreach (var part in frame())
-                        Painter.FillRegion(canvas, part, ClipRegion, PnPat, PatternAlign, Mode, HilitePending, colors, viaStretchBits);
+                        Painter.FillRegion(canvas, part, ClipRegion, PnPat, Align, Mode, HilitePending, colors, viaStretchBits, OriginV);
                     break;
-                case 1: Painter.FillRegion(canvas, interior(), ClipRegion, PnPat, PatternAlign, Mode, HilitePending, colors, viaStretchBits); break;
-                case 2: Painter.FillRegion(canvas, interior(), ClipRegion, BkPat, PatternAlign, TransferModes.PatCopy, false, colors, viaStretchBits); break;
-                case 3: Painter.FillRegion(canvas, interior(), ClipRegion, QuickDrawPattern.Black, PatternAlign, TransferModes.PatXor, HilitePending, colors, viaStretchBits); break;
-                case 4: Painter.FillRegion(canvas, interior(), ClipRegion, FillPat, PatternAlign, TransferModes.PatCopy, false, colors, viaStretchBits); break;
+                case 1: Painter.FillRegion(canvas, interior(), ClipRegion, PnPat, Align, Mode, HilitePending, colors, viaStretchBits, OriginV); break;
+                case 2: Painter.FillRegion(canvas, interior(), ClipRegion, BkPat, Align, TransferModes.PatCopy, false, colors, viaStretchBits, OriginV); break;
+                case 3: Painter.FillRegion(canvas, interior(), ClipRegion, QuickDrawPattern.Black, Align, TransferModes.PatXor, HilitePending, colors, viaStretchBits, OriginV); break;
+                case 4: Painter.FillRegion(canvas, interior(), ClipRegion, FillPat, Align, TransferModes.PatCopy, false, colors, viaStretchBits, OriginV); break;
             }
             Done();
         }
 
+        // The pattern phase: local coordinates plus patAlign.
+        private (int h, int v) Align => (PatternAlign.h + OriginH, PatternAlign.v + OriginV);
+
         // StdLine paints the pen-swept region with the pen pattern; Boolean pen modes act as pattern modes.
         internal void PaintLine(int x1, int y1, int x2, int y2)
         {
+            if (PenVis < 0) return;
             var region = RegionShapes.Line(x1, y1, x2, y2, PenWidth, PenHeight);
             int mode = Mode < TransferModes.Blend ? (Mode % 0x40) | 8 : Mode;
-            Painter.FillRegion(canvas, region, ClipRegion, PnPat, PatternAlign, mode, HilitePending, Colors, x1 == x2 || y1 == y2);
+            Painter.FillRegion(canvas, region, ClipRegion, PnPat, Align, mode, HilitePending, Colors, x1 == x2 || y1 == y2, OriginV);
         }
 
         // The mask and the clip together limit the copy.
         internal void CopyBits(PixMap source, PictRect sourceRect, PictRect destinationRect, int mode, Region? mask)
         {
+            if (PenVis < 0) { Done(); return; }
             if (ClipRegion != null) mask = mask == null ? ClipRegion : mask.Intersect(ClipRegion);
             Bits.CopyBits(canvas, source, sourceRect, destinationRect, mode, mask, HilitePending, Colors, Options.PreserveAlpha);
             Done();
@@ -428,6 +593,15 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (font != null)
                 {
                     int charExtra = unchecked(((short)ChExtra << 4) + InterCharSpacing);
+                    if (PenVis < 0)
+                    {
+                        // A hidden pen still moves.
+                        advance = TextDrawer.Advance(font, text, charExtra);
+                        PenFrac = (startFrac + advance) & 0xFFFF;
+                        Moved();
+                        Done();
+                        return;
+                    }
                     int frac = mode == TransferModes.GrayishTextOr
                         ? GrayishText(font, text, x, y, charExtra, out advance)
                         : TextDrawer.Draw(canvas, font, text, x, y, PenFrac, charExtra, mode, ClipRegion, HilitePending, Colors, out advance);
@@ -440,7 +614,7 @@ namespace ClassicMac.Graphics.QuickDraw
             if (Options.TextFallback is { } fallback)
             {
                 var mask = fallback.Render(MacRoman.Decode(text), new TextFallbackStyle(fallbackFontId, Face, Size, fallbackName));
-                if (mask != null && mask.Width > 0 && mask.Height > 0)
+                if (mask != null && mask.Width > 0 && mask.Height > 0 && PenVis >= 0)
                     Painter.FillMask(canvas, x - mask.OriginX, y - mask.OriginY, mask.Width, mask.Height, mask.Bits,
                         ClipRegion, mode, HilitePending, Colors);
                 if (mask != null) advance = (int)Math.Round(mask.Advance * 65536.0);
@@ -453,8 +627,10 @@ namespace ClassicMac.Graphics.QuickDraw
             void Moved()
             {
                 if (!movePen) return;
-                long pen = ((long)x << 16) + startFrac + advance;
-                (PenH, PenV) = ((int)(pen >> 16), y);
+                long pen = ((long)(x + OriginH) << 16) + startFrac + advance;
+                // Mac OS 9 stops the pen at 32752.0.
+                if (macOS9 && pen > 32752L << 16) (pen, PenFrac) = (32752L << 16, 0);
+                (PenH, PenV) = ((int)(pen >> 16), y + OriginV);
             }
         }
 
@@ -489,7 +665,7 @@ namespace ClassicMac.Graphics.QuickDraw
             int frac = TextDrawer.Draw(canvas, font, text, x, y, PenFrac, charExtra, TransferModes.SrcOr, ClipRegion,
                 HilitePending, Colors, out advance);
             var box = new PictRect(y - ascent, x, y + descent, x + width);
-            Painter.FillRegion(canvas, RegionShapes.Rect(box), ClipRegion, Gray, PatternAlign, TransferModes.PatBic, false, Colors, true);
+            Painter.FillRegion(canvas, RegionShapes.Rect(box), ClipRegion, Gray, Align, TransferModes.PatBic, false, Colors, true, OriginV);
             return frac;
         }
 

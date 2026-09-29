@@ -134,6 +134,20 @@ Details:
 
 ---
 
+### 3.4 The port: origin, pen visibility, pen fraction
+
+- **SetOrigin(h, v)** offsets portRect, the pixel map's bounds and visRgn, so the canvas's top-left pixel gets local
+  coordinates (h, v). The clip region, patAlign and the pen are untouched: they keep their local coordinates and so move
+  on the screen. Nothing happens when the origin is unchanged [Code].
+- **pnVis** (HidePen decrements it, ShowPen increments it): while negative, lines, every frame/paint/erase/invert/fill
+  verb, text pixels, CopyBits into the port's own pixels and ScrollRect draw nothing. The pen still moves: LineTo sets
+  pnLoc, and DrawString advances it. CopyBits into other bitmaps, CopyMask/CopyDeepMask, region and polygon recording
+  and picture recording (unless pnVis < −1) are not suppressed [Code]. The ROM and Mac OS 9 agree.
+- **pnLocHFrac** (colour ports) is reset to `$8000` by MoveTo, Move, the line path (LineTo, Line, FramePoly, also when
+  the pen is hidden) and InitCPort/OpenCPort; not by SetOrigin, SetPort, the pen-state calls, PenNormal, HidePen,
+  ShowPen or PortChanged. DrawString adds the fraction of the text's width to it, the carry going into pnLoc.h [Code].
+  Mac OS 9 caps the pen at 32752.0.
+
 ## 4. Shapes
 
 All shapes produce regions in canvas coordinates, clipped horizontally to the shape's rect where noted.
@@ -406,10 +420,14 @@ not do this.
 
 ### 5.6 Pattern placement
 
-Pattern pixel for canvas pixel (x, y), where patAlign is the accumulated Origin shift ([PICT.md](PICT.md) §6.4):
+A pattern's phase is the port's **local** coordinates plus patAlign, for every verb (rects, regions, ovals, arcs,
+polygons, lines; PatExpand) [Code]. For pixel (x, y) in local coordinates:
 
 - **1-bit patterns:** row `(y + patAlign.v) & 7`, bit `(x + patAlign.h) & 7`.
-- **Pixel patterns (ROM):** `((x + patAlign.h) mod w, y mod h)`. There is no vertical shift.
+- **Pixel patterns (ROM):** `((x + patAlign.h) mod w, y mod h)`. patAlign.v is not applied.
+
+So SetOrigin (§3.4) shifts patterns on the screen. patAlign itself changes only in InitGraf, DrawPicture (saved,
+zeroed and restored) and the ROM's Origin opcode ([PICT.md](PICT.md) §6.4); PortChanged does nothing [Code].
 
 ---
 
@@ -863,6 +881,22 @@ exactly.
 
 ---
 
+### 7.8 Character extra, measuring and font metrics
+
+- **CharExtra(extra: Fixed)** (colour ports; old ports ignore it) stores the extra **per point**:
+  `chExtra = (short)(FixDiv(extra, size << 16) >> 4)`, a 4.12 value, where size is txSize, or when that is 0 the
+  system font size (SysFontSize, then FMDefaultSize, then 12). FixDiv rounds. TextSize always clears chExtra. Drawing
+  and measuring use `(short)chExtra << 4` (plus the picture's LineJustify spacing) × the strike size × the text scale ×
+  FOutDenom / FOutNumer, after every character but spaces (§7.5) [Code].
+- **TextWidth / StringWidth / CharWidth:** `trunc(trunc(sum) × FOutNumer.h / FOutDenom.h)`, where sum is StdTxMeas's
+  Fixed width (§7.4: the strike's widths with the style extra, space extra, character extra and the FScaleDisable
+  factor), with an unsigned multiply and divide. There is no text scaling (numer = denom = 1). Always truncated, never
+  rounded [Code].
+- **GetFontInfo** takes FMOutput's metrics, not the strike's. widMax gets FOutExtra (bold +1, outline +1, shadow +2,
+  condense −1, extend +1, or the family's style extra; italic 0); shadow and outline add 1 to the ascent and the
+  shadow count (outline 1, shadow 2, both 3) to the descent. Then each is stretched, `(value × numer + denom / 2) / denom`,
+  vertically for ascent, descent and leading and horizontally for widMax [Code].
+
 ## 8. Screen depths
 
 A picture drawn on a 1, 2, 4, 8 or 16-bit screen looks different. For indexed depths, QuickDraw works on colour-table
@@ -1160,7 +1194,19 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
     the pen. Glyphs of width 0 draw nothing.
   - The pen advances as for 1-bit text.
 
-### 9.4 Not yet pinned down
+### 9.4 The port and measuring
+
+- **Pixel patterns** also apply patAlign.v, and a port can have its own pattern origin for them (QDSetPatternOrigin,
+  grafVars flag `$4000`; the picture opcode `$0200`) [Code]; ClassicMac does not model the pattern origin.
+- **SetOrigin** does nothing without a port and clears QDErr [Code].
+- **CharExtra:** the divide truncates and the result is clamped to ±$7FFF; TextSize clears chExtra only when the size
+  changes; the extra is added only to characters with a width, and is 0 for non-native scripts [Code].
+- **TextWidth:** a signed divide. Strings under 32 characters are cached, and with a stretched font a cache hit can be 1
+  more (`floor(FixTxWid × n / d)` rather than `trunc(w) × n / d`) [Code]; ClassicMac does not model the cache.
+- **GetFontInfo:** the FScaleDisable factor is applied twice, and a negative leading works [Code]; ClassicMac applies it
+  once.
+
+### 9.5 Not yet pinned down
 
 These Mac OS 9 differences are known but not yet exactly specified or verified. ClassicMac.Graphics draws them the ROM way
 in both modes:
@@ -1186,7 +1232,7 @@ Everything this document knows about but ClassicMac.Graphics does not reproduce,
   band; outline and shadow shrink the rect by 1 first.
 - **The ROM's arithmetic-mode text on indexed screens** is not verified (§8.5).
 
-**Mac OS 9 quirks found in code but not reproduced** (§9.4)
+**Mac OS 9 quirks found in code but not reproduced** (§9.5)
 - Corrupted italic rows that need shifts of 32 bits or more.
 - A clipped reduction's right-edge span that is one column short.
 - A destination rect past the pixel map's bounds picking its scaling routine from truncated widths.

@@ -411,14 +411,15 @@ decoder may keep it for srcCopy transfers ([QUICKDRAW.md](QUICKDRAW.md) §6.6).
 
 `DrawPicture` starts with:
 
-- **Pen:** location (0, 0), size 1×1, mode patCopy.
+- **Pen:** location (0, 0), mode patCopy, size ScalePt((1, 1)) from picFrame (not an extended header's srcRect) to the
+  destination: 1×1 unless the picture is scaled [Code]. Visibility is kept.
 - **Patterns:** pen and fill black, background white.
 - **Colours:** foreground black, background white, OpColor black. Highlight colour is the system default: `$9999/$CCCC/$CCCC`
   in the ROM, lavender `$CCCC/$CCCC/$FFFF` on Mac OS 9 (Appearance default). DefHilite restores it. A decoder should
   let the caller choose it.
 - **Text:** font 0, face 0, mode srcOr, size 0, space extra 0, character extra 0, pen fraction ½ (`$8000`).
 - **Text ratio:** numer = toRect size, denom = fromRect size (§7).
-- **Clip:** none.
+- **Clip:** empty until the ClipRgn opcode (§6.5).
 - **Pattern origin:** (0, 0).
 - **No font-name mappings.**
 
@@ -460,15 +461,29 @@ DrawPicture reads them. It adds dh to fromRect's left and right and dv to its to
 (each Origin adds to the previous shift until the next DrawPicture). All later coordinates therefore land dh, dv further
 up and left. It also:
 
-- adds (dh, dv) to the **pattern alignment** (patAlign);
+- adds (dh, dv) to the **pattern alignment** (patAlign; the ROM only, [QUICKDRAW.md](QUICKDRAW.md) §5.6);
 - re-maps the current clip (kept in picture coordinates).
 
 ### 6.5 Clip
 
-- The clip region is stored in picture coordinates and mapped (§6.3) whenever it or fromRect changes.
-- Every drawing operation is limited to the mapped clip and the canvas.
+- DrawPicture replaces the port's clip with an **empty** region until the picture's ClipRgn opcode, so a picture without
+  one draws nothing; from then on the clip is the mapped picture clip intersected with the caller's clip [Code].
+  ClassicMac's decoder (a fresh canvas, no caller) draws such a picture anyway [ClassicMac]; `DrawPicture` onto a
+  `QuickDrawPort` follows the Mac.
+- The clip region is stored in picture coordinates and mapped (§6.3), then intersected with the caller's clip, whenever
+  it or fromRect changes (the Origin opcode re-maps it).
+- Every drawing operation is limited to that clip and the canvas.
 
-### 6.6 MapFixPt (text positions only, ROM)
+### 6.6 Saving and restoring the port
+
+DrawPicture copies the whole port record at entry and restores it at exit, so the pen (location, fraction, size,
+mode, visibility), the patterns, the text font, face, size and mode, the space and character extras, the colours and
+the clip come back unchanged, and the pen does not move. patAlign, the picture's LineJustify spacing, FractEnable and
+FScaleDisable are saved and restored too. The ROM writes OpColor (black) and the highlight colour, and the `$1D`–`$1F`
+opcodes, into the real port's colour state and does not restore them; Mac OS 9 plays those into a copy but still
+leaves OpColor black [Code]. pnVis is not reset, so a hidden pen hides the picture.
+
+### 6.7 MapFixPt (text positions only, ROM)
 
 Version-2 text positions are mapped with fixed-point precision. For each axis, on a Fixed coordinate `c`:
 
@@ -487,7 +502,7 @@ result = d + (toLo << 16)
 - **LongText, DHText, DVText, DHDVText:**
   - Set or move the text location (picture coordinates). The location persists between text opcodes.
   - The pen goes to the mapped location:
-    - **version 2:** MapFixPt (§6.6) of `(v + ½, h + pendingFrac)`. The pen is the integer parts, and the pen
+    - **version 2:** MapFixPt (§6.7) of `(v + ½, h + pendingFrac)`. The pen is the integer parts, and the pen
       fraction becomes h's fraction.
     - **version 1:** MapPt. The pen fraction keeps whatever the previous text left.
   - pendingFrac resets to ½ at every text opcode.

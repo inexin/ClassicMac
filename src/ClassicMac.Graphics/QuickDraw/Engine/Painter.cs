@@ -3,10 +3,10 @@ using ClassicMac.Graphics;
 
 namespace ClassicMac.Graphics.QuickDraw
 {
-    // Transfers a pattern, or a 1-bit mask, through a region onto the canvas. A 1-bit pattern is aligned to the
-    // canvas origin shifted by the picture's pattern alignment (align: the Origin opcodes' accumulated dh, dv): pixel
-    // (x, y) takes pattern bit ((x + align.h) & 7) of row ((y + align.v) & 7). A pixel pattern is rotated
-    // horizontally by align.h only (the ROM does not apply patAlign.v to them). A pixel the picture never drew
+    // Transfers a pattern, or a 1-bit mask, through a region onto the canvas. A pattern's phase is the port's local
+    // coordinates plus patAlign (align: the port origin plus patAlign, which the Origin opcodes accumulate): pixel
+    // (x, y) takes pattern bit ((x + align.h) & 7) of row ((y + align.v) & 7). The ROM leaves patAlign.v out of a
+    // pixel pattern's rows (pixPatRomV: the port origin's v alone); Mac OS 9 applies it. A pixel the picture never drew
     // (alpha 0) reads as white, the erased background of a fresh port; pixels a mode leaves alone keep their alpha.
     internal static class Painter
     {
@@ -15,7 +15,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // viaStretchBits: the verb draws through StretchBits (rects, regions, polygons, horizontal and vertical lines),
         // not DrawArc / DrawLine's own slab code (ovals, round rects, arcs, slanted lines).
         public static void FillRegion(RgbaBitmap canvas, Region region, Region? clip, QuickDrawPattern pattern, (int h, int v) align,
-            int mode, bool hilitePending, in PortColors colors, bool viaStretchBits)
+            int mode, bool hilitePending, in PortColors colors, bool viaStretchBits, int pixPatRomV = 0)
         {
             var area = Visible(canvas, region, clip);
             if (area.IsEmpty) return;
@@ -23,7 +23,7 @@ namespace ClassicMac.Graphics.QuickDraw
             bool colorPattern = pattern.Pixels != null || pattern.Rgb != null;
             if (colors.Device != null)
             {
-                FillRegionOnDevice(canvas, area, pattern, align, m, colors);
+                FillRegionOnDevice(canvas, area, pattern, align, m, colors, pixPatRomV);
                 return;
             }
 
@@ -45,7 +45,7 @@ namespace ClassicMac.Graphics.QuickDraw
                         {
                             // Pixel patterns in Boolean modes act as pixel values with fore = all ones, back = 0:
                             // copy P, or d | P, xor d ^ P, bic d & ~P (P inverted first for the not modes).
-                            var src = pattern.Rgb ?? PatternPixel(pattern.Pixels!, x + align.h, y + (colors.MacOS9 ? align.v : 0));
+                            var src = pattern.Rgb ?? PatternPixel(pattern.Pixels!, x + align.h, y + (colors.MacOS9 ? align.v : pixPatRomV));
                             if (TransferModes.IsArithmetic(m) || m == TransferModes.Hilite)
                                 write = TransferModes.ApplyColor(m, src, dst, colors, out result);
                             else
@@ -96,7 +96,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // values (Color2Index for indexed patterns, the inverse table for direct ones; an RGB pattern is PatDither's 2 x 2
         // cell, solid only at 32 bits) drawn with fg all ones and bk 0.
         private static void FillRegionOnDevice(RgbaBitmap canvas, Region area, QuickDrawPattern pattern, (int h, int v) align, int m,
-            in PortColors colors)
+            in PortColors colors, int pixPatRomV)
         {
             var device = colors.Device!;
             int[]? cell = pattern.Rgb != null ? device.PatDither(pattern.Rgb16) : null;
@@ -114,7 +114,7 @@ namespace ClassicMac.Graphics.QuickDraw
                         }
                         else if (pixels != null)
                         {
-                            var c = PatternPixel(pixels, x + align.h, y + (colors.MacOS9 ? align.v : 0));
+                            var c = PatternPixel(pixels, x + align.h, y + (colors.MacOS9 ? align.v : pixPatRomV));
                             int p = pixels.IsDirect ? device.Lookup(c) : device.Color2Index(c);
                             write = DeviceModes.PatternValue(m, p, c, dst, colors, out value);
                         }

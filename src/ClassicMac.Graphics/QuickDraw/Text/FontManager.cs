@@ -18,6 +18,7 @@ namespace ClassicMac.Graphics.QuickDraw
         public int Size;                                   // the requested size (the width table's fSize)
         public (int h, int v) InNumer, InDenom;            // the text scale it was asked for
         public int Ascent, Descent;                        // FMOutput's metrics (bytes; scaled with FScaleDisable)
+        public int WidMax, Leading;                        // FMOutput's widMax and leading (bytes; scaled likewise)
         public bool MacOS9;                                // drawn by Mac OS 9's text code
         public RgbaColor[]? Palette;                       // a color font's colors (fctb or the standard table)
     }
@@ -237,6 +238,8 @@ namespace ClassicMac.Graphics.QuickDraw
                 fScaleDisable ? (byte)FixedMath.FixRound(FixedMath.FixMul((sbyte)b << 16, factor)) : (byte)b;
             s.Ascent = Metric(f.Ascent & 0xFF, vFactor);
             s.Descent = Metric(f.Descent & 0xFF, vFactor);
+            s.Leading = Metric(f.Leading & 0xFF, vFactor);
+            s.WidMax = Metric(f.MaxWidth & 0xFF, hFactor);   // [ClassicMac: FScaleDisable's scaling of widMax not checked]
 
             // Width source: with fractional widths, the NFNT's width table, else the family's (flags bit 14 clear).
             var fond = found.Fond;
