@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The viewer shows an icon's suite as the Finder draws it: each size, plain, selected, disabled, offline and open, and
+  the label colours, at the chosen screen depth.
 - Editing (Editor I): the app adds, duplicates, deletes and renumbers resources, changes their names and attributes,
   edits their bytes as hex or replaces them from a file, with undo and redo, and saves back into the file (raw fork,
   AppleDouble, Basilisk II, MacBinary as III, BinHex, AppleSingle), verified, keeping the original as `.orig`; Save As

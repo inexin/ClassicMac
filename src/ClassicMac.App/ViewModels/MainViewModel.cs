@@ -244,7 +244,7 @@ namespace ClassicMac.App.ViewModels
             if (cancellation.IsCancellationRequested) return;
             foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
             // Small images (icons, patterns) open enlarged.
-            if (result.Kind == PreviewKind.Image) Zoom = result.Images.Max(i => Math.Max(i.Width, i.Height)) <= 64 ? 4 : 1;
+            if (result.Kind == PreviewKind.Image) Zoom = result.Images[0] is { Width: <= 64, Height: <= 64 } ? (result.Images.Any(i => i.Width > 256) ? 2 : 4) : 1;
             else if (result.Kind is PreviewKind.Dialog or PreviewKind.Menu) Zoom = 2;
             Preview = result;
             if (result.HasPreview) SelectedTab = 1;

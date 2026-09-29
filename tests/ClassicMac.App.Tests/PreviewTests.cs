@@ -98,8 +98,11 @@ public class PreviewTests : IDisposable
         var icon = await Select(model, Resource(file, "ICN#", 128));
         Assert.Equal(PreviewKind.Image, icon.Kind);
         Assert.Equal((32, 32), (icon.Images[0].Width, icon.Images[0].Height));
-        Assert.Equal(4, model.Zoom); // small images open enlarged
-        Assert.Equal(128, model.Images[0].Width);
+        // Then the suite as the Finder draws it: five states at 32 x 32, and the seven labels.
+        Assert.Equal(["Finder 32 × 32: plain, selected, disabled, offline, open", "Finder labels 1–7"], icon.Images.Skip(1).Select(i => i.Caption));
+        Assert.Equal((8 + 5 * 40, 48), (icon.Images[1].Width, icon.Images[1].Height));
+        Assert.Equal(2, model.Zoom); // small images open enlarged (less when the Finder strips are wide)
+        Assert.Equal(64, model.Images[0].Width);
         Assert.Equal(1, model.SelectedTab);
 
         var picture = await Select(model, Resource(file, "PICT", 128));

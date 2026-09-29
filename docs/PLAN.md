@@ -469,7 +469,7 @@ folder or file, as HTML) and Unpack as AppleDouble or Basilisk II (input, contai
 named after the item ("Disk unpacked", numbered when it exists), with progress in the status line and problems in the
 diagnostics list. **Sound (built):** a `snd ` shows its waveform (one lane per channel) and details (exact rate, channels,
 size, length, loop, base note) and plays through SoundFlow at its true pitch (converted to the device's 48 kHz
-stereo); playback stops when the selection changes. **Next:** drag and drop out of the app, then the other previews
+stereo); playback stops when the selection changes. **Icons (built):** an icon resource's preview adds its suite as the Finder draws it (`IconSuite` through the QuickDraw renderer): every size, plain, selected, disabled, offline and open, and the seven labels, at the preview's screen depth. **Next:** drag and drop out of the app, then the other previews
 (fonts, dialogs) as their decoders arrive.
 
 **Editing, in three stages** — the viewer becomes an editor, ResEdit-style. Every save writes a verified round trip

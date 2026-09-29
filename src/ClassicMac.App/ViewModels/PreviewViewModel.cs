@@ -146,7 +146,11 @@ namespace ClassicMac.App.ViewModels
             var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(resource.Type));
             if (decoder is null) return Nothing($"'{type}'");
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));
-            return FromFiles(files, $"'{type}'");
+            var preview = FromFiles(files, $"'{type}'");
+            // Icons: the suite of their ID as the Finder draws it, after the member itself.
+            if (preview.Kind == PreviewKind.Image && FinderIcons.Applies(resource))
+                preview = new PreviewViewModel(PreviewKind.Image, "") { Images = [.. preview.Images, .. FinderIcons.Draw(resource, fork, options, readOptions, diagnostics)] };
+            return preview;
         }
 
         // A picture file (type PICT, after its 512-byte header), a document (DOCMaker, or SimpleText with pictures), or a
