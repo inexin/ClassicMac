@@ -148,11 +148,26 @@ namespace ClassicMac.App.ViewModels
 
         private void UpdateForm(NodeViewModel? node)
         {
-            Form = node is ResourceNode r && FileOwner(r) is { } owner
-                ? ResourceForm.For(r.Resource, r.Fork, ReadOptions) ?? TemplateFormFor(r, owner)
-                : null;
+            ResourceForm? typed = null, template = null;
+            if (node is ResourceNode r && FileOwner(r) is { } owner)
+            {
+                typed = ResourceForm.For(r.Resource, r.Fork, ReadOptions);
+                template = TemplateFormFor(r, owner);
+            }
+            HasTemplateChoice = typed is not null && template is not null;
+            Form = UseTemplate ? template ?? typed : typed ?? template;
             WatchForm(Form, node as ResourceNode);
         }
+
+        /// <summary>Whether the Edit tab shows a resource through its <c>TMPL</c> even when it has a form of its own.</summary>
+        [ObservableProperty]
+        private bool useTemplate;
+
+        /// <summary>Whether the selection has both a form of its own and a template to choose between.</summary>
+        [ObservableProperty]
+        private bool hasTemplateChoice;
+
+        partial void OnUseTemplateChanged(bool value) => UpdateForm(Selected);
 
         private bool CanApplyForm() => Form is not null && Selected is ResourceNode;
 

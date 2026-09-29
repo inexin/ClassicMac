@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Edit tab: "Edit with template" shows a resource that has a typed form through its `TMPL` instead, when one is at hand.
 - Hex editing in the hex view: Edit Bytes types hex digits over or into a resource's bytes, with Delete, Backspace and
   cursor keys, applied as one undoable edit.
 - Resource forks: a map offset past the end of the fork is recovered from the end of the data area, as ResEdit does

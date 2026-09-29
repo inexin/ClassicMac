@@ -126,7 +126,8 @@ bottom or whose left is right of its right. [Code]
 - **The app** shows a resource through a template when it has no form of its own: one row per field (a check box
   for `BOOL` and `BBIT`, counts read-only), lists with their items to add, insert and remove. Like ResEdit it takes the
   template from the resource's own file, then from any other open file whose resources are loaded, so opening a copy of
-  ResEdit makes its templates available. Apply makes an undoable edit. [ClassicMac]
+  ResEdit makes its templates available. Apply makes an undoable edit. A resource that has a form of its own and a template also gets an "Edit with template"
+  check box that swaps between the two. [ClassicMac]
 - Read back and written again, all 471 resources of §5 come out byte for byte (the short ones zero-filled).
 
 ## 9. Not covered

@@ -310,6 +310,29 @@ public sealed class EditTests : IDisposable
     }
 
     [Fact]
+    public async Task A_resource_with_a_form_can_be_edited_through_its_template()
+    {
+        var path = Path.Combine(folder, "Both.rsrc");
+        var str = FourCC.FromString("STR ");
+        var fork = new ResourceFork();
+        fork.Add(new Resource(str, 128, new byte[] { 2, (byte)'h', (byte)'i' }));
+        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("Text", "PSTR"))) { Name = MacString.FromMacRoman("STR ") });
+        File.WriteAllBytes(path, fork.ToArray());
+
+        var model = new MainViewModel { EditDialogs = new Dialogs() };
+        var input = (await model.OpenAsync(path))!;
+        await input.EnsureLoadedAsync();
+        model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == str).Children[0];
+        Assert.IsType<StringForm>(model.Form);
+        Assert.True(model.HasTemplateChoice);
+
+        model.UseTemplate = true;
+        Assert.IsType<TemplateForm>(model.Form);
+        model.UseTemplate = false;
+        Assert.IsType<StringForm>(model.Form);
+    }
+
+    [Fact]
     public async Task Closing_with_unsaved_edits_asks_and_can_save()
     {
         var (model, file, dialogs, _, path) = await Open();
