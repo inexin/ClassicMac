@@ -100,6 +100,9 @@ internal static class HfsPlusReader
         }
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
+        const uint catalogNodeIdsReused = 1u << 12;
+        if ((U32(header, 4) & catalogNodeIdsReused) == 0 && U32(header, 64) <= catalogIds.Max())
+            throw new InvalidDataException("The HFS Plus next catalog ID is not greater than all catalog IDs.");
         ValidateCatalogThreads(catalogNodes, catalogThreads);
         var childCounts = new Dictionary<uint, uint>(folders.Count);
         foreach (uint folderId in folders.Keys) childCounts.Add(folderId, 0);

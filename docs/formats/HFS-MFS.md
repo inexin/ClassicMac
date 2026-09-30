@@ -805,7 +805,9 @@ leaf-record keys are unique, catalog IDs are unique and each required file and f
 record's parent and name. TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
 nonroot folder, including empty folders. TN1150 defines valence as the count of file and folder records whose key
-parent ID is that folder's ID **[Doc]**. It then resolves file paths and reads both forks, Finder info and dates. It
+parent ID is that folder's ID **[Doc]**. Unless the volume's catalog-ID-reuse flag is set, `nextCatalogID` must be
+greater than all file and folder IDs, as TN1150 requires **[Doc]**. It then resolves file paths and reads both forks,
+Finder info and dates. It
 also reads data and resource fork overflow
 extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
 (which may exceed the blocks needed by its logical length). It checks extents-overflow keys are strictly ordered by

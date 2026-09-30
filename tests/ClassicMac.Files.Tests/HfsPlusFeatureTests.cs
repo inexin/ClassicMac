@@ -54,6 +54,24 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusNextCatalogIdMustExceedEveryExistingCatalogId()
+    {
+        byte[] image = HfsPlusFixture.Build(nextCatalogId: 17);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusNextCatalogIdMayWrapWhenCatalogIdsHaveBeenReused()
+    {
+        byte[] image = HfsPlusFixture.Build(nextCatalogId: 17, catalogIdsReused: true);
+
+        Assert.Equal("Documents:Read Me",
+            Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
     public void HfsPlusUnicodeNameIsPreservedInTheMacPath()
     {
         byte[] image = HfsPlusFixture.Build("文件");
@@ -443,17 +461,19 @@ public sealed class HfsPlusFeatureTests
             bool invalidCatalogIndexBackwardLink = false, bool duplicateOverflowExtent = false,
             bool unsortedOverflowKeys = false, bool unsortedOverflowFileIds = false,
             bool unsortedOverflowForkTypes = false, bool reverseCatalogRecords = false,
-            byte? catalogKeyCompareType = null)
+            byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
             U16(volume, 0, hfsX ? (ushort)0x4858 : (ushort)0x482B);
             U16(volume, 2, hfsX ? (ushort)5 : (ushort)4);
+            U32(volume, 4, catalogIdsReused ? 0x1000u : 0);
             U32(volume, 32, 1); // fileCount
             U32(volume, 36, 1); // folderCount excludes root
             U32(volume, 40, Block);
             U32(volume, 44, fragmentedData ? 32u : 16u);
             U32(volume, 48, fragmentedData ? 19u : 10u);
+            U32(volume, 64, nextCatalogId ?? (additionalFolderParent is null ? 18u : 19u));
             Fork(volume.Slice(272, 80), (multiLeafCatalog ? 4 : 2) * Block, 2,
                 multiLeafCatalog ? 4u : 2u);
             if (fragmentedData) Fork(volume.Slice(192, 80), 2 * Block, 4, 2);
