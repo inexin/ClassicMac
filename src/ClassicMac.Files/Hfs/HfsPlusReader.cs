@@ -217,6 +217,8 @@ internal static class HfsPlusReader
     {
         if (tree.Length < 512 || tree[8] != 1)
             throw new InvalidDataException($"The HFS Plus {name} tree has no B-tree header.");
+        if (U32(tree, 4) != 0 || U16(tree, 10) != 3)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree header node is invalid.");
         if (tree[14 + 36] != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree has an invalid tree type.");
         bool caseSensitiveCatalog = false;
