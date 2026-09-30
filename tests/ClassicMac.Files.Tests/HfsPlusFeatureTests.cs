@@ -1155,6 +1155,15 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusRejectsOverflowExtentsThatDoNotBelongToAFork()
+    {
+        byte[] image = HfsPlusFixture.BuildWithUnreferencedOverflowExtent(23, markAllocated: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusVolumeRequiresAnAllocationFile()
     {
         byte[] image = HfsPlusFixture.Build(includeAllocationFile: false);
@@ -1227,6 +1236,37 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
+    [InlineData(0)]
+    [InlineData(15)]
+    public void HfsPlusForksCannotClaimBlocksReservedForVolumeHeaders(uint allocationBlock)
+    {
+        byte[] image = HfsPlusFixture.BuildWithFileDataExtent(allocationBlock);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(14)]
+    public void HfsPlusForkMayUseBlocksImmediatelyInsideTheVolumeDataArea(uint allocationBlock)
+    {
+        byte[] image = HfsPlusFixture.BuildWithFileDataExtent(allocationBlock);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusBadBlockRecordMayIdentifyADamagedAlternateHeaderBlock()
+    {
+        byte[] image = HfsPlusFixture.BuildWithBadBlockExtent(31);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
     public void HfsPlusAllocationFileMustMarkAttributeAndStartupForks(bool attributesFile, bool startupFile)
@@ -1270,6 +1310,38 @@ public sealed class HfsPlusFeatureTests
             Assert.Equal(Enumerable.Range(1, 8).SelectMany(index => Enumerable.Repeat((byte)index, 4096)),
                 file.DataFork.ToArray());
         }
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void HfsPlusReportsSparedBlocksFlagMismatches(bool hasBadBlockRecords, bool setFlag)
+    {
+        byte[] image = hasBadBlockRecords
+            ? HfsPlusFixture.Build(fragmentedData: true, badBlockExtent: true)
+            : HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 4), setFlag ? 0x200u : 0u);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-spared-blocks" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusDoesNotReportSparedBlocksWhenHeaderMatches(bool hasBadBlockRecords)
+    {
+        byte[] image = hasBadBlockRecords
+            ? HfsPlusFixture.Build(fragmentedData: true, badBlockExtent: true)
+            : HfsPlusFixture.Build();
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-spared-blocks");
     }
 
     [Fact]
@@ -1936,7 +2008,7 @@ public sealed class HfsPlusFeatureTests
             Span<byte> volume = image.AsSpan(1024, 512);
             U16(volume, 0, hfsX ? (ushort)0x4858 : (ushort)0x482B);
             U16(volume, 2, hfsX ? (ushort)5 : (ushort)4);
-            U32(volume, 4, catalogIdsReused ? 0x1000u : 0);
+            U32(volume, 4, (catalogIdsReused ? 0x1000u : 0) | (badBlockExtent ? 0x200u : 0));
             U32(volume, 32, 1); // fileCount
             U32(volume, 36, 1); // folderCount excludes root
             U32(volume, 40, Block);
@@ -2240,7 +2312,7 @@ public sealed class HfsPlusFeatureTests
             return image;
         }
 
-        public static byte[] BuildWithUnreferencedOverflowExtent(uint physicalBlock)
+        public static byte[] BuildWithUnreferencedOverflowExtent(uint physicalBlock, bool markAllocated = false)
         {
             byte[] image = Build(fragmentedData: true);
             Span<byte> leaf = image.AsSpan(5 * Block, Block);
@@ -2249,7 +2321,34 @@ public sealed class HfsPlusFeatureTests
             U16(leaf, Block - 6, 166);
             WriteExtentRecord(leaf, 90, 0, physicalBlock, fileId: 99);
             U32(image.AsSpan(4 * Block), 20, 2);
-            image[9 * Block + (int)(physicalBlock / 8)] &= unchecked((byte)~(1 << (7 - (int)(physicalBlock % 8))));
+            if (!markAllocated)
+                image[9 * Block + (int)(physicalBlock / 8)] &=
+                    unchecked((byte)~(1 << (7 - (int)(physicalBlock % 8))));
+            return image;
+        }
+
+        public static byte[] BuildWithFileDataExtent(uint allocationBlock)
+        {
+            byte[] image = Build();
+            Span<byte> leaf = image.AsSpan(3 * Block, Block);
+            int recordCount = BinaryPrimitives.ReadUInt16BigEndian(leaf[10..]);
+            for (int index = 0; index < recordCount; index++)
+            {
+                int start = BinaryPrimitives.ReadUInt16BigEndian(leaf[(Block - 2 * (index + 1))..]);
+                int keyLength = BinaryPrimitives.ReadUInt16BigEndian(leaf[start..]);
+                int data = start + 2 + keyLength;
+                if (BinaryPrimitives.ReadUInt16BigEndian(leaf[data..]) != 2) continue;
+                U32(leaf, data + 88 + 16, allocationBlock);
+                return image;
+            }
+
+            throw new InvalidOperationException("The HFS Plus fixture has no file record.");
+        }
+
+        public static byte[] BuildWithBadBlockExtent(uint allocationBlock)
+        {
+            byte[] image = Build(fragmentedData: true, badBlockExtent: true);
+            U32(image.AsSpan(5 * Block), 14 + 12, allocationBlock);
             return image;
         }
 

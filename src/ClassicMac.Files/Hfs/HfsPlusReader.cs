@@ -37,10 +37,11 @@ internal static class HfsPlusReader
 
         var overflow = new Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>();
         var allocationExtents = new List<(uint Start, uint End)>();
+        var ordinaryForkExtents = new List<(uint Start, uint End)>();
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(192, 8)) != 0)
         {
             ForkData extentsFork = ReadFork(image, header.AsSpan(192, 80), blockSize, totalBlocks,
-                allocationExtents: allocationExtents);
+                allocationExtents: allocationExtents, ordinaryForkExtents: ordinaryForkExtents);
             foreach (var (key, data) in LeafRecords(
                 extentsFork.ToArray(context.Options.MaxExpandedBytesPerInput), "extents-overflow"))
             {
@@ -51,31 +52,38 @@ internal static class HfsPlusReader
                     throw new InvalidDataException("An HFS Plus bad-block extent must use the data fork.");
                 uint start = U32(key, 8);
                 _ = AddExtentRecord(data.AsSpan(0, 64), totalBlocks, allocationExtents,
-                    "An HFS Plus overflow extent lies outside the allocation area.");
+                    "An HFS Plus overflow extent lies outside the allocation area.",
+                    id.File == BadBlockFileId ? null : ordinaryForkExtents);
                 if (!overflow.TryGetValue(id, out var entries)) overflow[id] = entries = [];
                 entries.Add((start, data.AsSpan(0, 64).ToArray()));
             }
         }
+        bool hasBadBlockRecords = overflow.ContainsKey((0, BadBlockFileId));
+        bool sparedBlocksFlag = (U32(header, 4) & (1u << 9)) != 0;
+        if (hasBadBlockRecords != sparedBlocksFlag)
+            context.Report(DiagnosticSeverity.Info, "hfs.plus-spared-blocks",
+                "The HFS Plus spared-blocks attribute disagrees with its bad-block extent records.");
 
         ForkData allocationFork = ReadFork(image, header.AsSpan(112, 80), blockSize, totalBlocks,
-            overflow, 0, 6, allocationExtents);
+            overflow, 0, 6, allocationExtents, ordinaryForkExtents);
         byte[] allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(432, 8)) != 0)
             _ = ReadFork(image, header.AsSpan(432, 80), blockSize, totalBlocks, overflow, 0, 7,
-                allocationExtents);
+                allocationExtents, ordinaryForkExtents);
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(352, 8)) != 0)
         {
             ForkData attributesFork = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks,
-                overflow, 0, 8, allocationExtents);
+                overflow, 0, 8, allocationExtents, ordinaryForkExtents);
             byte[] attributes = attributesFork.ToArray(context.Options.MaxExpandedBytesPerInput);
             var attributeForks = new Dictionary<(uint FileId, string Name), AttributeForkState>();
             foreach (var (key, data) in LeafRecords(attributes, "attributes"))
-                CollectAttributeForkRecord(key, data, totalBlocks, allocationExtents, attributeForks);
+                CollectAttributeForkRecord(key, data, totalBlocks, allocationExtents, ordinaryForkExtents,
+                    attributeForks);
             ValidateAttributeForks(attributeForks, blockSize);
         }
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4,
-            allocationExtents);
+            allocationExtents, ordinaryForkExtents);
         byte[] catalog = catalogFork.ToArray();
         var records = LeafRecords(catalog, "catalog", isHfsX: signature == 0x4858).ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence)>();
@@ -199,10 +207,13 @@ internal static class HfsPlusReader
                 Name(key), U32(key, 2), linkReference, U16(data, 42), finderInfo,
                 Date(U32(data, 12)), Date(U32(data, 16)),
                 ReadFork(image, data.AsSpan(88, 80), blockSize, totalBlocks, overflow, 0, fileId,
-                    allocationExtents),
+                    allocationExtents, ordinaryForkExtents),
                 ReadFork(image, data.AsSpan(168, 80), blockSize, totalBlocks, overflow, 0xFF, fileId,
-                    allocationExtents)));
+                    allocationExtents, ordinaryForkExtents)));
         }
+
+        if (overflow.Keys.Any(key => key.File != BadBlockFileId))
+            throw new InvalidDataException("An HFS Plus overflow extent has no corresponding fork.");
 
         var hardLinkTargets = new Dictionary<uint, CatalogFileData>();
         if (privateDataFolderId is { } dataFolderId)
@@ -250,7 +261,7 @@ internal static class HfsPlusReader
                 HardLinkReference = isHardLink ? file.LinkReference : null,
             });
         }
-        ValidateAllocationExtents(allocationExtents);
+        ValidateAllocationExtents(allocationExtents, ordinaryForkExtents, blockSize, totalBlocks);
         ValidateAllocationBitmap(allocationBitmap, totalBlocks, blockSize, allocationExtents);
         uint freeBlocks = CountFreeAllocationBlocks(allocationBitmap, totalBlocks);
         uint declaredFreeBlocks = U32(header, 48);
@@ -283,18 +294,27 @@ internal static class HfsPlusReader
                 "The HFS Plus alternate volume header is missing or has an invalid signature or version.", offset);
     }
 
-    private static void ValidateAllocationExtents(List<(uint Start, uint End)> extents)
+    private static void ValidateAllocationExtents(List<(uint Start, uint End)> extents,
+        List<(uint Start, uint End)> ordinaryForkExtents, uint blockSize, uint totalBlocks)
     {
         // TN1150's allocation-file consistency check assigns allocation blocks to fork extents. A block cannot
         // belong to two extents in a valid volume; this follows from that ownership model.
+        uint primaryReservedEnd = checked((uint)Math.Min(totalBlocks, (1536UL + blockSize - 1) / blockSize));
+        ulong volumeBytes = (ulong)totalBlocks * blockSize;
+        uint alternateReservedStart = checked((uint)((volumeBytes > 1024 ? volumeBytes - 1024 : 0) / blockSize));
+        foreach (var extent in ordinaryForkExtents)
+            if (extent.Start < primaryReservedEnd || extent.End > alternateReservedStart)
+                throw new InvalidDataException("HFS Plus forks claim blocks reserved for volume headers.");
         extents.Sort(static (left, right) => left.Start.CompareTo(right.Start));
-        for (int index = 1; index < extents.Count; index++)
-            if (extents[index].Start < extents[index - 1].End)
+        for (int index = 0; index < extents.Count; index++)
+        {
+            if (index > 0 && extents[index].Start < extents[index - 1].End)
                 throw new InvalidDataException("HFS Plus forks claim overlapping allocation blocks.");
+        }
     }
 
     private static void CollectAttributeForkRecord(byte[] key, byte[] data, uint totalBlocks,
-        List<(uint Start, uint End)> allocationExtents,
+        List<(uint Start, uint End)> allocationExtents, List<(uint Start, uint End)> ordinaryForkExtents,
         Dictionary<(uint FileId, string Name), AttributeForkState> attributeForks)
     {
         if (data.Length < 4) throw new InvalidDataException("An HFS Plus attribute record is truncated.");
@@ -317,7 +337,7 @@ internal static class HfsPlusReader
                 state.LogicalSize = BinaryPrimitives.ReadUInt64BigEndian(fork);
                 state.TotalBlocks = U32(fork, 12);
                 ExtentRecordInfo initialRecord = AddExtentRecord(fork[16..], totalBlocks, allocationExtents,
-                    "An HFS Plus fork-data attribute lies outside the allocation area.");
+                    "An HFS Plus fork-data attribute lies outside the allocation area.", ordinaryForkExtents);
                 state.InitialBlocks = initialRecord.BlockCount;
                 state.InitialExtentCount = initialRecord.ExtentCount;
                 if (state.InitialBlocks > state.TotalBlocks)
@@ -327,7 +347,7 @@ internal static class HfsPlusReader
                 if (data.Length != 72)
                     throw new InvalidDataException("An HFS Plus attribute extension record has an invalid length.");
                 ExtentRecordInfo extension = AddExtentRecord(data.AsSpan(8, 64), totalBlocks, allocationExtents,
-                    "An HFS Plus attribute extension extent lies outside the allocation area.");
+                    "An HFS Plus attribute extension extent lies outside the allocation area.", ordinaryForkExtents);
                 state.Extensions.Add((U32(key, 8), extension));
                 return;
         }
@@ -364,7 +384,8 @@ internal static class HfsPlusReader
     }
 
     private static ExtentRecordInfo AddExtentRecord(ReadOnlySpan<byte> extents, uint totalBlocks,
-        List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage)
+        List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage,
+        List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
         ulong covered = 0;
         int extentCount = 0;
@@ -373,7 +394,8 @@ internal static class HfsPlusReader
             uint start = U32(extents, index * 8);
             uint count = U32(extents, index * 8 + 4);
             if (count == 0) break;
-            AddAllocationExtent(start, count, totalBlocks, allocationExtents, outOfRangeMessage);
+            AddAllocationExtent(start, count, totalBlocks, allocationExtents, outOfRangeMessage,
+                ordinaryForkExtents);
             covered = checked(covered + count);
             extentCount++;
         }
@@ -381,10 +403,13 @@ internal static class HfsPlusReader
     }
 
     private static void AddAllocationExtent(uint start, uint count, uint totalBlocks,
-        List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage)
+        List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage,
+        List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
         if ((ulong)start + count > totalBlocks) throw new InvalidDataException(outOfRangeMessage);
-        allocationExtents.Add((start, checked(start + count)));
+        var extent = (start, checked(start + count));
+        allocationExtents.Add(extent);
+        ordinaryForkExtents?.Add(extent);
     }
 
     private static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks, uint blockSize,
@@ -466,7 +491,8 @@ internal static class HfsPlusReader
 
     private static ForkData ReadFork(ForkData image, ReadOnlySpan<byte> fork, uint blockSize, uint totalBlocks,
         Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>? overflow = null,
-        byte forkType = 0, uint fileId = 0, List<(uint Start, uint End)>? allocationExtents = null)
+        byte forkType = 0, uint fileId = 0, List<(uint Start, uint End)>? allocationExtents = null,
+        List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
         ulong logical = BinaryPrimitives.ReadUInt64BigEndian(fork);
         if (logical > long.MaxValue) throw new InvalidDataException("An HFS Plus fork is too large.");
@@ -501,7 +527,10 @@ internal static class HfsPlusReader
                     throw new InvalidDataException("An HFS Plus extent lies outside the image.");
                 ranges.Add((offset, length));
                 if (addToAllocationOwnership)
+                {
                     allocationExtents?.Add((start, checked(start + count)));
+                    ordinaryForkExtents?.Add((start, checked(start + count)));
+                }
                 coveredBlocks = checked(coveredBlocks + count);
                 coveredExtents++;
             }
@@ -534,6 +563,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException("An HFS Plus fork's extent count differs from its allocated block count.");
         if ((ulong)coveredBlocks * blockSize < logical)
             throw new InvalidDataException("An HFS Plus fork has insufficient extents for its logical length.");
+        if (overflowEntries is { Count: > 0 }) overflow!.Remove((forkType, fileId));
         if (logical == 0) return ForkData.Empty;
         return new ExtentForkData(image, ranges, checked((long)logical));
     }

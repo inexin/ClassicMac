@@ -854,11 +854,19 @@ extents it reads, following TN1150's allocation-file ownership model. The volume
 allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the declared allocation blocks and to mark
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
 **[Doc]** TN1150. Any bitmap bits beyond the declared allocation-block count must be clear **[Doc]** TN1150. It checks
+that parsed fork extents do not claim any allocation blocks containing the volume's primary or alternate header or
+the reserved areas around them, following TN1150's description of those areas as reserved. It checks
 that the number of free bitmap bits agrees with the volume header's `freeBlocks`; a mismatch is reported as an
-informational diagnostic **[Doc]** TN1150. It checks the attributes and startup special-file forks from the volume
+informational diagnostic **[Doc]** TN1150. Bit 9 (`kHFSVolumeSparedBlocksBit`) indicates that bad-block records
+exist; a mismatch between that flag and CNID 5 extent records is reported as an informational diagnostic **[Doc]**
+TN1150. It checks the attributes and startup special-file forks from the volume
 header, including their overflow extents, and accounts
 for every extent record in the extents-overflow tree, including bad-block records and records not needed to read a
-catalog fork **[Doc]** TN1150. It walks the attributes B-tree
+catalog fork **[Doc]** TN1150. Every non-bad-block overflow record must also resolve to a catalog or special-file
+fork; by inference from TN1150's key semantics, orphan records are rejected because their file ID, fork type and
+`startBlock` must identify the fork extents they extend. Bad-block records remain keyed to CNID 5 and the data fork
+**[Doc]** TN1150. It walks
+the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
 records do not claim extents **[Doc]** TN1150. For each extent-backed attribute it requires one fork-data record at
 key `startBlock` zero, matches extension records by file ID and attribute name, and requires each extension's
@@ -935,6 +943,7 @@ followed in its code.
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
 | `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
 | `hfs.plus-free-blocks` | I | The allocation bitmap free-block count differs from `freeBlocks` in the volume header | Reports only | Not traced |
+| `hfs.plus-spared-blocks` | I | The volume header's spared-blocks flag disagrees with bad-block extent records | Reports only | Not traced |
 | `hfs.plus-alternate-header` | W | The alternate HFS Plus volume header is missing or has an invalid signature/version | Reads using the primary header | Not traced |
 | `hfs.plus-hardlink-target-missing` | W | A hard-link reference has no matching private indirect node | Keeps the link record, using its catalog forks | Not traced |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |
