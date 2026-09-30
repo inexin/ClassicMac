@@ -325,6 +325,28 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusBtreeFreeNodesMustBeZeroFilled()
+    {
+        byte[] image = HfsPlusFixture.Build(extraCatalogForkNode: true, catalogTotalNodes: 3);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(2 * HfsPlusFixture.Block + 14 + 26), 1);
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        image[4 * HfsPlusFixture.Block] = 0x01;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusBtreeNodeMapMustNotMarkUnreachableNodesAsAllocated()
+    {
+        byte[] image = HfsPlusFixture.Build(extraCatalogForkNode: true, catalogTotalNodes: 3);
+        image[2 * HfsPlusFixture.Block + 14 + 106 + 128] = 0xE0;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusAttributesBtreeMustUseTheControlTreeType()
     {
         byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false);
@@ -398,6 +420,32 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HfsPlusCatalogFolderAndFileRecordsMustHaveExactLengths(bool folderRecord)
+    {
+        byte[] image = HfsPlusFixture.Build(catalogFolderDataHasTrailingByte: folderRecord,
+            catalogFileDataHasTrailingByte: !folderRecord);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(520, true)]
+    [InlineData(521, false)]
+    public void HfsPlusCatalogThreadRecordsMustFitTheDefinedMaximum(int recordLength, bool valid)
+    {
+        byte[] image = HfsPlusFixture.Build(catalogThreadDataLength: recordLength);
+
+        if (valid)
+            Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        else
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Theory]
@@ -539,7 +587,10 @@ public sealed class HfsPlusFeatureTests
         image[282 * blockSize + (totalBlocks - 1) / 8] = 0xF0; // Clear unused low bits after block 299.
 
         int treeOffset = 4 * blockSize;
+        byte[] headerNode = image.AsSpan(treeOffset, nodeSize).ToArray();
         byte[] leaf = image.AsSpan(5 * blockSize, nodeSize).ToArray();
+        image.AsSpan(treeOffset, totalNodes * nodeSize).Clear();
+        headerNode.CopyTo(image, treeOffset);
         Span<byte> header = image.AsSpan(treeOffset, nodeSize);
         BinaryPrimitives.WriteUInt16BigEndian(header[32..], nodeSize);
         BinaryPrimitives.WriteUInt32BigEndian(header[36..], (uint)totalNodes);
@@ -666,6 +717,34 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Equal("Documents:Read Me",
             Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Theory]
+    [InlineData(15, false)]
+    [InlineData(16, true)]
+    public void HfsPlusReusedCatalogIdsStillKeepNextCatalogIdOutsideTheReservedRange(uint nextCatalogId,
+        bool valid)
+    {
+        byte[] image = HfsPlusFixture.Build(nextCatalogId: nextCatalogId, catalogIdsReused: true);
+
+        if (valid)
+            Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        else
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HfsPlusFileAndNonrootFolderIdsMustNotUseReservedCatalogIds(bool file)
+    {
+        byte[] image = file
+            ? HfsPlusFixture.Build(catalogFileId: 15)
+            : HfsPlusFixture.Build(catalogFolderId: 15);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -1623,7 +1702,9 @@ public sealed class HfsPlusFeatureTests
             bool zeroLengthResourceFork = false, bool includeAllocationFile = true,
             bool markDataForkAllocated = true, bool includeAttributeFile = false,
             bool includeStartupFile = false, bool badBlockExtent = false,
-            bool badBlockOverlapsFileExtent = false, bool extraCatalogForkNode = false)
+            bool badBlockOverlapsFileExtent = false, bool extraCatalogForkNode = false,
+            bool catalogFolderDataHasTrailingByte = false, bool catalogFileDataHasTrailingByte = false,
+            int? catalogThreadDataLength = null, uint? catalogFolderId = null, uint? catalogFileId = null)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -1664,11 +1745,13 @@ public sealed class HfsPlusFeatureTests
             byte[] folder = new byte[88];
             U16(folder, 0, 1);
             U32(folder, 4, documentsFolderValence);
-            U32(folder, 8, 16);
+            uint folderId = catalogFolderId ?? 16;
+            U32(folder, 8, folderId);
             byte[] file = new byte[248];
             U16(file, 0, 2);
             U16(file, 2, missingFileThreadFlag ? (ushort)0 : (ushort)2); // file thread exists
-            U32(file, 8, duplicateCatalogId ? 16u : 17u);
+            uint fileId = catalogFileId ?? (duplicateCatalogId ? 16u : 17u);
+            U32(file, 8, fileId);
             U32(file, 12, 2_500_000_000);
             U32(file, 16, 2_600_000_000);
             "TEXTttxt"u8.CopyTo(file.AsSpan(48));
@@ -1703,6 +1786,9 @@ public sealed class HfsPlusFeatureTests
                 "Resource fork"u8.CopyTo(image.AsSpan((int)resourceStart * Block));
             }
 
+            if (catalogFolderDataHasTrailingByte) folder = [.. folder, 0];
+            if (catalogFileDataHasTrailingByte) file = [.. file, 0];
+
             var records = new List<byte[]>
             {
                 Record(1, "Volume", root),
@@ -1711,14 +1797,18 @@ public sealed class HfsPlusFeatureTests
             };
             if (!omitFolderThread)
             {
-                records.Add(Record(16, "", Thread(2, "Documents", 3)));
-                if (duplicateFolderThread) records.Add(Record(16, "", Thread(2, "Documents", 3)));
+                records.Add(Record(folderId, "", Thread(2, "Documents", 3)));
+                if (duplicateFolderThread) records.Add(Record(folderId, "", Thread(2, "Documents", 3)));
             }
-            records.Add(Record(16, fileName, file));
+            records.Add(Record(folderId, fileName, file));
             if (!omitFileThread)
-                records.Add(Record(duplicateCatalogId ? 16u : 17u, nonEmptyFileThreadKey ? "Thread" : "",
-                    Thread(invalidFileThread ? 2u : 16u, invalidFileThread ? "Other" : fileName,
-                        wrongFileThreadKind ? (ushort)3 : (ushort)4)));
+            {
+                byte[] fileThread = Record(fileId, nonEmptyFileThreadKey ? "Thread" : "",
+                    Thread(invalidFileThread ? 2u : folderId, invalidFileThread ? "Other" : fileName,
+                        wrongFileThreadKind ? (ushort)3 : (ushort)4));
+                if (fileId < 16) records.Insert(3, fileThread);
+                else records.Add(fileThread);
+            }
             if (additionalFolderParent is { } additionalParent)
             {
                 byte[] additionalFolder = new byte[88];
@@ -1729,6 +1819,17 @@ public sealed class HfsPlusFeatureTests
                 records.Add(Record(18, "", Thread(additionalParent, "Empty", 3)));
             }
             if (orphanFileThread) records.Add(Record(42, "", Thread(16, "Missing", 4)));
+            if (catalogThreadDataLength is { } threadDataLength)
+            {
+                byte[] threadRecord = records[1];
+                int dataOffset = 2 + BinaryPrimitives.ReadUInt16BigEndian(threadRecord);
+                int currentDataLength = threadRecord.Length - dataOffset;
+                if (threadDataLength < currentDataLength)
+                    throw new ArgumentOutOfRangeException(nameof(catalogThreadDataLength));
+                byte[] paddedThread = new byte[dataOffset + threadDataLength];
+                threadRecord.AsSpan(0, threadRecord.Length).CopyTo(paddedThread);
+                records[1] = paddedThread;
+            }
             if (catalogKeyHasTrailingByte)
             {
                 byte[] fileRecord = records[^2];

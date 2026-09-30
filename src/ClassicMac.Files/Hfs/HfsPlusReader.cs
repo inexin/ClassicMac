@@ -86,8 +86,11 @@ internal static class HfsPlusReader
             switch (U16(data, 0))
             {
                 case 1:
-                    if (data.Length < 88) throw new InvalidDataException("An HFS Plus folder record is truncated.");
+                    if (data.Length != 88)
+                        throw new InvalidDataException("An HFS Plus folder record must be exactly 88 bytes.");
                     uint id = U32(data, 8);
+                    if (id < 16 && id != RootFolderId)
+                        throw new InvalidDataException($"HFS Plus folder catalog ID {id} is reserved.");
                     if (!catalogIds.Add(id))
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     uint parent = U32(key, 2);
@@ -97,8 +100,11 @@ internal static class HfsPlusReader
                     catalogNodes.Add(id, new CatalogNode(parent, name, IsFolder: true));
                     break;
                 case 2:
-                    if (data.Length < 248) throw new InvalidDataException("An HFS Plus file record is truncated.");
+                    if (data.Length != 248)
+                        throw new InvalidDataException("An HFS Plus file record must be exactly 248 bytes.");
                     uint fileId = U32(data, 8);
+                    if (fileId < 16)
+                        throw new InvalidDataException($"HFS Plus file catalog ID {fileId} is reserved.");
                     if (!catalogIds.Add(fileId))
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     if ((U16(data, 2) & 0x0002) == 0)
@@ -109,6 +115,8 @@ internal static class HfsPlusReader
                     if (key.Length != 8 || U16(key, 0) != 6 || U16(key, 6) != 0)
                         throw new InvalidDataException("An HFS Plus catalog thread key is invalid.");
                     if (data.Length < 10) throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
+                    if (data.Length > 520)
+                        throw new InvalidDataException("An HFS Plus catalog thread record exceeds 520 bytes.");
                     ushort threadNameLength = U16(data, 8);
                     if (threadNameLength > 255 || data.Length < 10 + 2 * threadNameLength)
                         throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
@@ -127,7 +135,10 @@ internal static class HfsPlusReader
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
         const uint catalogNodeIdsReused = 1u << 12;
-        if ((U32(header, 4) & catalogNodeIdsReused) == 0 && U32(header, 64) <= catalogIds.Max())
+        uint nextCatalogId = U32(header, 64);
+        if (nextCatalogId < 16)
+            throw new InvalidDataException("The HFS Plus next catalog ID is reserved.");
+        if ((U32(header, 4) & catalogNodeIdsReused) == 0 && nextCatalogId <= catalogIds.Max())
             throw new InvalidDataException("The HFS Plus next catalog ID is not greater than all catalog IDs.");
         ValidateCatalogThreads(catalogNodes, catalogThreads);
         var childCounts = new Dictionary<uint, uint>(folders.Count);
@@ -928,9 +939,25 @@ internal static class HfsPlusReader
         foreach (uint nodeNumber in referencedNodes) RequireAllocated(nodeNumber);
         foreach (uint nodeNumber in mapNodes) RequireAllocated(nodeNumber);
 
+        var knownNodes = new HashSet<uint>(referencedNodes) { 0 };
+        knownNodes.UnionWith(mapNodes);
         uint freeNodes = 0;
         for (uint nodeNumber = 0; nodeNumber < totalNodes; nodeNumber++)
-            if (!IsAllocated(nodeNumber)) freeNodes++;
+        {
+            if (IsAllocated(nodeNumber))
+            {
+                if (!knownNodes.Contains(nodeNumber))
+                    throw new InvalidDataException(
+                        $"HFS Plus B-tree node {nodeNumber} is allocated but not referenced by the tree.");
+                continue;
+            }
+            freeNodes++;
+
+            // [Code] Apple's HFS verifier's BTCheckUnusedNodes requires free B-tree nodes to be zero-filled.
+            int offset = checked((int)nodeNumber * nodeSize);
+            if (tree.AsSpan(offset, nodeSize).IndexOfAnyExcept((byte)0) >= 0)
+                throw new InvalidDataException($"HFS Plus B-tree free node {nodeNumber} is not zero-filled.");
+        }
         if (freeNodes != U32(tree, 14 + 26))
             throw new InvalidDataException("The HFS Plus B-tree free-node count differs from its node map.");
     }

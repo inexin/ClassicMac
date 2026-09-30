@@ -810,17 +810,27 @@ the catalog and attributes trees and fixed-length index keys in the extents tree
 most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader requires exactly
 enough continuation map nodes to cover the tree, checks their descriptors, record boundaries and bitmap coverage, and requires the header, index, leaf and map nodes to be marked
-allocated, verifies `freeNodes` against the complete bitmap, and requires unused bytes after the final byte containing
-node bits in the last map record to be zero **[Code]** as Apple's HFS verifier's `CmpBTM` does in
-[`SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c). It checks that
+allocated with no additional nodes marked allocated, matching the tree's reachable nodes **[Code]** as Apple's HFS
+verifier's `CmpBTM` does. It verifies `freeNodes` against the complete bitmap, and requires unused bytes after the
+final byte containing node bits in the last map record to be zero **[Code]** as `CmpBTM` does in
+[`SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c). Every node
+marked free must also be zero-filled **[Code]**, as Apple's `BTCheckUnusedNodes` checks in the same verifier. It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
-`totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user
+`totalNodes × nodeSize`, and folder and file catalog records are exactly 88 and 248 bytes respectively **[Code]** as
+Apple's `CheckCatalogRecord` verifies in
+[`CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
+Variable-length catalog thread records are at most 520 bytes, the full `HFSPlusCatalogThread` size; Apple's verifier
+accepts that maximum and rejects larger records **[Code]** in `CheckCatalogRecord`. Header nodes have height zero and use the required 106-byte header record, 128-byte user
 record and remaining map record, index records contain exactly the padded key and child pointer, and leaf-record keys are
 unique. It checks the catalog, extents-overflow and attributes B-trees' `maxKeyLength` against their defined maxima
 (516, 10 and 266 bytes respectively). The attributes maximum follows `kHFSPlusAttrKeyMaximumLength` in Apple's
 [`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h); the catalog and
-extents maxima are defined by TN1150 **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
-record's parent and name.
+extents maxima are defined by TN1150 **[Doc]**. File catalog IDs must be at least 16, and folder catalog IDs must be
+at least 16 except for the root folder's ID 2 **[Doc]** [TN1150](https://developer.apple.com/library/archive/technotes/tn/tn1150.html);
+Apple's `CheckFile` and `CheckDirectory` enforce these bounds **[Code]** in
+[`CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
+Catalog IDs are unique and each required file and folder thread points back to its record's parent and name. `nextCatalogID`
+must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
 nonroot folder, including empty folders. TN1150 defines valence as the count of file and folder records whose key

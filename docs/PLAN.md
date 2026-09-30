@@ -796,12 +796,14 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, the
     catalog/extents/attributes key-length maxima, the catalog node-size minimum, control-file types for the catalog,
     extents-overflow and attributes trees, header nodes,
-    node maps (including exactly the required chained map nodes, free counts and zero unused bytes), roots, index graphs,
-    sibling links, exact catalog key lengths, zero-padded attribute keys and unique leaf keys,
+    node maps (including exactly the required chained map nodes, matching allocated nodes, free counts, zero unused
+    bytes and zero-filled free nodes), roots, index graphs,
+    sibling links, exact catalog key and file/folder record lengths, bounded catalog thread records, zero-padded
+    attribute keys and unique leaf keys,
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
-    unique catalog
-    IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders).
+    reserved catalog ID rules, unique catalog IDs and next-ID consistency, file/folder threads, folder valences and
+    parent chains (including empty folders).
     The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
     forks; these layouts currently have hand-built fixtures only. The StuffIt v5 reader handles stored, RLE90,
     Compress/LZW, Huffman, LZAH (method 5), MW (method 8),
