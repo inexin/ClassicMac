@@ -23,7 +23,7 @@ resource bytes, which precede data-fork bytes. These member details are **[Fitte
 parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet been checked against a corpus created by
 the original StuffIt application.
 
-ClassicMac currently extracts method 0 (stored) and method 1 (RLE90) for either fork. RLE90 emits ordinary bytes as
+ClassicMac currently extracts method 0 (stored), method 1 (RLE90) and method 2 (Compress/LZW) for either fork. RLE90 emits ordinary bytes as
 literals; `$90 00` emits a literal `$90`; `$90 n` for nonzero `n` repeats the previously decoded byte until the run has
 `n` copies **[Fitted]**. Truncated runs, runs without a prior byte, output-length mismatches and extents outside the
 archive are rejected. Per-fork CRC mismatches are reported as errors while retaining the decoded file. Encrypted
@@ -31,5 +31,13 @@ entries and unsupported methods are reported and omitted; no password is request
 through the normal `ContainerUnwrapper` pipeline, preserving UTF-8 paths, Finder type/creator/flags, dates and both
 forks.
 
-The v1–4 record layout, methods 2, 3, 5, 8, 13, 14 and 15, archive-level comments, complete folder metadata and
+Method 2 uses the Compress-style LZW stream: codes are least-significant-bit first, begin at 9 bits and grow to 14;
+in block mode, code 256 clears the dictionary and the remainder of its eight-code group is skipped before reading
+again **[Fitted]**. Decoder vectors cover dictionary reset, width growth, the full 14-bit table, the LZW next-code
+case, invalid codes and declared output-length checks. The method dispatch and block-mode parameters are cross-checked
+against [XADMaster's StuffIt parser](https://sources.debian.org/src/unar/1.8.1-3/XADMaster/XADStuffItParser.m/) and
+[Compress decoder](https://sources.debian.org/src/unar/1.8.1-3/XADMaster/XADCompressHandle.m/); vectors are
+hand-built and have not yet been checked against an archive created by the original StuffIt application.
+
+The v1–4 record layout, methods 3, 5, 8, 13, 14 and 15, archive-level comments, complete folder metadata and
 verification against original-application archives remain unimplemented. See Phase 10 in [the project plan](../PLAN.md).

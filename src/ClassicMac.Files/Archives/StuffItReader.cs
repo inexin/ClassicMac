@@ -118,7 +118,7 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1) || member.ResourceMethod is not (0 or 1 or null))
+            if (member.DataMethod is not (0 or 1 or 2) || member.ResourceMethod is not (0 or 1 or 2 or null))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -300,9 +300,10 @@ public sealed class StuffItReader : IContainerReader
                 throw new InvalidDataException("A stored StuffIt fork has different stored and logical lengths.");
             return archive.AsSpan(offset, outputLength).ToArray();
         }
+        ReadOnlySpan<byte> input = archive.AsSpan(offset, compressedLength);
+        if (method == 2) return DecodeCompress(input, outputLength);
 
         var output = new byte[outputLength];
-        ReadOnlySpan<byte> input = archive.AsSpan(offset, compressedLength);
         int written = 0;
         for (int index = 0; index < input.Length; index++)
         {
@@ -333,6 +334,123 @@ public sealed class StuffItReader : IContainerReader
         if (written != outputLength)
             throw new InvalidDataException($"StuffIt RLE90 produced {written} of {outputLength} declared bytes.");
         return output;
+    }
+
+    private static byte[] DecodeCompress(ReadOnlySpan<byte> input, int outputLength)
+    {
+        const int ClearCode = 256;
+        const int FirstDictionaryCode = 257;
+        const int MaximumCodeBits = 14;
+        int maximumCodes = 1 << MaximumCodeBits;
+        var prefix = new int[maximumCodes];
+        Array.Fill(prefix, -1);
+        var suffix = new byte[maximumCodes];
+        for (int code = 0; code < 256; code++) suffix[code] = (byte)code;
+        var phrase = new byte[maximumCodes];
+        var output = new byte[outputLength];
+        var reader = new LsbBitReader(input);
+        int nextCode = FirstDictionaryCode;
+        int codeBits = 9;
+        int previousCode = -1;
+        int codesInGroup = 0;
+        int written = 0;
+
+        while (reader.TryRead(codeBits, out int code))
+        {
+            codesInGroup = (codesInGroup + 1) & 7;
+            if (code == ClearCode)
+            {
+                reader.Skip((8 - codesInGroup) % 8 * codeBits);
+                nextCode = FirstDictionaryCode;
+                codeBits = 9;
+                previousCode = -1;
+                codesInGroup = 0;
+                continue;
+            }
+
+            if (previousCode < 0)
+            {
+                if (code >= FirstDictionaryCode)
+                    throw new InvalidDataException("A StuffIt Compress fork starts with an invalid LZW code.");
+                if (written == output.Length)
+                    throw new InvalidDataException("StuffIt Compress output exceeds its declared fork length.");
+                output[written++] = (byte)code;
+                previousCode = code;
+                continue;
+            }
+
+            if (code > nextCode)
+                throw new InvalidDataException("A StuffIt Compress fork contains an invalid LZW code.");
+
+            bool nextCodeCase = code == nextCode;
+            int currentCode = nextCodeCase ? previousCode : code;
+            int phraseLength = 0;
+            if (nextCodeCase) phrase[phraseLength++] = FirstByte(previousCode, prefix);
+
+            while (currentCode >= 256)
+            {
+                if (currentCode >= nextCode || prefix[currentCode] < 0 || phraseLength == phrase.Length)
+                    throw new InvalidDataException("A StuffIt Compress fork contains an invalid LZW dictionary chain.");
+                phrase[phraseLength++] = suffix[currentCode];
+                currentCode = prefix[currentCode];
+            }
+            if (phraseLength == phrase.Length)
+                throw new InvalidDataException("A StuffIt Compress LZW phrase is too long.");
+            phrase[phraseLength++] = (byte)currentCode;
+            byte firstByte = (byte)currentCode;
+            if (phraseLength > output.Length - written)
+                throw new InvalidDataException("StuffIt Compress output exceeds its declared fork length.");
+            while (phraseLength > 0) output[written++] = phrase[--phraseLength];
+
+            if (nextCode < maximumCodes)
+            {
+                prefix[nextCode] = previousCode;
+                suffix[nextCode] = firstByte;
+                nextCode++;
+                if (codeBits < MaximumCodeBits && nextCode == 1 << codeBits) codeBits++;
+            }
+            previousCode = code;
+        }
+
+        if (written != output.Length)
+            throw new InvalidDataException(
+                $"StuffIt Compress produced {written} of {output.Length} declared bytes.");
+        return output;
+    }
+
+    private static byte FirstByte(int code, int[] prefix)
+    {
+        while (code >= 256)
+        {
+            if (prefix[code] < 0)
+                throw new InvalidDataException("A StuffIt Compress fork contains an invalid LZW dictionary chain.");
+            code = prefix[code];
+        }
+        return (byte)code;
+    }
+
+    private ref struct LsbBitReader
+    {
+        private readonly ReadOnlySpan<byte> input;
+        private long bitOffset;
+
+        public LsbBitReader(ReadOnlySpan<byte> input) => this.input = input;
+
+        public bool TryRead(int bitCount, out int value)
+        {
+            if ((long)input.Length * 8 - bitOffset < bitCount)
+            {
+                value = 0;
+                return false;
+            }
+
+            value = 0;
+            for (int bit = 0; bit < bitCount; bit++, bitOffset++)
+                value |= ((input[(int)(bitOffset >> 3)] >> (int)(bitOffset & 7)) & 1) << bit;
+            return true;
+        }
+
+        public void Skip(int bitCount) => bitOffset = Math.Min((long)input.Length * 8, bitOffset + bitCount);
     }
 
     // StuffIt's CRC-16/ARC variant is identified independently in Deark's v5 reader; this checksum only reports

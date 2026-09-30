@@ -78,7 +78,7 @@ public sealed class StuffItFeatureTests
     [Fact]
     public void UnsupportedStuffItCompressionIsReportedAndNotReturnedAsAnEmptyFile()
     {
-        byte[] image = StuffItFixture.BuildFile("Compressed", "encoded"u8.ToArray(), [], dataMethod: 2);
+        byte[] image = StuffItFixture.BuildFile("Compressed", "encoded"u8.ToArray(), [], dataMethod: 4);
         var diagnostics = new List<Diagnostic>();
 
         IReadOnlyList<MacFile> files = StuffItReader.Instance.Read(ForkData.FromBytes(image),
@@ -86,6 +86,76 @@ public sealed class StuffItFeatureTests
 
         Assert.Empty(files);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.compression-unsupported");
+    }
+
+    [Fact]
+    public void StuffItCompressMethodDecodesLzwKwKwKCaseInBothForks()
+    {
+        byte[] expected = "ABABABA"u8.ToArray();
+        byte[] encoded = StuffItFixture.EncodeCompressCodes(65, 66, 257, 259);
+        byte[] image = StuffItFixture.BuildFile("LZW", expected, expected, dataMethod: 2, encodedData: encoded,
+            resourceMethod: 2, encodedResource: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+        Assert.Equal(expected, file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItCompressMethodRejectsAnInvalidLzwCode()
+    {
+        byte[] image = StuffItFixture.BuildFile("Bad LZW", "A"u8.ToArray(), [], dataMethod: 2,
+            encodedData: StuffItFixture.EncodeCompressCodes(65, 300));
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItCompressMethodRejectsLzwOutputLongerThanTheForkLength()
+    {
+        byte[] image = StuffItFixture.BuildFile("Long LZW", "AB"u8.ToArray(), [], dataMethod: 2,
+            encodedData: StuffItFixture.EncodeCompressCodes(65, 66, 257, 259));
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItCompressMethodIncreasesCodeWidthWhenTheDictionaryReaches512Entries()
+    {
+        byte[] expected = [.. Enumerable.Range(0, 256).Select(static value => (byte)value), 0];
+        byte[] image = StuffItFixture.BuildFile("Wide LZW", expected, [], dataMethod: 2,
+            encodedData: StuffItFixture.EncodeCompressWidthBoundary());
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItCompressMethodCanClearAndRestartItsDictionary()
+    {
+        byte[] image = StuffItFixture.BuildFile("Reset LZW", "ABC"u8.ToArray(), [], dataMethod: 2,
+            encodedData: StuffItFixture.EncodeCompressWithClear());
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("ABC"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItCompressMethodSupportsItsFullFourteenBitDictionary()
+    {
+        const int outputLength = 16_129;
+        byte[] expected = new byte[outputLength];
+        byte[] image = StuffItFixture.BuildFile("Full LZW", expected, [], dataMethod: 2,
+            encodedData: StuffItFixture.EncodeCompressRepeatedLiterals(outputLength));
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
     }
 
     [Fact]
@@ -302,6 +372,83 @@ public sealed class StuffItFeatureTests
             U32(image, 84, 0);
             U16(image, 92, rootEntries);
             U32(image, 94, firstEntry);
+        }
+
+        public static byte[] EncodeCompressCodes(params ushort[] codes)
+        {
+            const int CodeBits = 9;
+            int codeBytes = (codes.Length * CodeBits + 7) / 8;
+            byte[] encoded = new byte[9 + codeBytes];
+            encoded[1] = 1; // Block-mode clear code 256, padded to the next 8-code group.
+            for (int index = 0; index < codes.Length; index++)
+            {
+                int bitOffset = index * CodeBits;
+                for (int bit = 0; bit < CodeBits; bit++)
+                    if ((codes[index] & (1 << bit)) != 0)
+                        encoded[9 + (bitOffset + bit) / 8] |= (byte)(1 << ((bitOffset + bit) & 7));
+            }
+            return encoded;
+        }
+
+        public static byte[] EncodeCompressWidthBoundary()
+        {
+            byte[] encoded = new byte[9 + 256 * 9 / 8 + 2];
+            encoded[1] = 1;
+            for (int code = 0; code < 256; code++)
+                for (int bit = 0; bit < 9; bit++)
+                    if ((code & (1 << bit)) != 0)
+                    {
+                        int bitOffset = code * 9 + bit;
+                        encoded[9 + bitOffset / 8] |= (byte)(1 << (bitOffset & 7));
+            }
+            return encoded;
+        }
+
+        public static byte[] EncodeCompressWithClear()
+        {
+            byte[] encoded = new byte[20];
+            encoded[1] = 1;
+            WriteCode(encoded, 72, 65, 9);
+            WriteCode(encoded, 81, 66, 9);
+            WriteCode(encoded, 90, 256, 9);
+            WriteCode(encoded, 144, 67, 9);
+            return encoded;
+        }
+
+        public static byte[] EncodeCompressRepeatedLiterals(int count)
+        {
+            var codes = new List<(ushort Value, int Width)>(count);
+            int width = 9;
+            int nextCode = 257;
+            bool hasPrevious = false;
+            for (int index = 0; index < count; index++)
+            {
+                codes.Add((0, width));
+                if (hasPrevious && nextCode < 1 << 14)
+                {
+                    nextCode++;
+                    if (width < 14 && nextCode == 1 << width) width++;
+                }
+                hasPrevious = true;
+            }
+
+            int bitCount = codes.Sum(static code => code.Width);
+            byte[] encoded = new byte[9 + (bitCount + 7) / 8];
+            encoded[1] = 1;
+            int bitOffset = 72;
+            foreach ((ushort value, int codeWidth) in codes)
+            {
+                WriteCode(encoded, bitOffset, value, codeWidth);
+                bitOffset += codeWidth;
+            }
+            return encoded;
+        }
+
+        private static void WriteCode(Span<byte> output, int bitOffset, ushort value, int width)
+        {
+            for (int bit = 0; bit < width; bit++)
+                if ((value & (1 << bit)) != 0)
+                    output[(bitOffset + bit) / 8] |= (byte)(1 << ((bitOffset + bit) & 7));
         }
 
         private static ushort HeaderCrc(ReadOnlySpan<byte> header)
