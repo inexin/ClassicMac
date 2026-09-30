@@ -14,6 +14,7 @@ internal static class HfsPlusReader
     private const int HeaderOffset = 1024;
     private const int HeaderLength = 512;
     private const uint RootFolderId = 2;
+    private const uint BadBlockFileId = 5;
 
     public static IReadOnlyList<MacFile> Read(ForkData image, ContainerContext context)
     {
@@ -41,12 +42,15 @@ internal static class HfsPlusReader
             {
                 if (key.Length != 12 || U16(key, 0) != 10 || data.Length < 64 || key[2] is not (0 or 0xFF))
                     throw new InvalidDataException("An HFS Plus extents-overflow record is invalid.");
-                var id = (key[2], U32(key, 4));
+                var id = (Fork: key[2], File: U32(key, 4));
+                if (id.File == BadBlockFileId && id.Fork != 0)
+                    throw new InvalidDataException("An HFS Plus bad-block extent must use the data fork.");
                 uint start = U32(key, 8);
                 if (!overflow.TryGetValue(id, out var entries)) overflow[id] = entries = [];
                 entries.Add((start, data.AsSpan(0, 64).ToArray()));
             }
         }
+        AddBadBlockExtents(overflow, totalBlocks, allocationExtents);
 
         byte[]? allocationBitmap = null;
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(112, 8)) != 0)
@@ -179,6 +183,25 @@ internal static class HfsPlusReader
         for (int index = 1; index < extents.Count; index++)
             if (extents[index].Start < extents[index - 1].End)
                 throw new InvalidDataException("HFS Plus forks claim overlapping allocation blocks.");
+    }
+
+    private static void AddBadBlockExtents(
+        Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>> overflow,
+        uint totalBlocks, List<(uint Start, uint End)> allocationExtents)
+    {
+        if (!overflow.TryGetValue((0, BadBlockFileId), out var records)) return;
+        foreach (var record in records)
+        {
+            for (int index = 0; index < 8; index++)
+            {
+                uint start = U32(record.Extents, index * 8);
+                uint count = U32(record.Extents, index * 8 + 4);
+                if (count == 0) break;
+                if ((ulong)start + count > totalBlocks)
+                    throw new InvalidDataException("An HFS Plus bad-block extent lies outside the allocation area.");
+                allocationExtents.Add((start, checked(start + count)));
+            }
+        }
     }
 
     private static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks, uint blockSize,

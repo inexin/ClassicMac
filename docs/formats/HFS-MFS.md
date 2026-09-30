@@ -822,16 +822,16 @@ extents and requires the primary and overflow extents to account for each fork's
 extents it reads, following TN1150's allocation-file ownership model. If the volume header provides an allocation
 file, the reader requires its bitmap to cover the declared allocation blocks and to mark each parsed extent as
 allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes **[Doc]** TN1150. It checks
-the attributes and startup special-file forks from the volume header, including their overflow extents. It checks
-extents-overflow keys are strictly ordered by
+the attributes and startup special-file forks from the volume header, including their overflow extents, and accounts
+for data extents in bad-block records from the extents-overflow file **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
 retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary catalog
 index and leaf keys are checked in order, including index sibling ranges, while case-folding key order is not yet validated **[Doc]**. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, complete volume allocation ownership (including
-bad-block extents, extents named by attribute records, and unreferenced bitmap bits), hard-link/symlink semantics,
-or the full HFSX collation rules.
+extents named by attribute records and unreferenced bitmap bits), hard-link/symlink semantics, or the full HFSX
+collation rules.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,

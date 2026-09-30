@@ -569,6 +569,47 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext())).MacPath);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusBadBlockExtentsParticipateInAllocationOwnership(bool overlapsFileExtent)
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, badBlockExtent: true,
+            badBlockOverlapsFileExtent: overlapsFileExtent);
+
+        if (overlapsFileExtent)
+        {
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+        }
+        else
+        {
+            MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+            Assert.Equal(Enumerable.Range(1, 8).SelectMany(index => Enumerable.Repeat((byte)index, 4096)),
+                file.DataFork.ToArray());
+        }
+    }
+
+    [Fact]
+    public void HfsPlusBadBlockExtentMustStayInsideTheAllocationArea()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, badBlockExtent: true);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(5 * 4096 + 14 + 12), 32);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusBadBlockExtentMustUseTheDataFork()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, badBlockExtent: true);
+        image[5 * 4096 + 14 + 2] = 0xFF;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusOverflowTreeCannotRepeatAnExtentKey()
     {
@@ -863,7 +904,8 @@ public sealed class HfsPlusFeatureTests
             bool deepCatalogTree = false, bool overlappingFileForks = false,
             bool zeroLengthResourceFork = false, bool includeAllocationFile = false,
             bool markDataForkAllocated = true, bool includeAttributeFile = false,
-            bool includeStartupFile = false)
+            bool includeStartupFile = false, bool badBlockExtent = false,
+            bool badBlockOverlapsFileExtent = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -900,7 +942,7 @@ public sealed class HfsPlusFeatureTests
             "TEXTttxt"u8.CopyTo(file.AsSpan(48));
             if (fragmentedData)
             {
-                uint dataExtentCount = unsortedOverflowKeys ? 10u : 9u;
+                uint dataExtentCount = badBlockExtent ? 8u : unsortedOverflowKeys ? 10u : 9u;
                 BinaryPrimitives.WriteUInt64BigEndian(file.AsSpan(88), (ulong)dataExtentCount * Block);
                 U32(file, 88 + 12, dataExtentCount);
                 for (int index = 0; index < 8; index++)
@@ -913,7 +955,8 @@ public sealed class HfsPlusFeatureTests
                 Fork(file.AsSpan(168, 80), "Resource fork"u8.Length, 25, 1);
                 "Resource fork"u8.CopyTo(image.AsSpan(25 * Block));
                 WriteExtentsTree(image, duplicateOverflowExtent, unsortedOverflowKeys,
-                    unsortedOverflowFileIds, unsortedOverflowForkTypes, indexedOverflowTree);
+                    unsortedOverflowFileIds, unsortedOverflowForkTypes, indexedOverflowTree,
+                    badBlockExtent, badBlockOverlapsFileExtent);
             }
             else
             {
@@ -1121,8 +1164,14 @@ public sealed class HfsPlusFeatureTests
         }
 
         private static void WriteExtentsTree(byte[] image, bool duplicateRecord, bool unsortedKeys,
-            bool unsortedFileIds, bool unsortedForkTypes, bool indexedOverflowTree)
+            bool unsortedFileIds, bool unsortedForkTypes, bool indexedOverflowTree,
+            bool badBlockExtent, bool badBlockOverlapsFileExtent)
         {
+            if (badBlockExtent)
+            {
+                WriteBadBlockExtentTree(image, badBlockOverlapsFileExtent ? 12u : 23u);
+                return;
+            }
             if (indexedOverflowTree)
             {
                 WriteIndexedExtentsTree(image);
@@ -1160,6 +1209,35 @@ public sealed class HfsPlusFeatureTests
             U16(header, 34, 10);
             U32(header, 36, 2);
             U32(header, 14 + 38, 2); // 16-bit key lengths and fixed-width extents index keys.
+            header[14 + 106 + 128] = 0xC0;
+            U16(header, Block - 2, 14);
+            U16(header, Block - 4, 14 + 106);
+            U16(header, Block - 6, 14 + 106 + 128);
+            U16(header, Block - 8, Block - 8);
+        }
+
+        private static void WriteBadBlockExtentTree(byte[] image, uint physicalBlock)
+        {
+            Span<byte> leaf = image.AsSpan(5 * Block, Block);
+            leaf[8] = 0xFF;
+            leaf[9] = 1;
+            U16(leaf, 10, 1);
+            U16(leaf, Block - 2, 14);
+            U16(leaf, Block - 4, 90);
+            WriteExtentRecord(leaf, 14, 0, physicalBlock, fileId: 5);
+
+            Span<byte> header = image.AsSpan(4 * Block, Block);
+            header[8] = 1;
+            U16(header, 10, 3);
+            U16(header, 14, 1);
+            U32(header, 16, 1);
+            U32(header, 20, 1);
+            U32(header, 24, 1);
+            U32(header, 28, 1);
+            U16(header, 32, Block);
+            U16(header, 34, 10);
+            U32(header, 36, 2);
+            U32(header, 14 + 38, 2);
             header[14 + 106 + 128] = 0xC0;
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);

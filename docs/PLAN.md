@@ -802,8 +802,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders); an initial StuffIt v5 reader handles stored and RLE90 forks. Original-application
     interoperability, remaining archive methods and formats, and deeper HFS+ validation remain. The HFS+ reader
     rejects overlapping allocation ranges and, when the allocation file is present, checks its bitmap for the extents
-    it reads (including the attributes and startup special-file forks) and the reserved volume-header areas TN1150
-    requires.
+    it reads (including the attributes and startup special-file forks, and bad-block extents) and the reserved
+    volume-header areas TN1150 requires.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
