@@ -810,7 +810,7 @@ chain, checks map-node descriptors, record boundaries and bitmap coverage, requi
 allocated, and verifies `freeNodes` against the complete bitmap. It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
 `totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user
-record and remaining map record, and leaf-record keys are
+record and remaining map record, index records contain exactly the padded key and child pointer, and leaf-record keys are
 unique. It checks the catalog and extents-overflow B-trees' `maxKeyLength` against TN1150's defined maxima (516 and
 10 bytes respectively) **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
 record's parent and name.

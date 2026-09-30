@@ -971,6 +971,36 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusAttributesBtreeIndexSeparatorMustRemainAfterThePreviousChildRecords()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
+            separatorFileId: 17, separatorName: "alpha");
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAttributesBtreeIndexSeparatorMayFallBetweenChildKeyRanges()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
+            separatorFileId: 17, separatorName: "omega");
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusAttributesBtreeIndexRecordMustContainOnlyItsKeyAndChildPointer()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
+            extraIndexRecordBytes: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(18u, "a", 0u, 17u, "a", 0u)]
     [InlineData(17u, "zz", 0u, 17u, "a", 0u)]
@@ -1668,16 +1698,21 @@ public sealed class HfsPlusFeatureTests
         }
 
         public static byte[] BuildWithIndexedAttributesTree(bool invalidChild, bool reverseAttributeKeys = false,
-            bool invalidSeparator = false)
+            bool invalidSeparator = false, uint? separatorFileId = null, string? separatorName = null,
+            bool extraIndexRecordBytes = false)
         {
             byte[] image = Build(includeAttributeFile: true);
             Fork(image.AsSpan(1024 + 352, 80), 4 * Block, 10, 4);
             byte[] first = AttributeRecord(reverseAttributeKeys ? 18u : 17u, "alpha", 0, 0x40);
             byte[] second = AttributeRecord(reverseAttributeKeys ? 17u : 18u, "beta", 0, 0x40);
-            byte[] secondIndexKey = (byte[])second.Clone();
+            byte[] secondIndexKey = separatorFileId is { } fileId && separatorName is { } name
+                ? AttributeRecord(fileId, name, 0, 0x40)
+                : (byte[])second.Clone();
             if (invalidSeparator) U32(secondIndexKey, 4, 19);
+            byte[] secondIndexRecord = IndexRecord(secondIndexKey, 3);
+            if (extraIndexRecordBytes) Array.Resize(ref secondIndexRecord, secondIndexRecord.Length + 2);
             WriteBTreeNode(image.AsSpan(11 * Block, Block), 0, 2, 0, 0,
-                [IndexRecord(first, invalidChild ? 4u : 2u), IndexRecord(secondIndexKey, 3)]);
+                [IndexRecord(first, invalidChild ? 4u : 2u), secondIndexRecord]);
             WriteBTreeNode(image.AsSpan(12 * Block, Block), 0xFF, 1, 3, 0, [first]);
             WriteBTreeNode(image.AsSpan(13 * Block, Block), 0xFF, 1, 0, 2, [second]);
 

@@ -239,6 +239,21 @@ public sealed class DiskDoublerFeatureTests
         Assert.Equal(expected, file.DataFork.ToArray());
     }
 
+    [Theory]
+    [InlineData(0x2A, 0x80)]
+    [InlineData(0x29, 0x00)]
+    public void Dda2Method2LeavesOutputUnchangedWhenInfoDisablesTheXor(byte info1, byte info2)
+    {
+        byte[] expected = "AAA"u8.ToArray();
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive no XOR", 0,
+            expected, [], dataMethod: 2, encodedData: [0x41, 0x41, 0xF0], info1: info1, info2: info2));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
     [Fact]
     public void Dda2Method2DecodesTheResourceFork()
     {
@@ -259,6 +274,22 @@ public sealed class DiskDoublerFeatureTests
 
         Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
             new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method2ReportsChecksumMismatchAfterDecoding()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Bad adaptive checksum", 0,
+            "AAA"u8.ToArray(), [], dataMethod: 2, encodedData: [0x41, 0x41, 0xF0]));
+        archive[62 + 60 + 44] ^= 0x01;
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("AAA"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum" &&
+            diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]

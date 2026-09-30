@@ -667,8 +667,8 @@ internal static class HfsPlusReader
                 int storedKeyLength = (name is "catalog" or "attributes") ? keyLength : maxKeyLength;
                 int childOffset = begin + 2 + storedKeyLength;
                 if ((childOffset & 1) != 0) childOffset++;
-                if (childOffset > end - 4)
-                    throw new InvalidDataException($"An HFS Plus {name} B-tree index record is truncated.");
+                if (childOffset + 4 != end)
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree index record has an invalid length.");
                 var childRange = Visit(U32(tree, start + childOffset), checked((ushort)(expectedHeight - 1)));
                 childRanges.Add((indexKey, childRange));
             }
