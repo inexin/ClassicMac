@@ -153,6 +153,168 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void StuffItMethod13DecodesDistinctDynamicTreesAndBackReferences()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod13");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "DistinctDynamicTrees.bin"));
+        byte[] expected = "AAAAB"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("distinct dynamic trees", expected, [], dataMethod: 13,
+            encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14DecodesAByteFromItsCompressedBlocks()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "SingleLiteral.bin"));
+        byte[] expected = [(byte)'A'];
+        byte[] image = StuffItFixture.BuildFile("method 14 literal", expected, [], dataMethod: 14,
+            encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14AcceptsAnEmptyForkWithNoBlocks()
+    {
+        byte[] image = StuffItFixture.BuildFile("empty method 14 fork", [], [], dataMethod: 14,
+            encodedData: [0, 0]);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Empty(file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14ExpandsALengthDistancePair()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "LiteralAndMatch.bin"));
+        byte[] expected = "AAAAA"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("method 14 match", expected, [], dataMethod: 14,
+            encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14UsesExtendedLengthAndDistanceCodes()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExtendedLengthAndDistance.bin"));
+        byte[] expected = "ABCDEFGHIABCDEFGHIABCD"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("method 14 extended match", expected, [],
+            dataMethod: 14, encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14ReadsRecursivelyEncodedTreeLengths()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "EncodedTreeLengths.bin"));
+        byte[] expected = "A"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("method 14 encoded tree", expected, [], dataMethod: 14,
+            encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14ExpandsRepeatedCodeLengths()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "RepeatedCodeLengths.bin"));
+        byte[] expected = "A"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("method 14 repeated code lengths", expected, [],
+            dataMethod: 14, encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14DecodesIndependentBlocksInOrder()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "TwoLiteralBlocks.bin"));
+        byte[] expected = "AB"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("method 14 blocks", expected, [], dataMethod: 14,
+            encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14DecodesAResourceFork()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "SingleLiteral.bin"));
+        byte[] expected = "A"u8.ToArray();
+        byte[] image = StuffItFixture.BuildFile("method 14 resource", [], expected,
+            resourceMethod: 14, encodedResource: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Empty(file.DataFork.ToArray());
+        Assert.Equal(expected, file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMethod14RejectsABlockThatExceedsItsCompressedFork()
+    {
+        byte[] encoded = [1, 0, 99, 0, 0, 0, 1, 0, 0, 0];
+        byte[] image = StuffItFixture.BuildFile("truncated method 14 block", "A"u8.ToArray(), [],
+            dataMethod: 14, encodedData: encoded);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItMethod14RejectsABlockExpandedLengthBeyondTheFork()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "SingleLiteral.bin"));
+        encoded[6] = 2;
+        byte[] image = StuffItFixture.BuildFile("oversized method 14 block", "A"u8.ToArray(), [],
+            dataMethod: 14, encodedData: encoded);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItMethod14CanExpandAZeroInitializedHistoryMatch()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod14");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "MatchBeforeHistory.bin"));
+        byte[] expected = new byte[4];
+        byte[] image = StuffItFixture.BuildFile("method 14 initial history", expected, [],
+            dataMethod: 14, encodedData: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
     public void StuffItCompressMethodDecodesLzwKwKwKCaseInBothForks()
     {
         byte[] expected = "ABABABA"u8.ToArray();

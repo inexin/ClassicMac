@@ -7,7 +7,7 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Files.Archives;
 
-/// <summary>Reads the StuffIt 5 archive container and stored forks.</summary>
+/// <summary>Reads StuffIt 5 archives and decompresses supported forks.</summary>
 /// <remarks>
 /// StuffIt does not have a published format specification. The v5 record layout is cross-checked against Deark's
 /// independent parser and remains subject to verification with archives written by the original StuffIt application.
@@ -118,8 +118,8 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13) ||
-                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or null))
+            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14) ||
+                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or null))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -307,6 +307,7 @@ public sealed class StuffItReader : IContainerReader
         if (method == 5) return DecodeLzah(input, outputLength);
         if (method == 8) return DecodeMw(input, outputLength);
         if (method == 13) return StuffItMethod13Decoder.Decode(input, outputLength);
+        if (method == 14) return StuffItMethod14Decoder.Decode(input, outputLength);
 
         var output = new byte[outputLength];
         int written = 0;

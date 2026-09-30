@@ -23,8 +23,8 @@ resource bytes, which precede data-fork bytes. These member details are **[Fitte
 parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet been checked against a corpus created by
 the original StuffIt application.
 
-ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH), 8 (MW), and
-13 (LZ + Huffman) for either fork. RLE90 emits ordinary bytes as
+ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH), 8 (MW),
+13 (LZ + Huffman), and 14 (Installer) for either fork. RLE90 emits ordinary bytes as
 literals; `$90 00` emits a literal `$90`; `$90 n` for nonzero `n` repeats the previously decoded byte until the run has
 `n` copies **[Fitted]**. Truncated runs, runs without a prior byte, output-length mismatches and extents outside the
 archive are rejected. Per-fork CRC mismatches are reported as errors while retaining the decoded file. Encrypted
@@ -68,8 +68,18 @@ Method 13 reads its control and Huffman-coded symbols least-significant-bit firs
 and dynamically described literal/length and distance tables, followed by LZ references. Its table data is
 transcribed from compcol's MIT-licensed method-13 tables (see `THIRD-PARTY-NOTICES.md`); the decoder is an independent
 implementation. The CC0 StuffIt Deluxe 4.5 corpus vectors cover preset tables, dynamic tables, both forks, and exact
-decoded bytes or CRC-16 checks. Dynamic tables with aliased code alphabets are represented in the current real-world
-fixtures; other valid dynamic table forms still need broader interoperability coverage.
+decoded bytes or CRC-16 checks. The corpus has aliased code alphabets; a separate hand-built vector covers distinct
+literal/length trees and a distance-one back-reference. Wider validation against archives from different StuffIt
+versions remains useful.
 
-The v1–4 record layout, methods 14 and 15, archive-level comments, complete folder metadata and
+Method 14 is the block-based LZ+Huffman codec associated with StuffIt Installer Maker. A v5 fork begins with a
+little-endian block count. Each block carries its compressed and expanded byte lengths, then separate 308-symbol
+literal/length and 75-symbol distance trees. The tree descriptions can store lengths directly or through a recursively
+described Huffman tree. Matches use a zero-initialized 256 KiB sliding window that carries across blocks. This layout
+is **[Fitted]** against
+[XADMaster's method-14 reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADMaster/XADStuffItOldHandles.m/).
+Hand-built vectors cover literals, matches, direct and recursively encoded tree lengths, multiple blocks, both forks,
+and truncated block bounds; no original-application method-14 archive has yet been verified.
+
+The v1–4 record layout, method 15, archive-level comments, complete folder metadata and
 verification against original-application archives remain unimplemented. See Phase 10 in [the project plan](../PLAN.md).

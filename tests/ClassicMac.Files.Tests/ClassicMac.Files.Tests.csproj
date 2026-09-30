@@ -23,5 +23,6 @@
 
   <ItemGroup>
     <None Update="TestData\StuffItMethod13\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="TestData\StuffItMethod14\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
