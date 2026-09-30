@@ -847,7 +847,9 @@ greater than all file and folder IDs, as TN1150 requires **[Doc]**. It then reso
 Finder info and dates. It
 also reads data and resource fork overflow
 extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
-(which may exceed the blocks needed by its logical length). It rejects overlapping allocation ranges among the
+(which may exceed the blocks needed by its logical length). Overflow records are allowed only after all eight initial
+extent descriptors are occupied, every non-final overflow record must contain eight extents, and no matching records
+may remain after the fork's declared block count is covered **[Doc]** TN1150. It rejects overlapping allocation ranges among the
 extents it reads, following TN1150's allocation-file ownership model. The volume header must provide the required
 allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the declared allocation blocks and to mark
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
@@ -858,7 +860,14 @@ header, including their overflow extents, and accounts
 for every extent record in the extents-overflow tree, including bad-block records and records not needed to read a
 catalog fork **[Doc]** TN1150. It walks the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
-records do not claim extents **[Doc]** TN1150. Attribute keys are validated and ordered by file ID, name length,
+records do not claim extents **[Doc]** TN1150. For each extent-backed attribute it requires one fork-data record at
+key `startBlock` zero, matches extension records by file ID and attribute name, and requires each extension's
+`startBlock` to continue the preceding extent count. The initial record must contain eight extents when overflow is
+present, and each non-final extension record must contain eight **[Doc]** TN1150. Their combined extent count must equal
+`HFSPlusForkData.totalBlocks`, and the logical size must fit in those allocated blocks **[Doc]** TN1150 / Apple's
+`HFSPlusAttrForkData` and `HFSPlusAttrExtents` definitions in
+[`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h). Orphan extensions and
+gaps in an attribute fork's extent sequence are rejected. Attribute keys are validated and ordered by file ID, name length,
 binary UTF-16 name and start block in leaves and index nodes; the key's reserved padding field must be zero, and
 separators must bound their child key ranges. The key
 ordering uses Apple's HFS comparator for the rule that

@@ -842,15 +842,18 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
     extents), plus the attributes and startup special-file forks and defined fork-data and extent records in the
-    attributes B-tree; attribute keys and child ranges are validated in leaves and index nodes using Apple's HFS
-    key comparator. It checks the alternate volume header's signature and version, reporting a warning if the recovery
+    attributes B-tree; forks use overflow only after eight initial extents, non-final overflow records must be full,
+    and matching overflow records must account for the declared blocks. Attribute keys and child ranges are validated
+    in leaves and index nodes using Apple's HFS key comparator. It checks the alternate volume header's signature
+    and version, reporting a warning if the recovery
     copy is invalid while continuing from the primary header; it also checks TN1150's reserved volume-header areas
     and zero unused bitmap bits; it reports a mismatch between bitmap free blocks and the volume header's `freeBlocks`.
     HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
     to indirect-node forks while keeping the visible path and hiding private metadata; dangling links are reported.
     The HFS+ B-tree reader validates even record boundaries and exact extents-overflow and defined attribute payload
-    lengths; [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) records the rules and the verifier-backed thread and
-    empty-leaf compatibility cases. Broader HFS+ validation remains.
+    lengths, and matches each attribute fork-data record with its ordered extension extents and declared logical and
+    allocation sizes; [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) records the rules and the verifier-backed
+    thread and empty-leaf compatibility cases. Broader HFS+ validation remains.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
