@@ -280,6 +280,16 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusAttributesBtreeMustUseTheControlTreeType()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false);
+        image[10 * HfsPlusFixture.Block + 14 + 36] = 0x80;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(false, 0x00000000)] // The catalog must use 16-bit lengths and variable index keys.
     [InlineData(false, 0x00000002)] // The catalog is missing variable index keys.
