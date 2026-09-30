@@ -799,7 +799,9 @@ the embedded byte offset is `drAlBlSt × 512 + drEmbedExtent.start × drAlBlkSiz
 that extent and return the embedded volume's entries, not the wrapper's placeholder file.
 
 The reader walks the catalog B-tree's linked leaf nodes, resolves folder paths and reads both forks, Finder info and
-dates. It also reads data and resource fork overflow extents. Unicode names are retained in `MacFile.MacPath`; the
+dates. It also reads data and resource fork overflow extents and requires the primary and overflow extents to account
+for each fork's declared allocation-block count (which may exceed the blocks needed by its logical length). Unicode
+names are retained in `MacFile.MacPath`; the
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, volume allocation ownership, catalog thread

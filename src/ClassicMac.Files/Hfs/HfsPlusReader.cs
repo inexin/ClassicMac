@@ -114,16 +114,20 @@ internal static class HfsPlusReader
         ulong logical = BinaryPrimitives.ReadUInt64BigEndian(fork);
         if (logical == 0) return ForkData.Empty;
         if (logical > long.MaxValue) throw new InvalidDataException("An HFS Plus fork is too large.");
+        uint allocatedBlocks = U32(fork, 12);
+        if (allocatedBlocks == 0)
+            throw new InvalidDataException("A nonempty HFS Plus fork has no allocated blocks.");
         var ranges = new List<(long Offset, long Length)>();
-        ulong covered = 0;
         uint coveredBlocks = 0;
         void AddExtents(ReadOnlySpan<byte> extents)
         {
-            for (int index = 0; index < 8 && covered < logical; index++)
+            for (int index = 0; index < 8; index++)
             {
                 uint start = U32(extents, index * 8);
                 uint count = U32(extents, index * 8 + 4);
                 if (count == 0) break;
+                if (count > allocatedBlocks - coveredBlocks)
+                    throw new InvalidDataException("An HFS Plus fork's extents exceed its allocated block count.");
                 if ((ulong)start + count > totalBlocks)
                     throw new InvalidDataException("An HFS Plus extent lies outside the allocation area.");
                 long offset = checked((long)start * blockSize);
@@ -131,20 +135,22 @@ internal static class HfsPlusReader
                 if (offset > image.Length - length)
                     throw new InvalidDataException("An HFS Plus extent lies outside the image.");
                 ranges.Add((offset, length));
-                covered += (ulong)length;
                 coveredBlocks = checked(coveredBlocks + count);
             }
         }
         AddExtents(fork.Slice(16, 64));
-        if (covered < logical && overflow is not null && overflow.TryGetValue((forkType, fileId), out var entries))
+        if (coveredBlocks < allocatedBlocks && overflow is not null &&
+            overflow.TryGetValue((forkType, fileId), out var entries))
             foreach (var entry in entries.OrderBy(e => e.Start))
             {
-                if (covered >= logical) break;
+                if (coveredBlocks >= allocatedBlocks) break;
                 if (entry.Start != coveredBlocks)
                     throw new InvalidDataException("An HFS Plus overflow extent is not contiguous with the fork.");
                 AddExtents(entry.Extents);
             }
-        if (covered < logical)
+        if (coveredBlocks != allocatedBlocks)
+            throw new InvalidDataException("An HFS Plus fork's extent count differs from its allocated block count.");
+        if ((ulong)coveredBlocks * blockSize < logical)
             throw new InvalidDataException("An HFS Plus fork has insufficient extents for its logical length.");
         return new ExtentForkData(image, ranges, checked((long)logical));
     }

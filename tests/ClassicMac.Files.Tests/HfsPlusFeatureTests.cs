@@ -122,6 +122,28 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void HfsPlusForkExtentCountMustMatchItsAllocatedBlockCount(uint recordedBlocks)
+    {
+        byte[] image = HfsPlusFixture.Build(dataBlockCount: recordedBlocks);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusForkMayOwnMoreBlocksThanItsLogicalLength()
+    {
+        byte[] image = HfsPlusFixture.Build(dataBlockCount: 2, dataExtentBlockCount: 2);
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("Resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
     [Fact]
     public void CyclicHfsPlusCatalogLeafChainIsRejected()
     {
@@ -147,7 +169,8 @@ public sealed class HfsPlusFeatureTests
         private const int Block = 4096;
 
         public static byte[] Build(string fileName = "Read Me", bool hfsX = false, bool fragmentedData = false,
-            bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false)
+            bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false,
+            uint? dataBlockCount = null, uint? dataExtentBlockCount = null)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -193,10 +216,15 @@ public sealed class HfsPlusFeatureTests
             }
             else
             {
-                Fork(file.AsSpan(88, 80), "HFS Plus data"u8.Length, invalidDataExtent ? 16u : 4u, 1);
-                Fork(file.AsSpan(168, 80), "Resource fork"u8.Length, 5, 1);
-                "HFS Plus data"u8.CopyTo(image.AsSpan(4 * Block));
-                "Resource fork"u8.CopyTo(image.AsSpan(5 * Block));
+                uint dataBlocks = dataExtentBlockCount ?? 1;
+                uint dataStart = invalidDataExtent ? 16u : 4u;
+                Fork(file.AsSpan(88, 80), "HFS Plus data"u8.Length, dataStart, dataBlocks);
+                if (dataBlockCount is { } count) U32(file.AsSpan(88), 12, count);
+                uint resourceStart = invalidDataExtent ? 5u : dataStart + dataBlocks;
+                Fork(file.AsSpan(168, 80), "Resource fork"u8.Length, resourceStart, 1);
+                uint dataStorageBlock = invalidDataExtent ? 4u : dataStart;
+                "HFS Plus data"u8.CopyTo(image.AsSpan((int)dataStorageBlock * Block));
+                "Resource fork"u8.CopyTo(image.AsSpan((int)resourceStart * Block));
             }
 
             byte[] leaf = image.AsSpan(3 * Block, Block).ToArray();
