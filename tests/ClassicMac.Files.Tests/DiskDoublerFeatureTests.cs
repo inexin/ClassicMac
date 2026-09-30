@@ -10,8 +10,23 @@ public sealed class DiskDoublerFeatureTests
     [Fact]
     public void CanReadRecognizesOnlyACompleteDda2Header()
     {
+        byte[] archive = DiskDoublerFixture.BuildArchive();
+
         Assert.False(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes("DDA2"u8.ToArray())));
-        Assert.True(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(DiskDoublerFixture.BuildArchive())));
+        Assert.True(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(archive)));
+
+        archive[12] ^= 0x01;
+        Assert.False(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(archive)));
+    }
+
+    [Fact]
+    public void Dda2RejectsAnInvalidArchiveHeaderChecksum()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive();
+        archive[12] ^= 0x01;
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(
+            ForkData.FromBytes(archive), new ContainerContext()));
     }
 
     [Fact]
@@ -589,6 +604,7 @@ public sealed class DiskDoublerFeatureTests
             }
             "DDA2"u8.CopyTo(archive.AsSpan(offset));
             U16(archive, offset + 4, 0xBBBB);
+            U16(archive, 60, Crc16Xmodem(archive.AsSpan(0, 60)));
             return archive;
         }
 
@@ -645,6 +661,18 @@ public sealed class DiskDoublerFeatureTests
                 crc ^= value;
                 for (int bit = 0; bit < 8; bit++)
                     crc = (ushort)((crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xA001));
+            }
+            return crc;
+        }
+
+        private static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
+        {
+            ushort crc = 0;
+            foreach (byte value in bytes)
+            {
+                crc ^= (ushort)(value << 8);
+                for (int bit = 0; bit < 8; bit++)
+                    crc = (ushort)((crc & 0x8000) == 0 ? crc << 1 : (crc << 1) ^ 0x1021);
             }
             return crc;
         }

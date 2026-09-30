@@ -30,10 +30,13 @@ public sealed class DiskDoublerReader : IContainerReader
     public bool CanRead(ForkData input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        if (input.Length >= ArchiveHeaderLength)
+        {
+            byte[] header = input.ReadPrefix(ArchiveHeaderLength);
+            if (IsValidDda2Header(header)) return true;
+        }
         if (input.Length < 4) return false;
-        byte[] signature = input.ReadPrefix(4);
-        return (input.Length >= ArchiveHeaderLength && signature.AsSpan().SequenceEqual("DDA2"u8)) ||
-            (input.Length >= 78 && signature.AsSpan().SequenceEqual("DDAR"u8));
+        return input.ReadPrefix(4).AsSpan().SequenceEqual("DDAR"u8) && input.Length >= 78;
     }
 
     /// <inheritdoc/>
@@ -47,7 +50,7 @@ public sealed class DiskDoublerReader : IContainerReader
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
         if (archive.AsSpan(0, 4).SequenceEqual("DDAR"u8))
             return ReadLegacy(archive, context);
-        if (archive.Length < ArchiveHeaderLength || !archive.AsSpan(0, 4).SequenceEqual("DDA2"u8))
+        if (!IsValidDda2Header(archive))
             throw new InvalidDataException("Not a DiskDoubler archive.");
 
         var files = new List<MacFile>();
@@ -548,6 +551,24 @@ public sealed class DiskDoublerReader : IContainerReader
             crc ^= value;
             for (int bit = 0; bit < 8; bit++)
                 crc = (ushort)((crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xA001));
+        }
+        return crc;
+    }
+
+    private static bool IsValidDda2Header(ReadOnlySpan<byte> header) =>
+        header.Length >= ArchiveHeaderLength && header[..4].SequenceEqual("DDA2"u8) &&
+        U16(header, 60) == Crc16Xmodem(header[..60]);
+
+    private static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
+    {
+        // [Fitted] XADMaster validates the DDA2 header CRC using its reversed 0x1021 table; the stored
+        // big-endian result is equivalent to CRC-16/XMODEM over the preceding 60 bytes.
+        ushort crc = 0;
+        foreach (byte value in bytes)
+        {
+            crc ^= (ushort)(value << 8);
+            for (int bit = 0; bit < 8; bit++)
+                crc = (ushort)((crc & 0x8000) == 0 ? crc << 1 : (crc << 1) ^ 0x1021);
         }
         return crc;
     }
