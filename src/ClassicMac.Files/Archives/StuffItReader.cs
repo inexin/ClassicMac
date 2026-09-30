@@ -118,7 +118,8 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1 or 2) || member.ResourceMethod is not (0 or 1 or 2 or null))
+            if (member.DataMethod is not (0 or 1 or 2 or 3) ||
+                member.ResourceMethod is not (0 or 1 or 2 or 3 or null))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -302,6 +303,7 @@ public sealed class StuffItReader : IContainerReader
         }
         ReadOnlySpan<byte> input = archive.AsSpan(offset, compressedLength);
         if (method == 2) return DecodeCompress(input, outputLength);
+        if (method == 3) return DecodeHuffman(input, outputLength);
 
         var output = new byte[outputLength];
         int written = 0;
@@ -427,6 +429,83 @@ public sealed class StuffItReader : IContainerReader
             code = prefix[code];
         }
         return (byte)code;
+    }
+
+    private static byte[] DecodeHuffman(ReadOnlySpan<byte> input, int outputLength)
+    {
+        var reader = new MsbBitReader(input);
+        int nodeCount = 0;
+        int leafCount = 0;
+        HuffmanNode root = ReadHuffmanNode(ref reader, 0, ref nodeCount, ref leafCount);
+        var output = new byte[outputLength];
+        for (int index = 0; index < output.Length; index++)
+        {
+            HuffmanNode node = root;
+            while (!node.IsLeaf)
+                node = reader.ReadBit() ? node.One! : node.Zero!;
+            output[index] = node.Symbol;
+        }
+        return output;
+    }
+
+    private static HuffmanNode ReadHuffmanNode(ref MsbBitReader reader, int depth, ref int nodeCount,
+        ref int leafCount)
+    {
+        if (depth > 255 || ++nodeCount > 511)
+            throw new InvalidDataException("A StuffIt Huffman code tree is too large.");
+        if (reader.ReadBit())
+        {
+            if (++leafCount > 256)
+                throw new InvalidDataException("A StuffIt Huffman code tree has too many symbols.");
+            return new HuffmanNode(reader.ReadByte());
+        }
+        HuffmanNode zero = ReadHuffmanNode(ref reader, depth + 1, ref nodeCount, ref leafCount);
+        HuffmanNode one = ReadHuffmanNode(ref reader, depth + 1, ref nodeCount, ref leafCount);
+        return new HuffmanNode(zero, one);
+    }
+
+    private sealed class HuffmanNode
+    {
+        public HuffmanNode(byte symbol)
+        {
+            Symbol = symbol;
+            IsLeaf = true;
+        }
+
+        public HuffmanNode(HuffmanNode zero, HuffmanNode one)
+        {
+            Zero = zero;
+            One = one;
+        }
+
+        public bool IsLeaf { get; }
+        public byte Symbol { get; }
+        public HuffmanNode? Zero { get; }
+        public HuffmanNode? One { get; }
+    }
+
+    private ref struct MsbBitReader
+    {
+        private readonly ReadOnlySpan<byte> input;
+        private long bitOffset;
+
+        public MsbBitReader(ReadOnlySpan<byte> input) => this.input = input;
+
+        public bool ReadBit()
+        {
+            if (bitOffset >= (long)input.Length * 8)
+                throw new InvalidDataException("A StuffIt Huffman fork ends inside its code tree or data.");
+            bool value = (input[checked((int)(bitOffset >> 3))] & (0x80 >> (int)(bitOffset & 7))) != 0;
+            bitOffset++;
+            return value;
+        }
+
+        public byte ReadByte()
+        {
+            byte value = 0;
+            for (int bit = 0; bit < 8; bit++) value = (byte)((value << 1) | (ReadBit() ? 1 : 0));
+            return value;
+        }
     }
 
     private ref struct LsbBitReader

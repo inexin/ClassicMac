@@ -159,6 +159,39 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void StuffItHuffmanMethodDecodesATreeWrittenInTheBitStream()
+    {
+        byte[] encoded = StuffItFixture.EncodeHuffman("ABA", ((byte)'A', (byte)'B'));
+        byte[] image = StuffItFixture.BuildFile("Huffman", "ABA"u8.ToArray(), "ABA"u8.ToArray(), dataMethod: 3,
+            encodedData: encoded, resourceMethod: 3, encodedResource: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("ABA"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("ABA"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItHuffmanMethodRejectsATruncatedPrefixTree()
+    {
+        byte[] image = StuffItFixture.BuildFile("Bad Huffman", [0], [], dataMethod: 3, encodedData: [0]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItHuffmanMethodRejectsTruncatedSymbolData()
+    {
+        byte[] encoded = StuffItFixture.EncodeHuffman("A", ((byte)'A', (byte)'B'));
+        byte[] image = StuffItFixture.BuildFile("Short Huffman", "AAAAAAA"u8.ToArray(), [], dataMethod: 3,
+            encodedData: encoded);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void StuffItRle90MethodDecodesBothForks()
     {
         byte[] data = [.. Enumerable.Repeat((byte)'A', 3), (byte)'B', 0x90, 0x90];
@@ -442,6 +475,25 @@ public sealed class StuffItFeatureTests
                 bitOffset += codeWidth;
             }
             return encoded;
+        }
+
+        public static byte[] EncodeHuffman(string text, (byte Zero, byte One) symbols)
+        {
+            var bits = new List<bool>();
+            bits.Add(false); // Root internal node.
+            WriteTreeLeaf(bits, symbols.Zero);
+            WriteTreeLeaf(bits, symbols.One);
+            foreach (char value in text) bits.Add(value == symbols.Zero ? false : true);
+            byte[] encoded = new byte[(bits.Count + 7) / 8];
+            for (int index = 0; index < bits.Count; index++)
+                if (bits[index]) encoded[index / 8] |= (byte)(0x80 >> (index & 7));
+            return encoded;
+        }
+
+        private static void WriteTreeLeaf(List<bool> bits, byte symbol)
+        {
+            bits.Add(true);
+            for (int bit = 7; bit >= 0; bit--) bits.Add((symbol & (1 << bit)) != 0);
         }
 
         private static void WriteCode(Span<byte> output, int bitOffset, ushort value, int width)

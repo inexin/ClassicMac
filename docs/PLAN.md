@@ -801,7 +801,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     key bounds,
     unique catalog
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders). The
-    StuffIt v5 reader handles stored, RLE90 and Compress/LZW forks. Original-application interoperability, remaining
+    StuffIt v5 reader handles stored, RLE90, Compress/LZW and Huffman forks. Original-application interoperability, remaining
     archive methods and formats, and deeper HFS+ validation remain. The HFS+ reader
     requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for the extents it
     reads (including the attributes and startup special-file forks, defined fork-data and extent records in the
