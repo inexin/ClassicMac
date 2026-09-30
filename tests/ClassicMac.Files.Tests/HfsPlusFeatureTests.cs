@@ -507,6 +507,34 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusAllocationFileMustMarkReferencedForkBlocksAsAllocated()
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: true, markDataForkAllocated: false);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAllocationFileWithAllReferencedBlocksMarkedIsReadable()
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: true);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusAllocationFileMustCoverEveryVolumeAllocationBlock()
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: true);
+        BinaryPrimitives.WriteUInt64BigEndian(image.AsSpan(1024 + 112), 1);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusOverflowTreeCannotRepeatAnExtentKey()
     {
         byte[] image = HfsPlusFixture.Build(fragmentedData: true, duplicateOverflowExtent: true);
@@ -798,7 +826,8 @@ public sealed class HfsPlusFeatureTests
             byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false,
             bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false,
             bool deepCatalogTree = false, bool overlappingFileForks = false,
-            bool zeroLengthResourceFork = false)
+            bool zeroLengthResourceFork = false, bool includeAllocationFile = false,
+            bool markDataForkAllocated = true)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -955,6 +984,12 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
+            if (includeAllocationFile)
+            {
+                Fork(image.AsSpan(1024 + 112, 80), 2, 9, 1);
+                image[9 * Block] = markDataForkAllocated ? (byte)0x3C : (byte)0x34;
+                image[9 * Block + 1] = 0x40; // Allocation block 9 is marked in the second bitmap byte.
+            }
             return image;
         }
 
