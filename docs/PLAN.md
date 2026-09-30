@@ -720,7 +720,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
 | 8 | Editor III (HFS writing) | Done for plain HFS: fork replacement, file/folder create and delete, constrained B-tree growth, and HFS image Save As |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
-| 10 | Later (HFS+, archives) | Not started |
+| 10 | Later (HFS+, archives) | In progress |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
 
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
@@ -792,7 +792,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    layer (done, 2026-09-29)**; 3. shared types (Core's geometry; the renderer on `.Fonts`, done 2026-09-29, pixel-identical
    on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
-10. **Later** — HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
+10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
+    info, dates and both forks (including overflow extents); format validation and the archive work below remain.
+    HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
     (RLE81 + LZH); then DiskDoubler, PackIt and segmented archives. Anything from row 5 of Inputs only on request.

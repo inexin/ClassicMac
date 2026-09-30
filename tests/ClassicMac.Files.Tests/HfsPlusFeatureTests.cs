@@ -31,12 +31,13 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
-    public void JotaRandomFormatterImageWithoutACatalogTreeIsRejected()
+    public void HfsPlusVolumeWithoutACatalogTreeIsRejected()
     {
-        string? path = Environment.GetEnvironmentVariable("CLASSICMAC_HFSPLUS_INTEROP_INPUT");
-        if (string.IsNullOrEmpty(path)) return;
-        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(ForkData.FromFile(path),
-            new ContainerContext()));
+        byte[] image = HfsPlusFixture.Build();
+        Array.Clear(image, 2 * 4096, 4096);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -57,6 +58,47 @@ public sealed class HfsPlusFeatureTests
         Assert.True(HfsReader.Instance.CanRead(ForkData.FromBytes(image)));
         Assert.Equal("Documents:Read Me",
             Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsWrapperReadsTheEmbeddedHfsPlusVolume()
+    {
+        byte[] image = HfsPlusFixture.BuildWrapped();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("Resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void HfsWrapperRejectsEmbeddedVolumeExtentPastTheImage()
+    {
+        byte[] image = HfsPlusFixture.BuildWrapped();
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1024 + 0x80), ushort.MaxValue);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsWrapperRejectsEmbeddedVolumeExtentPastTheDeclaredAllocationArea()
+    {
+        byte[] image = HfsPlusFixture.BuildWrapped();
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1024 + 0x12), 10);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsWrapperRejectsAnEmbeddedVolumeWithAnUnknownSignature()
+    {
+        byte[] image = HfsPlusFixture.BuildWrapped(invalidEmbeddedSignature: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -89,6 +131,15 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void UnknownHfsPlusCatalogRecordKindIsRejectedInsteadOfSilentlyOmitted()
+    {
+        byte[] image = HfsPlusFixture.Build(unknownCatalogRecord: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     // A small HFS+ volume built from the structures in TN1150: 4 KiB allocation and B-tree nodes,
     // one catalog leaf, a root folder, nested folder, file and their threads.
     private static class HfsPlusFixture
@@ -96,7 +147,7 @@ public sealed class HfsPlusFeatureTests
         private const int Block = 4096;
 
         public static byte[] Build(string fileName = "Read Me", bool hfsX = false, bool fragmentedData = false,
-            bool invalidDataExtent = false, bool cyclicCatalog = false)
+            bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -161,6 +212,7 @@ public sealed class HfsPlusFeatureTests
                 Record(16, fileName, file),
                 Record(17, "", Thread(16, fileName, 4)),
             };
+            if (unknownCatalogRecord) U16(records[4], 0, 0x1234);
             U16(leaf, 10, (ushort)records.Length);
             int at = 14;
             for (int index = 0; index < records.Length; index++)
@@ -189,6 +241,25 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
             return image;
+        }
+
+        public static byte[] BuildWrapped(bool invalidEmbeddedSignature = false)
+        {
+            byte[] embedded = Build();
+            const int embeddedOffset = 6 * 512;
+            if (invalidEmbeddedSignature) U16(embedded.AsSpan(1024), 0, 0x1234);
+            byte[] wrapper = new byte[embeddedOffset + embedded.Length];
+            embedded.CopyTo(wrapper, embeddedOffset);
+
+            Span<byte> mdb = wrapper.AsSpan(1024, 162);
+            U16(mdb, 0, 0x4244); // HFS master directory block signature
+            U32(mdb, 0x14, 512); // allocation block size
+            U16(mdb, 0x1C, 2); // drAlBlSt is measured in 512-byte blocks
+            U16(mdb, 0x12, checked((ushort)(wrapper.Length / 512 - 2)));
+            U16(mdb, 0x7C, 0x482B); // drEmbedSigWord: HFS Plus
+            U16(mdb, 0x7E, 4); // embedded volume starts at allocation block 4
+            U16(mdb, 0x80, checked((ushort)(embedded.Length / 512)));
+            return wrapper;
         }
 
         private static void WriteExtentsTree(byte[] image)

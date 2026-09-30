@@ -48,7 +48,30 @@ namespace ClassicMac.Files.Hfs
             var mdb = input.Slice(MdbOffset, MdbLength).ToArray();
             if (BinaryPrimitives.ReadUInt16BigEndian(mdb) is HfsPlusSignature or HfsXSignature)
                 return HfsPlusReader.Read(input, context);
+            if (BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x7C)) == HfsPlusSignature)
+                return ReadEmbeddedPlus(input, mdb, context);
             return new Volume(input, mdb, context).Files();
+        }
+
+        private static IReadOnlyList<MacFile> ReadEmbeddedPlus(ForkData input, byte[] mdb, ContainerContext context)
+        {
+            uint blockSize = BinaryPrimitives.ReadUInt32BigEndian(mdb.AsSpan(0x14));
+            uint allocationBlocks = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x12));
+            uint allocationStart = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x1C));
+            uint embeddedStart = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x7E));
+            uint embeddedBlocks = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x80));
+            if (blockSize == 0 || allocationBlocks == 0 || embeddedBlocks == 0 ||
+                (ulong)embeddedStart + embeddedBlocks > allocationBlocks)
+                throw new InvalidDataException("The HFS wrapper's embedded HFS Plus extent is invalid.");
+
+            ulong allocationAreaStart = (ulong)allocationStart * 512;
+            ulong offset = allocationAreaStart + (ulong)embeddedStart * blockSize;
+            ulong length = (ulong)embeddedBlocks * blockSize;
+            ulong allocationAreaEnd = allocationAreaStart + (ulong)allocationBlocks * blockSize;
+            if (offset > (ulong)input.Length || length > (ulong)input.Length - offset ||
+                offset + length > allocationAreaEnd || length < 1536)
+                throw new InvalidDataException("The HFS wrapper's embedded HFS Plus volume lies outside the image.");
+            return HfsPlusReader.Read(input.Slice(checked((long)offset), checked((long)length)), context);
         }
 
         // One HFS volume being read.
@@ -72,7 +95,6 @@ namespace ClassicMac.Files.Hfs
                 Name = new MacString(m.Slice(0x25, Math.Min(m[0x24], (byte)27)));
                 FileCount = BinaryPrimitives.ReadUInt32BigEndian(m[0x54..]);
                 FolderCount = BinaryPrimitives.ReadUInt32BigEndian(m[0x58..]);
-                EmbeddedSignature = BinaryPrimitives.ReadUInt16BigEndian(m[0x7C..]);
                 ExtentsLength = BinaryPrimitives.ReadUInt32BigEndian(m[0x82..]);
                 ExtentsRecord = m.Slice(0x86, 12).ToArray();
                 CatalogLength = BinaryPrimitives.ReadUInt32BigEndian(m[0x92..]);
@@ -84,8 +106,6 @@ namespace ClassicMac.Files.Hfs
             private uint FileCount { get; }
 
             private uint FolderCount { get; }
-
-            private ushort EmbeddedSignature { get; }
 
             private long ExtentsLength { get; }
 
@@ -99,12 +119,6 @@ namespace ClassicMac.Files.Hfs
             {
                 if (blockSize == 0 || blockSize % 512 != 0)
                     throw new InvalidDataException($"The allocation block size {blockSize} is not a multiple of 512.");
-                if (EmbeddedSignature == HfsPlusSignature)
-                {
-                    context.Report(DiagnosticSeverity.Info, "hfs.plus-wrapper",
-                        "This HFS volume wraps an HFS Plus volume, which is not read yet; only the wrapper's files are listed.");
-                }
-
                 // The extents overflow file never overflows itself; the catalog may.
                 var extentsFile = Fork(ExtentsRecord, 0, 3, ExtentsLength, "extents overflow file");
                 if (extentsFile is not null) ReadOverflow(extentsFile);

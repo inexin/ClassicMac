@@ -204,15 +204,13 @@ public class HfsTests
     }
 
     [Fact]
-    public void HFS_Plus_is_recognised_but_not_read()
+    public void HFS_Plus_signature_is_claimed_and_invalid_volume_is_rejected()
     {
         var image = new byte[4096];
         Encoding.ASCII.GetBytes("H+").CopyTo(image, 1024);
 
-        var (files, diagnostics) = Read(image);
-
-        Assert.Empty(files);
-        Assert.Equal("hfs.plus", Assert.Single(diagnostics).Code);
+        Assert.True(HfsReader.Instance.CanRead(ForkData.FromBytes(image)));
+        Assert.Throws<InvalidDataException>(() => Read(image));
     }
 
     [Fact]

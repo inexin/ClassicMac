@@ -4,8 +4,9 @@ This document describes how classic Mac OS lays out a disk: the Apple partition 
 the flat Macintosh File System (MFS) of the first 400K floppies, and the Hierarchical File System (HFS) that every
 Mac used from 1986 until HFS Plus. It is complete enough to write a reader that lists every file on a volume with its
 folder path, Finder information, dates and both forks, without reading ClassicMac's code. It is the behaviour of
-`PartitionMapReader`, `MfsReader` and `HfsReader` in `ClassicMac.Files.Hfs`. HFS Plus is recognised but read later
-(section 11). Disk images that hold these volumes (Disk Copy 4.2, NDIF, DART, UDIF) are in
+`PartitionMapReader`, `MfsReader` and `HfsReader` in `ClassicMac.Files.Hfs`. HFS Plus and HFSX are read-only formats
+supported by the phase 10 implementation described in section 11. Disk images that hold these volumes (Disk Copy
+4.2, NDIF, DART, UDIF) are in
 [DISK-IMAGES.md](DISK-IMAGES.md).
 
 References:
@@ -791,21 +792,25 @@ some may be missing or the header may be stale).
 
 ## 11. HFS Plus
 
-HFS Plus (Mac OS 8.1 and later) keeps its volume header at the same byte 1024, signature `'H+'` **[Doc]** TN1150.
-It is read later (phase 10 of the plan). Two cases are recognised now:
+HFS Plus (Mac OS 8.1 and later) keeps its volume header at byte 1024, signature `'H+'`, version 4 **[Doc]** TN1150.
+HFSX uses signature `'HX'`, version 5. ClassicMac reads either volume directly and reads an HFS Plus volume embedded
+in a classic HFS wrapper. The wrapper's MDB has `drEmbedSigWord` (+$7C) and `drEmbedExtent` (+$7E, start and count);
+the embedded byte offset is `drAlBlSt × 512 + drEmbedExtent.start × drAlBlkSiz` **[Doc]** TN1150. Wrapper reads follow
+that extent and return the embedded volume's entries, not the wrapper's placeholder file.
 
-- `'H+'` at 1024: an HFS Plus volume. ClassicMac lists nothing and reports `hfs.plus`.
-- An HFS volume whose `drEmbedSigWord` (+$7C in the MDB) is `'H+'` is an **HFS wrapper**: a small HFS volume, holding
-  a "Where have all my files gone?" file for older systems, around an HFS Plus volume stored in the allocation blocks
-  given by `drEmbedExtent` (+$7E, start and count) **[Doc]** TN1150. ClassicMac lists the wrapper's files and reports
-  `hfs.plus-wrapper`.
+The reader walks the catalog B-tree's linked leaf nodes, resolves folder paths and reads both forks, Finder info and
+dates. It also reads data and resource fork overflow extents. Unicode names are retained in `MacFile.MacPath`; the
+legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
+the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
+reader does not yet validate every B-tree index/map invariant, volume allocation ownership, catalog thread
+consistency, hard-link/symlink semantics, or the full HFSX collation rules.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,
 and the ROM's `MountVol` accepts only `'BD'` and `$D2D7` **[Code]** Mac OS 9.0 ROM and System. An HFSX volume
-presumably fails to mount with `noMacDskErr` (−57); that outcome is inferred, not run. ClassicMac does not recognise
-`'HX'` either: the HFS reader does not claim the image, no diagnostic is given, and the image is left as a plain file
-unless another reader recognises it.
+presumably fails to mount with `noMacDskErr` (−57); that outcome is inferred, not run. ClassicMac recognizes HFSX
+independently of Mac OS 9.0 and reads its catalog and forks, but does not yet apply HFSX's case-sensitive catalog
+collation for lookup (listing does not require lookup).
 
 ---
 
@@ -827,8 +832,7 @@ followed in its code.
 | `mfs.fork-short` | E | A fork's chain or the image holds fewer bytes than its logical length | Cuts the fork | Not traced |
 | `mfs.too-many-entries` | E | More than `MaxVolumeEntries` files | Stops reading | — |
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
-| `hfs.plus` | I | An HFS Plus volume | Lists nothing | Mounts it (Mac OS 8.1 and later) **[Doc]** TN1150 |
-| `hfs.plus-wrapper` | I | An HFS wrapper around an HFS Plus volume | Lists the wrapper's files | Mounts the HFS Plus volume inside (Mac OS 8.1 and later) **[Doc]** TN1150 |
+| `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |
 | `hfs.not-leaf` | E | A node on the leaf chain is not a leaf | Stops the walk; keeps the records read | Not traced |
 | `hfs.bad-record-offset` | E | A record's offsets in its node are impossible | Skips the record | Not traced |
@@ -847,6 +851,7 @@ with the reason:
 - MFS: an allocation block map that runs past the end of the image.
 - HFS: a catalog file whose extents lie outside the volume.
 - HFS: a B-tree file larger than `MaxExpandedBytesPerInput`.
+- HFS Plus: a malformed volume header, B-tree, catalog record, fork extent or wrapper embed extent.
 
 ## 13. Conservative HFS writing
 

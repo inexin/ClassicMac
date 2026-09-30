@@ -20,6 +20,8 @@ internal static class HfsPlusReader
         byte[] header = image.Slice(HeaderOffset, HeaderLength).ToArray();
         ushort signature = U16(header, 0);
         ushort version = U16(header, 2);
+        if (signature is not (0x482B or 0x4858))
+            throw new InvalidDataException($"Unknown HFS Plus volume signature 0x{signature:X4}.");
         if ((signature == 0x482B && version != 4) || (signature == 0x4858 && version != 5))
             throw new InvalidDataException($"Unsupported HFS Plus version {version}.");
         uint blockSize = U32(header, 40);
@@ -44,21 +46,33 @@ internal static class HfsPlusReader
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4);
         byte[] catalog = catalogFork.ToArray();
-        foreach (var (key, data) in LeafRecords(catalog))
-        {
-            if (key.Length < 6 || data.Length < 2)
-                throw new InvalidDataException("An HFS Plus catalog record is truncated.");
-        }
-
         var records = LeafRecords(catalog).ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name)>();
         foreach (var (key, data) in records)
         {
-            if (U16(data, 0) != 1) continue;
-            if (data.Length < 88) throw new InvalidDataException("An HFS Plus folder record is truncated.");
-            uint id = U32(data, 8);
-            if (!folders.TryAdd(id, (U32(key, 2), Name(key))))
-                throw new InvalidDataException("Duplicate HFS Plus folder ID.");
+            if (key.Length < 8 || data.Length < 2)
+                throw new InvalidDataException("An HFS Plus catalog record is truncated.");
+            switch (U16(data, 0))
+            {
+                case 1:
+                    if (data.Length < 88) throw new InvalidDataException("An HFS Plus folder record is truncated.");
+                    uint id = U32(data, 8);
+                    if (!folders.TryAdd(id, (U32(key, 2), Name(key))))
+                        throw new InvalidDataException("Duplicate HFS Plus folder ID.");
+                    break;
+                case 2:
+                    if (data.Length < 248) throw new InvalidDataException("An HFS Plus file record is truncated.");
+                    _ = Name(key);
+                    break;
+                case 3 or 4:
+                    if (data.Length < 10) throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
+                    ushort threadNameLength = U16(data, 8);
+                    if (threadNameLength > 255 || data.Length < 10 + 2 * threadNameLength)
+                        throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
+                    break;
+                default:
+                    throw new InvalidDataException($"Unknown HFS Plus catalog record type {U16(data, 0)}.");
+            }
         }
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
@@ -67,7 +81,6 @@ internal static class HfsPlusReader
         foreach (var (key, data) in records)
         {
             if (U16(data, 0) != 2) continue;
-            if (data.Length < 248) throw new InvalidDataException("An HFS Plus file record is truncated.");
             string name = Name(key);
             uint parent = U32(key, 2);
             byte[] info = [.. data.AsSpan(48, 16), .. data.AsSpan(64, 16)];
