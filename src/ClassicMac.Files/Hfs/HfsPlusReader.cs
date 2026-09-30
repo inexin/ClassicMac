@@ -271,6 +271,19 @@ internal static class HfsPlusReader
         if ((ulong)bitmap.Length < requiredBytes)
             throw new InvalidDataException("The HFS Plus allocation file is too short for the volume.");
 
+        int wholeBitmapBytes = checked((int)(totalBlocks / 8));
+        int remainingBits = checked((int)(totalBlocks % 8));
+        if (remainingBits != 0)
+        {
+            int unusedBitMask = (1 << (8 - remainingBits)) - 1;
+            if ((bitmap[wholeBitmapBytes] & unusedBitMask) != 0)
+                throw new InvalidDataException("Unused HFS Plus allocation bitmap bits must be clear.");
+            wholeBitmapBytes++;
+        }
+        for (int index = wholeBitmapBytes; index < bitmap.Length; index++)
+            if (bitmap[index] != 0)
+                throw new InvalidDataException("Unused HFS Plus allocation bitmap bits must be clear.");
+
         uint firstAreaEnd = checked((uint)Math.Min(totalBlocks, (1536UL + blockSize - 1) / blockSize));
         ulong volumeBytes = (ulong)totalBlocks * blockSize;
         uint lastAreaStart = checked((uint)((volumeBytes > 1024 ? volumeBytes - 1024 : 0) / blockSize));

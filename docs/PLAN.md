@@ -803,7 +803,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     interoperability, remaining archive methods and formats, and deeper HFS+ validation remain. The HFS+ reader
     requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for the extents it
     reads (including the attributes and startup special-file forks, defined fork-data and extent records in the
-    attributes B-tree, and bad-block extents) and the reserved volume-header areas TN1150 requires.
+    attributes B-tree, and bad-block extents), the reserved volume-header areas TN1150 requires, and zero unused
+    allocation-bitmap bits.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro

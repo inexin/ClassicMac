@@ -822,7 +822,7 @@ extents and requires the primary and overflow extents to account for each fork's
 extents it reads, following TN1150's allocation-file ownership model. The volume header must provide the required
 allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the declared allocation blocks and to mark
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
-**[Doc]** TN1150. It checks
+**[Doc]** TN1150. Any bitmap bits beyond the declared allocation-block count must be clear **[Doc]** TN1150. It checks
 the attributes and startup special-file forks from the volume header, including their overflow extents, and accounts
 for data extents in bad-block records from the extents-overflow file **[Doc]** TN1150. It walks the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute

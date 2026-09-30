@@ -200,6 +200,7 @@ public sealed class HfsPlusFeatureTests
         BinaryPrimitives.WriteUInt64BigEndian(allocationFork, (ulong)(totalBlocks + 7) / 8);
         BinaryPrimitives.WriteUInt32BigEndian(allocationFork[16..], 282);
         image.AsSpan(282 * blockSize, (totalBlocks + 7) / 8).Fill(0xFF);
+        image[282 * blockSize + (totalBlocks - 1) / 8] = 0xF0; // Clear unused low bits after block 299.
 
         int treeOffset = 4 * blockSize;
         byte[] leaf = image.AsSpan(5 * blockSize, nodeSize).ToArray();
@@ -542,6 +543,38 @@ public sealed class HfsPlusFeatureTests
     {
         byte[] image = HfsPlusFixture.Build(includeAllocationFile: true);
         BinaryPrimitives.WriteUInt64BigEndian(image.AsSpan(1024 + 112), 1);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAllocationBitmapRejectsSetBitsBeyondTheVolume()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 44), 15);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAllocationBitmapAllowsClearBitsBeyondTheVolume()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 44), 15);
+        image[9 * 4096 + 1] &= 0xFE;
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusAllocationBitmapRejectsSetBitsInExtraBytes()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt64BigEndian(image.AsSpan(1024 + 112), 3);
+        image[9 * 4096 + 2] = 0x80;
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
