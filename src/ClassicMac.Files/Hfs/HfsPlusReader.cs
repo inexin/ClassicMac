@@ -345,6 +345,7 @@ internal static class HfsPlusReader
         var visitedNodes = new HashSet<uint>();
         var leafNodes = new HashSet<uint>();
         var nodesByHeight = new Dictionary<ushort, List<uint>>();
+        var indexKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)>();
         int maxKeyLength = U16(tree, 34);
 
         void AddAtHeight(uint nodeNumber, ushort height)
@@ -375,6 +376,7 @@ internal static class HfsPlusReader
                 throw new InvalidDataException($"An HFS Plus {name} B-tree index node has an invalid record count.");
             int offsetTableStart = nodeSize - 2 * (count + 1);
             byte[]? previousIndexKey = null;
+            byte[]? firstIndexKey = null;
             for (int index = 0; index < count; index++)
             {
                 int begin = U16(tree, start + nodeSize - 2 * (index + 1));
@@ -399,6 +401,7 @@ internal static class HfsPlusReader
                     if (previousIndexKey is not null && CompareExtentKeys(previousIndexKey, indexKey) >= 0)
                         throw new InvalidDataException("The HFS Plus extents-overflow index keys are not strictly ordered.");
                 }
+                firstIndexKey ??= indexKey;
                 previousIndexKey = indexKey;
                 int storedKeyLength = name == "catalog" ? keyLength : maxKeyLength;
                 int childOffset = begin + 2 + storedKeyLength;
@@ -407,6 +410,7 @@ internal static class HfsPlusReader
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index record is truncated.");
                 Visit(U32(tree, start + childOffset), checked((ushort)(expectedHeight - 1)));
             }
+            indexKeyRanges.Add(nodeNumber, (firstIndexKey!, previousIndexKey!));
         }
 
         Visit(root, depth);
@@ -420,6 +424,20 @@ internal static class HfsPlusReader
                 if (U32(tree, start) != expectedForward || U32(tree, start + 4) != expectedBackward)
                     throw new InvalidDataException(
                         $"The HFS Plus {name} B-tree height-{height} sibling links are invalid.");
+                if (index > 0 && height > 1 && indexKeyRanges.TryGetValue(nodes[index - 1], out var previousRange))
+                {
+                    var currentRange = indexKeyRanges[nodes[index]];
+                    int comparison = name switch
+                    {
+                        "catalog" when caseSensitiveCatalog =>
+                            CompareHfsXCatalogKeys(previousRange.Last, currentRange.First),
+                        "extents-overflow" => CompareExtentKeys(previousRange.Last, currentRange.First),
+                        _ => -1
+                    };
+                    if (comparison >= 0)
+                        throw new InvalidDataException(
+                            $"The HFS Plus {name} B-tree index keys are not strictly ordered across sibling nodes.");
+                }
             }
         }
         return (leafNodes, visitedNodes);

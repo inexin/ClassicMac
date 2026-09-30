@@ -337,6 +337,31 @@ public sealed class HfsPlusFeatureTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void HfsXBinaryIndexKeysMustBeOrderedAcrossSiblingNodes(bool corruptSiblingKey)
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, deepCatalogTree: true);
+        if (corruptSiblingKey)
+        {
+            int nodeStart = 29 * 4096;
+            int firstRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(nodeStart + 4096 - 2));
+            BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(nodeStart + firstRecord + 2), 0);
+        }
+
+        if (corruptSiblingKey)
+        {
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+        }
+        else
+        {
+            Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext())).MacPath);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void HfsPlusExtentsBtreeIndexKeysMustBeOrdered(bool corruptSecondKey)
     {
         byte[] image = HfsPlusFixture.Build(fragmentedData: true, indexedOverflowTree: true);
@@ -719,9 +744,11 @@ public sealed class HfsPlusFeatureTests
             bool unsortedOverflowKeys = false, bool unsortedOverflowFileIds = false,
             bool unsortedOverflowForkTypes = false, bool reverseCatalogRecords = false,
             byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false,
-            bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false)
+            bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false,
+            bool deepCatalogTree = false)
         {
-            byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
+            uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
+            byte[] image = new byte[checked((int)volumeBlocks * Block)];
             Span<byte> volume = image.AsSpan(1024, 512);
             U16(volume, 0, hfsX ? (ushort)0x4858 : (ushort)0x482B);
             U16(volume, 2, hfsX ? (ushort)5 : (ushort)4);
@@ -729,11 +756,11 @@ public sealed class HfsPlusFeatureTests
             U32(volume, 32, 1); // fileCount
             U32(volume, 36, 1); // folderCount excludes root
             U32(volume, 40, Block);
-            U32(volume, 44, fragmentedData ? 32u : 16u);
+            U32(volume, 44, volumeBlocks);
             U32(volume, 48, fragmentedData ? 19u : 10u);
             U32(volume, 64, nextCatalogId ?? (additionalFolderParent is null ? 18u : 19u));
-            Fork(volume.Slice(272, 80), (multiLeafCatalog ? 4 : 2) * Block, 2,
-                multiLeafCatalog ? 4u : 2u);
+            Fork(volume.Slice(272, 80), (deepCatalogTree ? 8 : multiLeafCatalog ? 4 : 2) * Block,
+                deepCatalogTree ? 26u : 2u, deepCatalogTree ? 8u : multiLeafCatalog ? 4u : 2u);
             if (fragmentedData)
                 Fork(volume.Slice(192, 80), (indexedOverflowTree ? 4 : 2) * Block,
                     indexedOverflowTree ? 26u : 4u, indexedOverflowTree ? 4u : 2u);
@@ -822,6 +849,11 @@ public sealed class HfsPlusFeatureTests
             }
             if (unknownCatalogRecord) U16(records[4], 0, 0x1234);
             if (reverseCatalogRecords) records.Reverse();
+            if (deepCatalogTree)
+            {
+                WriteDeepCatalogTree(image, records, hfsX);
+                return image;
+            }
             if (multiLeafCatalog)
             {
                 int split = records.Count / 2;
@@ -920,6 +952,46 @@ public sealed class HfsPlusFeatureTests
                 at += records[index].Length;
             }
             U16(node, node.Length - 2 * (records.Count + 1), checked((ushort)at));
+        }
+
+        private static void WriteDeepCatalogTree(byte[] image, IReadOnlyList<byte[]> records, bool hfsX)
+        {
+            if (records.Count != 6) throw new InvalidOperationException("The deep catalog fixture needs six records.");
+
+            int firstNodeOffset = 26 * Block;
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + Block, Block), 0, 3, 0, 0,
+                [IndexRecord(records[0], 2), IndexRecord(records[3], 3)]);
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + 2 * Block, Block), 0, 2, 3, 0,
+                [IndexRecord(records[0], 4), IndexRecord(records[2], 5)]);
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + 3 * Block, Block), 0, 2, 0, 2,
+                [IndexRecord(records[3], 6), IndexRecord(records[4], 7)]);
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + 4 * Block, Block), 0xFF, 1, 5, 0,
+                records.Take(2).ToArray());
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + 5 * Block, Block), 0xFF, 1, 6, 4,
+                [records[2]]);
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + 6 * Block, Block), 0xFF, 1, 7, 5,
+                [records[3]]);
+            WriteBTreeNode(image.AsSpan(firstNodeOffset + 7 * Block, Block), 0xFF, 1, 0, 6,
+                records.Skip(4).ToArray());
+
+            Span<byte> header = image.AsSpan(firstNodeOffset, Block);
+            header[8] = 1;
+            U16(header, 10, 3);
+            U16(header, 14, 3);
+            U32(header, 16, 1);
+            U32(header, 20, (uint)records.Count);
+            U32(header, 24, 4);
+            U32(header, 28, 7);
+            U16(header, 32, Block);
+            U16(header, 34, 516);
+            U32(header, 36, 8);
+            header[14 + 37] = hfsX ? (byte)0xBC : (byte)0;
+            U32(header, 14 + 38, 6);
+            header[14 + 106 + 128] = 0xFF;
+            U16(header, Block - 2, 14);
+            U16(header, Block - 4, 14 + 106);
+            U16(header, Block - 6, 14 + 106 + 128);
+            U16(header, Block - 8, Block - 8);
         }
 
         private static void WriteExtentsTree(byte[] image, bool duplicateRecord, bool unsortedKeys,
