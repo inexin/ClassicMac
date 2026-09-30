@@ -509,7 +509,9 @@ internal static class HfsPlusReader
         var leafNodes = new HashSet<uint>();
         var nodesByHeight = new Dictionary<ushort, List<uint>>();
         var indexKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)>();
+        var subtreeKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)?>();
         int maxKeyLength = U16(tree, 34);
+        bool validateChildKeyRanges = name == "extents-overflow" || (name == "catalog" && caseSensitiveCatalog);
 
         void AddAtHeight(uint nodeNumber, ushort height)
         {
@@ -517,7 +519,7 @@ internal static class HfsPlusReader
             nodes.Add(nodeNumber);
         }
 
-        void Visit(uint nodeNumber, ushort expectedHeight)
+        (byte[] First, byte[] Last)? Visit(uint nodeNumber, ushort expectedHeight)
         {
             if (nodeNumber >= totalNodes || !visitedNodes.Add(nodeNumber))
                 throw new InvalidDataException($"The HFS Plus {name} B-tree index graph is cyclic or out of range.");
@@ -528,7 +530,9 @@ internal static class HfsPlusReader
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index points to a non-leaf node.");
                 AddAtHeight(nodeNumber, expectedHeight);
                 leafNodes.Add(nodeNumber);
-                return;
+                var leafRange = LeafKeyRange(tree, start, nodeSize, maxKeyLength, name);
+                subtreeKeyRanges.Add(nodeNumber, leafRange);
+                return leafRange;
             }
 
             if (tree[start + 8] != 0 || tree[start + 9] != expectedHeight)
@@ -540,6 +544,7 @@ internal static class HfsPlusReader
             int offsetTableStart = nodeSize - 2 * (count + 1);
             byte[]? previousIndexKey = null;
             byte[]? firstIndexKey = null;
+            var childRanges = new List<(byte[] Key, (byte[] First, byte[] Last)? Range)>(count);
             for (int index = 0; index < count; index++)
             {
                 int begin = U16(tree, start + nodeSize - 2 * (index + 1));
@@ -571,12 +576,38 @@ internal static class HfsPlusReader
                 if ((childOffset & 1) != 0) childOffset++;
                 if (childOffset > end - 4)
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index record is truncated.");
-                Visit(U32(tree, start + childOffset), checked((ushort)(expectedHeight - 1)));
+                var childRange = Visit(U32(tree, start + childOffset), checked((ushort)(expectedHeight - 1)));
+                childRanges.Add((indexKey, childRange));
             }
             indexKeyRanges.Add(nodeNumber, (firstIndexKey!, previousIndexKey!));
+            if (validateChildKeyRanges)
+            {
+                for (int index = 0; index < childRanges.Count; index++)
+                {
+                    var (separator, childRange) = childRanges[index];
+                    if (childRange is not { } child) continue;
+                    if (CompareTreeKeys(name, caseSensitiveCatalog, separator, child.First) > 0)
+                        throw new InvalidDataException(
+                            $"An HFS Plus {name} B-tree index key sorts after a key in its child subtree.");
+                    if (index > 0 && childRanges[index - 1].Range is { } previousChild &&
+                        CompareTreeKeys(name, caseSensitiveCatalog, previousChild.Last, separator) >= 0)
+                        throw new InvalidDataException(
+                            $"An HFS Plus {name} B-tree child contains a key beyond its index range.");
+                }
+            }
+            (byte[] First, byte[] Last)? subtreeRange = null;
+            foreach (var child in childRanges)
+            {
+                if (child.Range is not { } range) continue;
+                subtreeRange = subtreeRange is { } existing
+                    ? (existing.First, range.Last)
+                    : range;
+            }
+            subtreeKeyRanges.Add(nodeNumber, subtreeRange);
+            return subtreeRange;
         }
 
-        Visit(root, depth);
+        _ = Visit(root, depth);
         foreach (var (height, nodes) in nodesByHeight)
         {
             for (int index = 0; index < nodes.Count; index++)
@@ -601,10 +632,45 @@ internal static class HfsPlusReader
                         throw new InvalidDataException(
                             $"The HFS Plus {name} B-tree index keys are not strictly ordered across sibling nodes.");
                 }
+                if (index > 0 && height > 1 && validateChildKeyRanges &&
+                    subtreeKeyRanges[nodes[index - 1]] is { } previousSubtree &&
+                    subtreeKeyRanges[nodes[index]] is { } currentSubtree &&
+                    CompareTreeKeys(name, caseSensitiveCatalog, previousSubtree.Last, currentSubtree.First) >= 0)
+                    throw new InvalidDataException(
+                        $"The HFS Plus {name} B-tree child key ranges overlap across sibling nodes.");
             }
         }
         return (leafNodes, visitedNodes);
     }
+
+    private static (byte[] First, byte[] Last)? LeafKeyRange(byte[] tree, int nodeStart, int nodeSize,
+        int maxKeyLength, string name)
+    {
+        int count = U16(tree, nodeStart + 10);
+        if (count == 0) return null;
+        int offsetTableStart = nodeSize - 2 * (count + 1);
+
+        byte[] ReadKey(int index)
+        {
+            int begin = U16(tree, nodeStart + nodeSize - 2 * (index + 1));
+            int end = U16(tree, nodeStart + nodeSize - 2 * (index + 2));
+            if (begin < 14 || end <= begin || end > offsetTableStart)
+                throw new InvalidDataException($"An HFS Plus {name} B-tree leaf record offset is invalid.");
+            int keyLength = U16(tree, nodeStart + begin);
+            if (keyLength < 6 || keyLength > maxKeyLength || begin + 2 + keyLength > end)
+                throw new InvalidDataException($"An HFS Plus {name} B-tree leaf key length is invalid.");
+            return tree.AsSpan(nodeStart + begin, 2 + keyLength).ToArray();
+        }
+
+        return (ReadKey(0), ReadKey(count - 1));
+    }
+
+    private static int CompareTreeKeys(string name, bool caseSensitiveCatalog, byte[] left, byte[] right) => name switch
+    {
+        "catalog" when caseSensitiveCatalog => CompareHfsXCatalogKeys(left, right),
+        "extents-overflow" => CompareExtentKeys(left, right),
+        _ => throw new InvalidOperationException($"No key comparator is defined for the {name} B-tree.")
+    };
 
     private static void ValidateNodeMap(byte[] tree, int nodeSize, uint totalNodes,
         HashSet<uint> referencedNodes)

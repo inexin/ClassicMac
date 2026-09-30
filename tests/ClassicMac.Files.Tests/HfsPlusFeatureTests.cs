@@ -362,6 +362,29 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsXBinaryCatalogIndexSeparatorMustNotSortAfterItsChildRecords()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, multiLeafCatalog: true, catalogKeyCompareType: 0xBC);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(3 * 4096 + 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(3 * 4096 + secondRecord + 2), uint.MaxValue);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsXBinaryCatalogIndexSeparatorMustRemainAfterThePreviousChild()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, multiLeafCatalog: true, catalogKeyCompareType: 0xBC);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(3 * 4096 + 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(3 * 4096 + secondRecord + 2), 2);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("child contains a key beyond its index range", exception.Message);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -409,6 +432,31 @@ public sealed class HfsPlusFeatureTests
             Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
                 ForkData.FromBytes(image), new ContainerContext())).MacPath);
         }
+    }
+
+    [Fact]
+    public void HfsPlusExtentsIndexSeparatorMustNotSortAfterItsChildRecords()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, indexedOverflowTree: true);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(28 * 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(27 * 4096 + secondRecord + 8), uint.MaxValue);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusExtentsIndexSeparatorMustRemainAfterThePreviousChild()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, indexedOverflowTree: true);
+        int firstRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(28 * 4096 - 2));
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(28 * 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(27 * 4096 + firstRecord + 4), 16);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(27 * 4096 + secondRecord + 8), 8);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("child contains a key beyond its index range", exception.Message);
     }
 
     [Fact]

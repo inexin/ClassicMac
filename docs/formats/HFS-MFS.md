@@ -828,8 +828,9 @@ for data extents in bad-block records from the extents-overflow file **[Doc]** T
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
 records do not claim extents **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
-retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary catalog
-index and leaf keys are checked in order, including index sibling ranges, while case-folding key order is not yet validated **[Doc]**. The
+retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode. For binary
+HFSX catalogs and for the extents tree, index and leaf keys are checked in order, including index sibling ranges and
+child key bounds. Case-folding key order is not yet validated **[Doc]**. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, complete volume allocation ownership (including
