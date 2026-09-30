@@ -40,15 +40,16 @@ internal static class HfsPlusReader
                 if (key.Length != 12 || U16(key, 0) != 10 || data.Length < 64 || key[2] is not (0 or 0xFF))
                     throw new InvalidDataException("An HFS Plus extents-overflow record is invalid.");
                 var id = (key[2], U32(key, 4));
+                uint start = U32(key, 8);
                 if (!overflow.TryGetValue(id, out var entries)) overflow[id] = entries = [];
-                entries.Add((U32(key, 8), data.AsSpan(0, 64).ToArray()));
+                entries.Add((start, data.AsSpan(0, 64).ToArray()));
             }
         }
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4);
         byte[] catalog = catalogFork.ToArray();
         var records = LeafRecords(catalog, "catalog").ToArray();
-        var folders = new Dictionary<uint, (uint Parent, string Name)>();
+        var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence)>();
         var catalogIds = new HashSet<uint>();
         var catalogNodes = new Dictionary<uint, CatalogNode>();
         var catalogThreads = new Dictionary<uint, CatalogThread>();
@@ -65,7 +66,7 @@ internal static class HfsPlusReader
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     uint parent = U32(key, 2);
                     string name = Name(key);
-                    if (!folders.TryAdd(id, (parent, name)))
+                    if (!folders.TryAdd(id, (parent, name, U32(data, 4))))
                         throw new InvalidDataException("Duplicate HFS Plus folder ID.");
                     catalogNodes.Add(id, new CatalogNode(parent, name, IsFolder: true));
                     break;
@@ -100,6 +101,20 @@ internal static class HfsPlusReader
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
         ValidateCatalogThreads(catalogNodes, catalogThreads);
+        var childCounts = new Dictionary<uint, uint>(folders.Count);
+        foreach (uint folderId in folders.Keys) childCounts.Add(folderId, 0);
+        foreach (CatalogNode node in catalogNodes.Values)
+            if (childCounts.TryGetValue(node.Parent, out uint childCount))
+                childCounts[node.Parent] = checked(childCount + 1);
+        foreach (var (folderId, folder) in folders)
+        {
+            uint childCount = childCounts[folderId];
+            if (folder.Valence != childCount)
+                throw new InvalidDataException(
+                    $"HFS Plus folder {folderId} has valence {folder.Valence}, but {childCount} catalog children.");
+            if (folderId != RootFolderId)
+                _ = FolderPath(folder.Parent, folders);
+        }
 
         var result = new List<MacFile>();
         foreach (var (key, data) in records)
@@ -233,6 +248,8 @@ internal static class HfsPlusReader
         uint previous = 0;
         uint finalLeaf = 0;
         var seen = new HashSet<uint>();
+        var keys = new HashSet<byte[]>(ByteArrayEqualityComparer.Instance);
+        byte[]? previousExtentKey = null;
         for (uint node = first; node != 0; node = U32(tree, checked((int)node * nodeSize)))
         {
             if (!seen.Add(node) || node >= totalNodes)
@@ -256,7 +273,18 @@ internal static class HfsPlusReader
                 if (keyLength < 6 || 2 + keyLength > end - begin)
                     throw new InvalidDataException($"An HFS Plus {name} B-tree key is invalid.");
                 int dataOffset = offset + 2 + keyLength;
-                yield return (tree.AsSpan(offset, 2 + keyLength).ToArray(),
+                byte[] key = tree.AsSpan(offset, 2 + keyLength).ToArray();
+                if (name == "extents-overflow")
+                {
+                    if (key.Length != 12 || keyLength != 10 || key[2] is not (0 or 0xFF))
+                        throw new InvalidDataException("An HFS Plus extents-overflow key is invalid.");
+                    if (previousExtentKey is not null && CompareExtentKeys(previousExtentKey, key) >= 0)
+                        throw new InvalidDataException("The HFS Plus extents-overflow keys are not strictly ordered.");
+                    previousExtentKey = key;
+                }
+                else if (!keys.Add(key))
+                    throw new InvalidDataException($"The HFS Plus {name} B-tree has a duplicate leaf key.");
+                yield return (key,
                     tree.AsSpan(dataOffset, start + end - dataOffset).ToArray());
                 readRecords++;
             }
@@ -349,8 +377,16 @@ internal static class HfsPlusReader
         return Encoding.BigEndianUnicode.GetString(key.Slice(8, 2 * length)).Normalize(NormalizationForm.FormC);
     }
 
+    private static int CompareExtentKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    {
+        int comparison = U32(left, 4).CompareTo(U32(right, 4));
+        if (comparison != 0) return comparison;
+        comparison = left[2].CompareTo(right[2]);
+        return comparison != 0 ? comparison : U32(left, 8).CompareTo(U32(right, 8));
+    }
+
     private static IReadOnlyList<string> FolderPath(uint parent,
-        Dictionary<uint, (uint Parent, string Name)> folders)
+        Dictionary<uint, (uint Parent, string Name, uint Valence)> folders)
     {
         var path = new List<string>();
         var seen = new HashSet<uint>();
@@ -367,6 +403,21 @@ internal static class HfsPlusReader
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
     private readonly record struct CatalogNode(uint Parent, string Name, bool IsFolder);
     private readonly record struct CatalogThread(uint Parent, string Name, bool IsFolder);
+    private sealed class ByteArrayEqualityComparer : IEqualityComparer<byte[]>
+    {
+        public static ByteArrayEqualityComparer Instance { get; } = new();
+
+        public bool Equals(byte[]? left, byte[]? right) =>
+            ReferenceEquals(left, right) || left is not null && right is not null && left.AsSpan().SequenceEqual(right);
+
+        public int GetHashCode(byte[] key)
+        {
+            var hash = new HashCode();
+            foreach (byte value in key) hash.Add(value);
+            return hash.ToHashCode();
+        }
+    }
+
     private static MacString LegacyName(string name)
     {
         try { return MacString.FromMacRoman(name); }

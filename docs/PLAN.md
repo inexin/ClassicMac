@@ -793,9 +793,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
-    info, dates and both forks (including overflow extents), validates B-tree roots, index graphs and sibling links,
+    info, dates and both forks (including overflow extents), validates B-tree roots, index graphs, sibling links and unique leaf keys,
     unique catalog
-    IDs and file/folder threads; an initial StuffIt v5 reader handles stored and RLE90 forks. Original-application
+    IDs, file/folder threads, folder valences and parent chains (including empty folders); an initial StuffIt v5 reader handles stored and RLE90 forks. Original-application
     interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),

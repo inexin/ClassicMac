@@ -800,10 +800,15 @@ that extent and return the embedded volume's entries, not the wrapper's placehol
 
 The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
 linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It checks that
-catalog IDs are unique and that each required file and folder thread points back to its record's parent and name. It
-resolves folder paths and reads both forks, Finder info and dates. It also reads data and resource fork overflow
+leaf-record keys are unique, catalog IDs are unique and each required file and folder thread points back to its
+record's parent and name. TN1150 requires leaf-record keys to be unique **[Doc]**. It
+checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
+nonroot folder, including empty folders. TN1150 defines valence as the count of file and folder records whose key
+parent ID is that folder's ID **[Doc]**. It then resolves file paths and reads both forks, Finder info and dates. It
+also reads data and resource fork overflow
 extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
-(which may exceed the blocks needed by its logical length). Unicode names are retained in `MacFile.MacPath`; the
+(which may exceed the blocks needed by its logical length). It checks extents-overflow keys are strictly ordered by
+file ID, fork type and start block, as TN1150 specifies **[Doc]**. Unicode names are retained in `MacFile.MacPath`; the
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, volume allocation ownership, hard-link/symlink
