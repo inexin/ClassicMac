@@ -424,7 +424,7 @@ internal static class HfsPlusReader
     {
         if (tree.Length < 512 || tree[8] != 1)
             throw new InvalidDataException($"The HFS Plus {name} tree has no B-tree header.");
-        if (U32(tree, 4) != 0 || U16(tree, 10) != 3)
+        if (U32(tree, 4) != 0 || tree[9] != 0 || U16(tree, 10) != 3)
             throw new InvalidDataException($"The HFS Plus {name} B-tree header node is invalid.");
         if (tree[14 + 36] != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree has an invalid tree type.");
@@ -446,10 +446,11 @@ internal static class HfsPlusReader
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
+        ValidateHeaderNodeRecordLayout(tree.AsSpan(0, nodeSize), nodeSize, name);
         if ((name is "catalog" or "attributes") && nodeSize < 4096)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is below the 4 KiB minimum.");
         uint totalNodes = U32(tree, 36);
-        if (totalNodes == 0 || totalNodes > tree.Length / nodeSize)
+        if (totalNodes == 0 || totalNodes != tree.Length / nodeSize)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node count is invalid.");
         uint first = U32(tree, 24);
         uint last = U32(tree, 28);
@@ -491,6 +492,7 @@ internal static class HfsPlusReader
             if (!seen.Add(node) || node >= totalNodes)
                 throw new InvalidDataException($"The HFS Plus {name} B-tree leaf chain is invalid.");
             int start = checked((int)node * nodeSize);
+            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsSpan(start, nodeSize), nodeSize, name);
             if (tree[start + 8] != 0xFF || tree[start + 9] != 1)
                 throw new InvalidDataException($"An HFS Plus {name} B-tree linked leaf has an invalid type.");
             if (U32(tree, start + 4) != previous)
@@ -551,6 +553,23 @@ internal static class HfsPlusReader
         ValidateNodeMap(tree, nodeSize, totalNodes, indexedNodes);
     }
 
+    private static void ValidateHeaderNodeRecordLayout(ReadOnlySpan<byte> headerNode, int nodeSize, string name)
+    {
+        int freeSpaceOffset = nodeSize - 8;
+        if (U16(headerNode, nodeSize - 2) != 14 ||
+            U16(headerNode, nodeSize - 4) != 14 + 106 ||
+            U16(headerNode, nodeSize - 6) != 14 + 106 + 128 ||
+            U16(headerNode, freeSpaceOffset) != freeSpaceOffset)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree header node has an invalid record layout.");
+    }
+
+    private static void RequireFirstRecordStartsAtNodeDescriptorEnd(ReadOnlySpan<byte> node, int nodeSize,
+        string name)
+    {
+        if (U16(node, 10) != 0 && U16(node, nodeSize - 2) != 14)
+            throw new InvalidDataException($"An HFS Plus {name} B-tree record does not start after its node descriptor.");
+    }
+
     private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
         int nodeSize, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog,
         bool caseFoldingCatalog)
@@ -575,6 +594,7 @@ internal static class HfsPlusReader
             if (nodeNumber >= totalNodes || !visitedNodes.Add(nodeNumber))
                 throw new InvalidDataException($"The HFS Plus {name} B-tree index graph is cyclic or out of range.");
             int start = checked((int)nodeNumber * nodeSize);
+            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsSpan(start, nodeSize), nodeSize, name);
             if (expectedHeight == 1)
             {
                 if (tree[start + 8] != 0xFF || tree[start + 9] != 1)
@@ -746,9 +766,11 @@ internal static class HfsPlusReader
                 throw new InvalidDataException("The HFS Plus B-tree map-node chain is cyclic or invalid.");
 
             int offset = checked((int)nextMapNode * nodeSize);
+            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsSpan(offset, nodeSize), nodeSize,
+                "node map");
             if (tree[offset + 8] != 2 || tree[offset + 9] != 0 || U16(tree, offset + 10) != 1 ||
-                U32(tree, offset + 4) != 0)
-                throw new InvalidDataException("An HFS Plus B-tree map node has an invalid descriptor.");
+                U32(tree, offset + 4) != 0 || U16(tree, offset + nodeSize - 4) != nodeSize - 6)
+                throw new InvalidDataException("An HFS Plus B-tree map node has an invalid descriptor or record layout.");
             mapNodes.Add(nextMapNode);
             capacity += mapNodeCapacity;
             nextMapNode = U32(tree, offset);

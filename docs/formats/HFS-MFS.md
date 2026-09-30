@@ -806,9 +806,11 @@ minimum **[Doc]**, and that their key-layout attributes use 16-bit key lengths, 
 the catalog and attributes trees and fixed-length index keys in the extents tree **[Doc]** TN1150. The B-tree map is one
 most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader follows that
-chain, checks map-node descriptors and bitmap coverage, requires the header, index, leaf and map nodes to be marked
+chain, checks map-node descriptors, record boundaries and bitmap coverage, requires the header, index, leaf and map nodes to be marked
 allocated, and verifies `freeNodes` against the complete bitmap. It checks that
-catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, leaf-record keys are
+catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
+`totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user
+record and remaining map record, and leaf-record keys are
 unique, catalog IDs are unique and each required file and folder thread points back to its record's parent and name.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
@@ -843,8 +845,8 @@ and their nonzero BSD `special` link reference; the reference resolves to `iNode
 `\0\0\0\0HFS+ Private Data` directory **[Doc]** TN1150. The link's visible path is kept while the indirect node's
 forks and file metadata are used; the private directory subtree is omitted from the file list. The reference is exposed
 as `MacFile.HardLinkReference`. A nonzero link reference without a matching node is retained with its catalog forks and
-reported as `hfs.plus-hardlink-target-missing`. The current reader does not yet validate every B-tree index/map
-invariant. As TN1150 permits, allocation blocks marked used but not described by known
+reported as `hfs.plus-hardlink-target-missing`. Additional B-tree invariants remain. As TN1150 permits, allocation
+blocks marked used but not described by known
 fork extents are not rejected; the reader checks that every extent it recognizes is marked allocated.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024

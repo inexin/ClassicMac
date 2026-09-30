@@ -8,6 +8,29 @@ namespace ClassicMac.Files.Tests;
 public sealed class StuffItFeatureTests
 {
     [Fact]
+    public void LegacyStuffItVersion2StoredFilePreservesBothForksAndFinderMetadata()
+    {
+        byte[] image = StuffItFixture.BuildLegacyV2File("Read Me", "data fork"u8.ToArray(),
+            "resource fork"u8.ToArray());
+        var diagnostics = new List<Diagnostic>();
+        ForkData input = ForkData.FromBytes(image);
+
+        Assert.True(StuffItReader.Instance.CanRead(input));
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(input,
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Read Me", file.MacPath);
+        Assert.Equal("data fork"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("TEXT"), file.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("ttxt"), file.FinderInfo.Creator);
+        Assert.Equal((FinderFlags)0x4000, file.FinderInfo.Flags);
+        Assert.Equal(new MacDate(2_500_000_000), file.Created);
+        Assert.Equal(new MacDate(2_600_000_000), file.Modified);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void StoredStuffItV5FilePreservesBothForksAndFinderMetadata()
     {
         byte[] image = StuffItFixture.BuildFile("Read Me", "data fork"u8.ToArray(), "resource fork"u8.ToArray());
@@ -739,6 +762,50 @@ public sealed class StuffItFeatureTests
             }
             encodedData.CopyTo(image, dataOffset);
             U32(image, 84, checked((uint)image.Length));
+            return image;
+        }
+
+        public static byte[] BuildLegacyV2File(string name, byte[] data, byte[] resource)
+        {
+            const int archiveHeaderLength = 22;
+            const int memberHeaderLength = 112;
+            byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+            if (nameBytes.Length is 0 or > 31) throw new ArgumentOutOfRangeException(nameof(name));
+            int resourceOffset = archiveHeaderLength + memberHeaderLength;
+            int dataOffset = resourceOffset + resource.Length;
+            byte[] image = new byte[dataOffset + data.Length];
+            "SIT!"u8.CopyTo(image);
+            U16(image, 4, 1);
+            U32(image, 6, checked((uint)image.Length));
+            "rLau"u8.CopyTo(image.AsSpan(10));
+            image[14] = 2;
+            U32(image, 16, archiveHeaderLength);
+            U16(image, 20, 1);
+
+            Span<byte> member = image.AsSpan(archiveHeaderLength, memberHeaderLength);
+            member[0] = 0;
+            member[1] = 0;
+            member[2] = checked((byte)nameBytes.Length);
+            nameBytes.CopyTo(member[3..]);
+            U16(member, 34, Crc16Arc(member[..34]));
+            U16(member, 48, 0);
+            U32(member, 50, 0);
+            U32(member, 54, 0);
+            U32(member, 58, 0);
+            U32(member, 62, uint.MaxValue);
+            "TEXTttxt"u8.CopyTo(member[66..]);
+            U16(member, 74, 0x4000);
+            U32(member, 76, 2_500_000_000);
+            U32(member, 80, 2_600_000_000);
+            U32(member, 84, checked((uint)resource.Length));
+            U32(member, 88, checked((uint)data.Length));
+            U32(member, 92, checked((uint)resource.Length));
+            U32(member, 96, checked((uint)data.Length));
+            U16(member, 100, Crc16Arc(resource));
+            U16(member, 102, Crc16Arc(data));
+            U16(member, 110, Crc16Arc(member[..110]));
+            resource.CopyTo(image.AsSpan(resourceOffset));
+            data.CopyTo(image.AsSpan(dataOffset));
             return image;
         }
 
