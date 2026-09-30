@@ -13,6 +13,7 @@ internal static class HfsPlusReader
 {
     private const int HeaderOffset = 1024;
     private const int HeaderLength = 512;
+    private const uint RootParentId = 1;
     private const uint RootFolderId = 2;
     private const uint BadBlockFileId = 5;
 
@@ -88,6 +89,8 @@ internal static class HfsPlusReader
                 case 1:
                     if (data.Length != 88)
                         throw new InvalidDataException("An HFS Plus folder record must be exactly 88 bytes.");
+                    if ((U16(data, 2) & 0x0003) != 0)
+                        throw new InvalidDataException("An HFS Plus folder record sets file-only flags.");
                     uint id = U32(data, 8);
                     if (id < 16 && id != RootFolderId)
                         throw new InvalidDataException($"HFS Plus folder catalog ID {id} is reserved.");
@@ -120,6 +123,9 @@ internal static class HfsPlusReader
                     ushort threadNameLength = U16(data, 8);
                     if (threadNameLength > 255 || data.Length < 10 + 2 * threadNameLength)
                         throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
+                    if (!HfsPlusUnicodeNormalization.IsCanonical(data.AsSpan(10, threadNameLength * 2)))
+                        throw new InvalidDataException(
+                            "An HFS Plus catalog thread name is not canonically decomposed.");
                     uint threadId = U32(key, 2);
                     var thread = new CatalogThread(U32(data, 4),
                         Encoding.BigEndianUnicode.GetString(data, 10, threadNameLength * 2)
@@ -134,6 +140,8 @@ internal static class HfsPlusReader
         }
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
+        if (folders[RootFolderId].Parent != RootParentId)
+            throw new InvalidDataException("The HFS Plus root folder does not use the reserved root parent ID.");
         const uint catalogNodeIdsReused = 1u << 12;
         uint nextCatalogId = U32(header, 64);
         if (nextCatalogId < 16)
@@ -578,6 +586,9 @@ internal static class HfsPlusReader
                 if (name == "catalog")
                 {
                     ValidateCatalogKey(key);
+                    ReadOnlySpan<byte> recordData = tree.AsSpan(dataOffset, start + end - dataOffset);
+                    if (U16(key, 6) == 0 && recordData.Length >= 2 && U16(recordData, 0) is 1 or 2)
+                        throw new InvalidDataException("An HFS Plus file or folder catalog key has an empty name.");
                     if (caseSensitiveCatalog || caseFoldingCatalog)
                     {
                         if (previousCatalogKey is not null &&
@@ -991,6 +1002,8 @@ internal static class HfsPlusReader
         int nameLength = U16(key, 6);
         if (nameLength > 255 || key.Length != 8 + nameLength * 2)
             throw new InvalidDataException("An HFSX catalog key has an invalid name length.");
+        if (!HfsPlusUnicodeNormalization.IsCanonical(key.Slice(8, nameLength * 2)))
+            throw new InvalidDataException("An HFS Plus catalog name is not canonically decomposed.");
     }
 
     private static int CompareHfsXCatalogKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)

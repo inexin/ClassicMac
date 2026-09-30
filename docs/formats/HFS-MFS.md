@@ -829,6 +829,14 @@ extents maxima are defined by TN1150 **[Doc]**. File catalog IDs must be at leas
 at least 16 except for the root folder's ID 2 **[Doc]** [TN1150](https://developer.apple.com/library/archive/technotes/tn/tn1150.html);
 Apple's `CheckFile` and `CheckDirectory` enforce these bounds **[Code]** in
 [`CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
+Folder records must not set the file-locked or thread-exists flags **[Code]**; Apple's `CheckDirectory` rejects
+those file-only flags in the same verifier.
+The root folder's catalog key must use parent ID 1, `kHFSRootParentID` **[Doc]** TN1150. File and folder catalog keys
+must have nonempty names **[Doc]** TN1150. Catalog key names and thread names must be fully decomposed in canonical
+combining-mark order **[Doc]** TN1150. The
+reader validates this with fixed Unicode 3.2 canonical decomposition data, including algorithmic Hangul decomposition
+and TN1150's preserved ranges U+2000–U+2FFF, U+F900–U+FAFF and U+2F800–U+2FAFF; it does not depend on the host
+runtime's evolving normalization tables.
 Catalog IDs are unique and each required file and folder thread points back to its record's parent and name. `nextCatalogID`
 must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
@@ -995,6 +1003,9 @@ No rule in this document is fitted to data alone. Still open:
    uses its own disk and CD drivers rather than Apple's.
 2. That an HFSX volume fails to mount on Mac OS 9.0 with −57 is inferred from the code, not run (section 11).
 3. The Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (section 10).
+4. TN1150 says Mac OS 8.1–10.2 used Unicode 2.1 decompositions, while Mac OS X 10.3 and later use Unicode 3.2.
+   The volume does not record which version produced its names. The reader currently validates against 3.2; uncommon
+   characters whose decomposition changed between versions need compatibility coverage (section 11).
 
 Differences from the Mac that ClassicMac knowingly keeps (section 3.4): a partition's volume ends where the partition
 ends (`pmPartBlkCnt − pmLgDataStart` blocks, where the CD-ROM driver takes `pmPartBlkCnt` from the data start);

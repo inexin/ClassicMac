@@ -47,6 +47,23 @@ public sealed class HfsPlusFeatureTests
         Assert.Null(file.SymbolicLinkTarget);
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-free-blocks");
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-counts");
+    }
+
+    [Theory]
+    [InlineData(32)]
+    [InlineData(36)]
+    public void HfsPlusReportsWhenCatalogCountsDifferFromTheVolumeHeader(int countFieldOffset)
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + countFieldOffset), 2);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-counts" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
     }
 
     [Fact]
@@ -747,6 +764,40 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(0x0001)]
+    [InlineData(0x0002)]
+    public void HfsPlusFolderRecordsMustNotSetFileOnlyFlags(ushort folderFlags)
+    {
+        byte[] image = HfsPlusFixture.Build(catalogFolderFlags: folderFlags);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HfsPlusFileAndFolderRecordsMustHaveNonemptyNames(bool folder)
+    {
+        byte[] image = folder
+            ? HfsPlusFixture.Build(catalogFolderName: "")
+            : HfsPlusFixture.Build(fileName: "");
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Equal("An HFS Plus file or folder catalog key has an empty name.", exception.Message);
+    }
+
+    [Fact]
+    public void HfsPlusRootFolderMustUseTheReservedRootParentId()
+    {
+        byte[] image = HfsPlusFixture.Build(rootFolderParentId: 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusUnicodeNameIsPreservedInTheMacPath()
     {
@@ -755,6 +806,50 @@ public sealed class HfsPlusFeatureTests
         MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
 
         Assert.Equal("Documents:文件", file.MacPath);
+    }
+
+    [Theory]
+    [InlineData("caf\u00E9", false)]
+    [InlineData("cafe\u0301", true)]
+    [InlineData("\u00C5", false)]
+    [InlineData("\u2126", true)]
+    [InlineData("\uF900", true)]
+    [InlineData("\U0001F600", true)]
+    [InlineData("\uAC01", false)]
+    [InlineData("\u1100\u1161\u11A8", true)]
+    [InlineData("a\u0301\u0327", false)]
+    [InlineData("a\u0327\u0301", true)]
+    public void HfsPlusCatalogNamesMustUseCanonicalDecomposition(string fileName, bool valid)
+    {
+        byte[] image = HfsPlusFixture.Build(fileName);
+
+        if (!valid)
+        {
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+            return;
+        }
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Equal("Documents:" + fileName.Normalize(NormalizationForm.FormC), file.MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusCatalogThreadNamesMustUseCanonicalDecomposition()
+    {
+        byte[] image = HfsPlusFixture.Build("cafe\u0301", catalogFileThreadName: "caf\u00E9");
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsXCatalogNamesMustUseCanonicalDecomposition()
+    {
+        byte[] image = HfsPlusFixture.Build("caf\u00E9", hfsX: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -1704,7 +1799,9 @@ public sealed class HfsPlusFeatureTests
             bool includeStartupFile = false, bool badBlockExtent = false,
             bool badBlockOverlapsFileExtent = false, bool extraCatalogForkNode = false,
             bool catalogFolderDataHasTrailingByte = false, bool catalogFileDataHasTrailingByte = false,
-            int? catalogThreadDataLength = null, uint? catalogFolderId = null, uint? catalogFileId = null)
+            int? catalogThreadDataLength = null, uint? catalogFolderId = null, uint? catalogFileId = null,
+            ushort catalogFolderFlags = 0, string? catalogFileThreadName = null,
+            string catalogFolderName = "Documents", uint rootFolderParentId = 1)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -1744,6 +1841,7 @@ public sealed class HfsPlusFeatureTests
             U32(root, 8, 2);
             byte[] folder = new byte[88];
             U16(folder, 0, 1);
+            U16(folder, 2, catalogFolderFlags);
             U32(folder, 4, documentsFolderValence);
             uint folderId = catalogFolderId ?? 16;
             U32(folder, 8, folderId);
@@ -1791,20 +1889,21 @@ public sealed class HfsPlusFeatureTests
 
             var records = new List<byte[]>
             {
-                Record(1, "Volume", root),
-                Record(2, "", Thread(1, "Volume", 3)),
-                Record(2, "Documents", folder),
+                Record(rootFolderParentId, "Volume", root),
+                Record(2, "", Thread(rootFolderParentId, "Volume", 3)),
+                Record(2, catalogFolderName, folder),
             };
             if (!omitFolderThread)
             {
-                records.Add(Record(folderId, "", Thread(2, "Documents", 3)));
-                if (duplicateFolderThread) records.Add(Record(folderId, "", Thread(2, "Documents", 3)));
+                records.Add(Record(folderId, "", Thread(2, catalogFolderName, 3)));
+                if (duplicateFolderThread) records.Add(Record(folderId, "", Thread(2, catalogFolderName, 3)));
             }
             records.Add(Record(folderId, fileName, file));
             if (!omitFileThread)
             {
                 byte[] fileThread = Record(fileId, nonEmptyFileThreadKey ? "Thread" : "",
-                    Thread(invalidFileThread ? 2u : folderId, invalidFileThread ? "Other" : fileName,
+                    Thread(invalidFileThread ? 2u : folderId,
+                        invalidFileThread ? "Other" : catalogFileThreadName ?? fileName,
                         wrongFileThreadKind ? (ushort)3 : (ushort)4));
                 if (fileId < 16) records.Insert(3, fileThread);
                 else records.Add(fileThread);

@@ -12,9 +12,10 @@ ClassicMac is MIT-licensed. Code or data taken from other projects is listed her
 
 ## Unicode 3.2 data
 
-`src/ClassicMac.Files/Hfs/HfsPlusUnicodeComparison.cs` contains simple lowercase mappings and default-ignorable
-ranges derived from `UnicodeData-3.2.0.txt` and `DerivedCoreProperties-3.2.0.txt`, used to implement TN1150's
-`FastUnicodeCompare` behavior. The source data is available from the
+`src/ClassicMac.Files/Hfs/HfsPlusUnicodeComparison.cs` and `HfsPlusUnicodeNormalization.Data.cs` contain simple
+lowercase mappings, default-ignorable ranges, canonical decomposition mappings and combining classes derived from
+`UnicodeData-3.2.0.txt` and `DerivedCoreProperties-3.2.0.txt`, used to implement TN1150's `FastUnicodeCompare` and
+name-normalization rules. The source data is available from the
 [Unicode 3.2 archive](https://www.unicode.org/Public/3.2-Update/).
 
 ```

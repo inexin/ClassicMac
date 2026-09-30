@@ -802,8 +802,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     attribute keys and unique leaf keys,
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
-    reserved catalog ID rules, unique catalog IDs and next-ID consistency, file/folder threads, folder valences and
-    parent chains (including empty folders).
+    reserved catalog ID rules, folder flag validity, nonempty and canonically decomposed catalog names (Unicode 3.2;
+    legacy 2.1 differences remain), root-parent ID, unique catalog IDs and next-ID consistency, file/folder threads,
+    folder valences and parent chains (including empty folders).
     The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
     forks; these layouts currently have hand-built fixtures only. The StuffIt v5 reader handles stored, RLE90,
     Compress/LZW, Huffman, LZAH (method 5), MW (method 8),
