@@ -23,7 +23,8 @@ resource bytes, which precede data-fork bytes. These member details are **[Fitte
 parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet been checked against a corpus created by
 the original StuffIt application.
 
-ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH) and 8 (MW) for either fork. RLE90 emits ordinary bytes as
+ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH), 8 (MW), and
+13 (LZ + Huffman) for either fork. RLE90 emits ordinary bytes as
 literals; `$90 00` emits a literal `$90`; `$90 n` for nonzero `n` repeats the previously decoded byte until the run has
 `n` copies **[Fitted]**. Truncated runs, runs without a prior byte, output-length mismatches and extents outside the
 archive are rejected. Per-fork CRC mismatches are reported as errors while retaining the decoded file. Encrypted
@@ -63,5 +64,12 @@ with a fresh nine-bit dictionary **[Fitted]** against
 vectors. Tests cover phrase reconstruction, group reset, width growth and invalid/truncated input. These vectors do
 not establish compatibility with files produced by the original StuffIt application.
 
-The v1–4 record layout, methods 13, 14 and 15, archive-level comments, complete folder metadata and
+Method 13 reads its control and Huffman-coded symbols least-significant-bit first. It supports preset code tables
+and dynamically described literal/length and distance tables, followed by LZ references. Its table data is
+transcribed from compcol's MIT-licensed method-13 tables (see `THIRD-PARTY-NOTICES.md`); the decoder is an independent
+implementation. The CC0 StuffIt Deluxe 4.5 corpus vectors cover preset tables, dynamic tables, both forks, and exact
+decoded bytes or CRC-16 checks. Dynamic tables with aliased code alphabets are represented in the current real-world
+fixtures; other valid dynamic table forms still need broader interoperability coverage.
+
+The v1–4 record layout, methods 14 and 15, archive-level comments, complete folder metadata and
 verification against original-application archives remain unimplemented. See Phase 10 in [the project plan](../PLAN.md).

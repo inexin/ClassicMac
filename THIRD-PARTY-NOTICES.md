@@ -94,6 +94,38 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   Copy's codec, which follows the authors' freely distributed `lzhuf.c`. The authors placed the program in the public
   domain; they are credited here for the algorithm and tables.
 
+## StuffIt method-13 tables
+
+The interoperability table values in `src/ClassicMac.Files/Archives/StuffItMethod13Tables.cs` are transcribed from
+[KarpelesLab/compcol](https://github.com/KarpelesLab/compcol), `src/sit13/tables.rs`. The decoder implementation is
+independent. The table data is covered by the upstream MIT license:
+
+```
+The MIT License (MIT)
+
+Copyright (c) 2026 Karpeles Lab Inc.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+documentation files (the "Software"), to deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
+persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the
+Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+## StuffIt method-13 test fixtures
+
+`tests/ClassicMac.Files.Tests/TestData/StuffItMethod13/` contains small fork streams and expected output extracted from
+the StuffIt Deluxe 4.5 sample archive in [ssokolow/stuffit-test-files](https://github.com/ssokolow/stuffit-test-files).
+The corpus author released the archive and contents under CC0; see the fixture README for provenance and the upstream
+license.
+
 ## Executor (QuickDraw.Pict)
 
 QuickDraw.Pict follows Apple's *Inside Macintosh: Imaging With QuickDraw* (Appendix A, Picture Opcodes) and Apple

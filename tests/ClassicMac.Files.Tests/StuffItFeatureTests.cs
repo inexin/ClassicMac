@@ -89,6 +89,70 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void StuffItMethod13RejectsAnIllegalControlByteInsteadOfBeingTreatedAsUnsupported()
+    {
+        byte[] image = StuffItFixture.BuildFile("Malformed LZ+Huffman", [0], [], dataMethod: 13,
+            encodedData: [0x60]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItMethod13DecodesARealStuffIt45DataFork()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod13");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "DataFork.bin"));
+        byte[] expected = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.jpg"));
+        byte[] image = StuffItFixture.BuildFile("testfile.jpg", expected, [], dataMethod: 13,
+            encodedData: encoded);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("Preset1ResourceFork.bin", 332, 0xF0F8)]
+    [InlineData("DynamicResourceFork.bin", 9134, 0xB07B)]
+    public void StuffItMethod13DecodesRealStuffIt45ForksAndMatchesTheirStoredChecksums(
+        string fixtureName, int expectedLength, ushort expectedCrc)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod13");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName));
+        byte[] image = StuffItFixture.BuildFile("real method 13 fork", new byte[expectedLength], [],
+            dataMethod: 13, encodedData: encoded, dataCrcOverride: expectedCrc);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal(expectedLength, file.DataFork.Length);
+        Assert.Equal(expectedCrc, StuffItFixture.Crc16Arc(file.DataFork.ToArray()));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void StuffItMethod13DecodesAResourceFork()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod13");
+        byte[] encoded = File.ReadAllBytes(Path.Combine(fixtureDirectory, "Preset1ResourceFork.bin"));
+        byte[] image = StuffItFixture.BuildFile("real resource fork", [], new byte[332],
+            resourceMethod: 13, encodedResource: encoded, resourceCrcOverride: 0xF0F8);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal(332, file.ResourceFork.Length);
+        Assert.Equal((ushort)0xF0F8, StuffItFixture.Crc16Arc(file.ResourceFork.ToArray()));
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void StuffItCompressMethodDecodesLzwKwKwKCaseInBothForks()
     {
         byte[] expected = "ABABABA"u8.ToArray();
@@ -439,7 +503,8 @@ public sealed class StuffItFeatureTests
         private const uint ModifySeconds = 2_600_000_000;
 
         public static byte[] BuildFile(string name, byte[] data, byte[] resource, bool encrypted = false,
-            byte dataMethod = 0, byte[]? encodedData = null, byte resourceMethod = 0, byte[]? encodedResource = null)
+            byte dataMethod = 0, byte[]? encodedData = null, byte resourceMethod = 0, byte[]? encodedResource = null,
+            ushort? dataCrcOverride = null, ushort? resourceCrcOverride = null)
         {
             encodedData ??= data;
             encodedResource ??= resource;
@@ -461,7 +526,7 @@ public sealed class StuffItFeatureTests
             U16(member, 30, checked((ushort)nameBytes.Length));
             U32(member, 34, checked((uint)data.Length));
             U32(member, 38, checked((uint)encodedData.Length));
-            U16(member, 42, Crc16Arc(data));
+            U16(member, 42, dataCrcOverride ?? Crc16Arc(data));
             member[46] = dataMethod;
             nameBytes.CopyTo(member[48..]);
             U16(member, 32, HeaderCrc(member));
@@ -475,7 +540,7 @@ public sealed class StuffItFeatureTests
             {
                 U32(image.AsSpan(forksAt), 0, checked((uint)resource.Length));
                 U32(image.AsSpan(forksAt), 4, checked((uint)encodedResource.Length));
-                U16(image.AsSpan(forksAt), 8, Crc16Arc(resource));
+                U16(image.AsSpan(forksAt), 8, resourceCrcOverride ?? Crc16Arc(resource));
                 image[forksAt + 12] = resourceMethod;
                 encodedResource.CopyTo(image.AsSpan(forksAt + resourceInfoLength, encodedResource.Length));
             }
@@ -778,7 +843,7 @@ public sealed class StuffItFeatureTests
             return Crc16Arc(copy);
         }
 
-        private static ushort Crc16Arc(ReadOnlySpan<byte> bytes)
+        public static ushort Crc16Arc(ReadOnlySpan<byte> bytes)
         {
             ushort crc = 0;
             foreach (byte value in bytes)

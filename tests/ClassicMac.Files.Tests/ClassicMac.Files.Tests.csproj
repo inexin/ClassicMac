@@ -20,4 +20,8 @@
   <ItemGroup>
     <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Update="TestData\StuffItMethod13\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
