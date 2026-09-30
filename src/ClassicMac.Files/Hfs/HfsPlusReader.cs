@@ -155,7 +155,7 @@ internal static class HfsPlusReader
         }
         ValidateAllocationExtents(allocationExtents);
         if (allocationBitmap is not null)
-            ValidateAllocationBitmap(allocationBitmap, totalBlocks, allocationExtents);
+            ValidateAllocationBitmap(allocationBitmap, totalBlocks, blockSize, allocationExtents);
         uint expectedFiles = U32(header, 32);
         uint expectedFolders = U32(header, 36);
         if (result.Count != expectedFiles || folders.Count - 1 != expectedFolders)
@@ -175,27 +175,35 @@ internal static class HfsPlusReader
                 throw new InvalidDataException("HFS Plus forks claim overlapping allocation blocks.");
     }
 
-    private static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks,
+    private static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks, uint blockSize,
         List<(uint Start, uint End)> extents)
     {
         ulong requiredBytes = ((ulong)totalBlocks + 7) / 8;
         if ((ulong)bitmap.Length < requiredBytes)
             throw new InvalidDataException("The HFS Plus allocation file is too short for the volume.");
 
+        uint firstAreaEnd = checked((uint)Math.Min(totalBlocks, (1536UL + blockSize - 1) / blockSize));
+        ulong volumeBytes = (ulong)totalBlocks * blockSize;
+        uint lastAreaStart = checked((uint)((volumeBytes > 1024 ? volumeBytes - 1024 : 0) / blockSize));
+        RequireAllocationRange(bitmap, 0, firstAreaEnd);
+        RequireAllocationRange(bitmap, lastAreaStart, totalBlocks);
         foreach (var (start, end) in extents)
+            RequireAllocationRange(bitmap, start, end);
+    }
+
+    private static void RequireAllocationRange(byte[] bitmap, uint start, uint end)
+    {
+        uint block = start;
+        while (block < end)
         {
-            uint block = start;
-            while (block < end)
-            {
-                uint blockInByte = block & 7;
-                uint count = Math.Min(end - block, 8 - blockInByte);
-                int lastBit = checked((int)(blockInByte + count - 1));
-                int mask = (0xFF >> checked((int)blockInByte)) & (0xFF << (7 - lastBit));
-                int byteIndex = checked((int)(block >> 3));
-                if ((bitmap[byteIndex] & mask) != mask)
-                    throw new InvalidDataException("An HFS Plus fork extent is marked free in the allocation file.");
-                block += count;
-            }
+            uint blockInByte = block & 7;
+            uint count = Math.Min(end - block, 8 - blockInByte);
+            int lastBit = checked((int)(blockInByte + count - 1));
+            int mask = (0xFF >> checked((int)blockInByte)) & (0xFF << (7 - lastBit));
+            int byteIndex = checked((int)(block >> 3));
+            if ((bitmap[byteIndex] & mask) != mask)
+                throw new InvalidDataException("An HFS Plus allocation block is marked free in the allocation file.");
+            block += count;
         }
     }
 

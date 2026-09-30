@@ -534,6 +534,18 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(0, 0x80)] // Allocation block 0 contains the first 1,536 reserved bytes.
+    [InlineData(1, 0x01)] // Allocation block 15 contains the final 1,024 bytes.
+    public void HfsPlusAllocationFileMustMarkReservedVolumeBlocks(int bitmapByte, byte mask)
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: true);
+        image[9 * 4096 + bitmapByte] &= unchecked((byte)~mask);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusOverflowTreeCannotRepeatAnExtentKey()
     {
@@ -987,8 +999,8 @@ public sealed class HfsPlusFeatureTests
             if (includeAllocationFile)
             {
                 Fork(image.AsSpan(1024 + 112, 80), 2, 9, 1);
-                image[9 * Block] = markDataForkAllocated ? (byte)0x3C : (byte)0x34;
-                image[9 * Block + 1] = 0x40; // Allocation block 9 is marked in the second bitmap byte.
+                image[9 * Block] = markDataForkAllocated ? (byte)0xFC : (byte)0xF4;
+                image[9 * Block + 1] = 0x41; // Blocks 9 and 15, including the final reserved block.
             }
             return image;
         }
