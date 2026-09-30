@@ -50,6 +50,8 @@ internal static class HfsPlusReader
         var records = LeafRecords(catalog, "catalog").ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name)>();
         var catalogIds = new HashSet<uint>();
+        var catalogNodes = new Dictionary<uint, CatalogNode>();
+        var catalogThreads = new Dictionary<uint, CatalogThread>();
         foreach (var (key, data) in records)
         {
             if (key.Length < 8 || data.Length < 2)
@@ -61,20 +63,35 @@ internal static class HfsPlusReader
                     uint id = U32(data, 8);
                     if (!catalogIds.Add(id))
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
-                    if (!folders.TryAdd(id, (U32(key, 2), Name(key))))
+                    uint parent = U32(key, 2);
+                    string name = Name(key);
+                    if (!folders.TryAdd(id, (parent, name)))
                         throw new InvalidDataException("Duplicate HFS Plus folder ID.");
+                    catalogNodes.Add(id, new CatalogNode(parent, name, IsFolder: true));
                     break;
                 case 2:
                     if (data.Length < 248) throw new InvalidDataException("An HFS Plus file record is truncated.");
-                    if (!catalogIds.Add(U32(data, 8)))
+                    uint fileId = U32(data, 8);
+                    if (!catalogIds.Add(fileId))
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
-                    _ = Name(key);
+                    if ((U16(data, 2) & 0x0002) == 0)
+                        throw new InvalidDataException("An HFS Plus file is missing its required thread flag.");
+                    catalogNodes.Add(fileId, new CatalogNode(U32(key, 2), Name(key), IsFolder: false));
                     break;
                 case 3 or 4:
+                    if (key.Length != 8 || U16(key, 0) != 6 || U16(key, 6) != 0)
+                        throw new InvalidDataException("An HFS Plus catalog thread key is invalid.");
                     if (data.Length < 10) throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
                     ushort threadNameLength = U16(data, 8);
                     if (threadNameLength > 255 || data.Length < 10 + 2 * threadNameLength)
                         throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
+                    uint threadId = U32(key, 2);
+                    var thread = new CatalogThread(U32(data, 4),
+                        Encoding.BigEndianUnicode.GetString(data, 10, threadNameLength * 2)
+                            .Normalize(NormalizationForm.FormC),
+                        IsFolder: U16(data, 0) == 3);
+                    if (!catalogThreads.TryAdd(threadId, thread))
+                        throw new InvalidDataException("Duplicate HFS Plus catalog thread ID.");
                     break;
                 default:
                     throw new InvalidDataException($"Unknown HFS Plus catalog record type {U16(data, 0)}.");
@@ -82,6 +99,7 @@ internal static class HfsPlusReader
         }
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
+        ValidateCatalogThreads(catalogNodes, catalogThreads);
 
         var result = new List<MacFile>();
         foreach (var (key, data) in records)
@@ -111,6 +129,21 @@ internal static class HfsPlusReader
                 $"The HFS Plus catalog has {result.Count} files and {folders.Count - 1} folders; " +
                 $"the volume header says {expectedFiles} and {expectedFolders}.");
         return result;
+    }
+
+    private static void ValidateCatalogThreads(Dictionary<uint, CatalogNode> nodes,
+        Dictionary<uint, CatalogThread> threads)
+    {
+        foreach (var (id, node) in nodes)
+        {
+            if (!threads.TryGetValue(id, out var thread))
+                throw new InvalidDataException($"The HFS Plus catalog node {id} has no thread record.");
+            if (thread.IsFolder != node.IsFolder || thread.Parent != node.Parent ||
+                !string.Equals(thread.Name, node.Name, StringComparison.Ordinal))
+                throw new InvalidDataException($"The HFS Plus catalog thread for node {id} is inconsistent.");
+        }
+        if (threads.Count != nodes.Count)
+            throw new InvalidDataException("The HFS Plus catalog has a thread for a missing node.");
     }
 
     private static ForkData ReadFork(ForkData image, ReadOnlySpan<byte> fork, uint blockSize, uint totalBlocks,
@@ -173,15 +206,29 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree node count is invalid.");
         uint first = U32(tree, 24);
         uint last = U32(tree, 28);
+        ushort depth = U16(tree, 14);
+        uint root = U32(tree, 16);
         uint expectedRecords = U32(tree, 20);
         if (expectedRecords == 0)
         {
-            if (first != 0 || last != 0)
-                throw new InvalidDataException($"The empty HFS Plus {name} B-tree has leaf links.");
+            if (depth != 0 || root != 0 || first != 0 || last != 0)
+                throw new InvalidDataException($"The empty HFS Plus {name} B-tree has root or leaf nodes.");
             yield break;
         }
-        if (first == 0 || last == 0 || first >= totalNodes || last >= totalNodes)
-            throw new InvalidDataException($"The HFS Plus {name} B-tree leaf endpoints are invalid.");
+        if (depth == 0 || root == 0 || root >= totalNodes || first == 0 || last == 0 ||
+            first >= totalNodes || last >= totalNodes)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree root or leaf endpoints are invalid.");
+        int rootOffset = checked((int)root * nodeSize);
+        if (depth == 1)
+        {
+            if (root != first || first != last || tree[rootOffset + 8] != 0xFF || tree[rootOffset + 9] != 1)
+                throw new InvalidDataException($"The single-leaf HFS Plus {name} B-tree has an invalid root.");
+        }
+        else if (tree[rootOffset + 8] != 0 || tree[rootOffset + 9] != depth)
+        {
+            throw new InvalidDataException($"The HFS Plus {name} B-tree root kind or height is invalid.");
+        }
+        HashSet<uint> indexedLeaves = ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth);
         uint readRecords = 0;
         uint previous = 0;
         uint finalLeaf = 0;
@@ -220,6 +267,77 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree leaf-record count is inconsistent.");
         if (finalLeaf != last)
             throw new InvalidDataException($"The HFS Plus {name} B-tree ends at leaf {finalLeaf}, not {last}.");
+        if (!seen.SetEquals(indexedLeaves))
+            throw new InvalidDataException($"The HFS Plus {name} B-tree index and leaf chain disagree.");
+    }
+
+    private static HashSet<uint> ValidateIndexGraph(byte[] tree, string name, int nodeSize, uint totalNodes,
+        uint root, ushort depth)
+    {
+        var visitedNodes = new HashSet<uint>();
+        var leafNodes = new HashSet<uint>();
+        var nodesByHeight = new Dictionary<ushort, List<uint>>();
+        int maxKeyLength = U16(tree, 34);
+
+        void AddAtHeight(uint nodeNumber, ushort height)
+        {
+            if (!nodesByHeight.TryGetValue(height, out var nodes)) nodesByHeight.Add(height, nodes = []);
+            nodes.Add(nodeNumber);
+        }
+
+        void Visit(uint nodeNumber, ushort expectedHeight)
+        {
+            if (nodeNumber >= totalNodes || !visitedNodes.Add(nodeNumber))
+                throw new InvalidDataException($"The HFS Plus {name} B-tree index graph is cyclic or out of range.");
+            int start = checked((int)nodeNumber * nodeSize);
+            if (expectedHeight == 1)
+            {
+                if (tree[start + 8] != 0xFF || tree[start + 9] != 1)
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree index points to a non-leaf node.");
+                AddAtHeight(nodeNumber, expectedHeight);
+                leafNodes.Add(nodeNumber);
+                return;
+            }
+
+            if (tree[start + 8] != 0 || tree[start + 9] != expectedHeight)
+                throw new InvalidDataException($"An HFS Plus {name} B-tree index node has an invalid kind or height.");
+            AddAtHeight(nodeNumber, expectedHeight);
+            int count = U16(tree, start + 10);
+            if (count < 2 || count > (nodeSize - 14) / 2)
+                throw new InvalidDataException($"An HFS Plus {name} B-tree index node has an invalid record count.");
+            int offsetTableStart = nodeSize - 2 * (count + 1);
+            for (int index = 0; index < count; index++)
+            {
+                int begin = U16(tree, start + nodeSize - 2 * (index + 1));
+                int end = U16(tree, start + nodeSize - 2 * (index + 2));
+                if (begin < 14 || end <= begin || end > offsetTableStart)
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree index record offset is invalid.");
+                int keyLength = U16(tree, start + begin);
+                if (keyLength < 6 || keyLength > maxKeyLength)
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree index key length is invalid.");
+                int storedKeyLength = name == "catalog" ? keyLength : maxKeyLength;
+                int childOffset = begin + 2 + storedKeyLength;
+                if ((childOffset & 1) != 0) childOffset++;
+                if (childOffset > end - 4)
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree index record is truncated.");
+                Visit(U32(tree, start + childOffset), checked((ushort)(expectedHeight - 1)));
+            }
+        }
+
+        Visit(root, depth);
+        foreach (var (height, nodes) in nodesByHeight)
+        {
+            for (int index = 0; index < nodes.Count; index++)
+            {
+                int start = checked((int)nodes[index] * nodeSize);
+                uint expectedForward = index + 1 < nodes.Count ? nodes[index + 1] : 0;
+                uint expectedBackward = index > 0 ? nodes[index - 1] : 0;
+                if (U32(tree, start) != expectedForward || U32(tree, start + 4) != expectedBackward)
+                    throw new InvalidDataException(
+                        $"The HFS Plus {name} B-tree height-{height} sibling links are invalid.");
+            }
+        }
+        return leafNodes;
     }
 
     private static string Name(ReadOnlySpan<byte> key)
@@ -247,6 +365,8 @@ internal static class HfsPlusReader
     }
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
+    private readonly record struct CatalogNode(uint Parent, string Name, bool IsFolder);
+    private readonly record struct CatalogThread(uint Parent, string Name, bool IsFolder);
     private static MacString LegacyName(string name)
     {
         try { return MacString.FromMacRoman(name); }

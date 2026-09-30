@@ -712,8 +712,7 @@ A thread record lets the File Manager find a folder (or file) from its CNID alon
 All of it **[Doc]** *Inside Macintosh: Files*. Every folder has a thread; a file has one only when something asked
 for it (a file ID reference) **[Doc]** *Inside Macintosh: Files*.
 
-ClassicMac skips thread records: the folder records already give each folder's parent and name. It rejects catalogs
-that reuse a CNID between file and folder records.
+ClassicMac skips thread records: the folder records already give each folder's parent and name.
 
 ### 7.5 Folder paths
 
@@ -799,15 +798,16 @@ in a classic HFS wrapper. The wrapper's MDB has `drEmbedSigWord` (+$7C) and `drE
 the embedded byte offset is `drAlBlSt × 512 + drEmbedExtent.start × drAlBlkSiz` **[Doc]** TN1150. Wrapper reads follow
 that extent and return the embedded volume's entries, not the wrapper's placeholder file.
 
-The reader walks the catalog B-tree's linked leaf nodes, checking the header's leaf endpoints, backward links, node
-range and record count; it resolves folder paths and reads both forks, Finder info and dates. It also reads data and
-resource fork overflow extents and requires the primary and overflow extents to account for each fork's declared
-allocation-block count (which may exceed the blocks needed by its logical length). Unicode
-names are retained in `MacFile.MacPath`; the
+The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
+linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It checks that
+catalog IDs are unique and that each required file and folder thread points back to its record's parent and name. It
+resolves folder paths and reads both forks, Finder info and dates. It also reads data and resource fork overflow
+extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
+(which may exceed the blocks needed by its logical length). Unicode names are retained in `MacFile.MacPath`; the
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
-reader does not yet validate every B-tree index/map invariant, volume allocation ownership, catalog thread
-consistency, hard-link/symlink semantics, or the full HFSX collation rules.
+reader does not yet validate every B-tree index/map invariant, volume allocation ownership, hard-link/symlink
+semantics, or the full HFSX collation rules.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,

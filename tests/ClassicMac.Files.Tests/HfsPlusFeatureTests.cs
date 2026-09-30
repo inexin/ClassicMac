@@ -184,6 +184,56 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusBTreeRootMustBeWithinTheNodeRange()
+    {
+        byte[] image = HfsPlusFixture.Build(catalogRootNode: 2);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusSingleLeafTreeMustDeclareThatLeafAsItsDepthOneRoot()
+    {
+        byte[] image = HfsPlusFixture.Build(catalogTreeDepth: 2);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusCatalogWithAnIndexRootAndTwoLeavesCanBeRead()
+    {
+        byte[] image = HfsPlusFixture.Build(multiLeafCatalog: true);
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void HfsPlusIndexChildMustReferenceAnExistingNode()
+    {
+        byte[] image = HfsPlusFixture.Build(multiLeafCatalog: true, invalidCatalogIndexChild: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void HfsPlusIndexNodeSiblingLinksMustMatchItsLevel(bool badForward, bool badBackward)
+    {
+        byte[] image = HfsPlusFixture.Build(multiLeafCatalog: true,
+            invalidCatalogIndexForwardLink: badForward, invalidCatalogIndexBackwardLink: badBackward);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void UnknownHfsPlusCatalogRecordKindIsRejectedInsteadOfSilentlyOmitted()
     {
         byte[] image = HfsPlusFixture.Build(unknownCatalogRecord: true);
@@ -201,6 +251,78 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusFileThreadMustAgreeWithItsCatalogParentAndName()
+    {
+        byte[] image = HfsPlusFixture.Build(invalidFileThread: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusFileMustHaveItsRequiredThreadRecord()
+    {
+        byte[] image = HfsPlusFixture.Build(omitFileThread: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusFileThreadFlagMustBeSet()
+    {
+        byte[] image = HfsPlusFixture.Build(missingFileThreadFlag: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusFolderMustHaveItsRequiredThreadRecord()
+    {
+        byte[] image = HfsPlusFixture.Build(omitFolderThread: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusThreadMustReferToAnExistingCatalogRecord()
+    {
+        byte[] image = HfsPlusFixture.Build(orphanFileThread: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusFileThreadMustHaveTheFileThreadRecordType()
+    {
+        byte[] image = HfsPlusFixture.Build(wrongFileThreadKind: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusThreadKeyMustHaveAnEmptyName()
+    {
+        byte[] image = HfsPlusFixture.Build(nonEmptyFileThreadKey: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusCatalogCannotContainTwoThreadsForOneNode()
+    {
+        byte[] image = HfsPlusFixture.Build(duplicateFolderThread: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     // A small HFS+ volume built from the structures in TN1150: 4 KiB allocation and B-tree nodes,
     // one catalog leaf, a root folder, nested folder, file and their threads.
     private static class HfsPlusFixture
@@ -210,7 +332,13 @@ public sealed class HfsPlusFeatureTests
         public static byte[] Build(string fileName = "Read Me", bool hfsX = false, bool fragmentedData = false,
             bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false,
             uint? dataBlockCount = null, uint? dataExtentBlockCount = null, uint? lastCatalogLeaf = null,
-            uint? catalogTotalNodes = null, bool duplicateCatalogId = false)
+            uint? catalogTotalNodes = null, bool duplicateCatalogId = false, bool invalidFileThread = false,
+            bool omitFileThread = false, bool omitFolderThread = false, bool orphanFileThread = false,
+            bool wrongFileThreadKind = false, bool missingFileThreadFlag = false,
+            bool nonEmptyFileThreadKey = false, bool duplicateFolderThread = false,
+            uint? catalogRootNode = null, ushort? catalogTreeDepth = null, bool multiLeafCatalog = false,
+            bool invalidCatalogIndexChild = false, bool invalidCatalogIndexForwardLink = false,
+            bool invalidCatalogIndexBackwardLink = false)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -221,7 +349,8 @@ public sealed class HfsPlusFeatureTests
             U32(volume, 40, Block);
             U32(volume, 44, fragmentedData ? 32u : 16u);
             U32(volume, 48, fragmentedData ? 19u : 10u);
-            Fork(volume.Slice(272, 80), 2 * Block, 2, 2);
+            Fork(volume.Slice(272, 80), (multiLeafCatalog ? 4 : 2) * Block, 2,
+                multiLeafCatalog ? 4u : 2u);
             if (fragmentedData) Fork(volume.Slice(192, 80), 2 * Block, 4, 2);
 
             byte[] root = new byte[88];
@@ -234,7 +363,7 @@ public sealed class HfsPlusFeatureTests
             U32(folder, 8, 16);
             byte[] file = new byte[248];
             U16(file, 0, 2);
-            U16(file, 2, 2); // file thread exists
+            U16(file, 2, missingFileThreadFlag ? (ushort)0 : (ushort)2); // file thread exists
             U32(file, 8, duplicateCatalogId ? 16u : 17u);
             U32(file, 12, 2_500_000_000);
             U32(file, 16, 2_600_000_000);
@@ -257,7 +386,7 @@ public sealed class HfsPlusFeatureTests
             else
             {
                 uint dataBlocks = dataExtentBlockCount ?? 1;
-                uint dataStart = invalidDataExtent ? 16u : 4u;
+                uint dataStart = invalidDataExtent ? 16u : multiLeafCatalog ? 6u : 4u;
                 Fork(file.AsSpan(88, 80), "HFS Plus data"u8.Length, dataStart, dataBlocks);
                 if (dataBlockCount is { } count) U32(file.AsSpan(88), 12, count);
                 uint resourceStart = invalidDataExtent ? 5u : dataStart + dataBlocks;
@@ -267,43 +396,66 @@ public sealed class HfsPlusFeatureTests
                 "Resource fork"u8.CopyTo(image.AsSpan((int)resourceStart * Block));
             }
 
-            byte[] leaf = image.AsSpan(3 * Block, Block).ToArray();
-            if (cyclicCatalog) U32(leaf, 0, 1);
-            leaf[8] = 0xFF;
-            leaf[9] = 1;
-            var records = new[]
+            var records = new List<byte[]>
             {
                 Record(1, "Volume", root),
                 Record(2, "", Thread(1, "Volume", 3)),
                 Record(2, "Documents", folder),
-                Record(16, "", Thread(2, "Documents", 3)),
-                Record(16, fileName, file),
-                Record(17, "", Thread(16, fileName, 4)),
             };
-            if (unknownCatalogRecord) U16(records[4], 0, 0x1234);
-            U16(leaf, 10, (ushort)records.Length);
-            int at = 14;
-            for (int index = 0; index < records.Length; index++)
+            if (!omitFolderThread)
             {
-                U16(leaf, Block - 2 * (index + 1), (ushort)at);
-                records[index].CopyTo(leaf, at);
-                at += records[index].Length;
+                records.Add(Record(16, "", Thread(2, "Documents", 3)));
+                if (duplicateFolderThread) records.Add(Record(16, "", Thread(2, "Documents", 3)));
             }
-            U16(leaf, Block - 2 * (records.Length + 1), (ushort)at);
-            leaf.CopyTo(image, 3 * Block);
+            records.Add(Record(16, fileName, file));
+            if (!omitFileThread)
+                records.Add(Record(duplicateCatalogId ? 16u : 17u, nonEmptyFileThreadKey ? "Thread" : "",
+                    Thread(invalidFileThread ? 2u : 16u, invalidFileThread ? "Other" : fileName,
+                        wrongFileThreadKind ? (ushort)3 : (ushort)4)));
+            if (orphanFileThread) records.Add(Record(42, "", Thread(16, "Missing", 4)));
+            if (unknownCatalogRecord) U16(records[4], 0, 0x1234);
+            if (multiLeafCatalog)
+            {
+                int split = records.Count / 2;
+                WriteBTreeNode(image.AsSpan(3 * Block, Block), 0, 2,
+                    invalidCatalogIndexForwardLink ? 1u : 0u,
+                    invalidCatalogIndexBackwardLink ? 1u : 0u,
+                    [IndexRecord(records[0], invalidCatalogIndexChild ? 4u : 2u), IndexRecord(records[split], 3)]);
+                WriteBTreeNode(image.AsSpan(4 * Block, Block), 0xFF, 1, 3, 0,
+                    records.Take(split).ToArray());
+                WriteBTreeNode(image.AsSpan(5 * Block, Block), 0xFF, 1, 0, 2,
+                    records.Skip(split).ToArray());
+            }
+            else
+            {
+                byte[] leaf = image.AsSpan(3 * Block, Block).ToArray();
+                if (cyclicCatalog) U32(leaf, 0, 1);
+                leaf[8] = 0xFF;
+                leaf[9] = 1;
+                U16(leaf, 10, (ushort)records.Count);
+                int at = 14;
+                for (int index = 0; index < records.Count; index++)
+                {
+                    U16(leaf, Block - 2 * (index + 1), (ushort)at);
+                    records[index].CopyTo(leaf, at);
+                    at += records[index].Length;
+                }
+                U16(leaf, Block - 2 * (records.Count + 1), (ushort)at);
+                leaf.CopyTo(image, 3 * Block);
+            }
 
             Span<byte> header = image.AsSpan(2 * Block, Block);
             header[8] = 1;
             U16(header, 10, 3);
-            U16(header, 14, 1); // depth
-            U32(header, 16, 1); // root node
-            U32(header, 20, (uint)records.Length);
-            U32(header, 24, 1); // first leaf
-            U32(header, 28, lastCatalogLeaf ?? 1); // last leaf
+            U16(header, 14, catalogTreeDepth ?? (multiLeafCatalog ? (ushort)2 : (ushort)1)); // depth
+            U32(header, 16, catalogRootNode ?? 1); // root node
+            U32(header, 20, (uint)records.Count);
+            U32(header, 24, multiLeafCatalog ? 2u : 1u); // first leaf
+            U32(header, 28, lastCatalogLeaf ?? (multiLeafCatalog ? 3u : 1u)); // last leaf
             U16(header, 32, Block);
             U16(header, 34, 516);
-            U32(header, 36, catalogTotalNodes ?? 2); // total nodes
-            header[14 + 106 + 128] = 0xC0; // both nodes in use
+            U32(header, 36, catalogTotalNodes ?? (multiLeafCatalog ? 4u : 2u)); // total nodes
+            header[14 + 106 + 128] = multiLeafCatalog ? (byte)0xF0 : (byte)0xC0; // allocated nodes
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
@@ -328,6 +480,36 @@ public sealed class HfsPlusFeatureTests
             U16(mdb, 0x7E, 4); // embedded volume starts at allocation block 4
             U16(mdb, 0x80, checked((ushort)(embedded.Length / 512)));
             return wrapper;
+        }
+
+        private static byte[] IndexRecord(byte[] catalogRecord, uint child)
+        {
+            int keyLength = BinaryPrimitives.ReadUInt16BigEndian(catalogRecord);
+            int keySize = keyLength + 2;
+            int padding = keySize & 1;
+            byte[] record = new byte[keySize + padding + 4];
+            catalogRecord.AsSpan(0, keySize).CopyTo(record);
+            U32(record, keySize + padding, child);
+            return record;
+        }
+
+        private static void WriteBTreeNode(Span<byte> node, byte kind, byte height, uint forward,
+            uint backward, IReadOnlyList<byte[]> records)
+        {
+            node.Clear();
+            U32(node, 0, forward);
+            U32(node, 4, backward);
+            node[8] = kind;
+            node[9] = height;
+            U16(node, 10, checked((ushort)records.Count));
+            int at = 14;
+            for (int index = 0; index < records.Count; index++)
+            {
+                U16(node, node.Length - 2 * (index + 1), checked((ushort)at));
+                records[index].CopyTo(node[at..]);
+                at += records[index].Length;
+            }
+            U16(node, node.Length - 2 * (records.Count + 1), checked((ushort)at));
         }
 
         private static void WriteExtentsTree(byte[] image)
