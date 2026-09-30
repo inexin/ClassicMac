@@ -6,9 +6,9 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Files.Archives;
 
-/// <summary>Reads DiskDoubler DDA2 archives with stored or Compact Pro compatible forks.</summary>
-/// <remarks>The DDA2 record layout is fitted against XADMaster's independent DiskDoubler parser. Other archive
-/// variants and DDA2 compression methods are reported as unsupported.</remarks>
+/// <summary>Reads legacy DDAR and DiskDoubler DDA2 archives.</summary>
+/// <remarks>The record layouts and compressed-method behavior are fitted against XADMaster's independent DiskDoubler parser.
+/// Other DDA2 compression methods are reported as unsupported.</remarks>
 public sealed class DiskDoublerReader : IContainerReader
 {
     private const int ArchiveHeaderLength = 62;
@@ -30,7 +30,10 @@ public sealed class DiskDoublerReader : IContainerReader
     public bool CanRead(ForkData input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return input.Length >= ArchiveHeaderLength && input.ReadPrefix(4).AsSpan().SequenceEqual("DDA2"u8);
+        if (input.Length < 4) return false;
+        byte[] signature = input.ReadPrefix(4);
+        return (input.Length >= ArchiveHeaderLength && signature.AsSpan().SequenceEqual("DDA2"u8)) ||
+            (input.Length >= 78 && signature.AsSpan().SequenceEqual("DDAR"u8));
     }
 
     /// <inheritdoc/>
@@ -42,8 +45,10 @@ public sealed class DiskDoublerReader : IContainerReader
             throw new InvalidDataException("The DiskDoubler archive exceeds the configured input-size limit.");
 
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
+        if (archive.AsSpan(0, 4).SequenceEqual("DDAR"u8))
+            return ReadLegacy(archive, context);
         if (archive.Length < ArchiveHeaderLength || !archive.AsSpan(0, 4).SequenceEqual("DDA2"u8))
-            throw new InvalidDataException("Not a DiskDoubler DDA2 archive.");
+            throw new InvalidDataException("Not a DiskDoubler archive.");
 
         var files = new List<MacFile>();
         var folders = new List<MacString>();
@@ -147,13 +152,29 @@ public sealed class DiskDoublerReader : IContainerReader
             ReadOnlySpan<byte> encodedData = archive.AsSpan(payloadOffset, compressedDataLength);
             ReadOnlySpan<byte> encodedResource = archive.AsSpan(payloadOffset + compressedDataLength,
                 compressedResourceLength);
-            byte[] data = DecodeFork(encodedData, dataLength, dataMethod);
-            byte[] resource = DecodeFork(encodedResource, resourceLength, resourceMethod);
+            byte[] data = DecodeFork(encodedData, dataLength, dataMethod,
+                archive[header + 18], archive[header + 48]);
+            byte[] resource = DecodeFork(encodedResource, resourceLength, resourceMethod,
+                archive[header + 18], archive[header + 48]);
             if (dataMethod == 8 && U16(archive, header + 44) != Crc16Ibm(data))
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                     $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
+            if (dataMethod == 1 && U16(archive, header + 44) != MacCompressChecksum(data, encodedData,
+                archive[header + 18], archive[header + 48]))
+                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
+                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
+            if (dataMethod == 4 && U16(archive, header + 44) != ByteSum(data))
+                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
+                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
             if (resourceMethod == 8 && U16(archive, header + 46) != Crc16Ibm(resource))
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
+                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
+            if (resourceMethod == 1 && U16(archive, header + 46) != MacCompressChecksum(resource, encodedResource,
+                archive[header + 18], archive[header + 48]))
+                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
+                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
+            if (resourceMethod == 4 && U16(archive, header + 46) != ByteSum(resource))
+                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                     $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
             files.Add(new MacFile
             {
@@ -174,11 +195,97 @@ public sealed class DiskDoublerReader : IContainerReader
         return files;
     }
 
-    private static bool IsSupportedMethod(int method) => method is 0 or 8;
+    private static IReadOnlyList<MacFile> ReadLegacy(byte[] archive, ContainerContext context)
+    {
+        const int archiveHeaderLength = 78;
+        const int recordHeaderLength = 124;
+        if (archive.Length < archiveHeaderLength)
+            throw new InvalidDataException("The DiskDoubler DDAR archive header is truncated.");
 
-    private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method)
+        var files = new List<MacFile>();
+        var folders = new List<MacString>();
+        long expandedBytes = 0;
+        int entryCount = 0;
+        int offset = archiveHeaderLength;
+        while (offset < archive.Length)
+        {
+            if (archive.Length - offset < 4)
+                throw new InvalidDataException("A DiskDoubler DDAR record marker is truncated.");
+            uint marker = U32(archive, offset);
+            if (marker == FileHeaderMagic)
+            {
+                const int redundantHeaderLength = 84;
+                if (archive.Length - offset < redundantHeaderLength)
+                    throw new InvalidDataException("A trailing DiskDoubler DDAR file header is truncated.");
+                offset += redundantHeaderLength;
+                continue;
+            }
+            if (marker != 0x44444152)
+                throw new InvalidDataException("A DiskDoubler DDAR record has an invalid signature.");
+            if (archive.Length - offset < recordHeaderLength)
+                throw new InvalidDataException("A DiskDoubler DDAR record header is truncated.");
+
+            entryCount++;
+            if (entryCount > context.Options.MaxVolumeEntries)
+                throw new InvalidDataException("The DiskDoubler DDAR archive exceeds the configured entry limit.");
+            int nameLength = Math.Min((int)archive[offset + 8], 63);
+            var name = new MacString(archive.AsSpan(offset + 9, nameLength));
+            bool isDirectory = archive[offset + 72] != 0;
+            bool isEndDirectory = archive[offset + 73] != 0;
+            int dataLength = ReadLength(U32(archive, offset + 74), "data fork");
+            int resourceLength = ReadLength(U32(archive, offset + 78), "resource fork");
+            long payloadLength = (long)dataLength + resourceLength;
+            int payloadOffset = checked(offset + recordHeaderLength);
+            if (payloadLength > archive.Length - payloadOffset)
+                throw new InvalidDataException("A DiskDoubler DDAR fork payload extends past the archive.");
+            int recordEnd = checked(payloadOffset + (int)payloadLength);
+
+            if (isEndDirectory)
+            {
+                if (folders.Count == 0)
+                    throw new InvalidDataException("A DiskDoubler DDAR directory end marker has no open folder.");
+                folders.RemoveAt(folders.Count - 1);
+            }
+            else if (isDirectory)
+            {
+                if (folders.Count >= context.Options.MaxNestingDepth)
+                    throw new InvalidDataException("The DiskDoubler DDAR folder nesting exceeds the configured depth limit.");
+                folders.Add(name);
+            }
+            else
+            {
+                expandedBytes = checked(expandedBytes + payloadLength);
+                if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+                    throw new InvalidDataException("DiskDoubler DDAR extraction exceeds the configured expanded-size limit.");
+                var type = new FourCC(archive.AsSpan(offset + 90, 4));
+                var creator = new FourCC(archive.AsSpan(offset + 94, 4));
+                var finderFlags = (FinderFlags)U16(archive, offset + 98);
+                uint creation = U32(archive, offset + 82);
+                uint modification = U32(archive, offset + 86);
+                files.Add(new MacFile
+                {
+                    Name = name,
+                    FolderPath = folders.ToArray(),
+                    FinderInfo = new FinderInfo { Type = type, Creator = creator, Flags = finderFlags },
+                    Created = Date(creation),
+                    Modified = Date(modification),
+                    DataFork = ForkData.FromBytes(archive.AsSpan(payloadOffset, dataLength).ToArray()),
+                    ResourceFork = ForkData.FromBytes(archive.AsSpan(payloadOffset + dataLength, resourceLength).ToArray()),
+                });
+            }
+            offset = recordEnd;
+        }
+        return files;
+    }
+
+    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 4 or 8;
+
+    private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method,
+        byte info1, byte info2)
     {
         if (method == 0) return input.ToArray();
+        if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);
+        if (method == 4) return DecodeHuffman(input, outputLength, info1, info2);
         if (input.Length < 16)
             throw new InvalidDataException("A DiskDoubler Compact Pro fork is missing its 16-byte method header.");
         int headerSum = 0;
@@ -188,6 +295,162 @@ public sealed class DiskDoublerReader : IContainerReader
         return headerSum == 0
             ? CompactProLzhDecoder.Decode(compressed, outputLength)
             : CompactProReader.DecodeRle8182(compressed, outputLength);
+    }
+
+    private static byte[] DecodeHuffman(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2)
+    {
+        // [Fitted] XADMaster uses the same tree-described Huffman stream for DDA2 method 4 and StuffIt's
+        // Huffman method. DDA2's Info1/Info2-selected XOR is applied to decoded bytes before its byte-sum check.
+        byte xor = info1 >= 0x2A && (info2 & 0x80) == 0 ? (byte)0x5A : (byte)0;
+        byte[] output = StuffItReader.DecodeHuffman(input, outputLength);
+        if (xor != 0)
+            for (int index = 0; index < output.Length; index++) output[index] ^= xor;
+        return output;
+    }
+
+    private static ushort ByteSum(ReadOnlySpan<byte> output)
+    {
+        uint sum = 0;
+        foreach (byte value in output) sum += value;
+        return (ushort)sum;
+    }
+
+    private static byte[] DecodeMacCompress(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2)
+    {
+        if (input.Length < 3)
+            throw new InvalidDataException("A DiskDoubler MacCompress fork is missing its three-byte header.");
+
+        // [Fitted] XADMaster's DiskDoubler parser identifies the optional 0x5A output transform
+        // from Info1/Info2 and treats the first three fork bytes as checksum contributions and flags.
+        byte xor = info1 >= 0x2A && (info2 & 0x80) == 0 ? (byte)0x5A : (byte)0;
+        int flags = input[2] ^ xor;
+        int maximumBits = flags & 0x1F;
+        bool blockMode = (flags & 0x80) != 0;
+        if ((flags & 0x60) != 0 || maximumBits is < 9 or > 16)
+            throw new InvalidDataException("A DiskDoubler MacCompress fork has invalid LZW flags.");
+
+        int maximumCodes = 1 << maximumBits;
+        var prefix = new int[maximumCodes];
+        Array.Fill(prefix, -1);
+        var suffix = new byte[maximumCodes];
+        for (int code = 0; code < 256; code++) suffix[code] = (byte)code;
+        var phrase = new byte[maximumCodes];
+        byte[] output = new byte[outputLength];
+        ReadOnlySpan<byte> compressed = input[3..];
+        long bitOffset = 0;
+        int codeBits = 9;
+        int nextCode = blockMode ? 257 : 256;
+        int previousCode = -1;
+        int written = 0;
+
+        while (written < output.Length && TryReadLzwCode(compressed, ref bitOffset, codeBits, out int code))
+        {
+            if (blockMode && code == 256)
+            {
+                AlignLzwCodeGroup(ref bitOffset, codeBits);
+                Array.Fill(prefix, -1, 257, maximumCodes - 257);
+                nextCode = 257;
+                codeBits = 9;
+                previousCode = -1;
+                continue;
+            }
+
+            if (previousCode < 0)
+            {
+                if (code > 255)
+                    throw new InvalidDataException("A DiskDoubler MacCompress fork starts with an invalid LZW code.");
+                WriteMacCompressByte((byte)code, output, ref written, xor);
+                previousCode = code;
+                continue;
+            }
+
+            if (code > nextCode || code >= maximumCodes)
+                throw new InvalidDataException("A DiskDoubler MacCompress fork contains an invalid LZW code.");
+            bool nextCodeCase = code == nextCode;
+            int currentCode = nextCodeCase ? previousCode : code;
+            int phraseLength = 0;
+            if (nextCodeCase) phrase[phraseLength++] = FirstByte(previousCode, prefix);
+            while (currentCode >= 256)
+            {
+                if (currentCode >= nextCode || prefix[currentCode] < 0 || phraseLength == phrase.Length)
+                    throw new InvalidDataException("A DiskDoubler MacCompress fork has an invalid LZW dictionary chain.");
+                phrase[phraseLength++] = suffix[currentCode];
+                currentCode = prefix[currentCode];
+            }
+            if (phraseLength == phrase.Length)
+                throw new InvalidDataException("A DiskDoubler MacCompress LZW phrase is too long.");
+            phrase[phraseLength++] = (byte)currentCode;
+            byte firstByte = (byte)currentCode;
+            if (phraseLength > output.Length - written)
+                throw new InvalidDataException("DiskDoubler MacCompress output exceeds its declared fork length.");
+            while (phraseLength > 0) WriteMacCompressByte(phrase[--phraseLength], output, ref written, xor);
+
+            if (nextCode < maximumCodes)
+            {
+                prefix[nextCode] = previousCode;
+                suffix[nextCode] = firstByte;
+                nextCode++;
+                if (codeBits < maximumBits && nextCode > (1 << codeBits) - 1)
+                {
+                    AlignLzwCodeGroup(ref bitOffset, codeBits);
+                    codeBits++;
+                }
+            }
+            previousCode = code;
+        }
+
+        if (written != output.Length)
+            throw new InvalidDataException(
+                $"DiskDoubler MacCompress produced {written} of {output.Length} declared bytes.");
+        return output;
+    }
+
+    private static void WriteMacCompressByte(byte value, byte[] output, ref int written, byte xor)
+    {
+        if (written == output.Length)
+            throw new InvalidDataException("DiskDoubler MacCompress output exceeds its declared fork length.");
+        output[written++] = (byte)(value ^ xor);
+    }
+
+    private static ushort MacCompressChecksum(ReadOnlySpan<byte> output, ReadOnlySpan<byte> input,
+        byte info1, byte info2)
+    {
+        byte xor = info1 >= 0x2A && (info2 & 0x80) == 0 ? (byte)0x5A : (byte)0;
+        uint sum = (uint)(input[0] ^ xor) + (uint)(input[1] ^ xor) + (uint)(input[2] ^ xor);
+        foreach (byte value in output) sum += value;
+        return (ushort)sum;
+    }
+
+    private static bool TryReadLzwCode(ReadOnlySpan<byte> input, ref long bitOffset, int codeBits, out int code)
+    {
+        if (bitOffset > (long)input.Length * 8 - codeBits)
+        {
+            code = 0;
+            return false;
+        }
+        code = 0;
+        for (int bit = 0; bit < codeBits; bit++)
+            if ((input[(int)((bitOffset + bit) >> 3)] & (1 << (int)((bitOffset + bit) & 7))) != 0)
+                code |= 1 << bit;
+        bitOffset += codeBits;
+        return true;
+    }
+
+    private static void AlignLzwCodeGroup(ref long bitOffset, int codeBits)
+    {
+        int groupSize = codeBits * 8;
+        bitOffset = checked((bitOffset + groupSize - 1) / groupSize * groupSize);
+    }
+
+    private static byte FirstByte(int code, int[] prefix)
+    {
+        while (code >= 256)
+        {
+            if (prefix[code] < 0)
+                throw new InvalidDataException("A DiskDoubler MacCompress fork has an invalid LZW dictionary chain.");
+            code = prefix[code];
+        }
+        return (byte)code;
     }
 
     private static ushort Crc16Ibm(ReadOnlySpan<byte> bytes)

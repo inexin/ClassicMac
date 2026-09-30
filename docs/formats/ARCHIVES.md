@@ -41,22 +41,31 @@ Huffman entries with both forks, Finder metadata and dates, CRC diagnostics, cor
 weak DES keys, encrypted stream alignment, unsupported methods, and truncated headers. Original-application verification
 remains.
 
-## DiskDoubler (DDA2 stored entries)
+## DiskDoubler (DDA2)
 
 The DDA2 archive header is 62 bytes. Records begin with `DDA2`, a record type, a 31-byte Pascal name field, a
 directory depth, and the record's total byte length. Directory records carry Mac creation and modification dates.
 File records contain a `0xABCD0054` file header with expanded and stored fork lengths, per-fork methods, dates, Finder
-type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths, method-0 stored forks and
-method-8 Compact Pro compatible forks. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed by RLE,
-otherwise the fork is RLE-only. Other compression and delta methods are diagnosed and skipped while parsing continues
-at the next bounded record. Method-8 forks are checked with CRC-16/IBM.
+type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths, method-0 stored forks,
+method-1 MacCompress LZW forks, method-4 Huffman forks and method-8 Compact Pro compatible forks. Method 1 uses a
+three-byte prefix, variable 9–16-bit LZW codes, block-mode dictionary resets and an optional fitted `0x5A` output
+transform selected by Info1 and Info2. Its 16-bit checksum includes the decoded fork and the decoded prefix bytes.
+Method 4 uses the tree-described Huffman stream also used by StuffIt and the same optional `0x5A` output transform;
+its 16-bit checksum is the decoded fork byte sum. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed
+by RLE, otherwise the fork is RLE-only. Other compression and delta methods are diagnosed and skipped while parsing
+continues at the next bounded record. Method-8 forks are checked with CRC-16/IBM.
+
+The older `DDAR` archive has a 78-byte archive header and fixed 124-byte entry headers, followed by stored data and
+resource forks. Its directory and end-directory markers build folder paths; redundant standalone file headers found
+after records are skipped. These layouts are **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
-Tests use hand-built DDA2 records to check stored and method-8 fork bytes, Finder metadata, dates, nested paths,
-unsupported-method recovery, checksum mismatch reporting, truncation, invalid folder depth, and entry limits. DDA2
-archive-header and method-0 fork checksums are not verified. Legacy `DDAR` archives, standalone compressed files, and
-DDA2 compression methods other than 0 and 8 remain unsupported; original-application interoperability remains
-unverified.
+Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, Huffman
+and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
+variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
+invalid folder depth, and entry limits. DDA2
+archive-header and method-0 fork checksums are not verified. Standalone compressed files and DDA2 compression methods
+other than 0, 1, 4 and 8 remain unsupported; original-application interoperability remains unverified.
 
 ## Compact Pro (RLE and LZH subset)
 

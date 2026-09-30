@@ -736,7 +736,7 @@ public sealed class StuffItReader : IContainerReader
         return (byte)code;
     }
 
-    private static byte[] DecodeHuffman(ReadOnlySpan<byte> input, int outputLength)
+    internal static byte[] DecodeHuffman(ReadOnlySpan<byte> input, int outputLength)
     {
         var reader = new MsbBitReader(input);
         int nodeCount = 0;
