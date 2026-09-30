@@ -118,8 +118,8 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14) ||
-                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or null))
+            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or 15) ||
+                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or 15 or null))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -136,8 +136,9 @@ public sealed class StuffItReader : IContainerReader
                 ? DecodeFork(archive, member.ResourceOffset, member.ResourceCompressedLength, member.ResourceLength,
                     resourceMethod)
                 : [];
-            CheckForkCrc(data, member.DataCrc, "data", member.Name, list.Position, context);
-            if (member.ResourceMethod is not null)
+            if (member.DataMethod != 15)
+                CheckForkCrc(data, member.DataCrc, "data", member.Name, list.Position, context);
+            if (member.ResourceMethod is not null and not 15)
                 CheckForkCrc(resource, member.ResourceCrc, "resource", member.Name, list.Position, context);
 
             files.Add(new MacFile
@@ -308,6 +309,7 @@ public sealed class StuffItReader : IContainerReader
         if (method == 8) return DecodeMw(input, outputLength);
         if (method == 13) return StuffItMethod13Decoder.Decode(input, outputLength);
         if (method == 14) return StuffItMethod14Decoder.Decode(input, outputLength);
+        if (method == 15) return StuffItMethod15Decoder.Decode(input, outputLength);
 
         var output = new byte[outputLength];
         int written = 0;

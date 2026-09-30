@@ -802,8 +802,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     unique catalog
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders). The
     StuffIt v5 reader handles stored, RLE90, Compress/LZW, Huffman, LZAH (method 5), MW (method 8),
-    LZ + Huffman (method 13), and Installer (method 14) forks. Method 13 is checked against CC0 archives made by
-    StuffIt Deluxe 4.5; method 14 currently has hand-built protocol vectors only.
+    LZ + Huffman (method 13), Installer (method 14), and Arsenic (method 15) forks. Methods 13 and 15 are checked
+    against CC0 archives made by StuffIt Deluxe 4.5 and 6.5.1 respectively; method 14 currently has hand-built protocol
+    vectors only.
     Original-application interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for
     the extents it reads (including the attributes and startup special-file forks, defined fork-data and extent records in the

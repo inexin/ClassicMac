@@ -24,7 +24,7 @@ parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet be
 the original StuffIt application.
 
 ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH), 8 (MW),
-13 (LZ + Huffman), and 14 (Installer) for either fork. RLE90 emits ordinary bytes as
+13 (LZ + Huffman), 14 (Installer), and 15 (Arsenic) for either fork. RLE90 emits ordinary bytes as
 literals; `$90 00` emits a literal `$90`; `$90 n` for nonzero `n` repeats the previously decoded byte until the run has
 `n` copies **[Fitted]**. Truncated runs, runs without a prior byte, output-length mismatches and extents outside the
 archive are rejected. Per-fork CRC mismatches are reported as errors while retaining the decoded file. Encrypted
@@ -81,5 +81,15 @@ is **[Fitted]** against
 Hand-built vectors cover literals, matches, direct and recursively encoded tree lengths, multiple blocks, both forks,
 and truncated block bounds; no original-application method-14 archive has yet been verified.
 
-The v1–4 record layout, method 15, archive-level comments, complete folder metadata and
+Method 15 begins with arithmetic-coded `As` and a block-size selector. Each block carries its randomized flag and BWT
+primary index, followed by adaptive arithmetic-coded selector/MTF symbols and zero-run coding. Decoding applies the
+inverse BWT, optional bit de-randomization, and the final repeat-byte RLE, then checks the stream's CRC-32. The model
+parameters and range-coder behavior follow Matthew T. Russotto's published
+[method-15 description](http://www.russotto.net/arseniccomp.html); the randomization table is transcribed from
+compcol's MIT-licensed interoperability data (see `THIRD-PARTY-NOTICES.md`). The decoder is independently written.
+Vectors use original StuffIt Deluxe 6.5.1 archives from the CC0 test corpus and assert exact data- and resource-fork
+bytes, including randomized blocks. The v5 member layout and per-fork integration are **[Fitted]** against those
+original-application archives.
+
+The v1–4 record layout, archive-level comments, complete folder metadata and
 verification against original-application archives remain unimplemented. See Phase 10 in [the project plan](../PLAN.md).

@@ -315,6 +315,37 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void StuffItMethod15DecodesRealStuffItDeluxe651DataAndResourceForks()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItMethod15");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "StuffItDeluxe651.sit"));
+        byte[] expected = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedPicture.pict"));
+        byte[] expectedPictureResource = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedPictureResource.bin"));
+        byte[] expectedResource = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedTestImageResource.bin"));
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = StuffItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics));
+
+        MacFile picture = Assert.Single(files, file => file.MacPath == "testfile.PICT");
+        Assert.Equal(expected, picture.DataFork.ToArray());
+        Assert.Equal(expectedPictureResource, picture.ResourceFork.ToArray());
+        MacFile image = Assert.Single(files, file => file.MacPath == "Test Image");
+        Assert.Equal(expectedResource, image.ResourceFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void StuffItMethod15RejectsATruncatedArithmeticStream()
+    {
+        byte[] image = StuffItFixture.BuildFile("truncated method 15", [0], [], dataMethod: 15,
+            encodedData: [0]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void StuffItCompressMethodDecodesLzwKwKwKCaseInBothForks()
     {
         byte[] expected = "ABABABA"u8.ToArray();

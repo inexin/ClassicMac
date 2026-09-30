@@ -94,11 +94,12 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
   Copy's codec, which follows the authors' freely distributed `lzhuf.c`. The authors placed the program in the public
   domain; they are credited here for the algorithm and tables.
 
-## StuffIt method-13 tables
+## StuffIt method-13 and method-15 interoperability tables
 
-The interoperability table values in `src/ClassicMac.Files/Archives/StuffItMethod13Tables.cs` are transcribed from
-[KarpelesLab/compcol](https://github.com/KarpelesLab/compcol), `src/sit13/tables.rs`. The decoder implementation is
-independent. The table data is covered by the upstream MIT license:
+The method-13 interoperability table values in `src/ClassicMac.Files/Archives/StuffItMethod13Tables.cs` and the
+method-15 randomization table in `src/ClassicMac.Files/Archives/StuffItMethod15Decoder.cs` are transcribed from
+[KarpelesLab/compcol](https://github.com/KarpelesLab/compcol), `src/sit13/tables.rs` and `src/arsenic/tables.rs`
+respectively. Both decoder implementations are independent. The table data is covered by the upstream MIT license:
 
 ```
 The MIT License (MIT)
@@ -119,12 +120,13 @@ COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER I
 OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## StuffIt method-13 test fixtures
+## StuffIt method-13 and method-15 test fixtures
 
 `tests/ClassicMac.Files.Tests/TestData/StuffItMethod13/` contains small fork streams and expected output extracted from
-the StuffIt Deluxe 4.5 sample archive in [ssokolow/stuffit-test-files](https://github.com/ssokolow/stuffit-test-files).
-The corpus author released the archive and contents under CC0; see the fixture README for provenance and the upstream
-license.
+the StuffIt Deluxe 4.5 sample archive. `tests/ClassicMac.Files.Tests/TestData/StuffItMethod15/` contains a StuffIt
+Deluxe 6.5.1 archive and expected method-15 data- and resource-fork output. Both are from
+[ssokolow/stuffit-test-files](https://github.com/ssokolow/stuffit-test-files), whose author released the archives and
+contents under CC0; see each fixture README and the upstream license for provenance.
 
 ## Executor (QuickDraw.Pict)
 
