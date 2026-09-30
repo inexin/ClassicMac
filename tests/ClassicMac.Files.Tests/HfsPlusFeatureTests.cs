@@ -187,7 +187,7 @@ public sealed class HfsPlusFeatureTests
         const int nodeSize = 512;
         const int totalNodes = 2049;
         byte[] image = HfsPlusFixture.Build(fragmentedData: true);
-        const int totalBlocks = 264;
+        const int totalBlocks = 300;
         const int allocatedBlocks = 257;
         Array.Resize(ref image, totalBlocks * blockSize);
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 44), totalBlocks);
@@ -226,6 +226,29 @@ public sealed class HfsPlusFeatureTests
         Span<byte> leafNode = image.AsSpan(treeOffset + nodeSize, nodeSize);
         BinaryPrimitives.WriteUInt16BigEndian(leafNode[(nodeSize - 2)..], 14);
         BinaryPrimitives.WriteUInt16BigEndian(leafNode[(nodeSize - 4)..], 90);
+
+        // The enlarged extents tree occupies blocks 4 through 260, so keep the file forks outside its allocation.
+        Span<byte> catalogLeaf = image.AsSpan(3 * blockSize, blockSize);
+        int catalogRecords = BinaryPrimitives.ReadUInt16BigEndian(catalogLeaf[10..]);
+        for (int index = 0; index < catalogRecords; index++)
+        {
+            int recordStart = BinaryPrimitives.ReadUInt16BigEndian(catalogLeaf[(blockSize - 2 * (index + 1))..]);
+            int recordEnd = BinaryPrimitives.ReadUInt16BigEndian(catalogLeaf[(blockSize - 2 * (index + 2))..]);
+            int keyLength = BinaryPrimitives.ReadUInt16BigEndian(catalogLeaf[recordStart..]);
+            int dataStart = recordStart + 2 + keyLength;
+            if (BinaryPrimitives.ReadUInt16BigEndian(catalogLeaf[dataStart..]) != 2) continue;
+            for (int extent = 0; extent < 8; extent++)
+            {
+                uint block = checked((uint)(263 + extent * 2));
+                BinaryPrimitives.WriteUInt32BigEndian(catalogLeaf[(dataStart + 88 + 16 + extent * 8)..], block);
+                image.AsSpan((int)block * blockSize, blockSize).Fill(checked((byte)(extent + 1)));
+            }
+            BinaryPrimitives.WriteUInt32BigEndian(catalogLeaf[(dataStart + 168 + 16)..], 281);
+            BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(treeOffset + nodeSize + 14 + 12), 279);
+            image.AsSpan(281 * blockSize, blockSize).Clear();
+            "Resource fork"u8.CopyTo(image.AsSpan(281 * blockSize));
+            break;
+        }
 
         return image;
     }
@@ -452,6 +475,35 @@ public sealed class HfsPlusFeatureTests
         byte[] expected = Enumerable.Range(1, 9).SelectMany(index => Enumerable.Repeat((byte)index, 4096)).ToArray();
         Assert.Equal(expected, file.DataFork.ToArray());
         Assert.Equal("Resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void HfsPlusOverflowExtentStartBlockMustContinueAfterCatalogExtents()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true);
+        // The catalog contains eight one-block extents, so TN1150 says the overflow record starts at fork block 8.
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(5 * 4096 + 14 + 8), 7);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusForksCannotClaimTheSameAllocationBlock()
+    {
+        byte[] image = HfsPlusFixture.Build(overlappingFileForks: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void AllocatedZeroLengthForkCannotAliasAnotherFork()
+    {
+        byte[] image = HfsPlusFixture.Build(overlappingFileForks: true, zeroLengthResourceFork: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -745,7 +797,8 @@ public sealed class HfsPlusFeatureTests
             bool unsortedOverflowForkTypes = false, bool reverseCatalogRecords = false,
             byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false,
             bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false,
-            bool deepCatalogTree = false)
+            bool deepCatalogTree = false, bool overlappingFileForks = false,
+            bool zeroLengthResourceFork = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -803,8 +856,8 @@ public sealed class HfsPlusFeatureTests
                 uint dataStart = invalidDataExtent ? 16u : multiLeafCatalog ? 6u : 4u;
                 Fork(file.AsSpan(88, 80), "HFS Plus data"u8.Length, dataStart, dataBlocks);
                 if (dataBlockCount is { } count) U32(file.AsSpan(88), 12, count);
-                uint resourceStart = invalidDataExtent ? 5u : dataStart + dataBlocks;
-                Fork(file.AsSpan(168, 80), "Resource fork"u8.Length, resourceStart, 1);
+                uint resourceStart = invalidDataExtent ? 5u : overlappingFileForks ? dataStart : dataStart + dataBlocks;
+                Fork(file.AsSpan(168, 80), zeroLengthResourceFork ? 0 : "Resource fork"u8.Length, resourceStart, 1);
                 uint dataStorageBlock = invalidDataExtent ? 4u : dataStart;
                 "HFS Plus data"u8.CopyTo(image.AsSpan((int)dataStorageBlock * Block));
                 "Resource fork"u8.CopyTo(image.AsSpan((int)resourceStart * Block));

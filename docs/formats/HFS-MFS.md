@@ -818,7 +818,8 @@ greater than all file and folder IDs, as TN1150 requires **[Doc]**. It then reso
 Finder info and dates. It
 also reads data and resource fork overflow
 extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
-(which may exceed the blocks needed by its logical length). It checks extents-overflow keys are strictly ordered by
+(which may exceed the blocks needed by its logical length). It rejects overlapping allocation ranges among the
+extents it reads, following TN1150's allocation-file ownership model. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
 retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary catalog
 index and leaf keys are checked in order, including index sibling ranges, while case-folding key order is not yet validated **[Doc]**. The
