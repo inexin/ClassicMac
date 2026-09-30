@@ -836,7 +836,10 @@ must have nonempty names **[Doc]** TN1150. Catalog key names and thread names mu
 combining-mark order **[Doc]** TN1150. The
 reader validates this with fixed Unicode 3.2 canonical decomposition data, including algorithmic Hangul decomposition
 and TN1150's preserved ranges U+2000–U+2FFF, U+F900–U+FAFF and U+2F800–U+2FAFF; it does not depend on the host
-runtime's evolving normalization tables.
+runtime's evolving normalization tables. HFSX also rejects two post-Jaguar legacy sequences: Greek alpha plus U+030D
+and Bengali BA plus nukta, which Apple's `fsck_hfs` rewrites to their corrected forms. Since HFS+ has no field
+recording which decomposition version created its names, the reader continues to accept those legacy sequences there.
+Other Unicode 2.1/3.2 differences remain open.
 Catalog IDs are unique and each required file and folder thread points back to its record's parent and name. `nextCatalogID`
 must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It

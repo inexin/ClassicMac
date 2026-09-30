@@ -852,6 +852,49 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData("\u03B1\u030D", false)] // Legacy Greek tonos representation.
+    [InlineData("\u03B1\u0301", true)]
+    [InlineData("\u09AC\u09BC", false)] // Bengali BA + NUKTA is corrected to RA with middle diagonal.
+    [InlineData("\u09B0", true)]
+    public void HfsXCatalogNamesMustUsePostJaguarCanonicalDecompositions(string fileName, bool valid)
+    {
+        byte[] image = HfsPlusFixture.Build(fileName, hfsX: true);
+
+        if (!valid)
+        {
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+            return;
+        }
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Equal("Documents:" + fileName.Normalize(NormalizationForm.FormC), file.MacPath);
+    }
+
+    [Theory]
+    [InlineData("\u03B1\u030D")]
+    [InlineData("\u09AC\u09BC")]
+    public void HfsXCatalogThreadNamesMustUsePostJaguarCanonicalDecompositions(string threadName)
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", hfsX: true, catalogFileThreadName: threadName);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData("\u03B1\u030D")]
+    [InlineData("\u09AC\u09BC")]
+    public void HfsPlusAcceptsLegacyCanonicalNameDecompositions(string fileName)
+    {
+        byte[] image = HfsPlusFixture.Build(fileName);
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.StartsWith("Documents:", file.MacPath, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void CaseSensitiveHfsXVolumeListsItsFiles()
     {

@@ -6,7 +6,7 @@ namespace ClassicMac.Files.Hfs;
 /// <summary>Validates HFS Plus names using the fixed Unicode 3.2 decomposition rules.</summary>
 internal static partial class HfsPlusUnicodeNormalization
 {
-    public static bool IsCanonical(ReadOnlySpan<byte> bigEndianName)
+    public static bool IsCanonical(ReadOnlySpan<byte> bigEndianName, bool usePostJaguarFixups = false)
     {
         var decomposed = new List<int>(bigEndianName.Length / 2);
         for (int offset = 0; offset < bigEndianName.Length; offset += 2)
@@ -39,6 +39,8 @@ internal static partial class HfsPlusUnicodeNormalization
             }
         }
 
+        if (usePostJaguarFixups && HasKnownPostJaguarCorrection(decomposed)) return false;
+
         int inputOffset = 0;
         foreach (int codePoint in decomposed)
         {
@@ -65,6 +67,21 @@ internal static partial class HfsPlusUnicodeNormalization
         }
 
         return inputOffset == bigEndianName.Length;
+    }
+
+    private static bool HasKnownPostJaguarCorrection(List<int> codePoints)
+    {
+        for (int index = 0; index < codePoints.Count; index++)
+        {
+            // Apple fsck_hfs's FixDecomps corrects these legacy sequences before comparing names.
+            if (codePoints[index] == 0x03B1 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x030D)
+                return true;
+
+            if (codePoints[index] == 0x09AC && index + 1 < codePoints.Count && codePoints[index + 1] == 0x09BC)
+                return true;
+        }
+
+        return false;
     }
 
     private static void AppendDecomposition(int codePoint, List<int> output)

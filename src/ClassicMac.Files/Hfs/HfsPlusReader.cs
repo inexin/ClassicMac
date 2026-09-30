@@ -22,6 +22,7 @@ internal static class HfsPlusReader
         byte[] header = image.Slice(HeaderOffset, HeaderLength).ToArray();
         ushort signature = U16(header, 0);
         ushort version = U16(header, 2);
+        bool isHfsX = signature == 0x4858;
         if (signature is not (0x482B or 0x4858))
             throw new InvalidDataException($"Unknown HFS Plus volume signature 0x{signature:X4}.");
         if ((signature == 0x482B && version != 4) || (signature == 0x4858 && version != 5))
@@ -85,7 +86,7 @@ internal static class HfsPlusReader
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4,
             allocationExtents, ordinaryForkExtents);
         byte[] catalog = catalogFork.ToArray();
-        var records = LeafRecords(catalog, "catalog", isHfsX: signature == 0x4858).ToArray();
+        var records = LeafRecords(catalog, "catalog", isHfsX).ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence)>();
         var catalogIds = new HashSet<uint>();
         var catalogNodes = new Dictionary<uint, CatalogNode>();
@@ -133,7 +134,7 @@ internal static class HfsPlusReader
                     ushort threadNameLength = U16(data, 8);
                     if (threadNameLength > 255 || data.Length < 10 + 2 * threadNameLength)
                         throw new InvalidDataException("An HFS Plus catalog thread record is truncated.");
-                    if (!HfsPlusUnicodeNormalization.IsCanonical(data.AsSpan(10, threadNameLength * 2)))
+                    if (!HfsPlusUnicodeNormalization.IsCanonical(data.AsSpan(10, threadNameLength * 2), isHfsX))
                         throw new InvalidDataException(
                             "An HFS Plus catalog thread name is not canonically decomposed.");
                     uint threadId = U32(key, 2);
@@ -639,7 +640,7 @@ internal static class HfsPlusReader
         }
         (HashSet<uint> indexedLeaves, HashSet<uint> indexedNodes) =
             ValidateIndexGraph(tree, name, nodeSize, maxKeyLength, totalNodes, root, depth, caseSensitiveCatalog,
-                caseFoldingCatalog);
+                caseFoldingCatalog, isHfsX);
         uint readRecords = 0;
         uint previous = 0;
         uint finalLeaf = 0;
@@ -676,7 +677,7 @@ internal static class HfsPlusReader
                 byte[] key = tree.AsSpan(offset, 2 + keyLength).ToArray();
                 if (name == "catalog")
                 {
-                    ValidateCatalogKey(key);
+                    ValidateCatalogKey(key, isHfsX);
                     ReadOnlySpan<byte> recordData = tree.AsSpan(dataOffset, start + end - dataOffset);
                     if (U16(key, 6) == 0 && recordData.Length >= 2 && U16(recordData, 0) is 1 or 2)
                         throw new InvalidDataException("An HFS Plus file or folder catalog key has an empty name.");
@@ -744,7 +745,7 @@ internal static class HfsPlusReader
 
     private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
         int nodeSize, int maxKeyLength, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog,
-        bool caseFoldingCatalog)
+        bool caseFoldingCatalog, bool isHfsX)
     {
         var visitedNodes = new HashSet<uint>();
         var leafNodes = new HashSet<uint>();
@@ -799,7 +800,7 @@ internal static class HfsPlusReader
                 byte[] indexKey = tree.AsSpan(start + begin, 2 + keyLength).ToArray();
                 if (name == "catalog")
                 {
-                    ValidateCatalogKey(indexKey);
+                    ValidateCatalogKey(indexKey, isHfsX);
                     if ((caseSensitiveCatalog || caseFoldingCatalog) && previousIndexKey is not null &&
                         CompareCatalogKeys(previousIndexKey, indexKey, caseFoldingCatalog) >= 0)
                         throw new InvalidDataException("The HFS Plus catalog index keys are not strictly ordered.");
@@ -1088,12 +1089,12 @@ internal static class HfsPlusReader
         return comparison != 0 ? comparison : U32(left, 8).CompareTo(U32(right, 8));
     }
 
-    private static void ValidateCatalogKey(ReadOnlySpan<byte> key)
+    private static void ValidateCatalogKey(ReadOnlySpan<byte> key, bool isHfsX)
     {
         int nameLength = U16(key, 6);
         if (nameLength > 255 || key.Length != 8 + nameLength * 2)
             throw new InvalidDataException("An HFSX catalog key has an invalid name length.");
-        if (!HfsPlusUnicodeNormalization.IsCanonical(key.Slice(8, nameLength * 2)))
+        if (!HfsPlusUnicodeNormalization.IsCanonical(key.Slice(8, nameLength * 2), isHfsX))
             throw new InvalidDataException("An HFS Plus catalog name is not canonically decomposed.");
     }
 
