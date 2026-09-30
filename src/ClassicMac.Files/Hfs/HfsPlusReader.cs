@@ -25,6 +25,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"Unknown HFS Plus volume signature 0x{signature:X4}.");
         if ((signature == 0x482B && version != 4) || (signature == 0x4858 && version != 5))
             throw new InvalidDataException($"Unsupported HFS Plus version {version}.");
+        ReportAlternateHeaderProblem(image, signature, version, context);
         uint blockSize = U32(header, 40);
         uint totalBlocks = U32(header, 44);
         if (blockSize < 512 || (blockSize & (blockSize - 1)) != 0 ||
@@ -237,6 +238,23 @@ internal static class HfsPlusReader
                 $"The HFS Plus catalog has {catalogFiles.Count} files and {folders.Count - 1} folders; " +
                 $"the volume header says {expectedFiles} and {expectedFolders}.");
         return result;
+    }
+
+    private static void ReportAlternateHeaderProblem(ForkData image, ushort signature, ushort version,
+        ContainerContext context)
+    {
+        if (image.Length < HeaderOffset + HeaderLength + 1024)
+        {
+            context.Report(DiagnosticSeverity.Warning, "hfs.plus-alternate-header",
+                "The HFS Plus volume is too small to contain an alternate volume header.");
+            return;
+        }
+
+        long offset = image.Length - 1024;
+        byte[] alternate = image.Slice(offset, HeaderLength).ToArray(HeaderLength);
+        if (U16(alternate, 0) != signature || U16(alternate, 2) != version)
+            context.Report(DiagnosticSeverity.Warning, "hfs.plus-alternate-header",
+                "The HFS Plus alternate volume header is missing or has an invalid signature or version.", offset);
     }
 
     private static void ValidateAllocationExtents(List<(uint Start, uint End)> extents)

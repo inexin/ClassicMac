@@ -48,6 +48,82 @@ public sealed class HfsPlusFeatureTests
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
     }
 
+    [Fact]
+    public void HfsPlusReportsAMissingAlternateVolumeHeaderButReadsFromThePrimaryHeader()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        image.AsSpan(image.Length - 1024, 512).Clear();
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusReportsAnInvalidAlternateVolumeHeaderSignature()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(image.Length - 1024), 0x1234);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusReportsAnInvalidAlternateVolumeHeaderVersion()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(image.Length - 1024 + 2), 5);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusReportsAnImageTooSmallToContainAnAlternateVolumeHeader()
+    {
+        byte[] image = new byte[1536];
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1024), 0x482B);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1026), 4);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 40), 512);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 44), 1);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusUsesThePrimaryHeaderWhenTheAlternateHeaderIsStale()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(image.Length - 1024 + 32), 99);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -1528,6 +1604,7 @@ public sealed class HfsPlusFeatureTests
             if (deepCatalogTree)
             {
                 WriteDeepCatalogTree(image, records, hfsX);
+                image.AsSpan(1024, 512).CopyTo(image.AsSpan(image.Length - 1024, 512));
                 return image;
             }
             if (multiLeafCatalog)
@@ -1578,6 +1655,7 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
+            image.AsSpan(1024, 512).CopyTo(image.AsSpan(image.Length - 1024, 512));
             return image;
         }
 

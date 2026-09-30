@@ -796,7 +796,9 @@ HFS Plus (Mac OS 8.1 and later) keeps its volume header at byte 1024, signature 
 HFSX uses signature `'HX'`, version 5. ClassicMac reads either volume directly and reads an HFS Plus volume embedded
 in a classic HFS wrapper. The wrapper's MDB has `drEmbedSigWord` (+$7C) and `drEmbedExtent` (+$7E, start and count);
 the embedded byte offset is `drAlBlSt × 512 + drEmbedExtent.start × drAlBlkSiz` **[Doc]** TN1150. Wrapper reads follow
-that extent and return the embedded volume's entries, not the wrapper's placeholder file.
+that extent and return the embedded volume's entries, not the wrapper's placeholder file. The reader checks the
+alternate volume header 1,024 bytes before the volume end for a matching signature and version; it reports a warning
+if the recovery copy is absent or invalid and continues using the primary header **[Doc]** TN1150.
 
 The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
 linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It also requires
@@ -883,6 +885,7 @@ followed in its code.
 | `mfs.too-many-entries` | E | More than `MaxVolumeEntries` files | Stops reading | — |
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
 | `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
+| `hfs.plus-alternate-header` | W | The alternate HFS Plus volume header is missing or has an invalid signature/version | Reads using the primary header | Not traced |
 | `hfs.plus-hardlink-target-missing` | W | A hard-link reference has no matching private indirect node | Keeps the link record, using its catalog forks | Not traced |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |
 | `hfs.not-leaf` | E | A node on the leaf chain is not a leaf | Stops the walk; keeps the records read | Not traced |
