@@ -794,7 +794,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
     info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, header nodes,
-    node maps (referenced nodes), roots, index graphs, sibling links, unique leaf keys,
+    node maps (referenced nodes and free counts when the header map covers the tree), roots, index graphs,
+    sibling links, unique leaf keys,
     and HFSX key-compare modes plus binary catalog order,
     unique catalog
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders); an initial StuffIt v5 reader handles stored and RLE90 forks. Original-application

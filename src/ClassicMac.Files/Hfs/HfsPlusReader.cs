@@ -248,7 +248,7 @@ internal static class HfsPlusReader
         {
             if (depth != 0 || root != 0 || first != 0 || last != 0)
                 throw new InvalidDataException($"The empty HFS Plus {name} B-tree has root or leaf nodes.");
-            ValidateNodeMap(tree, nodeSize, []);
+            ValidateNodeMap(tree, nodeSize, totalNodes, []);
             yield break;
         }
         if (depth == 0 || root == 0 || root >= totalNodes || first == 0 || last == 0 ||
@@ -327,7 +327,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree ends at leaf {finalLeaf}, not {last}.");
         if (!seen.SetEquals(indexedLeaves))
             throw new InvalidDataException($"The HFS Plus {name} B-tree index and leaf chain disagree.");
-        ValidateNodeMap(tree, nodeSize, indexedNodes);
+        ValidateNodeMap(tree, nodeSize, totalNodes, indexedNodes);
     }
 
     private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
@@ -399,7 +399,8 @@ internal static class HfsPlusReader
         return (leafNodes, visitedNodes);
     }
 
-    private static void ValidateNodeMap(byte[] tree, int nodeSize, HashSet<uint> referencedNodes)
+    private static void ValidateNodeMap(byte[] tree, int nodeSize, uint totalNodes,
+        HashSet<uint> referencedNodes)
     {
         const int MapOffset = 14 + 106 + 128;
         int mapLength = nodeSize - 256;
@@ -408,14 +409,28 @@ internal static class HfsPlusReader
         void RequireAllocated(uint nodeNumber)
         {
             if (nodeNumber >= addressableNodes) return; // Later nodes are represented by chained map nodes.
+            if (!IsAllocated(nodeNumber))
+                throw new InvalidDataException($"HFS Plus B-tree node {nodeNumber} is referenced but marked free.");
+        }
+
+        bool IsAllocated(uint nodeNumber)
+        {
             int byteOffset = MapOffset + checked((int)(nodeNumber / 8));
             byte mask = (byte)(0x80 >> (int)(nodeNumber % 8));
-            if ((tree[byteOffset] & mask) == 0)
-                throw new InvalidDataException($"HFS Plus B-tree node {nodeNumber} is referenced but marked free.");
+            return (tree[byteOffset] & mask) != 0;
         }
 
         RequireAllocated(0);
         foreach (uint nodeNumber in referencedNodes) RequireAllocated(nodeNumber);
+
+        if (totalNodes <= addressableNodes)
+        {
+            uint freeNodes = 0;
+            for (uint nodeNumber = 0; nodeNumber < totalNodes; nodeNumber++)
+                if (!IsAllocated(nodeNumber)) freeNodes++;
+            if (freeNodes != U32(tree, 14 + 26))
+                throw new InvalidDataException("The HFS Plus B-tree free-node count differs from its node map.");
+        }
     }
 
     private static string Name(ReadOnlySpan<byte> key)

@@ -806,8 +806,9 @@ their key-layout attributes use 16-bit key lengths, with variable-length index k
 index keys in the extents tree **[Doc]** TN1150. It also requires the header-node bitmap to mark node 0 and every
 catalog/extents B-tree node referenced by its index graph or leaf chain as allocated, where those nodes fit in the
 header map record. TN1150 defines this bitmap as one most-significant-bit-first bit per node and continues it in
-linked map nodes when the header map record is too small **[Doc]**. The reader does not yet validate chained map
-nodes or free-node accounting. It checks that
+linked map nodes when the header map record is too small **[Doc]**. The reader checks `freeNodes` against the bitmap
+when the complete tree fits in the header map record; chained map nodes and their free-node accounting are not yet
+validated. It checks that
 leaf-record keys are unique, catalog IDs are unique and each required file and folder thread points back to its
 record's parent and name. TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
