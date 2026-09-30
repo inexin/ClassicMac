@@ -48,7 +48,7 @@ internal static class HfsPlusReader
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4);
         byte[] catalog = catalogFork.ToArray();
-        var records = LeafRecords(catalog, "catalog").ToArray();
+        var records = LeafRecords(catalog, "catalog", isHfsX: signature == 0x4858).ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence)>();
         var catalogIds = new HashSet<uint>();
         var catalogNodes = new Dictionary<uint, CatalogNode>();
@@ -209,10 +209,19 @@ internal static class HfsPlusReader
         return new ExtentForkData(image, ranges, checked((long)logical));
     }
 
-    private static IEnumerable<(byte[] Key, byte[] Data)> LeafRecords(byte[] tree, string name)
+    private static IEnumerable<(byte[] Key, byte[] Data)> LeafRecords(byte[] tree, string name,
+        bool isHfsX = false)
     {
         if (tree.Length < 512 || tree[8] != 1)
             throw new InvalidDataException($"The HFS Plus {name} tree has no B-tree header.");
+        bool caseSensitiveCatalog = false;
+        if (name == "catalog" && isHfsX)
+        {
+            byte keyCompareType = tree[14 + 37];
+            if (keyCompareType is not (0xBC or 0xCF))
+                throw new InvalidDataException("The HFSX catalog has an unsupported key comparison type.");
+            caseSensitiveCatalog = keyCompareType == 0xBC;
+        }
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
@@ -250,6 +259,7 @@ internal static class HfsPlusReader
         var seen = new HashSet<uint>();
         var keys = new HashSet<byte[]>(ByteArrayEqualityComparer.Instance);
         byte[]? previousExtentKey = null;
+        byte[]? previousCatalogKey = null;
         for (uint node = first; node != 0; node = U32(tree, checked((int)node * nodeSize)))
         {
             if (!seen.Add(node) || node >= totalNodes)
@@ -274,7 +284,14 @@ internal static class HfsPlusReader
                     throw new InvalidDataException($"An HFS Plus {name} B-tree key is invalid.");
                 int dataOffset = offset + 2 + keyLength;
                 byte[] key = tree.AsSpan(offset, 2 + keyLength).ToArray();
-                if (name == "extents-overflow")
+                if (name == "catalog" && caseSensitiveCatalog)
+                {
+                    ValidateCatalogKey(key);
+                    if (previousCatalogKey is not null && CompareHfsXCatalogKeys(previousCatalogKey, key) >= 0)
+                        throw new InvalidDataException("The HFSX catalog keys are not strictly ordered.");
+                    previousCatalogKey = key;
+                }
+                else if (name == "extents-overflow")
                 {
                     if (key.Length != 12 || keyLength != 10 || key[2] is not (0 or 0xFF))
                         throw new InvalidDataException("An HFS Plus extents-overflow key is invalid.");
@@ -383,6 +400,27 @@ internal static class HfsPlusReader
         if (comparison != 0) return comparison;
         comparison = left[2].CompareTo(right[2]);
         return comparison != 0 ? comparison : U32(left, 8).CompareTo(U32(right, 8));
+    }
+
+    private static void ValidateCatalogKey(ReadOnlySpan<byte> key)
+    {
+        int nameLength = U16(key, 6);
+        if (nameLength > 255 || key.Length != 8 + nameLength * 2)
+            throw new InvalidDataException("An HFSX catalog key has an invalid name length.");
+    }
+
+    private static int CompareHfsXCatalogKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    {
+        int comparison = U32(left, 2).CompareTo(U32(right, 2));
+        if (comparison != 0) return comparison;
+        int leftLength = U16(left, 6);
+        int rightLength = U16(right, 6);
+        for (int index = 0; index < Math.Min(leftLength, rightLength); index++)
+        {
+            comparison = U16(left, 8 + index * 2).CompareTo(U16(right, 8 + index * 2));
+            if (comparison != 0) return comparison;
+        }
+        return leftLength.CompareTo(rightLength);
     }
 
     private static IReadOnlyList<string> FolderPath(uint parent,

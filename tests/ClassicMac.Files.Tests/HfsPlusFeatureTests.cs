@@ -61,6 +61,34 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsXCatalogKeysMustUseCaseSensitiveBTreeOrder()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, reverseCatalogRecords: true,
+            catalogKeyCompareType: 0xBC);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsXCatalogRejectsAnUnknownKeyComparisonType()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, catalogKeyCompareType: 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void CaseFoldingHfsXCatalogRemainsReadable()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, catalogKeyCompareType: 0xCF);
+
+        Assert.Equal("Documents:Read Me",
+            Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
     public void HfsWrapperReadsTheEmbeddedHfsPlusVolume()
     {
         byte[] image = HfsPlusFixture.BuildWrapped();
@@ -401,7 +429,8 @@ public sealed class HfsPlusFeatureTests
             bool invalidCatalogIndexChild = false, bool invalidCatalogIndexForwardLink = false,
             bool invalidCatalogIndexBackwardLink = false, bool duplicateOverflowExtent = false,
             bool unsortedOverflowKeys = false, bool unsortedOverflowFileIds = false,
-            bool unsortedOverflowForkTypes = false)
+            bool unsortedOverflowForkTypes = false, bool reverseCatalogRecords = false,
+            byte? catalogKeyCompareType = null)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -488,6 +517,7 @@ public sealed class HfsPlusFeatureTests
             }
             if (orphanFileThread) records.Add(Record(42, "", Thread(16, "Missing", 4)));
             if (unknownCatalogRecord) U16(records[4], 0, 0x1234);
+            if (reverseCatalogRecords) records.Reverse();
             if (multiLeafCatalog)
             {
                 int split = records.Count / 2;
@@ -529,6 +559,7 @@ public sealed class HfsPlusFeatureTests
             U16(header, 32, Block);
             U16(header, 34, 516);
             U32(header, 36, catalogTotalNodes ?? (multiLeafCatalog ? 4u : 2u)); // total nodes
+            header[14 + 37] = catalogKeyCompareType ?? (hfsX ? (byte)0xBC : (byte)0);
             header[14 + 106 + 128] = multiLeafCatalog ? (byte)0xF0 : (byte)0xC0; // allocated nodes
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);
