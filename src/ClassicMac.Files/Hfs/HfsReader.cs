@@ -11,7 +11,7 @@ namespace ClassicMac.Files.Hfs
     /// HFS volumes, from <i>Inside Macintosh: Files</i>, "Data Organization on Volumes": the master directory block at
     /// byte 1024, the catalog B-tree (folders, files, threads) and the extents overflow B-tree, 512-byte nodes. Every
     /// file on the volume comes out with its folder path, Finder info, dates and both forks, which are read from the
-    /// image in place. HFS Plus volumes are recognised but not read yet.
+    /// image in place. HFS Plus volumes use the corresponding HFS Plus reader.
     /// </summary>
     public sealed class HfsReader : IContainerReader
     {
@@ -19,6 +19,7 @@ namespace ClassicMac.Files.Hfs
         private const int MdbLength = 162;
         private const ushort HfsSignature = 0x4244; // 'BD'
         private const ushort HfsPlusSignature = 0x482B; // 'H+'
+        private const ushort HfsXSignature = 0x4858; // 'HX'
         private const int NodeSize = 512;
         private const uint RootParentId = 1, RootFolderId = 2, CatalogFileId = 4;
 
@@ -37,7 +38,7 @@ namespace ClassicMac.Files.Hfs
         {
             if (input.Length < MdbOffset + MdbLength) return false;
             var signature = BinaryPrimitives.ReadUInt16BigEndian(input.Slice(MdbOffset, 2).ToArray());
-            return signature is HfsSignature or HfsPlusSignature;
+            return signature is HfsSignature or HfsPlusSignature or HfsXSignature;
         }
 
         /// <inheritdoc/>
@@ -45,11 +46,8 @@ namespace ClassicMac.Files.Hfs
         {
             if (!CanRead(input)) throw new InvalidDataException("Not an HFS volume.");
             var mdb = input.Slice(MdbOffset, MdbLength).ToArray();
-            if (BinaryPrimitives.ReadUInt16BigEndian(mdb) == HfsPlusSignature)
-            {
-                context.Report(DiagnosticSeverity.Info, "hfs.plus", "This is an HFS Plus volume, which is not read yet.");
-                return [];
-            }
+            if (BinaryPrimitives.ReadUInt16BigEndian(mdb) is HfsPlusSignature or HfsXSignature)
+                return HfsPlusReader.Read(input, context);
             return new Volume(input, mdb, context).Files();
         }
 
