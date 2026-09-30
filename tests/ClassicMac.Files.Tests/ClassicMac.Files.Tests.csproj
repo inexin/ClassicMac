@@ -25,5 +25,6 @@
     <None Update="TestData\StuffItMethod13\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\StuffItMethod14\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\StuffItMethod15\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="TestData\DiskDoublerOriginal\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

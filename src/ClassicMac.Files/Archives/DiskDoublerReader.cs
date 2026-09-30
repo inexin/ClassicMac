@@ -370,7 +370,7 @@ public sealed class DiskDoublerReader : IContainerReader
         return files;
     }
 
-    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 8;
+    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 8 or 10;
 
     private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method,
         byte info1, byte info2)
@@ -379,6 +379,7 @@ public sealed class DiskDoublerReader : IContainerReader
         if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);
         if (method == 2) return DecodeAdaptiveHuffman(input, outputLength, info1, info2);
         if (method == 4) return DecodeHuffman(input, outputLength, info1, info2);
+        if (method == 10) return DiskDoublerMethod10Decoder.Decode(input, outputLength);
         if (input.Length < 16)
             throw new InvalidDataException("A DiskDoubler Compact Pro fork is missing its 16-byte method header.");
         int headerSum = 0;

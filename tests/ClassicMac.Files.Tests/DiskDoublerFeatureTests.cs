@@ -20,6 +20,23 @@ public sealed class DiskDoublerFeatureTests
     }
 
     [Fact]
+    public void DiskDoublerPro411Method10FileExpandsToOriginalApplicationOutput()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "DiskDoublerPro411Dd3TestFile.dd"));
+
+        IReadOnlyList<MacFile> files = DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("testfile.PICT.dd")));
+
+        MacFile file = Assert.Single(files);
+        Assert.Equal("testfile.PICT", file.Name.ToMacRoman());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict")),
+            file.DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin")),
+            file.ResourceFork.ToArray());
+    }
+
+    [Fact]
     public void Dda2RejectsAnInvalidArchiveHeaderChecksum()
     {
         byte[] archive = DiskDoublerFixture.BuildArchive();
