@@ -793,7 +793,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
-    info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, header nodes,
+    info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, the catalog
+    node-size minimum, header nodes,
     node maps (including chained map nodes and free counts), roots, index graphs,
     sibling links, unique leaf keys,
     and HFSX key-compare modes plus binary catalog order,

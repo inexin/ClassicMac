@@ -801,9 +801,10 @@ that extent and return the embedded volume's entries, not the wrapper's placehol
 The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
 linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It also requires
 the B-tree header node to contain three records and a zero backward link **[Doc]**. It checks that the catalog and
-extents B-tree headers have the required control-file type **[Doc]**, and that
-their key-layout attributes use 16-bit key lengths, with variable-length index keys in the catalog and fixed-length
-index keys in the extents tree **[Doc]** TN1150. The B-tree map is one most-significant-bit-first bit per node and
+extents B-tree headers have the required control-file type **[Doc]**, that catalog B-tree nodes meet TN1150's 4 KiB
+minimum **[Doc]**, and that their key-layout attributes use 16-bit key lengths, with variable-length index keys in
+the catalog and fixed-length index keys in the extents tree **[Doc]** TN1150. The B-tree map is one
+most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader follows that
 chain, checks map-node descriptors and bitmap coverage, requires the header, index, leaf and map nodes to be marked
 allocated, and verifies `freeNodes` against the complete bitmap. It checks that

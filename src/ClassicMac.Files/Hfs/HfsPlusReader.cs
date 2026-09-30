@@ -236,6 +236,8 @@ internal static class HfsPlusReader
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
+        if (name == "catalog" && nodeSize < 4096)
+            throw new InvalidDataException("The HFS Plus catalog B-tree node size is below the 4 KiB minimum.");
         uint totalNodes = U32(tree, 36);
         if (totalNodes == 0 || totalNodes > tree.Length / nodeSize)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node count is invalid.");

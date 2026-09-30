@@ -102,6 +102,15 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusCatalogBtreeNodesMustBeAtLeastFourKilobytes()
+    {
+        byte[] image = BuildHfsPlusVolumeWithSmallCatalogNodes();
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -145,6 +154,19 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusOverflowExtentCanEndWithANonzeroStartAndZeroCount()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true);
+        // TN1150's fragmented-fork example ends its final extent record with (startBlock: 1, blockCount: 0).
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(5 * 4096 + 14 + 82), 1);
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(Enumerable.Range(1, 9).SelectMany(index => Enumerable.Repeat((byte)index, 4096)),
+            file.DataFork.ToArray());
     }
 
     private static byte[] BuildOversizedExtentsTree(bool addMapNode)
@@ -193,6 +215,51 @@ public sealed class HfsPlusFeatureTests
         BinaryPrimitives.WriteUInt16BigEndian(leafNode[(nodeSize - 2)..], 14);
         BinaryPrimitives.WriteUInt16BigEndian(leafNode[(nodeSize - 4)..], 90);
 
+        return image;
+    }
+
+    private static byte[] BuildHfsPlusVolumeWithSmallCatalogNodes()
+    {
+        const int blockSize = 4096;
+        const int nodeSize = 512;
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 32), 0);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 36), 0);
+
+        byte[] sourceLeaf = image.AsSpan(3 * blockSize, blockSize).ToArray();
+        Span<byte> header = image.AsSpan(2 * blockSize, nodeSize);
+        BinaryPrimitives.WriteUInt16BigEndian(header[32..], nodeSize);
+        BinaryPrimitives.WriteUInt32BigEndian(header[20..], 2);
+        BinaryPrimitives.WriteUInt32BigEndian(header[36..], 16);
+        BinaryPrimitives.WriteUInt32BigEndian(header[40..], 14);
+        header.Slice(248, nodeSize - 256).Clear();
+        header[248] = 0xC0;
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 2)..], 14);
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 4)..], 120);
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 6)..], 248);
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 8)..], nodeSize - 8);
+
+        Span<byte> leaf = image.AsSpan(2 * blockSize + nodeSize, nodeSize);
+        leaf.Clear();
+        leaf[8] = 0xFF;
+        leaf[9] = 1;
+        BinaryPrimitives.WriteUInt16BigEndian(leaf[10..], 2);
+        int at = 14;
+        for (int index = 0; index < 2; index++)
+        {
+            int begin = BinaryPrimitives.ReadUInt16BigEndian(sourceLeaf.AsSpan(blockSize - 2 * (index + 1)));
+            int end = BinaryPrimitives.ReadUInt16BigEndian(sourceLeaf.AsSpan(blockSize - 2 * (index + 2)));
+            int length = end - begin;
+            BinaryPrimitives.WriteUInt16BigEndian(leaf[(nodeSize - 2 * (index + 1))..], checked((ushort)at));
+            sourceLeaf.AsSpan(begin, length).CopyTo(leaf[at..]);
+            if (index == 0)
+            {
+                int keyLength = BinaryPrimitives.ReadUInt16BigEndian(leaf[at..]);
+                BinaryPrimitives.WriteUInt32BigEndian(leaf[(at + 2 + keyLength + 4)..], 0); // Root valence.
+            }
+            at += length;
+        }
+        BinaryPrimitives.WriteUInt16BigEndian(leaf[(nodeSize - 6)..], checked((ushort)at));
         return image;
     }
 
