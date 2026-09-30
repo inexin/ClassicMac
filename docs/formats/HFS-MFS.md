@@ -800,6 +800,7 @@ that extent and return the embedded volume's entries, not the wrapper's placehol
 
 The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
 linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It checks that
+the catalog and extents B-tree headers have the required control-file type **[Doc]**, and that
 leaf-record keys are unique, catalog IDs are unique and each required file and folder thread points back to its
 record's parent and name. TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every

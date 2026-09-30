@@ -40,6 +40,19 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusSystemBtreesMustUseTheControlTreeType(bool extentsTree)
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: extentsTree);
+        int headerNodeOffset = (extentsTree ? 4 : 2) * 4096;
+        image[headerNodeOffset + 50] = 1;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusUnicodeNameIsPreservedInTheMacPath()
     {
