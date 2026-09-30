@@ -839,8 +839,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     and zero unused bitmap bits; it reports a mismatch between bitmap free blocks and the volume header's `freeBlocks`.
     HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
     to indirect-node forks while keeping the visible path and hiding private metadata; dangling links are reported.
-    Remaining B-tree validation is enumerated in [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus): even record-
-    offset alignment and exact leaf-payload layouts for extents, threads and defined attribute records.
+    The HFS+ B-tree reader validates even record boundaries and exact extents-overflow and defined attribute payload
+    lengths; [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) records the rules and the verifier-backed thread and
+    empty-leaf compatibility cases. Broader HFS+ validation remains.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro

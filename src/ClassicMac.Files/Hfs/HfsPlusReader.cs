@@ -44,7 +44,7 @@ internal static class HfsPlusReader
             foreach (var (key, data) in LeafRecords(
                 extentsFork.ToArray(context.Options.MaxExpandedBytesPerInput), "extents-overflow"))
             {
-                if (key.Length != 12 || U16(key, 0) != 10 || data.Length < 64 || key[2] is not (0 or 0xFF))
+                if (key.Length != 12 || U16(key, 0) != 10 || data.Length != 64 || key[2] is not (0 or 0xFF))
                     throw new InvalidDataException("An HFS Plus extents-overflow record is invalid.");
                 var id = (Fork: key[2], File: U32(key, 4));
                 if (id.File == BadBlockFileId && id.Fork != 0)
@@ -300,8 +300,8 @@ internal static class HfsPlusReader
             case 0x10:
                 return;
             case 0x20:
-                if (data.Length < 88)
-                    throw new InvalidDataException("An HFS Plus fork-data attribute is truncated.");
+                if (data.Length != 88)
+                    throw new InvalidDataException("An HFS Plus fork-data attribute has an invalid length.");
                 ReadOnlySpan<byte> fork = data.AsSpan(8, 80);
                 ulong logical = BinaryPrimitives.ReadUInt64BigEndian(fork);
                 uint allocated = U32(fork, 12);
@@ -321,8 +321,8 @@ internal static class HfsPlusReader
                 }
                 return;
             case 0x30:
-                if (data.Length < 72)
-                    throw new InvalidDataException("An HFS Plus attribute extension record is truncated.");
+                if (data.Length != 72)
+                    throw new InvalidDataException("An HFS Plus attribute extension record has an invalid length.");
                 AddExtentRecord(data.AsSpan(8, 64), totalBlocks, allocationExtents,
                     "An HFS Plus attribute extension extent lies outside the allocation area.");
                 return;
@@ -575,7 +575,8 @@ internal static class HfsPlusReader
             {
                 int begin = U16(tree, start + nodeSize - 2 * (index + 1));
                 int end = U16(tree, start + nodeSize - 2 * (index + 2));
-                if (begin < 14 || end <= begin || end > nodeSize - 2 * (count + 1))
+                if ((begin & 1) != 0 || (end & 1) != 0 || begin < 14 || end <= begin ||
+                    end > nodeSize - 2 * (count + 1))
                     throw new InvalidDataException($"An HFS Plus {name} B-tree record offset is invalid.");
                 int offset = start + begin;
                 int keyLength = U16(tree, offset);
@@ -700,7 +701,7 @@ internal static class HfsPlusReader
             {
                 int begin = U16(tree, start + nodeSize - 2 * (index + 1));
                 int end = U16(tree, start + nodeSize - 2 * (index + 2));
-                if (begin < 14 || end <= begin || end > offsetTableStart)
+                if ((begin & 1) != 0 || (end & 1) != 0 || begin < 14 || end <= begin || end > offsetTableStart)
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index record offset is invalid.");
                 int keyLength = U16(tree, start + begin);
                 if (keyLength < 6 || keyLength > maxKeyLength)
@@ -814,7 +815,7 @@ internal static class HfsPlusReader
         {
             int begin = U16(tree, nodeStart + nodeSize - 2 * (index + 1));
             int end = U16(tree, nodeStart + nodeSize - 2 * (index + 2));
-            if (begin < 14 || end <= begin || end > offsetTableStart)
+            if ((begin & 1) != 0 || (end & 1) != 0 || begin < 14 || end <= begin || end > offsetTableStart)
                 throw new InvalidDataException($"An HFS Plus {name} B-tree leaf record offset is invalid.");
             int keyLength = U16(tree, nodeStart + begin);
             if (keyLength < 6 || keyLength > maxKeyLength || begin + 2 + keyLength > end)

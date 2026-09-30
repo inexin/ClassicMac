@@ -1439,6 +1439,44 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusBtreeRecordOffsetsMustHaveEvenBoundaries()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeRecord(0x40, dataBlock: 4);
+        int freeSpaceOffsetPosition = 11 * HfsPlusFixture.Block + HfsPlusFixture.Block - 4;
+        ushort freeSpaceOffset = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(freeSpaceOffsetPosition));
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(freeSpaceOffsetPosition), checked((ushort)(freeSpaceOffset + 1)));
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(0x20u)]
+    [InlineData(0x30u)]
+    public void HfsPlusDefinedAttributePayloadsMustHaveTheirExactLengths(uint recordType)
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeRecord(recordType, dataBlock: 12);
+        int freeSpaceOffsetPosition = 11 * HfsPlusFixture.Block + HfsPlusFixture.Block - 4;
+        ushort freeSpaceOffset = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(freeSpaceOffsetPosition));
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(freeSpaceOffsetPosition), checked((ushort)(freeSpaceOffset + 2)));
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusOverflowExtentPayloadMustHaveItsExactLength()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true);
+        int freeSpaceOffsetPosition = 5 * HfsPlusFixture.Block + HfsPlusFixture.Block - 4;
+        ushort freeSpaceOffset = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(freeSpaceOffsetPosition));
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(freeSpaceOffsetPosition), checked((ushort)(freeSpaceOffset + 2)));
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusAttributesBtreeRejectsAnOutOfRangeIndexChild()
     {
         byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: true);
