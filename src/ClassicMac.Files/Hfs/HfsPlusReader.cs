@@ -496,6 +496,7 @@ internal static class HfsPlusReader
         var keys = new HashSet<byte[]>(ByteArrayEqualityComparer.Instance);
         byte[]? previousExtentKey = null;
         byte[]? previousCatalogKey = null;
+        byte[]? previousAttributeKey = null;
         for (uint node = first; node != 0; node = U32(tree, checked((int)node * nodeSize)))
         {
             if (!seen.Add(node) || node >= totalNodes)
@@ -544,6 +545,13 @@ internal static class HfsPlusReader
                         throw new InvalidDataException("The HFS Plus extents-overflow keys are not strictly ordered.");
                     previousExtentKey = key;
                 }
+                else if (name == "attributes")
+                {
+                    ValidateAttributeKey(key);
+                    if (previousAttributeKey is not null && CompareAttributeKeys(previousAttributeKey, key) >= 0)
+                        throw new InvalidDataException("The HFS Plus attributes B-tree keys are not strictly ordered.");
+                    previousAttributeKey = key;
+                }
                 else if (!keys.Add(key))
                     throw new InvalidDataException($"The HFS Plus {name} B-tree has a duplicate leaf key.");
                 yield return (key,
@@ -588,7 +596,7 @@ internal static class HfsPlusReader
         var nodesByHeight = new Dictionary<ushort, List<uint>>();
         var indexKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)>();
         var subtreeKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)?>();
-        bool validateChildKeyRanges = name == "extents-overflow" ||
+        bool validateChildKeyRanges = name == "extents-overflow" || name == "attributes" ||
             (name == "catalog" && (caseSensitiveCatalog || caseFoldingCatalog));
 
         void AddAtHeight(uint nodeNumber, ushort height)
@@ -648,6 +656,12 @@ internal static class HfsPlusReader
                     if (previousIndexKey is not null && CompareExtentKeys(previousIndexKey, indexKey) >= 0)
                         throw new InvalidDataException("The HFS Plus extents-overflow index keys are not strictly ordered.");
                 }
+                else if (name == "attributes")
+                {
+                    ValidateAttributeKey(indexKey);
+                    if (previousIndexKey is not null && CompareAttributeKeys(previousIndexKey, indexKey) >= 0)
+                        throw new InvalidDataException("The HFS Plus attributes index keys are not strictly ordered.");
+                }
                 firstIndexKey ??= indexKey;
                 previousIndexKey = indexKey;
                 int storedKeyLength = (name is "catalog" or "attributes") ? keyLength : maxKeyLength;
@@ -706,6 +720,7 @@ internal static class HfsPlusReader
                         "catalog" when caseSensitiveCatalog || caseFoldingCatalog =>
                             CompareCatalogKeys(previousRange.Last, currentRange.First, caseFoldingCatalog),
                         "extents-overflow" => CompareExtentKeys(previousRange.Last, currentRange.First),
+                        "attributes" => CompareAttributeKeys(previousRange.Last, currentRange.First),
                         _ => -1
                     };
                     if (comparison >= 0)
@@ -740,7 +755,9 @@ internal static class HfsPlusReader
             int keyLength = U16(tree, nodeStart + begin);
             if (keyLength < 6 || keyLength > maxKeyLength || begin + 2 + keyLength > end)
                 throw new InvalidDataException($"An HFS Plus {name} B-tree leaf key length is invalid.");
-            return tree.AsSpan(nodeStart + begin, 2 + keyLength).ToArray();
+            byte[] key = tree.AsSpan(nodeStart + begin, 2 + keyLength).ToArray();
+            if (name == "attributes") ValidateAttributeKey(key);
+            return key;
         }
 
         return (ReadKey(0), ReadKey(count - 1));
@@ -752,8 +769,39 @@ internal static class HfsPlusReader
         "catalog" when caseSensitiveCatalog => CompareHfsXCatalogKeys(left, right),
         "catalog" when caseFoldingCatalog => CompareCatalogKeys(left, right, caseFolding: true),
         "extents-overflow" => CompareExtentKeys(left, right),
+        "attributes" => CompareAttributeKeys(left, right),
         _ => throw new InvalidOperationException($"No key comparator is defined for the {name} B-tree.")
     };
+
+    private static void ValidateAttributeKey(ReadOnlySpan<byte> key)
+    {
+        if (key.Length < 14 || U16(key, 0) != key.Length - 2)
+            throw new InvalidDataException("The HFS Plus attributes B-tree key length is invalid.");
+        int nameLength = U16(key, 12);
+        if (nameLength > 127 || key.Length != 14 + 2 * nameLength)
+            throw new InvalidDataException("The HFS Plus attributes B-tree key name length is invalid.");
+    }
+
+    // Apple’s HFS comparator orders attribute keys by file ID, name length, binary UTF-16 name,
+    // then start block (hfs_attrkeycompare in Apple’s HFS source).
+    private static int CompareAttributeKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    {
+        int comparison = U32(left, 4).CompareTo(U32(right, 4));
+        if (comparison != 0) return comparison;
+
+        int leftNameLength = U16(left, 12);
+        int rightNameLength = U16(right, 12);
+        comparison = leftNameLength.CompareTo(rightNameLength);
+        if (comparison != 0) return comparison;
+
+        for (int index = 0; index < leftNameLength; index++)
+        {
+            comparison = U16(left, 14 + index * 2).CompareTo(U16(right, 14 + index * 2));
+            if (comparison != 0) return comparison;
+        }
+
+        return U32(left, 8).CompareTo(U32(right, 8));
+    }
 
     private static void ValidateNodeMap(byte[] tree, int nodeSize, uint totalNodes,
         HashSet<uint> referencedNodes)

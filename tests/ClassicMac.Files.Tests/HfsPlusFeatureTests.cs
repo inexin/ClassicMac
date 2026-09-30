@@ -952,6 +952,72 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusAttributesBtreeIndexKeysMustBeOrderedByFileId()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
+            reverseAttributeKeys: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAttributesBtreeIndexSeparatorMustNotSortAfterItsChildRecords()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
+            invalidSeparator: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(18u, "a", 0u, 17u, "a", 0u)]
+    [InlineData(17u, "zz", 0u, 17u, "a", 0u)]
+    [InlineData(17u, "b", 0u, 17u, "a", 0u)]
+    [InlineData(17u, "a", 2u, 17u, "a", 1u)]
+    public void HfsPlusAttributesBtreeLeafKeysUseAppleKeyOrder(uint firstFileId, string firstName,
+        uint firstStartBlock, uint secondFileId, string secondName, uint secondStartBlock)
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecord(firstFileId, firstName, firstStartBlock, 0x40),
+            HfsPlusFixture.AttributeRecord(secondFileId, secondName, secondStartBlock, 0x40)
+        ]);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(17u, "a", 0u, 18u, "a", 0u)]
+    [InlineData(17u, "a", 0u, 17u, "zz", 0u)]
+    [InlineData(17u, "a", 0u, 17u, "b", 0u)]
+    [InlineData(17u, "a", 1u, 17u, "a", 2u)]
+    public void HfsPlusAttributesBtreeAcceptsAppleKeyOrder(uint firstFileId, string firstName,
+        uint firstStartBlock, uint secondFileId, string secondName, uint secondStartBlock)
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecord(firstFileId, firstName, firstStartBlock, 0x40),
+            HfsPlusFixture.AttributeRecord(secondFileId, secondName, secondStartBlock, 0x40)
+        ]);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusAttributesBtreeKeyLengthMustMatchItsUnicodeName()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecord(17, "alpha", 0, 0x40)
+        ]);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(11 * HfsPlusFixture.Block + 14), 12);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusAttributesBtreeRejectsAnOutOfRangeIndexChild()
     {
         byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: true);
@@ -1288,7 +1354,7 @@ public sealed class HfsPlusFeatureTests
     // one catalog leaf, a root folder, nested folder, file and their threads.
     private static class HfsPlusFixture
     {
-        private const int Block = 4096;
+        public const int Block = 4096;
 
         public static byte[] Build(string fileName = "Read Me", bool hfsX = false, bool fragmentedData = false,
             bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false,
@@ -1601,14 +1667,17 @@ public sealed class HfsPlusFeatureTests
             return image;
         }
 
-        public static byte[] BuildWithIndexedAttributesTree(bool invalidChild)
+        public static byte[] BuildWithIndexedAttributesTree(bool invalidChild, bool reverseAttributeKeys = false,
+            bool invalidSeparator = false)
         {
             byte[] image = Build(includeAttributeFile: true);
             Fork(image.AsSpan(1024 + 352, 80), 4 * Block, 10, 4);
-            byte[] first = AttributeRecord(17, 0x10);
-            byte[] second = AttributeRecord(18, 0x40);
+            byte[] first = AttributeRecord(reverseAttributeKeys ? 18u : 17u, "alpha", 0, 0x40);
+            byte[] second = AttributeRecord(reverseAttributeKeys ? 17u : 18u, "beta", 0, 0x40);
+            byte[] secondIndexKey = (byte[])second.Clone();
+            if (invalidSeparator) U32(secondIndexKey, 4, 19);
             WriteBTreeNode(image.AsSpan(11 * Block, Block), 0, 2, 0, 0,
-                [IndexRecord(first, invalidChild ? 4u : 2u), IndexRecord(second, 3)]);
+                [IndexRecord(first, invalidChild ? 4u : 2u), IndexRecord(secondIndexKey, 3)]);
             WriteBTreeNode(image.AsSpan(12 * Block, Block), 0xFF, 1, 3, 0, [first]);
             WriteBTreeNode(image.AsSpan(13 * Block, Block), 0xFF, 1, 0, 2, [second]);
 
@@ -1621,7 +1690,7 @@ public sealed class HfsPlusFeatureTests
             U32(header, 24, 2);
             U32(header, 28, 3);
             U16(header, 32, Block);
-            U16(header, 34, 516);
+            U16(header, 34, 266);
             U32(header, 36, 4);
             U32(header, 14 + 38, 6);
             header[14 + 106 + 128] = 0xF0;
@@ -1632,12 +1701,43 @@ public sealed class HfsPlusFeatureTests
             return image;
         }
 
-        private static byte[] AttributeRecord(uint fileId, uint recordType)
+        public static byte[] BuildWithAttributeLeaf(byte[][] records)
         {
-            byte[] record = new byte[2 + 10 + 4];
-            U16(record, 0, 10);
-            U32(record, 2, fileId);
-            U32(record, 12, recordType);
+            byte[] image = Build(includeAttributeFile: true);
+            Fork(image.AsSpan(1024 + 352, 80), 2 * Block, 10, 2);
+            WriteBTreeNode(image.AsSpan(11 * Block, Block), 0xFF, 1, 0, 0, records);
+
+            Span<byte> header = image.AsSpan(10 * Block, Block);
+            header[8] = 1;
+            U16(header, 10, 3);
+            U16(header, 14, 1);
+            U32(header, 16, 1);
+            U32(header, 20, checked((uint)records.Length));
+            U32(header, 24, 1);
+            U32(header, 28, 1);
+            U16(header, 32, Block);
+            U16(header, 34, 266);
+            U32(header, 36, 2);
+            U32(header, 14 + 38, 6);
+            header[14 + 106 + 128] = 0xC0;
+            U16(header, Block - 2, 14);
+            U16(header, Block - 4, 14 + 106);
+            U16(header, Block - 6, 14 + 106 + 128);
+            U16(header, Block - 8, Block - 8);
+            return image;
+        }
+
+        public static byte[] AttributeRecord(uint fileId, string name, uint startBlock, uint recordType)
+        {
+            byte[] nameBytes = Encoding.BigEndianUnicode.GetBytes(name);
+            ushort keyLength = checked((ushort)(12 + nameBytes.Length));
+            byte[] record = new byte[2 + keyLength + 4];
+            U16(record, 0, keyLength);
+            U32(record, 4, fileId);
+            U32(record, 8, startBlock);
+            U16(record, 12, checked((ushort)name.Length));
+            nameBytes.CopyTo(record, 14);
+            U32(record, 2 + keyLength, recordType);
             return record;
         }
 
@@ -1647,21 +1747,21 @@ public sealed class HfsPlusFeatureTests
             Fork(image.AsSpan(1024 + 352, 80), 2 * Block, 10, 2);
 
             int dataLength = recordType == 0x20 ? 88 : 72;
-            byte[] record = new byte[2 + 10 + dataLength];
-            U16(record, 0, 10);
-            U32(record, 2, 17);
-            U32(record, 12, recordType);
+            byte[] record = new byte[2 + 12 + dataLength];
+            U16(record, 0, 12);
+            U32(record, 4, 17);
+            U32(record, 14, recordType);
             if (recordType == 0x20)
             {
-                BinaryPrimitives.WriteUInt64BigEndian(record.AsSpan(20), 1);
-                U32(record, 12 + 8 + 12, 1);
-                U32(record, 12 + 8 + 16, dataBlock);
-                U32(record, 12 + 8 + 20, 1);
+                BinaryPrimitives.WriteUInt64BigEndian(record.AsSpan(22), 1);
+                U32(record, 14 + 8 + 12, 1);
+                U32(record, 14 + 8 + 16, dataBlock);
+                U32(record, 14 + 8 + 20, 1);
             }
             else
             {
-                U32(record, 12 + 8, dataBlock);
-                U32(record, 12 + 12, 1);
+                U32(record, 14 + 8, dataBlock);
+                U32(record, 14 + 12, 1);
             }
             WriteBTreeNode(image.AsSpan(11 * Block, Block), 0xFF, 1, 0, 0, [record]);
 
@@ -1674,7 +1774,7 @@ public sealed class HfsPlusFeatureTests
             U32(header, 24, 1);
             U32(header, 28, 1);
             U16(header, 32, Block);
-            U16(header, 34, 516);
+            U16(header, 34, 266);
             U32(header, 36, 2);
             U32(header, 14 + 38, 6); // 16-bit key lengths and variable-width attribute index keys.
             header[14 + 106 + 128] = 0xC0;
@@ -1842,7 +1942,7 @@ public sealed class HfsPlusFeatureTests
             header[8] = 1;
             U16(header, 10, 3);
             U16(header, 32, Block);
-            U16(header, 34, 516);
+            U16(header, 34, 266);
             U32(header, 36, 1);
             U32(header, 14 + 38, 6);
             header[14 + 106 + 128] = 0x80;

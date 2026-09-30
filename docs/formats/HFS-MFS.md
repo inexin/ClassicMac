@@ -831,7 +831,11 @@ the attributes and startup special-file forks from the volume header, including 
 for every extent record in the extents-overflow tree, including bad-block records and records not needed to read a
 catalog fork **[Doc]** TN1150. It walks the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
-records do not claim extents **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
+records do not claim extents **[Doc]** TN1150. Attribute keys are validated and ordered by file ID, name length,
+binary UTF-16 name and start block in leaves and index nodes; separators must bound their child key ranges. The key
+ordering uses Apple's HFS comparator for the rule that
+TN1150 leaves unfinished **[Code]** [Apple HFS `hfs_attrkeycompare`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_xattr.c#L2082-L2144).
+It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
 retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode. Catalog keys
 are checked in order in leaves and index nodes, across sibling ranges, and against child key bounds. HFSX's `0xBC`

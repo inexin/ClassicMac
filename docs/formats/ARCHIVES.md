@@ -47,7 +47,11 @@ The DDA2 archive header is 62 bytes. Records begin with `DDA2`, a record type, a
 directory depth, and the record's total byte length. Directory records carry Mac creation and modification dates.
 File records contain a `0xABCD0054` file header with expanded and stored fork lengths, per-fork methods, dates, Finder
 type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths, method-0 stored forks,
-method-1 MacCompress LZW forks, method-4 Huffman forks and method-8 Compact Pro compatible forks. Method 1 uses a
+method-1 MacCompress LZW forks, method-2 adaptive Huffman forks, method-4 Huffman forks and method-8 Compact Pro
+compatible forks. Method 2 maintains 256 adaptive trees, selecting the next tree by the previous decoded byte; it
+uses the optional fitted `0x5A` output transform selected by Info1 and Info2 and a decoded-byte-sum checksum. This
+behavior is **[Fitted]** against [XADMaster's parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/)
+and [method-2 decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerMethod2Handle.m/). Method 1 uses a
 three-byte prefix, variable 9–16-bit LZW codes, block-mode dictionary resets and an optional fitted `0x5A` output
 transform selected by Info1 and Info2. Its 16-bit checksum includes the decoded fork and the decoded prefix bytes.
 Method 4 uses the tree-described Huffman stream also used by StuffIt and the same optional `0x5A` output transform;
@@ -60,12 +64,12 @@ resource forks. Its directory and end-directory markers build folder paths; redu
 after records are skipped. These layouts are **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
-Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, Huffman
+Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive Huffman, Huffman
 and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
 invalid folder depth, and entry limits. DDA2
 archive-header and method-0 fork checksums are not verified. Standalone compressed files and DDA2 compression methods
-other than 0, 1, 4 and 8 remain unsupported; original-application interoperability remains unverified.
+other than 0, 1, 2, 4 and 8 remain unsupported; original-application interoperability remains unverified.
 
 ## Compact Pro (RLE and LZH subset)
 

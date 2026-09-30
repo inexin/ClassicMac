@@ -159,6 +159,9 @@ public sealed class DiskDoublerReader : IContainerReader
             if (dataMethod == 8 && U16(archive, header + 44) != Crc16Ibm(data))
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                     $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
+            if (dataMethod == 2 && U16(archive, header + 44) != ByteSum(data))
+                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
+                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
             if (dataMethod == 1 && U16(archive, header + 44) != MacCompressChecksum(data, encodedData,
                 archive[header + 18], archive[header + 48]))
                 context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
@@ -168,6 +171,9 @@ public sealed class DiskDoublerReader : IContainerReader
                     $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
             if (resourceMethod == 8 && U16(archive, header + 46) != Crc16Ibm(resource))
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
+                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
+            if (resourceMethod == 2 && U16(archive, header + 46) != ByteSum(resource))
+                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                     $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
             if (resourceMethod == 1 && U16(archive, header + 46) != MacCompressChecksum(resource, encodedResource,
                 archive[header + 18], archive[header + 48]))
@@ -278,13 +284,14 @@ public sealed class DiskDoublerReader : IContainerReader
         return files;
     }
 
-    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 4 or 8;
+    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 8;
 
     private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method,
         byte info1, byte info2)
     {
         if (method == 0) return input.ToArray();
         if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);
+        if (method == 2) return DecodeAdaptiveHuffman(input, outputLength, info1, info2);
         if (method == 4) return DecodeHuffman(input, outputLength, info1, info2);
         if (input.Length < 16)
             throw new InvalidDataException("A DiskDoubler Compact Pro fork is missing its 16-byte method header.");
@@ -295,6 +302,86 @@ public sealed class DiskDoublerReader : IContainerReader
         return headerSum == 0
             ? CompactProLzhDecoder.Decode(compressed, outputLength)
             : CompactProReader.DecodeRle8182(compressed, outputLength);
+    }
+
+    private static byte[] DecodeAdaptiveHuffman(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2)
+    {
+        byte xor = info1 >= 0x2A && (info2 & 0x80) == 0 ? (byte)0x5A : (byte)0;
+        var trees = new AdaptiveHuffmanTree?[256];
+        var output = new byte[outputLength];
+        long bitOffset = 0;
+        int currentTree = 0;
+        for (int index = 0; index < output.Length; index++)
+        {
+            AdaptiveHuffmanTree tree = trees[currentTree] ??= new AdaptiveHuffmanTree();
+            byte decoded = tree.ReadSymbol(input, ref bitOffset);
+            tree.Update(decoded);
+            output[index] = (byte)(decoded ^ xor);
+            currentTree = decoded;
+        }
+        return output;
+    }
+
+    private sealed class AdaptiveHuffmanTree
+    {
+        private readonly byte[] _parents = new byte[512];
+        private readonly ushort[] _leftChildren = new ushort[256];
+        private readonly ushort[] _rightChildren = new ushort[256];
+
+        public AdaptiveHuffmanTree()
+        {
+            for (int node = 0; node < 256; node++)
+            {
+                _parents[node * 2] = checked((byte)node);
+                _parents[node * 2 + 1] = checked((byte)node);
+                _leftChildren[node] = checked((ushort)(node * 2));
+                _rightChildren[node] = checked((ushort)(node * 2 + 1));
+            }
+        }
+
+        public byte ReadSymbol(ReadOnlySpan<byte> input, ref long bitOffset)
+        {
+            int node = 1;
+            while (node < 256)
+            {
+                if (bitOffset >= (long)input.Length * 8)
+                    throw new InvalidDataException("A DiskDoubler method-2 fork ends inside an adaptive Huffman code.");
+                int bitInByte = 7 - (int)(bitOffset & 7);
+                int bit = (input[(int)(bitOffset >> 3)] >> bitInByte) & 1;
+                bitOffset++;
+                node = bit == 0 ? _leftChildren[node] : _rightChildren[node];
+            }
+            return checked((byte)(node - 256));
+        }
+
+        public void Update(byte value)
+        {
+            int node = value + 256;
+            while (true)
+            {
+                int parent = _parents[node];
+                if (parent == 1) break;
+                int grandparent = _parents[parent];
+                int uncle;
+                if (_leftChildren[grandparent] == parent)
+                {
+                    uncle = _rightChildren[grandparent];
+                    _rightChildren[grandparent] = checked((ushort)node);
+                }
+                else
+                {
+                    uncle = _leftChildren[grandparent];
+                    _leftChildren[grandparent] = checked((ushort)node);
+                }
+
+                if (_leftChildren[parent] != node) _rightChildren[parent] = checked((ushort)uncle);
+                else _leftChildren[parent] = checked((ushort)uncle);
+                _parents[node] = checked((byte)grandparent);
+                _parents[uncle] = checked((byte)parent);
+                node = grandparent;
+                if (node == 1) break;
+            }
+        }
     }
 
     private static byte[] DecodeHuffman(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2)

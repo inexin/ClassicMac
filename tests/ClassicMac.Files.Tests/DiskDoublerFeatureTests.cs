@@ -200,6 +200,68 @@ public sealed class DiskDoublerFeatureTests
     }
 
     [Fact]
+    public void Dda2Method2DecodesAnInitialAdaptiveHuffmanTreeSymbol()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive", 0,
+            "AAA"u8.ToArray(), [], dataMethod: 2, encodedData: [0x41, 0x41, 0xF0]));
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("AAA"u8.ToArray(), file.DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum");
+    }
+
+    [Fact]
+    public void Dda2Method2UsesThePreviousSymbolToAdaptItsTree()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive", 0,
+            "AAA"u8.ToArray(), [], dataMethod: 2, encodedData: [0x41, 0x41, 0xF0]));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("AAA"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method2AppliesTheInfoSelectedOutputXor()
+    {
+        byte[] encoded = [0x41, 0x41, 0xF0];
+        byte[] expected = [0x1B, 0x1B, 0x1B];
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive XOR", 0,
+            expected, [], dataMethod: 2, encodedData: encoded, info1: 0x2A));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method2DecodesTheResourceFork()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive resource", 0,
+            [], "A"u8.ToArray(), resourceMethod: 2, encodedResource: [0x41]));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("A"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method2RejectsTruncatedAdaptiveHuffmanCodes()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Truncated", 0,
+            "AA"u8.ToArray(), [], dataMethod: 2, encodedData: [0x41]));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
     public void Dda2MacCompressMethodDecodesLzwDictionaryReferences()
     {
         byte[] expected = "AAA"u8.ToArray();
@@ -533,8 +595,10 @@ public sealed class DiskDoublerFeatureTests
             if (resourceMethod == 8) U16(bytes, header + 46, Crc16Ibm(resource));
             if (dataMethod == 1 && encodedData.Length >= 3) U16(bytes, header + 44,
                 MacCompressChecksum(data, encodedData, info1, info2));
+            if (dataMethod == 2) U16(bytes, header + 44, ByteSum(data));
             if (resourceMethod == 1 && encodedResource.Length >= 3) U16(bytes, header + 46,
                 MacCompressChecksum(resource, encodedResource, info1, info2));
+            if (resourceMethod == 2) U16(bytes, header + 46, ByteSum(resource));
             if (dataMethod == 4) U16(bytes, header + 44, ByteSum(data));
             if (resourceMethod == 4) U16(bytes, header + 46, ByteSum(resource));
             encodedData.CopyTo(bytes, RecordHeaderLength + 14 + FileHeaderLength);
