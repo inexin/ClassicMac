@@ -807,8 +807,8 @@ extents B-tree headers have the required control-file type **[Doc]**, that catal
 minimum **[Doc]**, and that their key-layout attributes use 16-bit key lengths, with variable-length index keys in
 the catalog and attributes trees and fixed-length index keys in the extents tree **[Doc]** TN1150. The B-tree map is one
 most-significant-bit-first bit per node and
-continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader follows that
-chain, checks map-node descriptors, record boundaries and bitmap coverage, requires the header, index, leaf and map nodes to be marked
+continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader requires exactly
+enough continuation map nodes to cover the tree, checks their descriptors, record boundaries and bitmap coverage, and requires the header, index, leaf and map nodes to be marked
 allocated, and verifies `freeNodes` against the complete bitmap. It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
 `totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user

@@ -849,6 +849,11 @@ internal static class HfsPlusReader
             capacity += mapNodeCapacity;
             nextMapNode = U32(tree, offset);
         }
+        uint requiredMapNodes = totalNodes <= headerMapCapacity
+            ? 0
+            : checked((totalNodes - headerMapCapacity + mapNodeCapacity - 1) / mapNodeCapacity);
+        if (mapNodes.Count != requiredMapNodes)
+            throw new InvalidDataException("The HFS Plus B-tree map-node chain has an invalid length.");
         if (capacity < totalNodes)
             throw new InvalidDataException("The HFS Plus B-tree map nodes do not cover every node.");
 

@@ -359,6 +359,15 @@ public sealed class HfsPlusFeatureTests
         Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusBtreeRejectsMapNodesBeyondThoseNeededToCoverTheTree()
+    {
+        byte[] image = BuildOversizedExtentsTree(addMapNode: true, addUnneededMapNode: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -399,18 +408,18 @@ public sealed class HfsPlusFeatureTests
             file.DataFork.ToArray());
     }
 
-    private static byte[] BuildOversizedExtentsTree(bool addMapNode)
+    private static byte[] BuildOversizedExtentsTree(bool addMapNode, bool addUnneededMapNode = false)
     {
         const int blockSize = 4096;
         const int nodeSize = 512;
-        const int totalNodes = 2049;
+        int totalNodes = addUnneededMapNode ? 2050 : 2049;
         byte[] image = HfsPlusFixture.Build(fragmentedData: true);
         const int totalBlocks = 300;
         const int allocatedBlocks = 257;
         Array.Resize(ref image, totalBlocks * blockSize);
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 44), totalBlocks);
         Span<byte> extentsFork = image.AsSpan(1024 + 192, 80);
-        BinaryPrimitives.WriteUInt64BigEndian(extentsFork, (ulong)nodeSize * totalNodes);
+        BinaryPrimitives.WriteUInt64BigEndian(extentsFork, (ulong)nodeSize * (uint)totalNodes);
         BinaryPrimitives.WriteUInt32BigEndian(extentsFork[12..], allocatedBlocks);
         BinaryPrimitives.WriteUInt32BigEndian(extentsFork[16..], 4);
         BinaryPrimitives.WriteUInt32BigEndian(extentsFork[20..], allocatedBlocks);
@@ -424,8 +433,9 @@ public sealed class HfsPlusFeatureTests
         byte[] leaf = image.AsSpan(5 * blockSize, nodeSize).ToArray();
         Span<byte> header = image.AsSpan(treeOffset, nodeSize);
         BinaryPrimitives.WriteUInt16BigEndian(header[32..], nodeSize);
-        BinaryPrimitives.WriteUInt32BigEndian(header[36..], totalNodes);
-        BinaryPrimitives.WriteUInt32BigEndian(header[40..], totalNodes - (addMapNode ? 3u : 2u));
+        BinaryPrimitives.WriteUInt32BigEndian(header[36..], (uint)totalNodes);
+        BinaryPrimitives.WriteUInt32BigEndian(header[40..],
+            checked((uint)totalNodes - (addMapNode ? addUnneededMapNode ? 4u : 3u : 2u)));
         header.Slice(248, nodeSize - 256).Clear();
         header[248] = 0xC0; // Nodes 0 and 1 allocated; no map node links follow.
         BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 2)..], 14);
@@ -436,13 +446,23 @@ public sealed class HfsPlusFeatureTests
         if (addMapNode)
         {
             BinaryPrimitives.WriteUInt32BigEndian(header, 2); // First map node follows header and leaf nodes.
-            header[248] = 0xE0; // Nodes 0, 1 and 2 (the map node) are allocated.
+            header[248] = addUnneededMapNode ? (byte)0xF0 : (byte)0xE0;
+            // Nodes 0, 1 and 2 (and optionally 3) are allocated.
             Span<byte> mapNode = image.AsSpan(treeOffset + 2 * nodeSize, nodeSize);
+            BinaryPrimitives.WriteUInt32BigEndian(mapNode, addUnneededMapNode ? 3u : 0u);
             mapNode[8] = 2;
             mapNode[10..12].Clear();
             BinaryPrimitives.WriteUInt16BigEndian(mapNode[10..], 1);
             BinaryPrimitives.WriteUInt16BigEndian(mapNode[(nodeSize - 2)..], 14);
             BinaryPrimitives.WriteUInt16BigEndian(mapNode[(nodeSize - 4)..], nodeSize - 6);
+            if (addUnneededMapNode)
+            {
+                Span<byte> extraMapNode = image.AsSpan(treeOffset + 3 * nodeSize, nodeSize);
+                extraMapNode[8] = 2;
+                BinaryPrimitives.WriteUInt16BigEndian(extraMapNode[10..], 1);
+                BinaryPrimitives.WriteUInt16BigEndian(extraMapNode[(nodeSize - 2)..], 14);
+                BinaryPrimitives.WriteUInt16BigEndian(extraMapNode[(nodeSize - 4)..], nodeSize - 6);
+            }
         }
 
         leaf.AsSpan(0, 14 + 76).CopyTo(image.AsSpan(treeOffset + nodeSize));

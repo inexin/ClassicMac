@@ -795,7 +795,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
     info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, the
     catalog/extents key-length maxima, the catalog node-size minimum, header nodes,
-    node maps (including chained map nodes and free counts), roots, index graphs,
+    node maps (including exactly the required chained map nodes and free counts), roots, index graphs,
     sibling links, exact catalog key lengths and unique leaf keys,
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
