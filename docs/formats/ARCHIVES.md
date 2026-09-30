@@ -50,7 +50,8 @@ Method 5 is LZSS with a 4 KiB pre-seeded history window and one adaptive sibling
 match lengths. Symbols 0–255 are literals; symbols 256–313 represent lengths 3–60. A match then carries a prefix code
 for the upper six offset bits and six raw bits for the lower offset bits, most-significant-bit first. The window seed
 and output length are independent of the fork bitstream. Tests exercise literals, the seeded space run, a maximum-
-distance reference and truncated input. The offset-prefix lengths are **[Fitted]** against
+distance reference, truncated input and long forks that trigger adaptive-tree renormalization at root frequency
+`0x8000`. The offset-prefix lengths are **[Fitted]** against
 [macutils' method-5 decoder](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/de_lzah.c/) and hand-built
 fixtures; no original-application archive has yet been verified.
 

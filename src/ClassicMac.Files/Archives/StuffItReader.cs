@@ -674,6 +674,8 @@ public sealed class StuffItReader : IContainerReader
 
         public void Update(int symbol)
         {
+            if (frequency[TreeSize - 1] >= 0x8000) Reorder();
+
             int node = backward[symbol + TreeSize];
             while (node != 0)
             {
@@ -697,6 +699,37 @@ public sealed class StuffItReader : IContainerReader
                     node = swap;
                 }
                 node = backward[node];
+            }
+        }
+
+        private void Reorder()
+        {
+            int leaf = 0;
+            for (int node = 0; node < TreeSize; node++)
+            {
+                if (forward[node] < TreeSize) continue;
+                frequency[leaf] = (frequency[node] + 1) >> 1;
+                forward[leaf++] = forward[node];
+            }
+
+            int nextNode = LeafCount;
+            for (int child = 0; child < TreeSize - 1; child += 2, nextNode++)
+            {
+                int combinedFrequency = frequency[child] + frequency[child + 1];
+                int insertAt = nextNode - 1;
+                while (insertAt >= 0 && combinedFrequency < frequency[insertAt]) insertAt--;
+                insertAt++;
+                Array.Copy(frequency, insertAt, frequency, insertAt + 1, nextNode - insertAt);
+                Array.Copy(forward, insertAt, forward, insertAt + 1, nextNode - insertAt);
+                frequency[insertAt] = combinedFrequency;
+                forward[insertAt] = child;
+            }
+
+            for (int node = 0; node < TreeSize; node++)
+            {
+                int child = forward[node];
+                backward[child] = node;
+                if (child < TreeSize) backward[child + 1] = node;
             }
         }
     }

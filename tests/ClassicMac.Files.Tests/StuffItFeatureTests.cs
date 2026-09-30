@@ -236,6 +236,20 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void StuffItLzahMethodRenormalizesItsAdaptiveTreeForLongForks()
+    {
+        const int outputLength = 33_000;
+        byte[] expected = [.. Enumerable.Range(0, outputLength).Select(static value => (byte)value)];
+        ushort[] symbols = expected.Select(static value => (ushort)value).ToArray();
+        byte[] image = StuffItFixture.BuildFile("Long LZAH", expected, [], dataMethod: 5,
+            encodedData: StuffItFixture.EncodeLzah(symbols));
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
     public void StuffItMwMethodDecodesLiteralsAndDictionaryPhrasesInBothForks()
     {
         byte[] expected = "ABAB"u8.ToArray();
@@ -628,6 +642,8 @@ public sealed class StuffItFeatureTests
                     path.Add(forward[parent] + 1 == child);
                 path.Reverse();
                 bits.AddRange(path);
+                if (frequencies[TreeSize - 1] >= 0x8000)
+                    ReorderLzahTree(frequencies, forward, backward, TreeSize, LeafCount);
                 UpdateLzahTree(symbol, frequencies, forward, backward, TreeSize);
                 if (symbol >= 256)
                 {
@@ -707,6 +723,38 @@ public sealed class StuffItFeatureTests
                     node = swap;
                 }
                 node = backward[node];
+            }
+        }
+
+        private static void ReorderLzahTree(int[] frequencies, int[] forward, int[] backward, int treeSize,
+            int leafCount)
+        {
+            int leaf = 0;
+            for (int node = 0; node < treeSize; node++)
+            {
+                if (forward[node] < treeSize) continue;
+                frequencies[leaf] = (frequencies[node] + 1) >> 1;
+                forward[leaf++] = forward[node];
+            }
+
+            int nextNode = leafCount;
+            for (int child = 0; child < treeSize - 1; child += 2, nextNode++)
+            {
+                int combinedFrequency = frequencies[child] + frequencies[child + 1];
+                int insertAt = nextNode - 1;
+                while (insertAt >= 0 && combinedFrequency < frequencies[insertAt]) insertAt--;
+                insertAt++;
+                Array.Copy(frequencies, insertAt, frequencies, insertAt + 1, nextNode - insertAt);
+                Array.Copy(forward, insertAt, forward, insertAt + 1, nextNode - insertAt);
+                frequencies[insertAt] = combinedFrequency;
+                forward[insertAt] = child;
+            }
+
+            for (int node = 0; node < treeSize; node++)
+            {
+                int child = forward[node];
+                backward[child] = node;
+                if (child < treeSize) backward[child + 1] = node;
             }
         }
 
