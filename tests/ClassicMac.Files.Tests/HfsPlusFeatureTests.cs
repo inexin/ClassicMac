@@ -853,8 +853,40 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
-    [InlineData("\u03B1\u030D", false)] // Legacy Greek tonos representation.
+    [InlineData("a\u0307\u0307", false)] // Legacy double-dot-above spelling.
+    [InlineData("a\u0310", true)]
+    [InlineData("\u00A8\u030D", false)] // Legacy dialytika tonos representation.
+    [InlineData("\u00A8\u0301", true)]
+    [InlineData("\u0391\u030D", false)] // Legacy Greek tonos representations.
+    [InlineData("\u0391\u0301", true)]
+    [InlineData("\u0395\u030D", false)]
+    [InlineData("\u0395\u0301", true)]
+    [InlineData("\u0397\u030D", false)]
+    [InlineData("\u0397\u0301", true)]
+    [InlineData("\u0399\u030D", false)]
+    [InlineData("\u0399\u0301", true)]
+    [InlineData("\u039F\u030D", false)]
+    [InlineData("\u039F\u0301", true)]
+    [InlineData("\u03A5\u030D", false)]
+    [InlineData("\u03A5\u0301", true)]
+    [InlineData("\u03A9\u030D", false)]
+    [InlineData("\u03A9\u0301", true)]
+    [InlineData("\u03B1\u030D", false)]
     [InlineData("\u03B1\u0301", true)]
+    [InlineData("\u03B5\u030D", false)]
+    [InlineData("\u03B5\u0301", true)]
+    [InlineData("\u03B7\u030D", false)]
+    [InlineData("\u03B7\u0301", true)]
+    [InlineData("\u03B9\u030D", false)]
+    [InlineData("\u03B9\u0301", true)]
+    [InlineData("\u03BF\u030D", false)]
+    [InlineData("\u03BF\u0301", true)]
+    [InlineData("\u03C5\u030D", false)]
+    [InlineData("\u03C5\u0301", true)]
+    [InlineData("\u03C9\u030D", false)]
+    [InlineData("\u03C9\u0301", true)]
+    [InlineData("\u03D2\u030D", false)]
+    [InlineData("\u03D2\u0301", true)]
     [InlineData("\u09AC\u09BC", false)] // Bengali BA + NUKTA is corrected to RA with middle diagonal.
     [InlineData("\u09B0", true)]
     public void HfsXCatalogNamesMustUsePostJaguarCanonicalDecompositions(string fileName, bool valid)
@@ -873,7 +905,10 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
+    [InlineData("a\u0307\u0307")]
     [InlineData("\u03B1\u030D")]
+    [InlineData("\u03B5\u030D")]
+    [InlineData("\u03C9\u030D")]
     [InlineData("\u09AC\u09BC")]
     public void HfsXCatalogThreadNamesMustUsePostJaguarCanonicalDecompositions(string threadName)
     {
@@ -884,7 +919,12 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
+    [InlineData("a\u0307\u0307")]
+    [InlineData("\u00A8\u030D")]
     [InlineData("\u03B1\u030D")]
+    [InlineData("\u03B5\u030D")]
+    [InlineData("\u0391\u030D")]
+    [InlineData("\u03C9\u030D")]
     [InlineData("\u09AC\u09BC")]
     public void HfsPlusAcceptsLegacyCanonicalNameDecompositions(string fileName)
     {

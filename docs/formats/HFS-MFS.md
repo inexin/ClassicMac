@@ -836,10 +836,10 @@ must have nonempty names **[Doc]** TN1150. Catalog key names and thread names mu
 combining-mark order **[Doc]** TN1150. The
 reader validates this with fixed Unicode 3.2 canonical decomposition data, including algorithmic Hangul decomposition
 and TN1150's preserved ranges U+2000–U+2FFF, U+F900–U+FAFF and U+2F800–U+2FAFF; it does not depend on the host
-runtime's evolving normalization tables. HFSX also rejects two post-Jaguar legacy sequences: Greek alpha plus U+030D
-and Bengali BA plus nukta, which Apple's `fsck_hfs` rewrites to their corrected forms. Since HFS+ has no field
-recording which decomposition version created its names, the reader continues to accept those legacy sequences there.
-Other Unicode 2.1/3.2 differences remain open.
+runtime's evolving normalization tables. HFSX also rejects the legacy doubled U+0307, Greek tonos sequences formed by
+U+030D after Greek tonos bases or diaeresis, and Bengali BA plus nukta; Apple's `fsck_hfs` rewrites them to their
+corrected forms. Since HFS+ has no field recording which decomposition version created its names, the reader continues
+to accept these legacy sequences there. Other Unicode 2.1/3.2 and `fsck_hfs` fixup cases remain open.
 Catalog IDs are unique and each required file and folder thread points back to its record's parent and name. `nextCatalogID`
 must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
@@ -1039,8 +1039,9 @@ No rule in this document is fitted to data alone. Still open:
 2. That an HFSX volume fails to mount on Mac OS 9.0 with −57 is inferred from the code, not run (section 11).
 3. The Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (section 10).
 4. TN1150 says Mac OS 8.1–10.2 used Unicode 2.1 decompositions, while Mac OS X 10.3 and later use Unicode 3.2.
-   The volume does not record which version produced its names. The reader currently validates against 3.2; uncommon
-   characters whose decomposition changed between versions need compatibility coverage (section 11).
+   The volume does not record which version produced its names. The reader validates against 3.2 and preserves the
+   historical dot-above, Greek tonos and Bengali spellings noted in section 11; the remaining uncommon Unicode version
+   changes and Apple's `fsck_hfs` fixup cases need compatibility coverage.
 
 Differences from the Mac that ClassicMac knowingly keeps (section 3.4): a partition's volume ends where the partition
 ends (`pmPartBlkCnt − pmLgDataStart` blocks, where the CD-ROM driver takes `pmPartBlkCnt` from the data start);

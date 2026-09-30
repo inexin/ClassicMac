@@ -817,8 +817,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
     reserved catalog ID rules, folder flag validity, nonempty and canonically decomposed catalog names (Unicode 3.2;
-    HFSX also checks two documented post-Jaguar Greek and Bengali corrections, while broader legacy 2.1 differences
-    remain),
+    HFSX also checks post-Jaguar doubled-dot-above, Greek tonos/dialytika, and Bengali BA+nukta corrections, while
+    other Unicode 2.1/3.2 and `fsck_hfs` compatibility cases remain),
     root-parent ID, unique catalog IDs and next-ID consistency, file/folder threads,
     folder valences and parent chains (including empty folders).
     The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored

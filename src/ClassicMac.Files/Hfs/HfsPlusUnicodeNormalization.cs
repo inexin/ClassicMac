@@ -74,7 +74,11 @@ internal static partial class HfsPlusUnicodeNormalization
         for (int index = 0; index < codePoints.Count; index++)
         {
             // Apple fsck_hfs's FixDecomps corrects these legacy sequences before comparing names.
-            if (codePoints[index] == 0x03B1 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x030D)
+            if (codePoints[index] == 0x0307 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0307)
+                return true;
+
+            if ((codePoints[index] == 0x00A8 || IsGreekTonosBase(codePoints[index])) &&
+                index + 1 < codePoints.Count && codePoints[index + 1] == 0x030D)
                 return true;
 
             if (codePoints[index] == 0x09AC && index + 1 < codePoints.Count && codePoints[index + 1] == 0x09BC)
@@ -83,6 +87,10 @@ internal static partial class HfsPlusUnicodeNormalization
 
         return false;
     }
+
+    private static bool IsGreekTonosBase(int codePoint) => codePoint is
+        0x0391 or 0x0395 or 0x0397 or 0x0399 or 0x039F or 0x03A5 or 0x03A9 or
+        0x03B1 or 0x03B5 or 0x03B7 or 0x03B9 or 0x03BF or 0x03C5 or 0x03C9 or 0x03D2;
 
     private static void AppendDecomposition(int codePoint, List<int> output)
     {
