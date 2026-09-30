@@ -881,6 +881,20 @@ internal static class HfsPlusReader
         if (capacity < totalNodes)
             throw new InvalidDataException("The HFS Plus B-tree map nodes do not cover every node.");
 
+        // [Code] Apple's HFS verifier's CmpBTM checks that unused bytes at the end of the final map record are zero.
+        if (totalNodes <= headerMapCapacity)
+        {
+            int usedMapBytes = checked((int)((totalNodes + 7UL) / 8));
+            RequireZeroMapPadding(tree.AsSpan(MapOffset, mapLength), usedMapBytes);
+        }
+        else
+        {
+            ulong precedingMapBits = (ulong)headerMapCapacity + (ulong)mapNodeCapacity * (uint)(mapNodes.Count - 1);
+            int usedMapBytes = checked((int)((totalNodes - precedingMapBits + 7) / 8));
+            int lastMapOffset = checked((int)mapNodes[^1] * nodeSize + 14);
+            RequireZeroMapPadding(tree.AsSpan(lastMapOffset, mapNodeLength), usedMapBytes);
+        }
+
         void RequireAllocated(uint nodeNumber)
         {
             if (!IsAllocated(nodeNumber))
@@ -919,6 +933,13 @@ internal static class HfsPlusReader
             if (!IsAllocated(nodeNumber)) freeNodes++;
         if (freeNodes != U32(tree, 14 + 26))
             throw new InvalidDataException("The HFS Plus B-tree free-node count differs from its node map.");
+    }
+
+    private static void RequireZeroMapPadding(ReadOnlySpan<byte> mapRecord, int usedBytes)
+    {
+        for (int index = usedBytes; index < mapRecord.Length; index++)
+            if (mapRecord[index] != 0)
+                throw new InvalidDataException("The HFS Plus B-tree node map has nonzero unused bytes.");
     }
 
     private static string Name(ReadOnlySpan<byte> key)

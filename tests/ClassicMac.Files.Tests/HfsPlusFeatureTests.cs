@@ -446,6 +446,29 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusBtreeRequiresUnusedHeaderMapBytesToBeZero()
+    {
+        const int nodeSize = 4096;
+        byte[] image = HfsPlusFixture.Build();
+        image[2 * nodeSize + 14 + 106 + 128 + 1] = 0x01;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusBtreeRequiresUnusedChainedMapBytesToBeZero()
+    {
+        const int blockSize = 4096;
+        const int nodeSize = 512;
+        byte[] image = BuildOversizedExtentsTree(addMapNode: true);
+        image[4 * blockSize + 2 * nodeSize + 14 + 1] = 0x01;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusBtreeRejectsMapNodesBeyondThoseNeededToCoverTheTree()
     {
         byte[] image = BuildOversizedExtentsTree(addMapNode: true, addUnneededMapNode: true);

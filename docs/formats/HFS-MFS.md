@@ -810,7 +810,9 @@ the catalog and attributes trees and fixed-length index keys in the extents tree
 most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader requires exactly
 enough continuation map nodes to cover the tree, checks their descriptors, record boundaries and bitmap coverage, and requires the header, index, leaf and map nodes to be marked
-allocated, and verifies `freeNodes` against the complete bitmap. It checks that
+allocated, verifies `freeNodes` against the complete bitmap, and requires unused bytes after the final byte containing
+node bits in the last map record to be zero **[Code]** as Apple's HFS verifier's `CmpBTM` does in
+[`SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c). It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
 `totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user
 record and remaining map record, index records contain exactly the padded key and child pointer, and leaf-record keys are

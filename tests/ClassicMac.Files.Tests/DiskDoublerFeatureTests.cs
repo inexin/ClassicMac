@@ -36,6 +36,126 @@ public sealed class DiskDoublerFeatureTests
             file.ResourceFork.ToArray());
     }
 
+    [Theory]
+    [InlineData("DiskDoublerPro411Ad1TestFile.dd")]
+    [InlineData("DiskDoublerPro411Ad2TestFile.dd")]
+    public void DiskDoublerPro411AutoDoublerFilesExpandToOriginalApplicationOutput(string fixtureName)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("testfile.PICT.dd"))));
+
+        Assert.Equal("testfile.PICT", file.Name.ToMacRoman());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict")),
+            file.DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin")),
+            file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StandaloneDiskDoublerMethod9CopiesAnUncompressedAdnBlock()
+    {
+        byte[] expected = "uncompressed ADn block"u8.ToArray();
+        byte[] encoded = DiskDoublerFixture.BuildAdnStoredBlock(expected);
+        byte[] archive = DiskDoublerFixture.BuildStandaloneFile(expected, [], dataMethod: 9, encodedData: encoded);
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("Stored.dd"))));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StandaloneDiskDoublerMethod9RejectsAnInvalidAdnBlockHeaderChecksum()
+    {
+        byte[] expected = "uncompressed ADn block"u8.ToArray();
+        byte[] encoded = DiskDoublerFixture.BuildAdnStoredBlock(expected);
+        encoded[11] ^= 0x01;
+        byte[] archive = DiskDoublerFixture.BuildStandaloneFile(expected, [], dataMethod: 9, encodedData: encoded);
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("Corrupt.dd"))));
+    }
+
+    [Fact]
+    public void Dda2Method10ForksDecodeOriginalApplicationCompressedPayloads()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] standalone = File.ReadAllBytes(Path.Combine(fixtureDirectory, "DiskDoublerPro411Dd3TestFile.dd"));
+        int dataLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(4)));
+        int compressedDataLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(8)));
+        int resourceLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(12)));
+        int compressedResourceLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(16)));
+        byte[] compressedData = standalone.AsSpan(84, compressedDataLength).ToArray();
+        byte[] compressedResource = standalone.AsSpan(84 + compressedDataLength, compressedResourceLength).ToArray();
+        byte[] data = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict"));
+        byte[] resource = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin"));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("testfile.PICT", 0,
+            data, resource, dataMethod: 10, resourceMethod: 10, encodedData: compressedData,
+            encodedResource: compressedResource));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(dataLength, file.DataFork.Length);
+        Assert.Equal(resourceLength, file.ResourceFork.Length);
+        Assert.Equal(data, file.DataFork.ToArray());
+        Assert.Equal(resource, file.ResourceFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData("DiskDoublerPro411Ad1TestFile.dd", 9)]
+    [InlineData("DiskDoublerPro411Ad2TestFile.dd", 6)]
+    public void Dda2AutoDoublerMethodsDecodeOriginalApplicationCompressedPayloads(string fixtureName, byte method)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] standalone = File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName));
+        int dataLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(4)));
+        int compressedDataLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(8)));
+        int resourceLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(12)));
+        int compressedResourceLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(standalone.AsSpan(16)));
+        byte[] compressedData = standalone.AsSpan(84, compressedDataLength).ToArray();
+        byte[] compressedResource = standalone.AsSpan(84 + compressedDataLength, compressedResourceLength).ToArray();
+        byte[] data = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict"));
+        byte[] resource = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin"));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("testfile.PICT", 0,
+            data, resource, dataMethod: method, resourceMethod: method, encodedData: compressedData,
+            encodedResource: compressedResource));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(dataLength, file.DataFork.Length);
+        Assert.Equal(resourceLength, file.ResourceFork.Length);
+        Assert.Equal(data, file.DataFork.ToArray());
+        Assert.Equal(resource, file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StandaloneMethod10RejectsACorruptBlockHeaderChecksum()
+    {
+        byte[] archive = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal",
+            "DiskDoublerPro411Dd3TestFile.dd"));
+        archive[84 + 21] ^= 0x01;
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("testfile.PICT.dd"))));
+    }
+
+    [Fact]
+    public void StandaloneMethod10RejectsAnIncorrectExpandedBlockChecksum()
+    {
+        byte[] archive = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal",
+            "DiskDoublerPro411Dd3TestFile.dd"));
+        archive[84 + 19] ^= 0x01;
+        archive[84 + 21] ^= 0x01;
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("testfile.PICT.dd"))));
+    }
+
     [Fact]
     public void Dda2RejectsAnInvalidArchiveHeaderChecksum()
     {
@@ -807,6 +927,20 @@ public sealed class DiskDoublerFeatureTests
             encodedResource.CopyTo(archive, 84 + encodedData.Length);
             if (headerChecksum) U16(archive, 82, Crc16Xmodem(archive.AsSpan(0, 82)));
             return archive;
+        }
+
+        public static byte[] BuildAdnStoredBlock(byte[] data)
+        {
+            if (data.Length > 0x2000) throw new ArgumentOutOfRangeException(nameof(data));
+            byte[] block = new byte[12 + data.Length];
+            U16(block, 0, checked((ushort)data.Length));
+            U16(block, 2, checked((ushort)data.Length));
+            block[9] = 1;
+            byte headerXor = 0;
+            for (int index = 0; index < 11; index++) headerXor ^= block[index];
+            block[11] = headerXor;
+            data.CopyTo(block, 12);
+            return block;
         }
 
         public static void UpdateStandaloneHeaderChecksum(byte[] archive) =>

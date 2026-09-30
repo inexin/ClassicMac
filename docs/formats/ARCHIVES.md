@@ -50,8 +50,13 @@ name field, a directory depth, and the record's total byte length. Directory rec
 modification dates.
 File records contain a `0xABCD0054` file header with expanded and stored fork lengths, per-fork methods, dates, Finder
 type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths, method-0 stored forks,
-method-1 MacCompress LZW forks, method-2 adaptive Huffman forks, method-4 Huffman forks and method-8 Compact Pro
-compatible forks. Method 2 maintains 256 adaptive trees, selecting the next tree by the previous decoded byte; it
+method-1 MacCompress LZW forks, method-2 adaptive Huffman forks, method-4 Huffman forks, method-6 AD2 forks,
+method-8 Compact Pro compatible forks, method-9 AD1 forks and method-10 DDn forks. Methods 6 and 9 use ADn blocks:
+each block has a 12-byte XOR-checked header, expands to at most 8 KiB, and is either raw or LZSS-coded with literal,
+near/far offset and length tokens **[Fitted]** against
+[XADMaster's ADn decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerADnHandle.m/) and
+checked against original DiskDoubler Pro 4.1.1 AD1 and AD2 standalone files. Method 2 maintains 256 adaptive trees,
+selecting the next tree by the previous decoded byte; it
 uses the optional fitted `0x5A` output transform selected by Info1 and Info2 and a decoded-byte-sum checksum. This
 behavior is **[Fitted]** against [XADMaster's parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/)
 and [method-2 decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerMethod2Handle.m/). Method 1 uses a
@@ -68,17 +73,28 @@ after records are skipped. These layouts are **[Fitted]** against [XADMaster's D
 
 A standalone compressed file starts with the same `0xABCD0054` file header and stores its compressed data and resource
 forks after the 84-byte header. Its checksum at +82 covers bytes 0–81; older files with a zero checksum are accepted
-**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 4 and 8 from standalone files as it does from
+**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 4, 6, 8, 9 and 10 from standalone files as it does from
 DDA2 entries, preserving Finder metadata and deriving the Mac filename from the host name (a `.dd` suffix is removed).
-Unsupported methods and delta processing are diagnosed and the file is skipped.
+Methods 6 (`AD2`) and 9 (`AD1`) use the ADn block decoder described above; both original-app files expand to the
+uncompressed data and resource forks in the CC0 corpus.
+Method 10 (`DDn`) is block-based: each block has a 22-byte header, an XOR header check, an expanded-output XOR check,
+and separate offset, literal, and length streams. The offset and length streams use canonical Huffman codes; literals
+may be raw or Huffman-coded, and matches refer to prior output. This layout is **[Fitted]** against
+[XADMaster's DDn decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerDDnHandle.m/) and checked
+against a standalone DD3 file produced by DiskDoubler Pro 4.1.1 in the CC0
+[DiskDoubler Test Files corpus](https://github.com/ssokolow/diskdoubler-test-files); the expanded data and resource
+forks match the uncompressed corpus originals. Methods 3, 5, 7 and delta processing are diagnosed and skipped.
 
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive Huffman, Huffman
 and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
 invalid folder depth, entry limits, standalone files and their header checksums, standalone fork methods, and
-unsupported standalone delta processing. Method-0 fork checksums are not verified. DDA2 compression methods other
-than 0, 1, 2, 4 and 8 remain unsupported; original-application interoperability remains unverified.
+unsupported standalone delta processing. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
+methods 9, 6 and 10 against both fork outputs; their compressed payloads are also tested inside DDA2 records.
+Method-0 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 4, 6, 8, 9 and 10 remain
+unsupported; standalone methods 3, 5 and 7 and delta processing remain unsupported. Original
+application interoperability for DDA2 archives remains unverified.
 
 ## Compact Pro (RLE and LZH subset)
 
