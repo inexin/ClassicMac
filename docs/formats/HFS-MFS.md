@@ -819,9 +819,10 @@ Finder info and dates. It
 also reads data and resource fork overflow
 extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
 (which may exceed the blocks needed by its logical length). It rejects overlapping allocation ranges among the
-extents it reads, following TN1150's allocation-file ownership model. If the volume header provides an allocation
-file, the reader requires its bitmap to cover the declared allocation blocks and to mark each parsed extent as
-allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes **[Doc]** TN1150. It checks
+extents it reads, following TN1150's allocation-file ownership model. The volume header must provide the required
+allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the declared allocation blocks and to mark
+each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
+**[Doc]** TN1150. It checks
 the attributes and startup special-file forks from the volume header, including their overflow extents, and accounts
 for data extents in bad-block records from the extents-overflow file **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are

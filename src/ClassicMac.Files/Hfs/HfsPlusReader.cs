@@ -30,6 +30,8 @@ internal static class HfsPlusReader
         if (blockSize < 512 || (blockSize & (blockSize - 1)) != 0 ||
             totalBlocks == 0 || (ulong)blockSize * totalBlocks > (ulong)image.Length)
             throw new InvalidDataException("The HFS Plus allocation area is invalid.");
+        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(112, 8)) == 0)
+            throw new InvalidDataException("The HFS Plus volume has no allocation file.");
 
         var overflow = new Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>();
         var allocationExtents = new List<(uint Start, uint End)>();
@@ -52,13 +54,9 @@ internal static class HfsPlusReader
         }
         AddBadBlockExtents(overflow, totalBlocks, allocationExtents);
 
-        byte[]? allocationBitmap = null;
-        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(112, 8)) != 0)
-        {
-            ForkData allocationFork = ReadFork(image, header.AsSpan(112, 80), blockSize, totalBlocks,
-                overflow, 0, 6, allocationExtents);
-            allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
-        }
+        ForkData allocationFork = ReadFork(image, header.AsSpan(112, 80), blockSize, totalBlocks,
+            overflow, 0, 6, allocationExtents);
+        byte[] allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(352, 8)) != 0)
             _ = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks, overflow, 0, 8,
                 allocationExtents);
@@ -164,8 +162,7 @@ internal static class HfsPlusReader
             });
         }
         ValidateAllocationExtents(allocationExtents);
-        if (allocationBitmap is not null)
-            ValidateAllocationBitmap(allocationBitmap, totalBlocks, blockSize, allocationExtents);
+        ValidateAllocationBitmap(allocationBitmap, totalBlocks, blockSize, allocationExtents);
         uint expectedFiles = U32(header, 32);
         uint expectedFolders = U32(header, 36);
         if (result.Count != expectedFiles || folders.Count - 1 != expectedFolders)

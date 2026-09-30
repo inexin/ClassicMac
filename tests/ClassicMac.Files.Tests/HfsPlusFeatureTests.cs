@@ -196,6 +196,10 @@ public sealed class HfsPlusFeatureTests
         BinaryPrimitives.WriteUInt32BigEndian(extentsFork[12..], allocatedBlocks);
         BinaryPrimitives.WriteUInt32BigEndian(extentsFork[16..], 4);
         BinaryPrimitives.WriteUInt32BigEndian(extentsFork[20..], allocatedBlocks);
+        Span<byte> allocationFork = image.AsSpan(1024 + 112, 80);
+        BinaryPrimitives.WriteUInt64BigEndian(allocationFork, (ulong)(totalBlocks + 7) / 8);
+        BinaryPrimitives.WriteUInt32BigEndian(allocationFork[16..], 282);
+        image.AsSpan(282 * blockSize, (totalBlocks + 7) / 8).Fill(0xFF);
 
         int treeOffset = 4 * blockSize;
         byte[] leaf = image.AsSpan(5 * blockSize, nodeSize).ToArray();
@@ -516,6 +520,15 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusVolumeRequiresAnAllocationFile()
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: false);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusAllocationFileWithAllReferencedBlocksMarkedIsReadable()
     {
         byte[] image = HfsPlusFixture.Build(includeAllocationFile: true);
@@ -553,6 +566,8 @@ public sealed class HfsPlusFeatureTests
     {
         byte[] image = HfsPlusFixture.Build(includeAllocationFile: true,
             includeAttributeFile: attributesFile, includeStartupFile: startupFile);
+        if (attributesFile) image[9 * 4096 + 1] &= 0xDF;
+        if (startupFile) image[9 * 4096 + 1] &= 0xEF;
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
@@ -902,7 +917,7 @@ public sealed class HfsPlusFeatureTests
             byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false,
             bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false,
             bool deepCatalogTree = false, bool overlappingFileForks = false,
-            bool zeroLengthResourceFork = false, bool includeAllocationFile = false,
+            bool zeroLengthResourceFork = false, bool includeAllocationFile = true,
             bool markDataForkAllocated = true, bool includeAttributeFile = false,
             bool includeStartupFile = false, bool badBlockExtent = false,
             bool badBlockOverlapsFileExtent = false)
@@ -917,13 +932,22 @@ public sealed class HfsPlusFeatureTests
             U32(volume, 36, 1); // folderCount excludes root
             U32(volume, 40, Block);
             U32(volume, 44, volumeBlocks);
-            U32(volume, 48, fragmentedData ? 19u : 10u);
+            U32(volume, 48, includeAllocationFile ? 0u : fragmentedData ? 19u : 10u);
             U32(volume, 64, nextCatalogId ?? (additionalFolderParent is null ? 18u : 19u));
             Fork(volume.Slice(272, 80), (deepCatalogTree ? 8 : multiLeafCatalog ? 4 : 2) * Block,
                 deepCatalogTree ? 26u : 2u, deepCatalogTree ? 8u : multiLeafCatalog ? 4u : 2u);
             if (fragmentedData)
                 Fork(volume.Slice(192, 80), (indexedOverflowTree ? 4 : 2) * Block,
                     indexedOverflowTree ? 26u : 4u, indexedOverflowTree ? 4u : 2u);
+            if (includeAllocationFile)
+            {
+                int bitmapLength = checked((int)((volumeBlocks + 7) / 8));
+                Fork(volume.Slice(112, 80), bitmapLength, 9, 1);
+                image.AsSpan(9 * Block, bitmapLength).Fill(0xFF);
+                if (!markDataForkAllocated) image[9 * Block] &= 0xF7;
+            }
+            if (includeAttributeFile) Fork(volume.Slice(352, 80), 1, 10, 1);
+            if (includeStartupFile) Fork(volume.Slice(432, 80), 1, 11, 1);
 
             byte[] root = new byte[88];
             U16(root, 0, 1);
@@ -1063,14 +1087,6 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
-            if (includeAllocationFile)
-            {
-                Fork(image.AsSpan(1024 + 112, 80), 2, 9, 1);
-                image[9 * Block] = markDataForkAllocated ? (byte)0xFC : (byte)0xF4;
-                image[9 * Block + 1] = 0x41; // Blocks 9 and 15, including the final reserved block.
-            }
-            if (includeAttributeFile) Fork(image.AsSpan(1024 + 352, 80), 1, 10, 1);
-            if (includeStartupFile) Fork(image.AsSpan(1024 + 432, 80), 1, 11, 1);
             return image;
         }
 
