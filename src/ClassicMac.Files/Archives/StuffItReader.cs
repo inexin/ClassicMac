@@ -1,0 +1,417 @@
+using System;
+using System.Buffers.Binary;
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using ClassicMac.Core;
+
+namespace ClassicMac.Files.Archives;
+
+/// <summary>Reads the StuffIt 5 archive container and stored forks.</summary>
+/// <remarks>
+/// StuffIt does not have a published format specification. The v5 record layout is cross-checked against Deark's
+/// independent parser and remains subject to verification with archives written by the original StuffIt application.
+/// </remarks>
+public sealed class StuffItReader : IContainerReader
+{
+    private const int ArchiveHeaderLength = 100;
+    private const uint MemberSignature = 0xA5A5A5A5;
+    private const byte FolderFlag = 0x40;
+    private const byte EncryptedFlag = 0x20;
+    private const ushort HasResourceForkFlag = 0x0001;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
+    /// <summary>The built-in reader.</summary>
+    public static StuffItReader Instance { get; } = new();
+
+    private StuffItReader()
+    {
+    }
+
+    /// <inheritdoc/>
+    public string FormatName => "StuffIt archive";
+
+    /// <inheritdoc/>
+    public bool CanRead(ForkData input)
+    {
+        if (input.Length < 83) return false;
+        byte[] prefix = input.ReadPrefix(83);
+        return prefix.AsSpan(0, 8).SequenceEqual("StuffIt "u8) && prefix[82] == 5;
+    }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(context);
+        if (!CanRead(input)) throw new InvalidDataException("Not a supported StuffIt v5 archive.");
+
+        byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
+        if (archive.Length < ArchiveHeaderLength)
+            throw new InvalidDataException("The StuffIt archive header is truncated.");
+
+        uint reportedLength = U32(archive, 84);
+        if (reportedLength != 0 && reportedLength > archive.Length)
+            throw new InvalidDataException("The StuffIt archive's reported size extends past the input.");
+
+        int rootCount = U16(archive, 92);
+        int firstMember = ReadPosition(U32(archive, 94), "first member");
+        if (rootCount > context.Options.MaxVolumeEntries)
+            throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
+        if (rootCount != 0 && (firstMember < ArchiveHeaderLength || firstMember >= archive.Length))
+            throw new InvalidDataException("The first StuffIt archive member lies outside the archive.");
+
+        var files = new List<MacFile>();
+        var visited = new HashSet<int>();
+        var pending = new Stack<MemberList>();
+        pending.Push(new MemberList(firstMember, rootCount, [], []));
+        int entriesRead = 0;
+        long expandedBytes = 0;
+
+        while (pending.Count > 0)
+        {
+            MemberList list = pending.Pop();
+            if (list.Remaining == 0) continue;
+            if (list.Position == 0)
+            {
+                context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
+                    $"A StuffIt member list ends before its declared count of {list.Remaining} remaining entries.");
+                continue;
+            }
+            if (!visited.Add(list.Position))
+                throw new InvalidDataException("A StuffIt member link refers to an entry already visited.");
+            if (++entriesRead > context.Options.MaxVolumeEntries)
+                throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
+
+            Member member = ParseMember(archive, list.Position, context);
+            int remaining = list.Remaining - 1;
+            if (remaining > 0)
+            {
+                if (member.Next == 0)
+                    context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
+                        $"A StuffIt member list has {remaining} more declared entries but no next-member link.");
+                else
+                    pending.Push(new MemberList(member.Next, remaining, list.LegacyPath, list.UnicodePath));
+            }
+
+            if (member.IsFolder)
+            {
+                if (member.ChildCount > context.Options.MaxVolumeEntries)
+                    throw new InvalidDataException("A StuffIt folder exceeds the configured entry limit.");
+                if (member.ChildCount > 0)
+                {
+                    var legacyPath = new MacString[list.LegacyPath.Length + 1];
+                    list.LegacyPath.CopyTo(legacyPath, 0);
+                    legacyPath[^1] = LegacyName(member.Name);
+                    var unicodePath = new string[list.UnicodePath.Length + 1];
+                    list.UnicodePath.CopyTo(unicodePath, 0);
+                    unicodePath[^1] = member.Name;
+                    pending.Push(new MemberList(member.FirstChild, member.ChildCount, legacyPath, unicodePath));
+                }
+                continue;
+            }
+
+            if (member.Encrypted)
+            {
+                context.Report(DiagnosticSeverity.Warning, "archive.encrypted",
+                    $"The encrypted StuffIt entry '{member.Name}' is listed but not opened.", list.Position);
+                continue;
+            }
+
+            if (member.DataMethod is not (0 or 1) || member.ResourceMethod is not (0 or 1 or null))
+            {
+                context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
+                    $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
+                continue;
+            }
+
+            expandedBytes = checked(expandedBytes + member.DataLength + member.ResourceLength);
+            if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+                throw new InvalidDataException("StuffIt extraction exceeds the configured expanded-size limit.");
+
+            byte[] data = DecodeFork(archive, member.DataOffset, member.DataCompressedLength, member.DataLength,
+                member.DataMethod);
+            byte[] resource = member.ResourceMethod is { } resourceMethod
+                ? DecodeFork(archive, member.ResourceOffset, member.ResourceCompressedLength, member.ResourceLength,
+                    resourceMethod)
+                : [];
+            CheckForkCrc(data, member.DataCrc, "data", member.Name, list.Position, context);
+            if (member.ResourceMethod is not null)
+                CheckForkCrc(resource, member.ResourceCrc, "resource", member.Name, list.Position, context);
+
+            files.Add(new MacFile
+            {
+                Name = LegacyName(member.Name),
+                UnicodeName = member.Name,
+                FolderPath = list.LegacyPath,
+                UnicodeFolderPath = list.UnicodePath,
+                FinderInfo = member.FinderInfo,
+                Created = member.Created,
+                Modified = member.Modified,
+                DataFork = ForkData.FromBytes(data),
+                ResourceFork = ForkData.FromBytes(resource),
+            });
+        }
+        return files;
+    }
+
+    private static Member ParseMember(byte[] archive, int offset, ContainerContext context)
+    {
+        Require(archive, offset, 48, "StuffIt member header");
+        if (U32(archive, offset) != MemberSignature)
+            throw new InvalidDataException($"No StuffIt member header is present at offset {offset}.");
+        int headerLength = U16(archive, offset + 6);
+        if (headerLength is < 48 or > 2000)
+            throw new InvalidDataException($"The StuffIt member header length {headerLength} is invalid.");
+        Require(archive, offset, headerLength, "StuffIt member name and header");
+
+        ushort expectedHeaderCrc = U16(archive, offset + 32);
+        if (HeaderCrc(archive.AsSpan(offset, headerLength)) != expectedHeaderCrc)
+            context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
+                $"The StuffIt member header checksum is incorrect at offset {offset}.", offset);
+
+        byte flags = archive[offset + 9];
+        bool isFolder = (flags & FolderFlag) != 0;
+        int nameLength = U16(archive, offset + 30);
+        int nameOffset;
+        int firstChild = 0;
+        int childCount = 0;
+        uint dataLength = 0;
+        uint dataCompressedLength = 0;
+        ushort dataCrc = 0;
+        byte dataMethod = 0;
+        int dataPasswordLength = 0;
+        if (isFolder)
+        {
+            firstChild = ReadPosition(U32(archive, offset + 34), "first child");
+            childCount = U16(archive, offset + 46);
+            nameOffset = offset + 48;
+        }
+        else
+        {
+            dataLength = U32(archive, offset + 34);
+            dataCompressedLength = U32(archive, offset + 38);
+            dataCrc = U16(archive, offset + 42);
+            dataMethod = archive[offset + 46];
+            dataPasswordLength = archive[offset + 47];
+            nameOffset = checked(offset + 48 + dataPasswordLength);
+        }
+        if (nameOffset > offset + headerLength - nameLength)
+            throw new InvalidDataException("A StuffIt member name extends past its header.");
+
+        string name;
+        try { name = StrictUtf8.GetString(archive.AsSpan(nameOffset, nameLength)); }
+        catch (DecoderFallbackException e) { throw new InvalidDataException("A StuffIt member name is not valid UTF-8.", e); }
+        if (name.Length == 0 || name.Contains(':'))
+            throw new InvalidDataException("A StuffIt member name is empty or contains a path separator.");
+
+        uint nextRaw = U32(archive, offset + 22);
+        if (nextRaw > int.MaxValue || (nextRaw != 0 && nextRaw >= archive.Length))
+            throw new InvalidDataException("A StuffIt next-member link lies outside the archive.");
+
+        var member = new Member
+        {
+            Name = name,
+            IsFolder = isFolder,
+            Next = (int)nextRaw,
+            FirstChild = firstChild,
+            ChildCount = childCount,
+            Encrypted = (flags & EncryptedFlag) != 0 || dataPasswordLength != 0,
+            DataLength = ReadLength(dataLength, "data-fork length"),
+            DataCompressedLength = ReadLength(dataCompressedLength, "compressed data-fork length"),
+            DataCrc = dataCrc,
+            DataMethod = dataMethod,
+            Created = Date(U32(archive, offset + 10)),
+            Modified = Date(U32(archive, offset + 14)),
+        };
+        if (isFolder)
+        {
+            if (firstChild != 0 && (firstChild < ArchiveHeaderLength || firstChild >= archive.Length))
+                throw new InvalidDataException("A StuffIt folder's first member lies outside the archive.");
+            return member;
+        }
+
+        int headerEnd = checked(offset + headerLength);
+        Require(archive, headerEnd, 36, "StuffIt Finder information");
+        ushort fileFlags = U16(archive, headerEnd);
+        var finder = new byte[FinderInfo.Length];
+        archive.AsSpan(headerEnd + 4, 8).CopyTo(finder);
+        U16(finder, 8, U16(archive, headerEnd + 12));
+        int forkInfo = headerEnd + 36;
+        int resourceLength = 0;
+        int resourceCompressedLength = 0;
+        ushort resourceCrc = 0;
+        byte? resourceMethod = null;
+        bool encrypted = member.Encrypted;
+        if ((fileFlags & HasResourceForkFlag) != 0)
+        {
+            Require(archive, forkInfo, 14, "StuffIt resource-fork metadata");
+            resourceLength = ReadLength(U32(archive, forkInfo), "resource-fork length");
+            resourceCompressedLength = ReadLength(U32(archive, forkInfo + 4), "compressed resource-fork length");
+            resourceCrc = U16(archive, forkInfo + 8);
+            resourceMethod = archive[forkInfo + 12];
+            int resourcePasswordLength = archive[forkInfo + 13];
+            encrypted |= resourcePasswordLength != 0;
+            forkInfo = checked(forkInfo + 14 + resourcePasswordLength);
+        }
+
+        long resourceOffsetLong = forkInfo;
+        long dataOffsetLong = resourceOffsetLong + resourceCompressedLength;
+        long forksEnd = dataOffsetLong + member.DataCompressedLength;
+        int archiveEnd = member.Next == 0 ? archive.Length : member.Next;
+        if (resourceOffsetLong > archiveEnd || forksEnd > archiveEnd)
+            throw new InvalidDataException("A StuffIt member's fork data overlaps its next entry or exceeds the archive.");
+        int resourceOffset = (int)resourceOffsetLong;
+        int dataOffset = (int)dataOffsetLong;
+
+        finder[0] = archive[headerEnd + 4];
+        finder[1] = archive[headerEnd + 5];
+        finder[2] = archive[headerEnd + 6];
+        finder[3] = archive[headerEnd + 7];
+        finder[4] = archive[headerEnd + 8];
+        finder[5] = archive[headerEnd + 9];
+        finder[6] = archive[headerEnd + 10];
+        finder[7] = archive[headerEnd + 11];
+        member.FinderInfo = FinderInfo.Read(finder);
+        member.Encrypted = encrypted;
+        member.ResourceLength = resourceLength;
+        member.ResourceCompressedLength = resourceCompressedLength;
+        member.ResourceCrc = resourceCrc;
+        member.ResourceMethod = resourceMethod;
+        member.ResourceOffset = resourceOffset;
+        member.DataOffset = dataOffset;
+        return member;
+    }
+
+    private static void CheckForkCrc(ReadOnlySpan<byte> bytes, ushort expected, string fork, string name, int offset,
+        ContainerContext context)
+    {
+        if (Crc16Arc(bytes) != expected)
+            context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
+                $"The StuffIt {fork} fork checksum is incorrect for '{name}'.", offset);
+    }
+
+    private static byte[] DecodeFork(byte[] archive, int offset, int compressedLength, int outputLength, byte method)
+    {
+        Require(archive, offset, compressedLength, "StuffIt compressed fork");
+        if (method == 0)
+        {
+            if (compressedLength != outputLength)
+                throw new InvalidDataException("A stored StuffIt fork has different stored and logical lengths.");
+            return archive.AsSpan(offset, outputLength).ToArray();
+        }
+
+        var output = new byte[outputLength];
+        ReadOnlySpan<byte> input = archive.AsSpan(offset, compressedLength);
+        int written = 0;
+        for (int index = 0; index < input.Length; index++)
+        {
+            byte value = input[index];
+            if (value != 0x90)
+            {
+                if (written == output.Length) throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+                output[written++] = value;
+                continue;
+            }
+
+            if (++index == input.Length)
+                throw new InvalidDataException("A StuffIt RLE90 fork ends with an incomplete run marker.");
+            byte count = input[index];
+            if (count == 0)
+            {
+                if (written == output.Length) throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+                output[written++] = 0x90;
+                continue;
+            }
+            if (written == 0) throw new InvalidDataException("A StuffIt RLE90 run has no preceding byte to repeat.");
+            int additional = count - 1;
+            if (additional > output.Length - written)
+                throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+            output.AsSpan(written, additional).Fill(output[written - 1]);
+            written += additional;
+        }
+        if (written != outputLength)
+            throw new InvalidDataException($"StuffIt RLE90 produced {written} of {outputLength} declared bytes.");
+        return output;
+    }
+
+    // StuffIt's CRC-16/ARC variant is identified independently in Deark's v5 reader; this checksum only reports
+    // damaged fork data and does not prevent extraction.
+    private static ushort HeaderCrc(ReadOnlySpan<byte> header)
+    {
+        ushort crc = 0;
+        for (int index = 0; index < header.Length; index++)
+            crc = CrcByte(crc, index is 32 or 33 ? (byte)0 : header[index]);
+        return crc;
+    }
+
+    private static ushort Crc16Arc(ReadOnlySpan<byte> bytes)
+    {
+        ushort crc = 0;
+        foreach (byte value in bytes) crc = CrcByte(crc, value);
+        return crc;
+    }
+
+    private static ushort CrcByte(ushort crc, byte value)
+    {
+        crc ^= value;
+        for (int bit = 0; bit < 8; bit++) crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+        return crc;
+    }
+
+    private static MacString LegacyName(string name)
+    {
+        try { return MacString.FromMacRoman(name); }
+        catch (ArgumentException) { return MacString.FromMacRoman("?"); }
+    }
+
+    private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
+
+    private static void Require(byte[] archive, int offset, int length, string what)
+    {
+        if (offset < 0 || length < 0 || offset > archive.Length - length)
+            throw new InvalidDataException($"The {what} lies outside the StuffIt archive.");
+    }
+
+    private static int ReadPosition(uint value, string what)
+    {
+        if (value > int.MaxValue) throw new InvalidDataException($"The StuffIt {what} offset is too large.");
+        return (int)value;
+    }
+
+    private static int ReadLength(uint value, string what)
+    {
+        if (value > int.MaxValue) throw new InvalidDataException($"The StuffIt {what} exceeds the supported size.");
+        return (int)value;
+    }
+
+    private static ushort U16(byte[] bytes, int offset) => BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(offset));
+    private static uint U32(byte[] bytes, int offset) => BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(offset));
+    private static void U16(Span<byte> bytes, int offset, ushort value) =>
+        BinaryPrimitives.WriteUInt16BigEndian(bytes[offset..], value);
+
+    private readonly record struct MemberList(int Position, int Remaining, MacString[] LegacyPath, string[] UnicodePath);
+
+    private sealed class Member
+    {
+        public required string Name { get; init; }
+        public bool IsFolder { get; init; }
+        public bool Encrypted { get; set; }
+        public int Next { get; init; }
+        public int FirstChild { get; init; }
+        public int ChildCount { get; init; }
+        public int DataLength { get; init; }
+        public int DataCompressedLength { get; init; }
+        public ushort DataCrc { get; init; }
+        public byte DataMethod { get; init; }
+        public int DataOffset { get; set; }
+        public int ResourceLength { get; set; }
+        public int ResourceCompressedLength { get; set; }
+        public ushort ResourceCrc { get; set; }
+        public byte? ResourceMethod { get; set; }
+        public int ResourceOffset { get; set; }
+        public FinderInfo FinderInfo { get; set; } = FinderInfo.Empty;
+        public MacDate? Created { get; init; }
+        public MacDate? Modified { get; init; }
+    }
+}
