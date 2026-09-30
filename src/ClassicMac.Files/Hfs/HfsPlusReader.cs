@@ -389,12 +389,14 @@ internal static class HfsPlusReader
         if ((attributes & 0x00000002) == 0 || variableIndexKeys != hasVariableIndexKeys)
             throw new InvalidDataException($"The HFS Plus {name} B-tree key-layout attributes are invalid.");
         bool caseSensitiveCatalog = false;
+        bool caseFoldingCatalog = name == "catalog" && !isHfsX;
         if (name == "catalog" && isHfsX)
         {
             byte keyCompareType = tree[14 + 37];
             if (keyCompareType is not (0xBC or 0xCF))
                 throw new InvalidDataException("The HFSX catalog has an unsupported key comparison type.");
             caseSensitiveCatalog = keyCompareType == 0xBC;
+            caseFoldingCatalog = keyCompareType == 0xCF;
         }
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
@@ -430,7 +432,8 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree root kind or height is invalid.");
         }
         (HashSet<uint> indexedLeaves, HashSet<uint> indexedNodes) =
-            ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth, caseSensitiveCatalog);
+            ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth, caseSensitiveCatalog,
+                caseFoldingCatalog);
         uint readRecords = 0;
         uint previous = 0;
         uint finalLeaf = 0;
@@ -465,10 +468,11 @@ internal static class HfsPlusReader
                 if (name == "catalog")
                 {
                     ValidateCatalogKey(key);
-                    if (caseSensitiveCatalog)
+                    if (caseSensitiveCatalog || caseFoldingCatalog)
                     {
-                        if (previousCatalogKey is not null && CompareHfsXCatalogKeys(previousCatalogKey, key) >= 0)
-                            throw new InvalidDataException("The HFSX catalog keys are not strictly ordered.");
+                        if (previousCatalogKey is not null &&
+                            CompareCatalogKeys(previousCatalogKey, key, caseFoldingCatalog) >= 0)
+                            throw new InvalidDataException("The HFS Plus catalog keys are not strictly ordered.");
                         previousCatalogKey = key;
                     }
                     else if (!keys.Add(key))
@@ -503,7 +507,8 @@ internal static class HfsPlusReader
     }
 
     private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
-        int nodeSize, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog)
+        int nodeSize, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog,
+        bool caseFoldingCatalog)
     {
         var visitedNodes = new HashSet<uint>();
         var leafNodes = new HashSet<uint>();
@@ -511,7 +516,8 @@ internal static class HfsPlusReader
         var indexKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)>();
         var subtreeKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)?>();
         int maxKeyLength = U16(tree, 34);
-        bool validateChildKeyRanges = name == "extents-overflow" || (name == "catalog" && caseSensitiveCatalog);
+        bool validateChildKeyRanges = name == "extents-overflow" ||
+            (name == "catalog" && (caseSensitiveCatalog || caseFoldingCatalog));
 
         void AddAtHeight(uint nodeNumber, ushort height)
         {
@@ -558,9 +564,9 @@ internal static class HfsPlusReader
                 if (name == "catalog")
                 {
                     ValidateCatalogKey(indexKey);
-                    if (caseSensitiveCatalog && previousIndexKey is not null &&
-                        CompareHfsXCatalogKeys(previousIndexKey, indexKey) >= 0)
-                        throw new InvalidDataException("The HFSX catalog index keys are not strictly ordered.");
+                    if ((caseSensitiveCatalog || caseFoldingCatalog) && previousIndexKey is not null &&
+                        CompareCatalogKeys(previousIndexKey, indexKey, caseFoldingCatalog) >= 0)
+                        throw new InvalidDataException("The HFS Plus catalog index keys are not strictly ordered.");
                 }
                 else if (name == "extents-overflow")
                 {
@@ -586,11 +592,12 @@ internal static class HfsPlusReader
                 {
                     var (separator, childRange) = childRanges[index];
                     if (childRange is not { } child) continue;
-                    if (CompareTreeKeys(name, caseSensitiveCatalog, separator, child.First) > 0)
+                    if (CompareTreeKeys(name, caseSensitiveCatalog, caseFoldingCatalog, separator, child.First) > 0)
                         throw new InvalidDataException(
                             $"An HFS Plus {name} B-tree index key sorts after a key in its child subtree.");
                     if (index > 0 && childRanges[index - 1].Range is { } previousChild &&
-                        CompareTreeKeys(name, caseSensitiveCatalog, previousChild.Last, separator) >= 0)
+                        CompareTreeKeys(name, caseSensitiveCatalog, caseFoldingCatalog,
+                            previousChild.Last, separator) >= 0)
                         throw new InvalidDataException(
                             $"An HFS Plus {name} B-tree child contains a key beyond its index range.");
                 }
@@ -623,8 +630,8 @@ internal static class HfsPlusReader
                     var currentRange = indexKeyRanges[nodes[index]];
                     int comparison = name switch
                     {
-                        "catalog" when caseSensitiveCatalog =>
-                            CompareHfsXCatalogKeys(previousRange.Last, currentRange.First),
+                        "catalog" when caseSensitiveCatalog || caseFoldingCatalog =>
+                            CompareCatalogKeys(previousRange.Last, currentRange.First, caseFoldingCatalog),
                         "extents-overflow" => CompareExtentKeys(previousRange.Last, currentRange.First),
                         _ => -1
                     };
@@ -635,7 +642,8 @@ internal static class HfsPlusReader
                 if (index > 0 && height > 1 && validateChildKeyRanges &&
                     subtreeKeyRanges[nodes[index - 1]] is { } previousSubtree &&
                     subtreeKeyRanges[nodes[index]] is { } currentSubtree &&
-                    CompareTreeKeys(name, caseSensitiveCatalog, previousSubtree.Last, currentSubtree.First) >= 0)
+                    CompareTreeKeys(name, caseSensitiveCatalog, caseFoldingCatalog,
+                        previousSubtree.Last, currentSubtree.First) >= 0)
                     throw new InvalidDataException(
                         $"The HFS Plus {name} B-tree child key ranges overlap across sibling nodes.");
             }
@@ -665,9 +673,11 @@ internal static class HfsPlusReader
         return (ReadKey(0), ReadKey(count - 1));
     }
 
-    private static int CompareTreeKeys(string name, bool caseSensitiveCatalog, byte[] left, byte[] right) => name switch
+    private static int CompareTreeKeys(string name, bool caseSensitiveCatalog, bool caseFoldingCatalog,
+        byte[] left, byte[] right) => name switch
     {
         "catalog" when caseSensitiveCatalog => CompareHfsXCatalogKeys(left, right),
+        "catalog" when caseFoldingCatalog => CompareCatalogKeys(left, right, caseFolding: true),
         "extents-overflow" => CompareExtentKeys(left, right),
         _ => throw new InvalidOperationException($"No key comparator is defined for the {name} B-tree.")
     };
@@ -777,6 +787,26 @@ internal static class HfsPlusReader
             if (comparison != 0) return comparison;
         }
         return leftLength.CompareTo(rightLength);
+    }
+
+    private static int CompareCatalogKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right, bool caseFolding)
+    {
+        int comparison = U32(left, 2).CompareTo(U32(right, 2));
+        if (comparison != 0) return comparison;
+        int leftLength = U16(left, 6);
+        int rightLength = U16(right, 6);
+        if (!caseFolding)
+        {
+            for (int index = 0; index < Math.Min(leftLength, rightLength); index++)
+            {
+                comparison = U16(left, 8 + index * 2).CompareTo(U16(right, 8 + index * 2));
+                if (comparison != 0) return comparison;
+            }
+            return leftLength.CompareTo(rightLength);
+        }
+
+        return HfsPlusUnicodeComparison.CompareBigEndian(left.Slice(8, leftLength * 2),
+            right.Slice(8, rightLength * 2));
     }
 
     private static IReadOnlyList<string> FolderPath(uint parent,

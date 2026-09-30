@@ -828,21 +828,22 @@ for data extents in bad-block records from the extents-overflow file **[Doc]** T
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
 records do not claim extents **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
-retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode. For binary
-HFSX catalogs and for the extents tree, index and leaf keys are checked in order, including index sibling ranges and
-child key bounds. Case-folding key order is not yet validated **[Doc]**. The
+retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode. Catalog keys
+are checked in order in leaves and index nodes, across sibling ranges, and against child key bounds. HFSX's `0xBC`
+mode compares unsigned UTF-16 code units; HFS+ and HFSX `0xCF` use TN1150's `FastUnicodeCompare` behavior with
+Unicode 3.2 simple lowercase mappings and default-ignorable characters skipped **[Doc]**. U+0000 sorts after other
+characters, and controls and surrogates remain significant. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, complete volume allocation ownership (including
-attribute fork continuity and unreferenced bitmap bits), hard-link/symlink semantics, or the full HFSX
-collation rules.
+attribute fork continuity and unreferenced bitmap bits), or hard-link/symlink semantics.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,
 and the ROM's `MountVol` accepts only `'BD'` and `$D2D7` **[Code]** Mac OS 9.0 ROM and System. An HFSX volume
 presumably fails to mount with `noMacDskErr` (−57); that outcome is inferred, not run. ClassicMac recognizes HFSX
-independently of Mac OS 9.0 and reads its catalog and forks, but does not yet apply HFSX's case-sensitive catalog
-collation for lookup (listing does not require lookup).
+independently of Mac OS 9.0 and reads its catalog and forks. It validates key order using the volume's comparison mode;
+catalog lookup is not currently exposed.
 
 ---
 

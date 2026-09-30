@@ -797,8 +797,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     node-size minimum, header nodes,
     node maps (including chained map nodes and free counts), roots, index graphs,
     sibling links, exact catalog key lengths and unique leaf keys,
-    and HFSX key-compare modes plus binary catalog and extents-tree index/leaf order, index sibling ranges and child
-    key bounds,
+    and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
+    ranges and child key bounds,
     unique catalog
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders). The
     StuffIt v5 reader handles stored, RLE90, Compress/LZW, Huffman, LZAH (method 5) and MW (method 8) forks.

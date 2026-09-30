@@ -8,6 +8,23 @@ namespace ClassicMac.Files.Tests;
 
 public sealed class HfsPlusFeatureTests
 {
+    [Theory]
+    [InlineData("Macintosh", "MACINTOSH", 0)]
+    [InlineData("αρχείο", "ΑΡΧΕΊΟ", 0)]
+    [InlineData("Volume", "volume", 0)]
+    [InlineData("ab\u200Cc", "ABC", 0)]
+    [InlineData("e\u0301", "e", 1)]
+    [InlineData("file", "filex", -1)]
+    [InlineData("\u0001a", "a", -1)]
+    [InlineData("\0a", "a", 1)]
+    public void HfsPlusCaseFoldingUsesFixedUnicodeMappingsAndIgnorables(string left, string right,
+        int expectedSign)
+    {
+        Assert.Equal(expectedSign, Math.Sign(HfsPlusUnicodeComparison.Compare(left, right)));
+        Assert.Equal(expectedSign, Math.Sign(HfsPlusUnicodeComparison.CompareBigEndian(
+            Encoding.BigEndianUnicode.GetBytes(left), Encoding.BigEndianUnicode.GetBytes(right))));
+    }
+
     [Fact]
     public void PlainHfsPlusVolumeListsNestedFileWithBothForksAndMetadata()
     {
@@ -475,6 +492,53 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Equal("Documents:Read Me",
             Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void CaseFoldingHfsXCatalogKeysMustUseCaseFoldingBTreeOrder()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, reverseCatalogRecords: true,
+            catalogKeyCompareType: 0xCF);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("catalog", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void HfsPlusCatalogKeysMustUseCaseFoldingBTreeOrder()
+    {
+        byte[] image = HfsPlusFixture.Build(reverseCatalogRecords: true);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("catalog", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CaseFoldingHfsXIndexKeysMustUseCaseFoldingBTreeOrder()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, multiLeafCatalog: true,
+            catalogKeyCompareType: 0xCF);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(3 * 4096 + 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(3 * 4096 + secondRecord + 2), 0);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("catalog index", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CaseFoldingHfsXIndexSeparatorsMustStayWithinTheirChildRanges()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, multiLeafCatalog: true,
+            catalogKeyCompareType: 0xCF);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(3 * 4096 + 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(3 * 4096 + secondRecord + 2), 2);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("child contains a key beyond its index range", exception.Message);
     }
 
     [Fact]
