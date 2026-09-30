@@ -34,7 +34,8 @@ internal static class HfsPlusReader
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(192, 8)) != 0)
         {
             ForkData extentsFork = ReadFork(image, header.AsSpan(192, 80), blockSize, totalBlocks);
-            foreach (var (key, data) in LeafRecords(extentsFork.ToArray()))
+            foreach (var (key, data) in LeafRecords(
+                extentsFork.ToArray(context.Options.MaxExpandedBytesPerInput), "extents-overflow"))
             {
                 if (key.Length != 12 || U16(key, 0) != 10 || data.Length < 64 || key[2] is not (0 or 0xFF))
                     throw new InvalidDataException("An HFS Plus extents-overflow record is invalid.");
@@ -46,7 +47,7 @@ internal static class HfsPlusReader
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4);
         byte[] catalog = catalogFork.ToArray();
-        var records = LeafRecords(catalog).ToArray();
+        var records = LeafRecords(catalog, "catalog").ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name)>();
         foreach (var (key, data) in records)
         {
@@ -155,45 +156,65 @@ internal static class HfsPlusReader
         return new ExtentForkData(image, ranges, checked((long)logical));
     }
 
-    private static IEnumerable<(byte[] Key, byte[] Data)> LeafRecords(byte[] tree)
+    private static IEnumerable<(byte[] Key, byte[] Data)> LeafRecords(byte[] tree, string name)
     {
         if (tree.Length < 512 || tree[8] != 1)
-            throw new InvalidDataException("The HFS Plus catalog has no B-tree header.");
+            throw new InvalidDataException($"The HFS Plus {name} tree has no B-tree header.");
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
-            throw new InvalidDataException("The HFS Plus catalog node size is invalid.");
+            throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
+        uint totalNodes = U32(tree, 36);
+        if (totalNodes == 0 || totalNodes > tree.Length / nodeSize)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree node count is invalid.");
         uint first = U32(tree, 24);
+        uint last = U32(tree, 28);
         uint expectedRecords = U32(tree, 20);
+        if (expectedRecords == 0)
+        {
+            if (first != 0 || last != 0)
+                throw new InvalidDataException($"The empty HFS Plus {name} B-tree has leaf links.");
+            yield break;
+        }
+        if (first == 0 || last == 0 || first >= totalNodes || last >= totalNodes)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree leaf endpoints are invalid.");
         uint readRecords = 0;
+        uint previous = 0;
+        uint finalLeaf = 0;
         var seen = new HashSet<uint>();
         for (uint node = first; node != 0; node = U32(tree, checked((int)node * nodeSize)))
         {
-            if (!seen.Add(node) || node >= tree.Length / nodeSize)
-                throw new InvalidDataException("The HFS Plus catalog leaf chain is invalid.");
+            if (!seen.Add(node) || node >= totalNodes)
+                throw new InvalidDataException($"The HFS Plus {name} B-tree leaf chain is invalid.");
             int start = checked((int)node * nodeSize);
             if (tree[start + 8] != 0xFF || tree[start + 9] != 1)
-                throw new InvalidDataException("The HFS Plus catalog leaf has an invalid type.");
+                throw new InvalidDataException($"An HFS Plus {name} B-tree linked leaf has an invalid type.");
+            if (U32(tree, start + 4) != previous)
+                throw new InvalidDataException($"An HFS Plus {name} B-tree leaf has an invalid backward link.");
             int count = U16(tree, start + 10);
             if (count > (nodeSize - 14) / 2)
-                throw new InvalidDataException("An HFS Plus catalog leaf has too many records.");
+                throw new InvalidDataException($"An HFS Plus {name} B-tree leaf has too many records.");
             for (int index = 0; index < count; index++)
             {
                 int begin = U16(tree, start + nodeSize - 2 * (index + 1));
                 int end = U16(tree, start + nodeSize - 2 * (index + 2));
                 if (begin < 14 || end <= begin || end > nodeSize - 2 * (count + 1))
-                    throw new InvalidDataException("An HFS Plus catalog record offset is invalid.");
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree record offset is invalid.");
                 int offset = start + begin;
                 int keyLength = U16(tree, offset);
                 if (keyLength < 6 || 2 + keyLength > end - begin)
-                    throw new InvalidDataException("An HFS Plus catalog key is invalid.");
+                    throw new InvalidDataException($"An HFS Plus {name} B-tree key is invalid.");
                 int dataOffset = offset + 2 + keyLength;
                 yield return (tree.AsSpan(offset, 2 + keyLength).ToArray(),
                     tree.AsSpan(dataOffset, start + end - dataOffset).ToArray());
                 readRecords++;
             }
+            finalLeaf = node;
+            previous = node;
         }
         if (readRecords != expectedRecords)
-            throw new InvalidDataException("The HFS Plus catalog leaf-record count is inconsistent.");
+            throw new InvalidDataException($"The HFS Plus {name} B-tree leaf-record count is inconsistent.");
+        if (finalLeaf != last)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree ends at leaf {finalLeaf}, not {last}.");
     }
 
     private static string Name(ReadOnlySpan<byte> key)

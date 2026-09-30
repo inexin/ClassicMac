@@ -798,9 +798,10 @@ in a classic HFS wrapper. The wrapper's MDB has `drEmbedSigWord` (+$7C) and `drE
 the embedded byte offset is `drAlBlSt × 512 + drEmbedExtent.start × drAlBlkSiz` **[Doc]** TN1150. Wrapper reads follow
 that extent and return the embedded volume's entries, not the wrapper's placeholder file.
 
-The reader walks the catalog B-tree's linked leaf nodes, resolves folder paths and reads both forks, Finder info and
-dates. It also reads data and resource fork overflow extents and requires the primary and overflow extents to account
-for each fork's declared allocation-block count (which may exceed the blocks needed by its logical length). Unicode
+The reader walks the catalog B-tree's linked leaf nodes, checking the header's leaf endpoints, backward links, node
+range and record count; it resolves folder paths and reads both forks, Finder info and dates. It also reads data and
+resource fork overflow extents and requires the primary and overflow extents to account for each fork's declared
+allocation-block count (which may exceed the blocks needed by its logical length). Unicode
 names are retained in `MacFile.MacPath`; the
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
@@ -915,7 +916,7 @@ systems and, if none takes it, the volume does not mount **[Code]** Mac OS 9.0 F
 
 ## 14. Not covered and open questions
 
-Not covered: the boot blocks; HFS Plus (section 11); the old `'TS'`
+Not covered: the boot blocks; complete HFS Plus/HFSX semantics and structural validation (section 11); the old `'TS'`
 partition map.
 
 No rule in this document is fitted to data alone. Still open:

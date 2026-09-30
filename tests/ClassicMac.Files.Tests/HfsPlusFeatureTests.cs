@@ -154,6 +154,36 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusCatalogLeafChainMustEndAtTheHeaderDeclaredLastLeaf()
+    {
+        byte[] image = HfsPlusFixture.Build(lastCatalogLeaf: 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void FirstHfsPlusCatalogLeafMustNotLinkBackward()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(3 * 4096 + 4), 1);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void HfsPlusBTreeNodeCountMustIncludeReferencedLeafNodes(uint totalNodes)
+    {
+        byte[] image = HfsPlusFixture.Build(catalogTotalNodes: totalNodes);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void UnknownHfsPlusCatalogRecordKindIsRejectedInsteadOfSilentlyOmitted()
     {
         byte[] image = HfsPlusFixture.Build(unknownCatalogRecord: true);
@@ -170,7 +200,8 @@ public sealed class HfsPlusFeatureTests
 
         public static byte[] Build(string fileName = "Read Me", bool hfsX = false, bool fragmentedData = false,
             bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false,
-            uint? dataBlockCount = null, uint? dataExtentBlockCount = null)
+            uint? dataBlockCount = null, uint? dataExtentBlockCount = null, uint? lastCatalogLeaf = null,
+            uint? catalogTotalNodes = null)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -259,10 +290,10 @@ public sealed class HfsPlusFeatureTests
             U32(header, 16, 1); // root node
             U32(header, 20, (uint)records.Length);
             U32(header, 24, 1); // first leaf
-            U32(header, 28, 1); // last leaf
+            U32(header, 28, lastCatalogLeaf ?? 1); // last leaf
             U16(header, 32, Block);
             U16(header, 34, 516);
-            U32(header, 36, 2); // total nodes
+            U32(header, 36, catalogTotalNodes ?? 2); // total nodes
             header[14 + 106 + 128] = 0xC0; // both nodes in use
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);
