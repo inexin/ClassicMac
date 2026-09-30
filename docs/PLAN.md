@@ -172,6 +172,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Core | `MacDate` | Seconds since 1904 in the writer's local time; converts to a `DateTime` of unspecified kind |
 | Core | `MacPoint`, `MacRect` | QuickDraw `Point` (v, h) and `Rect` (top, left, bottom, right), read and written big-endian; used by Finder info and by many resources (`DLOG`, `DITL`, `WIND`, `PICT` frames, `cicn` bounds) |
 | Core | `Fixed`, `UnsignedFixed` | 16.16 fixed-point numbers (resolutions, font metrics, QuickTime values; sound sample rates are unsigned) |
+| Core | `BigEndianReader`, `BigEndianWriter` | Cursor-based, allocation-free readers over `ReadOnlySpan<byte>` and writers over `Span<byte>`; big-endian scalar and Mac value reads/writes, with position, remaining length and checked bounds |
 | Files | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
 | Files | `MacFile` | Name, folder path inside its container (`MacPath` joins it with `:`), Finder info, dates, and both forks as `ForkData` (opened on demand) |
 | Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
@@ -194,9 +195,17 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Resources | `ReadOptions` | Resource-reading limits and the Resource Manager model (see Configuration) |
 | Files.Export | `Unpacker`, `OutputLayout`, `ExportFolders` | Every Mac file under a tree to a folder (`unpack`), or every resource fork (`extract`), placed as the tree nests; new numbered folders that never overwrite. Shared by the CLI and the app |
 | Resources.Export | `ResourceExporter`, `ExportOptions`, `ExportSource`, `ExportManifest` | A fork to type folders (decoded, or the data itself; stored bytes in `raw/` on request) with `manifest.json`, format 1.1 (`schemas/manifest-1.schema.json`) |
+
 | Resources.Export | `IResourceDecoder`, `DecodeInput`, `DecodedFile` | A decoder for some resource types; the exporter uses the first that handles a type and falls back to raw |
 | Resources.Decoders | `ResourceDecoders`, `DecodeOptions` | The built-in decoders, one namespace per area (`.Text`, `.Images` and `.Sound` built) |
 | Resources.Decoders.Images | `IImageEncoder`, `PngEncoder` | How decoded images are written; PNG (8-bit RGBA) built in |
+
+**Big-endian helpers:** `BigEndianReader` and `BigEndianWriter` are implemented in `ClassicMac.Core` as `ref struct`
+cursors over caller-owned spans. They support signed and unsigned 16-, 32- and 64-bit values, borrowed byte slices,
+skip/position/remaining, and `FourCC`, `MacPoint`, `MacRect`, `Fixed` and `UnsignedFixed`; throwing and `Try` operations
+check bounds. `Read*At` / `Write*At` operations address offsets from the start of the span without changing cursor
+position. The types do not allocate or take ownership of buffers. Existing callers are being migrated selectively;
+retain offset-explicit `BinaryPrimitives` calls where clearer and do not replace `Stream` or `BinaryReader` generally.
 
 A resource fork travels from the file layer to the resource map as bytes (`MacFile.ResourceFork` → `ResourceFork.Read`).
 `ClassicMac.Files` references `ClassicMac.Resources` (never the other way), because a few disk images keep their
@@ -872,6 +881,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Viewer drag-out** of files and resources.
 - [ ] **CD images: multisession.**
 - [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
+- [ ] **Adopt Core big-endian span cursors:** after API review, migrate suitable sequential parsing and writing to `BigEndianReader` / `BigEndianWriter`; keep offset-based `BinaryPrimitives` where clearer.
   (a damaged fork opened and saved already comes out clean).
 
 ## Decisions
