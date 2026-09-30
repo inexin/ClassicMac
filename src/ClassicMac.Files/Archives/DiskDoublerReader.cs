@@ -12,6 +12,7 @@ namespace ClassicMac.Files.Archives;
 public sealed class DiskDoublerReader : IContainerReader
 {
     private const int ArchiveHeaderLength = 62;
+    private const int StandaloneHeaderLength = 84;
     private const int RecordHeaderLength = 46;
     private const int FileHeaderLength = 80;
     private const uint FileHeaderMagic = 0xABCD0054;
@@ -35,6 +36,8 @@ public sealed class DiskDoublerReader : IContainerReader
             byte[] header = input.ReadPrefix(ArchiveHeaderLength);
             if (IsValidDda2Header(header)) return true;
         }
+        if (input.Length >= StandaloneHeaderLength && IsValidStandaloneHeader(input.ReadPrefix(StandaloneHeaderLength)))
+            return true;
         if (input.Length < 4) return false;
         return input.ReadPrefix(4).AsSpan().SequenceEqual("DDAR"u8) && input.Length >= 78;
     }
@@ -48,8 +51,10 @@ public sealed class DiskDoublerReader : IContainerReader
             throw new InvalidDataException("The DiskDoubler archive exceeds the configured input-size limit.");
 
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
-        if (archive.AsSpan(0, 4).SequenceEqual("DDAR"u8))
+        if (archive.Length >= 4 && archive.AsSpan(0, 4).SequenceEqual("DDAR"u8))
             return ReadLegacy(archive, context);
+        if (IsValidStandaloneHeader(archive))
+            return ReadStandalone(archive, context);
         if (!IsValidDda2Header(archive))
             throw new InvalidDataException("Not a DiskDoubler archive.");
 
@@ -159,32 +164,10 @@ public sealed class DiskDoublerReader : IContainerReader
                 archive[header + 18], archive[header + 48]);
             byte[] resource = DecodeFork(encodedResource, resourceLength, resourceMethod,
                 archive[header + 18], archive[header + 48]);
-            if (dataMethod == 8 && U16(archive, header + 44) != Crc16Ibm(data))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
-                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
-            if (dataMethod == 2 && U16(archive, header + 44) != ByteSum(data))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
-                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
-            if (dataMethod == 1 && U16(archive, header + 44) != MacCompressChecksum(data, encodedData,
-                archive[header + 18], archive[header + 48]))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
-                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
-            if (dataMethod == 4 && U16(archive, header + 44) != ByteSum(data))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
-                    $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", header + 44);
-            if (resourceMethod == 8 && U16(archive, header + 46) != Crc16Ibm(resource))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
-                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
-            if (resourceMethod == 2 && U16(archive, header + 46) != ByteSum(resource))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
-                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
-            if (resourceMethod == 1 && U16(archive, header + 46) != MacCompressChecksum(resource, encodedResource,
-                archive[header + 18], archive[header + 48]))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
-                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
-            if (resourceMethod == 4 && U16(archive, header + 46) != ByteSum(resource))
-                context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
-                    $"The DiskDoubler resource-fork checksum is incorrect for '{name}'.", header + 46);
+            ReportForkChecksum(archive, header + 44, encodedData, data, dataMethod,
+                archive[header + 18], archive[header + 48], "data", name.ToString(), context);
+            ReportForkChecksum(archive, header + 46, encodedResource, resource, resourceMethod,
+                archive[header + 18], archive[header + 48], "resource", name.ToString(), context);
             files.Add(new MacFile
             {
                 Name = name,
@@ -202,6 +185,106 @@ public sealed class DiskDoublerReader : IContainerReader
             context.Report(DiagnosticSeverity.Warning, "archive.truncated",
                 "The DiskDoubler DDA2 archive has no end marker.", offset);
         return files;
+    }
+
+    private static IReadOnlyList<MacFile> ReadStandalone(byte[] archive, ContainerContext context)
+    {
+        int header = 4;
+        int dataLength = ReadLength(U32(archive, header), "data fork");
+        int compressedDataLength = ReadLength(U32(archive, header + 4), "compressed data fork");
+        int resourceLength = ReadLength(U32(archive, header + 8), "resource fork");
+        int compressedResourceLength = ReadLength(U32(archive, header + 12), "compressed resource fork");
+        int dataMethod = archive[header + 16] & 0x7F;
+        int resourceMethod = archive[header + 17] & 0x7F;
+        uint modification = U32(archive, header + 20);
+        uint creation = U32(archive, header + 24);
+        var type = new FourCC(archive.AsSpan(header + 28, 4));
+        var creator = new FourCC(archive.AsSpan(header + 32, 4));
+        var finderFlags = (FinderFlags)U16(archive, header + 36);
+        int dataDelta = U16(archive, header + 50);
+        int resourceDelta = U16(archive, header + 52);
+        long payloadLength = (long)compressedDataLength + compressedResourceLength;
+        if (payloadLength > archive.Length - StandaloneHeaderLength)
+            throw new InvalidDataException("A standalone DiskDoubler fork payload extends past the file.");
+
+        MacString name = StandaloneName(context.HostName);
+        if (!IsSupportedMethod(dataMethod) || !IsSupportedMethod(resourceMethod) ||
+            dataDelta != 0 || resourceDelta != 0)
+        {
+            context.Report(DiagnosticSeverity.Warning, "archive.method-unsupported",
+                $"DiskDoubler compression methods {dataMethod}/{resourceMethod} or delta methods " +
+                $"{dataDelta}/{resourceDelta} are unsupported for '{name}'; the file is skipped.");
+            return [];
+        }
+        if ((dataMethod == 0 && dataLength != compressedDataLength) ||
+            (resourceMethod == 0 && resourceLength != compressedResourceLength))
+            throw new InvalidDataException("A stored DiskDoubler fork has inconsistent compressed and expanded lengths.");
+
+        if ((long)dataLength + resourceLength > context.Options.MaxExpandedBytesPerInput)
+            throw new InvalidDataException("DiskDoubler extraction exceeds the configured expanded-size limit.");
+        ReadOnlySpan<byte> encodedData = archive.AsSpan(StandaloneHeaderLength, compressedDataLength);
+        ReadOnlySpan<byte> encodedResource = archive.AsSpan(StandaloneHeaderLength + compressedDataLength,
+            compressedResourceLength);
+        byte info1 = archive[header + 18];
+        byte info2 = archive[header + 48];
+        byte[] data = DecodeFork(encodedData, dataLength, dataMethod, info1, info2);
+        byte[] resource = DecodeFork(encodedResource, resourceLength, resourceMethod, info1, info2);
+        ReportForkChecksum(archive, header + 44, encodedData, data, dataMethod,
+            info1, info2, "data", name.ToString(), context);
+        ReportForkChecksum(archive, header + 46, encodedResource, resource, resourceMethod,
+            info1, info2, "resource", name.ToString(), context);
+
+        return [new MacFile
+        {
+            Name = name,
+            FinderInfo = new FinderInfo { Type = type, Creator = creator, Flags = finderFlags },
+            Created = Date(creation),
+            Modified = Date(modification),
+            DataFork = ForkData.FromBytes(data),
+            ResourceFork = ForkData.FromBytes(resource),
+        }];
+    }
+
+    private static MacString StandaloneName(MacString? hostName)
+    {
+        if (hostName is not { } supplied || supplied.Bytes.IsEmpty)
+            return MacString.FromMacRoman("DiskDoubler file");
+
+        ReadOnlySpan<byte> bytes = supplied.Bytes;
+        if (bytes.Length >= 3 && bytes[^3] == '.' &&
+            (bytes[^2] is (byte)'d' or (byte)'D') && (bytes[^1] is (byte)'d' or (byte)'D'))
+            bytes = bytes[..^3];
+        return new MacString(bytes);
+    }
+
+    private static void ReportForkChecksum(ReadOnlySpan<byte> header, int checksumOffset,
+        ReadOnlySpan<byte> encoded, ReadOnlySpan<byte> decoded, int method, byte info1, byte info2,
+        string forkName, string fileName, ContainerContext context)
+    {
+        ushort calculated;
+        string code;
+        switch (method)
+        {
+            case 1:
+                calculated = MacCompressChecksum(decoded, encoded, info1, info2);
+                code = "archive.fork-checksum";
+                break;
+            case 2:
+            case 4:
+                calculated = ByteSum(decoded);
+                code = "archive.fork-checksum";
+                break;
+            case 8:
+                calculated = Crc16Ibm(decoded);
+                code = "archive.fork-crc";
+                break;
+            default:
+                return;
+        }
+
+        if (U16(header, checksumOffset) != calculated)
+            context.Report(DiagnosticSeverity.Error, code,
+                $"The DiskDoubler {forkName}-fork checksum is incorrect for '{fileName}'.", checksumOffset);
     }
 
     private static IReadOnlyList<MacFile> ReadLegacy(byte[] archive, ContainerContext context)
@@ -558,6 +641,13 @@ public sealed class DiskDoublerReader : IContainerReader
     private static bool IsValidDda2Header(ReadOnlySpan<byte> header) =>
         header.Length >= ArchiveHeaderLength && header[..4].SequenceEqual("DDA2"u8) &&
         U16(header, 60) == Crc16Xmodem(header[..60]);
+
+    private static bool IsValidStandaloneHeader(ReadOnlySpan<byte> header)
+    {
+        if (header.Length < StandaloneHeaderLength || U32(header, 0) != FileHeaderMagic) return false;
+        ushort checksum = U16(header, 82);
+        return checksum == 0 || checksum == Crc16Xmodem(header[..82]);
+    }
 
     private static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
     {

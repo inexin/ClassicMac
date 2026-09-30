@@ -812,9 +812,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     descriptions and hand-built vectors; verification against an archive made by the original application remains. The
     PackIt reader extracts stored (`PMag`), Huffman (`PMa4`), and password-protected XOR/Huffman (`PMa5`) and DES/Huffman
     (`PMa6`) entries. The DiskDoubler reader parses DDA2 archive paths and extracts stored, method-1 MacCompress LZW,
-    method-2 adaptive Huffman, method-4 Huffman and method-8 Compact Pro compatible forks, including fitted XOR variants and checksums; other compressed
-    methods and standalone compressed files remain unsupported. Legacy DDAR stored-fork archives are also supported;
-    DDA2 archive-header CRCs are checked against the fitted XADMaster behavior.
+    method-2 adaptive Huffman, method-4 Huffman and method-8 Compact Pro compatible forks, including fitted XOR variants and checksums. Standalone compressed
+    files extract stored and methods 1, 2, 4 and 8; other compressed methods and delta processing remain unsupported.
+    Legacy DDAR stored-fork archives are also supported; DDA2 archive-header CRCs and standalone file-header CRCs
+    (including the old zero-checksum form) follow fitted XADMaster behavior.
     Original-application interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block

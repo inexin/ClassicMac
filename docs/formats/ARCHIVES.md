@@ -66,13 +66,19 @@ The older `DDAR` archive has a 78-byte archive header and fixed 124-byte entry h
 resource forks. Its directory and end-directory markers build folder paths; redundant standalone file headers found
 after records are skipped. These layouts are **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 
+A standalone compressed file starts with the same `0xABCD0054` file header and stores its compressed data and resource
+forks after the 84-byte header. Its checksum at +82 covers bytes 0–81; older files with a zero checksum are accepted
+**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 4 and 8 from standalone files as it does from
+DDA2 entries, preserving Finder metadata and deriving the Mac filename from the host name (a `.dd` suffix is removed).
+Unsupported methods and delta processing are diagnosed and the file is skipped.
+
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive Huffman, Huffman
 and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
-invalid folder depth, and entry limits. Method-0 fork checksums are not verified. Standalone compressed files and
-DDA2 compression methods other than 0, 1, 2, 4 and 8 remain unsupported; original-application interoperability
-remains unverified.
+invalid folder depth, entry limits, standalone files and their header checksums, standalone fork methods, and
+unsupported standalone delta processing. Method-0 fork checksums are not verified. DDA2 compression methods other
+than 0, 1, 2, 4 and 8 remain unsupported; original-application interoperability remains unverified.
 
 ## Compact Pro (RLE and LZH subset)
 

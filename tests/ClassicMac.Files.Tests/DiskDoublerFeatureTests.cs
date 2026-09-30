@@ -30,6 +30,159 @@ public sealed class DiskDoublerFeatureTests
     }
 
     [Fact]
+    public void StandaloneDiskDoublerFileExtractsBothForksAndUsesTheHostName()
+    {
+        byte[] data = "standalone data"u8.ToArray();
+        byte[] resource = "standalone resource"u8.ToArray();
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile(data, resource);
+        var container = new MacFile
+        {
+            Name = MacString.FromMacRoman("Sample.dd"),
+            DataFork = ForkData.FromBytes(packed)
+        };
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(container, "test", new ContainerContext());
+
+        MacFile file = Assert.Single(result.Children).File;
+        Assert.Equal("Sample", file.Name.ToMacRoman());
+        Assert.Equal(data, file.DataFork.ToArray());
+        Assert.Equal(resource, file.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("TEXT"), file.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("ttxt"), file.FinderInfo.Creator);
+        Assert.Equal((FinderFlags)0x4000, file.FinderInfo.Flags);
+        Assert.Equal(new MacDate(2_500_000_000), file.Created);
+        Assert.Equal(new MacDate(2_600_000_000), file.Modified);
+    }
+
+    [Fact]
+    public void CanReadRecognizesStandaloneDiskDoublerFileWithAValidHeaderChecksum()
+    {
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile("data"u8.ToArray(), []);
+
+        Assert.True(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(packed)));
+
+        packed[12] ^= 0x01;
+        Assert.False(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(packed)));
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(
+            ForkData.FromBytes(packed), new ContainerContext()));
+    }
+
+    [Fact]
+    public void CanReadRecognizesLegacyStandaloneDiskDoublerFilesWithoutAHeaderChecksum()
+    {
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile("data"u8.ToArray(), [], headerChecksum: false);
+
+        Assert.True(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(packed)));
+    }
+
+    [Fact]
+    public void StandaloneDiskDoublerFileWithZeroHeaderChecksumIsStillReadable()
+    {
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile("legacy"u8.ToArray(), [], headerChecksum: false);
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(packed),
+            new ContainerContext(hostName: MacString.FromMacRoman("Old.dd"))));
+
+        Assert.Equal("legacy"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    public void StandaloneDiskDoublerFilesDecodeTheSupportedCompressedMethods(byte method)
+    {
+        byte[] expected = "A"u8.ToArray();
+        byte[] encoded = CompressedFork(method, expected, (byte)'A');
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile(expected, [], method, encoded);
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(packed),
+            new ContainerContext(hostName: MacString.FromMacRoman("Compressed.dd"))));
+
+        Assert.Equal("Compressed", file.Name.ToMacRoman());
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    public void StandaloneDiskDoublerFilesDecodeCompressedResourceForks(byte method)
+    {
+        byte[] expected = "R"u8.ToArray();
+        byte[] encoded = CompressedFork(method, expected, (byte)'R');
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile([], expected, resourceMethod: method,
+            encodedResource: encoded);
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(packed),
+            new ContainerContext(hostName: MacString.FromMacRoman("Resource.dd"))));
+
+        Assert.Empty(file.DataFork.ToArray());
+        Assert.Equal(expected, file.ResourceFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData(7, 0)]
+    [InlineData(0, 1)]
+    public void StandaloneDiskDoublerFilesReportUnsupportedMethodsAndDeltaProcessing(byte method, ushort delta)
+    {
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile([1], [], method, dataDelta: delta);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = DiskDoublerReader.Instance.Read(ForkData.FromBytes(packed),
+            new ContainerContext(diagnostics: diagnostics, hostName: MacString.FromMacRoman("Unsupported.dd")));
+
+        Assert.Empty(files);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.method-unsupported" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void StandaloneDiskDoublerFileRejectsForkPayloadPastTheFileEnd()
+    {
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile("data"u8.ToArray(), []);
+        Array.Resize(ref packed, packed.Length - 1);
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(
+            ForkData.FromBytes(packed), new ContainerContext()));
+    }
+
+    [Fact]
+    public void ReadRejectsInputTooShortToContainAFormatSignature()
+    {
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(
+            ForkData.FromBytes(new byte[] { 0xAB, 0xCD, 0x00 }), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StandaloneDiskDoublerFileReportsAForkChecksumMismatchButKeepsTheDecodedFork()
+    {
+        byte[] packed = DiskDoublerFixture.BuildStandaloneFile("A"u8.ToArray(), [], dataMethod: 2,
+            encodedData: [0x41]);
+        packed[48] ^= 0x01;
+        DiskDoublerFixture.UpdateStandaloneHeaderChecksum(packed);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(packed),
+            new ContainerContext(diagnostics: diagnostics, hostName: MacString.FromMacRoman("Bad.dd"))));
+
+        Assert.Equal("A"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum" &&
+            diagnostic.Severity == DiagnosticSeverity.Error && diagnostic.Offset == 48);
+    }
+
+    private static byte[] CompressedFork(byte method, byte[] expected, byte symbol) => method switch
+    {
+        1 => [0, 0, 9, .. DiskDoublerFixture.PackLsbCodes(symbol)],
+        2 => [symbol],
+        4 => DiskDoublerFixture.BuildHuffmanFork(expected, symbolA: symbol),
+        8 => [.. new byte[16], .. DiskDoublerFixture.BuildLzhLiteral(symbol)],
+        _ => throw new ArgumentOutOfRangeException(nameof(method))
+    };
+
+    [Fact]
     public void CanReadRecognizesLegacyDdarArchivesWithACompleteHeader()
     {
         Assert.True(DiskDoublerReader.Instance.CanRead(ForkData.FromBytes(DiskDoublerFixture.BuildLegacyArchive())));
@@ -607,6 +760,40 @@ public sealed class DiskDoublerFeatureTests
             U16(archive, 60, Crc16Xmodem(archive.AsSpan(0, 60)));
             return archive;
         }
+
+        public static byte[] BuildStandaloneFile(byte[] data, byte[] resource, byte dataMethod = 0,
+            byte[]? encodedData = null, bool headerChecksum = true, ushort dataDelta = 0, byte resourceMethod = 0,
+            byte[]? encodedResource = null)
+        {
+            encodedData ??= data;
+            encodedResource ??= resource;
+            byte[] archive = new byte[84 + encodedData.Length + encodedResource.Length];
+            U32(archive, 0, 0xABCD0054);
+            U32(archive, 4, checked((uint)data.Length));
+            U32(archive, 8, checked((uint)encodedData.Length));
+            U32(archive, 12, checked((uint)resource.Length));
+            U32(archive, 16, checked((uint)encodedResource.Length));
+            archive[20] = dataMethod;
+            archive[21] = resourceMethod;
+            U32(archive, 24, 2_600_000_000);
+            U32(archive, 28, 2_500_000_000);
+            "TEXTttxt"u8.CopyTo(archive.AsSpan(32));
+            U16(archive, 40, 0x4000);
+            U16(archive, 54, dataDelta);
+            if (dataMethod == 1) U16(archive, 48, MacCompressChecksum(data, encodedData, 0, 0));
+            if (dataMethod is 2 or 4) U16(archive, 48, ByteSum(data));
+            if (dataMethod == 8) U16(archive, 48, Crc16Ibm(data));
+            if (resourceMethod == 1) U16(archive, 50, MacCompressChecksum(resource, encodedResource, 0, 0));
+            if (resourceMethod is 2 or 4) U16(archive, 50, ByteSum(resource));
+            if (resourceMethod == 8) U16(archive, 50, Crc16Ibm(resource));
+            encodedData.CopyTo(archive, 84);
+            encodedResource.CopyTo(archive, 84 + encodedData.Length);
+            if (headerChecksum) U16(archive, 82, Crc16Xmodem(archive.AsSpan(0, 82)));
+            return archive;
+        }
+
+        public static void UpdateStandaloneHeaderChecksum(byte[] archive) =>
+            U16(archive, 82, Crc16Xmodem(archive.AsSpan(0, 82)));
 
         public static byte[] BuildFolder(string name, int depth)
         {
