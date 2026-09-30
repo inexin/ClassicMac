@@ -195,7 +195,7 @@ public sealed class CompactProReader : IContainerReader
         return new CompactProDirectory(storedCrc, crc, checked((int)stream.Position), comment, entries);
     }
 
-    private static byte[] DecodeRle8182(ReadOnlySpan<byte> input, int outputLength)
+    internal static byte[] DecodeRle8182(ReadOnlySpan<byte> input, int outputLength)
     {
         var output = new byte[outputLength];
         int source = 0;

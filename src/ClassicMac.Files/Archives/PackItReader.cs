@@ -2,12 +2,14 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files.Archives;
 
-/// <summary>Reads PackIt archives containing uncompressed entries.</summary>
-/// <remarks>The stream layout and CRCs are fitted against the published PackIt format notes.</remarks>
+/// <summary>Reads PackIt archives containing stored, Huffman-compressed, and encrypted Huffman entries.</summary>
+/// <remarks>The stream layout, encryption transforms, and CRCs are fitted against published format notes and
+/// XADMaster's independent reader; interoperability with the original application remains to be verified.</remarks>
 public sealed class PackItReader : IContainerReader
 {
     private const int EntryHeaderLength = 98;
@@ -54,12 +56,24 @@ public sealed class PackItReader : IContainerReader
                 ended = true;
                 break;
             }
-            bool huffman = signature.SequenceEqual("PMa4"u8);
+            bool huffman = signature.SequenceEqual("PMa4"u8) || signature.SequenceEqual("PMa5"u8) ||
+                signature.SequenceEqual("PMa6"u8);
+            bool xorEncrypted = signature.SequenceEqual("PMa5"u8);
+            bool desEncrypted = signature.SequenceEqual("PMa6"u8);
+            bool encrypted = xorEncrypted || desEncrypted;
             if (!signature.SequenceEqual("PMag"u8) && !huffman)
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.method-unsupported",
                     $"PackIt entry method '{System.Text.Encoding.ASCII.GetString(signature)}' is not supported; " +
                     "the remainder of the archive is not read.", offset);
+                break;
+            }
+            if (encrypted && context.Options.ArchivePassword is null)
+            {
+                context.Report(DiagnosticSeverity.Warning, "archive.method-unsupported",
+                    $"PackIt method '{System.Text.Encoding.ASCII.GetString(signature)}' requires an archive password; " +
+                    "the remainder of the archive is not read.",
+                    offset);
                 break;
             }
             byte[] metadataBytes;
@@ -69,13 +83,19 @@ public sealed class PackItReader : IContainerReader
             int nextOffset;
             if (huffman)
             {
+                byte[]? desDecoded = desEncrypted
+                    ? DecodeDesBlocks(archive.AsSpan(offset + 4), GetDesKey(context.Options.ArchivePassword!))
+                    : null;
+                ReadOnlySpan<byte> huffmanInput = desDecoded ?? archive.AsSpan(offset + 4);
                 DecodedHuffmanEntry decoded = DecodeHuffmanEntry(
-                    archive.AsSpan(offset + 4), context.Options.MaxExpandedBytesPerInput - expandedBytes);
+                    huffmanInput, context.Options.MaxExpandedBytesPerInput - expandedBytes,
+                    xorEncrypted ? DeriveXorKey(MacString.FromMacRoman(context.Options.ArchivePassword!).Bytes) : null);
                 metadataBytes = decoded.Metadata;
                 decodedData = decoded.Data;
                 decodedResource = decoded.Resource;
                 storedForkCrc = decoded.StoredForkCrc;
-                nextOffset = checked(offset + 4 + decoded.BytesConsumed);
+                int encodedBytesConsumed = encrypted ? checked((decoded.BytesConsumed + 7) & ~7) : decoded.BytesConsumed;
+                nextOffset = checked(offset + 4 + encodedBytesConsumed);
             }
             else
             {
@@ -135,8 +155,12 @@ public sealed class PackItReader : IContainerReader
             actualForkCrc = Crc16(resource, actualForkCrc);
             var name = new MacString(metadata.Slice(1, nameLength));
             if (storedForkCrc != actualForkCrc)
+            {
+                if (encrypted)
+                    throw new InvalidDataException($"The PackIt password is incorrect or the encrypted forks are corrupt for '{name}'.");
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                     $"The PackIt fork checksum is incorrect for '{name}'.", nextOffset - 2);
+            }
 
             var type = new FourCC(metadata.Slice(0x40, 4));
             var creator = new FourCC(metadata.Slice(0x44, 4));
@@ -166,9 +190,10 @@ public sealed class PackItReader : IContainerReader
         signature.SequenceEqual("PMa6"u8) || signature.SequenceEqual("PMa7"u8) ||
         signature.SequenceEqual("PEnd"u8);
 
-    private static DecodedHuffmanEntry DecodeHuffmanEntry(ReadOnlySpan<byte> input, long maxForkBytes)
+    private static DecodedHuffmanEntry DecodeHuffmanEntry(ReadOnlySpan<byte> input, long maxForkBytes,
+        byte[]? xorKey)
     {
-        var bits = new HuffmanBitReader(input);
+        var bits = new HuffmanBitReader(input, xorKey);
         int nodeCount = 0;
         int leafCount = 0;
         HuffmanNode root = ReadHuffmanNode(ref bits, 0, ref nodeCount, ref leafCount);
@@ -190,6 +215,61 @@ public sealed class PackItReader : IContainerReader
         for (int index = 0; index < resource.Length; index++) resource[index] = ReadSymbol(ref bits, root);
         ushort storedForkCrc = (ushort)((ReadSymbol(ref bits, root) << 8) | ReadSymbol(ref bits, root));
         return new DecodedHuffmanEntry(metadata, data, resource, storedForkCrc, bits.BytesConsumed);
+    }
+
+    private static byte[] DeriveXorKey(ReadOnlySpan<byte> password)
+    {
+        // PackIt III expands the first eight MacRoman password bytes through the DES PC-1 bit selection table,
+        // then XORs with the first seven resulting key bytes, cycling each archive byte over those seven bytes.
+        ReadOnlySpan<byte> pc1 = [57,49,41,33,25,17,9,1,58,50,42,34,26,18,10,2,59,51,43,35,27,19,11,3,
+            60,52,44,36,63,55,47,39,31,23,15,7,62,54,46,38,30,22,14,6,61,53,45,37,29,21,13,5,28,20,12,4];
+        Span<byte> passwordBytes = stackalloc byte[8];
+        password[..Math.Min(password.Length, passwordBytes.Length)].CopyTo(passwordBytes);
+        byte[] key = new byte[8];
+        for (int index = 0; index < pc1.Length; index++)
+        {
+            int sourceBit = pc1[index] - 1;
+            key[index / 8] |= (byte)(((passwordBytes[sourceBit / 8] << (sourceBit % 8)) & 0x80) >> (index % 8));
+        }
+        return key;
+    }
+
+    private static byte[] GetDesKey(string password)
+    {
+        ReadOnlySpan<byte> passwordBytes = MacString.FromMacRoman(password).Bytes;
+        var key = new byte[8];
+        passwordBytes[..Math.Min(passwordBytes.Length, key.Length)].CopyTo(key);
+        return key;
+    }
+
+    private static byte[] DecodeDesBlocks(ReadOnlySpan<byte> input, byte[] key)
+    {
+        int blockLength = input.Length & ~7;
+        if (blockLength == 0)
+            throw new InvalidDataException("A PackIt DES-encrypted Huffman entry is truncated.");
+        byte[] source = input[..blockLength].ToArray();
+        byte[] decoded = new byte[blockLength];
+        try
+        {
+            using TripleDES des = TripleDES.Create();
+            des.Mode = CipherMode.ECB;
+            des.Padding = PaddingMode.None;
+            // [Fitted] XADMaster decodes PMa6 blocks with DES_encrypt. Use an equivalent three-key DES schedule so
+            // the BCL accepts weak DES keys. Flipping a key parity bit
+            // makes the byte keys distinct without changing any effective DES key bits: E(K, D(K, E(K, block))).
+            byte[] threeDesKey = new byte[24];
+            key.CopyTo(threeDesKey, 0);
+            key.CopyTo(threeDesKey, 8);
+            threeDesKey[15] ^= 1;
+            key.CopyTo(threeDesKey, 16);
+            using ICryptoTransform transform = des.CreateEncryptor(threeDesKey, new byte[8]);
+            _ = transform.TransformBlock(source, 0, source.Length, decoded, 0);
+        }
+        catch (CryptographicException exception)
+        {
+            throw new InvalidDataException("The PackIt DES password cannot be used to decode this archive.", exception);
+        }
+        return decoded;
     }
 
     private static byte ReadSymbol(ref HuffmanBitReader bits, HuffmanNode root)
@@ -249,9 +329,10 @@ public sealed class PackItReader : IContainerReader
         public HuffmanNode? One { get; }
     }
 
-    private ref struct HuffmanBitReader(ReadOnlySpan<byte> input)
+    private ref struct HuffmanBitReader(ReadOnlySpan<byte> input, byte[]? xorKey)
     {
         private readonly ReadOnlySpan<byte> input = input;
+        private readonly byte[]? xorKey = xorKey;
         private int bitPosition;
 
         public int BytesConsumed => (bitPosition + 7) >> 3;
@@ -260,7 +341,10 @@ public sealed class PackItReader : IContainerReader
         {
             if ((long)bitPosition >= (long)input.Length * 8)
                 throw new InvalidDataException("A PackIt Huffman entry is truncated.");
-            bool value = (input[bitPosition >> 3] & (0x80 >> (bitPosition & 7))) != 0;
+            int byteIndex = bitPosition >> 3;
+            byte valueByte = input[byteIndex];
+            if (xorKey is not null) valueByte ^= xorKey[byteIndex % 7];
+            bool value = (valueByte & (0x80 >> (bitPosition & 7))) != 0;
             bitPosition++;
             return value;
         }

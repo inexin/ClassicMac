@@ -20,7 +20,7 @@ cover stored forks, Finder metadata, dates, nested v1 folder markers, and malfor
 has yet been verified against an archive made by the original application. Archive-level comments and method 6 are
 not implemented; encrypted entries are reported and skipped.
 
-## PackIt (stored-entry subset)
+## PackIt (stored, Huffman, and encrypted entries)
 
 PackIt is a flat stream of entries with no archive header. `PMag` starts an uncompressed entry, `PEnd` ends the archive,
 and the 94-byte entry metadata follows the four-byte signature. It holds a 63-byte Pascal name field, Finder type,
@@ -28,10 +28,35 @@ creator and flags, data- and resource-fork lengths, and creation/modification da
 CRC-16/XMODEM of their concatenation follow; the metadata also has a CRC-16/XMODEM **[Fitted]** against
 [psx-spx's PackIt format notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/) and
 [XADMaster's PackIt reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADPackItParser.m/).
-ClassicMac extracts stored `PMag` and Huffman-compressed `PMa4` records and reports header or fork CRC mismatches.
-`PMa1`–`PMa3` and `PMa5`–`PMa7` encrypted methods are recognized but reported as unsupported; parsing stops at the
-first unsupported record. Tests cover stored and Huffman entries with both forks, Finder metadata and dates, CRC
-diagnostics, unsupported methods and truncated headers. Original-application verification remains.
+ClassicMac extracts stored `PMag`, Huffman-compressed `PMa4`, XOR-encrypted Huffman `PMa5`, and DES-encrypted Huffman
+`PMa6` records. Passwords are supplied through `ContainerReadOptions.ArchivePassword` as MacRoman. The `PMa5` key is
+expanded from the first eight password bytes using PackIt's PC-1 selection table and cycles over seven key bytes.
+`PMa6` uses the first eight password bytes, zero-padded, as a DES key; the Huffman stream is transformed in ECB mode.
+Both encrypted methods pad their ciphertext to an 8-byte boundary before the next entry. The stream transformations are
+**[Fitted]** against [XADMaster's PackIt reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADPackItParser.m/)
+and the published [PackIt format notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/).
+Header and fork CRC mismatches are reported; a failed encrypted fork checksum rejects the file as a bad password or
+damaged ciphertext. Other markers are reported as unsupported and stop parsing at that record. Tests cover stored and
+Huffman entries with both forks, Finder metadata and dates, CRC diagnostics, correct and wrong XOR/DES passwords,
+weak DES keys, encrypted stream alignment, unsupported methods, and truncated headers. Original-application verification
+remains.
+
+## DiskDoubler (DDA2 stored entries)
+
+The DDA2 archive header is 62 bytes. Records begin with `DDA2`, a record type, a 31-byte Pascal name field, a
+directory depth, and the record's total byte length. Directory records carry Mac creation and modification dates.
+File records contain a `0xABCD0054` file header with expanded and stored fork lengths, per-fork methods, dates, Finder
+type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths, method-0 stored forks and
+method-8 Compact Pro compatible forks. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed by RLE,
+otherwise the fork is RLE-only. Other compression and delta methods are diagnosed and skipped while parsing continues
+at the next bounded record. Method-8 forks are checked with CRC-16/IBM.
+
+The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
+Tests use hand-built DDA2 records to check stored and method-8 fork bytes, Finder metadata, dates, nested paths,
+unsupported-method recovery, checksum mismatch reporting, truncation, invalid folder depth, and entry limits. DDA2
+archive-header and method-0 fork checksums are not verified. Legacy `DDAR` archives, standalone compressed files, and
+DDA2 compression methods other than 0 and 8 remain unsupported; original-application interoperability remains
+unverified.
 
 ## Compact Pro (RLE and LZH subset)
 

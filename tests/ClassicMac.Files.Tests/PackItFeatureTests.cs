@@ -51,11 +51,17 @@ public sealed class PackItFeatureTests
             diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
-    [Fact]
-    public void PackItEncryptedEntriesAreReportedAsUnsupported()
+    [Theory]
+    [InlineData("PMa1")]
+    [InlineData("PMa2")]
+    [InlineData("PMa3")]
+    [InlineData("PMa5")]
+    [InlineData("PMa6")]
+    [InlineData("PMa7")]
+    public void PackItUnsupportedEntriesAreReportedAsUnsupported(string method)
     {
         byte[] archive = PackItFixture.BuildStoredFile("compressed", [], []);
-        "PMa5"u8.CopyTo(archive);
+        System.Text.Encoding.ASCII.GetBytes(method).CopyTo(archive, 0);
         var diagnostics = new List<Diagnostic>();
 
         IReadOnlyList<MacFile> files = PackItReader.Instance.Read(ForkData.FromBytes(archive),
@@ -64,6 +70,101 @@ public sealed class PackItFeatureTests
         Assert.Empty(files);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.method-unsupported" &&
             diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData("secret")]
+    [InlineData("café")]
+    public void PackItXorEncryptedHuffmanEntryUsesTheSuppliedMacRomanPassword(string password)
+    {
+        byte[] archive = PackItFixture.BuildXorEncryptedHuffmanFile("secret", "data fork"u8.ToArray(),
+            "resource fork"u8.ToArray(), password);
+
+        MacFile file = Assert.Single(PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = password })));
+
+        Assert.Equal("secret", file.MacPath);
+        Assert.Equal("data fork"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void PackItXorEncryptedHuffmanEntryNeedsTheCorrectPassword()
+    {
+        byte[] archive = PackItFixture.BuildXorEncryptedHuffmanFile("secret", "payload"u8.ToArray(), [], "secret");
+
+        Assert.Throws<InvalidDataException>(() => PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "wrong" })));
+    }
+
+    [Fact]
+    public void PackItXorEncryptedHuffmanEntrySkipsPaddingBeforeTheNextEntry()
+    {
+        byte[] first = PackItFixture.BuildXorEncryptedHuffmanFile("secret", "first"u8.ToArray(), [], "secret");
+        byte[] second = PackItFixture.BuildStoredFile("second", "next"u8.ToArray(), []);
+        byte[] archive = new byte[first.Length - 4 + second.Length];
+        first.AsSpan(0, first.Length - 4).CopyTo(archive);
+        second.CopyTo(archive, first.Length - 4);
+
+        IReadOnlyList<MacFile> files = PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "secret" }));
+
+        Assert.Equal(new[] { "secret", "second" }, files.Select(file => file.MacPath));
+        Assert.Equal("first"u8.ToArray(), files[0].DataFork.ToArray());
+        Assert.Equal("next"u8.ToArray(), files[1].DataFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData("password")]
+    [InlineData("café")]
+    public void PackItDesEncryptedHuffmanEntryUsesTheSuppliedMacRomanPassword(string password)
+    {
+        byte[] archive = PackItFixture.BuildDesEncryptedHuffmanFile("secret", "data fork"u8.ToArray(),
+            "resource fork"u8.ToArray(), password);
+
+        MacFile file = Assert.Single(PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = password })));
+
+        Assert.Equal("secret", file.MacPath);
+        Assert.Equal("data fork"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void PackItDesEncryptedHuffmanEntryNeedsTheCorrectPassword()
+    {
+        byte[] archive = PackItFixture.BuildDesEncryptedHuffmanFile("secret", "payload"u8.ToArray(), [], "password");
+
+        Assert.Throws<InvalidDataException>(() => PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "wrong" })));
+    }
+
+    [Fact]
+    public void PackItDesEncryptedHuffmanEntryAcceptsAWeakDesPassword()
+    {
+        byte[] archive = PackItFixture.BuildDesEncryptedHuffmanFile("secret", "payload"u8.ToArray(), [], "");
+
+        MacFile file = Assert.Single(PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "" })));
+
+        Assert.Equal("payload"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void PackItDesEncryptedHuffmanEntrySkipsPaddingBeforeTheNextEntry()
+    {
+        byte[] first = PackItFixture.BuildDesEncryptedHuffmanFile("secret", "first"u8.ToArray(), [], "password");
+        byte[] second = PackItFixture.BuildStoredFile("second", "next"u8.ToArray(), []);
+        byte[] archive = new byte[first.Length - 4 + second.Length];
+        first.AsSpan(0, first.Length - 4).CopyTo(archive);
+        second.CopyTo(archive, first.Length - 4);
+
+        IReadOnlyList<MacFile> files = PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "password" }));
+
+        Assert.Equal(new[] { "secret", "second" }, files.Select(file => file.MacPath));
+        Assert.Equal("first"u8.ToArray(), files[0].DataFork.ToArray());
+        Assert.Equal("next"u8.ToArray(), files[1].DataFork.ToArray());
     }
 
     [Fact]
@@ -157,6 +258,83 @@ public sealed class PackItFeatureTests
                 if (bits[bit]) compressed[4 + bit / 8] |= (byte)(0x80 >> (bit & 7));
             "PEnd"u8.CopyTo(compressed.AsSpan(compressed.Length - 4));
             return compressed;
+        }
+
+        public static byte[] BuildXorEncryptedHuffmanFile(string name, byte[] data, byte[] resource, string password)
+        {
+            byte[] plain = BuildHuffmanFile(name, data, resource);
+            int payloadLength = plain.Length - 8;
+            int encryptedLength = (payloadLength + 7) & ~7;
+            byte[] archive = new byte[4 + encryptedLength + 4];
+            "PMa5"u8.CopyTo(archive);
+            byte[] key = DerivePackItXorKey(ClassicMac.Core.MacString.FromMacRoman(password).Bytes);
+            for (int index = 0; index < payloadLength; index++)
+                archive[4 + index] = (byte)(plain[4 + index] ^ key[index % 7]);
+            "PEnd"u8.CopyTo(archive.AsSpan(4 + encryptedLength));
+            return archive;
+        }
+
+        public static byte[] BuildDesEncryptedHuffmanFile(string name, byte[] data, byte[] resource, string password)
+        {
+            byte[] plain = BuildHuffmanFile(name, data, resource);
+            int payloadLength = plain.Length - 8;
+            int encryptedLength = (payloadLength + 7) & ~7;
+            byte[] key = ClassicMac.Core.MacString.FromMacRoman(password).Bytes.ToArray();
+            Array.Resize(ref key, 8);
+            byte[] archive = new byte[4 + encryptedLength + 4];
+            "PMa6"u8.CopyTo(archive);
+            if (System.Security.Cryptography.DES.IsWeakKey(key))
+            {
+                using System.Security.Cryptography.TripleDES des = System.Security.Cryptography.TripleDES.Create();
+                des.Mode = System.Security.Cryptography.CipherMode.ECB;
+                des.Padding = System.Security.Cryptography.PaddingMode.None;
+                byte[] threeDesKey = MakeWeakKeyCompatibleTripleDesKey(key);
+                using var transform = des.CreateDecryptor(threeDesKey, new byte[8]);
+                TransformDesPayload(transform, plain, payloadLength, encryptedLength, archive);
+            }
+            else
+            {
+                using System.Security.Cryptography.DES des = System.Security.Cryptography.DES.Create();
+                des.Mode = System.Security.Cryptography.CipherMode.ECB;
+                des.Padding = System.Security.Cryptography.PaddingMode.None;
+                using var transform = des.CreateDecryptor(key, new byte[8]);
+                TransformDesPayload(transform, plain, payloadLength, encryptedLength, archive);
+            }
+            "PEnd"u8.CopyTo(archive.AsSpan(4 + encryptedLength));
+            return archive;
+        }
+
+        private static byte[] MakeWeakKeyCompatibleTripleDesKey(byte[] key)
+        {
+            byte[] threeDesKey = new byte[24];
+            key.CopyTo(threeDesKey, 0);
+            key.CopyTo(threeDesKey, 8);
+            threeDesKey[15] ^= 1; // DES parity bit: gives 3DES distinct byte keys but identical DES subkeys.
+            key.CopyTo(threeDesKey, 16);
+            return threeDesKey;
+        }
+
+        private static void TransformDesPayload(System.Security.Cryptography.ICryptoTransform transform,
+            byte[] plain, int payloadLength, int encryptedLength, byte[] archive)
+        {
+            byte[] padded = new byte[encryptedLength];
+            plain.AsSpan(4, payloadLength).CopyTo(padded);
+            _ = transform.TransformBlock(padded, 0, padded.Length, archive, 4);
+        }
+
+        private static byte[] DerivePackItXorKey(ReadOnlySpan<byte> password)
+        {
+            int[] table = [57,49,41,33,25,17,9,1,58,50,42,34,26,18,10,2,59,51,43,35,27,19,11,3,60,52,44,36,
+                63,55,47,39,31,23,15,7,62,54,46,38,30,22,14,6,61,53,45,37,29,21,13,5,28,20,12,4];
+            Span<byte> passwordBytes = stackalloc byte[8];
+            password[..Math.Min(password.Length, 8)].CopyTo(passwordBytes);
+            byte[] key = new byte[8];
+            for (int index = 0; index < table.Length; index++)
+            {
+                int source = table[index] - 1;
+                key[index / 8] |= (byte)(((passwordBytes[source / 8] << (source % 8)) & 0x80) >> (index % 8));
+            }
+            return key;
         }
 
         private static void WriteHuffmanTree(List<bool> bits, int depth, int prefix)

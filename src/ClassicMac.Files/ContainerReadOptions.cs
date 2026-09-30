@@ -37,5 +37,8 @@ namespace ClassicMac.Files
         /// driver never checks them, only its "Verify checksum" setting does.
         /// </summary>
         public bool VerifyChecksums { get; init; }
+
+        /// <summary>The MacRoman password used by encrypted archive formats that accept a password; null by default.</summary>
+        public string? ArchivePassword { get; init; }
     }
 }

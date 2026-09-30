@@ -809,7 +809,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     vectors only. The Compact Pro reader parses directory and folder entries and extracts RLE8182 and LZH+RLE forks;
     Compact Pro archive comments are reported as diagnostics; multi-volume sets remain. Compression is fitted to published third-party
     descriptions and hand-built vectors; verification against an archive made by the original application remains. The
-    PackIt reader extracts stored (`PMag`) and Huffman (`PMa4`) entries; encrypted entries remain unsupported.
+    PackIt reader extracts stored (`PMag`), Huffman (`PMa4`), and password-protected XOR/Huffman (`PMa5`) and DES/Huffman
+    (`PMa6`) entries. The DiskDoubler reader parses DDA2 archive paths and extracts stored and method-8 Compact Pro
+    compatible forks; other compressed methods, legacy DDAR archives and standalone compressed files remain unsupported.
     Original-application interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
@@ -821,7 +823,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
-    (RLE81 + LZH); PackIt (stored and Huffman entries); then DiskDoubler, encrypted PackIt methods and segmented archives.
+    (RLE81 + LZH); PackIt (stored, Huffman, XOR/Huffman and DES/Huffman entries); DiskDoubler (DDA2 stored and
+    method-8 forks); then other DiskDoubler compression/legacy variants, any other documented PackIt methods and
+    segmented archives.
     Anything from row 5 of Inputs only on request.
 11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
    - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's
