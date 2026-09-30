@@ -879,7 +879,25 @@ and their nonzero BSD `special` link reference; the reference resolves to `iNode
 `\0\0\0\0HFS+ Private Data` directory **[Doc]** TN1150. The link's visible path is kept while the indirect node's
 forks and file metadata are used; the private directory subtree is omitted from the file list. The reference is exposed
 as `MacFile.HardLinkReference`. A nonzero link reference without a matching node is retained with its catalog forks and
-reported as `hfs.plus-hardlink-target-missing`. Additional B-tree invariants remain. As TN1150 permits, allocation
+reported as `hfs.plus-hardlink-target-missing`. The B-tree reader still has the following validation gaps:
+
+1. **Record-offset alignment.** It checks that record offsets are in bounds and strictly increasing, and that the
+   first record starts at byte 14, but it does not require every record offset and the free-space offset to be even.
+   TN1150 requires keyed-record data to be two-byte aligned and the record data to have even length. Confirm how
+   Apple's verifier handles malformed odd offsets, then add a feature test for the resulting rule.
+2. **Exact leaf payload sizes.** The extents-overflow reader accepts payloads longer than the fixed 64-byte
+   `HFSPlusExtentRecord`; catalog threads accept trailing bytes after the declared Unicode name; and the attributes
+   reader accepts extra bytes after the fixed 88-byte fork-data and 72-byte extents records. TN1150 says undefined
+   attribute record types must be ignored, so this check applies only to defined payload layouts. Add feature-level
+   malformed and valid boundary fixtures, including the specified alignment padding.
+
+The current implementation already checks the header and node kinds/heights, root-to-leaf graph, per-level sibling
+chains, leaf chain and endpoints, key ordering, child key ranges, record counts, node-map coverage/allocation and
+free-node accounting. Header fields documented as reserved are intentionally not treated as required-zero checks.
+Reachable empty leaves are accepted by the tree walk; TN1150 does not explicitly forbid them, and Apple's verifier's
+leaf traversal counts their zero records without a separate nonempty-node check. Keep this as a compatibility case,
+not a required rejection, unless evidence from the verifier or real volumes changes that conclusion.
+As TN1150 permits, allocation
 blocks marked used but not described by known
 fork extents are not rejected; the reader checks that every extent it recognizes is marked allocated.
 

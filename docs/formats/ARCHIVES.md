@@ -73,7 +73,7 @@ after records are skipped. These layouts are **[Fitted]** against [XADMaster's D
 
 A standalone compressed file starts with the same `0xABCD0054` file header and stores its compressed data and resource
 forks after the 84-byte header. Its checksum at +82 covers bytes 0–81; older files with a zero checksum are accepted
-**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 4, 6, 8, 9 and 10 from standalone files as it does from
+**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 4, 5, 6, 7, 8, 9 and 10 from standalone files as it does from
 DDA2 entries, preserving Finder metadata and deriving the Mac filename from the host name (a `.dd` suffix is removed).
 Methods 6 (`AD2`) and 9 (`AD1`) use the ADn block decoder described above; both original-app files expand to the
 uncompressed data and resource forks in the CC0 corpus.
@@ -83,17 +83,28 @@ may be raw or Huffman-coded, and matches refer to prior output. This layout is *
 [XADMaster's DDn decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerDDnHandle.m/) and checked
 against a standalone DD3 file produced by DiskDoubler Pro 4.1.1 in the CC0
 [DiskDoubler Test Files corpus](https://github.com/ssokolow/diskdoubler-test-files); the expanded data and resource
-forks match the uncompressed corpus originals. Methods 3, 5, 7 and delta processing are diagnosed and skipped.
+forks match the uncompressed corpus originals. Method 5 reads a leading adaptive-tree count (zero means 256), then
+uses the method-2 adaptive Huffman stream with decoded symbols selecting the next tree modulo that count. This layout
+is **[Fitted]** against [XADMaster's method-5 handling](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/)
+and has hand-built feature vectors; original-application interoperability remains unverified. Method 7 uses the
+Stac LZS stream grammar from [RFC 1974](https://www.rfc-editor.org/rfc/rfc1974) plus a six-byte preamble, an
+entry-counted dictionary area, and input/output XOR transforms fitted to
+[XADMaster's DiskDoubler wrapper](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
+The fork checksum is the XOR of expanded bytes with the even-length `0xff` correction fitted to
+[XADMaster's XOR-sum handle](https://github.com/MacPaw/XADMaster/blob/master/XADXORSumHandle.m). Tests cover literal
+and backreference streams, checksum parity, and malformed input; an original-app fixture remains. Method 3 and delta
+processing are diagnosed and skipped.
 
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
-Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive Huffman, Huffman
-and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
+Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive
+Huffman (methods 2 and 5), Huffman, Stac LZS literals and backreferences, and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
 invalid folder depth, entry limits, standalone files and their header checksums, standalone fork methods, and
 unsupported standalone delta processing. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
 methods 9, 6 and 10 against both fork outputs; their compressed payloads are also tested inside DDA2 records.
-Method-0 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 4, 6, 8, 9 and 10 remain
-unsupported; standalone methods 3, 5 and 7 and delta processing remain unsupported. Original
+Method-0 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 4, 5, 6, 7, 8, 9 and 10 remain
+unsupported; standalone method 3 and delta processing remain unsupported. Methods 5 and 7 have no original-app
+fixtures yet. Original
 application interoperability for DDA2 archives remains unverified.
 
 ## Compact Pro (RLE and LZH subset)

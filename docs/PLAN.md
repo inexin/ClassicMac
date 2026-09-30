@@ -815,10 +815,12 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     descriptions and hand-built vectors; verification against an archive made by the original application remains. The
     PackIt reader extracts stored (`PMag`), Huffman (`PMa4`), and password-protected XOR/Huffman (`PMa5`) and DES/Huffman
     (`PMa6`) entries. The DiskDoubler reader parses DDA2 archive paths and extracts stored, method-1 MacCompress LZW,
-    method-2 adaptive Huffman, method-4 Huffman, method-6 AD2, method-8 Compact Pro, method-9 AD1, and method-10 DDn
-    forks. Standalone compressed files extract stored and methods 1, 2, 4, 6, 8, 9 and 10. Methods 6, 9 and 10 are
+    method-2 adaptive Huffman, method-4 Huffman, method-5 adaptive Huffman, method-6 AD2, method-8 Compact Pro,
+    method-7 Stac LZS, method-9 AD1, and method-10 DDn forks. Standalone compressed files extract stored and methods 1, 2, 4, 5, 6, 7, 8, 9 and 10. Methods 6, 9 and 10 are
     verified against both forks of authentic DiskDoubler Pro 4.1.1 standalone files, and those compressed payloads
-    are also tested in DDA2 records. Methods 3, 5, 7 and delta processing remain unsupported.
+    are also tested in DDA2 records. Method 5 is fitted to XADMaster behavior and has hand-built vectors but no
+    original-app fixture yet. Method 7 uses the RFC 1974 stream grammar, fitted XADMaster wrapper transforms and XOR
+    checksum behavior; its original-app fixture remains missing. Methods 3 and delta processing remain unsupported.
     Legacy DDAR stored-fork archives are also supported; DDA2 archive-header CRCs and standalone file-header CRCs
     (including the old zero-checksum form) follow fitted XADMaster behavior.
     Standalone DiskDoubler Pro 4.1.1 interoperability is checked for methods 6, 9 and 10; original-application DDA2
@@ -832,7 +834,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     and zero unused bitmap bits; it reports a mismatch between bitmap free blocks and the volume header's `freeBlocks`.
     HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
     to indirect-node forks while keeping the visible path and hiding private metadata; dangling links are reported.
-    Additional B-tree invariants remain.
+    Remaining B-tree validation is enumerated in [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus): even record-
+    offset alignment and exact leaf-payload layouts for extents, threads and defined attribute records.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro

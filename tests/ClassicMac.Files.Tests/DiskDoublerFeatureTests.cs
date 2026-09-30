@@ -261,7 +261,7 @@ public sealed class DiskDoublerFeatureTests
     }
 
     [Theory]
-    [InlineData(7, 0)]
+    [InlineData(3, 0)]
     [InlineData(0, 1)]
     public void StandaloneDiskDoublerFilesReportUnsupportedMethodsAndDeltaProcessing(byte method, ushort delta)
     {
@@ -455,7 +455,7 @@ public sealed class DiskDoublerFeatureTests
     public void Dda2UnsupportedCompressionSkipsThatEntryAndContinuesAtTheNextRecord()
     {
         byte[] archive = DiskDoublerFixture.BuildArchive(
-            DiskDoublerFixture.BuildFile("Unsupported", 0, [1], [], dataMethod: 7),
+            DiskDoublerFixture.BuildFile("Unsupported", 0, [1], [], dataMethod: 3),
             DiskDoublerFixture.BuildFile("Stored", 0, "available"u8.ToArray(), []));
         var diagnostics = new List<Diagnostic>();
 
@@ -516,6 +516,232 @@ public sealed class DiskDoublerFeatureTests
 
         Assert.Equal("AAA"u8.ToArray(), file.DataFork.ToArray());
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum");
+    }
+
+    [Fact]
+    public void Dda2Method5UsesOneAdaptiveTreeWhenTreeCountIsOne()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive", 0,
+            "A"u8.ToArray(), [], dataMethod: 5, encodedData: [1, 0x41]));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("A"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method5WrapsTheNextTreeIndexByTheDeclaredTreeCount()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive", 0,
+            "AB"u8.ToArray(), [], dataMethod: 5, encodedData: [2, 0x41, 0x42]));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("AB"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method5TreatsAZeroTreeCountAs256()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Adaptive", 0,
+            "AAA"u8.ToArray(), [], dataMethod: 5, encodedData: [0, 0x41, 0x41, 0xF0]));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("AAA"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method5RejectsAMissingTreeCount()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Truncated", 0,
+            "A"u8.ToArray(), [], dataMethod: 5, encodedData: []));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7DecodesLiteralBytes()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsLiterals([0xBE]), entryCount: 2);
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("LZS", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("A"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method7DecodesBackreferences()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsRepeat([0xBE, 0xBD], offset: 2, length: 2));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("LZS", 0,
+            "ABAB"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        var diagnostics = new List<Diagnostic>();
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("ABAB"u8.ToArray(), file.DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum");
+    }
+
+    [Fact]
+    public void Dda2Method7DecodesAnElevenBitBackreferenceOffset()
+    {
+        byte[] source = Enumerable.Range(0, 128).Select(index => (byte)(index % 2 == 0 ? 'A' : 'B')).ToArray();
+        byte[] encodedSymbols = source.Select(value => (byte)(value ^ 0xFF)).ToArray();
+        byte[] expected = [.. source, (byte)'A', (byte)'B'];
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsRepeat(encodedSymbols, offset: 128, length: 2));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("LZS", 0,
+            expected, [], dataMethod: 7, encodedData: payload));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData(23)]
+    [InlineData(38)]
+    public void Dda2Method7DecodesAnExtendedBackreferenceLength(int matchLength)
+    {
+        byte[] expected = Enumerable.Repeat((byte)'A', matchLength + 1).ToArray();
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsRepeat([0xBE], offset: 1, length: matchLength));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("LZS", 0,
+            expected, [], dataMethod: 7, encodedData: payload));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method7DecodesAResourceFork()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsLiterals([0xBE]));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("LZS", 0,
+            [], "A"u8.ToArray(), resourceMethod: 7, encodedResource: payload));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal("A"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StandaloneMethod7DecodesBothForks()
+    {
+        byte[] data = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsLiterals([0xBE]));
+        byte[] resource = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsLiterals([0xBD]));
+        byte[] standalone = DiskDoublerFixture.BuildStandaloneFile("A"u8.ToArray(), "B"u8.ToArray(),
+            dataMethod: 7, encodedData: data, resourceMethod: 7, encodedResource: resource);
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(standalone),
+            new ContainerContext()));
+
+        Assert.Equal("A"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("B"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2Method7RejectsATruncatedCompressedStream()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload([0x00]);
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Truncated", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7RejectsATruncatedHeader()
+    {
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Truncated", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: []));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7RejectsATruncatedDictionary()
+    {
+        byte[] payload = [.. new byte[6], 0, 0, 0, 1];
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Truncated", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7RejectsAnInvalidBackreference()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsRepeat([], offset: 1, length: 2));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Invalid offset", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7RejectsAMatchThatExceedsTheDeclaredForkLength()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsRepeat([0xBE], offset: 1, length: 2));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Overrun", 0,
+            "AA"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7RejectsAnEndMarkerBeforeTheDeclaredForkLength()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(DiskDoublerFixture.BuildStacLzsLiterals([]));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Short", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+
+        Assert.Throws<InvalidDataException>(() => DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void Dda2Method7ReportsAnIncorrectForkChecksum()
+    {
+        byte[] payload = DiskDoublerFixture.BuildStacLzsPayload(
+            DiskDoublerFixture.BuildStacLzsLiterals([0xBE]));
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Bad checksum", 0,
+            "A"u8.ToArray(), [], dataMethod: 7, encodedData: payload));
+        archive[62 + 60 + 44] ^= 0x01;
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("A"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum" &&
+            diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -919,9 +1145,11 @@ public sealed class DiskDoublerFeatureTests
             U16(archive, 54, dataDelta);
             if (dataMethod == 1) U16(archive, 48, MacCompressChecksum(data, encodedData, 0, 0));
             if (dataMethod is 2 or 4) U16(archive, 48, ByteSum(data));
+            if (dataMethod == 7) U16(archive, 48, StacLzsChecksum(data));
             if (dataMethod == 8) U16(archive, 48, Crc16Ibm(data));
             if (resourceMethod == 1) U16(archive, 50, MacCompressChecksum(resource, encodedResource, 0, 0));
             if (resourceMethod is 2 or 4) U16(archive, 50, ByteSum(resource));
+            if (resourceMethod == 7) U16(archive, 50, StacLzsChecksum(resource));
             if (resourceMethod == 8) U16(archive, 50, Crc16Ibm(resource));
             encodedData.CopyTo(archive, 84);
             encodedResource.CopyTo(archive, 84 + encodedData.Length);
@@ -980,10 +1208,12 @@ public sealed class DiskDoublerFeatureTests
             if (resourceMethod == 8) U16(bytes, header + 46, Crc16Ibm(resource));
             if (dataMethod == 1 && encodedData.Length >= 3) U16(bytes, header + 44,
                 MacCompressChecksum(data, encodedData, info1, info2));
-            if (dataMethod == 2) U16(bytes, header + 44, ByteSum(data));
+            if (dataMethod is 2 or 5) U16(bytes, header + 44, ByteSum(data));
+            if (dataMethod == 7) U16(bytes, header + 44, StacLzsChecksum(data));
             if (resourceMethod == 1 && encodedResource.Length >= 3) U16(bytes, header + 46,
                 MacCompressChecksum(resource, encodedResource, info1, info2));
-            if (resourceMethod == 2) U16(bytes, header + 46, ByteSum(resource));
+            if (resourceMethod is 2 or 5) U16(bytes, header + 46, ByteSum(resource));
+            if (resourceMethod == 7) U16(bytes, header + 46, StacLzsChecksum(resource));
             if (dataMethod == 4) U16(bytes, header + 44, ByteSum(data));
             if (resourceMethod == 4) U16(bytes, header + 46, ByteSum(resource));
             encodedData.CopyTo(bytes, RecordHeaderLength + 14 + FileHeaderLength);
@@ -1031,6 +1261,14 @@ public sealed class DiskDoublerFeatureTests
             return (ushort)sum;
         }
 
+        private static ushort StacLzsChecksum(ReadOnlySpan<byte> data)
+        {
+            byte xor = 0;
+            foreach (byte value in data) xor ^= value;
+            if ((data.Length & 1) == 0) xor ^= 0xFF;
+            return xor;
+        }
+
         public static byte[] BuildHuffmanFork(ReadOnlySpan<byte> plain, byte symbolA = (byte)'A',
             byte symbolB = (byte)'B')
         {
@@ -1058,6 +1296,94 @@ public sealed class DiskDoublerFeatureTests
             WriteBits(bits, 0, 8);
             WriteBits(bits, 1, 1);
             WriteBits(bits, 0, 1);
+            byte[] encoded = new byte[(bits.Count + 7) / 8];
+            for (int bit = 0; bit < bits.Count; bit++)
+                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            return encoded;
+        }
+
+        public static byte[] BuildStacLzsPayload(ReadOnlySpan<byte> compressedStream, uint entryCount = 0)
+        {
+            int streamOffset = checked(18 + (int)entryCount * 2);
+            byte[] payload = new byte[checked(streamOffset + compressedStream.Length)];
+            U32(payload, 6, entryCount);
+            for (int index = 0; index < compressedStream.Length; index++)
+                payload[streamOffset + index] = (byte)(compressedStream[index] ^ 0xFF);
+            return payload;
+        }
+
+        public static byte[] BuildStacLzsLiterals(ReadOnlySpan<byte> values)
+        {
+            var bits = new List<bool>();
+            foreach (byte value in values)
+            {
+                bits.Add(false);
+                WriteBits(bits, value, 8);
+            }
+            AppendStacLzsEndMarker(bits);
+            return PackMsbBits(bits);
+        }
+
+        public static byte[] BuildStacLzsRepeat(ReadOnlySpan<byte> literals, int offset, int length)
+        {
+            if (offset is <= 0 or > 2047) throw new ArgumentOutOfRangeException(nameof(offset));
+            if (length < 2) throw new ArgumentOutOfRangeException(nameof(length));
+            var bits = new List<bool>();
+            foreach (byte value in literals)
+            {
+                bits.Add(false);
+                WriteBits(bits, value, 8);
+            }
+            bits.Add(true);
+            bool shortOffset = offset <= 127;
+            bits.Add(shortOffset);
+            WriteBits(bits, offset, shortOffset ? 7 : 11);
+            WriteStacLzsLength(bits, length);
+            AppendStacLzsEndMarker(bits);
+            return PackMsbBits(bits);
+        }
+
+        private static void WriteStacLzsLength(List<bool> bits, int length)
+        {
+            if (length is >= 2 and <= 4)
+            {
+                WriteBits(bits, length - 2, 2);
+                return;
+            }
+            bits.Add(true);
+            bits.Add(true);
+            if (length <= 7)
+            {
+                WriteBits(bits, length - 5, 2);
+                return;
+            }
+            bits.Add(true);
+            bits.Add(true);
+            if (length <= 22)
+            {
+                WriteBits(bits, length - 8, 4);
+                return;
+            }
+
+            WriteBits(bits, 15, 4);
+            int remainder = length - 23;
+            while (remainder >= 15)
+            {
+                WriteBits(bits, 15, 4);
+                remainder -= 15;
+            }
+            WriteBits(bits, remainder, 4);
+        }
+
+        private static void AppendStacLzsEndMarker(List<bool> bits)
+        {
+            bits.Add(true);
+            bits.Add(true);
+            WriteBits(bits, 0, 7);
+        }
+
+        private static byte[] PackMsbBits(List<bool> bits)
+        {
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
                 if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));

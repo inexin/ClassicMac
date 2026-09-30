@@ -262,6 +262,7 @@ public sealed class DiskDoublerReader : IContainerReader
         string forkName, string fileName, ContainerContext context)
     {
         ushort calculated;
+        ushort expected = U16(header, checksumOffset);
         string code;
         switch (method)
         {
@@ -270,8 +271,15 @@ public sealed class DiskDoublerReader : IContainerReader
                 code = "archive.fork-checksum";
                 break;
             case 2:
+            case 5:
             case 4:
                 calculated = ByteSum(decoded);
+                code = "archive.fork-checksum";
+                break;
+            case 7:
+                // [Fitted] Method 7 stores an XOR sum; even-length forks adjust the stored byte for the outer 0xff XOR.
+                calculated = ByteXor(decoded);
+                if ((decoded.Length & 1) == 0) expected ^= 0x00FF;
                 code = "archive.fork-checksum";
                 break;
             case 8:
@@ -282,7 +290,7 @@ public sealed class DiskDoublerReader : IContainerReader
                 return;
         }
 
-        if (U16(header, checksumOffset) != calculated)
+        if (expected != calculated)
             context.Report(DiagnosticSeverity.Error, code,
                 $"The DiskDoubler {forkName}-fork checksum is incorrect for '{fileName}'.", checksumOffset);
     }
@@ -370,7 +378,7 @@ public sealed class DiskDoublerReader : IContainerReader
         return files;
     }
 
-    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 6 or 8 or 9 or 10;
+    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 5 or 6 or 7 or 8 or 9 or 10;
 
     private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method,
         byte info1, byte info2)
@@ -378,7 +386,15 @@ public sealed class DiskDoublerReader : IContainerReader
         if (method == 0) return input.ToArray();
         if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);
         if (method == 2) return DecodeAdaptiveHuffman(input, outputLength, info1, info2);
+        if (method == 5)
+        {
+            if (input.IsEmpty)
+                throw new InvalidDataException("A DiskDoubler method-5 fork is missing its adaptive-tree count.");
+            int treeCount = input[0] == 0 ? 256 : input[0];
+            return DecodeAdaptiveHuffman(input[1..], outputLength, info1, info2, treeCount);
+        }
         if (method == 4) return DecodeHuffman(input, outputLength, info1, info2);
+        if (method == 7) return DecodeStacLzs(input, outputLength);
         if (method is 6 or 9) return DiskDoublerAdnDecoder.Decode(input, outputLength);
         if (method == 10) return DiskDoublerMethod10Decoder.Decode(input, outputLength);
         if (input.Length < 16)
@@ -392,10 +408,116 @@ public sealed class DiskDoublerReader : IContainerReader
             : CompactProReader.DecodeRle8182(compressed, outputLength);
     }
 
-    private static byte[] DecodeAdaptiveHuffman(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2)
+    private static byte[] DecodeStacLzs(ReadOnlySpan<byte> input, int outputLength)
+    {
+        if (input.Length < 10)
+            throw new InvalidDataException("A DiskDoubler method-7 fork has a truncated Stac LZS header.");
+        uint entryCount = U32(input, 6);
+        long streamOffsetLong = 18L + 2L * entryCount;
+        if (streamOffsetLong > input.Length)
+            throw new InvalidDataException("A DiskDoubler method-7 fork has a truncated Stac LZS dictionary.");
+
+        int streamOffset = (int)streamOffsetLong;
+        var transformed = new byte[input.Length - streamOffset];
+        for (int index = 0; index < transformed.Length; index++)
+            transformed[index] = (byte)(input[streamOffset + index] ^ 0xFF);
+
+        var bits = new StacLzsBitReader(transformed);
+        byte[] output = DecodeStacLzsStream(ref bits, outputLength);
+        for (int index = 0; index < output.Length; index++) output[index] ^= 0xFF;
+        return output;
+    }
+
+    private static byte[] DecodeStacLzsStream(ref StacLzsBitReader bits, int outputLength)
+    {
+        var output = new byte[outputLength];
+        int written = 0;
+        while (true)
+        {
+            if (bits.ReadBit() == 0)
+            {
+                if (written == output.Length)
+                    throw new InvalidDataException("A DiskDoubler method-7 fork expands beyond its declared length.");
+                output[written++] = checked((byte)bits.ReadBits(8));
+                continue;
+            }
+
+            bool shortOffset = bits.ReadBit() != 0;
+            int offset = bits.ReadBits(shortOffset ? 7 : 11);
+            if (shortOffset && offset == 0) break;
+            if (offset == 0 || offset > written)
+                throw new InvalidDataException("A DiskDoubler method-7 fork contains an invalid Stac LZS offset.");
+
+            int length = ReadStacLzsLength(ref bits);
+            if (length > output.Length - written)
+                throw new InvalidDataException("A DiskDoubler method-7 fork expands beyond its declared length.");
+            for (int index = 0; index < length; index++)
+            {
+                output[written] = output[written - offset];
+                written++;
+            }
+        }
+
+        if (written != output.Length)
+            throw new InvalidDataException("A DiskDoubler method-7 fork ends before its declared expanded length.");
+        return output;
+    }
+
+    private static int ReadStacLzsLength(ref StacLzsBitReader bits)
+    {
+        int prefix = bits.ReadBits(2);
+        if (prefix < 3) return prefix + 2;
+
+        prefix = bits.ReadBits(2);
+        if (prefix < 3) return prefix + 5;
+
+        int lengthCode = bits.ReadBits(4);
+        if (lengthCode < 15) return lengthCode + 8;
+
+        int length = 23;
+        while (true)
+        {
+            int extension = bits.ReadBits(4);
+            if (extension > int.MaxValue - length)
+                throw new InvalidDataException("A DiskDoubler method-7 fork contains an excessive match length.");
+            length += extension;
+            if (extension < 15) return length;
+        }
+    }
+
+    private ref struct StacLzsBitReader
+    {
+        private readonly ReadOnlySpan<byte> _input;
+        private long _bitOffset;
+
+        public StacLzsBitReader(ReadOnlySpan<byte> input)
+        {
+            _input = input;
+            _bitOffset = 0;
+        }
+
+        public int ReadBit()
+        {
+            if (_bitOffset >= _input.Length * 8L)
+                throw new InvalidDataException("A DiskDoubler method-7 fork ends inside a Stac LZS code.");
+            int bit = (_input[(int)(_bitOffset >> 3)] >> (7 - (int)(_bitOffset & 7))) & 1;
+            _bitOffset++;
+            return bit;
+        }
+
+        public int ReadBits(int count)
+        {
+            int value = 0;
+            for (int bit = 0; bit < count; bit++) value = (value << 1) | ReadBit();
+            return value;
+        }
+    }
+
+    private static byte[] DecodeAdaptiveHuffman(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2,
+        int numberOfTrees = 256)
     {
         byte xor = info1 >= 0x2A && (info2 & 0x80) == 0 ? (byte)0x5A : (byte)0;
-        var trees = new AdaptiveHuffmanTree?[256];
+        var trees = new AdaptiveHuffmanTree?[numberOfTrees];
         var output = new byte[outputLength];
         long bitOffset = 0;
         int currentTree = 0;
@@ -405,7 +527,7 @@ public sealed class DiskDoublerReader : IContainerReader
             byte decoded = tree.ReadSymbol(input, ref bitOffset);
             tree.Update(decoded);
             output[index] = (byte)(decoded ^ xor);
-            currentTree = decoded;
+            currentTree = decoded % numberOfTrees;
         }
         return output;
     }
@@ -488,6 +610,13 @@ public sealed class DiskDoublerReader : IContainerReader
         uint sum = 0;
         foreach (byte value in output) sum += value;
         return (ushort)sum;
+    }
+
+    private static byte ByteXor(ReadOnlySpan<byte> output)
+    {
+        byte xor = 0;
+        foreach (byte value in output) xor ^= value;
+        return xor;
     }
 
     private static byte[] DecodeMacCompress(ReadOnlySpan<byte> input, int outputLength, byte info1, byte info2)
