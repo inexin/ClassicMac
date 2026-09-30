@@ -39,10 +39,10 @@ internal static class HfsPlusReader
         var overflow = new Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>();
         var allocationExtents = new List<(uint Start, uint End)>();
         var ordinaryForkExtents = new List<(uint Start, uint End)>();
-        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(192, 8)) != 0)
+        ForkData extentsFork = ReadFork(image, header.AsSpan(192, 80), blockSize, totalBlocks,
+            allocationExtents: allocationExtents, ordinaryForkExtents: ordinaryForkExtents);
+        if (U32(header, 192 + 12) != 0)
         {
-            ForkData extentsFork = ReadFork(image, header.AsSpan(192, 80), blockSize, totalBlocks,
-                allocationExtents: allocationExtents, ordinaryForkExtents: ordinaryForkExtents);
             foreach (var (key, data) in LeafRecords(
                 extentsFork.ToArray(context.Options.MaxExpandedBytesPerInput), "extents-overflow"))
             {
@@ -68,13 +68,12 @@ internal static class HfsPlusReader
         ForkData allocationFork = ReadFork(image, header.AsSpan(112, 80), blockSize, totalBlocks,
             overflow, 0, 6, allocationExtents, ordinaryForkExtents);
         byte[] allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
-        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(432, 8)) != 0)
-            _ = ReadFork(image, header.AsSpan(432, 80), blockSize, totalBlocks, overflow, 0, 7,
-                allocationExtents, ordinaryForkExtents);
-        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(352, 8)) != 0)
+        _ = ReadFork(image, header.AsSpan(432, 80), blockSize, totalBlocks, overflow, 0, 7,
+            allocationExtents, ordinaryForkExtents);
+        ForkData attributesFork = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks,
+            overflow, 0, 8, allocationExtents, ordinaryForkExtents);
+        if (U32(header, 352 + 12) != 0)
         {
-            ForkData attributesFork = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks,
-                overflow, 0, 8, allocationExtents, ordinaryForkExtents);
             byte[] attributes = attributesFork.ToArray(context.Options.MaxExpandedBytesPerInput);
             var attributeForks = new Dictionary<(uint FileId, string Name), AttributeForkState>();
             foreach (var (key, data) in LeafRecords(attributes, "attributes"))
@@ -85,8 +84,17 @@ internal static class HfsPlusReader
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4,
             allocationExtents, ordinaryForkExtents);
-        byte[] catalog = catalogFork.ToArray();
-        var records = LeafRecords(catalog, "catalog", isHfsX).ToArray();
+        byte[] catalog = catalogFork.ToArray(context.Options.MaxExpandedBytesPerInput);
+        var records = new List<(byte[] Key, byte[] Data)>();
+        int volumeEntries = 0;
+        foreach (var record in LeafRecords(catalog, "catalog", isHfsX))
+        {
+            if (record.Data.Length >= 2 && (U16(record.Data, 0) is 1 or 2) &&
+                ++volumeEntries > context.Options.MaxVolumeEntries)
+                throw new InvalidDataException(
+                    $"The HFS Plus catalog holds more than {context.Options.MaxVolumeEntries} files and folders.");
+            records.Add(record);
+        }
         var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence)>();
         var catalogIds = new HashSet<uint>();
         var catalogNodes = new Dictionary<uint, CatalogNode>();
@@ -153,6 +161,9 @@ internal static class HfsPlusReader
             throw new InvalidDataException("The HFS Plus root folder is missing.");
         if (folders[RootFolderId].Parent != RootParentId)
             throw new InvalidDataException("The HFS Plus root folder does not use the reserved root parent ID.");
+        foreach (var (id, node) in catalogNodes)
+            if (id != RootFolderId && !folders.ContainsKey(node.Parent))
+                throw new InvalidDataException("An HFS Plus catalog item's parent is not an existing folder.");
         const uint catalogNodeIdsReused = 1u << 12;
         uint nextCatalogId = U32(header, 64);
         if (nextCatalogId < 16)

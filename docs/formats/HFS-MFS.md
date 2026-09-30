@@ -825,7 +825,10 @@ record and remaining map record, index records contain exactly the padded key an
 unique. It checks the catalog, extents-overflow and attributes B-trees' `maxKeyLength` against their defined maxima
 (516, 10 and 266 bytes respectively). The attributes maximum follows `kHFSPlusAttrKeyMaximumLength` in Apple's
 [`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h); the catalog and
-extents maxima are defined by TN1150 **[Doc]**. File catalog IDs must be at least 16, and folder catalog IDs must be
+extents maxima are defined by TN1150 **[Doc]**. Catalog B-tree materialization obeys
+`ContainerReadOptions.MaxExpandedBytesPerInput`, and throws `InvalidDataException` when file and folder
+records exceed `ContainerReadOptions.MaxVolumeEntries` (including the root folder). File catalog IDs must be at least
+16, and folder catalog IDs must be
 at least 16 except for the root folder's ID 2 **[Doc]** [TN1150](https://developer.apple.com/library/archive/technotes/tn/tn1150.html);
 Apple's `CheckFile` and `CheckDirectory` enforce these bounds **[Code]** in
 [`CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
@@ -840,7 +843,8 @@ runtime's evolving normalization tables. HFSX also rejects the legacy doubled U+
 U+030D after Greek tonos bases or diaeresis, and Bengali BA plus nukta; Apple's `fsck_hfs` rewrites them to their
 corrected forms. Since HFS+ has no field recording which decomposition version created its names, the reader continues
 to accept these legacy sequences there. Other Unicode 2.1/3.2 and `fsck_hfs` fixup cases remain open.
-Catalog IDs are unique and each required file and folder thread points back to its record's parent and name. `nextCatalogID`
+Catalog IDs are unique, every nonroot file or folder record's `parentID` names an existing folder, and each required
+file and folder thread points back to its record's parent and name **[Doc]** TN1150. `nextCatalogID`
 must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
@@ -865,7 +869,9 @@ that the number of free bitmap bits agrees with the volume header's `freeBlocks`
 informational diagnostic **[Doc]** TN1150. Bit 9 (`kHFSVolumeSparedBlocksBit`) indicates that bad-block records
 exist; a mismatch between that flag and CNID 5 extent records is reported as an informational diagnostic **[Doc]**
 TN1150. It checks the attributes and startup special-file forks from the volume
-header, including their overflow extents, and accounts
+header, including their overflow extents, and accounts for allocated blocks even when a special fork's logical size is
+zero. The attributes B-tree exists when its fork has allocated blocks, as TN1150 specifies; an allocated but empty
+attributes fork is rejected as a missing B-tree header. It accounts
 for every extent record in the extents-overflow tree, including bad-block records and records not needed to read a
 catalog fork **[Doc]** TN1150. Every non-bad-block overflow record must also resolve to a catalog or special-file
 fork; by inference from TN1150's key semantics, orphan records are rejected because their file ID, fork type and

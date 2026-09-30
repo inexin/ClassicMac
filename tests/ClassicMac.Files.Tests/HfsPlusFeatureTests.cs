@@ -50,6 +50,35 @@ public sealed class HfsPlusFeatureTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-counts");
     }
 
+    [Fact]
+    public void HfsPlusCatalogHonorsTheConfiguredVolumeEntryLimit()
+    {
+        byte[] image = HfsPlusFixture.Build();
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(options: ContainerReadOptions.Default with { MaxVolumeEntries = 2 })));
+    }
+
+    [Fact]
+    public void HfsPlusCatalogAcceptsAVolumeAtItsConfiguredEntryLimit()
+    {
+        byte[] image = HfsPlusFixture.Build();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(options: ContainerReadOptions.Default with { MaxVolumeEntries = 3 })));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusCatalogBtreeHonorsTheConfiguredExpandedByteLimit()
+    {
+        byte[] image = HfsPlusFixture.Build();
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(options: ContainerReadOptions.Default with { MaxExpandedBytesPerInput = 4096 })));
+    }
+
     [Theory]
     [InlineData(32)]
     [InlineData(36)]
@@ -289,6 +318,28 @@ public sealed class HfsPlusFeatureTests
     {
         byte[] image = HfsPlusFixture.Build();
         Array.Clear(image, 2 * 4096, 4096);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAttributesFileWithAllocatedBlocksCannotHaveAnEmptyBtree()
+    {
+        byte[] image = HfsPlusFixture.Build(includeAttributeFile: true);
+        BinaryPrimitives.WriteUInt64BigEndian(image.AsSpan(1024 + 352), 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusZeroLengthStartupForkStillOwnsItsAllocatedBlocks()
+    {
+        byte[] image = HfsPlusFixture.Build(includeStartupFile: true);
+        Span<byte> startupFork = image.AsSpan(1024 + 432, 80);
+        BinaryPrimitives.WriteUInt64BigEndian(startupFork, 0);
+        BinaryPrimitives.WriteUInt32BigEndian(startupFork[16..], 4);
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
@@ -2090,6 +2141,17 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(999)]
+    [InlineData(17)]
+    public void HfsPlusFileParentMustBeAnExistingFolder(uint parentId)
+    {
+        byte[] image = HfsPlusFixture.Build(catalogFileParentId: parentId);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     // A small HFS+ volume built from the structures in TN1150: 4 KiB allocation and B-tree nodes,
     // one catalog leaf, a root folder, nested folder, file and their threads.
     private static class HfsPlusFixture
@@ -2122,7 +2184,8 @@ public sealed class HfsPlusFeatureTests
             ushort catalogFolderFlags = 0, string? catalogFileThreadName = null,
             string catalogFolderName = "Documents", uint rootFolderParentId = 1,
             uint? fragmentedPrimaryExtentCount = null, bool emptyResourceForkHasExtent = false,
-            bool sparseDataExtentDescriptors = false, bool unusedDataExtentHasStartBlock = false)
+            bool sparseDataExtentDescriptors = false, bool unusedDataExtentHasStartBlock = false,
+            uint? catalogFileParentId = null)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -2239,11 +2302,12 @@ public sealed class HfsPlusFeatureTests
                 records.Add(Record(folderId, "", Thread(2, catalogFolderName, 3)));
                 if (duplicateFolderThread) records.Add(Record(folderId, "", Thread(2, catalogFolderName, 3)));
             }
-            records.Add(Record(folderId, fileName, file));
+            uint fileParentId = catalogFileParentId ?? folderId;
+            records.Add(Record(fileParentId, fileName, file));
             if (!omitFileThread)
             {
                 byte[] fileThread = Record(fileId, nonEmptyFileThreadKey ? "Thread" : "",
-                    Thread(invalidFileThread ? 2u : folderId,
+                    Thread(invalidFileThread ? 2u : fileParentId,
                         invalidFileThread ? "Other" : catalogFileThreadName ?? fileName,
                         wrongFileThreadKind ? (ushort)3 : (ushort)4));
                 if (fileId < 16) records.Insert(3, fileThread);

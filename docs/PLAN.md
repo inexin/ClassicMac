@@ -819,7 +819,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     reserved catalog ID rules, folder flag validity, nonempty and canonically decomposed catalog names (Unicode 3.2;
     HFSX also checks post-Jaguar doubled-dot-above, Greek tonos/dialytika, and Bengali BA+nukta corrections, while
     other Unicode 2.1/3.2 and `fsck_hfs` compatibility cases remain),
-    root-parent ID, unique catalog IDs and next-ID consistency, file/folder threads,
+    root-parent ID, unique catalog IDs and next-ID consistency, parent IDs that resolve to folders, file/folder threads,
     folder valences and parent chains (including empty folders).
     The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
     forks; these layouts currently have hand-built fixtures only. The StuffIt v5 reader handles stored, RLE90,
@@ -845,9 +845,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges and fork extents that claim
     blocks reserved for the primary/alternate headers, and checks its bitmap for
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
-    extents), plus the attributes and startup special-file forks and defined fork-data and extent records in the
+    extents), plus the attributes and startup special-file forks, including allocated extents in zero-logical-size
+    special forks, and defined fork-data and extent records in the
     attributes B-tree; forks use overflow only after eight initial extents, non-final overflow records must be full,
     matching overflow records must account for the declared blocks, and unused extent descriptors must be zero.
+    Catalog B-tree reads obey the configured expanded-byte and volume-entry limits.
     Attribute keys and child ranges are validated
     in leaves and index nodes using Apple's HFS key comparator. Every non-bad-block overflow record must match a
     catalog or special-file fork. It checks the alternate volume header's signature
