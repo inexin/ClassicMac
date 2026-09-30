@@ -114,6 +114,18 @@ public sealed class HfsPlusFeatureTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void HfsPlusCatalogKeyLengthMustExactlyCoverItsName(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: hfsX,
+            catalogKeyCompareType: hfsX ? (byte)0xCF : null, catalogKeyHasTrailingByte: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void HfsPlusBtreeFreeNodeCountMustMatchItsNodeMap(bool extentsTree)
     {
         byte[] image = HfsPlusFixture.Build(fragmentedData: extentsTree);
@@ -671,7 +683,8 @@ public sealed class HfsPlusFeatureTests
             bool invalidCatalogIndexBackwardLink = false, bool duplicateOverflowExtent = false,
             bool unsortedOverflowKeys = false, bool unsortedOverflowFileIds = false,
             bool unsortedOverflowForkTypes = false, bool reverseCatalogRecords = false,
-            byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false)
+            byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false,
+            bool catalogKeyHasTrailingByte = false)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -759,6 +772,17 @@ public sealed class HfsPlusFeatureTests
                 records.Add(Record(18, "", Thread(additionalParent, "Empty", 3)));
             }
             if (orphanFileThread) records.Add(Record(42, "", Thread(16, "Missing", 4)));
+            if (catalogKeyHasTrailingByte)
+            {
+                byte[] fileRecord = records[^2];
+                int keyLength = BinaryPrimitives.ReadUInt16BigEndian(fileRecord);
+                byte[] malformedRecord = new byte[fileRecord.Length + 1];
+                fileRecord.AsSpan(0, keyLength + 2).CopyTo(malformedRecord);
+                fileRecord.AsSpan(keyLength + 2).CopyTo(malformedRecord.AsSpan(keyLength + 3));
+                malformedRecord[keyLength + 2] = 0;
+                U16(malformedRecord, 0, checked((ushort)(keyLength + 1)));
+                records[^2] = malformedRecord;
+            }
             if (unknownCatalogRecord) U16(records[4], 0, 0x1234);
             if (reverseCatalogRecords) records.Reverse();
             if (multiLeafCatalog)

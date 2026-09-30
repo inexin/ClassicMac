@@ -808,8 +808,9 @@ most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader follows that
 chain, checks map-node descriptors and bitmap coverage, requires the header, index, leaf and map nodes to be marked
 allocated, and verifies `freeNodes` against the complete bitmap. It checks that
-leaf-record keys are unique, catalog IDs are unique and each required file and folder thread points back to its
-record's parent and name. TN1150 requires leaf-record keys to be unique **[Doc]**. It
+catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, leaf-record keys are
+unique, catalog IDs are unique and each required file and folder thread points back to its record's parent and name.
+TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
 nonroot folder, including empty folders. TN1150 defines valence as the count of file and folder records whose key
 parent ID is that folder's ID **[Doc]**. Unless the volume's catalog-ID-reuse flag is set, `nextCatalogID` must be

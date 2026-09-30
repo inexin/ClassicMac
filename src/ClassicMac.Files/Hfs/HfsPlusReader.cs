@@ -299,12 +299,19 @@ internal static class HfsPlusReader
                     throw new InvalidDataException($"An HFS Plus {name} B-tree key is invalid.");
                 int dataOffset = offset + 2 + keyLength;
                 byte[] key = tree.AsSpan(offset, 2 + keyLength).ToArray();
-                if (name == "catalog" && caseSensitiveCatalog)
+                if (name == "catalog")
                 {
                     ValidateCatalogKey(key);
-                    if (previousCatalogKey is not null && CompareHfsXCatalogKeys(previousCatalogKey, key) >= 0)
-                        throw new InvalidDataException("The HFSX catalog keys are not strictly ordered.");
-                    previousCatalogKey = key;
+                    if (caseSensitiveCatalog)
+                    {
+                        if (previousCatalogKey is not null && CompareHfsXCatalogKeys(previousCatalogKey, key) >= 0)
+                            throw new InvalidDataException("The HFSX catalog keys are not strictly ordered.");
+                        previousCatalogKey = key;
+                    }
+                    else if (!keys.Add(key))
+                    {
+                        throw new InvalidDataException("The HFS Plus catalog B-tree has a duplicate leaf key.");
+                    }
                 }
                 else if (name == "extents-overflow")
                 {

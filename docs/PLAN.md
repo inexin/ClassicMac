@@ -796,7 +796,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, the catalog
     node-size minimum, header nodes,
     node maps (including chained map nodes and free counts), roots, index graphs,
-    sibling links, unique leaf keys,
+    sibling links, exact catalog key lengths and unique leaf keys,
     and HFSX key-compare modes plus binary catalog order,
     unique catalog
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders); an initial StuffIt v5 reader handles stored and RLE90 forks. Original-application
