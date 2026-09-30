@@ -816,7 +816,8 @@ catalog key lengths exactly match their stored Unicode name lengths, as TN1150 s
 record and remaining map record, index records contain exactly the padded key and child pointer, and leaf-record keys are
 unique. It checks the catalog, extents-overflow and attributes B-trees' `maxKeyLength` against their defined maxima
 (516, 10 and 266 bytes respectively). The attributes maximum follows `kHFSPlusAttrKeyMaximumLength` in Apple's
-`hfs_format.h`; the catalog and extents maxima are defined by TN1150 **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
+[`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h); the catalog and
+extents maxima are defined by TN1150 **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
 record's parent and name.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
@@ -838,7 +839,8 @@ for every extent record in the extents-overflow tree, including bad-block record
 catalog fork **[Doc]** TN1150. It walks the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
 records do not claim extents **[Doc]** TN1150. Attribute keys are validated and ordered by file ID, name length,
-binary UTF-16 name and start block in leaves and index nodes; separators must bound their child key ranges. The key
+binary UTF-16 name and start block in leaves and index nodes; the key's reserved padding field must be zero, and
+separators must bound their child key ranges. The key
 ordering uses Apple's HFS comparator for the rule that
 TN1150 leaves unfinished **[Code]** [Apple HFS `hfs_attrkeycompare`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_xattr.c#L2082-L2144).
 It checks extents-overflow keys are strictly ordered by

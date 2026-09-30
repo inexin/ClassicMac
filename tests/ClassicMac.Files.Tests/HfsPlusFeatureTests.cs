@@ -1230,6 +1230,18 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusAttributesBtreeKeyPaddingMustBeZero()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecord(17, "alpha", 0, 0x40)
+        ]);
+        image[11 * HfsPlusFixture.Block + 14 + 2] = 1;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusAttributesBtreeRejectsAnOutOfRangeIndexChild()
     {
         byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: true);

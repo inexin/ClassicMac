@@ -797,7 +797,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     catalog/extents/attributes key-length maxima, the catalog node-size minimum, control-file types for the catalog,
     extents-overflow and attributes trees, header nodes,
     node maps (including exactly the required chained map nodes and free counts), roots, index graphs,
-    sibling links, exact catalog key lengths and unique leaf keys,
+    sibling links, exact catalog key lengths, zero-padded attribute keys and unique leaf keys,
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
     unique catalog

@@ -817,8 +817,8 @@ internal static class HfsPlusReader
 
     private static void ValidateAttributeKey(ReadOnlySpan<byte> key)
     {
-        if (key.Length < 14 || U16(key, 0) != key.Length - 2)
-            throw new InvalidDataException("The HFS Plus attributes B-tree key length is invalid.");
+        if (key.Length < 14 || U16(key, 0) != key.Length - 2 || U16(key, 2) != 0)
+            throw new InvalidDataException("The HFS Plus attributes B-tree key length or padding is invalid.");
         int nameLength = U16(key, 12);
         if (nameLength > 127 || key.Length != 14 + 2 * nameLength)
             throw new InvalidDataException("The HFS Plus attributes B-tree key name length is invalid.");
