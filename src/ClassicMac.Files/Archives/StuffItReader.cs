@@ -118,8 +118,8 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1 or 2 or 3) ||
-                member.ResourceMethod is not (0 or 1 or 2 or 3 or null))
+            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5) ||
+                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or null))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -304,6 +304,7 @@ public sealed class StuffItReader : IContainerReader
         ReadOnlySpan<byte> input = archive.AsSpan(offset, compressedLength);
         if (method == 2) return DecodeCompress(input, outputLength);
         if (method == 3) return DecodeHuffman(input, outputLength);
+        if (method == 5) return DecodeLzah(input, outputLength);
 
         var output = new byte[outputLength];
         int written = 0;
@@ -446,6 +447,175 @@ public sealed class StuffItReader : IContainerReader
             output[index] = node.Symbol;
         }
         return output;
+    }
+
+    private static byte[] DecodeLzah(ReadOnlySpan<byte> input, int outputLength)
+    {
+        var output = new byte[outputLength];
+        if (outputLength == 0) return output;
+
+        var reader = new MsbBitReader(input);
+        var tree = new LzahTree();
+        byte[] window = CreateLzahWindow();
+        int windowPosition = 0;
+        int written = 0;
+        while (written < output.Length)
+        {
+            int symbol = tree.ReadSymbol(ref reader);
+            tree.Update(symbol);
+            if (symbol < 256)
+            {
+                WriteLzahByte((byte)symbol, output, ref written, window, ref windowPosition);
+                continue;
+            }
+
+            int length = symbol - 253;
+            int offsetHigh = ReadLzahOffset(ref reader);
+            int offsetLow = 0;
+            for (int bit = 0; bit < 6; bit++) offsetLow = (offsetLow << 1) | (reader.ReadBit() ? 1 : 0);
+            int distance = (offsetHigh << 6) | offsetLow;
+            int source = (windowPosition - distance - 1) & 0xFFF;
+            for (int index = 0; index < length && written < output.Length; index++)
+            {
+                byte value = window[source];
+                source = (source + 1) & 0xFFF;
+                WriteLzahByte(value, output, ref written, window, ref windowPosition);
+            }
+        }
+        return output;
+    }
+
+    private static byte[] CreateLzahWindow()
+    {
+        var window = new byte[4096];
+        int position = 18;
+        for (int value = 0; value <= byte.MaxValue; value++)
+            for (int repeat = 0; repeat < 13; repeat++) window[position++] = (byte)value;
+        for (int value = 0; value <= byte.MaxValue; value++) window[position++] = (byte)value;
+        for (int value = byte.MaxValue; value >= 0; value--) window[position++] = (byte)value;
+        position += 128; // The volume-format seed leaves this region zero-filled.
+        window.AsSpan(position, 110).Fill(0x20);
+        return window;
+    }
+
+    private static void WriteLzahByte(byte value, byte[] output, ref int written, byte[] window,
+        ref int windowPosition)
+    {
+        output[written++] = value;
+        window[windowPosition] = value;
+        windowPosition = (windowPosition + 1) & 0xFFF;
+    }
+
+    private static int ReadLzahOffset(ref MsbBitReader reader)
+    {
+        int code = 0;
+        for (int length = 1; length <= 8; length++)
+        {
+            code = (code << 1) | (reader.ReadBit() ? 1 : 0);
+            for (int value = 0; value < 64; value++)
+                if (LzahOffsetCodeLengths[value] == length && LzahOffsetCodes[value] == code)
+                    return value;
+        }
+        throw new InvalidDataException("A StuffIt LZAH offset code is invalid.");
+    }
+
+    private static readonly byte[] LzahOffsetCodeLengths = CreateLzahOffsetCodeLengths();
+    private static readonly ushort[] LzahOffsetCodes = CreateLzahOffsetCodes();
+
+    private static byte[] CreateLzahOffsetCodeLengths()
+    {
+        var lengths = new byte[64];
+        for (int value = 0; value < lengths.Length; value++)
+            lengths[value] = value switch
+            {
+                0 => 3,
+                <= 2 => 4,
+                <= 10 => 5,
+                <= 26 => 6,
+                <= 58 => 7,
+                _ => 8,
+            };
+        return lengths;
+    }
+
+    private static ushort[] CreateLzahOffsetCodes()
+    {
+        var codes = new ushort[64];
+        int code = 0;
+        int previousLength = LzahOffsetCodeLengths[0];
+        for (int value = 1; value < codes.Length; value++)
+        {
+            int length = LzahOffsetCodeLengths[value];
+            code = (code + 1) << (length - previousLength);
+            codes[value] = checked((ushort)code);
+            previousLength = length;
+        }
+        return codes;
+    }
+
+    private sealed class LzahTree
+    {
+        private const int LeafCount = 314;
+        private const int TreeSize = LeafCount * 2 - 1;
+        private readonly int[] frequency = new int[TreeSize + 1];
+        private readonly int[] forward = new int[TreeSize];
+        private readonly int[] backward = new int[TreeSize + LeafCount];
+
+        public LzahTree()
+        {
+            for (int symbol = 0; symbol < LeafCount; symbol++)
+            {
+                frequency[symbol] = 1;
+                forward[symbol] = symbol + TreeSize;
+                backward[symbol + TreeSize] = symbol;
+            }
+            for (int node = LeafCount, child = 0; node < TreeSize; node++, child += 2)
+            {
+                frequency[node] = frequency[child] + frequency[child + 1];
+                forward[node] = child;
+                backward[child] = backward[child + 1] = node;
+            }
+            frequency[TreeSize] = ushort.MaxValue;
+        }
+
+        public int ReadSymbol(ref MsbBitReader reader)
+        {
+            int node = forward[TreeSize - 1];
+            while (node < TreeSize)
+            {
+                if (reader.ReadBit()) node++;
+                node = forward[node];
+            }
+            return node - TreeSize;
+        }
+
+        public void Update(int symbol)
+        {
+            int node = backward[symbol + TreeSize];
+            while (node != 0)
+            {
+                int weight = ++frequency[node];
+                int swap = node + 1;
+                if (frequency[swap] < weight)
+                {
+                    do { swap++; } while (frequency[swap] < weight);
+                    swap--;
+                    frequency[node] = frequency[swap];
+                    frequency[swap] = weight;
+
+                    int child = forward[node];
+                    backward[child] = swap;
+                    if (child < TreeSize) backward[child + 1] = swap;
+                    forward[node] = forward[swap];
+                    forward[swap] = child;
+                    child = forward[node];
+                    backward[child] = node;
+                    if (child < TreeSize) backward[child + 1] = node;
+                    node = swap;
+                }
+                node = backward[node];
+            }
+        }
     }
 
     private static HuffmanNode ReadHuffmanNode(ref MsbBitReader reader, int depth, ref int nodeCount,

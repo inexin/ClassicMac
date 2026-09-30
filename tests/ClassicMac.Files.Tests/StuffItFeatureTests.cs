@@ -192,6 +192,30 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void StuffItLzahMethodDecodesAdaptiveLiteralsAndCopiesFromItsInitialWindow()
+    {
+        byte[] encodedData = StuffItFixture.EncodeLzah(65, 66, 65, 66, 65, 66, 65);
+        byte[] encodedResource = StuffItFixture.EncodeLzah(256);
+        byte[] image = StuffItFixture.BuildFile("LZAH", "ABABABA"u8.ToArray(), "   "u8.ToArray(),
+            dataMethod: 5, encodedData: encodedData, resourceMethod: 5, encodedResource: encodedResource);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("ABABABA"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("   "u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItLzahMethodRejectsInputThatEndsBeforeTheDeclaredForkLength()
+    {
+        byte[] image = StuffItFixture.BuildFile("Truncated LZAH", "A"u8.ToArray(), [], dataMethod: 5,
+            encodedData: []);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void StuffItRle90MethodDecodesBothForks()
     {
         byte[] data = [.. Enumerable.Repeat((byte)'A', 3), (byte)'B', 0x90, 0x90];
@@ -488,6 +512,76 @@ public sealed class StuffItFeatureTests
             for (int index = 0; index < bits.Count; index++)
                 if (bits[index]) encoded[index / 8] |= (byte)(0x80 >> (index & 7));
             return encoded;
+        }
+
+        public static byte[] EncodeLzah(params ushort[] symbols)
+        {
+            const int LeafCount = 314;
+            const int TreeSize = LeafCount * 2 - 1;
+            var frequencies = new int[TreeSize + 1];
+            var forward = new int[TreeSize];
+            var backward = new int[TreeSize + LeafCount];
+            for (int symbol = 0; symbol < LeafCount; symbol++)
+            {
+                frequencies[symbol] = 1;
+                forward[symbol] = symbol + TreeSize;
+                backward[symbol + TreeSize] = symbol;
+            }
+            for (int node = LeafCount, child = 0; node < TreeSize; node++, child += 2)
+            {
+                frequencies[node] = frequencies[child] + frequencies[child + 1];
+                forward[node] = child;
+                backward[child] = backward[child + 1] = node;
+            }
+            frequencies[TreeSize] = ushort.MaxValue;
+
+            var bits = new List<bool>();
+            foreach (ushort symbol in symbols)
+            {
+                int child = backward[symbol + TreeSize];
+                var path = new List<bool>();
+                for (int parent = backward[child]; parent != 0; child = parent, parent = backward[child])
+                    path.Add(forward[parent] + 1 == child);
+                path.Reverse();
+                bits.AddRange(path);
+                UpdateLzahTree(symbol, frequencies, forward, backward, TreeSize);
+                if (symbol >= 256)
+                    for (int bit = 0; bit < 9; bit++) bits.Add(false); // Zero-distance offset.
+            }
+
+            byte[] encoded = new byte[(bits.Count + 7) / 8];
+            for (int bit = 0; bit < bits.Count; bit++)
+                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            return encoded;
+        }
+
+        private static void UpdateLzahTree(ushort symbol, int[] frequencies, int[] forward, int[] backward,
+            int treeSize)
+        {
+            int node = backward[symbol + treeSize];
+            while (node != 0)
+            {
+                int weight = ++frequencies[node];
+                int swap = node + 1;
+                if (frequencies[swap] < weight)
+                {
+                    while (frequencies[++swap] < weight) { }
+                    swap--;
+                    frequencies[node] = frequencies[swap];
+                    frequencies[swap] = weight;
+
+                    int child = forward[node];
+                    backward[child] = swap;
+                    if (child < treeSize) backward[child + 1] = swap;
+                    forward[node] = forward[swap];
+                    forward[swap] = child;
+                    child = forward[node];
+                    backward[child] = node;
+                    if (child < treeSize) backward[child + 1] = node;
+                    node = swap;
+                }
+                node = backward[node];
+            }
         }
 
         private static void WriteTreeLeaf(List<bool> bits, byte symbol)
