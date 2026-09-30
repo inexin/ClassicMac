@@ -821,7 +821,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     attributes B-tree; attribute keys and child ranges are validated in leaves and index nodes using Apple's HFS
     key comparator. It checks the alternate volume header's signature and version, reporting a warning if the recovery
     copy is invalid while continuing from the primary header; it also checks TN1150's reserved volume-header areas
-    and zero unused bitmap bits.
+    and zero unused bitmap bits; it reports a mismatch between bitmap free blocks and the volume header's `freeBlocks`.
     HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
     to indirect-node forks while keeping the visible path and hiding private metadata; dangling links are reported.
     Additional B-tree invariants remain.

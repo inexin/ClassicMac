@@ -46,6 +46,50 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal(new MacDate(2_600_000_000), file.Modified);
         Assert.Null(file.SymbolicLinkTarget);
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-free-blocks");
+    }
+
+    [Fact]
+    public void HfsPlusReportsWhenFreeBlockCountDoesNotMatchTheAllocationBitmap()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 48), 1);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-free-blocks" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void HfsPlusAcceptsAFreeBlockCountThatMatchesTheAllocationBitmap()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        image[9 * HfsPlusFixture.Block + 1] &= 0x7F;
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 48), 1);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-free-blocks");
+    }
+
+    [Fact]
+    public void HfsPlusFreeBlockCountIgnoresPaddingBitsAfterTheLastAllocationBlock()
+    {
+        byte[] image = BuildOversizedExtentsTree(addMapNode: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-free-blocks");
     }
 
     [Fact]

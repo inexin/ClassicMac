@@ -829,7 +829,9 @@ extents it reads, following TN1150's allocation-file ownership model. The volume
 allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the declared allocation blocks and to mark
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
 **[Doc]** TN1150. Any bitmap bits beyond the declared allocation-block count must be clear **[Doc]** TN1150. It checks
-the attributes and startup special-file forks from the volume header, including their overflow extents, and accounts
+that the number of free bitmap bits agrees with the volume header's `freeBlocks`; a mismatch is reported as an
+informational diagnostic **[Doc]** TN1150. It checks the attributes and startup special-file forks from the volume
+header, including their overflow extents, and accounts
 for every extent record in the extents-overflow tree, including bad-block records and records not needed to read a
 catalog fork **[Doc]** TN1150. It walks the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
@@ -885,6 +887,7 @@ followed in its code.
 | `mfs.too-many-entries` | E | More than `MaxVolumeEntries` files | Stops reading | — |
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
 | `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
+| `hfs.plus-free-blocks` | I | The allocation bitmap free-block count differs from `freeBlocks` in the volume header | Reports only | Not traced |
 | `hfs.plus-alternate-header` | W | The alternate HFS Plus volume header is missing or has an invalid signature/version | Reads using the primary header | Not traced |
 | `hfs.plus-hardlink-target-missing` | W | A hard-link reference has no matching private indirect node | Keeps the link record, using its catalog forks | Not traced |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |

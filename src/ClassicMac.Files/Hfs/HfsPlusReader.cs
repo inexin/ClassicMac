@@ -231,6 +231,11 @@ internal static class HfsPlusReader
         }
         ValidateAllocationExtents(allocationExtents);
         ValidateAllocationBitmap(allocationBitmap, totalBlocks, blockSize, allocationExtents);
+        uint freeBlocks = CountFreeAllocationBlocks(allocationBitmap, totalBlocks);
+        uint declaredFreeBlocks = U32(header, 48);
+        if (freeBlocks != declaredFreeBlocks)
+            context.Report(DiagnosticSeverity.Info, "hfs.plus-free-blocks",
+                $"The allocation bitmap has {freeBlocks} free blocks; the volume header says {declaredFreeBlocks}.");
         uint expectedFiles = U32(header, 32);
         uint expectedFolders = U32(header, 36);
         if (catalogFiles.Count != expectedFiles || folders.Count - 1 != expectedFolders)
@@ -369,6 +374,23 @@ internal static class HfsPlusReader
                 throw new InvalidDataException("An HFS Plus allocation block is marked free in the allocation file.");
             block += count;
         }
+    }
+
+    private static uint CountFreeAllocationBlocks(byte[] bitmap, uint totalBlocks)
+    {
+        int wholeBytes = checked((int)(totalBlocks / 8));
+        uint allocated = 0;
+        for (int index = 0; index < wholeBytes; index++)
+            allocated = checked(allocated + (uint)System.Numerics.BitOperations.PopCount((uint)bitmap[index]));
+
+        int remainingBits = checked((int)(totalBlocks % 8));
+        if (remainingBits != 0)
+        {
+            byte validBits = (byte)(0xFF << (8 - remainingBits));
+            allocated = checked(allocated +
+                (uint)System.Numerics.BitOperations.PopCount((uint)(bitmap[wholeBytes] & validBits)));
+        }
+        return totalBlocks - allocated;
     }
 
     private static void ValidateCatalogThreads(Dictionary<uint, CatalogNode> nodes,
