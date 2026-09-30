@@ -58,6 +58,104 @@ public class HfsTests
     }
 
     [Fact]
+    public void Replacing_a_fork_returns_a_new_image_and_preserves_the_other_fork()
+    {
+        var (_, image) = Sample();
+        var original = image.ToArray();
+        var replacement = Bytes(300, 19);
+
+        var result = HfsWriter.ReplaceFork(ForkData.FromBytes(image), "Games:Realmz:Scenario", HfsFork.Resource, replacement);
+
+        Assert.Equal(original, image);
+        var scenario = Assert.Single(Read(result).Files, f => f.MacPath == "Games:Realmz:Scenario");
+        Assert.Equal(replacement, scenario.ResourceFork.ToArray());
+        Assert.Equal(Bytes(1500, 5), scenario.DataFork.ToArray());
+        Assert.Equal(FourCC.FromString("scen"), scenario.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("RLMZ"), scenario.FinderInfo.Creator);
+    }
+
+    [Fact]
+    public void Growing_a_fork_into_an_adjacent_free_block_round_trips_the_new_bytes()
+    {
+        var (_, image) = Sample();
+        var replacement = Bytes(2000, 23);
+        ushort freeBefore = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(1024 + 0x22));
+
+        var result = HfsWriter.ReplaceFork(ForkData.FromBytes(image), "Games:Realmz:Scenario", HfsFork.Data, replacement);
+
+        var scenario = Assert.Single(Read(result).Files, f => f.MacPath == "Games:Realmz:Scenario");
+        Assert.Equal(replacement, scenario.DataFork.ToArray());
+        Assert.Equal(freeBefore - 1, BinaryPrimitives.ReadUInt16BigEndian(result.AsSpan(1024 + 0x22)));
+    }
+
+    [Fact]
+    public void Shrinking_a_fork_reclaims_blocks_and_round_trips_the_new_bytes()
+    {
+        var (_, image) = Sample();
+        var replacement = Bytes(100, 29);
+        ushort freeBefore = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(1024 + 0x22));
+
+        var result = HfsWriter.ReplaceFork(ForkData.FromBytes(image), "Games:Realmz:Scenario", HfsFork.Data, replacement);
+
+        var scenario = Assert.Single(Read(result).Files, f => f.MacPath == "Games:Realmz:Scenario");
+        Assert.Equal(replacement, scenario.DataFork.ToArray());
+        Assert.Equal(freeBefore + 2, BinaryPrimitives.ReadUInt16BigEndian(result.AsSpan(1024 + 0x22)));
+    }
+
+    [Fact]
+    public void Growing_a_fragmented_fork_keeps_its_terminal_overflow_record_after_a_leaf_split()
+    {
+        var builder = new HfsBuilder { ExtentsTreeNodes = 4 };
+        builder.File(HfsBuilder.Root, "Fragments", Bytes(69 * HfsBuilder.Block, 11), [], fragments: 69);
+        var image = builder.Build("Split");
+        Assert.Empty(Read(image).Diagnostics);
+        var replacement = Bytes(71 * HfsBuilder.Block, 17);
+
+        var result = HfsWriter.ReplaceFork(ForkData.FromBytes(image), "Fragments", HfsFork.Data, replacement);
+
+        Assert.Equal(replacement, Assert.Single(Read(result).Files).DataFork.ToArray());
+        var treeHeader = (HfsBuilder.FirstAllocationBlock * HfsBuilder.Block) + 14;
+        Assert.Equal((ushort)2, BinaryPrimitives.ReadUInt16BigEndian(result.AsSpan(treeHeader)));
+        Assert.Equal((uint)23, BinaryPrimitives.ReadUInt32BigEndian(result.AsSpan(treeHeader + 6)));
+    }
+
+    [Fact]
+    public void A_catalog_node_count_that_exceeds_the_offset_table_is_rejected_as_invalid_data()
+    {
+        var image = Sample().Image;
+        var firstCatalogLeaf = (HfsBuilder.FirstAllocationBlock + 3) * HfsBuilder.Block;
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(firstCatalogLeaf + 10), ushort.MaxValue);
+
+        Assert.Throws<InvalidDataException>(() => HfsWriter.ReplaceFork(
+            ForkData.FromBytes(image), "Read Me", HfsFork.Data, Bytes(700, 3)));
+    }
+
+    [Fact]
+    public void An_extents_index_that_disagrees_with_its_leaf_is_rejected()
+    {
+        var builder = new HfsBuilder { ExtentsTreeNodes = 4 };
+        builder.File(HfsBuilder.Root, "Fragments", Bytes(72 * HfsBuilder.Block, 13), [], fragments: 72);
+        var image = builder.Build("Indexed");
+        Assert.Equal(72 * HfsBuilder.Block, Assert.Single(Read(image).Files).DataFork.Length);
+        var rootIndex = (HfsBuilder.FirstAllocationBlock + 3) * HfsBuilder.Block;
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(rootIndex + 22), 2); // first key now points to the second leaf
+
+        Assert.Throws<InvalidDataException>(() => HfsWriter.ReplaceFork(
+            ForkData.FromBytes(image), "Fragments", HfsFork.Resource, Array.Empty<byte>()));
+    }
+
+    [Fact]
+    public void An_extents_node_map_that_marks_the_header_free_is_rejected()
+    {
+        var image = Sample().Image;
+        var mapRecord = HfsBuilder.FirstAllocationBlock * HfsBuilder.Block + 14 + 106 + 128;
+        image[mapRecord] &= 0x7F;
+
+        Assert.Throws<InvalidDataException>(() => HfsWriter.ReplaceFork(
+            ForkData.FromBytes(image), "Read Me", HfsFork.Data, Bytes(700, 3)));
+    }
+
+    [Fact]
     public void A_leaf_link_back_to_a_read_node_stops_the_walk()
     {
         var image = Sample().Image;

@@ -32,6 +32,7 @@
           <MenuItem Header="Apple_Single…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleSingle}" />
           <MenuItem Header="Apple_Double Pair…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.AppleDoublePair}" />
           <MenuItem Header="Basilisk _II Folder Entry…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.BasiliskEntry}" />
+          <MenuItem Header="_HFS Volume Image…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.HfsImage}" />
           <MenuItem Header="_Resource Fork Only…" Command="{Binding SaveAsCommand}" CommandParameter="{x:Static editing:SaveAsFormat.RawFork}" />
         </MenuItem>
         <MenuItem Header="_Revert" Command="{Binding RevertCommand}" />

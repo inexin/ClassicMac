@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Containers;
+using ClassicMac.Files.Hfs;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Editing;
 
@@ -51,6 +52,9 @@ namespace ClassicMac.Files.Editing
 
         /// <summary>A Basilisk II / SheepShaver folder entry: the data file, <c>.rsrc/</c> and <c>.finf/</c>.</summary>
         BasiliskEntry,
+
+        /// <summary>A copy of a plain HFS image with the selected file's edited fork replaced.</summary>
+        HfsImage,
     }
 
     /// <summary>A file's size and time when it was read, to notice a change on disk before overwriting it.</summary>
@@ -202,13 +206,49 @@ namespace ClassicMac.Files.Editing
                 SaveAsFormat.RawFork => SaveTarget.RawFork,
                 SaveAsFormat.AppleSingle => SaveTarget.AppleSingle,
                 SaveAsFormat.MacBinary => SaveTarget.MacBinary,
-                _ => SaveTarget.BinHex,
+                SaveAsFormat.BinHex => SaveTarget.BinHex,
+                SaveAsFormat.HfsImage => throw new ArgumentException("Use SaveHfsImageAs for an HFS volume image.", nameof(format)),
+                _ => throw new ArgumentOutOfRangeException(nameof(format)),
             };
             Directory.CreateDirectory(directory);
             File.WriteAllBytes(full, Serialize(target, edited, fork));
             var found = Verify(target, full, edited, fork, format == SaveAsFormat.RawFork || forkInDataFork);
             if (found.Count > 0) throw new SaveVerificationException(found);
             return [full];
+        }
+
+        /// <summary>
+        /// Writes an edited fork into a copy of a plain HFS image and atomically places the verified image at
+        /// <paramref name="destinationPath"/>. The destination cannot be the source image.
+        /// </summary>
+        /// <returns>The full path of the saved HFS image.</returns>
+        public static string SaveHfsImageAs(string sourcePath, string destinationPath, MacFile file, ResourceFork fork,
+            bool forkInDataFork = false)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+            ArgumentNullException.ThrowIfNull(file);
+            ArgumentNullException.ThrowIfNull(fork);
+            var source = System.IO.Path.GetFullPath(sourcePath);
+            var destination = System.IO.Path.GetFullPath(destinationPath);
+            var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+            if (string.Equals(source, destination, comparison))
+                throw new InvalidOperationException("Save As cannot overwrite the source HFS image.");
+
+            var directory = System.IO.Path.GetDirectoryName(destination)!;
+            var temporary = System.IO.Path.Combine(directory, $".classicmac-{Guid.NewGuid():N}.tmp");
+            try
+            {
+                var kind = forkInDataFork ? HfsFork.Data : HfsFork.Resource;
+                var image = HfsWriter.ReplaceFork(ForkData.FromFile(source), file.MacPath, kind, fork.ToArray());
+                File.WriteAllBytes(temporary, image);
+                File.Move(temporary, destination, overwrite: true);
+                return destination;
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
 
         private static MacFile WithFork(MacFile file, ResourceFork fork, bool inData)

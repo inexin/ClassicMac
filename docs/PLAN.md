@@ -718,7 +718,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 5 | Decoders II | Done (exit passed) |
 | 6 | Editor I | Done |
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
-| 8 | Editor III (HFS writing) | Not started |
+| 8 | Editor III (HFS writing) | Done for plain HFS: fork replacement, file/folder create and delete, constrained B-tree growth, and HFS image Save As |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | Later (HFS+, archives) | Not started |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
@@ -754,7 +754,37 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    ([formats/FONTS.md](formats/FONTS.md)).
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers. **Built** (2026-09-29).
 7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders). **Built** (2026-09-29): the Edit tab's forms for `STR `, `STR#`, `TEXT` (its `styl` kept in step), `vers` and the UI templates (`DLOG`, `DITL`, `ALRT`, `MENU`, `WIND`, `CNTL`, with the dialog or menu preview redrawn as the form changes), applied as undoable edits; and import (Resource ▸ Import Image or Sound): an image (PNG, JPEG, BMP, GIF, through Avalonia) becomes a `PICT`, `cicn`, icon (`ICON`, `ICN#`, `icl4`/`icl8`, the small and mini icons, or a whole icon family) or cursor (`CURS`, `crsr`), a WAV file a `snd ` (`ImageImport`, `SoundImport`; [formats/ICONS.md](formats/ICONS.md), [formats/PICT.md](formats/PICT.md) §9, [formats/SOUND.md](formats/SOUND.md) §12), replacing the data of a resource of that type and ID after asking. **Templates** (2026-09-29): a resource with no form of its own is edited through a `TMPL` found by name in its own file or any other open file (so a user's copy of ResEdit supplies ResEdit's templates; ClassicMac ships none; a check box shows a resource that has a form of its own through its `TMPL` too), read and written as ResEdit 2.1.3's template editor does ([formats/TEMPLATES.md](formats/TEMPLATES.md); all 471 templated resources in ResEdit's own fork read and write back byte for byte).
-8. **Editor III** — writing HFS disk images.
+8. **Editor III** — writing HFS disk images. Build a verified HFS volume writer and connect it to the editor, preserving
+   the other fork and Finder metadata when a file is edited. Work in these increments:
+   - First, replace the data or resource fork of an existing file in a plain HFS volume. Read the original
+     volume, write to a separate output, then reopen it and verify the changed fork and all unaffected file metadata.
+     Reject unsupported wrappers, malformed structures, software-locked volumes and changes that cannot be represented safely;
+     never partially modify the source image.
+   - The writer can grow a fork through free bitmap blocks, initialize an empty extents-overflow tree when it has a
+     mapped free node, insert records in key order, split full leaves and propagate splits through index nodes using
+     already mapped free nodes. Insertion before the first indexed key and deletion of the final overflow record are
+     supported by rebuilding the extents tree and its node map. The tree file can take additional free allocation blocks
+     with linked map nodes when the header map fills, while its three primary extent descriptors can represent them. On shrink
+     it reclaims trailing blocks and fully emptied descriptors, including overflow records. It updates `drFreeBks`, file
+     physical EOF and volume write metadata. Apple's `ExtendFileC` disallows extending the extents-overflow file beyond
+     its three primary extents, so the writer rejects that case. Keep edits copy-on-write until the completed image passes
+     verification.
+   - File and folder creation and deletion now maintain catalog records, folder threads and valences, B-tree nodes,
+     fork extents, allocation bitmap and MDB counts. Creation grows the catalog tree, adds linked B-tree map nodes when
+     needed, and stores additional catalog extents in the extents-overflow tree after its three primary runs are full.
+     Creation can preserve caller-supplied Mac creation and modification dates. Deletion refuses locked files and nonempty folders. Name lookup and ordering now use the complete `_RelString`
+     weight rules, independently checked against Apple's 256-entry compare table. The writer validates catalog and
+     extents B-tree structure, catalog ID uniqueness, bitmap ownership, free counts and folder valences before and after edits.
+   - The editor's Save As writes a verified copy of a plain HFS image with the selected fork replaced. Handle partitioned
+     and Disk Copy images only after their outer-container write strategy is specified. MFS, HFS+, and archives remain
+     read-only in this phase.
+   - Feature tests cover both forks, metadata and dates, nested paths, creation/deletion, B-tree and bitmap growth,
+     fragmentation, malformed structures, error atomicity and interleaved edits. An app-level test edits a nested
+     resource and reopens the saved image. Edited real HFS images mount and export with both Distrotech/hfsutils and
+     JotaRandom/hfsutils, with exported contents compared byte for byte.
+   *Exit:* edit, save, reopen and compare the target volume; verify both forks, Finder info, dates, folder paths and
+   counts, then confirm unrelated files are byte-identical at the logical-file level. Source images remain untouched
+   on errors. Update [formats/HFS-MFS.md](formats/HFS-MFS.md) with each implemented write rule.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,

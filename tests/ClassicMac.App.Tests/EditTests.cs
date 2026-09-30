@@ -3,6 +3,8 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Containers;
 using ClassicMac.Files.Editing;
+using ClassicMac.Files.Hfs;
+using ClassicMac.Files.Tests;
 using ClassicMac.Graphics;
 using ClassicMac.Resources;
 
@@ -370,6 +372,41 @@ public sealed class EditTests : IDisposable
         await reopened.EnsureLoadedAsync();
         Assert.Equal(2, reopened.Resources!.Fork!.Resources.Count);
         Assert.False(File.Exists(path + ".orig"));
+    }
+
+    [Fact]
+    public async Task Save_as_hfs_image_preserves_the_volume_and_other_forks()
+    {
+        var resourceFork = new ResourceFork();
+        resourceFork.Add(new Resource(Str, 128, new byte[] { 2, (byte)'h', (byte)'i' }));
+        var disk = new HfsBuilder();
+        var folderId = disk.Folder(HfsBuilder.Root, "Folder");
+        disk.File(folderId, "Prefs", "data fork"u8.ToArray(), resourceFork.ToArray());
+        disk.File(HfsBuilder.Root, "Other", "other file"u8.ToArray(), []);
+        var sourcePath = Path.Combine(folder, "Volume.hfs");
+        var original = disk.Build("Volume");
+        File.WriteAllBytes(sourcePath, original);
+
+        var dialogs = new Dialogs { Hex = [3, (byte)'b', (byte)'y', (byte)'e'] };
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        var input = (await model.OpenAsync(sourcePath))!;
+        var folderNode = Assert.IsType<FolderNode>(input.Children.Single(n => n.Title == "Folder"));
+        var fileNode = Assert.IsType<FileNode>(folderNode.Children.Single(n => n.Title == "Prefs"));
+        await fileNode.EnsureLoadedAsync();
+        model.Selected = Resource(fileNode, 128);
+        await model.EditHexCommand.ExecuteAsync(null);
+
+        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+
+        var savedPath = Path.Combine(folder, "Volume-edited.hfs");
+        Assert.True(File.Exists(savedPath), model.Status);
+        Assert.Equal(original, File.ReadAllBytes(sourcePath));
+        var savedFiles = HfsReader.Instance.Read(ForkData.FromFile(savedPath), new ContainerContext());
+        var savedPrefs = Assert.Single(savedFiles, f => f.MacPath == "Folder:Prefs");
+        Assert.Equal("data fork"u8.ToArray(), savedPrefs.DataFork.ToArray());
+        Assert.Equal([3, (byte)'b', (byte)'y', (byte)'e'],
+            ResourceFork.Read(savedPrefs.ResourceFork.ToArray()).Find(Str, 128)!.GetData().ToArray());
+        Assert.Equal("other file"u8.ToArray(), Assert.Single(savedFiles, f => f.MacPath == "Other").DataFork.ToArray());
     }
 
     [Fact]

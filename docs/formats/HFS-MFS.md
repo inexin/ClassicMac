@@ -620,8 +620,9 @@ the MDB (`drCTFlSize`, `drCTExtRec`); more extents may be in the extents overflo
 | +$02 | 4 | u32 | `ckrParID`: the parent folder's CNID (for a thread, the CNID the thread is for) |
 | +$06 | 1+n | Str31 | `ckrCName`: the name (empty for a thread) |
 
-In a leaf, `ckrKeyLen` is `6 + n` and the name takes only its length; the data follows at the next even offset
-**[Doc]** *Inside Macintosh: Files*. Names are at most 31 bytes **[Doc]** *Inside Macintosh: Files*.
+In a leaf, `ckrKeyLen` covers the name and any alignment byte: `6 + n` for an odd-length name and `7 + n` for
+an even-length name. The data starts at the next even offset. Names are at most 31 bytes **[Doc]**
+*Inside Macintosh: Files*.
 
 Every catalog data record starts with a type byte and a reserved byte **[Doc]** *Inside Macintosh: Files*:
 
@@ -847,15 +848,67 @@ with the reason:
 - HFS: a catalog file whose extents lie outside the volume.
 - HFS: a B-tree file larger than `MaxExpandedBytesPerInput`.
 
+## 13. Conservative HFS writing
+
+`HfsWriter.ReplaceFork` **[Author]** accepts a plain HFS volume, a colon-separated file path, a data or resource fork,
+and replacement bytes. It returns a new image; the input is never modified. `ForkSaver.SaveHfsImageAs` writes that
+verified image to a separate destination using a temporary file and rename; it refuses a destination that is the source
+image. The editor exposes this as Save As ▸ HFS Volume Image. It does not write partition maps, Disk Copy images, MFS,
+or HFS Plus volumes.
+
+Before editing, it checks that the target extents are allocated in the volume bitmap, are in bounds, and do not overlap
+the system files or other catalogued forks. It also validates the extents B-tree header, index keys and child pointers,
+node ordering and sibling links, node map, and free-node and leaf-record counts.
+
+The writer follows the extents in the file record and extents-overflow file. It writes the bytes into those allocation
+blocks, clears the remaining bytes in those blocks, and updates the fork's logical and physical EOFs. When more blocks
+are needed, it first extends the final extent over immediately following free blocks, then uses other free contiguous
+runs if the terminal extent record has enough unused descriptors. If more descriptors are needed, it inserts new
+records into the extents-overflow B-tree in key order. Insertion and deletion rebuild the tree's leaf and index nodes
+from the sorted records, including first-key changes and transitions to or from an empty tree. The rebuilt tree updates
+sibling links, root and leaf header fields, the node map, and its free-node count. It uses only nodes already present in
+the tree file. When more nodes are needed, it allocates free blocks to the tree file, updates its primary MDB extents
+and physical length, and adds linked map nodes when the header map fills. It refuses growth that needs more than three
+extents for the extents-overflow file itself. It marks the volume bitmap and decrements
+`drFreeBks`. When tree growth changes the MDB and an alternate MDB exists beyond the allocation area, it refreshes that
+copy too. On shrink, it releases trailing blocks until the fork uses only the number required by its new logical
+length; fully released descriptors are zeroed, and empty overflow records are removed. It marks released blocks free and
+increments `drFreeBks`. The target file's modification date and the MDB's last-modified date are set to the local
+write time, and `drWrCnt` is incremented once. A locked file and a software-locked volume are
+refused.
+
+Before returning, the writer reopens the result with `HfsReader` and checks the file list, Finder information, dates,
+paths, both target forks, and both forks of every unrelated file. Any structural diagnostic or mismatch fails the
+operation. It validates the extents B-tree again from the output image, including its index graph and node map.
+`HfsWriter.CreateFile` and `DeleteFile` add or remove catalog file records and allocate or reclaim both forks.
+`CreateFolder` and `DeleteFolder` maintain folder records, folder threads, parent valence and MDB file/folder counts;
+deleting a nonempty folder or locked file is refused. Catalog insertion and deletion rebuild the catalog B-tree and
+can extend its extents with free blocks, adding linked map nodes and catalog overflow-extent records as needed. These operations return new images
+and reopen them through the HFS reader. Before and after an edit, the writer validates both B-trees' index graph,
+sibling links, node maps, free-node counts, record counts, and key order. New catalog keys include their alignment byte
+in `ckrKeyLen` as real HFS volumes do. File and folder creation accept optional Mac creation and modification dates;
+when omitted, both are set to the local creation time. A real hfsutils-formatted volume has also been used to verify
+fork edits, folder changes and catalog growth by remounting the output with hfsutils.
+Before catalog mutation, the writer also checks that every catalogued extent is allocated, has no overlap with another
+file or system fork, that `drFreeBks` matches the volume bitmap, that catalog file and folder IDs are unique, and that
+folder valences and MDB file/folder counts match the catalog. Deleting a file removes its optional file thread.
+
+The extents-overflow file is limited to its three MDB extents. Apple's `ExtendFileC` returns `fxOvFlErr` when its first
+extent record is full, so the writer refuses further growth at that limit **[Code]** Apple
+[`SExtents.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SExtents.c). Catalog edits
+compare Mac Roman bytes with the full `_RelString` weight rules in section 6.6, including distinct `Á` and `á`, equal
+space and non-breaking space, and the feminine and masculine ordinal weights. The generated 256 weights were checked
+against Apple's `gCompareTable` with no differences; the table itself is not included here. Fork lookup applies the
+same comparison to every path component.
+
 When a drive's block at 1024 is not a volume the File Manager knows, `MountVol` hands it to the external file
 systems and, if none takes it, the volume does not mount **[Code]** Mac OS 9.0 File Manager.
 
 ---
 
-## 13. Not covered and open questions
+## 14. Not covered and open questions
 
-Not covered: the volume bitmap, B-tree map records and free-node management, and the rules for allocating blocks
-and nodes, which only a writer needs (phase 8 of the plan); the boot blocks; HFS Plus (section 11); the old `'TS'`
+Not covered: the boot blocks; HFS Plus (section 11); the old `'TS'`
 partition map.
 
 No rule in this document is fitted to data alone. Still open:

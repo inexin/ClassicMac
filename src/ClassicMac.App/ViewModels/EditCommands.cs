@@ -397,14 +397,24 @@ namespace ClassicMac.App.ViewModels
                 SaveAsFormat.BinHex => ".hqx",
                 SaveAsFormat.AppleSingle => ".as",
                 SaveAsFormat.RawFork => ".rsrc",
+                SaveAsFormat.HfsImage => Path.GetExtension(owner.Input.Path) is { Length: > 0 } imageExtension ? imageExtension : ".img",
                 _ => "",
             };
-            var name = HostNames.ToHostName(state.File.Name, 200);
+            var name = format == SaveAsFormat.HfsImage
+                ? Path.GetFileNameWithoutExtension(owner.Input.Path) + "-edited"
+                : HostNames.ToHostName(state.File.Name, 200);
             var path = await FilePicker.PickSaveFileAsync($"Save {owner.BaseTitle} As", name + extension, extension.Length > 0 ? [extension] : []);
             if (path is null) return;
             try
             {
                 var file = state.File;
+                if (format == SaveAsFormat.HfsImage)
+                {
+                    var writtenImage = await Task.Run(() => ForkSaver.SaveHfsImageAs(owner.Input.Path, path, file,
+                        state.Session.Fork, state.ForkInDataFork));
+                    Status = $"Saved {owner.BaseTitle}'s fork to HFS image {writtenImage}.";
+                    return;
+                }
                 var written = await Task.Run(() => ForkSaver.SaveAs(path, format, file, state.Session.Fork, state.ForkInDataFork));
                 Status = $"Saved {owner.BaseTitle} as {string.Join(", ", written.Select(Path.GetFileName))}.";
             }
