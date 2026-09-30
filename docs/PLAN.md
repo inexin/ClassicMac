@@ -35,19 +35,24 @@ Proposed priority:
 | 1 | PC Exchange / File Exchange folders (`RESOURCE.FRK/<8.3 name>` fork, `FINDER.DAT` records) | DOS and Windows disks written by Mac OS 7.1–9 |
 | 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites |
 | 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites |
-| 2 | HFS and MFS disk images: raw `.dsk`/`.img`, DiskCopy 4.2, NDIF (Disk Copy 6 `.img`, `.smi`), DART, UDIF `.dmg` | Emulator disks, floppy images, Apple system software, images re-shared from Mac OS X |
-| 2 | CD images: ISO 9660 with Apple extensions, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw `.bin` + `.cue` | Magazine, game and system CDs |
+| 2 | HFS and MFS disk images: raw `.dsk`/`.img`/`.hda` bare or inside an Apple Partition Map, DiskCopy 4.2, NDIF (Disk Copy 6 `.img`, `.smi`; ADC and resource-fork-less reconstruction), DART, UDIF `.dmg` | Emulator disks, floppy images, Apple system software, images re-shared from Mac OS X |
+| 2 | CD images: ISO 9660 with Apple extensions and Rock Ridge names, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw 2352-byte `.bin` + `.cue` | Magazine, game and system CDs |
 | 2 | FAT disk images with PC Exchange / File Exchange data (e.g. `RealmzClassicHD.img`) | Emulator hard disks and floppies shared with PCs |
 | 3 | HFS+ images | Mac OS 8.1–9 disks |
-| 2 | Zip with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers |
-| 3 | StuffIt 1.x–5 (`.sit`, `.sea`) and Compact Pro (`.cpt`) archives; self-extractors found by signature | Most classic Mac downloads |
-| 4 | DiskDoubler (`.dd`), segmented archives (StuffIt SegmentIt, Compact Pro segments), PackIt (`.pit`) | Early 1990s downloads, multi-floppy BBS files |
+| 2 | Zip / MacZip (`.zip`, stored and DEFLATE) with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (`.tar`, `.gz`, `.tgz`, MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers |
+| 2 | uuencode (`.uu`) | Usenet and mail transfers |
+| 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads |
+| 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives |
+| 4 | DiskDoubler (`.dd`), segmented archives (StuffIt SegmentIt, Compact Pro segments), PackIt (`.pit`), standalone LHA/LZH (`.lzh`) | Early 1990s downloads, multi-floppy BBS files |
+| 5 | Encrypted Mac application formats, only on request: StuffIt X (`.sitx`); FolderBolt; MacSafe II; Crypt for Mac; MacPGP; Apple File Security | Password-protected archives, files and folders |
 | 5 | Only on request: AppleLink PackageIt, Now Compress, MacLHA, MOOF flux images, MAME CHD, Apple II formats | Rare, or not classic Mac |
 | 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators |
 
 Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
 
-Out of scope: StuffIt X (`.sitx`, 2002+, a large proprietary format), `.sparseimage`/`.sparsebundle` (Mac OS X).
+Out of scope: `.sparseimage`/`.sparsebundle` (Mac OS X). StuffIt X (`.sitx`) and the other priority-5 encryption formats
+are only considered on request; their exact on-disk variants, password handling and cryptographic details need
+verification before implementation.
 
 Every container yields the same *Mac file* entry (`MacFile`, in `ClassicMac.Files`): name (MacRoman), type and
 creator, Finder flags, creation and modification dates (seconds since 1904, local time), data fork and resource fork.
@@ -919,7 +924,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   written here and verified against archives made by the real StuffIt and Compact Pro in an emulator (the corpus),
   marked as fitted where behaviour comes from test data rather than a published description.
 - **More input formats (decided):** CD images, DART, UDIF and zip/tar with Mac data join Phase 2; DiskDoubler, PackIt
-  and segmented archives follow StuffIt and Compact Pro; StuffIt X and Mac OS X sparse images are out of scope.
+  and segmented archives follow StuffIt and Compact Pro; StuffIt X and other encrypted Mac application formats are
+  considered only on request (priority 5); Mac OS X sparse images remain out of scope.
 - **`dcmp` 0–3 from disassembly:** all four decompressors follow the Mac OS 9.0 System's code (68k, emulated and
   compared on all 34 compressed System resources); the memory after the in-place block is modelled as 2 KiB of zeros.
 
