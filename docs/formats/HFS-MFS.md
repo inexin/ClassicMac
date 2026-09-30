@@ -814,8 +814,9 @@ allocated, and verifies `freeNodes` against the complete bitmap. It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
 `totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user
 record and remaining map record, index records contain exactly the padded key and child pointer, and leaf-record keys are
-unique. It checks the catalog and extents-overflow B-trees' `maxKeyLength` against TN1150's defined maxima (516 and
-10 bytes respectively) **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
+unique. It checks the catalog, extents-overflow and attributes B-trees' `maxKeyLength` against their defined maxima
+(516, 10 and 266 bytes respectively). The attributes maximum follows `kHFSPlusAttrKeyMaximumLength` in Apple's
+`hfs_format.h`; the catalog and extents maxima are defined by TN1150 **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
 record's parent and name.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every

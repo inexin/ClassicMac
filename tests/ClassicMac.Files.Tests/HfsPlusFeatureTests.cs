@@ -362,6 +362,23 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(266, true)]
+    [InlineData(267, false)]
+    [InlineData(268, false)]
+    public void HfsPlusAttributesBtreeMaximumKeyLengthMustMatchItsDefinedKeyFormat(ushort maxKeyLength,
+        bool isValid)
+    {
+        byte[] image = HfsPlusFixture.Build(includeAttributeFile: true);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(10 * HfsPlusFixture.Block + 34), maxKeyLength);
+
+        if (isValid)
+            Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        else
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusCatalogBtreeNodesMustBeAtLeastFourKilobytes()
     {

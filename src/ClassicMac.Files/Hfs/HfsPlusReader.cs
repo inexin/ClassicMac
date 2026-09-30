@@ -491,6 +491,8 @@ internal static class HfsPlusReader
         {
             "catalog" => 516,
             "extents-overflow" => 10,
+            // HFSPlusAttrKey is 268 bytes including its 2-byte keyLength field (Apple hfs_format.h).
+            "attributes" => 266,
             _ => maxKeyLength
         };
         if (maxKeyLength != definedMaxKeyLength)
