@@ -404,33 +404,68 @@ internal static class HfsPlusReader
     {
         const int MapOffset = 14 + 106 + 128;
         int mapLength = nodeSize - 256;
-        uint addressableNodes = checked((uint)(mapLength * 8));
+        uint headerMapCapacity = checked((uint)(mapLength * 8));
+        int mapNodeLength = nodeSize - 20;
+        uint mapNodeCapacity = checked((uint)(mapNodeLength * 8));
+        var mapNodes = new List<uint>();
+        var seenMapNodes = new HashSet<uint>();
+        uint nextMapNode = U32(tree, 0);
+        ulong capacity = headerMapCapacity;
+        while (nextMapNode != 0)
+        {
+            if (nextMapNode >= totalNodes || !seenMapNodes.Add(nextMapNode) ||
+                referencedNodes.Contains(nextMapNode))
+                throw new InvalidDataException("The HFS Plus B-tree map-node chain is cyclic or invalid.");
+
+            int offset = checked((int)nextMapNode * nodeSize);
+            if (tree[offset + 8] != 2 || tree[offset + 9] != 0 || U16(tree, offset + 10) != 1 ||
+                U32(tree, offset + 4) != 0)
+                throw new InvalidDataException("An HFS Plus B-tree map node has an invalid descriptor.");
+            mapNodes.Add(nextMapNode);
+            capacity += mapNodeCapacity;
+            nextMapNode = U32(tree, offset);
+        }
+        if (capacity < totalNodes)
+            throw new InvalidDataException("The HFS Plus B-tree map nodes do not cover every node.");
 
         void RequireAllocated(uint nodeNumber)
         {
-            if (nodeNumber >= addressableNodes) return; // Later nodes are represented by chained map nodes.
             if (!IsAllocated(nodeNumber))
                 throw new InvalidDataException($"HFS Plus B-tree node {nodeNumber} is referenced but marked free.");
         }
 
         bool IsAllocated(uint nodeNumber)
         {
-            int byteOffset = MapOffset + checked((int)(nodeNumber / 8));
-            byte mask = (byte)(0x80 >> (int)(nodeNumber % 8));
+            int byteOffset;
+            uint bitInByte;
+            if (nodeNumber < headerMapCapacity)
+            {
+                byteOffset = MapOffset + checked((int)(nodeNumber / 8));
+                bitInByte = nodeNumber % 8;
+            }
+            else
+            {
+                uint continuationBit = nodeNumber - headerMapCapacity;
+                uint mapIndex = continuationBit / mapNodeCapacity;
+                if (mapIndex >= mapNodes.Count)
+                    throw new InvalidDataException("The HFS Plus B-tree node map is truncated.");
+                byteOffset = checked((int)mapNodes[(int)mapIndex] * nodeSize + 14 +
+                    (int)((continuationBit % mapNodeCapacity) / 8));
+                bitInByte = continuationBit % 8;
+            }
+            byte mask = (byte)(0x80 >> (int)bitInByte);
             return (tree[byteOffset] & mask) != 0;
         }
 
         RequireAllocated(0);
         foreach (uint nodeNumber in referencedNodes) RequireAllocated(nodeNumber);
+        foreach (uint nodeNumber in mapNodes) RequireAllocated(nodeNumber);
 
-        if (totalNodes <= addressableNodes)
-        {
-            uint freeNodes = 0;
-            for (uint nodeNumber = 0; nodeNumber < totalNodes; nodeNumber++)
-                if (!IsAllocated(nodeNumber)) freeNodes++;
-            if (freeNodes != U32(tree, 14 + 26))
-                throw new InvalidDataException("The HFS Plus B-tree free-node count differs from its node map.");
-        }
+        uint freeNodes = 0;
+        for (uint nodeNumber = 0; nodeNumber < totalNodes; nodeNumber++)
+            if (!IsAllocated(nodeNumber)) freeNodes++;
+        if (freeNodes != U32(tree, 14 + 26))
+            throw new InvalidDataException("The HFS Plus B-tree free-node count differs from its node map.");
     }
 
     private static string Name(ReadOnlySpan<byte> key)

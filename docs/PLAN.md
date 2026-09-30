@@ -794,7 +794,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
     info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, header nodes,
-    node maps (referenced nodes and free counts when the header map covers the tree), roots, index graphs,
+    node maps (including chained map nodes and free counts), roots, index graphs,
     sibling links, unique leaf keys,
     and HFSX key-compare modes plus binary catalog order,
     unique catalog

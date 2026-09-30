@@ -116,6 +116,87 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusBtreeWithMoreNodesThanItsHeaderMapRequiresChainedMapNodes()
+    {
+        byte[] image = BuildOversizedExtentsTree(addMapNode: false);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusBtreeUsesAChainedMapNodeForNodesPastTheHeaderMap()
+    {
+        byte[] image = BuildOversizedExtentsTree(addMapNode: true);
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusBtreeMapNodesMustBeValidAndAllocated(bool markMapNodeFree)
+    {
+        byte[] image = BuildOversizedExtentsTree(addMapNode: true);
+        if (markMapNodeFree)
+            image[4 * 4096 + 248] = 0xC0;
+        else
+            image[4 * 4096 + 2 * 512 + 8] = 0;
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    private static byte[] BuildOversizedExtentsTree(bool addMapNode)
+    {
+        const int blockSize = 4096;
+        const int nodeSize = 512;
+        const int totalNodes = 2049;
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true);
+        const int totalBlocks = 264;
+        const int allocatedBlocks = 257;
+        Array.Resize(ref image, totalBlocks * blockSize);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 44), totalBlocks);
+        Span<byte> extentsFork = image.AsSpan(1024 + 192, 80);
+        BinaryPrimitives.WriteUInt64BigEndian(extentsFork, (ulong)nodeSize * totalNodes);
+        BinaryPrimitives.WriteUInt32BigEndian(extentsFork[12..], allocatedBlocks);
+        BinaryPrimitives.WriteUInt32BigEndian(extentsFork[16..], 4);
+        BinaryPrimitives.WriteUInt32BigEndian(extentsFork[20..], allocatedBlocks);
+
+        int treeOffset = 4 * blockSize;
+        byte[] leaf = image.AsSpan(5 * blockSize, nodeSize).ToArray();
+        Span<byte> header = image.AsSpan(treeOffset, nodeSize);
+        BinaryPrimitives.WriteUInt16BigEndian(header[32..], nodeSize);
+        BinaryPrimitives.WriteUInt32BigEndian(header[36..], totalNodes);
+        BinaryPrimitives.WriteUInt32BigEndian(header[40..], totalNodes - (addMapNode ? 3u : 2u));
+        header.Slice(248, nodeSize - 256).Clear();
+        header[248] = 0xC0; // Nodes 0 and 1 allocated; no map node links follow.
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 2)..], 14);
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 4)..], 14 + 106);
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 6)..], 14 + 106 + 128);
+        BinaryPrimitives.WriteUInt16BigEndian(header[(nodeSize - 8)..], nodeSize - 8);
+
+        if (addMapNode)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(header, 2); // First map node follows header and leaf nodes.
+            header[248] = 0xE0; // Nodes 0, 1 and 2 (the map node) are allocated.
+            Span<byte> mapNode = image.AsSpan(treeOffset + 2 * nodeSize, nodeSize);
+            mapNode[8] = 2;
+            mapNode[10..12].Clear();
+            BinaryPrimitives.WriteUInt16BigEndian(mapNode[10..], 1);
+            BinaryPrimitives.WriteUInt16BigEndian(mapNode[(nodeSize - 2)..], 14);
+            BinaryPrimitives.WriteUInt16BigEndian(mapNode[(nodeSize - 4)..], nodeSize - 6);
+        }
+
+        leaf.AsSpan(0, 14 + 76).CopyTo(image.AsSpan(treeOffset + nodeSize));
+        Span<byte> leafNode = image.AsSpan(treeOffset + nodeSize, nodeSize);
+        BinaryPrimitives.WriteUInt16BigEndian(leafNode[(nodeSize - 2)..], 14);
+        BinaryPrimitives.WriteUInt16BigEndian(leafNode[(nodeSize - 4)..], 90);
+
+        return image;
+    }
+
+    [Fact]
     public void HfsPlusNextCatalogIdMustExceedEveryExistingCatalogId()
     {
         byte[] image = HfsPlusFixture.Build(nextCatalogId: 17);
