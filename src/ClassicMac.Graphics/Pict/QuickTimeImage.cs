@@ -1,6 +1,7 @@
 using System;
-using System.Buffers.Binary;
+using System.IO;
 using System.Text;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
@@ -24,25 +25,22 @@ namespace ClassicMac.Graphics.Pict
         {
             if (block.Length < 2 + 36 + 4 + 8 + 2 + 8 + 4 + 4) return null;
             var q = new QuickTimeImage();
-            int p = 2;                                                // version
-            int I32() { int v = BinaryPrimitives.ReadInt32BigEndian(block.AsSpan(p)); p += 4; return v; }
-            short I16() { short v = BinaryPrimitives.ReadInt16BigEndian(block.AsSpan(p)); p += 2; return v; }
-            PictRect Rect() { var r = new PictRect(I16(), I16(), I16(), I16()); return r; }
-            for (int i = 0; i < 9; i++) q.Matrix[i] = I32();
-            int matteSize = I32();
-            Rect();                                                   // matte rect
-            q.Mode = (ushort)I16();
-            q.SourceRect = Rect();
-            I32();                                                    // accuracy
-            int maskSize = I32();
-            if (matteSize < 0 || maskSize < 0 || p + (long)matteSize + maskSize > block.Length) return null;
-            p += matteSize;                                           // the matte is not applied
+            var reader = new ClassicMac.Core.BigEndianReader(block) { Position = 2 }; // version
+            for (int i = 0; i < 9; i++) q.Matrix[i] = reader.ReadInt32();
+            int matteSize = reader.ReadInt32();
+            ReadRect(ref reader);                                     // matte rect
+            q.Mode = reader.ReadUInt16();
+            q.SourceRect = ReadRect(ref reader);
+            reader.ReadInt32();                                       // accuracy
+            int maskSize = reader.ReadInt32();
+            if (matteSize < 0 || maskSize < 0 || reader.Position + (long)matteSize + maskSize > block.Length) return null;
+            reader.Skip(matteSize);                                   // the matte is not applied
             if (maskSize > 0)
             {
-                using var r = new System.IO.BinaryReader(new System.IO.MemoryStream(block, p, maskSize));
-                try { q.Mask = Region.Read(r); } catch (System.IO.EndOfStreamException) { }
-                p += maskSize;
+                try { q.Mask = Region.FromRgnData(reader.ReadBytes(maskSize)); }
+                catch (InvalidDataException) { }
             }
+            var p = reader.Position;
             var description = ImageDescriptionReader.Read(block, p, out int idSize);
             if (description == null) return null;
             q.Description = description;
@@ -51,6 +49,9 @@ namespace ClassicMac.Graphics.Pict
             q.Data = block.AsSpan(dataStart).ToArray();
             return q;
         }
+
+        private static PictRect ReadRect(ref ClassicMac.Core.BigEndianReader reader) =>
+            new(reader.ReadInt16(), reader.ReadInt16(), reader.ReadInt16(), reader.ReadInt16());
 
         // Where the matrix puts the source rect, in picture coordinates (scale and translation; a rotated or skewed
         // image is placed in its bounding box).

@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -123,7 +122,7 @@ namespace ClassicMac.Resources.Decoders.Text
             // No Mac OS code reads this byte. Apple's files store it as BCD (Disk Copy 6.5b13: $13 for "b13"); some other
             // developers' as binary ($0F for "r15"): BCD when both digits are decimal, else binary (fitted to data).
             var nonRelease = (data[3] >> 4) <= 9 && (data[3] & 0x0F) <= 9 ? Bcd(data[3]) : data[3];
-            var region = BinaryPrimitives.ReadInt16BigEndian(data[4..]);
+            var region = new BigEndianReader(data).ReadInt16At(4);
             var offset = 6;
             var complete = MacText.TryReadPascal(data, ref offset, out var shortText);
             var shortVersion = MacText.Decode(shortText, options);

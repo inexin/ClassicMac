@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using ClassicMac.Core;
 using ClassicMac.Resources.Export;
@@ -53,25 +52,26 @@ namespace ClassicMac.Resources.Decoders.Text
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
             var data = input.Data.Span;
-            if (data.Length < 2) return [];
-            var count = BinaryPrimitives.ReadUInt16BigEndian(data);
+            var reader = new BigEndianReader(data);
+            if (!reader.TryReadUInt16(out ushort count)) return [];
             var strings = new List<string>(count);
-            var offset = 2;
             for (var i = 0; i < count; i++)
             {
                 // A string cut short is kept as far as it goes; the list ends there.
-                var complete = offset < data.Length;
-                if (complete)
-                {
-                    complete = MacText.TryReadPascal(data, ref offset, out var text);
-                    strings.Add(MacText.Decode(text, options));
-                }
-                if (!complete)
+                if (!reader.TryReadByte(out byte length))
                 {
                     input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "text.string-list-short",
                         $"{input.Resource}: the list counts {count} strings but the data ends after {strings.Count}."));
                     break;
                 }
+                if (!reader.TryReadBytes(length, out var text))
+                {
+                    strings.Add(MacText.Decode(reader.ReadBytes(reader.Remaining), options));
+                    input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "text.string-list-short",
+                        $"{input.Resource}: the list counts {count} strings but the data ends after {strings.Count}."));
+                    break;
+                }
+                strings.Add(MacText.Decode(text, options));
             }
             var json = MacText.Json(w =>
             {

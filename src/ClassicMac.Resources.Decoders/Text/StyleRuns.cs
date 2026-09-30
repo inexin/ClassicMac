@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using ClassicMac.Core;
 
@@ -30,21 +29,22 @@ namespace ClassicMac.Resources.Decoders.Text
             var runs = new List<StyleRun>();
             complete = data.Length >= 2;
             if (!complete) return runs;
-            var count = BinaryPrimitives.ReadUInt16BigEndian(data);
+            var reader = new BigEndianReader(data);
+            var count = reader.ReadUInt16();
             for (var i = 0; i < count; i++)
             {
-                var at = 2 + i * ElementLength;
-                if (at + ElementLength > data.Length)
+                if (reader.Remaining < ElementLength)
                 {
                     complete = false;
                     break;
                 }
-                var e = data.Slice(at, ElementLength);
-                runs.Add(new StyleRun(
-                    BinaryPrimitives.ReadInt32BigEndian(e), BinaryPrimitives.ReadInt16BigEndian(e[4..]),
-                    BinaryPrimitives.ReadInt16BigEndian(e[6..]), BinaryPrimitives.ReadInt16BigEndian(e[8..]), e[10],
-                    BinaryPrimitives.ReadInt16BigEndian(e[12..]), BinaryPrimitives.ReadUInt16BigEndian(e[14..]),
-                    BinaryPrimitives.ReadUInt16BigEndian(e[16..]), BinaryPrimitives.ReadUInt16BigEndian(e[18..])));
+                int start = reader.ReadInt32();
+                short height = reader.ReadInt16(), ascent = reader.ReadInt16(), font = reader.ReadInt16();
+                byte face = reader.ReadByte();
+                reader.Skip(1); // filler
+                short size = reader.ReadInt16();
+                ushort red = reader.ReadUInt16(), green = reader.ReadUInt16(), blue = reader.ReadUInt16();
+                runs.Add(new StyleRun(start, height, ascent, font, face, size, red, green, blue));
             }
             return runs;
         }
@@ -53,20 +53,21 @@ namespace ClassicMac.Resources.Decoders.Text
         public static byte[] Write(IReadOnlyList<StyleRun> runs)
         {
             var data = new byte[2 + runs.Count * ElementLength];
-            BinaryPrimitives.WriteUInt16BigEndian(data, (ushort)runs.Count);
+            var writer = new BigEndianWriter(data);
+            writer.WriteUInt16((ushort)runs.Count);
             for (var i = 0; i < runs.Count; i++)
             {
-                var e = data.AsSpan(2 + i * ElementLength, ElementLength);
                 var r = runs[i];
-                BinaryPrimitives.WriteInt32BigEndian(e, r.Start);
-                BinaryPrimitives.WriteInt16BigEndian(e[4..], r.Height);
-                BinaryPrimitives.WriteInt16BigEndian(e[6..], r.Ascent);
-                BinaryPrimitives.WriteInt16BigEndian(e[8..], r.Font);
-                e[10] = r.Face;
-                BinaryPrimitives.WriteInt16BigEndian(e[12..], r.Size);
-                BinaryPrimitives.WriteUInt16BigEndian(e[14..], r.Red);
-                BinaryPrimitives.WriteUInt16BigEndian(e[16..], r.Green);
-                BinaryPrimitives.WriteUInt16BigEndian(e[18..], r.Blue);
+                writer.WriteInt32(r.Start);
+                writer.WriteInt16(r.Height);
+                writer.WriteInt16(r.Ascent);
+                writer.WriteInt16(r.Font);
+                writer.WriteByte(r.Face);
+                writer.Skip(1);
+                writer.WriteInt16(r.Size);
+                writer.WriteUInt16(r.Red);
+                writer.WriteUInt16(r.Green);
+                writer.WriteUInt16(r.Blue);
             }
             return data;
         }

@@ -1,6 +1,4 @@
 using System;
-using System.Buffers.Binary;
-
 namespace ClassicMac.Core
 {
     /// <summary>
@@ -29,10 +27,24 @@ namespace ClassicMac.Core
         }
 
         /// <summary>Reads a big-endian <c>Fixed</c>.</summary>
-        public static Fixed Read(ReadOnlySpan<byte> source) => new(BinaryPrimitives.ReadInt32BigEndian(source));
+        public static Fixed Read(ReadOnlySpan<byte> source)
+        {
+            var reader = new BigEndianReader(source);
+            return reader.ReadFixed();
+        }
+
+        /// <summary>Reads a fixed-point value at the reader's current position and advances it.</summary>
+        public static Fixed Read(ref BigEndianReader reader) => reader.ReadFixed();
 
         /// <summary>Writes the value as four big-endian bytes.</summary>
-        public void Write(Span<byte> destination) => BinaryPrimitives.WriteInt32BigEndian(destination, Raw);
+        public void Write(Span<byte> destination)
+        {
+            var writer = new BigEndianWriter(destination);
+            writer.WriteFixed(this);
+        }
+
+        /// <summary>Writes a fixed-point value at the writer's current position and advances it.</summary>
+        public void Write(ref BigEndianWriter writer) => writer.WriteFixed(this);
 
         /// <inheritdoc/>
         public int CompareTo(Fixed other) => Raw.CompareTo(other.Raw);
@@ -67,10 +79,24 @@ namespace ClassicMac.Core
         }
 
         /// <summary>Reads a big-endian <c>UnsignedFixed</c>.</summary>
-        public static UnsignedFixed Read(ReadOnlySpan<byte> source) => new(BinaryPrimitives.ReadUInt32BigEndian(source));
+        public static UnsignedFixed Read(ReadOnlySpan<byte> source)
+        {
+            var reader = new BigEndianReader(source);
+            return reader.ReadUnsignedFixed();
+        }
+
+        /// <summary>Reads an unsigned fixed-point value at the reader's current position and advances it.</summary>
+        public static UnsignedFixed Read(ref BigEndianReader reader) => reader.ReadUnsignedFixed();
 
         /// <summary>Writes the value as four big-endian bytes.</summary>
-        public void Write(Span<byte> destination) => BinaryPrimitives.WriteUInt32BigEndian(destination, Raw);
+        public void Write(Span<byte> destination)
+        {
+            var writer = new BigEndianWriter(destination);
+            writer.WriteUnsignedFixed(this);
+        }
+
+        /// <summary>Writes an unsigned fixed-point value at the writer's current position and advances it.</summary>
+        public void Write(ref BigEndianWriter writer) => writer.WriteUnsignedFixed(this);
 
         /// <inheritdoc/>
         public int CompareTo(UnsignedFixed other) => Raw.CompareTo(other.Raw);

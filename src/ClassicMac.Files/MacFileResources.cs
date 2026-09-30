@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -80,10 +79,11 @@ namespace ClassicMac.Files
             ArgumentNullException.ThrowIfNull(data);
             if (data.Length is < 256 or > ResourceFork.MaxForkLength) return false;
             var header = data.ReadPrefix(16);
-            long dataOffset = BinaryPrimitives.ReadUInt32BigEndian(header);
-            long mapOffset = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
-            long dataLength = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(8));
-            long mapLength = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(12));
+            var headerReader = new ClassicMac.Core.BigEndianReader(header);
+            long dataOffset = headerReader.ReadUInt32At(0);
+            long mapOffset = headerReader.ReadUInt32At(4);
+            long dataLength = headerReader.ReadUInt32At(8);
+            long mapLength = headerReader.ReadUInt32At(12);
             return dataOffset >= 16 && mapOffset >= 16 && mapLength >= 30 && dataOffset + dataLength <= data.Length
                 && mapOffset + mapLength <= data.Length;
         }

@@ -1,6 +1,4 @@
 using System;
-using System.Buffers.Binary;
-
 namespace ClassicMac.Core
 {
     /// <summary>
@@ -15,15 +13,24 @@ namespace ClassicMac.Core
         public const int Length = 4;
 
         /// <summary>Reads a point from the first four bytes of <paramref name="source"/>.</summary>
-        public static MacPoint Read(ReadOnlySpan<byte> source) =>
-            new(BinaryPrimitives.ReadInt16BigEndian(source), BinaryPrimitives.ReadInt16BigEndian(source[2..]));
+        public static MacPoint Read(ReadOnlySpan<byte> source)
+        {
+            var reader = new BigEndianReader(source);
+            return reader.ReadMacPoint();
+        }
+
+        /// <summary>Reads a point at the reader's current position and advances it.</summary>
+        public static MacPoint Read(ref BigEndianReader reader) => reader.ReadMacPoint();
 
         /// <summary>Writes the point as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)
         {
-            BinaryPrimitives.WriteInt16BigEndian(destination, V);
-            BinaryPrimitives.WriteInt16BigEndian(destination[2..], H);
+            var writer = new BigEndianWriter(destination);
+            writer.WriteMacPoint(this);
         }
+
+        /// <summary>Writes a point at the writer's current position and advances it.</summary>
+        public void Write(ref BigEndianWriter writer) => writer.WriteMacPoint(this);
 
         /// <inheritdoc/>
         public override string ToString() => $"(v {V}, h {H})";
@@ -64,20 +71,24 @@ namespace ClassicMac.Core
         public bool IsEmpty => Bottom <= Top || Right <= Left;
 
         /// <summary>Reads a rectangle from the first eight bytes of <paramref name="source"/>.</summary>
-        public static MacRect Read(ReadOnlySpan<byte> source) => new(
-            BinaryPrimitives.ReadInt16BigEndian(source),
-            BinaryPrimitives.ReadInt16BigEndian(source[2..]),
-            BinaryPrimitives.ReadInt16BigEndian(source[4..]),
-            BinaryPrimitives.ReadInt16BigEndian(source[6..]));
+        public static MacRect Read(ReadOnlySpan<byte> source)
+        {
+            var reader = new BigEndianReader(source);
+            return reader.ReadMacRect();
+        }
+
+        /// <summary>Reads a rectangle at the reader's current position and advances it.</summary>
+        public static MacRect Read(ref BigEndianReader reader) => reader.ReadMacRect();
 
         /// <summary>Writes the rectangle as eight big-endian bytes.</summary>
         public void Write(Span<byte> destination)
         {
-            BinaryPrimitives.WriteInt16BigEndian(destination, Top);
-            BinaryPrimitives.WriteInt16BigEndian(destination[2..], Left);
-            BinaryPrimitives.WriteInt16BigEndian(destination[4..], Bottom);
-            BinaryPrimitives.WriteInt16BigEndian(destination[6..], Right);
+            var writer = new BigEndianWriter(destination);
+            writer.WriteMacRect(this);
         }
+
+        /// <summary>Writes a rectangle at the writer's current position and advances it.</summary>
+        public void Write(ref BigEndianWriter writer) => writer.WriteMacRect(this);
 
         /// <inheritdoc/>
         public override string ToString() => $"(t {Top}, l {Left}, b {Bottom}, r {Right})";

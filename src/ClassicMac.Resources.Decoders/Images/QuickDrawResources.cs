@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickDraw;
 
@@ -384,8 +384,8 @@ namespace ClassicMac.Resources.Decoders.Images
 
         private static Exception Truncated(string type) => new EndOfStreamException($"The '{type}' resource data is truncated.");
 
-        private static int U16(byte[] d, int o) => BinaryPrimitives.ReadUInt16BigEndian(d.AsSpan(o));
-        private static short I16(byte[] d, int o) => BinaryPrimitives.ReadInt16BigEndian(d.AsSpan(o));
-        private static uint U32(byte[] d, int o) => BinaryPrimitives.ReadUInt32BigEndian(d.AsSpan(o));
+        private static int U16(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadUInt16At(o);
+        private static short I16(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadInt16At(o);
+        private static uint U32(byte[] d, int o) => new ClassicMac.Core.BigEndianReader(d).ReadUInt32At(o);
     }
 }

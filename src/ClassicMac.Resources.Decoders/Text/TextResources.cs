@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -30,10 +29,13 @@ namespace ClassicMac.Resources.Decoders.Text
         public static IReadOnlyList<string> ReadStringList(ReadOnlySpan<byte> data)
         {
             var strings = new List<string>();
-            if (data.Length < 2) return strings;
-            var count = BinaryPrimitives.ReadUInt16BigEndian(data);
-            var offset = 2;
-            for (var i = 0; i < count && MacText.TryReadPascal(data, ref offset, out var text); i++) strings.Add(FromMac(text));
+            var reader = new BigEndianReader(data);
+            if (!reader.TryReadUInt16(out ushort count)) return strings;
+            for (var i = 0; i < count && reader.TryReadByte(out byte length); i++)
+            {
+                if (!reader.TryReadBytes(length, out var text)) break;
+                strings.Add(FromMac(text));
+            }
             return strings;
         }
 
@@ -44,7 +46,10 @@ namespace ClassicMac.Resources.Decoders.Text
             ArgumentNullException.ThrowIfNull(strings);
             if (strings.Count > ushort.MaxValue) throw new ArgumentException("A string list holds at most 65535 strings.", nameof(strings));
             var output = new MemoryStream();
-            output.Write([(byte)(strings.Count >> 8), (byte)strings.Count]);
+            Span<byte> count = stackalloc byte[sizeof(ushort)];
+            var writer = new BigEndianWriter(count);
+            writer.WriteUInt16((ushort)strings.Count);
+            output.Write(count);
             foreach (var s in strings) output.Write(Pascal(s));
             return output.ToArray();
         }
@@ -117,7 +122,8 @@ namespace ClassicMac.Resources.Decoders.Text
             var shortVersion = MacRoman.Decode(shortText);
             var longVersion = "";
             if (offset < data.Length && MacText.TryReadPascal(data, ref offset, out var longText)) longVersion = MacRoman.Decode(longText).Replace('\r', '\n');
-            return new VersionResource(Bcd(data[0]), data[1] >> 4, data[1] & 0x0F, data[2], nonRelease, BinaryPrimitives.ReadInt16BigEndian(data[4..]),
+            var reader = new BigEndianReader(data);
+            return new VersionResource(Bcd(data[0]), data[1] >> 4, data[1] & 0x0F, data[2], nonRelease, reader.ReadInt16At(4),
                 shortVersion, longVersion);
         }
 
@@ -128,7 +134,13 @@ namespace ClassicMac.Resources.Decoders.Text
             if (Major is < 0 or > 99 || Minor is < 0 or > 15 || BugFix is < 0 or > 15 || NonRelease is < 0 or > 99)
                 throw new ArgumentException("The version is major 0–99, minor and bug fix 0–15, non-release 0–99.");
             static byte Bcd(int v) => (byte)((v / 10 << 4) | (v % 10));
-            byte[] head = [Bcd(Major), (byte)((Minor << 4) | BugFix), Stage, Bcd(NonRelease), (byte)(Region >> 8), (byte)Region];
+            byte[] head = new byte[6];
+            var writer = new BigEndianWriter(head);
+            writer.WriteByte(Bcd(Major));
+            writer.WriteByte((byte)((Minor << 4) | BugFix));
+            writer.WriteByte(Stage);
+            writer.WriteByte(Bcd(NonRelease));
+            writer.WriteInt16(Region);
             return [.. head, .. TextResources.WriteString(ShortVersion), .. TextResources.WriteString(LongVersion)];
         }
     }

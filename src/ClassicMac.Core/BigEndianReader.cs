@@ -221,7 +221,11 @@ namespace ClassicMac.Core
         }
 
         /// <summary>Reads a QuickDraw point.</summary>
-        public MacPoint ReadMacPoint() => MacPoint.Read(ReadBytes(MacPoint.Length));
+        public MacPoint ReadMacPoint()
+        {
+            if (Remaining < MacPoint.Length) throw new EndOfStreamException();
+            return new(ReadInt16(), ReadInt16());
+        }
 
         /// <summary>Attempts to read a QuickDraw point.</summary>
         public bool TryReadMacPoint(out MacPoint value)
@@ -232,18 +236,22 @@ namespace ClassicMac.Core
         }
 
         /// <summary>Reads a QuickDraw point at an absolute offset without changing <see cref="Position"/>.</summary>
-        public MacPoint ReadMacPointAt(int offset) => MacPoint.Read(ReadBytesAt(offset, MacPoint.Length));
+        public MacPoint ReadMacPointAt(int offset) => new(ReadInt16At(offset), ReadInt16At(offset + sizeof(short)));
 
         /// <summary>Attempts to read a QuickDraw point at an absolute offset.</summary>
         public bool TryReadMacPointAt(int offset, out MacPoint value)
         {
-            if (!TryReadBytesAt(offset, MacPoint.Length, out var bytes)) { value = default; return false; }
-            value = MacPoint.Read(bytes);
+            if (!TryReadInt16At(offset, out var v) || !TryReadInt16At(offset + sizeof(short), out var h)) { value = default; return false; }
+            value = new MacPoint(v, h);
             return true;
         }
 
         /// <summary>Reads a QuickDraw rectangle.</summary>
-        public MacRect ReadMacRect() => MacRect.Read(ReadBytes(MacRect.Length));
+        public MacRect ReadMacRect()
+        {
+            if (Remaining < MacRect.Length) throw new EndOfStreamException();
+            return new(ReadInt16(), ReadInt16(), ReadInt16(), ReadInt16());
+        }
 
         /// <summary>Attempts to read a QuickDraw rectangle.</summary>
         public bool TryReadMacRect(out MacRect value)
@@ -254,13 +262,16 @@ namespace ClassicMac.Core
         }
 
         /// <summary>Reads a QuickDraw rectangle at an absolute offset without changing <see cref="Position"/>.</summary>
-        public MacRect ReadMacRectAt(int offset) => MacRect.Read(ReadBytesAt(offset, MacRect.Length));
+        public MacRect ReadMacRectAt(int offset) => new(ReadInt16At(offset), ReadInt16At(offset + 2),
+            ReadInt16At(offset + 4), ReadInt16At(offset + 6));
 
         /// <summary>Attempts to read a QuickDraw rectangle at an absolute offset.</summary>
         public bool TryReadMacRectAt(int offset, out MacRect value)
         {
-            if (!TryReadBytesAt(offset, MacRect.Length, out var bytes)) { value = default; return false; }
-            value = MacRect.Read(bytes);
+            if (!TryReadInt16At(offset, out var top) || !TryReadInt16At(offset + 2, out var left)
+                || !TryReadInt16At(offset + 4, out var bottom) || !TryReadInt16At(offset + 6, out var right))
+            { value = default; return false; }
+            value = new MacRect(top, left, bottom, right);
             return true;
         }
 

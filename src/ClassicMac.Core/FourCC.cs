@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Text;
 
 namespace ClassicMac.Core
@@ -19,7 +18,8 @@ namespace ClassicMac.Core
         public FourCC(ReadOnlySpan<byte> bytes)
         {
             if (bytes.Length != 4) throw new ArgumentException("A four-character code is four bytes.", nameof(bytes));
-            Value = BinaryPrimitives.ReadUInt32BigEndian(bytes);
+            var reader = new BigEndianReader(bytes);
+            Value = reader.ReadUInt32();
         }
 
         /// <summary>
@@ -57,7 +57,11 @@ namespace ClassicMac.Core
         }
 
         /// <summary>Writes the four bytes to <paramref name="destination"/>.</summary>
-        public void CopyTo(Span<byte> destination) => BinaryPrimitives.WriteUInt32BigEndian(destination, Value);
+        public void CopyTo(Span<byte> destination)
+        {
+            var writer = new BigEndianWriter(destination);
+            writer.WriteFourCC(this);
+        }
 
         /// <summary>
         /// The code as Mac OS Roman text; control characters and backslash as <c>\xHH</c>. <see cref="FromString"/>
