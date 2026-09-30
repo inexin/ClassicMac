@@ -39,6 +39,12 @@ namespace ClassicMac.Files
         /// <summary>The resource fork.</summary>
         public ForkData ResourceFork { get; init; } = ForkData.Empty;
 
+        /// <summary>The UTF-8 target path when this file is an HFS Plus symbolic link.</summary>
+        public string? SymbolicLinkTarget { get; init; }
+
+        /// <summary>The HFS Plus indirect-node reference when this file is a hard link.</summary>
+        public uint? HardLinkReference { get; init; }
+
         /// <summary>The Mac path inside the container, folders and name joined with ':' as the Mac wrote paths.</summary>
         public string MacPath => UnicodeName is { } name
             ? string.Join(":", (UnicodeFolderPath ?? FolderPath.Select(n => n.ToString()).ToArray()).Append(name))

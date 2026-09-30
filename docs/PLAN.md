@@ -807,9 +807,12 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     vectors only.
     Original-application interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for
-    the extents it reads (including the attributes and startup special-file forks, defined fork-data and extent records in the
-    attributes B-tree, and bad-block extents), the reserved volume-header areas TN1150 requires, and zero unused
-    allocation-bitmap bits.
+    catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
+    extents), plus the attributes and startup special-file forks and defined fork-data and extent records in the
+    attributes B-tree; it also checks the reserved volume-header areas TN1150 requires and zero unused bitmap bits.
+    HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
+    to indirect-node forks while keeping the visible path and hiding private metadata; dangling links are reported.
+    Additional B-tree invariants remain.
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro

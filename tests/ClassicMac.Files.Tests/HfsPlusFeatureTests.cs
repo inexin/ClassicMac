@@ -44,7 +44,107 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal(FourCC.FromString("ttxt"), file.FinderInfo.Creator);
         Assert.Equal(new MacDate(2_500_000_000), file.Created);
         Assert.Equal(new MacDate(2_600_000_000), file.Modified);
+        Assert.Null(file.SymbolicLinkTarget);
         Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxSymbolicLinksExposeTheirUtf8TargetAndKeepTheirDataFork(bool hfsX)
+    {
+        byte[] target = "../漢字/Read Me"u8.ToArray();
+        byte[] image = HfsPlusFixture.BuildSymbolicLink(target, hfsX: hfsX);
+
+        MacFile link = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("Documents:Shortcut", link.MacPath);
+        Assert.Equal("../漢字/Read Me", link.SymbolicLinkTarget);
+        Assert.Equal(target, link.DataFork.ToArray());
+        Assert.Empty(link.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("slnk"), link.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("rhap"), link.FinderInfo.Creator);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxHardLinksUseTheirIndirectNodeAndHidePrivateData(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithHardLink(hfsX: hfsX);
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
+        MacFile link = Assert.Single(files, file => file.MacPath == "Documents:Shared Alias");
+
+        Assert.Equal("shared file data"u8.ToArray(), link.DataFork.ToArray());
+        Assert.Equal("shared resource"u8.ToArray(), link.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("TEXT"), link.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("ttxt"), link.FinderInfo.Creator);
+        Assert.Equal(123u, link.HardLinkReference);
+        Assert.Equal(2, files.Count);
+        Assert.DoesNotContain(files, file => file.Name.ToString() == "iNode123");
+        Assert.DoesNotContain(files, file => file.MacPath.Contains("HFS+ Private Data", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void HfsPlusHardLinkRejectsTheReservedZeroLinkReference()
+    {
+        byte[] image = HfsPlusFixture.BuildWithHardLink(linkReference: 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusHardLinkWithoutAnIndirectNodeIsRetainedAndReported()
+    {
+        byte[] image = HfsPlusFixture.BuildWithHardLink(includeIndirectNode: false);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+        MacFile link = Assert.Single(files, file => file.MacPath == "Documents:Shared Alias");
+
+        Assert.Equal(123u, link.HardLinkReference);
+        Assert.Empty(link.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-hardlink-target-missing" &&
+                                                   diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusSymbolicLinkRejectsAPathWithNullBytes()
+    {
+        byte[] image = HfsPlusFixture.BuildSymbolicLink([0x61, 0x00, 0x62]);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusSymbolicLinkRejectsInvalidUtf8()
+    {
+        byte[] image = HfsPlusFixture.BuildSymbolicLink([0xFF]);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusSymbolicLinkRequiresAnEmptyResourceFork()
+    {
+        byte[] image = HfsPlusFixture.BuildSymbolicLink("target"u8.ToArray(), includeResourceFork: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusSymbolicLinkRequiresTheDocumentedFinderCodes()
+    {
+        byte[] image = HfsPlusFixture.BuildSymbolicLink("target"u8.ToArray(), validFinderInfo: false);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -627,6 +727,15 @@ public sealed class HfsPlusFeatureTests
     public void HfsPlusAllocationFileMustMarkReferencedForkBlocksAsAllocated()
     {
         byte[] image = HfsPlusFixture.Build(includeAllocationFile: true, markDataForkAllocated: false);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAllocationFileMustMarkEveryOverflowTreeExtentAsAllocated()
+    {
+        byte[] image = HfsPlusFixture.BuildWithUnreferencedOverflowExtent(23);
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
@@ -1323,6 +1432,94 @@ public sealed class HfsPlusFeatureTests
         public static byte[] BuildWithAttributeRecord(uint recordType, uint dataBlock) =>
             BuildWithAttributeTree(dataBlock, recordType);
 
+        public static byte[] BuildSymbolicLink(byte[] target, bool hfsX = false, bool includeResourceFork = false,
+            bool validFinderInfo = true)
+        {
+            byte[] image = Build(fileName: "Shortcut", hfsX: hfsX);
+            Span<byte> catalog = image.AsSpan(3 * Block, Block);
+            int recordOffset = BinaryPrimitives.ReadUInt16BigEndian(catalog[(Block - 10)..]);
+            int dataOffset = recordOffset + 2 + BinaryPrimitives.ReadUInt16BigEndian(catalog[recordOffset..]);
+            Span<byte> file = catalog[dataOffset..];
+            U16(file, 42, 0xA000); // BSD S_IFLNK
+            if (validFinderInfo) "slnkrhap"u8.CopyTo(file[48..]);
+            Fork(file[88..], target.Length, 4, 1);
+            if (includeResourceFork)
+            {
+                Fork(file[168..], 6, 5, 1);
+                "unused"u8.CopyTo(image.AsSpan(5 * Block));
+            }
+            else
+            {
+                file.Slice(168, 80).Clear();
+            }
+            target.CopyTo(image, 4 * Block);
+            return image;
+        }
+
+        public static byte[] BuildWithHardLink(uint linkReference = 123, bool hfsX = false,
+            bool includeIndirectNode = true)
+        {
+            const string privateDirectory = "\0\0\0\0HFS+ Private Data";
+            const string data = "shared file data";
+            const string resource = "shared resource";
+            byte[] image = Build(hfsX: hfsX);
+            byte[] root = FolderData(2, 2);
+            byte[] documents = FolderData(16, 2);
+            byte[] privateFolder = FolderData(18, includeIndirectNode ? 1u : 0u);
+            byte[] readMe = FileData(17, 4, "HFS Plus data"u8, 5, "Resource fork"u8);
+            byte[] inode = FileData(19, 6, Encoding.UTF8.GetBytes(data), 7, Encoding.UTF8.GetBytes(resource));
+            byte[] link = new byte[248];
+            U16(link, 0, 2);
+            U16(link, 2, 2);
+            U32(link, 8, 20);
+            U32(link, 44, linkReference);
+            "hlnkhfs+"u8.CopyTo(link.AsSpan(48));
+
+            byte[][] rootEntries = hfsX
+                ? [Record(2, "", Thread(1, "Volume", 3)), Record(2, privateDirectory, privateFolder),
+                    Record(2, "Documents", documents)]
+                : [Record(2, "", Thread(1, "Volume", 3)), Record(2, "Documents", documents),
+                    Record(2, privateDirectory, privateFolder)];
+            byte[][] indirectNodeRecords = includeIndirectNode
+                ? [Record(18, "iNode123", inode), Record(19, "", Thread(18, "iNode123", 4))]
+                : [];
+            byte[][] records =
+            [
+                Record(1, "Volume", root),
+                .. rootEntries,
+                Record(16, "", Thread(2, "Documents", 3)),
+                Record(16, "Read Me", readMe),
+                Record(16, "Shared Alias", link),
+                Record(17, "", Thread(16, "Read Me", 4)),
+                Record(18, "", Thread(2, privateDirectory, 3)),
+                .. indirectNodeRecords,
+                Record(20, "", Thread(16, "Shared Alias", 4)),
+            ];
+
+            WriteBTreeNode(image.AsSpan(3 * Block, Block), 0xFF, 1, 0, 0, records);
+            U32(image.AsSpan(2 * Block, Block), 20, checked((uint)records.Length));
+            Span<byte> volume = image.AsSpan(1024, 512);
+            U32(volume, 32, includeIndirectNode ? 3u : 2u);
+            U32(volume, 36, 2);
+            U32(volume, 64, 21);
+            Encoding.UTF8.GetBytes(data).CopyTo(image.AsSpan(6 * Block));
+            Encoding.UTF8.GetBytes(resource).CopyTo(image.AsSpan(7 * Block));
+            return image;
+        }
+
+        public static byte[] BuildWithUnreferencedOverflowExtent(uint physicalBlock)
+        {
+            byte[] image = Build(fragmentedData: true);
+            Span<byte> leaf = image.AsSpan(5 * Block, Block);
+            U16(leaf, 10, 2);
+            U16(leaf, Block - 4, 90);
+            U16(leaf, Block - 6, 166);
+            WriteExtentRecord(leaf, 90, 0, physicalBlock, fileId: 99);
+            U32(image.AsSpan(4 * Block), 20, 2);
+            image[9 * Block + (int)(physicalBlock / 8)] &= unchecked((byte)~(1 << (7 - (int)(physicalBlock % 8))));
+            return image;
+        }
+
         public static byte[] BuildWithIndexedAttributesTree(bool invalidChild)
         {
             byte[] image = Build(includeAttributeFile: true);
@@ -1650,6 +1847,28 @@ public sealed class HfsPlusFeatureTests
             U16(record, 8, checked((ushort)name.Length));
             chars.CopyTo(record, 10);
             return record;
+        }
+
+        private static byte[] FolderData(uint id, uint valence)
+        {
+            byte[] folder = new byte[88];
+            U16(folder, 0, 1);
+            U32(folder, 4, valence);
+            U32(folder, 8, id);
+            return folder;
+        }
+
+        private static byte[] FileData(uint id, uint dataBlock, ReadOnlySpan<byte> data,
+            uint resourceBlock, ReadOnlySpan<byte> resource)
+        {
+            byte[] file = new byte[248];
+            U16(file, 0, 2);
+            U16(file, 2, 2);
+            U32(file, 8, id);
+            "TEXTttxt"u8.CopyTo(file.AsSpan(48));
+            Fork(file.AsSpan(88, 80), data.Length, dataBlock, 1);
+            Fork(file.AsSpan(168, 80), resource.Length, resourceBlock, 1);
+            return file;
         }
 
         private static void Fork(Span<byte> destination, int logicalSize, uint startBlock, uint blockCount)

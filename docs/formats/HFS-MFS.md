@@ -824,7 +824,8 @@ allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the de
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
 **[Doc]** TN1150. Any bitmap bits beyond the declared allocation-block count must be clear **[Doc]** TN1150. It checks
 the attributes and startup special-file forks from the volume header, including their overflow extents, and accounts
-for data extents in bad-block records from the extents-overflow file **[Doc]** TN1150. It walks the attributes B-tree
+for every extent record in the extents-overflow tree, including bad-block records and records not needed to read a
+catalog fork **[Doc]** TN1150. It walks the attributes B-tree
 and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
 records do not claim extents **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
@@ -834,9 +835,17 @@ mode compares unsigned UTF-16 code units; HFS+ and HFSX `0xCF` use TN1150's `Fas
 Unicode 3.2 simple lowercase mappings and default-ignorable characters skipped **[Doc]**. U+0000 sorts after other
 characters, and controls and surrogates remain significant. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
-the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
-reader does not yet validate every B-tree index/map invariant, complete volume allocation ownership (including
-attribute fork continuity and unreferenced bitmap bits), or hard-link/symlink semantics.
+the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. HFS+ and HFSX
+symbolic links are identified by `S_IFLNK` plus the required Finder type/creator codes; their data fork is retained and also
+exposed as a strict UTF-8 `MacFile.SymbolicLinkTarget`. Null bytes, invalid UTF-8 and a nonempty resource fork are
+rejected **[Doc]** TN1150. Targets are not resolved. Hard links are identified by Finder type/creator `hlnk`/`hfs+`
+and their nonzero BSD `special` link reference; the reference resolves to `iNode<decimal-reference>` in the root's
+`\0\0\0\0HFS+ Private Data` directory **[Doc]** TN1150. The link's visible path is kept while the indirect node's
+forks and file metadata are used; the private directory subtree is omitted from the file list. The reference is exposed
+as `MacFile.HardLinkReference`. A nonzero link reference without a matching node is retained with its catalog forks and
+reported as `hfs.plus-hardlink-target-missing`. The current reader does not yet validate every B-tree index/map
+invariant. As TN1150 permits, allocation blocks marked used but not described by known
+fork extents are not rejected; the reader checks that every extent it recognizes is marked allocated.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,
@@ -866,6 +875,7 @@ followed in its code.
 | `mfs.too-many-entries` | E | More than `MaxVolumeEntries` files | Stops reading | — |
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
 | `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
+| `hfs.plus-hardlink-target-missing` | W | A hard-link reference has no matching private indirect node | Keeps the link record, using its catalog forks | Not traced |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |
 | `hfs.not-leaf` | E | A node on the leaf chain is not a leaf | Stops the walk; keeps the records read | Not traced |
 | `hfs.bad-record-offset` | E | A record's offsets in its node are impossible | Skips the record | Not traced |
