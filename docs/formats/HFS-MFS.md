@@ -801,7 +801,8 @@ alternate volume header 1,024 bytes before the volume end for a matching signatu
 if the recovery copy is absent or invalid and continues using the primary header **[Doc]** TN1150.
 
 The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
-linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It also requires
+linked leaf nodes, checking the header's leaf endpoints, backward links and node range. For each tree, the total
+records found across all leaf nodes must match that tree's header `leafRecords` count **[Doc]** TN1150. It also requires
 the B-tree header node to contain three records and a zero backward link **[Doc]**. It checks that the catalog and
 extents B-tree headers have the required control-file type **[Doc]**, that catalog B-tree nodes meet TN1150's 4 KiB
 minimum **[Doc]**, that the catalog, extents-overflow and attributes B-tree headers use the control-file type **[Doc]** TN1150, and that their key-layout attributes use 16-bit key lengths, with variable-length index keys in

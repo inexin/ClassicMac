@@ -396,6 +396,21 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 2)]
+    [InlineData(true, 0)]
+    [InlineData(true, 2)]
+    public void HfsPlusBtreeLeafRecordCountMustMatchItsLeafNodes(bool extentsTree, uint leafRecords)
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: extentsTree);
+        int headerNodeOffset = (extentsTree ? 4 : 2) * 4096;
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(headerNodeOffset + 14 + 6), leafRecords);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusBtreeWithMoreNodesThanItsHeaderMapRequiresChainedMapNodes()
     {
