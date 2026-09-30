@@ -819,9 +819,9 @@ Finder info and dates. It
 also reads data and resource fork overflow
 extents and requires the primary and overflow extents to account for each fork's declared allocation-block count
 (which may exceed the blocks needed by its logical length). It checks extents-overflow keys are strictly ordered by
-file ID, fork type and start block, as TN1150 specifies **[Doc]**. Unicode names are retained in `MacFile.MacPath`; the
-HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary catalog leaf keys are checked in order,
-while case-folding key order is not yet validated **[Doc]**. The
+file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**. Unicode names are
+retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary catalog
+index and leaf keys are checked in order, while case-folding key order is not yet validated **[Doc]**. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, volume allocation ownership, hard-link/symlink

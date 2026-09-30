@@ -324,6 +324,41 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsXBinaryIndexKeysMustBeOrderedWithinTheirNode()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, multiLeafCatalog: true);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(3 * 4096 + 4096 - 4));
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(3 * 4096 + secondRecord + 2), 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusExtentsBtreeIndexKeysMustBeOrdered(bool corruptSecondKey)
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, indexedOverflowTree: true);
+        if (corruptSecondKey)
+        {
+            int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(28 * 4096 - 4));
+            BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(26 * 4096 + 4096 + secondRecord + 8), 7);
+        }
+
+        if (corruptSecondKey)
+        {
+            Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext()));
+        }
+        else
+        {
+            Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+                ForkData.FromBytes(image), new ContainerContext())).MacPath);
+        }
+    }
+
+    [Fact]
     public void HfsXCatalogRejectsAnUnknownKeyComparisonType()
     {
         byte[] image = HfsPlusFixture.Build(hfsX: true, catalogKeyCompareType: 0);
@@ -684,7 +719,7 @@ public sealed class HfsPlusFeatureTests
             bool unsortedOverflowKeys = false, bool unsortedOverflowFileIds = false,
             bool unsortedOverflowForkTypes = false, bool reverseCatalogRecords = false,
             byte? catalogKeyCompareType = null, uint? nextCatalogId = null, bool catalogIdsReused = false,
-            bool catalogKeyHasTrailingByte = false)
+            bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -699,7 +734,9 @@ public sealed class HfsPlusFeatureTests
             U32(volume, 64, nextCatalogId ?? (additionalFolderParent is null ? 18u : 19u));
             Fork(volume.Slice(272, 80), (multiLeafCatalog ? 4 : 2) * Block, 2,
                 multiLeafCatalog ? 4u : 2u);
-            if (fragmentedData) Fork(volume.Slice(192, 80), 2 * Block, 4, 2);
+            if (fragmentedData)
+                Fork(volume.Slice(192, 80), (indexedOverflowTree ? 4 : 2) * Block,
+                    indexedOverflowTree ? 26u : 4u, indexedOverflowTree ? 4u : 2u);
 
             byte[] root = new byte[88];
             U16(root, 0, 1);
@@ -731,7 +768,7 @@ public sealed class HfsPlusFeatureTests
                 Fork(file.AsSpan(168, 80), "Resource fork"u8.Length, 25, 1);
                 "Resource fork"u8.CopyTo(image.AsSpan(25 * Block));
                 WriteExtentsTree(image, duplicateOverflowExtent, unsortedOverflowKeys,
-                    unsortedOverflowFileIds, unsortedOverflowForkTypes);
+                    unsortedOverflowFileIds, unsortedOverflowForkTypes, indexedOverflowTree);
             }
             else
             {
@@ -886,8 +923,14 @@ public sealed class HfsPlusFeatureTests
         }
 
         private static void WriteExtentsTree(byte[] image, bool duplicateRecord, bool unsortedKeys,
-            bool unsortedFileIds, bool unsortedForkTypes)
+            bool unsortedFileIds, bool unsortedForkTypes, bool indexedOverflowTree)
         {
+            if (indexedOverflowTree)
+            {
+                WriteIndexedExtentsTree(image);
+                return;
+            }
+
             Span<byte> leaf = image.AsSpan(5 * Block, Block);
             leaf[8] = 0xFF;
             leaf[9] = 1;
@@ -924,6 +967,50 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
+        }
+
+        private static void WriteIndexedExtentsTree(byte[] image)
+        {
+            const int firstTreeBlock = 26;
+            byte[] firstExtent = ExtentRecord(startBlock: 8, physicalBlock: 22);
+            byte[] secondExtent = ExtentRecord(startBlock: 9, physicalBlock: 24);
+            WriteBTreeNode(image.AsSpan((firstTreeBlock + 1) * Block, Block), 0, 2, 0, 0,
+                [ExtentIndexRecord(firstExtent, 2), ExtentIndexRecord(secondExtent, 3)]);
+            WriteBTreeNode(image.AsSpan((firstTreeBlock + 2) * Block, Block), 0xFF, 1, 3, 0, [firstExtent]);
+            WriteBTreeNode(image.AsSpan((firstTreeBlock + 3) * Block, Block), 0xFF, 1, 0, 2, [secondExtent]);
+
+            Span<byte> header = image.AsSpan(firstTreeBlock * Block, Block);
+            header[8] = 1;
+            U16(header, 10, 3);
+            U16(header, 14, 2);
+            U32(header, 16, 1);
+            U32(header, 20, 2);
+            U32(header, 24, 2);
+            U32(header, 28, 3);
+            U16(header, 32, Block);
+            U16(header, 34, 10);
+            U32(header, 36, 4);
+            U32(header, 14 + 38, 2);
+            header[14 + 106 + 128] = 0xF0;
+            U16(header, Block - 2, 14);
+            U16(header, Block - 4, 14 + 106);
+            U16(header, Block - 6, 14 + 106 + 128);
+            U16(header, Block - 8, Block - 8);
+        }
+
+        private static byte[] ExtentRecord(uint startBlock, uint physicalBlock)
+        {
+            byte[] record = new byte[76];
+            WriteExtentRecord(record, 0, startBlock, physicalBlock);
+            return record;
+        }
+
+        private static byte[] ExtentIndexRecord(byte[] extentRecord, uint child)
+        {
+            byte[] record = new byte[16];
+            extentRecord.AsSpan(0, 12).CopyTo(record);
+            U32(record, 12, child);
+            return record;
         }
 
         private static void WriteExtentRecord(Span<byte> leaf, int offset, uint forkStart, uint physicalBlock,

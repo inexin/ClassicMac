@@ -267,7 +267,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree root kind or height is invalid.");
         }
         (HashSet<uint> indexedLeaves, HashSet<uint> indexedNodes) =
-            ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth);
+            ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth, caseSensitiveCatalog);
         uint readRecords = 0;
         uint previous = 0;
         uint finalLeaf = 0;
@@ -340,7 +340,7 @@ internal static class HfsPlusReader
     }
 
     private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
-        int nodeSize, uint totalNodes, uint root, ushort depth)
+        int nodeSize, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog)
     {
         var visitedNodes = new HashSet<uint>();
         var leafNodes = new HashSet<uint>();
@@ -374,6 +374,7 @@ internal static class HfsPlusReader
             if (count < 2 || count > (nodeSize - 14) / 2)
                 throw new InvalidDataException($"An HFS Plus {name} B-tree index node has an invalid record count.");
             int offsetTableStart = nodeSize - 2 * (count + 1);
+            byte[]? previousIndexKey = null;
             for (int index = 0; index < count; index++)
             {
                 int begin = U16(tree, start + nodeSize - 2 * (index + 1));
@@ -383,6 +384,22 @@ internal static class HfsPlusReader
                 int keyLength = U16(tree, start + begin);
                 if (keyLength < 6 || keyLength > maxKeyLength)
                     throw new InvalidDataException($"An HFS Plus {name} B-tree index key length is invalid.");
+                byte[] indexKey = tree.AsSpan(start + begin, 2 + keyLength).ToArray();
+                if (name == "catalog")
+                {
+                    ValidateCatalogKey(indexKey);
+                    if (caseSensitiveCatalog && previousIndexKey is not null &&
+                        CompareHfsXCatalogKeys(previousIndexKey, indexKey) >= 0)
+                        throw new InvalidDataException("The HFSX catalog index keys are not strictly ordered.");
+                }
+                else if (name == "extents-overflow")
+                {
+                    if (keyLength != 10 || indexKey[2] is not (0 or 0xFF))
+                        throw new InvalidDataException("An HFS Plus extents-overflow index key is invalid.");
+                    if (previousIndexKey is not null && CompareExtentKeys(previousIndexKey, indexKey) >= 0)
+                        throw new InvalidDataException("The HFS Plus extents-overflow index keys are not strictly ordered.");
+                }
+                previousIndexKey = indexKey;
                 int storedKeyLength = name == "catalog" ? keyLength : maxKeyLength;
                 int childOffset = begin + 2 + storedKeyLength;
                 if ((childOffset & 1) != 0) childOffset++;

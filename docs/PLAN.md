@@ -797,7 +797,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     node-size minimum, header nodes,
     node maps (including chained map nodes and free counts), roots, index graphs,
     sibling links, exact catalog key lengths and unique leaf keys,
-    and HFSX key-compare modes plus binary catalog order,
+    and HFSX key-compare modes plus binary catalog index and leaf order,
     unique catalog
     IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders); an initial StuffIt v5 reader handles stored and RLE90 forks. Original-application
     interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
