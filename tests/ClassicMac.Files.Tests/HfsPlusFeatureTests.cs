@@ -192,6 +192,15 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusCatalogRejectsDuplicateFileAndFolderIds()
+    {
+        byte[] image = HfsPlusFixture.Build(duplicateCatalogId: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     // A small HFS+ volume built from the structures in TN1150: 4 KiB allocation and B-tree nodes,
     // one catalog leaf, a root folder, nested folder, file and their threads.
     private static class HfsPlusFixture
@@ -201,7 +210,7 @@ public sealed class HfsPlusFeatureTests
         public static byte[] Build(string fileName = "Read Me", bool hfsX = false, bool fragmentedData = false,
             bool invalidDataExtent = false, bool cyclicCatalog = false, bool unknownCatalogRecord = false,
             uint? dataBlockCount = null, uint? dataExtentBlockCount = null, uint? lastCatalogLeaf = null,
-            uint? catalogTotalNodes = null)
+            uint? catalogTotalNodes = null, bool duplicateCatalogId = false)
         {
             byte[] image = new byte[(fragmentedData ? 32 : 16) * Block];
             Span<byte> volume = image.AsSpan(1024, 512);
@@ -226,7 +235,7 @@ public sealed class HfsPlusFeatureTests
             byte[] file = new byte[248];
             U16(file, 0, 2);
             U16(file, 2, 2); // file thread exists
-            U32(file, 8, 17);
+            U32(file, 8, duplicateCatalogId ? 16u : 17u);
             U32(file, 12, 2_500_000_000);
             U32(file, 16, 2_600_000_000);
             "TEXTttxt"u8.CopyTo(file.AsSpan(48));

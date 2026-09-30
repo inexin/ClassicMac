@@ -712,7 +712,8 @@ A thread record lets the File Manager find a folder (or file) from its CNID alon
 All of it **[Doc]** *Inside Macintosh: Files*. Every folder has a thread; a file has one only when something asked
 for it (a file ID reference) **[Doc]** *Inside Macintosh: Files*.
 
-ClassicMac skips thread records: the folder records already give each folder's parent and name.
+ClassicMac skips thread records: the folder records already give each folder's parent and name. It rejects catalogs
+that reuse a CNID between file and folder records.
 
 ### 7.5 Folder paths
 

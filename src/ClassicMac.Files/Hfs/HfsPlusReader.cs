@@ -49,6 +49,7 @@ internal static class HfsPlusReader
         byte[] catalog = catalogFork.ToArray();
         var records = LeafRecords(catalog, "catalog").ToArray();
         var folders = new Dictionary<uint, (uint Parent, string Name)>();
+        var catalogIds = new HashSet<uint>();
         foreach (var (key, data) in records)
         {
             if (key.Length < 8 || data.Length < 2)
@@ -58,11 +59,15 @@ internal static class HfsPlusReader
                 case 1:
                     if (data.Length < 88) throw new InvalidDataException("An HFS Plus folder record is truncated.");
                     uint id = U32(data, 8);
+                    if (!catalogIds.Add(id))
+                        throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     if (!folders.TryAdd(id, (U32(key, 2), Name(key))))
                         throw new InvalidDataException("Duplicate HFS Plus folder ID.");
                     break;
                 case 2:
                     if (data.Length < 248) throw new InvalidDataException("An HFS Plus file record is truncated.");
+                    if (!catalogIds.Add(U32(data, 8)))
+                        throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     _ = Name(key);
                     break;
                 case 3 or 4:
