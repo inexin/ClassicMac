@@ -1220,6 +1220,43 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void EmptyForkCannotRetainAnExtentDescriptorWhenItClaimsNoAllocationBlocks()
+    {
+        byte[] image = HfsPlusFixture.Build(emptyResourceForkHasExtent: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusForkCannotHaveAnExtentAfterAnUnusedDescriptor()
+    {
+        byte[] image = HfsPlusFixture.Build(sparseDataExtentDescriptors: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusUnusedForkExtentDescriptorMustBeAllZero()
+    {
+        byte[] image = HfsPlusFixture.Build(unusedDataExtentHasStartBlock: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusUnusedOverflowExtentDescriptorMustBeAllZero()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(5 * HfsPlusFixture.Block + 36), 24);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusAllocationFileMustMarkReferencedForkBlocksAsAllocated()
     {
         byte[] image = HfsPlusFixture.Build(includeAllocationFile: true, markDataForkAllocated: false);
@@ -2084,7 +2121,8 @@ public sealed class HfsPlusFeatureTests
             int? catalogThreadDataLength = null, uint? catalogFolderId = null, uint? catalogFileId = null,
             ushort catalogFolderFlags = 0, string? catalogFileThreadName = null,
             string catalogFolderName = "Documents", uint rootFolderParentId = 1,
-            uint? fragmentedPrimaryExtentCount = null)
+            uint? fragmentedPrimaryExtentCount = null, bool emptyResourceForkHasExtent = false,
+            bool sparseDataExtentDescriptors = false, bool unusedDataExtentHasStartBlock = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -2171,6 +2209,17 @@ public sealed class HfsPlusFeatureTests
                 if (dataBlockCount is { } count) U32(file.AsSpan(88), 12, count);
                 uint resourceStart = invalidDataExtent ? 5u : overlappingFileForks ? dataStart : dataStart + dataBlocks;
                 Fork(file.AsSpan(168, 80), zeroLengthResourceFork ? 0 : "Resource fork"u8.Length, resourceStart, 1);
+                if (sparseDataExtentDescriptors)
+                {
+                    U32(file.AsSpan(88), 32, 24);
+                    U32(file.AsSpan(88), 36, 1);
+                }
+                if (unusedDataExtentHasStartBlock) U32(file.AsSpan(88), 24, 24);
+                if (emptyResourceForkHasExtent)
+                {
+                    file.AsSpan(168, 8).Clear();
+                    U32(file.AsSpan(168), 12, 0);
+                }
                 uint dataStorageBlock = invalidDataExtent ? 4u : dataStart;
                 "HFS Plus data"u8.CopyTo(image.AsSpan((int)dataStorageBlock * Block));
                 "Resource fork"u8.CopyTo(image.AsSpan((int)resourceStart * Block));

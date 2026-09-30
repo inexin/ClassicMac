@@ -388,6 +388,7 @@ internal static class HfsPlusReader
         List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
+        ValidateExtentDescriptorSequence(extents);
         ulong covered = 0;
         int extentCount = 0;
         for (int index = 0; index < 8; index++)
@@ -401,6 +402,34 @@ internal static class HfsPlusReader
             extentCount++;
         }
         return new ExtentRecordInfo(covered, extentCount);
+    }
+
+    private static bool HasExtentDescriptor(ReadOnlySpan<byte> extents)
+    {
+        for (int index = 0; index < 8; index++)
+            if (U32(extents, index * 8) != 0 || U32(extents, index * 8 + 4) != 0)
+                return true;
+        return false;
+    }
+
+    private static void ValidateExtentDescriptorSequence(ReadOnlySpan<byte> extents)
+    {
+        bool unusedDescriptorSeen = false;
+        for (int index = 0; index < 8; index++)
+        {
+            uint start = U32(extents, index * 8);
+            uint count = U32(extents, index * 8 + 4);
+            if (count == 0)
+            {
+                if (start != 0)
+                    throw new InvalidDataException("An unused HFS Plus extent descriptor must be zero.");
+                unusedDescriptorSeen = true;
+            }
+            else if (unusedDescriptorSeen)
+            {
+                throw new InvalidDataException("HFS Plus extent descriptors must not follow an unused descriptor.");
+            }
+        }
     }
 
     private static void AddAllocationExtent(uint start, uint count, uint totalBlocks,
@@ -504,6 +533,8 @@ internal static class HfsPlusReader
             throw new InvalidDataException("A nonempty HFS Plus fork has no allocated blocks.");
         if (allocatedBlocks == 0)
         {
+            if (HasExtentDescriptor(fork.Slice(16, 64)))
+                throw new InvalidDataException("An empty HFS Plus fork has extent descriptors.");
             if (overflowEntries is { Count: > 0 })
                 throw new InvalidDataException("An empty HFS Plus fork has overflow extents.");
             return ForkData.Empty;
@@ -513,6 +544,7 @@ internal static class HfsPlusReader
         int coveredExtents = 0;
         void AddExtents(ReadOnlySpan<byte> extents, bool addToAllocationOwnership)
         {
+            ValidateExtentDescriptorSequence(extents);
             for (int index = 0; index < 8; index++)
             {
                 uint start = U32(extents, index * 8);

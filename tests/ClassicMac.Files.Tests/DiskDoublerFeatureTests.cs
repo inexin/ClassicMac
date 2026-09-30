@@ -167,6 +167,52 @@ public sealed class DiskDoublerFeatureTests
     }
 
     [Fact]
+    public void Dda2AppliesDeltaPreprocessingToEachForkIndependently()
+    {
+        byte[] encodedData = [0x10, 0x01, 0x02, 0xFD];
+        byte[] encodedResource = [0xFE, 0x05, 0x04];
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Delta", 0,
+            encodedData, encodedResource, dataDelta: 1, resourceDelta: 1));
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+
+        Assert.Equal(new byte[] { 0x10, 0x11, 0x13, 0x10 }, file.DataFork.ToArray());
+        Assert.Equal(new byte[] { 0xFE, 0x03, 0x07 }, file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void Dda2AppliesDeltaAfterCompressedForkChecksumValidation()
+    {
+        byte[] decodedBeforeDelta = [0x10, 0x01, 0x02, 0xFD];
+        byte[] encoded = [0, 0, 9, .. DiskDoublerFixture.PackLsbCodes(0x10, 0x01, 0x02, 0xFD)];
+        byte[] archive = DiskDoublerFixture.BuildArchive(DiskDoublerFixture.BuildFile("Compressed delta", 0,
+            decodedBeforeDelta, [], dataMethod: 1, encodedData: encoded, dataDelta: 1));
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal(new byte[] { 0x10, 0x11, 0x13, 0x10 }, file.DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.fork-checksum");
+    }
+
+    [Fact]
+    public void StandaloneDiskDoublerAppliesDeltaPreprocessingToBothForks()
+    {
+        byte[] encodedData = [0x10, 0x01, 0x02, 0xFD];
+        byte[] encodedResource = [0x41, 0x01, 0x01];
+        byte[] archive = DiskDoublerFixture.BuildStandaloneFile(encodedData, encodedResource, dataDelta: 1,
+            resourceDelta: 1);
+
+        MacFile file = Assert.Single(DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(hostName: MacString.FromMacRoman("Delta.dd"))));
+
+        Assert.Equal(new byte[] { 0x10, 0x11, 0x13, 0x10 }, file.DataFork.ToArray());
+        Assert.Equal(new byte[] { 0x41, 0x42, 0x43 }, file.ResourceFork.ToArray());
+    }
+
+    [Fact]
     public void StandaloneDiskDoublerFileExtractsBothForksAndUsesTheHostName()
     {
         byte[] data = "standalone data"u8.ToArray();
@@ -262,7 +308,7 @@ public sealed class DiskDoublerFeatureTests
 
     [Theory]
     [InlineData(3, 0)]
-    [InlineData(0, 1)]
+    [InlineData(0, 2)]
     public void StandaloneDiskDoublerFilesReportUnsupportedMethodsAndDeltaProcessing(byte method, ushort delta)
     {
         byte[] packed = DiskDoublerFixture.BuildStandaloneFile([1], [], method, dataDelta: delta);
@@ -1126,7 +1172,7 @@ public sealed class DiskDoublerFeatureTests
 
         public static byte[] BuildStandaloneFile(byte[] data, byte[] resource, byte dataMethod = 0,
             byte[]? encodedData = null, bool headerChecksum = true, ushort dataDelta = 0, byte resourceMethod = 0,
-            byte[]? encodedResource = null)
+            byte[]? encodedResource = null, ushort resourceDelta = 0)
         {
             encodedData ??= data;
             encodedResource ??= resource;
@@ -1143,6 +1189,7 @@ public sealed class DiskDoublerFeatureTests
             "TEXTttxt"u8.CopyTo(archive.AsSpan(32));
             U16(archive, 40, 0x4000);
             U16(archive, 54, dataDelta);
+            U16(archive, 56, resourceDelta);
             if (dataMethod == 1) U16(archive, 48, MacCompressChecksum(data, encodedData, 0, 0));
             if (dataMethod is 2 or 4) U16(archive, 48, ByteSum(data));
             if (dataMethod == 7) U16(archive, 48, StacLzsChecksum(data));
@@ -1184,7 +1231,7 @@ public sealed class DiskDoublerFeatureTests
 
         public static byte[] BuildFile(string name, int depth, byte[] data, byte[] resource, byte dataMethod = 0,
             byte resourceMethod = 0, byte[]? encodedData = null, byte[]? encodedResource = null, byte info1 = 0,
-            byte info2 = 0)
+            byte info2 = 0, ushort dataDelta = 0, ushort resourceDelta = 0)
         {
             encodedData ??= data;
             encodedResource ??= resource;
@@ -1200,6 +1247,8 @@ public sealed class DiskDoublerFeatureTests
             bytes[header + 17] = resourceMethod;
             bytes[header + 18] = info1;
             bytes[header + 48] = info2;
+            U16(bytes, header + 50, dataDelta);
+            U16(bytes, header + 52, resourceDelta);
             U32(bytes, header + 20, 2_600_000_000);
             U32(bytes, header + 24, 2_500_000_000);
             "TEXTttxt"u8.CopyTo(bytes.AsSpan(header + 28));

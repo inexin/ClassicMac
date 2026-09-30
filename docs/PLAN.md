@@ -836,7 +836,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     verified against both forks of authentic DiskDoubler Pro 4.1.1 standalone files, and those compressed payloads
     are also tested in DDA2 records. Method 5 is fitted to XADMaster behavior and has hand-built vectors but no
     original-app fixture yet. Method 7 uses the RFC 1974 stream grammar, fitted XADMaster wrapper transforms and XOR
-    checksum behavior; its original-app fixture remains missing. Methods 3 and delta processing remain unsupported.
+    checksum behavior; its original-app fixture remains missing. Delta type 1 applies cumulative-byte preprocessing
+    after fork decompression; method 3 and other delta types remain unsupported.
     Legacy DDAR stored-fork archives are also supported; DDA2 archive-header CRCs and standalone file-header CRCs
     (including the old zero-checksum form) follow fitted XADMaster behavior.
     Standalone DiskDoubler Pro 4.1.1 interoperability is checked for methods 6, 9 and 10; original-application DDA2
@@ -846,7 +847,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
     extents), plus the attributes and startup special-file forks and defined fork-data and extent records in the
     attributes B-tree; forks use overflow only after eight initial extents, non-final overflow records must be full,
-    and matching overflow records must account for the declared blocks. Attribute keys and child ranges are validated
+    matching overflow records must account for the declared blocks, and unused extent descriptors must be zero.
+    Attribute keys and child ranges are validated
     in leaves and index nodes using Apple's HFS key comparator. Every non-bad-block overflow record must match a
     catalog or special-file fork. It checks the alternate volume header's signature
     and version, reporting a warning if the recovery

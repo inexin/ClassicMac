@@ -142,7 +142,7 @@ public sealed class DiskDoublerReader : IContainerReader
                 throw new InvalidDataException("A DiskDoubler DDA2 fork payload extends past its record.");
 
             if (!IsSupportedMethod(dataMethod) || !IsSupportedMethod(resourceMethod) ||
-                dataDelta != 0 || resourceDelta != 0)
+                !IsSupportedDelta(dataDelta) || !IsSupportedDelta(resourceDelta))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.method-unsupported",
                     $"DiskDoubler compression methods {dataMethod}/{resourceMethod} or delta methods " +
@@ -168,6 +168,8 @@ public sealed class DiskDoublerReader : IContainerReader
                 archive[header + 18], archive[header + 48], "data", name.ToString(), context);
             ReportForkChecksum(archive, header + 46, encodedResource, resource, resourceMethod,
                 archive[header + 18], archive[header + 48], "resource", name.ToString(), context);
+            ApplyDelta(data, dataDelta);
+            ApplyDelta(resource, resourceDelta);
             files.Add(new MacFile
             {
                 Name = name,
@@ -209,7 +211,7 @@ public sealed class DiskDoublerReader : IContainerReader
 
         MacString name = StandaloneName(context.HostName);
         if (!IsSupportedMethod(dataMethod) || !IsSupportedMethod(resourceMethod) ||
-            dataDelta != 0 || resourceDelta != 0)
+            !IsSupportedDelta(dataDelta) || !IsSupportedDelta(resourceDelta))
         {
             context.Report(DiagnosticSeverity.Warning, "archive.method-unsupported",
                 $"DiskDoubler compression methods {dataMethod}/{resourceMethod} or delta methods " +
@@ -233,6 +235,8 @@ public sealed class DiskDoublerReader : IContainerReader
             info1, info2, "data", name.ToString(), context);
         ReportForkChecksum(archive, header + 46, encodedResource, resource, resourceMethod,
             info1, info2, "resource", name.ToString(), context);
+        ApplyDelta(data, dataDelta);
+        ApplyDelta(resource, resourceDelta);
 
         return [new MacFile
         {
@@ -379,6 +383,17 @@ public sealed class DiskDoublerReader : IContainerReader
     }
 
     private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 5 or 6 or 7 or 8 or 9 or 10;
+
+    private static bool IsSupportedDelta(int delta) => delta is 0 or 1;
+
+    private static void ApplyDelta(Span<byte> bytes, int delta)
+    {
+        if (delta == 0) return;
+
+        // [Fitted] XADMaster applies its default distance-1 delta filter after fork decompression.
+        for (int index = 1; index < bytes.Length; index++)
+            bytes[index] = unchecked((byte)(bytes[index] + bytes[index - 1]));
+    }
 
     private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method,
         byte info1, byte info2)

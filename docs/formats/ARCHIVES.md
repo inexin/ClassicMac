@@ -64,8 +64,10 @@ three-byte prefix, variable 9–16-bit LZW codes, block-mode dictionary resets a
 transform selected by Info1 and Info2. Its 16-bit checksum includes the decoded fork and the decoded prefix bytes.
 Method 4 uses the tree-described Huffman stream also used by StuffIt and the same optional `0x5A` output transform;
 its 16-bit checksum is the decoded fork byte sum. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed
-by RLE, otherwise the fork is RLE-only. Other compression and delta methods are diagnosed and skipped while parsing
-continues at the next bounded record. Method-8 forks are checked with CRC-16/IBM.
+by RLE, otherwise the fork is RLE-only. Delta type 1 applies a byte-wise cumulative sum modulo 256 after fork
+decompression; other delta types and unsupported compression methods are diagnosed and skipped while parsing
+continues at the next bounded record. Fork checksums are checked on decompressed bytes before delta preprocessing;
+method-8 forks use CRC-16/IBM.
 
 The older `DDAR` archive has a 78-byte archive header and fixed 124-byte entry headers, followed by stored data and
 resource forks. Its directory and end-directory markers build folder paths; redundant standalone file headers found
@@ -100,10 +102,10 @@ Tests use hand-built records to check DDAR stored forks and directory markers, a
 Huffman (methods 2 and 5), Huffman, Stac LZS literals and backreferences, and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
 invalid folder depth, entry limits, standalone files and their header checksums, standalone fork methods, and
-unsupported standalone delta processing. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
+delta preprocessing and unsupported standalone delta types. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
 methods 9, 6 and 10 against both fork outputs; their compressed payloads are also tested inside DDA2 records.
 Method-0 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 4, 5, 6, 7, 8, 9 and 10 remain
-unsupported; standalone method 3 and delta processing remain unsupported. Methods 5 and 7 have no original-app
+unsupported; method 3 and delta types other than 0 and 1 remain unsupported. Methods 5 and 7 have no original-app
 fixtures yet. Original
 application interoperability for DDA2 archives remains unverified.
 
