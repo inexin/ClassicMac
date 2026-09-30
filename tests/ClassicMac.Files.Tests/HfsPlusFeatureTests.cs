@@ -68,6 +68,26 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusBtreeNodeMapMustMarkItsRootAsAllocated()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        image[2 * 4096 + 248] = 0x80; // Keep header node 0 allocated, but mark root node 1 free.
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusBtreeNodeMapMustMarkItsIndexNodesAsAllocated()
+    {
+        byte[] image = HfsPlusFixture.Build(multiLeafCatalog: true);
+        image[2 * 4096 + 248] = 0xE0; // Keep nodes 0-2 allocated, but mark root index node 3 free.
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusNextCatalogIdMustExceedEveryExistingCatalogId()
     {
         byte[] image = HfsPlusFixture.Build(nextCatalogId: 17);

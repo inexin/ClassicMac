@@ -817,8 +817,11 @@ HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary cata
 while case-folding key order is not yet validated **[Doc]**. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
-reader does not yet validate every B-tree index/map invariant, volume allocation ownership, hard-link/symlink
-semantics, or the full HFSX collation rules.
+reader requires the header-node bitmap to mark node 0 and every catalog/extents B-tree node referenced by its index
+graph or leaf chain as allocated, where those nodes fit in the header map record. TN1150 defines this bitmap as one
+most-significant-bit-first bit per node and continues it in linked map nodes when the header map record is too small
+**[Doc]**. The reader does not yet validate chained map nodes, free-node accounting, every B-tree index/map invariant,
+volume allocation ownership, hard-link/symlink semantics, or the full HFSX collation rules.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,

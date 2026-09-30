@@ -244,6 +244,7 @@ internal static class HfsPlusReader
         {
             if (depth != 0 || root != 0 || first != 0 || last != 0)
                 throw new InvalidDataException($"The empty HFS Plus {name} B-tree has root or leaf nodes.");
+            ValidateNodeMap(tree, nodeSize, []);
             yield break;
         }
         if (depth == 0 || root == 0 || root >= totalNodes || first == 0 || last == 0 ||
@@ -259,7 +260,8 @@ internal static class HfsPlusReader
         {
             throw new InvalidDataException($"The HFS Plus {name} B-tree root kind or height is invalid.");
         }
-        HashSet<uint> indexedLeaves = ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth);
+        (HashSet<uint> indexedLeaves, HashSet<uint> indexedNodes) =
+            ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth);
         uint readRecords = 0;
         uint previous = 0;
         uint finalLeaf = 0;
@@ -321,10 +323,11 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree ends at leaf {finalLeaf}, not {last}.");
         if (!seen.SetEquals(indexedLeaves))
             throw new InvalidDataException($"The HFS Plus {name} B-tree index and leaf chain disagree.");
+        ValidateNodeMap(tree, nodeSize, indexedNodes);
     }
 
-    private static HashSet<uint> ValidateIndexGraph(byte[] tree, string name, int nodeSize, uint totalNodes,
-        uint root, ushort depth)
+    private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
+        int nodeSize, uint totalNodes, uint root, ushort depth)
     {
         var visitedNodes = new HashSet<uint>();
         var leafNodes = new HashSet<uint>();
@@ -389,7 +392,26 @@ internal static class HfsPlusReader
                         $"The HFS Plus {name} B-tree height-{height} sibling links are invalid.");
             }
         }
-        return leafNodes;
+        return (leafNodes, visitedNodes);
+    }
+
+    private static void ValidateNodeMap(byte[] tree, int nodeSize, HashSet<uint> referencedNodes)
+    {
+        const int MapOffset = 14 + 106 + 128;
+        int mapLength = nodeSize - 256;
+        uint addressableNodes = checked((uint)(mapLength * 8));
+
+        void RequireAllocated(uint nodeNumber)
+        {
+            if (nodeNumber >= addressableNodes) return; // Later nodes are represented by chained map nodes.
+            int byteOffset = MapOffset + checked((int)(nodeNumber / 8));
+            byte mask = (byte)(0x80 >> (int)(nodeNumber % 8));
+            if ((tree[byteOffset] & mask) == 0)
+                throw new InvalidDataException($"HFS Plus B-tree node {nodeNumber} is referenced but marked free.");
+        }
+
+        RequireAllocated(0);
+        foreach (uint nodeNumber in referencedNodes) RequireAllocated(nodeNumber);
     }
 
     private static string Name(ReadOnlySpan<byte> key)
