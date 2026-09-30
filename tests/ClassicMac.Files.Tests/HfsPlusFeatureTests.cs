@@ -546,6 +546,29 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void HfsPlusAllocationFileMustMarkAttributeAndStartupForks(bool attributesFile, bool startupFile)
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: true,
+            includeAttributeFile: attributesFile, includeStartupFile: startupFile);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAllocationFileAcceptsAllocatedAttributeAndStartupForks()
+    {
+        byte[] image = HfsPlusFixture.Build(includeAllocationFile: true,
+            includeAttributeFile: true, includeStartupFile: true);
+        image[9 * 4096 + 1] |= 0x30; // Allocation blocks 10 and 11 are marked in the second bitmap byte.
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
     [Fact]
     public void HfsPlusOverflowTreeCannotRepeatAnExtentKey()
     {
@@ -839,7 +862,8 @@ public sealed class HfsPlusFeatureTests
             bool catalogKeyHasTrailingByte = false, bool indexedOverflowTree = false,
             bool deepCatalogTree = false, bool overlappingFileForks = false,
             bool zeroLengthResourceFork = false, bool includeAllocationFile = false,
-            bool markDataForkAllocated = true)
+            bool markDataForkAllocated = true, bool includeAttributeFile = false,
+            bool includeStartupFile = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -1002,6 +1026,8 @@ public sealed class HfsPlusFeatureTests
                 image[9 * Block] = markDataForkAllocated ? (byte)0xFC : (byte)0xF4;
                 image[9 * Block + 1] = 0x41; // Blocks 9 and 15, including the final reserved block.
             }
+            if (includeAttributeFile) Fork(image.AsSpan(1024 + 352, 80), 1, 10, 1);
+            if (includeStartupFile) Fork(image.AsSpan(1024 + 432, 80), 1, 11, 1);
             return image;
         }
 

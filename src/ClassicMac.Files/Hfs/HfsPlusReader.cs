@@ -55,6 +55,12 @@ internal static class HfsPlusReader
                 overflow, 0, 6, allocationExtents);
             allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
         }
+        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(352, 8)) != 0)
+            _ = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks, overflow, 0, 8,
+                allocationExtents);
+        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(432, 8)) != 0)
+            _ = ReadFork(image, header.AsSpan(432, 80), blockSize, totalBlocks, overflow, 0, 7,
+                allocationExtents);
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4,
             allocationExtents);
