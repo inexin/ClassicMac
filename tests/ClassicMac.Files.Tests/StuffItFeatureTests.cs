@@ -205,11 +205,88 @@ public sealed class StuffItFeatureTests
         Assert.Equal("   "u8.ToArray(), file.ResourceFork.ToArray());
     }
 
+    [Theory]
+    [InlineData(0, 3, 0, 32, 32, 32)]
+    [InlineData(3, 4, 4, 0, 0, 0)]
+    [InlineData(11, 5, 17, 45, 46, 47)]
+    [InlineData(23, 6, 47, 200, 200, 200)]
+    [InlineData(47, 7, 119, 82, 82, 82)]
+    [InlineData(63, 8, 255, 3, 3, 3)]
+    public void StuffItLzahMethodDecodesEachOffsetPrefixLength(int highBits, int codeLength, int code,
+        byte firstByte, byte secondByte, byte thirdByte)
+    {
+        Assert.InRange(highBits, 0, 63);
+        byte[] expected = [firstByte, secondByte, thirdByte];
+        byte[] image = StuffItFixture.BuildFile("Offset LZAH", expected, [],
+            dataMethod: 5, encodedData: StuffItFixture.EncodeLzahWithOffset(code, codeLength, 0, 256));
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
     [Fact]
     public void StuffItLzahMethodRejectsInputThatEndsBeforeTheDeclaredForkLength()
     {
         byte[] image = StuffItFixture.BuildFile("Truncated LZAH", "A"u8.ToArray(), [], dataMethod: 5,
             encodedData: []);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItMwMethodDecodesLiteralsAndDictionaryPhrasesInBothForks()
+    {
+        byte[] expected = "ABAB"u8.ToArray();
+        byte[] encoded = StuffItFixture.EncodeMwCodes(65, 66, 256);
+        byte[] image = StuffItFixture.BuildFile("MW", expected, expected, dataMethod: 8, encodedData: encoded,
+            resourceMethod: 8, encodedResource: encoded);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+        Assert.Equal(expected, file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMwMethodRejectsInputThatEndsBeforeTheDeclaredForkLength()
+    {
+        byte[] image = StuffItFixture.BuildFile("Truncated MW", "A"u8.ToArray(), [], dataMethod: 8,
+            encodedData: []);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void StuffItMwMethodStartsANewDictionaryGroupAtTheNextFreeCode()
+    {
+        byte[] image = StuffItFixture.BuildFile("MW reset", "AB"u8.ToArray(), [], dataMethod: 8,
+            encodedData: StuffItFixture.EncodeMwCodes(65, 256, 66));
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("AB"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMwMethodWidensCodesAfterTheDictionaryReaches512Entries()
+    {
+        byte[] expected = [.. Enumerable.Range(0, 256).Select(static value => (byte)value), 0, 1];
+        byte[] image = StuffItFixture.BuildFile("Wide MW", expected, [], dataMethod: 8,
+            encodedData: StuffItFixture.EncodeMwLiterals(expected));
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItMwMethodRejectsACodeOutsideItsCurrentDictionary()
+    {
+        byte[] image = StuffItFixture.BuildFile("Bad MW", "A"u8.ToArray(), [], dataMethod: 8,
+            encodedData: StuffItFixture.EncodeMwCodes(300));
 
         Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
@@ -515,6 +592,13 @@ public sealed class StuffItFeatureTests
         }
 
         public static byte[] EncodeLzah(params ushort[] symbols)
+            => EncodeLzah(symbols, 0, 3, 0);
+
+        public static byte[] EncodeLzahWithOffset(int offsetCode, int offsetCodeLength, int offsetLowBits,
+            params ushort[] symbols)
+            => EncodeLzah(symbols, offsetCode, offsetCodeLength, offsetLowBits);
+
+        private static byte[] EncodeLzah(ushort[] symbols, int offsetCode, int offsetCodeLength, int offsetLowBits)
         {
             const int LeafCount = 314;
             const int TreeSize = LeafCount * 2 - 1;
@@ -546,13 +630,55 @@ public sealed class StuffItFeatureTests
                 bits.AddRange(path);
                 UpdateLzahTree(symbol, frequencies, forward, backward, TreeSize);
                 if (symbol >= 256)
-                    for (int bit = 0; bit < 9; bit++) bits.Add(false); // Zero-distance offset.
+                {
+                    for (int bit = offsetCodeLength - 1; bit >= 0; bit--)
+                        bits.Add((offsetCode & (1 << bit)) != 0);
+                    for (int bit = 5; bit >= 0; bit--)
+                        bits.Add((offsetLowBits & (1 << bit)) != 0);
+                }
             }
 
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
                 if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
             return encoded;
+        }
+
+        public static byte[] EncodeMwCodes(params ushort[] codes)
+        {
+            var encoded = new byte[(codes.Length * 9 + 7) / 8];
+            int bitPosition = 0;
+            foreach (ushort code in codes)
+            {
+                for (int bit = 0; bit < 9; bit++, bitPosition++)
+                    if ((code & (1 << bit)) != 0)
+                        encoded[bitPosition / 8] |= (byte)(1 << (bitPosition & 7));
+            }
+            return encoded;
+        }
+
+        public static byte[] EncodeMwLiterals(ReadOnlySpan<byte> bytes)
+        {
+            var encoded = new List<byte>();
+            int bitPosition = 0;
+            int codeWidth = 9;
+            int nextCode = 256;
+            int nextWidthBoundary = 512;
+            foreach (byte value in bytes)
+            {
+                int requiredBytes = (bitPosition + codeWidth + 7) / 8;
+                while (encoded.Count < requiredBytes) encoded.Add(0);
+                for (int bit = 0; bit < codeWidth; bit++, bitPosition++)
+                    if ((value & (1 << bit)) != 0)
+                        encoded[bitPosition / 8] |= (byte)(1 << (bitPosition & 7));
+                if (nextCode < 16_385 && nextCode == nextWidthBoundary)
+                {
+                    nextWidthBoundary <<= 1;
+                    codeWidth++;
+                }
+                if (nextCode < 16_385) nextCode++;
+            }
+            return [.. encoded];
         }
 
         private static void UpdateLzahTree(ushort symbol, int[] frequencies, int[] forward, int[] backward,

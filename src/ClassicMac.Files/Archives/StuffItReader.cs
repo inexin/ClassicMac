@@ -118,8 +118,8 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5) ||
-                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or null))
+            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5 or 8) ||
+                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or 8 or null))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -305,6 +305,7 @@ public sealed class StuffItReader : IContainerReader
         if (method == 2) return DecodeCompress(input, outputLength);
         if (method == 3) return DecodeHuffman(input, outputLength);
         if (method == 5) return DecodeLzah(input, outputLength);
+        if (method == 8) return DecodeMw(input, outputLength);
 
         var output = new byte[outputLength];
         int written = 0;
@@ -485,6 +486,88 @@ public sealed class StuffItReader : IContainerReader
         return output;
     }
 
+    private static byte[] DecodeMw(ReadOnlySpan<byte> input, int outputLength)
+    {
+        const int FirstDictionaryCode = 256;
+        const int MaximumDictionarySize = 16_385;
+        var dictionary = new ushort[MaximumDictionarySize];
+        var stack = new ushort[MaximumDictionarySize];
+        var output = new byte[outputLength];
+        var reader = new LsbBitReader(input);
+        int written = 0;
+
+        while (written < output.Length)
+        {
+            int nextCode = FirstDictionaryCode;
+            int nextWidthBoundary = nextCode * 2;
+            int codeWidth = 9;
+            if (!reader.TryRead(codeWidth, out int code))
+                throw new InvalidDataException("A StuffIt MW fork ends before its declared output length.");
+
+            if (code < nextCode)
+            {
+                dictionary[FirstDictionaryCode - 1] = (ushort)code;
+                WriteMwPhrase(code, nextCode, dictionary, stack, output, ref written);
+            }
+            else if (code != nextCode)
+            {
+                throw new InvalidDataException("A StuffIt MW fork starts a dictionary group with an invalid code.");
+            }
+            else
+            {
+                // A code equal to the first free slot starts a new code group.
+                continue;
+            }
+
+            while (written < output.Length && reader.TryRead(codeWidth, out code) && code < nextCode)
+            {
+                if (nextCode < MaximumDictionarySize)
+                    dictionary[nextCode++] = (ushort)code;
+                WriteMwPhrase(code, nextCode, dictionary, stack, output, ref written);
+                if (nextCode == nextWidthBoundary)
+                {
+                    nextWidthBoundary <<= 1;
+                    codeWidth++;
+                }
+            }
+
+            if (written == output.Length) break;
+            if (code > nextCode)
+                throw new InvalidDataException("A StuffIt MW fork contains an invalid dictionary code.");
+            // A code equal to the next free dictionary slot ends this code group. The next
+            // group starts with a fresh 9-bit dictionary, as in the original MW decoder.
+            if (code == nextCode)
+                continue;
+            else
+                throw new InvalidDataException("A StuffIt MW fork ends before its declared output length.");
+        }
+
+        return output;
+    }
+
+    private static void WriteMwPhrase(int code, int nextCode, ushort[] dictionary, ushort[] stack,
+        byte[] output, ref int written)
+    {
+        int stackLength = 0;
+        int pendingCode = code;
+        while (true)
+        {
+            while (pendingCode >= 256)
+            {
+                if (pendingCode >= nextCode || pendingCode >= dictionary.Length || stackLength == stack.Length)
+                    throw new InvalidDataException("A StuffIt MW fork contains an invalid dictionary chain.");
+                stack[stackLength++] = dictionary[pendingCode];
+                pendingCode = dictionary[pendingCode - 1];
+            }
+
+            if (written == output.Length)
+                throw new InvalidDataException("StuffIt MW output exceeds its declared fork length.");
+            output[written++] = (byte)pendingCode;
+            if (stackLength == 0) return;
+            pendingCode = stack[--stackLength];
+        }
+    }
+
     private static byte[] CreateLzahWindow()
     {
         var window = new byte[4096];
@@ -529,10 +612,10 @@ public sealed class StuffItReader : IContainerReader
             lengths[value] = value switch
             {
                 0 => 3,
-                <= 2 => 4,
-                <= 10 => 5,
-                <= 26 => 6,
-                <= 58 => 7,
+                <= 3 => 4,
+                <= 11 => 5,
+                <= 23 => 6,
+                <= 47 => 7,
                 _ => 8,
             };
         return lengths;

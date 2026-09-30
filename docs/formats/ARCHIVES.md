@@ -23,7 +23,7 @@ resource bytes, which precede data-fork bytes. These member details are **[Fitte
 parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet been checked against a corpus created by
 the original StuffIt application.
 
-ClassicMac currently extracts method 0 (stored), method 1 (RLE90), method 2 (Compress/LZW) and method 3 (Huffman) for either fork. RLE90 emits ordinary bytes as
+ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH) and 8 (MW) for either fork. RLE90 emits ordinary bytes as
 literals; `$90 00` emits a literal `$90`; `$90 n` for nonzero `n` repeats the previously decoded byte until the run has
 `n` copies **[Fitted]**. Truncated runs, runs without a prior byte, output-length mismatches and extents outside the
 archive are rejected. Per-fork CRC mismatches are reported as errors while retaining the decoded file. Encrypted
@@ -46,5 +46,21 @@ branches, a truncated tree and truncated symbol data. The bitstream layout is cr
 [XADMaster's StuffIt Huffman reader](https://sources.debian.org/src/unar/1.1-2/XADMaster/XADStuffItHuffmanHandle.m/);
 hand-built vectors have not yet been checked against archives made by the original StuffIt application.
 
-The v1–4 record layout, methods 5, 8, 13, 14 and 15, archive-level comments, complete folder metadata and
+Method 5 is LZSS with a 4 KiB pre-seeded history window and one adaptive sibling-property Huffman tree for literals and
+match lengths. Symbols 0–255 are literals; symbols 256–313 represent lengths 3–60. A match then carries a prefix code
+for the upper six offset bits and six raw bits for the lower offset bits, most-significant-bit first. The window seed
+and output length are independent of the fork bitstream. Tests exercise literals, the seeded space run, a maximum-
+distance reference and truncated input. The offset-prefix lengths are **[Fitted]** against
+[macutils' method-5 decoder](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/de_lzah.c/) and hand-built
+fixtures; no original-application archive has yet been verified.
+
+Method 8 is the StuffIt MW (Miller–Wegman) dictionary method. Codes are read least-significant-bit first, begin at
+nine bits, and grow as the dictionary reaches powers of two. Literal codes emit one byte; later codes refer to
+dictionary phrases assembled from earlier phrases. The next-free code ends a group, after which decoding restarts
+with a fresh nine-bit dictionary **[Fitted]** against
+[XADMaster's MW decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADStuffItOldHandles.m/) and hand-built
+vectors. Tests cover phrase reconstruction, group reset, width growth and invalid/truncated input. These vectors do
+not establish compatibility with files produced by the original StuffIt application.
+
+The v1–4 record layout, methods 13, 14 and 15, archive-level comments, complete folder metadata and
 verification against original-application archives remain unimplemented. See Phase 10 in [the project plan](../PLAN.md).
