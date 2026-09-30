@@ -811,7 +811,9 @@ allocated, and verifies `freeNodes` against the complete bitmap. It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
 `totalNodes × nodeSize`, header nodes have height zero and use the required 106-byte header record, 128-byte user
 record and remaining map record, and leaf-record keys are
-unique, catalog IDs are unique and each required file and folder thread points back to its record's parent and name.
+unique. It checks the catalog and extents-overflow B-trees' `maxKeyLength` against TN1150's defined maxima (516 and
+10 bytes respectively) **[Doc]**. Catalog IDs are unique and each required file and folder thread points back to its
+record's parent and name.
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
 nonroot folder, including empty folders. TN1150 defines valence as the count of file and folder records whose key

@@ -32,7 +32,7 @@ namespace ClassicMac.Files
 
         /// <summary>
         /// The built-in readers, in the order they are tried: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex
-        /// 4.0, StuffIt, UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS and MFS volumes, DOS partition tables, FAT volumes
+        /// 4.0, PackIt, StuffIt, Compact Pro, UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS and MFS volumes, DOS partition tables, FAT volumes
         /// with PC Exchange data, raw CD images, cue sheets, and ISO 9660 / High Sierra volumes.
         /// </summary>
         public static ContainerUnwrapper Default { get; } = new([]);
@@ -50,7 +50,9 @@ namespace ClassicMac.Files
                 MacBinaryReader.II,
                 MacBinaryReader.I,
                 BinHexReader.Instance,
+                PackItReader.Instance,
                 StuffItReader.Instance,
+                CompactProReader.Instance,
                 UdifReader.Instance,
                 PartitionMapReader.Instance,
                 DiskCopy42Reader.Instance,

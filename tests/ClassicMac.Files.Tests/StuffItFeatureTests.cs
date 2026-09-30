@@ -31,6 +31,41 @@ public sealed class StuffItFeatureTests
     }
 
     [Fact]
+    public void LegacyStuffItVersion1ReadsSequentialMembersAndFolderMarkers()
+    {
+        byte[] image = StuffItFixture.BuildLegacyV1NestedFile();
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.True(StuffItReader.Instance.CanRead(ForkData.FromBytes(image)));
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Docs:Read Me", file.MacPath);
+        Assert.Equal("data fork"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Equal("resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("TEXT"), file.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("ttxt"), file.FinderInfo.Creator);
+        Assert.Equal((FinderFlags)0x4000, file.FinderInfo.Flags);
+        Assert.Equal(new MacDate(2_500_000_000), file.Created);
+        Assert.Equal(new MacDate(2_600_000_000), file.Modified);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void LegacyStuffItVersion1RejectsFolderEndWithoutOpenFolder()
+    {
+        byte[] image = StuffItFixture.BuildLegacyV1NestedFile();
+        const int firstMember = 22;
+        image[firstMember] = 33;
+        image[firstMember + 1] = 33;
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(firstMember + 110),
+            StuffItFixture.Crc16Arc(image.AsSpan(firstMember, 110)));
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext()));
+    }
+
+    [Fact]
     public void StoredStuffItV5FilePreservesBothForksAndFinderMetadata()
     {
         byte[] image = StuffItFixture.BuildFile("Read Me", "data fork"u8.ToArray(), "resource fork"u8.ToArray());
@@ -807,6 +842,68 @@ public sealed class StuffItFeatureTests
             resource.CopyTo(image.AsSpan(resourceOffset));
             data.CopyTo(image.AsSpan(dataOffset));
             return image;
+        }
+
+        public static byte[] BuildLegacyV1NestedFile()
+        {
+            const int archiveHeaderLength = 22;
+            const int memberHeaderLength = 112;
+            byte[] folderName = "Docs"u8.ToArray();
+            byte[] fileName = "Read Me"u8.ToArray();
+            byte[] data = "data fork"u8.ToArray();
+            byte[] resource = "resource fork"u8.ToArray();
+
+            byte[] folder = BuildLegacyV1Marker(folderName, 32);
+            byte[] fileHeader = new byte[memberHeaderLength];
+            fileName.CopyTo(fileHeader.AsSpan(3));
+            fileHeader[0] = 0;
+            fileHeader[1] = 0;
+            fileHeader[2] = checked((byte)fileName.Length);
+            "TEXTttxt"u8.CopyTo(fileHeader.AsSpan(66));
+            U16(fileHeader, 74, 0x4000);
+            U32(fileHeader, 76, CreateSeconds);
+            U32(fileHeader, 80, ModifySeconds);
+            U32(fileHeader, 84, checked((uint)resource.Length));
+            U32(fileHeader, 88, checked((uint)data.Length));
+            U32(fileHeader, 92, checked((uint)resource.Length));
+            U32(fileHeader, 96, checked((uint)data.Length));
+            U16(fileHeader, 100, Crc16Arc(resource));
+            U16(fileHeader, 102, Crc16Arc(data));
+            U16(fileHeader, 110, Crc16Arc(fileHeader.AsSpan(0, 110)));
+
+            byte[] endFolder = BuildLegacyV1Marker([], 33);
+            int archiveLength = archiveHeaderLength + folder.Length + fileHeader.Length + resource.Length +
+                data.Length + endFolder.Length + 4;
+            byte[] image = new byte[archiveLength];
+            "SIT!"u8.CopyTo(image);
+            U16(image, 4, 1);
+            U32(image, 6, checked((uint)archiveLength));
+            "rLau"u8.CopyTo(image.AsSpan(10));
+            image[14] = 1;
+            int offset = archiveHeaderLength;
+            folder.CopyTo(image, offset);
+            offset += folder.Length;
+            fileHeader.CopyTo(image, offset);
+            offset += fileHeader.Length;
+            resource.CopyTo(image, offset);
+            offset += resource.Length;
+            data.CopyTo(image, offset);
+            offset += data.Length;
+            endFolder.CopyTo(image, offset);
+            offset += endFolder.Length;
+            "PEnd"u8.CopyTo(image.AsSpan(offset));
+            return image;
+        }
+
+        private static byte[] BuildLegacyV1Marker(byte[] name, byte method)
+        {
+            byte[] marker = new byte[112];
+            marker[0] = method;
+            marker[1] = method;
+            marker[2] = checked((byte)name.Length);
+            name.CopyTo(marker.AsSpan(3));
+            U16(marker, 110, Crc16Arc(marker.AsSpan(0, 110)));
+            return marker;
         }
 
         public static byte[] BuildNestedFile()

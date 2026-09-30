@@ -446,6 +446,15 @@ internal static class HfsPlusReader
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
+        int maxKeyLength = U16(tree, 34);
+        int definedMaxKeyLength = name switch
+        {
+            "catalog" => 516,
+            "extents-overflow" => 10,
+            _ => maxKeyLength
+        };
+        if (maxKeyLength != definedMaxKeyLength)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree maximum key length is invalid.");
         ValidateHeaderNodeRecordLayout(tree.AsSpan(0, nodeSize), nodeSize, name);
         if ((name is "catalog" or "attributes") && nodeSize < 4096)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is below the 4 KiB minimum.");
@@ -478,7 +487,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree root kind or height is invalid.");
         }
         (HashSet<uint> indexedLeaves, HashSet<uint> indexedNodes) =
-            ValidateIndexGraph(tree, name, nodeSize, totalNodes, root, depth, caseSensitiveCatalog,
+            ValidateIndexGraph(tree, name, nodeSize, maxKeyLength, totalNodes, root, depth, caseSensitiveCatalog,
                 caseFoldingCatalog);
         uint readRecords = 0;
         uint previous = 0;
@@ -571,7 +580,7 @@ internal static class HfsPlusReader
     }
 
     private static (HashSet<uint> Leaves, HashSet<uint> Nodes) ValidateIndexGraph(byte[] tree, string name,
-        int nodeSize, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog,
+        int nodeSize, int maxKeyLength, uint totalNodes, uint root, ushort depth, bool caseSensitiveCatalog,
         bool caseFoldingCatalog)
     {
         var visitedNodes = new HashSet<uint>();
@@ -579,7 +588,6 @@ internal static class HfsPlusReader
         var nodesByHeight = new Dictionary<ushort, List<uint>>();
         var indexKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)>();
         var subtreeKeyRanges = new Dictionary<uint, (byte[] First, byte[] Last)?>();
-        int maxKeyLength = U16(tree, 34);
         bool validateChildKeyRanges = name == "extents-overflow" ||
             (name == "catalog" && (caseSensitiveCatalog || caseFoldingCatalog));
 

@@ -5,6 +5,56 @@ published vendor specifications in the project references; rules derived from an
 provisional and marked **[Fitted]**. An independently generated fixture proves the documented behavior, not that the
 original Mac application writes every detail the same way.
 
+## StuffIt 1.x–2.x (initial subset)
+
+Legacy archives start with `SIT!`, the root entry count, total archive length, and `rLau`. Version 1 uses sequential
+112-byte member headers beginning at offset 22; version 2 uses linked member records and the root offset at +16.
+Member headers hold the two fork methods, a Pascal-style byte name, Finder type/creator/flags, dates, expanded and
+compressed fork lengths, fork CRCs, and the header CRC at +110. In version 1, method `$20` starts a folder and `$21`
+ends it; folder members have no fork payload. Version 1 names can be up to 63 bytes and are decoded as MacRoman.
+Version 2 currently accepts names up to 31 bytes and follows first-child, next, and declared child-count fields.
+These layouts and folder markers are **[Fitted]** against the published format table in
+[psx-spx](https://psx-spx.consoledev.net/psx-spx.pdf) and the independent
+[XADMaster parser](https://sources.debian.org/src/unar/1.1-2/XADMaster/XADStuffItParser.m/). Hand-built feature tests
+cover stored forks, Finder metadata, dates, nested v1 folder markers, and malformed folder structure. Neither version
+has yet been verified against an archive made by the original application. Archive-level comments and method 6 are
+not implemented; encrypted entries are reported and skipped.
+
+## PackIt (stored-entry subset)
+
+PackIt is a flat stream of entries with no archive header. `PMag` starts an uncompressed entry, `PEnd` ends the archive,
+and the 94-byte entry metadata follows the four-byte signature. It holds a 63-byte Pascal name field, Finder type,
+creator and flags, data- and resource-fork lengths, and creation/modification dates. The data fork, resource fork and a
+CRC-16/XMODEM of their concatenation follow; the metadata also has a CRC-16/XMODEM **[Fitted]** against
+[psx-spx's PackIt format notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/) and
+[XADMaster's PackIt reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADPackItParser.m/).
+ClassicMac extracts stored `PMag` and Huffman-compressed `PMa4` records and reports header or fork CRC mismatches.
+`PMa1`–`PMa3` and `PMa5`–`PMa7` encrypted methods are recognized but reported as unsupported; parsing stops at the
+first unsupported record. Tests cover stored and Huffman entries with both forks, Finder metadata and dates, CRC
+diagnostics, unsupported methods and truncated headers. Original-application verification remains.
+
+## Compact Pro (RLE and LZH subset)
+
+A Compact Pro archive begins with an 8-byte header: marker `$01`, volume number, a 16-bit cross-volume field, and a
+big-endian offset to the directory. At that offset are a raw CRC-32 state, the total entry count, a Pascal comment,
+and a flattened sequence of entries. The checksum covers the entry count, comment length and bytes, and every entry
+record. A directory record has its high name-length bit set and carries a count of all descendant entries; a file
+record carries its volume, fork-data offset, Finder type/creator/flags, dates, combined fork checksum, method flags,
+expanded fork lengths, and compressed fork lengths. Resource bytes precede data bytes. These fields are **[Fitted]**
+against the [Compact Pro format description](https://docs.rs/crate/compact-pro/latest) and
+[XADMaster's independent reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADCompactProParser.m/).
+
+Method flag bit 0 marks encryption, bit 1 selects LZH+RLE for the resource fork, and bit 2 selects LZH+RLE for the
+data fork. The reader extracts both RLE-only and LZH+RLE forks. LZH uses an 8 KiB history window, three
+per-block canonical Huffman trees, MSB-first bits, literal tokens, and length/displacement matches; its output is
+then passed through RLE. Blocks switch after the documented token-count threshold and discard alignment bits before
+reading the next trees **[Fitted]** against
+[psx-spx's Compact Pro notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/). Tests cover both
+fork encodings, literal and overlapping-match LZH tokens, a block boundary, escaped bytes, repeat runs, nested
+directory paths, archive comments, checksums, default unwrapping, and directory/data overlap rejection. Comments are
+reported as MacRoman display text in an `archive.comment` information diagnostic **[Fitted]**. Encrypted entries and
+multi-volume sets remain unsupported; no original Compact Pro application archive has yet been verified.
+
 ## StuffIt 5 (initial subset)
 
 StuffIt 5 is recognized by the eight-byte `StuffIt ` signature and version byte 5 at offset 82. The 100-byte archive

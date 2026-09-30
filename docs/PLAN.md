@@ -793,18 +793,23 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
-    info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, the catalog
-    node-size minimum, header nodes,
+    info, dates and both forks (including overflow extents), validates B-tree types, key-layout attributes, the
+    catalog/extents key-length maxima, the catalog node-size minimum, header nodes,
     node maps (including chained map nodes and free counts), roots, index graphs,
     sibling links, exact catalog key lengths and unique leaf keys,
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
     unique catalog
-    IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders). The
-    StuffIt v5 reader handles stored, RLE90, Compress/LZW, Huffman, LZAH (method 5), MW (method 8),
+    IDs and next-ID consistency, file/folder threads, folder valences and parent chains (including empty folders).
+    The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
+    forks; these layouts currently have hand-built fixtures only. The StuffIt v5 reader handles stored, RLE90,
+    Compress/LZW, Huffman, LZAH (method 5), MW (method 8),
     LZ + Huffman (method 13), Installer (method 14), and Arsenic (method 15) forks. Methods 13 and 15 are checked
     against CC0 archives made by StuffIt Deluxe 4.5 and 6.5.1 respectively; method 14 currently has hand-built protocol
-    vectors only.
+    vectors only. The Compact Pro reader parses directory and folder entries and extracts RLE8182 and LZH+RLE forks;
+    Compact Pro archive comments are reported as diagnostics; multi-volume sets remain. Compression is fitted to published third-party
+    descriptions and hand-built vectors; verification against an archive made by the original application remains. The
+    PackIt reader extracts stored (`PMag`) and Huffman (`PMa4`) entries; encrypted entries remain unsupported.
     Original-application interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges, and checks its bitmap for
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
@@ -816,7 +821,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
     1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 8 (LZMW), 13 (LZ + Huffman),
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
-    (RLE81 + LZH); then DiskDoubler, PackIt and segmented archives. Anything from row 5 of Inputs only on request.
+    (RLE81 + LZH); PackIt (stored and Huffman entries); then DiskDoubler, encrypted PackIt methods and segmented archives.
+    Anything from row 5 of Inputs only on request.
 11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
    - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's
      single segment with `DATA 0` relocations, Retro68's relocation stream, Apple's `dcmp` jump-table shim).
