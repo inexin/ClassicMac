@@ -802,6 +802,12 @@ The reader checks the catalog B-tree's root index graph, node heights and same-l
 linked leaf nodes, checking the header's leaf endpoints, backward links, node range and record count. It also requires
 the B-tree header node to contain three records and a zero backward link **[Doc]**. It checks that the catalog and
 extents B-tree headers have the required control-file type **[Doc]**, and that
+their key-layout attributes use 16-bit key lengths, with variable-length index keys in the catalog and fixed-length
+index keys in the extents tree **[Doc]** TN1150. It also requires the header-node bitmap to mark node 0 and every
+catalog/extents B-tree node referenced by its index graph or leaf chain as allocated, where those nodes fit in the
+header map record. TN1150 defines this bitmap as one most-significant-bit-first bit per node and continues it in
+linked map nodes when the header map record is too small **[Doc]**. The reader does not yet validate chained map
+nodes or free-node accounting. It checks that
 leaf-record keys are unique, catalog IDs are unique and each required file and folder thread points back to its
 record's parent and name. TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
@@ -817,11 +823,8 @@ HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary cata
 while case-folding key order is not yet validated **[Doc]**. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
-reader requires the header-node bitmap to mark node 0 and every catalog/extents B-tree node referenced by its index
-graph or leaf chain as allocated, where those nodes fit in the header map record. TN1150 defines this bitmap as one
-most-significant-bit-first bit per node and continues it in linked map nodes when the header map record is too small
-**[Doc]**. The reader does not yet validate chained map nodes, free-node accounting, every B-tree index/map invariant,
-volume allocation ownership, hard-link/symlink semantics, or the full HFSX collation rules.
+reader does not yet validate every B-tree index/map invariant, volume allocation ownership, hard-link/symlink
+semantics, or the full HFSX collation rules.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,

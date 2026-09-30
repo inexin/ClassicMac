@@ -221,6 +221,10 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree header node is invalid.");
         if (tree[14 + 36] != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree has an invalid tree type.");
+        uint attributes = U32(tree, 14 + 38);
+        bool variableIndexKeys = (attributes & 0x00000004) != 0;
+        if ((attributes & 0x00000002) == 0 || variableIndexKeys != (name == "catalog"))
+            throw new InvalidDataException($"The HFS Plus {name} B-tree key-layout attributes are invalid.");
         bool caseSensitiveCatalog = false;
         if (name == "catalog" && isHfsX)
         {

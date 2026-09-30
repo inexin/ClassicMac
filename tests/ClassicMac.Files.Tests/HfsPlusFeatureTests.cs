@@ -87,6 +87,21 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Theory]
+    [InlineData(false, 0x00000000)] // The catalog must use 16-bit lengths and variable index keys.
+    [InlineData(false, 0x00000002)] // The catalog is missing variable index keys.
+    [InlineData(true, 0x00000000)]  // The extents tree must use 16-bit lengths.
+    [InlineData(true, 0x00000006)]  // The extents tree must use fixed-width index keys.
+    public void HfsPlusBtreeAttributesMustMatchTheTreeKeyLayout(bool extentsTree, uint attributes)
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: extentsTree);
+        int headerNodeOffset = (extentsTree ? 4 : 2) * 4096;
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(headerNodeOffset + 14 + 38), attributes);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusNextCatalogIdMustExceedEveryExistingCatalogId()
     {
@@ -627,6 +642,7 @@ public sealed class HfsPlusFeatureTests
             U16(header, 34, 516);
             U32(header, 36, catalogTotalNodes ?? (multiLeafCatalog ? 4u : 2u)); // total nodes
             header[14 + 37] = catalogKeyCompareType ?? (hfsX ? (byte)0xBC : (byte)0);
+            U32(header, 14 + 38, 6); // 16-bit key lengths and variable-width catalog index keys.
             header[14 + 106 + 128] = multiLeafCatalog ? (byte)0xF0 : (byte)0xC0; // allocated nodes
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);
@@ -717,6 +733,7 @@ public sealed class HfsPlusFeatureTests
             U16(header, 32, Block);
             U16(header, 34, 10);
             U32(header, 36, 2);
+            U32(header, 14 + 38, 2); // 16-bit key lengths and fixed-width extents index keys.
             header[14 + 106 + 128] = 0xC0;
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);
