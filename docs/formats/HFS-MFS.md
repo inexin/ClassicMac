@@ -836,13 +836,21 @@ Folder records must not set the file-locked or thread-exists flags **[Code]**; A
 those file-only flags in the same verifier.
 The root folder's catalog key must use parent ID 1, `kHFSRootParentID` **[Doc]** TN1150. File and folder catalog keys
 must have nonempty names **[Doc]** TN1150. Catalog key names and thread names must be fully decomposed in canonical
-combining-mark order **[Doc]** TN1150. The
-reader validates this with fixed Unicode 3.2 canonical decomposition data, including algorithmic Hangul decomposition
+combining-mark order **[Doc]** TN1150. Their 16-bit sequences must also be well-formed UTF-16: supplementary
+characters use valid surrogate pairs, and isolated surrogate code units are rejected **[Doc]** Unicode Standard §3.9.
+The reader validates this with fixed Unicode 3.2 canonical decomposition data, including algorithmic Hangul decomposition
 and TN1150's preserved ranges U+2000–U+2FFF, U+F900–U+FAFF and U+2F800–U+2FAFF; it does not depend on the host
-runtime's evolving normalization tables. HFSX also rejects the legacy doubled U+0307, Greek tonos sequences formed by
-U+030D after Greek tonos bases or diaeresis, and Bengali BA plus nukta; Apple's `fsck_hfs` rewrites them to their
-corrected forms. Since HFS+ has no field recording which decomposition version created its names, the reader continues
-to accept these legacy sequences there. Other Unicode 2.1/3.2 and `fsck_hfs` fixup cases remain open.
+runtime's evolving normalization tables. HFSX rejects the legacy doubled U+0307 and Greek tonos sequences formed by
+U+030D after Greek tonos bases or diaeresis, and also these `fsck_hfs` fixes **[Code]** Apple's
+[`FixDecomps`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c): Bengali BA plus
+nukta to RA with middle diagonal, Odia YA plus nukta to U+0B5F, Gurmukhi DDA plus nukta to U+0A5C, Thai and Lao vowel
+sequences to their AM letters, and two Tibetan three-character sequences to U+0F77 and U+0F79. Since HFS+ has no
+field recording which decomposition version created its names, the reader continues to accept these legacy sequences
+there. It also accepts the Unicode 2.1 forms of 44 code points whose canonical decomposition changed by
+Unicode 3.2, including U+01F8 and U+01F9 **[Doc]** TN1150; HFSX requires the updated forms **[Code]** Apple's
+[`FixDecomps`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c) and
+[`DecompData.h`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/DecompData.h).
+Other Unicode 2.1/3.2 sequence changes and `fsck_hfs` fixup cases remain open.
 Catalog IDs are unique, every nonroot file or folder record's `parentID` names an existing folder, and each required
 file and folder thread points back to its record's parent and name **[Doc]** TN1150. `nextCatalogID`
 must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.

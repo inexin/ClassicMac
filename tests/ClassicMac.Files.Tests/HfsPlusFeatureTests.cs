@@ -885,6 +885,28 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal("Documents:" + fileName.Normalize(NormalizationForm.FormC), file.MacPath);
     }
 
+    [Theory]
+    [InlineData(0xD800)]
+    [InlineData(0xDC00)]
+    public void HfsPlusCatalogNamesMustNotContainUnpairedSurrogates(ushort surrogate)
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", catalogFileNameCodeUnitOverride: surrogate);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Equal("An HFS Plus catalog name is not canonically decomposed.", exception.Message);
+    }
+
+    [Fact]
+    public void HfsPlusCatalogThreadNamesMustNotContainUnpairedSurrogates()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", catalogFileThreadNameCodeUnitOverride: 0xD800);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Equal("An HFS Plus catalog thread name is not canonically decomposed.", exception.Message);
+    }
+
     [Fact]
     public void HfsPlusCatalogThreadNamesMustUseCanonicalDecomposition()
     {
@@ -940,6 +962,18 @@ public sealed class HfsPlusFeatureTests
     [InlineData("\u03D2\u0301", true)]
     [InlineData("\u09AC\u09BC", false)] // Bengali BA + NUKTA is corrected to RA with middle diagonal.
     [InlineData("\u09B0", true)]
+    [InlineData("\u0B2F\u0B3C", false)] // Odia YA + NUKTA is corrected to its precomposed letter.
+    [InlineData("\u0B5F", true)]
+    [InlineData("\u0A21\u0A3C", false)] // Gurmukhi DDA + NUKTA is corrected to RRA.
+    [InlineData("\u0A5C", true)]
+    [InlineData("\u0E4D\u0E32", false)] // Thai NIKHAHIT + SARA AA is corrected to SARA AM.
+    [InlineData("\u0E33", true)]
+    [InlineData("\u0ECD\u0EB2", false)] // Lao NIGGAHITA + VOWEL SIGN AA is corrected to AM.
+    [InlineData("\u0EB3", true)]
+    [InlineData("\u0FB2\u0F80\u0F71", false)]
+    [InlineData("\u0F77", true)]
+    [InlineData("\u0FB3\u0F80\u0F71", false)]
+    [InlineData("\u0F79", true)]
     public void HfsXCatalogNamesMustUsePostJaguarCanonicalDecompositions(string fileName, bool valid)
     {
         byte[] image = HfsPlusFixture.Build(fileName, hfsX: true);
@@ -961,6 +995,12 @@ public sealed class HfsPlusFeatureTests
     [InlineData("\u03B5\u030D")]
     [InlineData("\u03C9\u030D")]
     [InlineData("\u09AC\u09BC")]
+    [InlineData("\u0B2F\u0B3C")]
+    [InlineData("\u0A21\u0A3C")]
+    [InlineData("\u0E4D\u0E32")]
+    [InlineData("\u0ECD\u0EB2")]
+    [InlineData("\u0FB2\u0F80\u0F71")]
+    [InlineData("\u0FB3\u0F80\u0F71")]
     public void HfsXCatalogThreadNamesMustUsePostJaguarCanonicalDecompositions(string threadName)
     {
         byte[] image = HfsPlusFixture.Build("Read Me", hfsX: true, catalogFileThreadName: threadName);
@@ -977,6 +1017,12 @@ public sealed class HfsPlusFeatureTests
     [InlineData("\u0391\u030D")]
     [InlineData("\u03C9\u030D")]
     [InlineData("\u09AC\u09BC")]
+    [InlineData("\u0B2F\u0B3C")]
+    [InlineData("\u0A21\u0A3C")]
+    [InlineData("\u0E4D\u0E32")]
+    [InlineData("\u0ECD\u0EB2")]
+    [InlineData("\u0FB2\u0F80\u0F71")]
+    [InlineData("\u0FB3\u0F80\u0F71")]
     public void HfsPlusAcceptsLegacyCanonicalNameDecompositions(string fileName)
     {
         byte[] image = HfsPlusFixture.Build(fileName);
@@ -984,6 +1030,111 @@ public sealed class HfsPlusFeatureTests
         MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
 
         Assert.StartsWith("Documents:", file.MacPath, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("\u01F8")]
+    [InlineData("\u01F9")]
+    [InlineData("\u0218")]
+    [InlineData("\u0219")]
+    [InlineData("\u021A")]
+    [InlineData("\u021B")]
+    [InlineData("\u021E")]
+    [InlineData("\u021F")]
+    [InlineData("\u0226")]
+    [InlineData("\u0227")]
+    [InlineData("\u0228")]
+    [InlineData("\u0229")]
+    [InlineData("\u022A")]
+    [InlineData("\u022B")]
+    [InlineData("\u022C")]
+    [InlineData("\u022D")]
+    [InlineData("\u022E")]
+    [InlineData("\u022F")]
+    [InlineData("\u0230")]
+    [InlineData("\u0231")]
+    [InlineData("\u0232")]
+    [InlineData("\u0233")]
+    [InlineData("\u0400")]
+    [InlineData("\u040D")]
+    [InlineData("\u0450")]
+    [InlineData("\u045D")]
+    [InlineData("\u04EC")]
+    [InlineData("\u04ED")]
+    [InlineData("\u0622")]
+    [InlineData("\u0623")]
+    [InlineData("\u0624")]
+    [InlineData("\u0625")]
+    [InlineData("\u0626")]
+    [InlineData("\u06C0")]
+    [InlineData("\u06C2")]
+    [InlineData("\u06D3")]
+    [InlineData("\u0A33")]
+    [InlineData("\u0A36")]
+    [InlineData("\u0DDA")]
+    [InlineData("\u0DDC")]
+    [InlineData("\u0DDD")]
+    [InlineData("\u0DDE")]
+    [InlineData("\u1026")]
+    [InlineData("\uFB1D")]
+    public void HfsPlusAcceptsANameThatWasCanonicalUnderUnicode21(string fileName)
+    {
+        byte[] image = HfsPlusFixture.Build(fileName);
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData("\u01F8")]
+    [InlineData("\u01F9")]
+    [InlineData("\u0218")]
+    [InlineData("\u0219")]
+    [InlineData("\u021A")]
+    [InlineData("\u021B")]
+    [InlineData("\u021E")]
+    [InlineData("\u021F")]
+    [InlineData("\u0226")]
+    [InlineData("\u0227")]
+    [InlineData("\u0228")]
+    [InlineData("\u0229")]
+    [InlineData("\u022A")]
+    [InlineData("\u022B")]
+    [InlineData("\u022C")]
+    [InlineData("\u022D")]
+    [InlineData("\u022E")]
+    [InlineData("\u022F")]
+    [InlineData("\u0230")]
+    [InlineData("\u0231")]
+    [InlineData("\u0232")]
+    [InlineData("\u0233")]
+    [InlineData("\u0400")]
+    [InlineData("\u040D")]
+    [InlineData("\u0450")]
+    [InlineData("\u045D")]
+    [InlineData("\u04EC")]
+    [InlineData("\u04ED")]
+    [InlineData("\u0622")]
+    [InlineData("\u0623")]
+    [InlineData("\u0624")]
+    [InlineData("\u0625")]
+    [InlineData("\u0626")]
+    [InlineData("\u06C0")]
+    [InlineData("\u06C2")]
+    [InlineData("\u06D3")]
+    [InlineData("\u0A33")]
+    [InlineData("\u0A36")]
+    [InlineData("\u0DDA")]
+    [InlineData("\u0DDC")]
+    [InlineData("\u0DDD")]
+    [InlineData("\u0DDE")]
+    [InlineData("\u1026")]
+    [InlineData("\uFB1D")]
+    public void HfsXRejectsANameThatWasCanonicalOnlyUnderUnicode21(string fileName)
+    {
+        byte[] image = HfsPlusFixture.Build(fileName, hfsX: true);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -2185,7 +2336,8 @@ public sealed class HfsPlusFeatureTests
             string catalogFolderName = "Documents", uint rootFolderParentId = 1,
             uint? fragmentedPrimaryExtentCount = null, bool emptyResourceForkHasExtent = false,
             bool sparseDataExtentDescriptors = false, bool unusedDataExtentHasStartBlock = false,
-            uint? catalogFileParentId = null)
+            uint? catalogFileParentId = null, ushort? catalogFileNameCodeUnitOverride = null,
+            ushort? catalogFileThreadNameCodeUnitOverride = null)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -2304,6 +2456,8 @@ public sealed class HfsPlusFeatureTests
             }
             uint fileParentId = catalogFileParentId ?? folderId;
             records.Add(Record(fileParentId, fileName, file));
+            if (catalogFileNameCodeUnitOverride is { } codeUnit)
+                U16(records[^1], 8, codeUnit);
             if (!omitFileThread)
             {
                 byte[] fileThread = Record(fileId, nonEmptyFileThreadKey ? "Thread" : "",
@@ -2312,6 +2466,10 @@ public sealed class HfsPlusFeatureTests
                         wrongFileThreadKind ? (ushort)3 : (ushort)4));
                 if (fileId < 16) records.Insert(3, fileThread);
                 else records.Add(fileThread);
+                ushort? threadCodeUnitOverride = catalogFileThreadNameCodeUnitOverride ??
+                    catalogFileNameCodeUnitOverride;
+                if (threadCodeUnitOverride is { } threadCodeUnit && fileId >= 16)
+                    U16(records[^1], 18, threadCodeUnit);
             }
             if (additionalFolderParent is { } additionalParent)
             {
