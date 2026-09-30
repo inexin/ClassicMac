@@ -803,7 +803,7 @@ linked leaf nodes, checking the header's leaf endpoints, backward links, node ra
 the B-tree header node to contain three records and a zero backward link **[Doc]**. It checks that the catalog and
 extents B-tree headers have the required control-file type **[Doc]**, that catalog B-tree nodes meet TN1150's 4 KiB
 minimum **[Doc]**, and that their key-layout attributes use 16-bit key lengths, with variable-length index keys in
-the catalog and fixed-length index keys in the extents tree **[Doc]** TN1150. The B-tree map is one
+the catalog and attributes trees and fixed-length index keys in the extents tree **[Doc]** TN1150. The B-tree map is one
 most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader follows that
 chain, checks map-node descriptors and bitmap coverage, requires the header, index, leaf and map nodes to be marked
@@ -824,14 +824,16 @@ allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the de
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
 **[Doc]** TN1150. It checks
 the attributes and startup special-file forks from the volume header, including their overflow extents, and accounts
-for data extents in bad-block records from the extents-overflow file **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
+for data extents in bad-block records from the extents-overflow file **[Doc]** TN1150. It walks the attributes B-tree
+and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
+records do not claim extents **[Doc]** TN1150. It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
 retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode; binary catalog
 index and leaf keys are checked in order, including index sibling ranges, while case-folding key order is not yet validated **[Doc]**. The
 legacy MacRoman `Name` field is a best-effort representation. HFS+ and HFSX remain read-only. Structural damage to
 the volume header, B-trees, catalog records, forks or wrapper extent is rejected as unreadable input. The current
 reader does not yet validate every B-tree index/map invariant, complete volume allocation ownership (including
-extents named by attribute records and unreferenced bitmap bits), hard-link/symlink semantics, or the full HFSX
+attribute fork continuity and unreferenced bitmap bits), hard-link/symlink semantics, or the full HFSX
 collation rules.
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024

@@ -57,12 +57,17 @@ internal static class HfsPlusReader
         ForkData allocationFork = ReadFork(image, header.AsSpan(112, 80), blockSize, totalBlocks,
             overflow, 0, 6, allocationExtents);
         byte[] allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
-        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(352, 8)) != 0)
-            _ = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks, overflow, 0, 8,
-                allocationExtents);
         if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(432, 8)) != 0)
             _ = ReadFork(image, header.AsSpan(432, 80), blockSize, totalBlocks, overflow, 0, 7,
                 allocationExtents);
+        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(352, 8)) != 0)
+        {
+            ForkData attributesFork = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks,
+                overflow, 0, 8, allocationExtents);
+            byte[] attributes = attributesFork.ToArray(context.Options.MaxExpandedBytesPerInput);
+            foreach (var (_, data) in LeafRecords(attributes, "attributes"))
+                AddAttributeRecordExtents(data, blockSize, totalBlocks, allocationExtents);
+        }
 
         var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4,
             allocationExtents);
@@ -194,11 +199,69 @@ internal static class HfsPlusReader
                 uint start = U32(record.Extents, index * 8);
                 uint count = U32(record.Extents, index * 8 + 4);
                 if (count == 0) break;
-                if ((ulong)start + count > totalBlocks)
-                    throw new InvalidDataException("An HFS Plus bad-block extent lies outside the allocation area.");
-                allocationExtents.Add((start, checked(start + count)));
+                AddAllocationExtent(start, count, totalBlocks, allocationExtents,
+                    "An HFS Plus bad-block extent lies outside the allocation area.");
             }
         }
+    }
+
+    private static void AddAttributeRecordExtents(byte[] data, uint blockSize, uint totalBlocks,
+        List<(uint Start, uint End)> allocationExtents)
+    {
+        if (data.Length < 4) throw new InvalidDataException("An HFS Plus attribute record is truncated.");
+        switch (U32(data, 0))
+        {
+            case 0x10:
+                return;
+            case 0x20:
+                if (data.Length < 88)
+                    throw new InvalidDataException("An HFS Plus fork-data attribute is truncated.");
+                ReadOnlySpan<byte> fork = data.AsSpan(8, 80);
+                ulong logical = BinaryPrimitives.ReadUInt64BigEndian(fork);
+                uint allocated = U32(fork, 12);
+                if (logical > (ulong)allocated * blockSize)
+                    throw new InvalidDataException("An HFS Plus fork-data attribute has insufficient extents.");
+                uint covered = 0;
+                for (int index = 0; index < 8; index++)
+                {
+                    uint start = U32(fork, 16 + index * 8);
+                    uint count = U32(fork, 20 + index * 8);
+                    if (count == 0) break;
+                    if (count > allocated - covered)
+                        throw new InvalidDataException("An HFS Plus fork-data attribute exceeds its allocated blocks.");
+                    AddAllocationExtent(start, count, totalBlocks, allocationExtents,
+                        "An HFS Plus fork-data attribute lies outside the allocation area.");
+                    covered = checked(covered + count);
+                }
+                return;
+            case 0x30:
+                if (data.Length < 72)
+                    throw new InvalidDataException("An HFS Plus attribute extension record is truncated.");
+                AddExtentRecord(data.AsSpan(8, 64), totalBlocks, allocationExtents,
+                    "An HFS Plus attribute extension extent lies outside the allocation area.");
+                return;
+            default:
+                return;
+        }
+    }
+
+    private static void AddExtentRecord(ReadOnlySpan<byte> extents, uint totalBlocks,
+        List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage)
+    {
+        for (int index = 0; index < 8; index++)
+        {
+            uint start = U32(extents, index * 8);
+            uint count = U32(extents, index * 8 + 4);
+            if (count == 0) break;
+            AddAllocationExtent(start, count, totalBlocks, allocationExtents, outOfRangeMessage);
+        }
+    }
+
+    private static void AddAllocationExtent(uint start, uint count, uint totalBlocks,
+        List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage)
+    {
+        if ((ulong)start + count > totalBlocks) throw new InvalidDataException(outOfRangeMessage);
+        allocationExtents.Add((start, checked(start + count)));
     }
 
     private static void ValidateAllocationBitmap(byte[] bitmap, uint totalBlocks, uint blockSize,
@@ -309,7 +372,8 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree has an invalid tree type.");
         uint attributes = U32(tree, 14 + 38);
         bool variableIndexKeys = (attributes & 0x00000004) != 0;
-        if ((attributes & 0x00000002) == 0 || variableIndexKeys != (name == "catalog"))
+        bool hasVariableIndexKeys = name is "catalog" or "attributes";
+        if ((attributes & 0x00000002) == 0 || variableIndexKeys != hasVariableIndexKeys)
             throw new InvalidDataException($"The HFS Plus {name} B-tree key-layout attributes are invalid.");
         bool caseSensitiveCatalog = false;
         if (name == "catalog" && isHfsX)
@@ -322,8 +386,8 @@ internal static class HfsPlusReader
         int nodeSize = U16(tree, 32);
         if (nodeSize < 512 || nodeSize > 32768 || (nodeSize & (nodeSize - 1)) != 0 || tree.Length % nodeSize != 0)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is invalid.");
-        if (name == "catalog" && nodeSize < 4096)
-            throw new InvalidDataException("The HFS Plus catalog B-tree node size is below the 4 KiB minimum.");
+        if ((name is "catalog" or "attributes") && nodeSize < 4096)
+            throw new InvalidDataException($"The HFS Plus {name} B-tree node size is below the 4 KiB minimum.");
         uint totalNodes = U32(tree, 36);
         if (totalNodes == 0 || totalNodes > tree.Length / nodeSize)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node count is invalid.");
@@ -489,7 +553,7 @@ internal static class HfsPlusReader
                 }
                 firstIndexKey ??= indexKey;
                 previousIndexKey = indexKey;
-                int storedKeyLength = name == "catalog" ? keyLength : maxKeyLength;
+                int storedKeyLength = (name is "catalog" or "attributes") ? keyLength : maxKeyLength;
                 int childOffset = begin + 2 + storedKeyLength;
                 if ((childOffset & 1) != 0) childOffset++;
                 if (childOffset > end - 4)
