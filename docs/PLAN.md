@@ -27,28 +27,28 @@ MacPaint, fonts) with the two adapters (the layering below).
 Resource forks rarely survive on modern disks, so most of the value is in unwrapping the containers they travel in.
 Proposed priority:
 
-| Priority | Container | Typical source |
-| --- | --- | --- |
-| 1 | Raw resource fork (`.rsrc`, `file/..namedfork/rsrc` on macOS) | Extracted forks, macOS copies |
-| 1 | AppleDouble (`._file`, `__MACOSX/` in zips) and AppleSingle | Files copied to FAT/SMB, zip archives |
-| 1 | Basilisk II / SheepShaver shared folders (`.rsrc/<name>` fork, `.finf/<name>` Finder info) | Files copied out of emulators |
-| 1 | PC Exchange / File Exchange folders (`RESOURCE.FRK/<8.3 name>` fork, `FINDER.DAT` records) | DOS and Windows disks written by Mac OS 7.1–9 |
-| 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites |
-| 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites |
-| 2 | HFS and MFS disk images: raw `.dsk`/`.img`/`.hda` bare or inside an Apple Partition Map, DiskCopy 4.2, NDIF (Disk Copy 6 `.img`, `.smi`; ADC and resource-fork-less reconstruction), DART, UDIF `.dmg` | Emulator disks, floppy images, Apple system software, images re-shared from Mac OS X |
-| 2 | CD images: ISO 9660 with Apple extensions and Rock Ridge names, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw 2352-byte `.bin` + `.cue` | Magazine, game and system CDs |
-| 2 | FAT disk images with PC Exchange / File Exchange data (e.g. `RealmzClassicHD.img`) | Emulator hard disks and floppies shared with PCs |
-| 3 | HFS+ images | Mac OS 8.1–9 disks |
-| 2 | Zip / MacZip (`.zip`, stored and DEFLATE) with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (`.tar`, `.gz`, `.tgz`, MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers |
-| 2 | uuencode (`.uu`) | Usenet and mail transfers |
-| 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads |
-| 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives |
-| 4 | DiskDoubler (`.dd`), StuffIt SegmentIt archives, PackIt (`.pit`), standalone LHA/LZH (`.lzh`) | Early 1990s downloads, multi-floppy BBS files |
-| 5 | Encrypted Mac application formats, only on request: StuffIt X (`.sitx`); FolderBolt; MacSafe II; Crypt for Mac; MacPGP; Apple File Security | Password-protected archives, files and folders |
-| 5 | Only on request: AppleLink PackageIt, Now Compress, MacLHA, MOOF flux images, MAME CHD, Apple II formats | Rare, or not classic Mac |
-| 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators |
+| Priority | Container | Typical source | Status (2026-10-01) |
+| --- | --- | --- | --- |
+| 1 | Raw resource fork (`.rsrc`, `file/..namedfork/rsrc` on macOS) | Extracted forks, macOS copies | Built |
+| 1 | AppleDouble (`._file`, `__MACOSX/` in zips) and AppleSingle | Files copied to FAT/SMB, zip archives | Built (read and write) |
+| 1 | Basilisk II / SheepShaver shared folders (`.rsrc/<name>` fork, `.finf/<name>` Finder info) | Files copied out of emulators | Built |
+| 1 | PC Exchange / File Exchange folders (`RESOURCE.FRK/<8.3 name>` fork, `FINDER.DAT` records) | DOS and Windows disks written by Mac OS 7.1–9 | Built |
+| 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites | Built (read and write) |
+| 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites | Built (read and write) |
+| 2 | HFS and MFS disk images: raw `.dsk`/`.img`/`.hda` bare or inside an Apple Partition Map, DiskCopy 4.2, NDIF (Disk Copy 6 `.img`, `.smi`; ADC and resource-fork-less reconstruction), DART, UDIF `.dmg` | Emulator disks, floppy images, Apple system software, images re-shared from Mac OS X | Built; plain HFS also written (phase 8) |
+| 2 | CD images: ISO 9660 with Apple extensions and Rock Ridge names, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw 2352-byte `.bin` + `.cue` | Magazine, game and system CDs | Built, as the Mac reads them: hybrid discs as HFS; no Rock Ridge (the Mac reads only the primary descriptor). Multisession: Todo |
+| 2 | FAT disk images with PC Exchange / File Exchange data (e.g. `RealmzClassicHD.img`) | Emulator hard disks and floppies shared with PCs | Built (with DOS partition tables) |
+| 2 | Zip / MacZip (`.zip`, stored and DEFLATE) with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (`.tar`, `.gz`, `.tgz`, MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers | Not started (Todo) |
+| 2 | uuencode (`.uu`) | Usenet and mail transfers | Not started (Todo) |
+| 3 | HFS+ images | Mac OS 8.1–9 disks | Built, read-only (phase 10) |
+| 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads | Archives built (phase 10); self-extractors not started (Todo) |
+| 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives | Not started (Todo) |
+| 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators | Not started (Todo) |
+| 4 | DiskDoubler (`.dd`), StuffIt SegmentIt archives, PackIt (`.pit`), standalone LHA/LZH (`.lzh`) | Early 1990s downloads, multi-floppy BBS files | Built (phase 10) |
+| 5 | Encrypted Mac application formats, only on request: StuffIt X (`.sitx`); FolderBolt; MacSafe II; Crypt for Mac; MacPGP; Apple File Security | Password-protected archives, files and folders | On request only |
+| 5 | Only on request: AppleLink PackageIt, Now Compress, MacLHA, MOOF flux images, MAME CHD, Apple II formats | Rare, or not classic Mac | On request only |
 
-Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection should recurse.
+Containers can nest (a `.hqx` holding a `.sit` holding a disk image), so input detection recurses (built).
 
 Out of scope: `.sparseimage`/`.sparsebundle` (Mac OS X). StuffIt X (`.sitx`) and the other priority-5 encryption formats
 are only considered on request; their exact on-disk variants, password handling and cryptographic details need
@@ -854,6 +854,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **CD images: multisession.**
 - [ ] **Zip and tar with Mac data** (AppleDouble `._` entries, `__MACOSX`) and **`.sea` self-extracting archive
   detection** (phase 2).
+- [ ] **uuencode** (`.uu`) input (Inputs, priority 2).
+- [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3).
+- [ ] **Mac ROM images:** read the ROM's built-in resource map (Inputs, priority 3).
 - [ ] **HFS create and delete in the app:** offer `HfsWriter`'s file and folder creation and deletion in the editor
   (phase 8).
 - [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
