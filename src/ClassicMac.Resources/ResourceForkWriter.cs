@@ -86,7 +86,7 @@ namespace ClassicMac.Resources
 
             foreach (var (resource, _) in items)
             {
-                writer.WriteUInt32((uint)resource.Length);
+                writer.WriteUInt32(resource.Length);
                 writer.WriteBytes(resource.GetData().Span);
             }
 
@@ -95,7 +95,7 @@ namespace ClassicMac.Resources
             writer.WriteByte((byte)(fork.Attributes & ~NotOnDisk));
             writer.WriteByte((byte)fork.MapFlags);
             writer.WriteUInt16(MapHeaderLength);
-            writer.WriteUInt16((ushort)nameListOffset);
+            writer.WriteUInt16(nameListOffset);
 
             writer.WriteUInt16((ushort)(groups.Count - 1));
             var referenceOffset = typeListLength; // from the start of the type list
@@ -104,15 +104,15 @@ namespace ClassicMac.Resources
                 if (referenceOffset > ushort.MaxValue)
                     throw new InvalidOperationException("The reference lists exceed the 64 KiB a type list can address.");
                 writer.WriteFourCC(type);
-                writer.WriteUInt16((ushort)(resources.Count - 1));
-                writer.WriteUInt16((ushort)referenceOffset);
+                writer.WriteUInt16(resources.Count - 1);
+                writer.WriteUInt16(referenceOffset);
                 referenceOffset += resources.Count * ReferenceEntryLength;
             }
             foreach (var (_, resources) in groups)
                 foreach (var resource in resources)
                 {
                     writer.WriteInt16(resource.Id);
-                    writer.WriteUInt16(nameOffsets.TryGetValue(resource, out var nameAt) ? (ushort)nameAt : NoName);
+                    writer.WriteUInt16(nameOffsets.TryGetValue(resource, out var nameAt) ? nameAt : NoName);
                     writer.WriteUInt32((uint)dataOffsets[resource] | (uint)(resource.Attributes & ~ResourceAttributes.Changed) << 24);
                     writer.WriteUInt32(resource.StoredHandle);
                 }
@@ -120,7 +120,7 @@ namespace ClassicMac.Resources
             foreach (var resource in named)
             {
                 var name = resource.Name!.Value;
-                writer.WriteByte((byte)name.Length);
+                writer.WriteByte(name.Length);
                 writer.WriteBytes(name.Bytes);
             }
             return writer.ToArray();
@@ -130,10 +130,10 @@ namespace ClassicMac.Resources
 
         private static void WriteHeader(BigEndianWriter writer, long dataOffset, long mapOffset, long dataLength, long mapLength)
         {
-            writer.WriteUInt32((uint)dataOffset);
-            writer.WriteUInt32((uint)mapOffset);
-            writer.WriteUInt32((uint)dataLength);
-            writer.WriteUInt32((uint)mapLength);
+            writer.WriteUInt32(dataOffset);
+            writer.WriteUInt32(mapOffset);
+            writer.WriteUInt32(dataLength);
+            writer.WriteUInt32(mapLength);
         }
     }
 }
