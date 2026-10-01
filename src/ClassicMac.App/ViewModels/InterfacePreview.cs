@@ -74,11 +74,12 @@ namespace ClassicMac.App.ViewModels
             if (table is null) return null;
             var data = Data(table, fork, readOptions, diagnostics).Span;
             if (data.Length < 8) return null;
-            var count = System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(data[6..]) + 1;
+            var reader = new BigEndianReader(data);
+            var count = reader.ReadInt16At(6) + 1;
             for (var i = 0; i < count && 16 + i * 8 <= data.Length; i++)
             {
-                var e = data[(8 + i * 8)..];
-                if (System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(e) == 0) return new(e[2], e[4], e[6]);
+                var e = 8 + i * 8;
+                if (reader.ReadInt16At(e) == 0) return new(data[e + 2], data[e + 4], data[e + 6]);
             }
             return null;
         }

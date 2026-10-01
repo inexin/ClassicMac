@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -276,7 +275,11 @@ namespace ClassicMac.App.ViewModels
         }
 
         // Width and height from the PNG's IHDR (which directly follows the signature).
-        private static (int Width, int Height) PngSize(ReadOnlySpan<byte> png) =>
-            png.Length >= 24 ? (BinaryPrimitives.ReadInt32BigEndian(png[16..]), BinaryPrimitives.ReadInt32BigEndian(png[20..])) : (0, 0);
+        private static (int Width, int Height) PngSize(ReadOnlySpan<byte> png)
+        {
+            if (png.Length < 24) return (0, 0);
+            var reader = new BigEndianReader(png);
+            return (reader.ReadInt32At(16), reader.ReadInt32At(20));
+        }
     }
 }
