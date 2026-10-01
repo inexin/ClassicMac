@@ -60,7 +60,7 @@ public sealed class CompactProReader : IContainerReader
         if (archive.Length < ArchiveHeaderLength || archive[0] != 1)
             throw new InvalidDataException("Not a Compact Pro archive.");
 
-        uint directoryOffsetRaw = U32(archive, 4);
+        uint directoryOffsetRaw = new BigEndianReader(archive).ReadUInt32At(4);
         if (directoryOffsetRaw > int.MaxValue)
             throw new InvalidDataException("The Compact Pro directory offset is too large.");
         int directoryOffset = (int)directoryOffsetRaw;
@@ -127,7 +127,8 @@ public sealed class CompactProReader : IContainerReader
                 minimumDataOffset = ArchiveHeaderLength;
             }
 
-            uint fileOffsetRaw = U32(metadata, 1);
+            var metadataReader = new BigEndianReader(metadata);
+            uint fileOffsetRaw = metadataReader.ReadUInt32At(1);
             if (fileOffsetRaw > int.MaxValue)
                 throw new InvalidDataException("A Compact Pro fork data offset is too large.");
             int fileOffset = (int)fileOffsetRaw;
@@ -135,15 +136,15 @@ public sealed class CompactProReader : IContainerReader
                 throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
             FourCC type = new(metadata.Span.Slice(5, 4));
             FourCC creator = new(metadata.Span.Slice(9, 4));
-            uint createdRaw = U32(metadata, 13);
-            uint modifiedRaw = U32(metadata, 17);
-            var finderFlags = (FinderFlags)U16(metadata, 21);
-            uint expectedCrc = U32(metadata, 23);
-            ushort flags = U16(metadata, 27);
-            int resourceLength = ReadLength(U32(metadata, 29), "resource fork");
-            int dataLength = ReadLength(U32(metadata, 33), "data fork");
-            int resourceCompressedLength = ReadLength(U32(metadata, 37), "compressed resource fork");
-            int dataCompressedLength = ReadLength(U32(metadata, 41), "compressed data fork");
+            uint createdRaw = metadataReader.ReadUInt32At(13);
+            uint modifiedRaw = metadataReader.ReadUInt32At(17);
+            var finderFlags = (FinderFlags)metadataReader.ReadUInt16At(21);
+            uint expectedCrc = metadataReader.ReadUInt32At(23);
+            ushort flags = metadataReader.ReadUInt16At(27);
+            int resourceLength = ReadLength(metadataReader.ReadUInt32At(29), "resource fork");
+            int dataLength = ReadLength(metadataReader.ReadUInt32At(33), "data fork");
+            int resourceCompressedLength = ReadLength(metadataReader.ReadUInt32At(37), "compressed resource fork");
+            int dataCompressedLength = ReadLength(metadataReader.ReadUInt32At(41), "compressed data fork");
             Require(dataVolume, fileOffset, checked(resourceCompressedLength + dataCompressedLength),
                 "Compact Pro fork data");
 
@@ -370,10 +371,6 @@ public sealed class CompactProReader : IContainerReader
         if (value > int.MaxValue) throw new InvalidDataException($"A Compact Pro {what} exceeds the supported size.");
         return (int)value;
     }
-
-    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
-
-    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private static void Require(byte[] archive, int offset, int length, string what)
     {

@@ -24,9 +24,10 @@ namespace ClassicMac.Files.Hfs
                 throw new ArgumentException("Use a colon-separated HFS path without empty components.", nameof(macPath));
 
             byte[] source = image.ToArray();
-            if (source.Length < MdbOffset + MdbSize || U16(source, MdbOffset) != 0x4244)
+            var sourceReader = new BigEndianReader(source);
+            if (source.Length < MdbOffset + MdbSize || U16(sourceReader, MdbOffset) != 0x4244)
                 throw new InvalidDataException("The input is not a plain HFS volume.");
-            var mdb = source.AsMemory(MdbOffset, MdbSize);
+            var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
             if (U16(mdb, 0x7C) == 0x482B)
                 throw new InvalidDataException("Writing an HFS wrapper around HFS Plus is not supported.");
             if ((U16(mdb, 0x0A) & 0x8000) != 0)
@@ -38,22 +39,22 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The HFS allocation area is invalid or extends beyond the image.");
 
             var overflow = new Dictionary<(byte Fork, uint File), List<(ushort Start, byte[] Extents)>>();
-            var extFileExtents = ParseExtents(mdb.Slice(0x86, 12));
+            var extFileExtents = ParseExtents(mdb, 0x86);
             var extFile = ReadFork(source, firstBlock, blockSize, blockCount, extFileExtents, U32(mdb, 0x82), overflow, 0xFF, 3, false);
             ValidateExtentsTree(extFile);
             var extFileRecords = LeafRecords(extFile).ToArray();
             foreach (var record in extFileRecords)
             {
                 if (record.Key.Length < 8 || record.Data.Length < 12) continue;
-                var key = record.Key;
+                var key = new BigEndianReader(record.Key);
                 var id = U32(key, 2);
                 var start = U16(key, 6);
-                var kind = key[1];
+                var kind = record.Key[1];
                 if (!overflow.TryGetValue((kind, id), out var list)) overflow[(kind, id)] = list = [];
                 list.Add((start, record.Data.AsSpan(0, 12).ToArray()));
             }
 
-            var catalogExtents = ParseExtents(mdb.Slice(0x96, 12));
+            var catalogExtents = ParseExtents(mdb, 0x96);
             var catalog = ReadFork(source, firstBlock, blockSize, blockCount, catalogExtents, U32(mdb, 0x92), overflow, 0, 4, true);
             ValidateCatalogTree(catalog);
             var catalogRecords = LeafRecords(catalog).ToArray();
@@ -61,34 +62,39 @@ namespace ClassicMac.Files.Hfs
             foreach (var entry in catalogRecords)
             {
                 if (entry.Key.Length >= 7 && entry.Data.Length >= 70 && entry.Data[0] == 1)
-                    folders[U32(entry.Data, 6)] = (U32(entry.Key, 2), DecodeName(entry.Key));
+                    folders[U32(new BigEndianReader(entry.Data), 6)] =
+                        (U32(new BigEndianReader(entry.Key), 2), DecodeName(entry.Key));
             }
 
             string wanted = macPath;
             var match = catalogRecords.FirstOrDefault(entry => entry.Key.Length >= 7 && entry.Data.Length >= 102 && entry.Data[0] == 2 &&
-                HfsPathEquals(PathOf(U32(entry.Key, 2), DecodeName(entry.Key), folders), wanted));
+                HfsPathEquals(PathOf(U32(new BigEndianReader(entry.Key), 2), DecodeName(entry.Key), folders), wanted));
             if (match is null) throw new InvalidDataException($"The HFS file '{macPath}' was not found.");
             if ((match.Data[2] & 1) != 0) throw new InvalidDataException($"The HFS file '{macPath}' is locked.");
-            string canonicalPath = PathOf(U32(match.Key, 2), DecodeName(match.Key), folders);
+            string canonicalPath = PathOf(U32(new BigEndianReader(match.Key), 2), DecodeName(match.Key), folders);
 
             int forkLengthOffset = fork == HfsFork.Data ? 26 : 36;
             int forkPhysicalLengthOffset = fork == HfsFork.Data ? 30 : 40;
             int forkExtentOffset = fork == HfsFork.Data ? 74 : 86;
-            uint fileId = U32(match.Data, 20);
-            uint logicalLength = U32(match.Data, forkLengthOffset);
-            var primaryExtentRecord = match.Data.AsSpan(forkExtentOffset, 12).ToArray();
+            var matchData = new BigEndianReader(match.Data);
+            uint fileId = U32(matchData, 20);
+            uint logicalLength = U32(matchData, forkLengthOffset);
+            var primaryExtentRecord = new BigEndianReader(match.Data.AsSpan(forkExtentOffset, 12).ToArray());
             LastExtentSlot(primaryExtentRecord);
             var extents = ParseExtents(primaryExtentRecord);
             var overflowKey = (fork == HfsFork.Data ? (byte)0 : (byte)0xFF, fileId);
-            var targetOverflow = extFileRecords.Where(r => r.Key.Length >= 8 && r.Key[1] == overflowKey.Item1 && U32(r.Key, 2) == fileId)
-                .OrderBy(r => U16(r.Key, 6)).ToArray();
+            var targetOverflow = extFileRecords.Where(r => r.Key.Length >= 8 && r.Key[1] == overflowKey.Item1 &&
+                    U32(new BigEndianReader(r.Key), 2) == fileId)
+                .OrderBy(r => U16(new BigEndianReader(r.Key), 6)).ToArray();
             uint forkBlockNumber = (uint)extents.Aggregate(0, (count, extent) => count + extent.Count);
             foreach (var overflowRecord in targetOverflow)
             {
-                if (U16(overflowRecord.Key, 6) != forkBlockNumber || overflowRecord.Data.Length < 12)
+                if (U16(new BigEndianReader(overflowRecord.Key), 6) != forkBlockNumber ||
+                    overflowRecord.Data.Length < 12)
                     throw new InvalidDataException("The file's extents-overflow keys are not contiguous with its fork extents.");
-                LastExtentSlot(overflowRecord.Data);
-                var next = ParseExtents(overflowRecord.Data);
+                var overflowData = new BigEndianReader(overflowRecord.Data);
+                LastExtentSlot(overflowData);
+                var next = ParseExtents(overflowData);
                 extents.AddRange(next);
                 forkBlockNumber += (uint)next.Aggregate(0, (count, extent) => count + extent.Count);
             }
@@ -159,10 +165,10 @@ namespace ClassicMac.Files.Hfs
             int alternateMdbOffset = result.Length - 2 * BlockSize;
             if (resizeContext.AllocatedTreeBlocks != 0 && alternateMdbOffset >= 0 &&
                 (ulong)alternateMdbOffset >= firstBlock + (ulong)blockCount * blockSize &&
-                U16(source, alternateMdbOffset) == 0x4244)
+                U16(sourceReader, alternateMdbOffset) == 0x4244)
                 result.AsSpan(MdbOffset, BlockSize).CopyTo(result.AsSpan(alternateMdbOffset, BlockSize));
             ValidateExtentsTree(ReadFork(result, firstBlock, blockSize, blockCount, extFileExtents,
-                U32(result, MdbOffset + 0x82), overflow, 0xFF, 3, false));
+                U32(new BigEndianReader(result), MdbOffset + 0x82), overflow, 0xFF, 3, false));
             Verify(source, result, canonicalPath, fork, data.Span, writeTime, newlyAllocatedBlocks, releasedBlocks);
             return result;
         }
@@ -208,13 +214,14 @@ namespace ClassicMac.Files.Hfs
         {
             var terminalOverflow = context.OverflowRecords.LastOrDefault();
             byte[] terminal = terminalOverflow?.Data ?? context.CatalogRecord.Data.AsSpan(context.ExtentOffset, 12).ToArray();
-            int lastSlot = LastExtentSlot(terminal);
+            var terminalReader = new BigEndianReader(terminal);
+            int lastSlot = LastExtentSlot(terminalReader);
             ulong remaining = requiredBlocks - allocatedBlocks;
             uint adjacentGrowth = 0;
             if (lastSlot >= 0)
             {
-                ushort lastStart = U16(terminal, lastSlot * 4);
-                ushort lastCount = U16(terminal, lastSlot * 4 + 2);
+                ushort lastStart = U16(terminalReader, lastSlot * 4);
+                ushort lastCount = U16(terminalReader, lastSlot * 4 + 2);
                 uint adjacent = (uint)lastStart + lastCount;
                 while (adjacentGrowth < remaining && adjacentGrowth < ushort.MaxValue - lastCount &&
                     adjacent + adjacentGrowth < context.BlockCount &&
@@ -231,7 +238,7 @@ namespace ClassicMac.Files.Hfs
 
             var additions = remaining == 0 ? [] : AllocateRuns(context.Bitmap,
                 checked((ushort)context.BlockCount), remaining, checked((int)context.BlockCount));
-            int slot = LastExtentSlot(terminal) + 1;
+            int slot = LastExtentSlot(terminalReader) + 1;
             ulong nextForkBlock = allocatedBlocks + adjacentGrowth;
             uint allocatedRuns = 0;
             bool changedTree = false;
@@ -323,7 +330,7 @@ namespace ClassicMac.Files.Hfs
             uint newMapNodes = ExtendBTreeNodeMap(grown, oldNodeCount, newNodeCount);
             var header = new BigEndianWriter(grown);
             header.WriteUInt32At(14 + 22, newNodeCount);
-            header.WriteUInt32At(14 + 26, checked(U32(grown, 14 + 26) + addedNodes - newMapNodes));
+            header.WriteUInt32At(14 + 26, checked(U32(new BigEndianReader(grown), 14 + 26) + addedNodes - newMapNodes));
             context.ExtentsTree = grown;
             context.AllocatedTreeBlocks++;
             ValidateExtentsTree(grown);
@@ -336,11 +343,12 @@ namespace ClassicMac.Files.Hfs
             for (int recordIndex = context.OverflowRecords.Length - 1; recordIndex >= 0 && excess > 0; recordIndex--)
             {
                 var overflowRecord = context.OverflowRecords[recordIndex];
-                int lastSlot = LastExtentSlot(overflowRecord.Data);
+                var overflowData = new BigEndianReader(overflowRecord.Data);
+                int lastSlot = LastExtentSlot(overflowData);
                 while (lastSlot >= 0 && excess > 0)
                 {
-                    ushort start = U16(overflowRecord.Data, lastSlot * 4);
-                    ushort count = U16(overflowRecord.Data, lastSlot * 4 + 2);
+                    ushort start = U16(overflowData, lastSlot * 4);
+                    ushort count = U16(overflowData, lastSlot * 4 + 2);
                     uint giveBack = (uint)Math.Min(excess, (ulong)count);
                     for (uint block = (uint)start + count - giveBack; block < (uint)start + count; block++)
                         SetBitmap(context.Bitmap, checked((ushort)block), allocated: false);
@@ -366,11 +374,12 @@ namespace ClassicMac.Files.Hfs
             }
 
             byte[] primary = context.CatalogRecord.Data.AsSpan(context.ExtentOffset, 12).ToArray();
-            int primarySlot = LastExtentSlot(primary);
+            var primaryReader = new BigEndianReader(primary);
+            int primarySlot = LastExtentSlot(primaryReader);
             while (primarySlot >= 0 && excess > 0)
             {
-                ushort start = U16(primary, primarySlot * 4);
-                ushort count = U16(primary, primarySlot * 4 + 2);
+                ushort start = U16(primaryReader, primarySlot * 4);
+                ushort count = U16(primaryReader, primarySlot * 4 + 2);
                 uint giveBack = (uint)Math.Min(excess, (ulong)count);
                 for (uint block = (uint)start + count - giveBack; block < (uint)start + count; block++)
                     SetBitmap(context.Bitmap, checked((ushort)block), allocated: false);
@@ -396,21 +405,22 @@ namespace ClassicMac.Files.Hfs
         private static IEnumerable<TreeRecord> LeafRecords(byte[] tree)
         {
             if (tree.Length < NodeSize) throw new InvalidDataException("An HFS B-tree is shorter than one node.");
-            uint node = U32(tree, 14 + 10);
+            uint node = U32(new BigEndianReader(tree), 14 + 10);
             var seen = new HashSet<uint>();
             while (node != 0)
             {
                 if (node >= tree.Length / NodeSize || !seen.Add(node)) throw new InvalidDataException("An HFS B-tree leaf link is invalid or loops.");
                 int nodeOffset = checked((int)node * NodeSize);
                 var bytes = tree.AsSpan(nodeOffset, NodeSize).ToArray();
+                var nodeReader = new BigEndianReader(bytes);
                 if ((sbyte)bytes[8] != -1) throw new InvalidDataException("An HFS B-tree leaf chain links to a non-leaf node.");
-                int count = U16(bytes, 10);
+                int count = U16(nodeReader, 10);
                 if (count > (NodeSize - 14) / 2 - 1)
                     throw new InvalidDataException("An HFS B-tree node has too many records for its offset table.");
                 for (int i = 0; i < count; i++)
                 {
-                    int start = U16(bytes, NodeSize - 2 * (i + 1));
-                    int end = U16(bytes, NodeSize - 2 * (i + 2));
+                    int start = U16(nodeReader, NodeSize - 2 * (i + 1));
+                    int end = U16(nodeReader, NodeSize - 2 * (i + 2));
                     if (start < 14 || end > NodeSize - 2 * (count + 1) || end <= start)
                         throw new InvalidDataException("An HFS B-tree record has invalid offsets.");
                     int keyEnd = start + 1 + bytes[start];
@@ -418,7 +428,7 @@ namespace ClassicMac.Files.Hfs
                     if (dataStart > end) throw new InvalidDataException("An HFS B-tree key exceeds its record.");
                     yield return new TreeRecord(bytes[start..keyEnd], bytes[dataStart..end], nodeOffset, start, end);
                 }
-                node = U32(bytes, 0);
+                node = U32(nodeReader, 0);
             }
         }
 
@@ -450,22 +460,23 @@ namespace ClassicMac.Files.Hfs
 
         private static void RebuildBTree(byte[] tree, List<(byte[] Key, byte[] Data)> records, bool validateExtents)
         {
-            uint nodeCount = U32(tree, 14 + 22);
+            var treeReader = new BigEndianReader(tree);
+            uint nodeCount = U32(treeReader, 14 + 22);
             var reserved = new HashSet<uint> { 0 };
             var maps = new List<(int Offset, int Length)>
             {
-                (U16(tree, NodeSize - 6), U16(tree, NodeSize - 8) - U16(tree, NodeSize - 6)),
+                (U16(treeReader, NodeSize - 6), U16(treeReader, NodeSize - 8) - U16(treeReader, NodeSize - 6)),
             };
-            uint mapNode = U32(tree, 0);
+            uint mapNode = U32(treeReader, 0);
             while (mapNode != 0)
             {
                 if (mapNode >= nodeCount || !reserved.Add(mapNode))
                     throw new InvalidDataException("The extents-overflow B-tree map-node chain is invalid.");
                 int offset = checked((int)mapNode * NodeSize);
-                int start = U16(tree, offset + NodeSize - 2);
-                int end = U16(tree, offset + NodeSize - 4);
+                int start = U16(treeReader, offset + NodeSize - 2);
+                int end = U16(treeReader, offset + NodeSize - 4);
                 maps.Add((offset + start, end - start));
-                mapNode = U32(tree, offset);
+                mapNode = U32(treeReader, offset);
             }
 
             var available = Enumerable.Range(1, checked((int)nodeCount - 1))
@@ -568,26 +579,27 @@ namespace ClassicMac.Files.Hfs
 
         private static uint ExtendBTreeNodeMap(byte[] tree, uint oldNodeCount, uint newNodeCount)
         {
-            int headerStart = U16(tree, NodeSize - 6);
-            int headerEnd = U16(tree, NodeSize - 8);
+            var treeReader = new BigEndianReader(tree);
+            int headerStart = U16(treeReader, NodeSize - 6);
+            int headerEnd = U16(treeReader, NodeSize - 8);
             if (headerStart < 14 || headerEnd <= headerStart || headerEnd > NodeSize - 8)
                 throw new InvalidDataException("The HFS B-tree header node map has invalid offsets.");
             var maps = new List<(int Offset, int Length)> { (headerStart, headerEnd - headerStart) };
             uint lastMapNode = 0;
             var seen = new HashSet<uint>();
-            uint current = U32(tree, 0);
+            uint current = U32(treeReader, 0);
             while (current != 0)
             {
                 if (current >= oldNodeCount || !seen.Add(current))
                     throw new InvalidDataException("The HFS B-tree map-node chain is invalid.");
                 int at = checked((int)current * NodeSize);
-                int start = U16(tree, at + NodeSize - 2);
-                int end = U16(tree, at + NodeSize - 4);
+                int start = U16(treeReader, at + NodeSize - 2);
+                int end = U16(treeReader, at + NodeSize - 4);
                 if (tree[at + 8] != 2 || start < 14 || end <= start || end > NodeSize - 4)
                     throw new InvalidDataException("The HFS B-tree map node has invalid offsets.");
                 maps.Add((at + start, end - start));
                 lastMapNode = current;
-                current = U32(tree, at);
+                current = U32(treeReader, at);
             }
 
             uint mapCapacity = checked((uint)maps.Sum(map => (long)map.Length * 8));
@@ -654,14 +666,15 @@ namespace ClassicMac.Files.Hfs
             if (nodeNumber >= tree.Length / NodeSize) throw new InvalidDataException("An HFS B-tree node lies outside the tree file.");
             int nodeOffset = checked((int)nodeNumber * NodeSize);
             var bytes = tree.AsMemory(nodeOffset, NodeSize);
-            int count = U16(bytes, 10);
+            var nodeReader = new BigEndianReader(bytes);
+            int count = U16(nodeReader, 10);
             if (count > (NodeSize - 14) / 2 - 1)
                 throw new InvalidDataException("An HFS B-tree node has too many records for its offset table.");
             var records = new List<(byte[] Key, byte[] Data)>(count);
             for (int i = 0; i < count; i++)
             {
-                int start = U16(bytes, NodeSize - 2 * (i + 1));
-                int end = U16(bytes, NodeSize - 2 * (i + 2));
+                int start = U16(nodeReader, NodeSize - 2 * (i + 1));
+                int end = U16(nodeReader, NodeSize - 2 * (i + 2));
                 if (start < 14 || end > NodeSize - 2 * (count + 1) || end <= start)
                     throw new InvalidDataException("An HFS B-tree node has invalid record offsets.");
                 int keyEnd = start + 1 + bytes.Span[start];
@@ -725,47 +738,49 @@ namespace ClassicMac.Files.Hfs
             string treeKind = catalog ? "catalog" : "extents-overflow";
             int CompareKeys(byte[] left, byte[] right) => catalog
                 ? CompareCatalogKeys(left, right) : CompareExtentsKeys(left, right);
-            if (tree.Length < NodeSize || tree.Length % NodeSize != 0 || tree[8] != 1 || U16(tree, 10) != 3)
+            var treeReader = new BigEndianReader(tree);
+            if (tree.Length < NodeSize || tree.Length % NodeSize != 0 || tree[8] != 1 || U16(treeReader, 10) != 3)
                 throw new InvalidDataException($"The HFS {treeKind} B-tree has an invalid header node or length.");
-            uint nodeCount = U32(tree, 14 + 22);
-            if (nodeCount != (uint)(tree.Length / NodeSize) || U16(tree, 14 + 18) != NodeSize)
+            uint nodeCount = U32(treeReader, 14 + 22);
+            if (nodeCount != (uint)(tree.Length / NodeSize) || U16(treeReader, 14 + 18) != NodeSize)
                 throw new InvalidDataException($"The HFS {treeKind} B-tree header disagrees with its node file.");
-            int mapStart = U16(tree, NodeSize - 6);
-            int mapEnd = U16(tree, NodeSize - 8);
-            if (U16(tree, NodeSize - 2) != 14 || U16(tree, NodeSize - 4) != 14 + 106 ||
+            int mapStart = U16(treeReader, NodeSize - 6);
+            int mapEnd = U16(treeReader, NodeSize - 8);
+            if (U16(treeReader, NodeSize - 2) != 14 || U16(treeReader, NodeSize - 4) != 14 + 106 ||
                 mapStart != 14 + 106 + 128 || mapEnd < mapStart || mapEnd > NodeSize - 8)
                 throw new InvalidDataException($"The HFS {treeKind} B-tree header records have invalid offsets.");
 
             var mapRecords = new List<(int Offset, int Length)> { (mapStart, mapEnd - mapStart) };
             var usedNodes = new HashSet<uint> { 0 };
-            uint mapNode = U32(tree, 0);
+            uint mapNode = U32(treeReader, 0);
             uint previousMapNode = 0;
             while (mapNode != 0)
             {
                 if (mapNode >= nodeCount || !usedNodes.Add(mapNode))
                     throw new InvalidDataException($"The HFS {treeKind} B-tree map-node chain is invalid.");
                 int offset = checked((int)mapNode * NodeSize);
-                if (tree[offset + 8] != 2 || U16(tree, offset + 10) != 1 ||
-                    U32(tree, offset + 4) != previousMapNode)
+                if (tree[offset + 8] != 2 || U16(treeReader, offset + 10) != 1 ||
+                    U32(treeReader, offset + 4) != previousMapNode)
                     throw new InvalidDataException($"The HFS {treeKind} B-tree has an invalid map node.");
-                int start = U16(tree, offset + NodeSize - 2);
-                int end = U16(tree, offset + NodeSize - 4);
+                int start = U16(treeReader, offset + NodeSize - 2);
+                int end = U16(treeReader, offset + NodeSize - 4);
                 if (start < 14 || end <= start || end > NodeSize - 4)
                     throw new InvalidDataException($"The HFS {treeKind} B-tree map node has invalid record offsets.");
                 mapRecords.Add((offset + start, end - start));
                 previousMapNode = mapNode;
-                mapNode = U32(tree, offset);
+                mapNode = U32(treeReader, offset);
             }
             if (mapRecords.Aggregate<(int Offset, int Length), ulong>(0, (total, record) => total + (ulong)record.Length * 8) < nodeCount)
                 throw new InvalidDataException($"The HFS {treeKind} B-tree node map is truncated.");
 
             var nodesByHeight = new Dictionary<int, List<uint>>();
             uint leafRecordCount = 0;
-            ushort depth = U16(tree, 14);
-            uint root = U32(tree, 14 + 2);
+            ushort depth = U16(treeReader, 14);
+            uint root = U32(treeReader, 14 + 2);
             if (depth == 0)
             {
-                if (root != 0 || U32(tree, 14 + 6) != 0 || U32(tree, 14 + 10) != 0 || U32(tree, 14 + 14) != 0)
+                if (root != 0 || U32(treeReader, 14 + 6) != 0 || U32(treeReader, 14 + 10) != 0 ||
+                    U32(treeReader, 14 + 14) != 0)
                     throw new InvalidDataException($"The empty HFS {treeKind} B-tree has inconsistent header fields.");
             }
             else
@@ -773,8 +788,8 @@ namespace ClassicMac.Files.Hfs
                 if (depth > 127 || root == 0) throw new InvalidDataException($"The HFS {treeKind} B-tree has an invalid root or depth.");
                 Visit(root, depth);
                 var leaves = nodesByHeight[1];
-                if (U32(tree, 14 + 10) != leaves[0] || U32(tree, 14 + 14) != leaves[^1] ||
-                    U32(tree, 14 + 6) != leafRecordCount)
+                if (U32(treeReader, 14 + 10) != leaves[0] || U32(treeReader, 14 + 14) != leaves[^1] ||
+                    U32(treeReader, 14 + 6) != leafRecordCount)
                     throw new InvalidDataException($"The HFS {treeKind} B-tree leaf header disagrees with its nodes.");
             }
 
@@ -785,7 +800,7 @@ namespace ClassicMac.Files.Hfs
                     int offset = checked((int)nodes[i] * NodeSize);
                     uint previous = i == 0 ? 0 : nodes[i - 1];
                     uint next = i + 1 == nodes.Count ? 0 : nodes[i + 1];
-                    if (U32(tree, offset) != next || U32(tree, offset + 4) != previous)
+                    if (U32(treeReader, offset) != next || U32(treeReader, offset + 4) != previous)
                         throw new InvalidDataException($"The HFS {treeKind} B-tree level {height} has inconsistent sibling links.");
                 }
             }
@@ -808,7 +823,7 @@ namespace ClassicMac.Files.Hfs
                 }
                 if (!found) throw new InvalidDataException($"The HFS {treeKind} B-tree node map is truncated.");
             }
-            if (actualFreeNodes != U32(tree, 14 + 26))
+            if (actualFreeNodes != U32(treeReader, 14 + 26))
                 throw new InvalidDataException($"The HFS {treeKind} B-tree free-node count disagrees with its map.");
 
             (byte[] First, byte[] Last) Visit(uint number, int height)
@@ -852,7 +867,7 @@ namespace ClassicMac.Files.Hfs
                     else
                     {
                         if (data.Length != 4) throw new InvalidDataException($"An HFS {treeKind} index record has an invalid child pointer.");
-                        var child = Visit(U32(data, 0), height - 1);
+                        var child = Visit(U32(new BigEndianReader(data), 0), height - 1);
                         if (CompareKeys(key, child.First) != 0 ||
                             (last is not null && CompareKeys(last, child.First) >= 0))
                             throw new InvalidDataException($"An HFS {treeKind} index key disagrees with its child.");
@@ -867,10 +882,12 @@ namespace ClassicMac.Files.Hfs
         private static int CompareExtentsKeys(byte[] left, byte[] right)
         {
             if (left.Length < 8 || right.Length < 8) throw new InvalidDataException("An extents-overflow key is shorter than eight bytes.");
-            int order = U32(left, 2).CompareTo(U32(right, 2));
+            var leftReader = new BigEndianReader(left);
+            var rightReader = new BigEndianReader(right);
+            int order = U32(leftReader, 2).CompareTo(U32(rightReader, 2));
             if (order != 0) return order;
             order = left[1].CompareTo(right[1]);
-            return order != 0 ? order : U16(left, 6).CompareTo(U16(right, 6));
+            return order != 0 ? order : U16(leftReader, 6).CompareTo(U16(rightReader, 6));
         }
 
         private static void ValidateExtentOwnership(uint blockCount, byte[] bitmap,
@@ -882,19 +899,22 @@ namespace ClassicMac.Files.Hfs
             Claim(extentsFile, "extents-overflow file");
             Claim(catalogFile, "catalog file");
             if (overflow.TryGetValue((0x00, 3), out var extentsOverflow))
-                foreach (var record in extentsOverflow.OrderBy(r => r.Start)) Claim(ParseExtents(record.Extents), "extents-overflow file");
+                foreach (var record in extentsOverflow.OrderBy(r => r.Start))
+                    Claim(ParseExtents(new BigEndianReader(record.Extents)), "extents-overflow file");
 
             foreach (var record in catalogRecords)
             {
                 if (record.Key.Length < 7 || record.Data.Length < 102 || record.Data[0] != 2) continue;
-                uint id = U32(record.Data, 20);
+                var data = new BigEndianReader(record.Data);
+                uint id = U32(data, 20);
                 foreach (var (kind, offset) in new[] { ((byte)0, 74), ((byte)0xFF, 86) })
                 {
                     if (ReferenceEquals(record, target) && id == targetFileId && offset == targetForkOffset) continue;
-                    var fileExtents = ParseExtents(record.Data.AsMemory(offset, 12));
+                    var fileExtents = ParseExtents(data, offset);
                     Claim(fileExtents, "file fork");
                     if (overflow.TryGetValue((kind, id), out var fileOverflow))
-                        foreach (var extra in fileOverflow.OrderBy(r => r.Start)) Claim(ParseExtents(extra.Extents), "file fork");
+                        foreach (var extra in fileOverflow.OrderBy(r => r.Start))
+                            Claim(ParseExtents(new BigEndianReader(extra.Extents)), "file fork");
                 }
             }
             Claim(targetExtents, "target fork");
@@ -922,7 +942,8 @@ namespace ClassicMac.Files.Hfs
         {
             var extents = firstExtents.ToList();
             if (includeOverflow && overflow.TryGetValue((overflowFork, fileId), out var extra))
-                extents.AddRange(extra.OrderBy(x => x.Start).SelectMany(x => ParseExtents(x.Extents)));
+                extents.AddRange(extra.OrderBy(x => x.Start)
+                    .SelectMany(x => ParseExtents(new BigEndianReader(x.Extents))));
             ulong capacity = extents.Aggregate<(ushort Start, ushort Count), ulong>(0, (n, e) => n + (ulong)e.Count * blockSize);
             if (logicalLength > capacity || logicalLength > int.MaxValue) throw new InvalidDataException("An HFS system fork has invalid length or extents.");
             var output = new byte[(int)logicalLength];
@@ -940,18 +961,18 @@ namespace ClassicMac.Files.Hfs
             return output;
         }
 
-        private static List<(ushort Start, ushort Count)> ParseExtents(ReadOnlyMemory<byte> bytes)
+        private static List<(ushort Start, ushort Count)> ParseExtents(BigEndianReader bytes, int offset = 0)
         {
             var result = new List<(ushort, ushort)>();
             for (int i = 0; i < 3; i++)
             {
-                ushort start = U16(bytes, i * 4), count = U16(bytes, i * 4 + 2);
+                ushort start = U16(bytes, offset + i * 4), count = U16(bytes, offset + i * 4 + 2);
                 if (count != 0) result.Add((start, count));
             }
             return result;
         }
 
-        private static int LastExtentSlot(ReadOnlyMemory<byte> record)
+        private static int LastExtentSlot(BigEndianReader record)
         {
             int last = -1;
             bool emptySeen = false;
@@ -1059,7 +1080,8 @@ namespace ClassicMac.Files.Hfs
         {
             var result = initial.ToList();
             if (overflow.TryGetValue((fork, fileId), out var values))
-                result.AddRange(values.OrderBy(x => x.Start).SelectMany(x => ParseExtents(x.Extents)));
+                result.AddRange(values.OrderBy(x => x.Start)
+                    .SelectMany(x => ParseExtents(new BigEndianReader(x.Extents))));
             return result;
         }
 
@@ -1067,11 +1089,14 @@ namespace ClassicMac.Files.Hfs
             DateTime writeTime, uint newlyAllocatedBlocks, uint releasedBlocks)
         {
             uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
-            uint previousWriteCount = U32(source, MdbOffset + 0x46);
-            ushort previousFreeBlocks = U16(source, MdbOffset + 0x22);
+            var sourceReader = new BigEndianReader(source);
+            var resultReader = new BigEndianReader(result);
+            uint previousWriteCount = U32(sourceReader, MdbOffset + 0x46);
+            ushort previousFreeBlocks = U16(sourceReader, MdbOffset + 0x22);
             ushort expectedFreeBlocks = checked((ushort)((uint)previousFreeBlocks - newlyAllocatedBlocks + releasedBlocks));
-            if (U32(result, MdbOffset + 0x06) != macWriteTime || U32(result, MdbOffset + 0x46) != unchecked(previousWriteCount + 1) ||
-                U16(result, MdbOffset + 0x22) != expectedFreeBlocks)
+            if (U32(resultReader, MdbOffset + 0x06) != macWriteTime ||
+                U32(resultReader, MdbOffset + 0x46) != unchecked(previousWriteCount + 1) ||
+                U16(resultReader, MdbOffset + 0x22) != expectedFreeBlocks)
                 throw new InvalidDataException("The rewritten HFS volume metadata did not record its modification and allocation changes.");
             var beforeDiagnostics = new List<Diagnostic>();
             var afterDiagnostics = new List<Diagnostic>();
@@ -1149,10 +1174,10 @@ namespace ClassicMac.Files.Hfs
 
         private static string DecodeName(byte[] key) => key.Length >= 7 ? new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7))).ToString() : "";
         // An offset outside the data throws ArgumentOutOfRangeException.
-        private static ushort U16(ReadOnlyMemory<byte> b, int o) =>
-            new BigEndianReader(b).TryReadUInt16At(o, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
-        private static uint U32(ReadOnlyMemory<byte> b, int o) =>
-            new BigEndianReader(b).TryReadUInt32At(o, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
+        private static ushort U16(BigEndianReader b, int o) =>
+            b.TryReadUInt16At(o, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
+        private static uint U32(BigEndianReader b, int o) =>
+            b.TryReadUInt32At(o, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
     }
 
     /// <summary>The fork selected for an HFS file edit.</summary>

@@ -57,13 +57,14 @@ public sealed class StuffItReader : IContainerReader
         if (IsLegacyV2(archive)) return ReadLegacyV2(archive, context);
         if (archive.Length < ArchiveHeaderLength)
             throw new InvalidDataException("The StuffIt archive header is truncated.");
+        var reader = new BigEndianReader(archive);
 
-        uint reportedLength = U32(archive, 84);
+        uint reportedLength = reader.ReadUInt32At(84);
         if (reportedLength != 0 && reportedLength > archive.Length)
             throw new InvalidDataException("The StuffIt archive's reported size extends past the input.");
 
-        int rootCount = U16(archive, 92);
-        int firstMember = ReadPosition(U32(archive, 94), "first member");
+        int rootCount = reader.ReadUInt16At(92);
+        int firstMember = ReadPosition(reader.ReadUInt32At(94), "first member");
         if (rootCount > context.Options.MaxVolumeEntries)
             throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
         if (rootCount != 0 && (firstMember < ArchiveHeaderLength || firstMember >= archive.Length))
@@ -91,7 +92,7 @@ public sealed class StuffItReader : IContainerReader
             if (++entriesRead > context.Options.MaxVolumeEntries)
                 throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
 
-            Member member = ParseMember(archive, list.Position, context);
+            Member member = ParseMember(archive, reader, list.Position, context);
             int remaining = list.Remaining - 1;
             if (remaining > 0)
             {
@@ -192,13 +193,14 @@ public sealed class StuffItReader : IContainerReader
         const int headerLength = 22;
         if (archive.Length < headerLength)
             throw new InvalidDataException("The legacy StuffIt archive header is truncated.");
+        var reader = new BigEndianReader(archive);
 
-        uint reportedLength = U32(archive, 6);
+        uint reportedLength = reader.ReadUInt32At(6);
         if (reportedLength != 0 && reportedLength > archive.Length)
             throw new InvalidDataException("The legacy StuffIt archive's reported size extends past the input.");
 
-        int rootCount = U16(archive, 4);
-        int firstMember = ReadPosition(U32(archive, 16), "first legacy member");
+        int rootCount = reader.ReadUInt16At(4);
+        int firstMember = ReadPosition(reader.ReadUInt32At(16), "first legacy member");
         if (rootCount > context.Options.MaxVolumeEntries)
             throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
         if (rootCount != 0 && (firstMember < headerLength || firstMember >= archive.Length))
@@ -303,7 +305,7 @@ public sealed class StuffItReader : IContainerReader
     {
         const int archiveHeaderLength = 22;
         const int memberHeaderLength = 112;
-        uint reportedLength = U32(archive, 6);
+        uint reportedLength = new BigEndianReader(archive).ReadUInt32At(6);
         if (reportedLength != 0 && (reportedLength < archiveHeaderLength || reportedLength > archive.Length))
             throw new InvalidDataException("The legacy StuffIt archive's reported size is invalid.");
         int archiveEnd = reportedLength == 0 ? archive.Length : (int)reportedLength;
@@ -319,7 +321,8 @@ public sealed class StuffItReader : IContainerReader
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
 
             ReadOnlyMemory<byte> header = archive.AsMemory(position, memberHeaderLength);
-            ushort expectedHeaderCrc = U16(header, 110);
+            var headerReader = new BigEndianReader(header);
+            ushort expectedHeaderCrc = headerReader.ReadUInt16At(110);
             if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
                 context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                     $"The legacy StuffIt member header checksum is incorrect at offset {position}.", position);
@@ -332,10 +335,10 @@ public sealed class StuffItReader : IContainerReader
             if (nameLength > 63 || (nameLength == 0 && !endsFolder))
                 throw new InvalidDataException("A legacy StuffIt member name length is invalid.");
             MacString name = nameLength == 0 ? MacString.FromMacRoman("") : new MacString(header.Span.Slice(3, nameLength));
-            int resourceLength = ReadLength(U32(header, 84), "resource fork length");
-            int dataLength = ReadLength(U32(header, 88), "data fork length");
-            int resourceCompressedLength = ReadLength(U32(header, 92), "compressed resource fork length");
-            int dataCompressedLength = ReadLength(U32(header, 96), "compressed data fork length");
+            int resourceLength = ReadLength(headerReader.ReadUInt32At(84), "resource fork length");
+            int dataLength = ReadLength(headerReader.ReadUInt32At(88), "data fork length");
+            int resourceCompressedLength = ReadLength(headerReader.ReadUInt32At(92), "compressed resource fork length");
+            int dataCompressedLength = ReadLength(headerReader.ReadUInt32At(96), "compressed data fork length");
             int payloadOffset = checked(position + memberHeaderLength);
             int payloadLength = startsFolder || endsFolder ? 0 :
                 checked(resourceCompressedLength + dataCompressedLength);
@@ -382,9 +385,10 @@ public sealed class StuffItReader : IContainerReader
                     int dataOffset = checked(payloadOffset + resourceCompressedLength);
                     byte[] data = DecodeFork(archive, dataOffset, dataCompressedLength, dataLength, dataCompression);
                     if (resourceCompression != 15)
-                        CheckForkCrc(resource, U16(header, 100), "resource", name.ToString(), position, context);
+                        CheckForkCrc(resource, headerReader.ReadUInt16At(100), "resource", name.ToString(), position,
+                            context);
                     if (dataCompression != 15)
-                        CheckForkCrc(data, U16(header, 102), "data", name.ToString(), position, context);
+                        CheckForkCrc(data, headerReader.ReadUInt16At(102), "data", name.ToString(), position, context);
 
                     files.Add(new MacFile
                     {
@@ -394,10 +398,10 @@ public sealed class StuffItReader : IContainerReader
                         {
                             Type = new FourCC(header.Span.Slice(66, 4)),
                             Creator = new FourCC(header.Span.Slice(70, 4)),
-                            Flags = (FinderFlags)U16(header, 74),
+                            Flags = (FinderFlags)headerReader.ReadUInt16At(74),
                         },
-                        Created = Date(U32(header, 76)),
-                        Modified = Date(U32(header, 80)),
+                        Created = Date(headerReader.ReadUInt32At(76)),
+                        Modified = Date(headerReader.ReadUInt32At(80)),
                         DataFork = ForkData.FromBytes(data),
                         ResourceFork = ForkData.FromBytes(resource),
                     });
@@ -421,30 +425,31 @@ public sealed class StuffItReader : IContainerReader
         const int headerLength = 112;
         Require(archive, offset, headerLength, "legacy StuffIt member header");
         ReadOnlyMemory<byte> header = archive.AsMemory(offset, headerLength);
+        var headerReader = new BigEndianReader(header);
         int nameLength = header.Span[2];
         if (nameLength is < 1 or > 31)
             throw new InvalidDataException("A legacy StuffIt member name length is invalid.");
 
-        ushort expectedHeaderCrc = U16(header, 110);
+        ushort expectedHeaderCrc = headerReader.ReadUInt16At(110);
         if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The legacy StuffIt member header checksum is incorrect at offset {offset}.", offset);
 
-        int resourceLength = ReadLength(U32(header, 84), "resource fork length");
-        int dataLength = ReadLength(U32(header, 88), "data fork length");
-        int resourceCompressedLength = ReadLength(U32(header, 92), "compressed resource fork length");
-        int dataCompressedLength = ReadLength(U32(header, 96), "compressed data fork length");
+        int resourceLength = ReadLength(headerReader.ReadUInt32At(84), "resource fork length");
+        int dataLength = ReadLength(headerReader.ReadUInt32At(88), "data fork length");
+        int resourceCompressedLength = ReadLength(headerReader.ReadUInt32At(92), "compressed resource fork length");
+        int dataCompressedLength = ReadLength(headerReader.ReadUInt32At(96), "compressed data fork length");
         int resourceOffset = checked(offset + headerLength);
         int dataOffset = checked(resourceOffset + resourceCompressedLength);
         Require(archive, resourceOffset, checked(resourceCompressedLength + dataCompressedLength),
             "legacy StuffIt fork data");
 
-        uint firstChildRaw = U32(header, 62);
+        uint firstChildRaw = headerReader.ReadUInt32At(62);
         bool isFolder = firstChildRaw != uint.MaxValue;
         int firstChild = isFolder && firstChildRaw != 0 ? ReadPosition(firstChildRaw, "first child") : 0;
-        uint previous = U32(header, 50);
-        int next = ReadPosition(U32(header, 54), "next member");
-        uint parent = U32(header, 58);
+        uint previous = headerReader.ReadUInt32At(50);
+        int next = ReadPosition(headerReader.ReadUInt32At(54), "next member");
+        uint parent = headerReader.ReadUInt32At(58);
         if (next != 0 && (next < headerLength || next >= archive.Length))
             throw new InvalidDataException("A legacy StuffIt next-member link lies outside the archive.");
         if (firstChild != 0 && (firstChild < headerLength || firstChild >= archive.Length))
@@ -454,13 +459,13 @@ public sealed class StuffItReader : IContainerReader
         {
             Type = new FourCC(header.Span.Slice(66, 4)),
             Creator = new FourCC(header.Span.Slice(70, 4)),
-            Flags = (FinderFlags)U16(header, 74),
+            Flags = (FinderFlags)headerReader.ReadUInt16At(74),
         };
         return new LegacyMember(
             new MacString(header.Span.Slice(3, nameLength)),
             isFolder,
             firstChild,
-            U16(header, 48),
+            headerReader.ReadUInt16At(48),
             previous,
             next,
             parent,
@@ -473,10 +478,10 @@ public sealed class StuffItReader : IContainerReader
             dataCompressedLength,
             resourceOffset,
             dataOffset,
-            U16(header, 100),
-            U16(header, 102),
-            U32(header, 76),
-            U32(header, 80),
+            headerReader.ReadUInt16At(100),
+            headerReader.ReadUInt16At(102),
+            headerReader.ReadUInt32At(76),
+            headerReader.ReadUInt32At(80),
             finderInfo);
     }
 
@@ -493,24 +498,24 @@ public sealed class StuffItReader : IContainerReader
     private static bool IsSupportedMethod(byte method) =>
         method is 0 or 1 or 2 or 3 or 5 or 6 or 8 or 13 or 14 or 15;
 
-    private static Member ParseMember(byte[] archive, int offset, ContainerContext context)
+    private static Member ParseMember(byte[] archive, BigEndianReader reader, int offset, ContainerContext context)
     {
         Require(archive, offset, 48, "StuffIt member header");
-        if (U32(archive, offset) != MemberSignature)
+        if (reader.ReadUInt32At(offset) != MemberSignature)
             throw new InvalidDataException($"No StuffIt member header is present at offset {offset}.");
-        int headerLength = U16(archive, offset + 6);
+        int headerLength = reader.ReadUInt16At(offset + 6);
         if (headerLength is < 48 or > 2000)
             throw new InvalidDataException($"The StuffIt member header length {headerLength} is invalid.");
         Require(archive, offset, headerLength, "StuffIt member name and header");
 
-        ushort expectedHeaderCrc = U16(archive, offset + 32);
+        ushort expectedHeaderCrc = reader.ReadUInt16At(offset + 32);
         if (HeaderCrc(archive.AsSpan(offset, headerLength)) != expectedHeaderCrc)
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The StuffIt member header checksum is incorrect at offset {offset}.", offset);
 
         byte flags = archive[offset + 9];
         bool isFolder = (flags & FolderFlag) != 0;
-        int nameLength = U16(archive, offset + 30);
+        int nameLength = reader.ReadUInt16At(offset + 30);
         int nameOffset;
         int firstChild = 0;
         int childCount = 0;
@@ -521,15 +526,15 @@ public sealed class StuffItReader : IContainerReader
         int dataPasswordLength = 0;
         if (isFolder)
         {
-            firstChild = ReadPosition(U32(archive, offset + 34), "first child");
-            childCount = U16(archive, offset + 46);
+            firstChild = ReadPosition(reader.ReadUInt32At(offset + 34), "first child");
+            childCount = reader.ReadUInt16At(offset + 46);
             nameOffset = offset + 48;
         }
         else
         {
-            dataLength = U32(archive, offset + 34);
-            dataCompressedLength = U32(archive, offset + 38);
-            dataCrc = U16(archive, offset + 42);
+            dataLength = reader.ReadUInt32At(offset + 34);
+            dataCompressedLength = reader.ReadUInt32At(offset + 38);
+            dataCrc = reader.ReadUInt16At(offset + 42);
             dataMethod = archive[offset + 46];
             dataPasswordLength = archive[offset + 47];
             nameOffset = checked(offset + 48 + dataPasswordLength);
@@ -543,7 +548,7 @@ public sealed class StuffItReader : IContainerReader
         if (name.Length == 0 || name.Contains(':'))
             throw new InvalidDataException("A StuffIt member name is empty or contains a path separator.");
 
-        uint nextRaw = U32(archive, offset + 22);
+        uint nextRaw = reader.ReadUInt32At(offset + 22);
         if (nextRaw > int.MaxValue || (nextRaw != 0 && nextRaw >= archive.Length))
             throw new InvalidDataException("A StuffIt next-member link lies outside the archive.");
 
@@ -559,8 +564,8 @@ public sealed class StuffItReader : IContainerReader
             DataCompressedLength = ReadLength(dataCompressedLength, "compressed data-fork length"),
             DataCrc = dataCrc,
             DataMethod = dataMethod,
-            Created = Date(U32(archive, offset + 10)),
-            Modified = Date(U32(archive, offset + 14)),
+            Created = Date(reader.ReadUInt32At(offset + 10)),
+            Modified = Date(reader.ReadUInt32At(offset + 14)),
         };
         if (isFolder)
         {
@@ -571,10 +576,10 @@ public sealed class StuffItReader : IContainerReader
 
         int headerEnd = checked(offset + headerLength);
         Require(archive, headerEnd, 36, "StuffIt Finder information");
-        ushort fileFlags = U16(archive, headerEnd);
+        ushort fileFlags = reader.ReadUInt16At(headerEnd);
         var finder = new byte[FinderInfo.Length];
         archive.AsSpan(headerEnd + 4, 8).CopyTo(finder);
-        new BigEndianWriter(finder).WriteUInt16At(8, U16(archive, headerEnd + 12));
+        new BigEndianWriter(finder).WriteUInt16At(8, reader.ReadUInt16At(headerEnd + 12));
         int forkInfo = headerEnd + 36;
         int resourceLength = 0;
         int resourceCompressedLength = 0;
@@ -584,9 +589,9 @@ public sealed class StuffItReader : IContainerReader
         if ((fileFlags & HasResourceForkFlag) != 0)
         {
             Require(archive, forkInfo, 14, "StuffIt resource-fork metadata");
-            resourceLength = ReadLength(U32(archive, forkInfo), "resource-fork length");
-            resourceCompressedLength = ReadLength(U32(archive, forkInfo + 4), "compressed resource-fork length");
-            resourceCrc = U16(archive, forkInfo + 8);
+            resourceLength = ReadLength(reader.ReadUInt32At(forkInfo), "resource-fork length");
+            resourceCompressedLength = ReadLength(reader.ReadUInt32At(forkInfo + 4), "compressed resource-fork length");
+            resourceCrc = reader.ReadUInt16At(forkInfo + 8);
             resourceMethod = archive[forkInfo + 12];
             int resourcePasswordLength = archive[forkInfo + 13];
             encrypted |= resourcePasswordLength != 0;
@@ -1388,9 +1393,6 @@ public sealed class StuffItReader : IContainerReader
         if (value > int.MaxValue) throw new InvalidDataException($"The StuffIt {what} exceeds the supported size.");
         return (int)value;
     }
-
-    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
-    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private readonly record struct MemberList(int Position, int Remaining, MacString[] LegacyPath, string[] UnicodePath);
     private readonly record struct LegacyMemberList(int Position, int Remaining, MacString[] Path,

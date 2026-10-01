@@ -109,13 +109,16 @@ namespace ClassicMac.Files.Iso
             {
                 b = bytes;
                 HighSierra = highSierra;
+                var reader = new BigEndianReader(bytes);
+                Extent = reader.ReadInt32At(6);
+                Size = reader.ReadUInt32At(14);
             }
 
             public bool HighSierra { get; }
             public int Length => b[0];
             public int AttributeBlocks => b[1];
-            public int Extent => new BigEndianReader(b).ReadInt32At(6);
-            public uint Size => new BigEndianReader(b).ReadUInt32At(14);
+            public int Extent { get; }
+            public uint Size { get; }
             public byte Flags => HighSierra ? b[24] : b[25];
             public int UnitBlocks => b[26];
             public int GapBlocks => b[27];

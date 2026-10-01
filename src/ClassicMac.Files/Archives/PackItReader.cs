@@ -42,6 +42,7 @@ public sealed class PackItReader : IContainerReader
             throw new InvalidDataException("The PackIt archive exceeds the configured input-size limit.");
 
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
+        var archiveReader = new BigEndianReader(archive);
         var files = new List<MacFile>();
         long expandedBytes = 0;
         int entryCount = 0;
@@ -113,8 +114,9 @@ public sealed class PackItReader : IContainerReader
                     if (entryInput.Length < EntryMetadataLength)
                         throw new InvalidDataException("A PackIt encrypted file header is truncated.");
                     metadataBytes = entryInput[..EntryMetadataLength].ToArray();
-                    int storedDataLength = ReadLength(U32(metadataBytes, 0x4C), "data fork");
-                    int storedResourceLength = ReadLength(U32(metadataBytes, 0x50), "resource fork");
+                    var entryReader = new BigEndianReader(entryInput);
+                    int storedDataLength = ReadLength(entryReader.ReadUInt32At(0x4C), "data fork");
+                    int storedResourceLength = ReadLength(entryReader.ReadUInt32At(0x50), "resource fork");
                     int encryptedForksLength = checked(storedDataLength + storedResourceLength);
                     int crcOffset = checked(EntryMetadataLength + encryptedForksLength);
                     if (crcOffset > entryInput.Length - 2)
@@ -124,7 +126,7 @@ public sealed class PackItReader : IContainerReader
                     decodedData = entryInput.Slice(EntryMetadataLength, storedDataLength).ToArray();
                     decodedResource = entryInput.Slice(EntryMetadataLength + storedDataLength,
                         storedResourceLength).ToArray();
-                    storedForkCrc = U16(entryInput, crcOffset);
+                    storedForkCrc = entryReader.ReadUInt16At(crcOffset);
                     nextOffset = checked(offset + 4 + ((crcOffset + 2 + 7) & ~7));
                 }
             }
@@ -132,32 +134,32 @@ public sealed class PackItReader : IContainerReader
             {
                 if (offset > archive.Length - EntryHeaderLength)
                     throw new InvalidDataException("A PackIt file header is truncated.");
-                ReadOnlyMemory<byte> header = archive.AsMemory(offset, EntryHeaderLength);
-                metadataBytes = header.Slice(4, EntryMetadataLength).ToArray();
-                int storedDataLength = ReadLength(U32(header, 0x50), "data fork");
-                int storedResourceLength = ReadLength(U32(header, 0x54), "resource fork");
+                metadataBytes = archive.AsMemory(offset + 4, EntryMetadataLength).ToArray();
+                int storedDataLength = ReadLength(archiveReader.ReadUInt32At(offset + 0x50), "data fork");
+                int storedResourceLength = ReadLength(archiveReader.ReadUInt32At(offset + 0x54), "resource fork");
                 int storedForkLength = checked(storedDataLength + storedResourceLength);
                 int payloadOffset = checked(offset + EntryHeaderLength);
                 int crcOffset = checked(payloadOffset + storedForkLength);
                 if (crcOffset > archive.Length - 2)
                     throw new InvalidDataException("A PackIt fork payload or checksum extends past the archive.");
-                storedForkCrc = U16(archive, crcOffset);
+                storedForkCrc = archiveReader.ReadUInt16At(crcOffset);
                 nextOffset = checked(crcOffset + 2);
             }
 
             ReadOnlyMemory<byte> metadata = metadataBytes;
+            var metadataReader = new BigEndianReader(metadata);
             int nameLength = metadata.Span[0];
             if (nameLength == 0 || nameLength > 63)
                 throw new InvalidDataException("A PackIt file name length is invalid.");
-            ushort storedHeaderCrc = U16(metadata, 0x5C);
+            ushort storedHeaderCrc = metadataReader.ReadUInt16At(0x5C);
             ushort actualHeaderCrc = Crc16(metadata.Span[..0x5C]);
             if (storedHeaderCrc != actualHeaderCrc)
                 context.Report(DiagnosticSeverity.Error, "archive.header-crc",
                     $"The PackIt header checksum is incorrect for '{new MacString(metadata.Span.Slice(1, nameLength))}'.",
                     offset + 0x60);
 
-            int dataLength = ReadLength(U32(metadata, 0x4C), "data fork");
-            int resourceLength = ReadLength(U32(metadata, 0x50), "resource fork");
+            int dataLength = ReadLength(metadataReader.ReadUInt32At(0x4C), "data fork");
+            int resourceLength = ReadLength(metadataReader.ReadUInt32At(0x50), "resource fork");
             int forksLength = checked(dataLength + resourceLength);
             expandedBytes = checked(expandedBytes + forksLength);
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
@@ -198,9 +200,12 @@ public sealed class PackItReader : IContainerReader
             files.Add(new MacFile
             {
                 Name = name,
-                FinderInfo = new FinderInfo { Type = type, Creator = creator, Flags = (FinderFlags)U16(metadata, 0x48) },
-                Created = Date(U32(metadata, 0x54)),
-                Modified = Date(U32(metadata, 0x58)),
+                FinderInfo = new FinderInfo
+                {
+                    Type = type, Creator = creator, Flags = (FinderFlags)metadataReader.ReadUInt16At(0x48),
+                },
+                Created = Date(metadataReader.ReadUInt32At(0x54)),
+                Modified = Date(metadataReader.ReadUInt32At(0x58)),
                 DataFork = dataFork,
                 ResourceFork = resourceFork,
             });
@@ -228,12 +233,13 @@ public sealed class PackItReader : IContainerReader
         HuffmanNode root = ReadHuffmanNode(ref bits, 0, ref nodeCount, ref leafCount);
         var metadata = new byte[EntryMetadataLength];
         for (int index = 0; index < metadata.Length; index++) metadata[index] = ReadSymbol(ref bits, root);
+        var metadataReader = new BigEndianReader(metadata);
 
         int nameLength = metadata[0];
         if (nameLength == 0 || nameLength > 63)
             throw new InvalidDataException("A PackIt file name length is invalid.");
-        int dataLength = ReadLength(U32(metadata, 0x4C), "data fork");
-        int resourceLength = ReadLength(U32(metadata, 0x50), "resource fork");
+        int dataLength = ReadLength(metadataReader.ReadUInt32At(0x4C), "data fork");
+        int resourceLength = ReadLength(metadataReader.ReadUInt32At(0x50), "resource fork");
         int forksLength = checked(dataLength + resourceLength);
         if (forksLength > maxForkBytes)
             throw new InvalidDataException("PackIt extraction exceeds the configured expanded-size limit.");
@@ -402,8 +408,4 @@ public sealed class PackItReader : IContainerReader
             throw new InvalidDataException($"A PackIt {what} length exceeds the supported size.");
         return (int)value;
     }
-
-    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
-
-    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 }

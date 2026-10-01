@@ -132,8 +132,9 @@ public sealed class StuffItSplitReader : IContainerReader
             return [];
         }
 
-        uint createdRaw = U32(firstHeader.Metadata, 10);
-        uint modifiedRaw = U32(firstHeader.Metadata, 14);
+        var metadata = new BigEndianReader(firstHeader.Metadata);
+        uint createdRaw = metadata.ReadUInt32At(10);
+        uint modifiedRaw = metadata.ReadUInt32At(14);
         return
         [
             new MacFile
@@ -143,7 +144,7 @@ public sealed class StuffItSplitReader : IContainerReader
                 {
                     Type = new FourCC(firstHeader.Metadata.AsSpan(0, 4)),
                     Creator = new FourCC(firstHeader.Metadata.AsSpan(4, 4)),
-                    Flags = (FinderFlags)U16(firstHeader.Metadata, 8),
+                    Flags = (FinderFlags)metadata.ReadUInt16At(8),
                 },
                 Created = createdRaw == 0 ? null : new MacDate(createdRaw),
                 Modified = modifiedRaw == 0 ? null : new MacDate(modifiedRaw),
@@ -166,13 +167,11 @@ public sealed class StuffItSplitReader : IContainerReader
             if (value == 0) return false;
 
         byte[] metadata = bytes.Slice(SharedMetadataOffset, SharedMetadataLength).ToArray();
-        header = new SplitHeader(bytes[3], nameBytes.ToArray(), metadata, U32(metadata, 18), U32(metadata, 22));
+        var reader = new BigEndianReader(metadata);
+        header = new SplitHeader(bytes[3], nameBytes.ToArray(), metadata, reader.ReadUInt32At(18),
+            reader.ReadUInt32At(22));
         return true;
     }
-
-    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
-
-    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private sealed record SplitHeader(byte PartNumber, byte[] NameBytes, byte[] Metadata,
         uint ResourceLength, uint DataLength)

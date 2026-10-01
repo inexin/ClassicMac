@@ -33,9 +33,10 @@ public sealed class DiskDoublerReader : IContainerReader
         if (input.Length >= ArchiveHeaderLength)
         {
             byte[] header = input.ReadPrefix(ArchiveHeaderLength);
-            if (IsValidDda2Header(header)) return true;
+            if (IsValidDda2Header(new BigEndianReader(header))) return true;
         }
-        if (input.Length >= StandaloneHeaderLength && IsValidStandaloneHeader(input.ReadPrefix(StandaloneHeaderLength)))
+        if (input.Length >= StandaloneHeaderLength && IsValidStandaloneHeader(
+            new BigEndianReader(input.ReadPrefix(StandaloneHeaderLength))))
             return true;
         if (input.Length < 4) return false;
         return input.ReadPrefix(4).AsSpan().SequenceEqual("DDAR"u8) && input.Length >= 78;
@@ -50,11 +51,12 @@ public sealed class DiskDoublerReader : IContainerReader
             throw new InvalidDataException("The DiskDoubler archive exceeds the configured input-size limit.");
 
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
+        var reader = new BigEndianReader(archive);
         if (archive.Length >= 4 && archive.AsSpan(0, 4).SequenceEqual("DDAR"u8))
-            return ReadLegacy(archive, context);
-        if (IsValidStandaloneHeader(archive))
-            return ReadStandalone(archive, context);
-        if (!IsValidDda2Header(archive))
+            return ReadLegacy(archive, reader, context);
+        if (IsValidStandaloneHeader(reader))
+            return ReadStandalone(archive, reader, context);
+        if (!IsValidDda2Header(reader))
             throw new InvalidDataException("Not a DiskDoubler archive.");
 
         var files = new List<MacFile>();
@@ -67,7 +69,7 @@ public sealed class DiskDoublerReader : IContainerReader
         {
             if (!archive.AsSpan(offset, 4).SequenceEqual("DDA2"u8))
                 throw new InvalidDataException("A DiskDoubler DDA2 record has an invalid signature.");
-            ushort entryType = U16(archive, offset + 4);
+            ushort entryType = reader.ReadUInt16At(offset + 4);
             if (entryType == 0xBBBB)
             {
                 ended = true;
@@ -85,8 +87,8 @@ public sealed class DiskDoublerReader : IContainerReader
             if (nameLength is 0 or > 31)
                 throw new InvalidDataException("A DiskDoubler DDA2 name length is invalid.");
             var name = new MacString(archive.AsSpan(offset + 7, nameLength));
-            uint rawDepth = U32(archive, offset + 38);
-            int recordLength = ReadLength(U32(archive, offset + 42), "record");
+            uint rawDepth = reader.ReadUInt32At(offset + 38);
+            int recordLength = ReadLength(reader.ReadUInt32At(offset + 42), "record");
             if (recordLength < RecordHeaderLength || recordLength > archive.Length - offset)
                 throw new InvalidDataException("A DiskDoubler DDA2 record extends past the archive.");
             int recordEnd = checked(offset + recordLength);
@@ -126,8 +128,8 @@ public sealed class DiskDoublerReader : IContainerReader
                 if (recordLength < RecordHeaderLength + rawFileMetadataLength)
                     throw new InvalidDataException("A raw DiskDoubler DDA2 file record is truncated.");
 
-                int rawDataLength = ReadLength(U32(archive, metadataOffset + 32), "data fork");
-                int rawResourceLength = ReadLength(U32(archive, metadataOffset + 36), "resource fork");
+                int rawDataLength = ReadLength(reader.ReadUInt32At(metadataOffset + 32), "data fork");
+                int rawResourceLength = ReadLength(reader.ReadUInt32At(metadataOffset + 36), "resource fork");
                 int rawPayloadOffset = checked(metadataOffset + rawFileMetadataLength);
                 long rawPayloadLength = (long)rawDataLength + rawResourceLength;
                 if (rawPayloadLength > recordEnd - rawPayloadOffset)
@@ -137,11 +139,11 @@ public sealed class DiskDoublerReader : IContainerReader
                 if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
                     throw new InvalidDataException("DiskDoubler extraction exceeds the configured expanded-size limit.");
 
-                uint rawCreation = U32(archive, metadataOffset + 8);
-                uint rawModification = U32(archive, metadataOffset + 12);
+                uint rawCreation = reader.ReadUInt32At(metadataOffset + 8);
+                uint rawModification = reader.ReadUInt32At(metadataOffset + 12);
                 var rawType = new FourCC(archive.AsSpan(metadataOffset + 16, 4));
                 var rawCreator = new FourCC(archive.AsSpan(metadataOffset + 20, 4));
-                var rawFinderFlags = (FinderFlags)U16(archive, metadataOffset + 24);
+                var rawFinderFlags = (FinderFlags)reader.ReadUInt16At(metadataOffset + 24);
                 byte[] rawData = archive.AsSpan(rawPayloadOffset, rawDataLength).ToArray();
                 byte[] rawResource = archive.AsSpan(rawPayloadOffset + rawDataLength, rawResourceLength).ToArray();
                 files.Add(new MacFile
@@ -161,22 +163,22 @@ public sealed class DiskDoublerReader : IContainerReader
             int fileHeaderOffset = checked(offset + RecordHeaderLength + 10);
             if (recordLength < RecordHeaderLength + 10 + 4 + FileHeaderLength)
                 throw new InvalidDataException("A DiskDoubler DDA2 file header is truncated.");
-            if (U32(archive, fileHeaderOffset) != FileHeaderMagic)
+            if (reader.ReadUInt32At(fileHeaderOffset) != FileHeaderMagic)
                 throw new InvalidDataException("A DiskDoubler DDA2 file has an invalid file-header marker.");
             int header = fileHeaderOffset + 4;
-            int dataLength = ReadLength(U32(archive, header), "data fork");
-            int compressedDataLength = ReadLength(U32(archive, header + 4), "compressed data fork");
-            int resourceLength = ReadLength(U32(archive, header + 8), "resource fork");
-            int compressedResourceLength = ReadLength(U32(archive, header + 12), "compressed resource fork");
+            int dataLength = ReadLength(reader.ReadUInt32At(header), "data fork");
+            int compressedDataLength = ReadLength(reader.ReadUInt32At(header + 4), "compressed data fork");
+            int resourceLength = ReadLength(reader.ReadUInt32At(header + 8), "resource fork");
+            int compressedResourceLength = ReadLength(reader.ReadUInt32At(header + 12), "compressed resource fork");
             int dataMethod = archive[header + 16] & 0x7F;
             int resourceMethod = archive[header + 17] & 0x7F;
-            uint modification = U32(archive, header + 20);
-            uint creation = U32(archive, header + 24);
+            uint modification = reader.ReadUInt32At(header + 20);
+            uint creation = reader.ReadUInt32At(header + 24);
             var type = new FourCC(archive.AsSpan(header + 28, 4));
             var creator = new FourCC(archive.AsSpan(header + 32, 4));
-            var finderFlags = (FinderFlags)U16(archive, header + 36);
-            int dataDelta = U16(archive, header + 50);
-            int resourceDelta = U16(archive, header + 52);
+            var finderFlags = (FinderFlags)reader.ReadUInt16At(header + 36);
+            int dataDelta = reader.ReadUInt16At(header + 50);
+            int resourceDelta = reader.ReadUInt16At(header + 52);
             int payloadOffset = checked(header + FileHeaderLength);
             long payloadLength = (long)compressedDataLength + compressedResourceLength;
             if (payloadLength > recordEnd - payloadOffset)
@@ -205,9 +207,9 @@ public sealed class DiskDoublerReader : IContainerReader
                 archive[header + 18], archive[header + 48]);
             byte[] resource = DecodeFork(encodedResource, resourceLength, resourceMethod,
                 archive[header + 18], archive[header + 48]);
-            ReportForkChecksum(archive, header + 44, encodedData.Span, data, dataMethod,
+            ReportForkChecksum(reader, header + 44, encodedData.Span, data, dataMethod,
                 archive[header + 18], archive[header + 48], "data", name.ToString(), context);
-            ReportForkChecksum(archive, header + 46, encodedResource.Span, resource, resourceMethod,
+            ReportForkChecksum(reader, header + 46, encodedResource.Span, resource, resourceMethod,
                 archive[header + 18], archive[header + 48], "resource", name.ToString(), context);
             ApplyDelta(data, dataDelta);
             ApplyDelta(resource, resourceDelta);
@@ -230,22 +232,23 @@ public sealed class DiskDoublerReader : IContainerReader
         return files;
     }
 
-    private static IReadOnlyList<MacFile> ReadStandalone(byte[] archive, ContainerContext context)
+    private static IReadOnlyList<MacFile> ReadStandalone(byte[] archive, BigEndianReader reader,
+        ContainerContext context)
     {
         int header = 4;
-        int dataLength = ReadLength(U32(archive, header), "data fork");
-        int compressedDataLength = ReadLength(U32(archive, header + 4), "compressed data fork");
-        int resourceLength = ReadLength(U32(archive, header + 8), "resource fork");
-        int compressedResourceLength = ReadLength(U32(archive, header + 12), "compressed resource fork");
+        int dataLength = ReadLength(reader.ReadUInt32At(header), "data fork");
+        int compressedDataLength = ReadLength(reader.ReadUInt32At(header + 4), "compressed data fork");
+        int resourceLength = ReadLength(reader.ReadUInt32At(header + 8), "resource fork");
+        int compressedResourceLength = ReadLength(reader.ReadUInt32At(header + 12), "compressed resource fork");
         int dataMethod = archive[header + 16] & 0x7F;
         int resourceMethod = archive[header + 17] & 0x7F;
-        uint modification = U32(archive, header + 20);
-        uint creation = U32(archive, header + 24);
+        uint modification = reader.ReadUInt32At(header + 20);
+        uint creation = reader.ReadUInt32At(header + 24);
         var type = new FourCC(archive.AsSpan(header + 28, 4));
         var creator = new FourCC(archive.AsSpan(header + 32, 4));
-        var finderFlags = (FinderFlags)U16(archive, header + 36);
-        int dataDelta = U16(archive, header + 50);
-        int resourceDelta = U16(archive, header + 52);
+        var finderFlags = (FinderFlags)reader.ReadUInt16At(header + 36);
+        int dataDelta = reader.ReadUInt16At(header + 50);
+        int resourceDelta = reader.ReadUInt16At(header + 52);
         long payloadLength = (long)compressedDataLength + compressedResourceLength;
         if (payloadLength > archive.Length - StandaloneHeaderLength)
             throw new InvalidDataException("A standalone DiskDoubler fork payload extends past the file.");
@@ -272,9 +275,9 @@ public sealed class DiskDoublerReader : IContainerReader
         byte info2 = archive[header + 48];
         byte[] data = DecodeFork(encodedData, dataLength, dataMethod, info1, info2);
         byte[] resource = DecodeFork(encodedResource, resourceLength, resourceMethod, info1, info2);
-        ReportForkChecksum(archive, header + 44, encodedData.Span, data, dataMethod,
+        ReportForkChecksum(reader, header + 44, encodedData.Span, data, dataMethod,
             info1, info2, "data", name.ToString(), context);
-        ReportForkChecksum(archive, header + 46, encodedResource.Span, resource, resourceMethod,
+        ReportForkChecksum(reader, header + 46, encodedResource.Span, resource, resourceMethod,
             info1, info2, "resource", name.ToString(), context);
         ApplyDelta(data, dataDelta);
         ApplyDelta(resource, resourceDelta);
@@ -302,12 +305,12 @@ public sealed class DiskDoublerReader : IContainerReader
         return new MacString(bytes);
     }
 
-    private static void ReportForkChecksum(ReadOnlyMemory<byte> header, int checksumOffset,
+    private static void ReportForkChecksum(BigEndianReader header, int checksumOffset,
         ReadOnlySpan<byte> encoded, ReadOnlySpan<byte> decoded, int method, byte info1, byte info2,
         string forkName, string fileName, ContainerContext context)
     {
         ushort calculated;
-        ushort expected = U16(header, checksumOffset);
+        ushort expected = header.ReadUInt16At(checksumOffset);
         string code;
         switch (method)
         {
@@ -340,7 +343,8 @@ public sealed class DiskDoublerReader : IContainerReader
                 $"The DiskDoubler {forkName}-fork checksum is incorrect for '{fileName}'.", checksumOffset);
     }
 
-    private static IReadOnlyList<MacFile> ReadLegacy(byte[] archive, ContainerContext context)
+    private static IReadOnlyList<MacFile> ReadLegacy(byte[] archive, BigEndianReader reader,
+        ContainerContext context)
     {
         const int archiveHeaderLength = 78;
         const int recordHeaderLength = 124;
@@ -356,7 +360,7 @@ public sealed class DiskDoublerReader : IContainerReader
         {
             if (archive.Length - offset < 4)
                 throw new InvalidDataException("A DiskDoubler DDAR record marker is truncated.");
-            uint marker = U32(archive, offset);
+            uint marker = reader.ReadUInt32At(offset);
             if (marker == FileHeaderMagic)
             {
                 const int redundantHeaderLength = 84;
@@ -377,8 +381,8 @@ public sealed class DiskDoublerReader : IContainerReader
             var name = new MacString(archive.AsSpan(offset + 9, nameLength));
             bool isDirectory = archive[offset + 72] != 0;
             bool isEndDirectory = archive[offset + 73] != 0;
-            int dataLength = ReadLength(U32(archive, offset + 74), "data fork");
-            int resourceLength = ReadLength(U32(archive, offset + 78), "resource fork");
+            int dataLength = ReadLength(reader.ReadUInt32At(offset + 74), "data fork");
+            int resourceLength = ReadLength(reader.ReadUInt32At(offset + 78), "resource fork");
             long payloadLength = (long)dataLength + resourceLength;
             int payloadOffset = checked(offset + recordHeaderLength);
             if (payloadLength > archive.Length - payloadOffset)
@@ -404,9 +408,9 @@ public sealed class DiskDoublerReader : IContainerReader
                     throw new InvalidDataException("DiskDoubler DDAR extraction exceeds the configured expanded-size limit.");
                 var type = new FourCC(archive.AsSpan(offset + 90, 4));
                 var creator = new FourCC(archive.AsSpan(offset + 94, 4));
-                var finderFlags = (FinderFlags)U16(archive, offset + 98);
-                uint creation = U32(archive, offset + 82);
-                uint modification = U32(archive, offset + 86);
+                var finderFlags = (FinderFlags)reader.ReadUInt16At(offset + 98);
+                uint creation = reader.ReadUInt32At(offset + 82);
+                uint modification = reader.ReadUInt32At(offset + 86);
                 files.Add(new MacFile
                 {
                     Name = name,
@@ -551,7 +555,7 @@ public sealed class DiskDoublerReader : IContainerReader
         ReadOnlySpan<byte> input = encoded.Span;
         if (input.Length < 10)
             throw new InvalidDataException("A DiskDoubler method-7 fork has a truncated Stac LZS header.");
-        uint entryCount = U32(encoded, 6);
+        uint entryCount = new BigEndianReader(encoded).ReadUInt32At(6);
         long streamOffsetLong = 18L + 2L * entryCount;
         if (streamOffsetLong > input.Length)
             throw new InvalidDataException("A DiskDoubler method-7 fork has a truncated Stac LZS dictionary.");
@@ -905,15 +909,15 @@ public sealed class DiskDoublerReader : IContainerReader
         return crc;
     }
 
-    private static bool IsValidDda2Header(ReadOnlyMemory<byte> header) =>
-        header.Length >= ArchiveHeaderLength && header.Span[..4].SequenceEqual("DDA2"u8) &&
-        U16(header, 60) == Crc16Xmodem(header.Span[..60]);
+    private static bool IsValidDda2Header(BigEndianReader header) =>
+        header.Source.Length >= ArchiveHeaderLength && header.Source.Span[..4].SequenceEqual("DDA2"u8) &&
+        header.ReadUInt16At(60) == Crc16Xmodem(header.Source.Span[..60]);
 
-    private static bool IsValidStandaloneHeader(ReadOnlyMemory<byte> header)
+    private static bool IsValidStandaloneHeader(BigEndianReader header)
     {
-        if (header.Length < StandaloneHeaderLength || U32(header, 0) != FileHeaderMagic) return false;
-        ushort checksum = U16(header, 82);
-        return checksum == 0 || checksum == Crc16Xmodem(header.Span[..82]);
+        if (header.Source.Length < StandaloneHeaderLength || header.ReadUInt32At(0) != FileHeaderMagic) return false;
+        ushort checksum = header.ReadUInt16At(82);
+        return checksum == 0 || checksum == Crc16Xmodem(header.Source.Span[..82]);
     }
 
     private static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
@@ -938,8 +942,4 @@ public sealed class DiskDoublerReader : IContainerReader
             throw new InvalidDataException($"A DiskDoubler {what} length exceeds the supported size.");
         return (int)value;
     }
-
-    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
-
-    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 }
