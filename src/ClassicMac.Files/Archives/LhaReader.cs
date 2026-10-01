@@ -7,7 +7,7 @@ using ClassicMac.Core;
 namespace ClassicMac.Files.Archives;
 
 /// <summary>Reads LHA archives containing stored and compressed files.</summary>
-/// <remarks>Methods -lh2-, -lh3- and LArc -lzs- are not supported yet.</remarks>
+/// <remarks>All documented LHA methods supported by this reader are implemented.</remarks>
 public sealed class LhaReader : IContainerReader
 {
     private const int LevelZeroHeaderMinimumLength = 25;
@@ -163,7 +163,8 @@ public sealed class LhaReader : IContainerReader
                 throw new InvalidDataException("An LHA file payload is truncated.");
 
             if (method.SequenceEqual("-lh0-"u8) || method.SequenceEqual("-lh1-"u8) ||
-                method.SequenceEqual("-lz5-"u8) || IsNewStyleMethod(method))
+                method.SequenceEqual("-lzs-"u8) || method.SequenceEqual("-lz5-"u8) ||
+                method.SequenceEqual("-lh2-"u8) || method.SequenceEqual("-lh3-"u8) || IsNewStyleMethod(method))
             {
                 if (osIdentifier != (byte)'m')
                 {
@@ -193,6 +194,18 @@ public sealed class LhaReader : IContainerReader
                 else if (method.SequenceEqual("-lz5-"u8))
                 {
                     decodedData = LhaLarcDecoder.DecodeLz5(packedData, expandedSize);
+                }
+                else if (method.SequenceEqual("-lzs-"u8))
+                {
+                    decodedData = LhaLarcDecoder.DecodeLzs(packedData, expandedSize);
+                }
+                else if (method.SequenceEqual("-lh3-"u8))
+                {
+                    decodedData = LhaLegacyStaticDecoder.DecodeLh3(packedData, expandedSize);
+                }
+                else if (method.SequenceEqual("-lh2-"u8))
+                {
+                    decodedData = LhaLh2Decoder.Decode(packedData, expandedSize);
                 }
                 else
                 {

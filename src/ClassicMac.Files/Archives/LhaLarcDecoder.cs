@@ -3,11 +3,51 @@ using System.IO;
 
 namespace ClassicMac.Files.Archives;
 
-/// <summary>Decodes the LArc <c>-lz5-</c> sliding-window method used in LHA archives.</summary>
+/// <summary>Decodes the LArc <c>-lzs-</c> and <c>-lz5-</c> methods used in LHA archives.</summary>
 internal static class LhaLarcDecoder
 {
+    private const int LzsWindowSize = 2048;
     private const int WindowSize = 4096;
     private const int InitialPosition = WindowSize - 18;
+
+    public static byte[] DecodeLzs(ReadOnlySpan<byte> packed, int expandedSize)
+    {
+        if (expandedSize < 0) throw new ArgumentOutOfRangeException(nameof(expandedSize));
+
+        byte[] window = new byte[LzsWindowSize];
+        window.AsSpan().Fill((byte)' ');
+        byte[] output = new byte[expandedSize];
+        var bits = new LzsBitReader(packed);
+        int outputOffset = 0;
+        int windowOffset = LzsWindowSize - 17;
+
+        while (outputOffset < output.Length)
+        {
+            if (bits.Read(1) != 0)
+            {
+                byte value = (byte)bits.Read(8);
+                output[outputOffset++] = value;
+                window[windowOffset] = value;
+                windowOffset = (windowOffset + 1) & (LzsWindowSize - 1);
+                continue;
+            }
+
+            int sourceOffset = bits.Read(11);
+            int length = bits.Read(4) + 2;
+            if (length > output.Length - outputOffset)
+                throw new InvalidDataException("An LZS match exceeds the declared expanded size.");
+
+            for (int i = 0; i < length; i++)
+            {
+                byte value = window[(sourceOffset + i) & (LzsWindowSize - 1)];
+                output[outputOffset++] = value;
+                window[windowOffset] = value;
+                windowOffset = (windowOffset + 1) & (LzsWindowSize - 1);
+            }
+        }
+
+        return output;
+    }
 
     public static byte[] DecodeLz5(ReadOnlySpan<byte> packed, int expandedSize)
     {
@@ -77,5 +117,31 @@ internal static class LhaLarcDecoder
         if ((uint)offset >= (uint)packed.Length)
             throw new InvalidDataException("An LZ5 payload is truncated.");
         return packed[offset++];
+    }
+
+    private ref struct LzsBitReader
+    {
+        private readonly ReadOnlySpan<byte> _packed;
+        private int _byteOffset;
+        private int _bitOffset;
+
+        public LzsBitReader(ReadOnlySpan<byte> packed) => _packed = packed;
+
+        public int Read(int count)
+        {
+            int value = 0;
+            for (int bit = 0; bit < count; bit++)
+            {
+                if (_byteOffset >= _packed.Length)
+                    throw new InvalidDataException("An LZS payload is truncated.");
+                value = (value << 1) | ((_packed[_byteOffset] >> (7 - _bitOffset)) & 1);
+                if (++_bitOffset == 8)
+                {
+                    _bitOffset = 0;
+                    _byteOffset++;
+                }
+            }
+            return value;
+        }
     }
 }

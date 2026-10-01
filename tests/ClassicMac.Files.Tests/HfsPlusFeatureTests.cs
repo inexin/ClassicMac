@@ -111,6 +111,85 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsXReportsAnActiveFolderCountThatDiffersFromItsDirectSubfolders()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, catalogFolderFlags: 0x0010,
+            catalogFolderCount: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void HfsXAcceptsAnActiveFolderCountThatMatchesItsDirectSubfolders()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, catalogFolderFlags: 0x0010,
+            catalogFolderCount: 0);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count");
+    }
+
+    [Fact]
+    public void HfsXFolderCountCountsSubfoldersRatherThanAllCatalogChildren()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, additionalFolderParent: 16,
+            documentsFolderValence: 2, catalogFolderFlags: 0x0010, catalogFolderCount: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count");
+    }
+
+    [Fact]
+    public void HfsXFolderCountIncludesDirectoryHardLinkAliases()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, directoryHardLinkAlias: true,
+            catalogFolderFlags: 0x0010, catalogFolderCount: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count");
+    }
+
+    [Fact]
+    public void HfsXReportsAFolderCountMismatchEvenWhenItsFlagIsClear()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, catalogFolderCount: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void HfsPlusDoesNotInterpretTheHfsxOnlyFolderCountField()
+    {
+        byte[] image = HfsPlusFixture.Build(catalogFolderFlags: 0x0010, catalogFolderCount: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-folder-count");
+    }
+
+    [Fact]
     public void HfsPlusAcceptsAFreeBlockCountThatMatchesTheAllocationBitmap()
     {
         byte[] image = HfsPlusFixture.Build();
@@ -319,6 +398,23 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal(2, files.Count);
         Assert.DoesNotContain(files, file => file.Name.ToString() == "iNode123");
         Assert.DoesNotContain(files, file => file.MacPath.Contains("HFS+ Private Data", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinksExposeInodeContentsAtTheirVisiblePath(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX);
+
+        var context = new ContainerContext();
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), context);
+
+        Assert.True(files.Count == 1, string.Join(Environment.NewLine, context.Diagnostics));
+        MacFile file = Assert.Single(files);
+        Assert.Equal("Shared Folder:Inside", file.MacPath);
+        Assert.Equal("directory data"u8.ToArray(), file.DataFork.ToArray());
+        Assert.DoesNotContain(files, item => item.MacPath.Contains("Private Directory Data", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -2720,7 +2816,8 @@ public sealed class HfsPlusFeatureTests
             uint? catalogFileParentId = null, ushort? catalogFileNameCodeUnitOverride = null,
             ushort? catalogFileThreadNameCodeUnitOverride = null, ushort catalogFileMode = 0,
             ushort catalogFolderMode = 0, uint? volumeAttributes = null,
-            uint fileTextEncoding = 0, uint folderTextEncoding = 0, ulong encodingBitmap = 1)
+            uint fileTextEncoding = 0, uint folderTextEncoding = 0, ulong encodingBitmap = 1,
+            uint? catalogFolderCount = null, bool directoryHardLinkAlias = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -2760,6 +2857,7 @@ public sealed class HfsPlusFeatureTests
             U16(root, 0, 1);
             U32(root, 4, rootFolderValence);
             U32(root, 8, 2);
+            U32(root, 84, hfsX ? 1u : 0u);
             byte[] folder = new byte[88];
             U16(folder, 0, 1);
             U16(folder, 2, catalogFolderFlags);
@@ -2767,6 +2865,7 @@ public sealed class HfsPlusFeatureTests
             uint folderId = catalogFolderId ?? 16;
             U32(folder, 8, folderId);
             U32(folder, 80, folderTextEncoding);
+            U32(folder, 84, catalogFolderCount ?? 0);
             U16(folder, 42, catalogFolderMode);
             byte[] file = new byte[248];
             U16(file, 0, 2);
@@ -2775,9 +2874,14 @@ public sealed class HfsPlusFeatureTests
             U32(file, 8, fileId);
             U32(file, 80, fileTextEncoding);
             U16(file, 42, catalogFileMode);
+            if (directoryHardLinkAlias)
+            {
+                U16(file, 2, 0x0022);
+            }
             U32(file, 12, 2_500_000_000);
             U32(file, 16, 2_600_000_000);
             "TEXTttxt"u8.CopyTo(file.AsSpan(48));
+            if (directoryHardLinkAlias) "alisMACS"u8.CopyTo(file.AsSpan(48));
             if (fragmentedData)
             {
                 uint primaryExtentCount = fragmentedPrimaryExtentCount ?? 8u;
@@ -2866,8 +2970,11 @@ public sealed class HfsPlusFeatureTests
                 U16(additionalFolder, 0, 1);
                 U32(additionalFolder, 4, additionalParent == 18 ? 1u : 0u);
                 U32(additionalFolder, 8, 18);
-                records.Add(Record(additionalParent, "Empty", additionalFolder));
-                records.Add(Record(18, "", Thread(additionalParent, "Empty", 3)));
+                byte[] additionalFolderRecord = Record(additionalParent, "zzzz", additionalFolder);
+                int insertion = records.FindIndex(record =>
+                    BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(2)) > additionalParent);
+                records.Insert(insertion < 0 ? records.Count : insertion, additionalFolderRecord);
+                records.Add(Record(18, "", Thread(additionalParent, "zzzz", 3)));
             }
             if (orphanFileThread) records.Add(Record(42, "", Thread(16, "Missing", 4)));
             if (catalogThreadDataLength is { } threadDataLength)
@@ -3014,8 +3121,10 @@ public sealed class HfsPlusFeatureTests
             const string resource = "shared resource";
             byte[] image = Build(hfsX: hfsX);
             byte[] root = FolderData(2, 2);
+            if (hfsX) U32(root, 84, 2);
             byte[] documents = FolderData(16, includeHardLinkAlias ? 2u : 1u);
             byte[] privateFolder = FolderData(18, includeIndirectNode ? 1u : 0u);
+            if (hfsX && includeIndirectNode && indirectNodeIsFolder) U32(privateFolder, 84, 1);
             byte[] readMe = FileData(17, 4, "HFS Plus data"u8, 5, "Resource fork"u8);
             byte[] inode = FileData(19, 6, Encoding.UTF8.GetBytes(data), 7, Encoding.UTF8.GetBytes(resource));
             U32(inode, 44, indirectLinkCount);
@@ -3066,6 +3175,56 @@ public sealed class HfsPlusFeatureTests
             U32(volume, 64, 21);
             Encoding.UTF8.GetBytes(data).CopyTo(image.AsSpan(6 * Block));
             Encoding.UTF8.GetBytes(resource).CopyTo(image.AsSpan(7 * Block));
+            return image;
+        }
+
+        public static byte[] BuildWithDirectoryHardLink(bool hfsX)
+        {
+            const string privateDirectory = ".HFS+ Private Directory Data\r";
+            const string directoryInode = "dir_19";
+            byte[] image = Build(hfsX: hfsX);
+            byte[] root = FolderData(2, 3);
+            byte[] documents = FolderData(16, 0);
+            byte[] privateFolder = FolderData(18, 1);
+            byte[] inodeFolder = FolderData(19, 1);
+            byte[] contents = FileData(20, 4, "directory data"u8, 5, []);
+            contents.AsSpan(168, 80).Clear();
+            byte[] alias = FileData(21, 6, [], 7, []);
+            U16(alias, 2, 0x0022); // Thread exists; hard-link chain.
+            U32(alias, 44, 19); // Directory inode catalog ID.
+            "alisMACS"u8.CopyTo(alias.AsSpan(48));
+            U16(alias, 56, (ushort)FinderFlags.IsAlias);
+            alias.AsSpan(88, 80).Clear();
+            alias.AsSpan(168, 80).Clear();
+            if (hfsX)
+            {
+                U32(root, 84, 3);
+                U32(privateFolder, 84, 1);
+            }
+
+            byte[][] records =
+            [
+                Record(1, "Volume", root),
+                Record(2, "", Thread(1, "Volume", 3)),
+                Record(2, privateDirectory, privateFolder),
+                Record(2, "Documents", documents),
+                Record(2, "Shared Folder", alias),
+                Record(16, "", Thread(2, "Documents", 3)),
+                Record(18, "", Thread(2, privateDirectory, 3)),
+                Record(18, directoryInode, inodeFolder),
+                Record(19, "", Thread(18, directoryInode, 3)),
+                Record(19, "Inside", contents),
+                Record(20, "", Thread(19, "Inside", 4)),
+                Record(21, "", Thread(2, "Shared Folder", 4)),
+            ];
+            WriteBTreeNode(image.AsSpan(3 * Block, Block), 0xFF, 1, 0, 0, records);
+            U32(image.AsSpan(2 * Block, Block), 20, checked((uint)records.Length));
+            Span<byte> volume = image.AsSpan(1024, 512);
+            U32(volume, 32, 2);
+            U32(volume, 36, 3);
+            U32(volume, 64, 22);
+            "directory data"u8.CopyTo(image.AsSpan(4 * Block));
+            volume.CopyTo(image.AsSpan(image.Length - 1024, 512));
             return image;
         }
 

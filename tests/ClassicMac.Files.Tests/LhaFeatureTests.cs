@@ -196,6 +196,249 @@ public sealed class LhaFeatureTests
     }
 
     [Fact]
+    public void LhaDecodesALarcLzsLiteral()
+    {
+        byte[] packed = LhaFixture.BuildLzsLiteral((byte)'X');
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lzs-", "literal", packed, 1,
+            checksumData: "X"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("X"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaDecodesALarcLzsCopyFromItsInitialWindow()
+    {
+        byte[] packed = LhaFixture.BuildLzsMatch(position: 0, length: 2);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lzs-", "copy", packed, 2,
+            checksumData: "  "u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("  "u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaCopiesOverlappingLarcLzsMatchesFromRecentlyExpandedBytes()
+    {
+        byte[] packed = LhaFixture.BuildLzsLiteralAndMatch((byte)'A', position: 2031, length: 5);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lzs-", "overlap", packed, 6,
+            checksumData: "AAAAAA"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("AAAAAA"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaRejectsATruncatedLarcLzsLiteral()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lzs-", "truncated", [0x80], 1);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaRejectsATruncatedLarcLzsMatch()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lzs-", "truncated", [0x00], 2);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaRejectsALarcLzsMatchThatExceedsTheDeclaredOutput()
+    {
+        byte[] packed = LhaFixture.BuildLzsMatch(position: 0, length: 3);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lzs-", "oversized", packed, 2);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaDecodesLh3BlockWithOneRepeatedLiteralSymbol()
+    {
+        byte[] packed = LhaFixture.BuildLh3RepeatedLiteralBlock((byte)'A', count: 3);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "repeated", packed, 3,
+            checksumData: "AAA"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("AAA"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void LhaDecodesLh3BackReferenceWithEitherPositionTree(int positionTreeMode)
+    {
+        byte[] packed = LhaFixture.BuildLh3LiteralAndOverlappingMatch(positionTreeMode);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "back-reference", packed, 4,
+            checksumData: "AAAA"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("AAAA"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaRejectsATruncatedLh3BlockHeader()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "truncated", [], 1);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaRejectsAnLh3MatchPastTheDeclaredOutput()
+    {
+        byte[] packed = LhaFixture.BuildLh3LiteralAndOverlappingMatch(positionTreeMode: 1);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "oversized", packed, 3);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaReadsTheNextLh3BlockAfterTheDeclaredCommandCount()
+    {
+        byte[] packed = LhaFixture.BuildLh3TwoLiteralBlocks((byte)'A', (byte)'B');
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "blocks", packed, 2,
+            checksumData: "AB"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("AB"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaRejectsAnOversubscribedLh3LiteralTree()
+    {
+        byte[] packed = LhaFixture.BuildLh3OversubscribedLiteralTree();
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "bad-tree", packed, 1);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaDecodesTheMaximumLengthLh3Match()
+    {
+        byte[] expected = new byte[257];
+        Array.Fill(expected, (byte)'A');
+        byte[] packed = LhaFixture.BuildLh3LongMatch(224);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "long-match", packed, expected.Length,
+            checksumData: expected);
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaRejectsAnLh3MatchLongerThanItsMaximum()
+    {
+        byte[] packed = LhaFixture.BuildLh3LongMatch(225);
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh3-", "too-long", packed, 258);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaDecodesAnInitialLh2AdaptiveHuffmanLiteral()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "literal", [0x05], 1,
+            checksumData: "A"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("A"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaUpdatesTheLh2AdaptiveTreeBetweenLiterals()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "adaptive", [0x05, 0xE0], 2,
+            checksumData: "AA"u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("AA"u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaDecodesAnInitialLh2MatchFromItsPresetWindow()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "match", [0xC4, 0x00], 3,
+            checksumData: "   "u8.ToArray());
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal("   "u8.ToArray(), file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaRejectsATruncatedLh2AdaptiveCode()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "truncated", [], 1);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaRejectsAnLh2MatchPastTheDeclaredOutput()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "oversized", [0xC4, 0x00], 2);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaDecodesTheMaximumLengthLh2Match()
+    {
+        byte[] expected = new byte[256];
+        Array.Fill(expected, (byte)' ');
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "long-match", [0xE1, 0xE0, 0x00], 256,
+            checksumData: expected);
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LhaRejectsAnLh2MatchLongerThanItsMaximum()
+    {
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "too-long", [0xE1, 0xE1, 0x00], 257);
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LhaAddsLh2PositionSymbolsAsTheExpandedWindowAdvances()
+    {
+        byte[] expected = new byte[68];
+        Array.Fill(expected, (byte)' ');
+        byte[] packed = LhaFixture.BuildLh2PositionTreeGrowthStream();
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "position-tree", packed, expected.Length,
+            checksumData: expected);
+
+        MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
     public void LhaLevelThreeRejectsAnInvalidHeaderCrc()
     {
         byte[] archive = LhaFixture.BuildLevelThreeStoredFile("Folder/", "name", "data"u8.ToArray());
@@ -509,6 +752,157 @@ public sealed class LhaFeatureTests
             WriteNewStyleLiteralBlock(bits, method, "A"u8);
             WriteNewStyleLiteralBlock(bits, method, "B"u8);
             return bits.ToArray();
+        }
+
+        public static byte[] BuildLzsLiteral(byte value)
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(1, 1); // LArc marks a literal with a one bit.
+            bits.Write(value, 8);
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLzsMatch(int position, int length)
+        {
+            var bits = new LhaBitWriter();
+            WriteLzsMatch(bits, position, length);
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLzsLiteralAndMatch(byte value, int position, int length)
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(1, 1);
+            bits.Write(value, 8);
+            WriteLzsMatch(bits, position, length);
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLh3RepeatedLiteralBlock(byte value, int count)
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(count, 16);
+            bits.Write(1, 1);
+            bits.Write(0, 4);
+            bits.Write(1, 1);
+            bits.Write(0, 4);
+            bits.Write(1, 1);
+            bits.Write(0, 4);
+            bits.Write(value, 9);
+            bits.Write(0, 1); // Use the method's ready-made position table.
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLh3LiteralAndOverlappingMatch(int positionTreeMode)
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(2, 16); // One literal token and one match token.
+            for (int symbol = 0; symbol < 286; symbol++)
+            {
+                bool hasCode = symbol is (byte)'A' or 256;
+                bits.Write(hasCode ? 1 : 0, 1);
+                if (hasCode) bits.Write(0, 4); // A one-bit canonical code.
+            }
+
+            bits.Write(positionTreeMode == 0 ? 0 : 1, 1);
+            if (positionTreeMode == 1)
+            {
+                bits.Write(1, 4);
+                bits.Write(1, 4);
+                bits.Write(1, 4); // The three one-bit lengths select the compact form.
+                bits.Write(0, 7); // The only position symbol is zero.
+            }
+            else if (positionTreeMode == 2)
+            {
+                for (int symbol = 0; symbol < 128; symbol++)
+                    bits.Write(symbol < 2 ? 1 : 0, 4); // Position codes zero and one have one-bit codes.
+            }
+
+            bits.Write(0, 1); // Literal A.
+            bits.Write(1, 1); // Length-three match.
+            if (positionTreeMode == 0)
+                bits.Write(0, 2); // Ready-made table's code for position symbol zero.
+            else if (positionTreeMode == 2)
+                bits.Write(0, 1); // Canonical code for position symbol zero.
+            bits.Write(0, 6); // Low bits make the absolute ring position zero.
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLh3TwoLiteralBlocks(byte first, byte second)
+        {
+            var bits = new LhaBitWriter();
+            WriteLh3SingleLiteralBlock(bits, first);
+            WriteLh3SingleLiteralBlock(bits, second);
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLh3OversubscribedLiteralTree()
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(1, 16);
+            for (int symbol = 0; symbol < 286; symbol++)
+            {
+                bool hasCode = symbol is 0 or 1 or 2 or 3;
+                bits.Write(hasCode ? 1 : 0, 1);
+                if (hasCode) bits.Write(symbol == 2 ? 1 : 0, 4);
+            }
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLh3LongMatch(int extraLength)
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(2, 16);
+            for (int symbol = 0; symbol < 286; symbol++)
+            {
+                bool hasCode = symbol is (byte)'A' or 285;
+                bits.Write(hasCode ? 1 : 0, 1);
+                if (hasCode) bits.Write(0, 4);
+            }
+            bits.Write(1, 1); // Transmit the position tree.
+            for (int index = 0; index < 3; index++)
+            {
+                bits.Write(1, 4);
+            }
+            bits.Write(0, 7); // A degenerate tree for absolute position zero.
+            bits.Write(0, 1); // Literal A.
+            bits.Write(1, 1); // The longest length symbol.
+            bits.Write(extraLength, 8);
+            bits.Write(0, 6); // The absolute ring position is zero.
+            return bits.ToArray();
+        }
+
+        public static byte[] BuildLh2PositionTreeGrowthStream()
+        {
+            var bits = new LhaBitWriter();
+            bits.Write(0b11100001, 8); // Extended length symbol 285.
+            bits.Write(33, 8); // Match length 65.
+            bits.Write(0, 6); // Initial position symbol zero and offset zero.
+            bits.Write(0b11000100, 8); // After the first update, symbol 256 is a length-three match.
+            bits.Write(0, 1); // The new high position symbol one has code zero.
+            bits.Write(0, 6); // Position 64 points back to the start of the window.
+            return bits.ToArray();
+        }
+
+        private static void WriteLh3SingleLiteralBlock(LhaBitWriter bits, byte value)
+        {
+            bits.Write(1, 16);
+            for (int index = 0; index < 3; index++)
+            {
+                bits.Write(1, 1);
+                bits.Write(0, 4);
+            }
+            bits.Write(value, 9);
+            bits.Write(0, 1); // Reuse the method's ready-made position tree.
+        }
+
+        private static void WriteLzsMatch(LhaBitWriter bits, int position, int length)
+        {
+            if ((uint)position >= 2048 || length is < 2 or > 17)
+                throw new ArgumentOutOfRangeException(nameof(length));
+            bits.Write(0, 1); // A zero bit introduces a sliding-window match.
+            bits.Write(position, 11);
+            bits.Write(length - 2, 4);
         }
 
         private static void WriteNewStyleLiteralBlock(LhaBitWriter bits, string method, ReadOnlySpan<byte> literals)

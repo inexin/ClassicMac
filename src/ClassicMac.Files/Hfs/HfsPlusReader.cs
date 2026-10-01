@@ -107,7 +107,7 @@ internal static class HfsPlusReader
                     $"The HFS Plus catalog holds more than {context.Options.MaxVolumeEntries} files and folders.");
             records.Add(record);
         }
-        var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence)>();
+        var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence, uint FolderCount)>();
         var catalogIds = new HashSet<uint>();
         var catalogNodes = new Dictionary<uint, CatalogNode>();
         var catalogThreads = new Dictionary<uint, CatalogThread>();
@@ -133,7 +133,7 @@ internal static class HfsPlusReader
                     uint parent = U32(key, 2);
                     ValidateCatalogObjectName(key);
                     string name = Name(key);
-                    if (!folders.TryAdd(id, (parent, name, U32(data, 4))))
+                    if (!folders.TryAdd(id, (parent, name, U32(data, 4), U32(data, 84))))
                         throw new InvalidDataException("Duplicate HFS Plus folder ID.");
                     catalogNodes.Add(id, new CatalogNode(parent, name, IsFolder: true));
                     break;
@@ -209,14 +209,23 @@ internal static class HfsPlusReader
                 _ = FolderPath(folder.Parent, folders);
         }
 
+        const string privateFileDataFolderName = "\0\0\0\0HFS+ Private Data";
+        const string privateDirectoryDataFolderName = ".HFS+ Private Directory Data\r";
         uint? privateDataFolderId = folders
-            .Where(folder => folder.Value.Parent == RootFolderId && folder.Value.Name == "\0\0\0\0HFS+ Private Data")
+            .Where(folder => folder.Value.Parent == RootFolderId && folder.Value.Name == privateFileDataFolderName)
             .Select(folder => (uint?)folder.Key)
             .SingleOrDefault();
-        var privateDataFolderIds = new HashSet<uint>();
-        if (privateDataFolderId is { } privateId)
+        uint? privateDirectoryDataFolderId = folders
+            .Where(folder => folder.Value.Parent == RootFolderId && folder.Value.Name == privateDirectoryDataFolderName)
+            .Select(folder => (uint?)folder.Key)
+            .SingleOrDefault();
+        var privateDataFolderIds = folders
+            .Where(folder => folder.Value.Parent == RootFolderId &&
+                folder.Value.Name is privateFileDataFolderName or privateDirectoryDataFolderName)
+            .Select(folder => folder.Key)
+            .ToHashSet();
+        if (privateDataFolderIds.Count > 0)
         {
-            privateDataFolderIds.Add(privateId);
             bool added;
             do
             {
@@ -226,6 +235,35 @@ internal static class HfsPlusReader
                         added = true;
             }
             while (added);
+        }
+
+        if (isHfsX)
+        {
+            const ushort hasLinkChainMask = 0x0020;
+            FourCC aliasType = FourCC.FromString("alis");
+            FourCC aliasCreator = FourCC.FromString("MACS");
+            var folderCounts = new Dictionary<uint, uint>(folders.Count);
+            foreach (uint folderId in folders.Keys) folderCounts.Add(folderId, 0);
+            foreach (var (id, folder) in folders)
+                if (folderCounts.TryGetValue(folder.Parent, out uint count))
+                    folderCounts[folder.Parent] = checked(count + 1);
+            foreach (var (key, data) in records)
+            {
+                if (U16(data, 0) != 2 || (U16(data, 2) & hasLinkChainMask) == 0 ||
+                    privateDataFolderIds.Contains(U32(key, 2)) ||
+                    BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(48, 4)) != aliasType.Value ||
+                    BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(52, 4)) != aliasCreator.Value)
+                    continue;
+                uint parentId = U32(key, 2);
+                if (folderCounts.TryGetValue(parentId, out uint count))
+                    folderCounts[parentId] = checked(count + 1);
+            }
+            foreach (var (folderId, folder) in folders)
+            {
+                if (folder.FolderCount != folderCounts[folderId])
+                    context.Report(DiagnosticSeverity.Info, "hfs.plus-folder-count",
+                        $"HFSX folder {folderId} records {folder.FolderCount} enclosed folders, but {folderCounts[folderId]} are present.");
+            }
         }
 
         var catalogFiles = new Dictionary<uint, CatalogFileData>();
@@ -242,12 +280,39 @@ internal static class HfsPlusReader
             if (IsHardLinkFile(finderInfo) && special == 0)
                 throw new InvalidDataException("An HFS Plus hard link has the reserved zero link reference.");
             catalogFiles.Add(fileId, new CatalogFileData(
-                Name(key), U32(key, 2), special, U16(data, 42), finderInfo,
+                fileId, Name(key), U32(key, 2), special, U16(data, 2), U16(data, 42), finderInfo,
                 Date(U32(data, 12)), Date(U32(data, 16)),
                 ReadFork(image, data.AsSpan(88, 80), blockSize, totalBlocks, overflow, 0, fileId,
                     allocationExtents, ordinaryForkExtents),
                 ReadFork(image, data.AsSpan(168, 80), blockSize, totalBlocks, overflow, 0xFF, fileId,
                     allocationExtents, ordinaryForkExtents)));
+        }
+
+        var directoryInodeFolderIds = new HashSet<uint>();
+        if (privateDirectoryDataFolderId is { } directoryDataFolderId)
+            foreach (var (folderId, folder) in folders)
+                if (folder.Parent == directoryDataFolderId &&
+                    TryParseDirectoryInodeName(folder.Name, out uint inodeId) && inodeId == folderId)
+                    directoryInodeFolderIds.Add(folderId);
+
+        var directoryAliasesByInode = new Dictionary<uint, List<DirectoryHardLinkAlias>>();
+        var directoryAliasFileIds = new HashSet<uint>();
+        foreach (CatalogFileData file in catalogFiles.Values)
+        {
+            if (!IsDirectoryHardLinkAlias(file)) continue;
+            if (!directoryInodeFolderIds.Contains(file.Special) ||
+                (file.FinderInfo.Flags & FinderFlags.IsAlias) == 0)
+            {
+                context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-target-missing",
+                    $"The HFS Plus directory hard link '{file.Name}' has no valid directory inode target.");
+                continue;
+            }
+
+            if (privateDataFolderIds.Contains(file.Parent)) continue;
+            if (!directoryAliasesByInode.TryGetValue(file.Special, out List<DirectoryHardLinkAlias>? aliases))
+                directoryAliasesByInode.Add(file.Special, aliases = []);
+            aliases.Add(new DirectoryHardLinkAlias(file.Name, file.Parent));
+            directoryAliasFileIds.Add(file.FileId);
         }
 
         if (overflow.Keys.Any(key => key.File != BadBlockFileId))
@@ -314,8 +379,9 @@ internal static class HfsPlusReader
             string name = Name(key);
             uint parent = U32(key, 2);
             uint fileId = U32(data, 8);
-            if (privateDataFolderIds.Contains(parent)) continue;
+            if (privateDataFolderIds.Contains(parent) && !directoryAliasesByInode.ContainsKey(parent)) continue;
             CatalogFileData file = catalogFiles[fileId];
+            if (directoryAliasFileIds.Contains(fileId)) continue;
             bool isHardLink = IsHardLinkFile(file.FinderInfo);
             CatalogFileData target = default;
             bool hasHardLinkTarget = isHardLink && hardLinkTargets.TryGetValue(file.Special, out target);
@@ -323,23 +389,27 @@ internal static class HfsPlusReader
                 context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-target-missing",
                     $"The HFS Plus hard link '{name}' has no matching indirect node.");
             CatalogFileData content = hasHardLinkTarget ? target : file;
-            var path = FolderPath(parent, folders);
-            result.Add(new MacFile
+            IReadOnlyList<IReadOnlyList<string>> folderPaths = ResolveFolderPaths(parent, folders,
+                privateDataFolderIds, directoryAliasesByInode);
+            foreach (IReadOnlyList<string> path in folderPaths)
             {
-                Name = LegacyName(name),
-                UnicodeName = name,
-                FolderPath = path.Select(LegacyName).ToArray(),
-                UnicodeFolderPath = path,
-                FinderInfo = content.FinderInfo,
-                Created = content.Created,
-                Modified = content.Modified,
-                DataFork = content.DataFork,
-                ResourceFork = content.ResourceFork,
-                SymbolicLinkTarget = ReadSymbolicLinkTarget(content.Mode, content.FinderInfo,
-                    content.DataFork, content.ResourceFork,
-                    context.Options.MaxExpandedBytesPerInput),
-                HardLinkReference = isHardLink ? file.Special : null,
-            });
+                result.Add(new MacFile
+                {
+                    Name = LegacyName(name),
+                    UnicodeName = name,
+                    FolderPath = path.Select(LegacyName).ToArray(),
+                    UnicodeFolderPath = path,
+                    FinderInfo = content.FinderInfo,
+                    Created = content.Created,
+                    Modified = content.Modified,
+                    DataFork = content.DataFork,
+                    ResourceFork = content.ResourceFork,
+                    SymbolicLinkTarget = ReadSymbolicLinkTarget(content.Mode, content.FinderInfo,
+                        content.DataFork, content.ResourceFork,
+                        context.Options.MaxExpandedBytesPerInput),
+                    HardLinkReference = isHardLink ? file.Special : null,
+                });
+            }
         }
         ValidateAllocationExtents(allocationExtents, ordinaryForkExtents, blockSize, totalBlocks);
         ValidateAllocationBitmap(allocationBitmap, totalBlocks, blockSize, allocationExtents);
@@ -1282,7 +1352,7 @@ internal static class HfsPlusReader
     }
 
     private static IReadOnlyList<string> FolderPath(uint parent,
-        Dictionary<uint, (uint Parent, string Name, uint Valence)> folders)
+        Dictionary<uint, (uint Parent, string Name, uint Valence, uint FolderCount)> folders)
     {
         var path = new List<string>();
         var seen = new HashSet<uint>();
@@ -1294,6 +1364,37 @@ internal static class HfsPlusReader
             parent = folder.Parent;
         }
         return path;
+    }
+
+    private static IReadOnlyList<IReadOnlyList<string>> ResolveFolderPaths(uint folderId,
+        Dictionary<uint, (uint Parent, string Name, uint Valence, uint FolderCount)> folders,
+        HashSet<uint> privateDataFolderIds, Dictionary<uint, List<DirectoryHardLinkAlias>> directoryAliasesByInode,
+        HashSet<uint>? activeFolderIds = null)
+    {
+        if (folderId == RootFolderId) return [Array.Empty<string>()];
+        activeFolderIds ??= [];
+        if (!activeFolderIds.Add(folderId)) return [];
+        if (directoryAliasesByInode.TryGetValue(folderId, out List<DirectoryHardLinkAlias>? aliases))
+        {
+            var paths = new List<IReadOnlyList<string>>();
+            foreach (DirectoryHardLinkAlias alias in aliases)
+                foreach (IReadOnlyList<string> parentPath in ResolveFolderPaths(alias.Parent, folders,
+                    privateDataFolderIds, directoryAliasesByInode, activeFolderIds))
+                    paths.Add([.. parentPath, alias.Name]);
+            activeFolderIds.Remove(folderId);
+            return paths;
+        }
+
+        if (privateDataFolderIds.Contains(folderId) || !folders.TryGetValue(folderId, out var folder))
+        {
+            activeFolderIds.Remove(folderId);
+            return [];
+        }
+
+        IReadOnlyList<IReadOnlyList<string>> parentPaths = ResolveFolderPaths(folder.Parent, folders,
+            privateDataFolderIds, directoryAliasesByInode, activeFolderIds);
+        activeFolderIds.Remove(folderId);
+        return parentPaths.Select(path => (IReadOnlyList<string>)[.. path, folder.Name]).ToArray();
     }
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
@@ -1326,6 +1427,10 @@ internal static class HfsPlusReader
     private static bool IsHardLinkFile(FinderInfo finderInfo) =>
         finderInfo.Type == FourCC.FromString("hlnk") && finderInfo.Creator == FourCC.FromString("hfs+");
 
+    private static bool IsDirectoryHardLinkAlias(CatalogFileData file) =>
+        (file.RecordFlags & 0x0020) != 0 && file.FinderInfo.Type == FourCC.FromString("alis") &&
+        file.FinderInfo.Creator == FourCC.FromString("MACS");
+
     private static bool HasHardLinkMarker(FinderInfo finderInfo) =>
         finderInfo.Type == FourCC.FromString("hlnk") || finderInfo.Creator == FourCC.FromString("hfs+");
 
@@ -1341,8 +1446,19 @@ internal static class HfsPlusReader
         return name.AsSpan(5).SequenceEqual(canonicalReference.AsSpan());
     }
 
-    private readonly record struct CatalogFileData(string Name, uint Parent, uint Special, ushort Mode,
+    private static bool TryParseDirectoryInodeName(string name, out uint inodeId)
+    {
+        inodeId = 0;
+        if (!name.StartsWith("dir_", StringComparison.Ordinal) ||
+            !uint.TryParse(name.AsSpan(4), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out inodeId))
+            return false;
+        return name.AsSpan(4).SequenceEqual(inodeId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private readonly record struct CatalogFileData(uint FileId, string Name, uint Parent, uint Special, ushort RecordFlags, ushort Mode,
         FinderInfo FinderInfo, MacDate? Created, MacDate? Modified, ForkData DataFork, ForkData ResourceFork);
+    private readonly record struct DirectoryHardLinkAlias(string Name, uint Parent);
     private readonly record struct CatalogNode(uint Parent, string Name, bool IsFolder);
     private readonly record struct CatalogThread(uint Parent, string Name, bool IsFolder);
     private sealed class AttributeForkState

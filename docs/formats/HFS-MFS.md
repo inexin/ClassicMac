@@ -877,7 +877,14 @@ must be at least 16 even when IDs have been reused; otherwise, TN1150 requires i
 TN1150 requires leaf-record keys to be unique **[Doc]**. It
 checks each folder's recorded valence against its direct file and folder records, and checks the ancestry of every
 nonroot folder, including empty folders. TN1150 defines valence as the count of file and folder records whose key
-parent ID is that folder's ID **[Doc]**. Unless the volume's catalog-ID-reuse flag is set, `nextCatalogID` must be
+parent ID is that folder's ID **[Doc]**. On HFSX it also checks `folderCount`, which counts enclosed folder records
+and directory hard-link aliases rather than all catalog children. Apple's verifier sets a missing
+`kHFSHasFolderCountMask` before comparing the field; the read-only reader reports a mismatch as
+`hfs.plus-folder-count` whether or not the flag is set, without preventing the volume from being read **[Code]** Apple's
+[`CheckFolderCount`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c)
+and the `HFSPlusCatalogFolder` definition in
+[`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h). Unless the volume's
+catalog-ID-reuse flag is set, `nextCatalogID` must be
 greater than all file and folder IDs, as TN1150 requires **[Doc]**. It then resolves file paths and reads both forks,
 Finder info and dates. It
 also reads data and resource fork overflow
@@ -990,6 +997,7 @@ followed in its code.
 | `mfs.too-many-entries` | E | More than `MaxVolumeEntries` files | Stops reading | — |
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
 | `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
+| `hfs.plus-folder-count` | I | An HFSX folder count differs from its enclosed folders and directory hard-link aliases | Reports only | `fsck_hfs` repairs the stored count **[Code]** |
 | `hfs.plus-encoding-bitmap` | I | A catalog file or folder uses an encoding whose bit is absent from `encodingsBitmap` | Reports only | Not traced |
 | `hfs.plus-free-blocks` | I | The allocation bitmap free-block count differs from `freeBlocks` in the volume header | Reports only | Not traced |
 | `hfs.plus-spared-blocks` | I | The volume header's spared-blocks flag disagrees with bad-block extent records | Reports only | Not traced |

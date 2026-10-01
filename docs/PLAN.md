@@ -822,7 +822,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     breve + dot-above, Greek tonos/dialytika and the known Bengali, Odia, Gurmukhi, Thai, Lao and Tibetan `fsck_hfs` corrections; other
     Unicode 2.1/3.2 compatibility cases remain),
     root-parent ID, unique catalog IDs and next-ID consistency, parent IDs that resolve to folders, file/folder threads,
-    folder valences and parent chains (including empty folders).
+    folder valences and parent chains (including empty folders), and HFSX `folderCount` values, including missing-flag cases.
     The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
     forks; these layouts currently have hand-built fixtures only. The StuffIt v5 reader handles stored, RLE90,
     Compress/LZW, Huffman, LZAH (method 5), MW (method 8),
@@ -834,7 +834,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     PackIt reader extracts stored (`PMag`), password-protected XOR and DES uncompressed (`PMa1`/`PMa2`) and Huffman
     (`PMa5`/`PMa6`) entries, plus unencrypted Huffman (`PMa4`); reserved encrypted methods (`PMa3`/`PMa7`) remain
     unsupported. A standalone LHA reader extracts level-0 through level-3 files with `-lh0-`, adaptive-Huffman
-    `-lh1-`, LArc `-lz5-` and static-Huffman LZSS `-lh4-`, `-lh5-`, `-lh6-` and `-lh7-`; `-lh2-`, `-lh3-` and LArc `-lzs-` remain.
+    `-lh1-`/`-lh2-`, legacy static-Huffman `-lh3-`, LArc `-lzs-` and `-lz5-`, and static-Huffman LZSS `-lh4-`, `-lh5-`, `-lh6-` and `-lh7-`.
     The DiskDoubler reader
     parses DDA2 archive paths and extracts stored, method-1 MacCompress LZW,
     method-2 adaptive Huffman, method-4 Huffman, method-5 adaptive Huffman, method-6 AD2, method-8 Compact Pro,
@@ -884,10 +884,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     (RLE81 + LZH); PackIt (stored, Huffman, encrypted raw and Huffman entries; reserved PMa3/PMa7 unsupported);
     DiskDoubler (DDAR stored entries and DDA2 stored, MacCompress LZW, adaptive Huffman, Huffman, AD2, Compact Pro
     method-8, AD1 and DDn method-10 forks); LHA level-0 through level-3 records with stored entries (`-lh0-`) and
-    adaptive-Huffman LZSS (`-lh1-`), static-Huffman LZSS methods (`-lh4-` through `-lh7-`); then LHA `-lh2-` through
-    `-lh3-`, LArc methods and
-    other DiskDoubler
-    compression variants, any other documented PackIt methods and segmented archives.
+    adaptive-Huffman LZSS (`-lh1-`, `-lh2-`), legacy static-Huffman LZSS (`-lh3-`), LArc LZSS (`-lzs-`, `-lz5-`) and static-Huffman LZSS methods (`-lh4-` through
+    `-lh7-`); then other DiskDoubler compression variants, any other documented PackIt methods and
+    segmented archives.
     Anything from row 5 of Inputs only on request.
 11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
    - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's

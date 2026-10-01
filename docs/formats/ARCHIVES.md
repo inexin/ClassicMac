@@ -48,7 +48,8 @@ and truncated headers. Original-application verification remains.
 ## LHA / LArc (level-0 through level-3 records; stored and compressed methods)
 
 ClassicMac recognizes LHA level-0 through level-3 records and reads uncompressed `-lh0-` files, adaptive-Huffman LZSS
-`-lh1-`, LArc `-lz5-`, plus static-Huffman LZSS `-lh4-`, `-lh5-`, `-lh6-` and `-lh7-` files. The static-Huffman methods use 4 KiB,
+`-lh1-` and `-lh2-`, legacy static-Huffman LZSS `-lh3-`, LArc `-lzs-` and `-lz5-`, plus the newer static-Huffman LZSS `-lh4-`,
+`-lh5-`, `-lh6-` and `-lh7-` files. The static-Huffman methods use 4 KiB,
 8 KiB, 32 KiB and 64 KiB history windows, respectively, with a maximum 256-byte match **[Fitted]** against the
 [LHa for UNIX method table](https://github.com/jca02266/lha/blob/master/src/lha_macro.h) and the independent
 [Lhasa `-lh4-`…`-lh7-` decoder](https://github.com/fragglet/lhasa/blob/master/lib/lh_new_decoder.c). Each compressed block begins with a
@@ -59,9 +60,13 @@ Match copies can overlap and continue from bytes just emitted.
 Decoded output must exactly match the declared expanded size; truncated bitstreams, invalid tables and matches beyond
 the declared output are rejected. `-lh1-` follows the 4 KiB adaptive-Huffman and offset coding in the
 [Lhasa `-lh1-` decoder](https://github.com/fragglet/lhasa/blob/master/lib/lh1_decoder.c); it uses a maximum 60-byte match.
-`-lz5-` uses LArc's 4 KiB window, preset with its format-defined byte pattern, and groups eight literal/back-reference
-commands under a least-significant-bit-first flag byte. The Lhasa sources are behavioral references only; the decoders
-and their hand-built protocol fixtures are independently implemented.
+`-lzs-` uses a space-filled 2 KiB ring window and a most-significant-bit-first stream of literal or back-reference
+tokens; matches contain an 11-bit ring position and a 4-bit length offset for lengths 2–17. `-lz5-` uses LArc's 4 KiB
+window, preset with its format-defined byte pattern, and groups eight literal/back-reference commands under a
+least-significant-bit-first flag byte. `-lh2-` uses an 8 KiB space-filled window, a dynamic literal/length tree, and a position tree that grows as output passes each 64-byte boundary; matches are 3–256 bytes. `-lh3-` uses an 8 KiB window and blocks with a 16-bit command count, a
+286-symbol literal/length Huffman tree and either a transmitted or ready-made position tree; matches are 3–256 bytes.
+The LHa for UNIX sources are behavioral references only; the decoders and their hand-built protocol fixtures are
+independently implemented.
 
 A level-0 record's one-byte size is the number of following header bytes, so the full header is that value plus two;
 the header checksum covers the declared number of bytes beginning at the method. The header carries method, packed
@@ -82,12 +87,12 @@ applies `MaxExpandedBytesPerInput` to the archive and total expanded file data.
 The layout is based on the [LHa for UNIX header description](https://github.com/jca02266/lha/blob/master/header.doc.md)
 and the CC0 [Kaitai LHA record specification](https://formats.kaitai.io/lzh/) **[Fitted]** to hand-built Mac OS
 records. Tests cover all four supported header levels, MacRoman names and paths, stored data, extended filenames and
-directories, extension-chain payload positioning, initial adaptive-Huffman literals and truncated-code rejection,
-literal and back-reference tokens in all four static-Huffman methods, multiple compressed blocks, output-length and
-truncation checks, unwrapper integration, header and
+directories, extension-chain payload positioning, initial and updated adaptive-Huffman literals, LH2 preset-window matches and position-tree growth, and truncated-code rejection,
+LArc literals, preset-window copies and overlapping matches, legacy-Huffman literals and matches using both position
+tree forms, multiple LH3 blocks, literal and back-reference tokens in all four newer static-Huffman methods, multiple
+compressed blocks, output-length and truncation checks, unwrapper integration, header and
 data checksums, unsupported-method and unsupported-encoding continuation, input-size limits, and truncated payloads.
-Compressed `-lh2-`, `-lh3-` and LArc `-lzs-` remain. Compressed methods are
-currently verified with hand-built vectors rather than archives produced by an original Mac LHA application.
+Compressed methods are currently verified with hand-built vectors rather than archives produced by an original Mac LHA application.
 
 ## DiskDoubler (DDA2)
 
