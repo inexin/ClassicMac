@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
@@ -100,7 +99,7 @@ namespace ClassicMac.Graphics.Pict
             version1 = false;
             b.ReadUInt16();                                            // Version (0x02FF)
             Span<byte> headerOp = stackalloc byte[2 + 24];
-            if (b.Peek(headerOp) < headerOp.Length || BinaryPrimitives.ReadUInt16BigEndian(headerOp) != 0x0C00)
+            if (b.Peek(headerOp) < headerOp.Length || new BigEndianReader(headerOp).ReadUInt16() != 0x0C00)
                 return new PictInfo(2, false, frame, frame, 72, 72);   // no HeaderOp: that word is the first opcode
 
             b.ReadUInt16();                                            // HeaderOp
@@ -120,8 +119,9 @@ namespace ClassicMac.Graphics.Pict
         private static bool HasVersionOpcode(ReadOnlySpan<byte> data, int offset)
         {
             if (data.Length - offset < 14) return false;
-            ushort op = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 10)..]);
-            return op == 0x1101 || (op == 0x0011 && BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 12)..]) == 0x02FF);
+            var reader = new BigEndianReader(data);
+            ushort op = reader.ReadUInt16At(offset + 10);
+            return op == 0x1101 || (op == 0x0011 && reader.ReadUInt16At(offset + 12) == 0x02FF);
         }
 
         private static bool IsVersion1(BigEndianReader reader, int offset) =>

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -166,13 +165,14 @@ namespace ClassicMac.Graphics.QuickTime
             long p = 0;
             while (p + 8 <= data.Length)
             {
-                long size = BinaryPrimitives.ReadUInt32BigEndian(data.Slice((int)p));
-                string type = Encoding.Latin1.GetString(data.Slice((int)p + 4, 4));
+                var atom = new BigEndianReader(data.Slice((int)p, 8));
+                long size = atom.ReadUInt32();
+                string type = Encoding.Latin1.GetString(atom.ReadBytes(4));
                 int header = 8;
                 if (size == 1)
                 {
                     if (p + 16 > data.Length) break;
-                    size = (long)BinaryPrimitives.ReadUInt64BigEndian(data.Slice((int)p + 8));
+                    size = (long)new BigEndianReader(data.Slice((int)p + 8, 8)).ReadUInt64();
                     header = 16;
                 }
                 else if (size == 0) size = data.Length - p;
