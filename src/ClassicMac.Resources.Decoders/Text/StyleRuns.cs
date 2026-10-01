@@ -53,7 +53,7 @@ namespace ClassicMac.Resources.Decoders.Text
         public static byte[] Write(IReadOnlyList<StyleRun> runs)
         {
             var writer = new BigEndianWriter(2 + runs.Count * ElementLength);
-            writer.WriteUInt16((ushort)runs.Count);
+            writer.WriteUInt16(runs.Count);
             for (var i = 0; i < runs.Count; i++)
             {
                 var r = runs[i];

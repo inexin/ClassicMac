@@ -54,7 +54,7 @@ namespace ClassicMac.Resources.Decoders.Sound
             w.WriteUInt32(rate);
             w.WriteUInt32(loopStart);
             w.WriteUInt32(loopEnd);
-            w.WriteByte((byte)(standard ? 0x00 : 0xFF));             // encode: stdSH or extSH
+            w.WriteByte(standard ? 0x00 : 0xFF);             // encode: stdSH or extSH
             w.WriteByte(baseNote);
             if (!standard)
             {
@@ -63,7 +63,7 @@ namespace ClassicMac.Resources.Decoders.Sound
                 w.WriteUInt32(0);                                    // markerChunk
                 w.WriteUInt32(0);                                    // instrumentChunks
                 w.WriteUInt32(0);                                    // AESRecording
-                w.WriteUInt16((ushort)sampleSize);
+                w.WriteUInt16(sampleSize);
                 w.WriteUInt16(0); w.WriteUInt32(0); w.WriteUInt32(0); w.WriteUInt32(0); // futureUse1-4
             }
             w.WriteBytes(samples);
@@ -141,7 +141,7 @@ namespace ClassicMac.Resources.Decoders.Sound
                         32 => FromFloat(BinaryPrimitives.ReadSingleLittleEndian(s)),
                         _ => FromFloat(BinaryPrimitives.ReadDoubleLittleEndian(s)),
                     };
-                    output.WriteInt16((short)value);
+                    output.WriteInt16(value);
                 }
                 samples = output.ToArray();
             }
@@ -161,7 +161,7 @@ namespace ClassicMac.Resources.Decoders.Sound
             }
             int exponent = (int)Math.Floor(Math.Log2(value));
             ulong mantissa = (ulong)Math.Round(value / Math.Pow(2, exponent - 63));
-            w.WriteUInt16((ushort)(exponent + 16383));
+            w.WriteUInt16(exponent + 16383);
             w.WriteUInt64(mantissa);
         }
     }

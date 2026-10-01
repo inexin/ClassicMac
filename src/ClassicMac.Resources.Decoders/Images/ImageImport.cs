@@ -145,8 +145,8 @@ namespace ClassicMac.Resources.Decoders.Images
             var b = new BigEndianWriter();
             b.WriteBytes(Bits(fitted, dark: true));
             b.WriteBytes(Bits(fitted, dark: false));
-            b.WriteUInt16((ushort)Math.Clamp(hotspotV, 0, 15));
-            b.WriteUInt16((ushort)Math.Clamp(hotspotH, 0, 15));
+            b.WriteUInt16(Math.Clamp(hotspotV, 0, 15));
+            b.WriteUInt16(Math.Clamp(hotspotH, 0, 15));
             return b.ToArray();
         }
 
@@ -172,8 +172,8 @@ namespace ClassicMac.Resources.Decoders.Images
             b.WriteUInt32(0);                                             // crsrXHandle
             b.WriteBytes(Bits(fitted, dark: true));
             b.WriteBytes(Bits(fitted, dark: false));
-            b.WriteUInt16((ushort)Math.Clamp(hotspotV, 0, 15));
-            b.WriteUInt16((ushort)Math.Clamp(hotspotH, 0, 15));
+            b.WriteUInt16(Math.Clamp(hotspotV, 0, 15));
+            b.WriteUInt16(Math.Clamp(hotspotH, 0, 15));
             b.WriteUInt32(0);                                             // crsrXTable
             b.WriteUInt32(0);                                             // crsrID
             PixMapRecord(b, 16, 16, depth, rowBytes, tableAt);
@@ -302,16 +302,16 @@ namespace ClassicMac.Resources.Decoders.Images
         private static void PixMapRecord(BigEndianWriter b, int w, int h, int depth, int rowBytes, int tableAt)
         {
             b.WriteUInt32(0);                                             // baseAddr
-            b.WriteUInt16((ushort)(0x8000 | rowBytes));
-            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16((ushort)h); b.WriteUInt16((ushort)w); // bounds
+            b.WriteUInt16(0x8000 | rowBytes);
+            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16(h); b.WriteUInt16(w); // bounds
             b.WriteUInt16(0);                                             // pmVersion
             b.WriteUInt16(0);                                             // packType
             b.WriteUInt32(0);                                             // packSize
             b.WriteUInt32(0x00480000); b.WriteUInt32(0x00480000);         // hRes, vRes: 72 dpi
             b.WriteUInt16(0);                                             // pixelType: indexed
-            b.WriteUInt16((ushort)depth);                                 // pixelSize
+            b.WriteUInt16(depth);                                 // pixelSize
             b.WriteUInt16(1);                                             // cmpCount
-            b.WriteUInt16((ushort)depth);                                 // cmpSize
+            b.WriteUInt16(depth);                                 // cmpSize
             b.WriteUInt32(0);                                             // planeBytes
             b.WriteInt32(tableAt);                                        // pmTable
             b.WriteUInt32(0);                                             // pmReserved
@@ -320,8 +320,8 @@ namespace ClassicMac.Resources.Decoders.Images
         private static void BitMapRecord(BigEndianWriter b, int w, int h, int rowBytes)
         {
             b.WriteUInt32(0);
-            b.WriteUInt16((ushort)rowBytes);
-            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16((ushort)h); b.WriteUInt16((ushort)w);
+            b.WriteUInt16(rowBytes);
+            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16(h); b.WriteUInt16(w);
         }
 
         // ctSeed 0, ctFlags 0 (a PixMap's table), ctSize, then value/r/g/b per entry (16-bit, each byte repeated).
@@ -332,8 +332,8 @@ namespace ClassicMac.Resources.Decoders.Images
             b.WriteUInt16((ushort)(table.Length - 1));
             for (int i = 0; i < table.Length; i++)
             {
-                b.WriteUInt16((ushort)i);
-                b.WriteUInt16((ushort)(table[i].R * 257)); b.WriteUInt16((ushort)(table[i].G * 257)); b.WriteUInt16((ushort)(table[i].B * 257));
+                b.WriteUInt16(i);
+                b.WriteUInt16(table[i].R * 257); b.WriteUInt16(table[i].G * 257); b.WriteUInt16(table[i].B * 257);
             }
         }
 

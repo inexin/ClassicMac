@@ -548,7 +548,7 @@ namespace ClassicMac.Resources.Decoders.Templates
                     case "PSTR" or "ESTR" or "OSTR":
                     {
                         var b = Encode(node, text, 255);
-                        Output.WriteByte((byte)b.Length);
+                        Output.WriteByte(b.Length);
                         Output.WriteBytes(b);
                         if (type == "ESTR" && b.Length % 2 == 0 || type == "OSTR" && b.Length % 2 == 1) Output.WriteByte(0);
                         return;
@@ -556,14 +556,14 @@ namespace ClassicMac.Resources.Decoders.Templates
                     case "WSTR":
                     {
                         var b = Encode(node, text, 0xFFFF);
-                        Output.WriteUInt16((ushort)b.Length);
+                        Output.WriteUInt16(b.Length);
                         Output.WriteBytes(b);
                         return;
                     }
                     case "LSTR":
                     {
                         var b = Encode(node, text, int.MaxValue);
-                        Output.WriteUInt32((uint)b.Length);
+                        Output.WriteUInt32(b.Length);
                         Output.WriteBytes(b);
                         return;
                     }
@@ -599,7 +599,7 @@ namespace ClassicMac.Resources.Decoders.Templates
                     default:
                     {
                         var b = Encode(node, text, Math.Min(size, 255));
-                        Output.WriteByte((byte)b.Length);
+                        Output.WriteByte(b.Length);
                         Output.WriteBytes(b);
                         Output.WriteZeros(size - b.Length);
                         return;

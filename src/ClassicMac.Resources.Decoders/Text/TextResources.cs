@@ -46,7 +46,7 @@ namespace ClassicMac.Resources.Decoders.Text
             ArgumentNullException.ThrowIfNull(strings);
             if (strings.Count > ushort.MaxValue) throw new ArgumentException("A string list holds at most 65535 strings.", nameof(strings));
             var writer = new BigEndianWriter();
-            writer.WriteUInt16((ushort)strings.Count);
+            writer.WriteUInt16(strings.Count);
             foreach (var s in strings) writer.WriteBytes(Pascal(s));
             return writer.ToArray();
         }

@@ -93,7 +93,7 @@ namespace ClassicMac.Resources.Decoders.Colors
                 highest = Math.Max(highest, e.Index);
             }
             var writer = new BigEndianWriter(act);
-            writer.WriteUInt16At(768, (ushort)(highest + 1));
+            writer.WriteUInt16At(768, highest + 1);
             writer.WriteUInt16At(770, 0xFFFF);
             return act;
         }
