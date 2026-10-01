@@ -34,65 +34,64 @@ namespace ClassicMac.Graphics.QuickTime
 
         /// <summary>Reads the file's image description.</summary>
         /// <exception cref="NotSupportedException">The data has no readable image description.</exception>
-        public static PictImageDescription ReadDescription(byte[] data)
+        public static PictImageDescription ReadDescription(ReadOnlySpan<byte> data)
         {
-            ArgumentNullException.ThrowIfNull(data);
-            foreach (var (type, offset, _) in Atoms(data))
-                if (type == "idsc" && ImageDescriptionReader.Read(data, offset, out _) is { } description)
-                    return description;
+            if (TryFindAtom(data, "idsc", out int offset, out _) && ImageDescriptionReader.Read(data, offset, out _) is { } description)
+                return description;
             throw new NotSupportedException("Not a QuickTime image file: it has no image description ('idsc').");
         }
 
         /// <summary>The file's embedded ICC profile (<c>iicc</c> atom), or null.</summary>
-        public static byte[]? ReadIccProfile(byte[] data)
+        public static byte[]? ReadIccProfile(ReadOnlySpan<byte> data)
         {
-            ArgumentNullException.ThrowIfNull(data);
-            foreach (var (type, offset, length) in Atoms(data))
-                if (type == "iicc") return data.AsSpan(offset, length).ToArray();
-            return null;
+            return TryFindAtom(data, "iicc", out int offset, out int length) ? data.Slice(offset, length).ToArray() : null;
         }
 
         /// <summary>Decodes the image.</summary>
         /// <param name="data">The file's bytes.</param>
         /// <param name="codec">Decoder for codecs the core lacks (e.g. JPEG); null for built-in codecs only.</param>
         /// <exception cref="NotSupportedException">The file has no image, or its codec is not supported.</exception>
-        public static RgbaBitmap Decode(byte[] data, IPictImageCodec? codec = null)
+        public static RgbaBitmap Decode(ReadOnlySpan<byte> data, IPictImageCodec? codec = null)
         {
             var description = ReadDescription(data);
-            byte[]? image = null;
-            foreach (var (type, offset, length) in Atoms(data))
-                if (type == "idat")
-                {
-                    image = data.AsSpan(offset, length).ToArray();
-                    break;
-                }
-            if (image == null) throw new NotSupportedException("The QuickTime image file has no image data ('idat').");
+            if (!TryFindAtom(data, "idat", out int offset, out int length))
+                throw new NotSupportedException("The QuickTime image file has no image data ('idat').");
+            byte[] image = data.Slice(offset, length).ToArray();
             return QuickTimeCodecs.Decode(description, image) ?? codec?.Decode(description, image)
                 ?? throw new NotSupportedException($"QuickTime codec '{description.CodecType}' is not supported.");
         }
 
-        // Top-level atoms (type, content offset, content length). Size 0 runs to the end of the file, size 1 has a
+        // Finds the first top-level atom of the requested type. Size 0 runs to the end of the file, size 1 has a
         // 64-bit size after the type; an atom running past the end is cut there.
-        private static IEnumerable<(string type, int offset, int length)> Atoms(byte[] data)
+        private static bool TryFindAtom(ReadOnlySpan<byte> data, string requestedType, out int contentOffset, out int contentLength)
         {
             long p = 0;
             while (p + 8 <= data.Length)
             {
-                long size = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan((int)p));
-                string type = Encoding.Latin1.GetString(data, (int)p + 4, 4);
+                long size = BinaryPrimitives.ReadUInt32BigEndian(data.Slice((int)p));
+                string type = Encoding.Latin1.GetString(data.Slice((int)p + 4, 4));
                 int header = 8;
                 if (size == 1)
                 {
-                    if (p + 16 > data.Length) yield break;
-                    size = (long)BinaryPrimitives.ReadUInt64BigEndian(data.AsSpan((int)p + 8));
+                    if (p + 16 > data.Length) break;
+                    size = (long)BinaryPrimitives.ReadUInt64BigEndian(data.Slice((int)p + 8));
                     header = 16;
                 }
                 else if (size == 0) size = data.Length - p;
-                if (size < header) yield break;
+                if (size < header) break;
                 long end = Math.Min(data.Length, p + size);
-                yield return (type, (int)(p + header), (int)(end - p - header));
+                if (type == requestedType)
+                {
+                    contentOffset = (int)(p + header);
+                    contentLength = (int)(end - p - header);
+                    return true;
+                }
                 p += size;
             }
+
+            contentOffset = 0;
+            contentLength = 0;
+            return false;
         }
     }
 }

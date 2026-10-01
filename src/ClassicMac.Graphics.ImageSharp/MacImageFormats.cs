@@ -109,7 +109,7 @@ namespace ClassicMac.Graphics.ImageSharp
         protected override ImageInfo Identify(DecoderOptions options, Stream stream, CancellationToken cancellationToken)
         {
             var data = MacImages.ReadAll(stream);
-            var description = MacImages.Guard(() => QuickTimeImageFile.ReadDescription(data));
+            var description = MacImages.Guard(data, QuickTimeImageFile.ReadDescription);
             var metadata = new ImageMetadata();
             if (!options.SkipMetadata) ApplyMetadata(metadata, description, data);
             return new ImageInfo(new PixelTypeInfo(32), new Size(Math.Max(1, description.Width), Math.Max(1, description.Height)), metadata);
@@ -119,7 +119,7 @@ namespace ClassicMac.Graphics.ImageSharp
         protected override Image<TPixel> Decode<TPixel>(DecoderOptions options, Stream stream, CancellationToken cancellationToken)
         {
             var data = MacImages.ReadAll(stream);
-            var bitmap = MacImages.Guard(() => QuickTimeImageFile.Decode(data, new ImageSharpImageCodec(options.Configuration)));
+            var bitmap = MacImages.Guard(data, bytes => QuickTimeImageFile.Decode(bytes, new ImageSharpImageCodec(options.Configuration)));
             var image = MacImages.ToImage<TPixel>(options, bitmap);
             if (!options.SkipMetadata) ApplyMetadata(image.Metadata, QuickTimeImageFile.ReadDescription(data), data);
             ScaleToTargetSize(options, image);
@@ -130,7 +130,7 @@ namespace ClassicMac.Graphics.ImageSharp
         protected override Image Decode(DecoderOptions options, Stream stream, CancellationToken cancellationToken) =>
             Decode<Rgba32>(options, stream, cancellationToken);
 
-        private static void ApplyMetadata(ImageMetadata metadata, PictImageDescription description, byte[] data)
+        private static void ApplyMetadata(ImageMetadata metadata, PictImageDescription description, ReadOnlySpan<byte> data)
         {
             metadata.ResolutionUnits = PixelResolutionUnit.PixelsPerInch;
             metadata.HorizontalResolution = description.HorizontalResolution > 0 ? description.HorizontalResolution : 72;
@@ -162,7 +162,7 @@ namespace ClassicMac.Graphics.ImageSharp
         protected override Image<TPixel> Decode<TPixel>(DecoderOptions options, Stream stream, CancellationToken cancellationToken)
         {
             var data = MacImages.ReadAll(stream);
-            var image = MacImages.ToImage<TPixel>(options, MacImages.Guard(() => MacPaintFile.Decode(data)));
+            var image = MacImages.ToImage<TPixel>(options, MacImages.Guard(data, MacPaintFile.Decode));
             if (!options.SkipMetadata) ApplyMetadata(image.Metadata);
             ScaleToTargetSize(options, image);
             return image;
@@ -182,11 +182,11 @@ namespace ClassicMac.Graphics.ImageSharp
 
     internal static class MacImages
     {
-        public static byte[] ReadAll(Stream stream)
+        public static ReadOnlySpan<byte> ReadAll(Stream stream)
         {
             using var ms = new MemoryStream();
             stream.CopyTo(ms);
-            return ms.ToArray();
+            return ms.GetBuffer().AsSpan(0, checked((int)ms.Length));
         }
 
         public static Image<TPixel> ToImage<TPixel>(DecoderOptions options, RgbaBitmap bitmap)
@@ -209,5 +209,19 @@ namespace ClassicMac.Graphics.ImageSharp
                 throw new InvalidImageContentException(ex.Message, ex);
             }
         }
+
+        public static T Guard<T>(ReadOnlySpan<byte> data, SpanReader<T> read)
+        {
+            try
+            {
+                return read(data);
+            }
+            catch (Exception ex) when (ex is NotSupportedException or EndOfStreamException or ArgumentException)
+            {
+                throw new InvalidImageContentException(ex.Message, ex);
+            }
+        }
+
+        public delegate T SpanReader<T>(ReadOnlySpan<byte> data);
     }
 }

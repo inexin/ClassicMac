@@ -25,22 +25,22 @@ namespace ClassicMac.Graphics.Pict
             try { return CodePagesEncodingProvider.Instance.GetEncoding(10000) ?? Encoding.Latin1; }
             catch { return Encoding.Latin1; }
         }
-        internal static string MacRomanString(byte[] bytes) => MacRoman.GetString(bytes);
+        internal static string MacRomanString(ReadOnlySpan<byte> bytes) => MacRoman.GetString(bytes);
 
         /// <summary>Decodes the picture read from the current position to the end of <paramref name="stream"/>.</summary>
-        /// <inheritdoc cref="Decode(byte[], PictDecodeOptions?, CancellationToken)"/>
+        /// <inheritdoc cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/>
         public static RgbaBitmap Decode(Stream stream, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default) => Read(stream, options, cancellationToken).Bitmap;
 
         /// <summary>Decodes the picture read from the current position to the end of <paramref name="stream"/>, with its header and metadata.</summary>
-        /// <inheritdoc cref="Decode(byte[], PictDecodeOptions?, CancellationToken)"/>
+        /// <inheritdoc cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/>
         public static PictPicture Read(Stream stream, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(stream);
             using var ms = new MemoryStream();
             stream.CopyTo(ms);
-            return Read(ms.ToArray(), options, cancellationToken);
+            return Read(ms.GetBuffer().AsSpan(0, checked((int)ms.Length)), options, cancellationToken);
         }
 
         /// <summary>
@@ -54,15 +54,14 @@ namespace ClassicMac.Graphics.Pict
         /// <param name="cancellationToken">Cancels decoding between opcodes.</param>
         /// <exception cref="NotSupportedException">The picture uses an unsupported pixel format.</exception>
         /// <exception cref="EndOfStreamException">The picture data is truncated.</exception>
-        public static RgbaBitmap Decode(byte[] data, PictDecodeOptions? options = null,
+        public static RgbaBitmap Decode(ReadOnlySpan<byte> data, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default) => Read(data, options, cancellationToken).Bitmap;
 
-        /// <summary>Decodes a picture as <see cref="Decode(byte[], PictDecodeOptions?, CancellationToken)"/> does, with its header and metadata.</summary>
-        /// <inheritdoc cref="Decode(byte[], PictDecodeOptions?, CancellationToken)"/>
-        public static PictPicture Read(byte[] data, PictDecodeOptions? options = null,
+        /// <summary>Decodes a picture as <see cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/> does, with its header and metadata.</summary>
+        /// <inheritdoc cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/>
+        public static PictPicture Read(ReadOnlySpan<byte> data, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            ArgumentNullException.ThrowIfNull(data);
             var b = new ClassicMac.Core.BigEndianReader(data);
 
             options ??= PictDecodeOptions.Default;

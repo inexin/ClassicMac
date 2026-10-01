@@ -42,18 +42,16 @@ namespace ClassicMac.Graphics
 
         /// <summary>Decodes the image: black on white, opaque. Rows missing from a truncated file stay white.</summary>
         /// <exception cref="NotSupportedException">The data is too short to hold a MacPaint image.</exception>
-        public static RgbaBitmap Decode(byte[] data)
+        public static RgbaBitmap Decode(ReadOnlySpan<byte> data)
         {
-            ArgumentNullException.ThrowIfNull(data);
-            ReadOnlySpan<byte> span = data;
-            var reader = new BigEndianReader(span);
+            var reader = new BigEndianReader(data);
             if (IsMacBinary(reader))
             {
                 int forkLength = (int)Math.Min(reader.ReadUInt32At(83), (uint)(data.Length - MacBinaryHeaderSize));
-                span = span.Slice(MacBinaryHeaderSize, forkLength);
+                data = data.Slice(MacBinaryHeaderSize, forkLength);
             }
-            if (span.Length <= HeaderSize) throw new NotSupportedException("The data is too short to be a MacPaint document.");
-            var rows = new BigEndianReader(span.Slice(HeaderSize));
+            if (data.Length <= HeaderSize) throw new NotSupportedException("The data is too short to be a MacPaint document.");
+            var rows = new BigEndianReader(data.Slice(HeaderSize));
             var image = DecodeRows(ref rows);
             return image ?? throw new NotSupportedException("The MacPaint document has no image data.");
         }
