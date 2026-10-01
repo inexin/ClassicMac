@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using System.Numerics;
 
 namespace ClassicMac.Core
 {
@@ -156,6 +157,78 @@ namespace ClassicMac.Core
 
         /// <summary>Overwrites bytes already written.</summary>
         public void WriteBytesAt(int offset, ReadOnlySpan<byte> value) => value.CopyTo(At(offset, value.Length));
+
+
+        // Any number, written as the field's type when it fits: a generic overload loses to the exact one, so a value
+        // of the field's type, or one cast to it on purpose (to wrap), is written as before.
+
+        /// <summary>Appends any number as a byte.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a byte.</exception>
+        public void WriteByte<T>(T value) where T : INumberBase<T> => WriteByte(Fit<byte, T>(value));
+
+        /// <summary>Appends any number as a short.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a short.</exception>
+        public void WriteInt16<T>(T value) where T : INumberBase<T> => WriteInt16(Fit<short, T>(value));
+
+        /// <summary>Appends any number as a ushort.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a ushort.</exception>
+        public void WriteUInt16<T>(T value) where T : INumberBase<T> => WriteUInt16(Fit<ushort, T>(value));
+
+        /// <summary>Appends any number as a int.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a int.</exception>
+        public void WriteInt32<T>(T value) where T : INumberBase<T> => WriteInt32(Fit<int, T>(value));
+
+        /// <summary>Appends any number as a uint.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a uint.</exception>
+        public void WriteUInt32<T>(T value) where T : INumberBase<T> => WriteUInt32(Fit<uint, T>(value));
+
+        /// <summary>Appends any number as a long.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a long.</exception>
+        public void WriteInt64<T>(T value) where T : INumberBase<T> => WriteInt64(Fit<long, T>(value));
+
+        /// <summary>Appends any number as a ulong.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a ulong.</exception>
+        public void WriteUInt64<T>(T value) where T : INumberBase<T> => WriteUInt64(Fit<ulong, T>(value));
+
+        /// <summary>Overwrites a byte already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a byte, or the bytes were not written yet.</exception>
+        public void WriteByteAt<T>(int offset, T value) where T : INumberBase<T> => WriteByteAt(offset, Fit<byte, T>(value));
+
+        /// <summary>Overwrites a short already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a short, or the bytes were not written yet.</exception>
+        public void WriteInt16At<T>(int offset, T value) where T : INumberBase<T> => WriteInt16At(offset, Fit<short, T>(value));
+
+        /// <summary>Overwrites a ushort already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a ushort, or the bytes were not written yet.</exception>
+        public void WriteUInt16At<T>(int offset, T value) where T : INumberBase<T> => WriteUInt16At(offset, Fit<ushort, T>(value));
+
+        /// <summary>Overwrites a int already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a int, or the bytes were not written yet.</exception>
+        public void WriteInt32At<T>(int offset, T value) where T : INumberBase<T> => WriteInt32At(offset, Fit<int, T>(value));
+
+        /// <summary>Overwrites a uint already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a uint, or the bytes were not written yet.</exception>
+        public void WriteUInt32At<T>(int offset, T value) where T : INumberBase<T> => WriteUInt32At(offset, Fit<uint, T>(value));
+
+        /// <summary>Overwrites a long already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a long, or the bytes were not written yet.</exception>
+        public void WriteInt64At<T>(int offset, T value) where T : INumberBase<T> => WriteInt64At(offset, Fit<long, T>(value));
+
+        /// <summary>Overwrites a ulong already written with any number.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">The value does not fit a ulong, or the bytes were not written yet.</exception>
+        public void WriteUInt64At<T>(int offset, T value) where T : INumberBase<T> => WriteUInt64At(offset, Fit<ulong, T>(value));
+
+        private static TField Fit<TField, T>(T value) where TField : INumberBase<TField> where T : INumberBase<T>
+        {
+            try
+            {
+                return TField.CreateChecked(value);
+            }
+            catch (OverflowException e)
+            {
+                throw new ArgumentOutOfRangeException($"{value} does not fit a {typeof(TField).Name}.", e);
+            }
+        }
 
         // The next count bytes, growing the buffer, and counts them as written.
         private Span<byte> Append(int count)

@@ -251,4 +251,26 @@ public class BigEndianReaderWriterTests
         writer.WriteUInt16At(0, 0);
         Assert.Equal(0x12, block[0]);
     }
+
+    [Fact]
+    public void Any_number_is_written_as_the_field_when_it_fits()
+    {
+        var writer = new BigEndianWriter();
+        long length = 0x12345678;
+        int count = 3;
+        writer.WriteUInt32(length);
+        writer.WriteUInt16(count);
+        writer.WriteByte(count);
+        writer.WriteInt16(-2L);
+        writer.WriteUInt16((ushort)(count - 4));                      // an explicit cast still wraps on purpose
+        writer.WriteUInt32At(0, 7L);
+        Assert.Equal(new byte[] { 0, 0, 0, 7, 0, 3, 3, 0xFF, 0xFE, 0xFF, 0xFF }, writer.ToArray());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteUInt32(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteUInt32(0x1_0000_0000L));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteUInt16(70000));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteByte(256));
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteInt16At(0, 40000));
+        Assert.Equal(11, writer.Length);
+    }
 }
