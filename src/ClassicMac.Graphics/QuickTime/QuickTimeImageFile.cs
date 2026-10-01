@@ -26,7 +26,7 @@ namespace ClassicMac.Graphics.QuickTime
         public static bool IsQuickTimeImageFile(ReadOnlySpan<byte> data)
         {
             if (data.Length < SignatureLength) return false;
-            uint size = BinaryPrimitives.ReadUInt32BigEndian(data);
+            uint size = new ClassicMac.Core.BigEndianReader(data).ReadUInt32At(0);
             if (size != 1 && size < 8) return false;
             string type = Encoding.Latin1.GetString(data.Slice(4, 4));
             return type is "idsc" or "idat" or "iicc";

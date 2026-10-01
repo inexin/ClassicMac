@@ -78,6 +78,41 @@ public class BigEndianReaderWriterTests
     }
 
     [Fact]
+    public void Read_sub_reader_is_bounded_and_advances_the_parent()
+    {
+        var parent = new BigEndianReader([0xAA, 0x01, 0x02, 0x03, 0x04, 0xBB]);
+        Assert.Equal((byte)0xAA, parent.ReadByte());
+
+        var section = parent.ReadSubReader(4);
+
+        Assert.Equal(5, parent.Position);
+        Assert.Equal(1, parent.Remaining);
+        Assert.Equal(0x01020304, section.ReadInt32());
+        Assert.Equal(0, section.Remaining);
+        Assert.Equal((byte)0xBB, parent.ReadByte());
+        Assert.Equal(6, parent.Position);
+
+        bool childThrew = false;
+        try { section.ReadByte(); }
+        catch (EndOfStreamException) { childThrew = true; }
+        Assert.True(childThrew);
+        Assert.Equal(4, section.Position);
+    }
+
+    [Fact]
+    public void Failed_sub_reader_creation_leaves_parent_cursor_unchanged()
+    {
+        var reader = new BigEndianReader([0x12, 0x34]) { Position = 1 };
+
+        bool threw = false;
+        try { reader.ReadSubReader(2); }
+        catch (EndOfStreamException) { threw = true; }
+
+        Assert.True(threw);
+        Assert.Equal(1, reader.Position);
+    }
+
+    [Fact]
     public void Try_operations_leave_state_and_output_clear_when_the_span_is_too_short()
     {
         byte[] source = [0x12];

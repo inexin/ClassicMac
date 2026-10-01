@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -34,9 +33,10 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             var rows = ToQuickDrawData();
             var data = new byte[10 + 2 * rows.Length];
-            BinaryPrimitives.WriteUInt16BigEndian(data, (ushort)data.Length);
-            BoundingBox.Write(data.AsSpan(2));
-            for (var i = 0; i < rows.Length; i++) BinaryPrimitives.WriteInt16BigEndian(data.AsSpan(10 + 2 * i), rows[i]);
+            var writer = new BigEndianWriter(data);
+            writer.WriteUInt16((ushort)data.Length);
+            BoundingBox.Write(ref writer);
+            foreach (var row in rows) writer.WriteInt16(row);
             return data;
         }
 

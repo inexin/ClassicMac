@@ -47,11 +47,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // only.
         internal static QuickDrawPattern Read(ref ClassicMac.Core.BigEndianReader b, bool macOS9)
         {
-            int patType = b.ReadU16BE();
-            var pattern = FromMono(b.ReadExactly(8));
+            int patType = b.ReadUInt16();
+            var pattern = FromMono(b.ReadBytes(8).ToArray());
             if (macOS9 ? patType != 1 && patType != 3 : patType == 2)
             {
-                int r = b.ReadU16BE(), g = b.ReadU16BE(), bl = b.ReadU16BE();
+                int r = b.ReadUInt16(), g = b.ReadUInt16(), bl = b.ReadUInt16();
                 pattern.Rgb = new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8));
                 pattern.Rgb16 = ((ushort)r, (ushort)g, (ushort)bl);
             }

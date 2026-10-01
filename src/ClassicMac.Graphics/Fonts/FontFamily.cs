@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -54,36 +53,45 @@ namespace ClassicMac.Graphics.Fonts
     /// </summary>
     public sealed class FontFamily
     {
-        private byte[] data = [];
+        private ushort[] rawWidthWords = [];
 
-        // A family width table as the Font Manager reads it: its style and the offset of its first width.
+        // A family width table as the Font Manager reads it: its style and index of its first raw width word.
         internal readonly record struct RawWidthTable(int Style, int Start);
 
         // ffProperty's nine words as stored.
         internal IReadOnlyList<int> Property { get; private init; } = [];
 
-        // The width tables as the Font Manager finds them: stepped by the family's range, a table whose widths run past
-        // the data kept (its words read as 0 there), unlike WidthTables.
+        // The width tables as the Font Manager finds them: stepped by the family's range; entries beyond the resource
+        // read as 0, unlike WidthTables.
         internal IReadOnlyList<RawWidthTable> RawWidthTables { get; private init; } = [];
 
         // Width word i of a width table, read on from its start wherever that lands (0 past the resource).
         internal int WidthWord(RawWidthTable table, int i)
         {
-            var at = table.Start + 2L * i;
-            return i >= 0 && at + 2 <= data.Length ? BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan((int)at)) : 0;
+            int at = table.Start + i;
+            return i >= 0 && (uint)at < (uint)rawWidthWords.Length ? rawWidthWords[at] : 0;
         }
 
-        private static RawWidthTable[] ReadRawWidthTables(byte[] data, int offset, int firstChar, int lastChar)
+        private static RawWidthTable[] ReadRawWidthTables(ref BigEndianReader reader, int offset, int firstChar, int lastChar,
+            out ushort[] rawWidthWords)
         {
-            if (offset <= 0 || lastChar == 0 || offset + 2 > data.Length) return [];
-            var count = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset)) + 1;
+            rawWidthWords = [];
+            if (offset <= 0 || lastChar == 0 || offset + 2 > reader.Length) return [];
+            var count = reader.ReadInt16At(offset) + 1;
             var entries = lastChar - firstChar + 3;
             if (count <= 0 || entries <= 0) return [];
+            int firstWidth = offset + 4;
+            if (firstWidth < reader.Length)
+            {
+                rawWidthWords = new ushort[(reader.Length - firstWidth) / 2];
+                for (int i = 0; i < rawWidthWords.Length; i++)
+                    rawWidthWords[i] = reader.ReadUInt16At(firstWidth + 2 * i);
+            }
             var tables = new List<RawWidthTable>();
             var at = offset + 2;
-            for (var t = 0; t < count && at + 2 <= data.Length; t++)
+            for (var t = 0; t < count && at + 2 <= reader.Length; t++)
             {
-                tables.Add(new RawWidthTable(BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(at)), at + 2));
+                tables.Add(new RawWidthTable(reader.ReadUInt16At(at), (at + 2 - firstWidth) / 2));
                 at += 2 + 2 * entries;
             }
             return [.. tables];
@@ -152,58 +160,64 @@ namespace ClassicMac.Graphics.Fonts
         /// </summary>
         public static FontFamily Read(ReadOnlySpan<byte> input, string name, ICollection<Diagnostic>? diagnostics = null)
         {
-            var data = input.ToArray();
-            if (input.Length < 54) throw new InvalidDataException($"A font family record needs 54 bytes; this is {data.Length}.");
+            var reader = new BigEndianReader(input);
+            return Read(ref reader, name, diagnostics);
+        }
+
+        /// <summary>Reads a family record at the reader's current position and advances past it.</summary>
+        public static FontFamily Read(ref BigEndianReader input, string name, ICollection<Diagnostic>? diagnostics = null)
+        {
+            var fields = input.ReadSubReader(input.Remaining);
+            if (fields.Length < 54) throw new InvalidDataException($"A font family record needs 54 bytes; this is {fields.Length}.");
             var shortData = false;
-            short Word(int offset) => BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset));
             static double Fixed412(int value) => value / 4096.0;
             // Mac OS 9 reads a 4.12 kern below −$2000 as sign and magnitude.
             static int SignMagnitude(short value) => value < -0x2000 ? -(value & 0x7FFF) : value;
-            var firstChar = (int)Word(4);
-            var lastChar = (int)Word(6);
+            var firstChar = (int)fields.ReadInt16At(4);
+            var lastChar = (int)fields.ReadInt16At(6);
 
             var extras = new double[9];
             for (var i = 0; i < 9; i++)
             {
-                var w = (ushort)Word(28 + 2 * i);
+                var w = (ushort)fields.ReadInt16At(28 + 2 * i);
                 extras[i] = Fixed412(w is >= 0x8000 and <= 0x8FFF ? -(w & 0x0FFF) : (short)w);
             }
 
-            var count = Word(52) + 1;
+            var count = fields.ReadInt16At(52) + 1;
             var fonts = new List<FontAssociation>();
             for (var i = 0; i < count; i++)
             {
                 var at = 54 + 6 * i;
-                if (at + 6 > data.Length)
+                if (at + 6 > fields.Length)
                 {
                     shortData = true;
                     break;
                 }
-                fonts.Add(new FontAssociation(Word(at), (ushort)Word(at + 2), Word(at + 4)));
+                fonts.Add(new FontAssociation(fields.ReadInt16At(at), (ushort)fields.ReadInt16At(at + 2), fields.ReadInt16At(at + 4)));
             }
 
             // Width tables: a count less one, then per table a style and a 4.12 width per character, the missing symbol
             // and one more, stepped by the family's own range.
             var widthTables = new List<FamilyWidthTable>();
-            var widthOffset = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(16));
+            var widthOffset = fields.ReadInt32At(16);
             var entries = lastChar - firstChar + 3;
             if (widthOffset > 0 && lastChar != 0 && entries > 0)
             {
-                if (widthOffset + 2 > data.Length) shortData = true;
+                if (widthOffset + 2 > fields.Length) shortData = true;
                 else
                 {
-                    var tables = Word(widthOffset) + 1;
+                    var tables = fields.ReadInt16At(widthOffset) + 1;
                     var at = widthOffset + 2;
                     for (var t = 0; t < tables; t++)
                     {
-                        if (at + 2 + 2 * entries > data.Length)
+                        if (at + 2 + 2 * entries > fields.Length)
                         {
                             shortData = true;
                             break;
                         }
                         var widths = new double[entries];
-                        for (var c = 0; c < entries; c++) widths[c] = Fixed412((ushort)Word(at + 2 + 2 * c));
-                        widthTables.Add(new FamilyWidthTable((ushort)Word(at), widths));
+                        for (var c = 0; c < entries; c++) widths[c] = Fixed412((ushort)fields.ReadInt16At(at + 2 + 2 * c));
+                        widthTables.Add(new FamilyWidthTable((ushort)fields.ReadInt16At(at), widths));
                         at += 2 + 2 * entries;
                     }
                 }
@@ -212,33 +226,33 @@ namespace ClassicMac.Graphics.Fonts
             // Kerning tables: a count less one, then per table a style, a number of pairs, and 4-byte pairs (first
             // character, second character, 4.12 kern).
             var kerningTables = new List<KerningTable>();
-            var kernOffset = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(20));
+            var kernOffset = fields.ReadInt32At(20);
             if (kernOffset > 0)
             {
-                if (kernOffset + 2 > data.Length) shortData = true;
+                if (kernOffset + 2 > fields.Length) shortData = true;
                 else
                 {
-                    var tables = Word(kernOffset) + 1;
+                    var tables = fields.ReadInt16At(kernOffset) + 1;
                     var at = kernOffset + 2;
                     for (var t = 0; t < tables; t++)
                     {
-                        if (at + 4 > data.Length)
+                        if (at + 4 > fields.Length)
                         {
                             shortData = true;
                             break;
                         }
-                        var style = (ushort)Word(at);
-                        var pairs = Word(at + 2);
+                        var style = (ushort)fields.ReadInt16At(at);
+                        var pairs = fields.ReadInt16At(at + 2);
                         at += 4;
                         var list = new List<KerningPair>();
                         for (var p = 0; p < pairs; p++, at += 4)
                         {
-                            if (at + 4 > data.Length)
+                            if (at + 4 > fields.Length)
                             {
                                 shortData = true;
                                 break;
                             }
-                            list.Add(new KerningPair(data[at], data[at + 1], Fixed412(SignMagnitude(Word(at + 2)))));
+                            list.Add(new KerningPair(fields.ReadByteAt(at), fields.ReadByteAt(at + 1), Fixed412(SignMagnitude(fields.ReadInt16At(at + 2)))));
                         }
                         kerningTables.Add(new KerningTable(style, list));
                         if (shortData) break;
@@ -248,75 +262,76 @@ namespace ClassicMac.Graphics.Fonts
 
             // Style mapping: font class, encoding offset, reserved long, 48 indexes, then a count and the style names.
             StyleMapping? mapping = null;
-            var styleOffset = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(24));
+            var styleOffset = fields.ReadInt32At(24);
             if (styleOffset > 0)
             {
-                if (styleOffset + 58 > data.Length) shortData = true;
+                if (styleOffset + 58 > fields.Length) shortData = true;
                 else
                 {
                     var names = new List<string>();
                     var at = styleOffset + 58;
-                    var nameCount = at + 2 <= data.Length ? Word(at) : 0;
+                    var nameCount = at + 2 <= fields.Length ? fields.ReadInt16At(at) : 0;
                     at += 2;
                     for (var n = 0; n < nameCount; n++)
                     {
-                        if (at >= data.Length || at + 1 + data[at] > data.Length)
+                        if (at >= fields.Length || at + 1 + fields.ReadByteAt(at) > fields.Length)
                         {
                             shortData = true;
                             break;
                         }
-                        names.Add(MacRoman.Decode(data.AsSpan(at + 1, data[at])));
-                        at += 1 + data[at];
+                        names.Add(MacRoman.Decode(fields.ReadBytesAt(at + 1, fields.ReadByteAt(at))));
+                        at += 1 + fields.ReadByteAt(at);
                     }
                     // The glyph-encoding subtable (often at an odd offset): a count, then a character code and a Pascal glyph name each.
                     var encoding = new List<(byte, string)>();
-                    var encodingOffset = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(styleOffset + 2));
-                    if (encodingOffset > 0 && styleOffset + (long)encodingOffset + 2 <= data.Length)
+                    var encodingOffset = fields.ReadInt32At(styleOffset + 2);
+                    if (encodingOffset > 0 && styleOffset + (long)encodingOffset + 2 <= fields.Length)
                     {
                         var e = styleOffset + encodingOffset;
-                        var glyphNames = Word(e);
+                        var glyphNames = fields.ReadInt16At(e);
                         e += 2;
                         for (var i = 0; i < glyphNames; i++)
                         {
-                            if (e + 2 > data.Length || e + 2 + data[e + 1] > data.Length)
+                            if (e + 2 > fields.Length || e + 2 + fields.ReadByteAt(e + 1) > fields.Length)
                             {
                                 shortData = true;
                                 break;
                             }
-                            encoding.Add((data[e], MacRoman.Decode(data.AsSpan(e + 2, data[e + 1]))));
-                            e += 2 + data[e + 1];
+                            encoding.Add((fields.ReadByteAt(e), MacRoman.Decode(fields.ReadBytesAt(e + 2, fields.ReadByteAt(e + 1)))));
+                            e += 2 + fields.ReadByteAt(e + 1);
                         }
                     }
                     else if (encodingOffset > 0)
                     {
                         shortData = true;
                     }
-                    mapping = new StyleMapping(Word(styleOffset), encodingOffset, data.AsSpan(styleOffset + 10, 48).ToArray(), names, encoding);
+                    mapping = new StyleMapping(fields.ReadInt16At(styleOffset), encodingOffset,
+                        fields.ReadBytesAt(styleOffset + 10, 48).ToArray(), names, encoding);
                 }
             }
 
             // The offset table and bounding-box table right after the association table (version 1 and later): a count less
             // one and offsets from the offset table's start, the first to a count less one and 10-byte boxes (style, left,
             // bottom, right, top in 4.12).
-            var version = (ushort)Word(50);
+            var version = (ushort)fields.ReadInt16At(50);
             var bounds = new List<FamilyBounds>();
             var offsetTable = 54 + 6 * Math.Max(0, count);
-            if (version >= 1 && offsetTable + 6 <= data.Length)
+            if (version >= 1 && offsetTable + 6 <= fields.Length)
             {
-                var boxes = offsetTable + BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(offsetTable + 2));
-                if (boxes > offsetTable && boxes + 2 <= data.Length)
+                var boxes = offsetTable + fields.ReadInt32At(offsetTable + 2);
+                if (boxes > offsetTable && boxes + 2 <= fields.Length)
                 {
-                    var boxCount = Word(boxes) + 1;
+                    var boxCount = fields.ReadInt16At(boxes) + 1;
                     for (var i = 0; i < boxCount; i++)
                     {
                         var b = boxes + 2 + 10 * i;
-                        if (b + 10 > data.Length)
+                        if (b + 10 > fields.Length)
                         {
                             shortData = true;
                             break;
                         }
-                        bounds.Add(new FamilyBounds((ushort)Word(b), Fixed412(SignMagnitude(Word(b + 2))), Fixed412(SignMagnitude(Word(b + 4))),
-                            Fixed412(SignMagnitude(Word(b + 6))), Fixed412(SignMagnitude(Word(b + 8)))));
+                        bounds.Add(new FamilyBounds((ushort)fields.ReadInt16At(b), Fixed412(SignMagnitude(fields.ReadInt16At(b + 2))), Fixed412(SignMagnitude(fields.ReadInt16At(b + 4))),
+                            Fixed412(SignMagnitude(fields.ReadInt16At(b + 6))), Fixed412(SignMagnitude(fields.ReadInt16At(b + 8)))));
                     }
                 }
             }
@@ -324,25 +339,26 @@ namespace ClassicMac.Graphics.Fonts
             if (shortData)
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The family record's tables run past its data; read as far as they go."));
             var property = new int[9];
-            for (var i = 0; i < 9; i++) property[i] = (ushort)Word(28 + 2 * i);
+            for (var i = 0; i < 9; i++) property[i] = (ushort)fields.ReadInt16At(28 + 2 * i);
+            var rawWidthTables = ReadRawWidthTables(ref fields, widthOffset, firstChar, lastChar, out var rawWidthWords);
             return new FontFamily
             {
-                data = data,
+                rawWidthWords = rawWidthWords,
                 Property = property,
-                RawWidthTables = ReadRawWidthTables(data, widthOffset, firstChar, lastChar),
+                RawWidthTables = rawWidthTables,
                 Name = name,
-                Flags = (ushort)Word(0),
-                FamilyId = (ushort)Word(2),
+                Flags = (ushort)fields.ReadInt16At(0),
+                FamilyId = (ushort)fields.ReadInt16At(2),
                 FirstChar = firstChar,
                 LastChar = lastChar,
-                Ascent = Fixed412(Word(8)),
-                Descent = Fixed412(Word(10)),
-                Leading = Fixed412(Word(12)),
-                MaxWidth = Fixed412(Word(14)),
+                Ascent = Fixed412(fields.ReadInt16At(8)),
+                Descent = Fixed412(fields.ReadInt16At(10)),
+                Leading = Fixed412(fields.ReadInt16At(12)),
+                MaxWidth = Fixed412(fields.ReadInt16At(14)),
                 StyleExtras = extras[..8],
-                International = [(ushort)Word(46), (ushort)Word(48)],
+                International = [(ushort)fields.ReadInt16At(46), (ushort)fields.ReadInt16At(48)],
                 Version = version,
-                Language = version >= 4 ? (Word(44) > 0 ? Word(44) : -128) : null,
+                Language = version >= 4 ? (fields.ReadInt16At(44) > 0 ? fields.ReadInt16At(44) : -128) : null,
                 Bounds = bounds,
                 Fonts = fonts,
                 WidthTables = widthTables,
@@ -362,7 +378,9 @@ namespace ClassicMac.Graphics.Fonts
             if (font.Size <= 0) return null;
             // An empty result counts as none (a null array converts to empty memory, not null).
             var data = lookup(FourCC.FromString("NFNT"), font.FontId) is { Length: > 0 } nfnt ? nfnt : lookup(FourCC.FromString("FONT"), font.FontId);
-            return data is { Length: > 0 } bytes ? BitmapFont.Read(bytes.Span, diagnostics) : null;
+            if (data is not { Length: > 0 } bytes) return null;
+            var reader = new BigEndianReader(bytes.Span);
+            return BitmapFont.Read(ref reader, diagnostics, rom: false);
         }
 
         /// <summary>The family's sizes with a bitmap font, in order.</summary>

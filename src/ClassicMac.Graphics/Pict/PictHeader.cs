@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
@@ -25,12 +24,22 @@ namespace ClassicMac.Graphics.Pict
         /// <summary>True if <paramref name="data"/> starts with a bare picture (as stored in a <c>PICT</c> resource).</summary>
         public static bool IsPicture(ReadOnlySpan<byte> data)
         {
-            if (data.Length < 12) return false;
-            short top = I16(data, 2), left = I16(data, 4), bottom = I16(data, 6), right = I16(data, 8);
+            var reader = new ClassicMac.Core.BigEndianReader(data);
+            return IsPicture(ref reader);
+        }
+
+        /// <summary>Tests for a bare picture at the reader's current position without advancing it.</summary>
+        public static bool IsPicture(ref ClassicMac.Core.BigEndianReader reader)
+        {
+            int start = reader.Position;
+            if (reader.Remaining < 12) return false;
+            short top = reader.ReadInt16At(start + 2), left = reader.ReadInt16At(start + 4),
+                bottom = reader.ReadInt16At(start + 6), right = reader.ReadInt16At(start + 8);
             if (bottom <= top || right <= left) return false;
-            if (IsVersion1(data)) return true;
-            return data.Length >= SignatureLength
-                && U16(data, 10) == 0x0011 && U16(data, 12) == 0x02FF && U16(data, 14) == 0x0C00;
+            if (IsVersion1(reader, start)) return true;
+            return reader.Remaining >= SignatureLength
+                && reader.ReadUInt16At(start + 10) == 0x0011 && reader.ReadUInt16At(start + 12) == 0x02FF
+                && reader.ReadUInt16At(start + 14) == 0x0C00;
         }
 
         /// <summary>True if <paramref name="data"/> starts with a <c>.pict</c> file: a 512-byte header, then a picture.</summary>
@@ -41,7 +50,8 @@ namespace ClassicMac.Graphics.Pict
             if (!IsPicture(picture)) return false;
             // v1's two-byte version opcode is a weak signature at an arbitrary offset, so for v1 also require the
             // conventional all-zero application header.
-            return !IsVersion1(picture) || data.Slice(0, FileHeaderSize).IndexOfAnyExcept((byte)0) < 0;
+            var reader = new BigEndianReader(data);
+            return !IsVersion1(reader, FileHeaderSize) || data.Slice(0, FileHeaderSize).IndexOfAnyExcept((byte)0) < 0;
         }
 
         /// <summary>
@@ -79,10 +89,10 @@ namespace ClassicMac.Graphics.Pict
             if (length >= FileHeaderSize + 12 && !HasVersionOpcode(b, start) && HasVersionOpcode(b, start + FileHeaderSize))
                 start += FileHeaderSize;
             b.Position = start;
-            b.ReadU16BE();                                            // picSize: unreliable in v2
-            var frame = b.ReadRectBE();
+            b.ReadUInt16();                                            // picSize: unreliable in v2
+            var frame = PictRect.Read(ref b);
 
-            ushort versionOp = b.ReadU16BE();
+            ushort versionOp = b.ReadUInt16();
             if (versionOp == 0x1101)                                  // 0x11 VersionOp, 0x01: 1-byte opcodes follow
             {
                 version1 = true;
@@ -92,19 +102,19 @@ namespace ClassicMac.Graphics.Pict
                 throw new NotSupportedException($"Unexpected PICT version opcode 0x{versionOp:X4}");
 
             version1 = false;
-            b.ReadU16BE();                                            // Version (0x02FF)
+            b.ReadUInt16();                                            // Version (0x02FF)
             int afterVersion = b.Position;
-            if (b.Length - afterVersion < 2 + 24 || b.ReadU16BE() != 0x0C00)
+            if (b.Length - afterVersion < 2 + 24 || b.ReadUInt16() != 0x0C00)
             {
                 b.Position = afterVersion;                            // no HeaderOp: that word is the first opcode
                 return new PictInfo(2, false, frame, frame, 72, 72);
             }
 
-            short headerVersion = b.ReadI16BE();
-            b.ReadU16BE();                                            // reserved
-            int hRes = b.ReadI32BE(), vRes = b.ReadI32BE();           // Fixed 16.16
-            var srcRect = b.ReadRectBE();
-            b.ReadU32BE();                                            // reserved
+            short headerVersion = b.ReadInt16();
+            b.ReadUInt16();                                            // reserved
+            int hRes = b.ReadInt32(), vRes = b.ReadInt32();           // Fixed 16.16
+            var srcRect = PictRect.Read(ref b);
+            b.ReadUInt32();                                            // reserved
             if (headerVersion != -2)
                 return new PictInfo(2, false, frame, frame, 72, 72);
             return new PictInfo(2, true, frame, srcRect.IsEmpty ? frame : srcRect,
@@ -120,8 +130,7 @@ namespace ClassicMac.Graphics.Pict
             return op == 0x1101 || (op == 0x0011 && b.ReadUInt16At(offset + 12) == 0x02FF);
         }
 
-        private static bool IsVersion1(ReadOnlySpan<byte> picture) => picture[10] == 0x11 && picture[11] == 0x01;
-        private static short I16(ReadOnlySpan<byte> d, int offset) => BinaryPrimitives.ReadInt16BigEndian(d.Slice(offset));
-        private static ushort U16(ReadOnlySpan<byte> d, int offset) => BinaryPrimitives.ReadUInt16BigEndian(d.Slice(offset));
+        private static bool IsVersion1(BigEndianReader reader, int offset) =>
+            reader.ReadByteAt(offset + 10) == 0x11 && reader.ReadByteAt(offset + 11) == 0x01;
     }
 }

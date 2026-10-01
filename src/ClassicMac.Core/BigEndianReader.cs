@@ -331,6 +331,12 @@ namespace ClassicMac.Core
             return result;
         }
 
+        /// <summary>Creates a bounded reader over the next <paramref name="length"/> bytes and advances this reader past them.</summary>
+        /// <remarks>The returned reader borrows the same source; it cannot read beyond the selected section.</remarks>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
+        /// <exception cref="EndOfStreamException">Fewer than <paramref name="length"/> bytes remain.</exception>
+        public BigEndianReader ReadSubReader(int length) => new(ReadBytes(length));
+
         /// <summary>Attempts to return the next <paramref name="length"/> bytes as a borrowed slice.</summary>
         /// <remarks>A failed attempt returns an empty slice and leaves <see cref="Position"/> unchanged.</remarks>
         public bool TryReadBytes(int length, out ReadOnlySpan<byte> value)

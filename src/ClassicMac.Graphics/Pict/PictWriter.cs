@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
@@ -63,14 +64,13 @@ namespace ClassicMac.Graphics.Pict
     /// </summary>
     public sealed class PictWriter
     {
-        private readonly Stream stream;
+        private readonly BigEndianStreamWriter output;
         private readonly int width, height;
         private readonly PictWriteOptions options;
         private readonly RgbaColor[] palette;
         private readonly int bits;                       // pixel depth as stored
         private readonly bool bitMap;                    // plain 1-bit BitMap (white/black palette)
         private readonly List<byte[]>? buffered;         // rows kept for a multi-strip image
-        private long written;
         private int rows;
 
         /// <summary>Starts a picture of the given size on <paramref name="stream"/> and writes its header.</summary>
@@ -81,7 +81,7 @@ namespace ClassicMac.Graphics.Pict
             ArgumentNullException.ThrowIfNull(stream);
             if (width <= 0 || width > short.MaxValue) throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0 || height > short.MaxValue) throw new ArgumentOutOfRangeException(nameof(height));
-            this.stream = stream;
+            output = new BigEndianStreamWriter(stream);
             this.width = width;
             this.height = height;
             this.options = options ?? new PictWriteOptions();
@@ -230,29 +230,33 @@ namespace ClassicMac.Graphics.Pict
                     foreach (var row in buffered) WriteStripRow(row, left, w, unpacked);
                 }
             }
-            if ((written & 1) == 1) U8(0);                  // word-align before OpEndPic
-            U16(0x00FF);
+            if ((output.BytesWritten & 1) == 1) output.WriteByte(0); // word-align before OpEndPic
+            output.WriteUInt16(0x00FF);
         }
 
         // ---- header ----
 
         private void WriteHeader()
         {
-            if (options.FileHeader) Bytes(new byte[PictHeader.FileHeaderSize]);
+            if (options.FileHeader)
+            {
+                output.WriteBytes(new byte[PictHeader.FileHeaderSize]);
+            }
             double hRes = options.HorizontalResolution > 0 ? options.HorizontalResolution : 72;
             double vRes = options.VerticalResolution > 0 ? options.VerticalResolution : 72;
             int frameWidth = Math.Max(1, (int)Math.Round(width * 72 / hRes));
             int frameHeight = Math.Max(1, (int)Math.Round(height * 72 / vRes));
 
-            U16(0);                                          // picSize (unused for version 2)
-            Rect(0, 0, frameHeight, frameWidth);             // picFrame, 72 dpi
-            U16(0x0011); U16(0x02FF);                        // version 2
-            U16(0x0C00);                                     // extended version 2 header
-            U16(0xFFFE); U16(0);
-            U32(Fixed(hRes)); U32(Fixed(vRes));
-            Rect(0, 0, height, width);                       // source rect: the image at its resolution
-            U32(0);
-            U16(0x0001); U16(10); Rect(0, 0, height, width); // clip
+            output.WriteUInt16(0);                          // picSize (unused for version 2)
+            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16((short)frameHeight); output.WriteInt16((short)frameWidth); // picFrame, 72 dpi
+            output.WriteUInt16(0x0011); output.WriteUInt16(0x02FF); // version 2
+            output.WriteUInt16(0x0C00);                     // extended version 2 header
+            output.WriteUInt16(0xFFFE); output.WriteUInt16(0);
+            output.WriteUInt32(Fixed(hRes)); output.WriteUInt32(Fixed(vRes));
+            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16((short)height); output.WriteInt16((short)width); // source rect: image at its resolution
+            output.WriteUInt32(0);
+            output.WriteUInt16(0x0001); output.WriteUInt16(10);
+            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16((short)height); output.WriteInt16((short)width); // clip
             if (options.IccProfile is { Length: > 0 } icc) WriteIccProfile(icc);
             if (bits != 32) BitmapHeader(0, Math.Min(width, StripWidth), unpacked: false);
         }
@@ -282,63 +286,69 @@ namespace ClassicMac.Graphics.Pict
 
             void Comment(uint selector, ReadOnlySpan<byte> data)
             {
-                if ((written & 1) == 1) U8(0);
-                U16(0x00A1); U16(224); U16(4 + data.Length);
-                U32(selector);
-                Bytes(data.ToArray());
+                if ((output.BytesWritten & 1) == 1) output.WriteByte(0);
+                output.WriteUInt16(0x00A1); output.WriteUInt16(224); output.WriteUInt16((ushort)(4 + data.Length));
+                output.WriteUInt32(selector);
+                output.WriteBytes(data);
             }
         }
 
         // The opcode and pixel map fields up to the pixel data, for the strip [left, left + w).
         private void BitmapHeader(int left, int w, bool unpacked)
         {
-            if ((written & 1) == 1) U8(0);
+            if ((output.BytesWritten & 1) == 1) output.WriteByte(0);
             int rowBytes = RowBytes(w);
             var bounds = (0, left, height, left + w);
             if (bits > 8)
             {
-                U16(0x009A);                                 // DirectBitsRect
-                U32(0x000000FF);                             // baseAddr
-                U16(rowBytes | 0x8000);
-                Rect(bounds);
+                output.WriteUInt16(0x009A);                  // DirectBitsRect
+                output.WriteUInt32(0x000000FF);              // baseAddr
+                output.WriteUInt16((ushort)(rowBytes | 0x8000));
+                output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
+                output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4);
                 PixMapFields(packType: bits == 16 ? 3 : unpacked ? 1 : 4, pixelType: 16, cmpCount: bits == 16 || options.Format == PictPixelFormat.Rgb888 ? 3 : 4,
                     cmpSize: bits == 16 ? 5 : 8);
             }
             else
             {
-                U16(rowBytes < 8 ? 0x0090 : 0x0098);         // BitsRect (unpacked) / PackBitsRect
-                U16(bitMap ? rowBytes : rowBytes | 0x8000);
-                Rect(bounds);
+                output.WriteUInt16((ushort)(rowBytes < 8 ? 0x0090 : 0x0098)); // BitsRect (unpacked) / PackBitsRect
+                output.WriteUInt16((ushort)(bitMap ? rowBytes : rowBytes | 0x8000));
+                output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
+                output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4);
                 if (!bitMap)
                 {
                     PixMapFields(packType: 0, pixelType: 0, cmpCount: 1, cmpSize: bits);
-                    U32(0);                                  // ctSeed
-                    U16(0);                                  // ctFlags: entries carry their pixel values
-                    U16(palette.Length - 1);
+                    output.WriteUInt32(0);                   // ctSeed
+                    output.WriteUInt16(0);                   // ctFlags: entries carry their pixel values
+                    output.WriteUInt16((ushort)(palette.Length - 1));
                     for (int i = 0; i < palette.Length; i++)
                     {
-                        U16(i);
-                        U16(palette[i].R * 257); U16(palette[i].G * 257); U16(palette[i].B * 257);
+                        output.WriteUInt16((ushort)i);
+                        output.WriteUInt16((ushort)(palette[i].R * 257));
+                        output.WriteUInt16((ushort)(palette[i].G * 257));
+                        output.WriteUInt16((ushort)(palette[i].B * 257));
                     }
                 }
             }
-            Rect(bounds);                                    // srcRect
-            Rect(bounds);                                    // dstRect
-            U16(0);                                          // srcCopy
+            output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
+            output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4); // srcRect
+            output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
+            output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4); // dstRect
+            output.WriteUInt16(0);                           // srcCopy
         }
 
         private void PixMapFields(int packType, int pixelType, int cmpCount, int cmpSize)
         {
-            U16(0);                                          // pmVersion
-            U16(packType);
-            U32(0);                                          // packSize
-            U32(Fixed(options.HorizontalResolution > 0 ? options.HorizontalResolution : 72));
-            U32(Fixed(options.VerticalResolution > 0 ? options.VerticalResolution : 72));
-            U16(pixelType);
-            U16(bits);
-            U16(cmpCount);
-            U16(cmpSize);
-            U32(0); U32(0); U32(0);                          // planeBytes, pmTable, reserved
+            output.WriteUInt16(0);                           // pmVersion
+            output.WriteUInt16((ushort)packType);
+            output.WriteUInt32(0);                           // packSize
+            output.WriteUInt32(Fixed(options.HorizontalResolution > 0 ? options.HorizontalResolution : 72));
+            output.WriteUInt32(Fixed(options.VerticalResolution > 0 ? options.VerticalResolution : 72));
+            output.WriteUInt16((ushort)pixelType);
+            output.WriteUInt16((ushort)bits);
+            output.WriteUInt16((ushort)cmpCount);
+            output.WriteUInt16((ushort)cmpSize);
+            output.WriteUInt32(0); output.WriteUInt32(0); output.WriteUInt32(0); // planeBytes, pmTable, reserved
         }
 
         // Even row bytes for the strip's pixels.
@@ -381,12 +391,13 @@ namespace ClassicMac.Graphics.Pict
 
             if (rowBytes < 8 || unpacked)
             {
-                Bytes(line);
+                output.WriteBytes(line);
                 return;
             }
             var packed = bits == 16 ? PackWords(line) : PackBits(line);
-            if (rowBytes > 250) U16(packed.Length); else U8(packed.Length);
-            Bytes(packed);
+            if (rowBytes > 250) output.WriteUInt16((ushort)packed.Length);
+            else output.WriteByte((byte)packed.Length);
+            output.WriteBytes(packed);
         }
 
         // Component planes, each w bytes: alpha first when stored, then R, G, B.
@@ -436,11 +447,5 @@ namespace ClassicMac.Graphics.Pict
             return output.ToArray();
         }
 
-        private void U8(int v) { stream.WriteByte((byte)v); written++; }
-        private void U16(int v) { U8(v >> 8); U8(v); }
-        private void U32(uint v) { U8((int)(v >> 24)); U8((int)(v >> 16)); U8((int)(v >> 8)); U8((int)v); }
-        private void Rect(int t, int l, int b, int r) { U16(t); U16(l); U16(b); U16(r); }
-        private void Rect((int t, int l, int b, int r) x) => Rect(x.t, x.l, x.b, x.r);
-        private void Bytes(byte[] data) { stream.Write(data, 0, data.Length); written += data.Length; }
     }
 }

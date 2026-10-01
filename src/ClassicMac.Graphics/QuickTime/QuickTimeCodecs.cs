@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 
 namespace ClassicMac.Graphics.QuickTime
@@ -25,7 +26,7 @@ namespace ClassicMac.Graphics.QuickTime
                     "yuv2" => Yuv2(d, data),
                     "YVU9" => Yvu9(d, data),
                     "tga " => TargaCodec.Decode(data),
-                    "PNTG" => MacPaintFile.DecodeRows(data),
+                    "PNTG" => DecodeMacPaint(data),
                     _ => null,
                 };
             }
@@ -33,6 +34,12 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 return null;                                            // corrupt data: treat as undecodable
             }
+        }
+
+        private static RgbaBitmap? DecodeMacPaint(ReadOnlySpan<byte> data)
+        {
+            var reader = new BigEndianReader(data);
+            return MacPaintFile.DecodeRows(ref reader);
         }
 
         // ---- shared helpers ----
@@ -108,7 +115,8 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 int count = (data[2 * l] << 8) | data[2 * l + 1];
                 if (p + count > data.Length) return null;
-                PackBits.Unpack(data.AsSpan(p, count), planes.AsSpan(l * d.Width, d.Width));
+                var row = new BigEndianReader(data.AsSpan(p, count));
+                PackBits.Unpack(ref row, planes.AsSpan(l * d.Width, d.Width));
                 p += count;
             }
             var palette = Palette(d);

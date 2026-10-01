@@ -1,6 +1,5 @@
 using System;
-using System.Buffers.Binary;
-using System.Text;
+using ClassicMac.Core;
 
 namespace ClassicMac.Graphics
 {
@@ -30,12 +29,15 @@ namespace ClassicMac.Graphics
         /// </summary>
         public static bool IsMacPaintFile(ReadOnlySpan<byte> data)
         {
-            if (IsMacBinary(data)) return true;
+            var reader = new BigEndianReader(data);
+            if (IsMacBinary(reader)) return true;
             if (data.Length < HeaderSize + 2) return false;
-            uint version = BinaryPrimitives.ReadUInt32BigEndian(data);
+            uint version = reader.ReadUInt32At(0);
             if (version != 0 && version != 2 && version != 3) return false;
             if (data.Slice(4 + 38 * 8, HeaderSize - 4 - 38 * 8).IndexOfAnyExcept((byte)0) >= 0) return false;
-            return FirstRowIsWhole(data.Slice(HeaderSize));
+            reader.Position = HeaderSize;
+            var rows = reader.ReadSubReader(reader.Remaining);
+            return FirstRowIsWhole(ref rows);
         }
 
         /// <summary>Decodes the image: black on white, opaque. Rows missing from a truncated file stay white.</summary>
@@ -44,23 +46,25 @@ namespace ClassicMac.Graphics
         {
             ArgumentNullException.ThrowIfNull(data);
             ReadOnlySpan<byte> span = data;
-            if (IsMacBinary(span))
+            var reader = new BigEndianReader(span);
+            if (IsMacBinary(reader))
             {
-                int forkLength = (int)Math.Min(BinaryPrimitives.ReadUInt32BigEndian(span.Slice(83)), (uint)(data.Length - MacBinaryHeaderSize));
+                int forkLength = (int)Math.Min(reader.ReadUInt32At(83), (uint)(data.Length - MacBinaryHeaderSize));
                 span = span.Slice(MacBinaryHeaderSize, forkLength);
             }
             if (span.Length <= HeaderSize) throw new NotSupportedException("The data is too short to be a MacPaint document.");
-            var image = DecodeRows(span.Slice(HeaderSize));
+            var rows = new BigEndianReader(span.Slice(HeaderSize));
+            var image = DecodeRows(ref rows);
             return image ?? throw new NotSupportedException("The MacPaint document has no image data.");
         }
 
         // The image rows (after any header), PackBits-compressed back to back; 1 = black; rows missing from the data stay
         // white. Also QuickTime's 'PNTG' codec.
-        internal static RgbaBitmap? DecodeRows(ReadOnlySpan<byte> data)
+        internal static RgbaBitmap? DecodeRows(ref BigEndianReader data)
         {
             const int rowBytes = Width / 8;
             var bits = new byte[rowBytes * Height];
-            int consumed = PackBits.Unpack(data, bits);
+            int consumed = PackBits.Unpack(ref data, bits);
             if (consumed == 0) return null;
             var img = new RgbaBitmap(Width, Height);
             var px = img.Pixels;
@@ -76,31 +80,31 @@ namespace ClassicMac.Graphics
         }
 
         // MacBinary (I/II/III): byte 0 zero, a 1-63 character name at 1, file type PNTG at 65, zero at 74 and 82.
-        private static bool IsMacBinary(ReadOnlySpan<byte> data) =>
-            data.Length >= MacBinaryHeaderSize && data[0] == 0 && data[1] >= 1 && data[1] <= 63 && data[74] == 0 &&
-            data[82] == 0 && Encoding.Latin1.GetString(data.Slice(65, 4)) == "PNTG";
+        private static bool IsMacBinary(BigEndianReader data) =>
+            data.Length >= MacBinaryHeaderSize && data.ReadByteAt(0) == 0 && data.ReadByteAt(1) is >= 1 and <= 63 &&
+            data.ReadByteAt(74) == 0 && data.ReadByteAt(82) == 0 && data.ReadFourCCAt(65) == FourCC.FromString("PNTG");
 
         // The first PackBits row fills exactly 72 bytes (a run or literal never straddles MacPaint's rows).
-        private static bool FirstRowIsWhole(ReadOnlySpan<byte> rows)
+        private static bool FirstRowIsWhole(ref BigEndianReader rows)
         {
-            int ip = 0, produced = 0;
+            int produced = 0;
             while (produced < Width / 8)
             {
-                if (ip >= rows.Length) return false;
-                sbyte flag = (sbyte)rows[ip++];
+                if (!rows.TryReadByte(out byte rawFlag)) return false;
+                sbyte flag = (sbyte)rawFlag;
                 if (flag == -128) continue;
                 if (flag < 0)
                 {
                     produced += 1 - flag;
-                    ip++;
+                    if (!rows.TrySkip(1)) return false;
                 }
                 else
                 {
                     produced += flag + 1;
-                    ip += flag + 1;
+                    if (!rows.TrySkip(flag + 1)) return false;
                 }
             }
-            return produced == Width / 8 && ip <= rows.Length;
+            return produced == Width / 8;
         }
     }
 }

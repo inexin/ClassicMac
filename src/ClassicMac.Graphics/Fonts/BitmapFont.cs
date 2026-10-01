@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -27,13 +26,13 @@ namespace ClassicMac.Graphics.Fonts
     public sealed class BitmapFont
     {
         private readonly byte[] strike;
-        private readonly byte[] data;
+        private readonly int[] rawOffsetWidths;
         private readonly Dictionary<int, BitmapGlyph> glyphs = [];
 
-        private BitmapFont(byte[] strike, byte[] data)
+        private BitmapFont(byte[] strike, int[] rawOffsetWidths)
         {
             this.strike = strike;
-            this.data = data;
+            this.rawOffsetWidths = rawOffsetWidths;
         }
 
         /// <summary>The font type word: bit 0 image-height table, bit 1 glyph-width table, bits 2–3 depth, bit 7 colour table, bit 8 synthetic, bit 9 colours other than black, bit 13 fixed width, bit 14 not to be expanded to the screen depth.</summary>
@@ -94,65 +93,42 @@ namespace ClassicMac.Graphics.Fonts
         /// Reads a strike. Throws <see cref="InvalidDataException"/> under 26 bytes (the header). Tables that run past the
         /// data are read as far as they go and reported (<c>font.short</c>).
         /// </summary>
-        public static BitmapFont Read(ReadOnlySpan<byte> input, ICollection<Diagnostic>? diagnostics = null) => Read(input, diagnostics, rom: false);
+        public static BitmapFont Read(ReadOnlySpan<byte> input, ICollection<Diagnostic>? diagnostics = null)
+        {
+            var reader = new BigEndianReader(input);
+            return Read(ref reader, diagnostics, rom: false);
+        }
 
         // Reads a strike the way Mac OS 9 does, or with rom the way the 68k ROM's Font Manager and text drawing do: the
         // depth code in fontType bits 2-4 (Mac OS 9: 2-3), rowWords' top bit not masked (a strike with it set is
         // rejected), and the location table right after the strike (Mac OS 9: just before the offset/width table).
-        internal static BitmapFont Read(ReadOnlySpan<byte> input, ICollection<Diagnostic>? diagnostics, bool rom)
+        internal static BitmapFont Read(ref BigEndianReader input, ICollection<Diagnostic>? diagnostics, bool rom)
         {
-            var data = input.ToArray();
-            if (input.Length < 26) throw new InvalidDataException($"A font strike needs a 26-byte header; this is {data.Length} bytes.");
-            short Word(int offset) => BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(offset));
-            var fontType = (ushort)Word(0);
-            int firstChar = Word(2), lastChar = Word(4);
+            var fields = input.ReadSubReader(input.Remaining);
+            if (fields.Length < 26) throw new InvalidDataException($"A font strike needs a 26-byte header; this is {fields.Length} bytes.");
+            var fontType = (ushort)fields.ReadInt16At(0);
+            int firstChar = fields.ReadInt16At(2), lastChar = fields.ReadInt16At(4);
             if (lastChar < firstChar || firstChar < 0 || lastChar > 255)
                 throw new InvalidDataException($"The font's characters run from {firstChar} to {lastChar}.");
-            var rowWords = rom ? Word(24) : (ushort)Word(24) & 0x7FFF; // Mac OS 9 masks the top bit
+            var rowWords = rom ? fields.ReadInt16At(24) : (ushort)fields.ReadInt16At(24) & 0x7FFF; // Mac OS 9 masks the top bit
             if (rowWords < 0) throw new InvalidDataException($"The strike's row length is {rowWords} words.");
-            var rectHeight = Math.Max(0, (int)Word(14));
+            var rectHeight = Math.Max(0, (int)fields.ReadInt16At(14));
             var depth = 1 << ((fontType >> 2) & (rom ? 7 : 3));
             var strikeLong = (long)rowWords * 2 * depth * rectHeight;
             if (strikeLong > int.MaxValue / 2) throw new InvalidDataException($"The strike would be {strikeLong} bytes.");
             var strikeLength = (int)strikeLong;
             var shortData = false;
             var strike = new byte[strikeLength];
-            data.AsSpan(26, Math.Min(strikeLength, data.Length - 26)).CopyTo(strike);
-            if (26 + strikeLength > data.Length) shortData = true;
+            fields.ReadBytesAt(26, Math.Min(strikeLength, fields.Length - 26)).CopyTo(strike);
+            if (26 + strikeLength > fields.Length) shortData = true;
 
             // owTLoc is the offset in words from itself (+16) to the offset/width table; a positive nDescent (+10) is its
             // high word (Mac OS 9; the ROM takes 0 or more).
-            long owTLoc = (ushort)Word(16);
-            var nDescent = Word(10);
+            long owTLoc = fields.ReadUInt16At(16);
+            var nDescent = fields.ReadInt16At(10);
             if (nDescent > 0) owTLoc |= (long)nDescent << 16;
-            var font = new BitmapFont(strike, data)
-            {
-                FontType = fontType,
-                Depth = depth,
-                FirstChar = firstChar,
-                LastChar = lastChar,
-                MaxWidth = Word(6),
-                MaxKern = Word(8),
-                RectWidth = Word(12),
-                RectHeight = rectHeight,
-                Ascent = Word(18),
-                Descent = Word(20),
-                Leading = Word(22),
-                RowWords = rowWords,
-            };
-
             // Every table has one entry per character, then the missing symbol, then one more (the location table's end).
             var entries = lastChar - firstChar + 3;
-            int? Entry(long offset, int index)
-            {
-                var at = offset + 2L * index;
-                if (at < 0 || at + 2 > data.Length)
-                {
-                    shortData = true;
-                    return null;
-                }
-                return BinaryPrimitives.ReadInt16BigEndian(data.AsSpan((int)at));
-            }
             // Mac OS 9 finds the location table just before the offset/width table (the ROM, right after the strike;
             // the same place in a well-formed font).
             var offsetWidths = 16 + owTLoc * 2;
@@ -163,20 +139,38 @@ namespace ClassicMac.Graphics.Fonts
                     "The location table is not right after the strike; it is read just before the offset/width table, as Mac OS 9 reads it."));
             }
             var after = offsetWidths + 2L * entries;
-            var widths = font.HasWidthTable ? after : -1;
-            if (font.HasWidthTable) after += 2L * entries;
-            var heights = font.HasHeightTable ? after : -1;
+            var hasWidthTable = (fontType & 0x0002) != 0;
+            var hasHeightTable = (fontType & 0x0001) != 0;
+            var widths = hasWidthTable ? after : -1;
+            if (hasWidthTable) after += 2L * entries;
+            var heights = hasHeightTable ? after : -1;
+            var rawOffsetWidths = RawOffsetWidthWords(ref fields, offsetWidths, byte.MaxValue + 1);
+            var font = new BitmapFont(strike, rawOffsetWidths)
+            {
+                FontType = fontType,
+                Depth = depth,
+                FirstChar = firstChar,
+                LastChar = lastChar,
+                MaxWidth = fields.ReadInt16At(6),
+                MaxKern = fields.ReadInt16At(8),
+                RectWidth = fields.ReadInt16At(12),
+                RectHeight = rectHeight,
+                Ascent = fields.ReadInt16At(18),
+                Descent = fields.ReadInt16At(20),
+                Leading = fields.ReadInt16At(22),
+                RowWords = rowWords,
+            };
 
             for (var i = 0; i < entries - 1; i++)
             {
-                var ow = Entry(offsetWidths, i);
+                var ow = Entry(ref fields, offsetWidths, i, ref shortData);
                 if (ow is null or -1) continue; // missing: drawn as the missing symbol
-                var left = (ushort)(Entry(locations, i) ?? 0);
-                var right = (ushort)(Entry(locations, i + 1) ?? left);
+                var left = (ushort)(Entry(ref fields, locations, i, ref shortData) ?? 0);
+                var right = (ushort)(Entry(ref fields, locations, i + 1, ref shortData) ?? left);
                 var character = i == entries - 2 ? -1 : firstChar + i;
-                double? fractional = widths >= 0 && Entry(widths, i) is { } w ? (ushort)w / 256.0 : null;
+                double? fractional = widths >= 0 && Entry(ref fields, widths, i, ref shortData) is { } w ? (ushort)w / 256.0 : null;
                 int top = 0, rows = rectHeight;
-                if (heights >= 0 && Entry(heights, i) is { } h)
+                if (heights >= 0 && Entry(ref fields, heights, i, ref shortData) is { } h)
                 {
                     top = (ushort)h >> 8;
                     rows = h & 0xFF;
@@ -188,27 +182,49 @@ namespace ClassicMac.Graphics.Fonts
 
             // The raw tables for the renderer, words past the data read as the text code finds them (0; −1 for a
             // missing offset/width entry).
-            font.OffsetWidthTable = offsetWidths;
-            font.Locations = Words(data, locations, entries, unsigned: true);
-            font.OffsetWidths = Words(data, offsetWidths, entries, unsigned: false);
-            if (widths >= 0) font.FractionalWidths = Words(data, widths, entries, unsigned: true);
-            if (heights >= 0) font.Heights = Words(data, heights, entries, unsigned: true);
+            font.Locations = Words(ref fields, locations, entries, unsigned: true);
+            font.OffsetWidths = Words(ref fields, offsetWidths, entries, unsigned: false);
+            if (widths >= 0) font.FractionalWidths = Words(ref fields, widths, entries, unsigned: true);
+            if (heights >= 0) font.Heights = Words(ref fields, heights, entries, unsigned: true);
             return font;
         }
 
-        private static int[] Words(byte[] data, long offset, int count, bool unsigned)
+        private static int? Entry(ref BigEndianReader reader, long offset, int index, ref bool shortData)
+        {
+            var at = offset + 2L * index;
+            if (at < 0 || at + 2 > reader.Length)
+            {
+                shortData = true;
+                return null;
+            }
+            return reader.ReadInt16At((int)at);
+        }
+
+        private static int[] Words(ref BigEndianReader reader, long offset, int count, bool unsigned)
         {
             var result = new int[Math.Max(0, count)];
             for (var i = 0; i < result.Length; i++)
             {
                 var at = offset + 2L * i;
-                if (at < 0 || at + 2 > data.Length)
+                if (at < 0 || at + 2 > reader.Length)
                 {
                     result[i] = unsigned ? 0 : -1;
                     continue;
                 }
-                var w = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan((int)at));
+                var w = reader.ReadInt16At((int)at);
                 result[i] = unsigned ? (ushort)w : w;
+            }
+            return result;
+        }
+
+        private static int[] RawOffsetWidthWords(ref BigEndianReader reader, long offset, int count)
+        {
+            var result = new int[count];
+            for (var i = 0; i < result.Length; i++)
+            {
+                var at = offset + 2L * i;
+                if (at >= 0 && at + 2 <= reader.Length)
+                    result[i] = reader.ReadInt16At((int)at);
             }
             return result;
         }
@@ -225,8 +241,6 @@ namespace ClassicMac.Graphics.Fonts
         // Top << 8 | rows (fontType bit 0), or null.
         internal int[]? Heights { get; private set; }
 
-        private long OffsetWidthTable { get; set; }
-
         // The missing symbol's slot.
         internal int MissingIndex => LastChar - FirstChar + 1;
 
@@ -236,8 +250,7 @@ namespace ClassicMac.Graphics.Fonts
         // first-character kerning reads it.
         internal int RawOffsetWidth(int index)
         {
-            var at = OffsetWidthTable + 2L * index;
-            return at >= 0 && at + 2 <= data.Length ? BinaryPrimitives.ReadInt16BigEndian(data.AsSpan((int)at)) : 0;
+            return (uint)index < (uint)rawOffsetWidths.Length ? rawOffsetWidths[index] : 0;
         }
 
         // A 1-bit strike's pixel.

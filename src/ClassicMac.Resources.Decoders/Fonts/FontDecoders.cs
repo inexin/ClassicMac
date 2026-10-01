@@ -66,7 +66,8 @@ namespace ClassicMac.Resources.Decoders.Fonts
                 FontFamily family;
                 try
                 {
-                    family = FontFamily.Read(data.Span, fondName ?? "");
+                    var familyReader = new BigEndianReader(data.Span);
+                    family = FontFamily.Read(ref familyReader, fondName ?? "");
                 }
                 catch (InvalidDataException)
                 {
@@ -95,7 +96,8 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     w.WriteEndObject();
                 }))];
             }
-            var font = BitmapFont.Read(input.Data.Span, input.Diagnostics);
+            var fontReader = new BigEndianReader(input.Data.Span);
+            var font = BitmapFont.Read(ref fontReader, input.Diagnostics, rom: false);
             var (family, size, style) = Owner(input);
             var glyphs = font.Glyphs.OrderBy(g => g.Character < 0 ? int.MaxValue : g.Character).ToList();
             var json = MacText.Json(w =>
@@ -148,7 +150,7 @@ namespace ClassicMac.Resources.Decoders.Fonts
         private static Func<int, (byte R, byte G, byte B)> Palette(DecodeInput input, BitmapFont font)
         {
             if (font.Depth == 1) return _ => (0, 0, 0);
-            var table = input.Find(FourCC.FromString("fctb"), input.Resource.Id) is { } fctb ? FontColors.Read(fctb.Span) : [];
+            var table = input.Find(FourCC.FromString("fctb"), input.Resource.Id) is { } fctb ? FontColorTable.Read(fctb.Span) : [];
             var colours = table.GroupBy(e => e.Value).ToDictionary(g => g.Key, g => ((byte)(g.First().Red >> 8), (byte)(g.First().Green >> 8), (byte)(g.First().Blue >> 8)));
             var max = (1 << font.Depth) - 1;
             return value =>
@@ -251,7 +253,8 @@ namespace ClassicMac.Resources.Decoders.Fonts
 
         private IReadOnlyList<DecodedFile> Family(DecodeInput input)
         {
-            var family = FontFamily.Read(input.Data.Span, input.Resource.Name?.ToMacRoman() ?? "", input.Diagnostics);
+            var familyReader = new BigEndianReader(input.Data.Span);
+            var family = FontFamily.Read(ref familyReader, input.Resource.Name?.ToMacRoman() ?? "", input.Diagnostics);
             return [new DecodedFile(".json", MacText.Json(w =>
             {
                 w.WriteStartObject();
@@ -386,7 +389,7 @@ namespace ClassicMac.Resources.Decoders.Fonts
 
         private static IReadOnlyList<DecodedFile> Colors(DecodeInput input)
         {
-            var entries = FontColors.Read(input.Data.Span);
+            var entries = FontColorTable.Read(input.Data.Span);
             return [new DecodedFile(".json", MacText.Json(w =>
             {
                 w.WriteStartObject();

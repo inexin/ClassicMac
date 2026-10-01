@@ -60,20 +60,27 @@ public class FontTests
         var gap = sample[..strikeEnd].Concat(new byte[] { 0x7F, 0x7F, 0x7F, 0x7F }).Concat(sample[strikeEnd..]).ToArray();
         gap.AsSpan(16).Write16(((gap[16] << 8) | gap[17]) + 2);
         var diagnostics = new List<Diagnostic>();
-        Assert.Equal(3, BitmapFont.Read(gap, diagnostics, rom: false).Locations[1]);
+        var gapReader = new BigEndianReader(gap);
+        Assert.Equal(3, BitmapFont.Read(ref gapReader, diagnostics, rom: false).Locations[1]);
         Assert.Equal(["font.location-table"], diagnostics.Select(d => d.Code));
-        Assert.Equal(0x7F7F, BitmapFont.Read(gap, null, rom: true).Locations[0]);
+        Assert.Equal(0x7F7F, ReadRom(gap).Locations[0]);
 
         // fontType bit 4: a depth code of 4 (16 bits) to the ROM, 0 to Mac OS 9.
         var deep = Sample();
         deep[1] |= 0x10;
-        Assert.Equal((1, 16), (BitmapFont.Read(deep).Depth, BitmapFont.Read(deep, null, rom: true).Depth));
+        Assert.Equal((1, 16), (BitmapFont.Read(deep).Depth, ReadRom(deep).Depth));
 
         // rowWords' top bit: masked by Mac OS 9, a rejected strike to the ROM.
         var high = Sample();
         high[24] |= 0x80;
         Assert.Equal(rowWords, BitmapFont.Read(high).RowWords);
-        Assert.Throws<InvalidDataException>(() => BitmapFont.Read(high, null, rom: true));
+        Assert.Throws<InvalidDataException>(() => ReadRom(high));
+    }
+
+    private static BitmapFont ReadRom(byte[] data)
+    {
+        var reader = new BigEndianReader(data);
+        return BitmapFont.Read(ref reader, null, rom: true);
     }
 
     private static string Pixels(byte[] pixels) => string.Concat(pixels.Select(p => p == 0 ? '.' : '#'));
@@ -122,9 +129,35 @@ public class FontTests
         var sfnt = Sfnt();
 
         var font = OutlineFont.Read(sfnt);
+        var prefixed = new byte[sfnt.Length + 2];
+        sfnt.CopyTo(prefixed, 2);
+        var reader = new ClassicMac.Core.BigEndianReader(prefixed) { Position = 2 };
+        var fromReader = OutlineFont.Read(ref reader);
 
         Assert.True(font.IsTrueType);
         Assert.Equal(["glyf", "name"], font.Tables.Select(t => t.Tag.ToString()));
         Assert.Equal(("Test", "Te"), (font.FamilyName, font.FullName));
+        Assert.Equal(font.Tables, fromReader.Tables);
+        Assert.Equal(prefixed.Length, reader.Position);
+    }
+
+    [Fact]
+    public void Font_color_table_reads_sequentially_with_the_big_endian_reader()
+    {
+        var data = new byte[16];
+        var writer = new ClassicMac.Core.BigEndianWriter(data);
+        writer.WriteUInt32(0); // seed
+        writer.WriteUInt16(0); // flags
+        writer.WriteInt16(0); // one entry
+        writer.WriteInt16(7);
+        writer.WriteUInt16(0x1234);
+        writer.WriteUInt16(0x5678);
+        writer.WriteUInt16(0x9ABC);
+        var reader = new ClassicMac.Core.BigEndianReader(data);
+
+        var entries = FontColorTable.Read(ref reader);
+
+        Assert.Equal([new FontColorEntry(7, 0x1234, 0x5678, 0x9ABC)], entries);
+        Assert.Equal(data.Length, reader.Position);
     }
 }

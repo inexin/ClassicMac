@@ -38,7 +38,11 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             ArgumentNullException.ThrowIfNull(fond);
             // A record too short for its header and association count has no fonts.
-            try { families[familyId] = FontFamily.Read(fond, name ?? ""); }
+            try
+            {
+                var reader = new ClassicMac.Core.BigEndianReader(fond);
+                families[familyId] = FontFamily.Read(ref reader, name ?? "");
+            }
             catch (System.IO.InvalidDataException) { families.Remove(familyId); }
             if (!string.IsNullOrEmpty(name)) familyNames[name] = familyId;
         }
@@ -160,7 +164,11 @@ namespace ClassicMac.Graphics.QuickDraw
             if ((isNfnt ? nfnt : font).TryGetValue(id, out var data))
             {
                 // A strike the reader rejects (a short header, a bad character range or row length) is missing.
-                try { result = BitmapFont.Read(data, null, rom); }
+                try
+                {
+                    var reader = new ClassicMac.Core.BigEndianReader(data);
+                    result = BitmapFont.Read(ref reader, null, rom);
+                }
                 catch (System.IO.InvalidDataException) { }
             }
             parsed[(isNfnt, id, rom)] = result;

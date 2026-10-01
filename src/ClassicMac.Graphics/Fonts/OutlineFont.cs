@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -41,60 +40,73 @@ namespace ClassicMac.Graphics.Fonts
         /// </summary>
         public static OutlineFont Read(ReadOnlySpan<byte> data, ICollection<Diagnostic>? diagnostics = null)
         {
-            if (data.Length < 12) throw new InvalidDataException($"An sfnt needs a 12-byte offset table; this is {data.Length} bytes.");
-            var count = BinaryPrimitives.ReadUInt16BigEndian(data[4..]);
+            var reader = new ClassicMac.Core.BigEndianReader(data);
+            return Read(ref reader, diagnostics);
+        }
+
+        /// <summary>Reads an sfnt from the reader's current position and advances past its bytes.</summary>
+        public static OutlineFont Read(ref ClassicMac.Core.BigEndianReader reader, ICollection<Diagnostic>? diagnostics = null)
+        {
+            int start = reader.Position;
+            int length = reader.Remaining;
+            if (length < 12) throw new InvalidDataException($"An sfnt needs a 12-byte offset table; this is {length} bytes.");
+            var count = reader.ReadUInt16At(start + 4);
             var tables = new List<OutlineTable>();
             var shortData = false;
             for (var i = 0; i < count; i++)
             {
                 var at = 12 + 16 * i;
-                if (at + 16 > data.Length)
+                if (at + 16 > length)
                 {
                     shortData = true;
                     break;
                 }
-                var table = new OutlineTable(new FourCC(data.Slice(at, 4)), BinaryPrimitives.ReadUInt32BigEndian(data[(at + 4)..]),
-                    BinaryPrimitives.ReadUInt32BigEndian(data[(at + 8)..]), BinaryPrimitives.ReadUInt32BigEndian(data[(at + 12)..]));
-                if (table.Offset + (long)table.Length > data.Length) shortData = true;
+                var table = new OutlineTable(new FourCC(reader.ReadUInt32At(start + at)), reader.ReadUInt32At(start + at + 4),
+                    reader.ReadUInt32At(start + at + 8), reader.ReadUInt32At(start + at + 12));
+                if (table.Offset + (long)table.Length > length) shortData = true;
                 tables.Add(table);
             }
             string? family = null, subfamily = null, full = null;
-            if (tables.Find(t => t.Tag == FourCC.FromString("name")) is { Length: >= 6 } names && names.Offset + (long)names.Length <= data.Length)
+            if (tables.Find(t => t.Tag == FourCC.FromString("name")) is { Length: >= 6 } names && names.Offset + (long)names.Length <= length)
             {
-                var table = data.Slice((int)names.Offset, (int)names.Length);
-                family = Name(table, 1);
-                subfamily = Name(table, 2);
-                full = Name(table, 4);
+                reader.Position = start + (int)names.Offset;
+                var tableReader = reader.ReadSubReader((int)names.Length);
+                family = Name(ref tableReader, 1);
+                tableReader.Position = 0;
+                subfamily = Name(ref tableReader, 2);
+                tableReader.Position = 0;
+                full = Name(ref tableReader, 4);
             }
             if (shortData)
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The sfnt's table directory points past its data."));
-            return new OutlineFont
+            var result = new OutlineFont
             {
-                Version = new FourCC(data[..4]),
+                Version = new FourCC(reader.ReadUInt32At(start)),
                 Tables = tables,
                 FamilyName = family,
                 SubfamilyName = subfamily,
                 FullName = full,
             };
+            reader.Position = start + length;
+            return result;
         }
 
         // A name record's string: the Macintosh platform's (1, Roman) first, else a Unicode platform's (0, or 3 with
         // encoding 1), UTF-16 big-endian.
-        private static string? Name(ReadOnlySpan<byte> table, int nameId)
+        private static string? Name(ref BigEndianReader table, int nameId)
         {
-            var count = BinaryPrimitives.ReadUInt16BigEndian(table[2..]);
-            var strings = BinaryPrimitives.ReadUInt16BigEndian(table[4..]);
+            var count = table.ReadUInt16At(2);
+            var strings = table.ReadUInt16At(4);
             string? unicode = null;
             for (var i = 0; i < count; i++)
             {
                 var at = 6 + 12 * i;
                 if (at + 12 > table.Length) break;
-                var r = table[at..];
-                int platform = BinaryPrimitives.ReadUInt16BigEndian(r), encoding = BinaryPrimitives.ReadUInt16BigEndian(r[2..]),
-                    id = BinaryPrimitives.ReadUInt16BigEndian(r[6..]), length = BinaryPrimitives.ReadUInt16BigEndian(r[8..]),
-                    offset = BinaryPrimitives.ReadUInt16BigEndian(r[10..]);
+                int platform = table.ReadUInt16At(at), encoding = table.ReadUInt16At(at + 2),
+                    id = table.ReadUInt16At(at + 6), length = table.ReadUInt16At(at + 8),
+                    offset = table.ReadUInt16At(at + 10);
                 if (id != nameId || strings + offset + length > table.Length) continue;
-                var bytes = table.Slice(strings + offset, length);
+                var bytes = table.ReadBytesAt(strings + offset, length);
                 if (platform == 1 && encoding == 0) return MacRoman.Decode(bytes);
                 if (unicode is null && (platform == 0 || (platform == 3 && encoding == 1))) unicode = Encoding.BigEndianUnicode.GetString(bytes);
             }
@@ -102,20 +114,33 @@ namespace ClassicMac.Graphics.Fonts
         }
     }
 
-    /// <summary>A font colour table (<c>'fctb'</c>, of the same ID as its <c>'NFNT'</c>): a colour table indexed by pixel value.</summary>
-    public static class FontColors
+    /// <summary>A colour entry in a font colour table (<c>'fctb'</c>).</summary>
+    /// <param name="Value">The pixel value this colour represents.</param>
+    /// <param name="Red">The red component, 16 bits per channel.</param>
+    /// <param name="Green">The green component, 16 bits per channel.</param>
+    /// <param name="Blue">The blue component, 16 bits per channel.</param>
+    public readonly record struct FontColorEntry(int Value, ushort Red, ushort Green, ushort Blue);
+
+    /// <summary>Reads a font colour table (<c>'fctb'</c>, of the same ID as its <c>'NFNT'</c>).</summary>
+    public static class FontColorTable
     {
         /// <summary>The (pixel value, red, green, blue) entries, 16 bits per component; empty under 8 bytes.</summary>
-        public static IReadOnlyList<(int Value, ushort Red, ushort Green, ushort Blue)> Read(ReadOnlySpan<byte> data)
+        public static IReadOnlyList<FontColorEntry> Read(ReadOnlySpan<byte> data)
         {
-            var entries = new List<(int, ushort, ushort, ushort)>();
-            if (data.Length < 8) return entries;
-            var count = BinaryPrimitives.ReadInt16BigEndian(data[6..]) + 1;
-            for (var i = 0; i < count && 16 + i * 8 <= data.Length; i++)
+            var reader = new BigEndianReader(data);
+            return Read(ref reader);
+        }
+
+        /// <summary>Reads entries from the reader's current position and advances it past the table.</summary>
+        public static IReadOnlyList<FontColorEntry> Read(ref BigEndianReader reader)
+        {
+            var entries = new List<FontColorEntry>();
+            if (reader.Remaining < 8) return entries;
+            reader.Skip(6);
+            var count = reader.ReadInt16() + 1;
+            for (var i = 0; i < count && reader.Remaining >= 8; i++)
             {
-                var e = data[(8 + i * 8)..];
-                entries.Add((BinaryPrimitives.ReadInt16BigEndian(e), BinaryPrimitives.ReadUInt16BigEndian(e[2..]),
-                    BinaryPrimitives.ReadUInt16BigEndian(e[4..]), BinaryPrimitives.ReadUInt16BigEndian(e[6..])));
+                entries.Add(new FontColorEntry(reader.ReadInt16(), reader.ReadUInt16(), reader.ReadUInt16(), reader.ReadUInt16()));
             }
             return entries;
         }

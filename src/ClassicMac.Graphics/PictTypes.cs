@@ -9,6 +9,9 @@ namespace ClassicMac.Graphics
     /// </summary>
     internal readonly record struct PictRect(int Top, int Left, int Bottom, int Right)
     {
+        /// <summary>Reads the QuickDraw rectangle at the reader's current position.</summary>
+        public static PictRect Read(ref ClassicMac.Core.BigEndianReader reader) => From(reader.ReadMacRect());
+
         /// <summary>Right − Left.</summary>
         public int Width => Right - Left;
 

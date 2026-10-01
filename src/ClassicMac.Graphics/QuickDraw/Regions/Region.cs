@@ -79,12 +79,12 @@ namespace ClassicMac.Graphics.QuickDraw
 
         internal static Region Read(ref ClassicMac.Core.BigEndianReader b, out PictRect bbox)
         {
-            int size = b.ReadU16BE() & 0x7FFF;
-            bbox = b.ReadRectBE();
+            int size = b.ReadUInt16() & 0x7FFF;
+            bbox = PictRect.Read(ref b);
             if (size <= 10)
                 return FromRect(bbox);
             var data = new short[(size - 10) / 2];
-            for (int i = 0; i < data.Length; i++) data[i] = b.ReadI16BE();
+            for (int i = 0; i < data.Length; i++) data[i] = b.ReadInt16();
             if ((size & 1) != 0) b.ReadByte();
             return FromQuickDrawData(bbox, data);
         }
