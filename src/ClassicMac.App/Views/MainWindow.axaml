@@ -68,6 +68,8 @@
         <Separator />
         <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
         <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
+        <Separator />
+        <MenuItem Header="_Drag Files Out as MacBinary" ToggleType="CheckBox" IsChecked="{Binding DragOutAsMacBinary, Mode=TwoWay}" />
       </MenuItem>
     </Menu>
 
@@ -77,7 +79,7 @@
 
     <Grid RowDefinitions="*,5,180">
       <Grid ColumnDefinitions="380,5,*">
-        <TreeView ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
+        <TreeView x:Name="Tree" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
           <TreeView.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
           </TreeView.KeyBindings>
