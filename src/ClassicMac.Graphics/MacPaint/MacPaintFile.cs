@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Threading;
 using ClassicMac.Core;
 
 namespace ClassicMac.Graphics
@@ -44,26 +46,54 @@ namespace ClassicMac.Graphics
         /// <exception cref="NotSupportedException">The data is too short to hold a MacPaint image.</exception>
         public static RgbaBitmap Decode(ReadOnlySpan<byte> data)
         {
-            var reader = new BigEndianReader(data);
-            if (IsMacBinary(reader))
+            return Decode(BytesReader.Over(data), CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Decodes the document read from the current position of <paramref name="stream"/>, decompressing its rows as
+        /// they are read; the stream is read to its end and left open.
+        /// </summary>
+        /// <param name="stream">The document, MacBinary-wrapped or not.</param>
+        /// <param name="cancellationToken">Cancels decoding before the rows are read and before they are converted.</param>
+        /// <inheritdoc cref="Decode(ReadOnlySpan{byte})"/>
+        public static RgbaBitmap Decode(Stream stream, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(stream);
+            var reader = new BigEndianStreamReader(stream);
+            var image = Decode(reader, cancellationToken);
+            reader.SkipAtMost(long.MaxValue);
+            return image;
+        }
+
+        private static RgbaBitmap Decode(BigEndianStreamReader reader, CancellationToken cancellationToken)
+        {
+            // A MacBinary wrapper is skipped, and the image read no further than its data fork's length.
+            long length = long.MaxValue;
+            Span<byte> head = stackalloc byte[MacBinaryHeaderSize];
+            int peeked = reader.Peek(head);
+            var header = new BigEndianReader(head[..peeked]);
+            if (IsMacBinary(header))
             {
-                int forkLength = (int)Math.Min(reader.ReadUInt32At(83), (uint)(data.Length - MacBinaryHeaderSize));
-                data = data.Slice(MacBinaryHeaderSize, forkLength);
+                length = header.ReadUInt32At(83);
+                reader.Skip(MacBinaryHeaderSize);
             }
-            if (data.Length <= HeaderSize) throw new NotSupportedException("The data is too short to be a MacPaint document.");
-            var rows = new BigEndianReader(data.Slice(HeaderSize));
-            var image = DecodeRows(ref rows);
+            if (length <= HeaderSize || reader.SkipAtMost(HeaderSize) < HeaderSize || reader.IsAtEnd)
+                throw new NotSupportedException("The data is too short to be a MacPaint document.");
+            cancellationToken.ThrowIfCancellationRequested();
+            var image = DecodeRows(reader, length - HeaderSize, cancellationToken);
             return image ?? throw new NotSupportedException("The MacPaint document has no image data.");
         }
 
-        // The image rows (after any header), PackBits-compressed back to back; 1 = black; rows missing from the data stay
-        // white. Also QuickTime's 'PNTG' codec.
-        internal static RgbaBitmap? DecodeRows(ref BigEndianReader data)
+        // The image rows (after any header), PackBits-compressed back to back and read from at most maxInput bytes;
+        // 1 = black; rows missing from the data stay white. Also QuickTime's 'PNTG' codec.
+        internal static RgbaBitmap? DecodeRows(BigEndianStreamReader data, long maxInput = long.MaxValue,
+            CancellationToken cancellationToken = default)
         {
             const int rowBytes = Width / 8;
             var bits = new byte[rowBytes * Height];
-            int consumed = PackBits.Unpack(ref data, bits);
+            long consumed = PackBits.Unpack(data, bits, maxInput);
             if (consumed == 0) return null;
+            cancellationToken.ThrowIfCancellationRequested();
             var img = new RgbaBitmap(Width, Height);
             var px = img.Pixels;
             for (int y = 0; y < Height; y++)

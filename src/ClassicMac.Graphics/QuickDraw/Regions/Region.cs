@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Graphics;
@@ -75,12 +76,12 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A Region operand in a picture: u16 rgnSize (bytes, including itself and the bounding box), Rect rgnBBox,
         // then (rgnSize - 10) / 2 words of inversion-point data. A 10-byte region is its bounding rectangle.
-        internal static Region Read(ref ClassicMac.Core.BigEndianReader b) => Read(ref b, out _);
+        internal static Region Read(BigEndianStreamReader b) => Read(b, out _);
 
-        internal static Region Read(ref ClassicMac.Core.BigEndianReader b, out PictRect bbox)
+        internal static Region Read(BigEndianStreamReader b, out PictRect bbox)
         {
             int size = b.ReadUInt16() & 0x7FFF;
-            bbox = PictRect.Read(ref b);
+            bbox = PictRect.Read(b);
             if (size <= 10)
                 return FromRect(bbox);
             var data = new short[(size - 10) / 2];

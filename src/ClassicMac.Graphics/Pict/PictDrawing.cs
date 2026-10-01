@@ -36,13 +36,13 @@ namespace ClassicMac.Graphics.Pict
                 QuickDraw = drawing.Version, ScreenDepth = drawing.ScreenDepth, Fonts = drawing.Fonts, TextFallback = drawing.TextFallback,
                 HiliteColor = drawing.HiliteColor?.ToRgba(), PreserveAlpha = drawing.PreserveAlpha, ImageCodec = imageCodec,
             };
-            var reader = new ClassicMac.Core.BigEndianReader(picture);
-            var info = PictHeader.Parse(ref reader, picture.Length, out bool v1);
+            var reader = BytesReader.Over(picture);
+            var info = PictHeader.Parse(reader, out bool v1);
             var saved = port.Save();
             try
             {
                 var player = new GrafPort(port, info.FrameRect, info.BoundsRect, port.ToCanvas(destination), options);
-                PictReader.Play(ref reader, info, v1, player, options, cancellationToken);
+                PictReader.Play(reader, info, v1, player, options, cancellationToken);
             }
             finally
             {

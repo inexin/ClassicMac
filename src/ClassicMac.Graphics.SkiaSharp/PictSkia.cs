@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading;
 using SkiaSharp;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
@@ -47,11 +48,14 @@ namespace ClassicMac.Graphics.SkiaSharp
             return ToSKBitmap(PictReader.Decode(data, CoreOptions(options)));
         }
 
-        /// <summary>Decodes a picture from a stream to an unpremultiplied RGBA bitmap.</summary>
-        public static SKBitmap Decode(Stream stream, PictSkiaOptions? options = null)
+        /// <summary>
+        /// Decodes a picture read progressively from the current position of a stream to an unpremultiplied RGBA
+        /// bitmap. The stream is read to its end and left open; it need not be seekable.
+        /// </summary>
+        public static SKBitmap Decode(Stream stream, PictSkiaOptions? options = null, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(stream);
-            return ToSKBitmap(PictReader.Decode(stream, CoreOptions(options)));
+            return ToSKBitmap(PictReader.Decode(stream, CoreOptions(options), cancellationToken));
         }
 
         /// <summary>Decodes a picture to an immutable <see cref="SKImage"/>.</summary>
@@ -74,6 +78,38 @@ namespace ClassicMac.Graphics.SkiaSharp
             if (MacPaintFile.IsMacPaintFile(data)) return ToSKBitmap(MacPaintFile.Decode(data));
             return null;
         }
+
+        /// <summary>
+        /// Decodes a PICT, a QuickTime image file (<c>QTIF</c>) or a MacPaint document read from the current position of
+        /// a stream, whichever it is; null when it is none of them. Up to <see cref="ProbeLength"/> bytes are read to
+        /// recognize the format and replayed to the decoder, so the stream need not be seekable. A recognized image is
+        /// read to the end of the stream; the stream is left open.
+        /// </summary>
+        public static SKBitmap? DecodeAny(Stream stream, PictSkiaOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(stream);
+            var prefix = new byte[ProbeLength];
+            int length = 0;
+            while (length < prefix.Length)
+            {
+                int read = stream.Read(prefix, length, prefix.Length - length);
+                if (read == 0) break;
+                length += read;
+            }
+            var probe = prefix.AsSpan(0, length);
+            var replay = new ReplayStream(prefix, length, stream);
+            if (QuickTimeImageFile.IsQuickTimeImageFile(probe))
+                return ToSKBitmap(QuickTimeImageFile.Decode(replay, new SkiaImageCodec(), cancellationToken));
+            if (PictHeader.IsPicture(probe) || PictHeader.IsPictFile(probe)) return Decode(replay, options, cancellationToken);
+            if (MacPaintFile.IsMacPaintFile(probe)) return ToSKBitmap(MacPaintFile.Decode(replay, cancellationToken));
+            return null;
+        }
+
+        /// <summary>
+        /// The bytes <see cref="DecodeAny(Stream, PictSkiaOptions?, CancellationToken)"/> reads to recognize a format: a
+        /// <c>.pict</c> file's header and picture signature, or a MacPaint header and its first row however it is packed.
+        /// </summary>
+        public const int ProbeLength = 1024;
 
         /// <summary>Encodes a bitmap as a picture; see <see cref="PictWriter.Write"/> for the formats.</summary>
         public static void Encode(SKBitmap bitmap, Stream stream, PictWriteOptions? options = null)

@@ -218,10 +218,14 @@ The standalone form of a QuickTime image (`.qtif`, `.qti`, `.qif`) is a sequence
 | 4 chars | atom type |
 | bytes | content |
 
-- **`idsc`:** an image description, as in §1, including any colour table.
+- **`idsc`:** an image description, as in §1, including any colour table. ClassicMac reads it within its atom: a
+  description running past the atom's end is unreadable [ClassicMac].
 - **`idat`:** the compressed image. Decode it with the description's codec (§2).
 - **`iicc`:** an ICC profile (optional).
 - Other atoms (`meta`, …) can be ignored.
+- The first atom of each type is used. An atom running past the end of the file is cut there, and an atom whose size
+  is less than its header ends the file. Read from a stream, the atoms are taken in order and only the first `idsc`,
+  `idat` and `iicc` are kept [ClassicMac].
 - **Detection:** the first atom's type is `idsc`, `idat` or `iicc`.
 
 ---

@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
@@ -56,41 +57,36 @@ namespace ClassicMac.Graphics.Pict
 
         /// <summary>
         /// Reads the header of the picture at the current position of <paramref name="stream"/> (bare picture or
-        /// <c>.pict</c> file) without decoding it. Comments and the ICC profile are only collected by
-        /// <see cref="PictReader"/>.
+        /// <c>.pict</c> file) without decoding it, reading no further than the header: a seekable stream is left just
+        /// after it; a non-seekable one may have been read up to 526 bytes ahead while looking for the header. Comments
+        /// and the ICC profile are only collected by <see cref="PictReader"/>. The stream is left open.
         /// </summary>
         /// <exception cref="EndOfStreamException">The stream ends inside the picture header.</exception>
         /// <exception cref="NotSupportedException">The data does not start with a PICT version opcode.</exception>
         public static PictInfo ReadInfo(Stream stream)
         {
             ArgumentNullException.ThrowIfNull(stream);
-            long start = stream.Position;
-            using var copy = new MemoryStream();
-            stream.CopyTo(copy);
-            var data = copy.ToArray();
-            var reader = new ClassicMac.Core.BigEndianReader(data);
-            var info = Parse(ref reader, data.Length, out _);
-            stream.Position = start + reader.Position;
+            var reader = new BigEndianStreamReader(stream);
+            var info = Parse(reader, out _);
+            reader.ReturnLookahead();
             return info;
         }
 
         // Parses picSize, picFrame (skipping a 512-byte file header), the version opcode(s) and, for version 2, the
         // HeaderOp (0x0C00) if present, leaving the reader at the first drawing opcode.
-        // - An all-zero picSize+picFrame means a .pict file header precedes the picture.
         // - Extended version 2 (header version -2): hRes/vRes are the picture's resolution and a non-empty srcRect is
         //   the coordinate space its opcodes draw in (Listing A-5; Executor DrawPicture). Version -1 carries a Fixed
         //   bounding box instead and draws in picFrame at 72 dpi (Listing A-6).
-        internal static PictInfo Parse(ref ClassicMac.Core.BigEndianReader b, int length, out bool version1)
+        internal static PictInfo Parse(BigEndianStreamReader b, out bool version1)
         {
-            int start = b.Position;
             // A .pict file's 512-byte application header is usually zero, but some creators (MacDraw: "DRWG...",
             // MacDraft: "pictDF...") fill it; skip it whenever the picture's version opcode is found after it
             // rather than at the start.
-            if (length >= FileHeaderSize + 12 && !HasVersionOpcode(b, start) && HasVersionOpcode(b, start + FileHeaderSize))
-                start += FileHeaderSize;
-            b.Position = start;
+            Span<byte> head = stackalloc byte[FileHeaderSize + 14];
+            if (!HasVersionOpcode(head[..b.Peek(head[..14])], 0) && HasVersionOpcode(head[..b.Peek(head)], FileHeaderSize))
+                b.Skip(FileHeaderSize);
             b.ReadUInt16();                                            // picSize: unreliable in v2
-            var frame = PictRect.Read(ref b);
+            var frame = PictRect.Read(b);
 
             ushort versionOp = b.ReadUInt16();
             if (versionOp == 0x1101)                                  // 0x11 VersionOp, 0x01: 1-byte opcodes follow
@@ -103,17 +99,15 @@ namespace ClassicMac.Graphics.Pict
 
             version1 = false;
             b.ReadUInt16();                                            // Version (0x02FF)
-            int afterVersion = b.Position;
-            if (b.Length - afterVersion < 2 + 24 || b.ReadUInt16() != 0x0C00)
-            {
-                b.Position = afterVersion;                            // no HeaderOp: that word is the first opcode
-                return new PictInfo(2, false, frame, frame, 72, 72);
-            }
+            Span<byte> headerOp = stackalloc byte[2 + 24];
+            if (b.Peek(headerOp) < headerOp.Length || BinaryPrimitives.ReadUInt16BigEndian(headerOp) != 0x0C00)
+                return new PictInfo(2, false, frame, frame, 72, 72);   // no HeaderOp: that word is the first opcode
 
+            b.ReadUInt16();                                            // HeaderOp
             short headerVersion = b.ReadInt16();
             b.ReadUInt16();                                            // reserved
             int hRes = b.ReadInt32(), vRes = b.ReadInt32();           // Fixed 16.16
-            var srcRect = PictRect.Read(ref b);
+            var srcRect = PictRect.Read(b);
             b.ReadUInt32();                                            // reserved
             if (headerVersion != -2)
                 return new PictInfo(2, false, frame, frame, 72, 72);
@@ -122,12 +116,12 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // True if the picture starting at offset has a v1 (0x1101) or v2 (0x0011 0x02FF) version opcode after picSize
-        // and picFrame. Leaves the stream position unspecified.
-        private static bool HasVersionOpcode(ClassicMac.Core.BigEndianReader b, int offset)
+        // and picFrame.
+        private static bool HasVersionOpcode(ReadOnlySpan<byte> data, int offset)
         {
-            if (b.Length - offset < 14) return false;
-            ushort op = b.ReadUInt16At(offset + 10);
-            return op == 0x1101 || (op == 0x0011 && b.ReadUInt16At(offset + 12) == 0x02FF);
+            if (data.Length - offset < 14) return false;
+            ushort op = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 10)..]);
+            return op == 0x1101 || (op == 0x0011 && BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 12)..]) == 0x02FF);
         }
 
         private static bool IsVersion1(BigEndianReader reader, int offset) =>

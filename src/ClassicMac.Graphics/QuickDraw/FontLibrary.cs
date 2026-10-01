@@ -132,8 +132,7 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 try
                 {
-                    var b = new ClassicMac.Core.BigEndianReader(fctb);
-                    return PixMap.ReadColorTable(ref b, depth);
+                    return PixMap.ReadColorTable(BytesReader.Over(fctb), depth);
                 }
                 catch (System.IO.EndOfStreamException) { }
             }

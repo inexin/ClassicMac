@@ -95,15 +95,15 @@ namespace ClassicMac.Graphics
         // BitsRect/BitsRgn/PackBitsRect/PackBitsRgn operands up to (not including) srcRect: a 1-bit BitMap, or a
         // PixMap + ColorTable when rowBytes has its high bit set.
         // Mac OS 9 reads a color table whenever pixelSize < 9, whatever the opcode; the ROM by the opcode.
-        internal static PixMap ReadIndexedHeader(ref ClassicMac.Core.BigEndianReader b, bool macOS9)
+        internal static PixMap ReadIndexedHeader(BigEndianStreamReader b, bool macOS9)
         {
             int rawRowBytes = b.ReadUInt16();
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = (rawRowBytes & 0x8000) != 0, MacOS9 = macOS9 };
-            pm.Bounds = PictRect.Read(ref b);
+            pm.Bounds = PictRect.Read(b);
             if (pm.IsPixMap)
             {
-                pm.ReadPixMapFields(ref b);
-                if (!macOS9 || pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(ref b, pm.PixelSize);
+                pm.ReadPixMapFields(b);
+                if (!macOS9 || pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
             }
             else
             {
@@ -113,32 +113,32 @@ namespace ClassicMac.Graphics
         }
 
         // DirectBitsRect/DirectBitsRgn operands up to srcRect: baseAddr (always $000000FF), then a PixMap.
-        internal static PixMap ReadDirectHeader(ref ClassicMac.Core.BigEndianReader b, bool macOS9)
+        internal static PixMap ReadDirectHeader(BigEndianStreamReader b, bool macOS9)
         {
             b.ReadUInt32();                                           // baseAddr
             int rawRowBytes = b.ReadUInt16();
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = true, MacOS9 = macOS9 };
-            pm.Bounds = PictRect.Read(ref b);
-            pm.ReadPixMapFields(ref b);
-            if (macOS9 && pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(ref b, pm.PixelSize);
+            pm.Bounds = PictRect.Read(b);
+            pm.ReadPixMapFields(b);
+            if (macOS9 && pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
             return pm;
         }
 
         // BkPixPat/PnPixPat/FillPixPat full pattern (type 1): PixMap (rowBytes first, no baseAddr) + ColorTable + PixData.
-        internal static PixMap ReadPatternPixMap(ref ClassicMac.Core.BigEndianReader b, bool macOS9)
+        internal static PixMap ReadPatternPixMap(BigEndianStreamReader b, bool macOS9)
         {
             int rawRowBytes = b.ReadUInt16();
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = true, MacOS9 = macOS9 };
-            pm.Bounds = PictRect.Read(ref b);
-            pm.ReadPixMapFields(ref b);
-            if (!macOS9 || pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(ref b, pm.PixelSize);
-            pm.ReadPixData(ref b);
+            pm.Bounds = PictRect.Read(b);
+            pm.ReadPixMapFields(b);
+            if (!macOS9 || pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+            pm.ReadPixData(b);
             return pm;
         }
 
         // PixMap fields after rowBytes + bounds (Executor eatPixMap): pmVersion, packType, packSize, hRes, vRes,
         // pixelType, pixelSize, cmpCount, cmpSize, planeBytes, pmTable, pmReserved.
-        private void ReadPixMapFields(ref ClassicMac.Core.BigEndianReader b)
+        private void ReadPixMapFields(BigEndianStreamReader b)
         {
             b.ReadUInt16();                  // pmVersion
             PackType = b.ReadUInt16();
@@ -158,9 +158,9 @@ namespace ClassicMac.Graphics
 
         // ColorTable: ctSeed, ctFlags, ctSize (entries - 1), then (value, RGB) entries. A device table (ctFlags bit 15)
         // is indexed by position; otherwise each entry's value is its pixel index. Unlisted indices are black.
-        internal static RgbaColor[] ReadColorTable(ref ClassicMac.Core.BigEndianReader b, int pixelSize) => ReadColorTableExact(ref b, pixelSize).palette;
+        internal static RgbaColor[] ReadColorTable(BigEndianStreamReader b, int pixelSize) => ReadColorTableExact(b, pixelSize).palette;
 
-        internal static (RgbaColor[] palette, (ushort r, ushort g, ushort b)[] exact) ReadColorTableExact(ref ClassicMac.Core.BigEndianReader b, int pixelSize)
+        internal static (RgbaColor[] palette, (ushort r, ushort g, ushort b)[] exact) ReadColorTableExact(BigEndianStreamReader b, int pixelSize)
         {
             b.ReadUInt32();                                           // ctSeed
             int ctFlags = b.ReadUInt16();
@@ -188,7 +188,7 @@ namespace ClassicMac.Graphics
         // dispatched on packType whatever its pixel size (ReadDirect); everything else - BitMaps and indexed PixMaps,
         // with any packType and under any bitmap opcode - is one PackBits scan line per row, preceded by a byte count
         // (a word when rowBytes > 250).
-        internal void ReadPixData(ref ClassicMac.Core.BigEndianReader b)
+        internal void ReadPixData(BigEndianStreamReader b)
         {
             int height = Math.Max(0, Height);
             Data = new byte[RowBytes * height];
@@ -196,13 +196,13 @@ namespace ClassicMac.Graphics
 
             if (RowBytes < 8 || (direct && PackType == 1))
             {
-                var raw = b.ReadBytes(Data.Length).ToArray();
+                var raw = b.ReadBytes(Data.Length);
                 Buffer.BlockCopy(raw, 0, Data, 0, raw.Length);
                 return;
             }
             if (direct)
             {
-                ReadDirect(ref b, height);
+                ReadDirect(b, height);
                 return;
             }
 
@@ -210,7 +210,7 @@ namespace ClassicMac.Graphics
             var line = new byte[RowBytes];
             for (int y = 0; y < height; y++)
             {
-                UnpackRow(ref b, line, sizesAreWords, wordChunks: false, MacOS9);
+                UnpackRow(b, line, sizesAreWords, wordChunks: false, MacOS9);
                 Buffer.BlockCopy(line, 0, Data, y * RowBytes, RowBytes);
             }
         }
@@ -222,7 +222,7 @@ namespace ClassicMac.Graphics
         // 4 - cmpCount .. 3 (alpha stays 0 with three planes); 5 and up: the rows are read and discarded, leaving the
         // pixels zero.
         // Mac OS 9 fixes the ROM's 16-bit packType 0: word PackBits, like packType 3.
-        private void ReadDirect(ref ClassicMac.Core.BigEndianReader b, int height)
+        private void ReadDirect(BigEndianStreamReader b, int height)
         {
             bool sizesAreWords = RowBytes > 250;
             int pixels = RowBytes / 4;
@@ -234,13 +234,13 @@ namespace ClassicMac.Graphics
                     var line = new byte[RowBytes];
                     for (int y = 0; y < height; y++)
                     {
-                        UnpackRow(ref b, line, sizesAreWords, wordChunks: true, MacOS9);
+                        UnpackRow(b, line, sizesAreWords, wordChunks: true, MacOS9);
                         Buffer.BlockCopy(line, 0, Data, y * RowBytes, RowBytes);
                     }
                     return;
                 }
                 case 4 when MacOS9:
-                    ReadPlanesMacOS9(ref b, height, sizesAreWords, pixels);
+                    ReadPlanesMacOS9(b, height, sizesAreWords, pixels);
                     return;
                 case 4:
                 {
@@ -248,7 +248,7 @@ namespace ClassicMac.Graphics
                     var packed = new byte[pixels * planes];
                     for (int y = 0; y < height; y++)
                     {
-                        UnpackRow(ref b, packed, sizesAreWords, wordChunks: false, MacOS9);
+                        UnpackRow(b, packed, sizesAreWords, wordChunks: false, MacOS9);
                         int row = y * RowBytes;
                         for (int k = 0; k < planes; k++)
                             for (int x = 0; x < pixels; x++)
@@ -263,7 +263,7 @@ namespace ClassicMac.Graphics
                             b.Skip(sizesAreWords ? b.ReadUInt16() : b.ReadByte());
                         return;
                     }
-                    var raw = b.ReadBytes(pixels * height * 3).ToArray();
+                    var raw = b.ReadBytes(pixels * height * 3);
                     for (int i = 0, s = 0; i < pixels * height; i++, s += 3)
                     {
                         Data[4 * i + 1] = raw[s]; Data[4 * i + 2] = raw[s + 1]; Data[4 * i + 3] = raw[s + 2];
@@ -277,7 +277,7 @@ namespace ClassicMac.Graphics
         // only (n + (n >> 7) + 3) & ~3 bytes and the unpack buffer follows it directly, both kept for the whole
         // image: a row packed into more bytes than that spills into the unpack buffer, and the lazy unpacker, reading
         // those bytes after it has overwritten them, repeats early output there (a real Mac OS 9 artifact).
-        private void ReadPlanesMacOS9(ref ClassicMac.Core.BigEndianReader b, int height, bool sizesAreWords, int pixels)
+        private void ReadPlanesMacOS9(BigEndianStreamReader b, int height, bool sizesAreWords, int pixels)
         {
             int planes = CmpCount == 4 ? 4 : 3, first = 4 - planes;
             int n = CmpCount == 4 ? RowBytes : RowBytes - RowBytes / 4;
@@ -286,7 +286,7 @@ namespace ClassicMac.Graphics
             for (int y = 0; y < height; y++)
             {
                 int count = sizesAreWords ? b.ReadUInt16() : b.ReadByte();
-                var packed = b.ReadBytes(count).ToArray();
+                var packed = b.ReadBytes(count);
                 Array.Copy(packed, 0, memory, 0, Math.Min(count, memory.Length));
                 int src = 0, dst = 0;
                 while (dst < n && src < memory.Length)
@@ -316,10 +316,10 @@ namespace ClassicMac.Graphics
         // One PackBits scan line: [byteCount] then flag-counted runs until byteCount is consumed. flag < 0 repeats the
         // next unit 1 - flag times; flag >= 0 copies flag + 1 units; -128 is a no-op in the ROM (Apple TN1023) and a
         // run of 129 in Mac OS 9. A unit is a byte, or a word for 16-bit pixels.
-        private static void UnpackRow(ref ClassicMac.Core.BigEndianReader b, byte[] outRow, bool sizesAreWords, bool wordChunks, bool macOS9)
+        private static void UnpackRow(BigEndianStreamReader b, byte[] outRow, bool sizesAreWords, bool wordChunks, bool macOS9)
         {
             int packedBytes = sizesAreWords ? b.ReadUInt16() : b.ReadByte();
-            var src = b.ReadBytes(packedBytes).ToArray();
+            var src = b.ReadBytes(packedBytes);
             Array.Clear(outRow);
             int unit = wordChunks ? 2 : 1;
             int ip = 0, op = 0;
