@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Inputs: uuencode (`.uu`, `begin-base64`); zip (stored, DEFLATE, ZIP64) and tar/gzip with Mac data: AppleDouble `._`
+  and `__MACOSX/` pairing, Info-ZIP and ZipIt Mac extra fields (ARCHIVES.md, CONTAINERS.md section 8).
+- CD images: multisession discs are read by their last session's descriptors, as the Mac reads them, from cue sheets
+  and whole-disc raw images (ISO9660.md sections 14 and 15).
+- HFS: catalog keys whose length leaves out the pad byte, as Mac OS writes them, are no longer rejected; most files on
+  Mac-written volumes were missing from listings (HFS-MFS.md section 7.1).
+- Editor III: Volume ▸ New File, Import File, New Folder and Delete on plain HFS images, saved with Save As.
+- Viewer: files and resources drag out to the desktop (files as data fork plus AppleDouble, or MacBinary).
 - Core: `BigEndianReader` is a class over `ReadOnlyMemory<byte>`, with a constructor that reads a stream from its
   current position to its end; readers are passed without `ref` and can be fields. Every big-endian read in the
   libraries goes through it, and the methods that read with it take `ReadOnlyMemory<byte>` instead of

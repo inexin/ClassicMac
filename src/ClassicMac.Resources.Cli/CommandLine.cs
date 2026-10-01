@@ -107,8 +107,9 @@ namespace ClassicMac.Resources.Cli
 
         private static Argument<FileInfo> InputArgument() => new Argument<FileInfo>("input")
         {
-            Description = "A Mac file: AppleSingle, MacBinary, BinHex, a file in a Basilisk II folder or with an " +
-                "AppleDouble ._ file, or a raw resource fork",
+            Description = "A Mac file or a container holding them: AppleSingle, MacBinary, BinHex, uuencode, a file in a " +
+                "Basilisk II folder or with an AppleDouble ._ file, a raw resource fork, an archive (StuffIt, Compact Pro, " +
+                "DiskDoubler, PackIt, LHA, zip, tar, gzip) or a disk or CD image",
         }.AcceptExistingOnly();
 
         private Command InfoCommand()

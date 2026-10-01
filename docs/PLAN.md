@@ -36,10 +36,10 @@ Proposed priority:
 | 1 | MacBinary I/II/III (`.bin`) | Downloads, archive sites | Built (read and write) |
 | 1 | BinHex 4.0 (`.hqx`) | Usenet, old download sites | Built (read and write) |
 | 2 | HFS and MFS disk images: raw `.dsk`/`.img`/`.hda` bare or inside an Apple Partition Map, DiskCopy 4.2, NDIF (Disk Copy 6 `.img`, `.smi`; ADC and resource-fork-less reconstruction), DART, UDIF `.dmg` | Emulator disks, floppy images, Apple system software, images re-shared from Mac OS X | Built; plain HFS also written (phase 8) |
-| 2 | CD images: ISO 9660 with Apple extensions and Rock Ridge names, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw 2352-byte `.bin` + `.cue` | Magazine, game and system CDs | Built, as the Mac reads them: hybrid discs as HFS; no Rock Ridge (the Mac reads only the primary descriptor). Multisession: Todo |
+| 2 | CD images: ISO 9660 with Apple extensions and Rock Ridge names, hybrid ISO + partition map + HFS; `.iso`/`.toast`/`.cdr`, raw 2352-byte `.bin` + `.cue` | Magazine, game and system CDs | Built, as the Mac reads them: hybrid discs as HFS; no Rock Ridge (the Mac reads only the primary descriptor); multisession by the last session, as the Mac reads it |
 | 2 | FAT disk images with PC Exchange / File Exchange data (e.g. `RealmzClassicHD.img`) | Emulator hard disks and floppies shared with PCs | Built (with DOS partition tables) |
-| 2 | Zip / MacZip (`.zip`, stored and DEFLATE) with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (`.tar`, `.gz`, `.tgz`, MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers | Not started (Todo) |
-| 2 | uuencode (`.uu`) | Usenet and mail transfers | Not started (Todo) |
+| 2 | Zip / MacZip (`.zip`, stored and DEFLATE) with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (`.tar`, `.gz`, `.tgz`, MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers | Built (read); Mac extra fields fitted, no Mac-made zip checked yet |
+| 2 | uuencode (`.uu`, `begin-base64`) | Usenet and mail transfers | Built |
 | 3 | HFS+ images | Mac OS 8.1–9 disks | Built, read-only (phase 10) |
 | 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads | Archives built (phase 10); self-extractors not started (Todo) |
 | 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives | Not started (Todo) |
@@ -351,7 +351,7 @@ flowchart LR
   - `ClassicMac.Files.Hfs`: HFS and MFS volumes, Apple partition maps, Disk Copy 4.2, NDIF (Disk Copy 6, including
     `.smi` and segmented images), DART, UDIF `.dmg`; HFS+ later;
   - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them, raw-sector CD images
-    (`.bin`, 2352/2336-byte sectors) and cue sheets (multisession later);
+    (`.bin`, 2352/2336-byte sectors) and cue sheets, multisession discs by their last session;
   - `ClassicMac.Files.Compression`: decompressors shared by disk images and archives (ADC for NDIF and UDIF, KenCode,
     DART RLE and LZH, bzip2 for UDIF; the StuffIt and Compact Pro methods later);
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
@@ -726,13 +726,13 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | # | Phase | Status |
 |---|---|---|
 | 1 | Core | Done |
-| 2 | Disk images | Done except CD multisession, zip/tar with Mac data and `.sea` detection (Todo) |
+| 2 | Disk images | Done except `.sea` detection (Todo) |
 | 3 | Decoders I | Done (exit passed; DOCMaker and SimpleText built after) |
-| 4 | Viewer app | Built except drag-out (Todo) |
+| 4 | Viewer app | Done (drag-out built) |
 | 5 | Decoders II | Done (exit passed) |
 | 6 | Editor I | Done |
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
-| 8 | Editor III (HFS writing) | Done for plain HFS: the library replaces forks and creates and deletes files and folders (with constrained B-tree growth); the app's Save As saves fork edits into a copy of the image |
+| 8 | Editor III (HFS writing) | Done for plain HFS: the library replaces forks and creates and deletes files and folders (with constrained B-tree growth); the app creates, imports and deletes them too, and Save As saves all edits into a verified copy of the image |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | HFS+ and archives | Done (exit passed 2026-10-01); fixtures still missing for the fitted methods (Todo) |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
@@ -744,9 +744,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
    NDIF (with ADC in `ClassicMac.Files.Compression`), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed) (built); CD
-   images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors and cue sheets built; multisession next);
-   self-mounting `.smi` images read as NDIF (built); recursive unwrapping through all of them (built). Zip and tar with
-   Mac data and `.sea` detection are not started (Todo). *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
+   images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors, cue sheets and multisession built);
+   self-mounting `.smi` images read as NDIF (built); recursive unwrapping through all of them (built); zip, tar and gzip with
+   Mac data and uuencode (built). `.sea` detection is a Todo. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically). The classic HFS reader also
    reports damaged B-tree headers and node maps, out-of-order or duplicate keys and IDs, and malformed or misplaced
@@ -761,7 +761,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    and SimpleText documents to HTML, in `extract`, the `convert` command and the viewer
    ([formats/DOCUMENTS.md](formats/DOCUMENTS.md)).
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
-   decoders. First version built (browse, details, diagnostics, previews, hex, export); drag-out next.
+   decoders. First version built (browse, details, diagnostics, previews, hex, export, drag-out).
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
    *Exit:* extract → `pack` is byte-identical for unchanged resources. **Built:** UI resources and their colour and
    extension resources to JSON with dialog, alert and menu previews ([formats/INTERFACE.md](formats/INTERFACE.md)),
@@ -792,8 +792,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
      weight rules, independently checked against Apple's 256-entry compare table. The writer validates catalog and
      extents B-tree structure, catalog ID uniqueness, bitmap ownership, free counts and folder valences before and after edits.
    - The editor's Save As writes a verified copy of a plain HFS image with the edited fork replaced. File and folder
-     creation and deletion are library APIs (`HfsWriter.CreateFile`, `DeleteFile`, `CreateFolder`, `DeleteFolder`)
-     not yet offered in the app (Todo). Handle partitioned and Disk Copy images only after their outer-container write
+     creation, import and deletion (`HfsWriter.CreateFile`, `DeleteFile`, `CreateFolder`, `DeleteFolder`) are in the
+     app's Volume menu, pending until Save As like fork edits. Handle partitioned and Disk Copy images only after their outer-container write
      strategy is specified. MFS, HFS+, and archives remain read-only in this phase.
    - Feature tests cover both forks, metadata and dates, nested paths, creation/deletion, B-tree and bitmap growth,
      fragmentation, malformed structures, error atomicity and interleaved edits. An app-level test edits a nested
@@ -853,11 +853,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
 - [ ] **8-bit icon masks in icon suites** (Mac OS 9's deep CopyMask in `IconSuite.Plot`): needs a Mac OS 9 oracle run for 8-bit-mask cases first.
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
-- [ ] **Viewer drag-out** of files and resources.
-- [ ] **CD images: multisession.**
-- [ ] **Zip and tar with Mac data** (AppleDouble `._` entries, `__MACOSX`) and **`.sea` self-extracting archive
-  detection** (phase 2).
-- [ ] **uuencode** (`.uu`) input (Inputs, priority 2).
+- [ ] **`.sea` self-extracting archive detection** (phase 2).
 - [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column): StuffIt v1 and method 6,
   StuffIt 5 method 14, a SegmentIt set, Compact Pro archives and segmented sets, PackIt, DiskDoubler methods 2–5 and 7
   and the delta types, LHa archives. Each needs a redistributable archive made by the original application.
@@ -865,8 +861,6 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   table runs past the data). ResEdit is not in the corpus baseline; find what the Mac draws before fixing or allowlisting.
 - [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3).
 - [ ] **Mac ROM images:** read the ROM's built-in resource map (Inputs, priority 3).
-- [ ] **HFS create and delete in the app:** offer `HfsWriter`'s file and folder creation and deletion in the editor
-  (phase 8).
 - [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
   (a damaged fork opened and saved already comes out clean).
 - [x] **Big-endian reading and writing through Core:** every big-endian read and write goes through `BigEndianReader`
