@@ -726,13 +726,13 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | # | Phase | Status |
 |---|---|---|
 | 1 | Core | Done |
-| 2 | Disk images | Done except CD multisession (Todo) |
+| 2 | Disk images | Done except CD multisession, zip/tar with Mac data and `.sea` detection (Todo) |
 | 3 | Decoders I | Done (exit passed; DOCMaker and SimpleText built after) |
 | 4 | Viewer app | Built except drag-out (Todo) |
 | 5 | Decoders II | Done (exit passed) |
 | 6 | Editor I | Done |
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
-| 8 | Editor III (HFS writing) | Done for plain HFS: fork replacement, file/folder create and delete, constrained B-tree growth, and HFS image Save As |
+| 8 | Editor III (HFS writing) | Done for plain HFS: the library replaces forks and creates and deletes files and folders (with constrained B-tree growth); the app's Save As saves fork edits into a copy of the image |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | HFS+ and archives | In progress: see the table in the phase |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
@@ -744,9 +744,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 2. **Disk images** — `ClassicMac.Files.Hfs`: HFS and MFS volumes, raw or in DiskCopy 4.2 or behind an Apple partition
    map; `ClassicMac.Files.Fat` (FAT volumes with PC Exchange / File Exchange data, DOS partition tables) (built); then
    NDIF (with ADC in `ClassicMac.Files.Compression`), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed) (built); CD
-   images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors and cue sheets built; multisession next); zip and tar with
-   Mac data; `.sea`/`.smi` detection; recursive unwrapping through
-   all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
+   images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors and cue sheets built; multisession next);
+   self-mounting `.smi` images read as NDIF (built); recursive unwrapping through all of them (built). Zip and tar with
+   Mac data and `.sea` detection are not started (Todo). *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically). The classic HFS reader also
    reports damaged B-tree headers and node maps, out-of-order or duplicate keys and IDs, and malformed or misplaced
@@ -791,9 +791,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
      Creation can preserve caller-supplied Mac creation and modification dates. Deletion refuses locked files and nonempty folders. Name lookup and ordering now use the complete `_RelString`
      weight rules, independently checked against Apple's 256-entry compare table. The writer validates catalog and
      extents B-tree structure, catalog ID uniqueness, bitmap ownership, free counts and folder valences before and after edits.
-   - The editor's Save As writes a verified copy of a plain HFS image with the selected fork replaced. Handle partitioned
-     and Disk Copy images only after their outer-container write strategy is specified. MFS, HFS+, and archives remain
-     read-only in this phase.
+   - The editor's Save As writes a verified copy of a plain HFS image with the edited fork replaced. File and folder
+     creation and deletion are library APIs (`HfsWriter.CreateFile`, `DeleteFile`, `CreateFolder`, `DeleteFolder`)
+     not yet offered in the app (Todo). Handle partitioned and Disk Copy images only after their outer-container write
+     strategy is specified. MFS, HFS+, and archives remain read-only in this phase.
    - Feature tests cover both forks, metadata and dates, nested paths, creation/deletion, B-tree and bitmap growth,
      fragmentation, malformed structures, error atomicity and interleaved edits. An app-level test edits a nested
      resource and reopens the saved image. Edited real HFS images mount and export with both Distrotech/hfsutils and
@@ -851,6 +852,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
 - [ ] **Viewer drag-out** of files and resources.
 - [ ] **CD images: multisession.**
+- [ ] **Zip and tar with Mac data** (AppleDouble `._` entries, `__MACOSX`) and **`.sea` self-extracting archive
+  detection** (phase 2).
+- [ ] **HFS create and delete in the app:** offer `HfsWriter`'s file and folder creation and deletion in the editor
+  (phase 8).
 - [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
   (a damaged fork opened and saved already comes out clean).
 - [x] **Big-endian reading and writing through Core:** every big-endian read and write goes through `BigEndianReader`
