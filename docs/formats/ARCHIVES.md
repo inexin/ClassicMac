@@ -45,6 +45,23 @@ that record. Tests cover stored and Huffman entries with both forks, Finder meta
 and wrong passwords for raw and Huffman XOR/DES entries, weak DES keys, encrypted stream alignment, unsupported methods,
 and truncated headers. Original-application verification remains.
 
+## LHA / LArc (level 0 stored subset)
+
+ClassicMac recognizes LHA level-0 records and reads uncompressed `-lh0-` files. A level-0 record carries a one-byte
+header length and checksum, method, packed and expanded sizes, DOS date/time, attributes, level, a byte filename, file
+CRC-16 and OS identifier, then its payload. `0x00` ends the archive. Filenames from Mac OS (`m`) archives are retained
+as MacRoman bytes; entries with other OS identifiers are skipped because their filename encodings are not known.
+Both slash forms are treated as folder separators in returned Mac paths. File CRC mismatches are reported while
+preserving the stored data. Unsupported compression methods are diagnosed and skipped using their declared packed
+length; other header levels are not supported yet. The reader applies `MaxExpandedBytesPerInput` to the archive and
+the total expanded file data.
+
+The layout is based on the [LHa for UNIX header description](https://github.com/jca02266/lha/blob/master/header.doc.md)
+and the CC0 [Kaitai LHA record specification](https://formats.kaitai.io/lzh/) **[Fitted]** to a hand-built level-0
+Mac OS record. Tests cover MacRoman names and paths, stored data, unwrapper integration, header and data checksums,
+unsupported-method and unsupported-encoding continuation, input-size limits, and truncated payloads. Compressed
+methods and level-1 through level-3 headers remain.
+
 ## DiskDoubler (DDA2)
 
 The DDA2 archive header is 62 bytes; its big-endian checksum at +60 is CRC-16/XMODEM over bytes 0–59 **[Fitted]**
