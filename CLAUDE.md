@@ -103,6 +103,41 @@ correct.
 - `ClassicMac.Graphics/MacPaint/MacPaintFile`: MacPaint documents.
 - `ClassicMac.Graphics/Pict/PictWriter`: the encoder.
 
+## Reading and writing binary data (ClassicMac.Core)
+
+Every big-endian read goes through `BigEndianReader` and every big-endian write through `BigEndianWriter`. Outside
+Core, `BinaryPrimitives` is used only for little-endian data (FAT, ISO's both-endian fields, WAV, LHA, zip).
+
+**`BigEndianReader`**: a class over `ReadOnlyMemory<byte>`, so it is passed without `ref`, can be a field and works in
+iterators and lambdas.
+- `new BigEndianReader(bytes)` wraps the bytes without copying (a `byte[]` converts implicitly).
+- `new BigEndianReader(stream)` reads from the stream's current position to its end and leaves it open. Public
+  file-level APIs take a `Stream` at the edge and read it this way.
+- Reads are sequential (`ReadUInt16`, `ReadFourCC`, `ReadMacRect` …) or at absolute offsets (`ReadUInt32At`, which do
+  not move `Position`). `Try…` variants return false instead of throwing. `ReadSubReader(n)` gives a bounded reader
+  over the next bytes, without copying. `Source` is the underlying memory.
+- Truncated input throws `EndOfStreamException`.
+- Create **one reader per buffer** (a header, node, record or resource) and pass it to internal helpers as a
+  `BigEndianReader` parameter. Do not build a reader per field read: it is a class, so that is an allocation each time.
+- Methods that read with a reader take `ReadOnlyMemory<byte>` (or a `BigEndianReader`), not `ReadOnlySpan<byte>`,
+  so callers' bytes are not copied. Code that only consumes bytes keeps `ReadOnlySpan<byte>`: CRCs, hashes,
+  decompressors, text decoding, comparisons.
+
+**`BigEndianWriter`**: a class over a buffer that grows, like a `StringBuilder` for bytes.
+- `Write…` appends. `Write…At(offset, value)` overwrites bytes already written, for a length or offset known only
+  later: write a placeholder, then patch it.
+- `new BigEndianWriter(array)` wraps an existing array, all of it counting as written, so `Write…At` patches it in
+  place (disk-image blocks, B-tree nodes). Don't append to such a writer: appending moves to a new array.
+- Hand the result on with `ToArray()`, `WrittenMemory`/`WrittenSpan` or `WriteTo(stream)`. `WriteZeros(n)` writes padding.
+- The generic overloads (`WriteUInt32<T>`, `WriteUInt16At<T>` …) take any number and throw
+  `ArgumentOutOfRangeException` when it does not fit the field. Pass `int` and `long` values directly, with no cast.
+  Cast explicitly only to wrap or pack bits on purpose (e.g. `(ushort)(count - 1)` for an empty list, packed
+  attribute words); a value of the field's own type uses the exact overload.
+
+**Numbers**: format offsets and lengths are often u32. Do offset arithmetic in `long`, so `offset + length` cannot
+wrap. Check a value against the buffer before casting it to `int` to index. Where a value stays `int`, write bounds
+checks subtract-first (`offset > length - size`), as the Mac OS code does.
+
 ## Conventions
 
 - Work on `main` (no feature branches).
