@@ -734,7 +734,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
 | 8 | Editor III (HFS writing) | Done for plain HFS: the library replaces forks and creates and deletes files and folders (with constrained B-tree growth); the app's Save As saves fork edits into a copy of the image |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
-| 10 | HFS+ and archives | In progress: see the table in the phase |
+| 10 | HFS+ and archives | Done (exit passed 2026-10-01); fixtures still missing for the fitted methods (Todo) |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
 
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
@@ -829,7 +829,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     Other segmented archive formats remain, and anything from row 5 of Inputs is built only on request.
     *Exit:* every format in the table reads its original-application fixtures with both forks and Finder info byte for
     byte, a method still without one is marked fitted in [formats/ARCHIVES.md](formats/ARCHIVES.md), the journaled
-    HFS+ image lists and reads, and the corpus unpack baseline holds.
+    HFS+ image lists and reads, and the corpus unpack baseline holds. **Passed 2026-10-01:** the Files tests with every
+    original-app fixture, every remaining method marked **[Fitted]** or **[Reference]**, the `nps-2009-hfsjtest1` image
+    (SHA-256 pinned), and the corpus baseline over the Realmz, harness and `.rsrc` corpora. The table's Remaining column
+    is the Todo item below.
 11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
    - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's
      single segment with `DATA 0` relocations, Retro68's relocation stream, Apple's `dcmp` jump-table shim).
@@ -855,6 +858,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Zip and tar with Mac data** (AppleDouble `._` entries, `__MACOSX`) and **`.sea` self-extracting archive
   detection** (phase 2).
 - [ ] **uuencode** (`.uu`) input (Inputs, priority 2).
+- [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column): StuffIt v1 and method 6,
+  StuffIt 5 method 14, a SegmentIt set, Compact Pro archives and segmented sets, PackIt, DiskDoubler methods 2–5 and 7
+  and the delta types, LHa archives. Each needs a redistributable archive made by the original application.
+- [ ] **ResEdit's pixel patterns:** `ppat` 1731 and `ppt#` 1751/3100 in ResEdit 2.1.3 fail to decode (their colour
+  table runs past the data). ResEdit is not in the corpus baseline; find what the Mac draws before fixing or allowlisting.
 - [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3).
 - [ ] **Mac ROM images:** read the ROM's built-in resource map (Inputs, priority 3).
 - [ ] **HFS create and delete in the app:** offer `HfsWriter`'s file and folder creation and deletion in the editor
