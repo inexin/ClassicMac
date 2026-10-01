@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.Text;
 using ClassicMac.Core;
@@ -32,23 +31,23 @@ namespace ClassicMac.Files.Containers
             if (name.Length > 0) name[..Math.Min(63, name.Length)].CopyTo(header.AsSpan(2));
             else header[2] = (byte)'?';
             var info = file.FinderInfo;
-            info.Type.CopyTo(header.AsSpan(65));
-            info.Creator.CopyTo(header.AsSpan(69));
+            var writer = new BigEndianWriter(header);
+            writer.WriteFourCCAt(65, info.Type);
+            writer.WriteFourCCAt(69, info.Creator);
             header[73] = (byte)((ushort)info.Flags >> 8);
-            BinaryPrimitives.WriteInt16BigEndian(header.AsSpan(75), info.Location.V);
-            BinaryPrimitives.WriteInt16BigEndian(header.AsSpan(77), info.Location.H);
-            BinaryPrimitives.WriteInt16BigEndian(header.AsSpan(79), info.Folder);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(83), (uint)file.DataFork.Length);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(87), (uint)file.ResourceFork.Length);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(91), file.Created?.Seconds ?? 0);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(95), file.Modified?.Seconds ?? 0);
+            writer.WriteMacPointAt(75, info.Location);
+            writer.WriteInt16At(79, info.Folder);
+            writer.WriteUInt32At(83, (uint)file.DataFork.Length);
+            writer.WriteUInt32At(87, (uint)file.ResourceFork.Length);
+            writer.WriteUInt32At(91, file.Created?.Seconds ?? 0);
+            writer.WriteUInt32At(95, file.Modified?.Seconds ?? 0);
             header[101] = (byte)info.Flags;
             "mBIN"u8.CopyTo(header.AsSpan(102));
             header[106] = info.Extended.Length > 9 ? info.Extended.Span[8] : (byte)0;
             header[107] = info.Extended.Length > 9 ? info.Extended.Span[9] : (byte)0;
             header[122] = 130;
             header[123] = 129;
-            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(124), Crc16.Compute(header.AsSpan(0, 124)));
+            writer.WriteUInt16At(124, Crc16.Compute(header.AsSpan(0, 124)));
             output.Write(header);
             Fork(file.DataFork, output);
             Fork(file.ResourceFork, output);
@@ -96,17 +95,18 @@ namespace ClassicMac.Files.Containers
             var stream = new MemoryStream();
             var name = file.Name.Bytes;
             var length = Math.Clamp(name.Length, 1, 63);
-            var header = new byte[22 + length];
-            header[0] = (byte)length;
-            if (name.Length > 0) name[..length].CopyTo(header.AsSpan(1));
-            else header[1] = (byte)'?';
-            file.FinderInfo.Type.CopyTo(header.AsSpan(2 + length));
-            file.FinderInfo.Creator.CopyTo(header.AsSpan(6 + length));
-            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(10 + length), (ushort)file.FinderInfo.Flags);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(12 + length), (uint)file.DataFork.Length);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(16 + length), (uint)file.ResourceFork.Length);
-            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(20 + length), Crc16.Compute(header.AsSpan(0, 20 + length)));
-            stream.Write(header);
+            var header = new BigEndianWriter(22 + length);
+            header.WriteByte((byte)length);
+            if (name.Length > 0) header.WriteBytes(name[..length]);
+            else header.WriteByte((byte)'?');
+            header.WriteByte(0);
+            header.WriteFourCC(file.FinderInfo.Type);
+            header.WriteFourCC(file.FinderInfo.Creator);
+            header.WriteUInt16((ushort)file.FinderInfo.Flags);
+            header.WriteUInt32((uint)file.DataFork.Length);
+            header.WriteUInt32((uint)file.ResourceFork.Length);
+            header.WriteUInt16(Crc16.Compute(header.WrittenSpan));
+            header.WriteTo(stream);
             Part(file.DataFork, stream);
             Part(file.ResourceFork, stream);
 
@@ -130,9 +130,9 @@ namespace ClassicMac.Files.Containers
         {
             var bytes = fork.ToArray();
             stream.Write(bytes);
-            Span<byte> crc = stackalloc byte[2];
-            BinaryPrimitives.WriteUInt16BigEndian(crc, Crc16.Compute(bytes));
-            stream.Write(crc);
+            var crc = new BigEndianWriter(2);
+            crc.WriteUInt16(Crc16.Compute(bytes));
+            crc.WriteTo(stream);
         }
 
         // $90 is written as $90 $00; a byte repeated 3 to 255 times in all as the byte, $90, the count [ClassicMac: runs

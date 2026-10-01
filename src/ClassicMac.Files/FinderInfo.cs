@@ -90,13 +90,16 @@ namespace ClassicMac.Files
         public void Write(Span<byte> destination)
         {
             if (destination.Length < Length) throw new ArgumentException($"Finder info needs {Length} bytes.", nameof(destination));
-            Type.CopyTo(destination);
-            Creator.CopyTo(destination[4..]);
-            System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(destination[8..], (ushort)Flags);
-            Location.Write(destination[10..]);
-            System.Buffers.Binary.BinaryPrimitives.WriteInt16BigEndian(destination[14..], Folder);
-            destination[16..Length].Clear();
-            Extended.Span[..Math.Min(Extended.Length, 16)].CopyTo(destination[16..]);
+            var writer = new BigEndianWriter(Length);
+            writer.WriteFourCC(Type);
+            writer.WriteFourCC(Creator);
+            writer.WriteUInt16((ushort)Flags);
+            writer.WriteMacPoint(Location);
+            writer.WriteInt16(Folder);
+            var extended = Extended.Span[..Math.Min(Extended.Length, 16)];
+            writer.WriteBytes(extended);
+            writer.WriteZeros(16 - extended.Length);
+            writer.WrittenSpan.CopyTo(destination);
         }
 
         /// <summary>The 32 bytes <see cref="Write"/> writes.</summary>

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using ClassicMac.Core;
 
@@ -39,28 +38,28 @@ namespace ClassicMac.Files.Containers
             var entries = single ? 5 : 4;
             var first = HeaderLength + entries * EntryLength;
             var header = new byte[first + name.Length + 16 + FinderInfo.Length];
-            BinaryPrimitives.WriteUInt32BigEndian(header, single ? SingleMagic : DoubleMagic);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4), Version2);
-            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(24), (ushort)entries);
+            var writer = new BigEndianWriter(header);
+            writer.WriteUInt32At(0, single ? SingleMagic : DoubleMagic);
+            writer.WriteUInt32At(4, Version2);
+            writer.WriteUInt16At(24, (ushort)entries);
 
             var offset = first;
             var entry = HeaderLength;
             void Entry(uint id, int length)
             {
-                BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry), id);
-                BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry + 4), (uint)offset);
-                BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry + 8), (uint)length);
+                writer.WriteUInt32At(entry, id);
+                writer.WriteUInt32At(entry + 4, (uint)offset);
+                writer.WriteUInt32At(entry + 8, (uint)length);
                 entry += EntryLength;
                 offset += length;
             }
 
             name.CopyTo(header.AsSpan(offset));
             Entry(RealNameEntry, name.Length);
-            var dates = header.AsSpan(offset, 16);
-            BinaryPrimitives.WriteInt32BigEndian(dates, Seconds(file.Created, zone));
-            BinaryPrimitives.WriteInt32BigEndian(dates[4..], Seconds(file.Modified, zone));
-            BinaryPrimitives.WriteInt32BigEndian(dates[8..], int.MinValue); // backup: unknown
-            BinaryPrimitives.WriteInt32BigEndian(dates[12..], int.MinValue); // access: unknown
+            writer.WriteInt32At(offset, Seconds(file.Created, zone));
+            writer.WriteInt32At(offset + 4, Seconds(file.Modified, zone));
+            writer.WriteInt32At(offset + 8, int.MinValue); // backup: unknown
+            writer.WriteInt32At(offset + 12, int.MinValue); // access: unknown
             Entry(FileDatesEntry, 16);
             file.FinderInfo.Write(header.AsSpan(offset));
             Entry(FinderInfoEntry, FinderInfo.Length);
@@ -69,15 +68,15 @@ namespace ClassicMac.Files.Containers
                 throw new ArgumentException("The forks are too large for AppleSingle or AppleDouble.", nameof(file));
             if (single)
             {
-                BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry), DataForkEntry);
-                BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry + 4), (uint)offset);
-                BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry + 8), (uint)data);
+                writer.WriteUInt32At(entry, DataForkEntry);
+                writer.WriteUInt32At(entry + 4, (uint)offset);
+                writer.WriteUInt32At(entry + 8, (uint)data);
                 entry += EntryLength;
                 offset += (int)data;
             }
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry), ResourceForkEntry);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry + 4), (uint)offset);
-            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(entry + 8), (uint)file.ResourceFork.Length);
+            writer.WriteUInt32At(entry, ResourceForkEntry);
+            writer.WriteUInt32At(entry + 4, (uint)offset);
+            writer.WriteUInt32At(entry + 8, (uint)file.ResourceFork.Length);
 
             output.Write(header);
             if (single)

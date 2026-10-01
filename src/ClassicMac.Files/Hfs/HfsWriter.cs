@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -103,6 +102,7 @@ namespace ClassicMac.Files.Hfs
             }
 
             byte[] result = source.ToArray();
+            var volume = new BigEndianWriter(result);
             var bitmapOffset = checked((int)U16(mdb, 0x0E) * 512);
             int bitmapLength = checked(((int)blockCount + 7) / 8);
             if (bitmapOffset < 0 || bitmapOffset + bitmapLength > source.Length)
@@ -122,7 +122,7 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The HFS volume free-block count disagrees with the requested allocation change.");
             if (resize.AllocatedBlocks != 0 || resize.ReleasedBlocks != 0)
             {
-                BinaryPrimitives.WriteUInt16BigEndian(result.AsSpan(MdbOffset + 0x22), checked((ushort)remainingFreeBlocks));
+                volume.WriteUInt16At(MdbOffset + 0x22, checked((ushort)remainingFreeBlocks));
                 workingBitmap.CopyTo(result.AsSpan(bitmapOffset, bitmapLength));
             }
             bool changedExtentsTree = resize.TreeChanged;
@@ -130,7 +130,7 @@ namespace ClassicMac.Files.Hfs
             uint releasedBlocks = resize.ReleasedBlocks;
             if (resizeContext.AllocatedTreeBlocks != 0)
             {
-                BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(MdbOffset + 0x82), checked((uint)extFile.Length));
+                volume.WriteUInt32At(MdbOffset + 0x82, checked((uint)extFile.Length));
                 result.AsSpan(MdbOffset + 0x86, 12).Clear();
                 for (int index = 0; index < extFileExtents.Count; index++)
                     WriteExtent(result.AsSpan(MdbOffset + 0x86, 12), index,
@@ -140,13 +140,14 @@ namespace ClassicMac.Files.Hfs
 
             ulong physicalBytes = extents.Aggregate<(ushort Start, ushort Count), ulong>(0, (total, e) => total + (ulong)e.Count * blockSize);
             if (physicalBytes > uint.MaxValue) throw new InvalidDataException("The allocated fork exceeds HFS's 32-bit physical length field.");
-            BinaryPrimitives.WriteUInt32BigEndian(match.Data.AsSpan(forkPhysicalLengthOffset), (uint)physicalBytes);
-            BinaryPrimitives.WriteUInt32BigEndian(match.Data.AsSpan(forkLengthOffset), (uint)data.Length);
+            var matchRecord = new BigEndianWriter(match.Data);
+            matchRecord.WriteUInt32At(forkPhysicalLengthOffset, (uint)physicalBytes);
+            matchRecord.WriteUInt32At(forkLengthOffset, (uint)data.Length);
             DateTime writeTime = DateTime.Now;
             uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
-            BinaryPrimitives.WriteUInt32BigEndian(match.Data.AsSpan(48), macWriteTime);
-            BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(MdbOffset + 0x06), macWriteTime);
-            BinaryPrimitives.WriteUInt32BigEndian(result.AsSpan(MdbOffset + 0x46), unchecked(U32(mdb, 0x46) + 1));
+            matchRecord.WriteUInt32At(48, macWriteTime);
+            volume.WriteUInt32At(MdbOffset + 0x06, macWriteTime);
+            volume.WriteUInt32At(MdbOffset + 0x46, unchecked(U32(mdb, 0x46) + 1));
 
             WriteFork(result, firstBlock, blockSize, extents, data.Span);
             // Clear the unused tail within the existing allocation, so shortening a fork does not leave stale bytes.
@@ -242,11 +243,12 @@ namespace ClassicMac.Files.Hfs
                 if (pendingOverflowExtents is null) return;
                 if (pendingOverflowBlockStart > ushort.MaxValue)
                     throw new InvalidDataException("The fork's extent start exceeds HFS's 16-bit FABN field.");
-                var key = new byte[8];
-                key[0] = 7;
-                key[1] = context.ForkType;
-                BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(2), context.FileId);
-                BinaryPrimitives.WriteUInt16BigEndian(key.AsSpan(6), (ushort)pendingOverflowBlockStart);
+                var keyWriter = new BigEndianWriter(8);
+                keyWriter.WriteByte(7);
+                keyWriter.WriteByte(context.ForkType);
+                keyWriter.WriteUInt32(context.FileId);
+                keyWriter.WriteUInt16((ushort)pendingOverflowBlockStart);
+                var key = keyWriter.ToArray();
                 while (true)
                 {
                     try
@@ -319,9 +321,9 @@ namespace ClassicMac.Files.Hfs
             byte[] grown = new byte[checked(context.ExtentsTree.Length + (int)context.AllocationBlockSize)];
             context.ExtentsTree.CopyTo(grown, 0);
             uint newMapNodes = ExtendBTreeNodeMap(grown, oldNodeCount, newNodeCount);
-            BinaryPrimitives.WriteUInt32BigEndian(grown.AsSpan(14 + 22), newNodeCount);
-            BinaryPrimitives.WriteUInt32BigEndian(grown.AsSpan(14 + 26),
-                checked(U32(grown, 14 + 26) + addedNodes - newMapNodes));
+            var header = new BigEndianWriter(grown);
+            header.WriteUInt32At(14 + 22, newNodeCount);
+            header.WriteUInt32At(14 + 26, checked(U32(grown, 14 + 26) + addedNodes - newMapNodes));
             context.ExtentsTree = grown;
             context.AllocatedTreeBlocks++;
             ValidateExtentsTree(grown);
@@ -514,10 +516,9 @@ namespace ClassicMac.Files.Hfs
                 }
                 for (int index = 0; index < level.Count; index++)
                 {
-                    BinaryPrimitives.WriteUInt32BigEndian(level[index].Bytes.AsSpan(0),
-                        index + 1 < level.Count ? level[index + 1].Number : 0);
-                    BinaryPrimitives.WriteUInt32BigEndian(level[index].Bytes.AsSpan(4),
-                        index > 0 ? level[index - 1].Number : 0);
+                    var links = new BigEndianWriter(level[index].Bytes);
+                    links.WriteUInt32At(0, index + 1 < level.Count ? level[index + 1].Number : 0);
+                    links.WriteUInt32At(4, index > 0 ? level[index - 1].Number : 0);
                 }
                 return level;
             }
@@ -554,12 +555,13 @@ namespace ClassicMac.Files.Hfs
                 }
             }
 
-            BinaryPrimitives.WriteUInt16BigEndian(rebuilt.AsSpan(14), depth);
-            BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(14 + 2), levelNodes.Count == 0 ? 0 : levelNodes[0].Number);
-            BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(14 + 6), checked((uint)records.Count));
-            BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(14 + 10), leaves.Count == 0 ? 0 : leaves[0].Number);
-            BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(14 + 14), leaves.Count == 0 ? 0 : leaves[^1].Number);
-            BinaryPrimitives.WriteUInt32BigEndian(rebuilt.AsSpan(14 + 26), nodeCount - checked((uint)allocated.Count));
+            var header = new BigEndianWriter(rebuilt);
+            header.WriteUInt16At(14, depth);
+            header.WriteUInt32At(14 + 2, levelNodes.Count == 0 ? 0 : levelNodes[0].Number);
+            header.WriteUInt32At(14 + 6, checked((uint)records.Count));
+            header.WriteUInt32At(14 + 10, leaves.Count == 0 ? 0 : leaves[0].Number);
+            header.WriteUInt32At(14 + 14, leaves.Count == 0 ? 0 : leaves[^1].Number);
+            header.WriteUInt32At(14 + 26, nodeCount - checked((uint)allocated.Count));
             if (validateExtents) ValidateExtentsTree(rebuilt);
             rebuilt.CopyTo(tree, 0);
         }
@@ -592,18 +594,19 @@ namespace ClassicMac.Files.Hfs
             if (mapCapacity < oldNodeCount)
                 throw new InvalidDataException("The HFS B-tree node map does not cover its existing nodes.");
             var newMapNodes = new List<uint>();
+            var writer = new BigEndianWriter(tree);
             while (mapCapacity < newNodeCount)
             {
                 uint number = mapCapacity;
                 int at = checked((int)number * NodeSize);
                 if (number < oldNodeCount || at + NodeSize > tree.Length)
                     throw new InvalidDataException("The HFS B-tree has no node available for another map record.");
-                BinaryPrimitives.WriteUInt32BigEndian(tree.AsSpan(lastMapNode == 0 ? 0 : checked((int)lastMapNode * NodeSize)), number);
+                writer.WriteUInt32At(lastMapNode == 0 ? 0 : checked((int)lastMapNode * NodeSize), number);
                 tree[at + 8] = 2;
-                BinaryPrimitives.WriteUInt32BigEndian(tree.AsSpan(at + 4), lastMapNode);
-                BinaryPrimitives.WriteUInt16BigEndian(tree.AsSpan(at + 10), 1);
-                BinaryPrimitives.WriteUInt16BigEndian(tree.AsSpan(at + NodeSize - 2), 14);
-                BinaryPrimitives.WriteUInt16BigEndian(tree.AsSpan(at + NodeSize - 4), NodeSize - 6);
+                writer.WriteUInt32At(at + 4, lastMapNode);
+                writer.WriteUInt16At(at + 10, 1);
+                writer.WriteUInt16At(at + NodeSize - 2, 14);
+                writer.WriteUInt16At(at + NodeSize - 4, NodeSize - 6);
                 maps.Add((at + 14, NodeSize - 20));
                 newMapNodes.Add(number);
                 lastMapNode = number;
@@ -698,18 +701,19 @@ namespace ClassicMac.Files.Hfs
                 record.Data.CopyTo(rebuilt, at);
                 at += record.Data.Length;
             }
+            var writer = new BigEndianWriter(rebuilt);
             for (int i = 0; i < offsets.Count; i++)
-                BinaryPrimitives.WriteUInt16BigEndian(rebuilt.AsSpan(NodeSize - 2 * (i + 1)), offsets[i]);
-            BinaryPrimitives.WriteUInt16BigEndian(rebuilt.AsSpan(NodeSize - 2 * (offsets.Count + 1)), checked((ushort)at));
-            BinaryPrimitives.WriteUInt16BigEndian(rebuilt.AsSpan(10), checked((ushort)offsets.Count));
+                writer.WriteUInt16At(NodeSize - 2 * (i + 1), offsets[i]);
+            writer.WriteUInt16At(NodeSize - 2 * (offsets.Count + 1), checked((ushort)at));
+            writer.WriteUInt16At(10, checked((ushort)offsets.Count));
             return true;
         }
 
         private static byte[] ChildNode(uint node)
         {
-            var child = new byte[4];
-            BinaryPrimitives.WriteUInt32BigEndian(child, node);
-            return child;
+            var child = new BigEndianWriter(4);
+            child.WriteUInt32(node);
+            return child.ToArray();
         }
 
         private static void ValidateExtentsTree(byte[] tree) => ValidateBTree(tree, catalog: false);
@@ -970,8 +974,10 @@ namespace ClassicMac.Files.Hfs
 
         private static void WriteExtent(Span<byte> record, int slot, ushort start, ushort count)
         {
-            BinaryPrimitives.WriteUInt16BigEndian(record.Slice(slot * 4, 2), start);
-            BinaryPrimitives.WriteUInt16BigEndian(record.Slice(slot * 4 + 2, 2), count);
+            var extent = new BigEndianWriter(4);
+            extent.WriteUInt16(start);
+            extent.WriteUInt16(count);
+            extent.WrittenSpan.CopyTo(record.Slice(slot * 4, 4));
         }
 
         private static List<(ushort Start, ushort Count)> AllocateRuns(byte[] bitmap, ushort blockCount, ulong required, int maxRuns)

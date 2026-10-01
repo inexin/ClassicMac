@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -379,9 +378,9 @@ namespace ClassicMac.Files.Hfs
             public byte[] Finish()
             {
                 if (md5 is not null) return md5.GetHashAndReset();
-                var value = new byte[4];
-                BinaryPrimitives.WriteUInt32BigEndian(value, ~crc);
-                return value;
+                var writer = new BigEndianWriter(4);
+                writer.WriteUInt32(~crc);
+                return writer.ToArray();
             }
         }
     }

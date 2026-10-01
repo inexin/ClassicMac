@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,10 +26,11 @@ public static partial class HfsWriter
         byte[] finderBytes = finderInfo.ToArray();
         finderBytes.AsSpan(0, 16).CopyTo(record.AsSpan(4));
         finderBytes.AsSpan(16, 16).CopyTo(record.AsSpan(56));
-        BinaryPrimitives.WriteUInt32BigEndian(record.AsSpan(20), id);
+        var writer = new BigEndianWriter(record);
+        writer.WriteUInt32At(20, id);
         uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
-        BinaryPrimitives.WriteUInt32BigEndian(record.AsSpan(44), created?.Seconds ?? now);
-        BinaryPrimitives.WriteUInt32BigEndian(record.AsSpan(48), modified?.Seconds ?? now);
+        writer.WriteUInt32At(44, created?.Seconds ?? now);
+        writer.WriteUInt32At(48, modified?.Seconds ?? now);
         state.Records.Add((CatalogKey(parent, name), record));
         AdjustParentValence(state.Records, parent, 1);
         AddCount(state.Result, 0x1E, 1);
@@ -44,7 +44,7 @@ public static partial class HfsWriter
             // Fork replacement stamps its edit time. Restore the caller's file date after both forks are written.
             var dated = OpenCatalog(ForkData.FromBytes(result));
             var entry = FindCatalogRecord(dated.Records, parent, name);
-            BinaryPrimitives.WriteUInt32BigEndian(entry.Data.AsSpan(48), modified.Value.Seconds);
+            new BigEndianWriter(entry.Data).WriteUInt32At(48, modified.Value.Seconds);
             result = CommitCatalog(dated);
         }
         return result;
@@ -92,12 +92,13 @@ public static partial class HfsWriter
 
         var folder = new byte[70];
         folder[0] = 1;
-        BinaryPrimitives.WriteUInt32BigEndian(folder.AsSpan(6), id);
-        BinaryPrimitives.WriteUInt32BigEndian(folder.AsSpan(10), created?.Seconds ?? now);
-        BinaryPrimitives.WriteUInt32BigEndian(folder.AsSpan(14), modified?.Seconds ?? now);
+        var folderWriter = new BigEndianWriter(folder);
+        folderWriter.WriteUInt32At(6, id);
+        folderWriter.WriteUInt32At(10, created?.Seconds ?? now);
+        folderWriter.WriteUInt32At(14, modified?.Seconds ?? now);
         var thread = new byte[46];
         thread[0] = 3;
-        BinaryPrimitives.WriteUInt32BigEndian(thread.AsSpan(10), parent);
+        new BigEndianWriter(thread).WriteUInt32At(10, parent);
         byte[] nameBytes = MacRoman.Encode(name);
         thread[14] = checked((byte)nameBytes.Length);
         nameBytes.CopyTo(thread, 15);
@@ -227,23 +228,22 @@ public static partial class HfsWriter
             WriteFork(state.Result, state.FirstBlock, state.BlockSize,
                 state.ExtentsTreeExtents, state.ExtentsTree);
         uint allocatedSystemBlocks = checked(state.AllocatedCatalogBlocks + state.AllocatedExtentsTreeBlocks);
+        var volume = new BigEndianWriter(state.Result);
         if (allocatedSystemBlocks != 0)
         {
             ushort oldFree = U16(state.Result, MdbOffset + 0x22);
             if (oldFree < allocatedSystemBlocks)
                 throw new InvalidDataException("The HFS free-block count cannot cover catalog growth.");
-            BinaryPrimitives.WriteUInt16BigEndian(state.Result.AsSpan(MdbOffset + 0x22),
-                checked((ushort)(oldFree - allocatedSystemBlocks)));
+            volume.WriteUInt16At(MdbOffset + 0x22, checked((ushort)(oldFree - allocatedSystemBlocks)));
             state.Bitmap.CopyTo(state.Result, state.BitmapOffset);
-            BinaryPrimitives.WriteUInt32BigEndian(state.Result.AsSpan(MdbOffset + 0x92), checked((uint)state.Catalog.Length));
+            volume.WriteUInt32At(MdbOffset + 0x92, checked((uint)state.Catalog.Length));
             state.Result.AsSpan(MdbOffset + 0x96, 12).Clear();
             for (int index = 0; index < Math.Min(3, state.CatalogExtents.Count); index++)
                 WriteExtent(state.Result.AsSpan(MdbOffset + 0x96, 12), index,
                     state.CatalogExtents[index].Start, state.CatalogExtents[index].Count);
             if (state.AllocatedExtentsTreeBlocks != 0)
             {
-                BinaryPrimitives.WriteUInt32BigEndian(state.Result.AsSpan(MdbOffset + 0x82),
-                    checked((uint)state.ExtentsTree.Length));
+                volume.WriteUInt32At(MdbOffset + 0x82, checked((uint)state.ExtentsTree.Length));
                 state.Result.AsSpan(MdbOffset + 0x86, 12).Clear();
                 for (int index = 0; index < state.ExtentsTreeExtents.Count; index++)
                     WriteExtent(state.Result.AsSpan(MdbOffset + 0x86, 12), index,
@@ -251,9 +251,8 @@ public static partial class HfsWriter
             }
         }
         uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
-        BinaryPrimitives.WriteUInt32BigEndian(state.Result.AsSpan(MdbOffset + 0x06), now);
-        BinaryPrimitives.WriteUInt32BigEndian(state.Result.AsSpan(MdbOffset + 0x46),
-            unchecked(U32(state.Result, MdbOffset + 0x46) + 1));
+        volume.WriteUInt32At(MdbOffset + 0x06, now);
+        volume.WriteUInt32At(MdbOffset + 0x46, unchecked(U32(state.Result, MdbOffset + 0x46) + 1));
         int alternateMdbOffset = state.Result.Length - 2 * BlockSize;
         if (allocatedSystemBlocks != 0 && alternateMdbOffset >= 0 &&
             (ulong)alternateMdbOffset >= state.FirstBlock + (ulong)state.BlockCount * state.BlockSize &&
@@ -297,9 +296,9 @@ public static partial class HfsWriter
         byte[] grown = new byte[checked(state.Catalog.Length + (int)(chosenBlocks * state.BlockSize))];
         state.Catalog.CopyTo(grown, 0);
         uint newMapNodes = ExtendBTreeNodeMap(grown, oldNodeCount, newNodeCount);
-        BinaryPrimitives.WriteUInt32BigEndian(grown.AsSpan(14 + 22), newNodeCount);
-        BinaryPrimitives.WriteUInt32BigEndian(grown.AsSpan(14 + 26),
-            checked(U32(grown, 14 + 26) + addedNodes - newMapNodes));
+        var header = new BigEndianWriter(grown);
+        header.WriteUInt32At(14 + 22, newNodeCount);
+        header.WriteUInt32At(14 + 26, checked(U32(grown, 14 + 26) + addedNodes - newMapNodes));
         state.Catalog = grown;
         state.AllocatedCatalogBlocks += chosenBlocks;
         if (extents.Count > 3)
@@ -330,10 +329,12 @@ public static partial class HfsWriter
         }
         else
         {
-            var key = new byte[8];
-            key[0] = 7;
-            BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(2), 4);
-            BinaryPrimitives.WriteUInt16BigEndian(key.AsSpan(6), forkBlock);
+            var keyWriter = new BigEndianWriter(8);
+            keyWriter.WriteByte(7);
+            keyWriter.WriteByte(0);
+            keyWriter.WriteUInt32(4);
+            keyWriter.WriteUInt16(forkBlock);
+            var key = keyWriter.ToArray();
             var record = new byte[12];
             WriteExtent(record, 0, start, count);
             while (true)
@@ -437,12 +438,15 @@ public static partial class HfsWriter
     private static byte[] CatalogKey(uint parent, string name)
     {
         byte[] encoded = MacRoman.Encode(name);
-        var key = new byte[(7 + encoded.Length + 1) & ~1];
-        key[0] = checked((byte)(key.Length - 1));
-        BinaryPrimitives.WriteUInt32BigEndian(key.AsSpan(2), parent);
-        key[6] = checked((byte)encoded.Length);
-        encoded.CopyTo(key, 7);
-        return key;
+        int length = (7 + encoded.Length + 1) & ~1;
+        var key = new BigEndianWriter(length);
+        key.WriteByte(checked((byte)(length - 1)));
+        key.WriteByte(0);
+        key.WriteUInt32(parent);
+        key.WriteByte(checked((byte)encoded.Length));
+        key.WriteBytes(encoded);
+        key.WriteZeros(length - key.Length);
+        return key.ToArray();
     }
 
     internal static int CompareCatalogKeys(byte[] left, byte[] right)
@@ -503,14 +507,14 @@ public static partial class HfsWriter
         int updated = value + adjustment;
         if (updated is < 0 or > ushort.MaxValue)
             throw new InvalidDataException("The HFS parent folder valence cannot represent this change.");
-        BinaryPrimitives.WriteUInt16BigEndian(folder.Data.AsSpan(4), (ushort)updated);
+        new BigEndianWriter(folder.Data).WriteUInt16At(4, (ushort)updated);
     }
 
     private static void AddCount(byte[] image, int offset, int delta) =>
-        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(MdbOffset + offset),
+        new BigEndianWriter(image).WriteUInt32At(MdbOffset + offset,
             checked((uint)((long)U32(image, MdbOffset + offset) + delta)));
 
     private static void AddShortCount(byte[] image, int offset, int delta) =>
-        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(MdbOffset + offset),
+        new BigEndianWriter(image).WriteUInt16At(MdbOffset + offset,
             checked((ushort)(U16(image, MdbOffset + offset) + delta)));
 }

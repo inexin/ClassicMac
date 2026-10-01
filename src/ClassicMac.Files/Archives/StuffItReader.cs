@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -575,7 +574,7 @@ public sealed class StuffItReader : IContainerReader
         ushort fileFlags = U16(archive, headerEnd);
         var finder = new byte[FinderInfo.Length];
         archive.AsSpan(headerEnd + 4, 8).CopyTo(finder);
-        U16(finder, 8, U16(archive, headerEnd + 12));
+        new BigEndianWriter(finder).WriteUInt16At(8, U16(archive, headerEnd + 12));
         int forkInfo = headerEnd + 36;
         int resourceLength = 0;
         int resourceCompressedLength = 0;
@@ -1392,8 +1391,6 @@ public sealed class StuffItReader : IContainerReader
 
     private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
     private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
-    private static void U16(Span<byte> bytes, int offset, ushort value) =>
-        BinaryPrimitives.WriteUInt16BigEndian(bytes[offset..], value);
 
     private readonly record struct MemberList(int Position, int Remaining, MacString[] LegacyPath, string[] UnicodePath);
     private readonly record struct LegacyMemberList(int Position, int Remaining, MacString[] Path,
