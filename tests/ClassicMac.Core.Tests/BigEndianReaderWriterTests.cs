@@ -233,4 +233,22 @@ public class BigEndianReaderWriterTests
         writer.Clear();
         Assert.Equal(0, writer.Length);
     }
+
+    [Fact]
+    public void A_writer_over_an_array_patches_it_in_place_until_it_grows()
+    {
+        var block = new byte[12];
+        var writer = new BigEndianWriter(block);
+        Assert.Equal(12, writer.Length);
+        writer.WriteUInt16At(0, 0x1234);
+        writer.WriteMacRectAt(2, new MacRect(1, 2, 3, 4));
+        writer.WriteFourCCAt(8, FourCC.FromString("TEXT"));
+        Assert.Equal(new byte[] { 0x12, 0x34, 0, 1, 0, 2, 0, 3, (byte)'T', (byte)'E', (byte)'X', (byte)'T' }, block);
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteUInt32At(10, 0));
+
+        writer.WriteByte(0xFF);                                      // grows into a new array
+        Assert.Equal(13, writer.Length);
+        writer.WriteUInt16At(0, 0);
+        Assert.Equal(0x12, block[0]);
+    }
 }

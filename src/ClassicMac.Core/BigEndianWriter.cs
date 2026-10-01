@@ -22,6 +22,18 @@ namespace ClassicMac.Core
             buffer = capacity == 0 ? [] : new byte[capacity];
         }
 
+        /// <summary>
+        /// Creates a writer over <paramref name="buffer"/>, all of it counting as written: <c>Write…At</c> patches the
+        /// array in place. Appending grows into a new array and leaves <paramref name="buffer"/> as it was then.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="buffer"/> is null.</exception>
+        public BigEndianWriter(byte[] buffer)
+        {
+            ArgumentNullException.ThrowIfNull(buffer);
+            this.buffer = buffer;
+            length = buffer.Length;
+        }
+
         /// <summary>The number of bytes written.</summary>
         public int Length => length;
 
@@ -114,6 +126,33 @@ namespace ClassicMac.Core
 
         /// <summary>Overwrites an unsigned 32-bit integer already written.</summary>
         public void WriteUInt32At(int offset, uint value) => BinaryPrimitives.WriteUInt32BigEndian(At(offset, sizeof(uint)), value);
+
+        /// <summary>Overwrites a signed 64-bit integer already written.</summary>
+        public void WriteInt64At(int offset, long value) => BinaryPrimitives.WriteInt64BigEndian(At(offset, sizeof(long)), value);
+
+        /// <summary>Overwrites an unsigned 64-bit integer already written.</summary>
+        public void WriteUInt64At(int offset, ulong value) => BinaryPrimitives.WriteUInt64BigEndian(At(offset, sizeof(ulong)), value);
+
+        /// <summary>Overwrites a four-character code already written.</summary>
+        public void WriteFourCCAt(int offset, FourCC value) => WriteUInt32At(offset, value.Value);
+
+        /// <summary>Overwrites a QuickDraw point already written.</summary>
+        public void WriteMacPointAt(int offset, MacPoint value)
+        {
+            At(offset, MacPoint.Length);
+            WriteInt16At(offset, value.V);
+            WriteInt16At(offset + 2, value.H);
+        }
+
+        /// <summary>Overwrites a QuickDraw rectangle already written.</summary>
+        public void WriteMacRectAt(int offset, MacRect value)
+        {
+            At(offset, MacRect.Length);
+            WriteInt16At(offset, value.Top);
+            WriteInt16At(offset + 2, value.Left);
+            WriteInt16At(offset + 4, value.Bottom);
+            WriteInt16At(offset + 6, value.Right);
+        }
 
         /// <summary>Overwrites bytes already written.</summary>
         public void WriteBytesAt(int offset, ReadOnlySpan<byte> value) => value.CopyTo(At(offset, value.Length));
