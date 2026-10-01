@@ -33,7 +33,7 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             var rows = ToQuickDrawData();
             var writer = new BigEndianWriter(10 + 2 * rows.Length);
-            writer.WriteUInt16((ushort)(10 + 2 * rows.Length));
+            writer.WriteUInt16(10 + 2 * rows.Length);
             BoundingBox.Write(writer);
             foreach (var row in rows) writer.WriteInt16(row);
             return writer.ToArray();

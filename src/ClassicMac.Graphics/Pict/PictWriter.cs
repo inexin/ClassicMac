@@ -262,15 +262,15 @@ namespace ClassicMac.Graphics.Pict
             int frameHeight = Math.Max(1, (int)Math.Round(height * 72 / vRes));
 
             output.WriteUInt16(0);                          // picSize (unused for version 2)
-            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16((short)frameHeight); output.WriteInt16((short)frameWidth); // picFrame, 72 dpi
+            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16(frameHeight); output.WriteInt16(frameWidth); // picFrame, 72 dpi
             output.WriteUInt16(0x0011); output.WriteUInt16(0x02FF); // version 2
             output.WriteUInt16(0x0C00);                     // extended version 2 header
             output.WriteUInt16(0xFFFE); output.WriteUInt16(0);
             output.WriteUInt32(Fixed(hRes)); output.WriteUInt32(Fixed(vRes));
-            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16((short)height); output.WriteInt16((short)width); // source rect: image at its resolution
+            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16(height); output.WriteInt16(width); // source rect: image at its resolution
             output.WriteUInt32(0);
             output.WriteUInt16(0x0001); output.WriteUInt16(10);
-            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16((short)height); output.WriteInt16((short)width); // clip
+            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16(height); output.WriteInt16(width); // clip
             if (options.IccProfile is { Length: > 0 } icc) WriteIccProfile(icc);
             if (bits != 32) BitmapHeader(0, Math.Min(width, StripWidth), unpacked: false);
         }
@@ -301,7 +301,7 @@ namespace ClassicMac.Graphics.Pict
             void Comment(uint selector, ReadOnlySpan<byte> data)
             {
                 if ((Written & 1) == 1) output.WriteByte(0);
-                output.WriteUInt16(0x00A1); output.WriteUInt16(224); output.WriteUInt16((ushort)(4 + data.Length));
+                output.WriteUInt16(0x00A1); output.WriteUInt16(224); output.WriteUInt16((4 + data.Length));
                 output.WriteUInt32(selector);
                 output.WriteBytes(data);
             }
@@ -317,51 +317,51 @@ namespace ClassicMac.Graphics.Pict
             {
                 output.WriteUInt16(0x009A);                  // DirectBitsRect
                 output.WriteUInt32(0x000000FF);              // baseAddr
-                output.WriteUInt16((ushort)(rowBytes | 0x8000));
-                output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
-                output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4);
+                output.WriteUInt16((rowBytes | 0x8000));
+                output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
+                output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4);
                 PixMapFields(packType: bits == 16 ? 3 : unpacked ? 1 : 4, pixelType: 16, cmpCount: bits == 16 || options.Format == PictPixelFormat.Rgb888 ? 3 : 4,
                     cmpSize: bits == 16 ? 5 : 8);
             }
             else
             {
-                output.WriteUInt16((ushort)(rowBytes < 8 ? 0x0090 : 0x0098)); // BitsRect (unpacked) / PackBitsRect
-                output.WriteUInt16((ushort)(bitMap ? rowBytes : rowBytes | 0x8000));
-                output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
-                output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4);
+                output.WriteUInt16((rowBytes < 8 ? 0x0090 : 0x0098)); // BitsRect (unpacked) / PackBitsRect
+                output.WriteUInt16((bitMap ? rowBytes : rowBytes | 0x8000));
+                output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
+                output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4);
                 if (!bitMap)
                 {
                     PixMapFields(packType: 0, pixelType: 0, cmpCount: 1, cmpSize: bits);
                     output.WriteUInt32(0);                   // ctSeed
                     output.WriteUInt16(0);                   // ctFlags: entries carry their pixel values
-                    output.WriteUInt16((ushort)(palette.Length - 1));
+                    output.WriteUInt16((palette.Length - 1));
                     for (int i = 0; i < palette.Length; i++)
                     {
-                        output.WriteUInt16((ushort)i);
-                        output.WriteUInt16((ushort)(palette[i].R * 257));
-                        output.WriteUInt16((ushort)(palette[i].G * 257));
-                        output.WriteUInt16((ushort)(palette[i].B * 257));
+                        output.WriteUInt16(i);
+                        output.WriteUInt16((palette[i].R * 257));
+                        output.WriteUInt16((palette[i].G * 257));
+                        output.WriteUInt16((palette[i].B * 257));
                     }
                 }
             }
-            output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
-            output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4); // srcRect
-            output.WriteInt16((short)bounds.Item1); output.WriteInt16((short)bounds.Item2);
-            output.WriteInt16((short)bounds.Item3); output.WriteInt16((short)bounds.Item4); // dstRect
+            output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
+            output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4); // srcRect
+            output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
+            output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4); // dstRect
             output.WriteUInt16(0);                           // srcCopy
         }
 
         private void PixMapFields(int packType, int pixelType, int cmpCount, int cmpSize)
         {
             output.WriteUInt16(0);                           // pmVersion
-            output.WriteUInt16((ushort)packType);
+            output.WriteUInt16(packType);
             output.WriteUInt32(0);                           // packSize
             output.WriteUInt32(Fixed(options.HorizontalResolution > 0 ? options.HorizontalResolution : 72));
             output.WriteUInt32(Fixed(options.VerticalResolution > 0 ? options.VerticalResolution : 72));
-            output.WriteUInt16((ushort)pixelType);
-            output.WriteUInt16((ushort)bits);
-            output.WriteUInt16((ushort)cmpCount);
-            output.WriteUInt16((ushort)cmpSize);
+            output.WriteUInt16(pixelType);
+            output.WriteUInt16(bits);
+            output.WriteUInt16(cmpCount);
+            output.WriteUInt16(cmpSize);
             output.WriteUInt32(0); output.WriteUInt32(0); output.WriteUInt32(0); // planeBytes, pmTable, reserved
         }
 
@@ -409,8 +409,8 @@ namespace ClassicMac.Graphics.Pict
                 return;
             }
             var packed = bits == 16 ? PackWords(line) : PackBits(line);
-            if (rowBytes > 250) output.WriteUInt16((ushort)packed.Length);
-            else output.WriteByte((byte)packed.Length);
+            if (rowBytes > 250) output.WriteUInt16(packed.Length);
+            else output.WriteByte(packed.Length);
             output.WriteBytes(packed);
         }
 
