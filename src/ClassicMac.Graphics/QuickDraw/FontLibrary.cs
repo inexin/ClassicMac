@@ -41,7 +41,7 @@ namespace ClassicMac.Graphics.QuickDraw
             try
             {
                 var reader = new ClassicMac.Core.BigEndianReader(fond);
-                families[familyId] = FontFamily.Read(ref reader, name ?? "");
+                families[familyId] = FontFamily.Read(reader, name ?? "");
             }
             catch (System.IO.InvalidDataException) { families.Remove(familyId); }
             if (!string.IsNullOrEmpty(name)) familyNames[name] = familyId;
@@ -132,7 +132,8 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 try
                 {
-                    return PixMap.ReadColorTable(BytesReader.Over(fctb), depth);
+                    var b = new ClassicMac.Core.BigEndianReader(fctb);
+                    return PixMap.ReadColorTable(b, depth);
                 }
                 catch (System.IO.EndOfStreamException) { }
             }
@@ -166,7 +167,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 try
                 {
                     var reader = new ClassicMac.Core.BigEndianReader(data);
-                    result = BitmapFont.Read(ref reader, null, rom);
+                    result = BitmapFont.Read(reader, null, rom);
                 }
                 catch (System.IO.InvalidDataException) { }
             }

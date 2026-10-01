@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Binary;
 using System.Text;
 
 namespace ClassicMac.Core
@@ -18,8 +19,7 @@ namespace ClassicMac.Core
         public FourCC(ReadOnlySpan<byte> bytes)
         {
             if (bytes.Length != 4) throw new ArgumentException("A four-character code is four bytes.", nameof(bytes));
-            var reader = new BigEndianReader(bytes);
-            Value = reader.ReadUInt32();
+            Value = BinaryPrimitives.ReadUInt32BigEndian(bytes);
         }
 
         /// <summary>

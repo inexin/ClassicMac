@@ -73,7 +73,7 @@ namespace ClassicMac.Graphics.ImageSharp
 
         public bool TryDetectFormat(ReadOnlySpan<byte> header, [NotNullWhen(true)] out IImageFormat? format)
         {
-            bool match = QuickTimeImageFile.IsQuickTimeImageFile(header);
+            bool match = QuickTimeImageFile.IsQuickTimeImageFile(header.ToArray());
             format = match ? QuickTimeImageFormat.Instance : null;
             return match;
         }
@@ -86,7 +86,7 @@ namespace ClassicMac.Graphics.ImageSharp
 
         public bool TryDetectFormat(ReadOnlySpan<byte> header, [NotNullWhen(true)] out IImageFormat? format)
         {
-            bool match = MacPaintFile.IsMacPaintFile(header);
+            bool match = MacPaintFile.IsMacPaintFile(header.ToArray());
             format = match ? MacPaintFormat.Instance : null;
             return match;
         }
@@ -108,7 +108,7 @@ namespace ClassicMac.Graphics.ImageSharp
         /// <inheritdoc/>
         protected override ImageInfo Identify(DecoderOptions options, Stream stream, CancellationToken cancellationToken)
         {
-            var (description, profile) = MacImages.Guard(() => QuickTimeImageFile.ReadMetadata(stream, cancellationToken));
+            var (description, profile) = MacImages.Guard(() => QuickTimeImageFile.ReadMetadata(stream));
             var metadata = new ImageMetadata();
             if (!options.SkipMetadata) ApplyMetadata(metadata, description, profile);
             return new ImageInfo(new PixelTypeInfo(32), new Size(Math.Max(1, description.Width), Math.Max(1, description.Height)), metadata);

@@ -319,20 +319,20 @@ public sealed class StuffItReader : IContainerReader
             if (++entriesRead > context.Options.MaxVolumeEntries)
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
 
-            ReadOnlySpan<byte> header = archive.AsSpan(position, memberHeaderLength);
+            ReadOnlyMemory<byte> header = archive.AsMemory(position, memberHeaderLength);
             ushort expectedHeaderCrc = U16(header, 110);
-            if (Crc16Arc(header[..110]) != expectedHeaderCrc)
+            if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
                 context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                     $"The legacy StuffIt member header checksum is incorrect at offset {position}.", position);
 
-            byte resourceMethod = header[0];
-            byte dataMethod = header[1];
-            int nameLength = header[2];
+            byte resourceMethod = header.Span[0];
+            byte dataMethod = header.Span[1];
+            int nameLength = header.Span[2];
             bool startsFolder = resourceMethod == 32 || dataMethod == 32;
             bool endsFolder = resourceMethod == 33 || dataMethod == 33;
             if (nameLength > 63 || (nameLength == 0 && !endsFolder))
                 throw new InvalidDataException("A legacy StuffIt member name length is invalid.");
-            MacString name = nameLength == 0 ? MacString.FromMacRoman("") : new MacString(header.Slice(3, nameLength));
+            MacString name = nameLength == 0 ? MacString.FromMacRoman("") : new MacString(header.Span.Slice(3, nameLength));
             int resourceLength = ReadLength(U32(header, 84), "resource fork length");
             int dataLength = ReadLength(U32(header, 88), "data fork length");
             int resourceCompressedLength = ReadLength(U32(header, 92), "compressed resource fork length");
@@ -393,8 +393,8 @@ public sealed class StuffItReader : IContainerReader
                         FolderPath = [.. folderPath],
                         FinderInfo = new FinderInfo
                         {
-                            Type = new FourCC(header.Slice(66, 4)),
-                            Creator = new FourCC(header.Slice(70, 4)),
+                            Type = new FourCC(header.Span.Slice(66, 4)),
+                            Creator = new FourCC(header.Span.Slice(70, 4)),
                             Flags = (FinderFlags)U16(header, 74),
                         },
                         Created = Date(U32(header, 76)),
@@ -421,13 +421,13 @@ public sealed class StuffItReader : IContainerReader
     {
         const int headerLength = 112;
         Require(archive, offset, headerLength, "legacy StuffIt member header");
-        ReadOnlySpan<byte> header = archive.AsSpan(offset, headerLength);
-        int nameLength = header[2];
+        ReadOnlyMemory<byte> header = archive.AsMemory(offset, headerLength);
+        int nameLength = header.Span[2];
         if (nameLength is < 1 or > 31)
             throw new InvalidDataException("A legacy StuffIt member name length is invalid.");
 
         ushort expectedHeaderCrc = U16(header, 110);
-        if (Crc16Arc(header[..110]) != expectedHeaderCrc)
+        if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The legacy StuffIt member header checksum is incorrect at offset {offset}.", offset);
 
@@ -453,21 +453,21 @@ public sealed class StuffItReader : IContainerReader
 
         var finderInfo = new FinderInfo
         {
-            Type = new FourCC(header.Slice(66, 4)),
-            Creator = new FourCC(header.Slice(70, 4)),
+            Type = new FourCC(header.Span.Slice(66, 4)),
+            Creator = new FourCC(header.Span.Slice(70, 4)),
             Flags = (FinderFlags)U16(header, 74),
         };
         return new LegacyMember(
-            new MacString(header.Slice(3, nameLength)),
+            new MacString(header.Span.Slice(3, nameLength)),
             isFolder,
             firstChild,
             U16(header, 48),
             previous,
             next,
             parent,
-            (header[0] & 0x10) != 0 || (header[1] & 0x10) != 0,
-            checked((byte)(header[0] & 0x0F)),
-            checked((byte)(header[1] & 0x0F)),
+            (header.Span[0] & 0x10) != 0 || (header.Span[1] & 0x10) != 0,
+            checked((byte)(header.Span[0] & 0x0F)),
+            checked((byte)(header.Span[1] & 0x0F)),
             resourceLength,
             dataLength,
             resourceCompressedLength,
@@ -643,7 +643,7 @@ public sealed class StuffItReader : IContainerReader
         if (method == 2) return DecodeCompress(input, outputLength);
         if (method == 3) return DecodeHuffman(input, outputLength);
         if (method == 5) return DecodeLzah(input, outputLength);
-        if (method == 6) return DecodeMethod6Blocks(input, outputLength);
+        if (method == 6) return DecodeMethod6Blocks(archive.AsMemory(offset, compressedLength), outputLength);
         if (method == 8) return DecodeMw(input, outputLength);
         if (method == 13) return StuffItMethod13Decoder.Decode(input, outputLength);
         if (method == 14) return StuffItMethod14Decoder.Decode(input, outputLength);
@@ -682,7 +682,7 @@ public sealed class StuffItReader : IContainerReader
         return output;
     }
 
-    private static byte[] DecodeMethod6Blocks(ReadOnlySpan<byte> input, int outputLength)
+    private static byte[] DecodeMethod6Blocks(ReadOnlyMemory<byte> input, int outputLength)
     {
         var output = new byte[outputLength];
         var reader = new BigEndianReader(input);
@@ -698,10 +698,10 @@ public sealed class StuffItReader : IContainerReader
             if (blockLength < sizeof(int) || blockLength > input.Length - inputOffset)
                 throw new InvalidDataException("A StuffIt method 6 block length is outside its compressed fork.");
 
-            ReadOnlySpan<byte> block = input.Slice(inputOffset + sizeof(int), checked((int)blockLength - sizeof(int)));
+            ReadOnlyMemory<byte> block = input.Slice(inputOffset + sizeof(int), checked((int)blockLength - sizeof(int)));
             if (signedBlockLength < 0)
             {
-                DecodePackBits(block, output, ref outputOffset);
+                DecodePackBits(block.Span, output, ref outputOffset);
             }
             else
             {
@@ -716,7 +716,7 @@ public sealed class StuffItReader : IContainerReader
         return output;
     }
 
-    private static void DecodeMethod6HuffmanBlock(ReadOnlySpan<byte> block, byte[] output, ref int outputOffset)
+    private static void DecodeMethod6HuffmanBlock(ReadOnlyMemory<byte> block, byte[] output, ref int outputOffset)
     {
         if (block.Length < 6)
             throw new InvalidDataException("A StuffIt method 6 Huffman block has a truncated header.");
@@ -730,8 +730,8 @@ public sealed class StuffItReader : IContainerReader
         if (symbolCount > 256 || symbolCount > block.Length - 6)
             throw new InvalidDataException("A StuffIt method 6 Huffman block has an invalid translation table.");
 
-        ReadOnlySpan<byte> translationTable = block.Slice(6, symbolCount);
-        ReadOnlySpan<byte> encoded = block[(6 + symbolCount)..];
+        ReadOnlySpan<byte> translationTable = block.Span.Slice(6, symbolCount);
+        ReadOnlySpan<byte> encoded = block.Span[(6 + symbolCount)..];
         var reader = new MsbBitReader(encoded);
         var packed = new byte[packBitsLength];
         int packedOffset = 0;
@@ -1390,8 +1390,8 @@ public sealed class StuffItReader : IContainerReader
         return (int)value;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
+    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
+    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
     private static void U16(Span<byte> bytes, int offset, ushort value) =>
         BinaryPrimitives.WriteUInt16BigEndian(bytes[offset..], value);
 

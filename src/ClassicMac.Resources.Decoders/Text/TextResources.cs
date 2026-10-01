@@ -26,7 +26,7 @@ namespace ClassicMac.Resources.Decoders.Text
         public static byte[] WriteString(string text) => Pascal(text);
 
         /// <summary>The strings of a <c>'STR#'</c>, as many as its data holds.</summary>
-        public static IReadOnlyList<string> ReadStringList(ReadOnlySpan<byte> data)
+        public static IReadOnlyList<string> ReadStringList(ReadOnlyMemory<byte> data)
         {
             var strings = new List<string>();
             var reader = new BigEndianReader(data);
@@ -63,7 +63,7 @@ namespace ClassicMac.Resources.Decoders.Text
         /// the change starts in, as typing in TextEdit does [ClassicMac]. Runs left empty are dropped.
         /// </summary>
         /// <exception cref="ArgumentException">The text is not Mac OS Roman.</exception>
-        public static (byte[] Text, byte[]? Styl) WriteText(ReadOnlySpan<byte> oldText, ReadOnlySpan<byte> styl, string newText, bool hasStyl)
+        public static (byte[] Text, byte[]? Styl) WriteText(ReadOnlySpan<byte> oldText, ReadOnlyMemory<byte> styl, string newText, bool hasStyl)
         {
             var text = ToMac(newText);
             if (!hasStyl) return (text, null);
@@ -112,18 +112,19 @@ namespace ClassicMac.Resources.Decoders.Text
     public sealed record VersionResource(int Major, int Minor, int BugFix, byte Stage, int NonRelease, short Region, string ShortVersion, string LongVersion)
     {
         /// <summary>Reads one (null when it is shorter than its fixed part).</summary>
-        public static VersionResource? Read(ReadOnlySpan<byte> data)
+        public static VersionResource? Read(ReadOnlyMemory<byte> data)
         {
-            if (data.Length < 7) return null;
+            var bytes = data.Span;
+            if (bytes.Length < 7) return null;
             static int Bcd(byte b) => (b >> 4) * 10 + (b & 0x0F);
-            var nonRelease = (data[3] >> 4) <= 9 && (data[3] & 0x0F) <= 9 ? Bcd(data[3]) : data[3];
+            var nonRelease = (bytes[3] >> 4) <= 9 && (bytes[3] & 0x0F) <= 9 ? Bcd(bytes[3]) : bytes[3];
             var offset = 6;
-            MacText.TryReadPascal(data, ref offset, out var shortText);
+            MacText.TryReadPascal(bytes, ref offset, out var shortText);
             var shortVersion = MacRoman.Decode(shortText);
             var longVersion = "";
-            if (offset < data.Length && MacText.TryReadPascal(data, ref offset, out var longText)) longVersion = MacRoman.Decode(longText).Replace('\r', '\n');
+            if (offset < bytes.Length && MacText.TryReadPascal(bytes, ref offset, out var longText)) longVersion = MacRoman.Decode(longText).Replace('\r', '\n');
             var reader = new BigEndianReader(data);
-            return new VersionResource(Bcd(data[0]), data[1] >> 4, data[1] & 0x0F, data[2], nonRelease, reader.ReadInt16At(4),
+            return new VersionResource(Bcd(bytes[0]), bytes[1] >> 4, bytes[1] & 0x0F, bytes[2], nonRelease, reader.ReadInt16At(4),
                 shortVersion, longVersion);
         }
 

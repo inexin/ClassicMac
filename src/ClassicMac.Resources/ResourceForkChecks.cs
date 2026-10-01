@@ -11,10 +11,10 @@ namespace ClassicMac.Resources
     {
         // Why the modelled Resource Manager refuses the fork, as (error code, reason), or null. Error 0 means the ROM
         // opens it but reads memory past the map.
-        public static (int Error, string Reason)? Rejects(ReadOnlySpan<byte> fork, ResourceManagerModel model) =>
+        public static (int Error, string Reason)? Rejects(ReadOnlyMemory<byte> fork, ResourceManagerModel model) =>
             model == ResourceManagerModel.Rom68k ? RomRejects(fork) : MacOS9Rejects(fork);
 
-        private static (int, string)? MacOS9Rejects(ReadOnlySpan<byte> fork)
+        private static (int, string)? MacOS9Rejects(ReadOnlyMemory<byte> fork)
         {
             long eof = fork.Length;
             if (eof < 0x46) return (-39, $"it is {eof} bytes, under the 70 the Resource Manager reads first");
@@ -69,7 +69,7 @@ namespace ClassicMac.Resources
         // The ROM reads the header as signed longs and checks almost nothing: that the header and map can be read, the
         // type-list offset is even, the offsets stay under $FFFFFF, and the references end before the names (or the
         // map's end).
-        private static (int, string)? RomRejects(ReadOnlySpan<byte> fork)
+        private static (int, string)? RomRejects(ReadOnlyMemory<byte> fork)
         {
             long eof = fork.Length;
             if (eof < 36) return (-39, "its first 36 bytes cannot be read");

@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -25,40 +24,29 @@ namespace ClassicMac.Graphics.QuickTime
         public const int SignatureLength = 8;
 
         /// <summary>True if <paramref name="data"/> starts with a QuickTime image file's first atom.</summary>
-        public static bool IsQuickTimeImageFile(ReadOnlySpan<byte> data)
+        public static bool IsQuickTimeImageFile(ReadOnlyMemory<byte> data)
         {
             if (data.Length < SignatureLength) return false;
-            uint size = new ClassicMac.Core.BigEndianReader(data).ReadUInt32At(0);
+            uint size = new BigEndianReader(data).ReadUInt32At(0);
             if (size != 1 && size < 8) return false;
-            string type = Encoding.Latin1.GetString(data.Slice(4, 4));
+            string type = Encoding.Latin1.GetString(data.Span.Slice(4, 4));
             return type is "idsc" or "idat" or "iicc";
         }
 
         /// <summary>Reads the file's image description.</summary>
         /// <exception cref="NotSupportedException">The data has no readable image description.</exception>
-        public static PictImageDescription ReadDescription(ReadOnlySpan<byte> data)
-        {
-            return TryFindAtom(data, "idsc", out int offset, out int length)
-                ? Description(data.Slice(offset, length))
-                : throw NoDescription();
-        }
+        public static PictImageDescription ReadDescription(ReadOnlyMemory<byte> data) =>
+            TryFindAtom(data, "idsc", out var atom) ? Description(atom) : throw NoDescription();
 
         /// <summary>The file's embedded ICC profile (<c>iicc</c> atom), or null.</summary>
-        public static byte[]? ReadIccProfile(ReadOnlySpan<byte> data)
-        {
-            return TryFindAtom(data, "iicc", out int offset, out int length) ? data.Slice(offset, length).ToArray() : null;
-        }
+        public static byte[]? ReadIccProfile(ReadOnlyMemory<byte> data) =>
+            TryFindAtom(data, "iicc", out var atom) ? atom.ToArray() : null;
 
         /// <summary>Decodes the image.</summary>
         /// <param name="data">The file's bytes.</param>
         /// <param name="codec">Decoder for codecs the core lacks (e.g. JPEG); null for built-in codecs only.</param>
         /// <exception cref="NotSupportedException">The file has no image, or its codec is not supported.</exception>
-        public static RgbaBitmap Decode(ReadOnlySpan<byte> data, IPictImageCodec? codec = null)
-        {
-            var description = ReadDescription(data);
-            if (!TryFindAtom(data, "idat", out int offset, out int length)) throw NoImage();
-            return DecodeImage(description, data.Slice(offset, length).ToArray(), codec);
-        }
+        public static RgbaBitmap Decode(ReadOnlyMemory<byte> data, IPictImageCodec? codec = null) => Read(data, codec).Bitmap;
 
         /// <summary>Decodes the image read from the current position of <paramref name="stream"/>.</summary>
         /// <inheritdoc cref="Read(Stream, IPictImageCodec?, CancellationToken)"/>
@@ -66,101 +54,50 @@ namespace ClassicMac.Graphics.QuickTime
             Read(stream, codec, cancellationToken).Bitmap;
 
         /// <summary>
-        /// Decodes the image read from the current position of <paramref name="stream"/>, with its description and ICC
-        /// profile. The atoms are read in order and the stream to its end; only the first image description, image
-        /// data and ICC profile are kept, other atoms are skipped. The stream is left open and need not be seekable.
+        /// Decodes the image read from the current position of <paramref name="stream"/> to its end, with its
+        /// description and ICC profile. The stream is left open.
         /// </summary>
         /// <param name="stream">The file's bytes.</param>
         /// <param name="codec">Decoder for codecs the core lacks (e.g. JPEG); null for built-in codecs only.</param>
-        /// <param name="cancellationToken">Cancels reading between atoms.</param>
+        /// <param name="cancellationToken">Cancels decoding once the file is read.</param>
         /// <exception cref="NotSupportedException">The file has no image, or its codec is not supported.</exception>
         public static QuickTimeImageResult Read(Stream stream, IPictImageCodec? codec = null, CancellationToken cancellationToken = default)
         {
-            var (description, image, profile) = Scan(stream, keepImage: true, cancellationToken);
-            if (image == null) throw NoImage();
+            var data = new BigEndianReader(stream).Source;
             cancellationToken.ThrowIfCancellationRequested();
-            return new QuickTimeImageResult(DecodeImage(description, image, codec), description, profile);
+            return Read(data, codec);
         }
 
-        // The description and ICC profile read from the current position of stream, without decoding the image.
-        internal static (PictImageDescription Description, byte[]? IccProfile) ReadMetadata(Stream stream, CancellationToken cancellationToken = default)
+        // The description and ICC profile read from the current position of stream to its end, without decoding the image.
+        internal static (PictImageDescription Description, byte[]? IccProfile) ReadMetadata(Stream stream)
         {
-            var (description, _, profile) = Scan(stream, keepImage: false, cancellationToken);
-            return (description, profile);
+            var data = new BigEndianReader(stream).Source;
+            return (ReadDescription(data), ReadIccProfile(data));
         }
 
-        // Reads the atoms in order to the end of the stream, keeping the first description, image data (if asked) and
-        // ICC profile, and skipping the rest.
-        private static (PictImageDescription Description, byte[]? Image, byte[]? IccProfile) Scan(Stream stream, bool keepImage,
-            CancellationToken cancellationToken)
+        private static QuickTimeImageResult Read(ReadOnlyMemory<byte> data, IPictImageCodec? codec)
         {
-            ArgumentNullException.ThrowIfNull(stream);
-            var reader = new BigEndianStreamReader(stream);
-            byte[]? descriptionAtom = null, image = null, profile = null;
-            Span<byte> header = stackalloc byte[16];
-            while (reader.Peek(header[..8]) == 8)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                long size = reader.ReadUInt32();
-                string type = Encoding.Latin1.GetString(reader.ReadBytes(4));
-                int headerLength = 8;
-                if (size == 1)
-                {
-                    if (reader.Peek(header[..8]) < 8) break;
-                    size = (long)reader.ReadUInt64();
-                    headerLength = 16;
-                }
-                else if (size == 0) size = long.MaxValue;
-                if (size < headerLength) break;
-                long length = size == long.MaxValue ? long.MaxValue : size - headerLength;
-                switch (type)
-                {
-                    case "idsc" when descriptionAtom == null: descriptionAtom = ReadAtMost(reader, length); break;
-                    case "idat" when keepImage && image == null: image = ReadAtMost(reader, length); break;
-                    case "iicc" when profile == null: profile = ReadAtMost(reader, length); break;
-                    default: reader.SkipAtMost(length); break;
-                }
-            }
-            reader.SkipAtMost(long.MaxValue);
-            return (descriptionAtom != null ? Description(descriptionAtom) : throw NoDescription(), image, profile);
-        }
-
-        // The content of an atom: length bytes, or fewer when the file ends first (an atom running past the end is cut there).
-        private static byte[] ReadAtMost(BigEndianStreamReader reader, long length)
-        {
-            var result = new byte[(int)Math.Min(length, 81920)];
-            int filled = 0;
-            while (filled < length)
-            {
-                if (filled == result.Length)
-                {
-                    if (result.Length == Array.MaxLength)
-                        throw new NotSupportedException("The QuickTime image file's atom is too large.");
-                    Array.Resize(ref result, (int)Math.Min(Math.Min(length, Array.MaxLength), 2L * result.Length));
-                }
-                int read = reader.ReadAtMost(result.AsSpan(filled));
-                if (read == 0) break;
-                filled += read;
-            }
-            return filled == result.Length ? result : result[..filled];
+            var description = ReadDescription(data);
+            if (!TryFindAtom(data, "idat", out var atom)) throw NoImage();
+            var image = atom.ToArray();
+            var bitmap = QuickTimeCodecs.Decode(description, image) ?? codec?.Decode(description, image)
+                ?? throw new NotSupportedException($"QuickTime codec '{description.CodecType}' is not supported.");
+            return new QuickTimeImageResult(bitmap, description, ReadIccProfile(data));
         }
 
         // An image description atom's content; the description must lie within its atom.
-        private static PictImageDescription Description(ReadOnlySpan<byte> atom) =>
+        private static PictImageDescription Description(ReadOnlyMemory<byte> atom) =>
             ImageDescriptionReader.Read(atom, 0, out _) ?? throw NoDescription();
-
-        private static RgbaBitmap DecodeImage(PictImageDescription description, byte[] image, IPictImageCodec? codec) =>
-            QuickTimeCodecs.Decode(description, image) ?? codec?.Decode(description, image)
-                ?? throw new NotSupportedException($"QuickTime codec '{description.CodecType}' is not supported.");
 
         private static NotSupportedException NoDescription() =>
             new("Not a QuickTime image file: it has no image description ('idsc').");
 
         private static NotSupportedException NoImage() => new("The QuickTime image file has no image data ('idat').");
 
-        // Finds the first top-level atom of the requested type. Size 0 runs to the end of the file, size 1 has a
-        // 64-bit size after the type; an atom running past the end is cut there.
-        private static bool TryFindAtom(ReadOnlySpan<byte> data, string requestedType, out int contentOffset, out int contentLength)
+        // Finds the content of the first top-level atom of the requested type. Size 0 runs to the end of the file, size 1
+        // has a 64-bit size after the type; an atom running past the end is cut there, and one whose size is less than
+        // its header ends the search.
+        private static bool TryFindAtom(ReadOnlyMemory<byte> data, string requestedType, out ReadOnlyMemory<byte> content)
         {
             long p = 0;
             while (p + 8 <= data.Length)
@@ -180,15 +117,12 @@ namespace ClassicMac.Graphics.QuickTime
                 long end = Math.Min(data.Length, p + size);
                 if (type == requestedType)
                 {
-                    contentOffset = (int)(p + header);
-                    contentLength = (int)(end - p - header);
+                    content = data[(int)(p + header)..(int)end];
                     return true;
                 }
                 p += size;
             }
-
-            contentOffset = 0;
-            contentLength = 0;
+            content = default;
             return false;
         }
     }

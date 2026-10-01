@@ -128,7 +128,7 @@ namespace ClassicMac.App.ViewModels
                 var styl = fork.Find(FourCC.FromString("styl"), resource.Id) is { } s
                     ? ResourceDecompression.Default.GetData(s, fork, readOptions, diagnostics)
                     : ReadOnlyMemory<byte>.Empty;
-                return StyledPreview(StyledText.Read(data.Span, styl.Span, options));
+                return StyledPreview(StyledText.Read(data.Span, styl, options));
             }
             if (type == "snd " && SoundResource.Read(data, diagnostics, resource.ToString()) is { Sound: { } sampled })
                 return SoundPreview(sampled);
@@ -136,12 +136,12 @@ namespace ClassicMac.App.ViewModels
                 return new PreviewViewModel(PreviewKind.Dialog, "") { Dialog = dialog };
             if (type is "clut" or "pltt")
             {
-                var entries = type == "clut" ? Resources.Decoders.Colors.Palettes.ReadColorTable(data.Span, out _, out _, out _)
-                    : Resources.Decoders.Colors.Palettes.ReadPalette(data.Span, out _);
+                var entries = type == "clut" ? Resources.Decoders.Colors.Palettes.ReadColorTable(data, out _, out _, out _)
+                    : Resources.Decoders.Colors.Palettes.ReadPalette(data, out _);
                 return entries.Count == 0 ? Nothing($"'{type}'") : Swatches(entries);
             }
             if (type == "MENU")
-                return new PreviewViewModel(PreviewKind.Menu, "") { Menu = InterfaceResources.ReadMenu(data.Span, options, diagnostics, resource.ToString()) };
+                return new PreviewViewModel(PreviewKind.Menu, "") { Menu = InterfaceResources.ReadMenu(data, options, diagnostics, resource.ToString()) };
             var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(resource.Type));
             if (decoder is null) return Nothing($"'{type}'");
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));
@@ -172,7 +172,7 @@ namespace ClassicMac.App.ViewModels
                 var styl = ReadOnlyMemory<byte>.Empty;
                 if (MacFileResources.Read(file, readOptions).Fork is { } fork && fork.Find(FourCC.FromString("styl"), 128) is { } s)
                     styl = ResourceDecompression.Default.GetData(s, fork, readOptions, diagnostics);
-                return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl.Span, options));
+                return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl, options));
             }
             return None;
         }
@@ -275,7 +275,7 @@ namespace ClassicMac.App.ViewModels
         }
 
         // Width and height from the PNG's IHDR (which directly follows the signature).
-        private static (int Width, int Height) PngSize(ReadOnlySpan<byte> png)
+        private static (int Width, int Height) PngSize(ReadOnlyMemory<byte> png)
         {
             if (png.Length < 24) return (0, 0);
             var reader = new BigEndianReader(png);

@@ -164,7 +164,7 @@ namespace ClassicMac.Files.Hfs
             var entries = new List<(long Start, byte Type, long Offset, long Stored)>();
             for (var k = 0; k < header.Count; k++)
             {
-                var e = new BigEndianReader(map.AsSpan(header.EntriesAt + k * header.EntrySize, header.EntrySize));
+                var e = new BigEndianReader(map.AsMemory(header.EntriesAt + k * header.EntrySize, header.EntrySize));
                 var word = e.ReadUInt32();
                 long offset = e.ReadUInt32();
                 long stored = header.EntrySize == EntryLength ? e.ReadUInt32() : 0;

@@ -371,7 +371,7 @@ public class DecompressionTests
         {
             foreach (var resource in fork.Resources.Where(r => (r.Attributes & ResourceAttributes.Compressed) != 0))
             {
-                if (!CompressedResourceHeader.TryRead(resource.GetData().Span, out var header) || !header.IsCompressed)
+                if (!CompressedResourceHeader.TryRead(resource.GetData(), out var header) || !header.IsCompressed)
                     continue;
                 compressed++;
                 var diagnostics = new List<Diagnostic>();

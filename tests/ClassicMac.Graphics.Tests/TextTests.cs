@@ -68,7 +68,7 @@ public class TextTests
     public void BitmapFont_ParsesTheStrikeAndTables()
     {
         var reader = new ClassicMac.Core.BigEndianReader(Font9);
-        var f = BitmapFont.Read(ref reader, null, rom: true);
+        var f = BitmapFont.Read(reader, null, rom: true);
         Assert.Equal((' ', 'g', 3, 2, 5), ((char)f.FirstChar, (char)f.LastChar, f.Ascent, f.Descent, f.RectHeight));
         int a = 'A' - ' ';
         Assert.Equal(3, f.OffsetWidths[a] & 0xFF);

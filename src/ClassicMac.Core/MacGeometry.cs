@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Buffers.Binary;
 namespace ClassicMac.Core
 {
     /// <summary>
@@ -15,12 +17,12 @@ namespace ClassicMac.Core
         /// <summary>Reads a point from the first four bytes of <paramref name="source"/>.</summary>
         public static MacPoint Read(ReadOnlySpan<byte> source)
         {
-            var reader = new BigEndianReader(source);
-            return reader.ReadMacPoint();
+            if (source.Length < Length) throw new EndOfStreamException();
+            return new(BinaryPrimitives.ReadInt16BigEndian(source), BinaryPrimitives.ReadInt16BigEndian(source[2..]));
         }
 
         /// <summary>Reads a point at the reader's current position and advances it.</summary>
-        public static MacPoint Read(ref BigEndianReader reader) => reader.ReadMacPoint();
+        public static MacPoint Read(BigEndianReader reader) => reader.ReadMacPoint();
 
         /// <summary>Writes the point as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)
@@ -73,12 +75,13 @@ namespace ClassicMac.Core
         /// <summary>Reads a rectangle from the first eight bytes of <paramref name="source"/>.</summary>
         public static MacRect Read(ReadOnlySpan<byte> source)
         {
-            var reader = new BigEndianReader(source);
-            return reader.ReadMacRect();
+            if (source.Length < Length) throw new EndOfStreamException();
+            return new(BinaryPrimitives.ReadInt16BigEndian(source), BinaryPrimitives.ReadInt16BigEndian(source[2..]),
+                BinaryPrimitives.ReadInt16BigEndian(source[4..]), BinaryPrimitives.ReadInt16BigEndian(source[6..]));
         }
 
         /// <summary>Reads a rectangle at the reader's current position and advances it.</summary>
-        public static MacRect Read(ref BigEndianReader reader) => reader.ReadMacRect();
+        public static MacRect Read(BigEndianReader reader) => reader.ReadMacRect();
 
         /// <summary>Writes the rectangle as eight big-endian bytes.</summary>
         public void Write(Span<byte> destination)

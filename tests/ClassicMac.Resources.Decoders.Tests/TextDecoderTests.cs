@@ -122,7 +122,7 @@ public class TextDecoderTests
         Assert.Equal((0, 6, "Times", 18, true, (byte)255), (title.Start, title.Length, title.FontName, title.Size, title.Bold, title.Red));
         Assert.Equal((6, 6, "Monaco", 12, true), (body.Start, body.Length, body.FontName, body.Size, body.Italic));
 
-        var plain = Text.StyledText.Read(text, []);
+        var plain = Text.StyledText.Read(text, ReadOnlyMemory<byte>.Empty);
         Assert.Equal((0, 12, "Geneva"), (plain.Runs.Single().Start, plain.Runs.Single().Length, plain.Runs.Single().FontName));
     }
 

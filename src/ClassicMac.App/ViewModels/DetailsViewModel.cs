@@ -104,7 +104,7 @@ namespace ClassicMac.App.ViewModels
                 new("Stored size", Bytes(resource.Length)),
             };
             if ((resource.Attributes & ResourceAttributes.Compressed) != 0
-                && CompressedResourceHeader.TryRead(resource.GetData().Span, out var header) && header.IsCompressed)
+                && CompressedResourceHeader.TryRead(resource.GetData(), out var header) && header.IsCompressed)
             {
                 rows.Add(new("Compressed", $"'dcmp' {header.DecompressorId}, {Bytes(header.DecompressedSize)} when expanded"));
             }

@@ -36,9 +36,10 @@ namespace ClassicMac.Graphics.QuickTime
             }
         }
 
-        private static RgbaBitmap? DecodeMacPaint(ReadOnlySpan<byte> data)
+        private static RgbaBitmap? DecodeMacPaint(ReadOnlyMemory<byte> data)
         {
-            return MacPaintFile.DecodeRows(BytesReader.Over(data));
+            var reader = new BigEndianReader(data);
+            return MacPaintFile.DecodeRows(reader);
         }
 
         // ---- shared helpers ----
@@ -114,7 +115,8 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 int count = (data[2 * l] << 8) | data[2 * l + 1];
                 if (p + count > data.Length) return null;
-                PackBits.Unpack(BytesReader.Over(data.AsSpan(p, count)), planes.AsSpan(l * d.Width, d.Width));
+                var row = new BigEndianReader(data.AsMemory(p, count));
+                PackBits.Unpack(row, planes.AsSpan(l * d.Width, d.Width));
                 p += count;
             }
             var palette = Palette(d);

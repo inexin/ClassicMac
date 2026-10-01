@@ -213,7 +213,7 @@ public class RegionTests
         var bytes = new PictBuilder().U16(36).Rect(0, 0, 4, 4)
             .U16(0).U16(0).U16(4).U16(0x7FFF).U16(2).U16(2).U16(4).U16(0x7FFF).U16(4).U16(0).U16(2).U16(0x7FFF).U16(0x7FFF)
             .ToArray();
-        var b = BytesReader.Over(bytes);
+        var b = new ClassicMac.Core.BigEndianReader(bytes);
 
         var r = Region.Read(b);
 
@@ -225,7 +225,7 @@ public class RegionTests
     public void Read_RectangularRegion_IsItsBoundingBox()
     {
         var bytes = new PictBuilder().U16(10).Rect(1, 2, 3, 4).ToArray();
-        var b = BytesReader.Over(bytes);
+        var b = new ClassicMac.Core.BigEndianReader(bytes);
         Assert.Equal(new PictRect(1, 2, 3, 4), Region.Read(b).Bounds);
     }
 

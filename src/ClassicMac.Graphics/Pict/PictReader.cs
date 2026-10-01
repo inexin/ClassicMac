@@ -28,27 +28,20 @@ namespace ClassicMac.Graphics.Pict
         internal static string MacRomanString(ReadOnlySpan<byte> bytes) => MacRoman.GetString(bytes);
 
         /// <summary>
-        /// Decodes the picture read progressively from the current position of <paramref name="stream"/>, which is read
-        /// to its end and left open; the stream need not be seekable.
+        /// Decodes the picture read from the current position of <paramref name="stream"/> to its end; the stream is
+        /// left open.
         /// </summary>
-        /// <inheritdoc cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/>
+        /// <inheritdoc cref="Decode(ReadOnlyMemory{byte}, PictDecodeOptions, CancellationToken)"/>
         public static RgbaBitmap Decode(Stream stream, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default) => Read(stream, options, cancellationToken).Bitmap;
 
         /// <summary>
-        /// Decodes the picture read progressively from the current position of <paramref name="stream"/>, with its
-        /// header and metadata; the stream is read to its end and left open, and need not be seekable.
+        /// Decodes the picture read from the current position of <paramref name="stream"/> to its end, with its header
+        /// and metadata; the stream is left open.
         /// </summary>
-        /// <inheritdoc cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/>
+        /// <inheritdoc cref="Decode(ReadOnlyMemory{byte}, PictDecodeOptions, CancellationToken)"/>
         public static PictPicture Read(Stream stream, PictDecodeOptions? options = null,
-            CancellationToken cancellationToken = default)
-        {
-            ArgumentNullException.ThrowIfNull(stream);
-            var reader = new BigEndianStreamReader(stream);
-            var picture = Read(reader, options, cancellationToken);
-            reader.SkipAtMost(long.MaxValue);
-            return picture;
-        }
+            CancellationToken cancellationToken = default) => Read(new BigEndianReader(stream), options, cancellationToken);
 
         /// <summary>
         /// Decodes a picture, either bare (as stored in a <c>PICT</c> resource) or as a <c>.pict</c> file with its
@@ -61,18 +54,15 @@ namespace ClassicMac.Graphics.Pict
         /// <param name="cancellationToken">Cancels decoding between opcodes.</param>
         /// <exception cref="NotSupportedException">The picture uses an unsupported pixel format.</exception>
         /// <exception cref="EndOfStreamException">The picture data is truncated.</exception>
-        public static RgbaBitmap Decode(ReadOnlySpan<byte> data, PictDecodeOptions? options = null,
+        public static RgbaBitmap Decode(ReadOnlyMemory<byte> data, PictDecodeOptions? options = null,
             CancellationToken cancellationToken = default) => Read(data, options, cancellationToken).Bitmap;
 
-        /// <summary>Decodes a picture as <see cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/> does, with its header and metadata.</summary>
-        /// <inheritdoc cref="Decode(ReadOnlySpan{byte}, PictDecodeOptions, CancellationToken)"/>
-        public static PictPicture Read(ReadOnlySpan<byte> data, PictDecodeOptions? options = null,
-            CancellationToken cancellationToken = default)
-        {
-            return Read(BytesReader.Over(data), options, cancellationToken);
-        }
+        /// <summary>Decodes a picture as <see cref="Decode(ReadOnlyMemory{byte}, PictDecodeOptions, CancellationToken)"/> does, with its header and metadata.</summary>
+        /// <inheritdoc cref="Decode(ReadOnlyMemory{byte}, PictDecodeOptions, CancellationToken)"/>
+        public static PictPicture Read(ReadOnlyMemory<byte> data, PictDecodeOptions? options = null,
+            CancellationToken cancellationToken = default) => Read(new BigEndianReader(data), options, cancellationToken);
 
-        private static PictPicture Read(BigEndianStreamReader b, PictDecodeOptions? options, CancellationToken cancellationToken)
+        private static PictPicture Read(BigEndianReader b, PictDecodeOptions? options, CancellationToken cancellationToken)
         {
             options ??= PictDecodeOptions.Default;
             var info = PictHeader.Parse(b, out bool v1);
@@ -85,20 +75,20 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // Plays the opcodes after the header into the play state, to the end opcode or the end of the data.
-        internal static void Play(BigEndianStreamReader b, PictInfo info, bool v1, GrafPort port, PictDecodeOptions options,
+        internal static void Play(ClassicMac.Core.BigEndianReader b, PictInfo info, bool v1, GrafPort port, PictDecodeOptions options,
             CancellationToken cancellationToken)
         {
             bool macOS9 = options.QuickDraw == QuickDrawVersion.MacOS9;
             {
                 PictRect? quickTimeRect = null;           // destination of a QuickTime image drawn by the last opcode
-                while (!b.IsAtEnd)
+                while (b.Position < b.Length)
                 {
                     var justDrawnQuickTime = quickTimeRect;
                     quickTimeRect = null;
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!v1 && (b.Position & 1) == 1) // v2 opcodes are word-aligned
                         b.Skip(1);
-                    if (b.IsAtEnd) break;
+                    if (b.Position >= b.Length) break;
 
                     int op = v1 ? b.ReadByte() : b.ReadUInt16();
                     port.Version1 = v1;
@@ -128,7 +118,7 @@ namespace ClassicMac.Graphics.Pict
                         {
                             int kind = b.ReadUInt16();
                             int size = b.ReadUInt16();
-                            info.AddComment(kind, b.ReadBytes(size));
+                            info.AddComment(kind, b.ReadBytes(size).ToArray());
                             break;
                         }
                         case 0x00FF:                        // end of picture
@@ -169,22 +159,23 @@ namespace ClassicMac.Graphics.Pict
         // QuickTime writes pictures whose compressed image is followed by drawing for systems without QuickTime
         // ("QuickTime and a ... decompressor are needed"), introduced by a PnSize opcode with v = 0x00AE whose h is the
         // byte count QuickTime skips once it has drawn the image.
-        private static void SkipQuickTimeFallback(BigEndianStreamReader b)
+        private static void SkipQuickTimeFallback(ClassicMac.Core.BigEndianReader b)
         {
-            int pad = (int)(b.Position & 1);
-            Span<byte> marker = stackalloc byte[7];
-            if (b.Peek(marker) < pad + 6) return;
-            var reader = new BigEndianReader(marker[pad..]);
-            if (reader.ReadUInt16() == 0x0007 && reader.ReadUInt16() == 0x00AE)
+            int start = b.Position + (b.Position & 1);
+            if (start + 6 > b.Length) return;
+            b.Position = start;
+            if (b.ReadUInt16() == 0x0007 && b.ReadUInt16() == 0x00AE)
             {
-                b.Skip(pad + 6);
-                b.SkipAtMost(reader.ReadUInt16());
+                int skip = b.ReadUInt16();
+                b.Position = Math.Min(b.Length, b.Position + skip);
+                return;
             }
+            b.Position = start;
         }
 
         // A bitmap opcode's operands (0x90-0x93, 0x98-0x9B): the BitMap/PixMap, srcRect, dstRect, mode, the mask
         // region of the Rgn variants (odd opcodes), and the pixel data.
-        private static (PixMap pm, PictRect src, PictRect dst, int mode, Region? mask) ReadBits(BigEndianStreamReader b, int op,
+        private static (PixMap pm, PictRect src, PictRect dst, int mode, Region? mask) ReadBits(ClassicMac.Core.BigEndianReader b, int op,
             bool macOS9)
         {
             bool direct = (op & 0x0A) == 0x0A || op == 0x0092 || op == 0x0093;
@@ -199,7 +190,7 @@ namespace ClassicMac.Graphics.Pict
         // (picture space), or null when the block holds no bitmap opcode.
         private static PictRect? UncompressedQuickTime(GrafPort port, byte[] block, bool macOS9)
         {
-            var b = BytesReader.Over(block);
+            var b = new ClassicMac.Core.BigEndianReader(block);
             try
             {
                 b.ReadUInt16();                                        // version
@@ -208,7 +199,7 @@ namespace ClassicMac.Graphics.Pict
                 long matteSize = b.ReadUInt32();
                 PictRect.Read(b);                     // matte rect
                 if (matteSize > block.Length - b.Position) return null;
-                b.Skip(((b.Position + matteSize + 1) & ~1L) - b.Position);
+                b.Position = (int)((b.Position + matteSize + 1) & ~1L);
                 int op = b.ReadUInt16();
                 if (op < 0x0090 || op > 0x009B || (op > 0x0093 && op < 0x0098)) return null;
                 if (macOS9 && (op == 0x0092 || op == 0x0093)) return null;
@@ -222,7 +213,7 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // srcRect, dstRect, mode and (Rgn variants) maskRgn, which sit between a CopyBits PixMap and its PixData.
-        private static (PictRect src, PictRect dst, int mode, Region? mask) ReadCopyBitsTail(BigEndianStreamReader b, bool hasRegion)
+        private static (PictRect src, PictRect dst, int mode, Region? mask) ReadCopyBitsTail(ClassicMac.Core.BigEndianReader b, bool hasRegion)
         {
             var src = PictRect.Read(b);
             var dst = PictRect.Read(b);
@@ -234,14 +225,14 @@ namespace ClassicMac.Graphics.Pict
         // Applies the drawing and graphics-state opcodes to the port. Returns false if the opcode isn't one we
         // interpret (the caller then consumes its operands via SkipOperands). Shape blocks: rect 0x30, round rect
         // 0x40, oval 0x50, arc 0x60, poly 0x70, region 0x80; + verb, "same" variants at base + 8.
-        private static bool HandleDrawingOpcode(GrafPort port, BigEndianStreamReader b, int op, bool macOS9)
+        private static bool HandleDrawingOpcode(GrafPort port, ClassicMac.Core.BigEndianReader b, int op, bool macOS9)
         {
             switch (op)
             {
                 case 0x0001: port.SetClip(Region.Read(b)); return true;                  // ClipRgn
-                case 0x0002: port.BkPat = QuickDrawPattern.FromMono(b.ReadBytes(8)); return true;    // BkPat
-                case 0x0009: port.PnPat = QuickDrawPattern.FromMono(b.ReadBytes(8)); return true;    // PnPat
-                case 0x000A: port.FillPat = QuickDrawPattern.FromMono(b.ReadBytes(8)); return true;  // FillPat
+                case 0x0002: port.BkPat = QuickDrawPattern.FromMono(b.ReadBytes(8).ToArray()); return true;    // BkPat
+                case 0x0009: port.PnPat = QuickDrawPattern.FromMono(b.ReadBytes(8).ToArray()); return true;    // PnPat
+                case 0x000A: port.FillPat = QuickDrawPattern.FromMono(b.ReadBytes(8).ToArray()); return true;  // FillPat
                 case 0x0012: port.BkPat = QuickDrawPattern.Read(b, macOS9); return true;          // BkPixPat
                 case 0x0013: port.PnPat = QuickDrawPattern.Read(b, macOS9); return true;          // PnPixPat
                 case 0x0014: port.FillPat = QuickDrawPattern.Read(b, macOS9); return true;        // FillPixPat
@@ -276,20 +267,20 @@ namespace ClassicMac.Graphics.Pict
                 case 0x002C:                                                              // fontName
                 {
                     int length = b.ReadUInt16();
-                    var data = b.ReadBytes(length);
+                    var data = b.ReadBytes(length).ToArray();
                     if (length >= 3 && data[2] <= length - 3)
                         port.FontName((data[0] << 8) | data[1], MacRoman.GetString(data, 3, data[2]));
                     return true;
                 }
                 case 0x002D:                                                              // LineJustify
                 {
-                    var data = b.ReadBytes(b.ReadUInt16());                      // interCharSpacing, textExtra
+                    var data = b.ReadBytes(b.ReadUInt16()).ToArray();                      // interCharSpacing, textExtra
                     if (data.Length >= 4) port.LineJustify((data[0] << 24) | (data[1] << 16) | (data[2] << 8) | data[3]);
                     return true;
                 }
                 case 0x002E:                                                              // glyphState
                 {
-                    var data = b.ReadBytes(b.ReadUInt16());                      // outline preferred, preserve
+                    var data = b.ReadBytes(b.ReadUInt16()).ToArray();                      // outline preferred, preserve
                     if (data.Length >= 3)                                                 // glyph, fractional widths,
                         port.GlyphState(data[2] != 0, data.Length >= 4 && data[3] != 0);  // scaling disabled
                     return true;
@@ -312,10 +303,10 @@ namespace ClassicMac.Graphics.Pict
             return false;
         }
 
-        private static byte[] ReadText(BigEndianStreamReader b) => b.ReadBytes(b.ReadByte());
+        private static byte[] ReadText(ClassicMac.Core.BigEndianReader b) => b.ReadBytes(b.ReadByte()).ToArray();
 
         // QuickDraw Point is (v, h) - vertical first.
-        private static (int v, int h) ReadPoint(BigEndianStreamReader b)
+        private static (int v, int h) ReadPoint(ClassicMac.Core.BigEndianReader b)
         {
             int v = b.ReadInt16();
             int h = b.ReadInt16();
@@ -323,13 +314,13 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // RGBColor: three 16-bit channels (use the high byte).
-        internal static RgbaColor ReadRgb(BigEndianStreamReader b)
+        internal static RgbaColor ReadRgb(ClassicMac.Core.BigEndianReader b)
         {
             int r = b.ReadUInt16(), g = b.ReadUInt16(), bl = b.ReadUInt16();
             return new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255);
         }
 
-        private static (RgbaColor, (ushort, ushort, ushort)) ReadRgbExact(BigEndianStreamReader b)
+        private static (RgbaColor, (ushort, ushort, ushort)) ReadRgbExact(ClassicMac.Core.BigEndianReader b)
         {
             int r = b.ReadUInt16(), g = b.ReadUInt16(), bl = b.ReadUInt16();
             return (new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255), ((ushort)r, (ushort)g, (ushort)bl));
@@ -355,7 +346,7 @@ namespace ClassicMac.Graphics.Pict
 
         // A Polygon: u16 polySize + bounding Rect + (polySize - 10) / 4 Points, returned as (h, v) picture points.
         // An empty polygon (no points or an empty bounding box) draws nothing (Executor C_StdPoly).
-        private static (int h, int v)[] ReadPolygon(BigEndianStreamReader b)
+        private static (int h, int v)[] ReadPolygon(ClassicMac.Core.BigEndianReader b)
         {
             int size = b.ReadUInt16();
             var bbox = PictRect.Read(b);
@@ -372,32 +363,30 @@ namespace ClassicMac.Graphics.Pict
 
         // A QuickDraw Region or Polygon: u16 total size (including itself) + bounding Rect +
         // optional run data. We only need to skip past it.
-        private static void SkipRegion(BigEndianStreamReader b)
+        private static void SkipRegion(ClassicMac.Core.BigEndianReader b)
         {
             int size = b.ReadUInt16();
             if (size >= 2) b.Skip(size - 2);
         }
 
         // var16/var32: a u16/u32 byte-length prefix followed by that many data bytes.
-        private static void SkipVar16(BigEndianStreamReader b) => b.Skip(b.ReadUInt16());
-        private static void SkipVar32(BigEndianStreamReader b)
-        {
-            b.Skip(b.ReadUInt32());
-        }
-
-        private static byte[] ReadLengthPrefixedBytes(BigEndianStreamReader b)
+        private static void SkipVar16(ClassicMac.Core.BigEndianReader b) => b.Skip(b.ReadUInt16());
+        private static void SkipVar32(ClassicMac.Core.BigEndianReader b)
         {
             uint count = b.ReadUInt32();
-            if (count > Array.MaxLength)
-            {
-                b.SkipAtMost(count);
-                throw new EndOfStreamException();
-            }
-            return b.ReadBytes((int)count);
+            if (count > b.Remaining) throw new EndOfStreamException();
+            b.Skip((int)count);
+        }
+
+        private static byte[] ReadLengthPrefixedBytes(ClassicMac.Core.BigEndianReader b)
+        {
+            uint count = b.ReadUInt32();
+            if (count > b.Remaining) throw new EndOfStreamException();
+            return b.ReadBytes((int)count).ToArray();
         }
 
         // Text opcodes: positioning bytes, then a u8 char count, then that many chars.
-        private static void SkipText(BigEndianStreamReader b, int positionBytes)
+        private static void SkipText(ClassicMac.Core.BigEndianReader b, int positionBytes)
         {
             b.Skip(positionBytes);
             int count = b.ReadByte();
@@ -407,7 +396,7 @@ namespace ClassicMac.Graphics.Pict
         // Consumes the operands of an opcode that is not interpreted, by its size in Inside Macintosh: Imaging With
         // QuickDraw, Appendix A, Table A-2 (cross-checked with Executor's wparray, qPicstuff.cpp). Reserved opcodes
         // "for Apple use" are skipped, as QuickDraw does.
-        private static void SkipOperands(BigEndianStreamReader b, int op)
+        private static void SkipOperands(ClassicMac.Core.BigEndianReader b, int op)
         {
             switch (op)
             {

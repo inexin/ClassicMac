@@ -8,7 +8,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.Core.Tests" />
-    <InternalsVisibleTo Include="ClassicMac.Graphics" />
   </ItemGroup>
 
 </Project>

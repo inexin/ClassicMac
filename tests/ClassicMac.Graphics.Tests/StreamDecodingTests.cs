@@ -12,7 +12,7 @@ using ClassicMac.Graphics.SkiaSharp;
 
 namespace ClassicMac.Graphics.Tests;
 
-// PICT, QuickTime image files and MacPaint read progressively from streams: the same results as from bytes, from
+// PICT, QuickTime image files and MacPaint read from streams: the same results as from bytes, from
 // non-seekable streams that hand out a byte at a time, from the stream's current position, leaving it open.
 public class StreamDecodingTests
 {
@@ -119,13 +119,13 @@ public class StreamDecodingTests
     }
 
     [Fact]
-    public void A_picture_is_read_from_the_streams_position_and_its_header_alone_by_ReadInfo()
+    public void A_picture_is_read_from_the_streams_position_to_its_end()
     {
         var picture = Picture("file rgb888 144 dpi icc");
         var stream = new MemoryStream([.. "junk"u8, .. picture]) { Position = 4 };
         var info = PictHeader.ReadInfo(stream);
         Assert.Equal(144, info.HorizontalResolution);
-        Assert.Equal(4 + 512 + 2 + 8 + 4 + 26, stream.Position);                 // just past the HeaderOp
+        Assert.Equal(stream.Length, stream.Position);
 
         stream.Position = 4;
         Assert.Equal(PictReader.Decode(picture).Pixels, PictReader.Decode(stream).Pixels);
@@ -341,7 +341,7 @@ public class StreamDecodingTests
 
     [Theory]
     [MemberData(nameof(AllFormats))]
-    public void Skia_DecodeAny_probes_a_non_seekable_stream_and_replays_what_it_read(string format)
+    public void Skia_DecodeAny_reads_a_non_seekable_stream(string format)
     {
         var data = File(format);
         using var expected = PictSkia.DecodeAny(data);

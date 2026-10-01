@@ -25,10 +25,10 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A form for the resource's type, or null when there is none.</summary>
         public static ResourceForm? For(Resource resource, ResourceFork fork, ReadOptions readOptions)
         {
-            var data = ResourceDecompression.Default.GetData(resource, fork, readOptions, []).Span;
+            var data = ResourceDecompression.Default.GetData(resource, fork, readOptions, []);
             return resource.Type.ToString() switch
             {
-                "STR " => new StringForm(resource, TextResources.ReadString(data)),
+                "STR " => new StringForm(resource, TextResources.ReadString(data.Span)),
                 "STR#" => new StringListForm(resource, TextResources.ReadStringList(data)),
                 "TEXT" => new TextForm(resource, data.ToArray(), fork.Find(FourCC.FromString("styl"), resource.Id) is { } styl
                     ? (styl, ResourceDecompression.Default.GetData(styl, fork, readOptions, []).ToArray())

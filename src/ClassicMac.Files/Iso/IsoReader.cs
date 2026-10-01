@@ -121,7 +121,7 @@ namespace ClassicMac.Files.Iso
             public int GapBlocks => b[27];
             public int NameLength => b[32];
             public ReadOnlySpan<byte> RawName => b.AsSpan(33, NameLength);
-            public ReadOnlySpan<byte> Bytes => b;
+            public ReadOnlyMemory<byte> Bytes => b;
             public bool IsAssociated => (Flags & FlagAssociated) != 0;
             public bool IsHidden => (Flags & FlagHidden) != 0;
 
@@ -243,7 +243,7 @@ namespace ClassicMac.Files.Iso
                 if (!descriptor.CdI) return (record.Flags & FlagDirectory) != 0;
                 // CD-i keeps the directory bit in its system-use field.
                 var su = 33 + record.NameLength + ((record.NameLength & 1) != 0 ? 0 : 1);
-                return (record.Bytes[su + 4] & 0x80) != 0;
+                return (record.Bytes.Span[su + 4] & 0x80) != 0;
             }
 
             // A name of at most 31 bytes, cut before the version is stripped, trailing spaces trimmed; then ";digits"
@@ -317,8 +317,8 @@ namespace ClassicMac.Files.Iso
             // $0100 — so invisible, custom icon and stationery never come from 'AA'. Default TEXT/hscd.
             private (FourCC Type, FourCC Creator, Func<ushort, ushort> Flags) FinderInfoOf(Record record)
             {
-                var b = record.Bytes;
-                var reader = new BigEndianReader(b);
+                var b = record.Bytes.Span;
+                var reader = new BigEndianReader(record.Bytes);
                 var p = 0x21 + record.NameLength + ((record.NameLength & 1) != 0 ? 0 : 1);
                 if (record.NameLength + 0x21 < record.Length)
                 {

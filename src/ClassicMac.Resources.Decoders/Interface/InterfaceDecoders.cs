@@ -31,13 +31,13 @@ namespace ClassicMac.Resources.Decoders.Interface
 
         public static IEnumerable<IResourceDecoder> All(DecodeOptions options) =>
         [
-            new InterfaceDecoder(options, "ui.menu", "MENU", (d, i) => Menu(InterfaceResources.ReadMenu(i.Data.Span, d.Options, i.Diagnostics, i.Resource.ToString()))),
-            new InterfaceDecoder(options, "ui.menu-bar", "MBAR", (d, i) => MenuBar(InterfaceResources.ReadMenuBar(i.Data.Span, i.Diagnostics, i.Resource.ToString()))),
-            new InterfaceDecoder(options, "ui.window", "WIND", (d, i) => Window(InterfaceResources.ReadWindow(i.Data.Span, false, d.Options, i.Diagnostics, i.Resource.ToString()))),
-            new InterfaceDecoder(options, "ui.dialog", "DLOG", (d, i) => Window(InterfaceResources.ReadWindow(i.Data.Span, true, d.Options, i.Diagnostics, i.Resource.ToString()))),
-            new InterfaceDecoder(options, "ui.alert", "ALRT", (d, i) => Alert(InterfaceResources.ReadAlert(i.Data.Span, i.Diagnostics, i.Resource.ToString()))),
-            new InterfaceDecoder(options, "ui.dialog-items", "DITL", (d, i) => Items(InterfaceResources.ReadDialogItems(i.Data.Span, d.Options, i.Diagnostics, i.Resource.ToString()))),
-            new InterfaceDecoder(options, "ui.control", "CNTL", (d, i) => Control(InterfaceResources.ReadControl(i.Data.Span, d.Options, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.menu", "MENU", (d, i) => Menu(InterfaceResources.ReadMenu(i.Data, d.Options, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.menu-bar", "MBAR", (d, i) => MenuBar(InterfaceResources.ReadMenuBar(i.Data, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.window", "WIND", (d, i) => Window(InterfaceResources.ReadWindow(i.Data, false, d.Options, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.dialog", "DLOG", (d, i) => Window(InterfaceResources.ReadWindow(i.Data, true, d.Options, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.alert", "ALRT", (d, i) => Alert(InterfaceResources.ReadAlert(i.Data, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.dialog-items", "DITL", (d, i) => Items(InterfaceResources.ReadDialogItems(i.Data, d.Options, i.Diagnostics, i.Resource.ToString()))),
+            new InterfaceDecoder(options, "ui.control", "CNTL", (d, i) => Control(InterfaceResources.ReadControl(i.Data, d.Options, i.Diagnostics, i.Resource.ToString()))),
         ];
 
         private static byte[] Menu(MenuResource menu) => MacText.Json(w =>

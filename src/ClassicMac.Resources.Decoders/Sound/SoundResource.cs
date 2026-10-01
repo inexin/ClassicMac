@@ -133,7 +133,7 @@ namespace ClassicMac.Resources.Decoders.Sound
             var data = resource.Span;
             void Report(DiagnosticSeverity severity, string code, string message) => diagnostics.Add(new Diagnostic(severity, code, $"{source}: {message}"));
             if (data.Length < 4) return null;
-            var reader = new BigEndianReader(data);
+            var reader = new BigEndianReader(resource);
             int format = reader.ReadUInt16At(0);
             var synths = new List<SoundSynth>();
             var referenceCount = 0;
@@ -208,7 +208,7 @@ namespace ClassicMac.Resources.Decoders.Sound
                 report(DiagnosticSeverity.Error, "sound.bad-offset", $"the sound header's offset {offset} lies outside the {data.Length}-byte resource.");
                 return null;
             }
-            var h = new BigEndianReader(data[offset..]);
+            var h = new BigEndianReader(resource[offset..]);
             var samplePtr = h.ReadUInt32();
             var lengthOrChannels = h.ReadUInt32();
             var rate = h.ReadUInt32();

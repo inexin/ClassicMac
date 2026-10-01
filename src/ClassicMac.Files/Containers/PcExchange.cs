@@ -60,7 +60,7 @@ namespace ClassicMac.Files.Containers
             var records = new List<PcExchangeRecord>();
             foreach (var offset in Offsets(data.Length, clusterSize))
             {
-                if (Used(data, offset)) records.Add(Parse(data.AsSpan(offset, RecordLength)));
+                if (Used(data, offset)) records.Add(Parse(data.AsMemory(offset, RecordLength)));
             }
             return records;
         }
@@ -112,7 +112,7 @@ namespace ClassicMac.Files.Containers
                 }
             }
             var records = new List<PcExchangeRecord>(best.Count);
-            foreach (var offset in best) records.Add(Parse(data.AsSpan(offset, RecordLength)));
+            foreach (var offset in best) records.Add(Parse(data.AsMemory(offset, RecordLength)));
             return records;
         }
 
@@ -154,17 +154,17 @@ namespace ClassicMac.Files.Containers
         private static bool Plausible(ReadOnlySpan<byte> record) =>
             record[0] is >= 1 and <= 31 && record.Slice(0x50, 11).IndexOfAnyExceptInRange((byte)0x20, (byte)0x7E) < 0;
 
-        private static PcExchangeRecord Parse(ReadOnlySpan<byte> record)
+        private static PcExchangeRecord Parse(ReadOnlyMemory<byte> record)
         {
-            var nameLength = Math.Min(record[0], (byte)31);
+            var nameLength = Math.Min(record.Span[0], (byte)31);
             var reader = new BigEndianReader(record);
             return new PcExchangeRecord(
-                new MacString(record.Slice(1, nameLength)),
-                FinderInfo.Read(record.Slice(0x20, FinderInfo.Length)),
+                new MacString(record.Span.Slice(1, nameLength)),
+                FinderInfo.Read(record.Span.Slice(0x20, FinderInfo.Length)),
                 Date(reader.ReadUInt32At(0x40)),
                 Date(reader.ReadUInt32At(0x44)),
                 reader.ReadUInt32At(0x4C),
-                Encoding.Latin1.GetString(record.Slice(0x50, 11)));
+                Encoding.Latin1.GetString(record.Span.Slice(0x50, 11)));
         }
 
         private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);

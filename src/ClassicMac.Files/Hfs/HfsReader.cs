@@ -302,7 +302,7 @@ namespace ClassicMac.Files.Hfs
                 var ranges = new List<(long, long)>();
                 long covered = 0;
                 int expectedFileAllocationBlock = 0;
-                void Add(ReadOnlySpan<byte> record)
+                void Add(ReadOnlyMemory<byte> record)
                 {
                     var reader = new BigEndianReader(record);
                     for (var i = 0; i < 3; i++)
@@ -464,27 +464,28 @@ namespace ClassicMac.Files.Hfs
                         context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-map",
                             $"Node {node} of the {name} tree is marked free in its node map.");
                     var bytes = Node(tree, node);
+                    var nodeReader = new BigEndianReader(bytes);
                     if ((sbyte)bytes[8] != -1 || bytes[9] != 1)
                     {
                         context.Report(DiagnosticSeverity.Error, "hfs.not-leaf",
                             $"Node {node} of the {name} tree is linked as a leaf but has type {(sbyte)bytes[8]} and height {bytes[9]}; stopped.");
                         yield break;
                     }
-                    uint backwardLink = ReadUInt32(bytes, 4);
+                    uint backwardLink = nodeReader.ReadUInt32At(4);
                     if (backwardLink != previousLeaf)
                         context.Report(DiagnosticSeverity.Warning, "hfs.bad-link",
                             $"Leaf node {node} of the {name} tree links backward to {backwardLink}; expected {previousLeaf}.");
                     lastLeaf = node;
                     previousLeaf = node;
-                    int records = ReadUInt16(bytes, 10);
+                    int records = nodeReader.ReadUInt16At(10);
                     leafRecordCount += checked((uint)records);
                     for (var i = 0; i < records; i++)
                     {
                         var at = NodeSize - 2 * (i + 1);
                         var next = NodeSize - 2 * (i + 2);
                         if (next < 14) break;
-                        int start = ReadUInt16(bytes, at);
-                        int end = ReadUInt16(bytes, next);
+                        int start = nodeReader.ReadUInt16At(at);
+                        int end = nodeReader.ReadUInt16At(next);
                         if (start < 14 || end > next || end <= start)
                         {
                             context.Report(DiagnosticSeverity.Error, "hfs.bad-record-offset",
@@ -511,7 +512,7 @@ namespace ClassicMac.Files.Hfs
                         }
                         yield return (key, bytes[dataStart..end]);
                     }
-                    node = ReadUInt32(bytes, 0);
+                    node = nodeReader.ReadUInt32At(0);
                 }
 
                 if (lastLeaf != expectedLastLeaf)
@@ -556,7 +557,7 @@ namespace ClassicMac.Files.Hfs
                     mapNodeOrder.Add(nextMapNode);
 
                     int offset = checked((int)nextMapNode * NodeSize);
-                    var mapNode = new BigEndianReader(tree.AsSpan(offset, NodeSize));
+                    var mapNode = new BigEndianReader(tree.AsMemory(offset, NodeSize));
                     if (mapNode.ReadByteAt(8) != 2 || mapNode.ReadByteAt(9) != 0 ||
                         mapNode.ReadUInt16At(10) != 1 ||
                         mapNode.ReadUInt16At(12) != 0 ||
@@ -657,11 +658,6 @@ namespace ClassicMac.Files.Hfs
             }
 
             private static byte[] Node(byte[] tree, long index) => tree.AsSpan((int)(index * NodeSize), NodeSize).ToArray();
-
-            // Reads from a node in the leaf walk, which yields between reads and so cannot keep a reader.
-            private static ushort ReadUInt16(byte[] node, int offset) => new BigEndianReader(node).ReadUInt16At(offset);
-
-            private static uint ReadUInt32(byte[] node, int offset) => new BigEndianReader(node).ReadUInt32At(offset);
 
             private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
         }

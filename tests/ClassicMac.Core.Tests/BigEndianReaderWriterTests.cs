@@ -80,7 +80,7 @@ public class BigEndianReaderWriterTests
     [Fact]
     public void Read_sub_reader_is_bounded_and_advances_the_parent()
     {
-        var parent = new BigEndianReader([0xAA, 0x01, 0x02, 0x03, 0x04, 0xBB]);
+        var parent = new BigEndianReader(new byte[] { 0xAA, 0x01, 0x02, 0x03, 0x04, 0xBB });
         Assert.Equal((byte)0xAA, parent.ReadByte());
 
         var section = parent.ReadSubReader(4);
@@ -102,7 +102,7 @@ public class BigEndianReaderWriterTests
     [Fact]
     public void Failed_sub_reader_creation_leaves_parent_cursor_unchanged()
     {
-        var reader = new BigEndianReader([0x12, 0x34]) { Position = 1 };
+        var reader = new BigEndianReader(new byte[] { 0x12, 0x34 }) { Position = 1 };
 
         bool threw = false;
         try { reader.ReadSubReader(2); }
@@ -166,7 +166,7 @@ public class BigEndianReaderWriterTests
     [Fact]
     public void Throwing_reads_and_writes_report_exhausted_spans()
     {
-        var reader = new BigEndianReader([0x12]);
+        var reader = new BigEndianReader(new byte[] { 0x12 });
         bool readThrew = false;
         try { reader.ReadUInt16(); }
         catch (EndOfStreamException) { readThrew = true; }
@@ -221,5 +221,30 @@ public class BigEndianReaderWriterTests
         Assert.False(writer.TryWriteMacRectAt(1, new MacRect(1, 2, 3, 4)));
         Assert.Equal(5, writer.Position);
         Assert.Equal(new byte[] { 0xAA, 1, 2, 3, 4, 0xBB }, destination);
+    }
+
+    [Fact]
+    public void A_reader_over_a_stream_reads_from_its_position_to_its_end_and_leaves_it_open()
+    {
+        var stream = new MemoryStream([9, 9, 0x12, 0x34, 0x56]) { Position = 2 };
+        var reader = new BigEndianReader(stream);
+        Assert.Equal(3, reader.Length);
+        Assert.Equal(0x1234, reader.ReadUInt16());
+        Assert.Equal(new byte[] { 0x12, 0x34, 0x56 }, reader.Source.ToArray());
+        Assert.Equal(5, stream.Position);
+        Assert.True(stream.CanRead);
+        Assert.Throws<ArgumentNullException>(() => new BigEndianReader((Stream)null!));
+    }
+
+    [Fact]
+    public void A_reader_works_across_iterators_and_as_a_field()
+    {
+        static IEnumerable<ushort> Words(BigEndianReader reader)
+        {
+            while (reader.Remaining >= 2) yield return reader.ReadUInt16();
+        }
+        Assert.Equal(new ushort[] { 1, 2 }, Words(new BigEndianReader(new byte[] { 0, 1, 0, 2, 9 })));
+        var sub = new BigEndianReader(new byte[] { 1, 2, 3, 4 }).ReadSubReader(2);
+        Assert.Equal(new byte[] { 1, 2 }, sub.Source.ToArray());
     }
 }

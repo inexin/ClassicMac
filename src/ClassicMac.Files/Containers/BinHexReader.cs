@@ -70,18 +70,18 @@ namespace ClassicMac.Files.Containers
                 context.Report(DiagnosticSeverity.Info, "binhex.version",
                     $"The header's version byte is {d[1 + nameLength]}, not 0.");
             }
-            var fields = d[header..];
+            var fields = decoded.AsMemory(header);
             var reader = new BigEndianReader(fields);
             var finderInfo = new FinderInfo
             {
-                Type = new FourCC(fields[..4]),
-                Creator = new FourCC(fields[4..8]),
+                Type = new FourCC(fields.Span[..4]),
+                Creator = new FourCC(fields.Span[4..8]),
                 Flags = (FinderFlags)reader.ReadUInt16At(8),
             };
             long dataLength = reader.ReadUInt32At(10);
             long resourceLength = reader.ReadUInt32At(14);
             var headerEnd = header + 18;
-            CheckCrc(d[..headerEnd], d, headerEnd, "header", context);
+            CheckCrc(d[..headerEnd], decoded, headerEnd, "header", context);
 
             var dataStart = headerEnd + 2;
             var data = Fork(decoded, dataStart, dataLength, "data", context);
@@ -182,7 +182,7 @@ namespace ClassicMac.Files.Containers
             return ForkData.FromBytes(decoded.AsMemory((int)start, (int)length));
         }
 
-        private static void CheckCrc(ReadOnlySpan<byte> covered, ReadOnlySpan<byte> all, long at, string what, ContainerContext context)
+        private static void CheckCrc(ReadOnlySpan<byte> covered, ReadOnlyMemory<byte> all, long at, string what, ContainerContext context)
         {
             if (at + 2 > all.Length)
             {

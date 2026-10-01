@@ -54,7 +54,7 @@ namespace ClassicMac.Resources.Decoders.Text
         /// Reads <paramref name="text"/> in the options' encoding and styles it with <paramref name="styl"/> (a
         /// <c>StScrpRec</c>); with no style data, one plain run in Geneva 12.
         /// </summary>
-        public static StyledText Read(ReadOnlySpan<byte> text, ReadOnlySpan<byte> styl, DecodeOptions? options = null)
+        public static StyledText Read(ReadOnlySpan<byte> text, ReadOnlyMemory<byte> styl, DecodeOptions? options = null)
         {
             var decoded = MacText.Decode(text, options ?? DecodeOptions.Default);
             var complete = true;

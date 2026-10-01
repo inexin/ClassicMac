@@ -43,7 +43,7 @@ public class FontTests
         var diagnostics = new List<Diagnostic>();
         var data = Sample();
 
-        var font = BitmapFont.Read(data.AsSpan(0, data.Length - 6), diagnostics);
+        var font = BitmapFont.Read(data.AsMemory(0, data.Length - 6), diagnostics);
 
         Assert.Equal(["font.short"], diagnostics.Select(d => d.Code));
         Assert.NotNull(font.Glyph('A'));
@@ -61,7 +61,7 @@ public class FontTests
         gap.AsSpan(16).Write16(((gap[16] << 8) | gap[17]) + 2);
         var diagnostics = new List<Diagnostic>();
         var gapReader = new BigEndianReader(gap);
-        Assert.Equal(3, BitmapFont.Read(ref gapReader, diagnostics, rom: false).Locations[1]);
+        Assert.Equal(3, BitmapFont.Read(gapReader, diagnostics, rom: false).Locations[1]);
         Assert.Equal(["font.location-table"], diagnostics.Select(d => d.Code));
         Assert.Equal(0x7F7F, ReadRom(gap).Locations[0]);
 
@@ -80,7 +80,7 @@ public class FontTests
     private static BitmapFont ReadRom(byte[] data)
     {
         var reader = new BigEndianReader(data);
-        return BitmapFont.Read(ref reader, null, rom: true);
+        return BitmapFont.Read(reader, null, rom: true);
     }
 
     private static string Pixels(byte[] pixels) => string.Concat(pixels.Select(p => p == 0 ? '.' : '#'));
@@ -132,7 +132,7 @@ public class FontTests
         var prefixed = new byte[sfnt.Length + 2];
         sfnt.CopyTo(prefixed, 2);
         var reader = new ClassicMac.Core.BigEndianReader(prefixed) { Position = 2 };
-        var fromReader = OutlineFont.Read(ref reader);
+        var fromReader = OutlineFont.Read(reader);
 
         Assert.True(font.IsTrueType);
         Assert.Equal(["glyf", "name"], font.Tables.Select(t => t.Tag.ToString()));
@@ -155,7 +155,7 @@ public class FontTests
         writer.WriteUInt16(0x9ABC);
         var reader = new ClassicMac.Core.BigEndianReader(data);
 
-        var entries = FontColorTable.Read(ref reader);
+        var entries = FontColorTable.Read(reader);
 
         Assert.Equal([new FontColorEntry(7, 0x1234, 0x5678, 0x9ABC)], entries);
         Assert.Equal(data.Length, reader.Position);

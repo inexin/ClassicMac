@@ -36,7 +36,7 @@ namespace ClassicMac.Graphics.Pict
                 QuickDraw = drawing.Version, ScreenDepth = drawing.ScreenDepth, Fonts = drawing.Fonts, TextFallback = drawing.TextFallback,
                 HiliteColor = drawing.HiliteColor?.ToRgba(), PreserveAlpha = drawing.PreserveAlpha, ImageCodec = imageCodec,
             };
-            var reader = BytesReader.Over(picture);
+            var reader = new ClassicMac.Core.BigEndianReader(picture);
             var info = PictHeader.Parse(reader, out bool v1);
             var saved = port.Save();
             try

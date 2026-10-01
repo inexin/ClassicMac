@@ -10,7 +10,7 @@ namespace ClassicMac.Files.Compression
     internal static class DartRle
     {
         /// <summary>Decompresses into <paramref name="output"/> until it is full; false if the input runs out first or a run passes the end.</summary>
-        public static bool Decompress(ReadOnlySpan<byte> input, Span<byte> output, out int written)
+        public static bool Decompress(ReadOnlyMemory<byte> input, Span<byte> output, out int written)
         {
             written = 0;
             var reader = new BigEndianReader(input);

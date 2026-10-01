@@ -34,7 +34,7 @@ namespace ClassicMac.Resources.Decoders.Sound
             var f = sound.Format;
             if (Pcm.ToWav(sound) is { } pcm) return new WavSamples(pcm, Pcm.BytesPerSample(f, sound.SampleSize), Pcm.IsFloat(f));
             if (f == Mace3 || f == Mace6) return new WavSamples(Mace.Decode(sound.Data.Span, sound.Channels, f == Mace6), 1, false);
-            if (f == Ima4) return new WavSamples(Little(Sound.Ima4.Decode(sound.Data.Span, sound.Channels)), 2, false);
+            if (f == Ima4) return new WavSamples(Little(Sound.Ima4.Decode(sound.Data, sound.Channels)), 2, false);
             if (f == MuLaw)
             {
                 var data = sound.Data.Span;

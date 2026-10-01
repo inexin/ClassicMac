@@ -27,7 +27,7 @@ namespace ClassicMac.Resources.Decoders.Sound
         private static readonly sbyte[] IndexChange = [-1, -1, -1, -1, 2, 4, 6, 8, -1, -1, -1, -1, 2, 4, 6, 8];
 
         /// <summary>Expands <paramref name="data"/> to 16-bit samples, channels interleaved.</summary>
-        public static short[] Decode(ReadOnlySpan<byte> data, int channels)
+        public static short[] Decode(ReadOnlyMemory<byte> data, int channels)
         {
             var packets = data.Length / (PacketBytes * channels);
             var output = new short[packets * PacketSamples * channels];
@@ -49,10 +49,11 @@ namespace ClassicMac.Resources.Decoders.Sound
                         }
                     }
                     var at = p * PacketSamples * channels + c;
+                    var bytes = packet.Span;
                     for (var i = 2; i < PacketBytes; i++)
                     {
-                        Nibble(packet[i] & 0x0F, ref predictor, ref index, output, ref at, channels);
-                        Nibble(packet[i] >> 4, ref predictor, ref index, output, ref at, channels);
+                        Nibble(bytes[i] & 0x0F, ref predictor, ref index, output, ref at, channels);
+                        Nibble(bytes[i] >> 4, ref predictor, ref index, output, ref at, channels);
                     }
                 }
             }

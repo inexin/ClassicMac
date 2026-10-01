@@ -102,7 +102,7 @@ namespace ClassicMac.Resources.Decoders.Interface
     public static class InterfaceResources
     {
         /// <summary>A <c>'MENU'</c>: ID, width, height, MDEF ID, a filler word, the enable flags, the title, then items until a 0 length byte.</summary>
-        public static MenuResource ReadMenu(ReadOnlySpan<byte> data, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
+        public static MenuResource ReadMenu(ReadOnlyMemory<byte> data, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
         {
             var r = new Reader(data);
             var id = r.I16();
@@ -127,7 +127,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         }
 
         /// <summary>An <c>'MBAR'</c>: a count, then that many menu IDs.</summary>
-        public static IReadOnlyList<short> ReadMenuBar(ReadOnlySpan<byte> data, ICollection<Diagnostic> diagnostics, string what)
+        public static IReadOnlyList<short> ReadMenuBar(ReadOnlyMemory<byte> data, ICollection<Diagnostic> diagnostics, string what)
         {
             var r = new Reader(data);
             var count = r.I16();
@@ -146,7 +146,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         /// close box, a filler byte, reference value, (a dialog's item list ID,) title, then the positioning word at the
         /// next even offset when there is room for it.
         /// </summary>
-        public static WindowTemplate ReadWindow(ReadOnlySpan<byte> data, bool dialog, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
+        public static WindowTemplate ReadWindow(ReadOnlyMemory<byte> data, bool dialog, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
         {
             var r = new Reader(data);
             var bounds = r.Rect();
@@ -164,7 +164,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         }
 
         /// <summary>An <c>'ALRT'</c>: bounds, item list ID, stages word, then the positioning word when there is room for it.</summary>
-        public static AlertTemplate ReadAlert(ReadOnlySpan<byte> data, ICollection<Diagnostic> diagnostics, string what)
+        public static AlertTemplate ReadAlert(ReadOnlyMemory<byte> data, ICollection<Diagnostic> diagnostics, string what)
         {
             var r = new Reader(data);
             var bounds = r.Rect();
@@ -179,7 +179,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         /// A <c>'DITL'</c>: the item count less 1, then per item a placeholder long, its rectangle, its type (bit 7 disables
         /// it), its data's length and the data, padded to an even length.
         /// </summary>
-        public static IReadOnlyList<DialogItem> ReadDialogItems(ReadOnlySpan<byte> data, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
+        public static IReadOnlyList<DialogItem> ReadDialogItems(ReadOnlyMemory<byte> data, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
         {
             var r = new Reader(data);
             var count = r.I16() + 1;
@@ -194,7 +194,7 @@ namespace ClassicMac.Resources.Decoders.Interface
                 if (r.Short) break;
                 if ((length & 1) != 0 && r.Remaining > 0) r.Skip(1);
                 var kind = type & 0x7F;
-                string? text = kind is 4 or 5 or 6 or 8 or 16 ? MacText.Decode(itemData, options) : null;
+                string? text = kind is 4 or 5 or 6 or 8 or 16 ? MacText.Decode(itemData.Span, options) : null;
                 var itemReader = new BigEndianReader(itemData);
                 short? resource = kind is 7 or 32 or 64 && itemData.Length >= 2 ? itemReader.ReadInt16At(0)
                     : kind == 1 && itemData.Length >= 4 ? itemReader.ReadInt16At(2) : null;
@@ -205,7 +205,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         }
 
         /// <summary>A <c>'CNTL'</c>: bounds, value, visible, a filler byte, maximum, minimum, definition ID, reference value, title.</summary>
-        public static ControlTemplate ReadControl(ReadOnlySpan<byte> data, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
+        public static ControlTemplate ReadControl(ReadOnlyMemory<byte> data, DecodeOptions options, ICollection<Diagnostic> diagnostics, string what)
         {
             var r = new Reader(data);
             var bounds = r.Rect();
@@ -227,16 +227,17 @@ namespace ClassicMac.Resources.Decoders.Interface
         }
 
         // Big-endian fields in order; reading past the end gives zeros and sets Short.
-        private ref struct Reader(ReadOnlySpan<byte> data)
+        private ref struct Reader(ReadOnlyMemory<byte> data)
         {
-            private readonly ReadOnlySpan<byte> data = data;
+            private readonly ReadOnlyMemory<byte> data = data;
+            private readonly BigEndianReader reader = new(data);
             private int at;
 
             public bool Short { get; set; }
 
             public readonly int Remaining => Math.Max(0, data.Length - at);
 
-            public readonly byte Peek() => at < data.Length ? data[at] : (byte)0;
+            public readonly byte Peek() => at < data.Length ? data.Span[at] : (byte)0;
 
             private bool Take(int n)
             {
@@ -251,12 +252,12 @@ namespace ClassicMac.Resources.Decoders.Interface
                 if (Take(n)) at += n;
             }
 
-            public byte U8() => Take(1) ? data[at++] : (byte)0;
+            public byte U8() => Take(1) ? data.Span[at++] : (byte)0;
 
             public short I16()
             {
                 if (!Take(2)) return 0;
-                var value = new BigEndianReader(data).ReadInt16At(at);
+                var value = reader.ReadInt16At(at);
                 at += 2;
                 return value;
             }
@@ -264,14 +265,14 @@ namespace ClassicMac.Resources.Decoders.Interface
             public int I32()
             {
                 if (!Take(4)) return 0;
-                var value = new BigEndianReader(data).ReadInt32At(at);
+                var value = reader.ReadInt32At(at);
                 at += 4;
                 return value;
             }
 
             public MacRect Rect() => new(I16(), I16(), I16(), I16());
 
-            public ReadOnlySpan<byte> Bytes(int n)
+            public ReadOnlyMemory<byte> Bytes(int n)
             {
                 var available = Math.Min(n, Remaining);
                 var bytes = data.Slice(at, available);
@@ -283,8 +284,8 @@ namespace ClassicMac.Resources.Decoders.Interface
             public string Pascal(DecodeOptions options)
             {
                 if (!Take(1)) return "";
-                var length = data[at++];
-                return MacText.Decode(Bytes(length), options);
+                var length = data.Span[at++];
+                return MacText.Decode(Bytes(length).Span, options);
             }
 
             // A trailing word, at an even offset when aligned; null when the data ends first.
@@ -292,7 +293,7 @@ namespace ClassicMac.Resources.Decoders.Interface
             {
                 if (Short) return null;
                 var offset = align ? (at + 1) & ~1 : at;
-                if (!new BigEndianReader(data).TryReadUInt16At(offset, out var word)) return null;
+                if (!reader.TryReadUInt16At(offset, out var word)) return null;
                 at = offset + 2;
                 return word;
             }

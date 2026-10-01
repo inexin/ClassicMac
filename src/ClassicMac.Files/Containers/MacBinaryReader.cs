@@ -41,19 +41,19 @@ namespace ClassicMac.Files.Containers
         // lengths within $7FFFFF; then the CRC decides II/III against I, and 'mBIN' decides III against II. MacBinary I
         // has no CRC, so data that happens to start with zeros would pass; it must also have exactly the length its
         // header gives (forks padded to 128, the last one possibly not).
-        internal static int Detect(ReadOnlySpan<byte> header, long totalLength)
+        internal static int Detect(ReadOnlyMemory<byte> header, long totalLength)
         {
             if (header.Length < HeaderLength) return 0;
-            if (header[0] != 0 || header[74] != 0 || header[82] != 0) return 0;
-            if (header[1] is < 1 or > 63) return 0;
-            if (header.Slice(2, header[1]).IndexOfAny((byte)':', (byte)0) >= 0) return 0;
+            if (header.Span[0] != 0 || header.Span[74] != 0 || header.Span[82] != 0) return 0;
+            if (header.Span[1] is < 1 or > 63) return 0;
+            if (header.Span.Slice(2, header.Span[1]).IndexOfAny((byte)':', (byte)0) >= 0) return 0;
             var reader = new BigEndianReader(header);
             long dataLength = reader.ReadUInt32At(83);
             long resourceLength = reader.ReadUInt32At(87);
             if (dataLength > MaxForkLength || resourceLength > MaxForkLength) return 0;
-            if (Crc16.Compute(header[..124]) == reader.ReadUInt16At(124))
+            if (Crc16.Compute(header.Span[..124]) == reader.ReadUInt16At(124))
                 return reader.ReadUInt32At(102) == MBin ? 3 : 2;
-            if (header[99..126].IndexOfAnyExcept((byte)0) >= 0) return 0;
+            if (header.Span[99..126].IndexOfAnyExcept((byte)0) >= 0) return 0;
             var padded = HeaderLength + Padded(dataLength) + Padded(resourceLength);
             var lastUnpadded = resourceLength > 0
                 ? HeaderLength + Padded(dataLength) + resourceLength

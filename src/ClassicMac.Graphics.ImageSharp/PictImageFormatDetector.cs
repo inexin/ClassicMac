@@ -28,7 +28,7 @@ namespace ClassicMac.Graphics.ImageSharp
 
         public bool TryDetectFormat(ReadOnlySpan<byte> header, [NotNullWhen(true)] out IImageFormat? format)
         {
-            bool match = header.Length >= HeaderSize && (file ? PictHeader.IsPictFile(header) : PictHeader.IsPicture(header));
+            bool match = header.Length >= HeaderSize && (file ? PictHeader.IsPictFile(header.ToArray()) : PictHeader.IsPicture(header.ToArray()));
             format = match ? PictFormat.Instance : null;
             return match;
         }

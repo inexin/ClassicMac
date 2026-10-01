@@ -2,11 +2,14 @@
 
 ## Unreleased
 
-- Graphics: PICT pictures, QuickTime image files and MacPaint documents decode progressively from streams, seekable or
-  not, from the current position and leaving the stream open; only the decoded bitmap is held in memory.
-  `BigEndianStreamReader` in Core; `QuickTimeImageFile.Read(Stream)` returns a `QuickTimeImageResult` with the
-  description and ICC profile; `PictHeader.ReadInfo(Stream)` reads only the header; `PictSkia.DecodeAny(Stream)`.
-  The ImageSharp decoders read their streams directly.
+- Core: `BigEndianReader` is a class over `ReadOnlyMemory<byte>`, with a constructor that reads a stream from its
+  current position to its end; readers are passed without `ref` and can be fields. Every big-endian read in the
+  libraries goes through it, and the methods that read with it take `ReadOnlyMemory<byte>` instead of
+  `ReadOnlySpan<byte>`.
+- Graphics: PICT pictures, QuickTime image files and MacPaint documents decode from streams, seekable or not, from the
+  current position to the end, leaving the stream open. `QuickTimeImageFile.Read(Stream)` returns a
+  `QuickTimeImageResult` with the description and ICC profile; `PictSkia.DecodeAny(Stream)`. The ImageSharp decoders
+  read their streams directly.
 - Edit tab: "Edit with template" shows a resource that has a typed form through its `TMPL` instead, when one is at hand.
 - Hex editing in the hex view: Edit Bytes types hex digits over or into a resource's bytes, with Delete, Backspace and
   cursor keys, applied as one undoable edit.

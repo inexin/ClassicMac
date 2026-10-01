@@ -161,7 +161,7 @@ namespace ClassicMac.Resources.Export
         private static short? Dcmp(Resource resource)
         {
             if ((resource.Attributes & ResourceAttributes.Compressed) == 0) return null;
-            return CompressedResourceHeader.TryRead(resource.GetData().Span, out var header) && header.IsCompressed
+            return CompressedResourceHeader.TryRead(resource.GetData(), out var header) && header.IsCompressed
                 ? header.DecompressorId
                 : null;
         }

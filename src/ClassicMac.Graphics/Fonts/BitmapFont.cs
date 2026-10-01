@@ -93,16 +93,16 @@ namespace ClassicMac.Graphics.Fonts
         /// Reads a strike. Throws <see cref="InvalidDataException"/> under 26 bytes (the header). Tables that run past the
         /// data are read as far as they go and reported (<c>font.short</c>).
         /// </summary>
-        public static BitmapFont Read(ReadOnlySpan<byte> input, ICollection<Diagnostic>? diagnostics = null)
+        public static BitmapFont Read(ReadOnlyMemory<byte> input, ICollection<Diagnostic>? diagnostics = null)
         {
             var reader = new BigEndianReader(input);
-            return Read(ref reader, diagnostics, rom: false);
+            return Read(reader, diagnostics, rom: false);
         }
 
         // Reads a strike the way Mac OS 9 does, or with rom the way the 68k ROM's Font Manager and text drawing do: the
         // depth code in fontType bits 2-4 (Mac OS 9: 2-3), rowWords' top bit not masked (a strike with it set is
         // rejected), and the location table right after the strike (Mac OS 9: just before the offset/width table).
-        internal static BitmapFont Read(ref BigEndianReader input, ICollection<Diagnostic>? diagnostics, bool rom)
+        internal static BitmapFont Read(BigEndianReader input, ICollection<Diagnostic>? diagnostics, bool rom)
         {
             var fields = input.ReadSubReader(input.Remaining);
             if (fields.Length < 26) throw new InvalidDataException($"A font strike needs a 26-byte header; this is {fields.Length} bytes.");
@@ -144,7 +144,7 @@ namespace ClassicMac.Graphics.Fonts
             var widths = hasWidthTable ? after : -1;
             if (hasWidthTable) after += 2L * entries;
             var heights = hasHeightTable ? after : -1;
-            var rawOffsetWidths = RawOffsetWidthWords(ref fields, offsetWidths, byte.MaxValue + 1);
+            var rawOffsetWidths = RawOffsetWidthWords(fields, offsetWidths, byte.MaxValue + 1);
             var font = new BitmapFont(strike, rawOffsetWidths)
             {
                 FontType = fontType,
@@ -163,14 +163,14 @@ namespace ClassicMac.Graphics.Fonts
 
             for (var i = 0; i < entries - 1; i++)
             {
-                var ow = Entry(ref fields, offsetWidths, i, ref shortData);
+                var ow = Entry(fields, offsetWidths, i, ref shortData);
                 if (ow is null or -1) continue; // missing: drawn as the missing symbol
-                var left = (ushort)(Entry(ref fields, locations, i, ref shortData) ?? 0);
-                var right = (ushort)(Entry(ref fields, locations, i + 1, ref shortData) ?? left);
+                var left = (ushort)(Entry(fields, locations, i, ref shortData) ?? 0);
+                var right = (ushort)(Entry(fields, locations, i + 1, ref shortData) ?? left);
                 var character = i == entries - 2 ? -1 : firstChar + i;
-                double? fractional = widths >= 0 && Entry(ref fields, widths, i, ref shortData) is { } w ? (ushort)w / 256.0 : null;
+                double? fractional = widths >= 0 && Entry(fields, widths, i, ref shortData) is { } w ? (ushort)w / 256.0 : null;
                 int top = 0, rows = rectHeight;
-                if (heights >= 0 && Entry(ref fields, heights, i, ref shortData) is { } h)
+                if (heights >= 0 && Entry(fields, heights, i, ref shortData) is { } h)
                 {
                     top = (ushort)h >> 8;
                     rows = h & 0xFF;
@@ -182,14 +182,14 @@ namespace ClassicMac.Graphics.Fonts
 
             // The raw tables for the renderer, words past the data read as the text code finds them (0; −1 for a
             // missing offset/width entry).
-            font.Locations = Words(ref fields, locations, entries, unsigned: true);
-            font.OffsetWidths = Words(ref fields, offsetWidths, entries, unsigned: false);
-            if (widths >= 0) font.FractionalWidths = Words(ref fields, widths, entries, unsigned: true);
-            if (heights >= 0) font.Heights = Words(ref fields, heights, entries, unsigned: true);
+            font.Locations = Words(fields, locations, entries, unsigned: true);
+            font.OffsetWidths = Words(fields, offsetWidths, entries, unsigned: false);
+            if (widths >= 0) font.FractionalWidths = Words(fields, widths, entries, unsigned: true);
+            if (heights >= 0) font.Heights = Words(fields, heights, entries, unsigned: true);
             return font;
         }
 
-        private static int? Entry(ref BigEndianReader reader, long offset, int index, ref bool shortData)
+        private static int? Entry(BigEndianReader reader, long offset, int index, ref bool shortData)
         {
             var at = offset + 2L * index;
             if (at < 0 || at + 2 > reader.Length)
@@ -200,7 +200,7 @@ namespace ClassicMac.Graphics.Fonts
             return reader.ReadInt16At((int)at);
         }
 
-        private static int[] Words(ref BigEndianReader reader, long offset, int count, bool unsigned)
+        private static int[] Words(BigEndianReader reader, long offset, int count, bool unsigned)
         {
             var result = new int[Math.Max(0, count)];
             for (var i = 0; i < result.Length; i++)
@@ -217,7 +217,7 @@ namespace ClassicMac.Graphics.Fonts
             return result;
         }
 
-        private static int[] RawOffsetWidthWords(ref BigEndianReader reader, long offset, int count)
+        private static int[] RawOffsetWidthWords(BigEndianReader reader, long offset, int count)
         {
             var result = new int[count];
             for (var i = 0; i < result.Length; i++)

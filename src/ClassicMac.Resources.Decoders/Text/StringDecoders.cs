@@ -51,8 +51,7 @@ namespace ClassicMac.Resources.Decoders.Text
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
-            var data = input.Data.Span;
-            var reader = new BigEndianReader(data);
+            var reader = new BigEndianReader(input.Data);
             if (!reader.TryReadUInt16(out ushort count)) return [];
             var strings = new List<string>(count);
             for (var i = 0; i < count; i++)

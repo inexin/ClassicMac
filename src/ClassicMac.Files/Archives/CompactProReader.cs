@@ -37,7 +37,7 @@ public sealed class CompactProReader : IContainerReader
             stream.Seek(4, SeekOrigin.Begin);
             Span<byte> offsetBytes = stackalloc byte[4];
             stream.ReadExactly(offsetBytes);
-            uint offset = new BigEndianReader(offsetBytes).ReadUInt32();
+            uint offset = new BigEndianReader(offsetBytes.ToArray()).ReadUInt32();
             if (offset < ArchiveHeaderLength || offset > input.Length - 7 || offset > int.MaxValue) return false;
             CompactProDirectory directory = ReadDirectory(stream, input.Length, (int)offset);
             return directory.StoredCrc == directory.ComputedCrc;
@@ -95,8 +95,8 @@ public sealed class CompactProReader : IContainerReader
                 continue;
             }
 
-            ReadOnlySpan<byte> metadata = entry.Metadata;
-            int volume = metadata[0];
+            ReadOnlyMemory<byte> metadata = entry.Metadata;
+            int volume = metadata.Span[0];
             byte[] dataVolume = archive;
             int minimumDataOffset = directory.TableEnd;
             if (volume != archive[1])
@@ -133,8 +133,8 @@ public sealed class CompactProReader : IContainerReader
             int fileOffset = (int)fileOffsetRaw;
             if (fileOffset < minimumDataOffset)
                 throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
-            FourCC type = new(metadata.Slice(5, 4));
-            FourCC creator = new(metadata.Slice(9, 4));
+            FourCC type = new(metadata.Span.Slice(5, 4));
+            FourCC creator = new(metadata.Span.Slice(9, 4));
             uint createdRaw = U32(metadata, 13);
             uint modifiedRaw = U32(metadata, 17);
             var finderFlags = (FinderFlags)U16(metadata, 21);
@@ -320,14 +320,14 @@ public sealed class CompactProReader : IContainerReader
         Span<byte> bytes = stackalloc byte[2];
         stream.ReadExactly(bytes);
         crc = UpdateCrc(crc, bytes);
-        return new BigEndianReader(bytes).ReadUInt16();
+        return new BigEndianReader(bytes.ToArray()).ReadUInt16();
     }
 
     private static uint ReadU32(Stream stream)
     {
         Span<byte> bytes = stackalloc byte[4];
         stream.ReadExactly(bytes);
-        return new BigEndianReader(bytes).ReadUInt32();
+        return new BigEndianReader(bytes.ToArray()).ReadUInt32();
     }
 
     private static int ReadByteAndUpdate(Stream stream, ref uint crc)
@@ -371,9 +371,9 @@ public sealed class CompactProReader : IContainerReader
         return (int)value;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
+    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
 
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
+    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private static void Require(byte[] archive, int offset, int length, string what)
     {

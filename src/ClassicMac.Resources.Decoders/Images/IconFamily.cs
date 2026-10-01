@@ -65,10 +65,10 @@ namespace ClassicMac.Resources.Decoders.Images
         /// 32-bit member of its raw size is raw, else compressed.
         /// </summary>
         /// <exception cref="InvalidDataException">An element size under 1, or a compressed <c>it32</c> whose format word is not 0: the whole family fails.</exception>
-        public static IconFamily ReadIcns(ReadOnlySpan<byte> data, ICollection<Diagnostic>? diagnostics = null)
+        public static IconFamily ReadIcns(ReadOnlyMemory<byte> data, ICollection<Diagnostic>? diagnostics = null)
         {
             var family = new IconFamily();
-            if (data.Length < 8 || !FamilyTypes.Contains(new FourCC(data[..4]).ToString()))
+            if (data.Length < 8 || !FamilyTypes.Contains(new FourCC(data.Span[..4]).ToString()))
             {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "icon.family-header", "The data is not an icon family ('icns')."));
                 return family;
@@ -89,7 +89,7 @@ namespace ClassicMac.Resources.Decoders.Images
                 var size = reader.ReadUInt32At((int)at + 4);
                 if (size < 1) throw new InvalidDataException($"The icon family's '{type}' element has size {size}; the family fails (paramErr).");
                 if (at + size > length) break;                   // an element past the end is skipped
-                var payload = size >= 8 ? data.Slice((int)at + 8, (int)size - 8) : [];
+                var payload = size >= 8 ? data.Slice((int)at + 8, (int)size - 8) : ReadOnlyMemory<byte>.Empty;
                 if (MemberType(type) is { } member) family.Set(member, payload, diagnostics);
                 else if (FamilyTypes.Contains(type) && type != "icns") family.variants[type] = ReadIcns(data.Slice((int)at, (int)size), diagnostics);
                 else ignored.Add(type);
@@ -109,14 +109,14 @@ namespace ClassicMac.Resources.Decoders.Images
         public static IconFamily FromResources(Func<FourCC, short, ReadOnlyMemory<byte>?> lookup, short id, ICollection<Diagnostic>? diagnostics = null)
         {
             ArgumentNullException.ThrowIfNull(lookup);
-            if (lookup(FourCC.FromString("icns"), id) is { Length: > 0 } icns) return ReadIcns(icns.Span, diagnostics);
+            if (lookup(FourCC.FromString("icns"), id) is { Length: > 0 } icns) return ReadIcns(icns, diagnostics);
             var family = new IconFamily();
             foreach (var type in ClassicTypes)
-                if (lookup(FourCC.FromString(type), id) is { Length: > 0 } data) family.Set(MemberType(type)!, data.Span, diagnostics);
+                if (lookup(FourCC.FromString(type), id) is { Length: > 0 } data) family.Set(MemberType(type)!, data, diagnostics);
             return family;
         }
 
-        private void Set(IconMemberType member, ReadOnlySpan<byte> payload, ICollection<Diagnostic>? diagnostics)
+        private void Set(IconMemberType member, ReadOnlyMemory<byte> payload, ICollection<Diagnostic>? diagnostics)
         {
             if (member.Depth == 32)
             {
@@ -132,7 +132,7 @@ namespace ClassicMac.Resources.Decoders.Images
                         throw new InvalidDataException("The 'it32' member's compression format is not 0; the family fails (paramErr).");
                     payload = payload[4..];
                 }
-                members[member.Type] = Decompress(payload, member.Width * member.Height);
+                members[member.Type] = Decompress(payload.Span, member.Width * member.Height);
                 return;
             }
             if (payload.Length != member.RawSize)

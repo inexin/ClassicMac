@@ -134,7 +134,7 @@ namespace ClassicMac.Resources.Decoders.Images
 
         protected override IReadOnlyList<DecodedFile> DecodeImages(DecodeInput input)
         {
-            var family = IconFamily.ReadIcns(input.Data.Span, input.Diagnostics);
+            var family = IconFamily.ReadIcns(input.Data, input.Diagnostics);
             var files = new List<DecodedFile>();
             foreach (var type in Order)
             {

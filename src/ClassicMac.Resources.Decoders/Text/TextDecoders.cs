@@ -29,7 +29,7 @@ namespace ClassicMac.Resources.Decoders.Text
             var files = new List<DecodedFile> { new(".txt", MacText.Utf8(MacText.Lines(text, options)), encoding) };
             if (input.Find(Styl, input.Resource.Id) is { } styl)
             {
-                var styled = StyledText.Read(input.Data.Span, styl.Span, options);
+                var styled = StyledText.Read(input.Data.Span, styl, options);
                 if (!styled.Complete)
                 {
                     input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "text.styl-short",
@@ -56,7 +56,7 @@ namespace ClassicMac.Resources.Decoders.Text
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
-            var runs = StyleRuns.Read(input.Data.Span, out var complete);
+            var runs = StyleRuns.Read(input.Data, out var complete);
             if (!complete)
             {
                 input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "text.styl-short",
@@ -122,7 +122,7 @@ namespace ClassicMac.Resources.Decoders.Text
             // No Mac OS code reads this byte. Apple's files store it as BCD (Disk Copy 6.5b13: $13 for "b13"); some other
             // developers' as binary ($0F for "r15"): BCD when both digits are decimal, else binary (fitted to data).
             var nonRelease = (data[3] >> 4) <= 9 && (data[3] & 0x0F) <= 9 ? Bcd(data[3]) : data[3];
-            var region = new BigEndianReader(data).ReadInt16At(4);
+            var region = new BigEndianReader(input.Data).ReadInt16At(4);
             var offset = 6;
             var complete = MacText.TryReadPascal(data, ref offset, out var shortText);
             var shortVersion = MacText.Decode(shortText, options);

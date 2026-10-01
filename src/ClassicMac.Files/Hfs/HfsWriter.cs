@@ -27,7 +27,7 @@ namespace ClassicMac.Files.Hfs
             byte[] source = image.ToArray();
             if (source.Length < MdbOffset + MdbSize || U16(source, MdbOffset) != 0x4244)
                 throw new InvalidDataException("The input is not a plain HFS volume.");
-            var mdb = source.AsSpan(MdbOffset, MdbSize);
+            var mdb = source.AsMemory(MdbOffset, MdbSize);
             if (U16(mdb, 0x7C) == 0x482B)
                 throw new InvalidDataException("Writing an HFS wrapper around HFS Plus is not supported.");
             if ((U16(mdb, 0x0A) & 0x8000) != 0)
@@ -46,7 +46,7 @@ namespace ClassicMac.Files.Hfs
             foreach (var record in extFileRecords)
             {
                 if (record.Key.Length < 8 || record.Data.Length < 12) continue;
-                var key = record.Key.AsSpan();
+                var key = record.Key;
                 var id = U32(key, 2);
                 var start = U16(key, 6);
                 var kind = key[1];
@@ -650,7 +650,7 @@ namespace ClassicMac.Files.Hfs
         {
             if (nodeNumber >= tree.Length / NodeSize) throw new InvalidDataException("An HFS B-tree node lies outside the tree file.");
             int nodeOffset = checked((int)nodeNumber * NodeSize);
-            var bytes = tree.AsSpan(nodeOffset, NodeSize);
+            var bytes = tree.AsMemory(nodeOffset, NodeSize);
             int count = U16(bytes, 10);
             if (count > (NodeSize - 14) / 2 - 1)
                 throw new InvalidDataException("An HFS B-tree node has too many records for its offset table.");
@@ -661,7 +661,7 @@ namespace ClassicMac.Files.Hfs
                 int end = U16(bytes, NodeSize - 2 * (i + 2));
                 if (start < 14 || end > NodeSize - 2 * (count + 1) || end <= start)
                     throw new InvalidDataException("An HFS B-tree node has invalid record offsets.");
-                int keyEnd = start + 1 + bytes[start];
+                int keyEnd = start + 1 + bytes.Span[start];
                 int dataStart = (keyEnd + 1) & ~1;
                 if (keyEnd > end || dataStart > end)
                     throw new InvalidDataException("An HFS B-tree node record has an invalid key or data offset.");
@@ -887,7 +887,7 @@ namespace ClassicMac.Files.Hfs
                 foreach (var (kind, offset) in new[] { ((byte)0, 74), ((byte)0xFF, 86) })
                 {
                     if (ReferenceEquals(record, target) && id == targetFileId && offset == targetForkOffset) continue;
-                    var fileExtents = ParseExtents(record.Data.AsSpan(offset, 12));
+                    var fileExtents = ParseExtents(record.Data.AsMemory(offset, 12));
                     Claim(fileExtents, "file fork");
                     if (overflow.TryGetValue((kind, id), out var fileOverflow))
                         foreach (var extra in fileOverflow.OrderBy(r => r.Start)) Claim(ParseExtents(extra.Extents), "file fork");
@@ -936,7 +936,7 @@ namespace ClassicMac.Files.Hfs
             return output;
         }
 
-        private static List<(ushort Start, ushort Count)> ParseExtents(ReadOnlySpan<byte> bytes)
+        private static List<(ushort Start, ushort Count)> ParseExtents(ReadOnlyMemory<byte> bytes)
         {
             var result = new List<(ushort, ushort)>();
             for (int i = 0; i < 3; i++)
@@ -947,7 +947,7 @@ namespace ClassicMac.Files.Hfs
             return result;
         }
 
-        private static int LastExtentSlot(ReadOnlySpan<byte> record)
+        private static int LastExtentSlot(ReadOnlyMemory<byte> record)
         {
             int last = -1;
             bool emptySeen = false;
@@ -1143,9 +1143,9 @@ namespace ClassicMac.Files.Hfs
 
         private static string DecodeName(byte[] key) => key.Length >= 7 ? new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7))).ToString() : "";
         // An offset outside the data throws ArgumentOutOfRangeException.
-        private static ushort U16(ReadOnlySpan<byte> b, int o) =>
+        private static ushort U16(ReadOnlyMemory<byte> b, int o) =>
             new BigEndianReader(b).TryReadUInt16At(o, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
-        private static uint U32(ReadOnlySpan<byte> b, int o) =>
+        private static uint U32(ReadOnlyMemory<byte> b, int o) =>
             new BigEndianReader(b).TryReadUInt32At(o, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
     }
 

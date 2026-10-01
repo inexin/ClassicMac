@@ -54,9 +54,9 @@ public class PictReaderTests
         Assert.Equal(new byte[] { 0x00, 0x11, 0x02, 0xFF, 0x0C, 0x00 }, bytes[522..528]);
         Assert.Equal(new byte[] { 0x00, 0xFF }, bytes[^2..]);
         Assert.True(PictHeader.IsPictFile(bytes));
-        Assert.True(PictHeader.IsPicture(bytes.AsSpan(512)));
+        Assert.True(PictHeader.IsPicture(bytes.AsMemory(512)));
         var reader = new ClassicMac.Core.BigEndianReader(bytes) { Position = 512 };
-        Assert.True(PictHeader.IsPicture(ref reader));
+        Assert.True(PictHeader.IsPicture(reader));
         Assert.Equal(512, reader.Position); // probing does not consume the reader
         Assert.False(PictHeader.IsPicture(bytes));   // the zero file header is not itself a picture
     }

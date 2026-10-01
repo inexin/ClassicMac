@@ -67,6 +67,6 @@ public class TextResourcesTests
         Assert.Equal([(0, 1)], Runs(cut!));
 
         // No styl: none is written.
-        Assert.Null(TextResources.WriteText(old, [], "x", hasStyl: false).Styl);
+        Assert.Null(TextResources.WriteText(old, ReadOnlyMemory<byte>.Empty, "x", hasStyl: false).Styl);
     }
 }

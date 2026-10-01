@@ -14,7 +14,7 @@ namespace ClassicMac.Graphics.QuickDraw
         public static IEnumerable<(string type, int id, string? name, byte[] data)> Read(byte[] fork)
         {
             if (fork.Length < 16) throw new ArgumentException("Not a resource fork.", nameof(fork));
-            var s = fork.AsSpan();
+            var s = fork.AsMemory();
             var reader = new BigEndianReader(s);
             int dataOffset = (int)reader.ReadUInt32();
             int mapOffset = (int)reader.ReadUInt32();
@@ -37,7 +37,7 @@ namespace ClassicMac.Graphics.QuickDraw
                     int re = refs + 12 * r;
                     int id = reader.ReadInt16At(re);
                     int nameOffset = reader.ReadUInt16At(re + 2);
-                    int dataAt = dataOffset + ((s[re + 5] << 16) | (s[re + 6] << 8) | s[re + 7]);
+                    int dataAt = dataOffset + ((s.Span[re + 5] << 16) | (s.Span[re + 6] << 8) | s.Span[re + 7]);
                     if (dataAt + 4 > fork.Length) continue;
                     int length = (int)reader.ReadUInt32At(dataAt);
                     if (length < 0 || dataAt + 4 + length > fork.Length) continue;

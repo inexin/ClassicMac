@@ -24,7 +24,7 @@ namespace ClassicMac.Resources.Decoders.Colors
         /// A <c>'clut'</c> (a <c>ColorTable</c>): seed, flags, count less one, then value and <c>RGBColor</c> per entry. With
         /// flag bit 15 (a device's table) the entries are in pixel-value order and the value field is not an index.
         /// </summary>
-        public static IReadOnlyList<PaletteEntry> ReadColorTable(ReadOnlySpan<byte> data, out int seed, out ushort flags, out bool complete)
+        public static IReadOnlyList<PaletteEntry> ReadColorTable(ReadOnlyMemory<byte> data, out int seed, out ushort flags, out bool complete)
         {
             seed = 0;
             flags = 0;
@@ -55,7 +55,7 @@ namespace ClassicMac.Resources.Decoders.Colors
         /// A <c>'pltt'</c> (Palette Manager): a count and 14 reserved bytes, then 16 bytes per entry: <c>RGBColor</c>, usage,
         /// tolerance and 6 private bytes.
         /// </summary>
-        public static IReadOnlyList<PaletteEntry> ReadPalette(ReadOnlySpan<byte> data, out bool complete)
+        public static IReadOnlyList<PaletteEntry> ReadPalette(ReadOnlyMemory<byte> data, out bool complete)
         {
             complete = data.Length >= 16;
             var entries = new List<PaletteEntry>();
@@ -116,7 +116,7 @@ namespace ClassicMac.Resources.Decoders.Colors
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
-            var data = input.Data.Span;
+            var data = input.Data;
             var isTable = handled == FourCC.FromString("clut");
             int seed = 0;
             ushort flags = 0;

@@ -72,7 +72,7 @@ namespace ClassicMac.Graphics.Fonts
             return i >= 0 && (uint)at < (uint)rawWidthWords.Length ? rawWidthWords[at] : 0;
         }
 
-        private static RawWidthTable[] ReadRawWidthTables(ref BigEndianReader reader, int offset, int firstChar, int lastChar,
+        private static RawWidthTable[] ReadRawWidthTables(BigEndianReader reader, int offset, int firstChar, int lastChar,
             out ushort[] rawWidthWords)
         {
             rawWidthWords = [];
@@ -158,14 +158,14 @@ namespace ClassicMac.Graphics.Fonts
         /// Reads a family record. Throws <see cref="InvalidDataException"/> under 54 bytes (the header and association
         /// count); tables that run past the data are read as far as they go and reported (<c>font.short</c>).
         /// </summary>
-        public static FontFamily Read(ReadOnlySpan<byte> input, string name, ICollection<Diagnostic>? diagnostics = null)
+        public static FontFamily Read(ReadOnlyMemory<byte> input, string name, ICollection<Diagnostic>? diagnostics = null)
         {
             var reader = new BigEndianReader(input);
-            return Read(ref reader, name, diagnostics);
+            return Read(reader, name, diagnostics);
         }
 
         /// <summary>Reads a family record at the reader's current position and advances past it.</summary>
-        public static FontFamily Read(ref BigEndianReader input, string name, ICollection<Diagnostic>? diagnostics = null)
+        public static FontFamily Read(BigEndianReader input, string name, ICollection<Diagnostic>? diagnostics = null)
         {
             var fields = input.ReadSubReader(input.Remaining);
             if (fields.Length < 54) throw new InvalidDataException($"A font family record needs 54 bytes; this is {fields.Length}.");
@@ -340,7 +340,7 @@ namespace ClassicMac.Graphics.Fonts
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The family record's tables run past its data; read as far as they go."));
             var property = new int[9];
             for (var i = 0; i < 9; i++) property[i] = (ushort)fields.ReadInt16At(28 + 2 * i);
-            var rawWidthTables = ReadRawWidthTables(ref fields, widthOffset, firstChar, lastChar, out var rawWidthWords);
+            var rawWidthTables = ReadRawWidthTables(fields, widthOffset, firstChar, lastChar, out var rawWidthWords);
             return new FontFamily
             {
                 rawWidthWords = rawWidthWords,
@@ -379,8 +379,8 @@ namespace ClassicMac.Graphics.Fonts
             // An empty result counts as none (a null array converts to empty memory, not null).
             var data = lookup(FourCC.FromString("NFNT"), font.FontId) is { Length: > 0 } nfnt ? nfnt : lookup(FourCC.FromString("FONT"), font.FontId);
             if (data is not { Length: > 0 } bytes) return null;
-            var reader = new BigEndianReader(bytes.Span);
-            return BitmapFont.Read(ref reader, diagnostics, rom: false);
+            var reader = new BigEndianReader(bytes);
+            return BitmapFont.Read(reader, diagnostics, rom: false);
         }
 
         /// <summary>The family's sizes with a bitmap font, in order.</summary>

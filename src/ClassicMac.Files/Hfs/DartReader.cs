@@ -70,10 +70,10 @@ namespace ClassicMac.Files.Hfs
                 var length = header.Lengths[i];
                 var stored = header.Compression == Stored || length == -1;
                 var bytes = stored ? BlockLength : header.Compression == Rle ? length * 2 : length;
-                var source = raw.AsSpan(at, bytes);
+                var source = raw.AsMemory(at, bytes);
                 at += bytes;
                 Array.Clear(block);
-                if (stored) source.CopyTo(block);
+                if (stored) source.Span.CopyTo(block);
                 else if (header.Compression == Rle)
                 {
                     if (!DartRle.Decompress(source, block, out var written))
@@ -82,7 +82,7 @@ namespace ClassicMac.Files.Hfs
                 else
                 {
                     // DART's own files can end a block a byte short (a tag byte): zeros, as Disk Copy leaves them.
-                    var written = lzh.Decode(source, block);
+                    var written = lzh.Decode(source.Span, block);
                     if (written < DataPerBlock)
                         Report(context, $"LZH block {i} decodes to {written} of its {BlockLength} bytes; the rest reads as zeros.");
                 }
@@ -115,7 +115,7 @@ namespace ClassicMac.Files.Hfs
             foreach (var (id, bytes, what) in new[] { ((short)2, data, "data"), ((short)1, tags, "tag") })
             {
                 if (fork.Find(Cksm, id)?.GetData() is not { Length: >= 4 } stored) continue;
-                var expected = new BigEndianReader(stored.Span).ReadUInt32At(0);
+                var expected = new BigEndianReader(stored).ReadUInt32At(0);
                 var sum = DiskCopy42Reader.Sum(bytes);
                 if (sum != expected)
                 {

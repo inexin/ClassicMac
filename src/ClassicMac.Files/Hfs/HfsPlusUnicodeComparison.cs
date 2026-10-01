@@ -754,14 +754,16 @@ internal static class HfsPlusUnicodeComparison
         }
     }
 
-    internal static int CompareBigEndian(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    internal static int CompareBigEndian(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
+        var leftReader = new BigEndianReader(left);
+        var rightReader = new BigEndianReader(right);
         int leftIndex = 0;
         int rightIndex = 0;
         while (true)
         {
-            ushort leftValue = NextBigEndian(left, ref leftIndex);
-            ushort rightValue = NextBigEndian(right, ref rightIndex);
+            ushort leftValue = NextBigEndian(leftReader, ref leftIndex);
+            ushort rightValue = NextBigEndian(rightReader, ref rightIndex);
             int comparison = leftValue.CompareTo(rightValue);
             if (comparison != 0 || leftValue == 0) return comparison;
         }
@@ -790,10 +792,9 @@ internal static class HfsPlusUnicodeComparison
         return 0;
     }
 
-    private static ushort NextBigEndian(ReadOnlySpan<byte> value, ref int index)
+    private static ushort NextBigEndian(BigEndianReader reader, ref int index)
     {
-        var reader = new BigEndianReader(value);
-        while (index < value.Length)
+        while (index < reader.Length)
         {
             ushort character = reader.ReadUInt16At(index);
             index += 2;

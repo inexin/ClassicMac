@@ -122,7 +122,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                     // k advances even when the picture is missing, so a missing one leaves a gap.
                     if (fork!.Find(Pict, (short)(1000 + k)) is not { } resource) continue;
                     var data = ResourceDecompression.Default.GetData(resource, fork, readOptions, diagnostics);
-                    var (width, height) = PictureSize(data.Span, scaleTo72Dpi: true);
+                    var (width, height) = PictureSize(data, scaleTo72Dpi: true);
                     pictures.Add(new DocumentPicture(anchors[k], (short)(1000 + k), data, width, height, PictureAlignment.Center, true, PictureAction.None));
                 }
             }
@@ -151,7 +151,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                 return null;
             }
             var span = info.AsSpan();
-            var reader = new BigEndianReader(span);
+            var reader = new BigEndianReader(info);
             var id = reader.ReadInt16();
             var alignment = reader.ReadInt16() switch
             {
@@ -192,7 +192,7 @@ namespace ClassicMac.Resources.Decoders.Documents
             if (fork.Find(Pict, id) is { } resource)
             {
                 picture = ResourceDecompression.Default.GetData(resource, fork, readOptions, diagnostics);
-                (width, height) = PictureSize(picture.Value.Span, scaleTo72Dpi: false);
+                (width, height) = PictureSize(picture.Value, scaleTo72Dpi: false);
             }
             else
             {
@@ -202,7 +202,7 @@ namespace ClassicMac.Resources.Decoders.Documents
         }
 
         // A picture's frame size; SimpleText scales an extended version 2 picture's frame to 72 dpi by its resolution.
-        internal static (int Width, int Height) PictureSize(ReadOnlySpan<byte> pict, bool scaleTo72Dpi)
+        internal static (int Width, int Height) PictureSize(ReadOnlyMemory<byte> pict, bool scaleTo72Dpi)
         {
             if (pict.Length < 10) return (0, 0);
             var reader = new BigEndianReader(pict);

@@ -11,7 +11,7 @@ namespace ClassicMac.Graphics.QuickTime
         // An ImageDescription at p (86 bytes: idSize, cType, reserved, version, revision, vendor, temporal and spatial
         // quality, width, height, hRes, vRes, dataSize, frameCount, name[32], depth, clutID), with the color table that
         // follows it when clutID is 0 (else the standard table for the id or depth). Null if it does not fit.
-        public static PictImageDescription? Read(ReadOnlySpan<byte> block, int p, out int idSize)
+        public static PictImageDescription? Read(ReadOnlyMemory<byte> block, int p, out int idSize)
         {
             idSize = 0;
             if (p < 0 || p + 86 > block.Length) return null;
@@ -36,7 +36,7 @@ namespace ClassicMac.Graphics.QuickTime
         }
 
         // A ColorTable stored after the image description: ctSeed, ctFlags, ctSize, then (value, r, g, b) entries.
-        private static RgbaColor[]? ReadColorTable(ReadOnlySpan<byte> block, int p, int end)
+        private static RgbaColor[]? ReadColorTable(ReadOnlyMemory<byte> block, int p, int end)
         {
             var reader = new ClassicMac.Core.BigEndianReader(block);
             int size = reader.ReadUInt16At(p + 6) + 1;

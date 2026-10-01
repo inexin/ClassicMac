@@ -32,11 +32,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// A <c>'BNDL'</c>: signature, signature resource ID, the number of types less one, then per type the type, its
         /// number of mappings less one, and the (local ID, resource ID) pairs.
         /// </summary>
-        public static Bundle ReadBundle(ReadOnlySpan<byte> data, out bool complete)
+        public static Bundle ReadBundle(ReadOnlyMemory<byte> data, out bool complete)
         {
             complete = data.Length >= 8;
             var maps = new List<(FourCC, IReadOnlyList<(short, short)>)>();
-            if (!complete) return new Bundle(data.Length >= 4 ? new FourCC(data[..4]) : default, 0, maps);
+            if (!complete) return new Bundle(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, maps);
             var reader = new BigEndianReader(data);
             var signature = reader.ReadFourCC();
             var signatureId = reader.ReadInt16();
@@ -67,17 +67,17 @@ namespace ClassicMac.Resources.Decoders.Finder
         }
 
         /// <summary>A <c>'FREF'</c>: file type, local icon ID, file name.</summary>
-        public static FileReference ReadFileReference(ReadOnlySpan<byte> data, DecodeOptions options, out bool complete)
+        public static FileReference ReadFileReference(ReadOnlyMemory<byte> data, DecodeOptions options, out bool complete)
         {
             complete = data.Length >= 6;
-            if (!complete) return new FileReference(data.Length >= 4 ? new FourCC(data[..4]) : default, 0, "");
+            if (!complete) return new FileReference(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, "");
             var at = 6;
-            var name = at < data.Length && MacText.TryReadPascal(data, ref at, out var text) ? MacText.Decode(text, options) : "";
-            return new FileReference(new FourCC(data[..4]), new BigEndianReader(data).ReadInt16At(4), name);
+            var name = at < data.Length && MacText.TryReadPascal(data.Span, ref at, out var text) ? MacText.Decode(text, options) : "";
+            return new FileReference(new FourCC(data.Span[..4]), new BigEndianReader(data).ReadInt16At(4), name);
         }
 
         /// <summary>A <c>'SIZE'</c>: flags, preferred size, minimum size.</summary>
-        public static SizeResource ReadSize(ReadOnlySpan<byte> data, out bool complete)
+        public static SizeResource ReadSize(ReadOnlyMemory<byte> data, out bool complete)
         {
             complete = data.Length >= 10;
             var reader = new BigEndianReader(data);
@@ -126,7 +126,7 @@ namespace ClassicMac.Resources.Decoders.Finder
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
-            var data = input.Data.Span;
+            var data = input.Data;
             bool complete;
             byte[] json;
             switch (handled.ToString())
@@ -207,7 +207,7 @@ namespace ClassicMac.Resources.Decoders.Finder
                 foreach (var (_, freId) in references)
                 {
                     if (input.Find(FourCC.FromString("FREF"), freId) is not { } fref) continue;
-                    var reference = FinderResources.ReadFileReference(fref.Span, options, out _);
+                    var reference = FinderResources.ReadFileReference(fref, options, out _);
                     w.WriteStartObject();
                     w.WriteString("fileType", reference.FileType.ToString());
                     w.WriteNumber("fref", freId);

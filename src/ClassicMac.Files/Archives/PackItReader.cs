@@ -93,10 +93,10 @@ public sealed class PackItReader : IContainerReader
                     ? DecodeXorBytes(archive.AsSpan(offset + 4),
                         DeriveXorKey(MacString.FromMacRoman(context.Options.ArchivePassword!).Bytes))
                     : null;
-                ReadOnlySpan<byte> entryInput = desDecoded ?? xorDecoded ?? archive.AsSpan(offset + 4);
+                ReadOnlyMemory<byte> entryInput = desDecoded ?? xorDecoded ?? archive.AsMemory(offset + 4);
                 if (huffman)
                 {
-                    DecodedHuffmanEntry decoded = DecodeHuffmanEntry(entryInput,
+                    DecodedHuffmanEntry decoded = DecodeHuffmanEntry(entryInput.Span,
                         context.Options.MaxExpandedBytesPerInput - expandedBytes,
                         xorEncrypted ? DeriveXorKey(MacString.FromMacRoman(context.Options.ArchivePassword!).Bytes) : null);
                     metadataBytes = decoded.Metadata;
@@ -132,7 +132,7 @@ public sealed class PackItReader : IContainerReader
             {
                 if (offset > archive.Length - EntryHeaderLength)
                     throw new InvalidDataException("A PackIt file header is truncated.");
-                ReadOnlySpan<byte> header = archive.AsSpan(offset, EntryHeaderLength);
+                ReadOnlyMemory<byte> header = archive.AsMemory(offset, EntryHeaderLength);
                 metadataBytes = header.Slice(4, EntryMetadataLength).ToArray();
                 int storedDataLength = ReadLength(U32(header, 0x50), "data fork");
                 int storedResourceLength = ReadLength(U32(header, 0x54), "resource fork");
@@ -145,15 +145,15 @@ public sealed class PackItReader : IContainerReader
                 nextOffset = checked(crcOffset + 2);
             }
 
-            ReadOnlySpan<byte> metadata = metadataBytes;
-            int nameLength = metadata[0];
+            ReadOnlyMemory<byte> metadata = metadataBytes;
+            int nameLength = metadata.Span[0];
             if (nameLength == 0 || nameLength > 63)
                 throw new InvalidDataException("A PackIt file name length is invalid.");
             ushort storedHeaderCrc = U16(metadata, 0x5C);
-            ushort actualHeaderCrc = Crc16(metadata[..0x5C]);
+            ushort actualHeaderCrc = Crc16(metadata.Span[..0x5C]);
             if (storedHeaderCrc != actualHeaderCrc)
                 context.Report(DiagnosticSeverity.Error, "archive.header-crc",
-                    $"The PackIt header checksum is incorrect for '{new MacString(metadata.Slice(1, nameLength))}'.",
+                    $"The PackIt header checksum is incorrect for '{new MacString(metadata.Span.Slice(1, nameLength))}'.",
                     offset + 0x60);
 
             int dataLength = ReadLength(U32(metadata, 0x4C), "data fork");
@@ -184,7 +184,7 @@ public sealed class PackItReader : IContainerReader
             }
             ushort actualForkCrc = Crc16(data);
             actualForkCrc = Crc16(resource, actualForkCrc);
-            var name = new MacString(metadata.Slice(1, nameLength));
+            var name = new MacString(metadata.Span.Slice(1, nameLength));
             if (storedForkCrc != actualForkCrc)
             {
                 if (encrypted)
@@ -193,8 +193,8 @@ public sealed class PackItReader : IContainerReader
                     $"The PackIt fork checksum is incorrect for '{name}'.", nextOffset - 2);
             }
 
-            var type = new FourCC(metadata.Slice(0x40, 4));
-            var creator = new FourCC(metadata.Slice(0x44, 4));
+            var type = new FourCC(metadata.Span.Slice(0x40, 4));
+            var creator = new FourCC(metadata.Span.Slice(0x44, 4));
             files.Add(new MacFile
             {
                 Name = name,
@@ -403,7 +403,7 @@ public sealed class PackItReader : IContainerReader
         return (int)value;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
+    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
 
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
+    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 }

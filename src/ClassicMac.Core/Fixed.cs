@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.Buffers.Binary;
 namespace ClassicMac.Core
 {
     /// <summary>
@@ -29,12 +31,12 @@ namespace ClassicMac.Core
         /// <summary>Reads a big-endian <c>Fixed</c>.</summary>
         public static Fixed Read(ReadOnlySpan<byte> source)
         {
-            var reader = new BigEndianReader(source);
-            return reader.ReadFixed();
+            if (source.Length < 4) throw new EndOfStreamException();
+            return new(BinaryPrimitives.ReadInt32BigEndian(source));
         }
 
         /// <summary>Reads a fixed-point value at the reader's current position and advances it.</summary>
-        public static Fixed Read(ref BigEndianReader reader) => reader.ReadFixed();
+        public static Fixed Read(BigEndianReader reader) => reader.ReadFixed();
 
         /// <summary>Writes the value as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)
@@ -81,12 +83,12 @@ namespace ClassicMac.Core
         /// <summary>Reads a big-endian <c>UnsignedFixed</c>.</summary>
         public static UnsignedFixed Read(ReadOnlySpan<byte> source)
         {
-            var reader = new BigEndianReader(source);
-            return reader.ReadUnsignedFixed();
+            if (source.Length < 4) throw new EndOfStreamException();
+            return new(BinaryPrimitives.ReadUInt32BigEndian(source));
         }
 
         /// <summary>Reads an unsigned fixed-point value at the reader's current position and advances it.</summary>
-        public static UnsignedFixed Read(ref BigEndianReader reader) => reader.ReadUnsignedFixed();
+        public static UnsignedFixed Read(BigEndianReader reader) => reader.ReadUnsignedFixed();
 
         /// <summary>Writes the value as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)

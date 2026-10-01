@@ -14,7 +14,7 @@ namespace ClassicMac.Resources
         {
             var fork = new ResourceFork();
             if (input.IsEmpty) return fork; // a file without a resource fork
-            var bytes = input.Span;
+            var bytes = input;
             if (bytes.Length < HeaderLength)
                 throw new InvalidDataException($"A resource fork needs a {HeaderLength}-byte header; this is {bytes.Length}.");
 
@@ -77,15 +77,15 @@ namespace ClassicMac.Resources
 
             var map = (int)mapOffset;
             var headerCopy = bytes.Slice(map, HeaderLength);
-            if (!headerCopy.SequenceEqual(bytes[..HeaderLength]) && headerCopy.IndexOfAnyExcept((byte)0) >= 0)
+            if (!headerCopy.Span.SequenceEqual(bytes.Span[..HeaderLength]) && headerCopy.Span.IndexOfAnyExcept((byte)0) >= 0)
             {
                 fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Info, "fork.header-mismatch",
                     "The map's copy of the fork header differs from the header.", mapOffset));
             }
 
             fork.MapReservedData = input.Slice(map + HeaderLength, ResourceFork.MapReservedDataLength).ToArray();
-            fork.Attributes = (ResourceForkAttributes)bytes[map + MapAttributesOffset];
-            fork.MapFlags = (ResourceMapFlags)bytes[map + MapFlagsOffset];
+            fork.Attributes = (ResourceForkAttributes)bytes.Span[map + MapAttributesOffset];
+            fork.MapFlags = (ResourceMapFlags)bytes.Span[map + MapFlagsOffset];
             var typeList = mapOffset + reader.ReadUInt16At(map + MapTypeListOffsetOffset);
             var nameList = mapOffset + reader.ReadUInt16At(map + MapNameListOffsetOffset);
             if (typeList + TypeCountLength > mapEnd)
@@ -140,7 +140,7 @@ namespace ClassicMac.Resources
 
         private static void ReadReferences(Context context, FourCC type, int count, long references)
         {
-            var reader = new BigEndianReader(context.Input.Span);
+            var reader = new BigEndianReader(context.Input);
             for (var i = 0; i < count; i++)
             {
                 var entry = references + (long)i * ReferenceEntryLength;
@@ -190,7 +190,7 @@ namespace ClassicMac.Resources
                     $"The data of {label} at {start} lies outside the data area; the resource is skipped.", entry);
                 return null;
             }
-            long length = new BigEndianReader(context.Input.Span).ReadUInt32At((int)start);
+            long length = new BigEndianReader(context.Input).ReadUInt32At((int)start);
             if (length > context.Options.MaxResourceSize)
             {
                 context.Report(DiagnosticSeverity.Error, "resource.too-large",

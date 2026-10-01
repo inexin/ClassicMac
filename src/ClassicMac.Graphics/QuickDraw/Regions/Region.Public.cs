@@ -19,12 +19,13 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <c>rgnBBox</c>, then the inversion-point rows. A 10-byte region is its bounding rectangle.
         /// </summary>
         /// <exception cref="InvalidDataException">Shorter than its 10-byte header, or than its <c>rgnSize</c>.</exception>
-        public static Region FromRgnData(ReadOnlySpan<byte> data)
+        public static Region FromRgnData(ReadOnlyMemory<byte> data)
         {
             if (data.Length < 10) throw new InvalidDataException($"A region needs a 10-byte header; this is {data.Length} bytes.");
             var size = new ClassicMac.Core.BigEndianReader(data).ReadUInt16At(0) & 0x7FFF;
             if (size > data.Length) throw new InvalidDataException($"The region says it is {size} bytes; there are {data.Length}.");
-            return Read(BytesReader.Over(data[..Math.Max(10, size)]));
+            var reader = new ClassicMac.Core.BigEndianReader(data[..Math.Max(10, size)]);
+            return Read(reader);
         }
 
         /// <summary>The region in QuickDraw's stored form: <c>rgnSize</c>, <c>rgnBBox</c> and, unless it is a rectangle, its rows.</summary>

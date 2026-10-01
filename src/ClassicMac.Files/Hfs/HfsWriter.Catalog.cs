@@ -160,7 +160,7 @@ public static partial class HfsWriter
         byte[] source = image.ToArray();
         if (source.Length < MdbOffset + MdbSize || U16(source, MdbOffset) != 0x4244)
             throw new InvalidDataException("The input is not a plain HFS volume.");
-        var mdb = source.AsSpan(MdbOffset, MdbSize);
+        var mdb = source.AsMemory(MdbOffset, MdbSize);
         if (U16(mdb, 0x7C) == 0x482B || (U16(mdb, 0x0A) & 0x8000) != 0)
             throw new InvalidDataException("The HFS volume is wrapped or software-locked.");
         uint blockSize = U32(mdb, 0x14);
@@ -214,7 +214,7 @@ public static partial class HfsWriter
             {
                 RebuildBTree(state.Catalog, state.Records, validateExtents: false);
                 ValidateCatalogTree(state.Catalog);
-                ValidateCatalogAccounting(state.Result.AsSpan(MdbOffset, MdbSize), state.Records);
+                ValidateCatalogAccounting(state.Result.AsMemory(MdbOffset, MdbSize), state.Records);
                 break;
             }
             catch (BTreeNeedsNodesException)
@@ -376,7 +376,7 @@ public static partial class HfsWriter
         return (parent, parts[^1]);
     }
 
-    private static void ValidateCatalogAccounting(ReadOnlySpan<byte> mdb,
+    private static void ValidateCatalogAccounting(ReadOnlyMemory<byte> mdb,
         List<(byte[] Key, byte[] Data)> records)
     {
         var folders = records.Where(record => record.Data.Length >= 70 && record.Data[0] == 1).ToArray();

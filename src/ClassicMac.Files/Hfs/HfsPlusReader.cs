@@ -59,7 +59,7 @@ internal static class HfsPlusReader
         var securityAttributeFileIds = new HashSet<uint>();
         if (U32(header, 192 + 12) == 0)
             throw new InvalidDataException("The HFS Plus volume has no extents-overflow B-tree.");
-        ForkData extentsFork = ReadFork(image, header.AsSpan(192, 80), blockSize, totalBlocks,
+        ForkData extentsFork = ReadFork(image, header.AsMemory(192, 80), blockSize, totalBlocks,
             allocationExtents: allocationExtents, ordinaryForkExtents: ordinaryForkExtents);
         if (U32(header, 192 + 12) != 0)
         {
@@ -72,7 +72,7 @@ internal static class HfsPlusReader
                 if (id.File == BadBlockFileId && id.Fork != 0)
                     throw new InvalidDataException("An HFS Plus bad-block extent must use the data fork.");
                 uint start = U32(key, 8);
-                _ = AddExtentRecord(data.AsSpan(0, 64), totalBlocks, allocationExtents,
+                _ = AddExtentRecord(data.AsMemory(0, 64), totalBlocks, allocationExtents,
                     "An HFS Plus overflow extent lies outside the allocation area.",
                     id.File == BadBlockFileId ? null : ordinaryForkExtents);
                 if (!overflow.TryGetValue(id, out var entries)) overflow[id] = entries = [];
@@ -85,12 +85,12 @@ internal static class HfsPlusReader
             context.Report(DiagnosticSeverity.Info, "hfs.plus-spared-blocks",
                 "The HFS Plus spared-blocks attribute disagrees with its bad-block extent records.");
 
-        ForkData allocationFork = ReadFork(image, header.AsSpan(112, 80), blockSize, totalBlocks,
+        ForkData allocationFork = ReadFork(image, header.AsMemory(112, 80), blockSize, totalBlocks,
             overflow, 0, 6, allocationExtents, ordinaryForkExtents);
         byte[] allocationBitmap = allocationFork.ToArray(context.Options.MaxExpandedBytesPerInput);
-        _ = ReadFork(image, header.AsSpan(432, 80), blockSize, totalBlocks, overflow, 0, 7,
+        _ = ReadFork(image, header.AsMemory(432, 80), blockSize, totalBlocks, overflow, 0, 7,
             allocationExtents, ordinaryForkExtents);
-        ForkData attributesFork = ReadFork(image, header.AsSpan(352, 80), blockSize, totalBlocks,
+        ForkData attributesFork = ReadFork(image, header.AsMemory(352, 80), blockSize, totalBlocks,
             overflow, 0, 8, allocationExtents, ordinaryForkExtents);
         if (U32(header, 352 + 12) != 0)
         {
@@ -111,7 +111,7 @@ internal static class HfsPlusReader
             ValidateAttributeForks(attributeForks, blockSize);
         }
 
-        var catalogFork = ReadFork(image, header.AsSpan(272, 80), blockSize, totalBlocks, overflow, 0, 4,
+        var catalogFork = ReadFork(image, header.AsMemory(272, 80), blockSize, totalBlocks, overflow, 0, 4,
             allocationExtents, ordinaryForkExtents);
         byte[] catalog = catalogFork.ToArray(context.Options.MaxExpandedBytesPerInput);
         var records = new List<(byte[] Key, byte[] Data)>();
@@ -329,9 +329,9 @@ internal static class HfsPlusReader
                 fileId, Name(key), U32(key, 2), special, U32(data, 32), U32(data, 36), U16(data, 2),
                 U16(data, 42), finderInfo,
                 Date(U32(data, 12)), Date(U32(data, 16)),
-                ReadFork(image, data.AsSpan(88, 80), blockSize, totalBlocks, overflow, 0, fileId,
+                ReadFork(image, data.AsMemory(88, 80), blockSize, totalBlocks, overflow, 0, fileId,
                     allocationExtents, ordinaryForkExtents),
-                ReadFork(image, data.AsSpan(168, 80), blockSize, totalBlocks, overflow, 0xFF, fileId,
+                ReadFork(image, data.AsMemory(168, 80), blockSize, totalBlocks, overflow, 0xFF, fileId,
                     allocationExtents, ordinaryForkExtents));
             if (IsHardLinkFile(finderInfo) && U32(data, 88 + 12) != 0)
                 context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-alias-has-data",
@@ -351,7 +351,7 @@ internal static class HfsPlusReader
             uint parentIdForJournal = U32(key, 2);
             if ((volumeAttributes & volumeJournaledBit) != 0 && parentIdForJournal == RootFolderId &&
                 (catalogFile.Name is ".journal" or ".journal_info_block"))
-                journalFiles.Add(catalogFile.Name, ReadJournalCatalogFile(data.AsSpan(88, 80)));
+                journalFiles.Add(catalogFile.Name, ReadJournalCatalogFile(data.AsMemory(88, 80)));
         }
         var directoryInodeFolderIds = new HashSet<uint>();
         if (privateDirectoryDataFolderId is { } directoryDataFolderId)
@@ -532,7 +532,7 @@ internal static class HfsPlusReader
                 "The HFS Plus alternate volume header is missing or has an invalid signature or version.", offset);
     }
 
-    private static JournalInfo? ReportJournalInfoBlockProblem(ForkData image, ReadOnlySpan<byte> volumeHeader,
+    private static JournalInfo? ReportJournalInfoBlockProblem(ForkData image, ReadOnlyMemory<byte> volumeHeader,
         uint blockSize, uint totalBlocks, byte[] allocationBitmap, ContainerContext context)
     {
         const uint journalInVolumeFlag = 0x00000001;
@@ -656,7 +656,7 @@ internal static class HfsPlusReader
         context.Report(DiagnosticSeverity.Warning, "hfs.plus-journal-info-invalid",
             "The HFS Plus journal header has invalid fields, offsets, size, or checksum.");
 
-    private static JournalCatalogFile ReadJournalCatalogFile(ReadOnlySpan<byte> fork)
+    private static JournalCatalogFile ReadJournalCatalogFile(ReadOnlyMemory<byte> fork)
     {
         ulong logicalSize = U64(fork, 0);
         uint totalBlocks = U32(fork, 12);
@@ -727,7 +727,7 @@ internal static class HfsPlusReader
                     throw new InvalidDataException("An HFS Plus fork-data attribute has an invalid length.");
                 if (U32(key, 8) != 0 || state.HasForkData)
                     throw new InvalidDataException("An HFS Plus attribute fork-data record has an invalid key.");
-                ReadOnlySpan<byte> fork = data.AsSpan(8, 80);
+                ReadOnlyMemory<byte> fork = data.AsMemory(8, 80);
                 state.HasForkData = true;
                 state.LogicalSize = U64(fork, 0);
                 state.TotalBlocks = U32(fork, 12);
@@ -741,14 +741,14 @@ internal static class HfsPlusReader
             case 0x30:
                 if (data.Length != 72)
                     throw new InvalidDataException("An HFS Plus attribute extension record has an invalid length.");
-                ExtentRecordInfo extension = AddExtentRecord(data.AsSpan(8, 64), totalBlocks, allocationExtents,
+                ExtentRecordInfo extension = AddExtentRecord(data.AsMemory(8, 64), totalBlocks, allocationExtents,
                     "An HFS Plus attribute extension extent lies outside the allocation area.", ordinaryForkExtents);
                 state.Extensions.Add((U32(key, 8), extension));
                 return;
         }
     }
 
-    private static void ValidateSecurityAttribute(ReadOnlySpan<byte> record, ContainerContext context)
+    private static void ValidateSecurityAttribute(ReadOnlyMemory<byte> record, ContainerContext context)
     {
         const uint inlineDataRecord = 0x10;
         const uint fileSecurityMagic = 0x012CC16D;
@@ -766,7 +766,7 @@ internal static class HfsPlusReader
                 invalid = true;
             else
             {
-                ReadOnlySpan<byte> value = record.Slice(inlineHeaderSize, (int)valueLength);
+                ReadOnlyMemory<byte> value = record.Slice(inlineHeaderSize, (int)valueLength);
                 invalid = value.Length < fileSecurityHeaderSize || U32(value, 0) != fileSecurityMagic;
                 if (!invalid)
                 {
@@ -917,7 +917,7 @@ internal static class HfsPlusReader
         return true;
     }
 
-    private static ExtentRecordInfo AddExtentRecord(ReadOnlySpan<byte> extents, uint totalBlocks,
+    private static ExtentRecordInfo AddExtentRecord(ReadOnlyMemory<byte> extents, uint totalBlocks,
         List<(uint Start, uint End)> allocationExtents, string outOfRangeMessage,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
@@ -937,7 +937,7 @@ internal static class HfsPlusReader
         return new ExtentRecordInfo(covered, extentCount);
     }
 
-    private static bool HasExtentDescriptor(ReadOnlySpan<byte> extents)
+    private static bool HasExtentDescriptor(ReadOnlyMemory<byte> extents)
     {
         for (int index = 0; index < 8; index++)
             if (U32(extents, index * 8) != 0 || U32(extents, index * 8 + 4) != 0)
@@ -945,7 +945,7 @@ internal static class HfsPlusReader
         return false;
     }
 
-    private static void ValidateExtentDescriptorSequence(ReadOnlySpan<byte> extents)
+    private static void ValidateExtentDescriptorSequence(ReadOnlyMemory<byte> extents)
     {
         bool unusedDescriptorSeen = false;
         for (int index = 0; index < 8; index++)
@@ -1052,7 +1052,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException("The HFS Plus catalog has a thread for a missing node.");
     }
 
-    private static ForkData ReadFork(ForkData image, ReadOnlySpan<byte> fork, uint blockSize, uint totalBlocks,
+    private static ForkData ReadFork(ForkData image, ReadOnlyMemory<byte> fork, uint blockSize, uint totalBlocks,
         Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>? overflow = null,
         byte forkType = 0, uint fileId = 0, List<(uint Start, uint End)>? allocationExtents = null,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
@@ -1075,7 +1075,7 @@ internal static class HfsPlusReader
         var ranges = new List<(long Offset, long Length)>();
         uint coveredBlocks = 0;
         int coveredExtents = 0;
-        void AddExtents(ReadOnlySpan<byte> extents, bool addToAllocationOwnership)
+        void AddExtents(ReadOnlyMemory<byte> extents, bool addToAllocationOwnership)
         {
             ValidateExtentDescriptorSequence(extents);
             for (int index = 0; index < 8; index++)
@@ -1179,7 +1179,7 @@ internal static class HfsPlusReader
         };
         if (maxKeyLength != definedMaxKeyLength)
             throw new InvalidDataException($"The HFS Plus {name} B-tree maximum key length is invalid.");
-        ValidateHeaderNodeRecordLayout(tree.AsSpan(0, nodeSize), nodeSize, name);
+        ValidateHeaderNodeRecordLayout(tree.AsMemory(0, nodeSize), nodeSize, name);
         if ((name is "catalog" or "attributes") && nodeSize < 4096)
             throw new InvalidDataException($"The HFS Plus {name} B-tree node size is below the 4 KiB minimum.");
         uint totalNodes = U32(tree, 36);
@@ -1236,7 +1236,7 @@ internal static class HfsPlusReader
             if (!seen.Add(node) || node >= totalNodes)
                 throw new InvalidDataException($"The HFS Plus {name} B-tree leaf chain is invalid.");
             int start = checked((int)node * nodeSize);
-            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsSpan(start, nodeSize), nodeSize, name);
+            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsMemory(start, nodeSize), nodeSize, name);
             if (tree[start + 8] != 0xFF || tree[start + 9] != 1)
                 throw new InvalidDataException($"An HFS Plus {name} B-tree linked leaf has an invalid type.");
             if (U32(tree, start + 4) != previous)
@@ -1260,7 +1260,7 @@ internal static class HfsPlusReader
                 if (name == "catalog")
                 {
                     ValidateCatalogKey(key, isHfsX);
-                    ReadOnlySpan<byte> recordData = tree.AsSpan(dataOffset, start + end - dataOffset);
+                    ReadOnlyMemory<byte> recordData = tree.AsMemory(dataOffset, start + end - dataOffset);
                     if (U16(key, 6) == 0 && recordData.Length >= 2 && U16(recordData, 0) is 1 or 2)
                         throw new InvalidDataException("An HFS Plus file or folder catalog key has an empty name.");
                     if (caseSensitiveCatalog || caseFoldingCatalog)
@@ -1308,7 +1308,7 @@ internal static class HfsPlusReader
         ValidateNodeMap(tree, nodeSize, totalNodes, indexedNodes, name);
     }
 
-    private static void ValidateHeaderNodeRecordLayout(ReadOnlySpan<byte> headerNode, int nodeSize, string name)
+    private static void ValidateHeaderNodeRecordLayout(ReadOnlyMemory<byte> headerNode, int nodeSize, string name)
     {
         int freeSpaceOffset = nodeSize - 8;
         if (U16(headerNode, nodeSize - 2) != 14 ||
@@ -1318,7 +1318,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException($"The HFS Plus {name} B-tree header node has an invalid record layout.");
     }
 
-    private static void RequireFirstRecordStartsAtNodeDescriptorEnd(ReadOnlySpan<byte> node, int nodeSize,
+    private static void RequireFirstRecordStartsAtNodeDescriptorEnd(ReadOnlyMemory<byte> node, int nodeSize,
         string name)
     {
         if (U16(node, 10) != 0 && U16(node, nodeSize - 2) != 14)
@@ -1347,7 +1347,7 @@ internal static class HfsPlusReader
             if (nodeNumber >= totalNodes || !visitedNodes.Add(nodeNumber))
                 throw new InvalidDataException($"The HFS Plus {name} B-tree index graph is cyclic or out of range.");
             int start = checked((int)nodeNumber * nodeSize);
-            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsSpan(start, nodeSize), nodeSize, name);
+            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsMemory(start, nodeSize), nodeSize, name);
             if (expectedHeight == 1)
             {
                 if (tree[start + 8] != 0xFF || tree[start + 9] != 1)
@@ -1512,7 +1512,7 @@ internal static class HfsPlusReader
         _ => throw new InvalidOperationException($"No key comparator is defined for the {name} B-tree.")
     };
 
-    private static void ValidateAttributeKey(ReadOnlySpan<byte> key)
+    private static void ValidateAttributeKey(ReadOnlyMemory<byte> key)
     {
         if (key.Length < 14 || U16(key, 0) != key.Length - 2 || U16(key, 2) != 0)
             throw new InvalidDataException("The HFS Plus attributes B-tree key length or padding is invalid.");
@@ -1523,7 +1523,7 @@ internal static class HfsPlusReader
 
     // Apple’s HFS comparator orders attribute keys by file ID, name length, binary UTF-16 name,
     // then start block (hfs_attrkeycompare in Apple’s HFS source).
-    private static int CompareAttributeKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    private static int CompareAttributeKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         int comparison = U32(left, 4).CompareTo(U32(right, 4));
         if (comparison != 0) return comparison;
@@ -1561,7 +1561,7 @@ internal static class HfsPlusReader
                 throw new InvalidDataException("The HFS Plus B-tree map-node chain is cyclic or invalid.");
 
             int offset = checked((int)nextMapNode * nodeSize);
-            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsSpan(offset, nodeSize), nodeSize,
+            RequireFirstRecordStartsAtNodeDescriptorEnd(tree.AsMemory(offset, nodeSize), nodeSize,
                 "node map");
             if (tree[offset + 8] != 2 || tree[offset + 9] != 0 || U16(tree, offset + 10) != 1 ||
                 U32(tree, offset + 4) != 0 || U16(tree, offset + nodeSize - 4) != nodeSize - 6)
@@ -1659,7 +1659,7 @@ internal static class HfsPlusReader
                 throw new InvalidDataException("The HFS Plus B-tree node map has nonzero unused bytes.");
     }
 
-    private static void AddCatalogTextEncoding(ReadOnlySpan<byte> record, ref ulong requiredBitmap)
+    private static void AddCatalogTextEncoding(ReadOnlyMemory<byte> record, ref ulong requiredBitmap)
     {
         uint textEncoding = U32(record, 80);
         uint bit = textEncoding switch
@@ -1672,33 +1672,33 @@ internal static class HfsPlusReader
         if (bit < 64) requiredBitmap |= 1UL << checked((int)bit);
     }
 
-    private static string Name(ReadOnlySpan<byte> key)
+    private static string Name(ReadOnlyMemory<byte> key)
     {
         if (key.Length < 8) throw new InvalidDataException("An HFS Plus catalog name is truncated.");
         int length = U16(key, 6);
         if (length > 255 || key.Length < 8 + 2 * length)
             throw new InvalidDataException("An HFS Plus catalog name is invalid.");
-        return Encoding.BigEndianUnicode.GetString(key.Slice(8, 2 * length)).Normalize(NormalizationForm.FormC);
+        return Encoding.BigEndianUnicode.GetString(key.Span.Slice(8, 2 * length)).Normalize(NormalizationForm.FormC);
     }
 
-    private static int CompareExtentKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    private static int CompareExtentKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         int comparison = U32(left, 4).CompareTo(U32(right, 4));
         if (comparison != 0) return comparison;
-        comparison = left[2].CompareTo(right[2]);
+        comparison = left.Span[2].CompareTo(right.Span[2]);
         return comparison != 0 ? comparison : U32(left, 8).CompareTo(U32(right, 8));
     }
 
-    private static void ValidateCatalogKey(ReadOnlySpan<byte> key, bool isHfsX)
+    private static void ValidateCatalogKey(ReadOnlyMemory<byte> key, bool isHfsX)
     {
         int nameLength = U16(key, 6);
         if (nameLength > 255 || key.Length != 8 + nameLength * 2)
             throw new InvalidDataException("An HFSX catalog key has an invalid name length.");
-        if (!HfsPlusUnicodeNormalization.IsCanonical(key.Slice(8, nameLength * 2), isHfsX))
+        if (!HfsPlusUnicodeNormalization.IsCanonical(key.Span.Slice(8, nameLength * 2), isHfsX))
             throw new InvalidDataException("An HFS Plus catalog name is not canonically decomposed.");
     }
 
-    private static void ValidateCatalogObjectName(ReadOnlySpan<byte> key)
+    private static void ValidateCatalogObjectName(ReadOnlyMemory<byte> key)
     {
         int nameLength = U16(key, 6);
         if (nameLength == 1 && U16(key, 8) == '.')
@@ -1707,7 +1707,7 @@ internal static class HfsPlusReader
             throw new InvalidDataException("An HFS Plus catalog object is named '..'.");
     }
 
-    private static void ReportInvalidBsdMode(ushort mode, bool isFolder, ReadOnlySpan<byte> key,
+    private static void ReportInvalidBsdMode(ushort mode, bool isFolder, ReadOnlyMemory<byte> key,
         ContainerContext context)
     {
         if (mode == 0) return; // Apple fsck_hfs treats a zero BSD info record as uninitialized.
@@ -1723,7 +1723,7 @@ internal static class HfsPlusReader
                 $"in mode 0x{mode:X4}.");
     }
 
-    private static int CompareHfsXCatalogKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    private static int CompareHfsXCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right)
     {
         int comparison = U32(left, 2).CompareTo(U32(right, 2));
         if (comparison != 0) return comparison;
@@ -1737,7 +1737,7 @@ internal static class HfsPlusReader
         return leftLength.CompareTo(rightLength);
     }
 
-    private static int CompareCatalogKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right, bool caseFolding)
+    private static int CompareCatalogKeys(ReadOnlyMemory<byte> left, ReadOnlyMemory<byte> right, bool caseFolding)
     {
         int comparison = U32(left, 2).CompareTo(U32(right, 2));
         if (comparison != 0) return comparison;
@@ -1907,10 +1907,10 @@ internal static class HfsPlusReader
         catch (ArgumentException) { return MacString.FromMacRoman("?"); }
     }
     // An offset outside the data throws ArgumentOutOfRangeException.
-    private static ushort U16(ReadOnlySpan<byte> data, int offset) =>
+    private static ushort U16(ReadOnlyMemory<byte> data, int offset) =>
         new BigEndianReader(data).TryReadUInt16At(offset, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
-    private static uint U32(ReadOnlySpan<byte> data, int offset) =>
+    private static uint U32(ReadOnlyMemory<byte> data, int offset) =>
         new BigEndianReader(data).TryReadUInt32At(offset, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
-    private static ulong U64(ReadOnlySpan<byte> data, int offset) =>
+    private static ulong U64(ReadOnlyMemory<byte> data, int offset) =>
         new BigEndianReader(data).TryReadUInt64At(offset, out ulong value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
 }

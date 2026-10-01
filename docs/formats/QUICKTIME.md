@@ -224,8 +224,7 @@ The standalone form of a QuickTime image (`.qtif`, `.qti`, `.qif`) is a sequence
 - **`iicc`:** an ICC profile (optional).
 - Other atoms (`meta`, …) can be ignored.
 - The first atom of each type is used. An atom running past the end of the file is cut there, and an atom whose size
-  is less than its header ends the file. Read from a stream, the atoms are taken in order and only the first `idsc`,
-  `idat` and `iicc` are kept [ClassicMac].
+  is less than its header ends the file [ClassicMac].
 - **Detection:** the first atom's type is `idsc`, `idat` or `iicc`.
 
 ---

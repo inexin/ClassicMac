@@ -62,7 +62,7 @@ namespace ClassicMac.Files.Containers
             // Version 1 names the home file system in the filler ("Macintosh", "ProDOS", …); version 2 zeroes it.
             var homeFileSystem = System.Text.Encoding.ASCII.GetString(header, 8, 16).TrimEnd(' ', '\0');
             var count = reader.ReadUInt16At(24);
-            var table = input.ReadPrefix(HeaderLength + count * EntryLength).AsSpan(HeaderLength);
+            var table = input.ReadPrefix(HeaderLength + count * EntryLength).AsMemory(HeaderLength);
             if (table.Length < count * EntryLength)
             {
                 context.Report(DiagnosticSeverity.Error, "applesingle.entries-truncated",

@@ -73,7 +73,7 @@ namespace ClassicMac.Files.Hfs
         // The note's checksum: add each big-endian 16-bit word, then rotate the 32-bit sum right by one. The tag
         // checksum skips the first 12 bytes (the first block's tags), as Disk Copy does (confirmed on a DART 1.5.3
         // sample's Disk Copy 4.2 export).
-        internal static uint Sum(ReadOnlySpan<byte> data)
+        internal static uint Sum(ReadOnlyMemory<byte> data)
         {
             var reader = new BigEndianReader(data);
             uint sum = 0;
@@ -94,7 +94,7 @@ namespace ClassicMac.Files.Hfs
             int read;
             while ((read = stream.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false)) > 0)
             {
-                var reader = new BigEndianReader(buffer.AsSpan(0, read));
+                var reader = new BigEndianReader(buffer.AsMemory(0, read));
                 for (var i = 0; i + 1 < read; i += 2)
                 {
                     if (position + i >= skip)

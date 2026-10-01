@@ -28,16 +28,18 @@ namespace ClassicMac.Graphics.Pict
             var reader = new ClassicMac.Core.BigEndianReader(block) { Position = 2 }; // version
             for (int i = 0; i < 9; i++) q.Matrix[i] = reader.ReadInt32();
             int matteSize = reader.ReadInt32();
-            ReadRect(ref reader);                                     // matte rect
+            ReadRect(reader);                                     // matte rect
             q.Mode = reader.ReadUInt16();
-            q.SourceRect = ReadRect(ref reader);
+            q.SourceRect = ReadRect(reader);
             reader.ReadInt32();                                       // accuracy
             int maskSize = reader.ReadInt32();
             if (matteSize < 0 || maskSize < 0 || reader.Position + (long)matteSize + maskSize > block.Length) return null;
             reader.Skip(matteSize);                                   // the matte is not applied
             if (maskSize > 0)
             {
-                try { q.Mask = Region.FromRgnData(reader.ReadBytes(maskSize)); }
+                var mask = block.AsMemory(reader.Position, maskSize);
+                reader.Skip(maskSize);
+                try { q.Mask = Region.FromRgnData(mask); }
                 catch (InvalidDataException) { }
             }
             var p = reader.Position;
@@ -50,7 +52,7 @@ namespace ClassicMac.Graphics.Pict
             return q;
         }
 
-        private static PictRect ReadRect(ref ClassicMac.Core.BigEndianReader reader) =>
+        private static PictRect ReadRect(ClassicMac.Core.BigEndianReader reader) =>
             new(reader.ReadInt16(), reader.ReadInt16(), reader.ReadInt16(), reader.ReadInt16());
 
         // Where the matrix puts the source rect, in picture coordinates (scale and translation; a rotated or skewed

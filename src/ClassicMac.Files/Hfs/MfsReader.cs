@@ -68,7 +68,7 @@ namespace ClassicMac.Files.Hfs
                 while (at - block * BlockSize < 460 && at + 51 <= end && directory[at] != 0)
                 {
                     var e = directory.AsSpan(at);
-                    var entry = new BigEndianReader(e);
+                    var entry = new BigEndianReader(directory.AsMemory(at));
                     int nameLength = e[50];
                     if (at + 51 + nameLength > end)
                     {

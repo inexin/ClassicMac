@@ -50,36 +50,36 @@ namespace ClassicMac.Resources
         public bool IsCompressed => (Attributes & 1) != 0;
 
         /// <summary>Whether <paramref name="data"/> starts with the compressed-resource signature.</summary>
-        public static bool HasSignature(ReadOnlySpan<byte> data) =>
+        public static bool HasSignature(ReadOnlyMemory<byte> data) =>
             new BigEndianReader(data).TryReadUInt32At(0, out var signature) && signature == Signature;
 
         /// <summary>Reads the header; false when the data is too short or lacks the signature.</summary>
-        public static bool TryRead(ReadOnlySpan<byte> data, out CompressedResourceHeader header)
+        public static bool TryRead(ReadOnlyMemory<byte> data, out CompressedResourceHeader header)
         {
             header = default;
             if (data.Length < Length || !HasSignature(data)) return false;
             var reader = new BigEndianReader(data);
-            var version = data[6];
+            var version = data.Span[6];
             header = version == 8
                 ? new CompressedResourceHeader
                 {
                     Version = version,
-                    Attributes = data[7],
+                    Attributes = data.Span[7],
                     DecompressedSize = reader.ReadUInt32At(8),
-                    WorkingBufferFraction = data[12],
-                    ExpansionBytes = data[13],
+                    WorkingBufferFraction = data.Span[12],
+                    ExpansionBytes = data.Span[13],
                     DecompressorId = reader.ReadInt16At(14),
                     Reserved = reader.ReadUInt16At(16),
                 }
                 : new CompressedResourceHeader
                 {
                     Version = version,
-                    Attributes = data[7],
+                    Attributes = data.Span[7],
                     DecompressedSize = reader.ReadUInt32At(8),
                     DecompressorId = reader.ReadInt16At(12),
                     ExpansionBytes = reader.ReadUInt16At(14),
-                    Param1 = data[16],
-                    Param2 = data[17],
+                    Param1 = data.Span[16],
+                    Param2 = data.Span[17],
                 };
             return true;
         }

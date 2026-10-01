@@ -4,30 +4,41 @@ using System.IO;
 
 namespace ClassicMac.Core
 {
-    /// <summary>Reads big-endian values sequentially from a caller-owned byte span.</summary>
+    /// <summary>Reads big-endian values from bytes, sequentially or at absolute offsets.</summary>
     /// <remarks>
-    /// This stack-only reader does not copy or own the source. Failed <c>TryRead</c> operations do not advance
+    /// The reader does not copy the bytes it is given. Failed <c>TryRead</c> operations do not advance
     /// <see cref="Position"/>. Throwing reads report truncated input with <see cref="EndOfStreamException"/>.
     /// </remarks>
-    public ref struct BigEndianReader
+    public sealed class BigEndianReader
     {
-        private readonly ReadOnlySpan<byte> source;
+        private readonly ReadOnlyMemory<byte> source;
         private int position;
 
         /// <summary>Creates a reader positioned at the beginning of <paramref name="source"/>.</summary>
-        public BigEndianReader(ReadOnlySpan<byte> source)
+        public BigEndianReader(ReadOnlyMemory<byte> source)
         {
             this.source = source;
-            position = 0;
         }
 
+        /// <summary>
+        /// Creates a reader over the bytes from the current position of <paramref name="stream"/> to its end, which are
+        /// read now. The stream is left open.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="stream"/> is null.</exception>
+        public BigEndianReader(Stream stream) : this(ReadToEnd(stream))
+        {
+        }
+
+        /// <summary>All the bytes the reader reads from.</summary>
+        public ReadOnlyMemory<byte> Source => source;
+
         /// <summary>The total number of bytes in the source.</summary>
-        public readonly int Length => source.Length;
+        public int Length => source.Length;
 
         /// <summary>The current read position; setting it outside the source throws.</summary>
         public int Position
         {
-            readonly get => position;
+            get => position;
             set
             {
                 ArgumentOutOfRangeException.ThrowIfGreaterThan((uint)value, (uint)source.Length, nameof(value));
@@ -36,7 +47,7 @@ namespace ClassicMac.Core
         }
 
         /// <summary>The number of unread bytes.</summary>
-        public readonly int Remaining => source.Length - position;
+        public int Remaining => source.Length - position;
 
         /// <summary>Reads one byte.</summary>
         public byte ReadByte() => ReadBytes(1)[0];
@@ -45,7 +56,7 @@ namespace ClassicMac.Core
         public bool TryReadByte(out byte value)
         {
             if (Remaining < 1) { value = default; return false; }
-            value = source[position++];
+            value = source.Span[position++];
             return true;
         }
 
@@ -67,7 +78,7 @@ namespace ClassicMac.Core
         public bool TryReadInt16(out short value)
         {
             if (Remaining < sizeof(short)) { value = default; return false; }
-            value = BinaryPrimitives.ReadInt16BigEndian(source[position..]);
+            value = BinaryPrimitives.ReadInt16BigEndian(source.Span[position..]);
             position += sizeof(short);
             return true;
         }
@@ -90,7 +101,7 @@ namespace ClassicMac.Core
         public bool TryReadUInt16(out ushort value)
         {
             if (Remaining < sizeof(ushort)) { value = default; return false; }
-            value = BinaryPrimitives.ReadUInt16BigEndian(source[position..]);
+            value = BinaryPrimitives.ReadUInt16BigEndian(source.Span[position..]);
             position += sizeof(ushort);
             return true;
         }
@@ -113,7 +124,7 @@ namespace ClassicMac.Core
         public bool TryReadInt32(out int value)
         {
             if (Remaining < sizeof(int)) { value = default; return false; }
-            value = BinaryPrimitives.ReadInt32BigEndian(source[position..]);
+            value = BinaryPrimitives.ReadInt32BigEndian(source.Span[position..]);
             position += sizeof(int);
             return true;
         }
@@ -136,7 +147,7 @@ namespace ClassicMac.Core
         public bool TryReadUInt32(out uint value)
         {
             if (Remaining < sizeof(uint)) { value = default; return false; }
-            value = BinaryPrimitives.ReadUInt32BigEndian(source[position..]);
+            value = BinaryPrimitives.ReadUInt32BigEndian(source.Span[position..]);
             position += sizeof(uint);
             return true;
         }
@@ -159,7 +170,7 @@ namespace ClassicMac.Core
         public bool TryReadInt64(out long value)
         {
             if (Remaining < sizeof(long)) { value = default; return false; }
-            value = BinaryPrimitives.ReadInt64BigEndian(source[position..]);
+            value = BinaryPrimitives.ReadInt64BigEndian(source.Span[position..]);
             position += sizeof(long);
             return true;
         }
@@ -182,7 +193,7 @@ namespace ClassicMac.Core
         public bool TryReadUInt64(out ulong value)
         {
             if (Remaining < sizeof(ulong)) { value = default; return false; }
-            value = BinaryPrimitives.ReadUInt64BigEndian(source[position..]);
+            value = BinaryPrimitives.ReadUInt64BigEndian(source.Span[position..]);
             position += sizeof(ulong);
             return true;
         }
@@ -326,7 +337,7 @@ namespace ClassicMac.Core
         {
             ArgumentOutOfRangeException.ThrowIfNegative(length);
             if (length > Remaining) throw new EndOfStreamException();
-            var result = source.Slice(position, length);
+            var result = source.Span.Slice(position, length);
             position += length;
             return result;
         }
@@ -335,14 +346,21 @@ namespace ClassicMac.Core
         /// <remarks>The returned reader borrows the same source; it cannot read beyond the selected section.</remarks>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="length"/> is negative.</exception>
         /// <exception cref="EndOfStreamException">Fewer than <paramref name="length"/> bytes remain.</exception>
-        public BigEndianReader ReadSubReader(int length) => new(ReadBytes(length));
+        public BigEndianReader ReadSubReader(int length)
+        {
+            ArgumentOutOfRangeException.ThrowIfNegative(length);
+            if (length > Remaining) throw new EndOfStreamException();
+            var sub = new BigEndianReader(source.Slice(position, length));
+            position += length;
+            return sub;
+        }
 
         /// <summary>Attempts to return the next <paramref name="length"/> bytes as a borrowed slice.</summary>
         /// <remarks>A failed attempt returns an empty slice and leaves <see cref="Position"/> unchanged.</remarks>
         public bool TryReadBytes(int length, out ReadOnlySpan<byte> value)
         {
             if (length < 0 || length > Remaining) { value = default; return false; }
-            value = source.Slice(position, length);
+            value = source.Span.Slice(position, length);
             position += length;
             return true;
         }
@@ -351,14 +369,14 @@ namespace ClassicMac.Core
         public ReadOnlySpan<byte> ReadBytesAt(int offset, int length)
         {
             ValidateRange(offset, length);
-            return source.Slice(offset, length);
+            return source.Span.Slice(offset, length);
         }
 
         /// <summary>Attempts to return a borrowed byte slice at an absolute offset.</summary>
         public bool TryReadBytesAt(int offset, int length, out ReadOnlySpan<byte> value)
         {
             if (!IsRangeValid(offset, length)) { value = default; return false; }
-            value = source.Slice(offset, length);
+            value = source.Span.Slice(offset, length);
             return true;
         }
 
@@ -373,14 +391,22 @@ namespace ClassicMac.Core
             return true;
         }
 
-        private readonly bool IsRangeValid(int offset, int length) =>
+        private bool IsRangeValid(int offset, int length) =>
             offset >= 0 && length >= 0 && offset <= source.Length && length <= source.Length - offset;
 
-        private readonly void ValidateRange(int offset, int length)
+        private void ValidateRange(int offset, int length)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(offset);
             ArgumentOutOfRangeException.ThrowIfNegative(length);
             if (!IsRangeValid(offset, length)) throw new EndOfStreamException();
+        }
+
+        private static byte[] ReadToEnd(Stream stream)
+        {
+            ArgumentNullException.ThrowIfNull(stream);
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            return buffer.ToArray();
         }
     }
 }

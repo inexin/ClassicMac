@@ -74,7 +74,7 @@ namespace ClassicMac.Files
         {
             Span<byte> bytes = stackalloc byte[Length];
             source[..Math.Min(source.Length, Length)].CopyTo(bytes);
-            var reader = new BigEndianReader(bytes);
+            var reader = new BigEndianReader(bytes.ToArray());
             return new FinderInfo
             {
                 Type = new FourCC(bytes[..4]),

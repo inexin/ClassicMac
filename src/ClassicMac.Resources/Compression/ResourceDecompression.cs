@@ -58,7 +58,7 @@ namespace ClassicMac.Resources
             void Report(DiagnosticSeverity severity, string code, string message) =>
                 diagnostics?.Add(new Diagnostic(severity, code, $"{label}: {message}"));
 
-            var bytes = stored.Span;
+            var bytes = stored;
             if (!CompressedResourceHeader.HasSignature(bytes))
             {
                 // Both Resource Managers load such a resource as is.
@@ -133,7 +133,7 @@ namespace ClassicMac.Resources
             // After the block comes zeroed memory standing in for the Mac's heap, which decompressors may use.
             var block = new byte[blockLength + MemoryAfterBlock];
             var source = (int)(blockLength - sourceLength);
-            bytes[CompressedResourceHeader.Length..].CopyTo(block.AsSpan(source));
+            bytes.Span[CompressedResourceHeader.Length..].CopyTo(block.AsSpan(source));
 
             int written;
             DecompressionContext context = new(

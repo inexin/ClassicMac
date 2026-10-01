@@ -24,7 +24,7 @@ namespace ClassicMac.Resources.Decoders.Text
     {
         private const int ElementLength = 20;
 
-        public static List<StyleRun> Read(ReadOnlySpan<byte> data, out bool complete)
+        public static List<StyleRun> Read(ReadOnlyMemory<byte> data, out bool complete)
         {
             var runs = new List<StyleRun>();
             complete = data.Length >= 2;

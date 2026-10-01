@@ -38,14 +38,14 @@ namespace ClassicMac.Graphics.Fonts
         /// Reads the offset table and table directory, and the <c>name</c> table's names (Macintosh Roman, else Unicode).
         /// Throws <see cref="InvalidDataException"/> under 12 bytes.
         /// </summary>
-        public static OutlineFont Read(ReadOnlySpan<byte> data, ICollection<Diagnostic>? diagnostics = null)
+        public static OutlineFont Read(ReadOnlyMemory<byte> data, ICollection<Diagnostic>? diagnostics = null)
         {
             var reader = new ClassicMac.Core.BigEndianReader(data);
-            return Read(ref reader, diagnostics);
+            return Read(reader, diagnostics);
         }
 
         /// <summary>Reads an sfnt from the reader's current position and advances past its bytes.</summary>
-        public static OutlineFont Read(ref ClassicMac.Core.BigEndianReader reader, ICollection<Diagnostic>? diagnostics = null)
+        public static OutlineFont Read(ClassicMac.Core.BigEndianReader reader, ICollection<Diagnostic>? diagnostics = null)
         {
             int start = reader.Position;
             int length = reader.Remaining;
@@ -71,11 +71,11 @@ namespace ClassicMac.Graphics.Fonts
             {
                 reader.Position = start + (int)names.Offset;
                 var tableReader = reader.ReadSubReader((int)names.Length);
-                family = Name(ref tableReader, 1);
+                family = Name(tableReader, 1);
                 tableReader.Position = 0;
-                subfamily = Name(ref tableReader, 2);
+                subfamily = Name(tableReader, 2);
                 tableReader.Position = 0;
-                full = Name(ref tableReader, 4);
+                full = Name(tableReader, 4);
             }
             if (shortData)
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The sfnt's table directory points past its data."));
@@ -93,7 +93,7 @@ namespace ClassicMac.Graphics.Fonts
 
         // A name record's string: the Macintosh platform's (1, Roman) first, else a Unicode platform's (0, or 3 with
         // encoding 1), UTF-16 big-endian.
-        private static string? Name(ref BigEndianReader table, int nameId)
+        private static string? Name(BigEndianReader table, int nameId)
         {
             var count = table.ReadUInt16At(2);
             var strings = table.ReadUInt16At(4);
@@ -125,14 +125,14 @@ namespace ClassicMac.Graphics.Fonts
     public static class FontColorTable
     {
         /// <summary>The (pixel value, red, green, blue) entries, 16 bits per component; empty under 8 bytes.</summary>
-        public static IReadOnlyList<FontColorEntry> Read(ReadOnlySpan<byte> data)
+        public static IReadOnlyList<FontColorEntry> Read(ReadOnlyMemory<byte> data)
         {
             var reader = new BigEndianReader(data);
-            return Read(ref reader);
+            return Read(reader);
         }
 
         /// <summary>Reads entries from the reader's current position and advances it past the table.</summary>
-        public static IReadOnlyList<FontColorEntry> Read(ref BigEndianReader reader)
+        public static IReadOnlyList<FontColorEntry> Read(BigEndianReader reader)
         {
             var entries = new List<FontColorEntry>();
             if (reader.Remaining < 8) return entries;

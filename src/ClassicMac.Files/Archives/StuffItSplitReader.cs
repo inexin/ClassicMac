@@ -170,9 +170,9 @@ public sealed class StuffItSplitReader : IContainerReader
         return true;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
+    private static ushort U16(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
 
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
+    private static uint U32(ReadOnlyMemory<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private sealed record SplitHeader(byte PartNumber, byte[] NameBytes, byte[] Metadata,
         uint ResourceLength, uint DataLength)

@@ -64,7 +64,7 @@ namespace ClassicMac.Resources.Decoders.Interface
             });
         }
 
-        internal static void ColorTable(Utf8JsonWriter w, ReadOnlySpan<byte> data, string[] parts, DecodeInput input)
+        internal static void ColorTable(Utf8JsonWriter w, ReadOnlyMemory<byte> data, string[] parts, DecodeInput input)
         {
             if (data.Length < 8)
             {
@@ -143,7 +143,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         private static byte[] ItemColors(DecodeInput input, DecodeOptions options)
         {
             var ditl = input.Find(FourCC.FromString("DITL"), input.Resource.Id);
-            var items = ditl is { } list ? InterfaceResources.ReadDialogItems(list.Span, options, new List<Diagnostic>(), "") : [];
+            var items = ditl is { } list ? InterfaceResources.ReadDialogItems(list, options, new List<Diagnostic>(), "") : [];
             return Json(input, (w, data) =>
             {
                 w.WriteStartObject();
@@ -183,7 +183,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         }
 
         // A text style: font (or, with flag bit 15, an offset to its name), face (high byte), size, foreground, background, mode.
-        private static void TextStyle(Utf8JsonWriter w, ReadOnlySpan<byte> data, short flags, int offset, DecodeOptions options)
+        private static void TextStyle(Utf8JsonWriter w, ReadOnlyMemory<byte> data, short flags, int offset, DecodeOptions options)
         {
             var style = data[offset..];
             var reader = new BigEndianReader(style);
@@ -193,7 +193,7 @@ namespace ClassicMac.Resources.Decoders.Interface
             if ((flags & 0x8000) != 0 && font >= 0 && font < data.Length)
             {
                 var at = (int)font;
-                MacText.TryReadPascal(data, ref at, out var fontName);
+                MacText.TryReadPascal(data.Span, ref at, out var fontName);
                 w.WriteString("fontName", MacText.Decode(fontName, options));
             }
             else if ((flags & 1) != 0)
@@ -202,7 +202,7 @@ namespace ClassicMac.Resources.Decoders.Interface
             }
             if ((flags & 2) != 0)
             {
-                w.WriteNumber("face", style[2]);
+                w.WriteNumber("face", style.Span[2]);
             }
             if ((flags & 4) != 0)
             {
@@ -245,15 +245,15 @@ namespace ClassicMac.Resources.Decoders.Interface
         // (version 0; one too short for that is read as version 1).
         private static byte[] AlertExtension(DecodeInput input, DecodeOptions options)
         {
-            var head = input.Data.Span;
+            var head = input.Data;
             if (head.Length < 12) Short(input);
             var version = new BigEndianReader(head).TryReadInt16At(0, out var word) ? word : (short)0;
-            var titleAt = version == 0 && head.Length >= 0x1D && 0x1C + 1 + head[0x1C] <= head.Length ? 0x1C : 12;
+            var titleAt = version == 0 && head.Length >= 0x1D && 0x1C + 1 + head.Span[0x1C] <= head.Length ? 0x1C : 12;
             var title = "";
             if (head.Length > titleAt)
             {
                 var at = titleAt;
-                MacText.TryReadPascal(head, ref at, out var text);
+                MacText.TryReadPascal(head.Span, ref at, out var text);
                 title = MacText.Decode(text, options);
             }
             return Json(input, (w, data) =>
@@ -265,7 +265,7 @@ namespace ClassicMac.Resources.Decoders.Interface
                 Flags(w, flags, ["useThemeBackground", "useControlHierarchy", "movable", "useThemeControls"]);
                 w.WriteBoolean("movable", (flags & 4) != 0);
                 w.WriteNumber("refCon", reader.TryReadInt32At(6, out var refCon) ? refCon : 0);
-                w.WriteBoolean("useThemeWindow", data.Length >= 11 && data[10] != 0);
+                w.WriteBoolean("useThemeWindow", data.Length >= 11 && data.Span[10] != 0);
                 w.WriteString("title", title);
                 w.WriteEndObject();
             });
@@ -324,9 +324,9 @@ namespace ClassicMac.Resources.Decoders.Interface
             });
         }
 
-        private delegate void SpanWriter(Utf8JsonWriter w, ReadOnlySpan<byte> data);
+        private delegate void DataWriter(Utf8JsonWriter w, ReadOnlyMemory<byte> data);
 
-        private static byte[] Json(DecodeInput input, SpanWriter write) => MacText.Json(w => write(w, input.Data.Span));
+        private static byte[] Json(DecodeInput input, DataWriter write) => MacText.Json(w => write(w, input.Data));
 
         private static void Flags(Utf8JsonWriter w, uint flags, string[] names, string name = "flags")
         {
@@ -340,7 +340,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         }
 
         // An RGBColor: three u16, and the colour as #rrggbb (high bytes).
-        private static void Rgb(Utf8JsonWriter w, ReadOnlySpan<byte> rgb)
+        private static void Rgb(Utf8JsonWriter w, ReadOnlyMemory<byte> rgb)
         {
             if (rgb.Length < 6) return;
             var reader = new BigEndianReader(rgb);

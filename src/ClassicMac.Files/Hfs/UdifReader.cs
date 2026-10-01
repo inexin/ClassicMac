@@ -104,7 +104,7 @@ namespace ClassicMac.Files.Hfs
             ulong ResourceLength, uint SegmentNumber, uint SegmentCount, uint DataChecksumType, byte[] DataChecksum,
             ulong XmlOffset, ulong XmlLength, uint MasterChecksumType, byte[] MasterChecksum, ulong SectorCount)
         {
-            public static Koly Read(ReadOnlySpan<byte> t)
+            public static Koly Read(ReadOnlyMemory<byte> t)
             {
                 var reader = new BigEndianReader(t);
                 return new(
@@ -120,7 +120,7 @@ namespace ClassicMac.Files.Hfs
         }
 
         // A checksum field: a u32 size in bits, then the value, left-aligned in 128 bytes.
-        private static byte[] Checksum(ReadOnlySpan<byte> field)
+        private static byte[] Checksum(ReadOnlyMemory<byte> field)
         {
             var bits = new BigEndianReader(field).ReadUInt32At(0);
             return field.Slice(4, (int)Math.Min(128, (bits + 7) / 8)).ToArray();
@@ -159,7 +159,7 @@ namespace ClassicMac.Files.Hfs
                 }
                 var reader = new BigEndianReader(data);
                 tables.Add(new Table(id, reader.ReadUInt64At(8), reader.ReadUInt64At(0x10),
-                    reader.ReadUInt64At(0x18), reader.ReadUInt32At(0x40), Checksum(data.AsSpan(0x44)), data));
+                    reader.ReadUInt64At(0x18), reader.ReadUInt32At(0x40), Checksum(data.AsMemory(0x44)), data));
             }
             return tables;
         }

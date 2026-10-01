@@ -43,21 +43,21 @@ namespace ClassicMac.App.ViewModels
             {
                 case "DLOG":
                 {
-                    var dialog = InterfaceResources.ReadWindow(data.Span, true, options, diagnostics, what);
+                    var dialog = InterfaceResources.ReadWindow(data, true, options, diagnostics, what);
                     var items = Items(dialog.ItemsId ?? 0, fork, options, readOptions, diagnostics);
                     return new DialogPreview(dialog.Title, dialog.Definition, Width(dialog.Bounds), Height(dialog.Bounds), items, 0,
                         Content(fork.Find(FourCC.FromString("dctb"), resource.Id), fork, readOptions, diagnostics));
                 }
                 case "ALRT":
                 {
-                    var alert = InterfaceResources.ReadAlert(data.Span, diagnostics, what);
+                    var alert = InterfaceResources.ReadAlert(data, diagnostics, what);
                     var items = Items(alert.ItemsId, fork, options, readOptions, diagnostics);
                     return new DialogPreview("", 1, Width(alert.Bounds), Height(alert.Bounds), items, alert.Stage(1).BoldItem,
                         Content(fork.Find(FourCC.FromString("actb"), resource.Id), fork, readOptions, diagnostics));
                 }
                 case "DITL":
                 {
-                    var items = Build(InterfaceResources.ReadDialogItems(data.Span, options, diagnostics, what), fork, options, readOptions, diagnostics);
+                    var items = Build(InterfaceResources.ReadDialogItems(data, options, diagnostics, what), fork, options, readOptions, diagnostics);
                     // A lone item list: a plain box around its items, with a margin.
                     var right = items.Select(i => (int)i.Item.Bounds.Right).DefaultIfEmpty(100).Max() + 10;
                     var bottom = items.Select(i => (int)i.Item.Bounds.Bottom).DefaultIfEmpty(40).Max() + 10;
@@ -72,14 +72,14 @@ namespace ClassicMac.App.ViewModels
         private static Resources.Decoders.Documents.Rgb? Content(Resource? table, ResourceFork fork, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
         {
             if (table is null) return null;
-            var data = Data(table, fork, readOptions, diagnostics).Span;
+            var data = Data(table, fork, readOptions, diagnostics);
             if (data.Length < 8) return null;
             var reader = new BigEndianReader(data);
             var count = reader.ReadInt16At(6) + 1;
             for (var i = 0; i < count && 16 + i * 8 <= data.Length; i++)
             {
                 var e = 8 + i * 8;
-                if (reader.ReadInt16At(e) == 0) return new(data[e + 2], data[e + 4], data[e + 6]);
+                if (reader.ReadInt16At(e) == 0) return new(data.Span[e + 2], data.Span[e + 4], data.Span[e + 6]);
             }
             return null;
         }
@@ -91,7 +91,7 @@ namespace ClassicMac.App.ViewModels
         private static IReadOnlyList<DialogPreviewItem> Items(short id, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
             ICollection<Diagnostic> diagnostics) =>
             fork.Find(Ditl, id) is { } list
-                ? Build(InterfaceResources.ReadDialogItems(Data(list, fork, readOptions, diagnostics).Span, options, diagnostics, list.ToString()),
+                ? Build(InterfaceResources.ReadDialogItems(Data(list, fork, readOptions, diagnostics), options, diagnostics, list.ToString()),
                     fork, options, readOptions, diagnostics)
                 : [];
 
@@ -106,7 +106,7 @@ namespace ClassicMac.App.ViewModels
                     switch (item.Type)
                     {
                         case 7 when fork.Find(Cntl, id) is { } c:
-                            control = InterfaceResources.ReadControl(Data(c, fork, readOptions, diagnostics).Span, options, diagnostics, c.ToString());
+                            control = InterfaceResources.ReadControl(Data(c, fork, readOptions, diagnostics), options, diagnostics, c.ToString());
                             break;
                         case 32:
                             // A colour icon of the same ID is used first.

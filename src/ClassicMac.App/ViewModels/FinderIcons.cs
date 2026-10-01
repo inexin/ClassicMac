@@ -39,7 +39,7 @@ namespace ClassicMac.App.ViewModels
             {
                 try
                 {
-                    suite = IconSuite.FromFamily(IconFamily.ReadIcns(Lookup(resource.Type, resource.Id)!.Value.Span, diagnostics));
+                    suite = IconSuite.FromFamily(IconFamily.ReadIcns(Lookup(resource.Type, resource.Id)!.Value, diagnostics));
                 }
                 catch (System.IO.InvalidDataException)
                 {
