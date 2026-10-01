@@ -1075,6 +1075,35 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal("An HFS Plus catalog name is not canonically decomposed.", exception.Message);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsNamesOrderCombiningMarksByCodePointAcrossSupplementaryCharacters(bool hfsX)
+    {
+        // Unicode 3.2 assigns U+1D165 combining class 216 and U+0300 class 230.
+        byte[] canonicalImage = HfsPlusFixture.Build("a\U0001D165\u0300", hfsX: hfsX);
+        byte[] nonCanonicalImage = HfsPlusFixture.Build("a\u0300\U0001D165", hfsX: hfsX);
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(canonicalImage), new ContainerContext()));
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(nonCanonicalImage), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsNamesAreLimitedTo255Utf16CodeUnits(bool hfsX)
+    {
+        string maximumLengthName = new string('a', 253) + "\U0001F600";
+        string overMaximumName = new string('a', 254) + "\U0001F600";
+        byte[] maximumLengthImage = HfsPlusFixture.Build(maximumLengthName, hfsX: hfsX);
+        byte[] overMaximumImage = HfsPlusFixture.Build(overMaximumName, hfsX: hfsX);
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(maximumLengthImage), new ContainerContext()));
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(overMaximumImage), new ContainerContext()));
+    }
+
     [Fact]
     public void HfsPlusCatalogThreadNamesMustNotContainUnpairedSurrogates()
     {
@@ -1116,6 +1145,9 @@ public sealed class HfsPlusFeatureTests
 
     [Theory]
     [InlineData("a\u0307\u0307", false)] // Legacy double-dot-above spelling.
+    [InlineData("\u0306\u0307", false)] // Legacy breve + dot-above maps to U+0310.
+    [InlineData("\u03B9\u0308\u030D", false)] // Legacy dialytika + perispomeni maps to dialytika + tonos.
+    [InlineData("\u03B9\u0308\u0301", true)]
     [InlineData("a\u0310", true)]
     [InlineData("\u00A8\u030D", false)] // Legacy dialytika tonos representation.
     [InlineData("\u00A8\u0301", true)]
@@ -1180,6 +1212,8 @@ public sealed class HfsPlusFeatureTests
 
     [Theory]
     [InlineData("a\u0307\u0307")]
+    [InlineData("\u0306\u0307")]
+    [InlineData("\u03B9\u0308\u030D")]
     [InlineData("\u03B1\u030D")]
     [InlineData("\u03B5\u030D")]
     [InlineData("\u03C9\u030D")]
@@ -1200,6 +1234,8 @@ public sealed class HfsPlusFeatureTests
 
     [Theory]
     [InlineData("a\u0307\u0307")]
+    [InlineData("\u0306\u0307")]
+    [InlineData("\u03B9\u0308\u030D")]
     [InlineData("\u00A8\u030D")]
     [InlineData("\u03B1\u030D")]
     [InlineData("\u03B5\u030D")]

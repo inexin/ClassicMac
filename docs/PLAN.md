@@ -819,7 +819,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     reserved catalog ID rules, folder flag validity, BSD object-type validation, and catalog names that are nonempty,
     well-formed UTF-16 and canonically decomposed (Unicode 3.2; object names `.` and `..` are rejected; HFS+ also
     accepts the 44 known Unicode 2.1 spellings whose decomposition changed; HFSX checks post-Jaguar doubled-dot-above,
-    Greek tonos/dialytika and the known Bengali, Odia, Gurmukhi, Thai, Lao and Tibetan `fsck_hfs` corrections; other
+    breve + dot-above, Greek tonos/dialytika and the known Bengali, Odia, Gurmukhi, Thai, Lao and Tibetan `fsck_hfs` corrections; other
     Unicode 2.1/3.2 compatibility cases remain),
     root-parent ID, unique catalog IDs and next-ID consistency, parent IDs that resolve to folders, file/folder threads,
     folder valences and parent chains (including empty folders).

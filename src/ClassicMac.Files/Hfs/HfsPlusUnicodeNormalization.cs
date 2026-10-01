@@ -97,7 +97,10 @@ internal static partial class HfsPlusUnicodeNormalization
             if (codePoints[index] == 0x0307 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0307)
                 return true;
 
-            if ((codePoints[index] == 0x00A8 || IsGreekTonosBase(codePoints[index])) &&
+            if (codePoints[index] == 0x0306 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0307)
+                return true;
+
+            if ((codePoints[index] is 0x00A8 or 0x0308 || IsGreekTonosBase(codePoints[index])) &&
                 index + 1 < codePoints.Count && codePoints[index + 1] == 0x030D)
                 return true;
 
