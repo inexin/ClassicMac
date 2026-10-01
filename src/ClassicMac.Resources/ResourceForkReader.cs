@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -32,16 +31,17 @@ namespace ClassicMac.Resources
                     error == 0 ? "fork.mac-misreads" : "fork.mac-rejects", $"{verdict} Read anyway."));
             }
 
-            long dataOffset = BinaryPrimitives.ReadUInt32BigEndian(bytes);
-            long mapOffset = BinaryPrimitives.ReadUInt32BigEndian(bytes[4..]);
-            long dataLength = BinaryPrimitives.ReadUInt32BigEndian(bytes[8..]);
-            long mapLength = BinaryPrimitives.ReadUInt32BigEndian(bytes[12..]);
+            var reader = new BigEndianReader(bytes);
+            long dataOffset = reader.ReadUInt32();
+            long mapOffset = reader.ReadUInt32();
+            long dataLength = reader.ReadUInt32();
+            long mapLength = reader.ReadUInt32();
 
             // ResEdit's recovery [ClassicMac, from ResEdit's behaviour]: a map offset past the end is replaced by the end of the data area
             // when a map with a sane type-list offset sits there.
             var guess = dataOffset + dataLength;
             if (mapOffset + MapHeaderLength > bytes.Length && guess + MapHeaderLength <= bytes.Length
-                && BinaryPrimitives.ReadUInt16BigEndian(bytes[((int)guess + MapTypeListOffsetOffset)..]) is var guessTypes
+                && reader.ReadUInt16At((int)guess + MapTypeListOffsetOffset) is var guessTypes
                 && guessTypes >= MapHeaderLength && guess + guessTypes + TypeCountLength <= bytes.Length)
             {
                 fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "fork.map-recovered",
@@ -86,13 +86,13 @@ namespace ClassicMac.Resources
             fork.MapReservedData = input.Slice(map + HeaderLength, ResourceFork.MapReservedDataLength).ToArray();
             fork.Attributes = (ResourceForkAttributes)bytes[map + MapAttributesOffset];
             fork.MapFlags = (ResourceMapFlags)bytes[map + MapFlagsOffset];
-            var typeList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapTypeListOffsetOffset)..]);
-            var nameList = mapOffset + BinaryPrimitives.ReadUInt16BigEndian(bytes[(map + MapNameListOffsetOffset)..]);
+            var typeList = mapOffset + reader.ReadUInt16At(map + MapTypeListOffsetOffset);
+            var nameList = mapOffset + reader.ReadUInt16At(map + MapNameListOffsetOffset);
             if (typeList + TypeCountLength > mapEnd)
                 throw new InvalidDataException($"The type list at {typeList} lies outside the resource map. {verdict}".TrimEnd());
 
             var context = new Context(input, fork, options, dataOffset, dataEnd, mapEnd, nameList);
-            var typeCount = (ushort)(BinaryPrimitives.ReadUInt16BigEndian(bytes[(int)typeList..]) + 1);
+            var typeCount = (ushort)(reader.ReadUInt16At((int)typeList) + 1);
             var seenTypes = new HashSet<FourCC>();
             // The Resource Manager assumes the reference lists follow the type list contiguously, in type order.
             long expectedReferences = TypeCountLength + (long)typeCount * TypeEntryLength;
@@ -106,10 +106,10 @@ namespace ClassicMac.Resources
                         $"The type list promises {typeCount} types but the map ends after {i}.", entry));
                     break;
                 }
-                var e = bytes.Slice((int)entry, TypeEntryLength);
-                var type = new FourCC(e[..4]);
-                var count = BinaryPrimitives.ReadUInt16BigEndian(e[4..]) + 1;
-                var references = typeList + BinaryPrimitives.ReadUInt16BigEndian(e[6..]);
+                reader.Position = (int)entry;
+                var type = reader.ReadFourCC();
+                var count = reader.ReadUInt16() + 1;
+                var references = typeList + reader.ReadUInt16();
                 if (!seenTypes.Add(type))
                 {
                     fork.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "fork.duplicate-type",
@@ -140,7 +140,7 @@ namespace ClassicMac.Resources
 
         private static void ReadReferences(Context context, FourCC type, int count, long references)
         {
-            var bytes = context.Input.Span;
+            var reader = new BigEndianReader(context.Input.Span);
             for (var i = 0; i < count; i++)
             {
                 var entry = references + (long)i * ReferenceEntryLength;
@@ -150,11 +150,13 @@ namespace ClassicMac.Resources
                         $"The reference list of '{type}' promises {count} resources but the map ends after {i}.", entry);
                     return;
                 }
-                var e = bytes.Slice((int)entry, ReferenceEntryLength);
-                var id = BinaryPrimitives.ReadInt16BigEndian(e);
-                var nameOffset = BinaryPrimitives.ReadUInt16BigEndian(e[2..]);
-                var attributes = (ResourceAttributes)e[4];
-                var dataOffset = BinaryPrimitives.ReadUInt32BigEndian(e[4..]) & MaxDataOffset;
+                reader.Position = (int)entry;
+                var id = reader.ReadInt16();
+                var nameOffset = reader.ReadUInt16();
+                var attributesAndData = reader.ReadUInt32();
+                var attributes = (ResourceAttributes)(attributesAndData >> 24);
+                var dataOffset = attributesAndData & MaxDataOffset;
+                var storedHandle = reader.ReadUInt32();
                 var label = $"'{type}' {id}";
 
                 if (context.Fork.Find(type, id) is not null)
@@ -174,7 +176,7 @@ namespace ClassicMac.Resources
                 resource.DataPlacement = dataOffset;
                 resource.NamePlacement = nameOffset;
                 resource.DataModified = false;
-                resource.StoredHandle = BinaryPrimitives.ReadUInt32BigEndian(e[8..]);
+                resource.StoredHandle = storedHandle;
                 context.Fork.Add(resource);
             }
         }
@@ -188,7 +190,7 @@ namespace ClassicMac.Resources
                     $"The data of {label} at {start} lies outside the data area; the resource is skipped.", entry);
                 return null;
             }
-            long length = BinaryPrimitives.ReadUInt32BigEndian(context.Input.Span[(int)start..]);
+            long length = new BigEndianReader(context.Input.Span).ReadUInt32At((int)start);
             if (length > context.Options.MaxResourceSize)
             {
                 context.Report(DiagnosticSeverity.Error, "resource.too-large",

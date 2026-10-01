@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using ClassicMac.Core;
 
 namespace ClassicMac.Resources
 {
@@ -51,32 +51,33 @@ namespace ClassicMac.Resources
 
         /// <summary>Whether <paramref name="data"/> starts with the compressed-resource signature.</summary>
         public static bool HasSignature(ReadOnlySpan<byte> data) =>
-            data.Length >= 4 && BinaryPrimitives.ReadUInt32BigEndian(data) == Signature;
+            new BigEndianReader(data).TryReadUInt32At(0, out var signature) && signature == Signature;
 
         /// <summary>Reads the header; false when the data is too short or lacks the signature.</summary>
         public static bool TryRead(ReadOnlySpan<byte> data, out CompressedResourceHeader header)
         {
             header = default;
             if (data.Length < Length || !HasSignature(data)) return false;
+            var reader = new BigEndianReader(data);
             var version = data[6];
             header = version == 8
                 ? new CompressedResourceHeader
                 {
                     Version = version,
                     Attributes = data[7],
-                    DecompressedSize = BinaryPrimitives.ReadUInt32BigEndian(data[8..]),
+                    DecompressedSize = reader.ReadUInt32At(8),
                     WorkingBufferFraction = data[12],
                     ExpansionBytes = data[13],
-                    DecompressorId = BinaryPrimitives.ReadInt16BigEndian(data[14..]),
-                    Reserved = BinaryPrimitives.ReadUInt16BigEndian(data[16..]),
+                    DecompressorId = reader.ReadInt16At(14),
+                    Reserved = reader.ReadUInt16At(16),
                 }
                 : new CompressedResourceHeader
                 {
                     Version = version,
                     Attributes = data[7],
-                    DecompressedSize = BinaryPrimitives.ReadUInt32BigEndian(data[8..]),
-                    DecompressorId = BinaryPrimitives.ReadInt16BigEndian(data[12..]),
-                    ExpansionBytes = BinaryPrimitives.ReadUInt16BigEndian(data[14..]),
+                    DecompressedSize = reader.ReadUInt32At(8),
+                    DecompressorId = reader.ReadInt16At(12),
+                    ExpansionBytes = reader.ReadUInt16At(14),
                     Param1 = data[16],
                     Param2 = data[17],
                 };
