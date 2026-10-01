@@ -36,7 +36,83 @@ namespace ClassicMac.Files.Iso
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             var sectorSize = Layout(input) ?? throw new InvalidDataException("Not a raw CD image.");
-            return [new MacFile { Name = DiscName(context), DataFork = Cooked(input, sectorSize) }];
+            var disc = sectorSize == 2352 ? Sessions(input) : null;
+            return [new MacFile { Name = DiscName(context), DataFork = disc ?? Cooked(input, sectorSize) }];
+        }
+
+        /// <summary>
+        /// The absolute sector (logical block address) in a 2352-byte data sector's header: its minute, second and frame
+        /// in BCD, less the 150 sectors (two seconds) before logical block 0. Null for a sector without sync, a data mode
+        /// or a valid address (audio, damaged sectors).
+        /// </summary>
+        internal static long? HeaderLba(ReadOnlySpan<byte> sector)
+        {
+            if (sector.Length < 16 || !IsRawSector(sector)) return null;
+            static int? Bcd(byte b) => (b >> 4) <= 9 && (b & 15) <= 9 ? (b >> 4) * 10 + (b & 15) : null;
+            if (Bcd(sector[12]) is not { } m || Bcd(sector[13]) is not { } s || Bcd(sector[14]) is not { } f || s >= 60 || f >= 75)
+                return null;
+            var lba = ((long)m * 60 + s) * 75 + f - 150;
+            return lba >= 0 ? lba : null;
+        }
+
+        // ClassicMac's rule, not the Mac's (which asks the drive for the table of contents): a raw image of a whole
+        // multisession disc usually leaves out the sectors between sessions (lead-out, lead-in), which the sector headers
+        // show as a jump in address. Each run of sectors whose address less its index is constant is placed at its
+        // address; the last run is the last session. Its first track starts at the run's first sector, or 150 sectors
+        // later when the run begins with a pregap: whichever has a volume descriptor 16 sectors on. An image without a
+        // jump (one session, or the gap kept) is left as it is (null).
+        private static CdDisc? Sessions(ForkData input)
+        {
+            var count = input.Length / 2352;
+            using var stream = input.Open();
+            var sector = new byte[2352];
+            long? Offset(long index)
+            {
+                stream.Position = index * 2352;
+                stream.ReadExactly(sector);
+                return HeaderLba(sector) - index;
+            }
+
+            // The offset of the nearest sector with an address, looking up to 300 sectors from index on (a disc may
+            // start or end in audio or damaged sectors).
+            long? Nearest(long index, int step)
+            {
+                for (var i = 0; i < 300 && index >= 0 && index < count; i++, index += step)
+                {
+                    if (Offset(index) is { } o) return o;
+                }
+                return null;
+            }
+
+            if (Nearest(count - 1, -1) is not { } offset || offset <= 0 || Nearest(0, 1) == offset) return null;
+            var runs = new List<CdDisc.Segment>();
+            var end = count;
+            while (offset > 0 && end > 0 && runs.Count < 99)
+            {
+                // The run's first sector: the first index from which the offset is this one (offsets only grow).
+                long lo = 0, hi = end - 1;
+                while (lo < hi)
+                {
+                    var mid = lo + (hi - lo) / 2;
+                    if (Offset(mid) is { } o && o >= offset) hi = mid;
+                    else lo = mid + 1;
+                }
+                runs.Add(new CdDisc.Segment(lo + offset, end - lo, Cooked(input.Slice(lo * 2352, (end - lo) * 2352), 2352)));
+                end = lo;
+                offset = end > 0 && Nearest(end - 1, -1) is { } before && before < offset ? before : 0;
+            }
+            if (end > 0) runs.Add(new CdDisc.Segment(0, end, Cooked(input.Slice(0, end * 2352), 2352)));
+
+            var session = runs[0].Lba;
+            var disc = new CdDisc(runs, session);
+            foreach (var start in new[] { session, session + 150 })
+            {
+                if ((start + 17) * 2048 > disc.Length) continue;
+                var v = disc.Slice((start + 16) * 2048, 16).ToArray();
+                if (v.AsSpan(1, 5).SequenceEqual("CD001"u8) || v.AsSpan(1, 5).SequenceEqual("CD-I "u8) || v.AsSpan(9, 5).SequenceEqual("CDROM"u8))
+                    return new CdDisc(runs, start);
+            }
+            return disc;
         }
 
         /// <summary>The 2048-byte blocks of raw sectors of <paramref name="sectorSize"/> bytes (2352 or 2336).</summary>

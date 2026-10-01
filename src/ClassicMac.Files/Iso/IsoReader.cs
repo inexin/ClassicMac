@@ -39,29 +39,60 @@ namespace ClassicMac.Files.Iso
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             var descriptor = Descriptor.Find(input) ?? throw new InvalidDataException("Not an ISO 9660 or High Sierra volume.");
-            return new Volume(input, descriptor, context).Files();
+            return new Volume(descriptor.Image, descriptor, context).Files();
         }
 
-        // The primary volume descriptor, as the plug-ins look for it: sectors 16 onwards until a terminator, "CD001" or
-        // "CD-I" version 1 (ISO), or "CDROM" (High Sierra). Rejected, as the Mac rejects them: file structure version
-        // other than 0 or 1, and (ISO but not CD-i) little- and big-endian path table sizes that differ.
-        private sealed record Descriptor(bool HighSierra, bool CdI, bool Xa, int BlockSize, long RootOffset)
+        // The primary volume descriptor, as the plug-ins look for it: from an anchor sector onwards until a terminator,
+        // "CD001" or "CD-I" version 1 (ISO), or "CDROM" (High Sierra). Rejected, as the Mac rejects them: file structure
+        // version other than 0 or 1, and (ISO but not CD-i) little- and big-endian path table sizes that differ. Image is
+        // what the volume's block numbers count from.
+        private sealed record Descriptor(ForkData Image, bool HighSierra, bool CdI, bool Xa, int BlockSize, long RootOffset)
         {
             public static Descriptor? Find(ForkData input)
             {
-                if (input.Length < (FirstDescriptor + 1) * (long)Sector) return null;
-                for (var sector = FirstDescriptor; sector < FirstDescriptor + DescriptorsTried; sector++)
+                // A multisession disc (a cue sheet's or a raw image's sessions): the anchor is 16 sectors into the last
+                // session first (D + 16), then sector 16. Once an anchor passes, its scan decides.
+                if (input is CdDisc { LastSession: > 0 } disc && IsAnchor(input, disc.LastSession + FirstDescriptor))
                 {
-                    if ((sector + 1) * (long)Sector > input.Length) return null;
-                    var v = input.Slice(sector * (long)Sector, Sector).ToArray();
+                    if (Primary(input, disc.LastSession + FirstDescriptor) is not { } p) return null;
+                    // The driver maps the whole disc from offset 0 when the root's extent is at or after the session's
+                    // start, so extents are absolute; otherwise they count from the session's start.
+                    var reader = new BigEndianReader(p.Bytes);
+                    var rootExtent = reader.ReadUInt32At(p.HighSierra ? 180 + 6 : 156 + 6);
+                    int blockSize = reader.ReadUInt16At(p.HighSierra ? 138 : 130);
+                    var session = disc.LastSession * Sector;
+                    var image = (long)rootExtent * blockSize >= session ? input : input.Slice(session, input.Length - session);
+                    return p.HighSierra ? ReadHighSierra(image, p.Bytes) : Iso(image, p.Bytes, p.CdI);
+                }
+                return Primary(input, FirstDescriptor) is { } q
+                    ? q.HighSierra ? ReadHighSierra(input, q.Bytes) : Iso(input, q.Bytes, q.CdI)
+                    : null;
+            }
+
+            // An anchor holds a descriptor of either standard, version 1 (its type byte is not checked).
+            private static bool IsAnchor(ForkData input, long sector)
+            {
+                if ((sector + 1) * Sector > input.Length) return false;
+                var v = input.Slice(sector * Sector, 16).ToArray();
+                return (v[6] == 1 && (v.AsSpan(1, 5).SequenceEqual("CD001"u8) || v.AsSpan(1, 5).SequenceEqual("CD-I "u8)))
+                    || (v[14] == 1 && v.AsSpan(9, 5).SequenceEqual("CDROM"u8));
+            }
+
+            // From the anchor, each sector in turn up to the primary descriptor; null at a terminator.
+            private static (byte[] Bytes, bool HighSierra, bool CdI)? Primary(ForkData input, long first)
+            {
+                for (var sector = first; sector < first + DescriptorsTried; sector++)
+                {
+                    if ((sector + 1) * Sector > input.Length) return null;
+                    var v = input.Slice(sector * Sector, Sector).ToArray();
                     var id = System.Text.Encoding.ASCII.GetString(v, 1, 5).ToUpperInvariant();
                     var highSierra = System.Text.Encoding.ASCII.GetString(v, 9, 5).ToUpperInvariant() == "CDROM";
                     // A terminator ends the search: ISO's at byte 0, High Sierra's at byte 8.
                     if ((v[0] == 0xFF && id == "CD001") || (v[8] == 0xFF && highSierra)) return null;
                     if (v[0] == 1 && v[6] == 1 && id is "CD001" or "CD-I ")
-                        return Iso(input, v, cdI: id == "CD-I ");
+                        return (v, false, id == "CD-I ");
                     if (v[8] == 1 && v[14] == 1 && highSierra)
-                        return ReadHighSierra(input, v);
+                        return (v, true, false);
                 }
                 return null;
             }
@@ -76,7 +107,7 @@ namespace ClassicMac.Files.Iso
                 int blockSize = reader.ReadUInt16At(130);
                 // The root comes from the first entry of the big-endian path table.
                 var root = PathTableRoot(input, reader.ReadUInt32At(148), blockSize, 2);
-                return root is { } r ? new Descriptor(false, cdI, xa, blockSize, r) : null;
+                return root is { } r ? new Descriptor(input, false, cdI, xa, blockSize, r) : null;
             }
 
             private static Descriptor? ReadHighSierra(ForkData input, byte[] v)
@@ -84,7 +115,7 @@ namespace ClassicMac.Files.Iso
                 var reader = new BigEndianReader(v);
                 int blockSize = reader.ReadUInt16At(138);
                 var root = PathTableRoot(input, reader.ReadUInt32At(164), blockSize, 0);
-                return root is { } r ? new Descriptor(true, false, false, blockSize, r) : null;
+                return root is { } r ? new Descriptor(input, true, false, false, blockSize, r) : null;
             }
 
             private static long? PathTableRoot(ForkData input, uint table, int blockSize, int at)

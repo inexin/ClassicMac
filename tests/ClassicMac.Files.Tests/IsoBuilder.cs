@@ -11,7 +11,11 @@ internal sealed class IsoBuilder(bool highSierra = false)
     private const int Sector = 2048;
 
     public sealed record Rec(string Name, byte[] Data, byte Flags = 0, byte[]? SystemUse = null, byte[]? Date = null,
-        byte AttributeBlocks = 0, byte Unit = 0, byte Gap = 0, string? Folder = null);
+        byte AttributeBlocks = 0, byte Unit = 0, byte Gap = 0, string? Folder = null, int? At = null);
+
+    // The absolute sector of the image's first sector (a later session's start): every block number is counted from
+    // the disc's start, as on a multisession disc. A record with At points at data already there.
+    public int Origin { get; init; }
 
     private readonly List<(string Path, List<Rec> Records)> directories = [("", [])];
 
@@ -42,6 +46,11 @@ internal sealed class IsoBuilder(bool highSierra = false)
         var dataSectors = new Dictionary<Rec, int>(ReferenceEqualityComparer.Instance);
         foreach (var record in directories.SelectMany(d => d.Records))
         {
+            if (record.At is { } absolute)
+            {
+                dataSectors[record] = absolute - Origin; // data already on the disc (an earlier session)
+                continue;
+            }
             dataSectors[record] = sectors.Count;
             for (var i = 0; i < record.AttributeBlocks; i++) sectors.Add(new byte[Sector]);
             var at = 0;
@@ -83,14 +92,15 @@ internal sealed class IsoBuilder(bool highSierra = false)
         }
 
         // Descriptor and path table (root entry only; the plug-ins read nothing else from it).
-        BinaryPrimitives.WriteUInt32BigEndian(pathTable.AsSpan(highSierra ? 0 : 2), (uint)directorySectors[""]);
+        BinaryPrimitives.WriteUInt32BigEndian(pathTable.AsSpan(highSierra ? 0 : 2), (uint)(directorySectors[""] + Origin));
+        Record("\0",directorySectors[""], Sector, 2, null, DefaultDate, 0, 0, 0).CopyTo(descriptor, highSierra ? 180 : 156);
         if (highSierra)
         {
             descriptor[8] = 1;
             "CDROM"u8.CopyTo(descriptor.AsSpan(9));
             descriptor[14] = 1;
             BinaryPrimitives.WriteUInt16BigEndian(descriptor.AsSpan(138), Sector);
-            BinaryPrimitives.WriteUInt32BigEndian(descriptor.AsSpan(164), 18);
+            BinaryPrimitives.WriteUInt32BigEndian(descriptor.AsSpan(164), (uint)(18 + Origin));
         }
         else
         {
@@ -101,7 +111,7 @@ internal sealed class IsoBuilder(bool highSierra = false)
             BinaryPrimitives.WriteUInt16BigEndian(descriptor.AsSpan(130), Sector);
             BinaryPrimitives.WriteUInt32LittleEndian(descriptor.AsSpan(0x84), 10);
             BinaryPrimitives.WriteUInt32BigEndian(descriptor.AsSpan(0x88), 10);
-            BinaryPrimitives.WriteUInt32BigEndian(descriptor.AsSpan(148), 18);
+            BinaryPrimitives.WriteUInt32BigEndian(descriptor.AsSpan(148), (uint)(18 + Origin));
             descriptor[0x371] = 1;
         }
         terminator[0] = 0xFF;
@@ -118,8 +128,8 @@ internal sealed class IsoBuilder(bool highSierra = false)
         var r = new byte[length];
         r[0] = (byte)length;
         r[1] = xar;
-        BinaryPrimitives.WriteInt32LittleEndian(r.AsSpan(2), extent);
-        BinaryPrimitives.WriteInt32BigEndian(r.AsSpan(6), extent);
+        BinaryPrimitives.WriteInt32LittleEndian(r.AsSpan(2), extent + Origin);
+        BinaryPrimitives.WriteInt32BigEndian(r.AsSpan(6), extent + Origin);
         BinaryPrimitives.WriteInt32LittleEndian(r.AsSpan(10), size);
         BinaryPrimitives.WriteInt32BigEndian(r.AsSpan(14), size);
         date.AsSpan(0, highSierra ? 6 : 7).CopyTo(r.AsSpan(18));

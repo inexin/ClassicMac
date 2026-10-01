@@ -1258,5 +1258,5 @@ No rule in this document is fitted to data alone. Still open:
 Differences from the Mac that ClassicMac knowingly keeps (section 3.4): a partition's volume ends where the partition
 ends (`pmPartBlkCnt − pmLgDataStart` blocks, where the CD-ROM driver takes `pmPartBlkCnt` from the data start);
 `Apple_MFS` partitions are read too; partition types must match exactly, where the driver compares the first nine
-bytes with `Apple_HFS`; an entry without `'PM'` is skipped rather than ending the map; and no multisession base is
-applied.
+bytes with `Apple_HFS`; an entry without `'PM'` is skipped rather than ending the map; and the multisession base is
+applied only to a cue sheet's last session ([ISO9660.md](ISO9660.md) section 15), without the driver's multiplication by the stride.
