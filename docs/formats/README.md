@@ -50,7 +50,7 @@ ClassicMac follows 9.0; a 9.2.2 mode would take these differences.
 | [CONTAINERS.md](CONTAINERS.md) | MacBinary I/II/III, BinHex 4.0, AppleSingle and AppleDouble, uuencode | `ClassicMac.Files.Containers` |
 | [HOST-FOLDERS.md](HOST-FOLDERS.md) | Mac files on other file systems: Basilisk II / SheepShaver folders, AppleDouble `._` files, PC Exchange, File Exchange names; what `unpack` writes | `ClassicMac.Files` (`HostFiles`), `ClassicMac.Files.Export` |
 | [HFS-MFS.md](HFS-MFS.md) | Apple partition maps, MFS and HFS volumes | `ClassicMac.Files.Hfs` |
-| [ARCHIVES.md](ARCHIVES.md) | StuffIt v5 stored, RLE90, Compress/LZW, Huffman, LZAH, MW and method-13 forks | `ClassicMac.Files.Archives` |
+| [ARCHIVES.md](ARCHIVES.md) | StuffIt, PackIt, LHA, DiskDoubler, Compact Pro; zip, tar and gzip with AppleDouble `._`/`__MACOSX` entries and the Info-ZIP and ZipIt Mac extra fields | `ClassicMac.Files.Archives` |
 | [DISK-IMAGES.md](DISK-IMAGES.md) | Disk Copy 4.2, DART, NDIF (Disk Copy 6), ShrinkWrap, UDIF; the ADC, KenCode, LZH and bzip2 codecs | `ClassicMac.Files.Hfs`, `ClassicMac.Files.Compression` |
 | [FAT.md](FAT.md) | DOS partition tables, FAT12/16/32 with long names, PC Exchange and File Exchange data on FAT | `ClassicMac.Files.Fat` |
 | [ISO9660.md](ISO9660.md) | ISO 9660 and High Sierra as Mac OS 9 reads them, Apple's extensions, raw CD images and cue sheets | `ClassicMac.Files.Iso` |
