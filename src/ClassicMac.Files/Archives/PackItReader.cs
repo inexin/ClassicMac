@@ -58,10 +58,10 @@ public sealed class PackItReader : IContainerReader
             }
             bool huffman = signature.SequenceEqual("PMa4"u8) || signature.SequenceEqual("PMa5"u8) ||
                 signature.SequenceEqual("PMa6"u8);
-            bool xorEncrypted = signature.SequenceEqual("PMa5"u8);
-            bool desEncrypted = signature.SequenceEqual("PMa6"u8);
+            bool xorEncrypted = signature.SequenceEqual("PMa1"u8) || signature.SequenceEqual("PMa5"u8);
+            bool desEncrypted = signature.SequenceEqual("PMa2"u8) || signature.SequenceEqual("PMa6"u8);
             bool encrypted = xorEncrypted || desEncrypted;
-            if (!signature.SequenceEqual("PMag"u8) && !huffman)
+            if (!signature.SequenceEqual("PMag"u8) && !huffman && !encrypted)
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.method-unsupported",
                     $"PackIt entry method '{System.Text.Encoding.ASCII.GetString(signature)}' is not supported; " +
@@ -81,21 +81,49 @@ public sealed class PackItReader : IContainerReader
             byte[]? decodedResource = null;
             ushort storedForkCrc;
             int nextOffset;
-            if (huffman)
+            if (huffman || encrypted)
             {
                 byte[]? desDecoded = desEncrypted
                     ? DecodeDesBlocks(archive.AsSpan(offset + 4), GetDesKey(context.Options.ArchivePassword!))
                     : null;
-                ReadOnlySpan<byte> huffmanInput = desDecoded ?? archive.AsSpan(offset + 4);
-                DecodedHuffmanEntry decoded = DecodeHuffmanEntry(
-                    huffmanInput, context.Options.MaxExpandedBytesPerInput - expandedBytes,
-                    xorEncrypted ? DeriveXorKey(MacString.FromMacRoman(context.Options.ArchivePassword!).Bytes) : null);
-                metadataBytes = decoded.Metadata;
-                decodedData = decoded.Data;
-                decodedResource = decoded.Resource;
-                storedForkCrc = decoded.StoredForkCrc;
-                int encodedBytesConsumed = encrypted ? checked((decoded.BytesConsumed + 7) & ~7) : decoded.BytesConsumed;
-                nextOffset = checked(offset + 4 + encodedBytesConsumed);
+                byte[]? xorDecoded = xorEncrypted && !huffman
+                    ? DecodeXorBytes(archive.AsSpan(offset + 4),
+                        DeriveXorKey(MacString.FromMacRoman(context.Options.ArchivePassword!).Bytes))
+                    : null;
+                ReadOnlySpan<byte> entryInput = desDecoded ?? xorDecoded ?? archive.AsSpan(offset + 4);
+                if (huffman)
+                {
+                    DecodedHuffmanEntry decoded = DecodeHuffmanEntry(entryInput,
+                        context.Options.MaxExpandedBytesPerInput - expandedBytes,
+                        xorEncrypted ? DeriveXorKey(MacString.FromMacRoman(context.Options.ArchivePassword!).Bytes) : null);
+                    metadataBytes = decoded.Metadata;
+                    decodedData = decoded.Data;
+                    decodedResource = decoded.Resource;
+                    storedForkCrc = decoded.StoredForkCrc;
+                    int encodedBytesConsumed = encrypted
+                        ? checked((decoded.BytesConsumed + 7) & ~7)
+                        : decoded.BytesConsumed;
+                    nextOffset = checked(offset + 4 + encodedBytesConsumed);
+                }
+                else
+                {
+                    if (entryInput.Length < EntryMetadataLength)
+                        throw new InvalidDataException("A PackIt encrypted file header is truncated.");
+                    metadataBytes = entryInput[..EntryMetadataLength].ToArray();
+                    int storedDataLength = ReadLength(U32(metadataBytes, 0x4C), "data fork");
+                    int storedResourceLength = ReadLength(U32(metadataBytes, 0x50), "resource fork");
+                    int encryptedForksLength = checked(storedDataLength + storedResourceLength);
+                    int crcOffset = checked(EntryMetadataLength + encryptedForksLength);
+                    if (crcOffset > entryInput.Length - 2)
+                        throw new InvalidDataException("A PackIt encrypted fork payload or checksum is truncated.");
+                    if (encryptedForksLength > context.Options.MaxExpandedBytesPerInput - expandedBytes)
+                        throw new InvalidDataException("PackIt extraction exceeds the configured expanded-size limit.");
+                    decodedData = entryInput.Slice(EntryMetadataLength, storedDataLength).ToArray();
+                    decodedResource = entryInput.Slice(EntryMetadataLength + storedDataLength,
+                        storedResourceLength).ToArray();
+                    storedForkCrc = U16(entryInput, crcOffset);
+                    nextOffset = checked(offset + 4 + ((crcOffset + 2 + 7) & ~7));
+                }
             }
             else
             {
@@ -136,7 +164,7 @@ public sealed class PackItReader : IContainerReader
             ReadOnlySpan<byte> resource;
             ForkData dataFork;
             ForkData resourceFork;
-            if (huffman)
+            if (huffman || encrypted)
             {
                 data = decodedData!;
                 resource = decodedResource!;
@@ -232,6 +260,14 @@ public sealed class PackItReader : IContainerReader
             key[index / 8] |= (byte)(((passwordBytes[sourceBit / 8] << (sourceBit % 8)) & 0x80) >> (index % 8));
         }
         return key;
+    }
+
+    private static byte[] DecodeXorBytes(ReadOnlySpan<byte> input, ReadOnlySpan<byte> key)
+    {
+        byte[] decoded = new byte[input.Length];
+        for (int index = 0; index < input.Length; index++)
+            decoded[index] = (byte)(input[index] ^ key[index % 7]);
+        return decoded;
     }
 
     private static byte[] GetDesKey(string password)

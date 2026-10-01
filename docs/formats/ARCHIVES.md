@@ -28,18 +28,22 @@ creator and flags, data- and resource-fork lengths, and creation/modification da
 CRC-16/XMODEM of their concatenation follow; the metadata also has a CRC-16/XMODEM **[Fitted]** against
 [psx-spx's PackIt format notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/) and
 [XADMaster's PackIt reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADPackItParser.m/).
-ClassicMac extracts stored `PMag`, Huffman-compressed `PMa4`, XOR-encrypted Huffman `PMa5`, and DES-encrypted Huffman
-`PMa6` records. Passwords are supplied through `ContainerReadOptions.ArchivePassword` as MacRoman. The `PMa5` key is
+ClassicMac extracts stored `PMag`, XOR-encrypted uncompressed `PMa1`, DES-encrypted uncompressed `PMa2`,
+Huffman-compressed `PMa4`, XOR-encrypted Huffman `PMa5`, and DES-encrypted Huffman `PMa6` records. Passwords are
+supplied through `ContainerReadOptions.ArchivePassword` as MacRoman. The XOR key used by `PMa1` and `PMa5` is
 expanded from the first eight password bytes using PackIt's PC-1 selection table and cycles over seven key bytes.
-`PMa6` uses the first eight password bytes, zero-padded, as a DES key; the Huffman stream is transformed in ECB mode.
-Both encrypted methods pad their ciphertext to an 8-byte boundary before the next entry. The stream transformations are
+`PMa2` and `PMa6` use the first eight password bytes, zero-padded, as a DES key; the payload stream is transformed in
+ECB mode. Both encryption schemes pad ciphertext to an 8-byte boundary before the next entry. The stream transformations are
 **[Fitted]** against [XADMaster's PackIt reader](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADPackItParser.m/)
 and the published [PackIt format notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/).
+`PMa1` and `PMa2` behavior applies those encryption layers to otherwise uncompressed entries; this pairing is fitted
+from the published signature table and hand-built vectors because XADMaster only implements the encrypted Huffman
+variants and no original-app fixture is available.
 Header and fork CRC mismatches are reported; a failed encrypted fork checksum rejects the file as a bad password or
-damaged ciphertext. Other markers are reported as unsupported and stop parsing at that record. Tests cover stored and
-Huffman entries with both forks, Finder metadata and dates, CRC diagnostics, correct and wrong XOR/DES passwords,
-weak DES keys, encrypted stream alignment, unsupported methods, and truncated headers. Original-application verification
-remains.
+damaged ciphertext. `PMa3` and `PMa7` are reserved and other markers are reported as unsupported, stopping parsing at
+that record. Tests cover stored and Huffman entries with both forks, Finder metadata and dates, CRC diagnostics, correct
+and wrong passwords for raw and Huffman XOR/DES entries, weak DES keys, encrypted stream alignment, unsupported methods,
+and truncated headers. Original-application verification remains.
 
 ## DiskDoubler (DDA2)
 

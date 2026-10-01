@@ -52,11 +52,7 @@ public sealed class PackItFeatureTests
     }
 
     [Theory]
-    [InlineData("PMa1")]
-    [InlineData("PMa2")]
     [InlineData("PMa3")]
-    [InlineData("PMa5")]
-    [InlineData("PMa6")]
     [InlineData("PMa7")]
     public void PackItUnsupportedEntriesAreReportedAsUnsupported(string method)
     {
@@ -70,6 +66,92 @@ public sealed class PackItFeatureTests
         Assert.Empty(files);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.method-unsupported" &&
             diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData("PMa1")]
+    [InlineData("PMa2")]
+    public void PackItUncompressedEncryptedEntryUsesTheSuppliedMacRomanPassword(string method)
+    {
+        const string password = "café";
+        byte[] data = "data fork"u8.ToArray();
+        byte[] resource = "resource fork"u8.ToArray();
+        byte[] archive = PackItFixture.BuildEncryptedStoredFile(method, "secret", data, resource, password);
+
+        MacFile file = Assert.Single(PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = password })));
+
+        Assert.Equal("secret", file.MacPath);
+        Assert.Equal(data, file.DataFork.ToArray());
+        Assert.Equal(resource, file.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("TEXT"), file.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("ttxt"), file.FinderInfo.Creator);
+    }
+
+    [Theory]
+    [InlineData("PMa1")]
+    [InlineData("PMa2")]
+    public void PackItUncompressedEncryptedEntryRejectsAnIncorrectPassword(string method)
+    {
+        byte[] archive = PackItFixture.BuildEncryptedStoredFile(method, "secret", "payload"u8.ToArray(), [], "right");
+
+        Assert.Throws<InvalidDataException>(() => PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "wrong" })));
+    }
+
+    [Theory]
+    [InlineData("PMa1")]
+    [InlineData("PMa2")]
+    [InlineData("PMa5")]
+    [InlineData("PMa6")]
+    public void PackItEncryptedEntryWithoutAPasswordIsReportedAsUnsupported(string method)
+    {
+        byte[] archive = method switch
+        {
+            "PMa1" or "PMa2" => PackItFixture.BuildEncryptedStoredFile(method, "secret", "payload"u8.ToArray(), [],
+                "right"),
+            "PMa5" => PackItFixture.BuildXorEncryptedHuffmanFile("secret", "payload"u8.ToArray(), [], "right"),
+            "PMa6" => PackItFixture.BuildDesEncryptedHuffmanFile("secret", "payload"u8.ToArray(), [], "right"),
+            _ => throw new ArgumentOutOfRangeException(nameof(method)),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Empty(PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.method-unsupported" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData("PMa1")]
+    [InlineData("PMa2")]
+    public void PackItUncompressedEncryptedEntrySkipsPaddingBeforeTheNextEntry(string method)
+    {
+        byte[] first = PackItFixture.BuildEncryptedStoredFile(method, "first", "one"u8.ToArray(), [], "password");
+        byte[] second = PackItFixture.BuildStoredFile("second", "two"u8.ToArray(), []);
+        byte[] archive = new byte[first.Length - 4 + second.Length];
+        first.AsSpan(0, first.Length - 4).CopyTo(archive);
+        second.CopyTo(archive, first.Length - 4);
+
+        IReadOnlyList<MacFile> files = PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "password" }));
+
+        Assert.Equal(new[] { "first", "second" }, files.Select(file => file.MacPath));
+        Assert.Equal("one"u8.ToArray(), files[0].DataFork.ToArray());
+        Assert.Equal("two"u8.ToArray(), files[1].DataFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData("PMa1")]
+    [InlineData("PMa2")]
+    public void PackItUncompressedEncryptedEntryRejectsATruncatedPayload(string method)
+    {
+        byte[] archive = PackItFixture.BuildEncryptedStoredFile(method, "secret", "payload"u8.ToArray(), [],
+            "password");
+        Array.Resize(ref archive, 4 + 100); // The encrypted payload needs 103 plaintext bytes.
+
+        Assert.Throws<InvalidDataException>(() => PackItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(options: ContainerReadOptions.Default with { ArchivePassword = "password" })));
     }
 
     [Theory]
@@ -270,6 +352,50 @@ public sealed class PackItFeatureTests
             byte[] key = DerivePackItXorKey(ClassicMac.Core.MacString.FromMacRoman(password).Bytes);
             for (int index = 0; index < payloadLength; index++)
                 archive[4 + index] = (byte)(plain[4 + index] ^ key[index % 7]);
+            "PEnd"u8.CopyTo(archive.AsSpan(4 + encryptedLength));
+            return archive;
+        }
+
+        public static byte[] BuildEncryptedStoredFile(string method, string name, byte[] data, byte[] resource,
+            string password)
+        {
+            byte[] plain = BuildStoredFile(name, data, resource);
+            int payloadLength = plain.Length - 8;
+            int encryptedLength = (payloadLength + 7) & ~7;
+            byte[] archive = new byte[4 + encryptedLength + 4];
+            System.Text.Encoding.ASCII.GetBytes(method).CopyTo(archive, 0);
+            if (method == "PMa1")
+            {
+                byte[] key = DerivePackItXorKey(ClassicMac.Core.MacString.FromMacRoman(password).Bytes);
+                for (int index = 0; index < payloadLength; index++)
+                    archive[4 + index] = (byte)(plain[4 + index] ^ key[index % 7]);
+            }
+            else if (method == "PMa2")
+            {
+                byte[] key = ClassicMac.Core.MacString.FromMacRoman(password).Bytes.ToArray();
+                Array.Resize(ref key, 8);
+                if (System.Security.Cryptography.DES.IsWeakKey(key))
+                {
+                    using System.Security.Cryptography.TripleDES des = System.Security.Cryptography.TripleDES.Create();
+                    des.Mode = System.Security.Cryptography.CipherMode.ECB;
+                    des.Padding = System.Security.Cryptography.PaddingMode.None;
+                    byte[] threeDesKey = MakeWeakKeyCompatibleTripleDesKey(key);
+                    using var transform = des.CreateDecryptor(threeDesKey, new byte[8]);
+                    TransformDesPayload(transform, plain, payloadLength, encryptedLength, archive);
+                }
+                else
+                {
+                    using System.Security.Cryptography.DES des = System.Security.Cryptography.DES.Create();
+                    des.Mode = System.Security.Cryptography.CipherMode.ECB;
+                    des.Padding = System.Security.Cryptography.PaddingMode.None;
+                    using var transform = des.CreateDecryptor(key, new byte[8]);
+                    TransformDesPayload(transform, plain, payloadLength, encryptedLength, archive);
+                }
+            }
+            else
+            {
+                throw new ArgumentOutOfRangeException(nameof(method));
+            }
             "PEnd"u8.CopyTo(archive.AsSpan(4 + encryptedLength));
             return archive;
         }
