@@ -833,8 +833,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     descriptions and hand-built vectors; verification against an archive made by the original application remains. The
     PackIt reader extracts stored (`PMag`), password-protected XOR and DES uncompressed (`PMa1`/`PMa2`) and Huffman
     (`PMa5`/`PMa6`) entries, plus unencrypted Huffman (`PMa4`); reserved encrypted methods (`PMa3`/`PMa7`) remain
-    unsupported. A standalone LHA reader extracts stored `-lh0-` files from level-0 headers; compressed methods and
-    other header levels remain. The DiskDoubler reader parses DDA2 archive paths and extracts stored, method-1 MacCompress LZW,
+    unsupported. A standalone LHA reader extracts level-0 through level-3 files with `-lh0-`, adaptive-Huffman
+    `-lh1-`, LArc `-lz5-` and static-Huffman LZSS `-lh4-`, `-lh5-`, `-lh6-` and `-lh7-`; `-lh2-`, `-lh3-` and LArc `-lzs-` remain.
+    The DiskDoubler reader
+    parses DDA2 archive paths and extracts stored, method-1 MacCompress LZW,
     method-2 adaptive Huffman, method-4 Huffman, method-5 adaptive Huffman, method-6 AD2, method-8 Compact Pro,
     method-7 Stac LZS, method-9 AD1, and method-10 DDn forks. Standalone compressed files extract stored and methods 1, 2, 4, 5, 6, 7, 8, 9 and 10. Methods 6, 9 and 10 are
     verified against both forks of authentic DiskDoubler Pro 4.1.1 standalone files, and those compressed payloads
@@ -881,8 +883,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
     (RLE81 + LZH); PackIt (stored, Huffman, encrypted raw and Huffman entries; reserved PMa3/PMa7 unsupported);
     DiskDoubler (DDAR stored entries and DDA2 stored, MacCompress LZW, adaptive Huffman, Huffman, AD2, Compact Pro
-    method-8, AD1 and DDn method-10 forks); LHA level-0 stored entries (`-lh0-`); then LHA compression methods and
-    header levels 1–3, other DiskDoubler compression variants, any other documented PackIt methods and segmented archives.
+    method-8, AD1 and DDn method-10 forks); LHA level-0 through level-3 records with stored entries (`-lh0-`) and
+    adaptive-Huffman LZSS (`-lh1-`), static-Huffman LZSS methods (`-lh4-` through `-lh7-`); then LHA `-lh2-` through
+    `-lh3-`, LArc methods and
+    other DiskDoubler
+    compression variants, any other documented PackIt methods and segmented archives.
     Anything from row 5 of Inputs only on request.
 11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
    - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's

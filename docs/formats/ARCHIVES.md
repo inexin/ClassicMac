@@ -45,22 +45,49 @@ that record. Tests cover stored and Huffman entries with both forks, Finder meta
 and wrong passwords for raw and Huffman XOR/DES entries, weak DES keys, encrypted stream alignment, unsupported methods,
 and truncated headers. Original-application verification remains.
 
-## LHA / LArc (level 0 stored subset)
+## LHA / LArc (level-0 through level-3 records; stored and compressed methods)
 
-ClassicMac recognizes LHA level-0 records and reads uncompressed `-lh0-` files. A level-0 record carries a one-byte
-header length and checksum, method, packed and expanded sizes, DOS date/time, attributes, level, a byte filename, file
-CRC-16 and OS identifier, then its payload. `0x00` ends the archive. Filenames from Mac OS (`m`) archives are retained
-as MacRoman bytes; entries with other OS identifiers are skipped because their filename encodings are not known.
-Both slash forms are treated as folder separators in returned Mac paths. File CRC mismatches are reported while
-preserving the stored data. Unsupported compression methods are diagnosed and skipped using their declared packed
-length; other header levels are not supported yet. The reader applies `MaxExpandedBytesPerInput` to the archive and
-the total expanded file data.
+ClassicMac recognizes LHA level-0 through level-3 records and reads uncompressed `-lh0-` files, adaptive-Huffman LZSS
+`-lh1-`, LArc `-lz5-`, plus static-Huffman LZSS `-lh4-`, `-lh5-`, `-lh6-` and `-lh7-` files. The static-Huffman methods use 4 KiB,
+8 KiB, 32 KiB and 64 KiB history windows, respectively, with a maximum 256-byte match **[Fitted]** against the
+[LHa for UNIX method table](https://github.com/jca02266/lha/blob/master/src/lha_macro.h) and the independent
+[Lhasa `-lh4-`…`-lh7-` decoder](https://github.com/fragglet/lhasa/blob/master/lib/lh_new_decoder.c). Each compressed block begins with a
+16-bit command count and three Huffman tables: the code-length table, the literal/match table and the history-offset
+table. The position table count uses four bits for `-lh4-`/`-lh5-` and five bits for `-lh6-`/`-lh7-`. The initial
+history window is filled with spaces. `-lh1-` uses a 4 KiB adaptive-Huffman LZSS window and match lengths from 3 to 60.
+Match copies can overlap and continue from bytes just emitted.
+Decoded output must exactly match the declared expanded size; truncated bitstreams, invalid tables and matches beyond
+the declared output are rejected. `-lh1-` follows the 4 KiB adaptive-Huffman and offset coding in the
+[Lhasa `-lh1-` decoder](https://github.com/fragglet/lhasa/blob/master/lib/lh1_decoder.c); it uses a maximum 60-byte match.
+`-lz5-` uses LArc's 4 KiB window, preset with its format-defined byte pattern, and groups eight literal/back-reference
+commands under a least-significant-bit-first flag byte. The Lhasa sources are behavioral references only; the decoders
+and their hand-built protocol fixtures are independently implemented.
+
+A level-0 record's one-byte size is the number of following header bytes, so the full header is that value plus two;
+the header checksum covers the declared number of bytes beginning at the method. The header carries method, packed
+and expanded sizes, DOS date/time, attributes, level, byte filename, file CRC-16 and OS identifier, then its payload.
+For level 1, the same size and checksum rules apply to a base header with a two-byte next-extension size. Its packed
+size field counts the extension bytes plus file payload. Each extension has a type, data and a two-byte size for the
+following extension. Type 1 supplies the filename and type 2 the directory; those path components are combined before
+the payload is read. Extension records are bounded by the declared skip size and archive extent. `0x00` ends the
+archive. Filenames from Mac OS (`m`) archives are retained as MacRoman bytes; entries with other OS identifiers are
+skipped because their filename encodings are not known. Both slash forms are treated as folder separators in returned
+Mac paths. File CRC mismatches are reported while preserving decoded data. Unsupported compression methods are
+diagnosed and skipped using their declared packed length. Level 2 uses a 16-bit total header size, a type-0 header-CRC
+extension, and type-1/type-2 filename/directory extensions. Its packed-size field counts payload bytes only, and the
+header may have one padding byte. Level 3 uses a 32-bit total header size and 32-bit extension-chain sizes with no
+padding; its type-0 header CRC is checked with the stored CRC bytes treated as zero. The reader
+applies `MaxExpandedBytesPerInput` to the archive and total expanded file data.
 
 The layout is based on the [LHa for UNIX header description](https://github.com/jca02266/lha/blob/master/header.doc.md)
-and the CC0 [Kaitai LHA record specification](https://formats.kaitai.io/lzh/) **[Fitted]** to a hand-built level-0
-Mac OS record. Tests cover MacRoman names and paths, stored data, unwrapper integration, header and data checksums,
-unsupported-method and unsupported-encoding continuation, input-size limits, and truncated payloads. Compressed
-methods and level-1 through level-3 headers remain.
+and the CC0 [Kaitai LHA record specification](https://formats.kaitai.io/lzh/) **[Fitted]** to hand-built Mac OS
+records. Tests cover all four supported header levels, MacRoman names and paths, stored data, extended filenames and
+directories, extension-chain payload positioning, initial adaptive-Huffman literals and truncated-code rejection,
+literal and back-reference tokens in all four static-Huffman methods, multiple compressed blocks, output-length and
+truncation checks, unwrapper integration, header and
+data checksums, unsupported-method and unsupported-encoding continuation, input-size limits, and truncated payloads.
+Compressed `-lh2-`, `-lh3-` and LArc `-lzs-` remain. Compressed methods are
+currently verified with hand-built vectors rather than archives produced by an original Mac LHA application.
 
 ## DiskDoubler (DDA2)
 
