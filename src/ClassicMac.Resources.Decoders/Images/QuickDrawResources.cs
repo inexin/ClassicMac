@@ -122,11 +122,9 @@ namespace ClassicMac.Resources.Decoders.Images
             int maskAt = p;
             p += maskRowBytes * maskHeight + bitmapRowBytes * bitmapHeight;
             if (p + 8 > data.Length) throw Truncated("cicn");
-            using (var b = new BinaryReader(new MemoryStream(data, p, data.Length - p)))
-            {
-                pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
-                p += (int)b.BaseStream.Position;
-            }
+            var b = new ClassicMac.Core.BigEndianReader(data.AsSpan(p));
+            pm.Palette = PixMap.ReadColorTable(ref b, pm.PixelSize);
+            p += b.Position;
             pm.Data = Slice(data, p, pm.RowBytes * pm.Height, "cicn");
             return Render(pm, maskRowBytes > 0 ? data : null, maskAt, maskRowBytes);
         }
@@ -154,8 +152,8 @@ namespace ClassicMac.Resources.Decoders.Images
             {
                 color = ReadPixMap(data, mapAt, out int tableAt);
                 if (tableAt < 0 || tableAt + 8 > data.Length) throw Truncated("crsr");
-                using (var b = new BinaryReader(new MemoryStream(data, tableAt, data.Length - tableAt)))
-                    color.Palette = PixMap.ReadColorTable(b, color.PixelSize);
+                var b = new ClassicMac.Core.BigEndianReader(data.AsSpan(tableAt));
+                color.Palette = PixMap.ReadColorTable(ref b, color.PixelSize);
                 color.Data = Slice(data, pixelsAt, color.RowBytes * color.Height, "crsr");
             }
             return CursorBits(data, 20, color, I16(data, 86), I16(data, 84));
@@ -233,8 +231,8 @@ namespace ClassicMac.Resources.Decoders.Images
             if (pm.PixelType != 16)
             {
                 if (tableAt + 8 > data.Length) throw Truncated("ppat");
-                using var b = new BinaryReader(new MemoryStream(data, tableAt, data.Length - tableAt));
-                pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
+                var b = new ClassicMac.Core.BigEndianReader(data.AsSpan(tableAt));
+                pm.Palette = PixMap.ReadColorTable(ref b, pm.PixelSize);
             }
             return Render(pm, null, 0, 0);
         }

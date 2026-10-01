@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
@@ -53,8 +54,14 @@ namespace ClassicMac.Graphics.Pict
         public static PictInfo ReadInfo(Stream stream)
         {
             ArgumentNullException.ThrowIfNull(stream);
-            using var b = new BinaryReader(stream, System.Text.Encoding.Latin1, leaveOpen: true);
-            return Parse(b, stream.Length - stream.Position, out _);
+            long start = stream.Position;
+            using var copy = new MemoryStream();
+            stream.CopyTo(copy);
+            var data = copy.ToArray();
+            var reader = new ClassicMac.Core.BigEndianReader(data);
+            var info = Parse(ref reader, data.Length, out _);
+            stream.Position = start + reader.Position;
+            return info;
         }
 
         // Parses picSize, picFrame (skipping a 512-byte file header), the version opcode(s) and, for version 2, the
@@ -63,15 +70,15 @@ namespace ClassicMac.Graphics.Pict
         // - Extended version 2 (header version -2): hRes/vRes are the picture's resolution and a non-empty srcRect is
         //   the coordinate space its opcodes draw in (Listing A-5; Executor DrawPicture). Version -1 carries a Fixed
         //   bounding box instead and draws in picFrame at 72 dpi (Listing A-6).
-        internal static PictInfo Parse(BinaryReader b, long length, out bool version1)
+        internal static PictInfo Parse(ref ClassicMac.Core.BigEndianReader b, int length, out bool version1)
         {
-            long start = b.BaseStream.Position;
+            int start = b.Position;
             // A .pict file's 512-byte application header is usually zero, but some creators (MacDraw: "DRWG...",
             // MacDraft: "pictDF...") fill it; skip it whenever the picture's version opcode is found after it
             // rather than at the start.
             if (length >= FileHeaderSize + 12 && !HasVersionOpcode(b, start) && HasVersionOpcode(b, start + FileHeaderSize))
                 start += FileHeaderSize;
-            b.BaseStream.Position = start;
+            b.Position = start;
             b.ReadU16BE();                                            // picSize: unreliable in v2
             var frame = b.ReadRectBE();
 
@@ -86,10 +93,10 @@ namespace ClassicMac.Graphics.Pict
 
             version1 = false;
             b.ReadU16BE();                                            // Version (0x02FF)
-            long afterVersion = b.BaseStream.Position;
-            if (b.BaseStream.Length - afterVersion < 2 + 24 || b.ReadU16BE() != 0x0C00)
+            int afterVersion = b.Position;
+            if (b.Length - afterVersion < 2 + 24 || b.ReadU16BE() != 0x0C00)
             {
-                b.BaseStream.Position = afterVersion;                 // no HeaderOp: that word is the first opcode
+                b.Position = afterVersion;                            // no HeaderOp: that word is the first opcode
                 return new PictInfo(2, false, frame, frame, 72, 72);
             }
 
@@ -106,12 +113,11 @@ namespace ClassicMac.Graphics.Pict
 
         // True if the picture starting at offset has a v1 (0x1101) or v2 (0x0011 0x02FF) version opcode after picSize
         // and picFrame. Leaves the stream position unspecified.
-        private static bool HasVersionOpcode(BinaryReader b, long offset)
+        private static bool HasVersionOpcode(ClassicMac.Core.BigEndianReader b, int offset)
         {
-            if (b.BaseStream.Length - offset < 14) return false;
-            b.BaseStream.Position = offset + 10;
-            ushort op = b.ReadU16BE();
-            return op == 0x1101 || (op == 0x0011 && b.ReadU16BE() == 0x02FF);
+            if (b.Length - offset < 14) return false;
+            ushort op = b.ReadUInt16At(offset + 10);
+            return op == 0x1101 || (op == 0x0011 && b.ReadUInt16At(offset + 12) == 0x02FF);
         }
 
         private static bool IsVersion1(ReadOnlySpan<byte> picture) => picture[10] == 0x11 && picture[11] == 0x01;

@@ -75,9 +75,9 @@ namespace ClassicMac.Graphics.QuickDraw
 
         // A Region operand in a picture: u16 rgnSize (bytes, including itself and the bounding box), Rect rgnBBox,
         // then (rgnSize - 10) / 2 words of inversion-point data. A 10-byte region is its bounding rectangle.
-        internal static Region Read(System.IO.BinaryReader b) => Read(b, out _);
+        internal static Region Read(ref ClassicMac.Core.BigEndianReader b) => Read(ref b, out _);
 
-        internal static Region Read(System.IO.BinaryReader b, out PictRect bbox)
+        internal static Region Read(ref ClassicMac.Core.BigEndianReader b, out PictRect bbox)
         {
             int size = b.ReadU16BE() & 0x7FFF;
             bbox = b.ReadRectBE();

@@ -1,4 +1,5 @@
 using Xunit;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
@@ -212,20 +213,20 @@ public class RegionTests
         var bytes = new PictBuilder().U16(36).Rect(0, 0, 4, 4)
             .U16(0).U16(0).U16(4).U16(0x7FFF).U16(2).U16(2).U16(4).U16(0x7FFF).U16(4).U16(0).U16(2).U16(0x7FFF).U16(0x7FFF)
             .ToArray();
-        using var b = new BinaryReader(new MemoryStream(bytes));
+        var b = new ClassicMac.Core.BigEndianReader(bytes);
 
-        var r = Region.Read(b);
+        var r = Region.Read(ref b);
 
         Assert.Equal(new[] { "####", "####", "##..", "##.." }, Mask(r, 4, 4));
-        Assert.Equal(bytes.Length, b.BaseStream.Position);
+        Assert.Equal(bytes.Length, b.Position);
     }
 
     [Fact]
     public void Read_RectangularRegion_IsItsBoundingBox()
     {
         var bytes = new PictBuilder().U16(10).Rect(1, 2, 3, 4).ToArray();
-        using var b = new BinaryReader(new MemoryStream(bytes));
-        Assert.Equal(new PictRect(1, 2, 3, 4), Region.Read(b).Bounds);
+        var b = new ClassicMac.Core.BigEndianReader(bytes);
+        Assert.Equal(new PictRect(1, 2, 3, 4), Region.Read(ref b).Bounds);
     }
 
     [Fact]

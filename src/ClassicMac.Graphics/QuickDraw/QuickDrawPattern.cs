@@ -1,4 +1,3 @@
-using System.IO;
 using ClassicMac.Graphics;
 
 namespace ClassicMac.Graphics.QuickDraw
@@ -46,7 +45,7 @@ namespace ClassicMac.Graphics.QuickDraw
         // BkPixPat / PnPixPat / FillPixPat operands: patType, the 1-bit fallback pattern, then a PixMap + ColorTable +
         // PixData or an RGBColor. The ROM reads the RGBColor for type 2 only; Mac OS 9 reads a PixMap for types 1 and 3
         // only.
-        internal static QuickDrawPattern Read(BinaryReader b, bool macOS9)
+        internal static QuickDrawPattern Read(ref ClassicMac.Core.BigEndianReader b, bool macOS9)
         {
             int patType = b.ReadU16BE();
             var pattern = FromMono(b.ReadExactly(8));
@@ -57,7 +56,7 @@ namespace ClassicMac.Graphics.QuickDraw
                 pattern.Rgb16 = ((ushort)r, (ushort)g, (ushort)bl);
             }
             else
-                pattern.Pixels = PixMap.ReadPatternPixMap(b, macOS9);
+                pattern.Pixels = PixMap.ReadPatternPixMap(ref b, macOS9);
             return pattern;
         }
     }

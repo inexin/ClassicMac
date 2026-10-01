@@ -1,8 +1,8 @@
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.IO;
 using ClassicMac.Core;
 
 namespace ClassicMac.Graphics.QuickDraw
@@ -23,10 +23,10 @@ namespace ClassicMac.Graphics.QuickDraw
         public static Region FromRgnData(ReadOnlySpan<byte> data)
         {
             if (data.Length < 10) throw new InvalidDataException($"A region needs a 10-byte header; this is {data.Length} bytes.");
-            var size = BinaryPrimitives.ReadUInt16BigEndian(data) & 0x7FFF;
+            var size = new ClassicMac.Core.BigEndianReader(data).ReadUInt16At(0) & 0x7FFF;
             if (size > data.Length) throw new InvalidDataException($"The region says it is {size} bytes; there are {data.Length}.");
-            using var reader = new BinaryReader(new MemoryStream(data[..Math.Max(10, size)].ToArray()));
-            return Read(reader);
+            var reader = new ClassicMac.Core.BigEndianReader(data[..Math.Max(10, size)]);
+            return Read(ref reader);
         }
 
         /// <summary>The region in QuickDraw's stored form: <c>rgnSize</c>, <c>rgnBBox</c> and, unless it is a rectangle, its rows.</summary>

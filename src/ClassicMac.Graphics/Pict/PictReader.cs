@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Threading;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
@@ -62,34 +63,33 @@ namespace ClassicMac.Graphics.Pict
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(data);
-            using var ms = new MemoryStream(data);
-            using var b = new BinaryReader(ms);
+            var b = new ClassicMac.Core.BigEndianReader(data);
 
             options ??= PictDecodeOptions.Default;
-            var info = PictHeader.Parse(b, data.Length, out bool v1);
+            var info = PictHeader.Parse(ref b, data.Length, out bool v1);
             var bounds = info.BoundsRect;
             var canvasRect = options.Resolution == PictResolution.PictureFrame ? info.FrameRect : bounds;
             var canvas = new RgbaBitmap(Math.Max(1, canvasRect.Width), Math.Max(1, canvasRect.Height));
             var port = new GrafPort(canvas, info.FrameRect, bounds, options);
-            Play(b, info, v1, port, options, cancellationToken);
+            Play(ref b, info, v1, port, options, cancellationToken);
             return new PictPicture(canvas, info);
         }
 
         // Plays the opcodes after the header into the play state, to the end opcode or the end of the data.
-        internal static void Play(BinaryReader b, PictInfo info, bool v1, GrafPort port, PictDecodeOptions options,
+        internal static void Play(ref ClassicMac.Core.BigEndianReader b, PictInfo info, bool v1, GrafPort port, PictDecodeOptions options,
             CancellationToken cancellationToken)
         {
             bool macOS9 = options.QuickDraw == QuickDrawVersion.MacOS9;
             {
                 PictRect? quickTimeRect = null;           // destination of a QuickTime image drawn by the last opcode
-                while (b.BaseStream.Position < b.BaseStream.Length)
+                while (b.Position < b.Length)
                 {
                     var justDrawnQuickTime = quickTimeRect;
                     quickTimeRect = null;
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (!v1 && (b.BaseStream.Position & 1) == 1) // v2 opcodes are word-aligned
-                        b.BaseStream.Seek(1, SeekOrigin.Current);
-                    if (b.BaseStream.Position >= b.BaseStream.Length) break;
+                    if (!v1 && (b.Position & 1) == 1) // v2 opcodes are word-aligned
+                        b.Skip(1);
+                    if (b.Position >= b.Length) break;
 
                     int op = v1 ? b.ReadByte() : b.ReadU16BE();
                     port.Version1 = v1;
@@ -108,7 +108,7 @@ namespace ClassicMac.Graphics.Pict
                         case 0x009A:                        // DirectBitsRect
                         case 0x009B:                        // DirectBitsRgn
                         {
-                            var (pm, src, dst, mode, mask) = ReadBits(b, op, macOS9);
+                            var (pm, src, dst, mode, mask) = ReadBits(ref b, op, macOS9);
                             if (dst != justDrawnQuickTime) port.CopyBits(pm, src, dst, mode, mask);
                             break;
                         }
@@ -134,7 +134,7 @@ namespace ClassicMac.Graphics.Pict
                             if (drawn != null)
                             {
                                 quickTimeRect = drawn;
-                                SkipQuickTimeFallback(b);
+                                SkipQuickTimeFallback(ref b);
                             }
                             break;
                         }
@@ -144,13 +144,13 @@ namespace ClassicMac.Graphics.Pict
                             if (drawn != null)
                             {
                                 quickTimeRect = drawn;
-                                SkipQuickTimeFallback(b);
+                                SkipQuickTimeFallback(ref b);
                             }
                             break;
                         }
                         default:
-                            if (!HandleDrawingOpcode(port, b, op, macOS9))
-                                SkipOperands(b, op);
+                            if (!HandleDrawingOpcode(port, ref b, op, macOS9))
+                                SkipOperands(ref b, op);
                             break;
                     }
                 }
@@ -160,30 +160,29 @@ namespace ClassicMac.Graphics.Pict
         // QuickTime writes pictures whose compressed image is followed by drawing for systems without QuickTime
         // ("QuickTime and a ... decompressor are needed"), introduced by a PnSize opcode with v = 0x00AE whose h is the
         // byte count QuickTime skips once it has drawn the image.
-        private static void SkipQuickTimeFallback(BinaryReader b)
+        private static void SkipQuickTimeFallback(ref ClassicMac.Core.BigEndianReader b)
         {
-            var s = b.BaseStream;
-            long start = s.Position + (s.Position & 1);
-            if (start + 6 > s.Length) return;
-            s.Position = start;
+            int start = b.Position + (b.Position & 1);
+            if (start + 6 > b.Length) return;
+            b.Position = start;
             if (b.ReadU16BE() == 0x0007 && b.ReadU16BE() == 0x00AE)
             {
                 int skip = b.ReadU16BE();
-                s.Position = Math.Min(s.Length, s.Position + skip);
+                b.Position = Math.Min(b.Length, b.Position + skip);
                 return;
             }
-            s.Position = start;
+            b.Position = start;
         }
 
         // A bitmap opcode's operands (0x90-0x93, 0x98-0x9B): the BitMap/PixMap, srcRect, dstRect, mode, the mask
         // region of the Rgn variants (odd opcodes), and the pixel data.
-        private static (PixMap pm, PictRect src, PictRect dst, int mode, Region? mask) ReadBits(BinaryReader b, int op,
+        private static (PixMap pm, PictRect src, PictRect dst, int mode, Region? mask) ReadBits(ref ClassicMac.Core.BigEndianReader b, int op,
             bool macOS9)
         {
             bool direct = (op & 0x0A) == 0x0A || op == 0x0092 || op == 0x0093;
-            var pm = direct ? PixMap.ReadDirectHeader(b, macOS9) : PixMap.ReadIndexedHeader(b, macOS9);
-            var (src, dst, mode, mask) = ReadCopyBitsTail(b, hasRegion: (op & 1) != 0);
-            pm.ReadPixData(b);
+            var pm = direct ? PixMap.ReadDirectHeader(ref b, macOS9) : PixMap.ReadIndexedHeader(ref b, macOS9);
+            var (src, dst, mode, mask) = ReadCopyBitsTail(ref b, hasRegion: (op & 1) != 0);
+            pm.ReadPixData(ref b);
             return (pm, src, dst, mode, mask);
         }
 
@@ -192,7 +191,7 @@ namespace ClassicMac.Graphics.Pict
         // (picture space), or null when the block holds no bitmap opcode.
         private static PictRect? UncompressedQuickTime(GrafPort port, byte[] block, bool macOS9)
         {
-            using var b = new BinaryReader(new MemoryStream(block));
+            var b = new ClassicMac.Core.BigEndianReader(block);
             try
             {
                 b.ReadU16BE();                                        // version
@@ -200,12 +199,12 @@ namespace ClassicMac.Graphics.Pict
                 for (int i = 0; i < 9; i++) matrix[i] = b.ReadI32BE();
                 long matteSize = b.ReadU32BE();
                 b.ReadRectBE();                                       // matte rect
-                if (matteSize > block.Length - b.BaseStream.Position) return null;
-                b.BaseStream.Position = (b.BaseStream.Position + matteSize + 1) & ~1L;
+                if (matteSize > block.Length - b.Position) return null;
+                b.Position = (int)((b.Position + matteSize + 1) & ~1L);
                 int op = b.ReadU16BE();
                 if (op < 0x0090 || op > 0x009B || (op > 0x0093 && op < 0x0098)) return null;
                 if (macOS9 && (op == 0x0092 || op == 0x0093)) return null;
-                var (pm, src, dst, mode, mask) = ReadBits(b, op, macOS9);
+                var (pm, src, dst, mode, mask) = ReadBits(ref b, op, macOS9);
                 return port.UncompressedQuickTime(pm, src, dst, mode, mask, matrix);
             }
             catch (EndOfStreamException)
@@ -215,57 +214,57 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // srcRect, dstRect, mode and (Rgn variants) maskRgn, which sit between a CopyBits PixMap and its PixData.
-        private static (PictRect src, PictRect dst, int mode, Region? mask) ReadCopyBitsTail(BinaryReader b, bool hasRegion)
+        private static (PictRect src, PictRect dst, int mode, Region? mask) ReadCopyBitsTail(ref ClassicMac.Core.BigEndianReader b, bool hasRegion)
         {
             var src = b.ReadRectBE();
             var dst = b.ReadRectBE();
             int mode = b.ReadU16BE();
-            var mask = hasRegion ? Region.Read(b) : null;
+            var mask = hasRegion ? Region.Read(ref b) : null;
             return (src, dst, mode, mask);
         }
 
         // Applies the drawing and graphics-state opcodes to the port. Returns false if the opcode isn't one we
         // interpret (the caller then consumes its operands via SkipOperands). Shape blocks: rect 0x30, round rect
         // 0x40, oval 0x50, arc 0x60, poly 0x70, region 0x80; + verb, "same" variants at base + 8.
-        private static bool HandleDrawingOpcode(GrafPort port, BinaryReader b, int op, bool macOS9)
+        private static bool HandleDrawingOpcode(GrafPort port, ref ClassicMac.Core.BigEndianReader b, int op, bool macOS9)
         {
             switch (op)
             {
-                case 0x0001: port.SetClip(Region.Read(b)); return true;                  // ClipRgn
+                case 0x0001: port.SetClip(Region.Read(ref b)); return true;                  // ClipRgn
                 case 0x0002: port.BkPat = QuickDrawPattern.FromMono(b.ReadExactly(8)); return true;    // BkPat
                 case 0x0009: port.PnPat = QuickDrawPattern.FromMono(b.ReadExactly(8)); return true;    // PnPat
                 case 0x000A: port.FillPat = QuickDrawPattern.FromMono(b.ReadExactly(8)); return true;  // FillPat
-                case 0x0012: port.BkPat = QuickDrawPattern.Read(b, macOS9); return true;          // BkPixPat
-                case 0x0013: port.PnPat = QuickDrawPattern.Read(b, macOS9); return true;          // PnPixPat
-                case 0x0014: port.FillPat = QuickDrawPattern.Read(b, macOS9); return true;        // FillPixPat
+                case 0x0012: port.BkPat = QuickDrawPattern.Read(ref b, macOS9); return true;          // BkPixPat
+                case 0x0013: port.PnPat = QuickDrawPattern.Read(ref b, macOS9); return true;          // PnPixPat
+                case 0x0014: port.FillPat = QuickDrawPattern.Read(ref b, macOS9); return true;        // FillPixPat
                 case 0x0003: port.TextFont(b.ReadU16BE()); return true;                  // TxFont
                 case 0x0004: port.TextFace = b.ReadByte(); return true;                  // TxFace
                 case 0x0005: port.TextMode = b.ReadU16BE(); return true;                 // TxMode
-                case 0x0007: { var p = ReadPoint(b); port.PenSize(p.h, p.v); return true; }              // PnSize
+                case 0x0007: { var p = ReadPoint(ref b); port.PenSize(p.h, p.v); return true; }              // PnSize
                 case 0x0008: port.PenMode = b.ReadU16BE(); return true;                  // PnMode
-                case 0x000B: { var p = ReadPoint(b); port.OvalSize(p.h, p.v); return true; }             // OvSize
+                case 0x000B: { var p = ReadPoint(ref b); port.OvalSize(p.h, p.v); return true; }             // OvSize
                 case 0x000C: { int dh = b.ReadI16BE(), dv = b.ReadI16BE(); port.Origin(dh, dv); return true; } // Origin: dh, dv
                 case 0x000D: port.TextSize = b.ReadU16BE(); return true;                 // TxSize
                 case 0x0006: port.SpaceExtra = b.ReadI32BE(); return true;               // SpExtra (Fixed)
                 case 0x0015: port.PnLocHFrac(b.ReadU16BE()); return true;                // PnLocHFrac
                 case 0x0016: port.ChExtra = (short)b.ReadU16BE(); return true;           // ChExtra (4.12 per point)
-                case 0x0010: { var n = ReadPoint(b); var d = ReadPoint(b); port.TextRatio(n.h, n.v, d.h, d.v); return true; }   // TxRatio
+                case 0x0010: { var n = ReadPoint(ref b); var d = ReadPoint(ref b); port.TextRatio(n.h, n.v, d.h, d.v); return true; }   // TxRatio
                 case 0x000E: (port.ForeColor, port.Fore16) = ClassicColor((int)b.ReadU32BE(), true); return true;  // FgColor
                 case 0x000F: (port.BackColor, port.Back16) = ClassicColor((int)b.ReadU32BE(), false); return true; // BkColor
-                case 0x001A: (port.ForeColor, port.Fore16) = ReadRgbExact(b); return true;                          // RGBFgCol
-                case 0x001B: (port.BackColor, port.Back16) = ReadRgbExact(b); return true;                          // RGBBkCol
+                case 0x001A: (port.ForeColor, port.Fore16) = ReadRgbExact(ref b); return true;                          // RGBFgCol
+                case 0x001B: (port.BackColor, port.Back16) = ReadRgbExact(ref b); return true;                          // RGBBkCol
                 case 0x001C: port.HiliteMode(); return true;                             // HiliteMode
-                case 0x001D: port.HiliteColor = ReadRgb(b); return true;                 // HiliteColor
+                case 0x001D: port.HiliteColor = ReadRgb(ref b); return true;                 // HiliteColor
                 case 0x001E: port.DefaultHilite(); return true;                          // DefHilite
                 case 0x001F: port.OpColor = (b.ReadU16BE(), b.ReadU16BE(), b.ReadU16BE()); return true;   // OpColor
-                case 0x0020: { var a = ReadPoint(b); var c = ReadPoint(b); port.Line(a.h, a.v, c.h, c.v); return true; }   // Line
-                case 0x0021: { var c = ReadPoint(b); port.LineTo(c.h, c.v); return true; }               // LineFrom
-                case 0x0022: { var a = ReadPoint(b); sbyte dh = (sbyte)b.ReadByte(), dv = (sbyte)b.ReadByte(); port.Line(a.h, a.v, a.h + dh, a.v + dv); return true; }   // ShortLine
+                case 0x0020: { var a = ReadPoint(ref b); var c = ReadPoint(ref b); port.Line(a.h, a.v, c.h, c.v); return true; }   // Line
+                case 0x0021: { var c = ReadPoint(ref b); port.LineTo(c.h, c.v); return true; }               // LineFrom
+                case 0x0022: { var a = ReadPoint(ref b); sbyte dh = (sbyte)b.ReadByte(), dv = (sbyte)b.ReadByte(); port.Line(a.h, a.v, a.h + dh, a.v + dv); return true; }   // ShortLine
                 case 0x0023: { sbyte dh = (sbyte)b.ReadByte(), dv = (sbyte)b.ReadByte(); port.LineBy(dh, dv); return true; }   // ShortLineFrom
-                case 0x0028: { var p = ReadPoint(b); port.LongText(p.h, p.v, ReadText(b)); return true; }            // LongText
-                case 0x0029: { int dh = b.ReadByte(); port.OffsetText(dh, 0, ReadText(b)); return true; }            // DHText
-                case 0x002A: { int dv = b.ReadByte(); port.OffsetText(0, dv, ReadText(b)); return true; }            // DVText
-                case 0x002B: { int dh = b.ReadByte(), dv = b.ReadByte(); port.OffsetText(dh, dv, ReadText(b)); return true; }   // DHDVText
+                case 0x0028: { var p = ReadPoint(ref b); port.LongText(p.h, p.v, ReadText(ref b)); return true; }            // LongText
+                case 0x0029: { int dh = b.ReadByte(); port.OffsetText(dh, 0, ReadText(ref b)); return true; }            // DHText
+                case 0x002A: { int dv = b.ReadByte(); port.OffsetText(0, dv, ReadText(ref b)); return true; }            // DVText
+                case 0x002B: { int dh = b.ReadByte(), dv = b.ReadByte(); port.OffsetText(dh, dv, ReadText(ref b)); return true; }   // DHDVText
                 case 0x002C:                                                              // fontName
                 {
                     int length = b.ReadU16BE();
@@ -297,18 +296,18 @@ namespace ClassicMac.Graphics.Pict
             if (op >= 0x0058 && op <= 0x005C) { port.Oval(null, op - 0x0058); return true; }
             if (op >= 0x0060 && op <= 0x0064) { var r = b.ReadRectBE(); int sa = b.ReadI16BE(), aa = b.ReadI16BE(); port.Arc(r, sa, aa, op - 0x0060); return true; }
             if (op >= 0x0068 && op <= 0x006C) { int sa = b.ReadI16BE(), aa = b.ReadI16BE(); port.Arc(null, sa, aa, op - 0x0068); return true; }
-            if (op >= 0x0070 && op <= 0x0074) { port.Polygon(ReadPolygon(b), op - 0x0070); return true; }
+            if (op >= 0x0070 && op <= 0x0074) { port.Polygon(ReadPolygon(ref b), op - 0x0070); return true; }
             if (op >= 0x0078 && op <= 0x007C) { port.Polygon(null, op - 0x0078); return true; }
-            if (op >= 0x0080 && op <= 0x0084) { port.Rgn(Region.Read(b), op - 0x0080); return true; }
+            if (op >= 0x0080 && op <= 0x0084) { port.Rgn(Region.Read(ref b), op - 0x0080); return true; }
             if (op >= 0x0088 && op <= 0x008C) { port.Rgn(null, op - 0x0088); return true; }
 
             return false;
         }
 
-        private static byte[] ReadText(BinaryReader b) => b.ReadExactly(b.ReadByte());
+        private static byte[] ReadText(ref ClassicMac.Core.BigEndianReader b) => b.ReadExactly(b.ReadByte());
 
         // QuickDraw Point is (v, h) - vertical first.
-        private static (int v, int h) ReadPoint(BinaryReader b)
+        private static (int v, int h) ReadPoint(ref ClassicMac.Core.BigEndianReader b)
         {
             int v = b.ReadI16BE();
             int h = b.ReadI16BE();
@@ -316,13 +315,13 @@ namespace ClassicMac.Graphics.Pict
         }
 
         // RGBColor: three 16-bit channels (use the high byte).
-        internal static RgbaColor ReadRgb(BinaryReader b)
+        internal static RgbaColor ReadRgb(ref ClassicMac.Core.BigEndianReader b)
         {
             int r = b.ReadU16BE(), g = b.ReadU16BE(), bl = b.ReadU16BE();
             return new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255);
         }
 
-        private static (RgbaColor, (ushort, ushort, ushort)) ReadRgbExact(BinaryReader b)
+        private static (RgbaColor, (ushort, ushort, ushort)) ReadRgbExact(ref ClassicMac.Core.BigEndianReader b)
         {
             int r = b.ReadU16BE(), g = b.ReadU16BE(), bl = b.ReadU16BE();
             return (new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(bl >> 8), 255), ((ushort)r, (ushort)g, (ushort)bl));
@@ -348,7 +347,7 @@ namespace ClassicMac.Graphics.Pict
 
         // A Polygon: u16 polySize + bounding Rect + (polySize - 10) / 4 Points, returned as (h, v) picture points.
         // An empty polygon (no points or an empty bounding box) draws nothing (Executor C_StdPoly).
-        private static (int h, int v)[] ReadPolygon(BinaryReader b)
+        private static (int h, int v)[] ReadPolygon(ref ClassicMac.Core.BigEndianReader b)
         {
             int size = b.ReadU16BE();
             var bbox = b.ReadRectBE();
@@ -356,7 +355,7 @@ namespace ClassicMac.Graphics.Pict
             var pts = new (int h, int v)[count];
             for (int i = 0; i < count; i++)
             {
-                var p = ReadPoint(b);
+                var p = ReadPoint(ref b);
                 pts[i] = (p.h, p.v);
             }
             if (size > 10 && (size - 10) % 4 != 0) b.Skip((size - 10) % 4);
@@ -365,18 +364,18 @@ namespace ClassicMac.Graphics.Pict
 
         // A QuickDraw Region or Polygon: u16 total size (including itself) + bounding Rect +
         // optional run data. We only need to skip past it.
-        private static void SkipRegion(BinaryReader b)
+        private static void SkipRegion(ref ClassicMac.Core.BigEndianReader b)
         {
             int size = b.ReadU16BE();
             if (size >= 2) b.Skip(size - 2);
         }
 
         // var16/var32: a u16/u32 byte-length prefix followed by that many data bytes.
-        private static void SkipVar16(BinaryReader b) => b.Skip(b.ReadU16BE());
-        private static void SkipVar32(BinaryReader b) => b.Skip(b.ReadU32BE());
+        private static void SkipVar16(ref ClassicMac.Core.BigEndianReader b) => b.Skip(b.ReadU16BE());
+        private static void SkipVar32(ref ClassicMac.Core.BigEndianReader b) => b.Skip(b.ReadU32BE());
 
         // Text opcodes: positioning bytes, then a u8 char count, then that many chars.
-        private static void SkipText(BinaryReader b, int positionBytes)
+        private static void SkipText(ref ClassicMac.Core.BigEndianReader b, int positionBytes)
         {
             b.Skip(positionBytes);
             int count = b.ReadByte();
@@ -386,12 +385,12 @@ namespace ClassicMac.Graphics.Pict
         // Consumes the operands of an opcode that is not interpreted, by its size in Inside Macintosh: Imaging With
         // QuickDraw, Appendix A, Table A-2 (cross-checked with Executor's wparray, qPicstuff.cpp). Reserved opcodes
         // "for Apple use" are skipped, as QuickDraw does.
-        private static void SkipOperands(BinaryReader b, int op)
+        private static void SkipOperands(ref ClassicMac.Core.BigEndianReader b, int op)
         {
             switch (op)
             {
                 case 0x0000: return;                                    // NOP
-                case 0x0001: SkipRegion(b); return;                    // clip region
+                case 0x0001: SkipRegion(ref b); return;                // clip region
                 case 0x0002: case 0x0009: case 0x000A: case 0x0010:    // BkPat/PnPat/FillPat/TxRatio
                     b.Skip(8); return;
                 case 0x0003: case 0x0005: case 0x0008: case 0x000D:    // TxFont/TxMode/PnMode/TxSize
@@ -407,14 +406,14 @@ namespace ClassicMac.Graphics.Pict
                 case 0x001C: case 0x001E: return;                      // HiliteMode/DefHilite
                 case 0x0020: b.Skip(8); return;                        // Line
                 case 0x0022: b.Skip(6); return;                        // ShortLine
-                case 0x0028: SkipText(b, 4); return;                   // LongText
-                case 0x0029: case 0x002A: SkipText(b, 1); return;      // DH/DV Text
-                case 0x002B: SkipText(b, 2); return;                   // DHDV Text
+                case 0x0028: SkipText(ref b, 4); return;               // LongText
+                case 0x0029: case 0x002A: SkipText(ref b, 1); return;  // DH/DV Text
+                case 0x002B: SkipText(ref b, 2); return;               // DHDV Text
                 case 0x02FF: b.Skip(2); return;                        // Version (mid-stream)
             }
 
-            if (op >= 0x0024 && op <= 0x0027) { SkipVar16(b); return; }     // reserved: length + data
-            if (op >= 0x002C && op <= 0x002F) { SkipVar16(b); return; }     // fontName/lineJustify/glyphState/reserved
+            if (op >= 0x0024 && op <= 0x0027) { SkipVar16(ref b); return; } // reserved: length + data
+            if (op >= 0x002C && op <= 0x002F) { SkipVar16(ref b); return; } // fontName/lineJustify/glyphState/reserved
             if (op >= 0x0030 && op <= 0x0037) { b.Skip(8); return; }        // rect (incl. reserved)
             if (op >= 0x0038 && op <= 0x003F) return;                       // same rect (no data)
             if (op >= 0x0040 && op <= 0x0047) { b.Skip(8); return; }        // round rect
@@ -423,20 +422,20 @@ namespace ClassicMac.Graphics.Pict
             if (op >= 0x0058 && op <= 0x005F) return;
             if (op >= 0x0060 && op <= 0x0067) { b.Skip(12); return; }       // arc (rect + angles)
             if (op >= 0x0068 && op <= 0x006F) { b.Skip(4); return; }        // same arc (angles)
-            if (op >= 0x0070 && op <= 0x0077) { SkipRegion(b); return; }    // poly (size includes itself)
+            if (op >= 0x0070 && op <= 0x0077) { SkipRegion(ref b); return; } // poly (size includes itself)
             if (op >= 0x0078 && op <= 0x007F) return;                       // same poly (no data)
-            if (op >= 0x0080 && op <= 0x0087) { SkipRegion(b); return; }    // region
+            if (op >= 0x0080 && op <= 0x0087) { SkipRegion(ref b); return; } // region
             if (op >= 0x0088 && op <= 0x008F) return;                       // same region (no data)
-            if (op >= 0x0094 && op <= 0x0097) { SkipVar16(b); return; }     // reserved
-            if (op >= 0x009C && op <= 0x009F) { SkipVar16(b); return; }     // reserved
-            if (op >= 0x00A2 && op <= 0x00AF) { SkipVar16(b); return; }     // reserved
+            if (op >= 0x0094 && op <= 0x0097) { SkipVar16(ref b); return; } // reserved
+            if (op >= 0x009C && op <= 0x009F) { SkipVar16(ref b); return; } // reserved
+            if (op >= 0x00A2 && op <= 0x00AF) { SkipVar16(ref b); return; } // reserved
             if (op >= 0x00B0 && op <= 0x00CF) return;                       // reserved (no data)
-            if (op >= 0x00D0 && op <= 0x00DF) { SkipVar16(b); return; }     // reserved: the ROM reads a u16 length
-            if (op >= 0x00E0 && op <= 0x00FE) { SkipVar32(b); return; }     // reserved (u32 length + data)
+            if (op >= 0x00D0 && op <= 0x00DF) { SkipVar16(ref b); return; } // reserved: the ROM reads a u16 length
+            if (op >= 0x00E0 && op <= 0x00FE) { SkipVar32(ref b); return; } // reserved (u32 length + data)
             if (op >= 0x0100 && op <= 0x7FFF) { b.Skip(2 * (op >> 8)); return; }   // $nnXX: 2 * nn bytes
             if (op >= 0x8000 && op <= 0x80FF) return;                       // reserved (no data)
             // 0x8100-0xFFFF: u32 length + data, including 0x8200/0x8201 QuickTime and 0xFFFF.
-            SkipVar32(b);
+            SkipVar32(ref b);
         }
     }
 }

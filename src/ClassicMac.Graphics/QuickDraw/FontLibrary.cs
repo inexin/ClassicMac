@@ -128,8 +128,8 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 try
                 {
-                    using var b = new System.IO.BinaryReader(new System.IO.MemoryStream(fctb));
-                    return PixMap.ReadColorTable(b, depth);
+                    var b = new ClassicMac.Core.BigEndianReader(fctb);
+                    return PixMap.ReadColorTable(ref b, depth);
                 }
                 catch (System.IO.EndOfStreamException) { }
             }
