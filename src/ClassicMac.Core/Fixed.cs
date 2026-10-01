@@ -41,12 +41,11 @@ namespace ClassicMac.Core
         /// <summary>Writes the value as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)
         {
-            var writer = new BigEndianWriter(destination);
-            writer.WriteFixed(this);
+            BinaryPrimitives.WriteInt32BigEndian(destination, Raw);
         }
 
-        /// <summary>Writes a fixed-point value at the writer's current position and advances it.</summary>
-        public void Write(ref BigEndianWriter writer) => writer.WriteFixed(this);
+        /// <summary>Writes a fixed-point value at the end of the writer's output.</summary>
+        public void Write(BigEndianWriter writer) => writer.WriteFixed(this);
 
         /// <inheritdoc/>
         public int CompareTo(Fixed other) => Raw.CompareTo(other.Raw);
@@ -93,12 +92,11 @@ namespace ClassicMac.Core
         /// <summary>Writes the value as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)
         {
-            var writer = new BigEndianWriter(destination);
-            writer.WriteUnsignedFixed(this);
+            BinaryPrimitives.WriteUInt32BigEndian(destination, Raw);
         }
 
-        /// <summary>Writes an unsigned fixed-point value at the writer's current position and advances it.</summary>
-        public void Write(ref BigEndianWriter writer) => writer.WriteUnsignedFixed(this);
+        /// <summary>Writes an unsigned fixed-point value at the end of the writer's output.</summary>
+        public void Write(BigEndianWriter writer) => writer.WriteUnsignedFixed(this);
 
         /// <inheritdoc/>
         public int CompareTo(UnsignedFixed other) => Raw.CompareTo(other.Raw);

@@ -6,6 +6,9 @@
   current position to its end; readers are passed without `ref` and can be fields. Every big-endian read in the
   libraries goes through it, and the methods that read with it take `ReadOnlyMemory<byte>` instead of
   `ReadOnlySpan<byte>`.
+- Core: `BigEndianWriter` is a class that grows as it is written, like a `StringBuilder` for bytes, with `Write…At`
+  to patch a length or offset written earlier, `ToArray` and `WriteTo(Stream)`. `BigEndianStreamWriter` is gone;
+  `PictWriter` builds its output with `BigEndianWriter`.
 - Graphics: PICT pictures, QuickTime image files and MacPaint documents decode from streams, seekable or not, from the
   current position to the end, leaving the stream open. `QuickTimeImageFile.Read(Stream)` returns a
   `QuickTimeImageResult` with the description and ICC profile; `PictSkia.DecodeAny(Stream)`. The ImageSharp decoders

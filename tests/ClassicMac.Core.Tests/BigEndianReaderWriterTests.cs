@@ -7,8 +7,7 @@ public class BigEndianReaderWriterTests
     [Fact]
     public void Writer_and_reader_round_trip_big_endian_scalars_and_mac_values()
     {
-        byte[] bytes = new byte[4 + 2 + 2 + 4 + 4 + 8 + 8 + 4 + 4 + 8];
-        var writer = new BigEndianWriter(bytes);
+        var writer = new BigEndianWriter(capacity: 0);
         writer.WriteFourCC(FourCC.FromString("PICT"));
         writer.WriteInt16(-2);
         writer.WriteUInt16(0xABCD);
@@ -20,8 +19,8 @@ public class BigEndianReaderWriterTests
         writer.WriteMacPoint(new MacPoint(-2, 0x1234));
         writer.WriteMacRect(new MacRect(-1, 2, 3, -4));
 
-        Assert.Equal(bytes.Length, writer.Position);
-        Assert.Equal(0, writer.Remaining);
+        var bytes = writer.ToArray();
+        Assert.Equal(4 + 2 + 2 + 4 + 4 + 8 + 8 + 4 + 4 + 8, writer.Length);
         Assert.Equal(new byte[]
         {
             0x50, 0x49, 0x43, 0x54,
@@ -53,12 +52,11 @@ public class BigEndianReaderWriterTests
     [Fact]
     public void Fixed_values_round_trip_through_cursor_methods()
     {
-        byte[] bytes = new byte[8];
-        var writer = new BigEndianWriter(bytes);
+        var writer = new BigEndianWriter();
         writer.WriteFixed(new Fixed(unchecked((int)0xFFFF8000)));
         writer.WriteUnsignedFixed(new UnsignedFixed(0xAC440000));
 
-        var reader = new BigEndianReader(bytes);
+        var reader = new BigEndianReader(writer.WrittenMemory);
         Assert.Equal(new Fixed(unchecked((int)0xFFFF8000)), reader.ReadFixed());
         Assert.Equal(new UnsignedFixed(0xAC440000), reader.ReadUnsignedFixed());
     }
@@ -113,7 +111,7 @@ public class BigEndianReaderWriterTests
     }
 
     [Fact]
-    public void Try_operations_leave_state_and_output_clear_when_the_span_is_too_short()
+    public void Failed_try_reads_leave_the_position_unchanged()
     {
         byte[] source = [0x12];
         var reader = new BigEndianReader(source);
@@ -131,32 +129,15 @@ public class BigEndianReaderWriterTests
         Assert.False(reader.TrySkip(-1));
         Assert.Equal(0, reader.Position);
 
-        byte[] destination = [0xAA];
-        var writer = new BigEndianWriter(destination);
-        Assert.False(writer.TryWriteUInt16(0x1234));
-        Assert.Equal(0, writer.Position);
-        Assert.Equal(new byte[] { 0xAA }, destination);
-
-        Assert.False(writer.TryWriteMacRect(new MacRect(1, 2, 3, 4)));
-        Assert.Equal(0, writer.Position);
-        Assert.Equal(new byte[] { 0xAA }, destination);
-        Assert.False(writer.TryWriteBytes([1, 2]));
-        Assert.Equal(0, writer.Position);
-        Assert.Equal(new byte[] { 0xAA }, destination);
-        Assert.False(writer.TrySkip(2));
-        Assert.Equal(0, writer.Position);
     }
 
     [Fact]
-    public void Try_operations_succeed_at_exact_buffer_end()
+    public void Try_reads_succeed_at_the_exact_end()
     {
-        byte[] destination = new byte[2];
-        var writer = new BigEndianWriter(destination);
-        Assert.True(writer.TryWriteInt16(-2));
-        Assert.Equal(2, writer.Position);
-        Assert.Equal(0, writer.Remaining);
+        var writer = new BigEndianWriter();
+        writer.WriteInt16(-2);
 
-        var reader = new BigEndianReader(destination);
+        var reader = new BigEndianReader(writer.ToArray());
         Assert.True(reader.TryReadInt16(out short value));
         Assert.Equal((short)-2, value);
         Assert.Equal(2, reader.Position);
@@ -164,7 +145,7 @@ public class BigEndianReaderWriterTests
     }
 
     [Fact]
-    public void Throwing_reads_and_writes_report_exhausted_spans()
+    public void Throwing_reads_report_exhausted_data()
     {
         var reader = new BigEndianReader(new byte[] { 0x12 });
         bool readThrew = false;
@@ -172,13 +153,6 @@ public class BigEndianReaderWriterTests
         catch (EndOfStreamException) { readThrew = true; }
         Assert.True(readThrew);
         Assert.Equal(0, reader.Position);
-
-        var writer = new BigEndianWriter(new byte[1]);
-        bool writeThrew = false;
-        try { writer.WriteUInt16(0x1234); }
-        catch (ArgumentException) { writeThrew = true; }
-        Assert.True(writeThrew);
-        Assert.Equal(0, writer.Position);
     }
 
     [Fact]
@@ -211,16 +185,6 @@ public class BigEndianReaderWriterTests
         Assert.False(reader.TryReadBytesAt(-1, 1, out ReadOnlySpan<byte> missingBytes));
         Assert.True(missingBytes.IsEmpty);
         Assert.Equal(5, reader.Position);
-
-        byte[] destination = [0xAA, 0, 0, 0, 0, 0xBB];
-        var writer = new BigEndianWriter(destination) { Position = 5 };
-        Assert.True(writer.TryWriteUInt32At(1, 0x01020304));
-        Assert.Equal(5, writer.Position);
-        Assert.Equal(new byte[] { 0xAA, 1, 2, 3, 4, 0xBB }, destination);
-
-        Assert.False(writer.TryWriteMacRectAt(1, new MacRect(1, 2, 3, 4)));
-        Assert.Equal(5, writer.Position);
-        Assert.Equal(new byte[] { 0xAA, 1, 2, 3, 4, 0xBB }, destination);
     }
 
     [Fact]
@@ -246,5 +210,27 @@ public class BigEndianReaderWriterTests
         Assert.Equal(new ushort[] { 1, 2 }, Words(new BigEndianReader(new byte[] { 0, 1, 0, 2, 9 })));
         var sub = new BigEndianReader(new byte[] { 1, 2, 3, 4 }).ReadSubReader(2);
         Assert.Equal(new byte[] { 1, 2 }, sub.Source.ToArray());
+    }
+
+    [Fact]
+    public void The_writer_grows_and_patches_what_it_has_written()
+    {
+        var writer = new BigEndianWriter(capacity: 2);
+        writer.WriteUInt32(0);                                       // placeholder for a length
+        for (int i = 0; i < 1000; i++) writer.WriteUInt16((ushort)i);
+        writer.WriteZeros(3);
+        writer.WriteUInt32At(0, (uint)(writer.Length - 4));
+        Assert.Equal(4 + 2000 + 3, writer.Length);
+        var bytes = writer.ToArray();
+        Assert.Equal(2003u, new BigEndianReader(bytes).ReadUInt32());
+        Assert.Equal(999, new BigEndianReader(bytes).ReadUInt16At(4 + 2 * 999));
+        Assert.Equal(new byte[3], bytes[^3..]);
+        Assert.Throws<ArgumentOutOfRangeException>(() => writer.WriteUInt16At(writer.Length - 1, 1));
+
+        var stream = new MemoryStream();
+        writer.WriteTo(stream);
+        Assert.Equal(bytes, stream.ToArray());
+        writer.Clear();
+        Assert.Equal(0, writer.Length);
     }
 }

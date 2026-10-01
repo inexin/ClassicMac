@@ -144,8 +144,7 @@ public class FontTests
     [Fact]
     public void Font_color_table_reads_sequentially_with_the_big_endian_reader()
     {
-        var data = new byte[16];
-        var writer = new ClassicMac.Core.BigEndianWriter(data);
+        var writer = new ClassicMac.Core.BigEndianWriter();
         writer.WriteUInt32(0); // seed
         writer.WriteUInt16(0); // flags
         writer.WriteInt16(0); // one entry
@@ -153,11 +152,11 @@ public class FontTests
         writer.WriteUInt16(0x1234);
         writer.WriteUInt16(0x5678);
         writer.WriteUInt16(0x9ABC);
-        var reader = new ClassicMac.Core.BigEndianReader(data);
+        var reader = new ClassicMac.Core.BigEndianReader(writer.ToArray());
 
         var entries = FontColorTable.Read(reader);
 
         Assert.Equal([new FontColorEntry(7, 0x1234, 0x5678, 0x9ABC)], entries);
-        Assert.Equal(data.Length, reader.Position);
+        Assert.Equal(writer.Length, reader.Position);
     }
 }

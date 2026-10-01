@@ -52,8 +52,7 @@ namespace ClassicMac.Resources.Decoders.Text
         // The runs as a style scrap: a count, then 20-byte elements.
         public static byte[] Write(IReadOnlyList<StyleRun> runs)
         {
-            var data = new byte[2 + runs.Count * ElementLength];
-            var writer = new BigEndianWriter(data);
+            var writer = new BigEndianWriter(2 + runs.Count * ElementLength);
             writer.WriteUInt16((ushort)runs.Count);
             for (var i = 0; i < runs.Count; i++)
             {
@@ -63,13 +62,13 @@ namespace ClassicMac.Resources.Decoders.Text
                 writer.WriteInt16(r.Ascent);
                 writer.WriteInt16(r.Font);
                 writer.WriteByte(r.Face);
-                writer.Skip(1);
+                writer.WriteZeros(1);
                 writer.WriteInt16(r.Size);
                 writer.WriteUInt16(r.Red);
                 writer.WriteUInt16(r.Green);
                 writer.WriteUInt16(r.Blue);
             }
-            return data;
+            return writer.ToArray();
         }
 
         // The standard font family numbers of Inside Macintosh: Text ("Font Family Numbers"); others are the system's

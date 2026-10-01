@@ -27,12 +27,12 @@ namespace ClassicMac.Core
         /// <summary>Writes the point as four big-endian bytes.</summary>
         public void Write(Span<byte> destination)
         {
-            var writer = new BigEndianWriter(destination);
-            writer.WriteMacPoint(this);
+            BinaryPrimitives.WriteInt16BigEndian(destination, V);
+            BinaryPrimitives.WriteInt16BigEndian(destination[2..], H);
         }
 
-        /// <summary>Writes a point at the writer's current position and advances it.</summary>
-        public void Write(ref BigEndianWriter writer) => writer.WriteMacPoint(this);
+        /// <summary>Writes a point at the end of the writer's output.</summary>
+        public void Write(BigEndianWriter writer) => writer.WriteMacPoint(this);
 
         /// <inheritdoc/>
         public override string ToString() => $"(v {V}, h {H})";
@@ -86,12 +86,14 @@ namespace ClassicMac.Core
         /// <summary>Writes the rectangle as eight big-endian bytes.</summary>
         public void Write(Span<byte> destination)
         {
-            var writer = new BigEndianWriter(destination);
-            writer.WriteMacRect(this);
+            BinaryPrimitives.WriteInt16BigEndian(destination, Top);
+            BinaryPrimitives.WriteInt16BigEndian(destination[2..], Left);
+            BinaryPrimitives.WriteInt16BigEndian(destination[4..], Bottom);
+            BinaryPrimitives.WriteInt16BigEndian(destination[6..], Right);
         }
 
-        /// <summary>Writes a rectangle at the writer's current position and advances it.</summary>
-        public void Write(ref BigEndianWriter writer) => writer.WriteMacRect(this);
+        /// <summary>Writes a rectangle at the end of the writer's output.</summary>
+        public void Write(BigEndianWriter writer) => writer.WriteMacRect(this);
 
         /// <inheritdoc/>
         public override string ToString() => $"(t {Top}, l {Left}, b {Bottom}, r {Right})";

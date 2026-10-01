@@ -59,8 +59,7 @@ namespace ClassicMac.Core
         /// <summary>Writes the four bytes to <paramref name="destination"/>.</summary>
         public void CopyTo(Span<byte> destination)
         {
-            var writer = new BigEndianWriter(destination);
-            writer.WriteFourCC(this);
+            BinaryPrimitives.WriteUInt32BigEndian(destination, Value);
         }
 
         /// <summary>

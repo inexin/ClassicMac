@@ -64,7 +64,9 @@ namespace ClassicMac.Graphics.Pict
     /// </summary>
     public sealed class PictWriter
     {
-        private readonly BigEndianStreamWriter output;
+        private readonly Stream stream;
+        private readonly BigEndianWriter output = new();     // bytes not yet written to the stream
+        private long flushed;
         private readonly int width, height;
         private readonly PictWriteOptions options;
         private readonly RgbaColor[] palette;
@@ -81,7 +83,7 @@ namespace ClassicMac.Graphics.Pict
             ArgumentNullException.ThrowIfNull(stream);
             if (width <= 0 || width > short.MaxValue) throw new ArgumentOutOfRangeException(nameof(width));
             if (height <= 0 || height > short.MaxValue) throw new ArgumentOutOfRangeException(nameof(height));
-            output = new BigEndianStreamWriter(stream);
+            this.stream = stream;
             this.width = width;
             this.height = height;
             this.options = options ?? new PictWriteOptions();
@@ -107,6 +109,7 @@ namespace ClassicMac.Graphics.Pict
             // 32-bit strips are buffered to choose between packed and unpacked rows (see StripFitsMacOS9).
             if (width > StripWidth || bits == 32) buffered = new List<byte[]>(height);
             WriteHeader();
+            Flush();
         }
 
         /// <summary>The bytes <see cref="WriteRow"/> expects per row: one index per pixel for indexed formats,
@@ -214,6 +217,7 @@ namespace ClassicMac.Graphics.Pict
             if (buffered != null) buffered.Add(row.ToArray());
             else WriteStripRow(row, 0, width);
             rows++;
+            Flush();
         }
 
         /// <summary>Ends the picture. Every row must have been written.</summary>
@@ -230,8 +234,18 @@ namespace ClassicMac.Graphics.Pict
                     foreach (var row in buffered) WriteStripRow(row, left, w, unpacked);
                 }
             }
-            if ((output.BytesWritten & 1) == 1) output.WriteByte(0); // word-align before OpEndPic
+            if ((Written & 1) == 1) output.WriteByte(0); // word-align before OpEndPic
             output.WriteUInt16(0x00FF);
+            Flush();
+        }
+
+        private long Written => flushed + output.Length;
+
+        private void Flush()
+        {
+            output.WriteTo(stream);
+            flushed += output.Length;
+            output.Clear();
         }
 
         // ---- header ----
@@ -240,7 +254,7 @@ namespace ClassicMac.Graphics.Pict
         {
             if (options.FileHeader)
             {
-                output.WriteBytes(new byte[PictHeader.FileHeaderSize]);
+                output.WriteZeros(PictHeader.FileHeaderSize);
             }
             double hRes = options.HorizontalResolution > 0 ? options.HorizontalResolution : 72;
             double vRes = options.VerticalResolution > 0 ? options.VerticalResolution : 72;
@@ -286,7 +300,7 @@ namespace ClassicMac.Graphics.Pict
 
             void Comment(uint selector, ReadOnlySpan<byte> data)
             {
-                if ((output.BytesWritten & 1) == 1) output.WriteByte(0);
+                if ((Written & 1) == 1) output.WriteByte(0);
                 output.WriteUInt16(0x00A1); output.WriteUInt16(224); output.WriteUInt16((ushort)(4 + data.Length));
                 output.WriteUInt32(selector);
                 output.WriteBytes(data);
@@ -296,7 +310,7 @@ namespace ClassicMac.Graphics.Pict
         // The opcode and pixel map fields up to the pixel data, for the strip [left, left + w).
         private void BitmapHeader(int left, int w, bool unpacked)
         {
-            if ((output.BytesWritten & 1) == 1) output.WriteByte(0);
+            if ((Written & 1) == 1) output.WriteByte(0);
             int rowBytes = RowBytes(w);
             var bounds = (0, left, height, left + w);
             if (bits > 8)

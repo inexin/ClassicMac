@@ -32,12 +32,11 @@ namespace ClassicMac.Graphics.QuickDraw
         public byte[] ToRgnData()
         {
             var rows = ToQuickDrawData();
-            var data = new byte[10 + 2 * rows.Length];
-            var writer = new BigEndianWriter(data);
-            writer.WriteUInt16((ushort)data.Length);
-            BoundingBox.Write(ref writer);
+            var writer = new BigEndianWriter(10 + 2 * rows.Length);
+            writer.WriteUInt16((ushort)(10 + 2 * rows.Length));
+            BoundingBox.Write(writer);
             foreach (var row in rows) writer.WriteInt16(row);
-            return data;
+            return writer.ToArray();
         }
 
         /// <summary>The pixels an oval inscribed in <paramref name="rect"/> covers, as <c>PaintOval</c> paints it.</summary>

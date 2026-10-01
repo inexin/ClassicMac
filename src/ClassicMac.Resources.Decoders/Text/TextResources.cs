@@ -45,13 +45,10 @@ namespace ClassicMac.Resources.Decoders.Text
         {
             ArgumentNullException.ThrowIfNull(strings);
             if (strings.Count > ushort.MaxValue) throw new ArgumentException("A string list holds at most 65535 strings.", nameof(strings));
-            var output = new MemoryStream();
-            Span<byte> count = stackalloc byte[sizeof(ushort)];
-            var writer = new BigEndianWriter(count);
+            var writer = new BigEndianWriter();
             writer.WriteUInt16((ushort)strings.Count);
-            output.Write(count);
-            foreach (var s in strings) output.Write(Pascal(s));
-            return output.ToArray();
+            foreach (var s in strings) writer.WriteBytes(Pascal(s));
+            return writer.ToArray();
         }
 
         /// <summary>The text of a <c>'TEXT'</c> (Mac OS Roman, carriage returns as <c>\n</c>).</summary>
@@ -135,14 +132,15 @@ namespace ClassicMac.Resources.Decoders.Text
             if (Major is < 0 or > 99 || Minor is < 0 or > 15 || BugFix is < 0 or > 15 || NonRelease is < 0 or > 99)
                 throw new ArgumentException("The version is major 0–99, minor and bug fix 0–15, non-release 0–99.");
             static byte Bcd(int v) => (byte)((v / 10 << 4) | (v % 10));
-            byte[] head = new byte[6];
-            var writer = new BigEndianWriter(head);
+            var writer = new BigEndianWriter();
             writer.WriteByte(Bcd(Major));
             writer.WriteByte((byte)((Minor << 4) | BugFix));
             writer.WriteByte(Stage);
             writer.WriteByte(Bcd(NonRelease));
             writer.WriteInt16(Region);
-            return [.. head, .. TextResources.WriteString(ShortVersion), .. TextResources.WriteString(LongVersion)];
+            writer.WriteBytes(TextResources.WriteString(ShortVersion));
+            writer.WriteBytes(TextResources.WriteString(LongVersion));
+            return writer.ToArray();
         }
     }
 }
