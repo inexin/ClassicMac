@@ -873,7 +873,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     to indirect-node forks while keeping the visible path and hiding private metadata; dangling links and partial
     Finder signatures are reported, indirect-node names enforce TN1150's no-leading-zero decimal reference, directory
     nodes with a link target are diagnosed, and estimated link-count mismatches and unreferenced indirect nodes are
-    reported informationally.
+    reported informationally. Directory hard-link aliases resolve `dir_<CNID>` inode folders with the required
+    link-chain flag at every valid visible alias path; incomplete Finder alias signatures are reported and retained.
+    Nested inode contents are exposed through every alias.
     The HFS+ B-tree reader validates even record boundaries and exact extents-overflow and defined attribute payload
     lengths, and matches each attribute fork-data record with its ordered extension extents and declared logical and
     allocation sizes; [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) records the rules and the verifier-backed

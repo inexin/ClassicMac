@@ -951,7 +951,17 @@ indirect node's BSD special field is treated as its estimated link count; a diff
 links is reported as the informational `hfs.plus-hardlink-count-mismatch` because TN1150 says traditional Mac OS can
 make this estimate inaccurate. An indirect node with no referring hard link is reported as the informational
 `hfs.plus-hardlink-indirect-orphan`. The
-B-tree reader requires every record start and end offset to be
+reader also resolves directory hard-link aliases. A catalog file with the hard-link-chain flag and either Finder type
+`alis` or creator `MACS` is treated as a candidate; it must have both codes and Finder's `IsAlias` flag to be followed.
+An incomplete candidate is retained as a file and reported as `hfs.plus-hardlink-signature-invalid`. A valid alias
+targets a `dir_<catalog-ID>` folder in the root's `.HFS+ Private Directory Data\r` folder. Files below that directory
+inode are exposed at each valid alias path, and both private metadata subtrees are omitted from the file list. An alias
+whose `dir_<CNID>` folder lacks the hard-link-chain flag is treated as having no valid inode; the alias is retained and
+reported as `hfs.plus-hardlink-target-missing`. Files nested below a directory inode are mapped through every visible
+alias path. These directory-link
+rules follow Apple's `dirhardlink.c` verifier behavior; TN1150's file-hard-link section predates this directory-link
+representation **[Code]** [Apple `dirhardlink.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/dirhardlink.c).
+The B-tree reader requires every record start and end offset to be
 even, including each node's free-space offset **[Doc]** TN1150. It requires extents-overflow records to have the fixed
 64-byte `HFSPlusExtentRecord` payload and defined attribute fork-data and extents payloads to have their fixed 88- and
 72-byte lengths. TN1150 says undefined attribute record types must be ignored, so their payloads are not interpreted.

@@ -417,6 +417,67 @@ public sealed class HfsPlusFeatureTests
         Assert.DoesNotContain(files, item => item.MacPath.Contains("Private Directory Data", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinksExposeEveryVisibleAlias(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, secondAlias: true);
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
+
+        Assert.Equal(["Shared Copy:Inside", "Shared Folder:Inside"],
+            files.Select(file => file.MacPath).Order(StringComparer.Ordinal));
+        Assert.All(files, file => Assert.Equal("directory data"u8.ToArray(), file.DataFork.ToArray()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkWithPartialFinderSignatureIsRetainedAndReported(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, validFinderInfo: false);
+        var context = new ContainerContext();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), context);
+
+        MacFile alias = Assert.Single(files);
+        Assert.Equal("Shared Folder", alias.MacPath);
+        Assert.Contains(context.Diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-hardlink-signature-invalid");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkMapsNestedContentsThroughEveryAlias(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, secondAlias: true, nestedContents: true);
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
+
+        MacFile[] nestedFiles = files.Where(file => file.Name.ToString() == "Deep").ToArray();
+        Assert.Equal(["Shared Copy:Nested:Deep", "Shared Folder:Nested:Deep"],
+            nestedFiles.Select(file => file.MacPath).Order(StringComparer.Ordinal));
+        Assert.All(nestedFiles, file => Assert.Equal("nested data"u8.ToArray(), file.DataFork.ToArray()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkRequiresInodeLinkChainFlag(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, directoryInodeHasLinkChain: false);
+        var context = new ContainerContext();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), context);
+
+        MacFile alias = Assert.Single(files);
+        Assert.Equal("Shared Folder", alias.MacPath);
+        Assert.Contains(context.Diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-hardlink-target-missing");
+    }
+
     [Fact]
     public void HfsPlusFileWithOnlyPartOfTheHardLinkFinderSignatureIsRetainedAndReported()
     {
@@ -3178,32 +3239,44 @@ public sealed class HfsPlusFeatureTests
             return image;
         }
 
-        public static byte[] BuildWithDirectoryHardLink(bool hfsX)
+        public static byte[] BuildWithDirectoryHardLink(bool hfsX, bool secondAlias = false,
+            bool validFinderInfo = true, bool nestedContents = false, bool directoryInodeHasLinkChain = true)
         {
             const string privateDirectory = ".HFS+ Private Directory Data\r";
             const string directoryInode = "dir_19";
             byte[] image = Build(hfsX: hfsX);
-            byte[] root = FolderData(2, 3);
+            byte[] root = FolderData(2, secondAlias ? 4u : 3u);
             byte[] documents = FolderData(16, 0);
             byte[] privateFolder = FolderData(18, 1);
-            byte[] inodeFolder = FolderData(19, 1);
+            byte[] inodeFolder = FolderData(19, nestedContents ? 2u : 1u);
+            if (directoryInodeHasLinkChain) U16(inodeFolder, 2, 0x0020);
             byte[] contents = FileData(20, 4, "directory data"u8, 5, []);
             contents.AsSpan(168, 80).Clear();
-            byte[] alias = FileData(21, 6, [], 7, []);
-            U16(alias, 2, 0x0022); // Thread exists; hard-link chain.
-            U32(alias, 44, 19); // Directory inode catalog ID.
-            "alisMACS"u8.CopyTo(alias.AsSpan(48));
-            U16(alias, 56, (ushort)FinderFlags.IsAlias);
-            alias.AsSpan(88, 80).Clear();
-            alias.AsSpan(168, 80).Clear();
-            if (hfsX)
+            byte[] nestedFolder = FolderData(24, 1);
+            byte[] nestedFile = FileData(25, 6, "nested data"u8, 7, []);
+            nestedFile.AsSpan(168, 80).Clear();
+            byte[] MakeAlias(uint fileId)
             {
-                U32(root, 84, 3);
-                U32(privateFolder, 84, 1);
+                byte[] alias = FileData(fileId, 6, [], 7, []);
+                U16(alias, 2, 0x0022); // Thread exists; hard-link chain.
+                U32(alias, 44, 19); // Directory inode catalog ID.
+                (validFinderInfo ? "alisMACS"u8 : "alisMISS"u8).CopyTo(alias.AsSpan(48));
+                U16(alias, 56, (ushort)FinderFlags.IsAlias);
+                alias.AsSpan(88, 80).Clear();
+                alias.AsSpan(168, 80).Clear();
+                return alias;
             }
 
-            byte[][] records =
-            [
+            byte[] alias = MakeAlias(21);
+            if (hfsX)
+            {
+                U32(root, 84, secondAlias ? 4u : 3u);
+                U32(privateFolder, 84, 1);
+                U32(inodeFolder, 84, nestedContents ? 1u : 0u);
+            }
+
+            var records = new List<byte[]>
+            {
                 Record(1, "Volume", root),
                 Record(2, "", Thread(1, "Volume", 3)),
                 Record(2, privateDirectory, privateFolder),
@@ -3216,14 +3289,27 @@ public sealed class HfsPlusFeatureTests
                 Record(19, "Inside", contents),
                 Record(20, "", Thread(19, "Inside", 4)),
                 Record(21, "", Thread(2, "Shared Folder", 4)),
-            ];
-            WriteBTreeNode(image.AsSpan(3 * Block, Block), 0xFF, 1, 0, 0, records);
-            U32(image.AsSpan(2 * Block, Block), 20, checked((uint)records.Length));
+            };
+            if (nestedContents) records.Insert(10, Record(19, "Nested", nestedFolder));
+            if (secondAlias)
+            {
+                records.Insert(4, Record(2, "Shared Copy", MakeAlias(22)));
+                records.Add(Record(22, "", Thread(2, "Shared Copy", 4)));
+            }
+            if (nestedContents)
+            {
+                records.Add(Record(24, "", Thread(19, "Nested", 3)));
+                records.Add(Record(24, "Deep", nestedFile));
+                records.Add(Record(25, "", Thread(24, "Deep", 4)));
+            }
+            WriteBTreeNode(image.AsSpan(3 * Block, Block), 0xFF, 1, 0, 0, records.ToArray());
+            U32(image.AsSpan(2 * Block, Block), 20, checked((uint)records.Count));
             Span<byte> volume = image.AsSpan(1024, 512);
-            U32(volume, 32, 2);
-            U32(volume, 36, 3);
-            U32(volume, 64, 22);
+            U32(volume, 32, (secondAlias ? 3u : 2u) + (nestedContents ? 1u : 0u));
+            U32(volume, 36, nestedContents ? 4u : 3u);
+            U32(volume, 64, nestedContents ? 26u : secondAlias ? 23u : 22u);
             "directory data"u8.CopyTo(image.AsSpan(4 * Block));
+            if (nestedContents) "nested data"u8.CopyTo(image.AsSpan(6 * Block));
             volume.CopyTo(image.AsSpan(image.Length - 1024, 512));
             return image;
         }
