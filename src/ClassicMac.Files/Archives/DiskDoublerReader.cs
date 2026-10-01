@@ -117,6 +117,17 @@ public sealed class DiskDoublerReader : IContainerReader
                 continue;
             }
 
+            // [Fitted] Original DiskDoubler Pro 4.1.1 archives can contain 0x1000 records whose
+            // payload does not use the standard 0xABCD0054 file header. Their record boundaries
+            // remain usable, so skip them and continue extracting standard 0x5000 file records.
+            if (entryType == 0x1000)
+            {
+                context.Report(DiagnosticSeverity.Warning, "archive.entry-unsupported",
+                    $"DiskDoubler DDA2 entry type 0x1000 is unsupported for '{name}'; the entry is skipped.", offset);
+                offset = recordEnd;
+                continue;
+            }
+
             int fileHeaderOffset = checked(offset + RecordHeaderLength + 10);
             if (recordLength < RecordHeaderLength + 10 + 4 + FileHeaderLength)
                 throw new InvalidDataException("A DiskDoubler DDA2 file header is truncated.");

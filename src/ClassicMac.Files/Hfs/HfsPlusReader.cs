@@ -28,6 +28,18 @@ internal static class HfsPlusReader
         if ((signature == 0x482B && version != 4) || (signature == 0x4858 && version != 5))
             throw new InvalidDataException($"Unsupported HFS Plus version {version}.");
         ReportAlternateHeaderProblem(image, signature, version, context);
+        uint volumeAttributes = U32(header, 4);
+        const uint volumeUnmountedBit = 1u << 8;
+        const uint bootVolumeInconsistentBit = 1u << 11;
+        const uint volumeJournaledBit = 1u << 13;
+        const uint volumeInconsistentBit = 1u << 14; // kHFSVolumeInconsistentBit in Apple's HFS format header.
+        if ((volumeAttributes & volumeUnmountedBit) == 0 ||
+            (volumeAttributes & (bootVolumeInconsistentBit | volumeInconsistentBit)) != 0)
+            context.Report(DiagnosticSeverity.Warning, "hfs.plus-volume-inconsistent",
+                "The HFS Plus volume's attributes indicate an unclean unmount or an inconsistent volume state.");
+        if ((volumeAttributes & volumeJournaledBit) != 0)
+            context.Report(DiagnosticSeverity.Info, "hfs.plus-journal-not-replayed",
+                "The HFS Plus volume is journaled; ClassicMac reads the recorded structures without replaying the journal.");
         uint blockSize = U32(header, 40);
         uint totalBlocks = U32(header, 44);
         if (blockSize < 512 || (blockSize & (blockSize - 1)) != 0 ||
@@ -60,7 +72,7 @@ internal static class HfsPlusReader
             }
         }
         bool hasBadBlockRecords = overflow.ContainsKey((0, BadBlockFileId));
-        bool sparedBlocksFlag = (U32(header, 4) & (1u << 9)) != 0;
+        bool sparedBlocksFlag = (volumeAttributes & (1u << 9)) != 0;
         if (hasBadBlockRecords != sparedBlocksFlag)
             context.Report(DiagnosticSeverity.Info, "hfs.plus-spared-blocks",
                 "The HFS Plus spared-blocks attribute disagrees with its bad-block extent records.");
@@ -113,9 +125,11 @@ internal static class HfsPlusReader
                     uint id = U32(data, 8);
                     if (id < 16 && id != RootFolderId)
                         throw new InvalidDataException($"HFS Plus folder catalog ID {id} is reserved.");
+                    ReportInvalidBsdMode(U16(data, 42), isFolder: true, key, context);
                     if (!catalogIds.Add(id))
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     uint parent = U32(key, 2);
+                    ValidateCatalogObjectName(key);
                     string name = Name(key);
                     if (!folders.TryAdd(id, (parent, name, U32(data, 4))))
                         throw new InvalidDataException("Duplicate HFS Plus folder ID.");
@@ -127,10 +141,12 @@ internal static class HfsPlusReader
                     uint fileId = U32(data, 8);
                     if (fileId < 16)
                         throw new InvalidDataException($"HFS Plus file catalog ID {fileId} is reserved.");
+                    ReportInvalidBsdMode(U16(data, 42), isFolder: false, key, context);
                     if (!catalogIds.Add(fileId))
                         throw new InvalidDataException("Duplicate HFS Plus catalog ID.");
                     if ((U16(data, 2) & 0x0002) == 0)
                         throw new InvalidDataException("An HFS Plus file is missing its required thread flag.");
+                    ValidateCatalogObjectName(key);
                     catalogNodes.Add(fileId, new CatalogNode(U32(key, 2), Name(key), IsFolder: false));
                     break;
                 case 3 or 4:
@@ -168,7 +184,7 @@ internal static class HfsPlusReader
         uint nextCatalogId = U32(header, 64);
         if (nextCatalogId < 16)
             throw new InvalidDataException("The HFS Plus next catalog ID is reserved.");
-        if ((U32(header, 4) & catalogNodeIdsReused) == 0 && nextCatalogId <= catalogIds.Max())
+        if ((volumeAttributes & catalogNodeIdsReused) == 0 && nextCatalogId <= catalogIds.Max())
             throw new InvalidDataException("The HFS Plus next catalog ID is not greater than all catalog IDs.");
         ValidateCatalogThreads(catalogNodes, catalogThreads);
         var childCounts = new Dictionary<uint, uint>(folders.Count);
@@ -211,12 +227,15 @@ internal static class HfsPlusReader
             if (U16(data, 0) != 2) continue;
             byte[] info = [.. data.AsSpan(48, 16), .. data.AsSpan(64, 16)];
             uint fileId = U32(data, 8);
-            uint linkReference = U32(data, 44);
+            uint special = U32(data, 44);
             FinderInfo finderInfo = FinderInfo.Read(info);
-            if (IsHardLinkFile(finderInfo) && linkReference == 0)
+            if (HasHardLinkMarker(finderInfo) && !IsHardLinkFile(finderInfo))
+                context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-signature-invalid",
+                    $"The HFS Plus file '{Name(key)}' has only part of the required hard-link Finder signature.");
+            if (IsHardLinkFile(finderInfo) && special == 0)
                 throw new InvalidDataException("An HFS Plus hard link has the reserved zero link reference.");
             catalogFiles.Add(fileId, new CatalogFileData(
-                Name(key), U32(key, 2), linkReference, U16(data, 42), finderInfo,
+                Name(key), U32(key, 2), special, U16(data, 42), finderInfo,
                 Date(U32(data, 12)), Date(U32(data, 16)),
                 ReadFork(image, data.AsSpan(88, 80), blockSize, totalBlocks, overflow, 0, fileId,
                     allocationExtents, ordinaryForkExtents),
@@ -227,17 +246,59 @@ internal static class HfsPlusReader
         if (overflow.Keys.Any(key => key.File != BadBlockFileId))
             throw new InvalidDataException("An HFS Plus overflow extent has no corresponding fork.");
 
+        var hardLinkCounts = new Dictionary<uint, uint>();
+        foreach (CatalogFileData file in catalogFiles.Values)
+        {
+            if (!IsHardLinkFile(file.FinderInfo)) continue;
+            hardLinkCounts.TryGetValue(file.Special, out uint count);
+            hardLinkCounts[file.Special] = checked(count + 1);
+        }
+
         var hardLinkTargets = new Dictionary<uint, CatalogFileData>();
         if (privateDataFolderId is { } dataFolderId)
+        {
             foreach (CatalogFileData file in catalogFiles.Values)
             {
-                if (file.Parent != dataFolderId || !file.Name.StartsWith("iNode", StringComparison.Ordinal) ||
-                    !uint.TryParse(file.Name.AsSpan(5), System.Globalization.NumberStyles.None,
-                        System.Globalization.CultureInfo.InvariantCulture, out uint reference))
+                if (file.Parent != dataFolderId || !file.Name.StartsWith("iNode", StringComparison.Ordinal))
                     continue;
+
+                if (!TryParseHardLinkReference(file.Name, out uint reference))
+                {
+                    context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-indirect-name-invalid",
+                        $"The HFS Plus hard-link indirect node '{file.Name}' does not use a canonical decimal reference.");
+                    continue;
+                }
+
                 if (!hardLinkTargets.TryAdd(reference, file))
                     throw new InvalidDataException("Duplicate HFS Plus hard-link indirect node reference.");
             }
+
+            foreach (var (_, folder) in folders)
+            {
+                if (folder.Parent != dataFolderId || !TryParseHardLinkReference(folder.Name, out uint reference) ||
+                    !hardLinkCounts.ContainsKey(reference) || hardLinkTargets.ContainsKey(reference))
+                    continue;
+
+                context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-indirect-not-file",
+                    $"The HFS Plus hard-link reference {reference} names a folder instead of an indirect node file.");
+            }
+        }
+
+        foreach (var (reference, target) in hardLinkTargets)
+        {
+            uint actualCount = hardLinkCounts.GetValueOrDefault(reference);
+            if (actualCount == 0)
+            {
+                context.Report(DiagnosticSeverity.Info, "hfs.plus-hardlink-indirect-orphan",
+                    $"The HFS Plus hard-link indirect node '{target.Name}' has no catalog hard links referring to it.");
+                continue;
+            }
+
+            if (target.Special != actualCount)
+                context.Report(DiagnosticSeverity.Info, "hfs.plus-hardlink-count-mismatch",
+                    $"The HFS Plus hard-link indirect node '{target.Name}' records an estimated link count of " +
+                    $"{target.Special}, but {actualCount} catalog hard links refer to it.");
+        }
 
         var result = new List<MacFile>();
         foreach (var (key, data) in records)
@@ -250,7 +311,7 @@ internal static class HfsPlusReader
             CatalogFileData file = catalogFiles[fileId];
             bool isHardLink = IsHardLinkFile(file.FinderInfo);
             CatalogFileData target = default;
-            bool hasHardLinkTarget = isHardLink && hardLinkTargets.TryGetValue(file.LinkReference, out target);
+            bool hasHardLinkTarget = isHardLink && hardLinkTargets.TryGetValue(file.Special, out target);
             if (isHardLink && !hasHardLinkTarget)
                 context.Report(DiagnosticSeverity.Warning, "hfs.plus-hardlink-target-missing",
                     $"The HFS Plus hard link '{name}' has no matching indirect node.");
@@ -270,7 +331,7 @@ internal static class HfsPlusReader
                 SymbolicLinkTarget = ReadSymbolicLinkTarget(content.Mode, content.FinderInfo,
                     content.DataFork, content.ResourceFork,
                     context.Options.MaxExpandedBytesPerInput),
-                HardLinkReference = isHardLink ? file.LinkReference : null,
+                HardLinkReference = isHardLink ? file.Special : null,
             });
         }
         ValidateAllocationExtents(allocationExtents, ordinaryForkExtents, blockSize, totalBlocks);
@@ -1141,6 +1202,31 @@ internal static class HfsPlusReader
             throw new InvalidDataException("An HFS Plus catalog name is not canonically decomposed.");
     }
 
+    private static void ValidateCatalogObjectName(ReadOnlySpan<byte> key)
+    {
+        int nameLength = U16(key, 6);
+        if (nameLength == 1 && U16(key, 8) == '.')
+            throw new InvalidDataException("An HFS Plus catalog object is named '.'.");
+        if (nameLength == 2 && U16(key, 8) == '.' && U16(key, 10) == '.')
+            throw new InvalidDataException("An HFS Plus catalog object is named '..'.");
+    }
+
+    private static void ReportInvalidBsdMode(ushort mode, bool isFolder, ReadOnlySpan<byte> key,
+        ContainerContext context)
+    {
+        if (mode == 0) return; // Apple fsck_hfs treats a zero BSD info record as uninitialized.
+
+        const ushort fileTypeMask = 0xF000;
+        ushort fileType = (ushort)(mode & fileTypeMask);
+        bool valid = isFolder
+            ? fileType == 0x4000
+            : fileType is 0x1000 or 0x2000 or 0x6000 or 0x8000 or 0xA000 or 0xC000;
+        if (!valid)
+            context.Report(DiagnosticSeverity.Warning, "hfs.plus-invalid-bsd-mode",
+                $"The HFS Plus {(isFolder ? "folder" : "file")} '{Name(key)}' has an invalid BSD file type " +
+                $"in mode 0x{mode:X4}.");
+    }
+
     private static int CompareHfsXCatalogKeys(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
     {
         int comparison = U32(left, 2).CompareTo(U32(right, 2));
@@ -1220,7 +1306,22 @@ internal static class HfsPlusReader
     private static bool IsHardLinkFile(FinderInfo finderInfo) =>
         finderInfo.Type == FourCC.FromString("hlnk") && finderInfo.Creator == FourCC.FromString("hfs+");
 
-    private readonly record struct CatalogFileData(string Name, uint Parent, uint LinkReference, ushort Mode,
+    private static bool HasHardLinkMarker(FinderInfo finderInfo) =>
+        finderInfo.Type == FourCC.FromString("hlnk") || finderInfo.Creator == FourCC.FromString("hfs+");
+
+    private static bool TryParseHardLinkReference(string name, out uint reference)
+    {
+        reference = 0;
+        if (!name.StartsWith("iNode", StringComparison.Ordinal) ||
+            !uint.TryParse(name.AsSpan(5), System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out reference))
+            return false;
+
+        string canonicalReference = reference.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return name.AsSpan(5).SequenceEqual(canonicalReference.AsSpan());
+    }
+
+    private readonly record struct CatalogFileData(string Name, uint Parent, uint Special, ushort Mode,
         FinderInfo FinderInfo, MacDate? Created, MacDate? Modified, ForkData DataFork, ForkData ResourceFork);
     private readonly record struct CatalogNode(uint Parent, string Name, bool IsFolder);
     private readonly record struct CatalogThread(uint Parent, string Name, bool IsFolder);

@@ -36,6 +36,25 @@ public sealed class DiskDoublerFeatureTests
             file.ResourceFork.ToArray());
     }
 
+    [Fact]
+    public void DiskDoublerPro411Dda2ArchiveExpandsItsOriginalDd3File()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory,
+            "DiskDoublerPro411Dda2Dd3Archive.dd"));
+
+        var context = new ContainerContext();
+        IReadOnlyList<MacFile> files = DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive), context);
+        MacFile file = Assert.Single(files, candidate => candidate.Name.ToMacRoman() == "testfile.PICT");
+
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict")),
+            file.DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin")),
+            file.ResourceFork.ToArray());
+        Assert.Contains(context.Diagnostics, diagnostic => diagnostic.Code == "archive.entry-unsupported" &&
+            diagnostic.Message.Contains("0x1000", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData("DiskDoublerPro411Ad1TestFile.dd")]
     [InlineData("DiskDoublerPro411Ad2TestFile.dd")]

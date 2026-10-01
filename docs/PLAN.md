@@ -816,10 +816,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     attribute keys and unique leaf keys,
     and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
     ranges and child key bounds,
-    reserved catalog ID rules, folder flag validity, nonempty and well-formed UTF-16 catalog names that are canonically
-    decomposed (Unicode 3.2, while HFS+ also accepts the 44 known Unicode 2.1 spellings whose decomposition changed;
-    HFSX also checks post-Jaguar doubled-dot-above, Greek tonos/dialytika, and the known Bengali, Odia, Gurmukhi, Thai,
-    Lao and Tibetan `fsck_hfs` corrections, while other Unicode 2.1/3.2 compatibility cases remain),
+    reserved catalog ID rules, folder flag validity, BSD object-type validation, and catalog names that are nonempty,
+    well-formed UTF-16 and canonically decomposed (Unicode 3.2; object names `.` and `..` are rejected; HFS+ also
+    accepts the 44 known Unicode 2.1 spellings whose decomposition changed; HFSX checks post-Jaguar doubled-dot-above,
+    Greek tonos/dialytika and the known Bengali, Odia, Gurmukhi, Thai, Lao and Tibetan `fsck_hfs` corrections; other
+    Unicode 2.1/3.2 compatibility cases remain),
     root-parent ID, unique catalog IDs and next-ID consistency, parent IDs that resolve to folders, file/folder threads,
     folder valences and parent chains (including empty folders).
     The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
@@ -840,9 +841,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     checksum behavior; its original-app fixture remains missing. Delta type 1 applies cumulative-byte preprocessing
     after fork decompression; method 3 and other delta types remain unsupported.
     Legacy DDAR stored-fork archives are also supported; DDA2 archive-header CRCs and standalone file-header CRCs
-    (including the old zero-checksum form) follow fitted XADMaster behavior.
-    Standalone DiskDoubler Pro 4.1.1 interoperability is checked for methods 6, 9 and 10; original-application DDA2
-    archive interoperability, remaining archive methods and formats, and deeper HFS+ validation remain.
+    (including the old zero-checksum form) follow fitted XADMaster behavior. A CC0 original Pro 4.1.1 DDA2 archive
+    fixture verifies extraction of both PICT forks against the uncompressed source files; its unsupported 0x1000 entries
+    are diagnosed and skipped, so broader original-application DDA2 archive interoperability remains unverified.
+    Standalone methods 6, 9 and 10 are verified against original-app files; remaining archive methods and formats, and
+    deeper HFS+ validation remain.
     The HFS+ reader requires the allocation file, rejects overlapping allocation ranges and fork extents that claim
     blocks reserved for the primary/alternate headers, and checks its bitmap for
     catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
@@ -855,11 +858,16 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     in leaves and index nodes using Apple's HFS key comparator. Every non-bad-block overflow record must match a
     catalog or special-file fork. It checks the alternate volume header's signature
     and version, reporting a warning if the recovery
-    copy is invalid while continuing from the primary header; it also checks TN1150's reserved volume-header areas
-    and zero unused bitmap bits; it reports mismatches between bitmap free blocks and `freeBlocks`, and between
+    copy is invalid while continuing from the primary header; it also checks TN1150's reserved volume-header areas,
+    ignores reserved volume-attribute bits, and checks zero unused bitmap bits; it reports
+    unclean-unmount/inconsistent-volume flags and journaled volumes not replayed, mismatches between bitmap free
+    blocks and `freeBlocks`, and between
     bad-block records and the volume header's spared-blocks attribute.
     HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
-    to indirect-node forks while keeping the visible path and hiding private metadata; dangling links are reported.
+    to indirect-node forks while keeping the visible path and hiding private metadata; dangling links and partial
+    Finder signatures are reported, indirect-node names enforce TN1150's no-leading-zero decimal reference, directory
+    nodes with a link target are diagnosed, and estimated link-count mismatches and unreferenced indirect nodes are
+    reported informationally.
     The HFS+ B-tree reader validates even record boundaries and exact extents-overflow and defined attribute payload
     lengths, and matches each attribute fork-data record with its ordered extension extents and declared logical and
     allocation sizes; [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) records the rules and the verifier-backed

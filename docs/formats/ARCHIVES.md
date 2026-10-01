@@ -98,16 +98,21 @@ and backreference streams, checksum parity, and malformed input; an original-app
 processing are diagnosed and skipped.
 
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
+Original DiskDoubler Pro 4.1.1 DDA2 archives can contain entry-type `0x1000` records whose payload does not use the
+standard file-header layout; these are skipped with an `archive.entry-unsupported` warning so later supported records
+can still be extracted. This behavior is **[Fitted]** against the corpus archive noted below.
 Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive
 Huffman (methods 2 and 5), Huffman, Stac LZS literals and backreferences, and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
 invalid folder depth, entry limits, standalone files and their header checksums, standalone fork methods, and
 delta preprocessing and unsupported standalone delta types. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
 methods 9, 6 and 10 against both fork outputs; their compressed payloads are also tested inside DDA2 records.
+An original Pro 4.1.1 DDA2 archive from the CC0 corpus verifies extraction of both `testfile.PICT` forks against the
+uncompressed source files. Its unsupported `0x1000` entries are diagnosed and skipped, so broader original-application
+archive interoperability remains unverified.
 Method-0 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 4, 5, 6, 7, 8, 9 and 10 remain
 unsupported; method 3 and delta types other than 0 and 1 remain unsupported. Methods 5 and 7 have no original-app
-fixtures yet. Original
-application interoperability for DDA2 archives remains unverified.
+fixtures yet.
 
 ## Compact Pro (RLE and LZH subset)
 
