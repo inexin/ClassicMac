@@ -445,7 +445,7 @@ public static partial class HfsWriter
         return key;
     }
 
-    private static int CompareCatalogKeys(byte[] left, byte[] right)
+    internal static int CompareCatalogKeys(byte[] left, byte[] right)
     {
         int byParent = U32(left, 2).CompareTo(U32(right, 2));
         if (byParent != 0) return byParent;

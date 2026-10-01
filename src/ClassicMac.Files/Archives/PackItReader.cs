@@ -45,6 +45,7 @@ public sealed class PackItReader : IContainerReader
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
         var files = new List<MacFile>();
         long expandedBytes = 0;
+        int entryCount = 0;
         int offset = 0;
         bool ended = false;
         while (offset <= archive.Length - 4)
@@ -56,6 +57,9 @@ public sealed class PackItReader : IContainerReader
                 ended = true;
                 break;
             }
+            if (++entryCount > context.Options.MaxVolumeEntries)
+                throw new InvalidDataException("The PackIt archive exceeds the configured entry limit.");
+
             bool huffman = signature.SequenceEqual("PMa4"u8) || signature.SequenceEqual("PMa5"u8) ||
                 signature.SequenceEqual("PMa6"u8);
             bool xorEncrypted = signature.SequenceEqual("PMa1"u8) || signature.SequenceEqual("PMa5"u8);
@@ -201,8 +205,6 @@ public sealed class PackItReader : IContainerReader
                 DataFork = dataFork,
                 ResourceFork = resourceFork,
             });
-            if (files.Count > context.Options.MaxVolumeEntries)
-                throw new InvalidDataException("The PackIt archive exceeds the configured entry limit.");
             offset = nextOffset;
         }
         if (!ended)

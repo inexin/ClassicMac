@@ -96,6 +96,32 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusVolumeCountsIncludeCatalogFilesHiddenByHardLinkResolution()
+    {
+        byte[] image = HfsPlusFixture.BuildWithHardLink();
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal(2, files.Count);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-counts");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusVolumeCountsIncludePrivateDirectoryInodeFolders(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX);
+        var diagnostics = new List<Diagnostic>();
+
+        HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-counts");
+    }
+
+    [Fact]
     public void HfsPlusReportsWhenFreeBlockCountDoesNotMatchTheAllocationBitmap()
     {
         byte[] image = HfsPlusFixture.Build();
@@ -108,6 +134,22 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal("Documents:Read Me", file.MacPath);
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-free-blocks" &&
             diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void HfsPlusAlternateHeaderMayOccupyTheTrailingPartialAllocationUnit()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        int originalLength = image.Length;
+        Array.Resize(ref image, originalLength + 512);
+        image.AsSpan(originalLength - 1024, 512).Clear();
+        image.AsSpan(1024, 512).CopyTo(image.AsSpan(image.Length - 1024, 512));
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header");
     }
 
     [Fact]
@@ -193,7 +235,7 @@ public sealed class HfsPlusFeatureTests
     public void HfsPlusAcceptsAFreeBlockCountThatMatchesTheAllocationBitmap()
     {
         byte[] image = HfsPlusFixture.Build();
-        image[9 * HfsPlusFixture.Block + 1] &= 0x7F;
+        image[9 * HfsPlusFixture.Block + 1] &= 0xDF; // Leave unused allocation block 13 free.
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 48), 1);
         var diagnostics = new List<Diagnostic>();
 
@@ -362,6 +404,33 @@ public sealed class HfsPlusFeatureTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header");
     }
 
+    [Fact]
+    public void HfsPlusAlternateHeaderMayBePastTheLastWholeAllocationBlock()
+    {
+        byte[] alignedVolume = HfsPlusFixture.Build();
+        byte[] volumeWithPartialTail = new byte[alignedVolume.Length + 1500];
+        alignedVolume.AsSpan(0, alignedVolume.Length - 1024).CopyTo(volumeWithPartialTail);
+        alignedVolume.AsSpan(alignedVolume.Length - 1024, 512)
+            .CopyTo(volumeWithPartialTail.AsSpan(volumeWithPartialTail.Length - 1024));
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(volumeWithPartialTail),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-alternate-header");
+    }
+
+    [Fact]
+    public void HfsPlusRequiresAnExtentsOverflowBtreeEvenWhenThereAreNoOverflowRecords()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        image.AsSpan(1024 + 192, 80).Clear();
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -386,8 +455,9 @@ public sealed class HfsPlusFeatureTests
     public void HfsPlusAndHfsxHardLinksUseTheirIndirectNodeAndHidePrivateData(bool hfsX)
     {
         byte[] image = HfsPlusFixture.BuildWithHardLink(hfsX: hfsX);
+        var context = new ContainerContext();
 
-        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image), context);
         MacFile link = Assert.Single(files, file => file.MacPath == "Documents:Shared Alias");
 
         Assert.Equal("shared file data"u8.ToArray(), link.DataFork.ToArray());
@@ -398,6 +468,85 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal(2, files.Count);
         Assert.DoesNotContain(files, file => file.Name.ToString() == "iNode123");
         Assert.DoesNotContain(files, file => file.MacPath.Contains("HFS+ Private Data", StringComparison.Ordinal));
+        Assert.DoesNotContain(context.Diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-file-link-count-invalid");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxHardLinkAliasWithDataForkIsReportedButUsesItsIndirectNode(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithHardLink(hfsX: hfsX, aliasHasDataFork: true);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+        MacFile link = Assert.Single(files, file => file.MacPath == "Documents:Shared Alias");
+
+        Assert.Equal("shared file data"u8.ToArray(), link.DataFork.ToArray());
+        Assert.Equal("shared resource"u8.ToArray(), link.ResourceFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == "hfs.plus-hardlink-alias-has-data" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxRegularFileWithDirectoryHardLinkFlagIsRetainedAndReported(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: hfsX, fileHasUnexpectedLinkChainFlag: true);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        MacFile file = Assert.Single(files);
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == "hfs.plus-hardlink-chain-flag-unexpected" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxRegularFileWithMultipleLinksIsRetainedAndReported(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: hfsX, catalogFileMode: 0x81A4,
+            catalogFileLinkCount: 2);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        MacFile file = Assert.Single(files);
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == "hfs.plus-file-link-count-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxJournalFileIsExcludedFromRegularFileLinkCountWarning(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: hfsX, fileName: ".journal",
+            rootFolderValence: 2, documentsFolderValence: 0, catalogFileParentId: 2,
+            catalogFileMode: 0x81A4, catalogFileLinkCount: 2, volumeAttributes: 0x2100);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        MacFile file = Assert.Single(files);
+        Assert.Equal(".journal", file.MacPath);
+        Assert.DoesNotContain(diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-file-link-count-invalid");
     }
 
     [Theory]
@@ -429,6 +578,41 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal(["Shared Copy:Inside", "Shared Folder:Inside"],
             files.Select(file => file.MacPath).Order(StringComparer.Ordinal));
         Assert.All(files, file => Assert.Equal("directory data"u8.ToArray(), file.DataFork.ToArray()));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkAncestorsWithChildLinkFlagAreValid(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX,
+            aliasesInsideDocuments: true, documentsHasChildLink: true);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Documents:Shared Folder:Inside");
+        Assert.DoesNotContain(diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-hardlink-ancestor-flag-missing");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkReportsAncestorMissingChildLinkFlag(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX,
+            aliasesInsideDocuments: true, documentsHasChildLink: false);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Documents:Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == "hfs.plus-hardlink-ancestor-flag-missing" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
     }
 
     [Theory]
@@ -476,6 +660,139 @@ public sealed class HfsPlusFeatureTests
         Assert.Equal("Shared Folder", alias.MacPath);
         Assert.Contains(context.Diagnostics,
             diagnostic => diagnostic.Code == "hfs.plus-hardlink-target-missing");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkRequiresAValidFirstLinkAttribute(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, firstLinkAttributeValue: null);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-hardlink-chain-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkUsesItsFirstLinkAttribute(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, firstLinkAttributeValue: "21");
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.DoesNotContain(diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-hardlink-chain-invalid");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkRejectsAnInvalidFirstLinkAttributeValue(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX,
+            firstLinkAttributeValue: "not-a-catalog-id");
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-hardlink-chain-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkFollowsItsCompleteLinkChain(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, secondAlias: true);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(files, file => file.MacPath == "Shared Copy:Inside");
+        Assert.DoesNotContain(diagnostics,
+            diagnostic => diagnostic.Code == "hfs.plus-hardlink-chain-invalid");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkReportsABrokenLinkChain(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, secondAlias: true,
+            breakDirectoryLinkChain: true);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-hardlink-chain-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinkReportsAnIncorrectInodeLinkCount(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, directoryHardLinkCount: 2);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-hardlink-chain-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinksRequireAnImmutablePrivateDirectory(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, privateDirectoryOwnerFlags: 0);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == "hfs.plus-hardlink-private-directory-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusAndHfsxDirectoryHardLinksRequireAStickyPrivateDirectory(bool hfsX)
+    {
+        byte[] image = HfsPlusFixture.BuildWithDirectoryHardLink(hfsX, privateDirectoryMode: 0x4000);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(files, file => file.MacPath == "Shared Folder:Inside");
+        Assert.Contains(diagnostics, diagnostic =>
+            diagnostic.Code == "hfs.plus-hardlink-private-directory-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
     }
 
     [Fact]
@@ -653,6 +970,17 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusStartupForkLogicalSizeMustFitItsAllocatedBlocks()
+    {
+        byte[] image = HfsPlusFixture.Build(includeStartupFile: true);
+        Span<byte> startupFork = image.AsSpan(1024 + 432, 80);
+        BinaryPrimitives.WriteUInt64BigEndian(startupFork, HfsPlusFixture.Block + 1UL);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -664,6 +992,32 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Theory]
+    [InlineData(512)]
+    [InlineData(1024)]
+    [InlineData(2048)]
+    public void HfsPlusExtentsBtreeAcceptsLegalSmallNodeSizes(ushort nodeSize)
+    {
+        byte[] image = HfsPlusFixture.Build();
+        uint allocationBlockSize = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(1024 + 40));
+        uint treeStartBlock = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(1024 + 192 + 16));
+        int treeOffset = checked((int)(treeStartBlock * allocationBlockSize));
+        Span<byte> tree = image.AsSpan(treeOffset, HfsPlusFixture.Block);
+        uint totalNodes = checked((uint)(HfsPlusFixture.Block / nodeSize));
+        BinaryPrimitives.WriteUInt16BigEndian(tree[32..], nodeSize);
+        BinaryPrimitives.WriteUInt32BigEndian(tree[36..], totalNodes);
+        BinaryPrimitives.WriteUInt32BigEndian(tree[40..], totalNodes - 1);
+        tree[^8..].Clear();
+        BinaryPrimitives.WriteUInt16BigEndian(tree[(nodeSize - 2)..], 14);
+        BinaryPrimitives.WriteUInt16BigEndian(tree[(nodeSize - 4)..], 14 + 106);
+        BinaryPrimitives.WriteUInt16BigEndian(tree[(nodeSize - 6)..], 14 + 106 + 128);
+        BinaryPrimitives.WriteUInt16BigEndian(tree[(nodeSize - 8)..], checked((ushort)(nodeSize - 8)));
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
     }
 
     [Theory]
@@ -713,6 +1067,29 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusExtentsTreeDoesNotRequireFreeNodesToBeZeroFilled()
+    {
+        byte[] image = BuildOversizedExtentsTree(addMapNode: true);
+        image[4 * HfsPlusFixture.Block + 3 * 512] = 0x01;
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAttributesTreeDoesNotRequireFreeNodesToBeZeroFilled()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(10 * HfsPlusFixture.Block + 14 + 26), 1);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(10 * HfsPlusFixture.Block + 36), 5);
+        BinaryPrimitives.WriteUInt64BigEndian(image.AsSpan(1024 + 352), 5UL * HfsPlusFixture.Block);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 352 + 12), 5);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 352 + 16 + 4), 5);
+        image[14 * HfsPlusFixture.Block] = 0x01;
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusBtreeNodeMapMustNotMarkUnreachableNodesAsAllocated()
     {
         byte[] image = HfsPlusFixture.Build(extraCatalogForkNode: true, catalogTotalNodes: 3);
@@ -730,6 +1107,23 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusAttributesBtreeAcceptsAndReportsTheReservedHeaderValuesWrittenByMacOsX()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false);
+        int headerRecordOffset = 10 * HfsPlusFixture.Block + 14;
+        image[headerRecordOffset + 36] = 0xFF;
+        image[headerRecordOffset + 37] = 0xBC;
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-btree-type" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
     }
 
     [Theory]
@@ -1350,6 +1744,112 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
+    [InlineData("\u01F8", false)] // Latin extended
+    [InlineData("\u0400", false)] // Cyrillic
+    [InlineData("\u0622", false)] // Arabic
+    [InlineData("\u0A33", false)] // Gurmukhi
+    [InlineData("\u0DDA", false)] // Sinhala
+    [InlineData("\u1026", false)] // Myanmar
+    [InlineData("\uFB1D", false)] // Hebrew presentation form
+    [InlineData("\u01F9", false)]
+    [InlineData("\u0218", false)]
+    [InlineData("\u0219", false)]
+    [InlineData("\u021A", false)]
+    [InlineData("\u021B", false)]
+    [InlineData("\u021E", false)]
+    [InlineData("\u021F", false)]
+    [InlineData("\u0226", false)]
+    [InlineData("\u0227", false)]
+    [InlineData("\u0228", false)]
+    [InlineData("\u0229", false)]
+    [InlineData("\u022A", false)]
+    [InlineData("\u022B", false)]
+    [InlineData("\u022C", false)]
+    [InlineData("\u022D", false)]
+    [InlineData("\u022E", false)]
+    [InlineData("\u022F", false)]
+    [InlineData("\u0230", false)]
+    [InlineData("\u0231", false)]
+    [InlineData("\u0232", false)]
+    [InlineData("\u0233", false)]
+    [InlineData("\u040D", false)]
+    [InlineData("\u0450", false)]
+    [InlineData("\u045D", false)]
+    [InlineData("\u04EC", false)]
+    [InlineData("\u04ED", false)]
+    [InlineData("\u0623", false)]
+    [InlineData("\u0624", false)]
+    [InlineData("\u0625", false)]
+    [InlineData("\u0626", false)]
+    [InlineData("\u06C0", false)]
+    [InlineData("\u06C2", false)]
+    [InlineData("\u06D3", false)]
+    [InlineData("\u0A36", false)]
+    [InlineData("\u0DDC", false)]
+    [InlineData("\u0DDD", false)]
+    [InlineData("\u0DDE", false)]
+    [InlineData("\u01F8", true)]
+    [InlineData("\u0400", true)]
+    [InlineData("\u0622", true)]
+    [InlineData("\u0A33", true)]
+    [InlineData("\u0DDA", true)]
+    [InlineData("\u1026", true)]
+    [InlineData("\uFB1D", true)]
+    [InlineData("\u01F9", true)]
+    [InlineData("\u0218", true)]
+    [InlineData("\u0219", true)]
+    [InlineData("\u021A", true)]
+    [InlineData("\u021B", true)]
+    [InlineData("\u021E", true)]
+    [InlineData("\u021F", true)]
+    [InlineData("\u0226", true)]
+    [InlineData("\u0227", true)]
+    [InlineData("\u0228", true)]
+    [InlineData("\u0229", true)]
+    [InlineData("\u022A", true)]
+    [InlineData("\u022B", true)]
+    [InlineData("\u022C", true)]
+    [InlineData("\u022D", true)]
+    [InlineData("\u022E", true)]
+    [InlineData("\u022F", true)]
+    [InlineData("\u0230", true)]
+    [InlineData("\u0231", true)]
+    [InlineData("\u0232", true)]
+    [InlineData("\u0233", true)]
+    [InlineData("\u040D", true)]
+    [InlineData("\u0450", true)]
+    [InlineData("\u045D", true)]
+    [InlineData("\u04EC", true)]
+    [InlineData("\u04ED", true)]
+    [InlineData("\u0623", true)]
+    [InlineData("\u0624", true)]
+    [InlineData("\u0625", true)]
+    [InlineData("\u0626", true)]
+    [InlineData("\u06C0", true)]
+    [InlineData("\u06C2", true)]
+    [InlineData("\u06D3", true)]
+    [InlineData("\u0A36", true)]
+    [InlineData("\u0DDC", true)]
+    [InlineData("\u0DDD", true)]
+    [InlineData("\u0DDE", true)]
+    public void CatalogThreadNamesFollowTheVolumeUnicodeDecompositionVersion(string legacyThreadName, bool hfsX)
+    {
+        if (hfsX)
+        {
+            // Keep the object name current and the thread name legacy so the assertion reaches thread validation.
+            byte[] hfsXImage = HfsPlusFixture.Build(legacyThreadName.Normalize(NormalizationForm.FormD), hfsX: true,
+                catalogFileThreadName: legacyThreadName);
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+                ForkData.FromBytes(hfsXImage), new ContainerContext()));
+            Assert.Equal("An HFS Plus catalog thread name is not canonically decomposed.", exception.Message);
+            return;
+        }
+
+        byte[] hfsPlusImage = HfsPlusFixture.Build(legacyThreadName, catalogFileThreadName: legacyThreadName);
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(hfsPlusImage), new ContainerContext()));
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void HfsPlusAndHfsxCatalogThreadNamesUseCanonicalCombiningClassOrder(bool hfsX)
@@ -1370,8 +1870,9 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
-    [InlineData("a\u0307\u0307", false)] // Legacy double-dot-above spelling.
+    [InlineData("a\u0307\u0307", true)] // Equal-class marks retain order; repeated marks are not a fixup sequence.
     [InlineData("\u0306\u0307", false)] // Legacy breve + dot-above maps to U+0310.
+    [InlineData("\u0308\u030D", false)] // Legacy dialytika + vertical line above maps to dialytika + tonos.
     [InlineData("\u03B9\u0308\u030D", false)] // Legacy dialytika + perispomeni maps to dialytika + tonos.
     [InlineData("\u03B9\u0308\u0301", true)]
     [InlineData("a\u0310", true)]
@@ -1437,8 +1938,8 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Theory]
-    [InlineData("a\u0307\u0307")]
     [InlineData("\u0306\u0307")]
+    [InlineData("\u0308\u030D")]
     [InlineData("\u03B9\u0308\u030D")]
     [InlineData("\u03B1\u030D")]
     [InlineData("\u03B5\u030D")]
@@ -1461,6 +1962,7 @@ public sealed class HfsPlusFeatureTests
     [Theory]
     [InlineData("a\u0307\u0307")]
     [InlineData("\u0306\u0307")]
+    [InlineData("\u0308\u030D")]
     [InlineData("\u03B9\u0308\u030D")]
     [InlineData("\u00A8\u030D")]
     [InlineData("\u03B1\u030D")]
@@ -1481,6 +1983,17 @@ public sealed class HfsPlusFeatureTests
         MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
 
         Assert.StartsWith("Documents:", file.MacPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HfsXCatalogAndThreadNamesMayContainRepeatedEqualClassCombiningMarks()
+    {
+        const string fileName = "a\u0307\u0307";
+        byte[] image = HfsPlusFixture.Build(fileName, hfsX: true, catalogFileThreadName: fileName);
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("Documents:" + fileName.Normalize(NormalizationForm.FormC), file.MacPath);
     }
 
     [Theory]
@@ -1650,7 +2163,10 @@ public sealed class HfsPlusFeatureTests
     [InlineData(true)]
     public void JournaledHfsPlusAndHfsxVolumesAreReadWithoutJournalReplayAndReported(bool hfsX)
     {
-        byte[] image = HfsPlusFixture.Build("Read Me", hfsX: hfsX, volumeAttributes: 0x2100);
+        byte[] image = HfsPlusFixture.Build("Read Me", hfsX: hfsX, volumeAttributes: 0x2100,
+            includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
         var diagnostics = new List<Diagnostic>();
 
         IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
@@ -1659,6 +2175,205 @@ public sealed class HfsPlusFeatureTests
         Assert.Single(files, file => file.MacPath == "Documents:Read Me");
         Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-not-replayed" &&
                                                    diagnostic.Severity == DiagnosticSeverity.Info);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid");
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalHeaderChecksumIsInvalid()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        HfsPlusFixture.CorruptJournalHeaderChecksum(image);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Single(files, file => file.MacPath == "Documents:Read Me");
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Theory]
+    [InlineData(0, 0UL)]
+    [InlineData(4, 0UL)]
+    [InlineData(8, 0UL)]
+    [InlineData(16, 4097UL)]
+    [InlineData(24, 0UL)]
+    [InlineData(32, 0UL)]
+    [InlineData(32, 16UL)]
+    [InlineData(40, 0UL)]
+    public void HfsPlusWarnsWhenJournalHeaderFieldsAreInvalid(int fieldOffset, ulong invalidValue)
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        HfsPlusFixture.SetJournalHeaderField(image, fieldOffset, invalidValue);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusAcceptsJournalTransactionsThatWrapAroundTheJournalBuffer()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        HfsPlusFixture.SetJournalHeader(image, start: 3500, end: 800);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusChecksTheEntire2048ByteJournalHeaderSector(bool corruptUnusedSectorByte)
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        HfsPlusFixture.SetJournalHeader(image, start: 2048, end: 2048, headerSectorSize: 2048);
+        if (corruptUnusedSectorByte) image[13 * HfsPlusFixture.Block + 1024] ^= 0x01;
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Single(files, file => file.MacPath == "Documents:Read Me");
+        Assert.Equal(corruptUnusedSectorByte, diagnostics.Any(diagnostic =>
+            diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning));
+    }
+
+    [Fact]
+    public void HfsPlusSkipsJournalHeaderValidationWhenJournalNeedsInitialization()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block, flags: 5);
+        HfsPlusFixture.ClearJournalHeader(image);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Single(files, file => file.MacPath == "Documents:Read Me");
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid");
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalInfoBlockDoesNotPointToTheJournalFileExtent()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 14 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalFileUsesMoreThanOneExtent()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: 2 * HfsPlusFixture.Block);
+        HfsPlusFixture.FragmentJournalFile(image);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalInfoBlockFileDoesNotMatchTheHeaderPointer()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100, includeJournalFiles: true);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        HfsPlusFixture.SetCatalogFileDataExtent(image, fileId: 18, allocationBlock: 11);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalInfoBlockHasNoMatchingRootJournalFiles()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalInfoBlockIsOutsideTheAllocationArea()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 16, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block, writeBlock: false);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalRangeExtendsPastTheVolume()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 15 * HfsPlusFixture.Block,
+            journalSize: 2 * HfsPlusFixture.Block);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenJournalInfoBlockIsNotMarkedAllocated()
+    {
+        byte[] image = HfsPlusFixture.Build("Read Me", volumeAttributes: 0x2100);
+        HfsPlusFixture.SetJournalInfoBlock(image, allocationBlock: 12, journalOffset: 13 * HfsPlusFixture.Block,
+            journalSize: HfsPlusFixture.Block);
+        image[9 * HfsPlusFixture.Block + 1] &= 0xF7;
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-journal-info-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
     }
 
     [Fact]
@@ -1702,7 +2417,7 @@ public sealed class HfsPlusFeatureTests
 
         InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
-        Assert.Contains("child contains a key beyond its index range", exception.Message);
+        Assert.Contains("index key does not match the first key in its child subtree", exception.Message);
     }
 
     [Fact]
@@ -1714,7 +2429,7 @@ public sealed class HfsPlusFeatureTests
 
         InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
-        Assert.Contains("index key sorts after a key in its child subtree", exception.Message);
+        Assert.Contains("index key does not match the first key in its child subtree", exception.Message);
     }
 
     [Fact]
@@ -1726,7 +2441,26 @@ public sealed class HfsPlusFeatureTests
 
         InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
-        Assert.Contains("child contains a key beyond its index range", exception.Message);
+        Assert.Contains("index key does not match the first key in its child subtree", exception.Message);
+    }
+
+    [Fact]
+    public void HfsPlusCatalogIndexCannotPointToAnEmptyLeaf()
+    {
+        byte[] image = HfsPlusFixture.Build(multiLeafCatalog: true, emptySecondCatalogLeaf: true);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("empty child subtree", exception.Message);
+    }
+
+    [Fact]
+    public void HfsPlusEmptyExtentsRootLeafIsValid()
+    {
+        byte[] image = HfsPlusFixture.Build(emptyExtentsRootLeaf: true);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
     }
 
     [Theory]
@@ -1779,6 +2513,17 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusExtentsBtreeIndexCannotPointToAnEmptyLeaf()
+    {
+        byte[] image = HfsPlusFixture.Build(fragmentedData: true, indexedOverflowTree: true,
+            emptyOverflowSecondLeaf: true);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("empty child subtree", exception.Message);
+    }
+
+    [Fact]
     public void HfsPlusExtentsIndexSeparatorMustNotSortAfterItsChildRecords()
     {
         byte[] image = HfsPlusFixture.Build(fragmentedData: true, indexedOverflowTree: true);
@@ -1800,7 +2545,7 @@ public sealed class HfsPlusFeatureTests
 
         InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
-        Assert.Contains("child contains a key beyond its index range", exception.Message);
+        Assert.Contains("index key does not match the first key in its child subtree", exception.Message);
     }
 
     [Fact]
@@ -1865,19 +2610,35 @@ public sealed class HfsPlusFeatureTests
 
         InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
             HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
-        Assert.Contains("child contains a key beyond its index range", exception.Message);
+        Assert.Contains("index key does not match the first key in its child subtree", exception.Message);
+    }
+
+    [Fact]
+    public void CaseFoldingHfsXIndexSeparatorMayUseDifferentBytesForAnEqualChildKey()
+    {
+        byte[] image = HfsPlusFixture.Build(hfsX: true, multiLeafCatalog: true,
+            catalogKeyCompareType: 0xCF, catalogSplitIndex: 2);
+        int secondRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(3 * 4096 + 4096 - 4));
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(3 * 4096 + secondRecord + 8), 'd');
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
     }
 
     [Fact]
     public void HfsWrapperReadsTheEmbeddedHfsPlusVolume()
     {
         byte[] image = HfsPlusFixture.BuildWrapped();
+        var diagnostics = new List<Diagnostic>();
 
-        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
 
         Assert.Equal("Documents:Read Me", file.MacPath);
         Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
         Assert.Equal("Resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.wrapper-extent-unallocated");
     }
 
     [Fact]
@@ -1907,6 +2668,37 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsWrapperReportsAnEmbeddedVolumeExtentMarkedFreeAndStillReadsIt()
+    {
+        byte[] image = HfsPlusFixture.BuildWrapped();
+        int bitmapOffset = 3 * HfsBuilder.Block;
+        image[bitmapOffset] &= unchecked((byte)~0x08); // Allocation block 4 starts the embedded volume.
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.wrapper-extent-unallocated" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsWrapperReportsWhenItsVolumeBitmapIsTruncatedAndStillReadsTheEmbeddedVolume()
+    {
+        byte[] image = HfsPlusFixture.BuildWrapped();
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1024 + 0x0E), ushort.MaxValue);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.bitmap-truncated" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
     }
 
     [Fact]
@@ -2243,6 +3035,252 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusReportsAttributeRecordsForMissingCatalogObjects()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeFork(dataBlock: 12);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(11 * HfsPlusFixture.Block + 18), 99);
+        HfsPlusFixture.SetCatalogFileHasAttributesFlag(image, fileId: 17, enabled: false);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-attribute-orphan" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenAnObjectHasAttributeRecordsButNoHasAttributesFlag()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeFork(dataBlock: 12);
+        HfsPlusFixture.SetCatalogFileHasAttributesFlag(image, fileId: 17, enabled: false);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-attribute-flag-mismatch" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenHasAttributesFlagHasNoAttributeRecords()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        HfsPlusFixture.SetCatalogFileHasAttributesFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-attribute-flag-mismatch" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenHasSecurityFlagHasNoAclAttribute()
+    {
+        byte[] image = HfsPlusFixture.Build();
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-security-flag-mismatch" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenAclAttributeHasNoHasSecurityFlag()
+    {
+        byte[] inlineData = new byte[16];
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData, 0x10);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0, inlineData)
+        ]);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-security-flag-mismatch" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusAcceptsMatchingHasSecurityFlagAndAclAttribute()
+    {
+        byte[] inlineData = new byte[16];
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData, 0x10);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0, inlineData)
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-security-flag-mismatch");
+    }
+
+    [Fact]
+    public void HfsPlusAcceptsWellFormedEmptyAclAttribute()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(HfsPlusFixture.BuildAcl(entryCount: 0)))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid");
+    }
+
+    [Fact]
+    public void HfsPlusAcceptsTheNoAclFileSecuritySentinel()
+    {
+        byte[] acl = HfsPlusFixture.BuildAcl(entryCount: 0);
+        BinaryPrimitives.WriteUInt32BigEndian(acl.AsSpan(36), uint.MaxValue);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(acl))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid");
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenAclAttributeHasInvalidFileSecurityMagic()
+    {
+        byte[] acl = HfsPlusFixture.BuildAcl(entryCount: 0);
+        BinaryPrimitives.WriteUInt32BigEndian(acl, 0);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(acl))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenAclEntryCountDoesNotMatchPayloadLength()
+    {
+        byte[] acl = HfsPlusFixture.BuildAcl(entryCount: 0);
+        BinaryPrimitives.WriteUInt32BigEndian(acl.AsSpan(36), 1);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(acl))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusWarnsWhenAclHasMoreThan128Entries()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(HfsPlusFixture.BuildAcl(entryCount: 129)))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void HfsPlusAcceptsAclWith128Entries()
+    {
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(HfsPlusFixture.BuildAcl(entryCount: 128)))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid");
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void HfsPlusAcceptsDefinedAclEntryKinds(uint kind)
+    {
+        byte[] acl = HfsPlusFixture.BuildAcl(entryCount: 1);
+        BinaryPrimitives.WriteUInt32BigEndian(acl.AsSpan(60), kind);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(acl))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        _ = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(5)]
+    [InlineData(15)]
+    public void HfsPlusWarnsWhenAclEntryKindIsUndefined(uint kind)
+    {
+        byte[] acl = HfsPlusFixture.BuildAcl(entryCount: 1);
+        BinaryPrimitives.WriteUInt32BigEndian(acl.AsSpan(60), kind);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "com.apple.system.Security", 0,
+                HfsPlusFixture.InlineAttributeData(acl))
+        ]);
+        HfsPlusFixture.SetCatalogFileHasSecurityFlag(image, fileId: 17, enabled: true);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-acl-invalid" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
     public void HfsPlusAttributeForkMustAccountForEveryDeclaredAllocationBlock()
     {
         byte[] image = HfsPlusFixture.BuildWithAttributeForkAndOverflow(includeOverflow: false);
@@ -2352,6 +3390,26 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusEmptyAttributesRootLeafIsValid()
+    {
+        byte[] image = HfsPlusFixture.BuildWithEmptyAttributesRootLeaf();
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusAttributesBtreeIndexCannotPointToAnEmptyLeaf()
+    {
+        byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
+            emptySecondLeaf: true);
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+        Assert.Contains("empty child subtree", exception.Message);
+    }
+
+    [Fact]
     public void HfsPlusAttributesBtreeIndexKeysMustBeOrderedByFileId()
     {
         byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
@@ -2382,13 +3440,13 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
-    public void HfsPlusAttributesBtreeIndexSeparatorMayFallBetweenChildKeyRanges()
+    public void HfsPlusAttributesBtreeIndexSeparatorMustMatchItsChildFirstKey()
     {
         byte[] image = HfsPlusFixture.BuildWithIndexedAttributesTree(invalidChild: false,
             separatorFileId: 17, separatorName: "omega");
 
-        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
-            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
     }
 
     [Fact]
@@ -2486,6 +3544,63 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusInlineAttributePayloadMayUseTheBtreeAlignmentByte()
+    {
+        byte[] inlineData = new byte[18];
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData, 0x10);
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData.AsSpan(12), 1);
+        inlineData[16] = 0xA5;
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "inline", 0, inlineData)
+        ]);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusInlineAttributeReservedWordsAreIgnored()
+    {
+        byte[] inlineData = new byte[16];
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData, 0x10);
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData.AsSpan(4), 0x12345678);
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData.AsSpan(8), uint.MaxValue);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "inline", 0, inlineData)
+        ]);
+
+        Assert.Equal("Documents:Read Me", Assert.Single(HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext())).MacPath);
+    }
+
+    [Fact]
+    public void HfsPlusInlineAttributeRejectsARecordShorterThanItsHeader()
+    {
+        byte[] inlineData = new byte[14];
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData, 0x10);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "inline", 0, inlineData)
+        ]);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
+    public void HfsPlusInlineAttributeRejectsADeclaredPayloadLargerThanItsRecord()
+    {
+        byte[] inlineData = new byte[16];
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData, 0x10);
+        BinaryPrimitives.WriteUInt32BigEndian(inlineData.AsSpan(12), 3);
+        byte[] image = HfsPlusFixture.BuildWithAttributeLeaf([
+            HfsPlusFixture.AttributeRecordWithData(17, "inline", 0, inlineData)
+        ]);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    [Fact]
     public void HfsPlusOverflowExtentPayloadMustHaveItsExactLength()
     {
         byte[] image = HfsPlusFixture.Build(fragmentedData: true);
@@ -2571,6 +3686,46 @@ public sealed class HfsPlusFeatureTests
 
         Assert.Equal("HFS Plus data"u8.ToArray(), file.DataFork.ToArray());
         Assert.Equal("Resource fork"u8.ToArray(), file.ResourceFork.ToArray());
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusFileForkLogicalSizeMustFitItsAllocatedBlocks(bool resourceFork)
+    {
+        byte[] image = HfsPlusFixture.Build();
+        int logicalSizeOffset = FindCatalogFileForkLogicalSize(image, resourceFork);
+        BinaryPrimitives.WriteUInt64BigEndian(image.AsSpan(logicalSizeOffset), HfsPlusFixture.Block + 1UL);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
+    private static int FindCatalogFileForkLogicalSize(byte[] image, bool resourceFork)
+    {
+        const int volumeHeaderOffset = 1024;
+        const int catalogForkOffsetInVolumeHeader = 272;
+        uint allocationBlockSize = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(volumeHeaderOffset + 40));
+        uint catalogStartBlock = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(
+            volumeHeaderOffset + catalogForkOffsetInVolumeHeader + 16));
+        int treeOffset = checked((int)(catalogStartBlock * allocationBlockSize));
+        int nodeSize = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(treeOffset + 32));
+        uint firstLeafNode = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(treeOffset + 24));
+        int leafOffset = checked(treeOffset + (int)firstLeafNode * nodeSize);
+        int recordCount = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(leafOffset + 10));
+
+        for (int index = 0; index < recordCount; index++)
+        {
+            int recordStartPosition = leafOffset + nodeSize - 2 * (index + 1);
+            int recordStart = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(recordStartPosition));
+            ushort keyLength = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(leafOffset + recordStart));
+            int recordDataStart = (recordStart + 2 + keyLength + 1) & ~1;
+            ushort recordType = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(leafOffset + recordDataStart));
+            if (recordType == 2)
+                return checked(leafOffset + recordDataStart + (resourceFork ? 112 : 88));
+        }
+
+        throw new InvalidOperationException("The fixture catalog has no file record.");
     }
 
     [Fact]
@@ -2830,6 +3985,16 @@ public sealed class HfsPlusFeatureTests
             ForkData.FromBytes(image), new ContainerContext()));
     }
 
+    [Fact]
+    public void HfsPlusCatalogFolderParentChainCannotCycleAcrossTwoFolders()
+    {
+        byte[] image = HfsPlusFixture.Build(additionalFolderParent: 16, catalogFolderParentId: 18,
+            rootFolderValence: 0);
+
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.Read(
+            ForkData.FromBytes(image), new ContainerContext()));
+    }
+
     [Theory]
     [InlineData(999)]
     [InlineData(17)]
@@ -2878,7 +4043,11 @@ public sealed class HfsPlusFeatureTests
             ushort? catalogFileThreadNameCodeUnitOverride = null, ushort catalogFileMode = 0,
             ushort catalogFolderMode = 0, uint? volumeAttributes = null,
             uint fileTextEncoding = 0, uint folderTextEncoding = 0, ulong encodingBitmap = 1,
-            uint? catalogFolderCount = null, bool directoryHardLinkAlias = false)
+            uint? catalogFolderCount = null, bool directoryHardLinkAlias = false,
+            bool fileHasUnexpectedLinkChainFlag = false, uint? catalogFileLinkCount = null,
+            uint catalogFolderParentId = 2, int? catalogSplitIndex = null,
+            bool emptySecondCatalogLeaf = false, bool emptyExtentsRootLeaf = false,
+            bool emptyOverflowSecondLeaf = false, bool includeJournalFiles = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -2887,12 +4056,12 @@ public sealed class HfsPlusFeatureTests
             U16(volume, 2, hfsX ? (ushort)5 : (ushort)4);
             U32(volume, 4, volumeAttributes ?? (0x100u | (catalogIdsReused ? 0x1000u : 0) |
                 (badBlockExtent ? 0x200u : 0)));
-            U32(volume, 32, 1); // fileCount
+            U32(volume, 32, includeJournalFiles ? 3u : 1u); // fileCount
             U32(volume, 36, 1); // folderCount excludes root
             U32(volume, 40, Block);
             U32(volume, 44, volumeBlocks);
             U32(volume, 48, includeAllocationFile ? 0u : fragmentedData ? 19u : 10u);
-            U32(volume, 64, nextCatalogId ?? (additionalFolderParent is null ? 18u : 19u));
+            U32(volume, 64, nextCatalogId ?? (includeJournalFiles ? 20u : additionalFolderParent is null ? 18u : 19u));
             BinaryPrimitives.WriteUInt64BigEndian(volume[72..], encodingBitmap);
             int catalogForkNodes = deepCatalogTree ? 8 : multiLeafCatalog ? 4 : extraCatalogForkNode ? 3 : 2;
             Fork(volume.Slice(272, 80), catalogForkNodes * Block,
@@ -2900,12 +4069,21 @@ public sealed class HfsPlusFeatureTests
             if (fragmentedData)
                 Fork(volume.Slice(192, 80), (indexedOverflowTree ? 4 : 2) * Block,
                     indexedOverflowTree ? 26u : 4u, indexedOverflowTree ? 4u : 2u);
+            else
+            {
+                Fork(volume.Slice(192, 80), (emptyExtentsRootLeaf ? 2 : 1) * Block, 8,
+                    emptyExtentsRootLeaf ? 2u : 1u);
+                WriteEmptyExtentsTree(image.AsSpan(8 * Block, Block), emptyExtentsRootLeaf);
+                if (emptyExtentsRootLeaf)
+                    WriteBTreeNode(image.AsSpan(9 * Block, Block), 0xFF, 1, 0, 0, []);
+            }
             if (includeAllocationFile)
             {
                 int bitmapLength = checked((int)((volumeBlocks + 7) / 8));
-                Fork(volume.Slice(112, 80), bitmapLength, 9, 1);
-                image.AsSpan(9 * Block, bitmapLength).Fill(0xFF);
-                if (!markDataForkAllocated) image[9 * Block] &= 0xF7;
+                uint allocationStartBlock = emptyExtentsRootLeaf ? 12u : 9u;
+                Fork(volume.Slice(112, 80), bitmapLength, allocationStartBlock, 1);
+                image.AsSpan(checked((int)allocationStartBlock * Block), bitmapLength).Fill(0xFF);
+                if (!markDataForkAllocated) image[checked((int)allocationStartBlock * Block)] &= 0xF7;
             }
             if (includeAttributeFile)
             {
@@ -2916,7 +4094,7 @@ public sealed class HfsPlusFeatureTests
 
             byte[] root = new byte[88];
             U16(root, 0, 1);
-            U32(root, 4, rootFolderValence);
+            U32(root, 4, includeJournalFiles ? checked(rootFolderValence + 2) : rootFolderValence);
             U32(root, 8, 2);
             U32(root, 84, hfsX ? 1u : 0u);
             byte[] folder = new byte[88];
@@ -2931,8 +4109,11 @@ public sealed class HfsPlusFeatureTests
             byte[] file = new byte[248];
             U16(file, 0, 2);
             U16(file, 2, missingFileThreadFlag ? (ushort)0 : (ushort)2); // file thread exists
+            if (fileHasUnexpectedLinkChainFlag)
+                U16(file, 2, (ushort)(BinaryPrimitives.ReadUInt16BigEndian(file.AsSpan(2)) | 0x0020));
             uint fileId = catalogFileId ?? (duplicateCatalogId ? 16u : 17u);
             U32(file, 8, fileId);
+            if (catalogFileLinkCount is { } linkCount) U32(file, 44, linkCount);
             U32(file, 80, fileTextEncoding);
             U16(file, 42, catalogFileMode);
             if (directoryHardLinkAlias)
@@ -2967,6 +4148,7 @@ public sealed class HfsPlusFeatureTests
                 "Resource fork"u8.CopyTo(image.AsSpan(25 * Block));
                 WriteExtentsTree(image, duplicateOverflowExtent, unsortedOverflowKeys,
                     unsortedOverflowFileIds, unsortedOverflowForkTypes, indexedOverflowTree,
+                    emptyOverflowSecondLeaf,
                     badBlockExtent, badBlockOverlapsFileExtent, primaryExtentCount,
                     6 + primaryExtentCount * 2);
             }
@@ -3001,17 +4183,21 @@ public sealed class HfsPlusFeatureTests
             {
                 Record(rootFolderParentId, "Volume", root),
                 Record(2, "", Thread(rootFolderParentId, "Volume", 3)),
-                Record(2, catalogFolderName, folder),
+                Record(catalogFolderParentId, catalogFolderName, folder),
             };
             if (!omitFolderThread)
             {
-                records.Add(Record(folderId, "", Thread(2, catalogFolderName, 3)));
-                if (duplicateFolderThread) records.Add(Record(folderId, "", Thread(2, catalogFolderName, 3)));
+                records.Add(Record(folderId, "", Thread(catalogFolderParentId, catalogFolderName, 3)));
+                if (duplicateFolderThread)
+                    records.Add(Record(folderId, "", Thread(catalogFolderParentId, catalogFolderName, 3)));
             }
             uint fileParentId = catalogFileParentId ?? folderId;
-            records.Add(Record(fileParentId, fileName, file));
+            byte[] catalogFileRecord = Record(fileParentId, fileName, file);
             if (catalogFileNameCodeUnitOverride is { } codeUnit)
-                U16(records[^1], 8, codeUnit);
+                U16(catalogFileRecord, 8, codeUnit);
+            if (fileParentId == 2)
+                records.Insert(fileName.StartsWith(".", StringComparison.Ordinal) ? 2 : 3, catalogFileRecord);
+            else records.Add(catalogFileRecord);
             if (!omitFileThread)
             {
                 byte[] fileThread = Record(fileId, nonEmptyFileThreadKey ? "Thread" : "",
@@ -3024,6 +4210,13 @@ public sealed class HfsPlusFeatureTests
                     catalogFileNameCodeUnitOverride;
                 if (threadCodeUnitOverride is { } threadCodeUnit && fileId >= 16)
                     U16(records[^1], 18, threadCodeUnit);
+            }
+            if (includeJournalFiles)
+            {
+                records.Insert(2, JournalFileRecord(18, ".journal_info_block", startBlock: 12, logicalSize: 180));
+                records.Insert(2, JournalFileRecord(19, ".journal", startBlock: 13, logicalSize: Block));
+                records.Add(Record(18, "", Thread(2, ".journal_info_block", 4)));
+                records.Add(Record(19, "", Thread(2, ".journal", 4)));
             }
             if (additionalFolderParent is { } additionalParent)
             {
@@ -3070,15 +4263,16 @@ public sealed class HfsPlusFeatureTests
             }
             if (multiLeafCatalog)
             {
-                int split = records.Count / 2;
+                int split = catalogSplitIndex ?? records.Count / 2;
                 WriteBTreeNode(image.AsSpan(3 * Block, Block), 0, 2,
                     invalidCatalogIndexForwardLink ? 1u : 0u,
                     invalidCatalogIndexBackwardLink ? 1u : 0u,
-                    [IndexRecord(records[0], invalidCatalogIndexChild ? 4u : 2u), IndexRecord(records[split], 3)]);
+                    [IndexRecord(records[0], invalidCatalogIndexChild ? 4u : 2u),
+                        IndexRecord(records[emptySecondCatalogLeaf ? records.Count - 1 : split], 3)]);
                 WriteBTreeNode(image.AsSpan(4 * Block, Block), 0xFF, 1, 3, 0,
-                    records.Take(split).ToArray());
+                    emptySecondCatalogLeaf ? records.ToArray() : records.Take(split).ToArray());
                 WriteBTreeNode(image.AsSpan(5 * Block, Block), 0xFF, 1, 0, 2,
-                    records.Skip(split).ToArray());
+                    emptySecondCatalogLeaf ? [] : records.Skip(split).ToArray());
             }
             else
             {
@@ -3131,16 +4325,182 @@ public sealed class HfsPlusFeatureTests
             Span<byte> mdb = wrapper.AsSpan(1024, 162);
             U16(mdb, 0, 0x4244); // HFS master directory block signature
             U32(mdb, 0x14, 512); // allocation block size
+            U16(mdb, 0x0E, 3); // volume bitmap starts in logical block 3
             U16(mdb, 0x1C, 2); // drAlBlSt is measured in 512-byte blocks
             U16(mdb, 0x12, checked((ushort)(wrapper.Length / 512 - 2)));
             U16(mdb, 0x7C, 0x482B); // drEmbedSigWord: HFS Plus
             U16(mdb, 0x7E, 4); // embedded volume starts at allocation block 4
             U16(mdb, 0x80, checked((ushort)(embedded.Length / 512)));
+            for (uint block = 4; block < 4 + embedded.Length / 512; block++)
+                wrapper[3 * 512 + (int)(block / 8)] |= (byte)(0x80 >> (int)(block & 7));
             return wrapper;
         }
 
         public static byte[] BuildWithAttributeFork(uint dataBlock) =>
             BuildWithAttributeTree(dataBlock, 0x20);
+
+        public static void SetCatalogFileHasAttributesFlag(byte[] image, uint fileId, bool enabled)
+            => SetCatalogFileFlag(image, fileId, 0x0004, enabled);
+
+        public static void SetCatalogFileHasSecurityFlag(byte[] image, uint fileId, bool enabled)
+            => SetCatalogFileFlag(image, fileId, 0x0008, enabled);
+
+        public static void SetJournalInfoBlock(byte[] image, uint allocationBlock, ulong journalOffset,
+            ulong journalSize, uint flags = 1, bool writeBlock = true)
+        {
+            U32(image, 1024 + 12, allocationBlock);
+            if (!writeBlock) return;
+            Span<byte> journalInfo = image.AsSpan(checked((int)allocationBlock * Block), 180);
+            U32(journalInfo, 0, flags);
+            BinaryPrimitives.WriteUInt64BigEndian(journalInfo[36..], journalOffset);
+            BinaryPrimitives.WriteUInt64BigEndian(journalInfo[44..], journalSize);
+            if (journalOffset <= (ulong)image.Length && journalSize >= 512 &&
+                journalOffset <= (ulong)image.Length - 512)
+                SetJournalHeader(image, journalOffset, journalSize, start: 512, end: 512);
+        }
+
+        public static void SetJournalHeader(byte[] image, ulong start, ulong end, int headerSectorSize = 512)
+        {
+            SetJournalHeader(image, 13UL * Block, Block, start, end, headerSectorSize);
+        }
+
+        private static void SetJournalHeader(byte[] image, ulong journalOffset, ulong journalSize,
+            ulong start, ulong end, int headerSectorSize = 512)
+        {
+            Span<byte> header = image.AsSpan(checked((int)journalOffset), headerSectorSize);
+            header.Clear();
+            U32(header, 0, 0x4A4E4C78);
+            U32(header, 4, 0x12345678);
+            BinaryPrimitives.WriteUInt64BigEndian(header[8..], start);
+            BinaryPrimitives.WriteUInt64BigEndian(header[16..], end);
+            BinaryPrimitives.WriteUInt64BigEndian(header[24..], journalSize);
+            U32(header, 32, 4096);
+            U32(header, 40, checked((uint)headerSectorSize));
+            U32(header, 36, JournalChecksum(header));
+        }
+
+        public static void CorruptJournalHeaderChecksum(byte[] image)
+        {
+            int checksumOffset = checked(13 * Block + 36);
+            uint checksum = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(checksumOffset, 4));
+            U32(image, checksumOffset, checksum ^ 1);
+        }
+
+        public static void SetJournalHeaderField(byte[] image, int fieldOffset, ulong value)
+        {
+            Span<byte> header = image.AsSpan(13 * Block, 512);
+            if (fieldOffset is 8 or 16 or 24)
+                BinaryPrimitives.WriteUInt64BigEndian(header[fieldOffset..], value);
+            else
+                U32(header, fieldOffset, checked((uint)value));
+            U32(header, 36, 0);
+            uint headerSize = BinaryPrimitives.ReadUInt32BigEndian(header[40..]);
+            U32(header, 36, JournalChecksum(header[..checked((int)headerSize)]));
+        }
+
+        public static void ClearJournalHeader(byte[] image)
+        {
+            image.AsSpan(13 * Block, 512).Clear();
+        }
+
+        private static uint JournalChecksum(ReadOnlySpan<byte> bytes)
+        {
+            uint checksum = 0;
+            foreach (byte value in bytes)
+                checksum = unchecked((checksum << 8) ^ (checksum + value));
+            return ~checksum;
+        }
+
+        public static void FragmentJournalFile(byte[] image)
+        {
+            Span<byte> file = FindCatalogFileData(image, fileId: 19);
+            Span<byte> fork = file[88..168];
+            BinaryPrimitives.WriteUInt64BigEndian(fork, 2UL * Block);
+            U32(fork, 12, 2);
+            U32(fork, 16 + 8, 14);
+            U32(fork, 20 + 8, 1);
+        }
+
+        public static void SetCatalogFileDataExtent(byte[] image, uint fileId, uint allocationBlock)
+        {
+            Span<byte> file = FindCatalogFileData(image, fileId);
+            U32(file, 88 + 16, allocationBlock);
+        }
+
+        private static Span<byte> FindCatalogFileData(byte[] image, uint fileId)
+        {
+            Span<byte> leaf = image.AsSpan(3 * Block, Block);
+            int recordCount = BinaryPrimitives.ReadUInt16BigEndian(leaf[10..]);
+            for (int index = 0; index < recordCount; index++)
+            {
+                int recordStart = BinaryPrimitives.ReadUInt16BigEndian(leaf[(Block - 2 * (index + 1))..]);
+                int keyLength = BinaryPrimitives.ReadUInt16BigEndian(leaf[recordStart..]);
+                int dataStart = recordStart + 2 + keyLength;
+                if (BinaryPrimitives.ReadUInt16BigEndian(leaf[dataStart..]) == 2 &&
+                    BinaryPrimitives.ReadUInt32BigEndian(leaf[(dataStart + 8)..]) == fileId)
+                    return leaf[dataStart..(dataStart + 248)];
+            }
+            throw new InvalidOperationException($"The HFS Plus fixture has no file record {fileId}.");
+        }
+
+        private static byte[] JournalFileRecord(uint fileId, string name, uint startBlock, int logicalSize)
+        {
+            byte[] file = new byte[248];
+            U16(file, 0, 2);
+            U16(file, 2, 2);
+            U32(file, 8, fileId);
+            Fork(file.AsSpan(88, 80), logicalSize, startBlock, 1);
+            return Record(2, name, file);
+        }
+
+        private static void SetCatalogFileFlag(byte[] image, uint fileId, ushort flag, bool enabled)
+        {
+            Span<byte> leaf = image.AsSpan(3 * Block, Block);
+            int recordCount = BinaryPrimitives.ReadUInt16BigEndian(leaf[10..]);
+            for (int index = 0; index < recordCount; index++)
+            {
+                int recordStart = BinaryPrimitives.ReadUInt16BigEndian(leaf[(Block - 2 * (index + 1))..]);
+                int keyLength = BinaryPrimitives.ReadUInt16BigEndian(leaf[recordStart..]);
+                int dataStart = recordStart + 2 + keyLength;
+                if (BinaryPrimitives.ReadUInt16BigEndian(leaf[dataStart..]) != 2 ||
+                    BinaryPrimitives.ReadUInt32BigEndian(leaf[(dataStart + 8)..]) != fileId) continue;
+
+                ushort flags = BinaryPrimitives.ReadUInt16BigEndian(leaf[(dataStart + 2)..]);
+                U16(leaf, dataStart + 2, enabled ? (ushort)(flags | flag) : (ushort)(flags & ~flag));
+                return;
+            }
+
+            throw new InvalidOperationException($"The HFS Plus fixture has no file record for CNID {fileId}.");
+        }
+
+        private static void SetCatalogObjectHasAttributesFlagIfPresent(byte[] image, uint objectId)
+        {
+            Span<byte> leaf = image.AsSpan(3 * Block, Block);
+            int recordCount = BinaryPrimitives.ReadUInt16BigEndian(leaf[10..]);
+            for (int index = 0; index < recordCount; index++)
+            {
+                int recordStart = BinaryPrimitives.ReadUInt16BigEndian(leaf[(Block - 2 * (index + 1))..]);
+                int keyLength = BinaryPrimitives.ReadUInt16BigEndian(leaf[recordStart..]);
+                int dataStart = recordStart + 2 + keyLength;
+                if (dataStart + 12 > Block) continue;
+
+                ushort kind = BinaryPrimitives.ReadUInt16BigEndian(leaf[dataStart..]);
+                if (kind is not (1 or 2) ||
+                    BinaryPrimitives.ReadUInt32BigEndian(leaf[(dataStart + 8)..]) != objectId) continue;
+
+                ushort flags = BinaryPrimitives.ReadUInt16BigEndian(leaf[(dataStart + 2)..]);
+                U16(leaf, dataStart + 2, (ushort)(flags | 0x0004));
+                return;
+            }
+        }
+
+        private static void SetCatalogAttributeFlagsForRecords(byte[] image, IEnumerable<byte[]> records)
+        {
+            foreach (byte[] record in records)
+                if (record.Length >= 8)
+                    SetCatalogObjectHasAttributesFlagIfPresent(image,
+                        BinaryPrimitives.ReadUInt32BigEndian(record.AsSpan(4, 4)));
+        }
 
         public static byte[] BuildWithAttributeExtension(uint dataBlock) =>
             BuildWithAttributeTree(dataBlock, 0x30);
@@ -3175,7 +4535,7 @@ public sealed class HfsPlusFeatureTests
         public static byte[] BuildWithHardLink(uint linkReference = 123, bool hfsX = false,
             bool includeIndirectNode = true, string indirectNodeName = "iNode123", uint indirectLinkCount = 1,
             bool includeHardLinkAlias = true, bool indirectNodeIsFolder = false,
-            bool validHardLinkFinderInfo = true)
+            bool validHardLinkFinderInfo = true, bool aliasHasDataFork = false)
         {
             const string privateDirectory = "\0\0\0\0HFS+ Private Data";
             const string data = "shared file data";
@@ -3198,6 +4558,11 @@ public sealed class HfsPlusFeatureTests
                 "hlnkhfs+"u8.CopyTo(link.AsSpan(48));
             else
                 "hlnkBAD!"u8.CopyTo(link.AsSpan(48));
+            if (aliasHasDataFork)
+            {
+                Fork(link.AsSpan(88, 80), "unexpected alias data"u8.Length, 12, 1);
+                "unexpected alias data"u8.CopyTo(image.AsSpan(12 * Block));
+            }
             byte[][] hardLinkEntry = includeHardLinkAlias ? [Record(16, "Shared Alias", link)] : [];
             byte[][] hardLinkThread = includeHardLinkAlias
                 ? [Record(20, "", Thread(16, "Shared Alias", 4))]
@@ -3240,16 +4605,25 @@ public sealed class HfsPlusFeatureTests
         }
 
         public static byte[] BuildWithDirectoryHardLink(bool hfsX, bool secondAlias = false,
-            bool validFinderInfo = true, bool nestedContents = false, bool directoryInodeHasLinkChain = true)
+            bool validFinderInfo = true, bool nestedContents = false, bool directoryInodeHasLinkChain = true,
+            string? firstLinkAttributeValue = "21", bool breakDirectoryLinkChain = false,
+            uint? directoryHardLinkCount = null, byte privateDirectoryOwnerFlags = 0x02,
+            ushort privateDirectoryMode = 0x4200, bool aliasesInsideDocuments = false,
+            bool documentsHasChildLink = true)
         {
             const string privateDirectory = ".HFS+ Private Directory Data\r";
             const string directoryInode = "dir_19";
-            byte[] image = Build(hfsX: hfsX);
-            byte[] root = FolderData(2, secondAlias ? 4u : 3u);
-            byte[] documents = FolderData(16, 0);
+            byte[] image = Build(hfsX: hfsX, includeAttributeFile: true);
+            uint aliasCount = secondAlias ? 2u : 1u;
+            byte[] root = FolderData(2, aliasesInsideDocuments ? 2u : secondAlias ? 4u : 3u);
+            byte[] documents = FolderData(16, aliasesInsideDocuments ? aliasCount : 0u);
+            if (aliasesInsideDocuments && documentsHasChildLink) U16(documents, 2, 0x0040);
             byte[] privateFolder = FolderData(18, 1);
+            privateFolder[41] = privateDirectoryOwnerFlags; // UF_IMMUTABLE.
+            U16(privateFolder, 42, privateDirectoryMode); // S_ISVTX.
             byte[] inodeFolder = FolderData(19, nestedContents ? 2u : 1u);
             if (directoryInodeHasLinkChain) U16(inodeFolder, 2, 0x0020);
+            U32(inodeFolder, 44, directoryHardLinkCount ?? (secondAlias ? 2u : 1u));
             byte[] contents = FileData(20, 4, "directory data"u8, 5, []);
             contents.AsSpan(168, 80).Clear();
             byte[] nestedFolder = FolderData(24, 1);
@@ -3259,6 +4633,8 @@ public sealed class HfsPlusFeatureTests
             {
                 byte[] alias = FileData(fileId, 6, [], 7, []);
                 U16(alias, 2, 0x0022); // Thread exists; hard-link chain.
+                U32(alias, 32, fileId == 21 ? 0u : breakDirectoryLinkChain ? 0u : 21u);
+                U32(alias, 36, fileId == 21 && secondAlias ? 22u : 0u);
                 U32(alias, 44, 19); // Directory inode catalog ID.
                 (validFinderInfo ? "alisMACS"u8 : "alisMISS"u8).CopyTo(alias.AsSpan(48));
                 U16(alias, 56, (ushort)FinderFlags.IsAlias);
@@ -3270,10 +4646,14 @@ public sealed class HfsPlusFeatureTests
             byte[] alias = MakeAlias(21);
             if (hfsX)
             {
-                U32(root, 84, secondAlias ? 4u : 3u);
+                U32(root, 84, aliasesInsideDocuments ? 2u : secondAlias ? 4u : 3u);
+                U32(documents, 84, aliasesInsideDocuments ? aliasCount : 0u);
                 U32(privateFolder, 84, 1);
                 U32(inodeFolder, 84, nestedContents ? 1u : 0u);
             }
+
+            uint aliasParent = aliasesInsideDocuments ? 16u : 2u;
+            uint documentsParent = 2;
 
             var records = new List<byte[]>
             {
@@ -3281,20 +4661,21 @@ public sealed class HfsPlusFeatureTests
                 Record(2, "", Thread(1, "Volume", 3)),
                 Record(2, privateDirectory, privateFolder),
                 Record(2, "Documents", documents),
-                Record(2, "Shared Folder", alias),
-                Record(16, "", Thread(2, "Documents", 3)),
+                Record(16, "", Thread(documentsParent, "Documents", 3)),
                 Record(18, "", Thread(2, privateDirectory, 3)),
                 Record(18, directoryInode, inodeFolder),
                 Record(19, "", Thread(18, directoryInode, 3)),
                 Record(19, "Inside", contents),
                 Record(20, "", Thread(19, "Inside", 4)),
-                Record(21, "", Thread(2, "Shared Folder", 4)),
+                Record(21, "", Thread(aliasParent, "Shared Folder", 4)),
             };
+            int aliasRecordIndex = aliasesInsideDocuments ? 5 : 4;
+            records.Insert(aliasRecordIndex, Record(aliasParent, "Shared Folder", alias));
             if (nestedContents) records.Insert(10, Record(19, "Nested", nestedFolder));
             if (secondAlias)
             {
-                records.Insert(4, Record(2, "Shared Copy", MakeAlias(22)));
-                records.Add(Record(22, "", Thread(2, "Shared Copy", 4)));
+                records.Insert(aliasRecordIndex, Record(aliasParent, "Shared Copy", MakeAlias(22)));
+                records.Add(Record(22, "", Thread(aliasParent, "Shared Copy", 4)));
             }
             if (nestedContents)
             {
@@ -3303,6 +4684,16 @@ public sealed class HfsPlusFeatureTests
                 records.Add(Record(25, "", Thread(24, "Deep", 4)));
             }
             WriteBTreeNode(image.AsSpan(3 * Block, Block), 0xFF, 1, 0, 0, records.ToArray());
+            if (firstLinkAttributeValue is not null)
+            {
+                byte[] value = [.. Encoding.ASCII.GetBytes(firstLinkAttributeValue), 0];
+                byte[] inlineData = new byte[16 + value.Length + (value.Length & 1)];
+                U32(inlineData, 0, 0x10);
+                U32(inlineData, 12, checked((uint)value.Length));
+                value.CopyTo(inlineData, 16);
+                image = BuildWithAttributeLeaf(image,
+                    [AttributeRecordWithData(19, "com.apple.system.hfs.firstlink", 0, inlineData)]);
+            }
             U32(image.AsSpan(2 * Block, Block), 20, checked((uint)records.Count));
             Span<byte> volume = image.AsSpan(1024, 512);
             U32(volume, 32, (secondAlias ? 3u : 2u) + (nestedContents ? 1u : 0u));
@@ -3356,7 +4747,7 @@ public sealed class HfsPlusFeatureTests
 
         public static byte[] BuildWithIndexedAttributesTree(bool invalidChild, bool reverseAttributeKeys = false,
             bool invalidSeparator = false, uint? separatorFileId = null, string? separatorName = null,
-            bool extraIndexRecordBytes = false)
+            bool extraIndexRecordBytes = false, bool emptySecondLeaf = false)
         {
             byte[] image = Build(includeAttributeFile: true);
             Fork(image.AsSpan(1024 + 352, 80), 4 * Block, 10, 4);
@@ -3370,8 +4761,10 @@ public sealed class HfsPlusFeatureTests
             if (extraIndexRecordBytes) Array.Resize(ref secondIndexRecord, secondIndexRecord.Length + 2);
             WriteBTreeNode(image.AsSpan(11 * Block, Block), 0, 2, 0, 0,
                 [IndexRecord(first, invalidChild ? 4u : 2u), secondIndexRecord]);
-            WriteBTreeNode(image.AsSpan(12 * Block, Block), 0xFF, 1, 3, 0, [first]);
-            WriteBTreeNode(image.AsSpan(13 * Block, Block), 0xFF, 1, 0, 2, [second]);
+            WriteBTreeNode(image.AsSpan(12 * Block, Block), 0xFF, 1, 3, 0,
+                emptySecondLeaf ? [first, second] : [first]);
+            WriteBTreeNode(image.AsSpan(13 * Block, Block), 0xFF, 1, 0, 2,
+                emptySecondLeaf ? [] : [second]);
 
             Span<byte> header = image.AsSpan(10 * Block, Block);
             header[8] = 1;
@@ -3390,6 +4783,7 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
+            SetCatalogAttributeFlagsForRecords(image, [first, second]);
             return image;
         }
 
@@ -3397,6 +4791,15 @@ public sealed class HfsPlusFeatureTests
         {
             byte[] image = Build(includeAttributeFile: true);
             return BuildWithAttributeLeaf(image, records);
+        }
+
+        public static byte[] BuildWithEmptyAttributesRootLeaf()
+        {
+            byte[] image = Build(includeAttributeFile: true);
+            Fork(image.AsSpan(1024 + 352, 80), 2 * Block, 10, 2);
+            WriteEmptyAttributesTree(image.AsSpan(10 * Block, Block), rootLeaf: true);
+            WriteBTreeNode(image.AsSpan(11 * Block, Block), 0xFF, 1, 0, 0, []);
+            return image;
         }
 
         private static byte[] BuildWithAttributeLeaf(byte[] image, byte[][] records)
@@ -3421,6 +4824,7 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
+            SetCatalogAttributeFlagsForRecords(image, records);
             image.AsSpan(1024, 512).CopyTo(image.AsSpan(image.Length - 1024, 512));
             return image;
         }
@@ -3451,6 +4855,27 @@ public sealed class HfsPlusFeatureTests
             nameBytes.CopyTo(record, 14);
             data.CopyTo(record, 2 + keyLength);
             return record;
+        }
+
+        public static byte[] InlineAttributeData(byte[] value)
+        {
+            byte[] data = new byte[16 + value.Length];
+            U32(data, 0, 0x10);
+            U32(data, 12, checked((uint)value.Length));
+            value.CopyTo(data, 16);
+            return data;
+        }
+
+        public static byte[] BuildAcl(uint entryCount)
+        {
+            const int fileSecurityAndAclHeaderSize = 44;
+            const int aceSize = 24;
+            byte[] acl = new byte[checked(fileSecurityAndAclHeaderSize + (int)entryCount * aceSize)];
+            U32(acl, 0, 0x012CC16D);
+            U32(acl, 36, entryCount);
+            for (uint index = 0; index < entryCount; index++)
+                U32(acl, fileSecurityAndAclHeaderSize + (int)index * aceSize + 16, 1);
+            return acl;
         }
 
         public static byte[] BuildWithAttributeForkAndOverflow(bool includeOverflow,
@@ -3514,14 +4939,24 @@ public sealed class HfsPlusFeatureTests
         private static byte[] BuildWithAttributeTree(uint dataBlock, uint recordType)
         {
             byte[] image = Build(includeAttributeFile: true);
+            SetCatalogObjectHasAttributesFlagIfPresent(image, 17);
             Fork(image.AsSpan(1024 + 352, 80), 2 * Block, 10, 2);
 
-            int dataLength = recordType == 0x20 ? 88 : 72;
+            int dataLength = recordType switch
+            {
+                0x10 => 18,
+                0x20 => 88,
+                _ => 72
+            };
             byte[] record = new byte[2 + 12 + dataLength];
             U16(record, 0, 12);
             U32(record, 4, 17);
             U32(record, 14, recordType);
-            if (recordType == 0x20)
+            if (recordType == 0x10)
+            {
+                U32(record, 14 + 12, 2);
+            }
+            else if (recordType == 0x20)
             {
                 BinaryPrimitives.WriteUInt64BigEndian(record.AsSpan(22), 1);
                 U32(record, 14 + 8 + 12, 1);
@@ -3627,6 +5062,7 @@ public sealed class HfsPlusFeatureTests
 
         private static void WriteExtentsTree(byte[] image, bool duplicateRecord, bool unsortedKeys,
             bool unsortedFileIds, bool unsortedForkTypes, bool indexedOverflowTree,
+            bool emptyOverflowSecondLeaf,
             bool badBlockExtent, bool badBlockOverlapsFileExtent,
             uint overflowStartBlock, uint overflowPhysicalBlock)
         {
@@ -3637,7 +5073,7 @@ public sealed class HfsPlusFeatureTests
             }
             if (indexedOverflowTree)
             {
-                WriteIndexedExtentsTree(image);
+                WriteIndexedExtentsTree(image, emptyOverflowSecondLeaf);
                 return;
             }
 
@@ -3711,30 +5147,57 @@ public sealed class HfsPlusFeatureTests
             U16(header, Block - 8, Block - 8);
         }
 
-        private static void WriteEmptyAttributesTree(Span<byte> header)
+        private static void WriteEmptyAttributesTree(Span<byte> header, bool rootLeaf = false)
         {
             header[8] = 1;
             U16(header, 10, 3);
+            U16(header, 14, rootLeaf ? (ushort)1 : (ushort)0);
+            U32(header, 16, rootLeaf ? 1u : 0u);
+            U32(header, 20, 0);
+            U32(header, 24, rootLeaf ? 1u : 0u);
+            U32(header, 28, rootLeaf ? 1u : 0u);
             U16(header, 32, Block);
             U16(header, 34, 266);
-            U32(header, 36, 1);
+            U32(header, 36, rootLeaf ? 2u : 1u);
             U32(header, 14 + 38, 6);
-            header[14 + 106 + 128] = 0x80;
+            header[14 + 106 + 128] = rootLeaf ? (byte)0xC0 : (byte)0x80;
             U16(header, Block - 2, 14);
             U16(header, Block - 4, 14 + 106);
             U16(header, Block - 6, 14 + 106 + 128);
             U16(header, Block - 8, Block - 8);
         }
 
-        private static void WriteIndexedExtentsTree(byte[] image)
+        private static void WriteEmptyExtentsTree(Span<byte> header, bool rootLeaf)
+        {
+            header[8] = 1;
+            U16(header, 10, 3);
+            U16(header, 14, rootLeaf ? (ushort)1 : (ushort)0);
+            U32(header, 16, rootLeaf ? 1u : 0u);
+            U32(header, 20, 0);
+            U32(header, 24, rootLeaf ? 1u : 0u);
+            U32(header, 28, rootLeaf ? 1u : 0u);
+            U16(header, 32, Block);
+            U16(header, 34, 10);
+            U32(header, 36, rootLeaf ? 2u : 1u);
+            U32(header, 14 + 38, 2);
+            header[14 + 106 + 128] = rootLeaf ? (byte)0xC0 : (byte)0x80;
+            U16(header, Block - 2, 14);
+            U16(header, Block - 4, 14 + 106);
+            U16(header, Block - 6, 14 + 106 + 128);
+            U16(header, Block - 8, Block - 8);
+        }
+
+        private static void WriteIndexedExtentsTree(byte[] image, bool emptySecondLeaf)
         {
             const int firstTreeBlock = 26;
             byte[] firstExtent = ExtentRecord(startBlock: 8, physicalBlock: 30, extentCount: 8);
             byte[] secondExtent = ExtentRecord(startBlock: 16, physicalBlock: 38);
             WriteBTreeNode(image.AsSpan((firstTreeBlock + 1) * Block, Block), 0, 2, 0, 0,
                 [ExtentIndexRecord(firstExtent, 2), ExtentIndexRecord(secondExtent, 3)]);
-            WriteBTreeNode(image.AsSpan((firstTreeBlock + 2) * Block, Block), 0xFF, 1, 3, 0, [firstExtent]);
-            WriteBTreeNode(image.AsSpan((firstTreeBlock + 3) * Block, Block), 0xFF, 1, 0, 2, [secondExtent]);
+            WriteBTreeNode(image.AsSpan((firstTreeBlock + 2) * Block, Block), 0xFF, 1, 3, 0,
+                emptySecondLeaf ? [firstExtent, secondExtent] : [firstExtent]);
+            WriteBTreeNode(image.AsSpan((firstTreeBlock + 3) * Block, Block), 0xFF, 1, 0, 2,
+                emptySecondLeaf ? [] : [secondExtent]);
 
             Span<byte> header = image.AsSpan(firstTreeBlock * Block, Block);
             header[8] = 1;

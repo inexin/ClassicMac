@@ -1,4 +1,4 @@
-# DiskDoubler Pro 4.1.1 AD1, AD2, and DD3 fixtures
+# DiskDoubler 3.7.7 and Pro 4.1.1 fixtures
 
 `DiskDoublerPro411Ad1TestFile.dd`, `DiskDoublerPro411Ad2TestFile.dd`, and `DiskDoublerPro411Dd3TestFile.dd` are the
 individually compressed `testfile.PICT` files from the CC0
@@ -9,5 +9,22 @@ license.
 
 `DiskDoublerPro411Dda2Dd3Archive.dd` is the original Pro 4.1.1 archive at
 `build/sources.ddpro411.dd3.dd` in the same corpus. The test extracts its `testfile.PICT` entry and compares its data
-and resource forks with `ExpectedDataFork.pict` and `ExpectedResourceFork.bin`. Other records with entry type `0x1000` are
-skipped with a diagnostic because they do not use the standard DDA2 file-header layout implemented by this reader.
+and resource forks with `ExpectedDataFork.pict` and `ExpectedResourceFork.bin`. The same archive contains raw JPEG and
+PNG records with entry type `0x1000`. Their 44-byte metadata blocks provide Finder information, timestamps, and fork
+lengths before the uncompressed fork bytes; feature tests check those fields and both image signatures. This layout is
+fitted to the two records in this archive, and their checksum fields are not yet verified.
+
+`DiskDoublerPro411Dda2Dd1Archive.dd` and `DiskDoublerPro411Dda2Dd2Archive.dd` are the original Pro 4.1.1 archives at
+`build/sources.ddpro411.dd1.dd` and `build/sources.ddpro411.dd2.dd` in the same corpus. Feature tests compare both
+forks of each archive's `testfile.PICT` entry with the uncompressed source files. Those PICT records carry method ID 10
+in their DDA2 entry headers; the archive filenames do not identify each record's method ID.
+
+`DiskDoublerPro411Dd1TestFile.dd` and `DiskDoublerPro411Dd2TestFile.dd` are the original standalone files at
+`build/sources.ddpro411.dd1/testfile.PICT` and `build/sources.ddpro411.dd2/testfile.PICT`. They are read directly and
+their data and resource forks are compared with the uncompressed source files.
+
+`DiskDoubler377DdaTestFile.dd` is the original standalone file at `build/sources.dd377.dda/testfile.PICT`; the fixture
+has method 1 selected for both forks. Its extracted forks are compared with the same uncompressed source files.
+
+`DiskDoubler377DdbTestFile.dd` is the original standalone file at `build/sources.dd377.ddb/testfile.PICT`; the fixture
+has method 8 selected for both forks. Its extracted forks are compared with the same uncompressed source files.

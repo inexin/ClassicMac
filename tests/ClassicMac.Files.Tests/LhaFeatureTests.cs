@@ -32,6 +32,17 @@ public sealed class LhaFeatureTests
     }
 
     [Fact]
+    public void LhaArchiveHonorsTheMaximumEntryCount()
+    {
+        byte[] first = LhaFixture.BuildLevelZeroStoredFile("first", "one"u8.ToArray());
+        byte[] second = LhaFixture.BuildLevelZeroStoredFile("second", "two"u8.ToArray());
+        byte[] archive = [.. first.AsSpan(0, first.Length - 1), .. second];
+        var context = new ContainerContext(options: ContainerReadOptions.Default with { MaxVolumeEntries = 1 });
+
+        Assert.Throws<InvalidDataException>(() => LhaReader.Instance.Read(ForkData.FromBytes(archive), context));
+    }
+
+    [Fact]
     public void LhaLevelOneCombinesExtendedDirectoryAndFilename()
     {
         byte[] archive = LhaFixture.BuildLevelOneStoredFile("old-name", "Folder/", "New name.txt",

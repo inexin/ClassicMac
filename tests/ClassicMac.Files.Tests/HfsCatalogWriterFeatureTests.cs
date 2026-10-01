@@ -454,6 +454,67 @@ public sealed class HfsCatalogWriterFeatureTests
             System.IO.File.WriteAllBytes(path, edited);
     }
 
+    [Fact]
+    public void DeepCatalogCanBeReopenedAndHaveAlternatingFilesDeleted()
+    {
+        // Distrotech/hfsutils test2.tcl stresses nested directories, many files, a remount, and partial deletion.
+        const int topLevelCount = 4;
+        const int middleLevelCount = 4;
+        const int leafCount = 5;
+        byte[] image = WithFreeSpace(new HfsBuilder().Build("Volume"));
+        var expected = new Dictionary<string, (byte[] Data, byte[] Resource)>(StringComparer.Ordinal);
+
+        for (int top = 0; top < topLevelCount; top++)
+        {
+            string topName = $"Top{top:D2}";
+            image = HfsWriter.CreateFolder(ForkData.FromBytes(image), topName);
+            for (int middle = 0; middle < middleLevelCount; middle++)
+            {
+                string middleName = $"Middle{middle:D2}";
+                string middlePath = $"{topName}:{middleName}";
+                image = HfsWriter.CreateFolder(ForkData.FromBytes(image), middlePath);
+                for (int leaf = 0; leaf < leafCount; leaf++)
+                {
+                    string leafName = $"Leaf{leaf:D2}";
+                    string leafPath = $"{middlePath}:{leafName}";
+                    image = HfsWriter.CreateFolder(ForkData.FromBytes(image), leafPath);
+                    string filePath = $"{leafPath}:File";
+                    byte[] data = System.Text.Encoding.ASCII.GetBytes($"data:{filePath}");
+                    byte[] resource = System.Text.Encoding.ASCII.GetBytes($"resource:{filePath}");
+                    image = HfsWriter.CreateFile(ForkData.FromBytes(image), filePath, data, resource,
+                        FinderInfo.Empty);
+                    expected.Add(filePath, (data, resource));
+                }
+            }
+        }
+
+        var reopened = Read(image).ToDictionary(file => file.MacPath, StringComparer.Ordinal);
+        Assert.Equal(expected.Keys.Order(StringComparer.Ordinal), reopened.Keys.Order(StringComparer.Ordinal));
+        foreach (var (path, forks) in expected)
+        {
+            Assert.Equal(forks.Data, reopened[path].DataFork.ToArray());
+            Assert.Equal(forks.Resource, reopened[path].ResourceFork.ToArray());
+        }
+
+        int index = 0;
+        foreach (string path in expected.Keys.ToArray())
+        {
+            if (index++ % 2 == 0)
+            {
+                image = HfsWriter.DeleteFile(ForkData.FromBytes(image), path);
+                expected.Remove(path);
+            }
+        }
+
+        reopened = Read(image).ToDictionary(file => file.MacPath, StringComparer.Ordinal);
+        Assert.Equal(expected.Keys.Order(StringComparer.Ordinal), reopened.Keys.Order(StringComparer.Ordinal));
+        foreach (var (path, forks) in expected)
+        {
+            Assert.Equal(forks.Data, reopened[path].DataFork.ToArray());
+            Assert.Equal(forks.Resource, reopened[path].ResourceFork.ToArray());
+        }
+    }
+
     [Theory]
     [InlineData(20260930)]
     [InlineData(20261001)]

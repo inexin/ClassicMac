@@ -1,12 +1,266 @@
 using System.Buffers.Binary;
 using System.Text;
 using ClassicMac.Core;
+using ClassicMac.Files.Containers;
 using ClassicMac.Files.Archives;
+using ClassicMac.Resources;
 
 namespace ClassicMac.Files.Tests;
 
 public sealed class StuffItFeatureTests
 {
+    [Fact]
+    public void LegacyStuffItArchiveCommentIsReadFromTheSitCResourceAsMacRoman()
+    {
+        byte[] archive = StuffItFixture.BuildLegacyV2File("Inside", "payload"u8.ToArray(), []);
+        var resourceFork = new ResourceFork();
+        resourceFork.Add(new Resource(FourCC.FromString("SitC"), 0, new byte[] { 0x43, 0x61, 0x66, 0x8E }));
+        var input = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit"),
+            DataFork = ForkData.FromBytes(archive),
+            ResourceFork = ForkData.FromBytes(resourceFork.ToArray()),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(input, "Host file",
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal("payload"u8.ToArray(), Assert.Single(result.Leaves()).File.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.comment" &&
+            diagnostic.Severity == DiagnosticSeverity.Info && diagnostic.Message == "StuffIt comment: Café");
+    }
+
+    [Fact]
+    public void LegacyStuffItWithoutASitCResourceDoesNotReportAnArchiveComment()
+    {
+        var input = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit"),
+            DataFork = ForkData.FromBytes(StuffItFixture.BuildLegacyV2File("Inside", [], [])),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        _ = ContainerUnwrapper.Default.Unwrap(input, "Host file", new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.comment");
+    }
+
+    [Fact]
+    public void StuffItSplitProbeRequiresTheCompleteHeaderAndAValidInternalName()
+    {
+        byte[] valid = StuffItSplitFixture.BuildVolume(1, "Read Me.bin", 0, 3, "abc"u8);
+        byte[] wrongSignature = (byte[])valid.Clone();
+        wrongSignature[0] = 0;
+        byte[] invalidNameLength = (byte[])valid.Clone();
+        invalidNameLength[4] = 64;
+        byte[] emptyName = (byte[])valid.Clone();
+        emptyName[4] = 0;
+
+        Assert.True(StuffItSplitReader.Instance.CanRead(ForkData.FromBytes(valid)));
+        Assert.False(StuffItSplitReader.Instance.CanRead(ForkData.FromBytes(valid.AsSpan(0, 99).ToArray())));
+        Assert.False(StuffItSplitReader.Instance.CanRead(ForkData.FromBytes(wrongSignature)));
+        Assert.False(StuffItSplitReader.Instance.CanRead(ForkData.FromBytes(invalidNameLength)));
+        Assert.False(StuffItSplitReader.Instance.CanRead(ForkData.FromBytes(emptyName)));
+    }
+
+    [Fact]
+    public void StuffItSplitSetOpenedFromItsFinalVolumeRestoresBothForksAndMetadata()
+    {
+        byte[] resource = "resource fork"u8.ToArray();
+        byte[] data = "data fork spanning the remaining volumes"u8.ToArray();
+        byte[] combinedForks = [.. resource, .. data];
+        int firstCut = 3;
+        int secondCut = resource.Length + 5;
+        byte[] firstPart = StuffItSplitFixture.BuildVolume(1, "Read Me.bin", resource.Length, data.Length,
+            combinedForks.AsSpan(0, firstCut));
+        byte[] secondPart = StuffItSplitFixture.BuildVolume(2, "Read Me.bin", resource.Length, data.Length,
+            combinedForks.AsSpan(firstCut, secondCut - firstCut));
+        byte[] finalPart = StuffItSplitFixture.BuildVolume(3, "Read Me.bin", resource.Length, data.Length,
+            combinedForks.AsSpan(secondCut));
+        var firstVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit1"),
+            DataFork = ForkData.FromBytes(firstPart),
+        };
+        var secondVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit2"),
+            DataFork = ForkData.FromBytes(secondPart),
+        };
+        var finalVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit3"),
+            DataFork = ForkData.FromBytes(finalPart),
+        };
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(finalVolume, "Host file",
+            new ContainerContext(siblings: () => [firstVolume, secondVolume]));
+        MacFile restored = Assert.Single(result.Children).File;
+
+        Assert.Equal("Read Me.bin", restored.Name.ToString());
+        Assert.Equal(data, restored.DataFork.ToArray());
+        Assert.Equal(resource, restored.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("TEXT"), restored.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("ttxt"), restored.FinderInfo.Creator);
+        Assert.Equal((FinderFlags)0x4000, restored.FinderInfo.Flags);
+        Assert.Equal(new MacDate(2_500_000_000), restored.Created);
+        Assert.Equal(new MacDate(2_600_000_000), restored.Modified);
+    }
+
+    [Fact]
+    public void StuffItSplitReaderCanReadAForkWhenTheHostNameIsProvidedInContext()
+    {
+        byte[] firstBytes = StuffItSplitFixture.BuildVolume(1, "Read Me.bin", 0, 6, "abc"u8);
+        byte[] finalBytes = StuffItSplitFixture.BuildVolume(2, "Read Me.bin", 0, 6, "def"u8);
+        var sibling = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit1"),
+            DataFork = ForkData.FromBytes(firstBytes),
+        };
+        var context = new ContainerContext(
+            hostName: MacString.FromMacRoman("archive.sit2"),
+            siblings: () => [sibling]);
+
+        MacFile restored = Assert.Single(StuffItSplitReader.Instance.Read(ForkData.FromBytes(finalBytes), context));
+
+        Assert.Equal("Read Me.bin", restored.Name.ToString());
+        Assert.Equal("abcdef"u8.ToArray(), restored.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void DefaultUnwrapperReadsAStuffItArchiveSplitAcrossVolumes()
+    {
+        byte[] data = "payload from the segmented archive"u8.ToArray();
+        byte[] resource = "resource"u8.ToArray();
+        byte[] archive = StuffItFixture.BuildLegacyV2File("Inside", data, resource);
+        int cut = archive.Length / 2;
+        byte[] firstPart = StuffItSplitFixture.BuildVolume(1, "Backup.sit", 0, archive.Length,
+            archive.AsSpan(0, cut));
+        byte[] finalPart = StuffItSplitFixture.BuildVolume(2, "Backup.sit", 0, archive.Length,
+            archive.AsSpan(cut));
+        var firstVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("backup.sit1"),
+            DataFork = ForkData.FromBytes(firstPart),
+        };
+        var finalVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("backup.sit2"),
+            DataFork = ForkData.FromBytes(finalPart),
+        };
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(finalVolume, "Host file",
+            new ContainerContext(siblings: () => [firstVolume]));
+        MacFile restored = Assert.Single(result.Leaves()).File;
+
+        Assert.Equal("Inside", restored.MacPath);
+        Assert.Equal(data, restored.DataFork.ToArray());
+        Assert.Equal(resource, restored.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItSplitSetReportsAMissingVolumeInsteadOfReturningTruncatedForks()
+    {
+        byte[] missingVolume = StuffItSplitFixture.BuildVolume(1, "Read Me.bin", 0, 6, "abc"u8);
+        byte[] finalVolumeBytes = StuffItSplitFixture.BuildVolume(3, "Read Me.bin", 0, 6, "def"u8);
+        var finalVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit3"),
+            DataFork = ForkData.FromBytes(finalVolumeBytes),
+        };
+        var sibling = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit1"),
+            DataFork = ForkData.FromBytes(missingVolume),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(finalVolume, "Host file",
+            new ContainerContext(diagnostics: diagnostics, siblings: () => [sibling]));
+
+        Assert.Empty(result.Children);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.missing-volume" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void StuffItSplitSetReportsWhenContiguousVolumesEndBeforeTheDeclaredForks()
+    {
+        byte[] partialVolume = StuffItSplitFixture.BuildVolume(1, "Read Me.bin", 0, 6, "abc"u8);
+        var input = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit1"),
+            DataFork = ForkData.FromBytes(partialVolume),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(input, "Host file",
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Empty(result.Children);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.missing-volume" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void StuffItSplitSetRejectsTwoSiblingFilesClaimingTheSameVolumeNumber()
+    {
+        byte[] duplicateVolumeBytes = StuffItSplitFixture.BuildVolume(2, "Read Me.bin", 0, 6, "abc"u8);
+        byte[] finalVolumeBytes = StuffItSplitFixture.BuildVolume(3, "Read Me.bin", 0, 6, "def"u8);
+        var firstVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit1"),
+            DataFork = ForkData.FromBytes(StuffItSplitFixture.BuildVolume(1, "Read Me.bin", 0, 6, ""u8)),
+        };
+        var secondVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit2"),
+            DataFork = ForkData.FromBytes(duplicateVolumeBytes),
+        };
+        var duplicateVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive-copy.sit2"),
+            DataFork = ForkData.FromBytes(duplicateVolumeBytes),
+        };
+        var finalVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit3"),
+            DataFork = ForkData.FromBytes(finalVolumeBytes),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(finalVolume, "Host file",
+            new ContainerContext(diagnostics: diagnostics, siblings: () =>
+                [firstVolume, secondVolume, duplicateVolume]));
+
+        Assert.Empty(result.Children);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "container.unreadable" &&
+            diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void StuffItSplitSetHonorsTheCombinedInputSizeLimit()
+    {
+        byte[] firstBytes = StuffItSplitFixture.BuildVolume(1, "Read Me.bin", 0, 6, "abc"u8);
+        byte[] finalBytes = StuffItSplitFixture.BuildVolume(2, "Read Me.bin", 0, 6, "def"u8);
+        var firstVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit1"),
+            DataFork = ForkData.FromBytes(firstBytes),
+        };
+        var finalVolume = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit2"),
+            DataFork = ForkData.FromBytes(finalBytes),
+        };
+        var context = new ContainerContext(
+            options: new ContainerReadOptions { MaxExpandedBytesPerInput = firstBytes.Length + finalBytes.Length - 1 },
+            siblings: () => [firstVolume]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItSplitReader.Instance.Read(finalVolume, context));
+    }
+
     [Fact]
     public void LegacyStuffItVersion2StoredFilePreservesBothForksAndFinderMetadata()
     {
@@ -28,6 +282,274 @@ public sealed class StuffItFeatureTests
         Assert.Equal(new MacDate(2_500_000_000), file.Created);
         Assert.Equal(new MacDate(2_600_000_000), file.Modified);
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void LegacyStuffItDeluxe45OriginalArchiveExpandsItsMacintoshDataAndResourceForks()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItLegacy45");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "StuffItDeluxe45.sit"));
+        byte[] expectedPicture = File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedPicture.pict"));
+        byte[] expectedPictureResource = File.ReadAllBytes(Path.Combine(fixtureDirectory,
+            "ExpectedPictureResource.bin"));
+        byte[] expectedImageResource = File.ReadAllBytes(Path.Combine(fixtureDirectory,
+            "ExpectedTestImageResource.bin"));
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = StuffItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal(["Test Image", "Test Text", "testfile.PICT", "testfile.jpg", "testfile.png", "testfile.txt"],
+            files.Select(file => file.Name.ToMacRoman()).Order(StringComparer.Ordinal));
+        MacFile picture = Assert.Single(files, file => file.Name.ToMacRoman() == "testfile.PICT");
+        Assert.Equal(expectedPicture, picture.DataFork.ToArray());
+        Assert.Equal(expectedPictureResource, picture.ResourceFork.ToArray());
+        MacFile image = Assert.Single(files, file => file.Name.ToMacRoman() == "Test Image");
+        Assert.Equal(expectedImageResource, image.ResourceFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Theory]
+    [InlineData("testfile.stuffit651_dlx.mac9.sit")]
+    [InlineData("testfile.stuffit651_dlx.macx1.sit")]
+    [InlineData("testfile.stuffit7_dlx.mac9.sit")]
+    [InlineData("testfile.stuffit7_dlx.macx1.sit")]
+    public void OriginalStuffItDeluxe65And70MacArchivesPreserveFilesAndBothForks(string archiveName)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItOriginalCrossVersion");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, archiveName));
+        string legacyFixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItLegacy45");
+        byte[] expectedPicture = File.ReadAllBytes(Path.Combine(legacyFixtureDirectory, "ExpectedPicture.pict"));
+        byte[] expectedPictureResource = File.ReadAllBytes(Path.Combine(legacyFixtureDirectory,
+            "ExpectedPictureResource.bin"));
+        byte[] expectedImageResource = File.ReadAllBytes(Path.Combine(legacyFixtureDirectory,
+            "ExpectedTestImageResource.bin"));
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = StuffItReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal(["Test Image", "Test Text", "testfile.PICT", "testfile.jpg", "testfile.png", "testfile.txt"],
+            files.Select(file => file.Name.ToMacRoman()).Order(StringComparer.Ordinal));
+        MacFile picture = Assert.Single(files, file => file.Name.ToMacRoman() == "testfile.PICT");
+        Assert.Equal(expectedPicture, picture.DataFork.ToArray());
+        Assert.Equal(expectedPictureResource, picture.ResourceFork.ToArray());
+        MacFile image = Assert.Single(files, file => file.Name.ToMacRoman() == "Test Image");
+        Assert.Empty(image.DataFork.ToArray());
+        Assert.Equal(expectedImageResource, image.ResourceFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedTestText.bin")),
+            Assert.Single(files, file => file.Name.ToMacRoman() == "Test Text").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedTestFile.jpg")),
+            Assert.Single(files, file => file.Name.ToMacRoman() == "testfile.jpg").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedTestFile.png")),
+            Assert.Single(files, file => file.Name.ToMacRoman() == "testfile.png").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedTestFile.txt")),
+            Assert.Single(files, file => file.Name.ToMacRoman() == "testfile.txt").DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void LegacyStuffItDeluxe45OriginalArchiveReadsItsResourceForkComment()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItLegacy45");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "StuffItDeluxe45WithComment.sit"));
+        byte[] appleDouble = File.ReadAllBytes(Path.Combine(fixtureDirectory, "StuffItDeluxe45CommentAppleDouble.bin"));
+        var context = new ContainerContext(hostName: MacString.FromMacRoman("archive.sit"));
+        MacFile sidecar = Assert.Single(AppleSingleReader.AppleDouble.Read(ForkData.FromBytes(appleDouble), context));
+        var input = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.sit"),
+            DataFork = ForkData.FromBytes(archive),
+            ResourceFork = sidecar.ResourceFork,
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        _ = ContainerUnwrapper.Default.Unwrap(input, "Host file",
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.comment" &&
+            diagnostic.Severity == DiagnosticSeverity.Info &&
+            diagnostic.Message.StartsWith("StuffIt comment: ", StringComparison.Ordinal) &&
+            diagnostic.Message.Length > "StuffIt comment: ".Length);
+    }
+
+    [Fact]
+    public void LegacyStuffItVersion2ReportsIncorrectPreviousSiblingOffsetButKeepsFileReadable()
+    {
+        byte[] image = StuffItFixture.BuildLegacyV2File("Read Me", "payload"u8.ToArray(), []);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(22 + 50), 22);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(22 + 110),
+            StuffItFixture.Crc16Arc(image.AsSpan(22, 110)));
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Read Me", file.MacPath);
+        Assert.Equal("payload"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.previous-link-mismatch" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void LegacyStuffItVersion2ReportsIncorrectParentOffsetButKeepsFileReadable()
+    {
+        byte[] image = StuffItFixture.BuildLegacyV2File("Read Me", "payload"u8.ToArray(), []);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(22 + 58), 22);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(22 + 110),
+            StuffItFixture.Crc16Arc(image.AsSpan(22, 110)));
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Read Me", file.MacPath);
+        Assert.Equal("payload"u8.ToArray(), file.DataFork.ToArray());
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.parent-link-mismatch" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void LegacyStuffItVersion2AcceptsParentAndPreviousLinksForNestedAndSiblingEntries()
+    {
+        byte[] image = StuffItFixture.BuildLegacyV2FolderAndSiblingFiles();
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Collection(files,
+            file =>
+            {
+                Assert.Equal("Folder:Child", file.MacPath);
+                Assert.Equal("inside"u8.ToArray(), file.DataFork.ToArray());
+            },
+            file =>
+            {
+                Assert.Equal("Sibling", file.MacPath);
+                Assert.Equal("outside"u8.ToArray(), file.DataFork.ToArray());
+            });
+        Assert.DoesNotContain(diagnostics, diagnostic =>
+            diagnostic.Code is "archive.previous-link-mismatch" or "archive.parent-link-mismatch");
+    }
+
+    [Fact]
+    public void LegacyStuffItFixedHuffmanMethodCanDecodePackBitsOnlyBlocks()
+    {
+        byte[] packed = [0x02, (byte)'a', (byte)'b', (byte)'c', 0x80, 0xFE, (byte)'!'];
+        byte[] expected = "abc!!!"u8.ToArray();
+        byte[] compressed = new byte[15];
+        BinaryPrimitives.WriteInt32BigEndian(compressed, -9);
+        BinaryPrimitives.WriteInt32BigEndian(compressed.AsSpan(9), -6);
+        packed.AsSpan(0, 5).CopyTo(compressed.AsSpan(4));
+        compressed[9 + 4] = 0xFE;
+        compressed[9 + 5] = (byte)'!';
+        byte[] image = StuffItFixture.BuildLegacyV2Method6File("Read Me", compressed, expected);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+        Assert.Empty(file.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void StuffItV5FixedHuffmanMethodCanDecodePackBitsOnlyBlocks()
+    {
+        byte[] expected = "xyz"u8.ToArray();
+        byte[] compressed = [0xFF, 0xFF, 0xFF, 0xF8, 0x02, (byte)'x', (byte)'y', (byte)'z'];
+        byte[] image = StuffItFixture.BuildFile("Read Me", expected, [], dataMethod: 6, encodedData: compressed);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(expected, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LegacyStuffItFixedHuffmanMethodDecodesHuffmanAndPackBitsBlocks()
+    {
+        // The fixed codebook maps leaf 1 to the literal-run control byte and leaf 2 to 'A'.
+        // The following Huffman stream ends with the method-6 sentinel (leaf 257), producing
+        // the PackBits sequence [0x00, 'A'] and therefore the first byte of the data fork.
+        // A following PackBits-only block contributes the second byte.
+        byte[] compressed = [
+            0x00, 0x00, 0x00, 0x0F,
+            0x00, 0x00, 0x00, 0x02,
+            0x00, 0x02, 0x00, 0x41,
+            0x05, 0xFF, 0xE0,
+            0xFF, 0xFF, 0xFF, 0xFA, 0x00, 0x21,
+        ];
+        byte[] image = StuffItFixture.BuildLegacyV2Method6File("Read Me", compressed, [0x41, 0x21]);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        MacFile file = Assert.Single(files);
+        Assert.Equal(new byte[] { 0x41, 0x21 }, file.DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.compression-unsupported");
+    }
+
+    [Fact]
+    public void StuffItV5FixedHuffmanMethodDecodesHuffmanCodedBlocks()
+    {
+        // The final Huffman code selects the second end-marker leaf (258).
+        byte[] compressed = [
+            0x00, 0x00, 0x00, 0x0F,
+            0x00, 0x00, 0x00, 0x02,
+            0x00, 0x02, 0x00, 0x42,
+            0x05, 0xFF, 0xF0,
+        ];
+        byte[] image = StuffItFixture.BuildFile("Read Me", [0x42], [], dataMethod: 6, encodedData: compressed);
+
+        MacFile file = Assert.Single(StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Equal(new byte[] { 0x42 }, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void LegacyStuffItFixedHuffmanMethodRejectsAHuffmanStreamWithoutItsEndMarker()
+    {
+        byte[] compressed = [
+            0x00, 0x00, 0x00, 0x0D,
+            0x00, 0x00, 0x00, 0x02,
+            0x00, 0x02, 0x00, 0x41,
+            0x05,
+        ];
+        byte[] image = StuffItFixture.BuildLegacyV2Method6File("Read Me", compressed, [0x41]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LegacyStuffItFixedHuffmanMethodRejectsInvalidPackBitsBlockLength()
+    {
+        byte[] compressed = new byte[4];
+        BinaryPrimitives.WriteInt32BigEndian(compressed, -3);
+        byte[] image = StuffItFixture.BuildLegacyV2Method6File("Read Me", compressed, [0]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LegacyStuffItFixedHuffmanMethodRejectsTruncatedPackBitsLiteral()
+    {
+        byte[] compressed = [0xFF, 0xFF, 0xFF, 0xFB, 0x00];
+        byte[] image = StuffItFixture.BuildLegacyV2Method6File("Read Me", compressed, [0x41]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext()));
+    }
+
+    [Fact]
+    public void LegacyStuffItFixedHuffmanMethodRejectsPackBitsOutputBeyondDeclaredForkLength()
+    {
+        byte[] compressed = [0xFF, 0xFF, 0xFF, 0xF9, 0x01, 0x41, 0x42];
+        byte[] image = StuffItFixture.BuildLegacyV2Method6File("Read Me", compressed, [0x41]);
+
+        Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext()));
     }
 
     [Fact]
@@ -747,6 +1269,37 @@ public sealed class StuffItFeatureTests
         Assert.False(StuffItReader.Instance.CanRead(ForkData.FromBytes("StuffIt "u8.ToArray())));
     }
 
+    private static class StuffItSplitFixture
+    {
+        public static byte[] BuildVolume(byte volumeNumber, string name, int resourceLength, int dataLength,
+            ReadOnlySpan<byte> payload)
+        {
+            byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+            byte[] result = new byte[100 + payload.Length];
+            result[0] = 0xB0;
+            result[1] = 0x56;
+            result[2] = 0;
+            result[3] = volumeNumber;
+            result[4] = checked((byte)nameBytes.Length);
+            nameBytes.CopyTo(result.AsSpan(5));
+            U32(result, 68, FourCC.FromString("TEXT").Value);
+            U32(result, 72, FourCC.FromString("ttxt").Value);
+            U16(result, 76, 0x4000);
+            U32(result, 78, 2_500_000_000);
+            U32(result, 82, 2_600_000_000);
+            U32(result, 86, checked((uint)resourceLength));
+            U32(result, 90, checked((uint)dataLength));
+            payload.CopyTo(result.AsSpan(100));
+            return result;
+        }
+
+        private static void U16(Span<byte> data, int offset, ushort value) =>
+            BinaryPrimitives.WriteUInt16BigEndian(data[offset..], value);
+
+        private static void U32(Span<byte> data, int offset, uint value) =>
+            BinaryPrimitives.WriteUInt32BigEndian(data[offset..], value);
+    }
+
     private static class StuffItFixture
     {
         private const int ArchiveHeaderLength = 100;
@@ -841,6 +1394,63 @@ public sealed class StuffItFeatureTests
             U16(member, 110, Crc16Arc(member[..110]));
             resource.CopyTo(image.AsSpan(resourceOffset));
             data.CopyTo(image.AsSpan(dataOffset));
+            return image;
+        }
+
+        public static byte[] BuildLegacyV2FolderAndSiblingFiles()
+        {
+            const int archiveHeaderLength = 22;
+            const int memberHeaderLength = 112;
+            const int folderOffset = archiveHeaderLength;
+            const int childOffset = folderOffset + memberHeaderLength;
+            byte[] childData = "inside"u8.ToArray();
+            byte[] siblingData = "outside"u8.ToArray();
+            int siblingOffset = childOffset + memberHeaderLength + childData.Length;
+            byte[] image = new byte[siblingOffset + memberHeaderLength + childData.Length + siblingData.Length];
+
+            "SIT!"u8.CopyTo(image);
+            U16(image, 4, 2);
+            U32(image, 6, checked((uint)image.Length));
+            "rLau"u8.CopyTo(image.AsSpan(10));
+            image[14] = 2;
+            U32(image, 16, folderOffset);
+
+            WriteLegacyV2Member(image, folderOffset, "Folder", parent: 0, previous: 0,
+                next: checked((uint)siblingOffset), firstChild: childOffset, childCount: 1, data: []);
+            WriteLegacyV2Member(image, childOffset, "Child", parent: folderOffset, previous: 0,
+                next: 0, firstChild: uint.MaxValue, childCount: 0, data: childData);
+            WriteLegacyV2Member(image, siblingOffset, "Sibling", parent: 0, previous: folderOffset,
+                next: 0, firstChild: uint.MaxValue, childCount: 0, data: siblingData);
+            return image;
+        }
+
+        private static void WriteLegacyV2Member(byte[] image, int offset, string name, uint parent,
+            uint previous, uint next, uint firstChild, ushort childCount, byte[] data)
+        {
+            Span<byte> member = image.AsSpan(offset, 112);
+            byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+            member[2] = checked((byte)nameBytes.Length);
+            nameBytes.CopyTo(member[3..]);
+            U16(member, 48, childCount);
+            U32(member, 50, previous);
+            U32(member, 54, next);
+            U32(member, 58, parent);
+            U32(member, 62, firstChild);
+            U32(member, 88, checked((uint)data.Length));
+            U32(member, 96, checked((uint)data.Length));
+            U16(member, 102, Crc16Arc(data));
+            U16(member, 110, Crc16Arc(member[..110]));
+            data.CopyTo(image.AsSpan(offset + 112));
+        }
+
+        public static byte[] BuildLegacyV2Method6File(string name, byte[] compressed, byte[] expanded)
+        {
+            byte[] image = BuildLegacyV2File(name, compressed, []);
+            Span<byte> member = image.AsSpan(22, 112);
+            BinaryPrimitives.WriteUInt32BigEndian(member[88..], checked((uint)expanded.Length));
+            BinaryPrimitives.WriteUInt16BigEndian(member[102..], Crc16Arc(expanded));
+            member[1] = 6;
+            BinaryPrimitives.WriteUInt16BigEndian(member[110..], Crc16Arc(member[..110]));
             return image;
         }
 

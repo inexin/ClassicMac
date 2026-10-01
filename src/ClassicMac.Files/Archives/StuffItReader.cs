@@ -4,14 +4,15 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using ClassicMac.Core;
+using ClassicMac.Resources;
 
 namespace ClassicMac.Files.Archives;
 
 /// <summary>Reads legacy StuffIt v1/v2 and StuffIt 5 archives and decompresses supported forks.</summary>
 /// <remarks>
 /// StuffIt does not have a published format specification. Legacy v1/v2 and v5 record layouts are fitted against
-/// independent format references; legacy v1/v2 still need verification against archives written by the original
-/// StuffIt application.
+/// independent format references. Legacy v2 traversal has coverage against a StuffIt Deluxe 4.5 archive; version 1
+/// and method-6 behavior still need verification against original-application archives.
 /// </remarks>
 public sealed class StuffItReader : IContainerReader
 {
@@ -20,6 +21,9 @@ public sealed class StuffItReader : IContainerReader
     private const byte FolderFlag = 0x40;
     private const byte EncryptedFlag = 0x20;
     private const ushort HasResourceForkFlag = 0x0001;
+    private const int Method6MaximumPackBitsLength = 32_768;
+    private static readonly int[] Method6Weights = CreateMethod6Weights();
+    private static readonly Method6HuffmanTree Method6Tree = CreateMethod6Tree();
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     /// <summary>The built-in reader.</summary>
@@ -123,8 +127,9 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
 
-            if (member.DataMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or 15) ||
-                member.ResourceMethod is not (0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or 15 or null))
+            if (!IsSupportedMethod(member.DataMethod) ||
+                member.ResourceMethod is { } resourceCompressionMethod &&
+                !IsSupportedMethod(resourceCompressionMethod))
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.compression-unsupported",
                     $"The StuffIt entry '{member.Name}' uses an unsupported compression method.", list.Position);
@@ -162,6 +167,27 @@ public sealed class StuffItReader : IContainerReader
         return files;
     }
 
+    /// <inheritdoc/>
+    public IReadOnlyList<MacFile> Read(MacFile file, ContainerContext context)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        ArgumentNullException.ThrowIfNull(context);
+
+        bool isLegacyArchive = IsLegacyV1OrV2(file.DataFork.ReadPrefix(22));
+        IReadOnlyList<MacFile> files = Read(file.DataFork, context);
+        if (!isLegacyArchive || file.ResourceFork.Length == 0) return files;
+
+        FileResources resources = MacFileResources.Read(file, diagnostics: context.Diagnostics);
+        Resource? comment = resources.Fork?.Find(FourCC.FromString("SitC"), 0);
+        if (comment is not null)
+        {
+            string text = MacRoman.Decode(comment.GetData().Span);
+            if (text.Length > 0)
+                context.Report(DiagnosticSeverity.Info, "archive.comment", $"StuffIt comment: {text}");
+        }
+        return files;
+    }
+
     private static IReadOnlyList<MacFile> ReadLegacyV2(byte[] archive, ContainerContext context)
     {
         const int headerLength = 22;
@@ -182,7 +208,7 @@ public sealed class StuffItReader : IContainerReader
         var files = new List<MacFile>();
         var visited = new HashSet<int>();
         var pending = new Stack<LegacyMemberList>();
-        pending.Push(new LegacyMemberList(firstMember, rootCount, []));
+        pending.Push(new LegacyMemberList(firstMember, rootCount, [], 0, 0));
         int entriesRead = 0;
         long expandedBytes = 0;
 
@@ -202,6 +228,12 @@ public sealed class StuffItReader : IContainerReader
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
 
             LegacyMember member = ParseLegacyMember(archive, list.Position, context);
+            if (member.Previous != list.Previous)
+                context.Report(DiagnosticSeverity.Warning, "archive.previous-link-mismatch",
+                    $"The legacy StuffIt member at offset {list.Position} has a previous-member link that does not match its list position.", list.Position);
+            if (member.Parent != list.Parent)
+                context.Report(DiagnosticSeverity.Warning, "archive.parent-link-mismatch",
+                    $"The legacy StuffIt member at offset {list.Position} has a parent link that does not match its containing folder.", list.Position);
             int remaining = list.Remaining - 1;
             if (remaining > 0)
             {
@@ -209,7 +241,8 @@ public sealed class StuffItReader : IContainerReader
                     context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
                         $"A legacy StuffIt member list has {remaining} more declared entries but no next-member link.");
                 else
-                    pending.Push(new LegacyMemberList(member.Next, remaining, list.Path));
+                    pending.Push(new LegacyMemberList(member.Next, remaining, list.Path, list.Parent,
+                        checked((uint)list.Position)));
             }
 
             if (member.IsFolder)
@@ -221,7 +254,8 @@ public sealed class StuffItReader : IContainerReader
                     var path = new MacString[list.Path.Length + 1];
                     list.Path.CopyTo(path, 0);
                     path[^1] = member.Name;
-                    pending.Push(new LegacyMemberList(member.FirstChild, member.ChildCount, path));
+                    pending.Push(new LegacyMemberList(member.FirstChild, member.ChildCount, path,
+                        checked((uint)list.Position), 0));
                 }
                 continue;
             }
@@ -409,7 +443,9 @@ public sealed class StuffItReader : IContainerReader
         uint firstChildRaw = U32(header, 62);
         bool isFolder = firstChildRaw != uint.MaxValue;
         int firstChild = isFolder && firstChildRaw != 0 ? ReadPosition(firstChildRaw, "first child") : 0;
+        uint previous = U32(header, 50);
         int next = ReadPosition(U32(header, 54), "next member");
+        uint parent = U32(header, 58);
         if (next != 0 && (next < headerLength || next >= archive.Length))
             throw new InvalidDataException("A legacy StuffIt next-member link lies outside the archive.");
         if (firstChild != 0 && (firstChild < headerLength || firstChild >= archive.Length))
@@ -426,7 +462,9 @@ public sealed class StuffItReader : IContainerReader
             isFolder,
             firstChild,
             U16(header, 48),
+            previous,
             next,
+            parent,
             (header[0] & 0x10) != 0 || (header[1] & 0x10) != 0,
             checked((byte)(header[0] & 0x0F)),
             checked((byte)(header[1] & 0x0F)),
@@ -454,7 +492,7 @@ public sealed class StuffItReader : IContainerReader
     private static bool IsLegacyV1OrV2(ReadOnlySpan<byte> input) => IsLegacyV1(input) || IsLegacyV2(input);
 
     private static bool IsSupportedMethod(byte method) =>
-        method is 0 or 1 or 2 or 3 or 5 or 8 or 13 or 14 or 15;
+        method is 0 or 1 or 2 or 3 or 5 or 6 or 8 or 13 or 14 or 15;
 
     private static Member ParseMember(byte[] archive, int offset, ContainerContext context)
     {
@@ -605,6 +643,7 @@ public sealed class StuffItReader : IContainerReader
         if (method == 2) return DecodeCompress(input, outputLength);
         if (method == 3) return DecodeHuffman(input, outputLength);
         if (method == 5) return DecodeLzah(input, outputLength);
+        if (method == 6) return DecodeMethod6Blocks(input, outputLength);
         if (method == 8) return DecodeMw(input, outputLength);
         if (method == 13) return StuffItMethod13Decoder.Decode(input, outputLength);
         if (method == 14) return StuffItMethod14Decoder.Decode(input, outputLength);
@@ -641,6 +680,172 @@ public sealed class StuffItReader : IContainerReader
         if (written != outputLength)
             throw new InvalidDataException($"StuffIt RLE90 produced {written} of {outputLength} declared bytes.");
         return output;
+    }
+
+    private static byte[] DecodeMethod6Blocks(ReadOnlySpan<byte> input, int outputLength)
+    {
+        var output = new byte[outputLength];
+        int inputOffset = 0;
+        int outputOffset = 0;
+        while (inputOffset < input.Length)
+        {
+            if (input.Length - inputOffset < sizeof(int))
+                throw new InvalidDataException("A StuffIt method 6 block has a truncated length.");
+
+            int signedBlockLength = BinaryPrimitives.ReadInt32BigEndian(input[inputOffset..]);
+            long blockLength = signedBlockLength < 0 ? -(long)signedBlockLength : signedBlockLength;
+            if (blockLength < sizeof(int) || blockLength > input.Length - inputOffset)
+                throw new InvalidDataException("A StuffIt method 6 block length is outside its compressed fork.");
+
+            ReadOnlySpan<byte> block = input.Slice(inputOffset + sizeof(int), checked((int)blockLength - sizeof(int)));
+            if (signedBlockLength < 0)
+            {
+                DecodePackBits(block, output, ref outputOffset);
+            }
+            else
+            {
+                DecodeMethod6HuffmanBlock(block, output, ref outputOffset);
+            }
+            inputOffset += checked((int)blockLength);
+        }
+
+        if (outputOffset != output.Length)
+            throw new InvalidDataException(
+                $"StuffIt method 6 produced {outputOffset} of {output.Length} declared bytes.");
+        return output;
+    }
+
+    private static void DecodeMethod6HuffmanBlock(ReadOnlySpan<byte> block, byte[] output, ref int outputOffset)
+    {
+        if (block.Length < 6)
+            throw new InvalidDataException("A StuffIt method 6 Huffman block has a truncated header.");
+
+        uint packBitsLengthValue = BinaryPrimitives.ReadUInt32BigEndian(block);
+        if (packBitsLengthValue > Method6MaximumPackBitsLength)
+            throw new InvalidDataException("A StuffIt method 6 Huffman block exceeds its PackBits buffer limit.");
+        int packBitsLength = checked((int)packBitsLengthValue);
+        int symbolCount = BinaryPrimitives.ReadUInt16BigEndian(block[4..]);
+        if (symbolCount > 256 || symbolCount > block.Length - 6)
+            throw new InvalidDataException("A StuffIt method 6 Huffman block has an invalid translation table.");
+
+        ReadOnlySpan<byte> translationTable = block.Slice(6, symbolCount);
+        ReadOnlySpan<byte> encoded = block[(6 + symbolCount)..];
+        var reader = new MsbBitReader(encoded);
+        var packed = new byte[packBitsLength];
+        int packedOffset = 0;
+        while (true)
+        {
+            int node = 0;
+            while (node > 258 || node == 0)
+                node = reader.ReadBit() ? Method6Tree.One[node] : Method6Tree.Zero[node];
+
+            if (node >= 257)
+                break;
+
+            int symbolIndex = node - 1;
+            if (symbolIndex >= translationTable.Length || packedOffset == packed.Length)
+                throw new InvalidDataException("A StuffIt method 6 Huffman block contains too many or unmapped symbols.");
+            packed[packedOffset++] = translationTable[symbolIndex];
+        }
+
+        if (packedOffset != packed.Length)
+            throw new InvalidDataException(
+                $"A StuffIt method 6 Huffman block produced {packedOffset} of {packed.Length} PackBits bytes.");
+
+        DecodePackBits(packed, output, ref outputOffset);
+    }
+
+    // The fixed frequencies and split order are fitted to macutils' independent decoder (sit.c, method 6).
+    // The C table declares 258 entries; only its first 258 initializer values participate in that table.
+    private static int[] CreateMethod6Weights()
+    {
+        (int Weight, int Count)[] runs =
+        [
+            (1024, 1), (512, 1), (256, 4), (128, 12), (64, 32), (32, 16),
+            (16, 49), (8, 2), (16, 2), (8, 40), (4, 95), (1, 4),
+        ];
+        var weights = new int[258];
+        int offset = 0;
+        foreach ((int weight, int count) in runs)
+        {
+            weights.AsSpan(offset, count).Fill(weight);
+            offset += count;
+        }
+
+        if (offset != weights.Length)
+            throw new InvalidOperationException("The StuffIt method 6 fixed-Huffman table has an invalid length.");
+        return weights;
+    }
+
+    private static Method6HuffmanTree CreateMethod6Tree()
+    {
+        const int FirstInternalNode = 259;
+        var tree = new Method6HuffmanTree(new int[515], new int[515]);
+        int nextNode = FirstInternalNode;
+        int totalWeight = 0;
+        foreach (int weight in Method6Weights) totalWeight += weight;
+        Split(0, totalWeight, 1, Method6Weights.Length);
+        return tree;
+
+        void Split(int node, int sum, int lowerSymbol, int upperSymbol)
+        {
+            sum /= 2;
+            int cumulativeWeight = 0;
+            int splitSymbol = lowerSymbol;
+            while (cumulativeWeight < sum)
+                cumulativeWeight += Method6Weights[splitSymbol++ - 1];
+
+            if (lowerSymbol == splitSymbol - 1)
+            {
+                tree.Zero[node] = lowerSymbol;
+            }
+            else
+            {
+                int child = nextNode++;
+                tree.Zero[node] = child;
+                Split(child, sum, lowerSymbol, splitSymbol - 1);
+            }
+
+            if (upperSymbol == splitSymbol)
+            {
+                tree.One[node] = upperSymbol;
+            }
+            else
+            {
+                int child = nextNode++;
+                tree.One[node] = child;
+                Split(child, sum, splitSymbol, upperSymbol);
+            }
+        }
+    }
+
+    private static void DecodePackBits(ReadOnlySpan<byte> input, byte[] output, ref int outputOffset)
+    {
+        int inputOffset = 0;
+        while (inputOffset < input.Length)
+        {
+            sbyte control = unchecked((sbyte)input[inputOffset++]);
+            if (control == sbyte.MinValue) continue;
+
+            if (control >= 0)
+            {
+                int count = control + 1;
+                if (count > input.Length - inputOffset || count > output.Length - outputOffset)
+                    throw new InvalidDataException("A StuffIt method 6 literal run exceeds its block or fork.");
+                input.Slice(inputOffset, count).CopyTo(output.AsSpan(outputOffset));
+                inputOffset += count;
+                outputOffset += count;
+                continue;
+            }
+
+            if (inputOffset == input.Length)
+                throw new InvalidDataException("A StuffIt method 6 repeat run has no value byte.");
+            int repeatCount = 1 - control;
+            if (repeatCount > output.Length - outputOffset)
+                throw new InvalidDataException("A StuffIt method 6 repeat run exceeds its declared fork length.");
+            output.AsSpan(outputOffset, repeatCount).Fill(input[inputOffset++]);
+            outputOffset += repeatCount;
+        }
     }
 
     private static byte[] DecodeCompress(ReadOnlySpan<byte> input, int outputLength)
@@ -1053,6 +1258,18 @@ public sealed class StuffItReader : IContainerReader
         return new HuffmanNode(zero, one);
     }
 
+    private sealed class Method6HuffmanTree
+    {
+        public Method6HuffmanTree(int[] zero, int[] one)
+        {
+            Zero = zero;
+            One = one;
+        }
+
+        public int[] Zero { get; }
+        public int[] One { get; }
+    }
+
     private sealed class HuffmanNode
     {
         public HuffmanNode(byte symbol)
@@ -1177,14 +1394,17 @@ public sealed class StuffItReader : IContainerReader
         BinaryPrimitives.WriteUInt16BigEndian(bytes[offset..], value);
 
     private readonly record struct MemberList(int Position, int Remaining, MacString[] LegacyPath, string[] UnicodePath);
-    private readonly record struct LegacyMemberList(int Position, int Remaining, MacString[] Path);
+    private readonly record struct LegacyMemberList(int Position, int Remaining, MacString[] Path,
+        uint Parent, uint Previous);
 
     private readonly record struct LegacyMember(
         MacString Name,
         bool IsFolder,
         int FirstChild,
         int ChildCount,
+        uint Previous,
         int Next,
+        uint Parent,
         bool Encrypted,
         byte ResourceMethod,
         byte DataMethod,

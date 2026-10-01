@@ -51,6 +51,19 @@ public sealed class PackItFeatureTests
             diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
+    [Fact]
+    public void PackItEnforcesTheEntryLimitBeforeDecodingTheNextEntry()
+    {
+        byte[] first = PackItFixture.BuildStoredFile("first", "one"u8.ToArray(), []);
+        byte[] archive = [.. first.AsSpan(0, first.Length - 4), (byte)'P', (byte)'M', (byte)'a', (byte)'4', 0];
+        var context = new ContainerContext(options: ContainerReadOptions.Default with { MaxVolumeEntries = 1 });
+
+        InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+            PackItReader.Instance.Read(ForkData.FromBytes(archive), context));
+
+        Assert.Equal("The PackIt archive exceeds the configured entry limit.", exception.Message);
+    }
+
     [Theory]
     [InlineData("PMa3")]
     [InlineData("PMa7")]

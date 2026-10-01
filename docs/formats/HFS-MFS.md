@@ -374,7 +374,13 @@ most 65,535 allocation blocks, and larger volumes use larger allocation blocks *
 Everything the File Manager keeps about files, including the catalog and the extents overflow file themselves, is
 in allocation blocks; the boot blocks, MDB, bitmap and alternate MDB are not **[Doc]** *Inside Macintosh: Files*.
 
-ClassicMac does not read the boot blocks or the volume bitmap.
+ClassicMac does not read the boot blocks. It reads the declared volume bitmap, counts the bits for the declared
+allocation blocks, and reports an unreadable bitmap as `hfs.bitmap-truncated` or a mismatch with `drFreeBks` as
+`hfs.free-blocks`. It also reports `hfs.extent-unallocated` when a declared extent used by the extents-overflow file,
+catalog, or file fork includes a block marked free. For nonempty forks, it checks every descriptor in the initial and
+overflow extent records, including allocated blocks beyond the logical EOF; only the extents needed for the logical
+fork bytes contribute to returned data. A zero-length fork returns no bytes but any extents it declares are still
+checked for bounds and bitmap ownership. These bitmap diagnostics leave readable catalog and fork data available.
 
 ### 5.2 The master directory block
 
@@ -432,8 +438,10 @@ treats that block as part of the volume's structure: making a read-only or compr
 to the first allocation block, the used allocation blocks and block N − 2 as data, and everything else as zeros
 **[Code]** Disk Copy 6.3.3; **[Verified]** on images Disk Copy 6.1.2 made in SheepShaver, Mac OS 9.0.
 
-ClassicMac reads only the MDB at 1024 and never falls back to the alternate. A volume whose MDB is damaged is
-reported, not repaired.
+ClassicMac reads only the MDB at 1024 and never falls back to the alternate. It checks the HFS signature in the
+alternate MDB at `image length − 1024`, reports a missing or invalid signature as `hfs.alternate-mdb`, and continues
+reading from the primary MDB. It does not compare the remaining fields because the copy may be stale **[Doc]**
+*Inside Macintosh: Files*; the alternate MDB is not used to repair a damaged primary.
 
 ### 5.4 Extents
 
@@ -524,8 +532,19 @@ The header record (106 bytes, at +$0E in node 0):
 
 All of it **[Doc]** *Inside Macintosh: Files*.
 
-ClassicMac reads only `bthFNode`. It uses a node size of 512 whatever `bthNodeSize` says, and counts the tree's nodes
-from the file's length rather than `bthNNodes`.
+ClassicMac reads `bthFNode` and uses the fixed 512-byte HFS node size. It warns with `hfs.bad-btree-header` if the
+header node has a nonzero backward link, is not type 1, has nonzero height or reserved field, or does not contain three records. If `bthNodeSize`
+disagrees, it reports the same diagnostic and continues using 512-byte nodes. It also compares `bthNNodes` with the
+number of complete 512-byte nodes in the fork, checks that `bthRoot` is in range and agrees with `bthDepth`, and warns
+if these fields are invalid; a fork ending with a partial node also warns. It checks that `bthKeyLen` is 37 for the catalog and 7 for the extents-overflow tree; a
+mismatch is also a warning, and reading still uses the fork's actual length.
+Header-node record starts must match the 106-byte header record, 128-byte user record and following map record layout;
+invalid boundaries produce `hfs.bad-btree-header`.
+It checks that the bitmap covers the nodes, follows required linked map nodes, and compares its free-bit count with
+`bthFree`. It warns if the header or a leaf node is marked free, or if a map node is malformed or marked free; catalog
+files and forks remain readable. The leaf-chain endpoint and sum of leaf-node record counts are compared with
+`bthLNode` and `bthNRecs`, with mismatches reported as `hfs.bad-btree-header`; each leaf's backward link is also
+checked against the preceding leaf, with defects reported as `hfs.bad-link`.
 
 ### 6.4 Index and leaf nodes
 
@@ -552,7 +571,7 @@ into memory once (limited by `MaxExpandedBytesPerInput`, 1 GiB by default), and 
 read so far, when:
 
 - a link names a node at or past the end of the file, or a node already visited (`hfs.bad-link`);
-- a linked node's `ndType` is not −1 (`hfs.not-leaf`).
+- a linked node is not a level-1 leaf (`ndType` −1 and `ndNHeight` 1; `hfs.not-leaf`).
 
 A B-tree file shorter than one node is read as empty.
 
@@ -600,8 +619,8 @@ Quirks of the tables **[Code]** Mac OS 9.0 ROM:
 **Extents keys**: the file ID (unsigned 32-bit), then the fork type (`$00` data before `$FF` resource), then the
 starting block (unsigned 16-bit) **[Code]** Mac OS 9.0 ROM.
 
-ClassicMac walks the leaves (section 6.5) and never compares keys, so it does not depend on this order; a lookup or a
-writer does (writing HFS is phase 8 of the plan).
+ClassicMac checks leaf keys in this order while walking the tree; duplicate or descending keys produce the
+`hfs.key-order` warning while readable records remain available. The writer uses the same Mac OS 9 catalog comparator.
 
 ---
 
@@ -636,8 +655,13 @@ Every catalog data record starts with a type byte and a reserved byte **[Doc]** 
 
 ClassicMac takes a folder record of 70 bytes or more and a file record of 102 bytes or more, skips thread records,
 and reports any other type, or a folder or file record too short, as `hfs.bad-record`. Keys shorter than 7 bytes
-and data shorter than 2 bytes are skipped silently. After a million folders and files
+or with invalid lengths, reserved byte or name length are skipped with `hfs.bad-record`; data shorter than 2 bytes is
+skipped. After a million folders and files
 (`MaxVolumeEntries`) it stops reading the catalog (`hfs.too-many-entries`).
+Folder and file catalog IDs must be unique. Duplicate IDs are reported as `hfs.duplicate-id`; duplicate folders do not
+replace the first folder mapping, and file records remain available. IDs 6–15 are reserved; only the root folder may
+use the reserved root ID 2, and ordinary file/folder records must use IDs of at least 16. Violations produce
+`hfs.reserved-id` while the records remain available.
 
 ### 7.2 Folder records
 
@@ -745,8 +769,14 @@ All of it **[Doc]** *Inside Macintosh: Files*. So a fork whose first record cove
 keyed with `xkrFABN` 30, and so on **[Doc]** *Inside Macintosh: Files*.
 
 ClassicMac reads the whole extents overflow file first, grouping the records by (fork type, CNID) and ordering each
-group by `xkrFABN`. It does not check that each record's `xkrFABN` equals the blocks the previous extents covered. If
-the extents overflow file's own extents are unusable (section 9), it goes on without overflow extents.
+group by `xkrFABN`. For each fork, it checks that a record's `xkrFABN` equals the number of allocation blocks covered
+by the preceding extents; a mismatch produces the `hfs.overflow-start` warning while the fork remains readable using
+the records in key order. Each record must have a seven-byte key and a 12-byte extent record; malformed records
+produce `hfs.overflow-record`, and records without a complete key or extent payload are skipped. If a payload has extra
+bytes, ClassicMac uses its defined first 12 bytes after reporting the warning. These checks follow the
+`xkrFABN` definition in *Inside Macintosh: Files*: it identifies the first allocation block of the first extent
+descriptor in that record. If the extents overflow file's own extents are unusable (section 9), it goes on without
+overflow extents.
 
 ---
 
@@ -796,16 +826,28 @@ HFS Plus (Mac OS 8.1 and later) keeps its volume header at byte 1024, signature 
 HFSX uses signature `'HX'`, version 5. ClassicMac reads either volume directly and reads an HFS Plus volume embedded
 in a classic HFS wrapper. The wrapper's MDB has `drEmbedSigWord` (+$7C) and `drEmbedExtent` (+$7E, start and count);
 the embedded byte offset is `drAlBlSt × 512 + drEmbedExtent.start × drAlBlkSiz` **[Doc]** TN1150. Wrapper reads follow
-that extent and return the embedded volume's entries, not the wrapper's placeholder file. The reader checks the
-alternate volume header 1,024 bytes before the volume end for a matching signature and version; it reports a warning
+that extent and return the embedded volume's entries, not the wrapper's placeholder file. Each allocation block
+covered by the embedded extent must be marked in use in the wrapper's volume bitmap; a clear bit produces the
+`hfs.wrapper-extent-unallocated` warning while the embedded volume remains readable. The reader checks the alternate
+volume header 1,024 bytes before the volume end for a matching signature and version; it reports a warning
 if the recovery copy is absent or invalid and continues using the primary header **[Doc]** TN1150. A cleared clean-
 unmount bit or set boot-inconsistent bit produces `hfs.plus-volume-inconsistent`; the reader completes its structural
 checks and returns files when those checks succeed **[Doc]** TN1150. It also recognizes bit 14 as Apple's later
 `kHFSVolumeInconsistentBit` and reports the same warning **[Code]**
 [`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h), although TN1150 marks
-that bit reserved. If the journaled bit is set, the reader reports `hfs.plus-journal-not-replayed`; it returns the
-on-disk structures without applying journal transactions **[Doc]** TN1150. Other reserved volume-attribute bits are
-ignored **[Doc]** TN1150.
+that bit reserved. If the journaled bit is set, the reader reports `hfs.plus-journal-not-replayed`, validates that
+`journalInfoBlock` points to an allocated block, and checks the JournalInfoBlock's in-volume flags and journal range
+against the allocation area. It also checks that the root `.journal_info_block` file is one extent at the volume-header
+pointer and that the root `.journal` file is one extent whose start and logical size match the JournalInfoBlock.
+For an initialized journal, the reader also checks the journal header's magic, endian marker, size fields, circular-buffer
+offsets, and checksum over the full sector declared by `jhdr_size`; feature tests cover 512- and 2,048-byte sectors,
+including a changed byte beyond the fixed header fields. A `NeedInit` JournalInfoBlock flag skips header validation
+because TN1150 defines the header as invalid until initialized. Missing files or inconsistent journal structures
+produce `hfs.plus-journal-info-invalid`;
+readable catalog files are retained. ClassicMac still returns the on-disk structures without applying journal
+transactions **[Doc]** TN1150. Other reserved volume-attribute bits are ignored **[Doc]** TN1150. The JournalInfoBlock
+location and fields follow TN1150's [Journal Info Block definition](https://developer.apple.com/library/archive/technotes/tn/tn1150.html#JournalInfoBlock),
+and journal header layout and checksum follow its [Journal Header definition](https://developer.apple.com/library/archive/technotes/tn/tn1150.html#JournalHeader).
 
 For each catalog file and folder, the reader checks that the volume header's `encodingsBitmap` contains the bit for
 the record's `textEncoding` hint. Values below 64 use the same-numbered bit; MacFarsi (140) uses bit 49 and
@@ -813,12 +855,28 @@ MacUkrainian (152) uses bit 48 **[Doc]** TN1150. Missing bits produce the inform
 `hfs.plus-encoding-bitmap`; extra bits are accepted because TN1150 permits them to remain set after the last name using
 an encoding has been deleted.
 
-The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
+The volume header's `fileCount` must equal the number of file records in the catalog, and `folderCount` must equal
+the number of folder records minus the root folder. These counts include private hard-link inode files and directory
+inode folders even though ClassicMac hides those records when it returns the visible file tree **[Doc]**
+[`TN1150`](https://developer.apple.com/library/archive/technotes/tn/tn1150.html). The reader compares counts against
+catalog records before hard-link resolution and reports a mismatch as `hfs.plus-counts`.
+
+The reader requires an extents-overflow B-tree even when it contains no overflow records; [TN1150](https://developer.apple.com/library/archive/technotes/tn/tn1150.html)
+lists it as a special file needed to access the volume and permits its empty-tree root and leaf fields to be zero **[Doc]**. It checks the
+catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
 linked leaf nodes, checking the header's leaf endpoints, backward links and node range. For each tree, the total
 records found across all leaf nodes must match that tree's header `leafRecords` count **[Doc]** TN1150. It also requires
+an empty root leaf to be valid when no parent index key needs to identify its first record; an empty non-root child
+subtree is rejected because Apple's verifier compares each child separator with the first record in that child
+**[Code]** in [Apple's `SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c#L3198-L3210).
+The reader also respects the node size declared by each B-tree header; feature tests cover valid 512-, 1024- and 2048-byte
+extents-overflow nodes in addition to the standard fixture size. Catalog nodes retain TN1150's 4 KiB minimum.
 the B-tree header node to contain three records and a zero backward link **[Doc]**. It checks that the catalog and
 extents B-tree headers have the required control-file type **[Doc]**, that catalog B-tree nodes meet TN1150's 4 KiB
-minimum **[Doc]**, that the catalog, extents-overflow and attributes B-tree headers use the control-file type **[Doc]** TN1150, and that their key-layout attributes use 16-bit key lengths, with variable-length index keys in
+minimum **[Doc]**, and that the catalog, extents-overflow and attributes B-tree headers use the control-file type
+**[Doc]** TN1150. For compatibility with the corpus image, an attributes-tree type of `0xFF` is also accepted with the
+warning `hfs.plus-btree-type`; its attributes-tree `keyCompareType` value is reserved and ignored. Other nonzero
+tree types remain invalid. Key-layout attributes use 16-bit key lengths, with variable-length index keys in
 the catalog and attributes trees and fixed-length index keys in the extents tree **[Doc]** TN1150. The B-tree map is one
 most-significant-bit-first bit per node and
 continues in linked map nodes when the header map record is too small **[Doc]** TN1150. The reader requires exactly
@@ -827,7 +885,10 @@ allocated with no additional nodes marked allocated, matching the tree's reachab
 verifier's `CmpBTM` does. It verifies `freeNodes` against the complete bitmap, and requires unused bytes after the
 final byte containing node bits in the last map record to be zero **[Code]** as `CmpBTM` does in
 [`SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c). Every node
-marked free must also be zero-filled **[Code]**, as Apple's `BTCheckUnusedNodes` checks in the same verifier. It checks that
+marked free in the Catalog B-tree must also be zero-filled **[Code]**, as Apple's verifier calls
+`BTCheckUnusedNodes` for that tree and `hfs_format.h` names the corresponding volume bit for unused Catalog B-tree
+nodes. TN1150 does not apply this rule to the extents-overflow or attributes trees, whose free-node contents are ignored.
+It checks that
 catalog key lengths exactly match their stored Unicode name lengths, as TN1150 specifies, B-tree fork length matches
 `totalNodes × nodeSize`, and folder and file catalog records are exactly 88 and 248 bytes respectively **[Code]** as
 Apple's `CheckCatalogRecord` verifies in
@@ -857,7 +918,7 @@ combining-mark order **[Doc]** TN1150. Their 16-bit sequences must also be well-
 characters use valid surrogate pairs, and isolated surrogate code units are rejected **[Doc]** Unicode Standard §3.9.
 The reader validates this with fixed Unicode 3.2 canonical decomposition data, including algorithmic Hangul decomposition
 and TN1150's preserved ranges U+2000–U+2FFF, U+F900–U+FAFF and U+2F800–U+2FAFF; it does not depend on the host
-runtime's evolving normalization tables. HFSX rejects the legacy doubled U+0307 and U+0306 + U+0307 sequences, plus
+runtime's evolving normalization tables. HFSX rejects the legacy U+0306 + U+0307 sequence, plus
 Greek tonos sequences formed by U+030D after Greek tonos bases or diaeresis, and also these `fsck_hfs` fixes **[Code]** Apple's
 [`FixDecomps`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c): Bengali BA plus
 nukta to RA with middle diagonal, Odia YA plus nukta to U+0B5F, Gurmukhi DDA plus nukta to U+0A5C, Thai and Lao vowel
@@ -865,12 +926,17 @@ sequences to their AM letters, and two Tibetan three-character sequences to U+0F
 field recording which decomposition version created its names, the reader continues to accept these legacy sequences
 there. File and folder records named exactly `.` or `..` are rejected; Apple `fsck_hfs` marks those catalog names
 illegal **[Code]** [`CheckCatalogName`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
+Repeated combining marks with equal canonical combining classes, such as two U+0307 marks, retain their original order
+and are accepted; Apple's [`DecompMakeData.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/DecompMakeData.c)
+defines no correction for that sequence.
 Names such as `.hidden` and `...` remain valid. It also accepts the Unicode 2.1 forms of 44 code points whose
 canonical decomposition changed by Unicode 3.2, including U+01F8 and U+01F9 **[Doc]** TN1150; HFSX requires the
 updated forms **[Code]** Apple's
 [`FixDecomps`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c) and
 [`DecompData.h`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/DecompData.h).
-Other Unicode 2.1/3.2 sequence changes and `fsck_hfs` fixup cases remain open.
+Feature tests cover the Unicode 2.1 scalar forms and sequence corrections identified by Apple's `FixDecomps`; no additional
+Unicode 2.1/3.2 name-compatibility case is currently known. HFS+ continues to accept the legacy forms because the volume
+does not record which decomposition version produced its names.
 Catalog IDs are unique, every nonroot file or folder record's `parentID` names an existing folder, and each required
 file and folder thread points back to its record's parent and name **[Doc]** TN1150. `nextCatalogID`
 must be at least 16 even when IDs have been reused; otherwise, TN1150 requires it to exceed every catalog ID.
@@ -892,14 +958,19 @@ extents and requires the primary and overflow extents to account for each fork's
 (which may exceed the blocks needed by its logical length). Overflow records are allowed only after all eight initial
 extent descriptors are occupied, every non-final overflow record must contain eight extents, and no matching records
 may remain after the fork's declared block count is covered **[Doc]** TN1150. It rejects overlapping allocation ranges among the
-extents it reads, following TN1150's allocation-file ownership model. Extent descriptors must be contiguous from the
+extents it reads, following TN1150's allocation-file ownership model. Each fork's logical size must fit within its
+declared allocated blocks; feature tests exercise this for both catalog data and resource forks, plus the startup
+special-file fork **[Doc]** TN1150.
+Extent descriptors must be contiguous from the
 first descriptor, and every unused descriptor must be all zero **[Doc]** TN1150. Empty forks cannot retain extent
 descriptors or overflow records. The volume header must provide the required
 allocation file **[Doc]** TN1150; the reader requires its bitmap to cover the declared allocation blocks and to mark
 each parsed extent as allocated, along with the blocks containing the first 1,536 and last 1,024 volume bytes
 **[Doc]** TN1150. Any bitmap bits beyond the declared allocation-block count must be clear **[Doc]** TN1150. It checks
 that parsed fork extents do not claim any allocation blocks containing the volume's primary or alternate header or
-the reserved areas around them, following TN1150's description of those areas as reserved. It checks
+the reserved areas around them, following TN1150's description of those areas as reserved. The alternate header is
+located 1,024 bytes from the actual end of the volume; it may therefore lie in the trailing partial allocation unit
+when the volume length is not a multiple of the allocation block size. It checks
 that the number of free bitmap bits agrees with the volume header's `freeBlocks`; a mismatch is reported as an
 informational diagnostic **[Doc]** TN1150. Bit 9 (`kHFSVolumeSparedBlocksBit`) indicates that bad-block records
 exist; a mismatch between that flag and CNID 5 extent records is reported as an informational diagnostic **[Doc]**
@@ -913,8 +984,12 @@ fork; by inference from TN1150's key semantics, orphan records are rejected beca
 `startBlock` must identify the fork extents they extend. Bad-block records remain keyed to CNID 5 and the data fork
 **[Doc]** TN1150. It walks
 the attributes B-tree
-and includes defined fork-data and extent attribute records in allocation checks; inline and unknown attribute
-records do not claim extents **[Doc]** TN1150. For each extent-backed attribute it requires one fork-data record at
+and includes defined fork-data and extent attribute records in allocation checks; inline attribute records are
+checked against the current Apple `HFSPlusAttrData` layout, including the declared data size and the B-tree's
+even-byte record padding; reserved fields are ignored when reading, as TN1150 requires. Inline and unknown records
+do not claim extents **[Doc]** TN1150 / Apple's
+[`HFSPlusAttrData`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h). For each
+extent-backed attribute it requires one fork-data record at
 key `startBlock` zero, matches extension records by file ID and attribute name, and requires each extension's
 `startBlock` to continue the preceding extent count. The initial record must contain eight extents when overflow is
 present, and each non-final extension record must contain eight **[Doc]** TN1150. Their combined extent count must equal
@@ -923,9 +998,26 @@ present, and each non-final extension record must contain eight **[Doc]** TN1150
 [`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h). Orphan extensions and
 gaps in an attribute fork's extent sequence are rejected. Attribute keys are validated and ordered by file ID, name length,
 binary UTF-16 name and start block in leaves and index nodes; the key's reserved padding field must be zero, and
-separators must bound their child key ranges. The key
+each index key must compare equal to the first key in its child subtree, as Apple's verifier's `BTCheck` requires
+**[Code]** [`SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c);
+separators are also checked against adjacent child key ranges. The key
 ordering uses Apple's HFS comparator for the rule that
 TN1150 leaves unfinished **[Code]** [Apple HFS `hfs_attrkeycompare`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_xattr.c#L2082-L2144).
+Attribute keys whose file ID does not identify a catalog object or one of the special-file CNIDs 3 through 8
+produce a warning; the catalog remains readable. For cataloged files and folders, the `HasAttributes` catalog flag
+must agree with whether the attributes tree contains a record for that CNID. A mismatch produces the
+`hfs.plus-attribute-flag-mismatch` warning and leaves the object readable **[Code]** Apple
+[`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h).
+The `HasSecurity` flag must agree with the presence of the `com.apple.system.Security` ACL attribute for that CNID;
+mismatches produce `hfs.plus-security-flag-mismatch` and leave the object readable **[Code]** Apple's
+[`hfs_format.h`](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h) defines the flag, and
+[Linux's HFS+ implementation](https://github.com/torvalds/linux/blob/master/include/linux/hfs_common.h) names the ACL attribute.
+The ACL attribute's inline value is checked for Apple's `kauth_filesec` magic, a bounded entry count (maximum 128),
+and a payload size of 44 bytes plus 24 bytes per ACE; the `KAUTH_FILESEC_NOACL` sentinel uses the 44-byte header
+alone. ACE kind values 1 through 4 (permit, deny, audit and alarm) are accepted; undefined kinds produce
+`hfs.plus-acl-invalid` while the catalog object remains readable. The reader checks the ACL container layout and ACE
+kinds, not individual ACE principals, other flags or rights **[Code]** Apple's
+[`kauth.h`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/sys/kauth.h).
 It checks extents-overflow keys are strictly ordered by
 file ID, fork type and start block in both index and leaf records, as TN1150 specifies **[Doc]**, including ranges across index sibling nodes. Unicode names are
 retained in `MacFile.MacPath`; the HFSX catalog's `keyCompareType` selects binary or case-folding mode. Catalog keys
@@ -943,7 +1035,10 @@ retained as an ordinary file and reported as `hfs.plus-hardlink-signature-invali
 `iNode<decimal-reference>` in the root's
 `\0\0\0\0HFS+ Private Data` directory **[Doc]** TN1150. The link's visible path is kept while the indirect node's
 forks and file metadata are used; the private directory subtree is omitted from the file list. The reference is exposed
-as `MacFile.HardLinkReference`. Indirect-node names must use canonical decimal text without leading zeroes **[Doc]**
+as `MacFile.HardLinkReference`. An alias with allocated data-fork blocks is kept readable through its indirect node and
+reported as `hfs.plus-hardlink-alias-has-data` **[Code]** Apple's
+[`CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c#L1001-L1004).
+Indirect-node names must use canonical decimal text without leading zeroes **[Doc]**
 TN1150; malformed names are skipped and reported as `hfs.plus-hardlink-indirect-name-invalid`. A matching reference
 that names a folder instead of a file is reported as `hfs.plus-hardlink-indirect-not-file`. A nonzero link reference
 without a matching node is retained with its catalog forks and reported as `hfs.plus-hardlink-target-missing`. The
@@ -957,10 +1052,27 @@ An incomplete candidate is retained as a file and reported as `hfs.plus-hardlink
 targets a `dir_<catalog-ID>` folder in the root's `.HFS+ Private Directory Data\r` folder. Files below that directory
 inode are exposed at each valid alias path, and both private metadata subtrees are omitted from the file list. An alias
 whose `dir_<CNID>` folder lacks the hard-link-chain flag is treated as having no valid inode; the alias is retained and
-reported as `hfs.plus-hardlink-target-missing`. Files nested below a directory inode are mapped through every visible
-alias path. These directory-link
-rules follow Apple's `dirhardlink.c` verifier behavior; TN1150's file-hard-link section predates this directory-link
-representation **[Code]** [Apple `dirhardlink.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/dirhardlink.c).
+reported as `hfs.plus-hardlink-target-missing`. The reader also checks Apple's private
+`com.apple.system.hfs.firstlink` inline attribute on each directory inode, follows the catalog-ID chain through aliases,
+and checks each alias's previous-link ID, the inode's link count, and that the chain covers all visible aliases. A missing
+or malformed attribute, missing alias, broken/cyclic chain, or count mismatch is reported as
+`hfs.plus-hardlink-chain-invalid`; the visible files remain readable. These checks follow the corresponding chain
+validation in Apple's `dirhardlink.c`; the private directory must also have the immutable owner flag and sticky mode bit,
+and every folder ancestor of an alias (up to the root or private directory) must carry the `HasChildLink` catalog flag,
+or the reader reports `hfs.plus-hardlink-private-directory-invalid` or
+`hfs.plus-hardlink-ancestor-flag-missing`, respectively. These checks do not implement the verifier's repair
+behavior. TN1150's file-hard-link
+section predates this directory-link representation **[Code]**
+[Apple `dirhardlink.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/dirhardlink.c).
+Outside the private hard-link folders, a file with the directory hard-link chain flag but neither a recognized file-hard-link
+signature nor a directory-alias signature is retained and reported as `hfs.plus-hardlink-chain-flag-unexpected`; Apple's
+catalog checker treats such a record as a stray link-chain flag **[Code]**
+[Apple `CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
+An ordinary BSD regular file with a link count greater than one is also retained and reported as
+`hfs.plus-file-link-count-invalid`, except for recognized links, the private file-hard-link folder and journal files.
+Apple's catalog checker treats this count as inconsistent for an ordinary regular file **[Code]**
+[Apple `CatalogCheck.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/CatalogCheck.c).
+Files nested below a directory inode are mapped through every visible alias path.
 The B-tree reader requires every record start and end offset to be
 even, including each node's free-space offset **[Doc]** TN1150. It requires extents-overflow records to have the fixed
 64-byte `HFSPlusExtentRecord` payload and defined attribute fork-data and extents payloads to have their fixed 88- and
@@ -971,13 +1083,21 @@ maximum, so the reader does not require a thread payload to end immediately afte
 
 The current implementation checks the header and node kinds/heights, root-to-leaf graph, per-level sibling chains,
 leaf chain and endpoints, key ordering, child key ranges, record counts, node-map coverage/allocation and free-node
-accounting. Header fields documented as reserved are intentionally not treated as required-zero checks. Reachable
-empty leaves are accepted: TN1150 does not explicitly forbid them, and Apple's verifier's leaf traversal counts their
-zero records without a separate nonempty-node check **[Code]** in
-[`SVerify2.c`](https://github.com/apple-oss-distributions/hfs/blob/main/lib_fsck_hfs/dfalib/SVerify2.c).
+accounting. Header fields documented as reserved are intentionally not treated as required-zero checks.
 As TN1150 permits, allocation
 blocks marked used but not described by known
 fork extents are not rejected; the reader checks that every extent it recognizes is marked allocated.
+
+The HFS+ validation audit is bounded to the read path: TN1150's catalog-ID and allocation-file consistency checks,
+the B-tree structure and ordering used to find catalog data, and the catalog, fork, attribute and link rules needed to
+enumerate files and expose their forks. Feature tests build both valid and damaged volumes for those rules. This is
+not full `fsck_hfs` parity and does not implement repair or journal replay. The reader does not validate Hot Files
+records, boot blocks, or the HFS wrapper's software-lock bit and bad-block-file membership; its wrapper check covers
+the embedded extent bounds and allocation bitmap. The optional interoperability test uses a 10 MiB, journaled
+Mac OS X HFS+ image from Digital Corpora's `nps-2009-hfsjtest1` corpus (SHA-256
+`BEB7795DD6D1A5319F9C20101855FFFF9665FCC11C6B23DE822D50C0D1E388EE`); it verifies the published contents of
+`file1.txt` and `file2.txt`. The image is not included in the repository; see
+[`TestData/HfsPlusOriginal/README.md`](../../tests/ClassicMac.Files.Tests/TestData/HfsPlusOriginal/README.md).
 
 HFSX, the variant of HFS Plus with case-sensitive names (Mac OS X 10.3 and later), has the signature `'HX'` at 1024
 **[Doc]** TN1150. Nothing in Mac OS 9.0 recognises it: no code in the ROM or the System file compares with `'HX'`,
@@ -1011,20 +1131,40 @@ followed in its code.
 | `hfs.plus-encoding-bitmap` | I | A catalog file or folder uses an encoding whose bit is absent from `encodingsBitmap` | Reports only | Not traced |
 | `hfs.plus-free-blocks` | I | The allocation bitmap free-block count differs from `freeBlocks` in the volume header | Reports only | Not traced |
 | `hfs.plus-spared-blocks` | I | The volume header's spared-blocks flag disagrees with bad-block extent records | Reports only | Not traced |
+| `hfs.plus-attribute-orphan` | W | An attributes B-tree key refers to a missing catalog object other than special-file CNIDs 3 through 8 | Keeps the readable catalog and files | TN1150 attribute keys identify their owning file or folder **[Doc]** |
+| `hfs.plus-attribute-flag-mismatch` | W | A catalog object's `HasAttributes` flag disagrees with attribute-record presence for its CNID | Keeps the object readable | Apple `hfs_format.h` defines the flag as indicating extended attributes **[Code]** |
+| `hfs.plus-security-flag-mismatch` | W | A catalog object's `HasSecurity` flag disagrees with presence of its `com.apple.system.Security` ACL attribute | Keeps the object readable | Apple `hfs_format.h` defines the flag; Linux HFS+ names the ACL attribute **[Code]** |
+| `hfs.plus-acl-invalid` | W | The ACL attribute has invalid file-security magic, entry count, ACE payload length or ACE kind | Keeps the catalog object readable | Apple XNU `kauth.h` defines the file-security layout and ACE kinds **[Code]** |
+| `hfs.plus-btree-type` | W | The attributes B-tree uses reserved type `0xFF`, observed in the journaled Mac OS X reference image | Reads the attributes tree for compatibility | TN1150 specifies type zero for system B-trees **[Doc]** |
 | `hfs.plus-volume-inconsistent` | W | Volume attributes indicate an unclean unmount, inconsistent boot volume, or serious inconsistency | Completes structural checks and returns files if valid | Not traced |
 | `hfs.plus-journal-not-replayed` | I | Volume is marked journaled, but ClassicMac has not replayed its journal | Reads recorded structures | Not traced |
+| `hfs.plus-journal-info-invalid` | W | The journal info block pointer, storage flags, journal range, allocation bits, root journal files or their extents are inconsistent | Reads catalog files without replaying the journal | TN1150 Journal Info Block definition |
 | `hfs.plus-alternate-header` | W | The alternate HFS Plus volume header is missing or has an invalid signature/version | Reads using the primary header | Not traced |
 | `hfs.plus-hardlink-target-missing` | W | A hard-link reference has no matching private indirect node | Keeps the link record, using its catalog forks | Not traced |
+| `hfs.plus-hardlink-alias-has-data` | W | A hard-link alias has allocated data-fork blocks | Keeps the link readable through its indirect node | Apple `CatalogCheck.c` checks alias data-fork allocation **[Code]** |
+| `hfs.plus-hardlink-chain-flag-unexpected` | W | A non-private file has the directory hard-link chain flag but no hard-link Finder signature | Keeps the file and its forks | Apple `CatalogCheck.c` checks link-chain flags **[Code]** |
+| `hfs.plus-file-link-count-invalid` | W | A regular file that is not a recognized link has a BSD link count greater than one | Keeps the file and its forks | Apple `CatalogCheck.c` checks the count **[Code]** |
+| `hfs.plus-hardlink-chain-invalid` | W | A directory hard-link inode has a missing or malformed first-link attribute, a broken alias chain, or a mismatched link count | Keeps the readable directory aliases and their contents | Apple `dirhardlink.c` checks the chain **[Code]** |
+| `hfs.plus-hardlink-private-directory-invalid` | W | The directory-hard-link private folder lacks the immutable owner flag or sticky mode bit | Keeps reading the volume | Apple `dirhardlink.c` checks these flags **[Code]** |
+| `hfs.plus-hardlink-ancestor-flag-missing` | W | A directory hard-link alias ancestor lacks the `HasChildLink` catalog flag | Keeps the readable directory aliases and their contents | Apple `dirhardlink.c` checks ancestor flags **[Code]** |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |
 | `hfs.not-leaf` | E | A node on the leaf chain is not a leaf | Stops the walk; keeps the records read | Not traced |
 | `hfs.bad-record-offset` | E | A record's offsets in its node are impossible | Skips the record | Not traced |
-| `hfs.bad-record` | W | A catalog record of an unknown type, or a folder or file record too short | Skips it | Not traced |
+| `hfs.bad-record` | W | A catalog key is malformed, its record type is unknown, or a folder/file record is too short | Skips it | Not traced |
+| `hfs.key-order` | W | Catalog or extents-overflow leaf keys are duplicate or out of order | Keeps readable records | Not traced |
+| `hfs.duplicate-id` | W | A catalog file or folder CNID appears more than once | Keeps file records; retains the first folder mapping | Not traced |
+| `hfs.reserved-id` | W | A nonroot catalog file/folder uses a reserved CNID below 16 | Keeps the record | Not traced |
 | `hfs.too-many-entries` | E | More than `MaxVolumeEntries` folders and files | Stops reading the catalog | — |
 | `hfs.orphan` | W | A file's parent folder is missing, or the parents loop | Cuts the path there | Not traced |
 | `hfs.extent-outside` | E | An extent lies past `drNmAlBlks` | Empty fork | Not traced |
 | `hfs.fork-short` | E | A fork's extents cover less than its logical length | Cuts the fork | Not traced |
 | `hfs.image-truncated` | E | The image ends inside a fork | Cuts the fork | — |
 | `hfs.counts` | I | The files or folders read differ from `drFilCnt` / `drDirCnt` | Reports only | Not traced |
+| `hfs.alternate-mdb` | W | The HFS alternate MDB at `image length − 1024` is missing or has an invalid signature | Reads using the primary MDB | JotaRandom/hfsutils specification test |
+| `hfs.bitmap-truncated` | W | The bitmap bytes for all declared allocation blocks do not fit in the image | Reads the catalog without bitmap validation | Not traced |
+| `hfs.free-blocks` | I | The volume bitmap's free-block count differs from `drFreeBks` | Reports only | HFS bitmap layout in JotaRandom/hfsutils specification |
+| `hfs.extent-unallocated` | W | A catalog, extents-overflow, or file-fork extent contains an allocation block marked free | Reads available fork data | HFS allocation bitmap and extent records |
+| `hfs.wrapper-extent-unallocated` | W | An allocation block occupied by the embedded HFS Plus volume is marked free in the wrapper bitmap | Reads the embedded volume | TN1150 wrapper extent and HFS allocation bitmap |
 
 Some damage makes a volume unreadable. The reader then throws, and the unwrapper reports `container.unreadable`
 with the reason:
@@ -1095,8 +1235,9 @@ systems and, if none takes it, the volume does not mount **[Code]** Mac OS 9.0 F
 
 ## 14. Not covered and open questions
 
-Not covered: the boot blocks; complete HFS Plus/HFSX semantics and structural validation (section 11); the old `'TS'`
-partition map.
+Not covered: boot blocks; Hot Files B-tree semantics; journal replay and `fsck_hfs` repair behavior; HFS wrapper
+software-lock and bad-block-file consistency; the old `'TS'` partition map. HFS+ read-path structural checks and
+their explicit limits are recorded in section 11.
 
 No rule in this document is fitted to data alone. Still open:
 
@@ -1105,9 +1246,8 @@ No rule in this document is fitted to data alone. Still open:
 2. That an HFSX volume fails to mount on Mac OS 9.0 with −57 is inferred from the code, not run (section 11).
 3. The Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (section 10).
 4. TN1150 says Mac OS 8.1–10.2 used Unicode 2.1 decompositions, while Mac OS X 10.3 and later use Unicode 3.2.
-   The volume does not record which version produced its names. The reader validates against 3.2 and preserves the
-   historical dot-above, Greek tonos and Bengali spellings noted in section 11; the remaining uncommon Unicode version
-   changes and Apple's `fsck_hfs` fixup cases need compatibility coverage.
+   The volume does not record which version produced its names. The reader validates against 3.2, preserves the 44
+   Unicode 2.1 scalar spellings, and covers the sequence corrections identified by Apple's `fsck_hfs` `FixDecomps`.
 
 Differences from the Mac that ClassicMac knowingly keeps (section 3.4): a partition's volume ends where the partition
 ends (`pmPartBlkCnt − pmLgDataStart` blocks, where the CD-ROM driver takes `pmPartBlkCnt` from the data start);

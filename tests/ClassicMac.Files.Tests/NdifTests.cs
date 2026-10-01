@@ -19,6 +19,7 @@ public class NdifTests
         builder.File(HfsBuilder.Root, "Read Me", Bytes(3000, 3), Bytes(300, 7));
         var volume = builder.Build("Test Disk");
         Array.Resize(ref volume, 800 * 512);
+        volume.AsSpan(1024, 162).CopyTo(volume.AsSpan(volume.Length - 1024, 162));
         return volume;
     }
 
@@ -54,7 +55,8 @@ public class NdifTests
     {
         var kind = compressed ? Kind.Adc : Kind.Raw;
         var volume = Volume();
-        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (6, Kind.Raw), (200, kind), (94, kind), (500, Kind.Zero));
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (6, Kind.Raw), (200, kind), (94, kind),
+            (498, Kind.Zero), (2, Kind.Raw));
 
         var (disk, diagnostics) = Disk(Image(data, resource));
 
@@ -85,7 +87,7 @@ public class NdifTests
     public void Images_nest_through_the_unwrapper_to_the_volume()
     {
         var volume = Volume();
-        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (100, Kind.Adc), (700, Kind.Zero));
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (100, Kind.Adc), (698, Kind.Zero), (2, Kind.Raw));
         var macBinary = MacBinary(2, "Test.img", data, resource, type: "rohd", creator: "ddsk");
         var diagnostics = new List<Diagnostic>();
 
@@ -114,7 +116,7 @@ public class NdifTests
     public void Segments_are_found_by_their_part_resource_not_their_names()
     {
         var volume = Volume();
-        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (300, Kind.Raw), (500, Kind.Zero));
+        var (data, resource) = NdifBuilder.Build(volume, "Test Disk", (300, Kind.Raw), (498, Kind.Zero), (2, Kind.Raw));
         var third = data.Length / 3 / 512 * 512;
         var parts = new[] { data[..third], data[third..(2 * third)], data[(2 * third)..] };
         var master = WithMap(resource, map =>

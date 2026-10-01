@@ -16,6 +16,7 @@ public class DartTests
         builder.File(HfsBuilder.Root, "Read Me", Bytes(3000, 3), Bytes(300, 7));
         var volume = builder.Build("DART Disk");
         Array.Resize(ref volume, 800 * 1024);
+        volume.AsSpan(1024, 162).CopyTo(volume.AsSpan(volume.Length - 1024, 162));
         return volume;
     }
 

@@ -94,9 +94,6 @@ internal static partial class HfsPlusUnicodeNormalization
         for (int index = 0; index < codePoints.Count; index++)
         {
             // Apple fsck_hfs's FixDecomps corrects these legacy sequences before comparing names.
-            if (codePoints[index] == 0x0307 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0307)
-                return true;
-
             if (codePoints[index] == 0x0306 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0307)
                 return true;
 

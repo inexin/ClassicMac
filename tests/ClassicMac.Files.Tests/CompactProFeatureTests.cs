@@ -71,6 +71,147 @@ public sealed class CompactProFeatureTests
     }
 
     [Fact]
+    public void CompactProReadsForkPayloadsFromSiblingVolumes()
+    {
+        byte[] resource = "resource"u8.ToArray();
+        byte[] data = "inside"u8.ToArray();
+        byte[] archive = CompactProFixture.BuildFile("Read Me", resource, data, resource,
+            "inside"u8.ToArray(), dataOffsetOverride: 8, entryVolume: 2);
+        byte[] secondVolume = new byte[8 + resource.Length + data.Length];
+        secondVolume[0] = 1;
+        secondVolume[1] = 2;
+        resource.CopyTo(secondVolume.AsSpan(8));
+        data.CopyTo(secondVolume.AsSpan(8 + resource.Length));
+        var sibling = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.002"),
+            DataFork = ForkData.FromBytes(secondVolume),
+        };
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(CompactProReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics, siblings: () => [sibling])));
+
+        Assert.Equal("Read Me", file.MacPath);
+        Assert.Equal(resource, file.ResourceFork.ToArray());
+        Assert.Equal(data, file.DataFork.ToArray());
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "archive.missing-volume");
+    }
+
+    [Fact]
+    public void CompactProOpensTheFinalSegmentAndReadsPayloadFromAnEarlierSegment()
+    {
+        byte[] resource = "resource"u8.ToArray();
+        byte[] data = "segment payload"u8.ToArray();
+        byte[] finalSegment = CompactProFixture.BuildFile("Read Me", resource, data, resource, data,
+            dataOffsetOverride: 8, entryVolume: 1);
+        finalSegment[1] = 2;
+        byte[] firstSegment = new byte[8 + resource.Length + data.Length];
+        firstSegment[0] = 1;
+        firstSegment[1] = 1;
+        resource.CopyTo(firstSegment.AsSpan(8));
+        data.CopyTo(firstSegment.AsSpan(8 + resource.Length));
+        var firstSegmentFile = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.cpt.#1"),
+            DataFork = ForkData.FromBytes(firstSegment),
+        };
+        var finalSegmentFile = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.cpt.#2"),
+            DataFork = ForkData.FromBytes(finalSegment),
+        };
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(finalSegmentFile, "Host file",
+            new ContainerContext(siblings: () => [firstSegmentFile]));
+        MacFile file = Assert.Single(result.Children).File;
+
+        Assert.Equal("Read Me", file.MacPath);
+        Assert.Equal(resource, file.ResourceFork.ToArray());
+        Assert.Equal(data, file.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void DefaultUnwrapperUsesCompactProSiblingVolumes()
+    {
+        byte[] resource = "resource"u8.ToArray();
+        byte[] data = "inside"u8.ToArray();
+        byte[] archive = CompactProFixture.BuildFile("Read Me", resource, data, resource,
+            data, dataOffsetOverride: 8, entryVolume: 2);
+        byte[] secondVolume = new byte[8 + resource.Length + data.Length];
+        secondVolume[0] = 1;
+        secondVolume[1] = 2;
+        resource.CopyTo(secondVolume.AsSpan(8));
+        data.CopyTo(secondVolume.AsSpan(8 + resource.Length));
+        var host = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.cpt"),
+            DataFork = ForkData.FromBytes(archive),
+        };
+        var sibling = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.002"),
+            DataFork = ForkData.FromBytes(secondVolume),
+        };
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(host, "Host file",
+            new ContainerContext(siblings: () => [sibling]));
+
+        MacFile unpacked = Assert.Single(result.Children).File;
+        Assert.Equal("Read Me", unpacked.MacPath);
+        Assert.Equal(resource, unpacked.ResourceFork.ToArray());
+        Assert.Equal(data, unpacked.DataFork.ToArray());
+    }
+
+    [Fact]
+    public void CompactProReportsAnUnavailableSiblingVolume()
+    {
+        byte[] archive = CompactProFixture.BuildFile("Read Me", [], "inside"u8.ToArray(), [],
+            "inside"u8.ToArray(), dataOffsetOverride: 8, entryVolume: 2);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Empty(CompactProReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "archive.missing-volume" &&
+            diagnostic.Severity == DiagnosticSeverity.Warning);
+    }
+
+    [Fact]
+    public void CompactProRejectsAmbiguousSiblingVolumeNumbers()
+    {
+        byte[] archive = CompactProFixture.BuildFile("Read Me", [], "inside"u8.ToArray(), [],
+            "inside"u8.ToArray(), dataOffsetOverride: 8, entryVolume: 2);
+        byte[] secondVolume = [1, 2, 0, 0, 0, 0, 0, 0, .. "inside"u8.ToArray()];
+        MacFile[] siblings =
+        [
+            new() { Name = MacString.FromMacRoman("archive.002"), DataFork = ForkData.FromBytes(secondVolume) },
+            new() { Name = MacString.FromMacRoman("duplicate.002"), DataFork = ForkData.FromBytes(secondVolume) },
+        ];
+
+        Assert.Throws<InvalidDataException>(() => CompactProReader.Instance.Read(ForkData.FromBytes(archive),
+            new ContainerContext(siblings: () => siblings)));
+    }
+
+    [Fact]
+    public void CompactProSiblingVolumesShareTheConfiguredInputSizeLimit()
+    {
+        byte[] archive = CompactProFixture.BuildFile("Read Me", [], "inside"u8.ToArray(), [],
+            "inside"u8.ToArray(), dataOffsetOverride: 8, entryVolume: 2);
+        byte[] secondVolume = [1, 2, 0, 0, 0, 0, 0, 0, .. "inside"u8.ToArray()];
+        var sibling = new MacFile
+        {
+            Name = MacString.FromMacRoman("archive.002"),
+            DataFork = ForkData.FromBytes(secondVolume),
+        };
+        var context = new ContainerContext(
+            options: new ContainerReadOptions { MaxExpandedBytesPerInput = archive.Length + secondVolume.Length - 1 },
+            siblings: () => [sibling]);
+
+        Assert.Throws<InvalidDataException>(() => CompactProReader.Instance.Read(ForkData.FromBytes(archive), context));
+    }
+
+    [Fact]
     public void CompactProForkDataCannotOverlapItsDirectory()
     {
         byte[] archive = CompactProFixture.BuildFile("Read Me", [], "abc"u8.ToArray(),
@@ -158,7 +299,7 @@ public sealed class CompactProFeatureTests
 
         public static byte[] BuildFile(string name, byte[] resource, byte[] data,
             byte[] encodedResource, byte[] encodedData, int? dataOffsetOverride = null, ushort flags = 0,
-            byte[]? comment = null)
+            byte[]? comment = null, byte entryVolume = 1)
         {
             comment ??= [];
             byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(name);
@@ -179,7 +320,7 @@ public sealed class CompactProFeatureTests
             metadata[nameTypeOffset] = checked((byte)nameBytes.Length);
             nameBytes.CopyTo(metadata[(nameTypeOffset + 1)..]);
             Span<byte> entry = metadata.Slice(nameTypeOffset + 1 + nameBytes.Length, 45);
-            entry[0] = 1;
+            entry[0] = entryVolume;
             U32(entry, 1, checked((uint)(dataOffsetOverride ?? dataOffset)));
             "TEXTttxt"u8.CopyTo(entry[5..]);
             U32(entry, 13, CreationDate);

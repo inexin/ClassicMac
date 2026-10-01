@@ -10,7 +10,7 @@ namespace ClassicMac.Files.Archives;
 /// <summary>Reads Compact Pro archives with RLE and LZH+RLE fork encodings.</summary>
 /// <remarks>
 /// The directory layout and both compression methods are fitted against independent published format descriptions.
-/// Multi-volume sets are not yet supported.
+/// Fork payloads may reside in sibling files identified by their Compact Pro volume numbers.
 /// </remarks>
 public sealed class CompactProReader : IContainerReader
 {
@@ -78,6 +78,9 @@ public sealed class CompactProReader : IContainerReader
 
         var files = new List<MacFile>();
         var folders = new List<FolderScope>();
+        var otherVolumes = new Dictionary<byte, byte[]>();
+        var unavailableVolumes = new HashSet<byte>();
+        long volumeBytes = archive.Length;
         long expandedBytes = 0;
         for (int index = 0; index < directory.Entries.Count; index++)
         {
@@ -95,20 +98,42 @@ public sealed class CompactProReader : IContainerReader
 
             ReadOnlySpan<byte> metadata = entry.Metadata;
             int volume = metadata[0];
+            byte[] dataVolume = archive;
+            int minimumDataOffset = directory.TableEnd;
             if (volume != archive[1])
             {
-                context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
-                    $"Compact Pro entry '{entry.Name}' refers to volume {volume}; this reader has only one volume.",
-                    entry.Offset);
-                continue;
+                byte siblingVolumeNumber = checked((byte)volume);
+                if (otherVolumes.TryGetValue(siblingVolumeNumber, out byte[]? cachedVolume))
+                {
+                    dataVolume = cachedVolume;
+                }
+                else if (unavailableVolumes.Contains(siblingVolumeNumber))
+                {
+                    context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
+                        $"Compact Pro entry '{entry.Name}' refers to unavailable volume {volume}.", entry.Offset);
+                    continue;
+                }
+                else if (ReadSiblingVolume(siblingVolumeNumber, context, ref volumeBytes) is { } siblingVolume)
+                {
+                    dataVolume = siblingVolume;
+                    otherVolumes.Add(siblingVolumeNumber, siblingVolume);
+                }
+                else
+                {
+                    unavailableVolumes.Add(siblingVolumeNumber);
+                    context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
+                        $"Compact Pro entry '{entry.Name}' refers to unavailable volume {volume}.", entry.Offset);
+                    continue;
+                }
+                minimumDataOffset = ArchiveHeaderLength;
             }
 
             uint fileOffsetRaw = U32(metadata, 1);
             if (fileOffsetRaw > int.MaxValue)
                 throw new InvalidDataException("A Compact Pro fork data offset is too large.");
             int fileOffset = (int)fileOffsetRaw;
-            if (fileOffset < directory.TableEnd)
-                throw new InvalidDataException("A Compact Pro fork overlaps the archive directory.");
+            if (fileOffset < minimumDataOffset)
+                throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
             FourCC type = new(metadata.Slice(5, 4));
             FourCC creator = new(metadata.Slice(9, 4));
             uint createdRaw = U32(metadata, 13);
@@ -120,7 +145,7 @@ public sealed class CompactProReader : IContainerReader
             int dataLength = ReadLength(U32(metadata, 33), "data fork");
             int resourceCompressedLength = ReadLength(U32(metadata, 37), "compressed resource fork");
             int dataCompressedLength = ReadLength(U32(metadata, 41), "compressed data fork");
-            Require(archive, fileOffset, checked(resourceCompressedLength + dataCompressedLength),
+            Require(dataVolume, fileOffset, checked(resourceCompressedLength + dataCompressedLength),
                 "Compact Pro fork data");
 
             if ((flags & 1) != 0)
@@ -136,12 +161,12 @@ public sealed class CompactProReader : IContainerReader
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
                 throw new InvalidDataException("Compact Pro extraction exceeds the configured expanded-size limit.");
 
-            ReadOnlySpan<byte> resourceInput = archive.AsSpan(fileOffset, resourceCompressedLength);
+            ReadOnlySpan<byte> resourceInput = dataVolume.AsSpan(fileOffset, resourceCompressedLength);
             byte[] resource = (flags & 2) != 0
                 ? CompactProLzhDecoder.Decode(resourceInput, resourceLength)
                 : DecodeRle8182(resourceInput, resourceLength);
             int dataOffset = checked(fileOffset + resourceCompressedLength);
-            ReadOnlySpan<byte> dataInput = archive.AsSpan(dataOffset, dataCompressedLength);
+            ReadOnlySpan<byte> dataInput = dataVolume.AsSpan(dataOffset, dataCompressedLength);
             byte[] data = (flags & 4) != 0
                 ? CompactProLzhDecoder.Decode(dataInput, dataLength)
                 : DecodeRle8182(dataInput, dataLength);
@@ -161,6 +186,26 @@ public sealed class CompactProReader : IContainerReader
             });
         }
         return files;
+    }
+
+    private static byte[]? ReadSiblingVolume(byte volumeNumber, ContainerContext context, ref long totalVolumeBytes)
+    {
+        byte[]? foundVolume = null;
+        foreach (MacFile sibling in context.Siblings?.Invoke() ?? [])
+        {
+            ForkData data = sibling.DataFork;
+            if (data.Length < ArchiveHeaderLength) continue;
+            byte[] header = data.Slice(0, ArchiveHeaderLength).ToArray(ArchiveHeaderLength);
+            if (header[0] != 1 || header[1] != volumeNumber) continue;
+            if (foundVolume is not null)
+                throw new InvalidDataException($"More than one Compact Pro sibling identifies volume {volumeNumber}.");
+            if (data.Length > context.Options.MaxExpandedBytesPerInput - totalVolumeBytes)
+                throw new InvalidDataException("The Compact Pro volume set exceeds the configured input-size limit.");
+            foundVolume = data.ToArray(context.Options.MaxExpandedBytesPerInput);
+            totalVolumeBytes = checked(totalVolumeBytes + data.Length);
+        }
+
+        return foundVolume;
     }
 
     private static CompactProDirectory ReadDirectory(Stream stream, long archiveLength, int offset)

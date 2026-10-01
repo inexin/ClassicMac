@@ -2,23 +2,51 @@
 
 This document records the archive formats implemented by `ClassicMac.Files.Archives`. StuffIt and Compact Pro have no
 published vendor specifications in the project references; rules derived from another reader or from test fixtures are
-provisional and marked **[Fitted]**. An independently generated fixture proves the documented behavior, not that the
-original Mac application writes every detail the same way.
+provisional and marked **[Fitted]**. **[Reference]** marks a rule taken from another reader when no original-format
+sample verifies it yet. An independently generated fixture proves the documented behavior, not that the original Mac
+application writes every detail the same way.
 
-## StuffIt 1.x–2.x (initial subset)
+## StuffIt 1.x–4.x (legacy format)
 
-Legacy archives start with `SIT!`, the root entry count, total archive length, and `rLau`. Version 1 uses sequential
-112-byte member headers beginning at offset 22; version 2 uses linked member records and the root offset at +16.
+Legacy archives start with `SIT!`, the root entry count, total archive length, and `rLau`. The version-1 layout is used
+by StuffIt 1.0–1.5; it has sequential 112-byte member headers beginning at offset 22. The version-2 layout is used by
+StuffIt 1.6–4.5; it has linked member records and the root offset at +16.
 Member headers hold the two fork methods, a Pascal-style byte name, Finder type/creator/flags, dates, expanded and
 compressed fork lengths, fork CRCs, and the header CRC at +110. In version 1, method `$20` starts a folder and `$21`
 ends it; folder members have no fork payload. Version 1 names can be up to 63 bytes and are decoded as MacRoman.
 Version 2 currently accepts names up to 31 bytes and follows first-child, next, and declared child-count fields.
+It also checks each member's previous-sibling and parent offsets against the list position and containing folder
+established by traversal. A mismatch produces `archive.previous-link-mismatch` or `archive.parent-link-mismatch` as a
+warning; extraction continues using the traversed list, so inconsistent back-links do not discard otherwise readable
+files.
 These layouts and folder markers are **[Fitted]** against the published format table in
 [psx-spx](https://psx-spx.consoledev.net/psx-spx.pdf) and the independent
-[XADMaster parser](https://sources.debian.org/src/unar/1.1-2/XADMaster/XADStuffItParser.m/). Hand-built feature tests
-cover stored forks, Finder metadata, dates, nested v1 folder markers, and malformed folder structure. Neither version
-has yet been verified against an archive made by the original application. Archive-level comments and method 6 are
-not implemented; encrypted entries are reported and skipped.
+[XADMaster parser](https://sources.debian.org/src/unar/1.1-2/XADMaster/XADStuffItParser.m/). Method 6's negative-length
+blocks skip Huffman coding and carry PackBits data; ClassicMac decodes those blocks in legacy and v5 archives,
+including literal, repeat and no-op controls, and concatenates multiple blocks. This behavior is **[Reference]** based on
+[`macutils`' method-6 decoder](https://github.com/dgilman/macutils/blob/master/macunpack/sit.c) and the
+[StuffIt-Go method description](https://pkg.go.dev/github.com/ObsoleteMadness/StuffIt-Go/stuffit). Positive-length
+blocks decode the fixed 258-leaf Huffman tree, use the block's byte translation table, stop at either end-marker
+leaf, then expand the declared PackBits byte stream. Intermediate PackBits data is limited to the historical 32 KiB
+method-6 buffer size. Feature tests cover both block forms separately and mixed in one fork, the legacy and v5
+containers, and truncated Huffman and PackBits data. An original StuffIt Deluxe 4.5 archive from the CC0 test corpus
+verifies version-2 traversal and method-13 extraction of both `testfile.PICT` forks, as well as a method-13 resource
+fork. A second original StuffIt Deluxe 4.5 sample and its AppleDouble companion verify that an archive-level comment is
+read from resource type `SitC`, ID 0 in the archive file's resource fork and decoded as MacRoman. This placement was
+first **[Reference]** based on [XADMaster](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADStuffItParser.m/).
+Version 1 and method 6 still have hand-built tests only. Encrypted entries are reported and skipped.
+
+## StuffIt split files (SegmentIt)
+
+Each segment begins with a 100-byte `$B0 56 00` header. Byte 3 is its one-based volume number; byte 4 and the following
+bytes hold the shared MacRoman filename. Bytes 68–93 contain Finder type/creator/flags, creation and modification
+dates, and the resource- and data-fork lengths. Segments in a set repeat the filename and metadata; their payloads
+concatenate in volume order after each 100-byte header is removed. The reader discovers sibling segments by matching
+the filename and shared metadata, opens a set from any segment, restores both forks and Finder metadata, and reports a
+missing volume rather than returning truncated forks. When the embedded filename ends in `.sit`, the default unwrapper
+continues into the reconstructed StuffIt archive. This layout and sibling matching are **[Fitted]** against
+[XADMaster's split-file parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADStuffItSplitParser.m/); feature
+tests use hand-built volumes, and an archive made with the original SegmentIt application remains to be verified.
 
 ## PackIt (stored, Huffman, and encrypted entries)
 
@@ -43,7 +71,8 @@ Header and fork CRC mismatches are reported; a failed encrypted fork checksum re
 damaged ciphertext. `PMa3` and `PMa7` are reserved and other markers are reported as unsupported, stopping parsing at
 that record. Tests cover stored and Huffman entries with both forks, Finder metadata and dates, CRC diagnostics, correct
 and wrong passwords for raw and Huffman XOR/DES entries, weak DES keys, encrypted stream alignment, unsupported methods,
-and truncated headers. Original-application verification remains.
+truncated headers, and enforcing `MaxVolumeEntries` before decoding an over-limit record. Original-application
+verification remains.
 
 ## LHA / LArc (level-0 through level-3 records; stored and compressed methods)
 
@@ -82,7 +111,8 @@ diagnosed and skipped using their declared packed length. Level 2 uses a 16-bit 
 extension, and type-1/type-2 filename/directory extensions. Its packed-size field counts payload bytes only, and the
 header may have one padding byte. Level 3 uses a 32-bit total header size and 32-bit extension-chain sizes with no
 padding; its type-0 header CRC is checked with the stored CRC bytes treated as zero. The reader
-applies `MaxExpandedBytesPerInput` to the archive and total expanded file data.
+applies `MaxExpandedBytesPerInput` to the archive and total expanded file data, and `MaxVolumeEntries` to every valid
+archive record, including directories and entries skipped for unsupported compression or filename encoding.
 
 The layout is based on the [LHa for UNIX header description](https://github.com/jca02266/lha/blob/master/header.doc.md)
 and the CC0 [Kaitai LHA record specification](https://formats.kaitai.io/lzh/) **[Fitted]** to hand-built Mac OS
@@ -102,9 +132,9 @@ checksum prevents recognition and makes direct reads fail. Records begin with `D
 name field, a directory depth, and the record's total byte length. Directory records carry Mac creation and
 modification dates.
 File records contain a `0xABCD0054` file header with expanded and stored fork lengths, per-fork methods, dates, Finder
-type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths, method-0 stored forks,
-method-1 MacCompress LZW forks, method-2 adaptive Huffman forks, method-4 Huffman forks, method-6 AD2 forks,
-method-8 Compact Pro compatible forks, method-9 AD1 forks and method-10 DDn forks. Methods 6 and 9 use ADn blocks:
+type/creator/flags, checksums and delta-method fields. ClassicMac reads DDA2 folder paths and all currently identified
+method IDs 0 through 10: stored, MacCompress LZW (1), adaptive Huffman (2), RLE (3), Huffman (4), adaptive-tree Huffman
+(5), AD2 (6), Stac LZS (7), Compact Pro-compatible (8), AD1 (9) and DDn (10) forks. Methods 6 and 9 use ADn blocks:
 each block has a 12-byte XOR-checked header, expands to at most 8 KiB, and is either raw or LZSS-coded with literal,
 near/far offset and length tokens **[Fitted]** against
 [XADMaster's ADn decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerADnHandle.m/) and
@@ -113,14 +143,27 @@ selecting the next tree by the previous decoded byte; it
 uses the optional fitted `0x5A` output transform selected by Info1 and Info2 and a decoded-byte-sum checksum. This
 behavior is **[Fitted]** against [XADMaster's parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/)
 and [method-2 decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerMethod2Handle.m/). Method 1 uses a
-three-byte prefix, variable 9–16-bit LZW codes, block-mode dictionary resets and an optional fitted `0x5A` output
-transform selected by Info1 and Info2. Its 16-bit checksum includes the decoded fork and the decoded prefix bytes.
-Method 4 uses the tree-described Huffman stream also used by StuffIt and the same optional `0x5A` output transform;
+three-byte prefix, variable 9–16-bit LZW codes packed continuously across width changes, block-mode dictionary resets
+with alignment after clear codes, and an optional fitted `0x5A` output transform selected by Info1 and Info2. Its
+16-bit checksum includes the decoded fork and the decoded prefix bytes. The LZW packing and clear behavior follow
+[XADMaster's MacCompress handle](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADCompressHandle.m/); both forks of
+an authentic DiskDoubler 3.7.7 standalone file verify method 1.
+Method 3 uses `0x44` as an escape: an escape followed by zero emits a literal `0x44`; a nonzero count repeats the
+previous decoded byte `count - 1` more times. This layout is **[Reference]** based on the explicitly untested RLE
+decoder in [macutils' DiskDoubler reader](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/dd.c/) and its
+[escape definition](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/dd.h/). The reader requires decoded
+data to match the fork's declared length and rejects truncated escapes, repeats without a preceding byte, and
+output that exceeds or falls short of that length. Method 4 uses the tree-described Huffman stream also used by StuffIt and the same optional `0x5A` output transform;
 its 16-bit checksum is the decoded fork byte sum. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed
 by RLE, otherwise the fork is RLE-only. Delta type 1 applies a byte-wise cumulative sum modulo 256 after fork
-decompression; other delta types and unsupported compression methods are diagnosed and skipped while parsing
-continues at the next bounded record. Fork checksums are checked on decompressed bytes before delta preprocessing;
-method-8 forks use CRC-16/IBM.
+decompression. Delta type 2 cumulatively sums three interleaved byte lanes, with each lane wrapping modulo 256. This
+is **[Reference]** based on the `dd_delta3` routine in
+[macutils' DiskDoubler reader](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/dd.c/). The reader transforms
+only the bytes present in a final partial group; that tail handling is inferred from the lane layout and has no
+original-app fixture yet. Other delta types and unsupported compression methods are diagnosed and skipped while
+parsing continues at the next bounded record. Fork checksums are checked on decompressed bytes before delta
+preprocessing; method-3 has no checksum rule established by the available reference and is not included in fork
+checksum validation; method-8 forks use CRC-16/IBM.
 
 The older `DDAR` archive has a 78-byte archive header and fixed 124-byte entry headers, followed by stored data and
 resource forks. Its directory and end-directory markers build folder paths; redundant standalone file headers found
@@ -128,7 +171,7 @@ after records are skipped. These layouts are **[Fitted]** against [XADMaster's D
 
 A standalone compressed file starts with the same `0xABCD0054` file header and stores its compressed data and resource
 forks after the 84-byte header. Its checksum at +82 covers bytes 0–81; older files with a zero checksum are accepted
-**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 4, 5, 6, 7, 8, 9 and 10 from standalone files as it does from
+**[Fitted]** against XADMaster. ClassicMac extracts methods 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 and 10 from standalone files as it does from
 DDA2 entries, preserving Finder metadata and deriving the Mac filename from the host name (a `.dd` suffix is removed).
 Methods 6 (`AD2`) and 9 (`AD1`) use the ADn block decoder described above; both original-app files expand to the
 uncompressed data and resource forks in the CC0 corpus.
@@ -138,7 +181,8 @@ may be raw or Huffman-coded, and matches refer to prior output. This layout is *
 [XADMaster's DDn decoder](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerDDnHandle.m/) and checked
 against a standalone DD3 file produced by DiskDoubler Pro 4.1.1 in the CC0
 [DiskDoubler Test Files corpus](https://github.com/ssokolow/diskdoubler-test-files); the expanded data and resource
-forks match the uncompressed corpus originals. Method 5 reads a leading adaptive-tree count (zero means 256), then
+forks match the uncompressed corpus originals. Method 8 also matches both forks of an authentic DiskDoubler 3.7.7
+standalone file against the corpus's uncompressed originals. Method 5 reads a leading adaptive-tree count (zero means 256), then
 uses the method-2 adaptive Huffman stream with decoded symbols selecting the next tree modulo that count. This layout
 is **[Fitted]** against [XADMaster's method-5 handling](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/)
 and has hand-built feature vectors; original-application interoperability remains unverified. Method 7 uses the
@@ -147,25 +191,31 @@ entry-counted dictionary area, and input/output XOR transforms fitted to
 [XADMaster's DiskDoubler wrapper](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 The fork checksum is the XOR of expanded bytes with the even-length `0xff` correction fitted to
 [XADMaster's XOR-sum handle](https://github.com/MacPaw/XADMaster/blob/master/XADXORSumHandle.m). Tests cover literal
-and backreference streams, checksum parity, and malformed input; an original-app fixture remains. Method 3 and delta
-processing are diagnosed and skipped.
+and backreference streams, checksum parity, and malformed input; an original-app fixture remains. Method 3 is tested
+with escaped literals, repeated bytes, malformed codes, and declared-length mismatches; original-app verification
+remains unavailable. Delta type 2 has hand-built vectors for lane ordering, modulo wraparound, and one- and two-byte
+tails; original-app verification remains unavailable. Delta types other than 0, 1, and 2 are diagnosed and skipped.
 
 The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/).
 Original DiskDoubler Pro 4.1.1 DDA2 archives can contain entry-type `0x1000` records whose payload does not use the
-standard file-header layout; these are skipped with an `archive.entry-unsupported` warning so later supported records
-can still be extracted. This behavior is **[Fitted]** against the corpus archive noted below.
+standard file-header layout. In the corpus archive noted below, these records use a 44-byte metadata block followed by
+the raw data and resource forks. The metadata includes creation and modification times, Finder information and fork
+lengths. This layout is **[Fitted]** to the original Pro 4.1.1 JPEG and PNG entries; their checksum fields remain
+unverified and are not checked. Tests verify both image signatures, fork lengths and Finder type/creator values.
 Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive
-Huffman (methods 2 and 5), Huffman, Stac LZS literals and backreferences, and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
+Huffman (methods 2 and 5), method-3 RLE literals and repeats, Huffman, Stac LZS literals and backreferences, and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
 invalid folder depth, entry limits, standalone files and their header checksums, standalone fork methods, and
-delta preprocessing and unsupported standalone delta types. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
-methods 9, 6 and 10 against both fork outputs; their compressed payloads are also tested inside DDA2 records.
+delta types 1 and 2, and unsupported standalone delta types. Original DiskDoubler Pro 4.1.1 AD1, AD2 and DD3 standalone files verify
+methods 9, 6 and 10 against both fork outputs; their compressed payloads are also tested inside DDA2 records. An
+original DiskDoubler 3.7.7 standalone files verify methods 1 and 8 against both fork outputs.
 An original Pro 4.1.1 DDA2 archive from the CC0 corpus verifies extraction of both `testfile.PICT` forks against the
-uncompressed source files. Its unsupported `0x1000` entries are diagnosed and skipped, so broader original-application
-archive interoperability remains unverified.
-Method-0 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 4, 5, 6, 7, 8, 9 and 10 remain
-unsupported; method 3 and delta types other than 0 and 1 remain unsupported. Methods 5 and 7 have no original-app
-fixtures yet.
+uncompressed source files, plus its raw `testfile.jpg` and `testfile.png` entries. Broader original-application archive
+interoperability remains unverified.
+Method-0 and method-3 fork checksums are not verified. DDA2 compression methods other than 0, 1, 2, 3, 4, 5, 6, 7,
+8, 9 and 10 remain unsupported; delta types other than 0, 1 and 2 remain unsupported. Methods 3, 5 and 7, and
+delta type 2, have no
+original-app fixtures yet.
 
 ## Compact Pro (RLE and LZH subset)
 
@@ -186,8 +236,17 @@ reading the next trees **[Fitted]** against
 [psx-spx's Compact Pro notes](https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/). Tests cover both
 fork encodings, literal and overlapping-match LZH tokens, a block boundary, escaped bytes, repeat runs, nested
 directory paths, archive comments, checksums, default unwrapping, and directory/data overlap rejection. Comments are
-reported as MacRoman display text in an `archive.comment` information diagnostic **[Fitted]**. Encrypted entries and
-multi-volume sets remain unsupported; no original Compact Pro application archive has yet been verified.
+reported as MacRoman display text in an `archive.comment` information diagnostic **[Fitted]**. A file entry's volume
+number and offset select the sibling file holding both compressed forks; the directory-bearing volume remains the
+source of the entry table. The normal host-file unwrapping path supplies siblings, and a referenced volume that is not
+present is reported as `archive.missing-volume` while other entries continue. Tests cover both forks stored on a
+second volume, missing-volume reporting, and unwrapping through the default pipeline. Compact Pro's [*User's Guide*,
+“Working With Segmented Archives”](https://oldapplestuff.com/download/Macintosh/Macintosh_Garden/manuals/Compact-Pro-Users-Guide.pdf)
+says a segmented set is opened from its final segment and that the application
+uses information stored in the segment files to locate them. The same volume-number lookup lets the default pipeline
+open a final segment and read both forks from an earlier sibling segment; a feature test covers this path. Segment
+discovery depends on the host integration supplying the other segment files as siblings. Encrypted entries remain
+unsupported, and an authentic segmented archive from Compact Pro has not yet been verified.
 
 ## StuffIt 5 (initial subset)
 
@@ -207,14 +266,16 @@ resource bytes, which precede data-fork bytes. These member details are **[Fitte
 parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet been checked against a corpus created by
 the original StuffIt application.
 
-ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH), 8 (MW),
+ClassicMac currently extracts methods 0 (stored), 1 (RLE90), 2 (Compress/LZW), 3 (Huffman), 5 (LZAH), 6 (fixed Huffman + PackBits), 8 (MW),
 13 (LZ + Huffman), 14 (Installer), and 15 (Arsenic) for either fork. RLE90 emits ordinary bytes as
 literals; `$90 00` emits a literal `$90`; `$90 n` for nonzero `n` repeats the previously decoded byte until the run has
 `n` copies **[Fitted]**. Truncated runs, runs without a prior byte, output-length mismatches and extents outside the
 archive are rejected. Per-fork CRC mismatches are reported as errors while retaining the decoded file. Encrypted
 entries and unsupported methods are reported and omitted; no password is requested. Files and folders are returned
 through the normal `ContainerUnwrapper` pipeline, preserving UTF-8 paths, Finder type/creator/flags, dates and both
-forks.
+forks. Original v5 archives made with StuffIt Deluxe 6.5 and 7.0 for Macintosh verify the member listing and exact
+data/resource fork bytes across the Mac OS 9 and Mac OS X archive variants; the specific compression method of each
+member is not part of that acceptance test.
 
 Method 2 uses the Compress-style LZW stream: codes are least-significant-bit first, begin at 9 bits and grow to 14;
 in block mode, code 256 clears the dictionary and the remainder of its eight-code group is skipped before reading
@@ -275,5 +336,7 @@ Vectors use original StuffIt Deluxe 6.5.1 archives from the CC0 test corpus and 
 bytes, including randomized blocks. The v5 member layout and per-fork integration are **[Fitted]** against those
 original-application archives.
 
-The v1–4 record layout, archive-level comments, complete folder metadata and
-verification against original-application archives remain unimplemented. See Phase 10 in [the project plan](../PLAN.md).
+The legacy v1/v2 reader is implemented. Original-application coverage currently includes a flat version-2 archive;
+version 1, nested-folder metadata, and broader legacy interoperability remain unverified. Archive-level comment
+placement has an original-app test through the `SitC` resource described above. See Phase 10 in
+[the project plan](../PLAN.md).

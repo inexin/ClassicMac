@@ -62,6 +62,7 @@ public sealed class LhaReader : IContainerReader
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
         var files = new List<MacFile>();
         long expandedBytes = 0;
+        int entryCount = 0;
         int offset = 0;
         bool foundEndMarker = false;
 
@@ -103,6 +104,8 @@ public sealed class LhaReader : IContainerReader
                 headerLevel is not 2 and not 3 && headerLength > MaximumHeaderLength ||
                 headerLength > archive.Length - offset)
                 throw new InvalidDataException("An LHA header is truncated or has an invalid size.");
+            if (++entryCount > context.Options.MaxVolumeEntries)
+                throw new InvalidDataException("The LHA archive exceeds the configured entry limit.");
 
             ReadOnlySpan<byte> header = archive.AsSpan(offset, headerLength);
             if (headerLevel > 3)

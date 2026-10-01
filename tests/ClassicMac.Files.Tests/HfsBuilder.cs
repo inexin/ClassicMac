@@ -141,7 +141,8 @@ internal sealed class HfsBuilder
                 (uint)ExtentsTreeNodes, overflow.Count, usedNodes: overflow.Count > 0 ? 2 : 1, maxKeyLength: 7);
         }
 
-        var image = new byte[(FirstAllocationBlock + allocation.Count) * Block];
+        // The allocation area is followed by two reserved sectors, with the alternate MDB in the first.
+        var image = new byte[(FirstAllocationBlock + allocation.Count + 2) * Block];
         for (var i = 0; i < allocation.Count; i++) allocation[i].CopyTo(image, (FirstAllocationBlock + i) * Block);
 
         var mdb = image.AsSpan(1024);
@@ -166,6 +167,7 @@ internal sealed class HfsBuilder
         ExtentRecord([(catalogStart, 4)]).CopyTo(mdb[0x96..]);
         for (var i = 0; i < allocated.Count; i++)
             if (allocated[i]) image[3 * Block + (i >> 3)] |= (byte)(0x80 >> (i & 7));
+        image.AsSpan(1024, 162).CopyTo(image.AsSpan(image.Length - 1024, 162));
         return image;
     }
 

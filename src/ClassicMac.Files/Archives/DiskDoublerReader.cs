@@ -117,13 +117,44 @@ public sealed class DiskDoublerReader : IContainerReader
                 continue;
             }
 
-            // [Fitted] Original DiskDoubler Pro 4.1.1 archives can contain 0x1000 records whose
-            // payload does not use the standard 0xABCD0054 file header. Their record boundaries
-            // remain usable, so skip them and continue extracting standard 0x5000 file records.
             if (entryType == 0x1000)
             {
-                context.Report(DiagnosticSeverity.Warning, "archive.entry-unsupported",
-                    $"DiskDoubler DDA2 entry type 0x1000 is unsupported for '{name}'; the entry is skipped.", offset);
+                // [Fitted] DiskDoubler Pro 4.1.1 uses a 44-byte metadata block followed by raw forks
+                // for 0x1000 records in its original DDA2 archive. The layout is verified against
+                // its JPEG and PNG entries in the CC0 corpus; the checksum fields are not interpreted.
+                const int rawFileMetadataLength = 44;
+                int metadataOffset = checked(offset + RecordHeaderLength);
+                if (recordLength < RecordHeaderLength + rawFileMetadataLength)
+                    throw new InvalidDataException("A raw DiskDoubler DDA2 file record is truncated.");
+
+                int rawDataLength = ReadLength(U32(archive, metadataOffset + 32), "data fork");
+                int rawResourceLength = ReadLength(U32(archive, metadataOffset + 36), "resource fork");
+                int rawPayloadOffset = checked(metadataOffset + rawFileMetadataLength);
+                long rawPayloadLength = (long)rawDataLength + rawResourceLength;
+                if (rawPayloadLength > recordEnd - rawPayloadOffset)
+                    throw new InvalidDataException("A raw DiskDoubler DDA2 fork payload extends past its record.");
+
+                expandedBytes = checked(expandedBytes + rawPayloadLength);
+                if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+                    throw new InvalidDataException("DiskDoubler extraction exceeds the configured expanded-size limit.");
+
+                uint rawCreation = U32(archive, metadataOffset + 8);
+                uint rawModification = U32(archive, metadataOffset + 12);
+                var rawType = new FourCC(archive.AsSpan(metadataOffset + 16, 4));
+                var rawCreator = new FourCC(archive.AsSpan(metadataOffset + 20, 4));
+                var rawFinderFlags = (FinderFlags)U16(archive, metadataOffset + 24);
+                byte[] rawData = archive.AsSpan(rawPayloadOffset, rawDataLength).ToArray();
+                byte[] rawResource = archive.AsSpan(rawPayloadOffset + rawDataLength, rawResourceLength).ToArray();
+                files.Add(new MacFile
+                {
+                    Name = name,
+                    FolderPath = folders.ToArray(),
+                    FinderInfo = new FinderInfo { Type = rawType, Creator = rawCreator, Flags = rawFinderFlags },
+                    Created = Date(rawCreation),
+                    Modified = Date(rawModification),
+                    DataFork = ForkData.FromBytes(rawData),
+                    ResourceFork = ForkData.FromBytes(rawResource),
+                });
                 offset = recordEnd;
                 continue;
             }
@@ -393,17 +424,46 @@ public sealed class DiskDoublerReader : IContainerReader
         return files;
     }
 
-    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 4 or 5 or 6 or 7 or 8 or 9 or 10;
+    private static bool IsSupportedMethod(int method) => method is 0 or 1 or 2 or 3 or 4 or 5 or 6 or 7 or 8 or 9 or 10;
 
-    private static bool IsSupportedDelta(int delta) => delta is 0 or 1;
+    private static bool IsSupportedDelta(int delta) => delta is 0 or 1 or 2;
 
     private static void ApplyDelta(Span<byte> bytes, int delta)
     {
         if (delta == 0) return;
 
+        if (delta == 2)
+        {
+            ApplyThreeLaneDelta(bytes);
+            return;
+        }
+
         // [Fitted] XADMaster applies its default distance-1 delta filter after fork decompression.
         for (int index = 1; index < bytes.Length; index++)
             bytes[index] = unchecked((byte)(bytes[index] + bytes[index - 1]));
+    }
+
+    private static void ApplyThreeLaneDelta(Span<byte> bytes)
+    {
+        // [Reference] Delta type 2 accumulates three interleaved byte lanes, as macutils' delta3 routine does.
+        byte lane0 = 0;
+        byte lane1 = 0;
+        byte lane2 = 0;
+        for (int index = 0; index < bytes.Length; index += 3)
+        {
+            lane0 = unchecked((byte)(lane0 + bytes[index]));
+            bytes[index] = lane0;
+            if (index + 1 < bytes.Length)
+            {
+                lane1 = unchecked((byte)(lane1 + bytes[index + 1]));
+                bytes[index + 1] = lane1;
+            }
+            if (index + 2 < bytes.Length)
+            {
+                lane2 = unchecked((byte)(lane2 + bytes[index + 2]));
+                bytes[index + 2] = lane2;
+            }
+        }
     }
 
     private static byte[] DecodeFork(ReadOnlySpan<byte> input, int outputLength, int method,
@@ -412,6 +472,7 @@ public sealed class DiskDoublerReader : IContainerReader
         if (method == 0) return input.ToArray();
         if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);
         if (method == 2) return DecodeAdaptiveHuffman(input, outputLength, info1, info2);
+        if (method == 3) return DecodeRunLength(input, outputLength);
         if (method == 5)
         {
             if (input.IsEmpty)
@@ -432,6 +493,57 @@ public sealed class DiskDoublerReader : IContainerReader
         return headerSum == 0
             ? CompactProLzhDecoder.Decode(compressed, outputLength)
             : CompactProReader.DecodeRle8182(compressed, outputLength);
+    }
+
+    private static byte[] DecodeRunLength(ReadOnlySpan<byte> input, int outputLength)
+    {
+        // [Reference] Method 3's 0x44 escape/repeat grammar follows macutils' explicitly untested reader.
+        const byte escape = 0x44;
+        byte[] output = new byte[outputLength];
+        int sourceOffset = 0;
+        int outputOffset = 0;
+        byte previous = 0;
+        bool hasPrevious = false;
+
+        while (sourceOffset < input.Length)
+        {
+            byte value = input[sourceOffset++];
+            if (value != escape)
+            {
+                if (outputOffset == output.Length)
+                    throw new InvalidDataException("A DiskDoubler method-3 fork expands beyond its declared length.");
+                output[outputOffset++] = value;
+                previous = value;
+                hasPrevious = true;
+                continue;
+            }
+
+            if (sourceOffset == input.Length)
+                throw new InvalidDataException("A DiskDoubler method-3 escape is missing its repeat count.");
+
+            int repeatCount = input[sourceOffset++];
+            if (repeatCount == 0)
+            {
+                if (outputOffset == output.Length)
+                    throw new InvalidDataException("A DiskDoubler method-3 fork expands beyond its declared length.");
+                output[outputOffset++] = escape;
+                previous = escape;
+                hasPrevious = true;
+                continue;
+            }
+
+            if (!hasPrevious)
+                throw new InvalidDataException("A DiskDoubler method-3 repeat has no preceding byte.");
+            int additionalCopies = repeatCount - 1;
+            if (additionalCopies > output.Length - outputOffset)
+                throw new InvalidDataException("A DiskDoubler method-3 fork expands beyond its declared length.");
+            output.AsSpan(outputOffset, additionalCopies).Fill(previous);
+            outputOffset += additionalCopies;
+        }
+
+        if (outputOffset != output.Length)
+            throw new InvalidDataException("A DiskDoubler method-3 fork ends before its declared length.");
+        return output;
     }
 
     private static byte[] DecodeStacLzs(ReadOnlySpan<byte> input, int outputLength)
@@ -721,10 +833,7 @@ public sealed class DiskDoublerReader : IContainerReader
                 suffix[nextCode] = firstByte;
                 nextCode++;
                 if (codeBits < maximumBits && nextCode > (1 << codeBits) - 1)
-                {
-                    AlignLzwCodeGroup(ref bitOffset, codeBits);
                     codeBits++;
-                }
             }
             previousCode = code;
         }
