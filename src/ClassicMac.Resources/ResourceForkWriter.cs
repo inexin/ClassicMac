@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ClassicMac.Core;
 using static ClassicMac.Resources.ResourceForkFormat;
 
 namespace ClassicMac.Resources
@@ -80,24 +80,26 @@ namespace ClassicMac.Resources
 
             var output = new byte[total];
             var span = output.AsSpan();
-            WriteHeader(span, dataOffset, mapOffset, dataLength, mapLength);
+            var writer = new BigEndianWriter(output);
+            WriteHeader(writer, 0, dataOffset, mapOffset, dataLength, mapLength);
             fork.SystemData.Span.CopyTo(span[HeaderLength..]);
             fork.ApplicationData.Span.CopyTo(span[(HeaderLength + ResourceFork.SystemDataLength)..]);
 
             foreach (var (resource, offset) in items)
             {
                 var at = dataOffset + offset;
-                BinaryPrimitives.WriteUInt32BigEndian(span[at..], (uint)resource.Length);
+                writer.WriteUInt32At(at, (uint)resource.Length);
                 resource.GetData().Span.CopyTo(span[(at + 4)..]);
             }
 
-            var map = span[(int)mapOffset..];
-            WriteHeader(map, dataOffset, mapOffset, dataLength, mapLength);
+            var mapAt = (int)mapOffset;
+            var map = span[mapAt..];
+            WriteHeader(writer, mapAt, dataOffset, mapOffset, dataLength, mapLength);
             fork.MapReservedData.Span.CopyTo(map[HeaderLength..]);
             map[MapAttributesOffset] = (byte)(fork.Attributes & ~NotOnDisk);
             map[MapFlagsOffset] = (byte)fork.MapFlags;
-            BinaryPrimitives.WriteUInt16BigEndian(map[MapTypeListOffsetOffset..], MapHeaderLength);
-            BinaryPrimitives.WriteUInt16BigEndian(map[MapNameListOffsetOffset..], (ushort)nameListOffset);
+            writer.WriteUInt16At(mapAt + MapTypeListOffsetOffset, MapHeaderLength);
+            writer.WriteUInt16At(mapAt + MapNameListOffsetOffset, (ushort)nameListOffset);
 
             foreach (var resource in named)
             {
@@ -107,28 +109,27 @@ namespace ClassicMac.Resources
                 name.Bytes.CopyTo(map[(at + 1)..]);
             }
 
-            var typeList = map[MapHeaderLength..];
-            BinaryPrimitives.WriteUInt16BigEndian(typeList, (ushort)(groups.Count - 1));
+            var typeListAt = mapAt + MapHeaderLength;
+            writer.WriteUInt16At(typeListAt, (ushort)(groups.Count - 1));
             var referenceOffset = typeListLength; // from the start of the type list
             for (var i = 0; i < groups.Count; i++)
             {
                 var (type, resources) = groups[i];
-                var entry = typeList[(TypeCountLength + i * TypeEntryLength)..];
-                type.CopyTo(entry);
-                BinaryPrimitives.WriteUInt16BigEndian(entry[4..], (ushort)(resources.Count - 1));
-                BinaryPrimitives.WriteUInt16BigEndian(entry[6..], (ushort)referenceOffset);
+                var entry = typeListAt + TypeCountLength + i * TypeEntryLength;
+                writer.WriteFourCCAt(entry, type);
+                writer.WriteUInt16At(entry + 4, (ushort)(resources.Count - 1));
+                writer.WriteUInt16At(entry + 6, (ushort)referenceOffset);
                 if (referenceOffset > ushort.MaxValue)
                     throw new InvalidOperationException("The reference lists exceed the 64 KiB a type list can address.");
 
                 foreach (var resource in resources)
                 {
-                    var reference = typeList[referenceOffset..];
-                    BinaryPrimitives.WriteInt16BigEndian(reference, resource.Id);
-                    BinaryPrimitives.WriteUInt16BigEndian(reference[2..],
-                        nameOffsets.TryGetValue(resource, out var nameAt) ? (ushort)nameAt : NoName);
+                    var reference = typeListAt + referenceOffset;
+                    writer.WriteInt16At(reference, resource.Id);
+                    writer.WriteUInt16At(reference + 2, nameOffsets.TryGetValue(resource, out var nameAt) ? (ushort)nameAt : NoName);
                     var packed = (uint)dataOffsets[resource] | (uint)(resource.Attributes & ~ResourceAttributes.Changed) << 24;
-                    BinaryPrimitives.WriteUInt32BigEndian(reference[4..], packed);
-                    BinaryPrimitives.WriteUInt32BigEndian(reference[8..], resource.StoredHandle);
+                    writer.WriteUInt32At(reference + 4, packed);
+                    writer.WriteUInt32At(reference + 8, resource.StoredHandle);
                     referenceOffset += ReferenceEntryLength;
                 }
             }
@@ -137,12 +138,12 @@ namespace ClassicMac.Resources
 
         public static void Write(ResourceFork fork, Stream output) => output.Write(Write(fork));
 
-        private static void WriteHeader(Span<byte> at, long dataOffset, long mapOffset, long dataLength, long mapLength)
+        private static void WriteHeader(BigEndianWriter writer, int at, long dataOffset, long mapOffset, long dataLength, long mapLength)
         {
-            BinaryPrimitives.WriteUInt32BigEndian(at, (uint)dataOffset);
-            BinaryPrimitives.WriteUInt32BigEndian(at[4..], (uint)mapOffset);
-            BinaryPrimitives.WriteUInt32BigEndian(at[8..], (uint)dataLength);
-            BinaryPrimitives.WriteUInt32BigEndian(at[12..], (uint)mapLength);
+            writer.WriteUInt32At(at, (uint)dataOffset);
+            writer.WriteUInt32At(at + 4, (uint)mapOffset);
+            writer.WriteUInt32At(at + 8, (uint)dataLength);
+            writer.WriteUInt32At(at + 12, (uint)mapLength);
         }
     }
 }
