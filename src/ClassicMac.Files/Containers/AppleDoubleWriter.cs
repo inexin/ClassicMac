@@ -41,15 +41,15 @@ namespace ClassicMac.Files.Containers
             var writer = new BigEndianWriter(header);
             writer.WriteUInt32At(0, single ? SingleMagic : DoubleMagic);
             writer.WriteUInt32At(4, Version2);
-            writer.WriteUInt16At(24, (ushort)entries);
+            writer.WriteUInt16At(24, entries);
 
             var offset = first;
             var entry = HeaderLength;
             void Entry(uint id, int length)
             {
                 writer.WriteUInt32At(entry, id);
-                writer.WriteUInt32At(entry + 4, (uint)offset);
-                writer.WriteUInt32At(entry + 8, (uint)length);
+                writer.WriteUInt32At(entry + 4, offset);
+                writer.WriteUInt32At(entry + 8, length);
                 entry += EntryLength;
                 offset += length;
             }
@@ -69,14 +69,14 @@ namespace ClassicMac.Files.Containers
             if (single)
             {
                 writer.WriteUInt32At(entry, DataForkEntry);
-                writer.WriteUInt32At(entry + 4, (uint)offset);
-                writer.WriteUInt32At(entry + 8, (uint)data);
+                writer.WriteUInt32At(entry + 4, offset);
+                writer.WriteUInt32At(entry + 8, data);
                 entry += EntryLength;
                 offset += (int)data;
             }
             writer.WriteUInt32At(entry, ResourceForkEntry);
-            writer.WriteUInt32At(entry + 4, (uint)offset);
-            writer.WriteUInt32At(entry + 8, (uint)file.ResourceFork.Length);
+            writer.WriteUInt32At(entry + 4, offset);
+            writer.WriteUInt32At(entry + 8, file.ResourceFork.Length);
 
             output.Write(header);
             if (single)

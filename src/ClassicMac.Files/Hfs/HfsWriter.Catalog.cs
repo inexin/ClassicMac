@@ -238,16 +238,16 @@ public static partial class HfsWriter
             ushort oldFree = U16(volumeReader, MdbOffset + 0x22);
             if (oldFree < allocatedSystemBlocks)
                 throw new InvalidDataException("The HFS free-block count cannot cover catalog growth.");
-            volume.WriteUInt16At(MdbOffset + 0x22, checked((ushort)(oldFree - allocatedSystemBlocks)));
+            volume.WriteUInt16At(MdbOffset + 0x22, oldFree - allocatedSystemBlocks);
             state.Bitmap.CopyTo(state.Result, state.BitmapOffset);
-            volume.WriteUInt32At(MdbOffset + 0x92, checked((uint)state.Catalog.Length));
+            volume.WriteUInt32At(MdbOffset + 0x92, state.Catalog.Length);
             state.Result.AsSpan(MdbOffset + 0x96, 12).Clear();
             for (int index = 0; index < Math.Min(3, state.CatalogExtents.Count); index++)
                 WriteExtent(state.Result.AsSpan(MdbOffset + 0x96, 12), index,
                     state.CatalogExtents[index].Start, state.CatalogExtents[index].Count);
             if (state.AllocatedExtentsTreeBlocks != 0)
             {
-                volume.WriteUInt32At(MdbOffset + 0x82, checked((uint)state.ExtentsTree.Length));
+                volume.WriteUInt32At(MdbOffset + 0x82, state.ExtentsTree.Length);
                 state.Result.AsSpan(MdbOffset + 0x86, 12).Clear();
                 for (int index = 0; index < state.ExtentsTreeExtents.Count; index++)
                     WriteExtent(state.Result.AsSpan(MdbOffset + 0x86, 12), index,
@@ -448,10 +448,10 @@ public static partial class HfsWriter
         byte[] encoded = MacRoman.Encode(name);
         int length = (7 + encoded.Length + 1) & ~1;
         var key = new BigEndianWriter(length);
-        key.WriteByte(checked((byte)(length - 1)));
+        key.WriteByte(length - 1);
         key.WriteByte(0);
         key.WriteUInt32(parent);
-        key.WriteByte(checked((byte)encoded.Length));
+        key.WriteByte(encoded.Length);
         key.WriteBytes(encoded);
         key.WriteZeros(length - key.Length);
         return key.ToArray();
@@ -515,7 +515,7 @@ public static partial class HfsWriter
         int updated = value + adjustment;
         if (updated is < 0 or > ushort.MaxValue)
             throw new InvalidDataException("The HFS parent folder valence cannot represent this change.");
-        new BigEndianWriter(folder.Data).WriteUInt16At(4, (ushort)updated);
+        new BigEndianWriter(folder.Data).WriteUInt16At(4, updated);
     }
 
     private static void AddCount(byte[] image, int offset, int delta) =>

@@ -128,7 +128,7 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The HFS volume free-block count disagrees with the requested allocation change.");
             if (resize.AllocatedBlocks != 0 || resize.ReleasedBlocks != 0)
             {
-                volume.WriteUInt16At(MdbOffset + 0x22, checked((ushort)remainingFreeBlocks));
+                volume.WriteUInt16At(MdbOffset + 0x22, remainingFreeBlocks);
                 workingBitmap.CopyTo(result.AsSpan(bitmapOffset, bitmapLength));
             }
             bool changedExtentsTree = resize.TreeChanged;
@@ -136,7 +136,7 @@ namespace ClassicMac.Files.Hfs
             uint releasedBlocks = resize.ReleasedBlocks;
             if (resizeContext.AllocatedTreeBlocks != 0)
             {
-                volume.WriteUInt32At(MdbOffset + 0x82, checked((uint)extFile.Length));
+                volume.WriteUInt32At(MdbOffset + 0x82, extFile.Length);
                 result.AsSpan(MdbOffset + 0x86, 12).Clear();
                 for (int index = 0; index < extFileExtents.Count; index++)
                     WriteExtent(result.AsSpan(MdbOffset + 0x86, 12), index,
@@ -147,8 +147,8 @@ namespace ClassicMac.Files.Hfs
             ulong physicalBytes = extents.Aggregate<(ushort Start, ushort Count), ulong>(0, (total, e) => total + (ulong)e.Count * blockSize);
             if (physicalBytes > uint.MaxValue) throw new InvalidDataException("The allocated fork exceeds HFS's 32-bit physical length field.");
             var matchRecord = new BigEndianWriter(match.Data);
-            matchRecord.WriteUInt32At(forkPhysicalLengthOffset, (uint)physicalBytes);
-            matchRecord.WriteUInt32At(forkLengthOffset, (uint)data.Length);
+            matchRecord.WriteUInt32At(forkPhysicalLengthOffset, physicalBytes);
+            matchRecord.WriteUInt32At(forkLengthOffset, data.Length);
             DateTime writeTime = DateTime.Now;
             uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
             matchRecord.WriteUInt32At(48, macWriteTime);
@@ -254,7 +254,7 @@ namespace ClassicMac.Files.Hfs
                 keyWriter.WriteByte(7);
                 keyWriter.WriteByte(context.ForkType);
                 keyWriter.WriteUInt32(context.FileId);
-                keyWriter.WriteUInt16((ushort)pendingOverflowBlockStart);
+                keyWriter.WriteUInt16(pendingOverflowBlockStart);
                 var key = keyWriter.ToArray();
                 while (true)
                 {
@@ -569,7 +569,7 @@ namespace ClassicMac.Files.Hfs
             var header = new BigEndianWriter(rebuilt);
             header.WriteUInt16At(14, depth);
             header.WriteUInt32At(14 + 2, levelNodes.Count == 0 ? 0 : levelNodes[0].Number);
-            header.WriteUInt32At(14 + 6, checked((uint)records.Count));
+            header.WriteUInt32At(14 + 6, records.Count);
             header.WriteUInt32At(14 + 10, leaves.Count == 0 ? 0 : leaves[0].Number);
             header.WriteUInt32At(14 + 14, leaves.Count == 0 ? 0 : leaves[^1].Number);
             header.WriteUInt32At(14 + 26, nodeCount - checked((uint)allocated.Count));
@@ -717,8 +717,8 @@ namespace ClassicMac.Files.Hfs
             var writer = new BigEndianWriter(rebuilt);
             for (int i = 0; i < offsets.Count; i++)
                 writer.WriteUInt16At(NodeSize - 2 * (i + 1), offsets[i]);
-            writer.WriteUInt16At(NodeSize - 2 * (offsets.Count + 1), checked((ushort)at));
-            writer.WriteUInt16At(10, checked((ushort)offsets.Count));
+            writer.WriteUInt16At(NodeSize - 2 * (offsets.Count + 1), at);
+            writer.WriteUInt16At(10, offsets.Count);
             return true;
         }
 
