@@ -541,8 +541,8 @@ mismatch is also a warning, and reading still uses the fork's actual length.
 Header-node record starts must match the 106-byte header record, 128-byte user record and following map record layout;
 invalid boundaries produce `hfs.bad-btree-header`.
 It checks that the bitmap covers the nodes, follows required linked map nodes, and compares its free-bit count with
-`bthFree`. It warns if the header or a leaf node is marked free, or if a map node is malformed or marked free; catalog
-files and forks remain readable. The leaf-chain endpoint and sum of leaf-node record counts are compared with
+`bthFree`. It warns (`hfs.bad-btree-map`) if these disagree, if the header or a leaf node is marked free, or if a map
+node is malformed or marked free; catalog files and forks remain readable. The leaf-chain endpoint and sum of leaf-node record counts are compared with
 `bthLNode` and `bthNRecs`, with mismatches reported as `hfs.bad-btree-header`; each leaf's backward link is also
 checked against the preceding leaf, with defects reported as `hfs.bad-link`.
 
@@ -1148,6 +1148,10 @@ followed in its code.
 | `hfs.plus-hardlink-private-directory-invalid` | W | The directory-hard-link private folder lacks the immutable owner flag or sticky mode bit | Keeps reading the volume | Apple `dirhardlink.c` checks these flags **[Code]** |
 | `hfs.plus-hardlink-ancestor-flag-missing` | W | A directory hard-link alias ancestor lacks the `HasChildLink` catalog flag | Keeps the readable directory aliases and their contents | Apple `dirhardlink.c` checks ancestor flags **[Code]** |
 | `hfs.bad-link` | E | A leaf link leaves the B-tree or returns to a node already read | Stops the walk; keeps the records read | Not traced |
+| `hfs.bad-btree-header` | W | A B-tree header node has a bad descriptor, record boundaries, root/depth, node count, node size, maximum key length or leaf totals, or the fork holds a partial node | Reads on | Not traced |
+| `hfs.bad-btree-map` | W | The node map does not cover the tree, its map nodes are malformed or marked free, a used node is marked free, or the free count differs from `bthFree` | Reads on | Not traced |
+| `hfs.overflow-start` | W | An extents-overflow key's `xkrFABN` differs from the blocks covered by the extents before it | Keeps the fork readable from its records | Not traced |
+| `hfs.overflow-record` | W | An extents-overflow key or extent record has the wrong fixed size | Skips incomplete records; reads the rest | Not traced |
 | `hfs.not-leaf` | E | A node on the leaf chain is not a leaf | Stops the walk; keeps the records read | Not traced |
 | `hfs.bad-record-offset` | E | A record's offsets in its node are impossible | Skips the record | Not traced |
 | `hfs.bad-record` | W | A catalog key is malformed, its record type is unknown, or a folder/file record is too short | Skips it | Not traced |

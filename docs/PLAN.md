@@ -721,7 +721,7 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 
 Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
-**Status (2026-09-29):**
+**Status (2026-10-01):**
 
 | # | Phase | Status |
 |---|---|---|
@@ -734,7 +734,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 7 | Editor II | Done (forms, import, templates with toggle, in-view hex editing) |
 | 8 | Editor III (HFS writing) | Done for plain HFS: fork replacement, file/folder create and delete, constrained B-tree growth, and HFS image Save As |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
-| 10 | Later (HFS+, archives) | In progress |
+| 10 | HFS+ and archives | In progress: see the table in the phase |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
 
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
@@ -748,7 +748,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    Mac data; `.sea`/`.smi` detection; recursive unwrapping through
    all of them. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
-   (`classicmac unpack`, built: every corpus image unpacks and reads back identically).
+   (`classicmac unpack`, built: every corpus image unpacks and reads back identically). The classic HFS reader also
+   reports damaged B-tree headers and node maps, out-of-order or duplicate keys and IDs, and malformed or misplaced
+   extents-overflow records as diagnostics while reading on ([formats/HFS-MFS.md](formats/HFS-MFS.md) §6, §8, §12).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
@@ -806,154 +808,27 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    layer (done, 2026-09-29)**; 3. shared types (Core's geometry; the renderer on `.Fonts`, done 2026-09-29, pixel-identical
    on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
-10. **Later** — In progress: HFS+/HFSX volume and HFS-wrapper reads now list catalog files, Unicode paths, Finder
-    info, dates and both forks (including overflow extents), requires the extents-overflow B-tree even when empty,
-    validates B-tree types, key-layout attributes, the
-    catalog/extents/attributes key-length maxima, the catalog node-size minimum, control-file types for the catalog,
-    extents-overflow and attributes trees, header nodes,
-    node maps (including exactly the required chained map nodes, matching allocated nodes, free counts, zero unused
-    bytes and zero-filled free nodes in the Catalog B-tree), roots, index graphs,
-    sibling links, exact catalog key and file/folder record lengths, bounded catalog thread records, zero-padded
-    attribute keys and unique leaf keys,
-    and HFSX key-compare modes plus binary and case-folded catalog key order, extents-tree key order, index sibling
-    ranges and child key bounds,
-    reserved catalog ID rules, folder flag validity, BSD object-type validation, and catalog names that are nonempty,
-    well-formed UTF-16 and canonically decomposed (Unicode 3.2; object names `.` and `..` are rejected; HFS+ also
-    accepts the 44 known Unicode 2.1 spellings whose decomposition changed; HFSX checks post-Jaguar breve + dot-above,
-    Greek tonos/dialytika and the known Bengali, Odia, Gurmukhi, Thai, Lao and Tibetan `fsck_hfs` corrections; equal-class
-    repeated combining marks remain valid; the Unicode 2.1 scalar forms and sequence corrections identified by Apple's
-    `FixDecomps` are covered by feature tests),
-    root-parent ID, unique catalog IDs and next-ID consistency, parent IDs that resolve to folders, file/folder threads,
-    folder valences and parent chains (including empty folders), volume-header file/folder counts against catalog
-    records before private hard-link inode filtering, and HFSX `folderCount` values, including missing-flag cases.
-    The legacy StuffIt reader handles v1 sequential records with folder markers and v2 linked entries for stored
-    forks, validates previous-sibling and parent links against traversal, supports method-6 fixed-Huffman + PackBits
-    and PackBits-only blocks, and reads archive comments from the `SitC` resource;
-    these behaviors have hand-built coverage; an original StuffIt Deluxe 4.5 archive now verifies legacy v2 traversal
-    and method-13 extraction of both PICT forks and a resource fork; an original `.comment.sit` archive and its
-    AppleDouble companion verify the `SitC` archive comment. Legacy v1 and method 6 still lack original-app
-    verification. The StuffIt v5 reader handles stored, RLE90, Compress/LZW, Huffman, LZAH (method 5), both
-    method-6 fixed-Huffman + PackBits and PackBits-only blocks, MW (method 8),
-    LZ + Huffman (method 13), Installer (method 14), and Arsenic (method 15) forks. Method 13 is checked against a CC0
-    legacy archive made by StuffIt Deluxe 4.5; original v5 archives from Deluxe 6.5 and 7.0, in both Mac OS 9 and
-    Mac OS X variants, verify member listings and exact data/resource fork output; method 15 is checked against a CC0
-    v5 archive made by Deluxe 6.5.1.
-    Method 14 currently has hand-built protocol vectors only. The StuffIt split-file reader reassembles SegmentIt volumes
-    with a fixed per-volume header, restores
-    both forks and Finder metadata, and recursively unwraps a reconstructed `.sit` archive; this currently has
-    hand-built tests, with an original SegmentIt volume set still needed. The Compact Pro reader parses directory and
-    folder entries, extracts RLE8182 and LZH+RLE forks, and
-    resolves fork payloads in sibling volume files; missing volumes are reported per entry. Compact Pro's documented
-    segmented-archive workflow (open the final segment, then locate other segments from their stored volume numbers)
-    is covered through the default unwrapping pipeline with a hand-built final-segment fixture; verification against
-    an authentic segmented archive remains. Compact Pro archive comments are reported as diagnostics. Compression is
-    fitted to published third-party descriptions and hand-built vectors; verification against an archive made by the
-    original application remains. The
-    PackIt reader extracts stored (`PMag`), password-protected XOR and DES uncompressed (`PMa1`/`PMa2`) and Huffman
-    (`PMa5`/`PMa6`) entries, plus unencrypted Huffman (`PMa4`); reserved encrypted methods (`PMa3`/`PMa7`) remain
-    unsupported. A standalone LHA reader extracts level-0 through level-3 files with `-lh0-`, adaptive-Huffman
-    `-lh1-`/`-lh2-`, legacy static-Huffman `-lh3-`, LArc `-lzs-` and `-lz5-`, and static-Huffman LZSS `-lh4-`, `-lh5-`, `-lh6-` and `-lh7-`.
-    The DiskDoubler reader
-    parses DDA2 archive paths and extracts stored, method-1 MacCompress LZW,
-    method-2 adaptive Huffman, method-3 RLE, method-4 Huffman, method-5 adaptive Huffman, method-6 AD2, method-8 Compact Pro,
-    method-7 Stac LZS, method-9 AD1, and method-10 DDn forks. Standalone compressed files extract stored and methods 1, 2, 3, 4, 5, 6, 7, 8, 9 and 10. Methods 6, 9 and 10 are
-    verified against authentic DiskDoubler Pro 4.1.1 standalone files, and methods 1 and 8 are verified against both
-    forks of authentic DiskDoubler 3.7.7 standalone files; methods 6, 9 and 10 are also tested in DDA2 records. Method 5 is
-    fitted to XADMaster behavior and has hand-built vectors but no
-    original-app fixture yet. Method 7 uses the RFC 1974 stream grammar, fitted XADMaster wrapper transforms and XOR
-    checksum behavior; its original-app fixture remains missing. Method 3's escape/repeat behavior has hand-built
-    standalone and DDA2 vectors; verification against an original-app fixture remains. Delta type 1 applies
-    cumulative-byte preprocessing after fork decompression; delta type 2 independently accumulates three interleaved
-    byte lanes modulo 256, with hand-built vectors for both fork kinds and partial final groups. This behavior is
-    reference-derived and lacks original-app verification; other delta types remain unsupported.
-    Legacy DDAR stored-fork archives are also supported; DDA2 archive-header CRCs and standalone file-header CRCs
-    (including the old zero-checksum form) follow fitted XADMaster behavior. A CC0 original Pro 4.1.1 DDA2 archive
-    fixture verifies extraction of both PICT forks against the uncompressed source files and of the raw JPEG and PNG
-    entries, including Finder type/creator and fork lengths. The 0x1000 layout is fitted to those original-app entries;
-    its checksum fields remain unchecked, and broader DDA2 interoperability remains unverified.
-    Standalone methods 1, 6, 8, 9 and 10 are verified against original-app files; remaining archive methods and formats
-    remain. HFS+ validation has a bounded read-path scope: TN1150's catalog-ID and allocation-file consistency
-    checks, B-tree structure and ordering, catalog/fork/attribute rules needed to enumerate files, and the documented
-    HFSX, journal metadata, symlink and hard-link behaviors are mapped to feature tests in
-    [HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus). General-purpose `fsck_hfs` parity and repair validation are not
-    Phase 10 targets. An optional original-image test verifies a journaled Mac OS X HFS+ image from Digital Corpora's
-    `nps-2009-hfsjtest1` corpus (SHA-256 `BEB7795DD6D1A5319F9C20101855FFFF9665FCC11C6B23DE822D50C0D1E388EE`),
-    including the published contents of two files. Its attributes B-tree uses reserved header values accepted with a
-    warning; the test setup and source links are in
-    [TestData/HfsPlusOriginal/README.md](../tests/ClassicMac.Files.Tests/TestData/HfsPlusOriginal/README.md).
-    Broader cross-version and image-layout interoperability remains unverified.
-    The HFS+ reader requires the allocation file, checks catalog `textEncoding` values against the volume
-    `encodingsBitmap` (including TN1150's MacFarsi and MacUkrainian bit mappings, while allowing unused extra bits),
-    rejects overlapping allocation ranges and fork extents that claim blocks reserved for the primary/alternate
-    headers, and checks the allocation bitmap for catalog and special-file extents and every extent record in the
-    extents-overflow tree (including bad-block
-    extents), plus the attributes and startup special-file forks, including allocated extents in zero-logical-size
-    special forks, and defined fork-data and extent records in the
-    attributes B-tree; forks use overflow only after eight initial extents, non-final overflow records must be full,
-    matching overflow records must account for the declared blocks, each fork's logical size must fit its allocated
-    capacity, and unused extent descriptors must be zero.
-    Catalog B-tree reads obey the configured expanded-byte and volume-entry limits.
-    Attribute keys and child ranges are validated
-    in leaves and index nodes using Apple's HFS key comparator. Every non-bad-block overflow record must match a
-    catalog or special-file fork. It checks the alternate volume header's signature
-    and version, reporting a warning if the recovery
-    copy is invalid while continuing from the primary header; it also checks TN1150's reserved volume-header areas,
-    ignores reserved volume-attribute bits, and checks zero unused bitmap bits; it reports
-    unclean-unmount/inconsistent-volume flags and journaled volumes not replayed; journaled volumes' JournalInfoBlock
-    pointers, in-volume flags, journal ranges and allocated blocks are checked; the root journal files and their
-    single-extent mapping are checked too; initialized journal headers' fields, circular-buffer offsets, and checksum
-    are validated over the full 512- or 2,048-byte header sector, while a `NeedInit` flag skips header validation;
-    defects are reported as warnings;
-    mismatches between bitmap free
-    blocks and `freeBlocks`, and between
-    bad-block records and the volume header's spared-blocks attribute.
-    HFS Classic checks each extents-overflow key's `xkrFABN` against the allocation blocks covered by preceding
-    extent records; mismatches produce `hfs.overflow-start` while the fork remains readable. It also checks the fixed
-    overflow key and extent-record sizes, reporting `hfs.overflow-record` for malformed records; classic HFS B-tree
-    headers with an invalid node descriptor or record boundaries, root/depth values, a node count inconsistent with the
-    fork, a partial node, inconsistent leaf totals, invalid maximum key length, or non-512-byte node size produce
-    `hfs.bad-btree-header` while reads continue;
-    HFS Classic leaf backward links and catalog/extents key order are checked against the forward chain and Mac OS 9
-    comparison rules.
-    Classic HFS node maps check header/leaf allocation, map-node coverage and descriptors, and `bthFree` consistency; defects produce
-    `hfs.bad-btree-map` while reads continue. Classic HFS also diagnoses malformed catalog keys, duplicate or reserved
-    catalog IDs, and out-of-order or duplicate catalog/extents leaf keys while retaining readable records.
-    HFS+ and HFSX symbolic links expose their validated UTF-8 target alongside the raw data fork. Hard links resolve
-    to indirect-node forks while keeping the visible path and hiding private metadata; dangling links and partial
-    Finder signatures are reported, indirect-node names enforce TN1150's no-leading-zero decimal reference, directory
-    nodes with a link target are diagnosed, and estimated link-count mismatches and unreferenced indirect nodes are
-    reported informationally. Directory hard-link aliases resolve `dir_<CNID>` inode folders with the required
-    link-chain flag at every valid visible alias path; the first-link inline attribute, previous/next catalog IDs and
-    inode link count are checked, with missing or broken chains reported while files remain readable; ancestor folders'
-    `HasChildLink` flags and the private directory's immutable flag and sticky bit are validated; ordinary regular-file
-    BSD link counts, incomplete Finder alias signatures and stray directory hard-link chain flags are reported while
-    the records remain readable. Hard-link aliases that have allocated data-fork blocks are also reported while the
-    indirect node continues to supply their visible contents.
-    Nested inode contents are exposed through every alias.
-    The HFS+ B-tree reader validates even record boundaries, inline attribute declared lengths and padding, and exact
-    extents-overflow and defined attribute payload lengths; it matches each attribute fork-data record with its
-    ordered extension extents and declared logical and allocation sizes; index keys compare equal to the first key in
-    each child subtree, matching Apple's verifier;
-    [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) records the rules and the verifier-backed
-    thread and empty-root-leaf compatibility cases; indexed empty child subtrees are rejected. Extents-overflow
-    B-tree node sizes of 512, 1024 and 2048 bytes are
-    covered alongside the standard 4096-byte fixture. Attribute keys must refer to a catalog object or special-file
-    CNID; catalog objects' `HasAttributes` flags must agree with attribute-record presence and `HasSecurity` flags with
-    the ACL attribute, with mismatches reported while keeping readable objects. ACL payloads are checked against
-    Apple's file-security header, entry-count and ACE-size layout, and defined ACE kinds; malformed ACLs are reported
-    while objects remain readable. The bounded HFS+ read-path validation is complete within the scope and caveats
-    recorded above.
-    HFS+ (`ClassicMac.Files.Hfs`, Technical Note 1150); archives (`ClassicMac.Files.Archives`): StuffIt
-    1.x–4 and 5 with methods 0 (store), 1 (RLE90), 2 (LZW), 3 (Huffman), 5 (LZAH), 6 (fixed Huffman + PackBits),
-    8 (LZMW), 13 (LZ + Huffman),
-    14 (Installer) and 15 (Arsenic: BWT + arithmetic coding), encrypted archives reported, not opened; Compact Pro
-    (RLE81 + LZH); PackIt (stored, Huffman, encrypted raw and Huffman entries; reserved PMa3/PMa7 unsupported);
-    DiskDoubler (DDAR stored entries and DDA2 method IDs 0 through 10, including adaptive-tree Huffman (5) and Stac
-    LZS (7)); LHA level-0 through level-3 records with stored entries (`-lh0-`) and
-    adaptive-Huffman LZSS (`-lh1-`, `-lh2-`), legacy static-Huffman LZSS (`-lh3-`), LArc LZSS (`-lzs-`, `-lz5-`) and static-Huffman LZSS methods (`-lh4-` through
-    `-lh7-`); unverified original-application DiskDoubler methods and delta behavior, any other documented PackIt
-    methods, and other segmented archive formats not covered by Compact Pro or StuffIt split-file support remain.
-    Anything from row 5 of Inputs only on request.
+10. **HFS+ and archives** — read-only: HFS+ and HFSX volumes (also inside an HFS wrapper) in
+    `ClassicMac.Files.Hfs`, and the classic archive formats in `ClassicMac.Files.Archives`. The rules each reader follows
+    are in [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) §11 and [formats/ARCHIVES.md](formats/ARCHIVES.md);
+    this entry tracks only what is built and what is verified. "Fitted" means built from published descriptions or
+    other implementations and hand-built vectors, without an archive made by the original application.
+
+    | Format | Built | Verified against the original application | Remaining |
+    |---|---|---|---|
+    | HFS+ / HFSX | Catalog files with Unicode paths, Finder info, dates and both forks (with overflow extents); symbolic links; file and directory hard links; journal metadata checked, not replayed; a bounded read-path validation of TN1150 (§11) | A journaled Mac OS X image from Digital Corpora's `nps-2009-hfsjtest1` (optional test) | Broader cross-version and layout interoperability. `fsck_hfs` parity and repair are not targets |
+    | StuffIt 1.x–4 | v1 sequential records with folder markers, v2 linked entries; stored, method 6 (fixed Huffman + PackBits), method 13; `SitC` comments | StuffIt Deluxe 4.5 (v2 traversal, method 13); a `.comment.sit` with its AppleDouble companion (`SitC`) | v1 and method 6 |
+    | StuffIt 5 | Stored, RLE90 (1), LZW (2), Huffman (3), LZAH (5), method 6, LZMW (8), LZ + Huffman (13), Installer (14), Arsenic (15); encrypted archives reported, not opened | Deluxe 6.5 and 7.0, Mac OS 9 and Mac OS X variants (listings and exact forks); method 15 with Deluxe 6.5.1 | Method 14 (hand-built vectors only) |
+    | StuffIt split files | SegmentIt volumes reassembled, both forks and Finder info, the `.sit` inside unwrapped | — | An original SegmentIt volume set |
+    | Compact Pro | Directory and folders; RLE and LZH + RLE forks; multi-volume sets through sibling files, missing volumes reported per entry; comments as diagnostics | — (fitted) | An archive and a segmented set made by Compact Pro |
+    | PackIt | Stored (`PMag`), XOR- and DES-encrypted stored (`PMa1`, `PMa2`), Huffman (`PMa4`), encrypted Huffman (`PMa5`, `PMa6`) | — (fitted) | Reserved `PMa3`/`PMa7`; any other documented methods |
+    | DiskDoubler | DDAR stored entries; DDA2 archives and standalone files with methods 0–10; delta types 1 and 2; header CRCs (fitted) | Standalone methods 1 and 8 (DiskDoubler 3.7.7) and 6, 9, 10 (Pro 4.1.1); 6, 9, 10 in DDA2 records; a Pro 4.1.1 DDA2 archive (its `0x1000` layout fitted) | Methods 2, 3, 4, 5, 7 and the delta types; DDA2 checksum fields; other delta types |
+    | LHA | Header levels 0–3; `-lh0-`, `-lh1-`/`-lh2-`, `-lh3-`, `-lzs-`/`-lz5-`, `-lh4-` to `-lh7-` | — (fitted) | Archives made by LHa |
+
+    Other segmented archive formats remain, and anything from row 5 of Inputs is built only on request.
+    *Exit:* every format in the table reads its original-application fixtures with both forks and Finder info byte for
+    byte, a method still without one is marked fitted in [formats/ARCHIVES.md](formats/ARCHIVES.md), the journaled
+    HFS+ image lists and reads, and the corpus unpack baseline holds.
 11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
    - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's
      single segment with `DATA 0` relocations, Retro68's relocation stream, Apple's `dcmp` jump-table shim).
@@ -977,8 +852,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Viewer drag-out** of files and resources.
 - [ ] **CD images: multisession.**
 - [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
-- [ ] **Adopt Core big-endian span cursors:** after API review, migrate suitable sequential parsing and writing to `BigEndianReader` / `BigEndianWriter`; keep offset-based `BinaryPrimitives` where clearer.
   (a damaged fork opened and saved already comes out clean).
+- [x] **Big-endian reading and writing through Core:** every big-endian read and write goes through `BigEndianReader`
+  and `BigEndianWriter` (done 2026-10-01; see CLAUDE.md).
 
 ## Decisions
 
