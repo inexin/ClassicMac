@@ -288,6 +288,25 @@ public class HfsTests
     }
 
     [Fact]
+    public void A_classic_hfs_catalog_with_mac_os_key_lengths_that_leave_out_the_alignment_byte_reads_cleanly()
+    {
+        // Mac OS writes ckrKeyLen = 6 + n (the Finder's "Desktop DB" has 16, threads 6); hfsutils counts the pad byte.
+        var builder = new HfsBuilder { UncountedKeyPadding = true };
+        var games = builder.Folder(HfsBuilder.Root, "Games");
+        builder.File(HfsBuilder.Root, "ReadMe", Bytes(700, 3), [], thread: true);
+        builder.File(games, "Desktop DB", Bytes(300, 5), []);
+        byte[] image = builder.Build("Mac OS Keys");
+        int leaf = GetHfsTreeOffset(image, catalogTree: true) + HfsBuilder.Block;
+        int firstRecord = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(leaf + HfsBuilder.Block - 2));
+        Assert.Equal(image[leaf + firstRecord + 6] + 6, image[leaf + firstRecord]);
+
+        var (files, diagnostics) = Read(image);
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(["Games:Desktop DB", "ReadMe"], files.Select(f => f.MacPath).Order());
+    }
+
+    [Fact]
     public void A_classic_hfs_catalog_with_duplicate_file_ids_reports_them_but_keeps_both_files()
     {
         var builder = new HfsBuilder();

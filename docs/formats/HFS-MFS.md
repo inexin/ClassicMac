@@ -640,8 +640,10 @@ the MDB (`drCTFlSize`, `drCTExtRec`); more extents may be in the extents overflo
 | +$02 | 4 | u32 | `ckrParID`: the parent folder's CNID (for a thread, the CNID the thread is for) |
 | +$06 | 1+n | Str31 | `ckrCName`: the name (empty for a thread) |
 
-In a leaf, `ckrKeyLen` covers the name and any alignment byte: `6 + n` for an odd-length name and `7 + n` for
-an even-length name. The data starts at the next even offset. Names are at most 31 bytes **[Doc]**
+In a leaf, `ckrKeyLen` is `6 + n` as the Mac OS File Manager writes it (a thread's key is 6, the Finder's
+`Desktop DB` key 16), or `7 + n` for an even-length name when the alignment byte is counted, as hfsutils and
+ClassicMac's writer do. Either way the data starts at the next even offset. ClassicMac accepts both
+**[Verified]** on volumes Mac OS wrote in Basilisk II (Disk Copy 6 images). Names are at most 31 bytes **[Doc]**
 *Inside Macintosh: Files*.
 
 Every catalog data record starts with a type byte and a reserved byte **[Doc]** *Inside Macintosh: Files*:
@@ -1217,7 +1219,7 @@ deleting a nonempty folder or locked file is refused. Catalog insertion and dele
 can extend its extents with free blocks, adding linked map nodes and catalog overflow-extent records as needed. These operations return new images
 and reopen them through the HFS reader. Before and after an edit, the writer validates both B-trees' index graph,
 sibling links, node maps, free-node counts, record counts, and key order. New catalog keys include their alignment byte
-in `ckrKeyLen` as real HFS volumes do. File and folder creation accept optional Mac creation and modification dates;
+in `ckrKeyLen`, as hfsutils does (Mac OS leaves it out; both read the same). File and folder creation accept optional Mac creation and modification dates;
 when omitted, both are set to the local creation time. A real hfsutils-formatted volume has also been used to verify
 fork edits, folder changes and catalog growth by remounting the output with hfsutils.
 Before catalog mutation, the writer also checks that every catalogued extent is allocated, has no overlap with another

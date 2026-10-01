@@ -15,6 +15,9 @@ internal sealed class HfsBuilder
 
     public int ExtentsTreeNodes { get; init; } = 2;
 
+    /// <summary>Leaf keys with <c>ckrKeyLen</c> = 6 + n, the alignment byte not counted, as the Mac OS File Manager writes them.</summary>
+    public bool UncountedKeyPadding { get; init; }
+
     private readonly List<(uint Id, uint Parent, string Name)> folders = [];
     private readonly List<(uint Parent, string Name, string Type, string Creator, byte[] Data, byte[] Resource, int Fragments, uint Id, bool Thread)> files = [];
     private uint nextId = 16;
@@ -111,7 +114,7 @@ internal sealed class HfsBuilder
 
         // Catalog: records in two leaves, linked in order.
         var keyed = records.OrderBy(r => r.Parent).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(r => Keyed(r.Parent, r.Name, r.Record)).ToList();
+            .Select(r => Keyed(r.Parent, r.Name, r.Record, UncountedKeyPadding)).ToList();
         var half = (keyed.Count + 1) / 2;
         allocation[catalogStart + 1] = Leaf(keyed.Take(half).ToList(), forward: 2, backward: 0);
         allocation[catalogStart + 2] = Leaf(keyed.Skip(half).ToList(), forward: 0, backward: 1);
@@ -202,7 +205,7 @@ internal sealed class HfsBuilder
     }
 
     // Key (length, reserved, parent, Str31 name), padded to an even length, then the record.
-    private static byte[] Keyed(uint parent, string name, byte[] record)
+    private static byte[] Keyed(uint parent, string name, byte[] record, bool uncountedPadding = false)
     {
         var key = new List<byte> { (byte)(6 + name.Length), 0 };
         var id = new byte[4];
@@ -211,7 +214,7 @@ internal sealed class HfsBuilder
         key.Add((byte)name.Length);
         key.AddRange(Encoding.ASCII.GetBytes(name));
         if (key.Count % 2 != 0) key.Add(0);
-        key[0] = checked((byte)(key.Count - 1));
+        key[0] = checked((byte)(uncountedPadding ? 6 + name.Length : key.Count - 1));
         return [.. key, .. record];
     }
 

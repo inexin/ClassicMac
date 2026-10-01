@@ -636,8 +636,11 @@ namespace ClassicMac.Files.Hfs
                 if (name == "catalog")
                 {
                     if (key.Length < 7 || key[0] != key.Length - 1 || key[1] != 0 || key[6] > 31) return false;
-                    int expectedLength = 7 + key[6] + (key[6] % 2 == 0 ? 1 : 0);
-                    return key.Length == expectedLength;
+                    // ckrKeyLen is 6 + n as the Mac OS File Manager writes it (Finder-made Desktop DB, threads with
+                    // key length 6), or 7 + n for an even-length name when the alignment byte is counted (hfsutils,
+                    // HfsWriter). Both lay the data out at the same even offset. [Verified: Mac OS-written volumes]
+                    int nameLength = key[6];
+                    return key.Length == 7 + nameLength || (nameLength % 2 == 0 && key.Length == 8 + nameLength);
                 }
 
                 return key.Length == 8 && key[0] == 7 && key[1] is 0 or 0xFF;
