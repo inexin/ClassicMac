@@ -846,9 +846,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     are diagnosed and skipped, so broader original-application DDA2 archive interoperability remains unverified.
     Standalone methods 6, 9 and 10 are verified against original-app files; remaining archive methods and formats, and
     deeper HFS+ validation remain.
-    The HFS+ reader requires the allocation file, rejects overlapping allocation ranges and fork extents that claim
-    blocks reserved for the primary/alternate headers, and checks its bitmap for
-    catalog and special-file extents and every extent record in the extents-overflow tree (including bad-block
+    The HFS+ reader requires the allocation file, checks catalog `textEncoding` values against the volume
+    `encodingsBitmap` (including TN1150's MacFarsi and MacUkrainian bit mappings, while allowing unused extra bits),
+    rejects overlapping allocation ranges and fork extents that claim blocks reserved for the primary/alternate
+    headers, and checks the allocation bitmap for catalog and special-file extents and every extent record in the
+    extents-overflow tree (including bad-block
     extents), plus the attributes and startup special-file forks, including allocated extents in zero-logical-size
     special forks, and defined fork-data and extent records in the
     attributes B-tree; forks use overflow only after eight initial extents, non-final overflow records must be full,

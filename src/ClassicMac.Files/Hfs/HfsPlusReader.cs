@@ -111,6 +111,7 @@ internal static class HfsPlusReader
         var catalogIds = new HashSet<uint>();
         var catalogNodes = new Dictionary<uint, CatalogNode>();
         var catalogThreads = new Dictionary<uint, CatalogThread>();
+        ulong requiredEncodingBitmap = 0;
         foreach (var (key, data) in records)
         {
             if (key.Length < 8 || data.Length < 2)
@@ -120,6 +121,7 @@ internal static class HfsPlusReader
                 case 1:
                     if (data.Length != 88)
                         throw new InvalidDataException("An HFS Plus folder record must be exactly 88 bytes.");
+                    AddCatalogTextEncoding(data, ref requiredEncodingBitmap);
                     if ((U16(data, 2) & 0x0003) != 0)
                         throw new InvalidDataException("An HFS Plus folder record sets file-only flags.");
                     uint id = U32(data, 8);
@@ -138,6 +140,7 @@ internal static class HfsPlusReader
                 case 2:
                     if (data.Length != 248)
                         throw new InvalidDataException("An HFS Plus file record must be exactly 248 bytes.");
+                    AddCatalogTextEncoding(data, ref requiredEncodingBitmap);
                     uint fileId = U32(data, 8);
                     if (fileId < 16)
                         throw new InvalidDataException($"HFS Plus file catalog ID {fileId} is reserved.");
@@ -173,6 +176,10 @@ internal static class HfsPlusReader
                     throw new InvalidDataException($"Unknown HFS Plus catalog record type {U16(data, 0)}.");
             }
         }
+        ulong declaredEncodingBitmap = BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(72, 8));
+        if ((requiredEncodingBitmap & declaredEncodingBitmap) != requiredEncodingBitmap)
+            context.Report(DiagnosticSeverity.Info, "hfs.plus-encoding-bitmap",
+                "The HFS Plus volume encoding bitmap omits an encoding used by a catalog file or folder.");
         if (!folders.ContainsKey(RootFolderId))
             throw new InvalidDataException("The HFS Plus root folder is missing.");
         if (folders[RootFolderId].Parent != RootParentId)
@@ -1174,6 +1181,19 @@ internal static class HfsPlusReader
         for (int index = usedBytes; index < mapRecord.Length; index++)
             if (mapRecord[index] != 0)
                 throw new InvalidDataException("The HFS Plus B-tree node map has nonzero unused bytes.");
+    }
+
+    private static void AddCatalogTextEncoding(ReadOnlySpan<byte> record, ref ulong requiredBitmap)
+    {
+        uint textEncoding = U32(record, 80);
+        uint bit = textEncoding switch
+        {
+            140 => 49, // TN1150 assigns MacFarsi bitmap bit 49.
+            152 => 48, // TN1150 assigns MacUkrainian bitmap bit 48.
+            <= 63 => textEncoding,
+            _ => uint.MaxValue,
+        };
+        if (bit < 64) requiredBitmap |= 1UL << checked((int)bit);
     }
 
     private static string Name(ReadOnlySpan<byte> key)

@@ -126,6 +126,75 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusReportsCatalogTextEncodingsMissingFromTheVolumeBitmap()
+    {
+        byte[] image = HfsPlusFixture.Build(fileTextEncoding: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Equal("Documents:Read Me", file.MacPath);
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-encoding-bitmap" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void HfsPlusRequiresTextEncodingsUsedByFolderRecords()
+    {
+        byte[] image = HfsPlusFixture.Build(folderTextEncoding: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-encoding-bitmap" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Theory]
+    [InlineData(140, 49)] // MacFarsi uses bitmap bit 49.
+    [InlineData(152, 48)] // MacUkrainian uses bitmap bit 48.
+    public void HfsPlusMapsHighTextEncodingValuesToTheirDefinedBitmapBits(uint textEncoding, int bitmapBit)
+    {
+        ulong bitmap = 1UL | (1UL << bitmapBit);
+        byte[] image = HfsPlusFixture.Build(fileTextEncoding: textEncoding, encodingBitmap: bitmap);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-encoding-bitmap");
+    }
+
+    [Theory]
+    [InlineData(140)]
+    [InlineData(152)]
+    public void HfsPlusReportsMissingSpecialTextEncodingBitmapBits(uint textEncoding)
+    {
+        byte[] image = HfsPlusFixture.Build(fileTextEncoding: textEncoding);
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.Contains(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-encoding-bitmap" &&
+            diagnostic.Severity == DiagnosticSeverity.Info);
+    }
+
+    [Fact]
+    public void HfsPlusAllowsUnusedTextEncodingBitmapBits()
+    {
+        byte[] image = HfsPlusFixture.Build(encodingBitmap: 1UL | (1UL << 63));
+        var diagnostics = new List<Diagnostic>();
+
+        Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics)));
+
+        Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-encoding-bitmap");
+    }
+
+    [Fact]
     public void HfsPlusFreeBlockCountIgnoresPaddingBitsAfterTheLastAllocationBlock()
     {
         byte[] image = BuildOversizedExtentsTree(addMapNode: true);
@@ -2626,7 +2695,8 @@ public sealed class HfsPlusFeatureTests
             bool sparseDataExtentDescriptors = false, bool unusedDataExtentHasStartBlock = false,
             uint? catalogFileParentId = null, ushort? catalogFileNameCodeUnitOverride = null,
             ushort? catalogFileThreadNameCodeUnitOverride = null, ushort catalogFileMode = 0,
-            ushort catalogFolderMode = 0, uint? volumeAttributes = null)
+            ushort catalogFolderMode = 0, uint? volumeAttributes = null,
+            uint fileTextEncoding = 0, uint folderTextEncoding = 0, ulong encodingBitmap = 1)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -2641,6 +2711,7 @@ public sealed class HfsPlusFeatureTests
             U32(volume, 44, volumeBlocks);
             U32(volume, 48, includeAllocationFile ? 0u : fragmentedData ? 19u : 10u);
             U32(volume, 64, nextCatalogId ?? (additionalFolderParent is null ? 18u : 19u));
+            BinaryPrimitives.WriteUInt64BigEndian(volume[72..], encodingBitmap);
             int catalogForkNodes = deepCatalogTree ? 8 : multiLeafCatalog ? 4 : extraCatalogForkNode ? 3 : 2;
             Fork(volume.Slice(272, 80), catalogForkNodes * Block,
                 deepCatalogTree ? 26u : 2u, checked((uint)catalogForkNodes));
@@ -2671,12 +2742,14 @@ public sealed class HfsPlusFeatureTests
             U32(folder, 4, documentsFolderValence);
             uint folderId = catalogFolderId ?? 16;
             U32(folder, 8, folderId);
+            U32(folder, 80, folderTextEncoding);
             U16(folder, 42, catalogFolderMode);
             byte[] file = new byte[248];
             U16(file, 0, 2);
             U16(file, 2, missingFileThreadFlag ? (ushort)0 : (ushort)2); // file thread exists
             uint fileId = catalogFileId ?? (duplicateCatalogId ? 16u : 17u);
             U32(file, 8, fileId);
+            U32(file, 80, fileTextEncoding);
             U16(file, 42, catalogFileMode);
             U32(file, 12, 2_500_000_000);
             U32(file, 16, 2_600_000_000);

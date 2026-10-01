@@ -807,6 +807,12 @@ that bit reserved. If the journaled bit is set, the reader reports `hfs.plus-jou
 on-disk structures without applying journal transactions **[Doc]** TN1150. Other reserved volume-attribute bits are
 ignored **[Doc]** TN1150.
 
+For each catalog file and folder, the reader checks that the volume header's `encodingsBitmap` contains the bit for
+the record's `textEncoding` hint. Values below 64 use the same-numbered bit; MacFarsi (140) uses bit 49 and
+MacUkrainian (152) uses bit 48 **[Doc]** TN1150. Missing bits produce the informational diagnostic
+`hfs.plus-encoding-bitmap`; extra bits are accepted because TN1150 permits them to remain set after the last name using
+an encoding has been deleted.
+
 The reader checks the catalog B-tree's root index graph, node heights and same-level sibling links, then walks its
 linked leaf nodes, checking the header's leaf endpoints, backward links and node range. For each tree, the total
 records found across all leaf nodes must match that tree's header `leafRecords` count **[Doc]** TN1150. It also requires
@@ -984,6 +990,7 @@ followed in its code.
 | `mfs.too-many-entries` | E | More than `MaxVolumeEntries` files | Stops reading | — |
 | `mfs.counts` | I | The directory's file count differs from `drNmFls` | Reports only | Not traced |
 | `hfs.plus-counts` | I | HFS Plus catalog file/folder counts differ from the volume header | Reports only | Not traced |
+| `hfs.plus-encoding-bitmap` | I | A catalog file or folder uses an encoding whose bit is absent from `encodingsBitmap` | Reports only | Not traced |
 | `hfs.plus-free-blocks` | I | The allocation bitmap free-block count differs from `freeBlocks` in the volume header | Reports only | Not traced |
 | `hfs.plus-spared-blocks` | I | The volume header's spared-blocks flag disagrees with bad-block extent records | Reports only | Not traced |
 | `hfs.plus-volume-inconsistent` | W | Volume attributes indicate an unclean unmount, inconsistent boot volume, or serious inconsistency | Completes structural checks and returns files if valid | Not traced |
