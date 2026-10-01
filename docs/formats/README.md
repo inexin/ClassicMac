@@ -47,7 +47,7 @@ ClassicMac follows 9.0; a 9.2.2 mode would take these differences.
 | Document | Formats | Code |
 | --- | --- | --- |
 | [RESOURCE-FORK.md](RESOURCE-FORK.md) | Resource forks: header, map, attributes; how Mac OS 9 and the 68k ROM open them; compressed resources (`dcmp` 0–3) | `ClassicMac.Resources` |
-| [CONTAINERS.md](CONTAINERS.md) | MacBinary I/II/III, BinHex 4.0, AppleSingle and AppleDouble | `ClassicMac.Files.Containers` |
+| [CONTAINERS.md](CONTAINERS.md) | MacBinary I/II/III, BinHex 4.0, AppleSingle and AppleDouble, uuencode | `ClassicMac.Files.Containers` |
 | [HOST-FOLDERS.md](HOST-FOLDERS.md) | Mac files on other file systems: Basilisk II / SheepShaver folders, AppleDouble `._` files, PC Exchange, File Exchange names; what `unpack` writes | `ClassicMac.Files` (`HostFiles`), `ClassicMac.Files.Export` |
 | [HFS-MFS.md](HFS-MFS.md) | Apple partition maps, MFS and HFS volumes | `ClassicMac.Files.Hfs` |
 | [ARCHIVES.md](ARCHIVES.md) | StuffIt v5 stored, RLE90, Compress/LZW, Huffman, LZAH, MW and method-13 forks | `ClassicMac.Files.Archives` |
