@@ -33,13 +33,14 @@ public sealed class CompactProReader : IContainerReader
         try
         {
             using Stream stream = input.Open();
-            if (stream.ReadByte() != 1) return false;
-            stream.Seek(4, SeekOrigin.Begin);
-            Span<byte> offsetBytes = stackalloc byte[4];
-            stream.ReadExactly(offsetBytes);
-            uint offset = new BigEndianReader(offsetBytes.ToArray()).ReadUInt32();
+            var header = new byte[8];
+            stream.ReadExactly(header);
+            var reader = new BigEndianReader(header);
+            if (reader.ReadByte() != 1) return false;
+            uint offset = reader.ReadUInt32At(4);
             if (offset < ArchiveHeaderLength || offset > input.Length - 7 || offset > int.MaxValue) return false;
-            CompactProDirectory directory = ReadDirectory(stream, input.Length, (int)offset);
+            stream.Seek(offset, SeekOrigin.Begin);
+            CompactProDirectory directory = ReadDirectory(new BigEndianReader(stream), (int)offset);
             return directory.StoredCrc == directory.ComputedCrc;
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException or
@@ -64,8 +65,9 @@ public sealed class CompactProReader : IContainerReader
         if (directoryOffsetRaw > int.MaxValue)
             throw new InvalidDataException("The Compact Pro directory offset is too large.");
         int directoryOffset = (int)directoryOffsetRaw;
-        using var stream = new MemoryStream(archive, writable: false);
-        CompactProDirectory directory = ReadDirectory(stream, archive.Length, directoryOffset);
+        if (directoryOffset < ArchiveHeaderLength || directoryOffset > archive.Length - 7)
+            throw new InvalidDataException("The Compact Pro directory lies outside the archive.");
+        CompactProDirectory directory = ReadDirectory(new BigEndianReader(archive.AsMemory(directoryOffset)), directoryOffset);
         if (directory.StoredCrc != directory.ComputedCrc)
             context.Report(DiagnosticSeverity.Error, "archive.header-crc",
                 "The Compact Pro directory checksum is incorrect.", directoryOffset);
@@ -208,36 +210,33 @@ public sealed class CompactProReader : IContainerReader
         return foundVolume;
     }
 
-    private static CompactProDirectory ReadDirectory(Stream stream, long archiveLength, int offset)
+    // The directory, from its offset to the end of the archive; the entries' offsets are from the archive's start.
+    private static CompactProDirectory ReadDirectory(BigEndianReader directory, int offset)
     {
-        if (offset < ArchiveHeaderLength || offset > archiveLength - 7)
-            throw new InvalidDataException("The Compact Pro directory lies outside the archive.");
-        stream.Seek(offset, SeekOrigin.Begin);
-        uint storedCrc = ReadU32(stream);
+        uint storedCrc = directory.ReadUInt32();
         uint crc = uint.MaxValue;
-        ushort entryCount = ReadU16AndUpdate(stream, ref crc);
-        int commentLength = ReadByteAndUpdate(stream, ref crc);
-        MacString comment = new(ReadBytesAndUpdate(stream, commentLength, archiveLength, ref crc));
+        ushort entryCount = ReadU16AndUpdate(directory, ref crc);
+        int commentLength = ReadByteAndUpdate(directory, ref crc);
+        MacString comment = new(ReadBytesAndUpdate(directory, commentLength, ref crc));
         var entries = new List<CompactProEntry>(entryCount);
         for (int index = 0; index < entryCount; index++)
         {
-            int nameType = ReadByteAndUpdate(stream, ref crc);
+            int nameType = ReadByteAndUpdate(directory, ref crc);
             int nameLength = nameType & 0x7F;
             if (nameLength == 0) throw new InvalidDataException("A Compact Pro entry has an empty name.");
-            byte[] nameBytes = ReadBytesAndUpdate(stream, nameLength, archiveLength, ref crc);
-            var name = new MacString(nameBytes);
+            var name = new MacString(ReadBytesAndUpdate(directory, nameLength, ref crc));
             if ((nameType & 0x80) != 0)
             {
-                ushort children = ReadU16AndUpdate(stream, ref crc);
-                entries.Add(new CompactProEntry(name, true, children, [], checked((int)stream.Position - 2)));
+                ushort children = ReadU16AndUpdate(directory, ref crc);
+                entries.Add(new CompactProEntry(name, true, children, [], checked(offset + directory.Position - 2)));
             }
             else
             {
-                byte[] metadata = ReadBytesAndUpdate(stream, 45, archiveLength, ref crc);
-                entries.Add(new CompactProEntry(name, false, 0, metadata, checked((int)stream.Position - 45)));
+                byte[] metadata = ReadBytesAndUpdate(directory, 45, ref crc);
+                entries.Add(new CompactProEntry(name, false, 0, metadata, checked(offset + directory.Position - 45)));
             }
         }
-        return new CompactProDirectory(storedCrc, crc, checked((int)stream.Position), comment, entries);
+        return new CompactProDirectory(storedCrc, crc, checked(offset + directory.Position), comment, entries);
     }
 
     internal static byte[] DecodeRle8182(ReadOnlySpan<byte> input, int outputLength)
@@ -316,37 +315,26 @@ public sealed class CompactProReader : IContainerReader
         }
     }
 
-    private static ushort ReadU16AndUpdate(Stream stream, ref uint crc)
+    private static ushort ReadU16AndUpdate(BigEndianReader directory, ref uint crc)
     {
-        Span<byte> bytes = stackalloc byte[2];
-        stream.ReadExactly(bytes);
-        crc = UpdateCrc(crc, bytes);
-        return new BigEndianReader(bytes.ToArray()).ReadUInt16();
+        crc = UpdateCrc(crc, directory.ReadBytesAt(directory.Position, Math.Min(2, directory.Remaining)));
+        return directory.ReadUInt16();
     }
 
-    private static uint ReadU32(Stream stream)
+    private static int ReadByteAndUpdate(BigEndianReader directory, ref uint crc)
     {
-        Span<byte> bytes = stackalloc byte[4];
-        stream.ReadExactly(bytes);
-        return new BigEndianReader(bytes.ToArray()).ReadUInt32();
-    }
-
-    private static int ReadByteAndUpdate(Stream stream, ref uint crc)
-    {
-        int value = stream.ReadByte();
-        if (value < 0) throw new InvalidDataException("The Compact Pro directory is truncated.");
-        crc = UpdateCrcByte(crc, (byte)value);
+        if (!directory.TryReadByte(out byte value)) throw new InvalidDataException("The Compact Pro directory is truncated.");
+        crc = UpdateCrcByte(crc, value);
         return value;
     }
 
-    private static byte[] ReadBytesAndUpdate(Stream stream, int length, long archiveLength, ref uint crc)
+    private static byte[] ReadBytesAndUpdate(BigEndianReader directory, int length, ref uint crc)
     {
-        if (length < 0 || stream.Position > archiveLength - length)
+        if (length < 0 || length > directory.Remaining)
             throw new InvalidDataException("A Compact Pro directory entry extends past the archive.");
-        var bytes = new byte[length];
-        stream.ReadExactly(bytes);
+        var bytes = directory.ReadBytes(length);
         crc = UpdateCrc(crc, bytes);
-        return bytes;
+        return bytes.ToArray();
     }
 
     private static uint UpdateCrc(uint crc, ReadOnlySpan<byte> bytes)
