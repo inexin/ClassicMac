@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using ClassicMac.Core;
 
 namespace ClassicMac.Files.Compression
 {
@@ -13,26 +13,22 @@ namespace ClassicMac.Files.Compression
         public static bool Decompress(ReadOnlySpan<byte> input, Span<byte> output, out int written)
         {
             written = 0;
-            var i = 0;
+            var reader = new BigEndianReader(input);
             while (written < output.Length)
             {
-                if (i + 2 > input.Length) return false;
-                var count = BinaryPrimitives.ReadInt16BigEndian(input[i..]);
-                i += 2;
+                if (!reader.TryReadInt16(out var count)) return false;
                 var words = Math.Abs((int)count);
                 if (written + words * 2 > output.Length) return false;
                 if (count >= 0)
                 {
-                    if (i + words * 2 > input.Length) return false;
-                    input.Slice(i, words * 2).CopyTo(output[written..]);
-                    i += words * 2;
+                    if (!reader.TryReadBytes(words * 2, out var literal)) return false;
+                    literal.CopyTo(output[written..]);
                     written += words * 2;
                 }
                 else
                 {
-                    if (i + 2 > input.Length) return false;
-                    for (var n = 0; n < words; n++, written += 2) input.Slice(i, 2).CopyTo(output[written..]);
-                    i += 2;
+                    if (!reader.TryReadBytes(2, out var word)) return false;
+                    for (var n = 0; n < words; n++, written += 2) word.CopyTo(output[written..]);
                 }
             }
             return true;

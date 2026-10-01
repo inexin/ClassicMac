@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -48,11 +47,12 @@ namespace ClassicMac.Files.Containers
             if (header[0] != 0 || header[74] != 0 || header[82] != 0) return 0;
             if (header[1] is < 1 or > 63) return 0;
             if (header.Slice(2, header[1]).IndexOfAny((byte)':', (byte)0) >= 0) return 0;
-            long dataLength = BinaryPrimitives.ReadUInt32BigEndian(header[83..]);
-            long resourceLength = BinaryPrimitives.ReadUInt32BigEndian(header[87..]);
+            var reader = new BigEndianReader(header);
+            long dataLength = reader.ReadUInt32At(83);
+            long resourceLength = reader.ReadUInt32At(87);
             if (dataLength > MaxForkLength || resourceLength > MaxForkLength) return 0;
-            if (Crc16.Compute(header[..124]) == BinaryPrimitives.ReadUInt16BigEndian(header[124..]))
-                return BinaryPrimitives.ReadUInt32BigEndian(header[102..]) == MBin ? 3 : 2;
+            if (Crc16.Compute(header[..124]) == reader.ReadUInt16At(124))
+                return reader.ReadUInt32At(102) == MBin ? 3 : 2;
             if (header[99..126].IndexOfAnyExcept((byte)0) >= 0) return 0;
             var padded = HeaderLength + Padded(dataLength) + Padded(resourceLength);
             var lastUnpadded = resourceLength > 0
@@ -70,6 +70,7 @@ namespace ClassicMac.Files.Containers
             var name = new MacString(header.AsSpan(2, header[1]));
             // Finder flags: the high byte at 73 in every version, the low byte at 101 from MacBinary II on.
             var flags = (FinderFlags)(header[73] << 8 | (version >= 2 ? header[101] : 0));
+            var reader = new BigEndianReader(header);
             var extended = new byte[16];
             if (version == 3)
             {
@@ -82,13 +83,13 @@ namespace ClassicMac.Files.Containers
                 Creator = new FourCC(header.AsSpan(69, 4)),
                 Flags = flags,
                 Location = MacPoint.Read(header.AsSpan(75)),
-                Folder = BinaryPrimitives.ReadInt16BigEndian(header.AsSpan(79)),
+                Folder = reader.ReadInt16At(79),
                 Extended = extended,
             };
 
-            long dataLength = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(83));
-            long resourceLength = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(87));
-            long secondaryLength = version >= 2 ? BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(120)) : 0;
+            long dataLength = reader.ReadUInt32At(83);
+            long resourceLength = reader.ReadUInt32At(87);
+            long secondaryLength = version >= 2 ? reader.ReadUInt16At(120) : 0;
             var dataOffset = HeaderLength + Padded(secondaryLength);
             var resourceOffset = dataOffset + Padded(dataLength);
 
@@ -98,8 +99,8 @@ namespace ClassicMac.Files.Containers
                 {
                     Name = name,
                     FinderInfo = finderInfo,
-                    Created = Date(BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(91))),
-                    Modified = Date(BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(95))),
+                    Created = Date(reader.ReadUInt32At(91)),
+                    Modified = Date(reader.ReadUInt32At(95)),
                     DataFork = Fork(input, dataOffset, dataLength, "data", context),
                     ResourceFork = Fork(input, resourceOffset, resourceLength, "resource", context),
                 },

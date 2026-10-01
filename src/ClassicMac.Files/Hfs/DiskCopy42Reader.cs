@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -30,10 +29,12 @@ namespace ClassicMac.Files.Hfs
         public bool CanRead(ForkData input)
         {
             var header = input.ReadPrefix(HeaderLength);
-            if (header.Length < HeaderLength || BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(82)) != Private) return false;
+            if (header.Length < HeaderLength) return false;
+            var reader = new BigEndianReader(header);
+            if (reader.ReadUInt16At(82) != Private) return false;
             if (header[0] > 63) return false;
-            long dataSize = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(64));
-            long tagSize = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(68));
+            long dataSize = reader.ReadUInt32At(64);
+            long tagSize = reader.ReadUInt32At(68);
             // Fitted checks on top of the note's $0100: whole blocks, 12 tag bytes per block or none.
             return dataSize > 0 && dataSize % 512 == 0 && (tagSize == 0 || tagSize == dataSize / 512 * 12);
         }
@@ -43,8 +44,9 @@ namespace ClassicMac.Files.Hfs
         {
             if (!CanRead(input)) throw new InvalidDataException("Not a Disk Copy 4.2 image.");
             var header = input.ReadPrefix(HeaderLength);
-            long dataSize = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(64));
-            long tagSize = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(68));
+            var reader = new BigEndianReader(header);
+            long dataSize = reader.ReadUInt32At(64);
+            long tagSize = reader.ReadUInt32At(68);
             var available = input.Length - HeaderLength;
             if (dataSize > available)
             {
@@ -59,11 +61,11 @@ namespace ClassicMac.Files.Hfs
             }
 
             var disk = input.Slice(HeaderLength, dataSize);
-            if (dataSize == BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(64)))
+            if (dataSize == reader.ReadUInt32At(64))
             {
-                CheckSum(disk, 0, BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(72)), "data", context);
+                CheckSum(disk, 0, reader.ReadUInt32At(72), "data", context);
                 if (tagSize > 0)
-                    CheckSum(input.Slice(HeaderLength + dataSize, tagSize), 12, BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(76)), "tag", context);
+                    CheckSum(input.Slice(HeaderLength + dataSize, tagSize), 12, reader.ReadUInt32At(76), "tag", context);
             }
             return [new MacFile { Name = new MacString(header.AsSpan(1, header[0])), DataFork = disk }];
         }
@@ -73,10 +75,11 @@ namespace ClassicMac.Files.Hfs
         // sample's Disk Copy 4.2 export).
         internal static uint Sum(ReadOnlySpan<byte> data)
         {
+            var reader = new BigEndianReader(data);
             uint sum = 0;
-            for (var i = 0; i + 1 < data.Length; i += 2)
+            while (reader.Remaining >= 2)
             {
-                sum += BinaryPrimitives.ReadUInt16BigEndian(data[i..]);
+                sum += reader.ReadUInt16();
                 sum = sum >> 1 | sum << 31;
             }
             return sum;
@@ -91,11 +94,12 @@ namespace ClassicMac.Files.Hfs
             int read;
             while ((read = stream.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false)) > 0)
             {
+                var reader = new BigEndianReader(buffer.AsSpan(0, read));
                 for (var i = 0; i + 1 < read; i += 2)
                 {
                     if (position + i >= skip)
                     {
-                        sum += BinaryPrimitives.ReadUInt16BigEndian(buffer.AsSpan(i));
+                        sum += reader.ReadUInt16At(i);
                         sum = sum >> 1 | sum << 31;
                     }
                 }

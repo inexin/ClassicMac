@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -37,7 +36,7 @@ namespace ClassicMac.Files.Hfs
         public bool CanRead(ForkData input)
         {
             if (input.Length < MdbOffset + MdbLength) return false;
-            var signature = BinaryPrimitives.ReadUInt16BigEndian(input.Slice(MdbOffset, 2).ToArray());
+            var signature = new BigEndianReader(input.Slice(MdbOffset, 2).ToArray()).ReadUInt16At(0);
             return signature is HfsSignature or HfsPlusSignature or HfsXSignature;
         }
 
@@ -46,9 +45,10 @@ namespace ClassicMac.Files.Hfs
         {
             if (!CanRead(input)) throw new InvalidDataException("Not an HFS volume.");
             var mdb = input.Slice(MdbOffset, MdbLength).ToArray();
-            if (BinaryPrimitives.ReadUInt16BigEndian(mdb) is HfsPlusSignature or HfsXSignature)
+            var reader = new BigEndianReader(mdb);
+            if (reader.ReadUInt16At(0) is HfsPlusSignature or HfsXSignature)
                 return HfsPlusReader.Read(input, context);
-            if (BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x7C)) == HfsPlusSignature)
+            if (reader.ReadUInt16At(0x7C) == HfsPlusSignature)
                 return ReadEmbeddedPlus(input, mdb, context);
             ReportAlternateMdbProblem(input, context);
             return new Volume(input, mdb, context).Files();
@@ -58,8 +58,8 @@ namespace ClassicMac.Files.Hfs
         {
             const int AlternateMdbOffsetFromEnd = 1024;
             if (input.Length < AlternateMdbOffsetFromEnd + sizeof(ushort) ||
-                BinaryPrimitives.ReadUInt16BigEndian(
-                    input.Slice(input.Length - AlternateMdbOffsetFromEnd, sizeof(ushort)).ToArray()) != HfsSignature)
+                new BigEndianReader(input.Slice(input.Length - AlternateMdbOffsetFromEnd, sizeof(ushort)).ToArray())
+                    .ReadUInt16At(0) != HfsSignature)
                 context.Report(DiagnosticSeverity.Warning, "hfs.alternate-mdb",
                     "The HFS volume's alternate master directory block is missing or has an invalid signature.",
                     Math.Max(0, input.Length - AlternateMdbOffsetFromEnd));
@@ -67,11 +67,12 @@ namespace ClassicMac.Files.Hfs
 
         private static IReadOnlyList<MacFile> ReadEmbeddedPlus(ForkData input, byte[] mdb, ContainerContext context)
         {
-            uint blockSize = BinaryPrimitives.ReadUInt32BigEndian(mdb.AsSpan(0x14));
-            uint allocationBlocks = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x12));
-            uint allocationStart = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x1C));
-            uint embeddedStart = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x7E));
-            uint embeddedBlocks = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x80));
+            var reader = new BigEndianReader(mdb);
+            uint blockSize = reader.ReadUInt32At(0x14);
+            uint allocationBlocks = reader.ReadUInt16At(0x12);
+            uint allocationStart = reader.ReadUInt16At(0x1C);
+            uint embeddedStart = reader.ReadUInt16At(0x7E);
+            uint embeddedBlocks = reader.ReadUInt16At(0x80);
             if (blockSize == 0 || allocationBlocks == 0 || embeddedBlocks == 0 ||
                 (ulong)embeddedStart + embeddedBlocks > allocationBlocks)
                 throw new InvalidDataException("The HFS wrapper's embedded HFS Plus extent is invalid.");
@@ -90,8 +91,9 @@ namespace ClassicMac.Files.Hfs
         private static void ReportUnallocatedEmbeddedVolume(ForkData input, byte[] mdb, uint embeddedStart,
             uint embeddedBlocks, ContainerContext context)
         {
-            int allocationBlocks = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x12));
-            int bitmapStartBlock = BinaryPrimitives.ReadUInt16BigEndian(mdb.AsSpan(0x0E));
+            var reader = new BigEndianReader(mdb);
+            int allocationBlocks = reader.ReadUInt16At(0x12);
+            int bitmapStartBlock = reader.ReadUInt16At(0x0E);
             int bitmapLength = (allocationBlocks + 7) / 8;
             long bitmapOffset = bitmapStartBlock * 512L;
             if (bitmapOffset > input.Length || bitmapLength > input.Length - bitmapOffset)
@@ -130,19 +132,19 @@ namespace ClassicMac.Files.Hfs
             {
                 this.image = image;
                 this.context = context;
-                var m = mdb.AsSpan();
-                blockSize = BinaryPrimitives.ReadUInt32BigEndian(m[0x14..]);
-                firstBlock = BinaryPrimitives.ReadUInt16BigEndian(m[0x1C..]) * 512L;
-                blockCount = BinaryPrimitives.ReadUInt16BigEndian(m[0x12..]);
-                bitmapStartBlock = BinaryPrimitives.ReadUInt16BigEndian(m[0x0E..]);
-                freeBlockCount = BinaryPrimitives.ReadUInt16BigEndian(m[0x22..]);
-                Name = new MacString(m.Slice(0x25, Math.Min(m[0x24], (byte)27)));
-                FileCount = BinaryPrimitives.ReadUInt32BigEndian(m[0x54..]);
-                FolderCount = BinaryPrimitives.ReadUInt32BigEndian(m[0x58..]);
-                ExtentsLength = BinaryPrimitives.ReadUInt32BigEndian(m[0x82..]);
-                ExtentsRecord = m.Slice(0x86, 12).ToArray();
-                CatalogLength = BinaryPrimitives.ReadUInt32BigEndian(m[0x92..]);
-                CatalogRecord = m.Slice(0x96, 12).ToArray();
+                var m = new BigEndianReader(mdb);
+                blockSize = m.ReadUInt32At(0x14);
+                firstBlock = m.ReadUInt16At(0x1C) * 512L;
+                blockCount = m.ReadUInt16At(0x12);
+                bitmapStartBlock = m.ReadUInt16At(0x0E);
+                freeBlockCount = m.ReadUInt16At(0x22);
+                Name = new MacString(m.ReadBytesAt(0x25, Math.Min(mdb[0x24], (byte)27)));
+                FileCount = m.ReadUInt32At(0x54);
+                FolderCount = m.ReadUInt32At(0x58);
+                ExtentsLength = m.ReadUInt32At(0x82);
+                ExtentsRecord = m.ReadBytesAt(0x86, 12).ToArray();
+                CatalogLength = m.ReadUInt32At(0x92);
+                CatalogRecord = m.ReadBytesAt(0x96, 12).ToArray();
             }
 
             public MacString Name { get; }
@@ -178,12 +180,12 @@ namespace ClassicMac.Files.Hfs
                 {
                     // Key: length, reserved byte, parent ID, name (Str31).
                     if (key.Length < 7 || data.Length < 2) continue;
-                    var parent = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(2));
+                    var parent = new BigEndianReader(key).ReadUInt32At(2);
                     var name = new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7)));
                     switch (data[0])
                     {
                         case 1 when data.Length >= 70: // folder
-                            uint folderId = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(6));
+                            uint folderId = new BigEndianReader(data).ReadUInt32At(6);
                             if (folderId < 16 && folderId != RootFolderId)
                                 context.Report(DiagnosticSeverity.Warning, "hfs.reserved-id",
                                     $"Catalog folder ID {folderId} is reserved; only the root folder may use ID 2.");
@@ -194,7 +196,7 @@ namespace ClassicMac.Files.Hfs
                                 folders[folderId] = (parent, name);
                             break;
                         case 2 when data.Length >= 102: // file
-                            uint fileId = BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(20));
+                            uint fileId = new BigEndianReader(data).ReadUInt32At(20);
                             if (fileId < 16)
                                 context.Report(DiagnosticSeverity.Warning, "hfs.reserved-id",
                                     $"Catalog file ID {fileId} is reserved; file IDs must be at least 16.");
@@ -257,18 +259,19 @@ namespace ClassicMac.Files.Hfs
 
             private MacFile File(uint parent, MacString name, byte[] r, Dictionary<uint, (uint Parent, MacString Name)> folders)
             {
-                var id = BinaryPrimitives.ReadUInt32BigEndian(r.AsSpan(20));
+                var reader = new BigEndianReader(r);
+                var id = reader.ReadUInt32At(20);
                 var info = FinderInfo.Read([.. r.AsSpan(4, 16), .. r.AsSpan(56, 16)]);
                 var label = $"\"{name}\"";
-                var data = Fork(r.AsSpan(74, 12).ToArray(), 0x00, id, BinaryPrimitives.ReadUInt32BigEndian(r.AsSpan(26)), $"{label}'s data fork");
-                var resource = Fork(r.AsSpan(86, 12).ToArray(), 0xFF, id, BinaryPrimitives.ReadUInt32BigEndian(r.AsSpan(36)), $"{label}'s resource fork");
+                var data = Fork(r.AsSpan(74, 12).ToArray(), 0x00, id, reader.ReadUInt32At(26), $"{label}'s data fork");
+                var resource = Fork(r.AsSpan(86, 12).ToArray(), 0xFF, id, reader.ReadUInt32At(36), $"{label}'s resource fork");
                 return new MacFile
                 {
                     Name = name,
                     FolderPath = FolderPath(parent, folders, label),
                     FinderInfo = info,
-                    Created = Date(BinaryPrimitives.ReadUInt32BigEndian(r.AsSpan(44))),
-                    Modified = Date(BinaryPrimitives.ReadUInt32BigEndian(r.AsSpan(48))),
+                    Created = Date(reader.ReadUInt32At(44)),
+                    Modified = Date(reader.ReadUInt32At(48)),
                     DataFork = data ?? ForkData.Empty,
                     ResourceFork = resource ?? ForkData.Empty,
                 };
@@ -301,10 +304,11 @@ namespace ClassicMac.Files.Hfs
                 int expectedFileAllocationBlock = 0;
                 void Add(ReadOnlySpan<byte> record)
                 {
+                    var reader = new BigEndianReader(record);
                     for (var i = 0; i < 3; i++)
                     {
-                        int start = BinaryPrimitives.ReadUInt16BigEndian(record[(i * 4)..]);
-                        int count = BinaryPrimitives.ReadUInt16BigEndian(record[(i * 4 + 2)..]);
+                        int start = reader.ReadUInt16();
+                        int count = reader.ReadUInt16();
                         if (count == 0) continue;
                         expectedFileAllocationBlock += count;
                         if (start + count > blockCount)
@@ -388,8 +392,9 @@ namespace ClassicMac.Files.Hfs
                             "An extents overflow record has an invalid key or extent record length.");
                     if (!validKey || data.Length < 12) continue;
                     var fork = key[1];
-                    var file = BinaryPrimitives.ReadUInt32BigEndian(key.AsSpan(2));
-                    var start = BinaryPrimitives.ReadUInt16BigEndian(key.AsSpan(6));
+                    var reader = new BigEndianReader(key);
+                    var file = reader.ReadUInt32At(2);
+                    var start = reader.ReadUInt16At(6);
                     if (!overflow.TryGetValue((fork, file), out var list)) overflow[(fork, file)] = list = [];
                     list.Add((start, data[..12]));
                 }
@@ -407,34 +412,35 @@ namespace ClassicMac.Files.Hfs
                         $"The {name} B-tree fork ends with {tree.Length % NodeSize} partial bytes after its complete nodes.");
                 var nodes = tree.Length / NodeSize;
                 var header = Node(tree, 0);
-                var headerRecordCount = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(10));
-                var reserved = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(12));
-                if (BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4)) != 0 ||
+                var headerReader = new BigEndianReader(header);
+                var headerRecordCount = headerReader.ReadUInt16At(10);
+                var reserved = headerReader.ReadUInt16At(12);
+                if (headerReader.ReadUInt32At(4) != 0 ||
                     header[8] != 1 || header[9] != 0 || headerRecordCount != 3 || reserved != 0)
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                         $"The {name} B-tree header node has an invalid backward link, kind, height, record count, or reserved field.");
-                ushort declaredNodeSize = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(14 + 18));
+                ushort declaredNodeSize = headerReader.ReadUInt16At(14 + 18);
                 if (declaredNodeSize != NodeSize)
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                         $"The {name} B-tree declares {declaredNodeSize}-byte nodes; classic HFS nodes are {NodeSize} bytes.");
-                uint declaredNodeCount = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(14 + 22));
+                uint declaredNodeCount = headerReader.ReadUInt32At(14 + 22);
                 if (declaredNodeCount != nodes)
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                         $"The {name} B-tree declares {declaredNodeCount} nodes, but its fork contains {nodes} complete nodes.");
-                ushort depth = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(14));
-                uint root = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(14 + 2));
+                ushort depth = headerReader.ReadUInt16At(14);
+                uint root = headerReader.ReadUInt32At(14 + 2);
                 if (root >= nodes || (root == 0) != (depth == 0))
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                         $"The {name} B-tree root node {root} and depth {depth} are inconsistent with its node count.");
                 ushort expectedMaxKeyLength = name == "catalog" ? (ushort)37 : (ushort)7;
-                ushort maxKeyLength = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(14 + 20));
+                ushort maxKeyLength = headerReader.ReadUInt16At(14 + 20);
                 if (maxKeyLength != expectedMaxKeyLength)
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                         $"The {name} B-tree declares a maximum key length of {maxKeyLength}; expected {expectedMaxKeyLength}.");
                 var mapNodes = ValidateNodeMap(tree, header, nodes, name);
-                var node = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(14 + 10));
-                var expectedLastLeaf = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(14 + 14));
-                var expectedLeafRecords = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(14 + 6));
+                var node = headerReader.ReadUInt32At(14 + 10);
+                var expectedLastLeaf = headerReader.ReadUInt32At(14 + 14);
+                var expectedLeafRecords = headerReader.ReadUInt32At(14 + 6);
                 uint lastLeaf = 0;
                 uint previousLeaf = 0;
                 ulong leafRecordCount = 0;
@@ -464,21 +470,21 @@ namespace ClassicMac.Files.Hfs
                             $"Node {node} of the {name} tree is linked as a leaf but has type {(sbyte)bytes[8]} and height {bytes[9]}; stopped.");
                         yield break;
                     }
-                    uint backwardLink = BinaryPrimitives.ReadUInt32BigEndian(bytes.AsSpan(4));
+                    uint backwardLink = ReadUInt32(bytes, 4);
                     if (backwardLink != previousLeaf)
                         context.Report(DiagnosticSeverity.Warning, "hfs.bad-link",
                             $"Leaf node {node} of the {name} tree links backward to {backwardLink}; expected {previousLeaf}.");
                     lastLeaf = node;
                     previousLeaf = node;
-                    int records = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(10));
+                    int records = ReadUInt16(bytes, 10);
                     leafRecordCount += checked((uint)records);
                     for (var i = 0; i < records; i++)
                     {
                         var at = NodeSize - 2 * (i + 1);
                         var next = NodeSize - 2 * (i + 2);
                         if (next < 14) break;
-                        int start = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(at));
-                        int end = BinaryPrimitives.ReadUInt16BigEndian(bytes.AsSpan(next));
+                        int start = ReadUInt16(bytes, at);
+                        int end = ReadUInt16(bytes, next);
                         if (start < 14 || end > next || end <= start)
                         {
                             context.Report(DiagnosticSeverity.Error, "hfs.bad-record-offset",
@@ -505,7 +511,7 @@ namespace ClassicMac.Files.Hfs
                         }
                         yield return (key, bytes[dataStart..end]);
                     }
-                    node = BinaryPrimitives.ReadUInt32BigEndian(bytes);
+                    node = ReadUInt32(bytes, 0);
                 }
 
                 if (lastLeaf != expectedLastLeaf)
@@ -518,12 +524,13 @@ namespace ClassicMac.Files.Hfs
 
             private List<uint>? ValidateNodeMap(byte[] tree, byte[] header, int nodes, string name)
             {
-                if (BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(10)) != 3) return null;
+                var headerReader = new BigEndianReader(header);
+                if (headerReader.ReadUInt16At(10) != 3) return null;
 
-                int headerRecordStart = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(NodeSize - 2));
-                int userRecordStart = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(NodeSize - 4));
-                int mapStart = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(NodeSize - 6));
-                int mapEnd = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(NodeSize - 8));
+                int headerRecordStart = headerReader.ReadUInt16At(NodeSize - 2);
+                int userRecordStart = headerReader.ReadUInt16At(NodeSize - 4);
+                int mapStart = headerReader.ReadUInt16At(NodeSize - 6);
+                int mapEnd = headerReader.ReadUInt16At(NodeSize - 8);
                 if (headerRecordStart != 14 || userRecordStart != 14 + 106 || mapStart != 14 + 106 + 128 ||
                     mapEnd < mapStart || mapEnd > NodeSize - 8)
                 {
@@ -538,7 +545,7 @@ namespace ClassicMac.Files.Hfs
                 const uint MapNodeCapacity = MapNodeDataLength * 8;
                 var mapNodes = new HashSet<uint>();
                 var mapNodeOrder = new List<uint>();
-                uint nextMapNode = BinaryPrimitives.ReadUInt32BigEndian(header);
+                uint nextMapNode = headerReader.ReadUInt32At(0);
                 while (nextMapNode != 0)
                 {
                     if (nextMapNode >= (uint)nodes || !mapNodes.Add(nextMapNode))
@@ -549,18 +556,18 @@ namespace ClassicMac.Files.Hfs
                     mapNodeOrder.Add(nextMapNode);
 
                     int offset = checked((int)nextMapNode * NodeSize);
-                    var mapNode = tree.AsSpan(offset, NodeSize);
-                    if (mapNode[8] != 2 || mapNode[9] != 0 ||
-                        BinaryPrimitives.ReadUInt16BigEndian(mapNode[10..]) != 1 ||
-                        BinaryPrimitives.ReadUInt16BigEndian(mapNode[12..]) != 0 ||
-                        BinaryPrimitives.ReadUInt32BigEndian(mapNode[4..]) != 0 ||
-                        BinaryPrimitives.ReadUInt16BigEndian(mapNode[(NodeSize - 2)..]) != 14 ||
-                        BinaryPrimitives.ReadUInt16BigEndian(mapNode[(NodeSize - 4)..]) != NodeSize - 6)
+                    var mapNode = new BigEndianReader(tree.AsSpan(offset, NodeSize));
+                    if (mapNode.ReadByteAt(8) != 2 || mapNode.ReadByteAt(9) != 0 ||
+                        mapNode.ReadUInt16At(10) != 1 ||
+                        mapNode.ReadUInt16At(12) != 0 ||
+                        mapNode.ReadUInt32At(4) != 0 ||
+                        mapNode.ReadUInt16At(NodeSize - 2) != 14 ||
+                        mapNode.ReadUInt16At(NodeSize - 4) != NodeSize - 6)
                     {
                         ReportBadMap($"Map node {nextMapNode} of the {name} B-tree has an invalid descriptor or record layout.");
                         return null;
                     }
-                    nextMapNode = BinaryPrimitives.ReadUInt32BigEndian(mapNode);
+                    nextMapNode = mapNode.ReadUInt32At(0);
                 }
 
                 uint requiredMapNodes = (uint)nodes <= headerCapacity
@@ -595,7 +602,7 @@ namespace ClassicMac.Files.Hfs
                 uint freeNodes = 0;
                 for (uint nodeNumber = 0; nodeNumber < nodes; nodeNumber++)
                     if (!IsAllocated(nodeNumber)) freeNodes++;
-                uint declaredFree = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(14 + 26));
+                uint declaredFree = headerReader.ReadUInt32At(14 + 26);
                 if (freeNodes != declaredFree)
                     ReportBadMap($"The {name} B-tree declares {declaredFree} free nodes, but its map contains {freeNodes}.");
 
@@ -607,8 +614,9 @@ namespace ClassicMac.Files.Hfs
 
             private static bool IsNodeAllocated(byte[] tree, byte[] header, List<uint> mapNodes, uint nodeNumber)
             {
-                int mapStart = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(NodeSize - 6));
-                int mapEnd = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(NodeSize - 8));
+                var headerReader = new BigEndianReader(header);
+                int mapStart = headerReader.ReadUInt16At(NodeSize - 6);
+                int mapEnd = headerReader.ReadUInt16At(NodeSize - 8);
                 uint headerCapacity = checked((uint)((mapEnd - mapStart) * 8));
                 const uint MapNodeCapacity = (NodeSize - 20) * 8;
                 if (nodeNumber < headerCapacity)
@@ -638,17 +646,22 @@ namespace ClassicMac.Files.Hfs
             {
                 if (name == "catalog") return HfsWriter.CompareCatalogKeys(left, right);
 
-                int comparison = BinaryPrimitives.ReadUInt32BigEndian(left.AsSpan(2))
-                    .CompareTo(BinaryPrimitives.ReadUInt32BigEndian(right.AsSpan(2)));
+                var leftReader = new BigEndianReader(left);
+                var rightReader = new BigEndianReader(right);
+                int comparison = leftReader.ReadUInt32At(2).CompareTo(rightReader.ReadUInt32At(2));
                 if (comparison != 0) return comparison;
                 comparison = left[1].CompareTo(right[1]);
                 return comparison != 0
                     ? comparison
-                    : BinaryPrimitives.ReadUInt16BigEndian(left.AsSpan(6))
-                        .CompareTo(BinaryPrimitives.ReadUInt16BigEndian(right.AsSpan(6)));
+                    : leftReader.ReadUInt16At(6).CompareTo(rightReader.ReadUInt16At(6));
             }
 
             private static byte[] Node(byte[] tree, long index) => tree.AsSpan((int)(index * NodeSize), NodeSize).ToArray();
+
+            // Reads from a node in the leaf walk, which yields between reads and so cannot keep a reader.
+            private static ushort ReadUInt16(byte[] node, int offset) => new BigEndianReader(node).ReadUInt16At(offset);
+
+            private static uint ReadUInt32(byte[] node, int offset) => new BigEndianReader(node).ReadUInt32At(offset);
 
             private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
         }

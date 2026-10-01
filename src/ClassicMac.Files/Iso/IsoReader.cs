@@ -69,19 +69,21 @@ namespace ClassicMac.Files.Iso
             private static Descriptor? Iso(ForkData input, byte[] v, bool cdI)
             {
                 if (v[0x371] is not (0 or 1)) return null;
-                if (!cdI && BinaryPrimitives.ReadUInt32LittleEndian(v.AsSpan(0x84)) != BinaryPrimitives.ReadUInt32BigEndian(v.AsSpan(0x88)))
+                var reader = new BigEndianReader(v);
+                if (!cdI && BinaryPrimitives.ReadUInt32LittleEndian(v.AsSpan(0x84)) != reader.ReadUInt32At(0x88))
                     return null;
                 var xa = v.AsSpan(0x400, 8).SequenceEqual("CD-XA001"u8);
-                int blockSize = BinaryPrimitives.ReadUInt16BigEndian(v.AsSpan(130));
+                int blockSize = reader.ReadUInt16At(130);
                 // The root comes from the first entry of the big-endian path table.
-                var root = PathTableRoot(input, BinaryPrimitives.ReadUInt32BigEndian(v.AsSpan(148)), blockSize, 2);
+                var root = PathTableRoot(input, reader.ReadUInt32At(148), blockSize, 2);
                 return root is { } r ? new Descriptor(false, cdI, xa, blockSize, r) : null;
             }
 
             private static Descriptor? ReadHighSierra(ForkData input, byte[] v)
             {
-                int blockSize = BinaryPrimitives.ReadUInt16BigEndian(v.AsSpan(138));
-                var root = PathTableRoot(input, BinaryPrimitives.ReadUInt32BigEndian(v.AsSpan(164)), blockSize, 0);
+                var reader = new BigEndianReader(v);
+                int blockSize = reader.ReadUInt16At(138);
+                var root = PathTableRoot(input, reader.ReadUInt32At(164), blockSize, 0);
                 return root is { } r ? new Descriptor(true, false, false, blockSize, r) : null;
             }
 
@@ -90,7 +92,7 @@ namespace ClassicMac.Files.Iso
                 if (blockSize is < 512 or > Sector || (blockSize & (blockSize - 1)) != 0) return null;
                 var offset = (long)table * blockSize;
                 if (offset + 8 > input.Length) return null;
-                var extent = BinaryPrimitives.ReadUInt32BigEndian(input.Slice(offset, 8).ToArray().AsSpan(at));
+                var extent = new BigEndianReader(input.Slice(offset, 8).ToArray()).ReadUInt32At(at);
                 var root = (long)extent * blockSize;
                 return root > 0 && root < input.Length ? root : null;
             }
@@ -112,8 +114,8 @@ namespace ClassicMac.Files.Iso
             public bool HighSierra { get; }
             public int Length => b[0];
             public int AttributeBlocks => b[1];
-            public int Extent => BinaryPrimitives.ReadInt32BigEndian(b.AsSpan(6));
-            public uint Size => BinaryPrimitives.ReadUInt32BigEndian(b.AsSpan(14));
+            public int Extent => new BigEndianReader(b).ReadInt32At(6);
+            public uint Size => new BigEndianReader(b).ReadUInt32At(14);
             public byte Flags => HighSierra ? b[24] : b[25];
             public int UnitBlocks => b[26];
             public int GapBlocks => b[27];
@@ -316,19 +318,20 @@ namespace ClassicMac.Files.Iso
             private (FourCC Type, FourCC Creator, Func<ushort, ushort> Flags) FinderInfoOf(Record record)
             {
                 var b = record.Bytes;
+                var reader = new BigEndianReader(b);
                 var p = 0x21 + record.NameLength + ((record.NameLength & 1) != 0 ? 0 : 1);
                 if (record.NameLength + 0x21 < record.Length)
                 {
                     if (b[p] == (byte)'B' && b[p + 1] == (byte)'A')
                     {
-                        var type = new FourCC(BinaryPrimitives.ReadUInt32BigEndian(b[(p + 3)..]));
-                        var creator = new FourCC(BinaryPrimitives.ReadUInt32BigEndian(b[(p + 7)..]));
+                        var type = reader.ReadFourCCAt(p + 3);
+                        var creator = reader.ReadFourCCAt(p + 7);
                         switch (b[p + 2])
                         {
                             case 2 or 4: return (type, creator, f => (ushort)(f | 0x0100));
                             case 3 or 5: return (type, creator, f => (ushort)(f | 0x2100));
                             case 6:
-                                var stored = BinaryPrimitives.ReadUInt16BigEndian(b[(p + 11)..]);
+                                var stored = reader.ReadUInt16At(p + 11);
                                 return (type, creator, f => (ushort)(f | (stored & 0xB020) | 0x0100));
                         }
                     }
@@ -339,9 +342,9 @@ namespace ClassicMac.Files.Iso
                         {
                             if (b[p] == (byte)'A' && b[p + 1] == (byte)'A' && b[p + 3] == 2)
                             {
-                                var stored = BinaryPrimitives.ReadUInt16BigEndian(b[(p + 12)..]);
-                                return (new FourCC(BinaryPrimitives.ReadUInt32BigEndian(b[(p + 4)..])),
-                                    new FourCC(BinaryPrimitives.ReadUInt32BigEndian(b[(p + 8)..])),
+                                var stored = reader.ReadUInt16At(p + 12);
+                                return (reader.ReadFourCCAt(p + 4),
+                                    reader.ReadFourCCAt(p + 8),
                                     _ => (ushort)((stored & 0xB020) | 0x0100));
                             }
                             if (b[p + 2] < 4) break;

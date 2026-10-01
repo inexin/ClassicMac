@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -158,12 +157,13 @@ namespace ClassicMac.Files.Containers
         private static PcExchangeRecord Parse(ReadOnlySpan<byte> record)
         {
             var nameLength = Math.Min(record[0], (byte)31);
+            var reader = new BigEndianReader(record);
             return new PcExchangeRecord(
                 new MacString(record.Slice(1, nameLength)),
                 FinderInfo.Read(record.Slice(0x20, FinderInfo.Length)),
-                Date(BinaryPrimitives.ReadUInt32BigEndian(record[0x40..])),
-                Date(BinaryPrimitives.ReadUInt32BigEndian(record[0x44..])),
-                BinaryPrimitives.ReadUInt32BigEndian(record[0x4C..]),
+                Date(reader.ReadUInt32At(0x40)),
+                Date(reader.ReadUInt32At(0x44)),
+                reader.ReadUInt32At(0x4C),
                 Encoding.Latin1.GetString(record.Slice(0x50, 11)));
         }
 

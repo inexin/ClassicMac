@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -116,7 +115,7 @@ namespace ClassicMac.Files.Hfs
             foreach (var (id, bytes, what) in new[] { ((short)2, data, "data"), ((short)1, tags, "tag") })
             {
                 if (fork.Find(Cksm, id)?.GetData() is not { Length: >= 4 } stored) continue;
-                var expected = BinaryPrimitives.ReadUInt32BigEndian(stored.Span);
+                var expected = new BigEndianReader(stored.Span).ReadUInt32At(0);
                 var sum = DiskCopy42Reader.Sum(bytes);
                 if (sum != expected)
                 {
@@ -134,8 +133,9 @@ namespace ClassicMac.Files.Hfs
                 header = null!;
                 var start = input.ReadPrefix(4 + 72 * 2);
                 if (start.Length < 4) return false;
+                var reader = new BigEndianReader(start);
                 var compression = start[0];
-                int kilobytes = BinaryPrimitives.ReadUInt16BigEndian(start.AsSpan(2));
+                int kilobytes = reader.ReadUInt16At(2);
                 if (compression > Stored || kilobytes is not (400 or 720 or 800 or 1440)) return false;
                 var count = kilobytes == 1440 ? 72 : 40;
                 var length = 4 + count * 2;
@@ -145,7 +145,7 @@ namespace ClassicMac.Files.Hfs
                 long total = length;
                 for (var i = 0; i < count; i++)
                 {
-                    lengths[i] = BinaryPrimitives.ReadInt16BigEndian(start.AsSpan(4 + i * 2));
+                    lengths[i] = reader.ReadInt16At(4 + i * 2);
                     if (i >= blocks) continue;
                     var l = lengths[i];
                     if (compression == Stored || l == -1) total += BlockLength;

@@ -104,21 +104,25 @@ namespace ClassicMac.Files.Hfs
             ulong ResourceLength, uint SegmentNumber, uint SegmentCount, uint DataChecksumType, byte[] DataChecksum,
             ulong XmlOffset, ulong XmlLength, uint MasterChecksumType, byte[] MasterChecksum, ulong SectorCount)
         {
-            public static Koly Read(ReadOnlySpan<byte> t) => new(
-                BinaryPrimitives.ReadUInt32BigEndian(t[4..]), BinaryPrimitives.ReadUInt32BigEndian(t[12..]),
-                BinaryPrimitives.ReadUInt64BigEndian(t[0x18..]), BinaryPrimitives.ReadUInt64BigEndian(t[0x20..]),
-                BinaryPrimitives.ReadUInt64BigEndian(t[0x28..]), BinaryPrimitives.ReadUInt64BigEndian(t[0x30..]),
-                BinaryPrimitives.ReadUInt32BigEndian(t[0x38..]), BinaryPrimitives.ReadUInt32BigEndian(t[0x3C..]),
-                BinaryPrimitives.ReadUInt32BigEndian(t[0x50..]), Checksum(t[0x54..]),
-                BinaryPrimitives.ReadUInt64BigEndian(t[0xD8..]), BinaryPrimitives.ReadUInt64BigEndian(t[0xE0..]),
-                BinaryPrimitives.ReadUInt32BigEndian(t[0x160..]), Checksum(t[0x164..]),
-                BinaryPrimitives.ReadUInt64BigEndian(t[0x1EC..]));
+            public static Koly Read(ReadOnlySpan<byte> t)
+            {
+                var reader = new BigEndianReader(t);
+                return new(
+                    reader.ReadUInt32At(4), reader.ReadUInt32At(12),
+                    reader.ReadUInt64At(0x18), reader.ReadUInt64At(0x20),
+                    reader.ReadUInt64At(0x28), reader.ReadUInt64At(0x30),
+                    reader.ReadUInt32At(0x38), reader.ReadUInt32At(0x3C),
+                    reader.ReadUInt32At(0x50), Checksum(t[0x54..]),
+                    reader.ReadUInt64At(0xD8), reader.ReadUInt64At(0xE0),
+                    reader.ReadUInt32At(0x160), Checksum(t[0x164..]),
+                    reader.ReadUInt64At(0x1EC));
+            }
         }
 
         // A checksum field: a u32 size in bits, then the value, left-aligned in 128 bytes.
         private static byte[] Checksum(ReadOnlySpan<byte> field)
         {
-            var bits = BinaryPrimitives.ReadUInt32BigEndian(field);
+            var bits = new BigEndianReader(field).ReadUInt32At(0);
             return field.Slice(4, (int)Math.Min(128, (bits + 7) / 8)).ToArray();
         }
 
@@ -153,9 +157,9 @@ namespace ClassicMac.Files.Hfs
                     context.Report(DiagnosticSeverity.Error, "udif.bad-table", $"Block table {id} is not a 'mish' table; skipped.");
                     continue;
                 }
-                var t = data.AsSpan();
-                tables.Add(new Table(id, BinaryPrimitives.ReadUInt64BigEndian(t[8..]), BinaryPrimitives.ReadUInt64BigEndian(t[0x10..]),
-                    BinaryPrimitives.ReadUInt64BigEndian(t[0x18..]), BinaryPrimitives.ReadUInt32BigEndian(t[0x40..]), Checksum(t[0x44..]), data));
+                var reader = new BigEndianReader(data);
+                tables.Add(new Table(id, reader.ReadUInt64At(8), reader.ReadUInt64At(0x10),
+                    reader.ReadUInt64At(0x18), reader.ReadUInt32At(0x40), Checksum(data.AsSpan(0x44)), data));
             }
             return tables;
         }
@@ -201,8 +205,8 @@ namespace ClassicMac.Files.Hfs
         // A table's runs as disk chunks.
         private static List<DiskChunk> Runs(Table table, Koly koly, long inputLength, ContainerContext context)
         {
-            var t = table.Data.AsSpan();
-            var count = BinaryPrimitives.ReadUInt32BigEndian(t[0xC8..]);
+            var t = new BigEndianReader(table.Data);
+            var count = t.ReadUInt32At(0xC8);
             var room = (t.Length - TableHeader) / RunLength;
             if (count > room)
             {
@@ -213,12 +217,12 @@ namespace ClassicMac.Files.Hfs
             var ended = false;
             for (var i = 0; i < count; i++)
             {
-                var r = t.Slice(TableHeader + i * RunLength, RunLength);
-                var type = BinaryPrimitives.ReadUInt32BigEndian(r);
-                var first = BinaryPrimitives.ReadUInt64BigEndian(r[8..]);
-                var sectors = BinaryPrimitives.ReadUInt64BigEndian(r[0x10..]);
-                var offset = BinaryPrimitives.ReadUInt64BigEndian(r[0x18..]);
-                var stored = BinaryPrimitives.ReadUInt64BigEndian(r[0x20..]);
+                var at = TableHeader + i * RunLength;
+                var type = t.ReadUInt32At(at);
+                var first = t.ReadUInt64At(at + 8);
+                var sectors = t.ReadUInt64At(at + 0x10);
+                var offset = t.ReadUInt64At(at + 0x18);
+                var stored = t.ReadUInt64At(at + 0x20);
                 if (type == RunEnd)
                 {
                     ended = true;

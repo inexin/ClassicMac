@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -31,19 +30,19 @@ namespace ClassicMac.Files.Hfs
 
         /// <inheritdoc/>
         public bool CanRead(ForkData input) =>
-            input.Length >= MapOffset && BinaryPrimitives.ReadUInt16BigEndian(input.Slice(InfoOffset, 2).ToArray()) == Signature;
+            input.Length >= MapOffset && new BigEndianReader(input.Slice(InfoOffset, 2).ToArray()).ReadUInt16At(0) == Signature;
 
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             if (!CanRead(input)) throw new InvalidDataException("Not an MFS volume.");
-            var info = input.Slice(InfoOffset, 64).ToArray();
-            int directoryStart = BinaryPrimitives.ReadUInt16BigEndian(info.AsSpan(0x0E));
-            int directoryBlocks = BinaryPrimitives.ReadUInt16BigEndian(info.AsSpan(0x10));
-            int blocks = BinaryPrimitives.ReadUInt16BigEndian(info.AsSpan(0x12));
-            long blockSize = BinaryPrimitives.ReadUInt32BigEndian(info.AsSpan(0x14));
-            long firstBlock = BinaryPrimitives.ReadUInt16BigEndian(info.AsSpan(0x1C)) * (long)BlockSize;
-            int fileCount = BinaryPrimitives.ReadUInt16BigEndian(info.AsSpan(0x0C));
+            var info = new BigEndianReader(input.Slice(InfoOffset, 64).ToArray());
+            int directoryStart = info.ReadUInt16At(0x0E);
+            int directoryBlocks = info.ReadUInt16At(0x10);
+            int blocks = info.ReadUInt16At(0x12);
+            long blockSize = info.ReadUInt32At(0x14);
+            long firstBlock = info.ReadUInt16At(0x1C) * (long)BlockSize;
+            int fileCount = info.ReadUInt16At(0x0C);
             if (blockSize == 0 || blockSize % 512 != 0)
                 throw new InvalidDataException($"The allocation block size {blockSize} is not a multiple of 512.");
 
@@ -69,6 +68,7 @@ namespace ClassicMac.Files.Hfs
                 while (at - block * BlockSize < 460 && at + 51 <= end && directory[at] != 0)
                 {
                     var e = directory.AsSpan(at);
+                    var entry = new BigEndianReader(e);
                     int nameLength = e[50];
                     if (at + 51 + nameLength > end)
                     {
@@ -81,10 +81,10 @@ namespace ClassicMac.Files.Hfs
                     {
                         Name = name,
                         FinderInfo = FinderInfo.Read(e.Slice(2, 16)),
-                        Created = Date(BinaryPrimitives.ReadUInt32BigEndian(e[42..])),
-                        Modified = Date(BinaryPrimitives.ReadUInt32BigEndian(e[46..])),
-                        DataFork = Fork(BinaryPrimitives.ReadUInt16BigEndian(e[22..]), BinaryPrimitives.ReadUInt32BigEndian(e[24..]), $"{label}'s data fork"),
-                        ResourceFork = Fork(BinaryPrimitives.ReadUInt16BigEndian(e[32..]), BinaryPrimitives.ReadUInt32BigEndian(e[34..]), $"{label}'s resource fork"),
+                        Created = Date(entry.ReadUInt32At(42)),
+                        Modified = Date(entry.ReadUInt32At(46)),
+                        DataFork = Fork(entry.ReadUInt16At(22), entry.ReadUInt32At(24), $"{label}'s data fork"),
+                        ResourceFork = Fork(entry.ReadUInt16At(32), entry.ReadUInt32At(34), $"{label}'s resource fork"),
                     });
                     if (files.Count > context.Options.MaxVolumeEntries)
                     {

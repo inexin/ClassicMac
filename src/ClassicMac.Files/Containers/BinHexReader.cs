@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -72,14 +71,15 @@ namespace ClassicMac.Files.Containers
                     $"The header's version byte is {d[1 + nameLength]}, not 0.");
             }
             var fields = d[header..];
+            var reader = new BigEndianReader(fields);
             var finderInfo = new FinderInfo
             {
                 Type = new FourCC(fields[..4]),
                 Creator = new FourCC(fields[4..8]),
-                Flags = (FinderFlags)BinaryPrimitives.ReadUInt16BigEndian(fields[8..]),
+                Flags = (FinderFlags)reader.ReadUInt16At(8),
             };
-            long dataLength = BinaryPrimitives.ReadUInt32BigEndian(fields[10..]);
-            long resourceLength = BinaryPrimitives.ReadUInt32BigEndian(fields[14..]);
+            long dataLength = reader.ReadUInt32At(10);
+            long resourceLength = reader.ReadUInt32At(14);
             var headerEnd = header + 18;
             CheckCrc(d[..headerEnd], d, headerEnd, "header", context);
 
@@ -189,7 +189,7 @@ namespace ClassicMac.Files.Containers
                 context.Report(DiagnosticSeverity.Error, "binhex.truncated", $"The {what} CRC is missing.");
                 return;
             }
-            var stored = BinaryPrimitives.ReadUInt16BigEndian(all[(int)at..]);
+            var stored = new BigEndianReader(all).ReadUInt16At((int)at);
             var computed = Crc16.Compute(covered);
             if (stored != computed)
             {

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -171,11 +170,9 @@ public sealed class StuffItSplitReader : IContainerReader
         return true;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) =>
-        BinaryPrimitives.ReadUInt16BigEndian(bytes[offset..]);
+    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
 
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) =>
-        BinaryPrimitives.ReadUInt32BigEndian(bytes[offset..]);
+    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private sealed record SplitHeader(byte PartNumber, byte[] NameBytes, byte[] Metadata,
         uint ResourceLength, uint DataLength)

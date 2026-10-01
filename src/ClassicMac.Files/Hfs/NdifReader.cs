@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -106,7 +105,10 @@ namespace ClassicMac.Files.Hfs
             // The checks Disk Copy's validator makes that stop it from mounting throw; the rest are reported.
             public static Header Read(byte[] map, MacFile file, ContainerContext context)
             {
-                int version = BinaryPrimitives.ReadUInt16BigEndian(map);
+                // A map too short for its version word throws as a span read past its end does.
+                if (map.Length < 2) throw new ArgumentOutOfRangeException(nameof(map));
+                var reader = new BigEndianReader(map);
+                int version = reader.ReadUInt16At(0);
                 if (version > 12)
                     throw new InvalidDataException($"The image is NDIF version {version}, newer than Disk Copy 6.5 writes.");
                 if (version is not (2 or 10 or 11 or 12))
@@ -119,10 +121,10 @@ namespace ClassicMac.Files.Hfs
                     // No real image has been seen: the fields that would show another layout are reported with a request.
                     context.Report(DiagnosticSeverity.Info, "ndif.version-2",
                         $"A version 2 map (Disk Image Mounter 1.0 or Disk Copy 6.0.1), read as Disk Copy 6.1.2 reads it: type "
-                        + $"'{file.FinderInfo.Type}', creator '{file.FinderInfo.Creator}', +$54 = ${BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x54)):X8}, "
+                        + $"'{file.FinderInfo.Type}', creator '{file.FinderInfo.Creator}', +$54 = ${reader.ReadUInt32At(0x54):X8}, "
                         + $"map {map.Length} bytes. No real image of this kind has been seen yet: please send it to the ClassicMac project.");
                 }
-                var count = (int)BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(old ? 0x54 : 0x7C));
+                var count = (int)reader.ReadUInt32At(old ? 0x54 : 0x7C);
                 if (count < 2) throw new InvalidDataException($"The map lists {count} chunks; Disk Copy calls it damaged.");
                 var room = (map.Length - entriesAt) / entrySize;
                 if (map.Length != entriesAt + count * entrySize)
@@ -139,17 +141,17 @@ namespace ClassicMac.Files.Hfs
                 var nameLength = map[4];
                 if (nameLength > 63)
                     context.Report(DiagnosticSeverity.Error, "ndif.bad-name", "The volume name is longer than 63 bytes; cut.");
-                var blocks = BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x44));
+                var blocks = reader.ReadUInt32At(0x44);
                 if (blocks == 0 || blocks >= MaxBlocks)
                     throw new InvalidDataException($"The disk is {blocks} blocks; Disk Copy calls it damaged.");
-                var segmented = !old && BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x54)) != 0;
+                var segmented = !old && reader.ReadUInt32At(0x54) != 0;
                 if (segmented && version < 12)
                     throw new InvalidDataException("The map says segmented but its version is below 12; Disk Copy calls it damaged.");
-                var crc = BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x50));
+                var crc = reader.ReadUInt32At(0x50);
                 if (crc == 0xFFFFFFFF)
                     context.Report(DiagnosticSeverity.Warning, "ndif.crc-uninitialized", "The image's checksum was never set.");
                 return new Header(version, new MacString(map.AsSpan(5, Math.Min(nameLength, (byte)63))), blocks,
-                    BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x48)), BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x4C)),
+                    reader.ReadUInt32At(0x48), reader.ReadUInt32At(0x4C),
                     crc, segmented, count, entriesAt, entrySize);
             }
         }
@@ -162,10 +164,11 @@ namespace ClassicMac.Files.Hfs
             var entries = new List<(long Start, byte Type, long Offset, long Stored)>();
             for (var k = 0; k < header.Count; k++)
             {
-                var e = map.AsSpan(header.EntriesAt + k * header.EntrySize, header.EntrySize);
-                var word = BinaryPrimitives.ReadUInt32BigEndian(e);
-                long stored = header.EntrySize == EntryLength ? BinaryPrimitives.ReadUInt32BigEndian(e[8..]) : 0;
-                entries.Add((word >> 8, (byte)word, BinaryPrimitives.ReadUInt32BigEndian(e[4..]), stored));
+                var e = new BigEndianReader(map.AsSpan(header.EntriesAt + k * header.EntrySize, header.EntrySize));
+                var word = e.ReadUInt32();
+                long offset = e.ReadUInt32();
+                long stored = header.EntrySize == EntryLength ? e.ReadUInt32() : 0;
+                entries.Add((word >> 8, (byte)word, offset, stored));
             }
             if (header.EntrySize == OldEntryLength)
             {
@@ -263,15 +266,17 @@ namespace ClassicMac.Files.Hfs
                 context.Report(DiagnosticSeverity.Error, "ndif.missing-segment", "The image is segmented but has no bcm# 128; only its own data is read.");
                 return file.DataFork;
             }
-            int count = BinaryPrimitives.ReadUInt16BigEndian(master.AsSpan(2));
+            var reader = new BigEndianReader(master);
+            int count = reader.ReadUInt16At(2);
             var id = master.AsSpan(4, 16).ToArray();
             var parts = new ForkData?[count + 1];
-            parts[BinaryPrimitives.ReadUInt16BigEndian(master)] = file.DataFork;
+            parts[reader.ReadUInt16At(0)] = file.DataFork;
             foreach (var sibling in context.Siblings?.Invoke() ?? [])
             {
                 if (sibling.FinderInfo.Type != Dseg || Resources(sibling)?.Find(Bcm, 128)?.GetData().ToArray() is not { Length: >= 20 } part) continue;
-                int number = BinaryPrimitives.ReadUInt16BigEndian(part);
-                if (BinaryPrimitives.ReadUInt16BigEndian(part.AsSpan(2)) == count && part.AsSpan(4, 16).SequenceEqual(id)
+                var partReader = new BigEndianReader(part);
+                int number = partReader.ReadUInt16At(0);
+                if (partReader.ReadUInt16At(2) == count && part.AsSpan(4, 16).SequenceEqual(id)
                     && number is >= 1 && number <= count && parts[number] is null)
                     parts[number] = sibling.DataFork;
                 if (parts.Skip(1).All(p => p is not null)) break;

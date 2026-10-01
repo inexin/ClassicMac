@@ -74,13 +74,14 @@ namespace ClassicMac.Files
         {
             Span<byte> bytes = stackalloc byte[Length];
             source[..Math.Min(source.Length, Length)].CopyTo(bytes);
+            var reader = new BigEndianReader(bytes);
             return new FinderInfo
             {
                 Type = new FourCC(bytes[..4]),
                 Creator = new FourCC(bytes[4..8]),
-                Flags = (FinderFlags)System.Buffers.Binary.BinaryPrimitives.ReadUInt16BigEndian(bytes[8..]),
+                Flags = (FinderFlags)reader.ReadUInt16At(8),
                 Location = MacPoint.Read(bytes[10..]),
-                Folder = System.Buffers.Binary.BinaryPrimitives.ReadInt16BigEndian(bytes[14..]),
+                Folder = reader.ReadInt16At(14),
                 Extended = bytes[16..].ToArray(),
             };
         }

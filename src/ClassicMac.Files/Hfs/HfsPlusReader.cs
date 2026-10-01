@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -49,7 +48,7 @@ internal static class HfsPlusReader
         if (blockSize < 512 || (blockSize & (blockSize - 1)) != 0 ||
             totalBlocks == 0 || (ulong)blockSize * totalBlocks > (ulong)image.Length)
             throw new InvalidDataException("The HFS Plus allocation area is invalid.");
-        if (BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(112, 8)) == 0)
+        if (U64(header, 112) == 0)
             throw new InvalidDataException("The HFS Plus volume has no allocation file.");
 
         var overflow = new Dictionary<(byte Fork, uint File), List<(uint Start, byte[] Extents)>>();
@@ -222,7 +221,7 @@ internal static class HfsPlusReader
                 context.Report(DiagnosticSeverity.Warning, "hfs.plus-security-flag-mismatch",
                     $"The HFS Plus catalog object's HasSecurity flag disagrees with its ACL attribute (CNID {fileId}).");
         }
-        ulong declaredEncodingBitmap = BinaryPrimitives.ReadUInt64BigEndian(header.AsSpan(72, 8));
+        ulong declaredEncodingBitmap = U64(header, 72);
         if ((requiredEncodingBitmap & declaredEncodingBitmap) != requiredEncodingBitmap)
             context.Report(DiagnosticSeverity.Info, "hfs.plus-encoding-bitmap",
                 "The HFS Plus volume encoding bitmap omits an encoding used by a catalog file or folder.");
@@ -296,8 +295,8 @@ internal static class HfsPlusReader
             {
                 if (U16(data, 0) != 2 || (U16(data, 2) & HasLinkChainMask) == 0 ||
                     privateDataFolderIds.Contains(U32(key, 2)) ||
-                    BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(48, 4)) != aliasType.Value ||
-                    BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(52, 4)) != aliasCreator.Value)
+                    U32(data, 48) != aliasType.Value ||
+                    U32(data, 52) != aliasCreator.Value)
                     continue;
                 uint parentId = U32(key, 2);
                 if (folderCounts.TryGetValue(parentId, out uint count))
@@ -553,8 +552,8 @@ internal static class HfsPlusReader
         byte[] journalInfo = image.Slice(blockOffset, journalInfoBlockLength).ToArray();
         uint flags = U32(journalInfo, 0);
         ulong volumeBytes = (ulong)blockSize * totalBlocks;
-        ulong journalOffset = BinaryPrimitives.ReadUInt64BigEndian(journalInfo.AsSpan(36, 8));
-        ulong journalSize = BinaryPrimitives.ReadUInt64BigEndian(journalInfo.AsSpan(44, 8));
+        ulong journalOffset = U64(journalInfo, 36);
+        ulong journalSize = U64(journalInfo, 44);
         if ((flags & journalInVolumeFlag) == 0 || (flags & journalOnOtherDeviceFlag) != 0 ||
             journalSize == 0 || journalOffset > volumeBytes || journalSize > volumeBytes - journalOffset)
         {
@@ -620,9 +619,9 @@ internal static class HfsPlusReader
         byte[] fields = image.Slice((long)journalInfo.Offset, journalHeaderLength).ToArray(journalHeaderLength);
         uint magic = U32(fields, 0);
         uint endian = U32(fields, 4);
-        ulong start = BinaryPrimitives.ReadUInt64BigEndian(fields.AsSpan(8, 8));
-        ulong end = BinaryPrimitives.ReadUInt64BigEndian(fields.AsSpan(16, 8));
-        ulong declaredSize = BinaryPrimitives.ReadUInt64BigEndian(fields.AsSpan(24, 8));
+        ulong start = U64(fields, 8);
+        ulong end = U64(fields, 16);
+        ulong declaredSize = U64(fields, 24);
         uint blockListHeaderSize = U32(fields, 32);
         uint expectedChecksum = U32(fields, 36);
         uint headerSize = U32(fields, 40);
@@ -659,7 +658,7 @@ internal static class HfsPlusReader
 
     private static JournalCatalogFile ReadJournalCatalogFile(ReadOnlySpan<byte> fork)
     {
-        ulong logicalSize = BinaryPrimitives.ReadUInt64BigEndian(fork);
+        ulong logicalSize = U64(fork, 0);
         uint totalBlocks = U32(fork, 12);
         uint extentStart = U32(fork, 16);
         uint extentBlocks = U32(fork, 20);
@@ -730,7 +729,7 @@ internal static class HfsPlusReader
                     throw new InvalidDataException("An HFS Plus attribute fork-data record has an invalid key.");
                 ReadOnlySpan<byte> fork = data.AsSpan(8, 80);
                 state.HasForkData = true;
-                state.LogicalSize = BinaryPrimitives.ReadUInt64BigEndian(fork);
+                state.LogicalSize = U64(fork, 0);
                 state.TotalBlocks = U32(fork, 12);
                 ExtentRecordInfo initialRecord = AddExtentRecord(fork[16..], totalBlocks, allocationExtents,
                     "An HFS Plus fork-data attribute lies outside the allocation area.", ordinaryForkExtents);
@@ -1058,7 +1057,7 @@ internal static class HfsPlusReader
         byte forkType = 0, uint fileId = 0, List<(uint Start, uint End)>? allocationExtents = null,
         List<(uint Start, uint End)>? ordinaryForkExtents = null)
     {
-        ulong logical = BinaryPrimitives.ReadUInt64BigEndian(fork);
+        ulong logical = U64(fork, 0);
         if (logical > long.MaxValue) throw new InvalidDataException("An HFS Plus fork is too large.");
         uint allocatedBlocks = U32(fork, 12);
         List<(uint Start, byte[] Extents)>? overflowEntries = null;
@@ -1907,6 +1906,11 @@ internal static class HfsPlusReader
         try { return MacString.FromMacRoman(name); }
         catch (ArgumentException) { return MacString.FromMacRoman("?"); }
     }
-    private static ushort U16(ReadOnlySpan<byte> data, int offset) => BinaryPrimitives.ReadUInt16BigEndian(data[offset..]);
-    private static uint U32(ReadOnlySpan<byte> data, int offset) => BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
+    // An offset outside the data throws ArgumentOutOfRangeException.
+    private static ushort U16(ReadOnlySpan<byte> data, int offset) =>
+        new BigEndianReader(data).TryReadUInt16At(offset, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
+    private static uint U32(ReadOnlySpan<byte> data, int offset) =>
+        new BigEndianReader(data).TryReadUInt32At(offset, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
+    private static ulong U64(ReadOnlySpan<byte> data, int offset) =>
+        new BigEndianReader(data).TryReadUInt64At(offset, out ulong value) ? value : throw new ArgumentOutOfRangeException(nameof(offset));
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -938,9 +937,7 @@ public sealed class DiskDoublerReader : IContainerReader
         return (int)value;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) =>
-        BinaryPrimitives.ReadUInt16BigEndian(bytes[offset..]);
+    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
 
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) =>
-        BinaryPrimitives.ReadUInt32BigEndian(bytes[offset..]);
+    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 }

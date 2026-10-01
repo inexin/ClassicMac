@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -40,9 +39,10 @@ namespace ClassicMac.Files.Hfs
         {
             var start = input.ReadPrefix(CdBlock + 2);
             if (start.Length < Block + 2) return 0;
-            if (BinaryPrimitives.ReadUInt16BigEndian(start) is not (DriverSignature or 0)) return 0;
-            if (BinaryPrimitives.ReadUInt16BigEndian(start.AsSpan(Block)) == EntrySignature) return Block;
-            if (start.Length == CdBlock + 2 && BinaryPrimitives.ReadUInt16BigEndian(start.AsSpan(CdBlock)) == EntrySignature) return CdBlock;
+            var reader = new BigEndianReader(start);
+            if (reader.ReadUInt16At(0) is not (DriverSignature or 0)) return 0;
+            if (reader.ReadUInt16At(Block) == EntrySignature) return Block;
+            if (start.Length == CdBlock + 2 && reader.ReadUInt16At(CdBlock) == EntrySignature) return CdBlock;
             return 0;
         }
 
@@ -52,7 +52,7 @@ namespace ClassicMac.Files.Hfs
             var stride = Stride(input);
             if (stride == 0) throw new InvalidDataException("Not an Apple partition map.");
             var first = input.Slice(stride, Block).ToArray();
-            long entries = BinaryPrimitives.ReadUInt32BigEndian(first.AsSpan(4));
+            long entries = new BigEndianReader(first).ReadUInt32At(4);
             var files = new List<MacFile>();
             for (long i = 0; i < entries; i++)
             {
@@ -64,7 +64,8 @@ namespace ClassicMac.Files.Hfs
                     break;
                 }
                 var entry = input.Slice(at, Block).ToArray();
-                if (BinaryPrimitives.ReadUInt16BigEndian(entry) != EntrySignature)
+                var reader = new BigEndianReader(entry);
+                if (reader.ReadUInt16At(0) != EntrySignature)
                 {
                     context.Report(DiagnosticSeverity.Error, "partition.bad-entry", $"Partition entry {i + 1} has no 'PM' signature.", at);
                     continue;
@@ -79,9 +80,9 @@ namespace ClassicMac.Files.Hfs
 
                 // Physical start and size, and where the data starts in the partition, in units of the stride. The
                 // size comes from the partition's block count: no Mac mounting code reads pmDataCnt.
-                long start = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(8));
-                long count = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(12));
-                long dataStart = BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(80));
+                long start = reader.ReadUInt32At(8);
+                long count = reader.ReadUInt32At(12);
+                long dataStart = reader.ReadUInt32At(80);
                 var offset = (start + dataStart) * stride;
                 var length = Math.Max(0, count - dataStart) * stride;
                 if (offset >= input.Length)

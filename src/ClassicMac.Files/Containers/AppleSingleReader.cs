@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
@@ -47,9 +46,10 @@ namespace ClassicMac.Files.Containers
         public bool CanRead(ForkData input)
         {
             var header = input.ReadPrefix(HeaderLength);
+            var reader = new BigEndianReader(header);
             return header.Length == HeaderLength
-                && BinaryPrimitives.ReadUInt32BigEndian(header) == magic
-                && BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4)) is Version1 or Version2;
+                && reader.ReadUInt32At(0) == magic
+                && reader.ReadUInt32At(4) is Version1 or Version2;
         }
 
         /// <inheritdoc/>
@@ -57,10 +57,11 @@ namespace ClassicMac.Files.Containers
         {
             if (!CanRead(input)) throw new InvalidDataException($"Not an {FormatName} file.");
             var header = input.ReadPrefix(HeaderLength);
-            var version = BinaryPrimitives.ReadUInt32BigEndian(header.AsSpan(4));
+            var reader = new BigEndianReader(header);
+            var version = reader.ReadUInt32At(4);
             // Version 1 names the home file system in the filler ("Macintosh", "ProDOS", …); version 2 zeroes it.
             var homeFileSystem = System.Text.Encoding.ASCII.GetString(header, 8, 16).TrimEnd(' ', '\0');
-            var count = BinaryPrimitives.ReadUInt16BigEndian(header.AsSpan(24));
+            var count = reader.ReadUInt16At(24);
             var table = input.ReadPrefix(HeaderLength + count * EntryLength).AsSpan(HeaderLength);
             if (table.Length < count * EntryLength)
             {
@@ -73,10 +74,10 @@ namespace ClassicMac.Files.Containers
             var hasName = false;
             for (var i = 0; i < count; i++)
             {
-                var e = table.Slice(i * EntryLength, EntryLength);
-                var id = BinaryPrimitives.ReadUInt32BigEndian(e);
-                long offset = BinaryPrimitives.ReadUInt32BigEndian(e[4..]);
-                long length = BinaryPrimitives.ReadUInt32BigEndian(e[8..]);
+                var e = new BigEndianReader(table.Slice(i * EntryLength, EntryLength));
+                var id = e.ReadUInt32();
+                long offset = e.ReadUInt32();
+                long length = e.ReadUInt32();
                 var at = HeaderLength + (long)i * EntryLength;
                 if (offset + length > input.Length)
                 {
@@ -143,10 +144,11 @@ namespace ClassicMac.Files.Containers
                     $"The File Dates entry is {entry.Length} bytes; dates ignored.", offset);
                 return file;
             }
+            var reader = new BigEndianReader(entry);
             return file with
             {
-                Created = ToMacDate(BinaryPrimitives.ReadInt32BigEndian(entry), context, offset),
-                Modified = ToMacDate(BinaryPrimitives.ReadInt32BigEndian(entry.AsSpan(4)), context, offset),
+                Created = ToMacDate(reader.ReadInt32(), context, offset),
+                Modified = ToMacDate(reader.ReadInt32(), context, offset),
             };
         }
 
@@ -176,10 +178,11 @@ namespace ClassicMac.Files.Containers
                     $"The File Info entry is {entry.Length} bytes; dates ignored.", offset);
                 return file;
             }
+            var reader = new BigEndianReader(entry);
             return file with
             {
-                Created = new MacDate(BinaryPrimitives.ReadUInt32BigEndian(entry)),
-                Modified = new MacDate(BinaryPrimitives.ReadUInt32BigEndian(entry.AsSpan(4))),
+                Created = new MacDate(reader.ReadUInt32()),
+                Modified = new MacDate(reader.ReadUInt32()),
             };
         }
     }

@@ -1142,8 +1142,11 @@ namespace ClassicMac.Files.Hfs
         }
 
         private static string DecodeName(byte[] key) => key.Length >= 7 ? new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7))).ToString() : "";
-        private static ushort U16(ReadOnlySpan<byte> b, int o) => BinaryPrimitives.ReadUInt16BigEndian(b[o..]);
-        private static uint U32(ReadOnlySpan<byte> b, int o) => BinaryPrimitives.ReadUInt32BigEndian(b[o..]);
+        // An offset outside the data throws ArgumentOutOfRangeException.
+        private static ushort U16(ReadOnlySpan<byte> b, int o) =>
+            new BigEndianReader(b).TryReadUInt16At(o, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
+        private static uint U32(ReadOnlySpan<byte> b, int o) =>
+            new BigEndianReader(b).TryReadUInt32At(o, out uint value) ? value : throw new ArgumentOutOfRangeException(nameof(o));
     }
 
     /// <summary>The fork selected for an HFS file edit.</summary>

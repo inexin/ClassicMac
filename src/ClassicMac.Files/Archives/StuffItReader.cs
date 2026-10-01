@@ -685,6 +685,7 @@ public sealed class StuffItReader : IContainerReader
     private static byte[] DecodeMethod6Blocks(ReadOnlySpan<byte> input, int outputLength)
     {
         var output = new byte[outputLength];
+        var reader = new BigEndianReader(input);
         int inputOffset = 0;
         int outputOffset = 0;
         while (inputOffset < input.Length)
@@ -692,7 +693,7 @@ public sealed class StuffItReader : IContainerReader
             if (input.Length - inputOffset < sizeof(int))
                 throw new InvalidDataException("A StuffIt method 6 block has a truncated length.");
 
-            int signedBlockLength = BinaryPrimitives.ReadInt32BigEndian(input[inputOffset..]);
+            int signedBlockLength = reader.ReadInt32At(inputOffset);
             long blockLength = signedBlockLength < 0 ? -(long)signedBlockLength : signedBlockLength;
             if (blockLength < sizeof(int) || blockLength > input.Length - inputOffset)
                 throw new InvalidDataException("A StuffIt method 6 block length is outside its compressed fork.");
@@ -720,11 +721,12 @@ public sealed class StuffItReader : IContainerReader
         if (block.Length < 6)
             throw new InvalidDataException("A StuffIt method 6 Huffman block has a truncated header.");
 
-        uint packBitsLengthValue = BinaryPrimitives.ReadUInt32BigEndian(block);
+        var header = new BigEndianReader(block);
+        uint packBitsLengthValue = header.ReadUInt32At(0);
         if (packBitsLengthValue > Method6MaximumPackBitsLength)
             throw new InvalidDataException("A StuffIt method 6 Huffman block exceeds its PackBits buffer limit.");
         int packBitsLength = checked((int)packBitsLengthValue);
-        int symbolCount = BinaryPrimitives.ReadUInt16BigEndian(block[4..]);
+        int symbolCount = header.ReadUInt16At(4);
         if (symbolCount > 256 || symbolCount > block.Length - 6)
             throw new InvalidDataException("A StuffIt method 6 Huffman block has an invalid translation table.");
 
@@ -1388,8 +1390,8 @@ public sealed class StuffItReader : IContainerReader
         return (int)value;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => BinaryPrimitives.ReadUInt16BigEndian(bytes[offset..]);
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => BinaryPrimitives.ReadUInt32BigEndian(bytes[offset..]);
+    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
+    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
     private static void U16(Span<byte> bytes, int offset, ushort value) =>
         BinaryPrimitives.WriteUInt16BigEndian(bytes[offset..], value);
 

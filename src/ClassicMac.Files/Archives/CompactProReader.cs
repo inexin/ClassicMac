@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -38,7 +37,7 @@ public sealed class CompactProReader : IContainerReader
             stream.Seek(4, SeekOrigin.Begin);
             Span<byte> offsetBytes = stackalloc byte[4];
             stream.ReadExactly(offsetBytes);
-            uint offset = BinaryPrimitives.ReadUInt32BigEndian(offsetBytes);
+            uint offset = new BigEndianReader(offsetBytes).ReadUInt32();
             if (offset < ArchiveHeaderLength || offset > input.Length - 7 || offset > int.MaxValue) return false;
             CompactProDirectory directory = ReadDirectory(stream, input.Length, (int)offset);
             return directory.StoredCrc == directory.ComputedCrc;
@@ -321,14 +320,14 @@ public sealed class CompactProReader : IContainerReader
         Span<byte> bytes = stackalloc byte[2];
         stream.ReadExactly(bytes);
         crc = UpdateCrc(crc, bytes);
-        return BinaryPrimitives.ReadUInt16BigEndian(bytes);
+        return new BigEndianReader(bytes).ReadUInt16();
     }
 
     private static uint ReadU32(Stream stream)
     {
         Span<byte> bytes = stackalloc byte[4];
         stream.ReadExactly(bytes);
-        return BinaryPrimitives.ReadUInt32BigEndian(bytes);
+        return new BigEndianReader(bytes).ReadUInt32();
     }
 
     private static int ReadByteAndUpdate(Stream stream, ref uint crc)
@@ -372,11 +371,9 @@ public sealed class CompactProReader : IContainerReader
         return (int)value;
     }
 
-    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) =>
-        BinaryPrimitives.ReadUInt16BigEndian(bytes[offset..]);
+    private static ushort U16(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt16At(offset);
 
-    private static uint U32(ReadOnlySpan<byte> bytes, int offset) =>
-        BinaryPrimitives.ReadUInt32BigEndian(bytes[offset..]);
+    private static uint U32(ReadOnlySpan<byte> bytes, int offset) => new BigEndianReader(bytes).ReadUInt32At(offset);
 
     private static void Require(byte[] archive, int offset, int length, string what)
     {

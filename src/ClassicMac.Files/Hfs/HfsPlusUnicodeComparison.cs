@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -792,9 +792,10 @@ internal static class HfsPlusUnicodeComparison
 
     private static ushort NextBigEndian(ReadOnlySpan<byte> value, ref int index)
     {
+        var reader = new BigEndianReader(value);
         while (index < value.Length)
         {
-            ushort character = BinaryPrimitives.ReadUInt16BigEndian(value[index..]);
+            ushort character = reader.ReadUInt16At(index);
             index += 2;
             if (character == 0) return ushort.MaxValue;
             if (IsIgnorable(character)) continue;
