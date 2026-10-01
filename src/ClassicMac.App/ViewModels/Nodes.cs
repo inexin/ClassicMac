@@ -107,6 +107,16 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The edits made to the input's own resources, once any are.</summary>
         public EditState? Editing { get; internal set; }
 
+        /// <summary>
+        /// Whether the input is a plain HFS volume image (no partition map or disk-image wrapper), whose files and
+        /// folders can be created and deleted.
+        /// </summary>
+        public bool IsWritableHfs => Host.Layout == HostLayout.Plain && Root.Children.Count > 0
+            && Root.Children.All(c => c.Format == ClassicMac.Files.Hfs.HfsReader.Instance.FormatName);
+
+        /// <summary>The volume with the files and folders created and deleted so far, or null when there are none.</summary>
+        public byte[]? EditedVolume { get; internal set; }
+
         // A plain file that is no container may itself be a resource fork (a .rsrc file).
         protected override Task LoadAsync() =>
             Root.Children.Count > 0 ? Task.CompletedTask : FileNode.LoadResourcesAsync(this, Root.File, raw: Host.Layout == HostLayout.Plain);

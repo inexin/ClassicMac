@@ -617,6 +617,10 @@ Only the resource fork changes; the name, Finder info, dates and data fork are w
 
 - A file inside a disk image or archive, a PC Exchange folder or a macOS named fork is saved only with Save As, to any
   of: MacBinary III, BinHex 4.0, AppleSingle, an AppleDouble pair, a Basilisk II folder entry, or the resource fork alone.
+- A file in a plain HFS image can also be saved as a copy of the image (`ForkSaver.SaveHfsImageAs`): the image, or the
+  image with files and folders already created or deleted by `HfsWriter` ([HFS-MFS.md](HFS-MFS.md)), with each edited
+  fork replaced; the copy is read back with the HFS reader and every replaced fork compared before it is placed. The
+  source image is never written.
 - **Verified:** the new file is written beside the original under a temporary name and read back with the reader for
   its container; its resources (type, ID, name, attributes but the in-memory changed bit, data), the fork's attributes,
   and the name, Finder info and other fork where the container has them must equal what was meant. Only then does it

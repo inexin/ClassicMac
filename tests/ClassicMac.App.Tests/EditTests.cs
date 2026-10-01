@@ -57,6 +57,13 @@ public sealed class EditTests : IDisposable
             ImportTypes = types;
             return Task.FromResult(Import(initial));
         }
+
+        public Func<NewFileChoice, NewFileChoice?> NewFile { get; set; } = c => c;
+        public string? FolderName { get; set; } = "New Folder";
+
+        public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => Task.FromResult(NewFile(initial));
+
+        public Task<string?> NewFolderAsync(string initial) => Task.FromResult(FolderName);
     }
 
     private static readonly FourCC Str = FourCC.FromString("STR ");
@@ -407,6 +414,152 @@ public sealed class EditTests : IDisposable
         Assert.Equal([3, (byte)'b', (byte)'y', (byte)'e'],
             ResourceFork.Read(savedPrefs.ResourceFork.ToArray()).Find(Str, 128)!.GetData().ToArray());
         Assert.Equal("other file"u8.ToArray(), Assert.Single(savedFiles, f => f.MacPath == "Other").DataFork.ToArray());
+    }
+
+    // A plain HFS image with Folder:Prefs (data and a resource fork) and Other, with room to grow.
+    private async Task<(MainViewModel Model, InputNode Input, Dialogs Dialogs, Picker Picker, string Path, byte[] Original)> OpenVolume()
+    {
+        var resourceFork = new ResourceFork();
+        resourceFork.Add(new Resource(Str, 128, new byte[] { 2, (byte)'h', (byte)'i' }));
+        var disk = new HfsBuilder();
+        var folderId = disk.Folder(HfsBuilder.Root, "Folder");
+        disk.File(folderId, "Prefs", "data fork"u8.ToArray(), resourceFork.ToArray());
+        disk.File(HfsBuilder.Root, "Other", "other file"u8.ToArray(), []);
+        var image = WithFreeSpace(disk.Build("Volume"));
+        var path = Path.Combine(folder, "Volume.hfs");
+        File.WriteAllBytes(path, image);
+        var dialogs = new Dialogs();
+        var picker = new Picker(folder);
+        var model = new MainViewModel { FilePicker = picker, EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        return (model, input, dialogs, picker, path, image);
+    }
+
+    private static byte[] WithFreeSpace(byte[] image)
+    {
+        const int allocationBlocks = 1600;
+        int oldBlocks = image[2 * HfsBuilder.Block + 0x12] << 8 | image[2 * HfsBuilder.Block + 0x13];
+        int oldFree = image[2 * HfsBuilder.Block + 0x22] << 8 | image[2 * HfsBuilder.Block + 0x23];
+        Array.Resize(ref image, (HfsBuilder.FirstAllocationBlock + allocationBlocks + 2) * HfsBuilder.Block);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(2 * HfsBuilder.Block + 0x12), allocationBlocks);
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(2 * HfsBuilder.Block + 0x22), checked((ushort)(oldFree + allocationBlocks - oldBlocks)));
+        image.AsSpan(2 * HfsBuilder.Block, HfsBuilder.Block).CopyTo(image.AsSpan(image.Length - 2 * HfsBuilder.Block));
+        return image;
+    }
+
+    [Fact]
+    public async Task Volume_commands_create_import_and_delete_files_and_folders_until_save_as()
+    {
+        var (model, input, dialogs, picker, path, original) = await OpenVolume();
+        model.Selected = input;
+        Assert.True(model.NewFolderCommand.CanExecute(null));
+        Assert.False(model.DeleteItemCommand.CanExecute(null));          // the volume itself
+
+        dialogs.FolderName = "Docs";
+        await model.NewFolderCommand.ExecuteAsync(null);
+        var docs = Assert.IsType<FolderNode>(model.Selected);
+        Assert.Equal("Docs", docs.Title);
+        Assert.Contains(docs, input.Children);
+        Assert.True(model.HasUnsavedChanges);
+        Assert.EndsWith("•", input.Title);
+
+        dialogs.NewFile = c => c with { Name = "Notes", Type = "TEXT", Creator = "ttxt" };
+        await model.NewFileCommand.ExecuteAsync(null);
+        var notes = Assert.IsType<FileNode>(model.Selected);
+        Assert.Same(docs, notes.Parent);
+
+        // Import a MacBinary file into the root: its name, type, creator and both forks.
+        var fork = new ResourceFork();
+        fork.Add(new Resource(Str, 200, "\u0003new"u8.ToArray()));
+        var host = new MacFile
+        {
+            Name = MacString.FromMacRoman("Imported"), DataFork = ForkData.FromBytes("imported data"u8.ToArray()),
+            ResourceFork = ForkData.FromBytes(fork.ToArray()),
+            FinderInfo = FinderInfo.Empty with { Type = FourCC.FromString("APPL"), Creator = FourCC.FromString("abcd") },
+        };
+        picker.Open = Path.Combine(folder, "Imported.bin");
+        File.WriteAllBytes(picker.Open, MacBinaryWriter.ToArray(host));
+        model.Selected = input.Children.Single(n => n.Title == "Other");     // a file: its folder (the root) gets the new one
+        NewFileChoice? offered = null;
+        dialogs.NewFile = c => offered = c;
+        await model.ImportFileCommand.ExecuteAsync(null);
+        Assert.Equal(new NewFileChoice("Imported", "APPL", "abcd"), offered);
+        var imported = Assert.IsType<FileNode>(model.Selected);
+        Assert.Same(input, imported.Parent);
+
+        model.Selected = input.Children.Single(n => n.Title == "Other");
+        await model.DeleteItemCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(input.Children, n => n.Title == "Other");
+
+        Assert.Equal(original, File.ReadAllBytes(path));                 // nothing written until Save As
+        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = HfsReader.Instance.Read(ForkData.FromFile(Path.Combine(folder, "Volume-edited.hfs")), new ContainerContext());
+        Assert.Equal(["Docs:Notes", "Folder:Prefs", "Imported"], saved.Select(f => f.MacPath).Order(StringComparer.Ordinal));
+        var savedImport = saved.Single(f => f.MacPath == "Imported");
+        Assert.Equal("imported data"u8.ToArray(), savedImport.DataFork.ToArray());
+        Assert.Equal(fork.ToArray(), savedImport.ResourceFork.ToArray());
+        Assert.Equal(FourCC.FromString("APPL"), savedImport.FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("TEXT"), saved.Single(f => f.MacPath == "Docs:Notes").FinderInfo.Type);
+        Assert.Equal(original, File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public async Task Deleting_a_folder_deletes_its_contents_and_fork_edits_save_with_volume_changes()
+    {
+        var (model, input, dialogs, _, _, _) = await OpenVolume();
+        var folderNode = input.Children.Single(n => n.Title == "Folder");
+
+        dialogs.Confirm = false;                                           // asked first: no
+        model.Selected = folderNode;
+        await model.DeleteItemCommand.ExecuteAsync(null);
+        Assert.Contains(folderNode, input.Children);
+        Assert.False(model.HasUnsavedChanges);
+
+        dialogs.Confirm = true;
+        await model.DeleteItemCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(folderNode, input.Children);
+        Assert.Same(input, model.Selected);
+
+        // A new file's resources are edited like any other's, and saved into the image with it.
+        dialogs.NewFile = c => c with { Name = "Fresh" };
+        await model.NewFileCommand.ExecuteAsync(null);
+        var fresh = Assert.IsType<FileNode>(model.Selected);
+        dialogs.Info = i => i with { Type = "STR ", Id = 300 };
+        await model.NewResourceCommand.ExecuteAsync(null);
+        model.Selected = input;
+        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = HfsReader.Instance.Read(ForkData.FromFile(Path.Combine(folder, "Volume-edited.hfs")), new ContainerContext());
+        Assert.Equal(["Fresh", "Other"], saved.Select(f => f.MacPath).Order(StringComparer.Ordinal));
+        Assert.NotNull(ResourceFork.Read(saved.Single(f => f.MacPath == "Fresh").ResourceFork.ToArray()).Find(Str, 300));
+        _ = fresh;
+    }
+
+    [Fact]
+    public async Task Volume_commands_refuse_bad_names_and_other_containers()
+    {
+        var (model, input, dialogs, _, _, _) = await OpenVolume();
+        model.Selected = input;
+        dialogs.FolderName = "Bad:Name";
+        await model.NewFolderCommand.ExecuteAsync(null);
+        Assert.Contains("Could not", model.Status);
+        Assert.False(model.HasUnsavedChanges);
+
+        dialogs.FolderName = "Folder";                                     // already there
+        await model.NewFolderCommand.ExecuteAsync(null);
+        Assert.Contains("Could not", model.Status);
+        Assert.False(model.HasUnsavedChanges);
+
+        dialogs.NewFile = c => c with { Type = "TOOLONG" };
+        await model.NewFileCommand.ExecuteAsync(null);
+        Assert.Contains("four Mac OS Roman", model.Status);
+
+        // A MacBinary file is no volume.
+        var (other, file, _, _, _) = await Open();
+        other.Selected = file;
+        Assert.False(other.NewFileCommand.CanExecute(null));
+        Assert.False(other.NewFolderCommand.CanExecute(null));
+        Assert.False(other.DeleteItemCommand.CanExecute(null));
+        Assert.False(other.SaveAsCommand.CanExecute(SaveAsFormat.HfsImage));
     }
 
     [Fact]

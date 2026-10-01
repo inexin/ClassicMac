@@ -22,7 +22,8 @@ namespace ClassicMac.App.ViewModels
     public sealed partial class MainViewModel
     {
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand), nameof(ConvertDocumentsCommand))]
+        [NotifyCanExecuteChangedFor(nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand), nameof(ConvertDocumentsCommand),
+            nameof(NewFileCommand), nameof(ImportFileCommand), nameof(NewFolderCommand), nameof(DeleteItemCommand))]
         private bool isExporting;
 
         /// <summary>The last export's task (tests wait for it).</summary>

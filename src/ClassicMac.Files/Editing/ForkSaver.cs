@@ -93,6 +93,9 @@ namespace ClassicMac.Files.Editing
         public IReadOnlyList<string> Differences { get; } = differences;
     }
 
+    /// <summary>An edited fork to write into an HFS image, by its Mac path (folders and name joined with ':').</summary>
+    public sealed record HfsForkReplacement(string MacPath, ResourceFork Fork, bool ForkInDataFork = false);
+
     /// <summary>
     /// Saves an edited resource fork back into the container it came from, or into a new one. A save writes beside the
     /// original under a temporary name, reads it back with the same reader and compares it with what was meant (the fork's
@@ -225,10 +228,24 @@ namespace ClassicMac.Files.Editing
         public static string SaveHfsImageAs(string sourcePath, string destinationPath, MacFile file, ResourceFork fork,
             bool forkInDataFork = false)
         {
-            ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
-            ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
             ArgumentNullException.ThrowIfNull(file);
             ArgumentNullException.ThrowIfNull(fork);
+            return SaveHfsImageAs(sourcePath, destinationPath, null, [new HfsForkReplacement(file.MacPath, fork, forkInDataFork)]);
+        }
+
+        /// <summary>
+        /// Writes a copy of a plain HFS image: <paramref name="volume"/> (the source image with files and folders already
+        /// created or deleted by <see cref="HfsWriter"/>), or the source image itself when null, with each of
+        /// <paramref name="forks"/> replaced. The image is read back and every replaced fork compared before it is
+        /// atomically placed at <paramref name="destinationPath"/>, which cannot be the source image.
+        /// </summary>
+        /// <returns>The full path of the saved HFS image.</returns>
+        public static string SaveHfsImageAs(string sourcePath, string destinationPath, byte[]? volume,
+            IReadOnlyList<HfsForkReplacement> forks)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+            ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
+            ArgumentNullException.ThrowIfNull(forks);
             var source = System.IO.Path.GetFullPath(sourcePath);
             var destination = System.IO.Path.GetFullPath(destinationPath);
             var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
@@ -239,8 +256,16 @@ namespace ClassicMac.Files.Editing
             var temporary = System.IO.Path.Combine(directory, $".classicmac-{Guid.NewGuid():N}.tmp");
             try
             {
-                var kind = forkInDataFork ? HfsFork.Data : HfsFork.Resource;
-                var image = HfsWriter.ReplaceFork(ForkData.FromFile(source), file.MacPath, kind, fork.ToArray());
+                var image = volume?.ToArray() ?? File.ReadAllBytes(source);
+                var written = new List<(string MacPath, HfsFork Kind, byte[] Data)>();
+                foreach (var replacement in forks)
+                {
+                    var kind = replacement.ForkInDataFork ? HfsFork.Data : HfsFork.Resource;
+                    var data = replacement.Fork.ToArray();
+                    image = HfsWriter.ReplaceFork(ForkData.FromBytes(image), replacement.MacPath, kind, data);
+                    written.Add((replacement.MacPath, kind, data));
+                }
+                VerifyHfsForks(image, written);
                 File.WriteAllBytes(temporary, image);
                 File.Move(temporary, destination, overwrite: true);
                 return destination;
@@ -249,6 +274,22 @@ namespace ClassicMac.Files.Editing
             {
                 if (File.Exists(temporary)) File.Delete(temporary);
             }
+        }
+
+        // Reads the written volume back and compares each replaced fork (HfsWriter checks the volume's own structures).
+        private static void VerifyHfsForks(byte[] image, List<(string MacPath, HfsFork Kind, byte[] Data)> written)
+        {
+            if (written.Count == 0) return;
+            var files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
+            var found = new List<string>();
+            foreach (var (macPath, kind, data) in written)
+            {
+                var file = files.FirstOrDefault(f => f.MacPath == macPath);
+                var fork = kind == HfsFork.Data ? file?.DataFork : file?.ResourceFork;
+                if (fork is null) found.Add($"{macPath} is missing");
+                else if (!fork.ToArray().AsSpan().SequenceEqual(data)) found.Add($"{macPath}'s {(kind == HfsFork.Data ? "data" : "resource")} fork differs");
+            }
+            if (found.Count > 0) throw new SaveVerificationException(found);
         }
 
         private static MacFile WithFork(MacFile file, ResourceFork fork, bool inData)

@@ -75,6 +75,34 @@ namespace ClassicMac.App.Views
             return new ImportChoice(type.SelectedItem as string ?? initial.Type, (short)Math.Clamp(id.Value ?? 0, short.MinValue, short.MaxValue), name.Text ?? "");
         }
 
+        public async Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial)
+        {
+            var name = new TextBox { Text = initial.Name, MaxLength = 31, Width = 300, HorizontalAlignment = HorizontalAlignment.Left };
+            var type = new TextBox { Text = initial.Type, MaxLength = 4, Width = 90, HorizontalAlignment = HorizontalAlignment.Left };
+            var creator = new TextBox { Text = initial.Creator, MaxLength = 4, Width = 90, HorizontalAlignment = HorizontalAlignment.Left };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("90,*"), RowDefinitions = new RowDefinitions("Auto,Auto,Auto"), RowSpacing = 8 };
+            var rows = new (string Label, Control Control)[] { ("Name", name), ("Type", type), ("Creator", creator) };
+            for (var row = 0; row < rows.Length; row++)
+            {
+                var text = new TextBlock { Text = rows[row].Label, VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetRow(text, row);
+                Grid.SetRow(rows[row].Control, row);
+                Grid.SetColumn(rows[row].Control, 1);
+                grid.Children.Add(text);
+                grid.Children.Add(rows[row].Control);
+            }
+            var note = new TextBlock { Opacity = 0.65, Text = "Written to the image with File ▸ Save As ▸ HFS Volume Image.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
+            if (!await Show(title, new StackPanel { Spacing = 10, Children = { grid, note } }, "Create")) return null;
+            return new NewFileChoice(name.Text ?? "", type.Text ?? "", creator.Text ?? "");
+        }
+
+        public async Task<string?> NewFolderAsync(string initial)
+        {
+            var name = new TextBox { Text = initial, MaxLength = 31, Width = 300 };
+            var body = new StackPanel { Spacing = 8, Children = { new TextBlock { Text = "Name" }, name } };
+            return await Show("New Folder", body, "Create") ? name.Text ?? "" : null;
+        }
+
         public async Task<SaveChanges> AskSaveChangesAsync(string fileName)
         {
             var result = SaveChanges.Cancel;

@@ -53,6 +53,13 @@
         <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
         <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportCommand}" />
       </MenuItem>
+      <MenuItem Header="_Volume">
+        <MenuItem Header="New _File…" Command="{Binding NewFileCommand}" />
+        <MenuItem Header="_Import File…" Command="{Binding ImportFileCommand}" />
+        <MenuItem Header="New F_older…" Command="{Binding NewFolderCommand}" />
+        <Separator />
+        <MenuItem Header="_Delete File or Folder…" Command="{Binding DeleteItemCommand}" />
+      </MenuItem>
       <MenuItem Header="E_xport">
         <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
         <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
@@ -91,6 +98,11 @@
               <MenuItem Header="Edit _Hex…" Command="{Binding EditHexCommand}" InputGesture="Ctrl+H" />
               <MenuItem Header="_Replace Data from File…" Command="{Binding ReplaceDataCommand}" />
               <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportCommand}" />
+              <Separator />
+              <MenuItem Header="New _File…" Command="{Binding NewFileCommand}" />
+              <MenuItem Header="Import File…" Command="{Binding ImportFileCommand}" />
+              <MenuItem Header="New F_older…" Command="{Binding NewFolderCommand}" />
+              <MenuItem Header="Delete File or Folder…" Command="{Binding DeleteItemCommand}" />
               <Separator />
               <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" />
               <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />

@@ -41,6 +41,12 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Import: the type (one of <paramref name="types"/>), ID and name to make from <paramref name="fileName"/>, or null when cancelled.</summary>
         Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial);
+
+        /// <summary>New File (or Import File): the name, type and creator, or null when cancelled.</summary>
+        Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial);
+
+        /// <summary>New Folder: the name, or null when cancelled.</summary>
+        Task<string?> NewFolderAsync(string initial);
     }
 
     /// <summary>The edits made to one file's resources, and where they save to.</summary>
@@ -65,7 +71,7 @@ namespace ClassicMac.App.ViewModels
         internal Task SaveTask { get; private set; } = Task.CompletedTask;
 
         /// <summary>Whether any open file has unsaved edits.</summary>
-        public bool HasUnsavedChanges => Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
+        public bool HasUnsavedChanges => Roots.Any(r => r.EditedVolume is not null) || Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
 
         // The file node (a FileNode, or an input read as a fork) that the node belongs to, when its resources are loaded.
         private static NodeViewModel? FileOwner(NodeViewModel? node)
@@ -131,7 +137,8 @@ namespace ClassicMac.App.ViewModels
         private void NotifyEditCommands()
         {
             foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
-                ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand })
+                ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
+                NewFileCommand, ImportFileCommand, NewFolderCommand, DeleteItemCommand })
                 command.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(UndoTitle));
             OnPropertyChanged(nameof(RedoTitle));
@@ -384,11 +391,17 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        private bool CanSaveAs(SaveAsFormat format) => !IsExporting && FileOwner(Selected) is not null;
+        private bool CanSaveAs(SaveAsFormat format) =>
+            !IsExporting && (format == SaveAsFormat.HfsImage ? Selected?.Input.IsWritableHfs == true : FileOwner(Selected) is not null);
 
         [RelayCommand(CanExecute = nameof(CanSaveAs))]
         private async Task SaveAs(SaveAsFormat format)
         {
+            if (format == SaveAsFormat.HfsImage)
+            {
+                await SaveHfsImageAs();
+                return;
+            }
             if (FileOwner(Selected) is not { } owner || FilePicker is null) return;
             var state = StateFor(owner);
             var extension = format switch
@@ -397,24 +410,14 @@ namespace ClassicMac.App.ViewModels
                 SaveAsFormat.BinHex => ".hqx",
                 SaveAsFormat.AppleSingle => ".as",
                 SaveAsFormat.RawFork => ".rsrc",
-                SaveAsFormat.HfsImage => Path.GetExtension(owner.Input.Path) is { Length: > 0 } imageExtension ? imageExtension : ".img",
                 _ => "",
             };
-            var name = format == SaveAsFormat.HfsImage
-                ? Path.GetFileNameWithoutExtension(owner.Input.Path) + "-edited"
-                : HostNames.ToHostName(state.File.Name, 200);
+            var name = HostNames.ToHostName(state.File.Name, 200);
             var path = await FilePicker.PickSaveFileAsync($"Save {owner.BaseTitle} As", name + extension, extension.Length > 0 ? [extension] : []);
             if (path is null) return;
             try
             {
                 var file = state.File;
-                if (format == SaveAsFormat.HfsImage)
-                {
-                    var writtenImage = await Task.Run(() => ForkSaver.SaveHfsImageAs(owner.Input.Path, path, file,
-                        state.Session.Fork, state.ForkInDataFork));
-                    Status = $"Saved {owner.BaseTitle}'s fork to HFS image {writtenImage}.";
-                    return;
-                }
                 var written = await Task.Run(() => ForkSaver.SaveAs(path, format, file, state.Session.Fork, state.ForkInDataFork));
                 Status = $"Saved {owner.BaseTitle} as {string.Join(", ", written.Select(Path.GetFileName))}.";
             }
@@ -425,7 +428,34 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        private bool CanRevert() => SelectedState is { Session.IsDirty: true };
+        // Save As ▸ HFS Volume Image: a copy of the image with the files and folders created and deleted, and every
+        // edited fork in it (the selected file's always), written and verified; the image itself is not changed.
+        private async Task SaveHfsImageAs()
+        {
+            if (Selected?.Input is not { IsWritableHfs: true } input || FilePicker is null) return;
+            var selectedOwner = FileOwner(Selected);
+            if (selectedOwner is not null) StateFor(selectedOwner);
+            var forks = EditedFiles(input)
+                .Where(e => e.Node is FileNode && VolumeItem(e.Node) is not null && (e.State.Session.IsDirty || ReferenceEquals(e.Node, selectedOwner)))
+                .Select(e => new HfsForkReplacement(e.State.File.MacPath, e.State.Session.Fork, e.State.ForkInDataFork))
+                .ToList();
+            var extension = Path.GetExtension(input.Path) is { Length: > 0 } imageExtension ? imageExtension : ".img";
+            var path = await FilePicker.PickSaveFileAsync($"Save {input.BaseTitle} As", Path.GetFileNameWithoutExtension(input.Path) + "-edited" + extension, [extension]);
+            if (path is null) return;
+            try
+            {
+                var volume = input.EditedVolume;
+                var written = await Task.Run(() => ForkSaver.SaveHfsImageAs(input.Path, path, volume, forks));
+                Status = $"Saved HFS image {written} ({forks.Count} fork{(forks.Count == 1 ? "" : "s")}{(volume is null ? "" : ", files and folders")} changed).";
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or InvalidDataException)
+            {
+                Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "save.failed", e.Message), input.Source, input));
+                Status = $"{input.BaseTitle} was not saved: {e.Message}";
+            }
+        }
+
+        private bool CanRevert() => SelectedState is { Session.IsDirty: true } || Selected?.Input.EditedVolume is not null;
 
         /// <summary>Revert: the input read again from disk, discarding its edits.</summary>
         [RelayCommand(CanExecute = nameof(CanRevert))]
@@ -446,6 +476,17 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         internal async Task<bool> ConfirmCloseAsync(IEnumerable<InputNode> inputs)
         {
+            inputs = inputs.ToList();
+            foreach (var input in inputs.Where(i => i.EditedVolume is not null))
+            {
+                var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle);
+                if (choice == SaveChanges.Cancel) return false;
+                if (choice == SaveChanges.Save)
+                {
+                    Status = $"The files and folders created or deleted in {input.BaseTitle} are saved with Save As ▸ HFS Volume Image.";
+                    return false;
+                }
+            }
             foreach (var (node, state) in inputs.SelectMany(EditedFiles).ToList())
             {
                 if (!state.Session.IsDirty) continue;
