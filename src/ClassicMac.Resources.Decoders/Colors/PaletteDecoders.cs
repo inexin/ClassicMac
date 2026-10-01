@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Text;
@@ -93,8 +92,9 @@ namespace ClassicMac.Resources.Decoders.Colors
                 act[e.Index * 3 + 2] = (byte)(e.Blue >> 8);
                 highest = Math.Max(highest, e.Index);
             }
-            BinaryPrimitives.WriteUInt16BigEndian(act.AsSpan(768), (ushort)(highest + 1));
-            BinaryPrimitives.WriteUInt16BigEndian(act.AsSpan(770), 0xFFFF);
+            var writer = new BigEndianWriter(act);
+            writer.WriteUInt16At(768, (ushort)(highest + 1));
+            writer.WriteUInt16At(770, 0xFFFF);
             return act;
         }
     }

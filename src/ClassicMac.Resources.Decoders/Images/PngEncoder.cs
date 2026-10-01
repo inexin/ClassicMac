@@ -1,8 +1,8 @@
 using System;
-using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using ClassicMac.Core;
 
 namespace ClassicMac.Resources.Decoders.Images
 {
@@ -49,14 +49,15 @@ namespace ClassicMac.Resources.Decoders.Images
             var stride = checked(width * 4);
             if (rgba.Length < (long)stride * height) throw new ArgumentException("Fewer pixels than the size says.", nameof(rgba));
 
-            using var output = new MemoryStream();
-            output.Write(Signature);
-            Span<byte> header = stackalloc byte[13];
-            BinaryPrimitives.WriteInt32BigEndian(header, width);
-            BinaryPrimitives.WriteInt32BigEndian(header[4..], height);
-            header[8] = 8; // bit depth
-            header[9] = 6; // colour type: RGBA
-            Chunk(output, "IHDR", header);
+            var output = new BigEndianWriter();
+            output.WriteBytes(Signature);
+            var header = new BigEndianWriter(13);
+            header.WriteInt32(width);
+            header.WriteInt32(height);
+            header.WriteByte(8); // bit depth
+            header.WriteByte(6); // colour type: RGBA
+            header.WriteZeros(3);
+            Chunk(output, "IHDR", header.WrittenSpan);
 
             using (var compressed = new MemoryStream())
             {
@@ -74,17 +75,13 @@ namespace ClassicMac.Resources.Decoders.Images
             return output.ToArray();
         }
 
-        private static void Chunk(Stream output, string type, ReadOnlySpan<byte> data)
+        private static void Chunk(BigEndianWriter output, string type, ReadOnlySpan<byte> data)
         {
-            Span<byte> word = stackalloc byte[4];
-            BinaryPrimitives.WriteInt32BigEndian(word, data.Length);
-            output.Write(word);
+            output.WriteInt32(data.Length);
             var typeBytes = Encoding.ASCII.GetBytes(type);
-            output.Write(typeBytes);
-            output.Write(data);
-            var crc = Crc(Crc(0xFFFFFFFF, typeBytes), data) ^ 0xFFFFFFFF;
-            BinaryPrimitives.WriteUInt32BigEndian(word, crc);
-            output.Write(word);
+            output.WriteBytes(typeBytes);
+            output.WriteBytes(data);
+            output.WriteUInt32(Crc(Crc(0xFFFFFFFF, typeBytes), data) ^ 0xFFFFFFFF);
         }
 
         // CRC-32 (ISO 3309, reflected, polynomial $EDB88320) as the PNG specification defines it.

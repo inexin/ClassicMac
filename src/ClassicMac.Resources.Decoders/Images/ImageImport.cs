@@ -1,7 +1,7 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.Pict;
 
@@ -125,17 +125,16 @@ namespace ClassicMac.Resources.Decoders.Images
             int rowBytes = (w * depth + 15) / 16 * 2, bitRowBytes = (w + 15) / 16 * 2;
             var pixels = Indices(image, table, depth, rowBytes);
 
-            using var stream = new MemoryStream();
-            var b = new BigEndian(stream);
+            var b = new BigEndianWriter();
             PixMapRecord(b, w, h, depth, rowBytes, tableAt: 0);
             BitMapRecord(b, w, h, bitRowBytes);                       // maskBMap
             BitMapRecord(b, w, h, bitRowBytes);                       // iconBMap
-            b.U32(0);                                                 // iconData handle
-            b.Bytes(Bits(image, dark: false, bitRowBytes));           // mask
-            b.Bytes(Bits(image, dark: true, bitRowBytes));            // 1-bit icon
+            b.WriteUInt32(0);                                             // iconData handle
+            b.WriteBytes(Bits(image, dark: false, bitRowBytes));          // mask
+            b.WriteBytes(Bits(image, dark: true, bitRowBytes));           // 1-bit icon
             ColorTable(b, table);
-            b.Bytes(pixels);
-            return stream.ToArray();
+            b.WriteBytes(pixels);
+            return b.ToArray();
         }
 
         /// <summary><c>CURS</c>: the 16 × 16 image's 1-bit data and mask (transparent pixels leave the screen) and the
@@ -143,13 +142,12 @@ namespace ClassicMac.Resources.Decoders.Images
         public static byte[] WriteCursor(RgbaBitmap image, int hotspotH, int hotspotV)
         {
             var fitted = Fit(image, 16, 16);
-            using var stream = new MemoryStream();
-            var b = new BigEndian(stream);
-            b.Bytes(Bits(fitted, dark: true));
-            b.Bytes(Bits(fitted, dark: false));
-            b.U16(Math.Clamp(hotspotV, 0, 15));
-            b.U16(Math.Clamp(hotspotH, 0, 15));
-            return stream.ToArray();
+            var b = new BigEndianWriter();
+            b.WriteBytes(Bits(fitted, dark: true));
+            b.WriteBytes(Bits(fitted, dark: false));
+            b.WriteUInt16((ushort)Math.Clamp(hotspotV, 0, 15));
+            b.WriteUInt16((ushort)Math.Clamp(hotspotH, 0, 15));
+            return b.ToArray();
         }
 
         /// <summary>
@@ -165,24 +163,23 @@ namespace ClassicMac.Resources.Decoders.Images
             const int MapAt = 96, PixelsAt = MapAt + 50;
             int tableAt = PixelsAt + rowBytes * 16;
 
-            using var stream = new MemoryStream();
-            var b = new BigEndian(stream);
-            b.U16(0x8001);
-            b.U32(MapAt);
-            b.U32(PixelsAt);
-            b.U32(0);                                                 // crsrXData
-            b.U16(0);                                                 // crsrXValid
-            b.U32(0);                                                 // crsrXHandle
-            b.Bytes(Bits(fitted, dark: true));
-            b.Bytes(Bits(fitted, dark: false));
-            b.U16(Math.Clamp(hotspotV, 0, 15));
-            b.U16(Math.Clamp(hotspotH, 0, 15));
-            b.U32(0);                                                 // crsrXTable
-            b.U32(0);                                                 // crsrID
+            var b = new BigEndianWriter();
+            b.WriteUInt16(0x8001);
+            b.WriteUInt32(MapAt);
+            b.WriteUInt32(PixelsAt);
+            b.WriteUInt32(0);                                             // crsrXData
+            b.WriteUInt16(0);                                             // crsrXValid
+            b.WriteUInt32(0);                                             // crsrXHandle
+            b.WriteBytes(Bits(fitted, dark: true));
+            b.WriteBytes(Bits(fitted, dark: false));
+            b.WriteUInt16((ushort)Math.Clamp(hotspotV, 0, 15));
+            b.WriteUInt16((ushort)Math.Clamp(hotspotH, 0, 15));
+            b.WriteUInt32(0);                                             // crsrXTable
+            b.WriteUInt32(0);                                             // crsrID
             PixMapRecord(b, 16, 16, depth, rowBytes, tableAt);
-            b.Bytes(Indices(fitted, table, depth, rowBytes));
+            b.WriteBytes(Indices(fitted, table, depth, rowBytes));
             ColorTable(b, table);
-            return stream.ToArray();
+            return b.ToArray();
         }
 
         /// <summary>
@@ -302,41 +299,41 @@ namespace ClassicMac.Resources.Decoders.Images
         }
 
         // A 50-byte PixMap record; pmTable is the colour table's offset in the resource (0 when it follows by layout).
-        private static void PixMapRecord(BigEndian b, int w, int h, int depth, int rowBytes, int tableAt)
+        private static void PixMapRecord(BigEndianWriter b, int w, int h, int depth, int rowBytes, int tableAt)
         {
-            b.U32(0);                                                 // baseAddr
-            b.U16(0x8000 | rowBytes);
-            b.U16(0); b.U16(0); b.U16(h); b.U16(w);                   // bounds
-            b.U16(0);                                                 // pmVersion
-            b.U16(0);                                                 // packType
-            b.U32(0);                                                 // packSize
-            b.U32(0x00480000); b.U32(0x00480000);                     // hRes, vRes: 72 dpi
-            b.U16(0);                                                 // pixelType: indexed
-            b.U16(depth);                                             // pixelSize
-            b.U16(1);                                                 // cmpCount
-            b.U16(depth);                                             // cmpSize
-            b.U32(0);                                                 // planeBytes
-            b.U32(tableAt);                                           // pmTable
-            b.U32(0);                                                 // pmReserved
+            b.WriteUInt32(0);                                             // baseAddr
+            b.WriteUInt16((ushort)(0x8000 | rowBytes));
+            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16((ushort)h); b.WriteUInt16((ushort)w); // bounds
+            b.WriteUInt16(0);                                             // pmVersion
+            b.WriteUInt16(0);                                             // packType
+            b.WriteUInt32(0);                                             // packSize
+            b.WriteUInt32(0x00480000); b.WriteUInt32(0x00480000);         // hRes, vRes: 72 dpi
+            b.WriteUInt16(0);                                             // pixelType: indexed
+            b.WriteUInt16((ushort)depth);                                 // pixelSize
+            b.WriteUInt16(1);                                             // cmpCount
+            b.WriteUInt16((ushort)depth);                                 // cmpSize
+            b.WriteUInt32(0);                                             // planeBytes
+            b.WriteInt32(tableAt);                                        // pmTable
+            b.WriteUInt32(0);                                             // pmReserved
         }
 
-        private static void BitMapRecord(BigEndian b, int w, int h, int rowBytes)
+        private static void BitMapRecord(BigEndianWriter b, int w, int h, int rowBytes)
         {
-            b.U32(0);
-            b.U16(rowBytes);
-            b.U16(0); b.U16(0); b.U16(h); b.U16(w);
+            b.WriteUInt32(0);
+            b.WriteUInt16((ushort)rowBytes);
+            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16((ushort)h); b.WriteUInt16((ushort)w);
         }
 
         // ctSeed 0, ctFlags 0 (a PixMap's table), ctSize, then value/r/g/b per entry (16-bit, each byte repeated).
-        private static void ColorTable(BigEndian b, RgbaColor[] table)
+        private static void ColorTable(BigEndianWriter b, RgbaColor[] table)
         {
-            b.U32(0);
-            b.U16(0);
-            b.U16(table.Length - 1);
+            b.WriteUInt32(0);
+            b.WriteUInt16(0);
+            b.WriteUInt16((ushort)(table.Length - 1));
             for (int i = 0; i < table.Length; i++)
             {
-                b.U16(i);
-                b.U16(table[i].R * 257); b.U16(table[i].G * 257); b.U16(table[i].B * 257);
+                b.WriteUInt16((ushort)i);
+                b.WriteUInt16((ushort)(table[i].R * 257)); b.WriteUInt16((ushort)(table[i].G * 257)); b.WriteUInt16((ushort)(table[i].B * 257));
             }
         }
 
@@ -347,13 +344,5 @@ namespace ClassicMac.Resources.Decoders.Images
             "icm#" or "icm4" or "icm8" => (16, 12),
             _ => throw new ArgumentException($"'{type}' is not an icon type.", nameof(type)),
         };
-
-        private sealed class BigEndian(Stream stream)
-        {
-            public void U16(int value) { Span<byte> s = stackalloc byte[2]; BinaryPrimitives.WriteUInt16BigEndian(s, (ushort)value); stream.Write(s); }
-            public void U32(uint value) { Span<byte> s = stackalloc byte[4]; BinaryPrimitives.WriteUInt32BigEndian(s, value); stream.Write(s); }
-            public void U32(int value) => U32((uint)value);
-            public void Bytes(ReadOnlySpan<byte> bytes) => stream.Write(bytes);
-        }
     }
 }

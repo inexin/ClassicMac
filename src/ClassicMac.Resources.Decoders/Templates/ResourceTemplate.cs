@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -412,13 +411,13 @@ namespace ClassicMac.Resources.Decoders.Templates
             var writer = new Writer();
             writer.Items(Nodes, values);
             writer.Flush();
-            writer.Output.Write(extra);
+            writer.Output.WriteBytes(extra);
             return writer.Output.ToArray();
         }
 
         private sealed class Writer
         {
-            public readonly MemoryStream Output = new();
+            public readonly BigEndianWriter Output = new();
             private int bits, bitCount;
 
             public void Flush()
@@ -440,10 +439,10 @@ namespace ClassicMac.Resources.Decoders.Templates
                         int pad = node.Type switch
                         {
                             "FBYT" => 1, "FWRD" => 2, "FLNG" => 4,
-                            "AWRD" => (int)(Output.Length & 1),
-                            _ => (int)(-Output.Length & 3),
+                            "AWRD" => Output.Length & 1,
+                            _ => -Output.Length & 3,
                         };
-                        Output.Write(new byte[pad]);
+                        Output.WriteZeros(pad);
                         continue;
                     }
                     if (v >= values.Count || !ReferenceEquals(values[v].Node, node))
@@ -466,14 +465,12 @@ namespace ClassicMac.Resources.Decoders.Templates
                         // The count of the LSTC that follows (ResEdit keeps it in step as items are added and removed).
                         int count = i + 1 < nodes.Count && nodes[i + 1].IsList && v < values.Count && values[v] is TemplateList next ? next.Items.Count : 0;
                         if (count > 0xFFFF) throw new ArgumentException($"“{node.Label}”: too many items.");
-                        U16(node.Type == "ZCNT" ? (count - 1) & 0xFFFF : count);
+                        Output.WriteUInt16((ushort)(node.Type == "ZCNT" ? (count - 1) & 0xFFFF : count));
                         continue;
                     }
                     Field(node, text);
                 }
             }
-
-            private void U16(int value) { Span<byte> s = stackalloc byte[2]; BinaryPrimitives.WriteUInt16BigEndian(s, (ushort)value); Output.Write(s); }
 
             private void Number(TemplateNode node, string text, int bytes)
             {
@@ -532,11 +529,11 @@ namespace ClassicMac.Resources.Decoders.Templates
                     case "TNAM":
                     {
                         var b = Encode(node, text, 4);
-                        Output.Write(b);
+                        Output.WriteBytes(b);
                         for (int i = b.Length; i < 4; i++) Output.WriteByte((byte)' ');
                         return;
                     }
-                    case "BOOL": Output.Write(Flag(node, text) ? new byte[] { 1, 0 } : new byte[2]); return;
+                    case "BOOL": Output.WriteBytes(Flag(node, text) ? new byte[] { 1, 0 } : new byte[2]); return;
                     case "BBIT":
                         bits = (bits << 1) | (Flag(node, text) ? 1 : 0);
                         if (++bitCount == 8) Flush();
@@ -552,36 +549,34 @@ namespace ClassicMac.Resources.Decoders.Templates
                     {
                         var b = Encode(node, text, 255);
                         Output.WriteByte((byte)b.Length);
-                        Output.Write(b);
+                        Output.WriteBytes(b);
                         if (type == "ESTR" && b.Length % 2 == 0 || type == "OSTR" && b.Length % 2 == 1) Output.WriteByte(0);
                         return;
                     }
                     case "WSTR":
                     {
                         var b = Encode(node, text, 0xFFFF);
-                        U16(b.Length);
-                        Output.Write(b);
+                        Output.WriteUInt16((ushort)b.Length);
+                        Output.WriteBytes(b);
                         return;
                     }
                     case "LSTR":
                     {
                         var b = Encode(node, text, int.MaxValue);
-                        Span<byte> s = stackalloc byte[4];
-                        BinaryPrimitives.WriteUInt32BigEndian(s, (uint)b.Length);
-                        Output.Write(s);
-                        Output.Write(b);
+                        Output.WriteUInt32((uint)b.Length);
+                        Output.WriteBytes(b);
                         return;
                     }
                     case "CSTR" or "ECST" or "OCST":
                     {
                         var b = Encode(node, text, int.MaxValue);
                         if (Array.IndexOf(b, (byte)0) >= 0) throw new ArgumentException($"“{node.Label}”: a C string cannot hold a NUL.");
-                        Output.Write(b);
+                        Output.WriteBytes(b);
                         Output.WriteByte(0);
                         if (type == "ECST" && b.Length % 2 == 0 || type == "OCST" && b.Length % 2 == 1) Output.WriteByte(0);
                         return;
                     }
-                    case "HEXD": Output.Write(Hex(node, text)); return;
+                    case "HEXD": Output.WriteBytes(Hex(node, text)); return;
                 }
                 int size = SizeOf(type);
                 switch (type[0])
@@ -590,23 +585,23 @@ namespace ClassicMac.Resources.Decoders.Templates
                     {
                         var b = Hex(node, text);
                         if (b.Length > size) throw new ArgumentException($"“{node.Label}”: more than {size} bytes.");
-                        Output.Write(b);
-                        Output.Write(new byte[size - b.Length]);
+                        Output.WriteBytes(b);
+                        Output.WriteZeros(size - b.Length);
                         return;
                     }
                     case 'C':
                     {
                         var b = Encode(node, text, Math.Max(0, size - 1));
-                        Output.Write(b);
-                        Output.Write(new byte[size - b.Length]);
+                        Output.WriteBytes(b);
+                        Output.WriteZeros(size - b.Length);
                         return;
                     }
                     default:
                     {
                         var b = Encode(node, text, Math.Min(size, 255));
                         Output.WriteByte((byte)b.Length);
-                        Output.Write(b);
-                        Output.Write(new byte[size - b.Length]);
+                        Output.WriteBytes(b);
+                        Output.WriteZeros(size - b.Length);
                         return;
                     }
                 }

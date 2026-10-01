@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.IO;
+using ClassicMac.Core;
 
 namespace ClassicMac.Resources.Decoders.Sound
 {
@@ -38,40 +39,35 @@ namespace ClassicMac.Resources.Decoders.Sound
             bool standard = channels == 1 && sampleSize == 8;
             uint rate = (uint)Math.Round(sampleRate * 65536);
 
-            using var stream = new MemoryStream();
-            var w = new BinaryWriter(stream);
-            void U16(int v) { Span<byte> s = stackalloc byte[2]; BinaryPrimitives.WriteUInt16BigEndian(s, (ushort)v); w.Write(s); }
-            void U32(uint v) { Span<byte> s = stackalloc byte[4]; BinaryPrimitives.WriteUInt32BigEndian(s, v); w.Write(s); }
+            var w = new BigEndianWriter();
+            w.WriteUInt16(1);                                        // format 1
+            w.WriteUInt16(1);                                        // one synthesizer
+            w.WriteUInt16(SampledSynth);
+            w.WriteUInt32(channels == 2 ? InitStereo : InitMono);
+            w.WriteUInt16(1);                                        // one command
+            w.WriteUInt16(0x8000 | SoundCommand.BufferCmd);
+            w.WriteUInt16(0);
+            w.WriteUInt32(HeaderAt);
 
-            U16(1);                                                  // format 1
-            U16(1);                                                  // one synthesizer
-            U16(SampledSynth);
-            U32(channels == 2 ? InitStereo : InitMono);
-            U16(1);                                                  // one command
-            U16(0x8000 | SoundCommand.BufferCmd);
-            U16(0);
-            U32(HeaderAt);
-
-            U32(0);                                                  // samplePtr: the samples follow
-            U32(standard ? frames : (uint)channels);                 // length, or numChannels
-            U32(rate);
-            U32(loopStart);
-            U32(loopEnd);
-            w.Write((byte)(standard ? 0x00 : 0xFF));                 // encode: stdSH or extSH
-            w.Write(baseNote);
+            w.WriteUInt32(0);                                        // samplePtr: the samples follow
+            w.WriteUInt32(standard ? frames : (uint)channels);       // length, or numChannels
+            w.WriteUInt32(rate);
+            w.WriteUInt32(loopStart);
+            w.WriteUInt32(loopEnd);
+            w.WriteByte((byte)(standard ? 0x00 : 0xFF));             // encode: stdSH or extSH
+            w.WriteByte(baseNote);
             if (!standard)
             {
-                U32(frames);
-                w.Write(Extended80(sampleRate));                     // AIFFSampleRate
-                U32(0);                                              // markerChunk
-                U32(0);                                              // instrumentChunks
-                U32(0);                                              // AESRecording
-                U16(sampleSize);
-                U16(0); U32(0); U32(0); U32(0);                      // futureUse1-4
+                w.WriteUInt32(frames);
+                WriteExtended80(w, sampleRate);                      // AIFFSampleRate
+                w.WriteUInt32(0);                                    // markerChunk
+                w.WriteUInt32(0);                                    // instrumentChunks
+                w.WriteUInt32(0);                                    // AESRecording
+                w.WriteUInt16((ushort)sampleSize);
+                w.WriteUInt16(0); w.WriteUInt32(0); w.WriteUInt32(0); w.WriteUInt32(0); // futureUse1-4
             }
-            w.Write(samples);
-            w.Flush();
-            return stream.ToArray();
+            w.WriteBytes(samples);
+            return w.ToArray();
         }
 
         /// <summary>
@@ -133,7 +129,7 @@ namespace ClassicMac.Resources.Decoders.Sound
             }
             else
             {
-                samples = new byte[count * 2];
+                var output = new BigEndianWriter(count * 2);
                 for (int i = 0; i < count; i++)
                 {
                     var s = data.Slice(i * width, width);
@@ -145,8 +141,9 @@ namespace ClassicMac.Resources.Decoders.Sound
                         32 => FromFloat(BinaryPrimitives.ReadSingleLittleEndian(s)),
                         _ => FromFloat(BinaryPrimitives.ReadDoubleLittleEndian(s)),
                     };
-                    BinaryPrimitives.WriteInt16BigEndian(samples.AsSpan(i * 2), (short)value);
+                    output.WriteInt16((short)value);
                 }
+                samples = output.ToArray();
             }
             if (loopEnd <= loopStart) (loopStart, loopEnd) = (0, 0);
             return Write(samples, channels, bits == 8 ? 8 : 16, rate, loopStart, loopEnd, note);
@@ -155,15 +152,17 @@ namespace ClassicMac.Resources.Decoders.Sound
         private static int FromFloat(double v) => (int)Math.Clamp(Math.Round(v * 32768), short.MinValue, short.MaxValue);
 
         // An IEEE 754 80-bit extended number (AIFF's sample rate), big-endian.
-        private static byte[] Extended80(double value)
+        private static void WriteExtended80(BigEndianWriter w, double value)
         {
-            var bytes = new byte[10];
-            if (value <= 0) return bytes;
+            if (value <= 0)
+            {
+                w.WriteZeros(10);
+                return;
+            }
             int exponent = (int)Math.Floor(Math.Log2(value));
             ulong mantissa = (ulong)Math.Round(value / Math.Pow(2, exponent - 63));
-            BinaryPrimitives.WriteUInt16BigEndian(bytes, (ushort)(exponent + 16383));
-            BinaryPrimitives.WriteUInt64BigEndian(bytes.AsSpan(2), mantissa);
-            return bytes;
+            w.WriteUInt16((ushort)(exponent + 16383));
+            w.WriteUInt64(mantissa);
         }
     }
 }
