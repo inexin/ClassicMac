@@ -34,7 +34,8 @@ verifies version-2 traversal and method-13 extraction of both `testfile.PICT` fo
 fork. A second original StuffIt Deluxe 4.5 sample and its AppleDouble companion verify that an archive-level comment is
 read from resource type `SitC`, ID 0 in the archive file's resource fork and decoded as MacRoman. This placement was
 first **[Reference]** based on [XADMaster](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADStuffItParser.m/).
-Version 1 and method 6 still have hand-built tests only. Encrypted entries are reported and skipped.
+Version 1 and method 6 are **[Fitted]**: they have hand-built tests only, with no archive made by the original
+application yet. Encrypted entries are reported and skipped.
 
 ## StuffIt split files (SegmentIt)
 
@@ -154,9 +155,11 @@ decoder in [macutils' DiskDoubler reader](https://sources.debian.org/src/macutil
 [escape definition](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/dd.h/). The reader requires decoded
 data to match the fork's declared length and rejects truncated escapes, repeats without a preceding byte, and
 output that exceeds or falls short of that length. Method 4 uses the tree-described Huffman stream also used by StuffIt and the same optional `0x5A` output transform;
-its 16-bit checksum is the decoded fork byte sum. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed
+its 16-bit checksum is the decoded fork byte sum **[Fitted]** against
+[XADMaster's parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/), with hand-built
+vectors and no original-app fixture yet. Method 8 has a 16-byte prefix; a zero byte sum selects LZH followed
 by RLE, otherwise the fork is RLE-only. Delta type 1 applies a byte-wise cumulative sum modulo 256 after fork
-decompression. Delta type 2 cumulatively sums three interleaved byte lanes, with each lane wrapping modulo 256. This
+decompression **[Reference]**, with hand-built vectors and no original-app fixture yet. Delta type 2 cumulatively sums three interleaved byte lanes, with each lane wrapping modulo 256. This
 is **[Reference]** based on the `dd_delta3` routine in
 [macutils' DiskDoubler reader](https://sources.debian.org/src/macutils/2.0b3-17/macunpack/dd.c/). The reader transforms
 only the bytes present in a final partial group; that tail handling is inferred from the lane layout and has no
