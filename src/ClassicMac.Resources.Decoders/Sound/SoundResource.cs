@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using ClassicMac.Core;
 
@@ -134,13 +133,14 @@ namespace ClassicMac.Resources.Decoders.Sound
             var data = resource.Span;
             void Report(DiagnosticSeverity severity, string code, string message) => diagnostics.Add(new Diagnostic(severity, code, $"{source}: {message}"));
             if (data.Length < 4) return null;
-            int format = BinaryPrimitives.ReadUInt16BigEndian(data);
+            var reader = new BigEndianReader(data);
+            int format = reader.ReadUInt16At(0);
             var synths = new List<SoundSynth>();
             var referenceCount = 0;
             var at = 2;
             if (format == 1)
             {
-                int count = BinaryPrimitives.ReadUInt16BigEndian(data[at..]);
+                int count = reader.ReadUInt16At(at);
                 at += 2;
                 if (at + count * 6 + 2 > data.Length)
                 {
@@ -148,11 +148,11 @@ namespace ClassicMac.Resources.Decoders.Sound
                     return null;
                 }
                 for (var i = 0; i < count; i++, at += 6)
-                    synths.Add(new SoundSynth(BinaryPrimitives.ReadUInt16BigEndian(data[at..]), BinaryPrimitives.ReadUInt32BigEndian(data[(at + 2)..])));
+                    synths.Add(new SoundSynth(reader.ReadUInt16At(at), reader.ReadUInt32At(at + 2)));
             }
             else if (format == 2)
             {
-                referenceCount = BinaryPrimitives.ReadUInt16BigEndian(data[at..]);
+                referenceCount = reader.ReadUInt16At(at);
                 at += 2;
             }
             else
@@ -166,7 +166,7 @@ namespace ClassicMac.Resources.Decoders.Sound
                 Report(DiagnosticSeverity.Error, "sound.short", "the resource ends before its command count.");
                 return null;
             }
-            int commandCount = BinaryPrimitives.ReadUInt16BigEndian(data[at..]);
+            int commandCount = reader.ReadUInt16At(at);
             at += 2;
             var commands = new List<SoundCommand>();
             for (var i = 0; i < commandCount; i++, at += 8)
@@ -176,8 +176,7 @@ namespace ClassicMac.Resources.Decoders.Sound
                     Report(DiagnosticSeverity.Error, "sound.short", $"the resource ends after {i} of its {commandCount} commands.");
                     break;
                 }
-                commands.Add(new SoundCommand(BinaryPrimitives.ReadUInt16BigEndian(data[at..]), BinaryPrimitives.ReadInt16BigEndian(data[(at + 2)..]),
-                    BinaryPrimitives.ReadInt32BigEndian(data[(at + 4)..])));
+                commands.Add(new SoundCommand(reader.ReadUInt16At(at), reader.ReadInt16At(at + 2), reader.ReadInt32At(at + 4)));
             }
 
             // The sound the resource plays: the first buffer or sound command pointing into it. SndPlay finds a format 2
@@ -209,14 +208,14 @@ namespace ClassicMac.Resources.Decoders.Sound
                 report(DiagnosticSeverity.Error, "sound.bad-offset", $"the sound header's offset {offset} lies outside the {data.Length}-byte resource.");
                 return null;
             }
-            var h = data[offset..];
-            var samplePtr = BinaryPrimitives.ReadUInt32BigEndian(h);
-            var lengthOrChannels = BinaryPrimitives.ReadUInt32BigEndian(h[4..]);
-            var rate = BinaryPrimitives.ReadUInt32BigEndian(h[8..]);
-            var loopStart = BinaryPrimitives.ReadUInt32BigEndian(h[12..]);
-            var loopEnd = BinaryPrimitives.ReadUInt32BigEndian(h[16..]);
-            var encode = h[20];
-            var baseNote = h[21];
+            var h = new BigEndianReader(data[offset..]);
+            var samplePtr = h.ReadUInt32();
+            var lengthOrChannels = h.ReadUInt32();
+            var rate = h.ReadUInt32();
+            var loopStart = h.ReadUInt32();
+            var loopEnd = h.ReadUInt32();
+            var encode = h.ReadByte();
+            var baseNote = h.ReadByte();
             if (samplePtr != 0)
                 report(DiagnosticSeverity.Warning, "sound.sample-pointer", $"the header's samplePtr is ${samplePtr:X8}, not 0; the samples after the header are read.");
             if (rate == 0) report(DiagnosticSeverity.Warning, "sound.no-rate", "the sample rate is 0.");
@@ -250,16 +249,16 @@ namespace ClassicMac.Resources.Decoders.Sound
                         return null;
                     }
                     // The Sound Manager reads numChannels as the word at +6.
-                    int channels = BinaryPrimitives.ReadUInt16BigEndian(h[6..]);
+                    int channels = h.ReadUInt16At(6);
                     if (channels is 0 or > 64)
                     {
                         report(DiagnosticSeverity.Error, "sound.bad-header", $"the header gives {channels} channels.");
                         return null;
                     }
-                    var frames = (int)Math.Min(BinaryPrimitives.ReadUInt32BigEndian(h[22..]), int.MaxValue);
+                    var frames = (int)Math.Min(h.ReadUInt32At(22), int.MaxValue);
                     var start = offset + LongHeaderLength;
                     // sampleSize: at +48 in an extended header (after the AIFF fields), at +62 in a compressed one.
-                    int sampleSize = BinaryPrimitives.ReadUInt16BigEndian(h[(encode == (byte)SoundHeaderKind.Extended ? 48 : 62)..]);
+                    int sampleSize = h.ReadUInt16At(encode == (byte)SoundHeaderKind.Extended ? 48 : 62);
                     if (encode == (byte)SoundHeaderKind.Extended)
                     {
                         // Extended header: 8-bit samples offset binary as in a standard header, 16-bit two's complement
@@ -284,9 +283,9 @@ namespace ClassicMac.Resources.Decoders.Sound
 
                     // Compressed header (Sound Manager 3.5.1): compressionID 0 is PCM whatever format says, 3 and 4 are
                     // MACE, -1 and -2 leave it to format; it refuses any other (-223). A codec's numFrames counts packets.
-                    var format = new FourCC(BinaryPrimitives.ReadUInt32BigEndian(h[40..]));
-                    var compressionId = BinaryPrimitives.ReadInt16BigEndian(h[56..]);
-                    var packetSize = BinaryPrimitives.ReadUInt16BigEndian(h[58..]);
+                    var format = h.ReadFourCCAt(40);
+                    var compressionId = h.ReadInt16At(56);
+                    var packetSize = h.ReadUInt16At(58);
                     switch (compressionId)
                     {
                         case 0: format = sampleSize == 8 ? Raw : Twos; break;

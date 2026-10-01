@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Text;
@@ -196,8 +195,9 @@ namespace ClassicMac.Resources.Decoders.Interface
                 if ((length & 1) != 0 && r.Remaining > 0) r.Skip(1);
                 var kind = type & 0x7F;
                 string? text = kind is 4 or 5 or 6 or 8 or 16 ? MacText.Decode(itemData, options) : null;
-                short? resource = kind is 7 or 32 or 64 && itemData.Length >= 2 ? BinaryPrimitives.ReadInt16BigEndian(itemData)
-                    : kind == 1 && itemData.Length >= 4 ? BinaryPrimitives.ReadInt16BigEndian(itemData[2..]) : null;
+                var itemReader = new BigEndianReader(itemData);
+                short? resource = kind is 7 or 32 or 64 && itemData.Length >= 2 ? itemReader.ReadInt16At(0)
+                    : kind == 1 && itemData.Length >= 4 ? itemReader.ReadInt16At(2) : null;
                 items.Add(new DialogItem(bounds, kind, (type & 0x80) == 0, text, resource, itemData.ToArray()));
             }
             Report(r, diagnostics, what);
@@ -256,15 +256,17 @@ namespace ClassicMac.Resources.Decoders.Interface
             public short I16()
             {
                 if (!Take(2)) return 0;
+                var value = new BigEndianReader(data).ReadInt16At(at);
                 at += 2;
-                return BinaryPrimitives.ReadInt16BigEndian(data[(at - 2)..]);
+                return value;
             }
 
             public int I32()
             {
                 if (!Take(4)) return 0;
+                var value = new BigEndianReader(data).ReadInt32At(at);
                 at += 4;
-                return BinaryPrimitives.ReadInt32BigEndian(data[(at - 4)..]);
+                return value;
             }
 
             public MacRect Rect() => new(I16(), I16(), I16(), I16());
@@ -290,9 +292,9 @@ namespace ClassicMac.Resources.Decoders.Interface
             {
                 if (Short) return null;
                 var offset = align ? (at + 1) & ~1 : at;
-                if (offset + 2 > data.Length) return null;
+                if (!new BigEndianReader(data).TryReadUInt16At(offset, out var word)) return null;
                 at = offset + 2;
-                return BinaryPrimitives.ReadUInt16BigEndian(data[offset..]);
+                return word;
             }
         }
     }

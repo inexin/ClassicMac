@@ -285,19 +285,19 @@ namespace ClassicMac.Resources.Decoders.Templates
                 switch (type)
                 {
                     case "DBYT": return ((sbyte)Take(1)[0]).ToString(CultureInfo.InvariantCulture);
-                    case "DWRD": return BinaryPrimitives.ReadInt16BigEndian(Take(2)).ToString(CultureInfo.InvariantCulture);
-                    case "DLNG": return BinaryPrimitives.ReadInt32BigEndian(Take(4)).ToString(CultureInfo.InvariantCulture);
+                    case "DWRD": return new BigEndianReader(Take(2)).ReadInt16().ToString(CultureInfo.InvariantCulture);
+                    case "DLNG": return new BigEndianReader(Take(4)).ReadInt32().ToString(CultureInfo.InvariantCulture);
                     case "HBYT": return "$" + Convert.ToHexString(Take(1));
                     case "HWRD": return "$" + Convert.ToHexString(Take(2));
                     case "HLNG": return "$" + Convert.ToHexString(Take(4));
-                    case "OCNT" or "ZCNT": return BinaryPrimitives.ReadUInt16BigEndian(Take(2)).ToString(CultureInfo.InvariantCulture);
+                    case "OCNT" or "ZCNT": return new BigEndianReader(Take(2)).ReadUInt16().ToString(CultureInfo.InvariantCulture);
                     case "CHAR": { var b = Take(1); return b[0] == 0 ? "" : MacRoman.Decode(b); }
                     case "TNAM": return MacRoman.Decode(Take(4));
                     case "BOOL": return Take(2)[0] != 0 ? "1" : "0";   // only the first byte counts
                     case "RECT":
                     {
-                        var b = Take(8);
-                        return string.Join(", ", Enumerable.Range(0, 4).Select(i => BinaryPrimitives.ReadInt16BigEndian(b.AsSpan(2 * i))));
+                        var rect = new BigEndianReader(Take(8)).ReadMacRect();
+                        return string.Join(", ", rect.Top, rect.Left, rect.Bottom, rect.Right);
                     }
                     case "BBIT":
                     {
@@ -312,8 +312,8 @@ namespace ClassicMac.Resources.Decoders.Templates
                         int pad = type == "ESTR" && n % 2 == 0 || type == "OSTR" && n % 2 == 1 ? 1 : 0;
                         return Text(n, pad);
                     }
-                    case "WSTR": return Text(BinaryPrimitives.ReadUInt16BigEndian(Take(2)), 0);
-                    case "LSTR": return Text((int)Math.Min(BinaryPrimitives.ReadUInt32BigEndian(Take(4)), int.MaxValue), 0);
+                    case "WSTR": return Text(new BigEndianReader(Take(2)).ReadUInt16(), 0);
+                    case "LSTR": return Text((int)Math.Min(new BigEndianReader(Take(4)).ReadUInt32(), int.MaxValue), 0);
                     case "CSTR" or "ECST" or "OCST":
                     {
                         int start = Math.Min(Position, End);

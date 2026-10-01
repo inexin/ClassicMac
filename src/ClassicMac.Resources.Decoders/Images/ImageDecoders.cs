@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -67,8 +66,9 @@ namespace ClassicMac.Resources.Decoders.Images
             // pictures over the limit before anything is allocated.
             if (data.Length >= 10)
             {
-                long height = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(6)) - BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(2));
-                long width = BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(8)) - BinaryPrimitives.ReadInt16BigEndian(data.AsSpan(4));
+                var frame = new BigEndianReader(data).ReadMacRectAt(2);
+                long height = frame.Bottom - frame.Top;
+                long width = frame.Right - frame.Left;
                 if (width * height > Options.MaxImagePixels)
                 {
                     input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "image.too-large",

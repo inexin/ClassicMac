@@ -31,9 +31,10 @@ namespace ClassicMac.Resources.Decoders.Colors
             complete = data.Length >= 8;
             var entries = new List<PaletteEntry>();
             if (!complete) return entries;
-            seed = BinaryPrimitives.ReadInt32BigEndian(data);
-            flags = BinaryPrimitives.ReadUInt16BigEndian(data[4..]);
-            var count = BinaryPrimitives.ReadInt16BigEndian(data[6..]) + 1;
+            var reader = new BigEndianReader(data);
+            seed = reader.ReadInt32();
+            flags = reader.ReadUInt16();
+            var count = reader.ReadInt16() + 1;
             var device = (flags & 0x8000) != 0;
             for (var i = 0; i < count; i++)
             {
@@ -43,9 +44,9 @@ namespace ClassicMac.Resources.Decoders.Colors
                     complete = false;
                     break;
                 }
-                var value = BinaryPrimitives.ReadInt16BigEndian(data[e..]);
-                entries.Add(new PaletteEntry(device ? i : value, value, BinaryPrimitives.ReadUInt16BigEndian(data[(e + 2)..]),
-                    BinaryPrimitives.ReadUInt16BigEndian(data[(e + 4)..]), BinaryPrimitives.ReadUInt16BigEndian(data[(e + 6)..])));
+                var value = reader.ReadInt16At(e);
+                entries.Add(new PaletteEntry(device ? i : value, value, reader.ReadUInt16At(e + 2),
+                    reader.ReadUInt16At(e + 4), reader.ReadUInt16At(e + 6)));
             }
             return entries;
         }
@@ -59,7 +60,8 @@ namespace ClassicMac.Resources.Decoders.Colors
             complete = data.Length >= 16;
             var entries = new List<PaletteEntry>();
             if (!complete) return entries;
-            var count = BinaryPrimitives.ReadInt16BigEndian(data);
+            var reader = new BigEndianReader(data);
+            var count = reader.ReadInt16();
             for (var i = 0; i < count; i++)
             {
                 var e = 16 + i * 16;
@@ -68,9 +70,8 @@ namespace ClassicMac.Resources.Decoders.Colors
                     complete = false;
                     break;
                 }
-                entries.Add(new PaletteEntry(i, i, BinaryPrimitives.ReadUInt16BigEndian(data[e..]), BinaryPrimitives.ReadUInt16BigEndian(data[(e + 2)..]),
-                    BinaryPrimitives.ReadUInt16BigEndian(data[(e + 4)..]), BinaryPrimitives.ReadUInt16BigEndian(data[(e + 6)..]),
-                    BinaryPrimitives.ReadUInt16BigEndian(data[(e + 8)..])));
+                entries.Add(new PaletteEntry(i, i, reader.ReadUInt16At(e), reader.ReadUInt16At(e + 2),
+                    reader.ReadUInt16At(e + 4), reader.ReadUInt16At(e + 6), reader.ReadUInt16At(e + 8)));
             }
             return entries;
         }

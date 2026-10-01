@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -74,7 +73,8 @@ namespace ClassicMac.Resources.Decoders.Images
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "icon.family-header", "The data is not an icon family ('icns')."));
                 return family;
             }
-            var length = BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
+            var reader = new BigEndianReader(data);
+            var length = reader.ReadUInt32At(4);
             if (length < 9 || length != data.Length)
             {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "icon.family-length",
@@ -85,8 +85,8 @@ namespace ClassicMac.Resources.Decoders.Images
             var ignored = new SortedSet<string>(StringComparer.Ordinal);
             while (at + 8 <= length)
             {
-                var type = new FourCC(data.Slice((int)at, 4)).ToString();
-                var size = BinaryPrimitives.ReadUInt32BigEndian(data[((int)at + 4)..]);
+                var type = reader.ReadFourCCAt((int)at).ToString();
+                var size = reader.ReadUInt32At((int)at + 4);
                 if (size < 1) throw new InvalidDataException($"The icon family's '{type}' element has size {size}; the family fails (paramErr).");
                 if (at + size > length) break;                   // an element past the end is skipped
                 var payload = size >= 8 ? data.Slice((int)at + 8, (int)size - 8) : [];
@@ -128,7 +128,7 @@ namespace ClassicMac.Resources.Decoders.Images
                 if (member.Type == "it32")
                 {
                     // it32 alone carries a compression-format word, which must be 0.
-                    if (payload.Length < 4 || BinaryPrimitives.ReadUInt32BigEndian(payload) != 0)
+                    if (!new BigEndianReader(payload).TryReadUInt32(out var format) || format != 0)
                         throw new InvalidDataException("The 'it32' member's compression format is not 0; the family fails (paramErr).");
                     payload = payload[4..];
                 }

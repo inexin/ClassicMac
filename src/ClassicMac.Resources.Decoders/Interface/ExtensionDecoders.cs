@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text.Json;
 using ClassicMac.Core;
@@ -74,9 +73,10 @@ namespace ClassicMac.Resources.Decoders.Interface
                 w.WriteEndArray();
                 return;
             }
-            w.WriteNumber("seed", BinaryPrimitives.ReadInt32BigEndian(data));
-            w.WriteNumber("flags", BinaryPrimitives.ReadUInt16BigEndian(data[4..]));
-            var count = BinaryPrimitives.ReadInt16BigEndian(data[6..]) + 1;
+            var reader = new BigEndianReader(data);
+            w.WriteNumber("seed", reader.ReadInt32());
+            w.WriteNumber("flags", reader.ReadUInt16());
+            var count = reader.ReadInt16() + 1;
             w.WriteStartArray("entries");
             for (var i = 0; i < count; i++)
             {
@@ -86,7 +86,7 @@ namespace ClassicMac.Resources.Decoders.Interface
                     Short(input);
                     break;
                 }
-                var part = BinaryPrimitives.ReadInt16BigEndian(data[at..]);
+                var part = reader.ReadInt16At(at);
                 w.WriteStartObject();
                 w.WriteNumber("value", part);
                 if (part >= 0 && part < parts.Length) w.WriteString("part", parts[part]);
@@ -103,7 +103,8 @@ namespace ClassicMac.Resources.Decoders.Interface
             return Json(input, (w, data) =>
             {
                 w.WriteStartObject();
-                var count = data.Length >= 2 ? BinaryPrimitives.ReadInt16BigEndian(data) : 0;
+                var reader = new BigEndianReader(data);
+                var count = reader.TryReadInt16At(0, out var entryCount) ? entryCount : 0;
                 if (data.Length < 2) Short(input);
                 w.WriteStartArray("entries");
                 for (var i = 0; i < count; i++)
@@ -114,8 +115,8 @@ namespace ClassicMac.Resources.Decoders.Interface
                         Short(input);
                         break;
                     }
-                    var menu = BinaryPrimitives.ReadInt16BigEndian(data[at..]);
-                    var item = BinaryPrimitives.ReadInt16BigEndian(data[(at + 2)..]);
+                    var menu = reader.ReadInt16At(at);
+                    var item = reader.ReadInt16At(at + 2);
                     string[] names = menu == 0 ? ["titles", "menuBackground", "items", "menuBar"]
                         : item == 0 ? ["title", "menuBackground", "items", "menuBar"]
                         : ["mark", "text", "key", "background"];
@@ -148,6 +149,7 @@ namespace ClassicMac.Resources.Decoders.Interface
                 w.WriteStartObject();
                 w.WriteBoolean("itemList", ditl is not null);
                 w.WriteStartArray("items");
+                var reader = new BigEndianReader(data);
                 var entries = ditl is null ? data.Length / 4 : items.Count;
                 for (var i = 0; i < entries; i++)
                 {
@@ -156,8 +158,8 @@ namespace ClassicMac.Resources.Decoders.Interface
                         Short(input);
                         break;
                     }
-                    var value = BinaryPrimitives.ReadInt16BigEndian(data[(i * 4)..]);
-                    var offset = BinaryPrimitives.ReadInt16BigEndian(data[(i * 4 + 2)..]);
+                    var value = reader.ReadInt16At(i * 4);
+                    var offset = reader.ReadInt16At(i * 4 + 2);
                     w.WriteStartObject();
                     w.WriteNumber("number", i + 1);
                     w.WriteNumber("data", value);
@@ -184,9 +186,10 @@ namespace ClassicMac.Resources.Decoders.Interface
         private static void TextStyle(Utf8JsonWriter w, ReadOnlySpan<byte> data, short flags, int offset, DecodeOptions options)
         {
             var style = data[offset..];
+            var reader = new BigEndianReader(style);
             w.WriteStartObject("textStyle");
             w.WriteNumber("flags", (ushort)flags);
-            var font = BinaryPrimitives.ReadInt16BigEndian(style);
+            var font = reader.ReadInt16At(0);
             if ((flags & 0x8000) != 0 && font >= 0 && font < data.Length)
             {
                 var at = (int)font;
@@ -203,7 +206,7 @@ namespace ClassicMac.Resources.Decoders.Interface
             }
             if ((flags & 4) != 0)
             {
-                w.WriteNumber("size", BinaryPrimitives.ReadInt16BigEndian(style[4..]));
+                w.WriteNumber("size", reader.ReadInt16At(4));
                 w.WriteBoolean("addSize", (flags & 0x10) != 0);
             }
             if ((flags & 8) != 0)
@@ -218,7 +221,7 @@ namespace ClassicMac.Resources.Decoders.Interface
                 Rgb(w, style[12..]);
                 w.WriteEndObject();
             }
-            if ((flags & 0x4000) != 0) w.WriteNumber("mode", BinaryPrimitives.ReadInt16BigEndian(style[18..]));
+            if ((flags & 0x4000) != 0) w.WriteNumber("mode", reader.ReadInt16At(18));
             w.WriteEndObject();
         }
 
@@ -231,8 +234,9 @@ namespace ClassicMac.Resources.Decoders.Interface
             {
                 if (data.Length < 6) Short(input);
                 w.WriteStartObject();
-                w.WriteNumber("version", data.Length >= 2 ? BinaryPrimitives.ReadInt16BigEndian(data) : 0);
-                Flags(w, data.Length >= 6 ? BinaryPrimitives.ReadUInt32BigEndian(data[2..]) : 0, AppearanceFlags);
+                var reader = new BigEndianReader(data);
+                w.WriteNumber("version", reader.TryReadInt16At(0, out var version) ? version : 0);
+                Flags(w, reader.TryReadUInt32At(2, out var flags) ? flags : 0, AppearanceFlags);
                 w.WriteEndObject();
             });
         }
@@ -243,7 +247,7 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             var head = input.Data.Span;
             if (head.Length < 12) Short(input);
-            var version = head.Length >= 2 ? BinaryPrimitives.ReadInt16BigEndian(head) : (short)0;
+            var version = new BigEndianReader(head).TryReadInt16At(0, out var word) ? word : (short)0;
             var titleAt = version == 0 && head.Length >= 0x1D && 0x1C + 1 + head[0x1C] <= head.Length ? 0x1C : 12;
             var title = "";
             if (head.Length > titleAt)
@@ -256,10 +260,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             {
                 w.WriteStartObject();
                 w.WriteNumber("version", version);
-                var flags = data.Length >= 6 ? BinaryPrimitives.ReadUInt32BigEndian(data[2..]) : 0;
+                var reader = new BigEndianReader(data);
+                var flags = reader.TryReadUInt32At(2, out var flagBits) ? flagBits : 0;
                 Flags(w, flags, ["useThemeBackground", "useControlHierarchy", "movable", "useThemeControls"]);
                 w.WriteBoolean("movable", (flags & 4) != 0);
-                w.WriteNumber("refCon", data.Length >= 10 ? BinaryPrimitives.ReadInt32BigEndian(data[6..]) : 0);
+                w.WriteNumber("refCon", reader.TryReadInt32At(6, out var refCon) ? refCon : 0);
                 w.WriteBoolean("useThemeWindow", data.Length >= 11 && data[10] != 0);
                 w.WriteString("title", title);
                 w.WriteEndObject();
@@ -272,8 +277,9 @@ namespace ClassicMac.Resources.Decoders.Interface
             return Json(input, (w, data) =>
             {
                 w.WriteStartObject();
-                w.WriteNumber("version", data.Length >= 2 ? BinaryPrimitives.ReadInt16BigEndian(data) : 0);
-                var count = data.Length >= 4 ? BinaryPrimitives.ReadInt16BigEndian(data[2..]) : 0;
+                var reader = new BigEndianReader(data);
+                w.WriteNumber("version", reader.TryReadInt16At(0, out var version) ? version : 0);
+                var count = reader.TryReadInt16At(2, out var itemCount) ? itemCount : 0;
                 if (data.Length < 4) Short(input);
                 w.WriteStartArray("items");
                 var at = 4;
@@ -284,7 +290,7 @@ namespace ClassicMac.Resources.Decoders.Interface
                         Short(input);
                         break;
                     }
-                    var key = BinaryPrimitives.ReadInt16BigEndian(data[at..]);
+                    var key = reader.ReadInt16At(at);
                     at += 2;
                     w.WriteStartObject();
                     w.WriteNumber("number", i + 1);
@@ -297,17 +303,18 @@ namespace ClassicMac.Resources.Decoders.Interface
                             w.WriteEndObject();
                             break;
                         }
-                        var e = data[at..];
-                        w.WriteNumber("commandId", BinaryPrimitives.ReadUInt32BigEndian(e));
-                        w.WriteString("command", new FourCC(BinaryPrimitives.ReadUInt32BigEndian(e)).ToString());
-                        Flags(w, e[4], ["shift", "option", "control", "noCommand"], "modifiers");
-                        w.WriteNumber("iconType", e[5]);
-                        w.WriteNumber("textEncoding", BinaryPrimitives.ReadInt32BigEndian(e[10..]));
-                        w.WriteNumber("refCon", BinaryPrimitives.ReadInt32BigEndian(e[14..]));
-                        w.WriteNumber("refCon2", BinaryPrimitives.ReadInt32BigEndian(e[18..]));
-                        w.WriteNumber("submenu", BinaryPrimitives.ReadUInt16BigEndian(e[22..]));
-                        w.WriteNumber("font", BinaryPrimitives.ReadUInt16BigEndian(e[24..]));
-                        w.WriteNumber("glyph", BinaryPrimitives.ReadInt16BigEndian(e[26..]));
+                        var e = new BigEndianReader(data[at..]);
+                        var commandId = e.ReadUInt32At(0);
+                        w.WriteNumber("commandId", commandId);
+                        w.WriteString("command", new FourCC(commandId).ToString());
+                        Flags(w, e.ReadByteAt(4), ["shift", "option", "control", "noCommand"], "modifiers");
+                        w.WriteNumber("iconType", e.ReadByteAt(5));
+                        w.WriteNumber("textEncoding", e.ReadInt32At(10));
+                        w.WriteNumber("refCon", e.ReadInt32At(14));
+                        w.WriteNumber("refCon2", e.ReadInt32At(18));
+                        w.WriteNumber("submenu", e.ReadUInt16At(22));
+                        w.WriteNumber("font", e.ReadUInt16At(24));
+                        w.WriteNumber("glyph", e.ReadInt16At(26));
                         at += 28;
                     }
                     w.WriteEndObject();
@@ -336,8 +343,8 @@ namespace ClassicMac.Resources.Decoders.Interface
         private static void Rgb(Utf8JsonWriter w, ReadOnlySpan<byte> rgb)
         {
             if (rgb.Length < 6) return;
-            ushort r = BinaryPrimitives.ReadUInt16BigEndian(rgb), g = BinaryPrimitives.ReadUInt16BigEndian(rgb[2..]),
-                b = BinaryPrimitives.ReadUInt16BigEndian(rgb[4..]);
+            var reader = new BigEndianReader(rgb);
+            ushort r = reader.ReadUInt16(), g = reader.ReadUInt16(), b = reader.ReadUInt16();
             w.WriteNumber("red", r);
             w.WriteNumber("green", g);
             w.WriteNumber("blue", b);

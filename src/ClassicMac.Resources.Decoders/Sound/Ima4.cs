@@ -1,5 +1,5 @@
 using System;
-using System.Buffers.Binary;
+using ClassicMac.Core;
 
 namespace ClassicMac.Resources.Decoders.Sound
 {
@@ -39,7 +39,7 @@ namespace ClassicMac.Resources.Decoders.Sound
                     var packet = data.Slice((p * channels + c) * PacketBytes, PacketBytes);
                     if (p % Batch == 0)
                     {
-                        var word = BinaryPrimitives.ReadUInt16BigEndian(packet);
+                        var word = new BigEndianReader(packet).ReadUInt16At(0);
                         var start = (short)(word & 0xFF80);
                         var startIndex = word & 0x7F;
                         if (startIndex != index || Math.Abs(start - predictor) > 0x7F)

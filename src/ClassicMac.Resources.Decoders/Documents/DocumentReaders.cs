@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
@@ -52,9 +51,10 @@ namespace ClassicMac.Resources.Decoders.Documents
             var windowWidth = DefaultWindowWidth;
             if (Data(STwD, 128) is { Length: >= 8 } window)
             {
-                var mode = BinaryPrimitives.ReadInt16BigEndian(window);
-                if (mode == 2) windowWidth = BinaryPrimitives.ReadInt16BigEndian(window.AsSpan(6));
-                else if (mode == 1) windowWidth = BinaryPrimitives.ReadInt16BigEndian(window.AsSpan(2));
+                var reader = new BigEndianReader(window);
+                var mode = reader.ReadInt16At(0);
+                if (mode == 2) windowWidth = reader.ReadInt16At(6);
+                else if (mode == 1) windowWidth = reader.ReadInt16At(2);
             }
             var backgrounds = Data(Clut, 128) is { } clut ? ColorTable(clut) : [];
             var word = StringListItem(Data(StrList, 128), 16, options) ?? "Chapter";
@@ -69,9 +69,10 @@ namespace ClassicMac.Resources.Decoders.Documents
                     Report(DiagnosticSeverity.Error, "document.missing-part", $"Chapter {k} (\"{chapterTitle}\") has no TEXT or Wndo {id}; skipped.");
                     continue;
                 }
-                var left = BinaryPrimitives.ReadInt16BigEndian(wndo.AsSpan(2));
-                var right = BinaryPrimitives.ReadInt16BigEndian(wndo.AsSpan(6));
-                var justification = BinaryPrimitives.ReadInt16BigEndian(wndo.AsSpan(0x12)) switch
+                var wndoReader = new BigEndianReader(wndo);
+                var left = wndoReader.ReadInt16At(2);
+                var right = wndoReader.ReadInt16At(6);
+                var justification = wndoReader.ReadInt16At(0x12) switch
                 {
                     1 => Justification.Center,
                     -1 => Justification.Right,
@@ -150,21 +151,22 @@ namespace ClassicMac.Resources.Decoders.Documents
                 return null;
             }
             var span = info.AsSpan();
-            var id = BinaryPrimitives.ReadInt16BigEndian(span);
-            var alignment = BinaryPrimitives.ReadInt16BigEndian(span[2..]) switch
+            var reader = new BigEndianReader(span);
+            var id = reader.ReadInt16();
+            var alignment = reader.ReadInt16() switch
             {
                 2 => PictureAlignment.Left,
                 3 => PictureAlignment.Right,
                 _ => PictureAlignment.Center,
             };
-            var noScale = BinaryPrimitives.ReadInt16BigEndian(span[4..]) == 1;
-            int code = BinaryPrimitives.ReadInt16BigEndian(span[6..]);
+            var noScale = reader.ReadInt16() == 1;
+            int code = reader.ReadInt16();
             var at = 8;
             var action = new PictureAction(Math.Abs(code), code >= 0);
             switch (Math.Abs(code))
             {
                 case 1 when span.Length >= at + 4:
-                    action = action with { Chapter = BinaryPrimitives.ReadInt16BigEndian(span[at..]), Paragraph = BinaryPrimitives.ReadInt16BigEndian(span[(at + 2)..]) };
+                    action = action with { Chapter = reader.ReadInt16At(at), Paragraph = reader.ReadInt16At(at + 2) };
                     if (action.Chapter < 1 || action.Chapter > chapters)
                     {
                         diagnostics.Add(new Diagnostic(DiagnosticSeverity.Info, "document.bad-link",
@@ -203,13 +205,14 @@ namespace ClassicMac.Resources.Decoders.Documents
         internal static (int Width, int Height) PictureSize(ReadOnlySpan<byte> pict, bool scaleTo72Dpi)
         {
             if (pict.Length < 10) return (0, 0);
-            int width = BinaryPrimitives.ReadInt16BigEndian(pict[8..]) - BinaryPrimitives.ReadInt16BigEndian(pict[4..]);
-            int height = BinaryPrimitives.ReadInt16BigEndian(pict[6..]) - BinaryPrimitives.ReadInt16BigEndian(pict[2..]);
-            if (scaleTo72Dpi && pict.Length >= 0x1C && BinaryPrimitives.ReadUInt16BigEndian(pict[0x0A..]) == 0x0011
-                && BinaryPrimitives.ReadInt16BigEndian(pict[0x10..]) == -2)
+            var reader = new BigEndianReader(pict);
+            var frame = reader.ReadMacRectAt(2);
+            int width = frame.Right - frame.Left;
+            int height = frame.Bottom - frame.Top;
+            if (scaleTo72Dpi && pict.Length >= 0x1C && reader.ReadUInt16At(0x0A) == 0x0011 && reader.ReadInt16At(0x10) == -2)
             {
-                var hRes = BinaryPrimitives.ReadInt32BigEndian(pict[0x14..]) / 65536.0;
-                var vRes = BinaryPrimitives.ReadInt32BigEndian(pict[0x18..]) / 65536.0;
+                var hRes = reader.ReadInt32At(0x14) / 65536.0;
+                var vRes = reader.ReadInt32At(0x18) / 65536.0;
                 if (hRes > 0) width = (int)(width * 72 / hRes);
                 if (vRes > 0) height = (int)(height * 72 / vRes);
             }
@@ -221,7 +224,7 @@ namespace ClassicMac.Resources.Decoders.Documents
         {
             var colours = new List<Rgb>();
             if (clut.Length < 8) return colours;
-            var count = BinaryPrimitives.ReadInt16BigEndian(clut.AsSpan(6)) + 1;
+            var count = new BigEndianReader(clut).ReadInt16At(6) + 1;
             for (var i = 0; i < count && 16 + i * 8 <= clut.Length; i++)
             {
                 var e = clut.AsSpan(8 + i * 8);
@@ -235,13 +238,13 @@ namespace ClassicMac.Resources.Decoders.Documents
         {
             var entries = new List<ContentsEntry>();
             if (data is not { Length: >= 2 }) return entries;
-            var count = BinaryPrimitives.ReadInt16BigEndian(data);
+            var reader = new BigEndianReader(data);
+            var count = reader.ReadInt16At(0);
             var at = 2;
             for (var i = 0; i < count && at + 6 < data.Length; i++)
             {
                 var span = data.AsSpan();
-                int chapter = BinaryPrimitives.ReadInt16BigEndian(span[at..]), start = BinaryPrimitives.ReadInt16BigEndian(span[(at + 2)..]),
-                    end = BinaryPrimitives.ReadInt16BigEndian(span[(at + 4)..]);
+                int chapter = reader.ReadInt16At(at), start = reader.ReadInt16At(at + 2), end = reader.ReadInt16At(at + 4);
                 at += 6;
                 if (!MacText.TryReadPascal(span, ref at, out var title)) break;
                 entries.Add(new ContentsEntry(chapter, start, end, MacText.Decode(title, options)));
@@ -258,7 +261,7 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         private static string? StringListItem(byte[]? list, int index, DecodeOptions options)
         {
-            if (list is not { Length: >= 2 } || index > BinaryPrimitives.ReadUInt16BigEndian(list)) return null;
+            if (list is not { Length: >= 2 } || index > new BigEndianReader(list).ReadUInt16At(0)) return null;
             var at = 2;
             for (var i = 1; i <= index; i++)
             {

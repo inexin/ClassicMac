@@ -1,5 +1,4 @@
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
@@ -38,30 +37,28 @@ namespace ClassicMac.Resources.Decoders.Finder
             complete = data.Length >= 8;
             var maps = new List<(FourCC, IReadOnlyList<(short, short)>)>();
             if (!complete) return new Bundle(data.Length >= 4 ? new FourCC(data[..4]) : default, 0, maps);
-            var signature = new FourCC(data[..4]);
-            var signatureId = BinaryPrimitives.ReadInt16BigEndian(data[4..]);
-            var types = BinaryPrimitives.ReadInt16BigEndian(data[6..]) + 1;
-            var at = 8;
+            var reader = new BigEndianReader(data);
+            var signature = reader.ReadFourCC();
+            var signatureId = reader.ReadInt16();
+            var types = reader.ReadInt16() + 1;
             for (var t = 0; t < types; t++)
             {
-                if (at + 6 > data.Length)
+                if (reader.Remaining < 6)
                 {
                     complete = false;
                     break;
                 }
-                var type = new FourCC(data.Slice(at, 4));
-                var count = BinaryPrimitives.ReadInt16BigEndian(data[(at + 4)..]) + 1;
-                at += 6;
+                var type = reader.ReadFourCC();
+                var count = reader.ReadInt16() + 1;
                 var ids = new List<(short, short)>();
                 for (var i = 0; i < count; i++)
                 {
-                    if (at + 4 > data.Length)
+                    if (reader.Remaining < 4)
                     {
                         complete = false;
                         break;
                     }
-                    ids.Add((BinaryPrimitives.ReadInt16BigEndian(data[at..]), BinaryPrimitives.ReadInt16BigEndian(data[(at + 2)..])));
-                    at += 4;
+                    ids.Add((reader.ReadInt16(), reader.ReadInt16()));
                 }
                 maps.Add((type, ids));
                 if (!complete) break;
@@ -76,16 +73,17 @@ namespace ClassicMac.Resources.Decoders.Finder
             if (!complete) return new FileReference(data.Length >= 4 ? new FourCC(data[..4]) : default, 0, "");
             var at = 6;
             var name = at < data.Length && MacText.TryReadPascal(data, ref at, out var text) ? MacText.Decode(text, options) : "";
-            return new FileReference(new FourCC(data[..4]), BinaryPrimitives.ReadInt16BigEndian(data[4..]), name);
+            return new FileReference(new FourCC(data[..4]), new BigEndianReader(data).ReadInt16At(4), name);
         }
 
         /// <summary>A <c>'SIZE'</c>: flags, preferred size, minimum size.</summary>
         public static SizeResource ReadSize(ReadOnlySpan<byte> data, out bool complete)
         {
             complete = data.Length >= 10;
+            var reader = new BigEndianReader(data);
             return complete
-                ? new SizeResource(BinaryPrimitives.ReadUInt16BigEndian(data), BinaryPrimitives.ReadUInt32BigEndian(data[2..]), BinaryPrimitives.ReadUInt32BigEndian(data[6..]))
-                : new SizeResource(data.Length >= 2 ? BinaryPrimitives.ReadUInt16BigEndian(data) : (ushort)0, 0, 0);
+                ? new SizeResource(reader.ReadUInt16(), reader.ReadUInt32(), reader.ReadUInt32())
+                : new SizeResource(reader.TryReadUInt16(out var flags) ? flags : (ushort)0, 0, 0);
         }
 
         /// <summary>The <c>'SIZE'</c> flags that are set, by their Rez names, from bit 15 down.</summary>
