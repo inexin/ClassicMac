@@ -112,12 +112,52 @@ namespace ClassicMac.App.Views
 
         public static readonly StyledProperty<double> ScaleProperty = AvaloniaProperty.Register<MenuView, double>(nameof(Scale), 1);
 
+        /// <summary>The highlighted item (drawn inverted, as the Menu Manager highlights it), or -1; a click on an item sets it.</summary>
+        public static readonly StyledProperty<int> SelectedIndexProperty =
+            AvaloniaProperty.Register<MenuView, int>(nameof(SelectedIndex), -1, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
         private const double Bar = 20, Row = 16, Left = 16, Gutter = 12;
 
         static MenuView()
         {
             AffectsMeasure<MenuView>(MenuProperty, ScaleProperty);
-            AffectsRender<MenuView>(MenuProperty, ScaleProperty);
+            AffectsRender<MenuView>(MenuProperty, ScaleProperty, SelectedIndexProperty);
+        }
+
+        public int SelectedIndex
+        {
+            get => GetValue(SelectedIndexProperty);
+            set => SetValue(SelectedIndexProperty, value);
+        }
+
+        /// <summary>The item at a point in the control (in its own units), or -1 outside the items.</summary>
+        public int ItemAt(Point point)
+        {
+            if (Menu is not { } menu)
+            {
+                return -1;
+            }
+
+            var pixel = PixelScaling.Scale(Scale, RenderScaling);
+            var (x, y) = (point.X / pixel, point.Y / pixel);              // DIPs to Mac pixels
+            var top = Gutter + Bar;
+            if (x < Gutter || x > Gutter + MenuWidth(menu) + 2 || y < top)
+            {
+                return -1;
+            }
+
+            var index = (int)Math.Floor((y - top) / Row);
+            return index < menu.Items.Count ? index : -1;
+        }
+
+        protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            if (ItemAt(e.GetPosition(this)) is var index and >= 0)
+            {
+                SelectedIndex = index;
+                e.Handled = true;
+            }
         }
 
         public MenuResource? Menu
@@ -175,12 +215,20 @@ namespace ClassicMac.App.Views
             {
                 var item = menu.Items[i];
                 var y = box.Y + 1 + i * Row;
+                // The selected item inverted, as the Menu Manager highlights the item under the pointer.
+                var selected = i == SelectedIndex;
+                if (selected)
+                {
+                    context.FillRectangle(MacLook.Black, new Rect(box.X + 1, y, box.Width - 2, Row));
+                }
+
                 if (item.IsDivider)
                 {
-                    context.DrawLine(MacLook.Dotted, new Point(box.X + 1, y + Row / 2 - 0.5), new Point(box.Right - 1, y + Row / 2 - 0.5));
+                    context.DrawLine(selected ? new Pen(MacLook.White, 1, DashStyle.Dot) : MacLook.Dotted,
+                        new Point(box.X + 1, y + Row / 2 - 0.5), new Point(box.Right - 1, y + Row / 2 - 0.5));
                     continue;
                 }
-                var brush = item.Enabled && menu.Enabled ? MacLook.Black : MacLook.Grey;
+                var brush = selected ? MacLook.White : item.Enabled && menu.Enabled ? MacLook.Black : MacLook.Grey;
                 var text = MacLook.Text(item.Text, brush, Face(item.Face));
                 var baseline = y + (Row - text.Height) / 2;
                 if (item.Mark != 0 && item.Submenu is null && item.KeyEquivalent != 0x1A)

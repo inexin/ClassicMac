@@ -81,13 +81,13 @@ public sealed class InspectorViewTests
             edit.Command!.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, model.SelectedTab);
-            Assert.True(window.FindControl<DockPanel>("FormEditor")!.IsEffectivelyVisible);
+            Assert.True(window.FindControl<DockPanel>("FormHost")!.IsEffectivelyVisible);
             Assert.False(edit.IsEffectivelyVisible);
             Assert.True(header.GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("editing-badge")).IsEffectivelyVisible);
-            var cancel = window.FindControl<DockPanel>("FormEditor")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Cancel");
+            var cancel = window.FindControl<DockPanel>("FormHost")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Cancel");
             cancel.Command!.Execute(null);
             Dispatcher.UIThread.RunJobs();
-            Assert.False(window.FindControl<DockPanel>("FormEditor")!.IsEffectivelyVisible);
+            Assert.False(window.FindControl<DockPanel>("FormHost")!.IsEffectivelyVisible);
 
             // A resource without a form has no Edit button.
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ZZZZ").Children[0];

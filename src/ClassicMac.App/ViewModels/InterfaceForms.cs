@@ -175,96 +175,6 @@ namespace ClassicMac.App.ViewModels
         public override byte[] BuildData() => InterfaceWriter.WriteDialogItems(Items.Select(i => i.ToItem()).ToList());
     }
 
-    /// <summary>One item of a <c>'MENU'</c>.</summary>
-    public sealed partial class MenuItemRow : ObservableObject
-    {
-        public MenuItemRow(MenuItem item)
-        {
-            (text, enabled, icon, face) = (item.Text, item.Enabled, item.Icon, item.Face);
-            key = item.KeyEquivalent is 0 ? "" : item.KeyKind is null ? MacRoman.ToChar(item.KeyEquivalent).ToString() : $"${item.KeyEquivalent:X2}";
-            mark = item.Submenu is { } submenu ? $"menu {submenu}" : item.Mark is 0 ? "" : MacRoman.ToChar(item.Mark).ToString();
-            (KeyByte, MarkByte) = (item.KeyEquivalent, item.Mark);
-        }
-
-        private byte KeyByte { get; }
-        private byte MarkByte { get; }
-
-        [ObservableProperty] private string text;
-        [ObservableProperty] private bool enabled;
-        [ObservableProperty] private decimal icon;
-        [ObservableProperty] private decimal face;
-
-        /// <summary>The Command key (one character), or a code as $1B (submenu), $1C (script), $1A/$1D/$1E (icon forms).</summary>
-        [ObservableProperty] private string key;
-
-        /// <summary>The mark character; for a submenu (key $1B) "menu N".</summary>
-        [ObservableProperty] private string mark;
-
-        public MenuItem ToItem()
-        {
-            byte key = Key.Trim() switch
-            {
-                "" => 0,
-                var k when k.StartsWith('$') && byte.TryParse(k[1..], System.Globalization.NumberStyles.HexNumber, null, out var code) => code,
-                var k when k.Length == 1 && MacRoman.TryGetByte(k[0], out var b) => b,
-                _ => throw new ArgumentException($"“{Key}” is not a Command key (one character, or a code like $1B)."),
-            };
-            byte mark = Mark.Trim() switch
-            {
-                "" => 0,
-                var m when m.StartsWith("menu ", StringComparison.Ordinal) && byte.TryParse(m[5..], out var id) => id,
-                var m when m.Length == 1 && MacRoman.TryGetByte(m[0], out var b) => b,
-                _ => throw new ArgumentException($"“{Mark}” is not a mark (one character, or “menu N” for a submenu)."),
-            };
-            return new MenuItem(Text, (byte)Icon, key, mark, (byte)Face, Enabled);
-        }
-    }
-
-    /// <summary><c>'MENU'</c>: its title, flags and items.</summary>
-    public sealed partial class MenuForm : DataForm
-    {
-        private readonly MenuResource menu;
-
-        public MenuForm(Resource resource, MenuResource menu) : base(resource)
-        {
-            this.menu = menu;
-            (id, definition, title, enabled) = (menu.Id, menu.Definition, menu.Title, menu.Enabled);
-            foreach (var item in menu.Items)
-            {
-                Items.Add(new MenuItemRow(item));
-            }
-
-            Watch(Items);
-        }
-
-        [ObservableProperty] private decimal id;
-        [ObservableProperty] private decimal definition;
-        [ObservableProperty] private string title;
-        [ObservableProperty] private bool enabled;
-
-        public ObservableCollection<MenuItemRow> Items { get; } = [];
-
-        [RelayCommand]
-        private void Add() => Items.Add(new MenuItemRow(new MenuItem("Item", 0, 0, 0, 0, true)));
-
-        [RelayCommand]
-        private void Remove(MenuItemRow row) => Items.Remove(row);
-
-        [RelayCommand]
-        private void MoveUp(MenuItemRow row) => Move(Items, row, -1);
-
-        public MenuResource ToMenu() => menu with
-        {
-            Id = (short)Id,
-            Definition = (short)Definition,
-            Title = Title,
-            EnableFlags = Enabled ? menu.EnableFlags | 1 : menu.EnableFlags & ~1u,
-            Items = Items.Select(i => i.ToItem()).ToList(),
-        };
-
-        public override byte[] BuildData() => InterfaceWriter.WriteMenu(ToMenu());
-    }
-
     /// <summary><c>'CNTL'</c>.</summary>
     public sealed partial class ControlForm : DataForm
     {
@@ -297,20 +207,16 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         private DialogPreview? formDialog;
 
-        /// <summary>The live preview of the form's menu, or null.</summary>
-        [ObservableProperty]
-        private MenuResource? formMenu;
-
-        /// <summary>Why the form's values cannot be written, or null.</summary>
+        /// <summary>Why the form's values cannot be written, or null (the host's error line; Apply waits for it to go).</summary>
         [ObservableProperty]
         private string? formError;
 
+        // The form's error follows its values; a dialog, alert or item list also gets a live preview of the dialog.
         private void WatchForm(ResourceForm? form, ResourceNode? node)
         {
             FormDialog = null;
-            FormMenu = null;
             FormError = null;
-            if (form is not DataForm data || node is null)
+            if (form is null || node is null)
             {
                 return;
             }
@@ -320,24 +226,20 @@ namespace ClassicMac.App.ViewModels
             {
                 try
                 {
-                    var bytes = data.BuildData();
+                    var bytes = form.BuildData();
                     FormError = null;
-                    if (data is MenuForm menu)
-                    {
-                        FormMenu = menu.ToMenu();
-                    }
-                    else
+                    if (form is DataForm and not MenuForm)
                     {
                         FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = ScreenDepth }, ReadOptions, [],
                             sources ??= DialogSources.From(Roots));
                     }
                 }
-                catch (ArgumentException e)
+                catch (Exception e) when (e is ArgumentException or OverflowException)
                 {
                     FormError = e.Message;
                 }
             }
-            data.Edited += (_, _) => Update();
+            form.Edited += (_, _) => Update();
             Update();
         }
     }

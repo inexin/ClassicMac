@@ -189,38 +189,11 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        /// <summary>Whether the selection's form is open for editing (in the Preview tab).</summary>
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(EditFormCommand), nameof(CancelFormCommand))]
-        private bool isEditingForm;
-
-        private bool CanEditForm() => Form is not null && Selected is ResourceNode && !IsEditingForm;
-
-        /// <summary>Opens the selection's form for editing, in the Preview tab.</summary>
-        [RelayCommand(CanExecute = nameof(CanEditForm))]
-        private void EditForm()
-        {
-            if (!CanEditForm())
-            {
-                return;
-            }
-
-            IsEditingForm = true;
-            SelectedTab = 1;
-        }
-
-        /// <summary>Drops the form's unapplied values and ends editing.</summary>
-        [RelayCommand(CanExecute = nameof(IsEditingForm))]
-        private void CancelForm()
-        {
-            DiscardDraft();
-            IsEditingForm = false;
-        }
-
         // The header, its Export… and editing follow the selection.
         private void OnSelectionChangedForInspector()
         {
             IsEditingForm = false;
+            LastApplied = null;
             HeaderIconPng = null;
             HeaderIconTask = LoadHeaderIconAsync(Selected);
             OnPropertyChanged(nameof(Header));

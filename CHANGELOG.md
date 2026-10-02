@@ -15,6 +15,17 @@
   status line ("0x000A = 32 · 1 byte changed"), Discard and Apply in the footer; a byte inspector reading the bytes at the
   cursor as UInt8, Int8, UInt16/Int16/UInt32 BE, OSType and binary; Go to a hex offset. When editing ends on a resource
   with a preview, the preview shows again. The inspector shows a byte's meaning when a meaning provider is set (for E8).
+- Editor: every resource form opens read only in the Preview tab and is edited in place: Edit (or a double-click on
+  a row, which edits with that row selected) shows the inputs under a CmAccent line and the footer's hint, error line,
+  Cancel and Apply; Esc cancels, Ctrl+Enter applies; Apply makes one undoable edit, is disabled while the values have
+  an error, and leaves "Applied · Undo … (Ctrl+Z)" in the read-only footer. Leaving with unapplied values still asks
+  (E1).
+- Editor: the menu form reads as a summary and a table (#, text, ⌘ key, mark, icon, style, enabled; dividers as a
+  rule, disabled items muted) beside the live preview; editing has Add item, Add divider, a mark select (none, ✓, •,
+  ◆), toggles for all seven style bits (B, I, U, and Outline, Shadow, Condense, Extend under More; other bits kept),
+  and marks a Command key used twice on both key fields with the error "Item 4 (“Save As…”) uses ⌘S, already used by
+  item 3 (“Save”)."; selecting a row highlights its item in the preview and a click in the preview selects the row
+  (E2).
 - Viewer: the inspector header's tile shows the selection's large icon drawn 1:1 at any display scaling: an icon
   resource's family at 32 × 32 (16 when it has only small members), a cicn fitted into 32, a cursor, or a file's
   Finder icon at 32; the kind icon otherwise. Icon families list their members ("ICN# · icl8 · ics#", or an icns's

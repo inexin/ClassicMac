@@ -374,6 +374,165 @@
       <Setter Property="Opacity" Value="0.4" />
     </Style>
 
+    <!-- The read-then-edit host (boards/read-then-edit.md, E1): the footer on CmSidebarBackground under a CmDivider
+         line; while editing, a 3 px CmAccent line over the values; Apply greyed while the values have an error. -->
+    <Style Selector="Border.host-footer">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Padding" Value="16,10" />
+      <Setter Property="MinHeight" Value="50" />
+    </Style>
+    <Style Selector="Border.host-footer TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.applied">
+      <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    </Style>
+    <Style Selector="TextBlock.form-error">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+      <Setter Property="FontWeight" Value="Medium" />
+    </Style>
+    <Style Selector="PathIcon.lock">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.host-values">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="DockPanel.form-host.editing Border.host-values">
+      <Setter Property="BorderThickness" Value="0,3,0,0" />
+    </Style>
+    <Style Selector="ContentControl.form-content">
+      <Setter Property="Margin" Value="16,12" />
+    </Style>
+    <Style Selector="Grid.menu-form">
+      <Setter Property="Margin" Value="-16,-12" />
+    </Style>
+
+    <!-- The menu form (E2): summary, table rows 32 high with CmDivider between, the selected row CmRowHighlight with a
+         3 px CmAccent bar, disabled items muted, dividers as a short rule; key fields that clash in CmError on
+         CmErrorTint; the preview panel 420 wide. -->
+    <Style Selector="StackPanel.menu-table :is(Control).editing">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="StackPanel.menu-table.editing :is(Control).editing">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="StackPanel.menu-table.editing :is(Control).read-only">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="WrapPanel.menu-summary > TextBlock, WrapPanel.menu-fields > :is(Control)">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,8,4" />
+    </Style>
+    <Style Selector="WrapPanel.menu-summary > TextBlock.value">
+      <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+      <Setter Property="Margin" Value="0,0,20,4" />
+    </Style>
+    <Style Selector="Grid.menu-columns">
+      <Setter Property="Margin" Value="11,0,8,4" />
+    </Style>
+    <Style Selector="Border.menu-row">
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="Padding" Value="11,2,8,2" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.menu-row.selected">
+      <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    </Style>
+    <Style Selector="Border.menu-row Border.bar">
+      <Setter Property="Width" Value="3" />
+      <Setter Property="Margin" Value="-11,-2,0,-2" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Background" Value="{DynamicResource CmAccent}" />
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.menu-row.selected Border.bar">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Border.menu-row Grid.read-only > TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.menu-row.dimmed Grid.read-only TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="Border.menu-row StackPanel.divider-mark">
+      <Setter Property="IsVisible" Value="False" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.menu-row.divider StackPanel.divider-mark">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="Border.menu-row.divider TextBlock.item-text">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Border.rule">
+      <Setter Property="Width" Value="28" />
+      <Setter Property="Height" Value="1" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource CmBorder}" />
+    </Style>
+    <Style Selector="Border.menu-row Grid.editing > :is(Control)">
+      <Setter Property="Margin" Value="0,0,6,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBox.conflict">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmError}" />
+      <Setter Property="Background" Value="{DynamicResource CmErrorTint}" />
+    </Style>
+    <Style Selector="Button.row-tool">
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="FontSize" Value="9" />
+    </Style>
+    <Style Selector="Button.row-tool.remove">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
+    </Style>
+    <Style Selector="WrapPanel.menu-fields > StackPanel">
+      <Setter Property="Orientation" Value="Horizontal" />
+      <Setter Property="Spacing" Value="6" />
+    </Style>
+    <Style Selector="WrapPanel.menu-fields > StackPanel > TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.strong">
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="Button.row-tool.remove /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource CmError}" />
+    </Style>
+    <Style Selector=":is(Button).style-bit">
+      <Setter Property="MinWidth" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.style-bit.more.on /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    </Style>
+    <Style Selector="Border.preview-panel">
+      <Setter Property="MaxWidth" Value="420" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+      <Setter Property="BorderThickness" Value="1,0,0,0" />
+    </Style>
+    <Style Selector="Border.preview-header">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector="TextBlock.strong">
+      <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    </Style>
+
     <!-- View ▸ Screen Depth: one radio item per depth. -->
     <Style Selector="MenuItem.depths > MenuItem" x:DataType="vm:ScreenDepthChoice">
       <Setter Property="Header" Value="{Binding Label}" />
@@ -766,7 +925,7 @@
 
           <TabItem Header="Preview">
             <Panel>
-            <DockPanel IsVisible="{Binding !IsEditingForm}">
+            <DockPanel IsVisible="{Binding !ShowsForm}">
               <Panel>
                 <TextBlock Text="{Binding Preview.Message}" Margin="16" Classes="muted" IsVisible="{Binding Preview.IsMessage}" />
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Preview.IsImage}">
@@ -847,23 +1006,43 @@
                 </DockPanel>
               </Panel>
             </DockPanel>
-              <DockPanel x:Name="FormEditor" Margin="16,12" IsVisible="{Binding IsEditingForm}">
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
-                  <Button Content="Cancel" Command="{Binding CancelFormCommand}" />
-                  <Button Classes="accent" Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" />
-                  <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
-                  <TextBlock Text="Apply makes an undoable edit; File ▸ Save writes the file." Classes="muted" VerticalAlignment="Center" />
-                  <TextBlock Text="{Binding FormError}" Classes="error" VerticalAlignment="Center" />
-                </StackPanel>
+              <!-- The read-then-edit host (boards/read-then-edit.md, E1; FormHost.cs): every form, read only first, then
+                   in place with Cancel and Apply. Esc cancels and Ctrl+Enter applies (MainWindow.Host.cs); a double-click
+                   on a "form-row" edits with that row selected. -->
+              <DockPanel x:Name="FormHost" Classes="form-host" Classes.editing="{Binding IsEditingForm}" IsVisible="{Binding ShowsForm}">
+                <Border x:Name="FormFooter" DockPanel.Dock="Bottom" Classes="host-footer">
+                  <Panel>
+                    <StackPanel x:Name="ReadOnlyFooter" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditingForm}">
+                      <PathIcon Classes="lock" Data="M4,7 V5 A4,4 0 0 1 12,5 V7 H13 V15 H3 V7 Z M6,7 H10 V5 A2,2 0 0 0 6,5 Z" />
+                      <TextBlock Text="{Binding FormReadOnlyNote}" Classes="muted" />
+                      <TextBlock Text="{Binding LastApplied}" Classes="applied" IsVisible="{Binding LastApplied, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    </StackPanel>
+                    <DockPanel x:Name="EditingFooter" IsVisible="{Binding IsEditingForm}">
+                      <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Cancel" Command="{Binding CancelFormCommand}" ToolTip.Tip="Esc" />
+                        <Button Classes="accent" Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" ToolTip.Tip="Ctrl+Enter" />
+                      </StackPanel>
+                      <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                          <TextBlock Text="{Binding FormHint}" Classes="muted" VerticalAlignment="Center" />
+                          <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
+                        </StackPanel>
+                        <StackPanel x:Name="FormErrorLine" Orientation="Horizontal" Spacing="6"
+                                    IsVisible="{Binding FormError, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          <views:SeverityIcon Severity="Error" Width="12" Height="12" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding FormError}" Classes="error form-error" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </StackPanel>
+                    </DockPanel>
+                  </Panel>
+                </Border>
+                <Border Classes="host-values">
+                <DockPanel>
                 <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="560"
                               IsVisible="{Binding FormDialog, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <views:DialogView Dialog="{Binding FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
-                <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="400"
-                              IsVisible="{Binding FormMenu, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <views:MenuView Menu="{Binding FormMenu}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
-                </ScrollViewer>
-                <ContentControl Content="{Binding Form}">
+                <ContentControl Classes="form-content" Content="{Binding Form}">
                   <ContentControl.DataTemplates>
                     <DataTemplate DataType="vm:StringForm">
                       <StackPanel Spacing="6">
@@ -1021,45 +1200,141 @@
                         </ScrollViewer>
                       </DockPanel>
                     </DataTemplate>
+                    <!-- The menu form (boards/read-then-edit.md, E2): a summary and a table read only, inputs while
+                         editing; the live preview on the right, its highlighted item the selected row. -->
                     <DataTemplate DataType="vm:MenuForm">
-                      <DockPanel>
-                        <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="Title" VerticalAlignment="Center" Width="120" />
-                            <TextBox Text="{Binding Title}" Width="200" />
-                            <CheckBox Content="Menu enabled" IsChecked="{Binding Enabled}" />
+                      <Grid x:Name="MenuForm" Classes="menu-form" ColumnDefinitions="2*,*">
+                        <Border Grid.Column="1" Classes="preview-panel">
+                          <DockPanel>
+                            <Border DockPanel.Dock="Top" Classes="preview-header">
+                              <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Classes="muted" Text="2× · Mac OS 8/9" />
+                                <TextBlock x:Name="PreviewTitle" Classes="strong"
+                                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormPreviewTitle, FallbackValue=Preview}" />
+                              </DockPanel>
+                            </Border>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{DynamicResource CmCheckerboard}">
+                              <views:MenuView x:Name="MenuPreview" Menu="{Binding Preview}" SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="2"
+                                              HorizontalAlignment="Left" VerticalAlignment="Top" />
+                            </ScrollViewer>
+                          </DockPanel>
+                        </Border>
+                        <ScrollViewer Padding="18,12">
+                          <StackPanel Spacing="12">
+                            <WrapPanel Classes="menu-summary" IsVisible="{Binding !IsEditing}">
+                              <TextBlock Classes="muted" Text="Menu title" />
+                              <TextBlock Classes="value" Text="{Binding Title}" />
+                              <TextBlock Classes="muted" Text="Enabled" />
+                              <TextBlock Classes="value" Text="{Binding EnabledText}" />
+                              <TextBlock Classes="muted" Text="Menu ID" />
+                              <TextBlock Classes="value mono" Text="{Binding IdText}" />
+                              <TextBlock Classes="muted" Text="MDEF" />
+                              <TextBlock Classes="value mono" Text="{Binding DefinitionText}" />
+                            </WrapPanel>
+                            <WrapPanel Classes="menu-fields" IsVisible="{Binding IsEditing}">
+                              <StackPanel>
+                                <TextBlock Classes="muted" Text="Title" />
+                                <TextBox Text="{Binding Title}" Width="180" AutomationProperties.Name="Menu title" />
+                              </StackPanel>
+                              <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
+                              <StackPanel>
+                                <TextBlock Classes="muted" Text="Menu ID" />
+                                <NumericUpDown Classes="mono" Value="{Binding Id}" FormatString="0" Width="80" ShowButtonSpinner="False"
+                                               Minimum="-32768" Maximum="32767" AutomationProperties.Name="Menu ID" />
+                              </StackPanel>
+                              <StackPanel>
+                                <TextBlock Classes="muted" Text="MDEF" />
+                                <NumericUpDown Classes="mono" Value="{Binding Definition}" FormatString="0" Width="80" ShowButtonSpinner="False"
+                                               Minimum="-32768" Maximum="32767" AutomationProperties.Name="MDEF" />
+                              </StackPanel>
+                            </WrapPanel>
+                            <StackPanel Classes="menu-table" Classes.editing="{Binding IsEditing}">
+                              <Grid Classes="menu-columns read-only" ColumnDefinitions="28,*,52,44,40,120,60">
+                                <TextBlock Classes="caption" Text="#" />
+                                <TextBlock Grid.Column="1" Classes="caption" Text="TEXT" />
+                                <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
+                                <TextBlock Grid.Column="3" Classes="caption" Text="MARK" />
+                                <TextBlock Grid.Column="4" Classes="caption" Text="ICON" />
+                                <TextBlock Grid.Column="5" Classes="caption" Text="STYLE" />
+                                <TextBlock Grid.Column="6" Classes="caption" Text="ENABLED" />
+                              </Grid>
+                              <Grid Classes="menu-columns editing" ColumnDefinitions="28,*,40,84,40,126,28,28">
+                                <TextBlock Grid.Column="1" Classes="caption" Text="TEXT" />
+                                <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
+                                <TextBlock Grid.Column="3" Classes="caption" Text="MARK" />
+                                <TextBlock Grid.Column="4" Classes="caption" Text="ICON" />
+                                <TextBlock Grid.Column="5" Classes="caption" Text="STYLE" />
+                                <TextBlock Grid.Column="6" Classes="caption" Text="ON" />
+                              </Grid>
+                              <ItemsControl x:Name="MenuRows" ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate DataType="vm:MenuItemRow">
+                                    <Border Classes="menu-row form-row" Classes.selected="{Binding IsSelected}" Classes.dimmed="{Binding IsDimmed}"
+                                            Classes.divider="{Binding IsDivider}">
+                                      <Panel>
+                                        <Border Classes="bar" />
+                                        <Grid Classes="read-only" ColumnDefinitions="28,*,52,44,40,120,60">
+                                          <TextBlock Classes="muted mono" Text="{Binding Number}" />
+                                          <TextBlock Grid.Column="1" Classes="item-text" Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+                                          <StackPanel Grid.Column="1" Classes="divider-mark" Orientation="Horizontal" Spacing="8">
+                                            <Border Classes="rule" />
+                                            <TextBlock Classes="muted" Text="divider" />
+                                          </StackPanel>
+                                          <TextBlock Grid.Column="2" Classes="mono cell" Text="{Binding KeyText}" />
+                                          <TextBlock Grid.Column="3" Classes="cell" Text="{Binding MarkText}" />
+                                          <TextBlock Grid.Column="4" Classes="mono cell" Text="{Binding IconText}" />
+                                          <TextBlock Grid.Column="5" Classes="cell" Text="{Binding StyleText}" TextTrimming="CharacterEllipsis" />
+                                          <TextBlock Grid.Column="6" Classes="cell" Text="{Binding EnabledText}" />
+                                        </Grid>
+                                        <Grid Classes="editing" ColumnDefinitions="28,*,40,84,40,126,28,28">
+                                          <StackPanel Classes="move">
+                                            <Button Classes="flat row-tool" Content="▲" ToolTip.Tip="Move up" AutomationProperties.Name="Move up"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                                            <Button Classes="flat row-tool" Content="▼" ToolTip.Tip="Move down" AutomationProperties.Name="Move down"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
+                                          </StackPanel>
+                                          <TextBox Grid.Column="1" Text="{Binding Text}" AutomationProperties.Name="Text" />
+                                          <TextBox Grid.Column="2" Classes="mono key" Classes.conflict="{Binding HasKeyConflict}" Text="{Binding Key}"
+                                                   HorizontalContentAlignment="Center" AutomationProperties.Name="Command key" />
+                                          <ComboBox Grid.Column="3" ItemsSource="{Binding MarkChoices}" SelectedItem="{Binding MarkChoice}" AutomationProperties.Name="Mark" />
+                                          <NumericUpDown Grid.Column="4" Classes="mono" Value="{Binding Icon}" FormatString="0" ShowButtonSpinner="False"
+                                                         Minimum="0" Maximum="255" AutomationProperties.Name="Icon" />
+                                          <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="2">
+                                            <ToggleButton Classes="style-bit" Content="B" FontWeight="Bold" IsChecked="{Binding Bold}" ToolTip.Tip="Bold" />
+                                            <ToggleButton Classes="style-bit" Content="I" FontStyle="Italic" IsChecked="{Binding Italic}" ToolTip.Tip="Italic" />
+                                            <ToggleButton Classes="style-bit" ToolTip.Tip="Underline" IsChecked="{Binding Underline}">
+                                              <TextBlock Text="U" TextDecorations="Underline" />
+                                            </ToggleButton>
+                                            <Button Classes="style-bit more" Classes.on="{Binding HasMoreStyles}" Content="More" ToolTip.Tip="Outline, Shadow, Condense, Extend">
+                                              <Button.Flyout>
+                                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                                  <StackPanel Spacing="4">
+                                                    <CheckBox Content="Outline" IsChecked="{Binding Outline}" />
+                                                    <CheckBox Content="Shadow" IsChecked="{Binding Shadow}" />
+                                                    <CheckBox Content="Condense" IsChecked="{Binding Condense}" />
+                                                    <CheckBox Content="Extend" IsChecked="{Binding Extend}" />
+                                                  </StackPanel>
+                                                </Flyout>
+                                              </Button.Flyout>
+                                            </Button>
+                                          </StackPanel>
+                                          <CheckBox Grid.Column="6" IsChecked="{Binding Enabled}" AutomationProperties.Name="Enabled" />
+                                          <Button Grid.Column="7" Classes="flat row-tool remove" Content="×" ToolTip.Tip="Remove" AutomationProperties.Name="Remove"
+                                                  Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                                        </Grid>
+                                      </Panel>
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <StackPanel Classes="editing" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                <Button Content="Add item" Command="{Binding AddCommand}" />
+                                <Button Content="Add divider" Command="{Binding AddDividerCommand}" />
+                              </StackPanel>
+                            </StackPanel>
                           </StackPanel>
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="Menu ID" VerticalAlignment="Center" Width="120" />
-                            <NumericUpDown Value="{Binding Id}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
-                            <TextBlock Text="MDEF" VerticalAlignment="Center" />
-                            <NumericUpDown Value="{Binding Definition}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
-                          </StackPanel>
-                        </StackPanel>
-                        <Button DockPanel.Dock="Bottom" Content="Add Item" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto">
-                          <ItemsControl ItemsSource="{Binding Items}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate DataType="vm:MenuItemRow">
-                                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2">
-                                  <TextBox Text="{Binding Text}" Width="200" />
-                                  <CheckBox Content="enabled" IsChecked="{Binding Enabled}" />
-                                  <TextBlock Text="key" VerticalAlignment="Center" />
-                                  <TextBox Text="{Binding Key}" Width="50" />
-                                  <TextBlock Text="mark" VerticalAlignment="Center" />
-                                  <TextBox Text="{Binding Mark}" Width="80" />
-                                  <TextBlock Text="icon" VerticalAlignment="Center" />
-                                  <NumericUpDown Value="{Binding Icon}" FormatString="0" Width="56" ShowButtonSpinner="False" Minimum="0" Maximum="255" />
-                                  <TextBlock Text="style" VerticalAlignment="Center" />
-                                  <NumericUpDown Value="{Binding Face}" FormatString="0" Width="56" ShowButtonSpinner="False" Minimum="0" Maximum="127" />
-                                  <Button Content="↑" Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
-                                  <Button Content="Remove" Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
-                                </StackPanel>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
                         </ScrollViewer>
-                      </DockPanel>
+                      </Grid>
                     </DataTemplate>
                     <DataTemplate DataType="vm:ControlForm">
                       <StackPanel Spacing="8">
@@ -1133,6 +1408,8 @@
                     </DataTemplate>
                   </ContentControl.DataTemplates>
                 </ContentControl>
+                </DockPanel>
+                </Border>
               </DockPanel>
             </Panel>
           </TabItem>

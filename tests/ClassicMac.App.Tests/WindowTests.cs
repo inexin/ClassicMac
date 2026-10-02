@@ -649,6 +649,115 @@ public class WindowTests
         }
     });
 
+    // The read-then-edit host with the menu form (design/boards/read-then-edit.md, E1 and E2): read only first, a
+    // double-click on a row edits with it selected, rows and the preview select each other, a duplicate Command key shows
+    // on both key fields with Apply disabled, Esc cancels and Ctrl+Enter applies.
+    [Fact]
+    public void The_menu_form_reads_then_edits_in_place() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Menus.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("MENU", 129, null, InterfaceWriter.WriteMenu(MenuFormTests.File()))));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            var menu = Assert.IsType<MenuForm>(model.Form);
+            var host = window.FindControl<DockPanel>("FormHost")!;
+            Assert.True(host.IsEffectivelyVisible);
+            Assert.True(window.FindControl<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
+            Assert.False(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
+            var rows = host.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("menu-row")).ToList();
+            Assert.Equal(5, rows.Count);
+            Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);   // read only
+            Assert.Contains(rows[0].GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Open…" && t.IsEffectivelyVisible);
+            Assert.Contains(rows[1].GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "divider" && t.IsEffectivelyVisible);
+            Capture(window, "menu-form", baselines);
+
+            // A double-click on the third row: editing, with that row selected and highlighted in the preview.
+            var cell = rows[2].GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "Save");
+            cell.RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.DoubleTappedEvent, null!));
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsEditingForm);
+            Assert.Same(menu.Items[2], menu.SelectedItem);
+            var preview = host.GetVisualDescendants().OfType<MenuView>().Single();
+            Assert.Equal(2, preview.SelectedIndex);
+            Assert.Contains("selected", rows[2].Classes);
+            Assert.True(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
+            Assert.Equal("Live preview · unapplied changes", host.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "PreviewTitle").Text);
+
+            // The preview selects its row: an item under a click.
+            preview.SelectedIndex = 4;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(menu.Items[4], menu.SelectedItem);
+            Assert.Contains("selected", rows[4].Classes);
+            Assert.DoesNotContain("selected", rows[2].Classes);
+
+            // ⌘S twice: both key fields marked, the error shown, Apply disabled.
+            menu.Items[3].Key = "S";
+            Dispatcher.UIThread.RunJobs();
+            var keys = host.GetVisualDescendants().OfType<TextBox>().Where(t => t.Classes.Contains("key")).ToList();
+            Assert.Equal([false, false, true, true, false], keys.Select(k => k.Classes.Contains("conflict")));
+            Assert.True(window.FindControl<StackPanel>("FormErrorLine")!.IsEffectivelyVisible);
+            var apply = window.FindControl<DockPanel>("EditingFooter")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Apply");
+            Assert.False(apply.IsEffectivelyEnabled);
+            Capture(window, "menu-form-editing", baselines);
+
+            // Esc in a text box cancels: read only again, the draft gone.
+            var text = host.GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible);
+            text.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(model.IsEditingForm);
+            Assert.False(model.HasDraft);
+
+            // Edit again, change the title, Ctrl+Enter applies one undoable edit.
+            model.EditFormCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.IsType<MenuForm>(model.Form).Title = "Fichier";
+            text = host.GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible);
+            text.RaiseEvent(new Avalonia.Input.KeyEventArgs
+            {
+                RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter, KeyModifiers = Avalonia.Input.KeyModifiers.Control,
+            });
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(model.IsEditingForm);
+            Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.LastApplied);
+            Assert.Contains(window.FindControl<StackPanel>("ReadOnlyFooter")!.GetVisualDescendants().OfType<TextBlock>(),
+                t => t.Text == model.LastApplied && t.IsEffectivelyVisible);
+            window.Close();
+            Baselines.Verify(baselines);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
+    [Fact]
+    public void The_menu_preview_finds_the_item_under_a_point() => OnUiThread(() =>
+    {
+        var view = new MenuView { Menu = MenuFormTests.File(), Scale = 2 };
+        var window = new Window { Content = view };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        // Items start below the 12-pixel gutter and the 20-pixel title strip, 16 pixels each, at 2 DIPs per Mac pixel.
+        Assert.Equal(-1, view.ItemAt(new Point(40, 30)));
+        Assert.Equal(0, view.ItemAt(new Point(40, 2 * (32 + 1))));
+        Assert.Equal(2, view.ItemAt(new Point(40, 2 * (32 + 33))));
+        Assert.Equal(-1, view.ItemAt(new Point(40, 2 * (32 + 5 * 16 + 1))));
+        Assert.Equal(-1, view.ItemAt(new Point(2, 2 * (32 + 1))));
+        Assert.Equal(-1, new MenuView().ItemAt(default));
+        window.Close();
+    });
+
     // "Show item" on the selected diagnostic (design/boards/diagnostics.md) scrolls the tree to its node and focuses it;
     // the link shows on the selected row only, and the panel has its drag handle.
     [Fact]

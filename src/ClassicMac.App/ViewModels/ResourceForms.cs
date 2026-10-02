@@ -20,6 +20,39 @@ namespace ClassicMac.App.ViewModels
 
         public Resource Resource { get; }
 
+        // ---- The read-then-edit host's side of a form (see FormHost.cs) ----
+
+        /// <summary>Whether the host is editing the form (inputs) or showing it read only. The host sets it.</summary>
+        public bool IsEditing
+        {
+            get => isEditing;
+            internal set
+            {
+                // Not an edit of the values: no Edited, so the draft and the preview are left alone.
+                if (isEditing != value)
+                {
+                    isEditing = value;
+                    base.OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs(nameof(IsEditing)));
+                }
+            }
+        }
+
+        private bool isEditing;
+
+        /// <summary>
+        /// Whether the form has a read-only view of its own (its template shows values when <see cref="IsEditing"/> is
+        /// false); without one the host shows the resource's plain preview until Edit.
+        /// </summary>
+        public virtual bool HasReadOnlyView => false;
+
+        /// <summary>The hint in the host's footer while editing.</summary>
+        public virtual string EditHint => "Esc cancels, Ctrl+Enter applies.";
+
+        /// <summary>Selects the row a double-click started editing on (a no-op for forms without rows).</summary>
+        public virtual void SelectRow(object? row)
+        {
+        }
+
         /// <summary>The resource's bytes for the form's values (throws <see cref="ArgumentException"/> for values it cannot hold).</summary>
         public abstract byte[] BuildData();
 
@@ -34,8 +67,14 @@ namespace ClassicMac.App.ViewModels
         protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
         {
             base.OnPropertyChanged(e);
-            RaiseEdited();
+            if (IsValue(e.PropertyName))
+            {
+                RaiseEdited();
+            }
         }
+
+        /// <summary>Whether a property holds one of the resource's values (an edit), not the view's state (a selection, a preview).</summary>
+        protected virtual bool IsValue(string? propertyName) => true;
 
         // A list whose items' and own changes count as edits.
         protected void Watch<T>(ObservableCollection<T> list) where T : System.ComponentModel.INotifyPropertyChanged
@@ -221,7 +260,11 @@ namespace ClassicMac.App.ViewModels
 
         public bool HasForm => Form is not null;
 
-        partial void OnFormChanged(ResourceForm? value) => OnPropertyChanged(nameof(HasForm));
+        partial void OnFormChanged(ResourceForm? value)
+        {
+            OnPropertyChanged(nameof(HasForm));
+            HostForm(value);
+        }
 
         private void UpdateForm(NodeViewModel? node)
         {
@@ -292,7 +335,7 @@ namespace ClassicMac.App.ViewModels
         private bool hasTemplateChoice;
 
 
-        private bool CanApplyForm() => Form is not null && Selected is ResourceNode;
+        private bool CanApplyForm() => Form is not null && Selected is ResourceNode && FormError is null;
 
         [RelayCommand(CanExecute = nameof(CanApplyForm))]
         private void ApplyForm()
@@ -317,6 +360,7 @@ namespace ClassicMac.App.ViewModels
             form.MarkClean();
             Execute(owner, edit, () => resource);
             IsEditingForm = false;
+            LastApplied = $"Applied · {UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
         }
     }
 }

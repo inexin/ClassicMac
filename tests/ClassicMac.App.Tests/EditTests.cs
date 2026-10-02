@@ -29,7 +29,7 @@ public sealed partial class EditTests : IDisposable
             Task.FromResult<string?>(Path.Combine(folder, suggestedName));
     }
 
-    private sealed class Dialogs : IEditDialogs
+    internal sealed class Dialogs : IEditDialogs
     {
         public Func<ResourceInfo, ResourceInfo?> Info { get; set; } = i => i;
         public SaveChanges Choice { get; set; } = SaveChanges.Discard;
