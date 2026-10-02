@@ -122,6 +122,10 @@ public enum M68kRegisterKind
     FloatingPointControl,
     /// <summary>A 68040 cache of <c>cinv</c>/<c>cpush</c>: 1 DC, 2 IC, 3 BC (both).</summary>
     Cache,
+    /// <summary>A 68030/68851 PMMU register of <c>pmove</c>; the number is bits 15–10 of its extension word (the
+    /// format and register fields): $02 TT0, $03 TT1, $10 TC, $11 DRP, $12 SRP, $13 CRP, $14 CAL, $15 VAL, $16 SCC,
+    /// $17 AC, $18 MMUSR (the 68851's PSR), $19 PCSR, $1C BADn and $1D BACn with n × 64 added.</summary>
+    MemoryManagement,
 }
 
 /// <summary>A register.</summary>

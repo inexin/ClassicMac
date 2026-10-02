@@ -17,9 +17,11 @@ namespace ClassicMac.Code.Disassembly;
 /// <c>extb.l</c>, bit fields, <c>rtd</c>, <c>link.l</c>, <c>cas</c>/<c>cas2</c>, <c>chk2</c>/<c>cmp2</c>,
 /// <c>pack</c>/<c>unpk</c>, <c>trapcc</c>, long branches, full-extension-word addressing with scale and memory
 /// indirection, <c>callm</c>/<c>rtm</c>), the 68010's <c>movec</c>/<c>moves</c>, the 68040's
-/// <c>cinv</c>/<c>cpush</c>/<c>move16</c>/<c>pflush</c>/<c>ptest</c>, and the 68881/68882 FPU (coprocessor 1). A-line
-/// words ($Axxx) are Mac OS traps. Other words, and instructions with an addressing mode they do not allow, are
-/// <c>dc.w</c>. [Doc: M68000 Family Programmer's Reference Manual (Motorola)]
+/// <c>cinv</c>/<c>cpush</c>/<c>move16</c>/<c>pflush</c>/<c>ptest</c>, the 68881/68882 FPU (coprocessor 1) and the
+/// 68030 MMU and 68851 PMMU (coprocessor 0: <c>pmove</c>, <c>pflush</c>, <c>pload</c>, <c>ptest</c>, <c>pvalid</c>,
+/// the PMMU's conditionals, <c>psave</c>/<c>prestore</c>). A-line words ($Axxx) are Mac OS traps. Other words
+/// (among them the CPU32's <c>tbl</c> and <c>bgnd</c>, which no Macintosh processor has), and instructions with an
+/// addressing mode they do not allow, are <c>dc.w</c>. [Doc: M68000 Family Programmer's Reference Manual (Motorola)]
 /// </summary>
 public static class M68kDisassembler
 {
@@ -95,6 +97,11 @@ public static class M68kDisassembler
         "f", "eq", "ogt", "oge", "olt", "ole", "ogl", "or", "un", "ueq", "ugt", "uge", "ult", "ule", "ne", "t",
         "sf", "seq", "gt", "ge", "lt", "le", "gl", "gle", "ngle", "ngl", "nle", "nlt", "nge", "ngt", "sne", "st",
     ];
+
+    // The 68851's PMMU conditions [Doc: MC68851 PMMU User's Manual, 6]: B bus error, L limit, S supervisor, A access
+    // level, W write protected, I invalid, G gate, C globally shared; each set or clear.
+    private static readonly string[] MmuConditions =
+        ["bs", "bc", "ls", "lc", "ss", "sc", "as", "ac", "ws", "wc", "is", "ic", "gs", "gc", "cs", "cc"];
 
     private static readonly string[] BitOps = ["btst", "bchg", "bclr", "bset"];
     private static readonly string[] Shifts = ["asr", "asl", "lsr", "lsl", "roxr", "roxl", "ror", "rol"];
@@ -710,6 +717,8 @@ public static class M68kDisassembler
         private M68kInstruction? LineF(ushort op, int a, int b, int m, int xn)
         {
             flags |= M68kFlags.FLine;
+            if (a == 0)
+                return Mmu(op, b, m, xn);
             if (a == 1)
                 return Fpu(op, b, m, xn);
             // resource_dasm decodes no F-line word other than the FPU's; the rest is from the MC68040 User's Manual.
@@ -745,6 +754,192 @@ public static class M68kDisassembler
                 return (opmode & 1) == 0 ? Make("move16", M68kSize.None, an, abs) : Make("move16", M68kSize.None, abs, an);
             }
             return null;
+        }
+
+        // ---- coprocessor 0: the 68030's MMU and the 68851 PMMU [Doc: MC68030 User's Manual, 9; MC68851 Paged
+        // Memory Management Unit User's Manual, 6]. A word that is an instruction on either processor is decoded:
+        // the 68851's wider forms (4-bit masks and function codes, every addressing mode for pmove) and the 68030's
+        // own (TT0/TT1, pmovefd, which allow control alterable modes only). ----
+
+        private M68kInstruction? Mmu(ushort op, int b, int m, int xn)
+        {
+            switch (b)
+            {
+                case 0:
+                    return MmuGeneral(op, m, xn);
+                case 1:
+                {
+                    // pscc, pdbcc, ptrapcc (68851): the condition is the extension word's bits 5-0, 0-15.
+                    ushort ext = r.ReadUInt16();
+                    if ((ext & 0xFFF0) != 0)
+                        return null;
+                    string cc = MmuConditions[ext];
+                    if (m == 1)
+                    {
+                        // pdbcc: the displacement is from its own word, as fdbcc's.
+                        uint target = unchecked(PcHere() + (uint)r.ReadInt16());
+                        flags |= M68kFlags.Branch | M68kFlags.Conditional;
+                        AddFlowReference(target, M68kReferenceKind.Branch);
+                        return Make("pdb" + cc, M68kSize.None, Dr(xn), new M68kBranchTarget(target));
+                    }
+                    if (m == 7 && xn is >= 2 and <= 4)
+                        return TrapCc("ptrap" + cc, xn);
+                    return ReadEa(m, xn, M68kSize.None) is { IsDataAlterable: true } ea ? Make("ps" + cc, M68kSize.None, ea.Operand) : null;
+                }
+                case 2:
+                case 3:
+                {
+                    // pbcc.w/.l (68851): the condition is the opcode's bits 5-0, 0-15.
+                    if ((op & 0x30) != 0)
+                        return null;
+                    uint pc = PcHere();
+                    int disp = b == 2 ? r.ReadInt16() : r.ReadInt32();
+                    uint target = unchecked(pc + (uint)disp);
+                    flags |= M68kFlags.Branch | M68kFlags.Conditional;
+                    AddFlowReference(target, M68kReferenceKind.Branch);
+                    return Make("pb" + MmuConditions[op & 15], b == 2 ? M68kSize.Word : M68kSize.Long, new M68kBranchTarget(target));
+                }
+                case 4:
+                    return ReadEa(m, xn, M68kSize.None) is { } save && (save.IsControlAlterable || save.Mode == PreDec)
+                        ? Make("psave", M68kSize.None, save.Operand) : null;
+                case 5:
+                    return ReadEa(m, xn, M68kSize.None) is { } restore && (restore.IsControl || restore.Mode == PostInc)
+                        ? Make("prestore", M68kSize.None, restore.Operand) : null;
+                default:
+                    return null;
+            }
+        }
+
+        private M68kInstruction? MmuGeneral(ushort op, int m, int xn)
+        {
+            ushort ext = r.ReadUInt16();
+            int field = (ext >> 10) & 7;
+            bool toMemory = (ext & 0x0200) != 0;
+            switch (ext >> 13)
+            {
+                case 0:
+                    // pmove TT0/TT1 (68030): 000 PPP R FD 00000000.
+                    if (field is not (2 or 3) || (ext & 0xFF) != 0)
+                        return null;
+                    return PMove(field, toMemory, (ext & 0x0100) != 0, M68kSize.Long, true, m, xn);
+                case 1:
+                    return LoadValidFlush(op, ext, field, m, xn);
+                case 2:
+                {
+                    // pmove TC, DRP, SRP, CRP, CAL, VAL, SCC, AC: 010 PPP R FD 00000000; FD is the 68030's, for
+                    // TC, SRP and CRP.
+                    if ((ext & 0xFF) != 0)
+                        return null;
+                    bool fd = (ext & 0x0100) != 0;
+                    if (fd && field is not (0 or 2 or 3))
+                        return null;
+                    var size = field switch { 0 => M68kSize.Long, < 4 => M68kSize.Double, 7 => M68kSize.Word, _ => M68kSize.Byte };
+                    return PMove(0x10 | field, toMemory, fd, size, fd, m, xn);
+                }
+                case 3:
+                {
+                    // pmove MMUSR (PSR), PCSR: 011 PPP R 000000000; BADn, BACn: 011 PPP R 0000 NNN 00.
+                    if (field is 0 or 1)
+                    {
+                        // PCSR is read-only.
+                        if ((ext & 0x01FF) != 0 || (field == 1 && !toMemory))
+                            return null;
+                        return PMove(0x18 | field, toMemory, false, M68kSize.Word, false, m, xn);
+                    }
+                    if (field is not (4 or 5) || (ext & 0x01E3) != 0)
+                        return null;
+                    return PMove((0x18 | field) + (((ext >> 2) & 7) << 6), toMemory, false, M68kSize.Word, false, m, xn);
+                }
+                case 4:
+                {
+                    // ptest: 100 LLL R A RRR FFFFF; the A register only with a level above 0.
+                    int level = field, an = (ext >> 5) & 7;
+                    bool hasAn = (ext & 0x0100) != 0;
+                    if ((hasAn ? level == 0 : an != 0) || FunctionCode(ext) is not { } fc
+                        || ReadEa(m, xn, M68kSize.None) is not { IsControlAlterable: true } ea)
+                        return null;
+                    string name = toMemory ? "ptestr" : "ptestw";
+                    return hasAn
+                        ? Make(name, M68kSize.None, fc, ea.Operand, Quick(level), Ar(an))
+                        : Make(name, M68kSize.None, fc, ea.Operand, Quick(level));
+                }
+                case 5:
+                    // pflushr <ea> (68851): the 64-bit root pointer to flush by.
+                    if (ext != 0xA000 || ReadEa(m, xn, M68kSize.Double) is not { IsMemory: true } root)
+                        return null;
+                    return Make("pflushr", M68kSize.None, root.Operand);
+                default:
+                    return null;
+            }
+        }
+
+        // Extension word 001: pload (mode 000), pvalid (010 VAL, 011 An) and pflush (001 all, 100/101 by function
+        // code, 110/111 by function code and address; the odd modes are the 68851's pflushs).
+        private M68kInstruction? LoadValidFlush(ushort op, ushort ext, int mode, int m, int xn)
+        {
+            if (mode == 0)
+            {
+                // pload: 001000 R 0000 FFFFF
+                if ((ext & 0x01E0) != 0 || FunctionCode(ext) is not { } fc
+                    || ReadEa(m, xn, M68kSize.None) is not { IsControlAlterable: true } ea)
+                    return null;
+                return Make((ext & 0x0200) != 0 ? "ploadr" : "ploadw", M68kSize.None, fc, ea.Operand);
+            }
+            if (mode is 2 or 3)
+            {
+                // pvalid VAL,<ea>: $2800; pvalid An,<ea>: $2C00 + n.
+                if ((mode == 2 ? ext != 0x2800 : (ext & 0xFFF8) != 0x2C00)
+                    || ReadEa(m, xn, M68kSize.None) is not { IsControlAlterable: true } ea)
+                    return null;
+                M68kOperand against = mode == 2 ? new M68kRegisterOperand(M68kRegisterKind.MemoryManagement, 0x15) : Ar(ext & 7);
+                return Make("pvalid", M68kSize.None, against, ea.Operand);
+            }
+            if ((ext & 0x0200) != 0)
+                return null;
+            if (mode == 1)
+                return ext == 0x2400 && (op & 0x3F) == 0 ? Make("pflusha", M68kSize.None) : null;
+            // pflush: 001 MMM 0 MMMM FFFFF; the 68030's mask is 3 bits (bit 8 zero), the 68851's 4.
+            string name = (mode & 1) != 0 ? "pflushs" : "pflush";
+            if (FunctionCode(ext) is not { } code)
+                return null;
+            var mask = Quick((ext >> 5) & 15);
+            if (mode < 6)
+                return (op & 0x3F) == 0 ? Make(name, M68kSize.None, code, mask) : null;
+            return ReadEa(m, xn, M68kSize.None) is { IsControlAlterable: true } at ? Make(name, M68kSize.None, code, mask, at.Operand) : null;
+        }
+
+        // pmove <ea>,MRn or MRn,<ea>. The 68030's forms (TT0/TT1 and pmovefd) take control alterable modes only;
+        // the 68851 takes every mode from memory and alterable ones to it, no address register for a byte register
+        // and no register at all for a 64-bit root pointer.
+        private M68kInstruction? PMove(int register, bool toMemory, bool fd, M68kSize size, bool controlOnly, int m, int xn)
+        {
+            if (fd && toMemory)
+                return null;
+            if (ReadEa(m, xn, toMemory ? M68kSize.None : size) is not { } ea)
+                return null;
+            bool ok = controlOnly
+                ? ea.IsControlAlterable
+                : (!toMemory || ea.IsAlterable)
+                    && !(size == M68kSize.Double && ea.Mode is DReg or AReg)
+                    && !(size == M68kSize.Byte && ea.Mode == AReg)
+                    && !(ea.Operand is M68kImmediate { Size: M68kSize.Byte } imm && imm.Bytes[0] != 0);
+            if (!ok)
+                return null;
+            var mr = new M68kRegisterOperand(M68kRegisterKind.MemoryManagement, register);
+            string name = fd ? "pmovefd" : "pmove";
+            return toMemory ? Make(name, M68kSize.None, mr, ea.Operand) : Make(name, M68kSize.None, ea.Operand, mr);
+        }
+
+        // The function code field of pload, pflush and ptest: 00000 SFC, 00001 DFC, 01RRR Dn, 1DDDD #DDDD (the
+        // 68030 has 10DDD only).
+        private static M68kOperand? FunctionCode(ushort ext)
+        {
+            int fc = ext & 0x1F;
+            if ((fc & 0x10) != 0)
+                return Quick(fc & 15);
+            if ((fc & 0x18) == 0x08)
+                return Dr(fc & 7);
+            return fc <= 1 ? new M68kRegisterOperand(M68kRegisterKind.Control, fc) : null;
         }
 
         private M68kInstruction? Fpu(ushort op, int b, int m, int xn)
@@ -1172,6 +1367,12 @@ public static class M68kDisassembler
         M68kRegisterKind.UserStackPointer => "usp",
         M68kRegisterKind.Control => ControlRegisters[reg.Number],
         M68kRegisterKind.FloatingPointControl => reg.Number switch { 4 => "fpcr", 2 => "fpsr", _ => "fpiar" },
+        M68kRegisterKind.MemoryManagement => (reg.Number & 0x3F) switch
+        {
+            0x02 => "tt0", 0x03 => "tt1", 0x10 => "tc", 0x11 => "drp", 0x12 => "srp", 0x13 => "crp", 0x14 => "cal",
+            0x15 => "val", 0x16 => "scc", 0x17 => "ac", 0x18 => "mmusr", 0x19 => "pcsr",
+            0x1C => "bad" + Decimal(reg.Number >> 6), _ => "bac" + Decimal(reg.Number >> 6),
+        },
         _ => reg.Number switch { 1 => "dc", 2 => "ic", _ => "bc" },
     };
 

@@ -580,7 +580,7 @@ public class M68kDisassemblerTests
     [InlineData("3031 0104")]              // full extension: base displacement size 0
     [InlineData("3031 0114")]              // full extension: I/IS 4
     [InlineData("3031 0155")]              // full extension: index suppressed with I/IS 5
-    [InlineData("F000 0000")]              // 68030 MMU
+    [InlineData("F000 0000")]              // PMMU extension word 000, register 000
     [InlineData("FE00")]                   // coprocessor 7
     [InlineData("F200 007F")]              // unknown FPU operation
     [InlineData("F2A0 0000")]              // FPU condition above 31
