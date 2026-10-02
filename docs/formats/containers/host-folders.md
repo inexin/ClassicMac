@@ -138,19 +138,22 @@ of Finder information as the extended attribute `com.apple.FinderInfo` (and the 
 
 A host file `F/name` is read with the first layout that applies [ClassicMac]:
 
-1. **PC Exchange:** `F` holds a `RESOURCE.FRK` folder or a `FINDER.DAT` file (any case), `name` is not `FINDER.DAT`,
+1. **Basilisk II:** `F/.rsrc/name` or `F/.finf/name` exists. An empty `.rsrc` file is an empty fork. A `.finf` that is
+   not 32 bytes is reported (`host.finf-length`, Warning) and read as far as it goes: a short one padded with zeros, a
+   long one read for its first 32 bytes.
+2. **AppleDouble:** `F/._name` starts with the AppleDouble magic and version 1 or 2 (and has the 26-byte header).
+   Anything else is ignored with `host.appledouble-invalid` (Warning), and the next layout is tried.
+3. **AppleDouble, visible:** `F/name.rsrc` is a valid AppleDouble header. Otherwise it is ignored silently, since
+   plenty of `.rsrc` files are raw forks or other data. `._name` wins when both exist.
+4. **PC Exchange:** `F` holds a `RESOURCE.FRK` folder or a `FINDER.DAT` file (any case), `name` is not `FINDER.DAT`,
    and either `RESOURCE.FRK/name` exists or `FINDER.DAT` has a record for `name`
    ([pc-exchange.md §2.1](../file-systems/pc-exchange.md#21-finding-an-items-record)). The record gives the Mac name,
    Finder information and dates ([pc-exchange.md §2.6](../file-systems/pc-exchange.md#26-dates)); the extension map
    applies if supplied ([pc-exchange.md §2.5](../file-systems/pc-exchange.md#25-types-by-name-ending)); DOS hidden or system
    makes the file invisible.
-2. **Basilisk II:** `F/.rsrc/name` or `F/.finf/name` exists. An empty `.rsrc` file is an empty fork. A `.finf` that is
-   not 32 bytes is reported (`host.finf-length`, Warning) and read as far as it goes: a short one padded with zeros, a
-   long one read for its first 32 bytes.
-3. **AppleDouble:** `F/._name` starts with the AppleDouble magic and version 1 or 2 (and has the 26-byte header).
-   Anything else is ignored with `host.appledouble-invalid` (Warning), and the next layout is tried.
-4. **AppleDouble, visible:** `F/name.rsrc` is a valid AppleDouble header. Otherwise it is ignored silently, since
-   plenty of `.rsrc` files are raw forks or other data. `._name` wins when both exist.
+   It comes after the per-file companions, which name the file itself: a Mac folder may hold a `FINDER.DAT` copied
+   from a DOS disk, and written out with Basilisk II or AppleDouble companions that file is data, not the folder's
+   records.
 5. **macOS named fork:** on macOS only, `name/..namedfork/rsrc` is non-empty.
 6. **Plain:** the data fork only.
 
@@ -395,7 +398,7 @@ files and folders created on the Mac and read on the host, and host files read o
   an NDIF image in a folder: placement, names and `unpack.name-changed`, in both layouts),
   `Existing_files_are_kept_unless_overwriting`, and `Corpus_images_unpack_and_read_back` (the corpus's disk images,
   skipped without `CLASSICMAC_CORPUS`).
-- `tests/ClassicMac.Files.Tests/PcExchangeTests.cs`: the PC Exchange layout (§2.1 step 1).
+- `tests/ClassicMac.Files.Tests/PcExchangeTests.cs`: the PC Exchange layout (§2.1 step 4), and the per-file companions winning over a `FINDER.DAT` in the folder.
 - `tests/ClassicMac.App.Tests/ExportTests.cs`: `A_folder_unpacks_only_its_files`, `A_file_unpacks_alone_as_AppleDouble`;
   `tests/ClassicMac.App.Tests/DragOutTests.cs`: `A_file_drags_out_as_its_data_fork_and_an_AppleDouble_header`.
 

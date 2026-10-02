@@ -56,7 +56,9 @@ namespace ClassicMac.Files
             var hostName = Path.GetFileName(full);
             var file = new MacFile { Name = ToMacName(hostName, basilisk: false, context), DataFork = ForkData.FromFile(full) };
 
-            if (ReadPcExchange(full, directory, hostName, file, context) is { } pcExchange) return pcExchange;
+            // The per-file companions (Basilisk II, AppleDouble) are tried before PC Exchange's folder-wide FINDER.DAT and
+            // RESOURCE.FRK: a Mac folder can hold a FINDER.DAT copied from a DOS disk, and once written out with its
+            // companions that file is data, not the folder's metadata. [ClassicMac]
 
             // Basilisk II: .rsrc and .finf beside the file, same host name.
             var rsrc = Path.Combine(directory, ".rsrc", hostName);
@@ -110,6 +112,8 @@ namespace ClassicMac.Files
                 file = parts with { DataFork = file.DataFork };
                 return new HostFile(file, HostLayout.AppleDouble, [visible]);
             }
+
+            if (ReadPcExchange(full, directory, hostName, file, context) is { } pcExchange) return pcExchange;
 
             // macOS keeps the resource fork as a named fork of the file itself.
             if (OperatingSystem.IsMacOS())

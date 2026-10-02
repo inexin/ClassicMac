@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Host folders: a file's own Basilisk II (`.rsrc`/`.finf`) or AppleDouble companions win over a `FINDER.DAT` or
+  `RESOURCE.FRK` in its folder, so an unpacked Mac folder that holds a `FINDER.DAT` reads back as written
+  (containers/host-folders.md §2.1).
 - Code: a new package, `ClassicMac.Code`, reads classic Mac code: PEF containers (sections, pattern-initialized data,
   the loader's imports, relocations and export hash, transition vectors, traceback tables) and `'cfrg'`
   (`.Ppc`); 68k applications (`'CODE'` 0 and the jump table, near and far segments, the entry point and the bootstrap

@@ -132,6 +132,33 @@ public class PcExchangeTests : IDisposable
         Assert.Equal([1, 2, 3], host.File.ResourceFork.ToArray());
     }
 
+    // A Mac folder that holds a FINDER.DAT file (copied from a DOS disk), unpacked with per-file companions: each
+    // file's own .finf/.rsrc or ._ file describes it, not the folder's FINDER.DAT. (RealmzClassicHD.img's Mails.)
+    [Theory]
+    [InlineData(HostLayout.BasiliskII)]
+    [InlineData(HostLayout.AppleDouble)]
+    public void Per_file_companions_win_over_a_FINDER_DAT_in_the_folder(HostLayout layout)
+    {
+        File.WriteAllBytes(Path.Combine(folder, "FINDER.DAT"),
+            Record("Fantasoft news.eml", "TEXT", "MOSS", 1, 1, 0x7FFFF401, "FANTAS~1EML"));
+        Directory.CreateDirectory(Path.Combine(folder, "RESOURCE.FRK"));
+        File.WriteAllBytes(Path.Combine(folder, "RESOURCE.FRK", "Fantasoft news.eml"), [9, 9]);
+        var file = new MacFile
+        {
+            Name = MacString.FromMacRoman("Fantasoft news.eml"),
+            DataFork = ForkData.FromBytes(new byte[] { 1 }),
+            ResourceFork = ForkData.FromBytes(new byte[] { 1, 2, 3 }),
+            FinderInfo = new FinderInfo { Type = FourCC.FromString("ttro"), Creator = FourCC.FromString("ttxt") },
+        };
+        HostFiles.Write(file, folder, HostWriteOptions.Default with { Layout = layout });
+
+        var host = HostFiles.Read(Path.Combine(folder, "Fantasoft news.eml"));
+
+        Assert.Equal(layout, host.Layout);
+        Assert.Equal(("ttro", "ttxt"), (host.File.FinderInfo.Type.ToString(), host.File.FinderInfo.Creator.ToString()));
+        Assert.Equal([1, 2, 3], host.File.ResourceFork.ToArray());
+    }
+
     [Fact]
     public void Files_without_a_record_or_fork_stay_plain()
     {
