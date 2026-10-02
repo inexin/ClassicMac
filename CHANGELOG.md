@@ -15,6 +15,15 @@
   drawn from a whole device pixel without smoothing, so 1-pixel detail no longer blurs or doubles.
 - Viewer: the app bundles IBM Plex Sans (the default font) and IBM Plex Mono (hex, plain text, the hex dialog; the
   `CmFontSans` and `CmFontMono` resources), so Windows, macOS and Linux show the same type; Inter is no longer used.
+- Viewer: the design tokens (design/TOKENS.md) are the app's colours, light and dark (`Styles/Tokens.axaml`, merged in
+  `App.axaml`): the window, menu, status bar, tree and inspector take their surfaces from them and flip with the
+  theme variant; Fluent's accent and its shades come from CmAccent (F1).
+- Viewer: shared styles in `Styles/ClassicMac.axaml`: `.chrome`, `.pane`, `.sidebar`, `.badge.error` / `.warning` /
+  `.info`, `.segmented`, `.readonly-bar`, `.editing-badge`, `.caption`, `.muted`. Tree, list and tab selection use the
+  CmSelection tokens (inactive while focus is elsewhere), and muted text is a colour (CmTextMuted), not an opacity,
+  reading in CmSelectionText inside a focused selected row (F3).
+- Viewer: the hex cursor, form errors, the template note, the checkerboard behind images and the sound waveform take
+  their colours from the tokens and redraw when the theme changes (F4).
 - Viewer: the first selection after opening a disk no longer freezes the app (20 s on a 500 MB disk): the hex list's
   source never goes null, which made Avalonia walk every line of the previous fork. Only resources with no preview
   (unknown types) have a hex view, which opens for them; the Hex tab is hidden otherwise (Edit Hex… still edits any

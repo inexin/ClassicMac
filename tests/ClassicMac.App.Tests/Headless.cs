@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 
@@ -29,5 +30,18 @@ internal static class Headless
         }
         Assert.True(task.IsCompleted, "timed out");
         Dispatcher.UIThread.RunJobs();
+    }
+
+    public static void Capture(Window window, string name)
+    {
+        var frame = window.CaptureRenderedFrame();
+        Assert.NotNull(frame);
+        Assert.True(frame!.PixelSize.Width > 600);
+        if (Environment.GetEnvironmentVariable("CLASSICMAC_SCREENSHOT") is { Length: > 0 } shot)
+        {
+#pragma warning disable CS0618 // the simple overload is enough for a test snapshot
+            frame.Save(Path.Combine(Path.GetDirectoryName(shot)!, $"{Path.GetFileNameWithoutExtension(shot)}-{name}.png"));
+#pragma warning restore CS0618
+        }
     }
 }

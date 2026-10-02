@@ -83,8 +83,6 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A count, kept in step with its list's items.</summary>
         public bool IsReadOnly => Node.IsCount;
 
-        public double TextOpacity => IsReadOnly ? 0.6 : 1;
-
         public bool Flag
         {
             get => Text == "1";

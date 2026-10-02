@@ -3,11 +3,14 @@
              x:Class="ClassicMac.App.App"
              RequestedThemeVariant="Default">
   <Application.Resources>
-    <!-- The bundled fonts (AppFonts; design/TOKENS.md "Type"). -->
-    <FontFamily x:Key="CmFontSans">avares://ClassicMac/Assets/Fonts#IBM Plex Sans</FontFamily>
-    <FontFamily x:Key="CmFontMono">avares://ClassicMac/Assets/Fonts#IBM Plex Mono</FontFamily>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://ClassicMac/Styles/Tokens.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://ClassicMac/Styles/ClassicMac.axaml" />
   </Application.Styles>
 </Application>

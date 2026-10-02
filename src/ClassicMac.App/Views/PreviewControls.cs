@@ -18,22 +18,6 @@ namespace ClassicMac.App.Views
     {
         public static FuncValueConverter<byte[]?, Bitmap?> FromPng { get; } =
             new(png => png is null ? null : new Bitmap(new MemoryStream(png)));
-
-        // A light checkerboard behind images, so transparent pixels show.
-        public static IBrush Checkerboard { get; } = MakeCheckerboard();
-
-        private static IBrush MakeCheckerboard()
-        {
-            var tile = new DrawingGroup();
-            tile.Children.Add(new GeometryDrawing { Brush = new SolidColorBrush(Color.FromRgb(0xFF, 0xFF, 0xFF)), Geometry = new RectangleGeometry(new Rect(0, 0, 16, 16)) });
-            tile.Children.Add(new GeometryDrawing { Brush = new SolidColorBrush(Color.FromRgb(0xE4, 0xE4, 0xE4)), Geometry = new RectangleGeometry(new Rect(0, 0, 8, 8)) });
-            tile.Children.Add(new GeometryDrawing { Brush = new SolidColorBrush(Color.FromRgb(0xE4, 0xE4, 0xE4)), Geometry = new RectangleGeometry(new Rect(8, 8, 8, 8)) });
-            return new DrawingBrush(tile)
-            {
-                TileMode = TileMode.Tile,
-                DestinationRect = new RelativeRect(0, 0, 16, 16, RelativeUnit.Absolute),
-            };
-        }
     }
 
     /// <summary>Styled text (<c>TEXT</c> + <c>styl</c>) drawn with its fonts, sizes, faces and colours.</summary>
@@ -158,17 +142,19 @@ namespace ClassicMac.App.Views
         }
     }
 
-    /// <summary>A sound's waveform: one lane per channel, the lowest and highest sample under each pixel column.</summary>
+    /// <summary>
+    /// A sound's waveform: one lane per channel, the lowest and highest sample under each pixel column. Drawn from the
+    /// theme's tokens (boards/sound.md): CmPaneBackground behind, CmDivider centre line, CmAccent wave; redrawn when the
+    /// theme variant changes.
+    /// </summary>
     internal sealed class WaveformView : Control
     {
         public static readonly StyledProperty<DecodedSound?> SoundProperty =
             AvaloniaProperty.Register<WaveformView, DecodedSound?>(nameof(Sound));
 
-        private static readonly IBrush Background = new SolidColorBrush(Color.FromRgb(0xF6, 0xF6, 0xF6));
-        private static readonly IBrush Wave = new SolidColorBrush(Color.FromRgb(0x2B, 0x6C, 0xC4));
-        private static readonly Pen Axis = new(new SolidColorBrush(Color.FromRgb(0xC8, 0xC8, 0xC8)));
-
         static WaveformView() => AffectsRender<WaveformView>(SoundProperty);
+
+        public WaveformView() => ActualThemeVariantChanged += (_, _) => InvalidateVisual();
 
         public DecodedSound? Sound
         {
@@ -176,18 +162,22 @@ namespace ClassicMac.App.Views
             set => SetValue(SoundProperty, value);
         }
 
+        private IBrush? Token(string key) => this.TryFindResource(key, ActualThemeVariant, out var value) ? value as IBrush : null;
+
         public override void Render(DrawingContext context)
         {
             var size = Bounds.Size;
-            context.FillRectangle(Background, new Rect(size));
+            if (Token("CmPaneBackground") is { } background) context.FillRectangle(background, new Rect(size));
             if (Sound is not { Frames: > 0 } sound || size.Width < 1) return;
+            var wave = Token("CmAccent") ?? Brushes.Gray;
+            var axis = Token("CmDivider");
             var lane = size.Height / sound.Channels;
             var columns = (int)size.Width;
             for (var c = 0; c < sound.Channels; c++)
             {
                 var middle = lane * c + lane / 2;
                 var half = Math.Max(1, lane / 2 - 2);
-                context.DrawLine(Axis, new Point(0, middle), new Point(size.Width, middle));
+                if (axis is not null) context.FillRectangle(axis, new Rect(0, Math.Floor(middle), size.Width, 1)); // on whole pixels
                 for (var x = 0; x < columns; x++)
                 {
                     var first = (int)((long)x * sound.Frames / columns);
@@ -201,7 +191,7 @@ namespace ClassicMac.App.Views
                     }
                     var top = middle - Math.Clamp(high, -1, 1) * half;
                     var bottom = middle - Math.Clamp(low, -1, 1) * half;
-                    context.FillRectangle(Wave, new Rect(x, top, 1, Math.Max(1, bottom - top)));
+                    context.FillRectangle(wave, new Rect(x, top, 1, Math.Max(1, bottom - top)));
                 }
             }
         }

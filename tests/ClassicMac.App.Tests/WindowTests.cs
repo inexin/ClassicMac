@@ -1,6 +1,6 @@
+using Avalonia.Headless;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ClassicMac.App.ViewModels;
@@ -12,6 +12,8 @@ using MenuItem = Avalonia.Controls.MenuItem;
 using MacMenuItem = ClassicMac.Resources.Decoders.Interface.MenuItem;
 
 namespace ClassicMac.App.Tests;
+
+using static Headless;
 
 // The main window loads its XAML and draws, headless (Skia, no screen): the tree, an image preview, a styled-text
 // preview, the hex view, the tree's context menu and a sound's waveform. With CLASSICMAC_SCREENSHOT set to a path,
@@ -231,6 +233,10 @@ public class WindowTests
                 Capture(window, "edit-" + type.TrimEnd('#'), type == "DITL" ? baselines : null);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
             }
+
+            // The template's count field is read only and shown muted by its class, not an opacity.
+            var count = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.IsReadOnly && t.IsEffectivelyVisible);
+            Assert.Contains("readonly", count.Classes);
 
             // The item list's preview follows its form before Apply.
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "DITL").Children[0];

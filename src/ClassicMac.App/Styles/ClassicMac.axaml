@@ -1,0 +1,214 @@
+<!--
+  ClassicMac's shared styles (design/TOKENS.md, "Where tokens meet Fluent"), included after <FluentTheme />. Views use
+  these classes instead of local setters; every colour is a token from Tokens.axaml.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <!--
+      Fluent's resource keys, checked against Avalonia.Themes.Fluent 12.1.3 (decompiled):
+      - TreeViewItem's template reads TreeViewItemBackgroundSelected, …SelectedPointerOver, …SelectedPressed (Border
+        PART_LayoutRoot) and TreeViewItemForegroundSelected, …SelectedPointerOver, …SelectedPressed
+        (ContentPresenter PART_HeaderPresenter).
+      - TabItem reads TabItemHeaderSelectedPipeFill and TabItemHeaderForeground{Selected,Unselected}{,PointerOver,Pressed}.
+      - ListBoxItem reads SystemControlHighlightListAccent{Low,Medium,High}Brush, which other Fluent controls share, so
+        list selection is set by the ListBoxItem styles below instead of by those keys.
+      The brushes point at the token colours, so they follow the theme variant.
+    -->
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelected" Color="{DynamicResource CmSelectionColor}" />
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPointerOver" Color="{DynamicResource CmSelectionColor}" />
+    <SolidColorBrush x:Key="TreeViewItemBackgroundSelectedPressed" Color="{DynamicResource CmSelectionColor}" />
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelected" Color="{DynamicResource CmSelectionTextColor}" />
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPointerOver" Color="{DynamicResource CmSelectionTextColor}" />
+    <SolidColorBrush x:Key="TreeViewItemForegroundSelectedPressed" Color="{DynamicResource CmSelectionTextColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderSelectedPipeFill" Color="{DynamicResource CmAccentColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="{DynamicResource CmTextColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPointerOver" Color="{DynamicResource CmTextColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderForegroundSelectedPressed" Color="{DynamicResource CmTextColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="{DynamicResource CmTextMutedColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPointerOver" Color="{DynamicResource CmTextColor}" />
+    <SolidColorBrush x:Key="TabItemHeaderForegroundUnselectedPressed" Color="{DynamicResource CmTextColor}" />
+
+    <!-- The checkerboard behind previews (transparent pixels show): 8 DIP squares of the two checker tokens. -->
+    <DrawingBrush x:Key="CmCheckerboard" TileMode="Tile" DestinationRect="0,0,16,16">
+      <DrawingBrush.Drawing>
+        <DrawingGroup>
+          <GeometryDrawing Brush="{DynamicResource CmCheckerLight}" Geometry="M0,0 H16 V16 H0 Z" />
+          <GeometryDrawing Brush="{DynamicResource CmCheckerDark}" Geometry="M0,0 H8 V8 H0 Z M8,8 H16 V16 H8 Z" />
+        </DrawingGroup>
+      </DrawingBrush.Drawing>
+    </DrawingBrush>
+  </Styles.Resources>
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource CmWindowBackground}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+  </Style>
+
+  <!-- Surfaces: menu, toolbar, status and panel bars (.chrome); inspector, lists, dialogs (.pane); the tree (.sidebar).
+       A setter needs one target type, so each class has a style per kind of control: Border, Panel, TemplatedControl. -->
+  <Style Selector=":is(Border).chrome">
+    <Setter Property="Background" Value="{DynamicResource CmChromeBackground}" />
+  </Style>
+  <Style Selector=":is(Panel).chrome">
+    <Setter Property="Background" Value="{DynamicResource CmChromeBackground}" />
+  </Style>
+  <Style Selector=":is(TemplatedControl).chrome">
+    <Setter Property="Background" Value="{DynamicResource CmChromeBackground}" />
+  </Style>
+  <Style Selector=":is(Border).pane">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+  </Style>
+  <Style Selector=":is(Panel).pane">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+  </Style>
+  <Style Selector=":is(TemplatedControl).pane">
+    <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+  </Style>
+  <Style Selector=":is(Border).sidebar">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+  </Style>
+  <Style Selector=":is(Panel).sidebar">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+  </Style>
+  <Style Selector=":is(TemplatedControl).sidebar">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+  </Style>
+
+  <!-- The read-only footer of a form (boards/read-then-edit.md): sidebar background, a divider above. -->
+  <Style Selector=":is(Panel).readonly-bar">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+  </Style>
+  <Style Selector=":is(Border).readonly-bar">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="Padding" Value="16,8" />
+  </Style>
+
+  <!-- The "Editing" pill. -->
+  <Style Selector=":is(Panel).editing-badge">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector=":is(Border).editing-badge">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+    <Setter Property="Padding" Value="8,2" />
+  </Style>
+  <Style Selector=".editing-badge :is(TextBlock)">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+
+  <!-- Severity badges: a pill, the severity colour on its tint (boards/diagnostics.md). -->
+  <Style Selector="Border.badge">
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="7,1" />
+  </Style>
+  <Style Selector="Border.badge :is(TextBlock)">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+  <Style Selector="Border.badge.error">
+    <Setter Property="Background" Value="{DynamicResource CmErrorTint}" />
+  </Style>
+  <Style Selector="Border.badge.error :is(TextBlock)">
+    <Setter Property="Foreground" Value="{DynamicResource CmError}" />
+  </Style>
+  <Style Selector="Border.badge.warning">
+    <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+  </Style>
+  <Style Selector="Border.badge.warning :is(TextBlock)">
+    <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
+  </Style>
+  <Style Selector="Border.badge.info">
+    <Setter Property="Background" Value="{DynamicResource CmInfoTint}" />
+  </Style>
+  <Style Selector="Border.badge.info :is(TextBlock)">
+    <Setter Property="Foreground" Value="{DynamicResource CmInfo}" />
+  </Style>
+
+  <!-- Text: muted labels and hints (a colour, never an opacity), captions (TextBlock has no text transform, so the
+       caption's text is written in capitals where the spec wants them). -->
+  <Style Selector=":is(TextBlock).muted">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector=":is(TextBlock).caption">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeCaption}" />
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    <Setter Property="LetterSpacing" Value="{DynamicResource CmLetterSpacingCaption}" />
+  </Style>
+  <Style Selector="TextBox.readonly">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+
+  <!-- Severity text outside a badge. -->
+  <Style Selector=":is(TextBlock).error">
+    <Setter Property="Foreground" Value="{DynamicResource CmError}" />
+  </Style>
+  <Style Selector=":is(TextBlock).warning">
+    <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
+  </Style>
+
+  <!-- List selection: CmSelectionInactive while focus is elsewhere, CmSelection with CmSelectionText while the list has
+       focus. Inside that selected row all text, muted too, reads in CmSelectionText (the TOKENS.md contrast rule). -->
+  <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmSelectionInactive}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+  </Style>
+  <Style Selector="ListBox:focus-within ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmSelection}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
+  </Style>
+  <Style Selector="ListBox:focus-within ListBoxItem:selected :is(TextBlock).muted">
+    <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
+  </Style>
+
+  <!-- Tree selection: the keys above give the focused background; while focus is elsewhere the row is
+       CmSelectionInactive. Fluent 12.1.3's selected-foreground styles select "Border#PART_LayoutRoot >
+       ContentPresenter#PART_HeaderPresenter", but its template puts the presenter inside Grid#PART_Header, so they never
+       match: the foreground is set here. -->
+  <Style Selector="TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
+  </Style>
+  <Style Selector="TreeView:not(:focus-within) TreeViewItem:selected /template/ Border#PART_LayoutRoot">
+    <Setter Property="Background" Value="{DynamicResource CmSelectionInactive}" />
+  </Style>
+  <Style Selector="TreeView:not(:focus-within) TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+  </Style>
+  <!-- No ".muted inside a selected tree row" rule yet: a descendant selector from TreeViewItem:selected would also reach
+       the rows nested under it. The tree's meta text (T5) needs its own rule on the row's template. -->
+
+  <!-- Segmented control: a ListBox whose items sit side by side on CmSegmentTrack, the chosen one on CmSegmentOn. -->
+  <Style Selector="ListBox.segmented">
+    <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+    <Setter Property="Padding" Value="2" />
+    <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+    <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="2" />
+      </ItemsPanelTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem">
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="ListBox.segmented ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmSegmentOn}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+    <Setter Property="BoxShadow" Value="0 1 2 0 #26000000" />
+  </Style>
+</Styles>

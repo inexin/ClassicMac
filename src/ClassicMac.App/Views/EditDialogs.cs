@@ -44,7 +44,7 @@ namespace ClassicMac.App.Views
             Row(2, "Name", name);
             var flags = new WrapPanel();
             foreach (var box in boxes) flags.Children.Add(new Border { Child = box, Margin = new Thickness(0, 0, 12, 0) });
-            if (compressed) flags.Children.Add(new TextBlock { Text = "Compressed", Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center });
+            if (compressed) flags.Children.Add(new TextBlock { Text = "Compressed", Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center });
             Row(3, "Attributes", flags);
             var ok = await Show(title, grid, "OK");
             if (!ok) return null;
@@ -70,7 +70,7 @@ namespace ClassicMac.App.Views
                 grid.Children.Add(text);
                 grid.Children.Add(rows[row].Control);
             }
-            var note = new TextBlock { Opacity = 0.65, Text = "A resource of that type and ID has its data replaced.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
+            var note = new TextBlock { Classes = { "muted" }, Text = "A resource of that type and ID has its data replaced.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
             if (!await Show($"Import “{fileName}”", new StackPanel { Spacing = 10, Children = { grid, note } }, "Import")) return null;
             return new ImportChoice(type.SelectedItem as string ?? initial.Type, (short)Math.Clamp(id.Value ?? 0, short.MinValue, short.MaxValue), name.Text ?? "");
         }
@@ -91,7 +91,7 @@ namespace ClassicMac.App.Views
                 grid.Children.Add(text);
                 grid.Children.Add(rows[row].Control);
             }
-            var note = new TextBlock { Opacity = 0.65, Text = "Written to the image with File ▸ Save As ▸ HFS Volume Image.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
+            var note = new TextBlock { Classes = { "muted" }, Text = "Written to the image with File ▸ Save As ▸ HFS Volume Image.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
             if (!await Show(title, new StackPanel { Spacing = 10, Children = { grid, note } }, "Create")) return null;
             return new NewFileChoice(name.Text ?? "", type.Text ?? "", creator.Text ?? "");
         }
@@ -152,7 +152,7 @@ namespace ClassicMac.App.Views
                 Children =
                 {
                     new TextBlock { Text = $"Apply your changes to {what}?", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap },
-                    new TextBlock { Text = detail, Opacity = 0.65, TextWrapping = TextWrapping.Wrap },
+                    new TextBlock { Text = detail, Classes = { "muted" }, TextWrapping = TextWrapping.Wrap },
                 },
             }, buttons);
             await dialog.ShowDialog(owner);
@@ -169,7 +169,7 @@ namespace ClassicMac.App.Views
                 Text = Format(data), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = AppFonts.Mono,
                 Width = 560, Height = 360,
             };
-            var note = new TextBlock { Opacity = 0.65, Text = "Hex bytes; spaces and line breaks are ignored." };
+            var note = new TextBlock { Classes = { "muted" }, Text = "Hex bytes; spaces and line breaks are ignored." };
             while (await Show(title, new StackPanel { Spacing = 6, Children = { note, box } }, "OK"))
             {
                 if (Parse(box.Text ?? "") is { } bytes) return bytes;

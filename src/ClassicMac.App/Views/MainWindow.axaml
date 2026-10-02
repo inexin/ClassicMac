@@ -20,7 +20,7 @@
   </Window.Styles>
 
   <DockPanel>
-    <Menu DockPanel.Dock="Top">
+    <Menu DockPanel.Dock="Top" Classes="chrome">
       <MenuItem Header="_File">
         <MenuItem Header="_Open…" Command="{Binding OpenCommand}" InputGesture="Ctrl+O" HotKey="Ctrl+O" />
         <MenuItem Header="_Close" Command="{Binding CloseCommand}" InputGesture="Ctrl+W" HotKey="Ctrl+W" />
@@ -73,13 +73,13 @@
       </MenuItem>
     </Menu>
 
-    <Border DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+    <Border DockPanel.Dock="Bottom" Classes="chrome" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CmBorder}">
       <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
     </Border>
 
     <Grid RowDefinitions="*,5,180">
       <Grid ColumnDefinitions="380,5,*">
-        <TreeView x:Name="Tree" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
+        <TreeView x:Name="Tree" Classes="sidebar" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
           <TreeView.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
           </TreeView.KeyBindings>
@@ -119,7 +119,7 @@
 
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
 
-        <TabControl Grid.Column="2" SelectedIndex="{Binding SelectedTab, Mode=TwoWay}" Padding="0">
+        <TabControl Grid.Column="2" Classes="pane" SelectedIndex="{Binding SelectedTab, Mode=TwoWay}" Padding="0">
           <TabItem Header="Details">
             <ScrollViewer Padding="16,12">
               <StackPanel Spacing="10">
@@ -128,7 +128,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:DetailRow">
                       <Grid ColumnDefinitions="140,*" Margin="0,2">
-                        <TextBlock Text="{Binding Label}" Opacity="0.65" />
+                        <TextBlock Text="{Binding Label}" Classes="muted" />
                         <SelectableTextBlock Grid.Column="1" Text="{Binding Value}" TextWrapping="Wrap" />
                       </Grid>
                     </DataTemplate>
@@ -147,7 +147,7 @@
                 <ComboBox ItemsSource="{Binding ScreenDepths}" SelectedItem="{Binding ScreenDepth, Mode=TwoWay}" />
               </StackPanel>
               <Panel>
-                <TextBlock Text="{Binding Preview.Message}" Margin="16" Opacity="0.65" IsVisible="{Binding Preview.IsMessage}" />
+                <TextBlock Text="{Binding Preview.Message}" Margin="16" Classes="muted" IsVisible="{Binding Preview.IsMessage}" />
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Preview.IsImage}">
                   <ItemsControl ItemsSource="{Binding Images}" Margin="12">
                     <ItemsControl.ItemsPanel>
@@ -158,10 +158,10 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="vm:ImageItem">
                         <StackPanel Margin="0,0,16,16" Spacing="4">
-                          <Border Background="{x:Static views:Images.Checkerboard}" HorizontalAlignment="Left">
+                          <Border Background="{DynamicResource CmCheckerboard}" HorizontalAlignment="Left">
                             <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}" />
                           </Border>
-                          <TextBlock Text="{Binding Image.Caption}" Opacity="0.65" FontSize="12" />
+                          <TextBlock Text="{Binding Image.Caption}" Classes="muted" FontSize="{DynamicResource CmFontSizeMeta}" />
                         </StackPanel>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -220,7 +220,7 @@
                     <Button Content="Stop" Command="{Binding StopSoundCommand}" />
                     <TextBlock Text="{Binding Preview.SoundDetails}" VerticalAlignment="Center" Margin="8,0,0,0" />
                   </StackPanel>
-                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding PlaybackNote}" Opacity="0.65" Margin="0,6,0,0"
+                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding PlaybackNote}" Classes="muted" Margin="0,6,0,0"
                              IsVisible="{Binding PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <views:WaveformView Sound="{Binding Preview.Sound}" MinHeight="120" />
                 </DockPanel>
@@ -242,19 +242,19 @@
                 <Button Content="Edit Bytes" Command="{Binding BeginHexEditCommand}" IsVisible="{Binding !IsHexEditing}" />
                 <Button Content="Apply" Command="{Binding ApplyHexEditCommand}" IsVisible="{Binding IsHexEditing}" />
                 <Button Content="Discard" Command="{Binding DiscardHexEditCommand}" IsVisible="{Binding IsHexEditing}" />
-                <TextBlock Text="{Binding HexEdit.Status}" IsVisible="{Binding IsHexEditing}" VerticalAlignment="Center" Opacity="0.7" />
+                <TextBlock Text="{Binding HexEdit.Status}" IsVisible="{Binding IsHexEditing}" VerticalAlignment="Center" Classes="muted" />
                 <TextBlock Text="Hex digits type; Insert toggles insert; Delete, Backspace remove." IsVisible="{Binding IsHexEditing}"
-                           VerticalAlignment="Center" Opacity="0.5" />
+                           VerticalAlignment="Center" Classes="muted" />
               </StackPanel>
-              <ListBox x:Name="HexList" Classes="hex" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
+              <ListBox x:Name="HexList" Classes="hex pane" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="vm:HexLine">
                     <StackPanel Orientation="Horizontal" Spacing="16">
-                      <TextBlock Text="{Binding Offset}" Opacity="0.55" />
+                      <TextBlock Text="{Binding Offset}" Classes="muted" />
                       <TextBlock>
-                        <Run Text="{Binding Before}" /><Run Text="{Binding At}" Background="#5A80B0FF" /><Run Text="{Binding After}" />
+                        <Run Text="{Binding Before}" /><Run Text="{Binding At}" Background="{DynamicResource CmHexCursor}" Foreground="{DynamicResource CmOnAccent}" /><Run Text="{Binding After}" />
                       </TextBlock>
-                      <TextBlock Text="{Binding Characters}" Opacity="0.8" />
+                      <TextBlock Text="{Binding Characters}" Classes="muted" />
                     </StackPanel>
                   </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -266,8 +266,8 @@
               <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
                 <Button Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" />
                 <CheckBox Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
-                <TextBlock Text="Apply makes an undoable edit; File ▸ Save writes the file." Opacity="0.6" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding FormError}" Foreground="#C0392B" VerticalAlignment="Center" />
+                <TextBlock Text="Apply makes an undoable edit; File ▸ Save writes the file." Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding FormError}" Classes="error" VerticalAlignment="Center" />
               </StackPanel>
               <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="560"
                             IsVisible="{Binding FormDialog, Converter={x:Static ObjectConverters.IsNotNull}}">
@@ -281,7 +281,7 @@
                 <ContentControl.DataTemplates>
                   <DataTemplate DataType="vm:StringForm">
                     <StackPanel Spacing="6">
-                      <TextBlock Text="String (at most 255 Mac OS Roman characters)" Opacity="0.65" />
+                      <TextBlock Text="String (at most 255 Mac OS Roman characters)" Classes="muted" />
                       <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
                     </StackPanel>
                   </DataTemplate>
@@ -307,7 +307,7 @@
                   </DataTemplate>
                   <DataTemplate DataType="vm:TextForm">
                     <DockPanel>
-                      <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Opacity="0.65"
+                      <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Classes="muted"
                                  Text="Text (Mac OS Roman). Its 'styl' runs follow your edits; new text takes the style where the change starts."
                                  IsVisible="{Binding HasStyles}" TextWrapping="Wrap" />
                       <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" />
@@ -410,7 +410,7 @@
                         <ItemsControl ItemsSource="{Binding Items}">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate DataType="vm:DialogItemRow">
-                              <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" Padding="0,4">
+                              <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CmBorder}" Padding="0,4">
                                 <StackPanel Spacing="4">
                                   <StackPanel Orientation="Horizontal" Spacing="6">
                                     <ComboBox ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" Width="150" />
@@ -508,8 +508,8 @@
                   <DataTemplate DataType="vm:TemplateForm">
                     <DockPanel>
                       <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,8">
-                        <TextBlock Text="{Binding Source}" Opacity="0.65" />
-                        <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap" Foreground="#B9770E" />
+                        <TextBlock Text="{Binding Source}" Classes="muted" />
+                        <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap" Classes="warning" />
                       </StackPanel>
                       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <ItemsControl ItemsSource="{Binding Fields}" />
@@ -519,7 +519,7 @@
                   <DataTemplate DataType="vm:TemplateScalarRow">
                     <Grid ColumnDefinitions="220,*" Margin="0,2">
                       <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Type}" Margin="0,0,8,0" />
-                      <TextBox Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsText}" IsReadOnly="{Binding IsReadOnly}" Opacity="{Binding TextOpacity}" TextWrapping="Wrap" />
+                      <TextBox Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsText}" IsReadOnly="{Binding IsReadOnly}" Classes.readonly="{Binding IsReadOnly}" TextWrapping="Wrap" />
                       <CheckBox Grid.Column="1" IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" />
                     </Grid>
                   </DataTemplate>
@@ -527,17 +527,17 @@
                     <StackPanel Margin="0,4" Spacing="4">
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Summary}" Opacity="0.65" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Summary}" Classes="muted" VerticalAlignment="Center" />
                         <Button Content="Add Item" Command="{Binding AddCommand}" />
                       </StackPanel>
                       <ItemsControl ItemsSource="{Binding Items}" Margin="16,0,0,0" />
                     </StackPanel>
                   </DataTemplate>
                   <DataTemplate DataType="vm:TemplateItemRow">
-                    <Border BorderThickness="1,0,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" Padding="8,2,0,2" Margin="0,2">
+                    <Border BorderThickness="1,0,0,0" BorderBrush="{DynamicResource CmBorder}" Padding="8,2,0,2" Margin="0,2">
                       <StackPanel Spacing="2">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                          <TextBlock Text="{Binding Title}" Opacity="0.65" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Title}" Classes="muted" VerticalAlignment="Center" />
                           <Button Content="Insert Before" Command="{Binding List.InsertCommand}" CommandParameter="{Binding}" />
                           <Button Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}" />
                         </StackPanel>
@@ -559,13 +559,13 @@
           <TextBlock Text="Diagnostics" FontWeight="SemiBold" VerticalAlignment="Center" />
           <ComboBox ItemsSource="{Binding Filters}" SelectedItem="{Binding Filter, Mode=TwoWay}" MinWidth="170" />
         </StackPanel>
-        <ListBox ItemsSource="{Binding Diagnostics}" SelectedItem="{Binding SelectedDiagnostic, Mode=TwoWay}">
+        <ListBox Classes="pane" ItemsSource="{Binding Diagnostics}" SelectedItem="{Binding SelectedDiagnostic, Mode=TwoWay}">
           <ListBox.ItemTemplate>
             <DataTemplate DataType="vm:DiagnosticEntry">
               <Grid ColumnDefinitions="70,260,200,*">
                 <TextBlock Text="{Binding Severity}" />
-                <TextBlock Grid.Column="1" Text="{Binding Source}" TextTrimming="CharacterEllipsis" Opacity="0.75" />
-                <TextBlock Grid.Column="2" Text="{Binding Code}" TextTrimming="CharacterEllipsis" Opacity="0.75" />
+                <TextBlock Grid.Column="1" Text="{Binding Source}" TextTrimming="CharacterEllipsis" Classes="muted" />
+                <TextBlock Grid.Column="2" Text="{Binding Code}" TextTrimming="CharacterEllipsis" Classes="muted" />
                 <TextBlock Grid.Column="3" Text="{Binding Message}" TextTrimming="CharacterEllipsis" />
               </Grid>
             </DataTemplate>
