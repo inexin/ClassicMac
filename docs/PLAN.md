@@ -736,7 +736,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 8 | Editor III (HFS writing) | Done for plain HFS: the library replaces forks and creates and deletes files and folders (with constrained B-tree growth); the app creates, imports and deletes them too, and Save As saves all edits into a verified copy of the image |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | HFS+ and archives | Done (exit passed 2026-10-01); fixtures still missing for the fitted methods (Todo) |
-| 11 | Code (`ClassicMac.Code`) | Planned, not started |
+| 11 | Code (`ClassicMac.Code`) | In progress: PEF, `cfrg`, 68k segments and code resources, trap tables and both disassemblers built; annotation, integration and the exit check remain |
 | 12 | Runtime (`ClassicMac.Runtime`) | Idea, not started (after phase 11) |
 
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
