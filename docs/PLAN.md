@@ -499,7 +499,7 @@ stereo); playback stops when the selection changes. **Icons (built):** an icon r
 3. **Writing disk images:** add, replace and delete files in HFS images, with type/creator, dates and both forks.
    Archives (StuffIt, Compact Pro) stay read-only.
 
-**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** **built** (2026-09-29): the library (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified; [writing.md §1](formats/containers/writing.md#1-saving-edited-resources-back)) and the app (Edit and Resource menus, Save/Save As/Revert, prompts for unsaved edits). Hex editing is a dialog (the bytes as editable hex) for now; editing in the hex view itself is later.
+**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** **built** (2026-09-29): the library (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified; [writing.md §3](formats/containers/writing.md#3-writing)) and the app (Edit and Resource menus, Save/Save As/Revert, prompts for unsaved edits). Hex editing is a dialog (the bytes as editable hex) for now; editing in the hex view itself is later.
 
 - **Edits live in the library.** `ClassicMac.Resources.Editing`: each edit is a command on a `ResourceFork` that can be
   applied and undone (add, delete, duplicate, rename, renumber, set attributes, set data, set the fork's attributes), and
