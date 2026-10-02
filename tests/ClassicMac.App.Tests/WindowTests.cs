@@ -790,7 +790,8 @@ public class WindowTests
             Assert.True(footer.IsVisible);
             Assert.Contains(footer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "2 invisible items hidden");
             var texts = window.GetVisualDescendants().OfType<TreeView>().Single().GetVisualDescendants().OfType<TextBlock>().ToList();
-            var group = texts.Single(t => t.Text == "No name");
+            // A row's name is in runs (before, matched letters, after) for the search highlight.
+            var group = texts.Single(t => string.Concat(t.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? []) == "No name");
             Assert.Equal(Avalonia.Media.FontStyle.Italic, group.FontStyle);
             Assert.Contains(texts, t => t.Text == "4 files" && t.FontSize == 11);
             // Light and dark: the header's Tree display button, the italic "No name" row with its muted count, the

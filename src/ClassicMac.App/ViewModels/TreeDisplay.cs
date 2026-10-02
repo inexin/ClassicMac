@@ -226,7 +226,18 @@ namespace ClassicMac.App.ViewModels
             TreeDisplay.PropertyChanged += (_, _) => OnTreeDisplayChanged();
             TreeDisplay.LaidOut += UpdateHiddenCount;
             WatchSummary();
+            TreeDisplay.LaidOut += ReapplySearch;
+            InitRecentFiles(saved.RecentFiles);
         }
+
+        // What the app remembers: the display options and the recent files, over what else is stored (the theme).
+        private void SaveSettings() =>
+            settings.Save(settings.Load() with
+            {
+                GroupNoName = TreeDisplay.GroupNoName,
+                HideInvisible = TreeDisplay.HideInvisible,
+                RecentFiles = RecentFiles.Select(r => r.Path).ToList(),
+            });
 
         /// <summary>Which files the tree hides or groups.</summary>
         public TreeDisplayOptions TreeDisplay { get; }
@@ -254,7 +265,7 @@ namespace ClassicMac.App.ViewModels
         // when it is now hidden.
         private void OnTreeDisplayChanged()
         {
-            settings.Save(settings.Load() with { GroupNoName = TreeDisplay.GroupNoName, HideInvisible = TreeDisplay.HideInvisible });
+            SaveSettings();
             var kept = Selected;
             foreach (var root in Roots)
             {

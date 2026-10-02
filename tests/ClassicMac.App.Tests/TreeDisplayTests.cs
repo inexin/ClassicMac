@@ -141,7 +141,7 @@ public sealed class TreeDisplayTests : IDisposable
         model.Selected = space;
 
         model.TreeDisplay.GroupNoName = false;
-        Assert.Equal(new AppSettings(GroupNoName: false), store.Settings);
+        Assert.Equal((false, true), (store.Settings.GroupNoName, store.Settings.HideInvisible));
         Assert.DoesNotContain(realmz.Children, c => c is NoNameGroupNode);
         Assert.Same(space, model.Selected);
         Assert.Same(realmz, space.Parent);
@@ -161,7 +161,7 @@ public sealed class TreeDisplayTests : IDisposable
         model.Selected = icon;
         model.TreeDisplay.HideInvisible = true;
         Assert.Same(realmz, model.Selected);
-        Assert.Equal(new AppSettings(), store.Settings);
+        Assert.Equal((true, true), (store.Settings.GroupNoName, store.Settings.HideInvisible));
     }
 
     [Fact]

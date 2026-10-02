@@ -23,6 +23,14 @@
   System, Light or Dark, remembered), Window menu (Minimize, Zoom, one item per open file) and Help menu (ClassicMac
   Help, Report a Problem…, About ClassicMac); the About box shows the version, what the app does, the repository, the
   MIT licence and the third-party notices (S7).
+- Viewer: with nothing open, the inspector shows the empty state: a drop zone (marked while files are dragged over
+  the window) with Open…, and the Recent list (up to 10 files, kept in settings.json), which opens a file on click,
+  shows a missing one as "Not found" and drops it on click, and can be cleared (S5).
+- Viewer: a "Filter tree" field (Ctrl+F, Esc clears) above the tree shows only the rows that match, with what holds
+  them (opened) and what they hold, reading archives and disk images not yet read; typing in the tree opens a
+  type-ahead pill ("1 of 2 loaded matches") that selects the matches among the loaded rows, F3 and Shift+F3 step,
+  Backspace and Esc; matched letters are highlighted (CmMatch, CmMatchSoft) and other rows dimmed; files in a
+  "No name" group are skipped, the group row matches "no name" (S6).
 - Viewer: each resource that differs from the file as saved (new, renamed, other attributes or data) carries the
   unsaved " •" in the tree, not only its file; it clears on Save, or when undo brings the resource back (T6).
 - Viewer: a file never given a type or creator (zeros) shows no type · creator in the tree, and a dash for the one

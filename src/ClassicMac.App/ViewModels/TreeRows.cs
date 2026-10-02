@@ -93,6 +93,7 @@ namespace ClassicMac.App.ViewModels
         {
             OnPropertyChanged(nameof(Name));
             OnPropertyChanged(nameof(IsUnsaved));
+            OnNameChanged();
         }
 
         /// <summary>Tells the row the container was read, so its "not read" chip goes.</summary>

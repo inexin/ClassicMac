@@ -20,6 +20,9 @@ public class TreeViewTests
 {
     private static void OnUiThread(Action test) => Headless.OnUiThread(test);
 
+    // A row's name, held in runs (before, matched letters, after) for the search highlight.
+    private static string NameOf(TextBlock name) => string.Concat(name.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? []);
+
     private static void Pump(Task task) => Headless.Pump(task);
 
     private static IBrush Brush(string key) => (IBrush)Application.Current!.FindResource(Application.Current!.ActualThemeVariant, key)!;
@@ -195,7 +198,7 @@ public class TreeViewTests
             Assert.True(mark.IsVisible);
             Assert.Equal(FontWeight.SemiBold, mark.FontWeight);
             Assert.Equal(ColorOf(Brush("CmAccent")), ColorOf(mark.Foreground));
-            Assert.Equal("App", Part<TextBlock>(appRow, "name").Text);
+            Assert.Equal("App", NameOf(Part<TextBlock>(appRow, "name")));
             Assert.Equal(ColorOf(Brush("CmTextMuted")), ColorOf(Part<TextBlock>(appRow, "meta").Foreground));
             Assert.Equal("APPL · ABCD", Part<TextBlock>(appRow, "meta").Text);
 
@@ -258,7 +261,7 @@ public class TreeViewTests
         Assert.True(Part<Panel>(row, "spinner").IsVisible);
         Assert.False(row.GetVisualDescendants().OfType<TreeIcon>().Single().IsVisible);
         var name = Part<TextBlock>(row, "name");
-        Assert.Equal(("Loading…", FontStyle.Italic), (name.Text, name.FontStyle));
+        Assert.Equal(("Loading…", FontStyle.Italic), (NameOf(name), name.FontStyle));
         Assert.Equal(ColorOf(Brush("CmTextMuted")), ColorOf(name.Foreground));
         Assert.False(Part<TextBlock>(row, "meta").IsVisible); // no counts
         Assert.False(Part<Panel>(Row(window, parent), "spinner").IsVisible);

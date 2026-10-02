@@ -23,6 +23,8 @@
       <Color x:Key="CmSelectionTextColor">#FFFFFF</Color>
       <Color x:Key="CmSelectionInactiveColor">#DCE3FA</Color>
       <Color x:Key="CmRowHighlightColor">#EEF2FD</Color>
+      <Color x:Key="CmMatchColor">#FFE58A</Color>
+      <Color x:Key="CmMatchSoftColor">#FFF3C4</Color>
       <Color x:Key="CmHexCursorColor">#2E4EC2</Color>
       <Color x:Key="CmControlBackgroundColor">#FFFFFF</Color>
       <Color x:Key="CmControlBorderColor">#CFCEC8</Color>
@@ -57,6 +59,8 @@
       <Color x:Key="CmSelectionTextColor">#F2F4FF</Color>
       <Color x:Key="CmSelectionInactiveColor">#2C3354</Color>
       <Color x:Key="CmRowHighlightColor">#24283A</Color>
+      <Color x:Key="CmMatchColor">#6B5714</Color>
+      <Color x:Key="CmMatchSoftColor">#3F3618</Color>
       <Color x:Key="CmHexCursorColor">#8FA3FF</Color>
       <Color x:Key="CmControlBackgroundColor">#2C2C30</Color>
       <Color x:Key="CmControlBorderColor">#45454A</Color>
@@ -92,6 +96,10 @@
   <SolidColorBrush x:Key="CmSelectionText" Color="{DynamicResource CmSelectionTextColor}" />
   <SolidColorBrush x:Key="CmSelectionInactive" Color="{DynamicResource CmSelectionInactiveColor}" />
   <SolidColorBrush x:Key="CmRowHighlight" Color="{DynamicResource CmRowHighlightColor}" />
+  <!-- Search matches in the tree (boards/browse-tree.md S6: #FFE58A on the current match, lighter on the others); the
+       dark values and the lighter tint are not in TOKENS.md yet [ClassicMac]. -->
+  <SolidColorBrush x:Key="CmMatch" Color="{DynamicResource CmMatchColor}" />
+  <SolidColorBrush x:Key="CmMatchSoft" Color="{DynamicResource CmMatchSoftColor}" />
   <SolidColorBrush x:Key="CmHexCursor" Color="{DynamicResource CmHexCursorColor}" />
   <SolidColorBrush x:Key="CmControlBackground" Color="{DynamicResource CmControlBackgroundColor}" />
   <SolidColorBrush x:Key="CmControlBorder" Color="{DynamicResource CmControlBorderColor}" />

@@ -209,6 +209,8 @@ namespace ClassicMac.App.ViewModels
                 var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report, TreeDisplay);
                 Roots.Add(input);
                 UpdateHiddenCount();
+                AddRecent(path);
+                ReapplySearch();
                 foreach (var d in diagnostics)
                 {
                     Report(new DiagnosticEntry(d, Tree.SourceOf(input, d), input));

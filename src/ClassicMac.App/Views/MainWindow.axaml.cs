@@ -30,6 +30,10 @@ namespace ClassicMac.App.Views
             TitleBar.Classes.Set("mac", OperatingSystem.IsMacOS());
             AddHandler(DragDrop.DropEvent, OnDrop);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
+            AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+            Tree.AddHandler(TextInputEvent, OnTreeTextInput, RoutingStrategies.Tunnel);
+            Tree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
             DataContextChanged += (_, _) =>
             {
                 if (DataContext is not MainViewModel model)
@@ -242,12 +246,31 @@ namespace ClassicMac.App.Views
             return file?.TryGetLocalPath();
         }
 
-        // Files dropped in open; the app's own drag out is not dropped back in.
-        private void OnDragOver(object? sender, DragEventArgs e) =>
+        // Files dropped in open; the app's own drag out is not dropped back in. While files are over the window the
+        // empty state's drop zone is marked.
+        private void OnDragOver(object? sender, DragEventArgs e)
+        {
             e.DragEffects = !draggingOut && e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
+            if (DataContext is MainViewModel model)
+            {
+                model.IsDropTarget = e.DragEffects != DragDropEffects.None;
+            }
+        }
+
+        private void OnDragLeave(object? sender, DragEventArgs e)
+        {
+            if (DataContext is MainViewModel model)
+            {
+                model.IsDropTarget = false;
+            }
+        }
 
         private async void OnDrop(object? sender, DragEventArgs e)
         {
+            if (DataContext is MainViewModel dropped)
+            {
+                dropped.IsDropTarget = false;
+            }
             if (draggingOut || DataContext is not MainViewModel model)
             {
                 return;
@@ -263,5 +286,54 @@ namespace ClassicMac.App.Views
         }
 
         private void OnQuit(object? sender, RoutedEventArgs e) => Close();
+
+        // Ctrl+F: the tree's filter field.
+        private void OnWindowKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
+            {
+                TreeFilter.Focus();
+                TreeFilter.SelectAll();
+                e.Handled = true;
+            }
+        }
+
+        // Typing in the tree opens the type-ahead; F3 and Shift+F3 step through its matches, Backspace removes a letter,
+        // Esc closes it.
+        private void OnTreeTextInput(object? sender, TextInputEventArgs e)
+        {
+            if (DataContext is not MainViewModel model || string.IsNullOrEmpty(e.Text) || e.Text.Any(char.IsControl))
+            {
+                return;
+            }
+            model.TypeAhead(e.Text);
+            e.Handled = true;
+        }
+
+        private void OnTreeKeyDown(object? sender, KeyEventArgs e)
+        {
+            if (DataContext is not MainViewModel { IsTypeAheadOpen: true } model)
+            {
+                return;
+            }
+            switch (e.Key)
+            {
+                case Key.F3 when e.KeyModifiers == KeyModifiers.Shift:
+                    model.PreviousMatchCommand.Execute(null);
+                    break;
+                case Key.F3:
+                    model.NextMatchCommand.Execute(null);
+                    break;
+                case Key.Back:
+                    model.TypeAheadBackspace();
+                    break;
+                case Key.Escape:
+                    model.ClearTypeAheadCommand.Execute(null);
+                    break;
+                default:
+                    return;
+            }
+            e.Handled = true;
+        }
     }
 }

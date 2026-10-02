@@ -250,6 +250,9 @@ namespace ClassicMac.App.Views
         }
 
         /// <summary>A node kind's icon (a diagnostics group's header): the kind icon its rows would show.</summary>
+        /// <summary>An icon kind's icon (the empty state's Recent list and drop zone).</summary>
+        public static IValueConverter IconConverter { get; } = new FuncValueConverter<TreeIconKind, Bitmap?>(For);
+
         public static IValueConverter KindConverter { get; } = new FuncValueConverter<NodeKind, Bitmap?>(kind => For(kind switch
         {
             NodeKind.Input => TreeIconKind.HardDisk,

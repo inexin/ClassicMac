@@ -43,6 +43,8 @@ public class ThemeTests
         { "CmSelectionText", 0xFFFFFF, 0xF2F4FF },
         { "CmSelectionInactive", 0xDCE3FA, 0x2C3354 },
         { "CmRowHighlight", 0xEEF2FD, 0x24283A },
+        { "CmMatch", 0xFFE58A, 0x6B5714 },
+        { "CmMatchSoft", 0xFFF3C4, 0x3F3618 },
         { "CmHexCursor", 0x2E4EC2, 0x8FA3FF },
         { "CmControlBackground", 0xFFFFFF, 0x2C2C30 },
         { "CmControlBorder", 0xCFCEC8, 0x45454A },

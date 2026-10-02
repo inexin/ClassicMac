@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -17,7 +19,31 @@ namespace ClassicMac.App
     /// <param name="GroupNoName">Whether the tree groups a folder's files with no name under one "No name" node.</param>
     /// <param name="HideInvisible">Whether the tree leaves out files with the Finder's invisible flag.</param>
     /// <param name="Theme">The theme chosen in View ▸ Theme.</param>
-    public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true, AppTheme Theme = AppTheme.System);
+    /// <param name="RecentFiles">The files opened last, newest first (the empty state's Recent list).</param>
+    public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true, AppTheme Theme = AppTheme.System,
+        IReadOnlyList<string>? RecentFiles = null)
+    {
+        /// <summary>The files opened last, newest first; empty when none.</summary>
+        public IReadOnlyList<string> RecentFiles { get; init; } = RecentFiles ?? [];
+
+        // The list compares by its paths, so equal settings are equal records.
+        public bool Equals(AppSettings? other) =>
+            other is not null && GroupNoName == other.GroupNoName && HideInvisible == other.HideInvisible && Theme == other.Theme
+            && RecentFiles.SequenceEqual(other.RecentFiles);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(GroupNoName);
+            hash.Add(HideInvisible);
+            hash.Add(Theme);
+            foreach (var path in RecentFiles)
+            {
+                hash.Add(path);
+            }
+            return hash.ToHashCode();
+        }
+    }
 
     /// <summary>Where settings are kept: a JSON file for the app, memory for tests.</summary>
     public interface ISettingsStore

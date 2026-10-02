@@ -14,6 +14,95 @@
   <Window.Styles>
     <Style Selector="TreeViewItem" x:DataType="vm:NodeViewModel">
       <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+      <Setter Property="IsVisible" Value="{Binding !IsFilteredOut}" />
+    </Style>
+    <!-- The tree's filter and type-ahead (boards/browse-tree.md S6): the filter field (28 high, search icon, "Ctrl+F"),
+         matched letters on CmMatchSoft (CmMatch on the current match), rows that do not match dimmed to CmTextMuted,
+         and the type-ahead pill at the bottom of the tree (CmPaneBackground, CmAccent border, CmShadowPopover). -->
+    <Style Selector="TextBox.filter">
+      <Setter Property="Height" Value="28" />
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="Padding" Value="4,4,6,4" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="PathIcon.search">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Margin" Value="8,0,2,0" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="TextBlock.key-hint">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeCaption}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Run.match.on">
+      <Setter Property="Background" Value="{DynamicResource CmMatchSoft}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+    </Style>
+    <Style Selector="Run.match.on.current">
+      <Setter Property="Background" Value="{DynamicResource CmMatch}" />
+    </Style>
+    <Style Selector="TreeView.browse TextBlock.name.dimmed">
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="Border.type-ahead">
+      <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="Margin" Value="8,0,8,10" />
+      <Setter Property="BoxShadow" Value="{DynamicResource CmShadowPopover}" />
+    </Style>
+    <Style Selector="Border.type-ahead Border.key">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmControlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+      <Setter Property="Padding" Value="4,0" />
+    </Style>
+    <Style Selector="Border.type-ahead TextBlock.caret">
+      <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    </Style>
+    <!-- The empty state (boards/empty-state.md S5): a centred 640 column on CmPaneBackground, the drop zone (300 high,
+         2 px dashed CmControlBorder, radius 12, CmSidebarBackground; CmAccent on CmRowHighlight while a drag is over
+         the window) and the Recent list. -->
+    <Style Selector="Border.empty-state">
+      <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+    </Style>
+    <Style Selector="Border.drop-zone">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Height" Value="300" />
+    </Style>
+    <Style Selector="Border.drop-zone Rectangle.dash">
+      <Setter Property="Stroke" Value="{DynamicResource CmControlBorder}" />
+      <Setter Property="StrokeThickness" Value="2" />
+      <Setter Property="StrokeDashArray" Value="4,3" />
+      <Setter Property="RadiusX" Value="12" />
+      <Setter Property="RadiusY" Value="12" />
+    </Style>
+    <Style Selector="Border.drop-zone.active">
+      <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    </Style>
+    <Style Selector="Border.drop-zone.active Rectangle.dash">
+      <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
+    </Style>
+    <Style Selector="TextBlock.empty-title">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeTitle}" />
+      <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+      <Setter Property="TextAlignment" Value="Center" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="Border.recent-list">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+    </Style>
+    <Style Selector="Button.recent">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="CornerRadius" Value="0" />
     </Style>
     <!-- The tree's rows (design/boards/tree-no-name.md): no-name titles in italics, whitespace made visible in mono
          (.mono), the group's count as the row's meta ("4 files"). The tree's header (the Tree display button) and footer
@@ -401,8 +490,9 @@
     <Grid x:Name="Body" RowDefinitions="*,6,196">
       <Grid ColumnDefinitions="380,5,*">
         <DockPanel>
-        <Border DockPanel.Dock="Top" Classes="tree-bar" Padding="4,2" BorderThickness="0,0,0,1">
-          <Button x:Name="TreeDisplayButton" Classes="flat" HorizontalAlignment="Right" ToolTip.Tip="Tree display" AutomationProperties.Name="Tree display">
+        <Border DockPanel.Dock="Top" Classes="tree-bar" Padding="6,6,4,6" BorderThickness="0,0,0,1">
+          <DockPanel>
+          <Button x:Name="TreeDisplayButton" DockPanel.Dock="Right" Classes="flat" Margin="4,0,0,0" ToolTip.Tip="Tree display" AutomationProperties.Name="Tree display">
             <PathIcon Width="12" Height="12" Data="M1,2 H15 V4 H1 Z M1,7 H15 V9 H1 Z M1,12 H15 V14 H1 Z" />
             <Button.Flyout>
               <Flyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="tree-display">
@@ -414,6 +504,18 @@
               </Flyout>
             </Button.Flyout>
           </Button>
+          <TextBox x:Name="TreeFilter" Classes="filter" PlaceholderText="Filter tree" Text="{Binding FilterText}" AutomationProperties.Name="Filter tree">
+            <TextBox.InnerLeftContent>
+              <PathIcon Classes="search" Data="M6.5,1 A5.5,5.5 0 1 1 6.5,12 A5.5,5.5 0 1 1 6.5,1 Z M6.5,3 A3.5,3.5 0 1 0 6.5,10 A3.5,3.5 0 1 0 6.5,3 Z M10.2,11.6 L11.6,10.2 L15,13.6 L13.6,15 Z" />
+            </TextBox.InnerLeftContent>
+            <TextBox.InnerRightContent>
+              <TextBlock Classes="mono muted key-hint" Text="Ctrl+F" />
+            </TextBox.InnerRightContent>
+            <TextBox.KeyBindings>
+              <KeyBinding Gesture="Escape" Command="{Binding ClearFilterCommand}" />
+            </TextBox.KeyBindings>
+          </TextBox>
+          </DockPanel>
         </Border>
         <Border x:Name="HiddenFooter" DockPanel.Dock="Bottom" Classes="tree-bar" Padding="8,3" BorderThickness="0,1,0,0" IsVisible="{Binding HiddenSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
           <StackPanel Orientation="Horizontal" Spacing="6">
@@ -422,6 +524,7 @@
             <Button Content="Show" Command="{Binding ShowHiddenCommand}" Classes="flat link" Padding="4,0" Cursor="Hand" />
           </StackPanel>
         </Border>
+        <Panel>
         <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
           <TreeView.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
@@ -440,7 +543,10 @@
                       <Ellipse Classes="track" />
                       <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
                     </Panel>
-                    <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}" Classes.mono="{Binding IsMono}" Text="{Binding Name}" />
+                    <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}"
+                               Classes.mono="{Binding IsMono}" Classes.dimmed="{Binding IsDimmed}">
+                      <Run Text="{Binding NameBefore}" /><Run Classes="match" Classes.on="{Binding HasMatch}" Classes.current="{Binding IsCurrentMatch}" Text="{Binding NameMatch}" /><Run Text="{Binding NameAfter}" />
+                    </TextBlock>
                     <TextBlock Classes="unsaved" Text=" •" IsVisible="{Binding IsUnsaved}" />
                     <Panel Classes="not-read" IsVisible="{Binding IsUnread}">
                       <Rectangle />
@@ -476,6 +582,20 @@
             </ContextMenu>
           </TreeView.ContextMenu>
         </TreeView>
+        <!-- The type-ahead pill: what was typed, the matches, F3 and Esc. -->
+        <Border x:Name="TypeAheadPill" Classes="type-ahead" IsVisible="{Binding IsTypeAheadOpen}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Classes="search" Margin="0" Data="M6.5,1 A5.5,5.5 0 1 1 6.5,12 A5.5,5.5 0 1 1 6.5,1 Z M6.5,3 A3.5,3.5 0 1 0 6.5,10 A3.5,3.5 0 1 0 6.5,3 Z M10.2,11.6 L11.6,10.2 L15,13.6 L13.6,15 Z" />
+            <StackPanel Orientation="Horizontal">
+              <TextBlock Classes="mono" Text="{Binding TypeAheadText}" VerticalAlignment="Center" />
+              <TextBlock Classes="mono caret" Text="|" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Classes="muted" Text="{Binding TypeAheadSummary}" VerticalAlignment="Center" />
+            <Border Classes="key"><TextBlock Classes="mono muted key-hint" Text="F3" /></Border>
+            <Border Classes="key"><TextBlock Classes="mono muted key-hint" Text="Esc" /></Border>
+          </StackPanel>
+        </Border>
+        </Panel>
         </DockPanel>
 
         <GridSplitter Grid.Column="1" ResizeDirection="Columns" />
@@ -950,6 +1070,57 @@
           </TabItem>
         </TabControl>
         </DockPanel>
+
+        <!-- The empty state (boards/empty-state.md, S5): over the inspector while nothing is open. -->
+        <Border x:Name="EmptyState" Grid.Column="2" Classes="empty-state" IsVisible="{Binding IsEmpty}">
+          <ScrollViewer>
+            <StackPanel Width="640" HorizontalAlignment="Center" Margin="0,40" Spacing="24">
+              <Border x:Name="DropZone" Classes="drop-zone" Classes.active="{Binding IsDropTarget}">
+                <Panel>
+                  <Rectangle Classes="dash" />
+                  <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460" Spacing="14">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16">
+                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.HardDisk}, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Floppy}, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Parcel}, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                      <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Application}, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                    </StackPanel>
+                    <TextBlock Classes="empty-title" Text="Drop a Mac file, disk image or archive here" />
+                    <TextBlock Classes="muted" TextAlignment="Center" TextWrapping="Wrap"
+                               Text="HFS and HFS+ volume images, archives, MacBinary, BinHex, AppleSingle and AppleDouble files, or a file with its resource fork. ClassicMac shows everything inside, down to single resources." />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                      <Button Classes="accent" Content="Open…" Command="{Binding OpenCommand}" />
+                      <TextBlock Classes="mono muted" Text="Ctrl+O" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </StackPanel>
+                </Panel>
+              </Border>
+              <StackPanel x:Name="RecentList" Spacing="8" IsVisible="{Binding HasRecentFiles}">
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Classes="flat link" Content="Clear list" Command="{Binding ClearRecentCommand}" />
+                  <TextBlock Classes="caption" Text="RECENT" VerticalAlignment="Center" />
+                </DockPanel>
+                <Border Classes="recent-list">
+                  <ItemsControl ItemsSource="{Binding RecentFiles}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:RecentFile">
+                        <Button Classes="flat recent" Command="{Binding #EmptyState.((vm:MainViewModel)DataContext).OpenRecentCommand}" CommandParameter="{Binding}"
+                                ToolTip.Tip="{Binding Path}">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Image RenderOptions.BitmapInterpolationMode="None" Width="16" Height="16" Source="{Binding IconKind, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                            <TextBlock Text="{Binding Name}" Classes.muted="{Binding !Exists}" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted" Text="{Binding Folder}" TextTrimming="CharacterEllipsis" MaxWidth="380" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted" Text="Not found" IsVisible="{Binding !Exists}" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Border>
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
       </Grid>
 
       <!-- The drag handle: a 6 px strip with a 36 x 2 grip; hidden while the panel is collapsed. -->
