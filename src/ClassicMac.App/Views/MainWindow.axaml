@@ -357,7 +357,7 @@
             <DockPanel Margin="16,12">
               <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
                 <Button Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" />
-                <CheckBox Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
+                <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
                 <TextBlock Text="Apply makes an undoable edit; File ▸ Save writes the file." Classes="muted" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding FormError}" Classes="error" VerticalAlignment="Center" />
               </StackPanel>

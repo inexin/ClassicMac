@@ -24,6 +24,8 @@ namespace ClassicMac.App.Views
             DataContextChanged += (_, _) =>
             {
                 if (DataContext is not MainViewModel model) return;
+                model.ChangeRefused -= OnChangeRefused;
+                model.ChangeRefused += OnChangeRefused;
                 model.FilePicker = this;
                 model.EditDialogs ??= new EditDialogs(this);
                 model.AudioPlayer ??= audio;
@@ -36,7 +38,6 @@ namespace ClassicMac.App.Views
             };
             Closing += OnClosing;
             HexList.KeyDown += OnHexKeyDown;
-            Tree.SelectionChanged += OnTreeSelectionChanged;
             Tree.AddHandler(PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             Tree.AddHandler(PointerMovedEvent, OnTreePointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
             Tree.AddHandler(PointerReleasedEvent, (_, _) => dragPress = null, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -118,12 +119,18 @@ namespace ClassicMac.App.Views
             HexList.ScrollIntoView(editor.CursorLine);
         }
 
-        // A selection the view-model refused (it asks about unapplied edits first) is undone once the tree's own
-        // selection handling is over: the tree shows the node that is still selected.
-        private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e) => Dispatcher.UIThread.Post(() =>
+        // A change the view-model refused (a selection or the template box, while it asks about unapplied edits) is
+        // undone in the control once its own handling is over: a binding ignores the source while writing to it, and
+        // afterwards does not push a value it thinks the control has.
+        private void OnChangeRefused(object? sender, string property)
         {
-            if (DataContext is MainViewModel model && !ReferenceEquals(Tree.SelectedItem, model.Selected)) Tree.SelectedItem = model.Selected;
-        });
+            if (sender is not MainViewModel model) return;
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (property == nameof(MainViewModel.Selected) && !ReferenceEquals(Tree.SelectedItem, model.Selected)) Tree.SelectedItem = model.Selected;
+                if (property == nameof(MainViewModel.UseTemplate) && TemplateBox.IsChecked != model.UseTemplate) TemplateBox.IsChecked = model.UseTemplate;
+            });
+        }
 
         private bool quitting;
 

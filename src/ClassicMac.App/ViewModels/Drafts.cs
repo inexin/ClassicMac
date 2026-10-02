@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -8,6 +9,18 @@ namespace ClassicMac.App.ViewModels
     public sealed partial class MainViewModel
     {
         private bool askingDraft;
+
+        /// <summary>
+        /// Raised with the property's name when a change to <see cref="Selected"/> or <see cref="UseTemplate"/> is refused
+        /// while a draft is asked about; the view sets its control back once it is done changing.
+        /// </summary>
+        public event EventHandler<string>? ChangeRefused;
+
+        private void Refuse(string property)
+        {
+            OnPropertyChanged(property);
+            ChangeRefused?.Invoke(this, property);
+        }
 
         /// <summary>Whether a form or the hex view holds edits not yet applied.</summary>
         public bool HasDraft => CurrentDraft is not null;

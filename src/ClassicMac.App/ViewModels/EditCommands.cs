@@ -370,10 +370,17 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        private bool CanSave() => !IsExporting && SelectedState is { Session.IsDirty: true, Location: not null };
+        private bool CanSave() => !IsExporting && (SelectedState is { Session.IsDirty: true, Location: not null } || FileOwner(Selected) is not null && HasDraft);
 
         [RelayCommand(CanExecute = nameof(CanSave))]
-        private Task Save() => SaveTask = FileOwner(Selected) is { } owner ? SaveAsync(owner) : Task.CompletedTask;
+        private Task Save() => SaveTask = SaveSelectedAsync();
+
+        // Unapplied edits are applied (or discarded) first; cancelled, nothing is saved.
+        private async Task SaveSelectedAsync()
+        {
+            if (!await ResolveDraftAsync()) return;
+            if (FileOwner(Selected) is { } owner) await SaveAsync(owner);
+        }
 
         // Saves one file's edits back where they came from; true when saved (or nothing to save).
         private async Task<bool> SaveAsync(NodeViewModel owner)

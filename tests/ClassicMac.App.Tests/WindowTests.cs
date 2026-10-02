@@ -397,7 +397,7 @@ public class WindowTests
             Assert.Same(form, model.Form);
             Assert.Same(details, model.Details);
             dialogs.Pending.SetResult(DraftChoice.Cancel);
-            Pump(model.SelectionTask);
+            Pump(model.DraftTask);
             Assert.Same(type.Children[0], tree.SelectedItem);
             Assert.Equal("edited", form.Text);
 
@@ -411,7 +411,7 @@ public class WindowTests
             Assert.Same(type.Children[0], model.Selected);
             Assert.Same(type.Children[0], tree.SelectedItem);
             dialogs.Pending.SetResult(DraftChoice.Discard);
-            Pump(model.SelectionTask);
+            Pump(model.DraftTask);
             Assert.Same(type.Children[1], model.Selected);
             Assert.Same(type.Children[1], tree.SelectedItem);
             Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
@@ -513,7 +513,7 @@ public class WindowTests
             Assert.False(InView());
 
             link.Command!.Execute(link.CommandParameter);
-            Pump(model.SelectionTask);
+            Pump(model.DraftTask);
             Dispatcher.UIThread.RunJobs();
             window.UpdateLayout();
             Assert.True(InView());
@@ -584,5 +584,44 @@ public class WindowTests
         Assert.Equal(240, body.RowDefinitions[2].Height.Value);
         window.Close();
         Baselines.Verify(baselines);
+    });
+
+    // Ticking "Edit with template" with an unapplied form: the box stays unticked until the question is answered.
+    [Fact]
+    public void The_template_box_stays_while_a_draft_is_asked_about() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "both.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("STR ", 128, null, [2, .. "hi"u8]), ("TMPL", 1000, "STR ", EditTests.Tmpl(("Text", "PSTR")))));
+            var dialogs = new DraftDialogs();
+            var model = new MainViewModel { EditDialogs = dialogs };
+            var window = new MainWindow { DataContext = model, Width = 1200, Height = 800 };
+            window.Show();
+            Pump(model.OpenAsync(path));
+            Pump(model.Roots[0].EnsureLoadedAsync());
+            model.Selected = model.Roots[0].Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR ").Children[0];
+            Pump(model.PreviewTask);
+            model.SelectedTab = 3;
+            Dispatcher.UIThread.RunJobs();
+            Assert.IsType<StringForm>(model.Form).Text = "edited";
+            var box = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Content as string == "Edit with template");
+            box.IsChecked = true;                                           // as a click does
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1, dialogs.Asked);
+            Assert.False(model.UseTemplate);
+            Assert.False(box.IsChecked);
+            dialogs.Pending.SetResult(DraftChoice.Discard);
+            Pump(model.DraftTask);
+            Assert.True(model.UseTemplate);
+            Assert.True(box.IsChecked);
+            Assert.IsType<TemplateForm>(model.Form);
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
     });
 }

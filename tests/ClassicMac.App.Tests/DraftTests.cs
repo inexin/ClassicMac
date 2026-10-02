@@ -36,7 +36,7 @@ public sealed partial class EditTests
         Assert.Single(dialogs.DraftAsked);
 
         dialogs.Pending.SetResult(DraftChoice.Cancel);
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Same(form, model.Form);
         Assert.Equal("edited", form.Text);
@@ -52,7 +52,7 @@ public sealed partial class EditTests
         Assert.IsType<StringForm>(model.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Discard;
         model.Selected = Resource(file, 129);
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
         Assert.False(model.HasDraft);
@@ -69,7 +69,7 @@ public sealed partial class EditTests
         dialogs.Draft = DraftChoice.Apply;
         var target = Resource(file, 129);
         model.Selected = target;
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal("edited"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
         // The type's nodes were rebuilt by the edit: the clicked resource is selected in the new ones.
         Assert.Same(Resource(file, 129), model.Selected);
@@ -112,7 +112,7 @@ public sealed partial class EditTests
         Assert.IsType<StringForm>(model.Form).Text = "日本";               // not Mac OS Roman
         dialogs.Draft = DraftChoice.Apply;                                  // the dialog offers no Apply: treated as Cancel
         model.Selected = Resource(file, 129);
-        await model.SelectionTask;
+        await model.DraftTask;
         var (what, error) = Assert.Single(dialogs.DraftAsked);
         Assert.Equal("'STR ' 128", what);
         Assert.Contains("Mac OS Roman", error);
@@ -121,7 +121,7 @@ public sealed partial class EditTests
 
         dialogs.Draft = DraftChoice.Discard;
         model.Selected = Resource(file, 129);
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
     }
 
@@ -165,14 +165,14 @@ public sealed partial class EditTests
 
         dialogs.Draft = DraftChoice.Cancel;
         model.Selected = Resource(file, 128);
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal(("'STR ' 129", (string?)null), Assert.Single(dialogs.DraftAsked));
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.True(model.IsHexEditing);
 
         dialogs.Draft = DraftChoice.Discard;
         model.Selected = Resource(file, 128);
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.False(model.IsHexEditing);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal(3, Resource(file, 129).Resource.Length);
@@ -193,13 +193,13 @@ public sealed partial class EditTests
         Assert.IsType<StringForm>(model.Form).Text = "edited";
         dialogs.Draft = DraftChoice.Cancel;
         model.SelectedDiagnostic = new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Warning, "test", "a warning"), "Prefs", Resource(file, 129));
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Single(dialogs.DraftAsked);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
 
         dialogs.Draft = DraftChoice.Discard;
         model.SelectedDiagnostic = new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Warning, "test", "another warning"), "Prefs", Resource(file, 129));
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
     }
 
@@ -247,7 +247,7 @@ public sealed partial class EditTests
         var other = Path.Combine(folder, "Other.rsrc");
         File.WriteAllBytes(other, new ResourceFork().ToArray());
         await model.OpenAsync(other);
-        await model.SelectionTask;
+        await model.DraftTask;
         Assert.Equal(2, model.Roots.Count);                                 // opened, but the draft stays selected
         Assert.Single(dialogs.DraftAsked);
         Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
@@ -334,5 +334,96 @@ public sealed partial class EditTests
         model.Selected = Resource(file, 129);
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
         Assert.Equal("hello"u8.ToArray(), Resource(file, 128).Resource.GetData().ToArray());
+    }
+
+    [Fact]
+    public async Task Switching_to_the_template_asks_about_the_draft()
+    {
+        var path = Path.Combine(folder, "Both.rsrc");
+        var fork = new ResourceFork();
+        fork.Add(new Resource(Str, 128, new byte[] { 2, (byte)'h', (byte)'i' }));
+        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("Text", "PSTR"))) { Name = MacString.FromMacRoman("STR ") });
+        File.WriteAllBytes(path, fork.ToArray());
+        var dialogs = new Dialogs();
+        var model = new MainViewModel { EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        await input.EnsureLoadedAsync();
+        ResourceNode Node() => (ResourceNode)input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == Str).Children[0];
+        model.Selected = Node();
+        var form = Assert.IsType<StringForm>(model.Form);
+        form.Text = "edited";
+
+        dialogs.Pending = new TaskCompletionSource<DraftChoice>();
+        var changes = new List<string?>();
+        model.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        model.UseTemplate = true;
+        Assert.False(model.UseTemplate);                                    // not until answered
+        Assert.Same(form, model.Form);
+        Assert.Contains(nameof(MainViewModel.UseTemplate), changes);        // the check box is told to show it unchecked
+        dialogs.Pending.SetResult(DraftChoice.Cancel);
+        await model.DraftTask;
+        Assert.False(model.UseTemplate);
+        Assert.Same(form, model.Form);
+        Assert.Equal("edited", form.Text);
+        dialogs.Pending = null;
+
+        dialogs.Draft = DraftChoice.Discard;
+        model.UseTemplate = true;
+        await model.DraftTask;
+        Assert.True(model.UseTemplate);
+        Assert.Equal("hi", Assert.IsType<TemplateScalarRow>(Assert.IsType<TemplateForm>(model.Form).Fields[0]).Text);
+        Assert.Equal(2, dialogs.DraftAsked.Count);
+
+        ((TemplateScalarRow)((TemplateForm)model.Form!).Fields[0]).Text = "yo";
+        dialogs.Draft = DraftChoice.Apply;
+        model.UseTemplate = false;
+        await model.DraftTask;
+        Assert.False(model.UseTemplate);
+        Assert.Equal("yo", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.Equal("yo"u8.ToArray(), Node().Resource.GetData().ToArray());
+
+        model.UseTemplate = true;                                           // no draft: no question
+        Assert.Equal(3, dialogs.DraftAsked.Count);
+        Assert.True(model.UseTemplate);
+    }
+
+    [Fact]
+    public async Task Saving_asks_about_the_draft_and_applies_it_first()
+    {
+        var (model, file, dialogs, _, path) = await Open();
+        model.Selected = Resource(file, 128);
+        Assert.False(model.SaveCommand.CanExecute(null));
+        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        Assert.True(model.SaveCommand.CanExecute(null));                    // a draft alone can be saved
+
+        dialogs.Draft = DraftChoice.Cancel;
+        await model.SaveCommand.ExecuteAsync(null);
+        Assert.False(File.Exists(path + ".orig"));                          // not saved
+        Assert.True(model.HasDraft);
+
+        dialogs.Draft = DraftChoice.Apply;
+        await model.SaveCommand.ExecuteAsync(null);
+        Assert.Equal("edited"u8.ToArray(), Saved(path).Find(Str, 128)!.GetData().ToArray());
+        Assert.False(model.HasDraft);
+        Assert.False(model.HasUnsavedChanges);
+        Assert.Equal(2, dialogs.DraftAsked.Count);
+    }
+
+    [Fact]
+    public async Task Saving_with_the_draft_discarded_saves_the_applied_edits_only()
+    {
+        var (model, file, dialogs, _, path) = await Open();
+        model.Selected = Resource(file, 129);
+        await model.DeleteResourceCommand.ExecuteAsync(null);
+        model.Selected = Resource(file, 128);
+        Assert.IsType<StringForm>(model.Form).Text = "edited";
+
+        dialogs.Draft = DraftChoice.Discard;
+        await model.SaveCommand.ExecuteAsync(null);
+        var saved = Saved(path);
+        Assert.Null(saved.Find(Str, 129));
+        Assert.Equal("hello"u8.ToArray(), saved.Find(Str, 128)!.GetData().ToArray());
+        Assert.Equal("hello", Assert.IsType<StringForm>(model.Form).Text);
+        Assert.False(model.HasDraft);
     }
 }

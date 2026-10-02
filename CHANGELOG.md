@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Editor: "Edit with template" and Save also ask about unapplied edits first: the check box stays until the question is
+  answered; Save applies the draft (or saves without it, or does nothing on Cancel), and is available for a draft alone.
 - Core: `PackBits` (`Unpack` with the unit size and the `$80` flag's meaning, reporting why it stopped; `Pack`) is the
   one PackBits codec; pictures, MacPaint, QuickTime's planar codec and StuffIt's method 6 share it instead of their own
   copies (codecs/packbits.md §5).

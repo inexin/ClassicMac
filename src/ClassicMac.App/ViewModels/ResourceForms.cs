@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using System.Collections.ObjectModel;
 using System.Linq;
 using ClassicMac.Core;
@@ -192,19 +193,46 @@ namespace ClassicMac.App.ViewModels
             HasTemplateChoice = typed is not null && template is not null;
             var form = UseTemplate ? template ?? typed : typed ?? template;
             form?.MarkClean();
+            // A draft can be saved (Save applies it first): Save's state follows the form's values.
+            if (form is not null) form.PropertyChanged += (_, _) => SaveCommand.NotifyCanExecuteChanged();
+            if (form is DataForm data) data.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
             Form = form;
             WatchForm(Form, node as ResourceNode);
         }
 
-        /// <summary>Whether the Edit tab shows a resource through its <c>TMPL</c> even when it has a form of its own.</summary>
-        [ObservableProperty]
         private bool useTemplate;
+
+        /// <summary>
+        /// Whether the Edit tab shows a resource through its <c>TMPL</c> even when it has a form of its own. With an
+        /// unapplied draft, a change asks about it first and is made once it is applied or discarded.
+        /// </summary>
+        public bool UseTemplate
+        {
+            get => useTemplate;
+            set
+            {
+                if (useTemplate == value) return;
+                if (askingDraft || HasDraft)
+                {
+                    if (!askingDraft) DraftTask = UseTemplateAfterDraftAsync(value);
+                    // The check box (bound two-way) already shows the new value: told again, it shows the kept one.
+                    if (useTemplate != value) Refuse(nameof(UseTemplate));
+                    return;
+                }
+                SetProperty(ref useTemplate, value);
+                UpdateForm(Selected);
+            }
+        }
+
+        private async Task UseTemplateAfterDraftAsync(bool value)
+        {
+            if (await ResolveDraftAsync()) UseTemplate = value;
+        }
 
         /// <summary>Whether the selection has both a form of its own and a template to choose between.</summary>
         [ObservableProperty]
         private bool hasTemplateChoice;
 
-        partial void OnUseTemplateChanged(bool value) => UpdateForm(Selected);
 
         private bool CanApplyForm() => Form is not null && Selected is ResourceNode;
 

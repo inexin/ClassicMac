@@ -102,9 +102,9 @@ namespace ClassicMac.App.ViewModels
                 if (ReferenceEquals(selected, value)) return;
                 if (askingDraft || HasDraft)
                 {
-                    if (!askingDraft) SelectionTask = SelectAfterDraftAsync(value);
+                    if (!askingDraft) DraftTask = SelectAfterDraftAsync(value);
                     // The tree (bound two-way) already shows the new node: told again, it shows the kept one.
-                    if (!ReferenceEquals(selected, value)) OnPropertyChanged(nameof(Selected));
+                    if (!ReferenceEquals(selected, value)) Refuse(nameof(Selected));
                     return;
                 }
                 var old = selected;
@@ -119,8 +119,8 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        /// <summary>The last selection made after asking about a draft (tests wait for it).</summary>
-        internal Task SelectionTask { get; private set; } = Task.CompletedTask;
+        /// <summary>The last selection or template switch made after asking about a draft (tests wait for it).</summary>
+        internal Task DraftTask { get; private set; } = Task.CompletedTask;
 
         [ObservableProperty]
         private DetailsViewModel details = DetailsViewModel.Empty;
@@ -329,7 +329,7 @@ namespace ClassicMac.App.ViewModels
             var before = Selected;
             for (var at = node.Parent; at is not null; at = at.Parent) at.IsExpanded = true;
             Selected = node;
-            await SelectionTask;
+            await DraftTask;
             if (Selected is not { } shown || ReferenceEquals(shown, before) && !ReferenceEquals(before, node)) return;
             ItemShown?.Invoke(shown);
         }
