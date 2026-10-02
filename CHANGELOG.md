@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Editor: the hex inspector says what the byte at the cursor is in its resource ("Character 1 of string 1,
+  “Untitled”", with its value) for `STR `, `STR#` and types with a `TMPL` in an open file, read from the bytes as
+  edited, and the field's bytes are highlighted in the grid. Without editing, a click selects a byte (highlighted in
+  both columns) and the inspector reads it. The grid and a 200-pixel inspector fit side by side at the default window
+  size, the Mac OS Roman column in view.
 - Viewer: with nothing open, the status bar says "Ready" and the diagnostics panel is collapsed to its header, which
   says "Nothing opened yet"; it opens again when a file opens or something is reported, unless you opened or closed it
   yourself (S5).

@@ -1,5 +1,6 @@
 using ClassicMac.App.ViewModels;
 using ClassicMac.Core;
+using ClassicMac.Resources.Decoders.Templates;
 
 namespace ClassicMac.App.Tests;
 
@@ -238,36 +239,78 @@ public sealed class HexEditTests : IDisposable
         Assert.Equal((true, false), (cells[0].IsPlaceholder, cells[1].IsPlaceholder));
     }
 
-    // E8's hook: a provider of byte meanings, shown by the inspector when set.
-    private sealed class Meanings : IByteMeaningProvider
+    // E8 (design/boards/hex.md): the inspector says what the byte at the cursor is, from the edited bytes, and the
+    // field it belongs to is highlighted in the grid.
+    [Fact]
+    public async Task The_inspector_shows_the_meaning_and_the_grid_its_field()
     {
-        public List<(FourCC Type, int Offset)> Asked { get; } = [];
+        var (model, input) = await Open();
+        model.Selected = Resource(input, "STR#");
+        await model.PreviewTask;
+        await model.EditHexCommand.ExecuteAsync(null);
+        var editor = model.HexEdit!;
 
-        public string? MeaningOf(FourCC type, short id, ReadOnlySpan<byte> data, int offset)
-        {
-            Asked.Add((type, offset));
-            return offset < data.Length ? $"Byte {offset} of {type}" : null;
-        }
+        Assert.Equal(new ByteMeaning("Number of strings", 0, 2, "1"), editor.Inspector.Meaning);
+        Assert.Equal([true, true, false], editor.Lines[0].Cells.Take(3).Select(c => c.IsInField));
+        editor.MoveTo(4);
+        Assert.Equal("Character 2 of string 1, “Untitled”", editor.Inspector.Meaning!.Text);
+        Assert.Equal(Enumerable.Range(0, 11).Select(i => i is >= 3 and <= 10), editor.Lines[0].Cells.Take(11).Select(c => c.IsInField));
+
+        // From the bytes as edited: 'U' → 'A'.
+        editor.MoveTo(3);
+        editor.TypeDigit(4);
+        editor.TypeDigit(1);
+        editor.MoveTo(3);
+        Assert.Equal(("Character 1 of string 1, “Antitled”", "A"), (editor.Inspector.Meaning!.Text, editor.Inspector.Meaning.Value));
     }
 
     [Fact]
-    public async Task Byte_meanings_come_from_a_provider_when_one_is_set()
+    public async Task Types_without_a_field_map_have_no_meaning()
     {
         var (model, input) = await Open();
         model.Selected = Resource(input, "ZZZZ");
         await model.PreviewTask;
         await model.EditHexCommand.ExecuteAsync(null);
-        Assert.Null(model.HexEdit!.Inspector.Meaning);   // none set
+        Assert.Null(model.HexEdit!.Inspector.Meaning);
+        Assert.All(model.HexEdit.Lines[0].Cells, c => Assert.False(c.IsInField));
+    }
 
-        model.DiscardHexEditCommand.Execute(null);
-        var meanings = new Meanings();
-        model.ByteMeanings = meanings;
+    // Read only (the hex view of a resource with no preview): a click selects a byte; the pair highlights, and the
+    // inspector reads it, with its meaning when a TMPL in an open file describes the type.
+    [Fact]
+    public async Task Selecting_a_byte_read_only_highlights_and_inspects_it()
+    {
+        var path = Path.Combine(folder, "Data.rsrc");
+        File.WriteAllBytes(path, PreviewTests.Fork(("Rsrc", 128, null, [0, 7, 0xFF]),
+            ("TMPL", 1000, "Rsrc", EditTests.Tmpl(("ID", "DWRD"), ("Flag", "DBYT")))));
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(path))!;
+        await input.EnsureLoadedAsync();
+        model.Selected = Resource(input, "Rsrc");
+        await model.PreviewTask;
+        Assert.True(model.HasHex);
+        Assert.Null(model.HexInspection);
+        var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>();
+        model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+
+        model.SelectHexByte(1);
+
+        Assert.Contains(nameof(MainViewModel.HexInspection), changed);
+        Assert.Equal("At 0x0001", model.HexInspection!.Heading);
+        Assert.Equal("2,047", model.HexInspection.Rows[2].Value);   // UInt16 BE at 1: 07 FF
+        Assert.Equal(new ByteMeaning("ID", 0, 2, "7"), model.HexInspection.Meaning);
+        var cells = model.HexLines![0].Cells;
+        Assert.Equal([false, true, false], cells.Select(c => c.IsSelected));
+        Assert.Equal([true, true, false], cells.Select(c => c.IsInField));
+        Assert.All(cells, c => Assert.False(c.IsCursor));
+
+        // Editing shows the editor's inspector; a new selection drops the read-only one.
         await model.EditHexCommand.ExecuteAsync(null);
-        Assert.Equal("Byte 0 of ZZZZ", model.HexEdit!.Inspector.Meaning);
+        Assert.Same(model.HexEdit!.Inspector, model.HexInspection);
         model.HexEdit.MoveTo(2);
-        Assert.Equal("Byte 2 of ZZZZ", model.HexEdit.Inspector.Meaning);
-        model.HexEdit.MoveTo(6);
-        Assert.Null(model.HexEdit.Inspector.Meaning);
-        Assert.Contains((FourCC.FromString("ZZZZ"), 2), meanings.Asked);
+        Assert.Equal("At 0x0002", model.HexInspection!.Heading);
+        model.DiscardHexEditCommand.Execute(null);
+        model.Selected = input;
+        Assert.Null(model.HexInspection);
     }
 }

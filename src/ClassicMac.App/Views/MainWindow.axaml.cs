@@ -163,12 +163,12 @@ namespace ClassicMac.App.Views
             }
         }
 
-        // A click on a byte (or its character) while editing puts the cursor on it.
+        // A click on a byte (or its character) puts the cursor on it while editing, else selects it.
         private void OnHexPointerPressed(object? sender, PointerPressedEventArgs e)
         {
-            if (DataContext is MainViewModel { HexEdit: { } editor } && (e.Source as StyledElement)?.DataContext is HexCell cell)
+            if (DataContext is MainViewModel model && (e.Source as StyledElement)?.DataContext is HexCell cell)
             {
-                editor.MoveTo((int)Math.Min(cell.Offset, int.MaxValue));
+                model.SelectHexByte(cell.Offset);
                 HexList.Focus();
             }
         }

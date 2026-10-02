@@ -160,16 +160,16 @@
       <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
     </Style>
     <Style Selector="TextBlock.hex-offset">
-      <Setter Property="Width" Value="80" />
+      <Setter Property="Width" Value="68" />
       <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="TextBlock.hex-text">
-      <Setter Property="Margin" Value="16,0,0,0" />
+      <Setter Property="Margin" Value="12,0,0,0" />
     </Style>
     <Style Selector="Border.hex-cell">
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Width" Value="24" />
+      <Setter Property="Width" Value="22" />
       <Setter Property="Height" Value="20" />
     </Style>
     <Style Selector="Border.hex-cell.group-end">
@@ -191,6 +191,12 @@
     <Style Selector="Border.hex-cell.zero > TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
     </Style>
+    <Style Selector="Border.in-field">
+      <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    </Style>
+    <Style Selector="Border.selected">
+      <Setter Property="Background" Value="{DynamicResource CmSelectionInactive}" />
+    </Style>
     <Style Selector="Border.changed">
       <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
     </Style>
@@ -204,8 +210,8 @@
       <Setter Property="Foreground" Value="{DynamicResource CmOnAccent}" />
     </Style>
     <Style Selector="Border.hex-inspector">
-      <Setter Property="Width" Value="260" />
-      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="Width" Value="200" />
+      <Setter Property="Padding" Value="12,10" />
       <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
       <Setter Property="BorderThickness" Value="1,0,0,0" />
@@ -1451,13 +1457,13 @@
                   <TextBlock Classes="hex-status" Text="{Binding HexEdit.Status, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis" />
                 </DockPanel>
               </Border>
-              <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding IsHexEditing}">
+              <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding HexInspection, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="caption" Text="{Binding HexEdit.Inspector.Heading, FallbackValue={x:Null}}" />
-                  <ItemsControl ItemsSource="{Binding HexEdit.Inspector.Rows, FallbackValue={x:Null}}">
+                  <TextBlock Classes="caption" Text="{Binding HexInspection.Heading, FallbackValue={x:Null}}" />
+                  <ItemsControl ItemsSource="{Binding HexInspection.Rows, FallbackValue={x:Null}}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="vm:HexReading">
-                        <Grid ColumnDefinitions="90,*" Margin="0,2">
+                        <Grid ColumnDefinitions="76,*" Margin="0,2">
                           <TextBlock Text="{Binding Label}" Classes="muted" />
                           <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="mono" />
                         </Grid>
@@ -1465,9 +1471,11 @@
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
                   <StackPanel Spacing="4" Margin="0,12,0,0"
-                              IsVisible="{Binding HexEdit.Inspector.Meaning, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+                              IsVisible="{Binding HexInspection.Meaning, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
                     <TextBlock Classes="caption" Text="IN THIS RESOURCE" />
-                    <TextBlock Text="{Binding HexEdit.Inspector.Meaning, FallbackValue={x:Null}}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding HexInspection.Meaning.Text, FallbackValue={x:Null}}" TextWrapping="Wrap" />
+                    <TextBlock Classes="mono" Text="{Binding HexInspection.Meaning.Value, StringFormat='= {0}', FallbackValue={x:Null}}"
+                               IsVisible="{Binding HexInspection.Meaning.Value, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
                   </StackPanel>
                 </StackPanel>
               </Border>
@@ -1503,13 +1511,14 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="vm:HexCell">
                             <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}" Classes.zero="{Binding IsZero}"
+                                    Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}"
                                     Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
                               <TextBlock Text="{Binding Hex}" />
                             </Border>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                      <ItemsControl ItemsSource="{Binding Cells}" Margin="16,0,0,0">
+                      <ItemsControl ItemsSource="{Binding Cells}" Margin="12,0,0,0">
                         <ItemsControl.ItemsPanel>
                           <ItemsPanelTemplate>
                             <StackPanel Orientation="Horizontal" />
@@ -1517,7 +1526,8 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="vm:HexCell">
-                            <Border Classes="hex-char" Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                            <Border Classes="hex-char" Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}"
+                                    Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
                               <TextBlock Text="{Binding Character}" Classes.muted="{Binding IsPlaceholder}" />
                             </Border>
                           </DataTemplate>

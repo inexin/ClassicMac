@@ -273,14 +273,23 @@ namespace ClassicMac.App.ViewModels
         public ByteMeaning? MeaningAt(ResourceNode node, int offset)
         {
             ArgumentNullException.ThrowIfNull(node);
+            return MeaningsFor(node) is { } meanings ? meanings(node.Resource.GetData().ToArray(), offset) : null;
+        }
+
+        /// <summary>
+        /// The meanings of a resource's bytes, for any bytes of it (the hex editor's as edited): its template found once;
+        /// null for a compressed resource.
+        /// </summary>
+        internal Func<byte[], int, ByteMeaning?>? MeaningsFor(ResourceNode node)
+        {
             if ((node.Resource.Attributes & ResourceAttributes.Compressed) != 0)
             {
                 return null;
             }
-            var data = node.Resource.GetData().Span;
+
             var type = node.Resource.Type;
             var template = type.ToString() is "STR " or "STR#" ? null : FindTemplate(type, node.Fork, FileOwner(node))?.Template;
-            return ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, data, offset, template);
+            return (data, offset) => ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, data, offset, template);
         }
 
         private TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)

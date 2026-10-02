@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -427,8 +428,73 @@ namespace ClassicMac.App.ViewModels
             BeginHexEdit();
         }
 
-        /// <summary>What bytes mean in their resource (E8), shown by the hex inspector; null while there is no field map.</summary>
-        public IByteMeaningProvider? ByteMeanings { get; set; }
+        /// <summary>
+        /// The hex inspector's reading: the editor's at its cursor while editing, else the byte selected in the read-only
+        /// view; null when there is neither.
+        /// </summary>
+        public HexInspection? HexInspection => HexEdit?.Inspector ?? readInspection;
+
+        private HexInspection? readInspection;
+
+        /// <summary>
+        /// A click on a byte of the hex view: the cursor while editing; otherwise the byte is selected, its pair highlighted
+        /// and inspected, its field (E8) highlighted.
+        /// </summary>
+        public void SelectHexByte(long offset)
+        {
+            if (HexEdit is { } editor)
+            {
+                editor.MoveTo((int)Math.Min(offset, int.MaxValue));
+                return;
+            }
+
+            if (HexSource is not { } source || HexLines is not { } lines || offset < 0 || offset >= source.Data.Length)
+            {
+                return;
+            }
+
+            // Reads what is around the byte; a meaning needs the whole resource (the hex view shows resources only).
+            var data = source.Data.Length <= ReadOptions.MaxResourceSize ? source.Data.ToArray() : null;
+            var meanings = data is not null && Selected is ResourceNode node ? MeaningsFor(node) : null;
+            readInspection = data is not null
+                ? HexInspection.At(data, (int)offset, meanings)
+                : HexInspection.At(source.Data.Slice(offset, Math.Min(4, source.Data.Length - offset)).ToArray(), 0, null) with
+                {
+                    Heading = string.Create(CultureInfo.InvariantCulture, $"At 0x{offset:X4}"),
+                };
+            lines.Select(offset, readInspection.Meaning is { } field ? (field.Start, field.Length) : null);
+            OnPropertyChanged(nameof(HexInspection));
+        }
+
+        // The read-only selection goes with the lines it was made on.
+        partial void OnHexLinesChanged(HexLines? value)
+        {
+            readInspection = null;
+            OnPropertyChanged(nameof(HexInspection));
+        }
+
+        partial void OnHexEditChanged(HexEditor? oldValue, HexEditor? newValue)
+        {
+            if (oldValue is not null)
+            {
+                oldValue.PropertyChanged -= OnHexEditorChanged;
+            }
+
+            if (newValue is not null)
+            {
+                newValue.PropertyChanged += OnHexEditorChanged;
+            }
+
+            OnPropertyChanged(nameof(HexInspection));
+        }
+
+        private void OnHexEditorChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(HexEditor.Inspector))
+            {
+                OnPropertyChanged(nameof(HexInspection));
+            }
+        }
 
         /// <summary>The Hex tab's Go to box: a hex offset.</summary>
         [ObservableProperty]
@@ -470,10 +536,7 @@ namespace ClassicMac.App.ViewModels
             }
 
             hexEditTarget = (node.Resource, owner);
-            var resource = node.Resource;
-            var meanings = ByteMeanings;
-            HexEdit = new HexEditor(resource.GetData(),
-                meanings is null ? null : (data, offset) => meanings.MeaningOf(resource.Type, resource.Id, data, offset));
+            HexEdit = new HexEditor(node.Resource.GetData(), MeaningsFor(node));
             GoToError = null;
             HexEdit.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
             HexLines = HexEdit.Lines;

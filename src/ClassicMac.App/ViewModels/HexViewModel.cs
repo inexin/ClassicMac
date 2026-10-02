@@ -37,7 +37,10 @@ namespace ClassicMac.App.ViewModels
     /// whether it is zero (drawn lighter), changed (tinted), under the cursor, and the last of a group of eight (a gap
     /// follows). The append position at the end is a cell with no digits.
     /// </summary>
-    public sealed record HexCell(long Offset, string Hex, string Character, bool IsZero, bool IsChanged, bool IsCursor, bool IsGroupEnd)
+    /// <param name="IsSelected">Selected in the read-only view (a click): the pair highlights in both columns.</param>
+    /// <param name="IsInField">Part of the field the inspected byte belongs to (E8).</param>
+    public sealed record HexCell(long Offset, string Hex, string Character, bool IsZero, bool IsChanged, bool IsCursor, bool IsGroupEnd,
+        bool IsSelected = false, bool IsInField = false)
     {
         /// <summary>A non-printable byte, shown as a muted "·".</summary>
         public bool IsPlaceholder => Character == "·";
@@ -54,6 +57,8 @@ namespace ClassicMac.App.ViewModels
         private bool editing;
         private int cursor = -1;
         private Func<int, bool>? changed;
+        private long selected = -1;
+        private (long Start, long Length)? field;
         private long cachedBlock = -1;
         private byte[] cache = [];
 
@@ -80,14 +85,25 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Shows edited bytes, with the edit cursor on byte <paramref name="cursorOffset"/> (which may be the
         /// length, to append). There is always a line for the cursor at the end.</summary>
-        public void Reload(ForkData newData, int cursorOffset, Func<int, bool>? isChanged = null)
+        public void Reload(ForkData newData, int cursorOffset, Func<int, bool>? isChanged = null, (int Start, int Length)? meaningField = null)
         {
             data = newData;
             editing = true;
             cursor = cursorOffset;
             changed = isChanged;
+            field = meaningField;
             cachedBlock = -1;
             Count = (int)Math.Min(int.MaxValue, data.Length / BytesPerLine + 1);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
+
+        /// <summary>
+        /// Marks a byte selected in the read-only view (-1 for none) and the field of its meaning (null for none).
+        /// </summary>
+        public void Select(long offset, (int Start, int Length)? meaningField)
+        {
+            selected = offset;
+            field = meaningField;
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
@@ -121,7 +137,8 @@ namespace ClassicMac.App.ViewModels
                     {
                         var ch = MacRoman.ToChar(line[i]);
                         cells.Add(new HexCell(byteOffset, line[i].ToString("X2", CultureInfo.InvariantCulture), ch < ' ' || ch == '\u007F' ? "·" : ch.ToString(),
-                            line[i] == 0, editing && byteOffset <= int.MaxValue && changed?.Invoke((int)byteOffset) == true, editing && byteOffset == cursor, i == 7));
+                            line[i] == 0, editing && byteOffset <= int.MaxValue && changed?.Invoke((int)byteOffset) == true, editing && byteOffset == cursor, i == 7,
+                            !editing && byteOffset == selected, field is var (start, length) && byteOffset >= start && byteOffset < start + length));
                     }
                     else if (editing && byteOffset == cursor)
                     {

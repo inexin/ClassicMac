@@ -5,6 +5,7 @@ using System.Linq;
 using Avalonia.Input;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Resources.Decoders.Templates;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ClassicMac.App.ViewModels
@@ -17,14 +18,15 @@ namespace ClassicMac.App.ViewModels
     {
         private readonly byte[] original;
         private readonly List<byte> bytes;
-        private readonly Func<byte[], int, string?>? meaning;
+        private readonly Func<byte[], int, ByteMeaning?>? meaning;
         private bool half;
 
         /// <summary>
         /// An editor of <paramref name="data"/>; <paramref name="meaning"/>, when given, says what the byte at an offset
-        /// of the bytes means (design/boards/hex.md, E8), shown by the <see cref="Inspector"/>.
+        /// of the bytes (as edited) means and which field it is in (design/boards/hex.md, E8): the <see cref="Inspector"/>
+        /// shows it and the grid highlights the field.
         /// </summary>
-        public HexEditor(ReadOnlyMemory<byte> data, Func<byte[], int, string?>? meaning = null)
+        public HexEditor(ReadOnlyMemory<byte> data, Func<byte[], int, ByteMeaning?>? meaning = null)
         {
             original = data.ToArray();
             bytes = [.. original];
@@ -255,7 +257,7 @@ namespace ClassicMac.App.ViewModels
             Inspector = HexInspection.At(data, Cursor, meaning);
             OnPropertyChanged(nameof(Inspector));
             OnPropertyChanged(nameof(ChangedCount));
-            Lines.Reload(ForkData.FromBytes(data), Cursor, IsChanged);
+            Lines.Reload(ForkData.FromBytes(data), Cursor, IsChanged, Inspector.Meaning is { } field ? (field.Start, field.Length) : null);
             OnPropertyChanged(nameof(Status));
             OnPropertyChanged(nameof(IsModified));
             OnPropertyChanged(nameof(Length));
@@ -269,11 +271,11 @@ namespace ClassicMac.App.ViewModels
     /// The byte inspector (design/boards/hex.md): "At 0x0003", the bytes at the cursor as UInt8, Int8, UInt16 BE,
     /// Int16 BE, UInt32 BE, OSType and binary, and what the byte means in its resource when a provider knows (E8).
     /// </summary>
-    public sealed record HexInspection(string Heading, IReadOnlyList<HexReading> Rows, string? Meaning)
+    public sealed record HexInspection(string Heading, IReadOnlyList<HexReading> Rows, ByteMeaning? Meaning)
     {
         public static HexInspection Empty { get; } = new("", [], null);
 
-        public static HexInspection At(byte[] data, int offset, Func<byte[], int, string?>? meaning)
+        public static HexInspection At(byte[] data, int offset, Func<byte[], int, ByteMeaning?>? meaning)
         {
             const string None = "—";
             var reader = new BigEndianReader(data);
@@ -292,15 +294,5 @@ namespace ClassicMac.App.ViewModels
             };
             return new HexInspection(string.Create(CultureInfo.InvariantCulture, $"At 0x{offset:X4}"), rows, meaning?.Invoke(data, offset));
         }
-    }
-
-    /// <summary>
-    /// Says what a byte of a resource is ("Character 1 of string 1, “Untitled”"), from a field map per type
-    /// (design/boards/hex.md, E8); the hex inspector shows it when the app has one.
-    /// </summary>
-    public interface IByteMeaningProvider
-    {
-        /// <summary>The meaning of the byte at <paramref name="offset"/> of a <paramref name="type"/> resource's <paramref name="data"/>; null when unknown.</summary>
-        string? MeaningOf(FourCC type, short id, ReadOnlySpan<byte> data, int offset);
     }
 }
