@@ -1,39 +1,71 @@
 # IMA 4:1
 
-`'ima4'` is IMA ADPCM [Author] in Apple's packet layout, decoded by the `ima4` `sdec` component (68k `sift` −16589,
-PowerPC `nift` −16589); the two agree everywhere but on invalid step indexes (§3) [Code].
+`'ima4'` is IMA ADPCM in Apple's packet layout: 34-byte packets per channel, each a 2-byte preamble and 64 4-bit
+samples. Mac OS 9 decodes it with the `ima4` `sdec` component (68k `sift` −16589, PowerPC `nift` −16589); the two
+agree everywhere but on invalid step indexes (§4). Sampled sounds in `'snd '` resources name it as their format.
+ClassicMac decodes it to 16-bit WAV samples.
+
+| | |
+| --- | --- |
+| Used by | [sound.md](../resources/sound.md) (format `'ima4'` in a compressed sound header) |
+| ClassicMac | Reads; `ClassicMac.Resources.Decoders.Sound.Ima4` |
+| Verified against | Sound Manager 3.5.1 on Mac OS 9.0, its own decoding of IMA 4:1 samples it compressed (mono and stereo) |
+| Sources | The IMA ADPCM recommendation; the Mac OS 9.0 System's `ima4` `sdec` component, 68k and PowerPC, traced |
 
 Contents
 
-1. [Packets](#1-packets)
-2. [When the preamble is read](#2-when-the-preamble-is-read)
-3. [Nibbles](#3-nibbles)
+1. [Layout](#1-layout)
+2. [Reading](#2-reading)
+3. [Writing](#3-writing)
+4. [Variants](#4-variants)
+5. [ClassicMac](#5-classicmac)
+6. [Diagnostics](#6-diagnostics)
+7. [Verification](#7-verification)
+8. [Not covered](#8-not-covered)
+9. [References](#9-references)
 
----
+## 1. Layout
 
-## 1. Packets
+### 1.1 Packets
 
-| Offset | Size | Type | Meaning |
+| Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
-| +0 | 2 | u16 | preamble: the predictor in the upper 9 bits, the step index in the low 7 |
-| +2 | 32 | u8[] | 64 samples, 4 bits each, **low nibble first** |
+| +$00 | 2 | Preamble | The predictor in the upper 9 bits, the step index in the low 7 |
+| +$02 | 32 | Samples | 64 samples, 4 bits each, low nibble first |
 
-[Code][Verified].
+[Code] [Verified]
 
-- A packet is 34 bytes per channel; channels alternate by packet, L R L R …, each with its own state [Code][Verified].
-  The component handles 1 or 2 channels only [Code].
-- Preamble: predictor = sign-extend16(word & $FF80) (the low 7 bits zero); step index = word & $7F, not clamped
+- A packet is 34 bytes per channel; channels alternate by packet, L R L R …, each with its own state [Code]
+  [Verified]. The component handles 1 or 2 channels only [Code].
+- Preamble: predictor = sign-extend16(word & `$FF80`) (the low 7 bits zero); step index = word & `$7F`, not clamped
   [Code].
-- `numFrames` counts packets; the sound has 64 × `numFrames` frames [Code][Verified].
-- A trailing partial packet is never decoded [Code].
+- `numFrames` counts packets; the sound has 64 × `numFrames` frames [Code] [Verified].
 
----
+### 1.2 Tables
 
-## 2. When the preamble is read
+[Author] [Code] (Apple's are the standard ones):
+
+```
+STEP = [     7,     8,     9,    10,    11,    12,    13,    14,    16,    17,
+            19,    21,    23,    25,    28,    31,    34,    37,    41,    45,
+            50,    55,    60,    66,    73,    80,    88,    97,   107,   118,
+           130,   143,   157,   173,   190,   209,   230,   253,   279,   307,
+           337,   371,   408,   449,   494,   544,   598,   658,   724,   796,
+           876,   963,  1060,  1166,  1282,  1411,  1552,  1707,  1878,  2066,
+          2272,  2499,  2749,  3024,  3327,  3660,  4026,  4428,  4871,  5358,
+          5894,  6484,  7132,  7845,  8630,  9493, 10442, 11487, 12635, 13899,
+         15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767 ]        indexes 0–88
+
+INDEX = [ -1, -1, -1, -1, 2, 4, 6, 8,  -1, -1, -1, -1, 2, 4, 6, 8 ]           nibbles 0–15
+```
+
+## 2. Reading
+
+### 2.1 When the preamble is read
 
 The component decodes in batches of min(remaining packets, maxFrames / 64), and `maxFrames` is at most 1024, so a
-batch is **16 packets**. It looks at a preamble only for the first packet of each batch, and uses it only when it
-differs from the running state [Code][Verified]:
+batch is 16 packets. It looks at a preamble only for the first packet of each batch, and uses it only when it differs
+from the running state [Code] [Verified]:
 
 ```
 per channel: pred = 0, index = 0
@@ -52,10 +84,9 @@ for packet p = 0, 1, … of the channel:
 - The running state starts at 0 when the component opens and is reset by `StopSource` [Code].
 - On streams from Apple's own compressor this gives the same result as reading every preamble; on spliced data, a
   decoder that reads every preamble differs [Code].
+- A trailing partial packet is never decoded [Code].
 
----
-
-## 3. Nibbles
+### 2.2 Nibbles
 
 ```
 nibble(n):
@@ -70,27 +101,48 @@ nibble(n):
     emit pred
 ```
 
-- The difference is built by shifts that truncate, as the IMA recommendation gives it [Author][Code]. The 68k code
+- The difference is built by shifts that truncate, as the IMA recommendation gives it [Author] [Code]. The 68k code
   uses a precomputed 89 × 16 table of these values; a multiplying form would differ in 404 of its 1424 entries
   [Code].
 - The predictor is clamped before the index is updated [Code].
+- Output: 16-bit signed samples [Code] [Verified].
+
+## 3. Writing
+
+None.
+
+## 4. Variants
+
 - A preamble index above 88 is used once, for the next nibble, before it is clamped; Apple's code then reads past its
-  table, into memory that differs between 68k and PowerPC [Code]. ClassicMac uses `STEP[88]` for that nibble.
-- Output: 16-bit signed samples [Code][Verified]. Asked for 8-bit output, the component gives
-  `((pred >> 8) & $FF) XOR $80` [Code]. ClassicMac writes 16-bit.
+  table, into memory that differs between 68k and PowerPC [Code].
+- Asked for 8-bit output, the component gives `((pred >> 8) & $FF) XOR $80` [Code].
 
-Tables [Author][Code] (Apple's are the standard ones):
+## 5. ClassicMac
 
-```
-STEP = [     7,     8,     9,    10,    11,    12,    13,    14,    16,    17,
-            19,    21,    23,    25,    28,    31,    34,    37,    41,    45,
-            50,    55,    60,    66,    73,    80,    88,    97,   107,   118,
-           130,   143,   157,   173,   190,   209,   230,   253,   279,   307,
-           337,   371,   408,   449,   494,   544,   598,   658,   724,   796,
-           876,   963,  1060,  1166,  1282,  1411,  1552,  1707,  1878,  2066,
-          2272,  2499,  2749,  3024,  3327,  3660,  4026,  4428,  4871,  5358,
-          5894,  6484,  7132,  7845,  8630,  9493, 10442, 11487, 12635, 13899,
-         15289, 16818, 18500, 20350, 22385, 24623, 27086, 29794, 32767 ]        indexes 0–88
+- A preamble index above 88 uses `STEP[88]` for its one nibble (§4). [ClassicMac]
+- ClassicMac writes IMA 4:1 as 16-bit samples ([sound.md](../resources/sound.md)). [ClassicMac]
+- More than two channels, which the component refuses, are decoded alike, each channel by packet in turn. [ClassicMac]
 
-INDEX = [ -1, -1, -1, -1, 2, 4, 6, 8,  -1, -1, -1, -1, 2, 4, 6, 8 ]           nibbles 0–15
-```
+## 6. Diagnostics
+
+None. Sample counts beyond the resource are reported by the sound reader (`sound.short`,
+[sound.md](../resources/sound.md)).
+
+## 7. Verification
+
+- `tests/ClassicMac.Resources.Decoders.Tests/SoundDecoderTests.cs`:
+  - `IMA4_packets_decode`: two packets worked by hand from the tables; the second packet's preamble, mid-batch, is
+    ignored.
+  - `Sound_Manager_samples_decode_as_the_Sound_Manager_does`: with `CLASSICMAC_CORPUS` set, mono and stereo IMA 4:1
+    sounds (`ima4m.snd`, `ima4s.snd`) decode byte for byte to Sound Manager 3.5.1's own 16-bit output on Mac OS 9.0 in
+    SheepShaver. Not committed.
+
+## 8. Not covered
+
+- Sounds of more than two channels against any Mac decoder.
+
+## 9. References
+
+1. Interactive Multimedia Association, *Recommended Practices for Enhancing Digital Audio Compatibility in Multimedia
+   Systems* (IMA ADPCM), 1992.
+2. Mac OS 9.0 System file, `sdec` component −16589 (`sift`, `nift`), traced in disassembly.

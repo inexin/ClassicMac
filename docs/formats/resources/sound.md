@@ -391,7 +391,7 @@ A RIFF WAVE file (Microsoft's specifications): `RIFF` size `WAVE`, then the chun
 | 16-bit `'raw '` and `'twos'`, `'in24'`, `'in32'` | byte order reversed |
 | `'sowt'` | copied |
 | `'fl32'`, `'fl64'` | byte order reversed; IEEE float |
-| MACE | 8-bit, as the Sound Manager gives it ([mace.md §5](../codecs/mace.md#5-output)) |
+| MACE | 8-bit, as the Sound Manager gives it ([mace.md §2.4](../codecs/mace.md#24-output)) |
 | IMA 4:1, µ-law | 16-bit |
 
 The rate is the header's rate rounded to whole hertz, at least 1: 22254.545 Hz becomes 22255. The exact rate is in the

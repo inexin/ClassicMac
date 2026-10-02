@@ -1,155 +1,48 @@
 # MACE 3:1 and 6:1
 
-MACE (Macintosh Audio Compression and Expansion) compresses 8-bit sound 3:1 or 6:1 [Doc]. Apple documented the
-routines (`Comp3to1`, `Exp1to3`, `Comp6to1`, `Exp1to6`) but not the algorithm; everything below is from the code.
+MACE (Macintosh Audio Compression and Expansion) compresses 8-bit sound 3:1 or 6:1: each code of 2 or 3 bits picks a
+delta from a table row chosen by an adaptive level. Apple documented the routines (`Comp3to1`, `Exp1to3`, `Comp6to1`,
+`Exp1to6`) but not the algorithm; everything below is from the code [Doc]. Sampled sounds in `'snd '` resources name
+it as their format (`'MAC3'`, `'MAC6'`). ClassicMac decodes both to 8-bit WAV samples, as the Sound Manager on a
+PowerPC Mac gives them.
 
-- The `sdec` components `'MAC3'` and `'MAC6'` are wrappers: they call the Sound Manager's `Exp1to3` and `Exp1to6`
-  through `_SoundDispatch` [Code].
-- On a PowerPC Mac those are SoundLib's native routines, which this section describes. The 68k ROM (and the copy in
-  `gpch` 666) holds 68k versions: identical for 3:1 but for one saturation corner, slightly different in 6:1 rounding
-  (§6) [Code].
-- The tables are byte-identical in SoundLib, `gpch` 666 and the ROM [Code].
+| | |
+| --- | --- |
+| Used by | [sound.md](../resources/sound.md) (formats `'MAC3'` and `'MAC6'`, compressionID 3 and 4) |
+| ClassicMac | Reads; `ClassicMac.Resources.Decoders.Sound.Mace` |
+| Verified against | Sound Manager 3.5.1 on Mac OS 9.0, its own decoding of MACE 3:1 and 6:1 samples it compressed: mono and stereo from 8-bit sources, mono from 16-bit sources |
+| Sources | *Inside Macintosh: Sound*; Mac OS 9.0's SoundLib (`Exp1to3`, `Exp1to6`) and `sdec` components `'MAC3'` and `'MAC6'`, the 68k ROM and `gpch` 666, traced |
 
 Contents
 
-1. [Packets, channels and state](#1-packets-channels-and-state)
-2. [Levels and table rows](#2-levels-and-table-rows)
-3. [MACE 3:1](#3-mace-31)
-4. [MACE 6:1](#4-mace-61)
-5. [Output](#5-output)
-6. [The 68k ROM's expanders](#6-the-68k-roms-expanders)
-7. [Adjustment tables](#7-adjustment-tables)
-8. [Delta tables](#8-delta-tables)
+1. [Layout](#1-layout)
+2. [Reading](#2-reading)
+3. [Writing](#3-writing)
+4. [Variants](#4-variants)
+5. [ClassicMac](#5-classicmac)
+6. [Diagnostics](#6-diagnostics)
+7. [Verification](#7-verification)
+8. [Not covered](#8-not-covered)
+9. [References](#9-references)
 
----
+## 1. Layout
 
-## 1. Packets, channels and state
+### 1.1 Packets and channels
 
-- **MACE 3:1**: 2 bytes per channel → 6 samples. **MACE 6:1**: 1 byte per channel → 6 samples [Doc][Code].
-- Channels alternate by packet: MACE 3 stores L L R R L L R R …, MACE 6 stores L R L R … [Code][Verified].
+| Format | Packet per channel | Samples per packet | Code order in each byte |
+| --- | --- | --- | --- |
+| MACE 3:1 | 2 bytes | 6 | Lowest bits first: bits 0–2, 3–4, 5–7 |
+| MACE 6:1 | 1 byte | 6 (two per code) | Highest bits first: bits 5–7, 3–4, 0–2 |
+
+[Doc] [Code]
+
+- Channels alternate by packet: MACE 3 stores L L R R L L R R …, MACE 6 stores L R L R … [Code] [Verified].
 - Each channel has its own state; all of it starts at zero [Code].
+- The header's `numFrames` counts packets; the output is 6 × `numFrames` frames, channels interleaved by frame.
 - A trailing partial packet (or partial set of packets across the channels) is dropped: the component decodes
   ⌊samples/6⌋ packets [Code].
-- The output is 6 × `numFrames` frames, channels interleaved by frame.
 
----
-
-## 2. Levels and table rows
-
-Each code, 3 or 2 bits, updates the channel's `level` and picks a delta from a table row chosen by the level
-**before** the update [Code]:
-
-```
-row(adjust, code):
-    old   = level
-    level = old + adjust[code] - (old >> 5)
-    if level < 0: level = 0
-    return (old >> 4) & $7F
-```
-
-- 3-bit codes use the adjustment table `T3` and the delta table `T3D` (128 rows × 8 columns); 2-bit codes use `T2`
-  and `T2D` (128 rows × 4 columns) (§8) [Code].
-- `level` is a 32-bit value on PowerPC and is never limited from above; the row wraps through the `& $7F` mask
-  [Code].
-
----
-
-## 3. MACE 3:1
-
-State per channel: `level`, `prev`. Within each byte the fields are taken **lowest bits first** [Code]:
-
-```
-for each packet (2 bytes) of the channel:
-    for each byte b of the packet:
-        code3(b & 7,        T3, T3D)
-        code3((b >> 3) & 3, T2, T2D)
-        code3(b >> 5,       T3, T3D)
-
-code3(code, adjust, deltas):
-    d    = deltas[row(adjust, code)][code]
-    v    = clamp(d + prev, -32767, 32767)
-    prev = v - (v >> 3)                        # the value decays by 1/8
-    emit byte(v)
-
-byte(v) = ((v >> 8) & $FF) XOR $80             # 8-bit offset binary
-```
-
-[Code][Verified].
-
----
-
-## 4. MACE 6:1
-
-State per channel: `level`, `pred`, `fac`, `last`, `A` (the older value), `B` (the newer). Within each byte the
-fields are taken **highest bits first**, and each code gives two samples [Code]:
-
-```
-for each byte b of the channel:
-    code6(b >> 5,       T3, T3D)
-    code6((b >> 3) & 3, T2, T2D)
-    code6(b & 7,        T3, T3D)
-
-code6(code, adjust, deltas):
-    d = deltas[row(adjust, code)][code]
-    v = clamp(d + pred, -32767, 32767)
-    if (d & $8000) == (last & $8000):  fac = min(fac + 506, 32767)
-    else:                              fac = max(fac - 314, -32767)
-    last = v
-    pred = (v * fac) >> 15
-    emit byte(clamp(((3 * A) >> 3) + (B >> 1) + (v >> 3), -32767, 32767))
-    emit byte(clamp((B >> 1) + (A >> 3) + ((3 * v) >> 3), -32767, 32767))
-    A = B
-    B = v
-```
-
-[Code][Verified]. `d` and `last` both lie within 16 bits, so `& $8000` compares their signs. The two samples
-interpolate between the two previous values and the new one, so the output lags the input by about 4 samples [Code].
-
----
-
-## 5. Output
-
-- Both expanders give **8-bit offset binary** samples [Doc][Code][Verified].
-- Asked for 16-bit output, the Sound Manager replicates the byte: `s16 = ((b XOR $80) << 8) | (b XOR $80)`
-  [Verified]. No extra precision exists.
-
-ClassicMac writes MACE as 8-bit.
-
----
-
-## 6. The 68k ROM's expanders
-
-The 68k versions work in 16-bit words [Code]:
-
-- **3:1**: the same as §3, except that the sum `d + prev` is replaced by ±32767 only when it overflows 16 bits: a
-  sum of exactly −32768 is kept, where PowerPC gives −32767. The byte is the same; the next `prev` differs by 1.
-- **6:1**: different rounding and no output clamp. The state keeps halves, `p` = older >> 1 and `q` = newer >> 1:
-
-```
-code6_68k(code, adjust, deltas):
-    old   = level
-    level = wrap16(old + adjust[code] - (old >> 5));  if level < 0: level = 0
-    d = deltas[(old >> 4) & $7F][code]
-    s = d + pred;  v = (s > 32767) ? 32767 : (s < -32768) ? -32767 : s
-    if ((d XOR last) & $8000) == 0:  fac = min(fac + 506, 32767)
-    else:  f = fac - 314;  fac = (f < -32768) ? -32767 : f
-    pred = wrap16(((v * fac * 2) & $FFFFFFFF) >> 16)
-    last = v >> 1
-    h = v >> 1
-    e = wrap16(p - h) >> 2
-    emit byte(wrap16(p + q - e))
-    emit byte(wrap16(e + h + q))
-    p = q
-    q = h
-```
-
-The two 6:1 expanders differ on about 0.25 % of output bytes. The Sound Manager on a PowerPC Mac gives the PowerPC
-result: the 68k model differs from its output on 119 to 267 bytes of each MACE 6 sample, the PowerPC model on none
-[Verified]. ClassicMac follows PowerPC.
-
----
-
-## 7. Adjustment tables
+### 1.2 Adjustment tables
 
 Signed 16-bit, indexed by the code [Code]:
 
@@ -158,9 +51,7 @@ T3 = [ -13,   8,  76, 222, 222,  76,   8, -13 ]      3-bit codes
 T2 = [ -18, 140, 140, -18 ]                          2-bit codes
 ```
 
----
-
-## 8. Delta tables
+### 1.3 Delta tables
 
 Signed 16-bit; the row is `(old level >> 4) & $7F`, the column is the code [Code]. Apple's numbers, as they stand in
 SoundLib, `gpch` 666 and the ROM.
@@ -432,3 +323,157 @@ row         c0      c1      c2      c3
 126      15906   32767  -32768  -15907
 127      16615   32767  -32768  -16616
 ```
+
+## 2. Reading
+
+The `sdec` components `'MAC3'` and `'MAC6'` are wrappers: they call the Sound Manager's `Exp1to3` and `Exp1to6`
+through `_SoundDispatch` [Code]. On a PowerPC Mac those are SoundLib's native routines, which this section describes;
+the 68k versions are §4.1.
+
+Arithmetic in the pseudocode is on 32-bit signed integers. `>>` is an arithmetic shift right, rounding towards minus
+infinity; `clamp(v, lo, hi)` limits `v` to `lo … hi`; `wrap16(v)` keeps the low 16 bits of `v` as a signed value.
+
+### 2.1 Levels and table rows
+
+Each code, 3 or 2 bits, updates the channel's `level` and picks a delta from a table row chosen by the level
+**before** the update [Code]:
+
+```
+row(adjust, code):
+    old   = level
+    level = old + adjust[code] - (old >> 5)
+    if level < 0: level = 0
+    return (old >> 4) & $7F
+```
+
+- 3-bit codes use the adjustment table `T3` and the delta table `T3D` (128 rows × 8 columns); 2-bit codes use `T2`
+  and `T2D` (128 rows × 4 columns) (§1.3) [Code].
+- `level` is a 32-bit value on PowerPC and is never limited from above; the row wraps through the `& $7F` mask
+  [Code].
+
+### 2.2 MACE 3:1
+
+State per channel: `level`, `prev`. Within each byte the fields are taken **lowest bits first** [Code]:
+
+```
+for each packet (2 bytes) of the channel:
+    for each byte b of the packet:
+        code3(b & 7,        T3, T3D)
+        code3((b >> 3) & 3, T2, T2D)
+        code3(b >> 5,       T3, T3D)
+
+code3(code, adjust, deltas):
+    d    = deltas[row(adjust, code)][code]
+    v    = clamp(d + prev, -32767, 32767)
+    prev = v - (v >> 3)                        # the value decays by 1/8
+    emit byte(v)
+
+byte(v) = ((v >> 8) & $FF) XOR $80             # 8-bit offset binary
+```
+
+[Code][Verified].
+
+### 2.3 MACE 6:1
+
+State per channel: `level`, `pred`, `fac`, `last`, `A` (the older value), `B` (the newer). Within each byte the
+fields are taken **highest bits first**, and each code gives two samples [Code]:
+
+```
+for each byte b of the channel:
+    code6(b >> 5,       T3, T3D)
+    code6((b >> 3) & 3, T2, T2D)
+    code6(b & 7,        T3, T3D)
+
+code6(code, adjust, deltas):
+    d = deltas[row(adjust, code)][code]
+    v = clamp(d + pred, -32767, 32767)
+    if (d & $8000) == (last & $8000):  fac = min(fac + 506, 32767)
+    else:                              fac = max(fac - 314, -32767)
+    last = v
+    pred = (v * fac) >> 15
+    emit byte(clamp(((3 * A) >> 3) + (B >> 1) + (v >> 3), -32767, 32767))
+    emit byte(clamp((B >> 1) + (A >> 3) + ((3 * v) >> 3), -32767, 32767))
+    A = B
+    B = v
+```
+
+[Code][Verified]. `d` and `last` both lie within 16 bits, so `& $8000` compares their signs. The two samples
+interpolate between the two previous values and the new one, so the output lags the input by about 4 samples [Code].
+
+### 2.4 Output
+
+- Both expanders give 8-bit offset binary samples [Doc] [Code] [Verified].
+- Asked for 16-bit output, the Sound Manager replicates the byte: `s16 = ((b XOR $80) << 8) | (b XOR $80)`
+  [Verified]. No extra precision exists.
+
+## 3. Writing
+
+None.
+
+## 4. Variants
+
+### 4.1 The 68k ROM's expanders
+
+The 68k ROM (and the copy in `gpch` 666) holds 68k versions of `Exp1to3` and `Exp1to6`: identical for 3:1 but for one
+saturation corner, slightly different in 6:1 rounding [Code]. The tables are byte-identical in SoundLib, `gpch` 666
+and the ROM [Code].
+
+The 68k versions work in 16-bit words [Code]:
+
+- **3:1**: the same as §2.2, except that the sum `d + prev` is replaced by ±32767 only when it overflows 16 bits: a
+  sum of exactly −32768 is kept, where PowerPC gives −32767. The byte is the same; the next `prev` differs by 1.
+- **6:1**: different rounding and no output clamp. The state keeps halves, `p` = older >> 1 and `q` = newer >> 1:
+
+```
+code6_68k(code, adjust, deltas):
+    old   = level
+    level = wrap16(old + adjust[code] - (old >> 5));  if level < 0: level = 0
+    d = deltas[(old >> 4) & $7F][code]
+    s = d + pred;  v = (s > 32767) ? 32767 : (s < -32768) ? -32767 : s
+    if ((d XOR last) & $8000) == 0:  fac = min(fac + 506, 32767)
+    else:  f = fac - 314;  fac = (f < -32768) ? -32767 : f
+    pred = wrap16(((v * fac * 2) & $FFFFFFFF) >> 16)
+    last = v >> 1
+    h = v >> 1
+    e = wrap16(p - h) >> 2
+    emit byte(wrap16(p + q - e))
+    emit byte(wrap16(e + h + q))
+    p = q
+    q = h
+```
+
+The two 6:1 expanders differ on about 0.25 % of output bytes. The Sound Manager on a PowerPC Mac gives the PowerPC
+result (§7) [Verified].
+
+## 5. ClassicMac
+
+- ClassicMac follows the PowerPC expanders (§2), as the Sound Manager on a PowerPC Mac does. [ClassicMac]
+- MACE is written as 8-bit samples ([sound.md](../resources/sound.md)). [ClassicMac]
+- More than two channels are decoded alike, each channel by packet in turn. [ClassicMac]
+
+## 6. Diagnostics
+
+None. Sample counts beyond the resource are reported by the sound reader (`sound.short`,
+[sound.md](../resources/sound.md)).
+
+## 7. Verification
+
+- `tests/ClassicMac.Resources.Decoders.Tests/SoundDecoderTests.cs`:
+  - `Compression_IDs_are_read_as_the_Sound_Manager_reads_them`: compressionID 0 is PCM whatever the format says.
+  - `Sound_Manager_samples_decode_as_the_Sound_Manager_does`: with `CLASSICMAC_CORPUS` set, MACE 3:1 and 6:1 mono and
+    stereo from 8-bit sources (`mac3m8`, `mac3s8`, `mac6m8`, `mac6s8`) and mono from 16-bit sources (`mac3m16`,
+    `mac6m16`) decode byte for byte to Sound Manager 3.5.1's own 8-bit output on Mac OS 9.0 in SheepShaver. Not
+    committed.
+- The 68k model of §4.1 differs from that output on 119 to 267 bytes of each MACE 6 sample, the PowerPC model on none
+  [Verified].
+
+## 8. Not covered
+
+- Compressing MACE.
+- The 68k expanders (§4.1) are described but not implemented.
+
+## 9. References
+
+1. Apple, *Inside Macintosh: Sound*, "Sound Manager", the MACE routines.
+2. Mac OS 9.0 System file: SoundLib (`nlib` 666), the `sdec` components `'MAC3'` and `'MAC6'`, `gpch` 666; the 68k
+   ROM `$077D`. Traced in disassembly.
