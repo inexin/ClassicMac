@@ -110,12 +110,18 @@ namespace ClassicMac.App.ViewModels
         /// screen depth with the fonts and system icons <paramref name="sources"/> supply; null for other types.
         /// </summary>
         public static DialogPreview? Dialog(Resource resource, ReadOnlyMemory<byte> data, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
-            ICollection<Diagnostic> diagnostics, DialogSources? sources = null)
+            ICollection<Diagnostic> diagnostics, DialogSources? sources = null, int? defaultItem = null)
         {
             sources ??= DialogSources.None;
             if (DialogDrawings.Read(resource, data, fork, options, readOptions, diagnostics, DialogKind.Alert, sources.SystemForks) is not { } drawing)
             {
                 return null;
+            }
+
+            // An alert stage other than the first: its default button (item 1 or 2).
+            if (defaultItem is { } item && drawing.IsAlert)
+            {
+                drawing = drawing with { DefaultItem = item };
             }
 
             return Render(drawing, options, sources);

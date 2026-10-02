@@ -152,7 +152,7 @@ namespace ClassicMac.App.ViewModels
                 "vers" when VersionResource.Read(data) is { } version => new VersionForm(resource, version),
                 "WIND" => new WindowForm(resource, InterfaceResources.ReadWindow(data, false, DecodeOptions.Default, [], ""), false),
                 "DLOG" => new WindowForm(resource, InterfaceResources.ReadWindow(data, true, DecodeOptions.Default, [], ""), true),
-                "ALRT" => new AlertForm(resource, InterfaceResources.ReadAlert(data, [], "")),
+                "ALRT" => new AlertForm(resource, InterfaceResources.ReadAlert(data, [], ""), id => ItemListOf(fork, id, readOptions)),
                 "DITL" => new DialogItemsForm(resource, InterfaceResources.ReadDialogItems(data, DecodeOptions.Default, [], ""))
                 {
                     User = DialogItemsForm.FindUser(fork, resource.Id, readOptions),
@@ -161,6 +161,29 @@ namespace ClassicMac.App.ViewModels
                 "CNTL" => new ControlForm(resource, InterfaceResources.ReadControl(data, DecodeOptions.Default, [], "")),
                 _ => null,
             };
+        }
+    }
+
+    public abstract partial class ResourceForm
+    {
+        // An alert's item list from its fork: the DITL's name and its items' texts; null when it is missing or unreadable.
+        private static ItemList? ItemListOf(ResourceFork fork, short id, ReadOptions readOptions)
+        {
+            if (fork.Find(FourCC.FromString("DITL"), id) is not { } ditl)
+            {
+                return null;
+            }
+
+            try
+            {
+                var data = ResourceDecompression.Default.GetData(ditl, fork, readOptions, []);
+                var items = InterfaceResources.ReadDialogItems(data, DecodeOptions.Default, [], "");
+                return new ItemList(ditl.Name?.ToMacRoman(), [.. items.Select(i => i.Text ?? "")]);
+            }
+            catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+            {
+                return null;
+            }
         }
     }
 

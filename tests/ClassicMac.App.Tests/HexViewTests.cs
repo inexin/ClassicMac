@@ -43,12 +43,18 @@ public sealed class HexViewTests
             // Read only: the grid, no inspector or footer; Edit Bytes offered.
             Assert.False(window.FindControl<Border>("HexInspector")!.IsEffectivelyVisible);
             Assert.False(window.FindControl<Border>("HexFooter")!.IsEffectivelyVisible);
+            Assert.False(window.FindControl<Border>("HexEditLine")!.IsEffectivelyVisible);
             Assert.Contains("zero", Cell(window, 4).Classes);
 
             Pump(model.EditHexCommand.ExecuteAsync(null));
             Dispatcher.UIThread.RunJobs();
             Assert.True(window.FindControl<Border>("HexInspector")!.IsEffectivelyVisible);
             Assert.True(window.FindControl<Border>("HexFooter")!.IsEffectivelyVisible);
+            // The host's look (E1): its footer, and the 3 px accent line over the values while editing.
+            Assert.Contains("host-footer", window.FindControl<Border>("HexFooter")!.Classes);
+            var line = window.FindControl<Border>("HexEditLine")!;
+            Assert.True(line.IsEffectivelyVisible);
+            Assert.Equal((3.0, Token("CmAccent")), (line.Bounds.Height, ((ISolidColorBrush)line.Background!).Color));
             var inspector = window.FindControl<Border>("HexInspector")!.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
             Assert.Contains("At 0x0000", inspector);
             Assert.Contains("'Unti'", inspector);

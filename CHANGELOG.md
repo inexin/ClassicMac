@@ -18,6 +18,13 @@
   mctb (`BuiltInTemplates`, `ResourceTemplate.FromFields`), from Inside Macintosh and the ResEdit Reference; the
   template form and the hex view's byte meanings use them when no open file has a `TMPL` for the type, which still
   wins (templates.md §5).
+- Editor: window, dialog, alert and control forms open read only as property cards (bounds; title, definition,
+  visibility, close box, reference constant, auto-position) and switch to inputs with Edit. Window and control
+  definitions and positioning words are named ("Document window", `documentProc · 0`; "Stagger on parent window’s
+  screen", `0x780A`) with named selects while editing; a window's bounds are drawn on a half-scale screen of a chosen
+  size. An alert lists its stages (default button, drawn, sound); a stage's default button is item 1 or 2 only, named
+  by its text from the item list, and the selected stage is drawn in the preview. The alert's item list links to its
+  `'DITL'`. The Hex tab's editing footer and accent line match the other forms.
 - Editor: the dialog item list ('DITL') form on the read-then-edit host (E3): a read-only table (#, kind, text or
   resource, bounds, enabled), inputs while editing (bounds as mono text boxes), and a preview panel drawing the list in
   the 'DLOG' or 'ALRT' that uses it ("Drawn from 'DLOG' 128 · 300 × 106"; the header names it as Used by), redrawn on

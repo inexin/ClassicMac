@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -93,5 +94,28 @@ namespace ClassicMac.App.ViewModels
         }
 
         partial void OnFormErrorChanged(string? value) => ApplyFormCommand.NotifyCanExecuteChanged();
+
+        /// <summary>A dialog's or alert's item list link: selects that 'DITL' among its file's resources.</summary>
+        [RelayCommand]
+        private void ShowItemList(object? form)
+        {
+            var id = form switch
+            {
+                AlertForm alert => (short)alert.ItemsId,
+                WindowForm { IsDialog: true } dialog => (short)dialog.ItemsId,
+                _ => (short?)null,
+            };
+            if (id is null || Selected is not ResourceNode { Parent.Parent: { } file })
+            {
+                return;
+            }
+
+            var target = file.Children.OfType<ResourceTypeNode>().FirstOrDefault(t => t.Type.ToString() == "DITL")?
+                .Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == id);
+            if (target is not null)
+            {
+                Selected = target;
+            }
+        }
     }
 }

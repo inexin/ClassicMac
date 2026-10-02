@@ -31,82 +31,6 @@ namespace ClassicMac.App.ViewModels
         }
     }
 
-    /// <summary><c>'WIND'</c> and <c>'DLOG'</c>.</summary>
-    public sealed partial class WindowForm : DataForm
-    {
-        public WindowForm(Resource resource, WindowTemplate window, bool dialog) : base(resource)
-        {
-            IsDialog = dialog;
-            (top, left, bottom, right) = (window.Bounds.Top, window.Bounds.Left, window.Bounds.Bottom, window.Bounds.Right);
-            (definition, visible, goAway, refCon, title, itemsId) = (window.Definition, window.Visible, window.GoAway, window.RefCon, window.Title, window.ItemsId ?? 0);
-            (hasPosition, position) = (window.Position is not null, window.Position ?? 0);
-        }
-
-        public bool IsDialog { get; }
-
-        [ObservableProperty] private decimal top;
-        [ObservableProperty] private decimal left;
-        [ObservableProperty] private decimal bottom;
-        [ObservableProperty] private decimal right;
-        [ObservableProperty] private decimal definition;
-        [ObservableProperty] private bool visible;
-        [ObservableProperty] private bool goAway;
-        [ObservableProperty] private decimal refCon;
-        [ObservableProperty] private string title;
-        [ObservableProperty] private decimal itemsId;
-        [ObservableProperty] private bool hasPosition;
-        [ObservableProperty] private decimal position;
-
-        public override byte[] BuildData() => InterfaceWriter.WriteWindow(new WindowTemplate(Rect(Top, Left, Bottom, Right), (short)Definition, Visible, GoAway,
-            (int)RefCon, Title, IsDialog ? (short)ItemsId : null, HasPosition ? (ushort)Position : null), IsDialog);
-    }
-
-    /// <summary>One stage of an alert.</summary>
-    public sealed partial class AlertStage(int number, int boldItem, bool drawn, int sound) : ObservableObject
-    {
-        public int Number { get; } = number;
-        [ObservableProperty] private decimal boldItem = boldItem;
-        [ObservableProperty] private bool drawn = drawn;
-        [ObservableProperty] private decimal sound = sound;
-    }
-
-    /// <summary><c>'ALRT'</c>.</summary>
-    public sealed partial class AlertForm : DataForm
-    {
-        public AlertForm(Resource resource, AlertTemplate alert) : base(resource)
-        {
-            (top, left, bottom, right) = (alert.Bounds.Top, alert.Bounds.Left, alert.Bounds.Bottom, alert.Bounds.Right);
-            (itemsId, hasPosition, position) = (alert.ItemsId, alert.Position is not null, alert.Position ?? 0);
-            for (var n = 1; n <= 4; n++)
-            {
-                var (bold, drawn, sound) = alert.Stage(n);
-                Stages.Add(new AlertStage(n, bold, drawn, sound));
-            }
-            Watch(Stages);
-        }
-
-        [ObservableProperty] private decimal top;
-        [ObservableProperty] private decimal left;
-        [ObservableProperty] private decimal bottom;
-        [ObservableProperty] private decimal right;
-        [ObservableProperty] private decimal itemsId;
-        [ObservableProperty] private bool hasPosition;
-        [ObservableProperty] private decimal position;
-
-        public ObservableCollection<AlertStage> Stages { get; } = [];
-
-        public override byte[] BuildData()
-        {
-            var stages = 0;
-            foreach (var s in Stages)
-            {
-                stages |= ((s.BoldItem == 2 ? 8 : 0) | (s.Drawn ? 4 : 0) | ((int)s.Sound & 3)) << ((s.Number - 1) * 4);
-            }
-
-            return InterfaceWriter.WriteAlert(new AlertTemplate(Rect(Top, Left, Bottom, Right), (short)ItemsId, (ushort)stages, HasPosition ? (ushort)Position : null));
-        }
-    }
-
     /// <summary>An item kind a dialog item can be.</summary>
     public sealed record ItemKind(int Type, string Name)
     {
@@ -376,32 +300,6 @@ namespace ClassicMac.App.ViewModels
         public override byte[] BuildData() => InterfaceWriter.WriteDialogItems(Items.Select(i => i.ToItem()).ToList());
     }
 
-    /// <summary><c>'CNTL'</c>.</summary>
-    public sealed partial class ControlForm : DataForm
-    {
-        public ControlForm(Resource resource, ControlTemplate control) : base(resource)
-        {
-            (top, left, bottom, right) = (control.Bounds.Top, control.Bounds.Left, control.Bounds.Bottom, control.Bounds.Right);
-            (value, visible, maximum, minimum, definition, refCon, title) =
-                (control.Value, control.Visible, control.Maximum, control.Minimum, control.Definition, control.RefCon, control.Title);
-        }
-
-        [ObservableProperty] private decimal top;
-        [ObservableProperty] private decimal left;
-        [ObservableProperty] private decimal bottom;
-        [ObservableProperty] private decimal right;
-        [ObservableProperty] private decimal value;
-        [ObservableProperty] private bool visible;
-        [ObservableProperty] private decimal maximum;
-        [ObservableProperty] private decimal minimum;
-        [ObservableProperty] private decimal definition;
-        [ObservableProperty] private decimal refCon;
-        [ObservableProperty] private string title;
-
-        public override byte[] BuildData() => InterfaceWriter.WriteControl(new ControlTemplate(Rect(Top, Left, Bottom, Right), (short)Value, Visible,
-            (short)Maximum, (short)Minimum, (short)Definition, (int)RefCon, Title));
-    }
-
     public sealed partial class MainViewModel
     {
         /// <summary>The live preview of the form's dialog, alert or item list, or null.</summary>
@@ -450,8 +348,9 @@ namespace ClassicMac.App.ViewModels
                     }
                     else if (form is DataForm and not MenuForm)
                     {
+                        // An alert draws the selected stage's default button (E4).
                         FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = ScreenDepth }, ReadOptions, [],
-                            sources ??= DialogSources.From(Roots));
+                            sources ??= DialogSources.From(Roots), (form as AlertForm)?.SelectedStage?.BoldItem);
                     }
                 }
                 catch (Exception e) when (e is ArgumentException or OverflowException)
@@ -460,6 +359,17 @@ namespace ClassicMac.App.ViewModels
                 }
             }
             form.Edited += (_, _) => Update();
+            if (form is AlertForm alert)
+            {
+                alert.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(AlertForm.SelectedStage))
+                    {
+                        Update();
+                    }
+                };
+            }
+
             Update();
         }
     }
