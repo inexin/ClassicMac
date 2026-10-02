@@ -134,7 +134,7 @@ The resources have one layout each. Where Mac OS 9.0, the 68k ROM and Mac OS 9.2
 ## 5. ClassicMac
 
 - Each icon becomes an RGBA image, 1-bit icons black on white, masked pixels transparent. What `extract` writes for
-  each type, `SICN` lists and the masks included, is [export-manifest.md §8.3](../output/export-manifest.md#83-icons-and-their-masks).
+  each type, `SICN` lists and the masks included, is [export-manifest.md §3.10](../output/export-manifest.md#310-icons-and-their-masks).
   [ClassicMac]
 - A 4- or 8-bit icon without an icon list is decoded opaque and reported (`image.no-mask`), where the Icon Utilities
   draw nothing: ClassicMac prefers a visible image. [ClassicMac]

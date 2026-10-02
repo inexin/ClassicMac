@@ -533,17 +533,17 @@ decoders turn such an exception into `image.undecodable` with the renderer's mes
 1. A `PICT` is drawn at its native resolution.
 2. The screen depth (32 by default; 1, 2, 4, 8 or 16) is the depth of the screen the picture is drawn on. Below 32,
    QuickDraw's colour matching and dithering for that depth apply
-   ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths)); the file is still 8-bit RGBA. Only pictures use it;
+   ([quickdraw.md §4.6](../graphics/quickdraw.md#46-screen-depths)); the file is still 8-bit RGBA. Only pictures use it;
    icons, cursors and patterns are drawn at full colour.
 3. The QuickDraw model is Mac OS 9's by default, or the 68k ROM's
-   ([quickdraw.md §9](../graphics/quickdraw.md#9-mac-os-9-differences) and
-   [pict.md §10](../graphics/pict.md#10-mac-os-9-differences) list the differences).
+   ([quickdraw.md §4.1](../graphics/quickdraw.md#41-mac-os-9-bitmaps) and
+   [pict.md §4.2](../graphics/pict.md#42-mac-os-9) list the differences).
 4. Before drawing, the picture frame (`picFrame`, the `Rect` at bytes 2–9 of the resource) gives the canvas size. If
    width × height exceeds the pixel limit (64 Mi pixels, 67,108,864, by default), the picture is not drawn:
    `image.too-large`, and the resource is written raw. The check needs at least 10 bytes; shorter data goes to the
    renderer, which rejects it.
 5. Parts of the canvas the picture does not draw on are transparent
-   ([pict.md §2.4](../graphics/pict.md#24-the-drawing-space-and-the-canvas)).
+   ([pict.md §2.2](../graphics/pict.md#22-the-drawing-space-and-the-canvas)).
 
 ### 3.10 Icons and their masks
 

@@ -104,7 +104,7 @@ ClassicMac's editor makes both from an RGBA image [ClassicMac]:
 ## 5. ClassicMac
 
 - A cursor becomes an image of the pixels it paints and a JSON file of the pixels it inverts or XORs, with the
-  hotspot: [export-manifest.md §8.5](../output/export-manifest.md#85-cursors). The XOR values are those of a 32-bit
+  hotspot: [export-manifest.md §3.12](../output/export-manifest.md#312-cursors). The XOR values are those of a 32-bit
   screen. [ClassicMac]
 - A `crsr` of type `$8000`, or one whose PixMap offset is 0, is read from its 1-bit data and mask as a `CURS`; colour
   pixels outside the PixMap read as black. [ClassicMac]

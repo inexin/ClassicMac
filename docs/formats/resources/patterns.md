@@ -97,7 +97,7 @@ The four pattern types (§2.1 step 4). The ROM's GetPixPat was not traced.
 ## 5. ClassicMac
 
 - `PAT ` gives an 8 × 8 image, black on white; `PAT#` and `ppt#` one image per pattern, numbered
-  ([export-manifest.md §8.6](../output/export-manifest.md#86-patterns)); a `ppat` its pattern at its own size.
+  ([export-manifest.md §3.13](../output/export-manifest.md#313-patterns)); a `ppat` its pattern at its own size.
   [ClassicMac]
 - A type 2 `ppat` is drawn as a 32-bit screen draws it: an 8 × 8 solid of the colour. [ClassicMac]
 - `PAT#` reads the patterns that fit; a `ppat` under 28 bytes (or an element running past the data), of a type above

@@ -271,7 +271,7 @@ An `'icns'` may nest variant families (`'tile'`, `'over'`, `'drop'`, `'open'`, `
   `image.undecodable`. Variants are read but not exported. [ClassicMac]
 - The `icns` export writes each image member through the mask its own size selects (§2.4 step 1), the 8-bit mask of
   the same size as the image's alpha, any other as a hard edge mapped as MapRgn maps it; names and order are
-  [export-manifest.md §8.3](../output/export-manifest.md#83-icons-and-their-masks). A family with no mask is exported
+  [export-manifest.md §3.10](../output/export-manifest.md#310-icons-and-their-masks). A family with no mask is exported
   opaque (`image.no-mask`). [ClassicMac]
 
 ## 6. Diagnostics

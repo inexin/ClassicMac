@@ -48,7 +48,7 @@ A unit is a byte, except for word packing (a PICT PixMap's packType 3, 16-bit pi
 | … | byte count | Runs | §1.1 |
 
 [Doc: Inside Macintosh: Imaging With QuickDraw]. Which rows of a picture are packed, and how, is
-[pict.md §5](../graphics/pict.md#5-pixel-data). MacPaint's rows have no byte count: the runs of all 720 rows follow
+[pict.md §2.4](../graphics/pict.md#24-pixel-data). MacPaint's rows have no byte count: the runs of all 720 rows follow
 one another ([macpaint.md](../graphics/macpaint.md)). QuickTime's `8BPS` gives a `u16` byte count for every row of
 every plane before the rows ([quicktime.md](../graphics/quicktime.md)).
 
@@ -73,7 +73,7 @@ What ClassicMac's picture writer produces [ClassicMac]:
 3. At most 128 units go in one run or one block.
 4. A flag of −128 is never written.
 
-The byte count before each row is [pict.md §9](../graphics/pict.md#9-writing-pictures)'s.
+The byte count before each row is [pict.md §3](../graphics/pict.md#3-writing)'s.
 
 ## 4. Variants
 

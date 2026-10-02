@@ -331,7 +331,7 @@ packets: 7424 for 44 544 samples of MACE (44 544 / 6), 696 for IMA 4:1 (44 544 /
 
 - Formats 1 and 2 (§1.1, §1.2) and the three headers (§1.6–§1.8) [Doc].
 - The NewWorld ROM's 68k Sound Manager 3.2 decodes MACE by other code where the 68k behaviour differs:
-  [mace.md §6](../codecs/mace.md#6-the-68k-roms-expanders) [Code: 68k ROM].
+  [mace.md §4.1](../codecs/mace.md#41-the-68k-roms-expanders) [Code: 68k ROM].
 - `'in24'`, `'in32'`, `'fl32'` and `'fl64'` are QuickTime formats that the Sound Manager itself refuses (§2.6).
 
 ## 5. ClassicMac
