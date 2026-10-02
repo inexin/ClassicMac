@@ -188,14 +188,15 @@ public class ThemeTests
     [Fact]
     public void The_waveform_is_drawn_from_the_tokens_and_redrawn_when_the_theme_changes() => OnUiThread(() =>
     {
-        // One channel at a constant +0.5: the wave is one row at 51 (middle 100 less half of 98), the centre line row 100.
+        // One channel at a constant +0.5 over the 180 px above the 20 px ruler: the wave is one row at 46 (middle 90 less
+        // half of 88), the centre line row 90.
         var view = Show(new WaveformView { Sound = new DecodedSound(Enumerable.Repeat(0.5f, 1000).ToArray(), 1, 22050) });
         InEachTheme(variant =>
         {
             var frame = Frame(view);
             Assert.Equal(Expected("CmPaneBackground", variant), Pixel(frame, 20, 10));
-            Assert.Equal(Expected("CmAccent", variant), Pixel(frame, 20, 51));
-            Assert.Equal(Expected("CmDivider", variant), Pixel(frame, 20, 100));
+            Assert.Equal(Expected("CmAccent", variant), Pixel(frame, 20, 46));
+            Assert.Equal(Expected("CmDivider", variant), Pixel(frame, 20, 90));
         });
         ((Window)TopLevel.GetTopLevel(view)!).Close();
     });

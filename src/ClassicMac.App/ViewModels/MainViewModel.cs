@@ -291,7 +291,11 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnZoomChanged(int value) => Images = ItemsAt(Preview, value);
 
-        partial void OnPreviewChanged(PreviewViewModel value) => Images = ItemsAt(value, Zoom);
+        partial void OnPreviewChanged(PreviewViewModel value)
+        {
+            Images = ItemsAt(value, Zoom);
+            OnSoundPreviewChanged();
+        }
 
         partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
 

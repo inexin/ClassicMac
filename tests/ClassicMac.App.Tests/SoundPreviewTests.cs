@@ -11,33 +11,6 @@ public class SoundPreviewTests : IDisposable
 
     public void Dispose() => Directory.Delete(folder, recursive: true);
 
-    // Records what it is asked to play; Finish ends the sound as the device would.
-    private sealed class FakePlayer : IAudioPlayer
-    {
-        private Action? ended;
-
-        public List<DecodedSound> Played { get; } = [];
-
-        public int Stops { get; private set; }
-
-        public string? Unavailable { get; set; }
-
-        public void Play(DecodedSound sound, Action ended)
-        {
-            if (Unavailable is not null)
-            {
-                return;
-            }
-
-            Played.Add(sound);
-            this.ended = ended;
-        }
-
-        public void Stop() => Stops++;
-
-        public void Finish() => ended?.Invoke();
-    }
-
     // A format 1 'snd ' with a standard header: 8-bit, 11127.27 Hz, a loop, base note 72.
     internal static byte[] Sound(int length = 1000, byte encode = 0x00)
     {
@@ -48,7 +21,7 @@ public class SoundPreviewTests : IDisposable
 
     private static byte[] BigEndian(uint v) => [(byte)(v >> 24), (byte)(v >> 16), (byte)(v >> 8), (byte)v];
 
-    private async Task<(MainViewModel Model, ResourceNode Sound)> Open(FakePlayer? player)
+    private async Task<(MainViewModel Model, ResourceNode Sound)> Open(FakeAudioPlayer? player)
     {
         byte[] other = [.. Sound(64)[..20], .. new byte[64]];
         other[20 + 20] = 0xFE; // compressed header, compressionID -2, format 'QDM2'
@@ -71,7 +44,7 @@ public class SoundPreviewTests : IDisposable
     [Fact]
     public async Task A_sound_previews_with_its_details_and_plays()
     {
-        var player = new FakePlayer();
+        var player = new FakeAudioPlayer();
         var (model, sound) = await Open(player);
 
         model.Selected = sound;
@@ -86,7 +59,7 @@ public class SoundPreviewTests : IDisposable
 
         model.PlaySoundCommand.Execute(null);
 
-        Assert.Same(model.Preview.Sound, Assert.Single(player.Played));
+        Assert.Same(model.Preview.Sound, Assert.Single(player.Played).Sound);
         Assert.True(model.IsPlaying);
         Assert.False(model.PlaySoundCommand.CanExecute(null));
         Assert.True(model.StopSoundCommand.CanExecute(null));
@@ -100,7 +73,7 @@ public class SoundPreviewTests : IDisposable
     [Fact]
     public async Task Playback_stops_when_the_selection_changes()
     {
-        var player = new FakePlayer();
+        var player = new FakeAudioPlayer();
         var (model, sound) = await Open(player);
         model.Selected = sound;
         await model.PreviewTask;
@@ -116,18 +89,23 @@ public class SoundPreviewTests : IDisposable
     [Fact]
     public async Task Sounds_in_formats_not_read_say_so()
     {
-        var (model, sound) = await Open(new FakePlayer());
+        var (model, sound) = await Open(new FakeAudioPlayer());
         model.Selected = sound.Parent!.Children.OfType<ResourceNode>().Single(r => r.Resource.Id == 129);
         await model.PreviewTask;
 
-        Assert.Equal(PreviewKind.None, model.Preview.Kind);
-        Assert.Contains("'QDM2'", model.Preview.Message, StringComparison.Ordinal);
+        // The error state (boards/sound.md): what it is, why, and the way to its bytes.
+        Assert.Equal(PreviewKind.SoundError, model.Preview.Kind);
+        Assert.True(model.Preview.HasPreview);
+        Assert.True(model.Preview.IsSoundError);
+        Assert.Equal("No preview for 'snd ' 129", model.Preview.ErrorTitle);
+        Assert.Equal("Compressed as 'QDM2', which ClassicMac does not decode", model.Preview.ErrorDetail);
+        Assert.Equal(1, model.SelectedTab);
     }
 
     [Fact]
     public async Task Without_an_output_device_playback_is_off_with_a_note()
     {
-        var player = new FakePlayer { Unavailable = "Sound cannot play here: no device." };
+        var player = new FakeAudioPlayer { Unavailable = "Sound cannot play here: no device." };
         var (model, sound) = await Open(player);
         model.Selected = sound;
         await model.PreviewTask;

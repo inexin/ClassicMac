@@ -168,14 +168,41 @@ namespace ClassicMac.App.Views
     /// theme's tokens (boards/sound.md): CmPaneBackground behind, CmDivider centre line, CmAccent wave; redrawn when the
     /// theme variant changes.
     /// </summary>
+    /// <summary>
+    /// A sound's channel lanes (boards/sound.md): one 170 px lane per channel, the centre line in CmDivider, the waveform in
+    /// CmAccent, the loop as a CmLoopRegion band behind it, the playhead a 2 px CmPlayhead line; a time ruler in mono 11
+    /// below. A click asks <see cref="SeekCommand"/> to play from there (in seconds).
+    /// </summary>
     internal sealed class WaveformView : Control
     {
+        public const double LaneHeight = 170;
+
+        public const double RulerHeight = 20;
+
         public static readonly StyledProperty<DecodedSound?> SoundProperty =
             AvaloniaProperty.Register<WaveformView, DecodedSound?>(nameof(Sound));
 
-        static WaveformView() => AffectsRender<WaveformView>(SoundProperty);
+        public static readonly StyledProperty<(int Start, int End)?> LoopFramesProperty =
+            AvaloniaProperty.Register<WaveformView, (int Start, int End)?>(nameof(LoopFrames));
 
-        public WaveformView() => ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+        public static readonly StyledProperty<double> PlayheadProperty = AvaloniaProperty.Register<WaveformView, double>(nameof(Playhead));
+
+        public static readonly StyledProperty<bool> ShowsPlayheadProperty = AvaloniaProperty.Register<WaveformView, bool>(nameof(ShowsPlayhead));
+
+        public static readonly StyledProperty<System.Windows.Input.ICommand?> SeekCommandProperty =
+            AvaloniaProperty.Register<WaveformView, System.Windows.Input.ICommand?>(nameof(SeekCommand));
+
+        static WaveformView()
+        {
+            AffectsMeasure<WaveformView>(SoundProperty);
+            AffectsRender<WaveformView>(SoundProperty, LoopFramesProperty, PlayheadProperty, ShowsPlayheadProperty);
+        }
+
+        public WaveformView()
+        {
+            ActualThemeVariantChanged += (_, _) => InvalidateVisual();
+            Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand);
+        }
 
         public DecodedSound? Sound
         {
@@ -183,11 +210,58 @@ namespace ClassicMac.App.Views
             set => SetValue(SoundProperty, value);
         }
 
+        /// <summary>The loop's frames, drawn as a band; null for none.</summary>
+        public (int Start, int End)? LoopFrames
+        {
+            get => GetValue(LoopFramesProperty);
+            set => SetValue(LoopFramesProperty, value);
+        }
+
+        /// <summary>The playhead, in seconds from the start.</summary>
+        public double Playhead
+        {
+            get => GetValue(PlayheadProperty);
+            set => SetValue(PlayheadProperty, value);
+        }
+
+        /// <summary>Whether the playhead is drawn (while playing, or once moved).</summary>
+        public bool ShowsPlayhead
+        {
+            get => GetValue(ShowsPlayheadProperty);
+            set => SetValue(ShowsPlayheadProperty, value);
+        }
+
+        public System.Windows.Input.ICommand? SeekCommand
+        {
+            get => GetValue(SeekCommandProperty);
+            set => SetValue(SeekCommandProperty, value);
+        }
+
         private IBrush? Token(string key) => this.TryFindResource(key, ActualThemeVariant, out var value) ? value as IBrush : null;
+
+        protected override Size MeasureOverride(Size availableSize) =>
+            new(double.IsInfinity(availableSize.Width) ? 400 : availableSize.Width, LaneHeight * Math.Max(1, Sound?.Channels ?? 1) + RulerHeight);
+
+        protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            if (Sound is not { Frames: > 0 } sound || Bounds.Width < 1)
+            {
+                return;
+            }
+
+            var seconds = Math.Clamp(e.GetPosition(this).X / Bounds.Width, 0, 1) * sound.Duration;
+            if (SeekCommand?.CanExecute(seconds) == true)
+            {
+                SeekCommand.Execute(seconds);
+                e.Handled = true;
+            }
+        }
 
         public override void Render(DrawingContext context)
         {
             var size = Bounds.Size;
+            var lanes = new Rect(0, 0, size.Width, Math.Max(0, size.Height - RulerHeight));
             if (Token("CmPaneBackground") is { } background)
             {
                 context.FillRectangle(background, new Rect(size));
@@ -200,7 +274,14 @@ namespace ClassicMac.App.Views
 
             var wave = Token("CmAccent") ?? Brushes.Gray;
             var axis = Token("CmDivider");
-            var lane = size.Height / sound.Channels;
+            if (LoopFrames is { } loop && Token("CmLoopRegion") is { } band && loop.End > loop.Start)
+            {
+                var x0 = Math.Floor((double)loop.Start / sound.Frames * size.Width);
+                var x1 = Math.Ceiling((double)loop.End / sound.Frames * size.Width);
+                context.FillRectangle(band, new Rect(x0, 0, Math.Max(1, x1 - x0), lanes.Height));
+            }
+
+            var lane = lanes.Height / sound.Channels;
             var columns = (int)size.Width;
             for (var c = 0; c < sound.Channels; c++)
             {
@@ -226,6 +307,30 @@ namespace ClassicMac.App.Views
                     var bottom = middle - Math.Clamp(low, -1, 1) * half;
                     context.FillRectangle(wave, new Rect(x, top, 1, Math.Max(1, bottom - top)));
                 }
+            }
+
+            DrawRuler(context, sound, lanes.Height, size.Width);
+            if (ShowsPlayhead && sound.Duration > 0 && Token("CmPlayhead") is { } playhead)
+            {
+                var x = Math.Round(Math.Clamp(Playhead / sound.Duration, 0, 1) * (size.Width - 2));
+                context.FillRectangle(playhead, new Rect(x, 0, 2, lanes.Height));
+            }
+        }
+
+        // The time ruler: a tick and a label in mono 11 at about every 80 px, 0.00 s to the end.
+        private void DrawRuler(DrawingContext context, DecodedSound sound, double top, double width)
+        {
+            var text = Token("CmTextMuted") ?? Brushes.Gray;
+            var font = this.TryFindResource("CmFontMono", ActualThemeVariant, out var family) && family is FontFamily mono ? mono : FontFamily.Default;
+            var steps = Math.Max(1, (int)(width / 80));
+            for (var i = 0; i <= steps; i++)
+            {
+                var x = Math.Round(width * i / steps);
+                var label = new FormattedText(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00} s", sound.Duration * i / steps),
+                    System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface(font), 11, text);
+                context.FillRectangle(text, new Rect(Math.Min(x, width - 1), top, 1, 4));
+                var at = Math.Clamp(x - label.Width / 2, 0, Math.Max(0, width - label.Width));
+                context.DrawText(label, new Point(at, top + 5));
             }
         }
     }

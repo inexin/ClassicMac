@@ -31,7 +31,13 @@ namespace ClassicMac.App.ViewModels
         Dialog,
         Menu,
         Folder,
+
+        /// <summary>A sound that cannot be decoded: what it is, why, and the way to its bytes (boards/sound.md).</summary>
+        SoundError,
     }
+
+    /// <summary>One of a sound's detail chips: "Rate" "22,254.545 Hz".</summary>
+    public sealed record SoundFact(string Label, string Value);
 
     /// <summary>One decoded image: PNG bytes, its size, and a caption (a list item's number, a cursor's hotspot).</summary>
     public sealed record PreviewImage(byte[] Png, int Width, int Height, string? Caption);
@@ -72,6 +78,26 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A sound's rate, channels, sample size, length, format and loop.</summary>
         public string SoundDetails { get; private init; } = "";
 
+        /// <summary>The same facts as chips: Rate, Channels, Sample, Length, Loop, Base note, Format.</summary>
+        public IReadOnlyList<SoundFact> SoundFacts { get; private init; } = [];
+
+        /// <summary>A sound's loop in seconds (for playback), or null when it has none.</summary>
+        public SoundLoop? SoundLoop { get; private init; }
+
+        /// <summary>A sound's loop in frames (for the waveform's band), or null.</summary>
+        public (int Start, int End)? SoundLoopFrames { get; private init; }
+
+        /// <summary>The error state's title: "No preview for 'snd ' 8192".</summary>
+        public string ErrorTitle { get; private init; } = "";
+
+        /// <summary>The error state's reason: "Unknown sound format 3 · sound.unknown-format".</summary>
+        public string ErrorDetail { get; private init; } = "";
+
+        public bool IsSoundError => Kind == PreviewKind.SoundError;
+
+        /// <summary>The waveform card's title: "Channel 1", or "Channels 1–2" for a stereo sound.</summary>
+        public string SoundLanesTitle => Sound is { Channels: > 1 } s ? $"Channels 1–{s.Channels}" : "Channel 1";
+
         /// <summary>A DOCMaker or SimpleText document, a chapter at a time.</summary>
         public DocumentPreview? Document { get; private init; }
 
@@ -82,7 +108,7 @@ namespace ClassicMac.App.ViewModels
         public MenuResource? Menu { get; private init; }
 
         public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document
-            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder;
+            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError;
 
         public bool IsDocument => Kind == PreviewKind.Document;
 
@@ -143,9 +169,26 @@ namespace ClassicMac.App.ViewModels
                     : ReadOnlyMemory<byte>.Empty;
                 return StyledPreview(StyledText.Read(data.Span, styl, options));
             }
-            if (type == "snd " && SoundResource.Read(data, diagnostics, resource.ToString()) is { Sound: { } sampled })
+            if (type == "snd ")
             {
-                return SoundPreview(sampled);
+                var found = new List<Diagnostic>();
+                var read = SoundResource.Read(data, found, resource.ToString());
+                foreach (var d in found)
+                {
+                    diagnostics.Add(d);
+                }
+
+                var what = $"'{resource.Type}' {resource.Id}";
+                if (read is { Sound: { } sampled })
+                {
+                    return SoundPreview(sampled, what);
+                }
+
+                if (read is null || found.Any(d => d.Severity == DiagnosticSeverity.Error))
+                {
+                    var problem = found.FirstOrDefault(d => d.Severity == DiagnosticSeverity.Error);
+                    return SoundError(what, problem is null ? "The sound cannot be read" : $"{Reason(problem.Message, resource)} · {problem.Code}");
+                }
             }
 
             if (InterfacePreviews.Dialog(resource, data, fork, options, readOptions, diagnostics, dialogSources) is { } dialog)
@@ -258,22 +301,62 @@ namespace ClassicMac.App.ViewModels
             return new PreviewViewModel(PreviewKind.Image, "") { Images = [new PreviewImage(png, width, height, $"{entries.Count} colours")] };
         }
 
-        private static PreviewViewModel SoundPreview(SampledSound sampled)
+        // A diagnostic's message without the resource it names (the card's title names it): "Format 3 is neither 1 nor 2."
+        private static string Reason(string message, Resource resource)
         {
-            var bits = sampled.Kind == SoundHeaderKind.Compressed ? $"'{sampled.Format}'" : $"{sampled.SampleSize}-bit";
+            var prefix = resource + ": ";
+            var reason = message.StartsWith(prefix, StringComparison.Ordinal) ? message[prefix.Length..] : message;
+            return reason.Length > 0 ? char.ToUpperInvariant(reason[0]) + reason[1..] : reason;
+        }
+
+        private static PreviewViewModel SoundError(string what, string detail) =>
+            new(PreviewKind.SoundError, "") { ErrorTitle = $"No preview for {what}", ErrorDetail = detail };
+
+        private static PreviewViewModel SoundPreview(SampledSound sampled, string what)
+        {
+            var compressed = sampled.Kind == SoundHeaderKind.Compressed;
+            var bits = compressed ? $"'{sampled.Format}'" : $"{sampled.SampleSize}-bit";
             if (SoundSamples.Decode(sampled) is not { } sound)
             {
-                return new PreviewViewModel(PreviewKind.None, $"A {bits} sound, a format ClassicMac does not read; see Hex.");
+                return SoundError(what, compressed
+                    ? $"Compressed as '{sampled.Format}', which ClassicMac does not decode"
+                    : $"{sampled.SampleSize}-bit samples, which ClassicMac does not decode");
             }
 
             var channels = sound.Channels == 1 ? "mono" : sound.Channels == 2 ? "stereo" : $"{sound.Channels} channels";
-            var loop = sampled.LoopEnd > sampled.LoopStart && sampled.LoopEnd - sampled.LoopStart > 2 ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
+            var hasLoop = sampled.LoopEnd > sampled.LoopStart && sampled.LoopEnd - sampled.LoopStart > 2;
+            var loop = hasLoop ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
             var note = sampled.BaseNote is not (0 or 60) ? $", base note {sampled.BaseNote}" : "";
+            var facts = new List<SoundFact>
+            {
+                new("Rate", string.Create(CultureInfo.InvariantCulture, $"{sound.SampleRate:N3} Hz")),
+                new("Channels", channels),
+                new("Sample", bits),
+                new("Length", string.Create(CultureInfo.InvariantCulture, $"{sound.Duration:0.00} s · {sound.Frames:N0} frames")),
+            };
+            (int Start, int End)? loopFrames = null;
+            if (hasLoop)
+            {
+                facts.Add(new("Loop", string.Create(CultureInfo.InvariantCulture, $"{sampled.LoopStart:N0}–{sampled.LoopEnd:N0}")));
+                loopFrames = ((int)Math.Min(sampled.LoopStart, (uint)sound.Frames), (int)Math.Min(sampled.LoopEnd, (uint)sound.Frames));
+            }
+
+            if (sampled.BaseNote is not (0 or 60))
+            {
+                facts.Add(new("Base note", sampled.BaseNote.ToString(CultureInfo.InvariantCulture)));
+            }
+
+            facts.Add(new("Format", compressed ? $"sampled, compressed ('{sampled.Format}')" : "sampled, uncompressed"));
             return new PreviewViewModel(PreviewKind.Sound, "")
             {
                 Sound = sound,
                 SoundDetails = string.Create(CultureInfo.InvariantCulture,
                     $"{sound.SampleRate:0.###} Hz, {channels}, {bits}, {sound.Duration:0.00} s ({sound.Frames:N0} frames){loop}{note}"),
+                SoundFacts = facts,
+                SoundLoopFrames = loopFrames,
+                SoundLoop = loopFrames is { } frames && sound.SampleRate > 0
+                    ? new SoundLoop(frames.Start / sound.SampleRate, frames.End / sound.SampleRate)
+                    : null,
             };
         }
 

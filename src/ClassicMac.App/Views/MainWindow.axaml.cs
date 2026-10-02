@@ -20,6 +20,7 @@ namespace ClassicMac.App.Views
         {
             InitializeComponent();
             BindHost();
+            BindSound();
             // The custom title bar (S1): Windows and macOS extend the client area into the decorations; Linux keeps the
             // system title bar, whose support for this varies by desktop.
             if (!OperatingSystem.IsLinux())

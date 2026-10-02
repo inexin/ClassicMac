@@ -33,7 +33,11 @@ namespace ClassicMac.App.Audio
 
         public string? Unavailable => unavailable;
 
-        public void Play(DecodedSound sound, Action ended)
+        // The sound is converted to the device's rate, so its seconds are the player's: position, seek and loop points
+        // pass through as they are.
+        public double? Position => player?.Time;
+
+        public void Play(DecodedSound sound, double start, SoundLoop? loop, Action ended)
         {
             ArgumentNullException.ThrowIfNull(sound);
             ArgumentNullException.ThrowIfNull(ended);
@@ -45,6 +49,12 @@ namespace ClassicMac.App.Audio
 
             provider = new RawDataProvider(Convert(sound), DeviceFormat.SampleRate);
             var current = player = new SoundPlayer(engine!, DeviceFormat, provider);
+            if (start > 0)
+            {
+                current.Seek((float)start);
+            }
+
+            SetLoop(loop);
             current.PlaybackEnded += (_, _) => Dispatcher.UIThread.Post(() =>
             {
                 if (!ReferenceEquals(player, current))
@@ -57,6 +67,22 @@ namespace ClassicMac.App.Audio
             });
             device!.MasterMixer.AddComponent(current);
             current.Play();
+        }
+
+        public void Seek(double seconds) => player?.Seek((float)seconds);
+
+        public void SetLoop(SoundLoop? loop)
+        {
+            if (player is not { } p)
+            {
+                return;
+            }
+
+            p.IsLooping = loop is not null;
+            if (loop is not null)
+            {
+                p.SetLoopPoints((float)loop.Start, (float)loop.End);
+            }
         }
 
         public void Stop()

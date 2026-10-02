@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Viewer: the sound preview (P3) has a round Play/Stop button (Space too), the playhead's time over the length, detail
+  chips (rate, channels, sample, length, loop, base note, format), one 170 px lane per channel with the loop as a
+  band, a 2 px playhead and a time ruler; a click on the waveform plays from there, "Repeat the loop" loops the sound's
+  loop. A sound that cannot be decoded shows why, with Show in Hex and Save raw data….
+- Viewer: the audio player (A1) reports its position, seeks, and repeats a loop (`IAudioPlayer.Position`, `Seek`,
+  `SetLoop`; SoundFlow's time, seek and loop points).
 - Resources: built-in templates for MBAR, BNDL, FREF, SIZE, TMPL, CURS, PAT , PAT#, clut, wctb, actb, dctb, cctb and
   mctb (`BuiltInTemplates`, `ResourceTemplate.FromFields`), from Inside Macintosh and the ResEdit Reference; the
   template form and the hex view's byte meanings use them when no open file has a `TMPL` for the type, which still

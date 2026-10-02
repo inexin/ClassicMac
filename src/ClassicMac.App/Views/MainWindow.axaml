@@ -574,6 +574,59 @@
       <Setter Property="MinWidth" Value="40" />
       <Setter Property="Padding" Value="4,4" />
     </Style>
+    <!-- The sound preview (boards/sound.md): a 40 px round play button, chips with a 1 px CmCardBorder and radius 6, the
+         waveform card with its header strip, and the error card on CmSidebarBackground. -->
+    <Style Selector="Button.transport">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="40" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.transport PathIcon">
+      <Setter Property="Width" Value="14" />
+      <Setter Property="Height" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.sound-time">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Border.chip">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="Margin" Value="0,0,8,8" />
+    </Style>
+    <Style Selector="Border.wave-card">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="ClipToBounds" Value="True" />
+    </Style>
+    <Style Selector="Border.wave-header">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="12,6" />
+    </Style>
+    <Style Selector="Border.loop-swatch">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource CmLoopRegion}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.sound-error">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="16" />
+      <Setter Property="Margin" Value="16" />
+      <Setter Property="MaxWidth" Value="520" />
+    </Style>
     <Style Selector="Border.preview-header">
       <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
@@ -1045,16 +1098,80 @@
                     </ItemsControl>
                   </ScrollViewer>
                 </DockPanel>
-                <DockPanel IsVisible="{Binding Preview.IsSound}" Margin="12,8">
-                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
-                    <Button Content="Play" Command="{Binding PlaySoundCommand}" />
-                    <Button Content="Stop" Command="{Binding StopSoundCommand}" />
-                    <TextBlock Text="{Binding Preview.SoundDetails}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <!-- The sound preview (boards/sound.md, P3): the transport (Play/Stop, the playhead's time, Repeat the loop),
+                     the detail chips, and the channel lanes with the loop band and the playhead; a click on the waveform
+                     plays from there, Space plays and stops. -->
+                <ScrollViewer x:Name="SoundPreview" IsVisible="{Binding Preview.IsSound}" Focusable="True">
+                  <ScrollViewer.KeyBindings>
+                    <KeyBinding Gesture="Space" Command="{Binding ToggleSoundCommand}" />
+                  </ScrollViewer.KeyBindings>
+                  <StackPanel Margin="16,12" Spacing="12">
+                    <DockPanel>
+                      <CheckBox x:Name="RepeatLoopBox" DockPanel.Dock="Right" Content="Repeat the loop" IsChecked="{Binding RepeatLoop}"
+                                IsVisible="{Binding HasSoundLoop}" />
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Panel>
+                          <Button x:Name="PlayButton" Classes="accent transport" Command="{Binding PlaySoundCommand}" IsVisible="{Binding !IsPlaying}"
+                                  ToolTip.Tip="Play (Space)" AutomationProperties.Name="Play">
+                            <PathIcon Data="M5,2 L14,8 L5,14 Z" />
+                          </Button>
+                          <Button x:Name="StopButton" Classes="accent transport" Command="{Binding StopSoundCommand}" IsVisible="{Binding IsPlaying}"
+                                  ToolTip.Tip="Stop (Space)" AutomationProperties.Name="Stop">
+                            <PathIcon Data="M3,3 H13 V13 H3 Z" />
+                          </Button>
+                        </Panel>
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                          <TextBlock Classes="mono sound-time" Text="{Binding PlayheadText}" />
+                          <TextBlock Classes="mono muted sound-time" Text="{Binding SoundDurationText}" />
+                        </StackPanel>
+                        <TextBlock Classes="muted" VerticalAlignment="Center" Text="Space plays and stops · stops when the selection changes" />
+                      </StackPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding PlaybackNote}" Classes="muted" IsVisible="{Binding PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <ItemsControl ItemsSource="{Binding Preview.SoundFacts}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:SoundFact">
+                          <Border Classes="chip">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                              <TextBlock Classes="muted" Text="{Binding Label}" />
+                              <TextBlock Text="{Binding Value}" />
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Classes="wave-card">
+                      <DockPanel>
+                        <Border DockPanel.Dock="Top" Classes="wave-header">
+                          <DockPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasSoundLoop}">
+                              <Border Classes="loop-swatch" />
+                              <TextBlock Classes="muted" Text="Loop" />
+                            </StackPanel>
+                            <TextBlock Classes="strong" Text="{Binding Preview.SoundLanesTitle}" />
+                          </DockPanel>
+                        </Border>
+                        <views:WaveformView Sound="{Binding Preview.Sound}" LoopFrames="{Binding Preview.SoundLoopFrames}" Playhead="{Binding Playhead}"
+                                            ShowsPlayhead="{Binding IsPlaying}" SeekCommand="{Binding SeekSoundCommand}" />
+                      </DockPanel>
+                    </Border>
                   </StackPanel>
-                  <TextBlock DockPanel.Dock="Bottom" Text="{Binding PlaybackNote}" Classes="muted" Margin="0,6,0,0"
-                             IsVisible="{Binding PlaybackNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  <views:WaveformView Sound="{Binding Preview.Sound}" MinHeight="120" />
-                </DockPanel>
+                </ScrollViewer>
+                <!-- A sound that cannot be decoded: what it is, why, and its bytes. -->
+                <Border x:Name="SoundErrorCard" Classes="sound-error" IsVisible="{Binding Preview.IsSoundError}" VerticalAlignment="Top" HorizontalAlignment="Left">
+                  <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <views:SeverityIcon Severity="Error" Width="16" Height="16" VerticalAlignment="Center" />
+                      <TextBlock Classes="strong" Text="{Binding Preview.ErrorTitle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Classes="muted" Text="{Binding Preview.ErrorDetail}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Content="Show in Hex" Command="{Binding ShowInHexCommand}" />
+                      <Button Content="Save raw data…" Command="{Binding SaveRawDataCommand}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
               </Panel>
             </DockPanel>
               <!-- The read-then-edit host (boards/read-then-edit.md, E1; FormHost.cs): every form, read only first, then
