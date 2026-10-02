@@ -73,7 +73,8 @@ namespace ClassicMac.App.ViewModels
             var selected = (Selected as ResourceNode)?.Resource;
             var type = selected is not null && types.Contains(selected.Type.ToString()) ? selected.Type.ToString() : types[0];
             short id = selected is not null && selected.Type.ToString() == type ? selected.Id : ResourceEditRules.NextFreeId(fork, FourCC.FromString(type));
-            if (await EditDialogs.ImportAsync(fileName, types, new ImportChoice(type, id, "")) is not { } choice)
+            var source = isSound ? SoundSource(sound!) : ImageSource(image!);
+            if (await EditDialogs.ImportAsync(fileName, types, new ImportChoice(type, id, ""), source) is not { } choice)
             {
                 return;
             }
@@ -125,6 +126,48 @@ namespace ClassicMac.App.ViewModels
             }
             Execute(owner, edits.Count == 1 ? edits[0] : new CompoundEdit($"Import {fileName}", [.. edits]), select);
         }
+
+        // An image's size and depth ("32 × 32 · 24-bit", or 32-bit with alpha when a pixel is not opaque), and what each
+        // choice makes from it, drawn as the preview draws those resources.
+        private ImportSource ImageSource(RgbaBitmap image)
+        {
+            var alpha = false;
+            for (int i = 3; i < image.Pixels.Length; i += 4)
+            {
+                if (image.Pixels[i] != 255)
+                {
+                    alpha = true;
+                    break;
+                }
+            }
+
+            var details = $"{image.Width} × {image.Height} · {(alpha ? "32-bit with alpha" : "24-bit")}";
+            return new ImportSource(details, type => Made(type, image));
+        }
+
+        private IReadOnlyList<PreviewImage> Made(string type, RgbaBitmap image)
+        {
+            IReadOnlyList<(string Type, byte[] Data)> made;
+            try
+            {
+                made = type == IconFamily ? ImageImport.WriteIconFamily(image)
+                    : ImageImport.Types.Contains(type) ? [(type, ImageImport.Write(type, image))] : [];
+            }
+            catch (Exception e) when (e is ArgumentException or NotSupportedException)
+            {
+                return [];
+            }
+
+            var options = CurrentDecodeOptions;
+            return made.Select(m => PreviewViewModel.ForData(m.Type, m.Data, options, ReadOptions) is { Images.Count: > 0 } preview
+                    ? preview.Images[0] with { Caption = m.Type }
+                    : null)
+                .OfType<PreviewImage>().ToList();
+        }
+
+        // A sound's rate, channels, sample size and length, as its preview says them; nothing drawn.
+        private ImportSource SoundSource(byte[] sound) =>
+            new(PreviewViewModel.ForData("snd ", sound, CurrentDecodeOptions, ReadOptions).SoundDetails, _ => []);
 
         // Any image Avalonia decodes, converted to unpremultiplied RGBA.
         private static RgbaBitmap ReadImage(string path)

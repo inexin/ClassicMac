@@ -408,10 +408,10 @@ public class WindowTests
             return Pending.Task;
         }
 
-        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew) => throw new NotSupportedException();
-        public Task<SaveChanges> AskSaveChangesAsync(string fileName) => Task.FromResult(SaveChanges.Discard);
+        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew, DialogSubject? subject) => throw new NotSupportedException();
+        public Task<SaveChanges> AskSaveChangesAsync(string fileName, string edited) => Task.FromResult(SaveChanges.Discard);
         public Task<bool> ConfirmAsync(string title, string message) => throw new NotSupportedException();
-        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial) => throw new NotSupportedException();
+        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource source) => throw new NotSupportedException();
         public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => throw new NotSupportedException();
         public Task<string?> NewFolderAsync(string initial) => throw new NotSupportedException();
     }

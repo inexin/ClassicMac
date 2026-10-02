@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.Controls.Templates;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Resources;
 using CommunityToolkit.Mvvm.Input;
@@ -217,8 +220,42 @@ namespace ClassicMac.App.Views
 
         // ---- The dialogs ----
 
-        /// <summary>Get Info (or New Resource, where the type can be typed).</summary>
-        public static Dialog<ResourceInfo?> ResourceInfo(string title, ResourceInfo initial, bool isNew)
+        // A document glyph (16 px) for a file or a resource with no icon of its own.
+        private static PathIcon DocumentGlyph() => new()
+        {
+            Width = 16,
+            Height = 16,
+            Data = Geometry.Parse("M3,1 H10 L13,4 V15 H3 Z M10,1 V4 H13"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        // Get Info's subject: the icon on a 48 px checkerboard tile, the name and "Icon family in Finder · 2,240 bytes".
+        private static Control Subject(DialogSubject subject)
+        {
+            Control icon = subject.IconPng is { } png
+                ? new PixelImage { Source = Images.FromPng.Convert(png, typeof(Bitmap), null, CultureInfo.InvariantCulture) as Bitmap, Zoom = 1, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center }
+                : DocumentGlyph();
+            var tile = new Border { Name = "SubjectIcon", Classes = { "icon-tile" }, Width = 48, Height = 48, Child = icon, ClipToBounds = true };
+            var text = new StackPanel
+            {
+                Spacing = 2,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children =
+                {
+                    new TextBlock { Text = subject.Name, Classes = { "strong" }, TextTrimming = TextTrimming.CharacterEllipsis },
+                    new TextBlock { Text = subject.Line, Classes = { "muted" }, TextTrimming = TextTrimming.CharacterEllipsis },
+                },
+            };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("48,*"), ColumnSpacing = 12 };
+            Grid.SetColumn(text, 1);
+            grid.Children.Add(tile);
+            grid.Children.Add(text);
+            return grid;
+        }
+
+        /// <summary>Get Info (with its <paramref name="subject"/>), or New Resource (none; the type can be typed).</summary>
+        public static Dialog<ResourceInfo?> ResourceInfo(string title, ResourceInfo initial, bool isNew, DialogSubject? subject)
         {
             var window = NewWindow(title);
             var dialog = new Dialog<ResourceInfo?>(window, null);
@@ -241,6 +278,11 @@ namespace ClassicMac.App.Views
                 Children = { new TextBlock { Text = "ATTRIBUTES", Classes = { "caption" } }, attributes },
             };
             var body = new StackPanel { Spacing = 14, Children = { Fields(("Type", type), ("ID", id), ("Name", name)), fieldset } };
+            if (subject is not null)
+            {
+                body.Children.Insert(0, Subject(subject));
+            }
+
             var cancel = Button("Cancel", window.Close);
             var ok = Button("OK", () =>
             {
@@ -261,7 +303,7 @@ namespace ClassicMac.App.Views
         }
 
         /// <summary>Import Image or Sound: what to make, the first ID and the name.</summary>
-        public static ImportDialog Import(string fileName, IReadOnlyList<string> types, ImportChoice initial)
+        public static ImportDialog Import(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource made)
         {
             var title = $"Import “{fileName}”";
             var window = NewWindow(title);
@@ -284,14 +326,17 @@ namespace ClassicMac.App.Views
                         options.Selected = option;
                     }
                 };
+                var row = new Border { Classes = { "make-row" }, Child = radio };
+                row.Classes.Set("chosen", ReferenceEquals(option, options.Selected));
                 options.PropertyChanged += (_, e) =>
                 {
                     if (e.PropertyName == nameof(ImportOptions.Selected))
                     {
                         radio.IsChecked = ReferenceEquals(option, options.Selected);
+                        row.Classes.Set("chosen", ReferenceEquals(option, options.Selected));
                     }
                 };
-                list.Children.Add(new Border { Classes = { "make-row" }, Child = radio });
+                list.Children.Add(row);
             }
 
             var source = new StackPanel
@@ -300,10 +345,19 @@ namespace ClassicMac.App.Views
                 Spacing = 8,
                 Children =
                 {
-                    new PathIcon { Width = 16, Height = 16, Data = Geometry.Parse("M3,1 H10 L13,4 V15 H3 Z M10,1 V4 H13") },
+                    DocumentGlyph(),
                     new TextBlock { Text = fileName, Classes = { "strong" }, VerticalAlignment = VerticalAlignment.Center },
+                    new TextBlock
+                    {
+                        Name = "SourceDetails",
+                        Text = made.Details,
+                        IsVisible = made.Details.Length > 0,
+                        Classes = { "muted" },
+                        VerticalAlignment = VerticalAlignment.Center,
+                    },
                 },
             };
+            var strip = MadeStrip(made, options);
             var id = Number("ID", initial.Id);
             var name = Input("Name", initial.Name, 300);
             var note = new TextBlock { Classes = { "muted" }, Text = "A resource of that type and ID has its data replaced.", TextWrapping = TextWrapping.Wrap };
@@ -315,6 +369,7 @@ namespace ClassicMac.App.Views
                     source,
                     new StackPanel { Spacing = 6, Children = { new TextBlock { Text = "MAKE", Classes = { "caption" } }, list } },
                     Fields(("First ID", id), ("Name", name)),
+                    strip,
                     note,
                 },
             };
@@ -326,6 +381,66 @@ namespace ClassicMac.App.Views
             });
             Compose(window, Header(window, title, () => { }), body, Footer(cancel, import, null));
             return dialog;
+        }
+
+        // What the chosen "Make" choice makes, at 2× on a checkerboard with each type under it, and how colours are mapped;
+        // hidden when nothing is drawn (a sound, or a choice the file cannot make).
+        private static Control MadeStrip(ImportSource made, ImportOptions options)
+        {
+            var items = new ItemsControl
+            {
+                Name = "MadePreview",
+                ItemsPanel = new FuncTemplate<Panel?>(() => new WrapPanel()),
+                ItemTemplate = new FuncDataTemplate<PreviewImage>((image, _) => image is null ? null : new StackPanel
+                {
+                    Spacing = 4,
+                    Margin = new Thickness(0, 0, 12, 4),
+                    Children =
+                    {
+                        new Border
+                        {
+                            Classes = { "checker" },
+                            HorizontalAlignment = HorizontalAlignment.Left,
+                            Child = new PixelImage { Source = Images.FromPng.Convert(image.Png, typeof(Bitmap), null, CultureInfo.InvariantCulture) as Bitmap, Zoom = 2 },
+                        },
+                        new TextBlock { Text = image.Caption, Classes = { "mono", "muted" }, FontSize = 11 },
+                    },
+                }),
+            };
+            var note = new TextBlock
+            {
+                Name = "ColourNote",
+                Classes = { "muted" },
+                TextWrapping = TextWrapping.Wrap,
+                Text = "Colours become the nearest in each kind’s standard colour table, without dithering; pixels less than half opaque are masked out.",
+            };
+            var strip = new StackPanel
+            {
+                Name = "MadeStrip",
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock { Text = "PREVIEW", Classes = { "caption" } },
+                    new ScrollViewer { Content = items, MaxHeight = 180, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto },
+                    note,
+                },
+            };
+            void Update()
+            {
+                var images = made.Preview(options.Type);
+                items.ItemsSource = images;
+                strip.IsVisible = images.Count > 0;
+            }
+
+            options.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName is nameof(ImportOptions.Selected) or nameof(ImportOptions.Kind))
+                {
+                    Update();
+                }
+            };
+            Update();
+            return strip;
         }
 
         // A "Make" row: the label, its types in mono, why it is not offered, and for one icon kind the kind select.
@@ -398,8 +513,8 @@ namespace ClassicMac.App.Views
             return dialog;
         }
 
-        /// <summary>Unsaved changes: Don’t Save on the left, Cancel and Save on the right.</summary>
-        public static Dialog<SaveChanges> SaveChanges(string fileName)
+        /// <summary>Unsaved changes ("3 resources in Finder were edited."): Don’t Save on the left, Cancel and Save on the right.</summary>
+        public static Dialog<SaveChanges> SaveChanges(string fileName, string edited)
         {
             var window = NewWindow("Unsaved changes");
             var dialog = new Dialog<SaveChanges>(window, ViewModels.SaveChanges.Cancel);
@@ -408,7 +523,7 @@ namespace ClassicMac.App.Views
                 dialog.Result = choice;
                 window.Close();
             });
-            var body = Alert(AlertIcon.Warning, $"Save changes to “{fileName}” before closing?", "If you don’t save, the changes are lost.");
+            var body = Alert(AlertIcon.Warning, $"Save changes to “{fileName}” before closing?", $"{edited} If you don’t save, the changes are lost.");
             Compose(window, null, body, Footer(Choice("Cancel", ViewModels.SaveChanges.Cancel), Choice("Save", ViewModels.SaveChanges.Save),
                 Choice("Don’t Save", ViewModels.SaveChanges.Discard)));
             return dialog;

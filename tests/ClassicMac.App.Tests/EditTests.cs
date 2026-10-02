@@ -36,11 +36,19 @@ public sealed partial class EditTests : IDisposable
         public bool Confirm { get; set; } = true;
         public List<string> Asked { get; } = [];
 
-        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew) => Task.FromResult(Info(initial));
+        public List<DialogSubject?> Subjects { get; } = [];
+        public List<string> Edited { get; } = [];
 
-        public Task<SaveChanges> AskSaveChangesAsync(string fileName)
+        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew, DialogSubject? subject)
+        {
+            Subjects.Add(subject);
+            return Task.FromResult(Info(initial));
+        }
+
+        public Task<SaveChanges> AskSaveChangesAsync(string fileName, string edited)
         {
             Asked.Add(fileName);
+            Edited.Add(edited);
             Log.Add("save " + fileName);
             return Task.FromResult(Choice);
         }
@@ -64,9 +72,12 @@ public sealed partial class EditTests : IDisposable
         public Func<ImportChoice, ImportChoice?> Import { get; set; } = c => c;
         public IReadOnlyList<string> ImportTypes { get; private set; } = [];
 
-        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial)
+        public ImportSource? Source { get; private set; }
+
+        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource source)
         {
             ImportTypes = types;
+            Source = source;
             return Task.FromResult(Import(initial));
         }
 
@@ -432,8 +443,88 @@ public sealed partial class EditTests : IDisposable
         model.Selected = file;
         await model.CloseCommand.ExecuteAsync(null);
         Assert.Empty(model.Roots);
-        Assert.Equal(["Prefs"], dialogs.Asked.Distinct());
+        Assert.Equal(["Prefs.bin"], dialogs.Asked.Distinct());                    // the input, and the file in it with the count
+        Assert.Equal(["1 resource in Prefs was edited."], dialogs.Edited.Distinct());
         Assert.Null(Saved(path).Find(Str, 129));
+    }
+
+    [Theory]
+    [InlineData(1, "Prefs", "1 resource in Prefs was edited.")]
+    [InlineData(3, "Finder", "3 resources in Finder were edited.")]
+    [InlineData(2, null, "2 resources were edited.")]
+    [InlineData(0, "Finder", "Resources in Finder were edited.")]
+    [InlineData(0, null, "Resources were edited.")]
+    public void The_save_question_counts_the_edited_resources(int count, string? file, string expected) =>
+        Assert.Equal(expected, MainViewModel.EditedSummary(count, file));
+
+    [Fact]
+    public async Task The_save_question_counts_new_changed_and_deleted_resources()
+    {
+        var (model, file, dialogs, _, _) = await Open();
+        model.Selected = Resource(file, 128);
+        model.DuplicateResourceCommand.Execute(null);                  // new (130)
+        model.Selected = Resource(file, 129);
+        model.DeleteResourceCommand.Execute(null);                     // deleted
+        dialogs.Info = i => i with { Name = "renamed" };
+        model.Selected = Resource(file, 128);
+        await model.GetInfoCommand.ExecuteAsync(null);                 // changed
+        Assert.Equal(3, file.Editing!.UnsavedCount);
+        dialogs.Choice = SaveChanges.Cancel;
+        await model.CloseCommand.ExecuteAsync(null);
+        Assert.Equal("3 resources in Prefs were edited.", Assert.Single(dialogs.Edited));
+    }
+
+    [Fact]
+    public async Task Get_info_shows_the_icon_the_kind_and_the_size_and_new_resource_does_not()
+    {
+        var (model, file, dialogs, _, _) = await Open();
+        var node = Resource(file, 128);
+        model.Selected = node;
+        await model.GetInfoCommand.ExecuteAsync(null);
+        var subject = Assert.Single(dialogs.Subjects)!;
+        Assert.Equal((InspectorHeader.For(node)!.Name, "String in Prefs · 6 bytes"), (subject.Name, subject.Line));
+        Assert.Equal(NodeViewModel.LargeIcon(node), subject.IconPng);
+
+        await model.NewResourceCommand.ExecuteAsync(null);
+        Assert.Null(dialogs.Subjects[1]);
+    }
+
+    [Fact]
+    public async Task Import_shows_the_source_and_draws_what_each_choice_makes()
+    {
+        var (model, file, dialogs, picker, _) = await Open();
+        var image = new RgbaBitmap(40, 20);
+        Array.Fill(image.Pixels, (byte)255);
+        model.LoadImage = _ => image;
+        picker.Open = Path.Combine(folder, "art.png");
+        model.Selected = file;
+        dialogs.Import = _ => null;
+        await model.ImportCommand.ExecuteAsync(null);
+        var source = dialogs.Source!;
+        Assert.Equal("40 × 20 · 24-bit", source.Details);                // opaque
+        var pict = Assert.Single(source.Preview("PICT"));
+        Assert.Equal((40, 20, "PICT"), (pict.Width, pict.Height, pict.Caption));
+        Assert.Equal((32, 32, "ICN#"), Assert.Single(source.Preview("ICN#")) is var icn ? (icn.Width, icn.Height, icn.Caption) : default);
+        Assert.Equal(["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8"], source.Preview(MainViewModel.IconFamily).Select(i => i.Caption));
+        Assert.Empty(source.Preview("snd "));                             // not one an image makes
+
+        image.Pixels[3] = 0;                                              // a transparent pixel
+        await model.ImportCommand.ExecuteAsync(null);
+        Assert.Equal("40 × 20 · 32-bit with alpha", dialogs.Source!.Details);
+
+        picker.Open = Path.Combine(folder, "beep.wav");
+        File.WriteAllBytes(picker.Open, [.. "RIFF"u8, 36, 0, 0, 0, .. "WAVEfmt "u8, 16, 0, 0, 0, 1, 0, 1, 0, 0x11, 0x2B, 0, 0, 0x11, 0x2B, 0, 0, 1, 0, 8, 0,
+            .. "data"u8, 4, 0, 0, 0, 128, 200, 128, 50]);
+        await model.ImportCommand.ExecuteAsync(null);
+        Assert.StartsWith("11025 Hz, mono, 8-bit", dialogs.Source!.Details);
+        Assert.Empty(dialogs.Source.Preview("snd "));
+    }
+
+    [Fact]
+    public void An_import_source_with_nothing_drawn()
+    {
+        Assert.Equal("", ImportSource.None.Details);
+        Assert.Empty(ImportSource.None.Preview("PICT"));
     }
 
     [Fact]

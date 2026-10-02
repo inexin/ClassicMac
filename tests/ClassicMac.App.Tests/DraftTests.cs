@@ -302,7 +302,7 @@ public sealed partial class EditTests
         dialogs.Draft = DraftChoice.Apply;
         dialogs.Choice = SaveChanges.Cancel;
         await model.CloseCommand.ExecuteAsync(null);
-        Assert.Equal(["draft 'STR ' 128", "draft 'STR ' 128", "save Prefs"], dialogs.Log);
+        Assert.Equal(["draft 'STR ' 128", "draft 'STR ' 128", "save Prefs.bin"], dialogs.Log);
         Assert.Single(model.Roots);
         Assert.Equal("edited"u8.ToArray(), file.Resources!.Fork!.Find(Str, 128)!.GetData().ToArray());
         Assert.False(model.HasDraft);

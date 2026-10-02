@@ -21,6 +21,20 @@ public class DialogTests
 
     private static Button Footer(Window window, string label) => FooterButtons(window).Single(b => (string?)b.Content == label);
 
+    // A 32 × 32 icon: a black square on a transparent field.
+    private static byte[] Icon(int size) => PngEncoder.Instance.Encode(size, size,
+        [.. Enumerable.Range(0, size * size).SelectMany(i => i % size is > 7 and < 24 && i / size is > 7 and < 24 ? new byte[] { 0, 0, 0, 255 } : new byte[4])]);
+
+    private static readonly DialogSubject Trash = new("Trash", "Icon family in Finder · 2,240 bytes", Icon(32));
+
+    // An image's source: what each choice makes, one 32 × 32 icon per made resource (six for the family).
+    private static readonly ImportSource Art = new("32 × 32 · 24-bit", type => type switch
+    {
+        _ when type == MainViewModel.IconFamily => ImageImport.IconFamilyTypes.Select(t => new PreviewImage(Icon(t.StartsWith("ics", StringComparison.Ordinal) ? 16 : 32), 32, 32, t)).ToList(),
+        "snd " => [],
+        _ => [new PreviewImage(Icon(32), 32, 32, type)],
+    });
+
     private static T Show<T>(T built) where T : IDialog
     {
         built.Window.Show();
@@ -64,8 +78,16 @@ public class DialogTests
     [Fact]
     public void Get_info_has_the_frame_mono_fields_and_two_columns_of_attributes() => OnUiThread(() =>
     {
-        var dialog = Show(DialogViews.ResourceInfo("Get Info", new ResourceInfo("ICN#", 128, "Trash", ResourceAttributes.Purgeable | ResourceAttributes.Compressed), false));
+        var dialog = Show(DialogViews.ResourceInfo("Get Info", new ResourceInfo("ICN#", 128, "Trash", ResourceAttributes.Purgeable | ResourceAttributes.Compressed), false, Trash));
         AssertFrame(dialog.Window, "Get Info", "OK", "Cancel");
+        // The subject: the icon on a 48 px checkerboard tile, the name and the kind line.
+        var tile = dialog.Window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "SubjectIcon");
+        Assert.Equal((48, 48), (tile.Width, tile.Height));
+        Assert.Contains("icon-tile", tile.Classes);
+        Assert.NotNull(tile.GetVisualDescendants().OfType<PixelImage>().Single().Source);
+        var texts = dialog.Window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        Assert.Contains("Trash", texts);
+        Assert.Contains("Icon family in Finder · 2,240 bytes", texts);
         var inputs = dialog.Window.GetVisualDescendants().OfType<TextBox>().ToList();
         Assert.Contains("mono", inputs.Single(t => t.Name == "Type").Classes);
         Assert.True(inputs.Single(t => t.Name == "Type").IsReadOnly);
@@ -88,22 +110,30 @@ public class DialogTests
     [Fact]
     public void New_resource_lets_the_type_be_typed_and_cancel_or_close_gives_nothing() => OnUiThread(() =>
     {
-        var dialog = Show(DialogViews.ResourceInfo("New Resource", new ResourceInfo("STR ", 128, "", ResourceAttributes.None), true));
+        var dialog = Show(DialogViews.ResourceInfo("New Resource", new ResourceInfo("STR ", 128, "", ResourceAttributes.None), true, null));
         Assert.False(dialog.Window.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "Type").IsReadOnly);
+        Assert.DoesNotContain(dialog.Window.GetVisualDescendants().OfType<Border>(), b => b.Name == "SubjectIcon");   // no subject yet
         Footer(dialog.Window, "Cancel").Command!.Execute(null);
         Assert.Null(dialog.Result);
 
-        var closed = Show(DialogViews.ResourceInfo("New Resource", new ResourceInfo("STR ", 128, "", ResourceAttributes.None), true));
+        var closed = Show(DialogViews.ResourceInfo("New Resource", new ResourceInfo("STR ", 128, "", ResourceAttributes.None), true, null));
         closed.Window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "DialogClose").Command!.Execute(null);
         Assert.Null(closed.Result);
         Assert.False(closed.Window.IsVisible);
+
+        // A resource with no icon of its own: a plain glyph on the tile.
+        var plain = Show(DialogViews.ResourceInfo("Get Info", new ResourceInfo("STR ", 128, "", ResourceAttributes.None), false, Trash with { IconPng = null }));
+        var tile = plain.Window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "SubjectIcon");
+        Assert.Empty(tile.GetVisualDescendants().OfType<PixelImage>());
+        Assert.Single(tile.GetVisualDescendants().OfType<PathIcon>());
+        plain.Window.Close();
     });
 
     [Fact]
     public void Import_offers_what_to_make_as_choices() => OnUiThread(() =>
     {
         IReadOnlyList<string> types = [.. ImageImport.Types, MainViewModel.IconFamily];
-        var dialog = Show(DialogViews.Import("art.png", types, new ImportChoice("icl8", 128, "")));
+        var dialog = Show(DialogViews.Import("art.png", types, new ImportChoice("icl8", 128, ""), Art));
         AssertFrame(dialog.Window, "Import “art.png”", "Import", "Cancel");
         var options = dialog.Options;
         Assert.Equal(["Picture", "Color icon", "Icon family", "One icon kind", "Cursor", "Color cursor", "Sound"], options.Options.Select(o => o.Label));
@@ -113,9 +143,37 @@ public class DialogTests
         Assert.Equal("needs an audio file", options.Options.Single(o => o.Label == "Sound").Note);
         var radios = dialog.Window.GetVisualDescendants().OfType<RadioButton>().ToList();
         Assert.Equal(7, radios.Count);
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "32 × 32 · 24-bit");
+
+        // The chosen row is highlighted; the strip shows what it makes at 2× on a checkerboard, with the colour note.
+        List<Border> Rows() => dialog.Window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("make-row")).ToList();
+        Assert.Equal(["One icon kind"], Rows().Where(r => r.Classes.Contains("chosen")).Select(r => options.Options[Rows().IndexOf(r)].Label));
+        var strip = dialog.Window.GetVisualDescendants().OfType<ItemsControl>().Single(c => c.Name == "MadePreview");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["icl8"], Captions(strip));
+        Assert.All(strip.GetVisualDescendants().OfType<PixelImage>(), p => Assert.Equal(2, p.Zoom));
+        Assert.All(strip.GetVisualDescendants().OfType<PixelImage>(), p => Assert.Same(Application.Current!.FindResource("CmCheckerboard"), ((Border)p.Parent!).Background));
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Name == "ColourNote" && t.Text!.StartsWith("Colours become", StringComparison.Ordinal));
+
         options.Selected = options.Options.Single(o => o.Label == "Icon family");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Icon family"], Rows().Where(r => r.Classes.Contains("chosen")).Select(r => options.Options[Rows().IndexOf(r)].Label));
+        Assert.Equal([.. ImageImport.IconFamilyTypes], Captions(strip));
         Footer(dialog.Window, "Import").Command!.Execute(null);
         Assert.Equal(new ImportChoice(MainViewModel.IconFamily, 128, ""), dialog.Result);
+    });
+
+    private static List<string?> Captions(ItemsControl strip) =>
+        strip.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+
+    [Fact]
+    public void Import_hides_the_strip_when_nothing_is_drawn() => OnUiThread(() =>
+    {
+        var dialog = Show(DialogViews.Import("beep.wav", ["snd "], new ImportChoice("snd ", 128, ""), new ImportSource("11025 Hz, mono, 8-bit", _ => [])));
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "11025 Hz, mono, 8-bit");
+        Assert.False(dialog.Window.GetVisualDescendants().OfType<Control>().Single(c => c.Name == "MadeStrip").IsVisible);
+        var none = Show(DialogViews.Import("art.png", ["PICT"], new ImportChoice("PICT", 128, ""), ImportSource.None));
+        Assert.DoesNotContain(none.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Name == "SourceDetails" && t.IsVisible);
     });
 
     [Fact]
@@ -165,10 +223,10 @@ public class DialogTests
     [InlineData(SaveChanges.Cancel, "Cancel")]
     public void Unsaved_changes_is_an_alert_with_dont_save_on_the_left(SaveChanges choice, string button) => OnUiThread(() =>
     {
-        var dialog = Show(DialogViews.SaveChanges("Mac OS 9.hfv"));
+        var dialog = Show(DialogViews.SaveChanges("Mac OS 9.hfv", "3 resources in Finder were edited."));
         AssertFrame(dialog.Window, null, "Save", "Cancel", "Don’t Save");
         Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Save changes to “Mac OS 9.hfv” before closing?");
-        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "If you don’t save, the changes are lost.");
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "3 resources in Finder were edited. If you don’t save, the changes are lost.");
         Assert.Equal(SaveChanges.Cancel, dialog.Result);                    // closed by other means: cancel
         FooterButtons(dialog.Window).Single(b => (string?)b.Content == button).Command!.Execute(null);
         Assert.Equal(choice, dialog.Result);
@@ -204,13 +262,13 @@ public class DialogTests
     public void Dialogs_draw_in_light_and_dark() => OnUiThread(() =>
     {
         var baselines = new List<string>();
-        var info = Show(DialogViews.ResourceInfo("Get Info", new ResourceInfo("ICN#", 128, "Trash", ResourceAttributes.Purgeable), false));
+        var info = Show(DialogViews.ResourceInfo("Get Info", new ResourceInfo("ICN#", 128, "Trash", ResourceAttributes.Purgeable), false, Trash));
         Baselines.Check(info.Window, "dialog-get-info", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         info.Window.Close();
-        var save = Show(DialogViews.SaveChanges("Mac OS 9.hfv"));
+        var save = Show(DialogViews.SaveChanges("Mac OS 9.hfv", "3 resources in Finder were edited."));
         Baselines.Check(save.Window, "dialog-unsaved", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         save.Window.Close();
-        var import = Show(DialogViews.Import("art.png", [.. ImageImport.Types, MainViewModel.IconFamily], new ImportChoice("PICT", 128, "")));
+        var import = Show(DialogViews.Import("art.png", [.. ImageImport.Types, MainViewModel.IconFamily], new ImportChoice("PICT", 128, ""), Art));
         Baselines.Check(import.Window, "dialog-import", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         import.Window.Close();
         Baselines.Verify(baselines);

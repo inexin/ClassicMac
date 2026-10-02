@@ -41,11 +41,17 @@ namespace ClassicMac.App.ViewModels
     /// <summary>The editing dialogs; the window provides them, tests replace them.</summary>
     public interface IEditDialogs
     {
-        /// <summary>Get Info (or New Resource, when <paramref name="isNew"/>: the type can be typed): the new values, or null when cancelled.</summary>
-        Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew);
+        /// <summary>
+        /// Get Info (or New Resource, when <paramref name="isNew"/>: the type can be typed): the new values, or null when
+        /// cancelled. <paramref name="subject"/> is Get Info's icon tile, name and kind line; null for New Resource.
+        /// </summary>
+        Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew, DialogSubject? subject);
 
-        /// <summary>Asks whether to save <paramref name="fileName"/>'s edits before it closes.</summary>
-        Task<SaveChanges> AskSaveChangesAsync(string fileName);
+        /// <summary>
+        /// Asks whether to save <paramref name="fileName"/>'s edits before it closes; <paramref name="edited"/> says what
+        /// was edited ("3 resources in Finder were edited.").
+        /// </summary>
+        Task<SaveChanges> AskSaveChangesAsync(string fileName, string edited);
 
         /// <summary>
         /// Asks what to do with the unapplied edits to <paramref name="what"/> (<c>'STR#' 128</c>); <paramref name="error"/>,
@@ -56,14 +62,29 @@ namespace ClassicMac.App.ViewModels
         /// <summary>Asks a yes/no question; true for yes.</summary>
         Task<bool> ConfirmAsync(string title, string message);
 
-        /// <summary>Import: the type (one of <paramref name="types"/>), ID and name to make from <paramref name="fileName"/>, or null when cancelled.</summary>
-        Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial);
+        /// <summary>
+        /// Import: the type (one of <paramref name="types"/>), ID and name to make from <paramref name="fileName"/>, or
+        /// null when cancelled. <paramref name="source"/> describes the file and draws what each choice makes.
+        /// </summary>
+        Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource source);
 
         /// <summary>New File (or Import File): the name, type and creator, or null when cancelled.</summary>
         Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial);
 
         /// <summary>New Folder: the name, or null when cancelled.</summary>
         Task<string?> NewFolderAsync(string initial);
+    }
+
+    /// <summary>Get Info's subject (design/boards/dialogs.md): the icon tile's PNG (null: a plain glyph), the name and "Icon family in Finder · 2,240 bytes".</summary>
+    public sealed record DialogSubject(string Name, string Line, byte[]? IconPng);
+
+    /// <summary>
+    /// Import's source (design/boards/dialogs.md): the file's details ("32 × 32 · 24-bit") and, for a choice's type (or
+    /// <see cref="MainViewModel.IconFamily"/>), the resources it makes, drawn; none for a choice the file cannot make.
+    /// </summary>
+    public sealed record ImportSource(string Details, Func<string, IReadOnlyList<PreviewImage>> Preview)
+    {
+        public static ImportSource None { get; } = new("", _ => []);
     }
 
     /// <summary>The edits made to one file's resources, and where they save to.</summary>
@@ -91,6 +112,10 @@ namespace ClassicMac.App.ViewModels
             || was.Name != resource.Name
             || was.Attributes != resource.Attributes
             || !was.Data.Span.SequenceEqual(resource.GetData().Span);
+
+        /// <summary>How many resources differ from the file as saved: new, changed or deleted.</summary>
+        internal int UnsavedCount =>
+            Session.Fork.Resources.Count(IsUnsaved) + saved.Keys.Count(key => Session.Fork.Find(key.Type, key.Id) is null);
 
         private static Dictionary<(FourCC, short), (ReadOnlyMemory<byte>, MacString?, ResourceAttributes)> Snapshot(ResourceFork fork) =>
             fork.Resources.ToDictionary(r => (r.Type, r.Id), r => (r.GetData(), r.Name, r.Attributes));
@@ -310,7 +335,7 @@ namespace ClassicMac.App.ViewModels
             var fork = StateFor(owner).Session.Fork;
             var type = Selected switch { ResourceNode r => r.Resource.Type, ResourceTypeNode t => t.Type, _ => FourCC.FromString("STR ") };
             var initial = new ResourceInfo(type.ToString(), ResourceEditRules.NextFreeId(fork, type), "", ResourceAttributes.None);
-            if (await EditDialogs.ResourceInfoAsync("New Resource", initial, isNew: true) is not { } info)
+            if (await EditDialogs.ResourceInfoAsync("New Resource", initial, isNew: true, subject: null) is not { } info)
             {
                 return;
             }
@@ -372,7 +397,10 @@ namespace ClassicMac.App.ViewModels
 
             var resource = node.Resource;
             var initial = new ResourceInfo(resource.Type.ToString(), resource.Id, resource.Name?.ToMacRoman() ?? "", resource.Attributes);
-            if (await EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false) is not { } info || info == initial)
+            var header = InspectorHeader.For(node)!;
+            var subject = new DialogSubject(header.Name, string.Create(CultureInfo.InvariantCulture, $"{header.Kind} · {resource.Length:N0} bytes"),
+                await Task.Run(() => NodeViewModel.LargeIcon(node)));
+            if (await EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false, subject) is not { } info || info == initial)
             {
                 return;
             }
@@ -810,7 +838,7 @@ namespace ClassicMac.App.ViewModels
 
             foreach (var input in inputs.Where(i => i.EditedVolume is not null))
             {
-                var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle);
+                var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle, "Files and folders were created or deleted.");
                 if (choice == SaveChanges.Cancel)
                 {
                     return false;
@@ -829,7 +857,8 @@ namespace ClassicMac.App.ViewModels
                     continue;
                 }
 
-                var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(node.BaseTitle);
+                var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(node.Input.BaseTitle,
+                    EditedSummary(state.UnsavedCount, ReferenceEquals(node, node.Input) ? null : node.BaseTitle));
                 if (choice == SaveChanges.Cancel)
                 {
                     return false;
@@ -841,6 +870,18 @@ namespace ClassicMac.App.ViewModels
                 }
             }
             return true;
+        }
+
+        /// <summary>The save question's detail: "3 resources in Finder were edited." (no count when none is known).</summary>
+        public static string EditedSummary(int count, string? file)
+        {
+            var where = file is null ? "" : $" in {file}";
+            return count switch
+            {
+                <= 0 => $"Resources{where} were edited.",
+                1 => $"1 resource{where} was edited.",
+                _ => string.Create(CultureInfo.InvariantCulture, $"{count:N0} resources{where} were edited."),
+            };
         }
 
         /// <summary>Whether the app may quit: unsaved edits are saved or discarded first.</summary>

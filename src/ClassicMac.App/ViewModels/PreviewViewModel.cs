@@ -166,6 +166,15 @@ namespace ClassicMac.App.ViewModels
                 _ => None,
             };
 
+        /// <summary>The preview of resource data not in a file yet (what Import would make); decoding problems are dropped.</summary>
+        internal static PreviewViewModel ForData(string type, byte[] data, DecodeOptions options, ReadOptions readOptions)
+        {
+            var resource = new Resource(FourCC.FromString(type), 128, data);
+            var fork = new ResourceFork();
+            fork.Add(resource);
+            return ForResource(resource, fork, options, readOptions, new List<Diagnostic>());
+        }
+
         // A folder, volume root or container's contents as the Finder's icon view of its window.
         private static PreviewViewModel ForFolder(NodeViewModel node, DecodeOptions options, ReadOptions readOptions, DialogSources? sources) =>
             FolderPreviews.Build(node, options, readOptions, sources) is { } image

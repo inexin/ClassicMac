@@ -16,6 +16,10 @@
   loop. A sound that cannot be decoded shows why, with Show in Hex and Save raw data….
 - Viewer: the audio player (A1) reports its position, seeks, and repeats a loop (`IAudioPlayer.Position`, `Seek`,
   `SetLoop`; SoundFlow's time, seek and loop points).
+- Editor: Get Info shows the resource's icon on a checkerboard tile with its name and "Icon family in Finder · 2,240
+  bytes"; Import shows the source's size and depth ("32 × 32 · 24-bit", or a sound's rate and length), highlights the
+  chosen "Make" row and draws what it makes at 2× on a checkerboard with a note on how colours are mapped; the
+  unsaved-changes alert names the image and counts the edited resources ("3 resources in Finder were edited.").
 - Viewer: the Details tab in cards (File, Forks, Dates, Finder flags, How it was read): fork sizes with bars relative
   to the larger fork, the resource types a fork holds, compressed resources with their 'dcmp's, the dates with a note on
   their time zone (Mac local time for HFS and MFS, UTC for HFS Plus, zip and tar), the Finder flags as chips with the

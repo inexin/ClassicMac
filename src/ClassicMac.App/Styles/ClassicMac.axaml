@@ -520,6 +520,23 @@
   <Style Selector="Border.dialog-body TextBox, Border.dialog-body NumericUpDown">
     <Setter Property="MinHeight" Value="30" />
   </Style>
+  <!-- Get Info's icon tile, Import's chosen "Make" row and its preview strip on a checkerboard. -->
+  <Style Selector="Border.dialog-body Border.icon-tile">
+    <Setter Property="Background" Value="{DynamicResource CmCheckerboard}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+  </Style>
+  <Style Selector="Border.make-row">
+    <Setter Property="Padding" Value="6,0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+  </Style>
+  <Style Selector="Border.make-row.chosen">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector="Border.checker">
+    <Setter Property="Background" Value="{DynamicResource CmCheckerboard}" />
+  </Style>
 
   <!-- The Details tab (design/boards/details.md, P4): cards with a caption header on CmSidebarBackground, label and
        value rows, fork bars (6 px, CmAccent on CmSegmentTrack), Finder flag chips (set: CmRowHighlight; unset: dashed and

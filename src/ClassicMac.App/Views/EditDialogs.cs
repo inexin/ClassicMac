@@ -14,16 +14,17 @@ namespace ClassicMac.App.Views
             return dialog.Result;
         }
 
-        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew) => Show(DialogViews.ResourceInfo(title, initial, isNew));
+        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew, DialogSubject? subject) =>
+            Show(DialogViews.ResourceInfo(title, initial, isNew, subject));
 
-        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial) =>
-            Show<ImportChoice?>(DialogViews.Import(fileName, types, initial));
+        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource source) =>
+            Show<ImportChoice?>(DialogViews.Import(fileName, types, initial, source));
 
         public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => Show(DialogViews.NewFile(title, initial));
 
         public Task<string?> NewFolderAsync(string initial) => Show(DialogViews.NewFolder(initial));
 
-        public Task<SaveChanges> AskSaveChangesAsync(string fileName) => Show(DialogViews.SaveChanges(fileName));
+        public Task<SaveChanges> AskSaveChangesAsync(string fileName, string edited) => Show(DialogViews.SaveChanges(fileName, edited));
 
         public Task<DraftChoice> AskApplyDraftAsync(string what, string? error) => Show(DialogViews.ApplyDraft(what, error));
 
