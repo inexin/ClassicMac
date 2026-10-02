@@ -2,18 +2,20 @@
 
 ## Unreleased
 
+- Docs: the format documents are in category folders under `docs/formats/` (`containers/`, `archives/`,
+  `disk-images/`, `file-systems/`, `resources/`, `graphics/`, `codecs/`, `output/`), one file per format.
 - Interface previews: dialogs and alerts are drawn as Mac OS 9 with Appearance (Platinum) draws them, frames and
-  controls pixel for pixel; text through the fonts in open files (INTERFACE.md section 12.1).
-- Icons: Mac OS 9's 8-bit icon masks (`l8mk`, `s8mk`, `h8mk`) in icon suites at 8 bits and more (ICONS.md).
-- Inputs: Mac ROM images (the ROM's resource table, and the New World `Mac OS ROM` file; ROM.md); `.sea`
+  controls pixel for pixel; text through the fonts in open files (resources/windows-dialogs.md §8.1).
+- Icons: Mac OS 9's 8-bit icon masks (`l8mk`, `s8mk`, `h8mk`) in icon suites at 8 bits and more (resources/icon-families.md).
+- Inputs: Mac ROM images (the ROM's resource table, and the New World `Mac OS ROM` file; disk-images/rom.md); `.sea`
   self-extracting archives through their data fork; StuffIt 1.5.1 segment sets.
 - Pixel patterns: a colour table's size is signed, so ResEdit's `ppat`s with an empty table load and draw.
 - Inputs: uuencode (`.uu`, `begin-base64`); zip (stored, DEFLATE, ZIP64) and tar/gzip with Mac data: AppleDouble `._`
-  and `__MACOSX/` pairing, Info-ZIP and ZipIt Mac extra fields (ARCHIVES.md, CONTAINERS.md section 8).
+  and `__MACOSX/` pairing, Info-ZIP and ZipIt Mac extra fields (archives/zip.md, archives/tar-gzip.md, containers/uuencode.md).
 - CD images: multisession discs are read by their last session's descriptors, as the Mac reads them, from cue sheets
-  and whole-disc raw images (ISO9660.md sections 14 and 15).
+  and whole-disc raw images (disk-images/cd-images.md §2 and §3).
 - HFS: catalog keys whose length leaves out the pad byte, as Mac OS writes them, are no longer rejected; most files on
-  Mac-written volumes were missing from listings (HFS-MFS.md section 7.1).
+  Mac-written volumes were missing from listings (file-systems/hfs.md §5.1).
 - Editor III: Volume ▸ New File, Import File, New Folder and Delete on plain HFS images, saved with Save As.
 - Viewer: files and resources drag out to the desktop (files as data fork plus AppleDouble, or MacBinary).
 - Core: `BigEndianReader` is a class over `ReadOnlyMemory<byte>`, with a constructor that reads a stream from its
@@ -31,16 +33,16 @@
 - Hex editing in the hex view: Edit Bytes types hex digits over or into a resource's bytes, with Delete, Backspace and
   cursor keys, applied as one undoable edit.
 - Resource forks: a map offset past the end of the fork is recovered from the end of the data area, as ResEdit does
-  (`fork.map-recovered`; RESOURCE-FORK.md section 9). A damaged fork opened this way saves as a clean one.
+  (`fork.map-recovered`; resources/resource-fork.md §9). A damaged fork opened this way saves as a clean one.
 - Templates: resources without a form of their own are edited through a `TMPL` from their file or any other open
-  file, as ResEdit 2.1.3 reads and writes them; `ResourceTemplate` in the decoders library (TEMPLATES.md).
+  file, as ResEdit 2.1.3 reads and writes them; `ResourceTemplate` in the decoders library (resources/templates.md).
 - Editor II, import: Resource ▸ Import Image or Sound makes a `PICT`, `cicn`, icon, icon family or cursor from an image
   (PNG, JPEG, …) and a `snd ` from a WAV file, as an undoable edit; `ImageImport` and `SoundImport` in the decoders
-  library (ICONS.md, PICT.md section 9, SOUND.md section 12).
+  library (resources/icons.md, graphics/pict.md §9, resources/sound.md §9).
 - Editor II, UI templates: forms for `DLOG`, `ALRT`, `WIND`, `DITL`, `MENU` and `CNTL` in the Edit tab, the dialog or
-  menu preview beside them redrawn as they change; `InterfaceWriter` writes the templates (INTERFACE.md section 13).
+  menu preview beside them redrawn as they change; `InterfaceWriter` writes the templates (the Writing sections of resources/windows-dialogs.md, menus.md and dialog-items.md).
 - Editor II, first part: an Edit tab with forms for `STR `, `STR#`, `TEXT` (its `styl` runs kept in step) and `vers`,
-  applied as undoable edits; the library writes them (`TextResources`, `VersionResource`; TEXT.md section 12).
+  applied as undoable edits; the library writes them (`TextResources`, `VersionResource`; the Writing sections of resources/strings.md, styled-text.md and version.md).
 - The viewer shows an icon's suite as the Finder draws it: each size, plain, selected, disabled, offline and open, and
   the label colours, at the chosen screen depth.
 - Editing (Editor I): the app adds, duplicates, deletes and renumbers resources, changes their names and attributes,
@@ -57,8 +59,8 @@
 - `QuickDrawPort`: `SetOrigin`, `HidePen`/`ShowPen`, `CharExtra`, `TextWidth`/`StringWidth`/`CharWidth`, `GetFontInfo`,
   and `DrawPicture` onto a port (saving and restoring its state, clipped to nothing until the picture's ClipRgn, as
   the Mac does). Pictures now start with the pen ScalePt((1, 1)) to the destination, as DrawPicture does.
-- The PICT specification is split into `docs/formats/PICT.md` (the format and playback), `QUICKDRAW.md` (the drawing
-  rules), `QUICKTIME.md`, `MACPAINT.md` and `ICONS.md`.
+- The PICT specification is split into `docs/formats/graphics/pict.md` (the format and playback), `quickdraw.md` (the
+  drawing rules), `quicktime.md`, `macpaint.md` and the icon documents in `docs/formats/resources/`.
 - `QuickDrawPort`: the renderer as a public colour QuickDraw port (shapes, lines, regions, patterns, CopyBits, text)
   with QuickDraw's names, drawing exactly what the picture player draws, which now runs on it. Public `RgbColor`,
   `TransferMode`, `QuickDrawStyle`, `QuickDrawPattern`, `QuickDrawOptions`, `Region` and `PixMap`
@@ -81,20 +83,22 @@
 - Fonts (`ClassicMac.Graphics.Fonts`): bitmap strikes (`NFNT`, `FONT`), families (`FOND`) with their width,
   kerning and style-mapping tables, font colour tables and TrueType `sfnt` data. Font decoders: strikes to a glyph
   sheet PNG, BDF and metrics JSON; families and font colours to JSON; `sfnt` to `.ttf`. Specified in
-  `docs/formats/FONTS.md`.
+  `docs/formats/resources/bitmap-fonts.md`, `font-families.md` and `outline-fonts.md`.
 - `pack`: an export folder back into a resource fork, raw or in an AppleDouble, AppleSingle, MacBinary III or
   BinHex 4.0 file (new writers for the last three); unchanged resources come back byte for byte from `raw/` or a
   base fork. The corpus test now packs every export back.
 - Finder resources (`BNDL`, `FREF`, `SIZE`) to JSON, a bundle with each file type's icon, specified in
-  `docs/formats/FINDER.md`.
-- Colour tables (`clut`) and palettes (`pltt`) to JSON and Adobe `.act`, specified in `docs/formats/PALETTES.md`;
+  `docs/formats/resources/finder.md`.
+- Colour tables (`clut`) and palettes (`pltt`) to JSON and Adobe `.act`, specified in `docs/formats/resources/palettes.md`;
   the viewer shows them as swatches.
 - Interface resources to JSON: menus and menu bars, window, dialog and alert templates, dialog item lists and
   control templates, and their colour tables and Appearance extensions (`ui.*` decoders), specified in
-  `docs/formats/INTERFACE.md`. The viewer draws dialogs, alerts, item lists and menus in the System 7 style.
+  `docs/formats/resources/` (`menus.md`, `windows-dialogs.md`, `dialog-items.md`, `controls.md`). The viewer draws
+  dialogs, alerts, item lists and menus in the System 7 style.
 - DOCMaker stand-alone documents and SimpleText documents with pictures: read into a styled-document model
   (`StyledDocuments`) and converted to an HTML folder (`HtmlDocuments`: a page per chapter, a contents page, the
-  pictures as PNG reflowed into the text, picture actions as links). Specified in `docs/formats/DOCUMENTS.md`.
+  pictures as PNG reflowed into the text, picture actions as links). Specified in
+  `docs/formats/resources/documents.md` and `docs/formats/output/html.md`.
   `extract` adds a document's HTML folder as `document/` (manifest format 1.2: a `document` field; `--no-documents`
   leaves it out); the new `convert` command writes only the documents. Document converters plug in through
   `IDocumentConverter` and `ExportOptions.Documents`. The viewer previews documents a chapter at a time with the same

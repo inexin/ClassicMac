@@ -9,9 +9,9 @@ without reading ClassicMac's code. The writer is `ResourceExporter` (`ClassicMac
 
 Unlike the other documents in this folder, this one describes a format ClassicMac defines itself. Mac data appears in
 it only as the values the manifest records (types, IDs, attributes, Finder flags); how that data is read is specified
-in [RESOURCE-FORK.md](RESOURCE-FORK.md), [CONTAINERS.md](CONTAINERS.md) and [HOST-FOLDERS.md](HOST-FOLDERS.md). How
-icons, cursors, patterns and pictures are drawn is specified by [PICT.md](PICT.md), [QUICKDRAW.md](QUICKDRAW.md),
-[QUICKTIME.md](QUICKTIME.md) and [ICONS.md](ICONS.md); this document covers only what ClassicMac adds on top.
+in [resource-fork.md](../resources/resource-fork.md), [unwrapping.md](../containers/unwrapping.md) and [host-folders.md](../containers/host-folders.md). How
+icons, cursors, patterns and pictures are drawn is specified by [pict.md](../graphics/pict.md), [quickdraw.md](../graphics/quickdraw.md),
+[quicktime.md](../graphics/quicktime.md) and [icons.md](../resources/icons.md); this document covers only what ClassicMac adds on top.
 
 Contents
 
@@ -33,7 +33,7 @@ Contents
 
 ## 1. Conventions
 
-The shared conventions of [README.md](README.md) apply to the Mac values recorded here (big-endian fields, `OSType`,
+The shared conventions of [README.md](../README.md) apply to the Mac values recorded here (big-endian fields, `OSType`,
 Mac OS Roman text). In addition:
 
 - **JSON** (`manifest.json` and the JSON files decoders write) is UTF-8 without a byte-order mark, as RFC 8259
@@ -47,14 +47,14 @@ Mac OS Roman text). In addition:
   reversible: the original bytes can always be recovered. In the JSON source such a string holds a literal backslash,
   so it appears as `\\xHH` there. This is the same text `FourCC.ToString` and `MacString.ToString` give, and what the
   CLI's `--type` option reads back.
-- **Host names** (folder and file names on the output disk) use a different escape, `%XX`; see section 4.
+- **Host names** (folder and file names on the output disk) use a different escape, `%XX`; see §4.
 - A **fork** is a resource fork as ClassicMac reads it (a map of resources); a **resource** is one entry of it: type,
   ID, name, attribute byte and data. The **stored data** is a resource's bytes as they are in the fork; its **data**
   is what an application sees, which differs only for compressed resources (decompressed).
 
 ### Where the rules come from
 
-The tags of [README.md](README.md) mark facts about Mac data: **[Doc]** for Apple's documentation, **[Code]** for
+The tags of [README.md](../README.md) mark facts about Mac data: **[Doc]** for Apple's documentation, **[Code]** for
 Apple's code. Nearly everything in this document is a design decision of ClassicMac's rather than a fact about the Mac,
 and carries a tag of its own:
 
@@ -90,19 +90,19 @@ Realmz resources/
   …
 ```
 
-- One subfolder per resource type, named after the type (section 4.2). **[ClassicMac]**
-- In it, the files for each resource, named `<id> <name>` or `<id>` plus an extension (section 4.3). A decoder may write
-  several files for one resource; a resource no decoder handles is written as its data, `.bin` (section 5).
+- One subfolder per resource type, named after the type (§4.2). **[ClassicMac]**
+- In it, the files for each resource, named `<id> <name>` or `<id>` plus an extension (§4.3). A decoder may write
+  several files for one resource; a resource no decoder handles is written as its data, `.bin` (§5).
   **[ClassicMac]**
-- With the KeepRaw option, `raw/<type folder>/<id>.bin` holds each resource's stored data (section 5.3).
+- With the KeepRaw option, `raw/<type folder>/<id>.bin` holds each resource's stored data (§5.3).
   **[ClassicMac]**
 - With document converters, a file that is a whole document (a DOCMaker or SimpleText document) is also converted
-  into `document/` (section 6.10). **[ClassicMac]**
-- `manifest.json` lists every resource with where it came from and what was written (section 6). It is written last:
+  into `document/` (§6.10). **[ClassicMac]**
+- `manifest.json` lists every resource with where it came from and what was written (§6). It is written last:
   a folder without it is an incomplete export.
 
 When an input holds several forks (a disk image, an archive), each gets its own export folder, placed as `unpack`
-places files (section 3.2).
+places files (§3.2).
 
 ---
 
@@ -122,19 +122,19 @@ document's text); without it, the data fork counts as empty.
 ### 3.2 Several forks
 
 `Unpacker.Extract(root, forks, directory, options)` exports a list of forks found under one unwrapped input (a
-container tree, see [HOST-FOLDERS.md](HOST-FOLDERS.md) and [CONTAINERS.md](CONTAINERS.md)):
+container tree, see [host-folders.md](../containers/host-folders.md) and [unwrapping.md](../containers/unwrapping.md)):
 
 - **One fork** in the list: it is exported straight into `directory`. **[ClassicMac]**
 - **Several forks:** each is exported into a folder of its own, `directory/<placement>/<file name>`: **[ClassicMac]**
   - `<placement>` is the folder the file would get from `unpack`: folders inside volumes become folders; a container
     that in the end holds one file (MacBinary, BinHex, AppleSingle, a disk image of one file) is replaced by that
     file; one that holds several files, or folders, becomes a folder named after the outermost container of its chain.
-    The rules are those of `OutputLayout`, specified with `unpack` in [HOST-FOLDERS.md](HOST-FOLDERS.md).
-  - `<file name>` is the Mac file's name made host-safe (section 4.1, up to 255 characters), and made distinct from the
-    other names in the same folder (section 4.4). The file's own export then goes inside that folder.
-  - Each fork folder is checked for emptiness on its own (section 3.1). A fork whose folder cannot be written is
+    The rules are those of `OutputLayout`, specified with `unpack` in [host-folders.md](../containers/host-folders.md).
+  - `<file name>` is the Mac file's name made host-safe (§4.1, up to 255 characters), and made distinct from the
+    other names in the same folder (§4.4). The file's own export then goes inside that folder.
+  - Each fork folder is checked for emptiness on its own (§3.1). A fork whose folder cannot be written is
     reported and skipped; the others are still exported.
-  - The length budget (section 4.3) of a fork's export is `MaxPathLength` minus the length of `<placement>/<file
+  - The length budget (§4.3) of a fork's export is `MaxPathLength` minus the length of `<placement>/<file
     name>/`, but never less than 24.
 
 The order of forks is the caller's. Folder names and the " ~2" suffixes they may get depend on that order.
@@ -142,7 +142,7 @@ The order of forks is the caller's. Folder names and the " ~2" suffixes they may
 ### 3.3 Folders chosen by the CLI and the viewer
 
 - **CLI `extract`:** the output folder is `-o <dir>`, or by default `<input name without extension> resources` next to
-  the input. It is not numbered: an existing non-empty folder is refused unless `--overwrite` is given (section 10).
+  the input. It is not numbered: an existing non-empty folder is refused unless `--overwrite` is given (§10).
 - **Viewer:** every export goes into a new folder made by `ExportFolders.CreateNew(parent, name)`, which tries `name`,
   then `name 2`, `name 3`, … and creates the first path that is neither a folder nor a file. It never writes into an
   existing folder. **[ClassicMac]**
@@ -151,13 +151,13 @@ The order of forks is the caller's. Folder names and the " ~2" suffixes they may
     type is selected).
   - *Extract All Resources* (an input, a container or a folder): folder `<item's host name> resources`; every file
     under the item that has at least one resource, by `Unpacker.Extract`.
-  - Both convert a file that is a document into `document/` (section 6.10), as `extract` does; *Export Resources* of
+  - Both convert a file that is a document into `document/` (§6.10), as `extract` does; *Export Resources* of
     one type does not.
   - *Convert Documents* (an input, a container, a folder or a file): folder `<item's host name> documents`, by
-    `DocumentConverter.Convert` ([DOCUMENTS.md](DOCUMENTS.md) §7); when the item holds no document, the new folder is
+    `DocumentConverter.Convert` ([documents.md §6](../resources/documents.md#6-where-documents-are-converted)); when the item holds no document, the new folder is
     removed again.
   - *Save Resource As* writes one resource's decoded file (or its data as `.bin`) to a file the user chooses, with no
-    manifest. Its suggested name is the stem of section 4.3 cut to 200 characters. It offers one file per kind,
+    manifest. Its suggested name is the stem of §4.3 cut to 200 characters. It offers one file per kind,
     by its last extension: a list resource's first image as `.png`, a sidecar `.json` only when it is the only
     output.
 
@@ -194,9 +194,9 @@ Roman are one each).
 
 The folder for a resource type is `HostNames.TypeFolder(type, collides)`: **[ClassicMac]**
 
-- The type's four bytes as a host name (section 4.1): `PICT` → `PICT`, `snd ` → `snd%20`, `PAT ` → `PAT%20`,
+- The type's four bytes as a host name (§4.1): `PICT` → `PICT`, `snd ` → `snd%20`, `PAT ` → `PAT%20`,
   `STR#` → `STR#`, a type with a control byte `$01` → `%01…`.
-- **Case collisions:** the distinct types of the resources being exported (after the `Types` filter, section 9) are
+- **Case collisions:** the distinct types of the resources being exported (after the `Types` filter, §9) are
   grouped by their plain folder names compared without regard to case (ordinal, ignore-case). Every type in a group of
   two or more gets `~` and its four bytes as eight uppercase hex digits appended: `PICT` and `pict` become
   `PICT~50494354` and `pict~70696374`. Types that collide with nothing keep the plain name.
@@ -210,7 +210,7 @@ Each resource's files share a **stem**: **[ClassicMac]**
 - The Mac bytes of the ID in decimal (a leading `-` for negative IDs), a space and the resource's name: `128 Title
   Screen`, `-16455 Messages`.
 - Only the ID when the resource has no name or an empty one: `128`.
-- Converted by `ToHostName` (section 4.1) with a length limit, the **budget**:
+- Converted by `ToHostName` (§4.1) with a length limit, the **budget**:
 
   ```
   budget = max(8, MaxPathLength − length(type folder) − 1 − length(longest extension among the resource's files))
@@ -219,10 +219,10 @@ Each resource's files share a **stem**: **[ClassicMac]**
   `MaxPathLength` (default 200) counts from the export folder, so a file's path relative to the manifest,
   `<type folder>/<stem><extension>`, stays within it. The ID (at most 6 characters) always fits in 8.
 - A Mac name that itself looks like it ends in an extension (`128 Read Me.txt`) keeps that part when the stem is cut,
-  by rule 4 of section 4.1.
+  by rule 4 of §4.1.
 
-The limit is a target, not a guarantee: the minimum of 8, the ` ~N` suffix of section 4.4 and the fork folders of
-section 3.2 can take a path past it.
+The limit is a target, not a guarantee: the minimum of 8, the ` ~N` suffix of §4.4 and the fork folders of
+§3.2 can take a path past it.
 
 ### 4.4 Unique names
 
@@ -231,7 +231,7 @@ by `HostNames.MakeUnique`: if `<stem><extension>` is taken, ` ~2`, ` ~3`, … is
 `.`: `1 Good.txt` → `1 Good ~2.txt`; `128.1.png` → `128.1 ~2.png`. **[ClassicMac]**
 
 Since each stem starts with the ID, two resources collide only when a fork holds the same type and ID twice (a damaged
-fork), or when one decoder writes two files with the same extension. Fork folders (section 3.2) are made unique the same
+fork), or when one decoder writes two files with the same extension. Fork folders (§3.2) are made unique the same
 way within their parent folder.
 
 ---
@@ -241,18 +241,18 @@ way within their parent folder.
 Resources are exported in the fork's order. For each one:
 
 1. Its **data** is read, decompressed if compressed, with `ReadOptions` (the Resource Manager model and size limits;
-   see [RESOURCE-FORK.md](RESOURCE-FORK.md)). When decompression is impossible the stored data is used instead and the
+   see [resource-fork.md](../resources/resource-fork.md)). When decompression is impossible the stored data is used instead and the
    reason is reported.
-2. The **first decoder** in `ExportOptions.Decoders` whose `CanDecode(type)` is true is asked for files (section 7).
+2. The **first decoder** in `ExportOptions.Decoders` whose `CanDecode(type)` is true is asked for files (§7).
 3. Its files are written to the type folder, the first being the **main file**.
-4. With KeepRaw, the stored data is written to `raw/` (section 5.3).
+4. With KeepRaw, the stored data is written to `raw/` (§5.3).
 5. An entry is added to the manifest.
 
 ### 5.1 Decoded files
 
 A decoder returns a list of files, each an extension (with its dot) and content; the main file comes first. Each is
-named `<stem><extension>` (section 4). A decoder that writes several images gives them numbered extensions (`.1.png`,
-`.2.png`, …; section 8.4). **[ClassicMac]**
+named `<stem><extension>` (§4). A decoder that writes several images gives them numbered extensions (`.1.png`,
+`.2.png`, …; §8.4). **[ClassicMac]**
 
 ### 5.2 The raw fallback
 
@@ -274,8 +274,8 @@ With `KeepRaw` on, every exported resource's **stored** data (as in the fork: st
 written to `raw/<type folder>/<id>.bin`, and the manifest's `rawPath` points to it. The name holds only the ID, and is
 not made unique: a fork with a duplicate type and ID writes that file twice, the last one winning. **[ClassicMac]**
 
-The folder exists so that a fork can be rebuilt byte for byte (section 12). Its name has three characters, so it never
-clashes with a type folder (section 4.2).
+The folder exists so that a fork can be rebuilt byte for byte (§12). Its name has three characters, so it never
+clashes with a type folder (§4.2).
 
 ---
 
@@ -310,18 +310,18 @@ What ClassicMac writes (a reader must accept any valid JSON with the same conten
 | Name | Type | Meaning | Example |
 | --- | --- | --- | --- |
 | `$schema` | string | The schema's URL (not required by the schema; always written) | `"https://raw.githubusercontent.com/inexin/ClassicMac/main/schemas/manifest-1.schema.json"` |
-| `formatVersion` | string, `1.<minor>` | The format's version (section 6.1) | `"1.2"` |
-| `source` | object | The Mac file the fork came from (section 6.4) | |
-| `fork` | object | The fork's own attributes (section 6.5) | |
-| `resources` | array of objects | One entry per exported resource, in the fork's order (section 6.6) | |
-| `diagnostics` | array of objects | Problems found reading the fork and exporting it (section 6.8) | `[]` |
-| `document` | object or null | Since 1.2: the file converted as a whole document (section 6.10); `null` when it is none, or when no converter ran | `null` |
+| `formatVersion` | string, `1.<minor>` | The format's version (§6.1) | `"1.2"` |
+| `source` | object | The Mac file the fork came from (§6.4) | |
+| `fork` | object | The fork's own attributes (§6.5) | |
+| `resources` | array of objects | One entry per exported resource, in the fork's order (§6.6) | |
+| `diagnostics` | array of objects | Problems found reading the fork and exporting it (§6.8) | `[]` |
+| `document` | object or null | Since 1.2: the file converted as a whole document (§6.10); `null` when it is none, or when no converter ran | `null` |
 
 ### 6.4 source
 
 | Name | Type | Meaning | Example |
 | --- | --- | --- | --- |
-| `name` | string | The Mac file's name (Mac text, section 1) | `"Realmz"` |
+| `name` | string | The Mac file's name (Mac text, §1) | `"Realmz"` |
 | `formats` | array of strings | The formats the file was found through, outermost first (below) | `["host file", "MacBinary II"]` |
 | `type` | string | The file type from its Finder info (Mac text, four bytes) | `"APPL"` |
 | `creator` | string | The creator from its Finder info | `"RLMZ"` |
@@ -333,8 +333,8 @@ What ClassicMac writes (a reader must accept any valid JSON with the same conten
 `formats` names the chain of readers that led to the file. The CLI writes the full chain: the host format
 (`host file`, `AppleDouble pair`, `Basilisk II folder`, `macOS named fork`, `PC Exchange folder`), then each container
 and volume format as its reader names it (`MacBinary II`, `BinHex 4.0`, `AppleSingle`, …; see the documents in
-[README.md](README.md)), and `data fork as resource fork` when the fork was found in the file's data fork. A plain file
-read as a fork on its own gives `["raw resource fork"]`. The viewer writes less (section 12). The names are for people
+[README.md](../README.md)), and `data fork as resource fork` when the fork was found in the file's data fork. A plain file
+read as a fork on its own gives `["raw resource fork"]`. The viewer writes less (§12). The names are for people
 and are not a closed list. **[ClassicMac]**
 
 ### 6.5 fork
@@ -344,7 +344,7 @@ and are not a closed list. **[ClassicMac]**
 | `attributes` | integer, 0–255 | The resource map's attribute byte (`mAttr`, map offset 22) as stored: `$80` read-only, `$40` compact, `$20` changed ([Doc] *Inside Macintosh: More Macintosh Toolbox*, Resource Manager) | `0` |
 | `mapFlags` | integer, 0–255 | The byte after it (map offset 23) as stored, which the Resource Manager uses for in-memory flags (bit 0 is the 68k ROM's `decompressionPasswordBit`; [Code] 68k ROM `$077D`) | `0` |
 
-Both are specified in [RESOURCE-FORK.md](RESOURCE-FORK.md).
+Both are specified in [resource-fork.md](../resources/resource-fork.md).
 
 ### 6.6 resources[]
 
@@ -352,7 +352,7 @@ Every field below is always written in format 1.1.
 
 | Name | Type | Meaning | Example |
 | --- | --- | --- | --- |
-| `type` | string | The type as Mac text (section 1) | `"snd "` |
+| `type` | string | The type as Mac text (§1) | `"snd "` |
 | `typeBytes` | string, 8 uppercase hex digits | The type's four bytes; the authority when `type` is hard to read | `"736E6420"` |
 | `id` | integer, −32768–32767 | The resource ID | `128` |
 | `name` | string or null | The resource name as Mac text; `null` when it has none, `""` when it has an empty one | `"Door"` |
@@ -360,14 +360,14 @@ Every field below is always written in format 1.1.
 | `size` | integer ≥ 0 | The main file's length in bytes | `176` |
 | `storedSize` | integer ≥ 0 | The stored data's length (compressed length when compressed) | `106` |
 | `dcmp` | integer or null | The `'dcmp'` ID from the compressed-resource header, when the compressed attribute is set and the header says the data is compressed; otherwise `null` | `2` |
-| `decoder` | string | What wrote the files: `raw` for the data itself, otherwise the decoder's name (section 7) | `"sound.snd"` |
+| `decoder` | string | What wrote the files: `raw` for the data itself, otherwise the decoder's name (§7) | `"sound.snd"` |
 | `decoderVersion` | integer ≥ 1 | The decoder's version; 1 for `raw` | `1` |
 | `path` | string | The main file, relative to the manifest | `"snd%20/200 Door.wav"` |
 | `sha256` | string | SHA-256 of the main file | `"b9c6…1651"` |
 | `storedSha256` | string | SHA-256 of the stored data | `"7078…793c"` |
-| `rawPath` | string or null | The stored data's copy in `raw/` (section 5.3), or `null` without KeepRaw | `"raw/snd%20/200.bin"` |
-| `warnings` | array of strings | The messages of every diagnostic raised for this resource (section 6.7) | `[]` |
-| `otherFiles` | array of objects, or null | Since 1.1: the files the decoder wrote besides the main one, in its order (section 6.7); `[]` when none. ClassicMac never writes `null` | `[{"path": "snd%20/200 Door.json", "sha256": "738c…0d2d"}]` |
+| `rawPath` | string or null | The stored data's copy in `raw/` (§5.3), or `null` without KeepRaw | `"raw/snd%20/200.bin"` |
+| `warnings` | array of strings | The messages of every diagnostic raised for this resource (§6.7) | `[]` |
+| `otherFiles` | array of objects, or null | Since 1.1: the files the decoder wrote besides the main one, in its order (§6.7); `[]` when none. ClassicMac never writes `null` | `[{"path": "snd%20/200 Door.json", "sha256": "738c…0d2d"}]` |
 | `encoding` | string or null | Since 1.1: the text encoding the main file was decoded with, as an IANA name (`macintosh` for Mac OS Roman); `null` for outputs that are not decoded text, and for `raw` | `"macintosh"` |
 
 Notes:
@@ -379,13 +379,13 @@ Notes:
   so.
 - A resource flagged compressed whose data has no compressed-resource header has `dcmp` `null` and is used as stored.
 - `id` and `attributes` are as read; the compressed-resource header and the `'dcmp'` IDs are specified in
-  [RESOURCE-FORK.md](RESOURCE-FORK.md).
+  [resource-fork.md](../resources/resource-fork.md).
 
 ### 6.7 warnings and otherFiles
 
 `warnings` holds the **message** of every diagnostic raised while this resource was decompressed, decoded and
 exported, of any severity (despite its name it also holds `info` messages), in the order raised. The same diagnostics,
-with their severity and code, are in the top-level `diagnostics` (section 6.8). Each message begins with the resource's
+with their severity and code, are in the top-level `diagnostics` (§6.8). Each message begins with the resource's
 description, `'<type>' <id>` or `'<type>' <id> "<name>"`.
 
 Each `otherFiles` entry:
@@ -403,7 +403,7 @@ diagnostic identical to one already listed (same severity, code, message and off
 | Name | Type | Meaning | Example |
 | --- | --- | --- | --- |
 | `severity` | string | `info`, `warning` or `error` | `"warning"` |
-| `code` | string | The diagnostic's stable code (section 11) | `"image.undecodable"` |
+| `code` | string | The diagnostic's stable code (§11) | `"image.undecodable"` |
 | `message` | string | What happened, for people | `"'ICN#' 128: …"` |
 
 A diagnostic's offset in the file, which the CLI prints, is not recorded.
@@ -504,7 +504,7 @@ decompressed length, `"storedSize"` the stored length, and `"rawPath": "raw/CODE
 
 ### 6.10 document
 
-With `ExportOptions.Documents` (section 9.1), the exporter asks each converter in turn whether the file is a document;
+With `ExportOptions.Documents` (§9.1), the exporter asks each converter in turn whether the file is a document;
 the first that gives files has them written into `document/` beside the type folders. Documents are converted only
 when every type is exported (`Types` is null). **[ClassicMac]**
 
@@ -516,7 +516,7 @@ when every type is exported (`Types` is null). **[ClassicMac]**
 | `files` | array of objects | Every file of the document, the entry page first: `path` (relative to the manifest) and `sha256` | `[{"path": "document/index.html", "sha256": "…"}]` |
 
 The built-in converter, `document.html` version 1, converts DOCMaker and SimpleText documents to HTML
-([DOCUMENTS.md](DOCUMENTS.md) §6). Its diagnostics (`document.*`) join the manifest's `diagnostics`.
+([html.md](html.md)). Its diagnostics (`document.*`) join the manifest's `diagnostics`.
 
 ---
 
@@ -542,24 +542,24 @@ version 1.
 
 | Name | Types | Main file | Other files | `encoding` | Specified in |
 | --- | --- | --- | --- | --- | --- |
-| `text.string` | `STR ` | `.txt` | — | `macintosh` | [TEXT.md](TEXT.md) |
-| `text.string-list` | `STR#` | `.json` | — | `macintosh` | [TEXT.md](TEXT.md) |
-| `text.text` | `TEXT` | `.txt` | `.rtf` when a `styl` of the same ID exists | `macintosh` | [TEXT.md](TEXT.md) |
-| `text.style` | `styl` | `.json` | — | null | [TEXT.md](TEXT.md) |
-| `text.version` | `vers` | `.json` | — | `macintosh` | [TEXT.md](TEXT.md) |
-| `image.picture` | `PICT` | `.png` | — | null | section 8.2 |
-| `image.icon` | `ICON`, `ICN#`, `ics#`, `icm#`, `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8`, `cicn`; `SICN` | `.png`; `SICN`: `.1.png` | `SICN`: `.2.png`, … | null | section 8.3 |
-| `image.icon-family` | `icns` | the largest, deepest member (section 8.3) | the other members, largest and deepest first | null | section 8.3 |
-| `image.cursor` | `CURS`, `crsr` | `.png` | `.json` (section 8.5) | null | section 8.5 |
-| `image.pattern` | `PAT `, `ppat`; `PAT#`, `ppt#` | `.png`; lists: `.1.png` | lists: `.2.png`, … | null | section 8.6 |
-| `sound.snd` | `snd ` | `.wav`, or `.json` for a sound of commands only | `.json` after a `.wav` | null | [SOUND.md](SOUND.md) |
-| `ui.menu`, `ui.menu-bar`, `ui.window`, `ui.dialog`, `ui.alert`, `ui.dialog-items`, `ui.control` | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL` | `.json` | — | `macintosh` | [INTERFACE.md](INTERFACE.md) |
-| `font.bitmap`, `font.family`, `font.outline`, `font.colors` | `NFNT`, `FONT`; `FOND`; `sfnt`; `fctb` | strikes `.png`; `.json`; `.ttf`; `.json` | strikes `.bdf`, `.json`; `sfnt` `.json` | `FOND`: `macintosh` | [FONTS.md](FONTS.md) |
-| `finder.bundle`, `finder.file-reference`, `finder.size` | `BNDL`, `FREF`, `SIZE` | `.json` | — | `macintosh` | [FINDER.md](FINDER.md) |
-| `color.table`, `color.palette` | `clut`, `pltt` | `.json` | `.act` | null | [PALETTES.md](PALETTES.md) |
-| `ui.colors`, `ui.menu-colors`, `ui.item-colors`, `ui.dialog-extension`, `ui.alert-extension`, `ui.menu-extension` | `wctb`, `dctb`, `actb`, `cctb`; `mctb`; `ictb`; `dlgx`; `alrx`; `xmnu` | `.json` | — | null | [INTERFACE.md](INTERFACE.md) |
+| `text.string` | `STR ` | `.txt` | — | `macintosh` | [strings.md](../resources/strings.md) |
+| `text.string-list` | `STR#` | `.json` | — | `macintosh` | [strings.md](../resources/strings.md) |
+| `text.text` | `TEXT` | `.txt` | `.rtf` when a `styl` of the same ID exists | `macintosh` | [styled-text.md](../resources/styled-text.md) |
+| `text.style` | `styl` | `.json` | — | null | [styled-text.md](../resources/styled-text.md) |
+| `text.version` | `vers` | `.json` | — | `macintosh` | [version.md](../resources/version.md) |
+| `image.picture` | `PICT` | `.png` | — | null | §8.2 |
+| `image.icon` | `ICON`, `ICN#`, `ics#`, `icm#`, `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8`, `cicn`; `SICN` | `.png`; `SICN`: `.1.png` | `SICN`: `.2.png`, … | null | §8.3 |
+| `image.icon-family` | `icns` | the largest, deepest member (§8.3) | the other members, largest and deepest first | null | §8.3 |
+| `image.cursor` | `CURS`, `crsr` | `.png` | `.json` (§8.5) | null | §8.5 |
+| `image.pattern` | `PAT `, `ppat`; `PAT#`, `ppt#` | `.png`; lists: `.1.png` | lists: `.2.png`, … | null | §8.6 |
+| `sound.snd` | `snd ` | `.wav`, or `.json` for a sound of commands only | `.json` after a `.wav` | null | [sound.md](../resources/sound.md) |
+| `ui.menu`, `ui.menu-bar`, `ui.window`, `ui.dialog`, `ui.alert`, `ui.dialog-items`, `ui.control` | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL` | `.json` | — | `macintosh` | [windows-dialogs.md](../resources/windows-dialogs.md) |
+| `font.bitmap`, `font.family`, `font.outline`, `font.colors` | `NFNT`, `FONT`; `FOND`; `sfnt`; `fctb` | strikes `.png`; `.json`; `.ttf`; `.json` | strikes `.bdf`, `.json`; `sfnt` `.json` | `FOND`: `macintosh` | [bitmap-fonts.md](../resources/bitmap-fonts.md) |
+| `finder.bundle`, `finder.file-reference`, `finder.size` | `BNDL`, `FREF`, `SIZE` | `.json` | — | `macintosh` | [finder.md](../resources/finder.md) |
+| `color.table`, `color.palette` | `clut`, `pltt` | `.json` | `.act` | null | [palettes.md](../resources/palettes.md) |
+| `ui.colors`, `ui.menu-colors`, `ui.item-colors`, `ui.dialog-extension`, `ui.alert-extension`, `ui.menu-extension` | `wctb`, `dctb`, `actb`, `cctb`; `mctb`; `ictb`; `dlgx`; `alrx`; `xmnu` | `.json` | — | null | [windows-dialogs.md](../resources/windows-dialogs.md) |
 
-The image extensions are those of the configured image encoder (`.png` by default, section 8.1). Every other type,
+The image extensions are those of the configured image encoder (`.png` by default, §8.1). Every other type,
 `CODE` included, is written raw.
 
 ---
@@ -568,8 +568,8 @@ The image extensions are those of the configured image encoder (`.png` by defaul
 
 The image decoders hand each resource to `ClassicMac.Graphics` (`PictReader` for pictures, `QuickDrawResources` for icons,
 cursors and patterns), which draws it as the Mac would into a width × height grid of 8-bit RGBA pixels. How each
-resource is laid out and drawn is specified in [PICT.md](PICT.md), [ICONS.md](ICONS.md) (icons, cursors
-and patterns) and [QUICKDRAW.md](QUICKDRAW.md) (section 8 for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
+resource is laid out and drawn is specified in [pict.md](../graphics/pict.md), [icons.md](../resources/icons.md) (icons, cursors
+and patterns) and [quickdraw.md](../graphics/quickdraw.md) ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths) for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
 masks for colour icons, the cursor JSON, numbered list outputs and a size limit.
 
 `ClassicMac.Graphics` reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
@@ -600,33 +600,32 @@ message, and the resource is written raw. **[ClassicMac]**
 
 - A `PICT` is drawn by `PictReader.Decode` at its native resolution, with `ClassicMac.Graphics`'s default options otherwise.
 - **Screen depth:** `DecodeOptions.ScreenDepth` (32 by default; 1, 2, 4, 8 or 16) is the depth of the screen the
-  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([QUICKDRAW.md](QUICKDRAW.md)
-  section 8); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
+  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths)); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
 - **QuickDraw model:** Mac OS 9's QuickDraw by default, or the 68k ROM's when `DecodeOptions.QuickDraw` is
-  `Rom68k` ([QUICKDRAW.md](QUICKDRAW.md) section 9 and [PICT.md](PICT.md) section 10 list the differences).
+  `Rom68k` ([quickdraw.md §9](../graphics/quickdraw.md#9-mac-os-9-differences) and [pict.md §10](../graphics/pict.md#10-mac-os-9-differences) list the differences).
 - **Pixel limit:** before drawing, the picture frame (`picFrame`, the `Rect` at bytes 2–9 of the resource) gives the
   canvas size. If width × height exceeds `DecodeOptions.MaxImagePixels` (64 Mi pixels, 67,108,864, by default), the
   picture is not drawn: `image.too-large`, and the resource is written raw. The check needs at least 10 bytes; shorter
   data goes to `ClassicMac.Graphics`, which rejects it. **[ClassicMac]**
-- Parts of the canvas the picture does not draw on are transparent ([PICT.md](PICT.md) section 2.4).
+- Parts of the canvas the picture does not draw on are transparent ([pict.md §2.4](../graphics/pict.md#24-the-drawing-space-and-the-canvas)).
 
 ### 8.3 Icons and their masks
 
 | Types | Output |
 | --- | --- |
 | `ICON` | 32 × 32, black on white, opaque |
-| `ICN#`, `ics#`, `icm#` | the first icon of the list, with the list's mask as transparency (mask bit 0 → alpha 0); a list without a mask half gets a computed mask ([ICONS.md](ICONS.md)) |
+| `ICN#`, `ics#`, `icm#` | the first icon of the list, with the list's mask as transparency (mask bit 0 → alpha 0); a list without a mask half gets a computed mask ([icons.md](../resources/icons.md)) |
 | `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8` | the colour icon, masked by the icon list of the **same ID and size** in the same fork: `icl*` by `ICN#`, `ics*` by `ics#`, `icm*` by `icm#` |
 | `cicn` | the colour icon with its own mask |
-| `SICN` | one image per 16 × 16 icon, numbered (section 8.4), unmasked |
-| `icns` | one image per image member, named by it: `.it32.png`, `.ih32.png`, `.ich8.png`, `.ich4.png`, `.ich.png`, `.il32.png`, `.icl8.png`, `.icl4.png`, `.ICN.png`, `.is32.png`, `.ics8.png`, `.ics4.png`, `.ics.png`, `.icm8.png`, `.icm4.png`, `.icm.png`, in that order (the 1-bit members drop their `#`); each through the mask Icon Services picks for its size ([ICONS.md](ICONS.md)): an 8-bit mask of the same size as alpha, any other as a hard edge |
+| `SICN` | one image per 16 × 16 icon, numbered (§8.4), unmasked |
+| `icns` | one image per image member, named by it: `.it32.png`, `.ih32.png`, `.ich8.png`, `.ich4.png`, `.ich.png`, `.il32.png`, `.icl8.png`, `.icl4.png`, `.ICN.png`, `.is32.png`, `.ics8.png`, `.ics4.png`, `.ics.png`, `.icm8.png`, `.icm4.png`, `.icm.png`, in that order (the 1-bit members drop their `#`); each through the mask Icon Services picks for its size ([icons.md](../resources/icons.md)): an 8-bit mask of the same size as alpha, any other as a hard edge |
 
 - The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID
-  ([ICONS.md](ICONS.md)). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
+  ([icons.md](../resources/icons.md)). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
   reported against the colour icon.
 - **No list:** when the fork has no such list, the colour icon is drawn fully opaque and `image.no-mask` (info) is
   reported; the icon is still decoded. The Mac's Icon Utilities draw nothing in that case (noMaskFoundErr, per
-  [ICONS.md](ICONS.md)); ClassicMac prefers a visible image. **[ClassicMac]**
+  [icons.md](../resources/icons.md)); ClassicMac prefers a visible image. **[ClassicMac]**
 
 ### 8.4 Numbered list outputs
 
@@ -644,7 +643,7 @@ A cursor (`CURS`, `crsr`) gives two files, **[ClassicMac]**:
 - `<stem>.json`, what a PNG cannot hold, described below.
 
 On the Mac a cursor is drawn as `screen = (screen AND NOT mask) XOR image`: where the mask is 0, a `CURS` data bit 1
-inverts the screen, and a `crsr` pixel XORs the screen with its complement ([ICONS.md](ICONS.md)). The JSON
+inverts the screen, and a `crsr` pixel XORs the screen with its complement ([icons.md](../resources/icons.md)). The JSON
 records that as follows:
 
 | Name | Type | Meaning | Example |
@@ -663,7 +662,7 @@ The JSON is written indented by two spaces, with non-ASCII characters as they ar
 | --- | --- |
 | `PAT ` | 8 × 8, black on white |
 | `ppat` | the pixel pattern at its own size |
-| `PAT#`, `ppt#` | one image per pattern, numbered (section 8.4) |
+| `PAT#`, `ppt#` | one image per pattern, numbered (§8.4) |
 
 ---
 
@@ -675,13 +674,13 @@ Every tunable value of an export (`ClassicMac.Resources.Export.ExportOptions`):
 
 | Name | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `Types` | set of types, or null | null (all) | Export only resources of these types. The filter applies before type-folder collisions are worked out (section 4.2) |
-| `MaxPathLength` | integer | 200 | The longest a written path should be, in characters, counted from the export folder (sections 3.2, 4.3) |
-| `KeepRaw` | boolean | false | Also write each resource's stored data to `raw/` (section 5.3) |
-| `Overwrite` | boolean | false | Allow writing into an export folder that already holds files (section 3.1) |
+| `Types` | set of types, or null | null (all) | Export only resources of these types. The filter applies before type-folder collisions are worked out (§4.2) |
+| `MaxPathLength` | integer | 200 | The longest a written path should be, in characters, counted from the export folder (§3.2, §4.3) |
+| `KeepRaw` | boolean | false | Also write each resource's stored data to `raw/` (§5.3) |
+| `Overwrite` | boolean | false | Allow writing into an export folder that already holds files (§3.1) |
 | `Decoders` | list of decoders | empty | The decoders tried, in order; empty exports everything raw. `ResourceDecoders.Create` gives the built-in ones |
-| `Documents` | list of document converters | empty | The converters tried for the whole file (section 6.10); empty converts none. `ResourceDecoders.CreateDocumentConverters` gives the built-in one |
-| `ReadOptions` | `ReadOptions` | `ReadOptions.Default` | Size limits and the Resource Manager model (Mac OS 9 or 68k ROM) used to decompress resources ([RESOURCE-FORK.md](RESOURCE-FORK.md)) |
+| `Documents` | list of document converters | empty | The converters tried for the whole file (§6.10); empty converts none. `ResourceDecoders.CreateDocumentConverters` gives the built-in one |
+| `ReadOptions` | `ReadOptions` | `ReadOptions.Default` | Size limits and the Resource Manager model (Mac OS 9 or 68k ROM) used to decompress resources ([resource-fork.md](../resources/resource-fork.md)) |
 
 The fork's source is given separately, as an `ExportSource` (name, formats, type, creator, Finder flags), and becomes
 the manifest's `source`.
@@ -694,9 +693,9 @@ The options of the built-in decoders (`ClassicMac.Resources.Decoders.DecodeOptio
 | --- | --- | --- | --- |
 | `TextEncoding` | enum | Mac OS Roman | The encoding text resources are read with; recorded as `encoding` |
 | `LineEndings` | enum | LF | Line breaks in `.txt` output: LF, or as stored (CR) |
-| `ImageEncoder` | `IImageEncoder` | `PngEncoder` | How images are written (section 8.1) |
-| `ScreenDepth` | integer | 32 | The screen depth pictures are drawn at: 1, 2, 4, 8, 16 or 32 (section 8.2) |
-| `MaxImagePixels` | integer | 67,108,864 | The largest picture drawn, in pixels (section 8.2) |
+| `ImageEncoder` | `IImageEncoder` | `PngEncoder` | How images are written (§8.1) |
+| `ScreenDepth` | integer | 32 | The screen depth pictures are drawn at: 1, 2, 4, 8, 16 or 32 (§8.2) |
+| `MaxImagePixels` | integer | 67,108,864 | The largest picture drawn, in pixels (§8.2) |
 | `QuickDraw` | `ResourceManagerModel` | `MacOS9` | Whose QuickDraw pictures are drawn as: Mac OS 9's or the 68k ROM's |
 
 ---
@@ -715,7 +714,7 @@ classicmac extract <input> [-o <dir>] [--raw] [--keep-raw] [-t <type>]… [--ove
 | `-t`, `--type <type>` | `Types`; repeatable; four characters (`"snd "`) or `\xHH` escapes. A value that is not four characters is a usage error |
 | `--overwrite` | `Overwrite` |
 | `--screen-depth <n>` | `DecodeOptions.ScreenDepth`; one of 1, 2, 4, 8, 16, 32 (default 32) |
-| `--no-documents` | `Documents` empty. By default the built-in converter runs (section 6.10) |
+| `--no-documents` | `Documents` empty. By default the built-in converter runs (§6.10) |
 | `--max-resource-size`, `--max-nesting-depth`, `--max-expanded-bytes`, `--verify`, `--strict`, `-q` | The options every command takes: limits (`ReadOptions`, `ContainerReadOptions`), exit-code strictness and quiet output |
 
 `MaxPathLength` is not exposed (200). Decoders other than the screen depth use their defaults; the QuickDraw model
@@ -724,9 +723,9 @@ follows `ReadOptions.ResourceManager` (Mac OS 9, as the CLI does not change it).
 **What it does.** The input is opened and unwrapped as by `list` and `unpack`. A plain file that no container reader
 recognises is read as a raw resource fork (formats `["raw resource fork"]`); otherwise each file inside is read for a
 resource fork, or a data fork that holds one. Only forks with at least one resource of the chosen types are kept. They
-are exported with `Unpacker.Extract` (section 3.2): straight into the output folder when there is one, a folder each
+are exported with `Unpacker.Extract` (§3.2): straight into the output folder when there is one, a folder each
 when there are several. Files without resources get no folder. A file that is a document also gets its `document/`
-folder (section 6.10); the `convert` command writes documents alone ([DOCUMENTS.md](DOCUMENTS.md) §7).
+folder (§6.10); the `convert` command writes documents alone ([documents.md §6](../resources/documents.md#6-where-documents-are-converted)).
 
 **Output.** One line on stdout: `<n> resources from <m> files, to <folder>`. Diagnostics go to stderr, one per line:
 `<source>: <severity>[ at <offset>]: <message> [<code>]`, where `<source>` is the input's name, followed by
@@ -751,26 +750,26 @@ the manifest's `diagnostics`, and is printed by the CLI.
 
 | Code | Severity | Raised by | Meaning |
 | --- | --- | --- | --- |
-| `export.decoder-failed` | Warning | `ResourceExporter` | The decoder threw a data error (section 5.2); the message gives the decoder and the error. The resource is written raw |
+| `export.decoder-failed` | Warning | `ResourceExporter` | The decoder threw a data error (§5.2); the message gives the decoder and the error. The resource is written raw |
 | `export.converter-failed` | Warning | `ResourceExporter`, `convert` | A document converter threw a data error; no document is written, and the next converter is tried |
 | `export.not-decoded` | Info | `ResourceExporter` | The decoder returned no files and nothing had been reported for the resource (neither by decompression nor by the decoder). The resource is written raw |
 | `image.undecodable` | Warning | image decoders | `ClassicMac.Graphics` rejected the data (too short, a bad structure, an unsupported variant); the message is the library's. The resource is written raw |
-| `image.too-large` | Warning | `image.picture` | The picture's frame is over `MaxImagePixels` (section 8.2). The resource is written raw |
-| `image.no-mask` | Info | `image.icon`, `image.icon-family` | A colour icon has no 1-bit icon list of the same ID for its mask, or an icon family has no mask at all; it is drawn opaque (section 8.3). The resource is still decoded |
+| `image.too-large` | Warning | `image.picture` | The picture's frame is over `MaxImagePixels` (§8.2). The resource is written raw |
+| `image.no-mask` | Info | `image.icon`, `image.icon-family` | A colour icon has no 1-bit icon list of the same ID for its mask, or an icon family has no mask at all; it is drawn opaque (§8.3). The resource is still decoded |
 | `icon.family-header`, `icon.family-length` | Warning | `image.icon-family` | The data is not an `icns`, or its length word differs from its size (Mac OS 9 then treats the family as empty); nothing is written but the raw resource |
 | `icon.member-size` | Info | `image.icon-family` | A 1-, 4- or 8-bit member or an 8-bit mask is not its exact size; Mac OS 9 drops it, and so does the decoder |
 | `icon.family-ignored` | Info | `image.icon-family` | Elements Mac OS 9 does not know (`TOC `, `info`, `icnV`, `name`, …) were skipped |
 
 Other codes reach the manifest from the code the exporter calls:
 
-- reading the fork and decompressing resources (`fork.*`, `resource.*`): [RESOURCE-FORK.md](RESOURCE-FORK.md);
-- the text decoders (`text.*`): [TEXT.md](TEXT.md);
-- the sound decoder (`sound.*`): [SOUND.md](SOUND.md);
-- the interface decoders (`ui.*`): [INTERFACE.md](INTERFACE.md);
-- the palette decoders (`color.*`): [PALETTES.md](PALETTES.md);
-- the Finder decoders (`finder.*`): [FINDER.md](FINDER.md);
-- the font decoders (`font.*`): [FONTS.md](FONTS.md);
-- the document converter (`document.*`): [DOCUMENTS.md](DOCUMENTS.md).
+- reading the fork and decompressing resources (`fork.*`, `resource.*`): [resource-fork.md](../resources/resource-fork.md);
+- the text decoders (`text.*`): [styled-text.md](../resources/styled-text.md);
+- the sound decoder (`sound.*`): [sound.md](../resources/sound.md);
+- the interface decoders (`ui.*`): [windows-dialogs.md](../resources/windows-dialogs.md);
+- the palette decoders (`color.*`): [palettes.md](../resources/palettes.md);
+- the Finder decoders (`finder.*`): [finder.md](../resources/finder.md);
+- the font decoders (`font.*`): [bitmap-fonts.md](../resources/bitmap-fonts.md);
+- the document converter (`document.*`): [documents.md](../resources/documents.md).
 
 The viewer also reports `export.failed` (Error) when an export cannot be written (a file-system error, or an export
 folder that failed in `Unpacker.Extract`). It is shown in the viewer's diagnostics list only and never written to a
@@ -782,9 +781,9 @@ manifest.
 
 **Checking an export.** Every file listed (`path`, `otherFiles[].path`, `rawPath`, `document.files[].path`) exists and its SHA-256 matches;
 `sha256` against the file, `storedSha256` against the `raw/` copy when there is one. Files in the folder that the
-manifest does not list are not part of the export (section 3.1).
+manifest does not list are not part of the export (§3.1).
 
-**Rebuilding a fork** (`ResourcePacker.Pack`, the `pack` command, section 13) [ClassicMac]:
+**Rebuilding a fork** (`ResourcePacker.Pack`, the `pack` command, §13) [ClassicMac]:
 
 - A manifest whose major version is not 1 is refused.
 - The fork's attribute and map-flag bytes come from `fork`; the resources, in the manifest's order, take their type from
@@ -803,7 +802,7 @@ manifest does not list are not part of the export (section 3.1).
 
 With `raw/` copies (`extract --keep-raw`), every export of the corpus packs back with each resource's stored bytes and
 attributes unchanged (the corpus test). The fork itself is laid out anew by the fork writer
-([RESOURCE-FORK.md](RESOURCE-FORK.md)), so its bytes can differ from the original's where the original's layout was
+([resource-fork.md](../resources/resource-fork.md)), so its bytes can differ from the original's where the original's layout was
 not canonical.
 
 **What the viewer records differently.** Exports from the viewer follow this specification, with two differences in
@@ -812,7 +811,7 @@ own node, not the chain above it.
 
 **Producing an export.** Another tool may write exports that ClassicMac's readers accept: any valid JSON meeting the
 schema, with `formatVersion` `1.2` (or an earlier 1.x without the later fields), and files where the manifest says. The folder and
-file names of sections 3 and 4 are ClassicMac's choice and are not required: a reader finds files through the
+file names of §3 and §4 are ClassicMac's choice and are not required: a reader finds files through the
 manifest's paths.
 
 ---
@@ -830,7 +829,7 @@ classicmac pack <folder> -o <file> [--base <file>] [--data <file>] [--container 
 | `-o`, `--output <file>` | The file to write (required). An existing file is refused unless `--overwrite` is given |
 | `--base <file>` | The file the export was made from (any input `extract` reads, holding one resource fork): `PackOptions.Base` |
 | `--data <file>` | A data fork for AppleSingle, MacBinary and BinHex (default empty; an export holds no data fork) |
-| `--container` | `raw` (default): the resource fork itself; `appledouble`: an AppleDouble header file; `applesingle`, `macbinary` (III), `binhex` (4.0): see [CONTAINERS.md](CONTAINERS.md) §6. The container's name, type, creator and Finder flags come from the manifest's `source` |
+| `--container` | `raw` (default): the resource fork itself; `appledouble`: an AppleDouble header file; `applesingle`, `macbinary` (III), `binhex` (4.0): see [writing.md](../containers/writing.md). The container's name, type, creator and Finder flags come from the manifest's `source` |
 | `--allow-deletes` | `PackOptions.AllowDeletes` |
 
 **Output.** One line on stdout: `<n> resources (<bytes> bytes of resource fork), to <file>`. Diagnostics go to stderr

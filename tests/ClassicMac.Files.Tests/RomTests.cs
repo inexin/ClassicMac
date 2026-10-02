@@ -10,8 +10,9 @@ public class RomTests
 {
     private sealed record Entry(byte[] Mask, string Type, short Id, string? Name, byte[] Data, byte Attributes = 0x58, int SizeCorrection = 0);
 
-    // A ROM image laid out as docs/formats/ROM.md describes: version word at +8, table pointer at +$1A, table header,
-    // then for each entry a 12-byte block header, the data (padded to 16) and the entry; the list is linked last first.
+    // A ROM image laid out as docs/formats/disk-images/rom.md describes: version word at +8, table pointer at +$1A,
+    // table header, then for each entry a 12-byte block header, the data (padded to 16) and the entry; the list is
+    // linked last first.
     private static byte[] BuildRom(IReadOnlyList<Entry> entries, int length = 64 * 1024, ushort version = 0x077D,
         int maxIndex = 4, int fieldSize = 8, ushort tableVersion = 1)
     {

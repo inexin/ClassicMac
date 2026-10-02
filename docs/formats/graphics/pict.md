@@ -3,19 +3,19 @@
 This document specifies the Macintosh QuickDraw picture format (PICT, versions 1, 2 and extended 2) completely
 enough to write a decoder that plays pictures back as a Macintosh does, and an encoder whose output a Macintosh
 reads: the container, the opcodes and their operands, and the play state DrawPicture keeps. How the drawing itself
-comes out, pixel for pixel, is [QUICKDRAW.md](QUICKDRAW.md); QuickTime images inside pictures are
-[QUICKTIME.md](QUICKTIME.md). ClassicMac implements it in `ClassicMac.Graphics.Pict` and the ImageSharp and SkiaSharp
+comes out, pixel for pixel, is [quickdraw.md](quickdraw.md); QuickTime images inside pictures are
+[quicktime.md](quicktime.md). ClassicMac implements it in `ClassicMac.Graphics.Pict` and the ImageSharp and SkiaSharp
 adapters.
 
 There are two reference implementations, and they differ in details:
 
-- **Mac OS 9** (9.0; see [README.md](README.md#reference-builds)) replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
+- **Mac OS 9** (9.0; see [README.md](../README.md#reference-builds)) replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
   with a native PowerPC rewrite. This is what current Macs-in-emulation (SheepShaver, and anything running Mac OS 9)
   show, and it is the **default** of ClassicMac.
 - **The Macintosh ROM** (Mac OS ROM 1.6, `$077D`) holds the last Apple revision of the classic 68k QuickDraw, which
   every Mac before Mac OS 9 used.
 
-Sections 2–9 describe the ROM behaviour, marked **ROM** where it is surprising. Section 10 lists every point where
+§§2–9 describe the ROM behaviour, marked **ROM** where it is surprising. §10 lists every point where
 Mac OS 9 plays a picture differently.
 
 Contents
@@ -116,7 +116,7 @@ A version-2 picture normally continues with the **header opcode `0x0C00`** and 2
   - **72 dpi:** a canvas the size of `picFrame`. When the sizes differ, every coordinate is scaled (§6), exactly as
     `DrawPicture` scales into a destination rect of another size.
 
-The canvas starts transparent ([QUICKDRAW.md](QUICKDRAW.md) §3.1).
+The canvas starts transparent ([quickdraw.md §3.1](quickdraw.md#31-canvas)).
 
 ---
 
@@ -158,10 +158,10 @@ reserved ranges are given, and they differ from Inside Macintosh in places (mark
 | 0017–0019 | reserved | — | |
 | 001A | RGBFgCol | RGBColor | Foreground colour |
 | 001B | RGBBkCol | RGBColor | Background colour |
-| 001C | HiliteMode | — | The next drawing's XOR (or srcXor) becomes hilite ([QUICKDRAW.md](QUICKDRAW.md) §5.5) |
+| 001C | HiliteMode | — | The next drawing's XOR (or srcXor) becomes hilite ([quickdraw.md §5.5](quickdraw.md#55-hilite)) |
 | 001D | HiliteColor | RGBColor | Highlight colour |
 | 001E | DefHilite | — | Highlight colour back to the default |
-| 001F | OpColor | RGBColor | Weight/pin colour for arithmetic modes ([QUICKDRAW.md](QUICKDRAW.md) §5.4) |
+| 001F | OpColor | RGBColor | Weight/pin colour for arithmetic modes ([quickdraw.md §5.4](quickdraw.md#54-arithmetic-modes-rom-32-bit-destination)) |
 | 0020 | Line | Point from, Point to | |
 | 0021 | LineFrom | Point to | Line from the pen location |
 | 0022 | ShortLine | Point from, i8 dh, i8 dv | |
@@ -220,8 +220,8 @@ reserved ranges are given, and they differ from Inside Macintosh in places (mark
 | 0C00 | HeaderOp | 24 bytes | (§2.3) |
 | 8000–80FF | reserved | — | |
 | 8100–FFFF | reserved | u32 length + data | |
-| 8200 | CompressedQuickTime | u32 length + data | ([QUICKTIME.md](QUICKTIME.md)) |
-| 8201 | UncompressedQuickTime | u32 length + data | ([QUICKTIME.md](QUICKTIME.md) §3) |
+| 8200 | CompressedQuickTime | u32 length + data | ([quicktime.md](quicktime.md)) |
+| 8201 | UncompressedQuickTime | u32 length + data | ([quicktime.md §3](quicktime.md#3-uncompressedquicktime-0x8201)) |
 
 Notes:
 
@@ -274,7 +274,7 @@ Skip any leftover bytes of polySize. A polygon with an **empty bounding box** dr
 ### 4.3 Pattern (1-bit)
 
 - 8 bytes, one per row, with the most significant bit leftmost.
-- A 1 bit draws the foreground colour and a 0 bit the background colour ([QUICKDRAW.md](QUICKDRAW.md) §5).
+- A 1 bit draws the foreground colour and a 0 bit the background colour ([quickdraw.md §5](quickdraw.md#5-patterns-and-transfer-modes)).
 - The pattern tiles the plane from the **drawing origin** (§6.4).
 
 ### 4.4 PixPat (BkPixPat / PnPixPat / FillPixPat)
@@ -367,20 +367,9 @@ BackColor set these RGB colours from the QDColors table (`clut` 127 in the ROM).
 
 ## 5. Pixel data
 
-### 5.1 PackBits
+Packed scan lines are PackBits: [packbits.md](../codecs/packbits.md).
 
-A packed scan line is:
-
-- a **byte count** (a u8, or a **u16 when rowBytes > 250**);
-- then that many bytes of runs, each starting with a flag byte `n` (i8):
-  - `n ≥ 0`: copy the next `n + 1` units;
-  - `n < 0` and `n ≠ −128`: repeat the next unit `1 − n` times;
-  - `n = −128`: no-op.
-
-A unit is a byte, except for **word packing** (packType 3), where it is two bytes. Stop at the row length; ignore
-extra bytes inside the counted block.
-
-### 5.2 Which rows are packed (ROM)
+### 5.1 Which rows are packed (ROM)
 
 The ROM's rules are simpler and stranger than Inside Macintosh's. Apply them in this order:
 
@@ -398,10 +387,10 @@ The ROM's rules are simpler and stranger than Inside Macintosh's. Apply them in 
 3. **Everything else** (1-bit BitMaps and indexed PixMaps, whatever the packType and whichever bitmap opcode): one
    PackBits line per row. **packType is ignored** for indexed data, even packType 1.
 
-### 5.3 Alpha
+### 5.2 Alpha
 
 In a 32-bit map with cmpCount 4, the first byte of each pixel is alpha. QuickDraw ignores alpha when drawing. A
-decoder may keep it for srcCopy transfers ([QUICKDRAW.md](QUICKDRAW.md) §6.6).
+decoder may keep it for srcCopy transfers ([quickdraw.md §6.6](quickdraw.md#66-alpha)).
 
 ---
 
@@ -461,7 +450,7 @@ DrawPicture reads them. It adds dh to fromRect's left and right and dv to its to
 (each Origin adds to the previous shift until the next DrawPicture). All later coordinates therefore land dh, dv further
 up and left. It also:
 
-- adds (dh, dv) to the **pattern alignment** (patAlign; the ROM only, [QUICKDRAW.md](QUICKDRAW.md) §5.6);
+- adds (dh, dv) to the **pattern alignment** (patAlign; the ROM only, [quickdraw.md §5.6](quickdraw.md#56-pattern-placement));
 - re-maps the current clip (kept in picture coordinates).
 
 ### 6.5 Clip
@@ -509,10 +498,10 @@ result = d + (toLo << 16)
   - pendingFrac resets to ½ at every text opcode.
 - **PnLocHFrac:** sets pendingFrac for the **next** text opcode only.
 - **ChExtra:** stored as it is (4.12 per point; colour ports only), not through CharExtra [Code]. **LineJustify:** `interCharSpacing` (Fixed per point) is stored.
-  The character extra of [QUICKDRAW.md](QUICKDRAW.md) §7.5 is `(ChExtra << 4) + interCharSpacing`, scaled there.
-- **SpExtra:** the space extra (Fixed), scaled by the Font Manager ([QUICKDRAW.md](QUICKDRAW.md) §7.4).
-- **glyphState:** the third byte turns fractional widths on or off, and the fourth turns scaling off or on ([QUICKDRAW.md](QUICKDRAW.md) §7.3,
-  [QUICKDRAW.md](QUICKDRAW.md) §7.4).
+  The character extra of [quickdraw.md §7.5](quickdraw.md#75-drawing-text-drtext-rom) is `(ChExtra << 4) + interCharSpacing`, scaled there.
+- **SpExtra:** the space extra (Fixed), scaled by the Font Manager ([quickdraw.md §7.4](quickdraw.md#74-font-manager-output-rom)).
+- **glyphState:** the third byte turns fractional widths on or off, and the fourth turns scaling off or on ([quickdraw.md §7.3](quickdraw.md#73-choosing-a-font-font-manager-rom),
+  [quickdraw.md §7.4](quickdraw.md#74-font-manager-output-rom)).
 - **TxRatio:**
 
   ```
@@ -602,15 +591,15 @@ A picture that every PICT reader, and the ROM, decodes identically:
 - Anything else is written in literal blocks `(count − 1, units…)`. A literal block ends where a run of 3 begins.
 - At most 128 units per run or block.
 
----
-
 **Importing an image** (`ImageImport.WritePicture`, ClassicMac's editor) [ClassicMac]: the image is composited over
 white (a `PICT` has no transparency), then written as above without the file header: indexed at the smallest depth
 (1, 2, 4 or 8 bits) that holds its colours, else 32-bit direct (`Rgb888`).
 
+---
+
 ## 10. Mac OS 9 differences
 
-Mac OS 9's native QuickDraw is a rewrite, not a port. Where it differs from sections 2–9, a picture shown on Mac OS 9
+Mac OS 9's native QuickDraw is a rewrite, not a port. Where it differs from §§2–9, a picture shown on Mac OS 9
 follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul and FixRatio.
 
 - **LineJustify (`$2D`)** is skipped. The inter-character spacing stays 0 for the whole picture.
@@ -644,5 +633,5 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
 
 ## 11. Not covered
 
-What ClassicMac does not reproduce in playing pictures; the drawing's own gaps are in [QUICKDRAW.md](QUICKDRAW.md)
-section 10, QuickTime's in [QUICKTIME.md](QUICKTIME.md).
+What ClassicMac does not reproduce in playing pictures; the drawing's own gaps are in [quickdraw.md](quickdraw.md)
+§10, QuickTime's in [quicktime.md](quicktime.md).

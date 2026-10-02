@@ -44,35 +44,125 @@ scaled CopyMask on a 1-bit screen. The differences found [Code: 9.2.2]:
 
 ClassicMac follows 9.0; a 9.2.2 mode would take these differences.
 
+## Index
+
+One file per format, in its category folder. A codec used by more than one format has its own file in `codecs/`.
+
+### Containers
+
 | Document | Formats | Code |
 | --- | --- | --- |
-| [RESOURCE-FORK.md](RESOURCE-FORK.md) | Resource forks: header, map, attributes; how Mac OS 9 and the 68k ROM open them; compressed resources (`dcmp` 0–3) | `ClassicMac.Resources` |
-| [CONTAINERS.md](CONTAINERS.md) | MacBinary I/II/III, BinHex 4.0, AppleSingle and AppleDouble, uuencode | `ClassicMac.Files.Containers` |
-| [HOST-FOLDERS.md](HOST-FOLDERS.md) | Mac files on other file systems: Basilisk II / SheepShaver folders, AppleDouble `._` files, PC Exchange, File Exchange names; what `unpack` writes | `ClassicMac.Files` (`HostFiles`), `ClassicMac.Files.Export` |
-| [HFS-MFS.md](HFS-MFS.md) | Apple partition maps, MFS and HFS volumes | `ClassicMac.Files.Hfs` |
-| [ARCHIVES.md](ARCHIVES.md) | StuffIt, PackIt, LHA, DiskDoubler, Compact Pro; zip, tar and gzip with AppleDouble `._`/`__MACOSX` entries and the Info-ZIP and ZipIt Mac extra fields | `ClassicMac.Files.Archives` |
-| [DISK-IMAGES.md](DISK-IMAGES.md) | Disk Copy 4.2, DART, NDIF (Disk Copy 6), ShrinkWrap, UDIF; the ADC, KenCode, LZH and bzip2 codecs | `ClassicMac.Files.Hfs`, `ClassicMac.Files.Compression` |
-| [FAT.md](FAT.md) | DOS partition tables, FAT12/16/32 with long names, PC Exchange and File Exchange data on FAT | `ClassicMac.Files.Fat` |
-| [ISO9660.md](ISO9660.md) | ISO 9660 and High Sierra as Mac OS 9 reads them, Apple's extensions, raw CD images and cue sheets | `ClassicMac.Files.Iso` |
-| [ROM.md](ROM.md) | Macintosh ROM images: the ROM resource table, combinations, the resources listed as a synthesised resource fork; the NewWorld "Mac OS ROM" file and its LZSS image | `ClassicMac.Files.Rom` |
-| [SOUND.md](SOUND.md) | `snd ` resources; MACE 3:1 and 6:1, IMA 4:1, µ-law; the WAV output | `ClassicMac.Resources.Decoders.Sound` |
-| [TEXT.md](TEXT.md) | `STR `, `STR#`, `TEXT` and `styl`, `vers`; the text, RTF and JSON output | `ClassicMac.Resources.Decoders.Text` |
-| [INTERFACE.md](INTERFACE.md) | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL`, their colour tables and Appearance extensions; the JSON output | `ClassicMac.Resources.Decoders.Interface` |
-| [PALETTES.md](PALETTES.md) | `clut` colour tables and `pltt` palettes; the JSON and `.act` output | `ClassicMac.Resources.Decoders.Colors` |
-| [TEMPLATES.md](TEMPLATES.md) | `TMPL` resource templates, as ResEdit 2.1.3 reads and writes resources through them | `ClassicMac.Resources.Decoders.Templates` |
-| [FINDER.md](FINDER.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
-| [FONTS.md](FONTS.md) | `NFNT`/`FONT` strikes, `FOND` families, `fctb`, `sfnt`; the glyph sheet, BDF and JSON output | `ClassicMac.Graphics.Fonts`, `ClassicMac.Resources.Decoders.Fonts` |
-| [DOCUMENTS.md](DOCUMENTS.md) | DOCMaker stand-alone documents and SimpleText documents with pictures; the HTML output | `ClassicMac.Resources.Decoders.Documents` |
-| [PICT.md](PICT.md) | QuickDraw pictures (PICT v1, v2, extended v2): container, opcodes, operands, DrawPicture's play state; writing pictures | `ClassicMac.Graphics.Pict` |
-| [QUICKDRAW.md](QUICKDRAW.md) | How QuickDraw draws (Mac OS 9 and the 68k ROM): shapes, patterns, transfer modes, CopyBits, bitmap text and the Font Manager, screen depths | `ClassicMac.Graphics.QuickDraw` |
-| [QUICKTIME.md](QUICKTIME.md) | QuickTime still images in pictures, the codecs, QTIF files | `ClassicMac.Graphics.QuickTime` |
-| [MACPAINT.md](MACPAINT.md) | MacPaint documents | `ClassicMac.Graphics` |
-| [ICONS.md](ICONS.md) | Icon, cursor and pattern resources; icon families (`icns`, 48 × 48, 32-bit, 8-bit masks) | `ClassicMac.Resources.Decoders.Images` |
-| [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
+| [unwrapping.md](containers/unwrapping.md) | The structures the single-file containers share (Finder information, dates, CRC-16); how nested containers are unwrapped: reader order, nesting depth, the expanded-bytes limit | `ClassicMac.Files` (`ContainerUnwrapper`, `ContainerReadOptions`) |
+| [macbinary.md](containers/macbinary.md) | MacBinary I, II and III; writing MacBinary III | `ClassicMac.Files.Containers` |
+| [binhex.md](containers/binhex.md) | BinHex 4.0; writing it | `ClassicMac.Files.Containers` |
+| [applesingle-appledouble.md](containers/applesingle-appledouble.md) | AppleSingle and AppleDouble; writing them | `ClassicMac.Files.Containers` |
+| [uuencode.md](containers/uuencode.md) | uuencode, historical and Base64 | `ClassicMac.Files.Containers` |
+| [writing.md](containers/writing.md) | Saving edited resources back into the container they came from | `ClassicMac.Files.Editing` |
+| [host-folders.md](containers/host-folders.md) | Mac files on other file systems: Basilisk II / SheepShaver folders, AppleDouble `._` files, macOS named forks; host names; what `unpack` writes | `ClassicMac.Files` (`HostFiles`), `ClassicMac.Files.Export` |
+
+### Archives
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [stuffit.md](archives/stuffit.md) | StuffIt 1.x–4.x (`SIT!`) | `ClassicMac.Files.Archives` |
+| [stuffit5.md](archives/stuffit5.md) | StuffIt 5 | `ClassicMac.Files.Archives` |
+| [stuffit-segments.md](archives/stuffit-segments.md) | StuffIt split files: SegmentIt (`$B056`) and StuffIt 1.5.1's segments (`$41A7`) | `ClassicMac.Files.Archives` |
+| [packit.md](archives/packit.md) | PackIt: stored, Huffman and encrypted entries | `ClassicMac.Files.Archives` |
+| [lha.md](archives/lha.md) | LHA and LArc, header levels 0–3 | `ClassicMac.Files.Archives` |
+| [diskdoubler.md](archives/diskdoubler.md) | DiskDoubler archives (`DDA2`, `DDAR`) and standalone files; its split files (`SPLT`) | `ClassicMac.Files.Archives` |
+| [compact-pro.md](archives/compact-pro.md) | Compact Pro, including segmented archives | `ClassicMac.Files.Archives` |
+| [zip.md](archives/zip.md) | zip with AppleDouble `._`/`__MACOSX` entries and the Info-ZIP and ZipIt Mac extra fields | `ClassicMac.Files.Archives` |
+| [tar-gzip.md](archives/tar-gzip.md) | tar and gzip with Mac data | `ClassicMac.Files.Archives` |
+| [sea.md](archives/sea.md) | Self-extracting archives (`.sea`) | `ClassicMac.Files.Archives` |
+
+### Disk images
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [diskcopy42.md](disk-images/diskcopy42.md) | Disk Copy 4.2 | `ClassicMac.Files.Hfs` |
+| [dart.md](disk-images/dart.md) | DART | `ClassicMac.Files.Hfs` |
+| [ndif.md](disk-images/ndif.md) | NDIF (Disk Copy 6), self-mounting and segmented images; how an image is recognised | `ClassicMac.Files.Hfs` |
+| [udif.md](disk-images/udif.md) | UDIF (`.dmg`) | `ClassicMac.Files.Hfs` |
+| [raw-images.md](disk-images/raw-images.md) | ShrinkWrap 2.1, DiskDup+ and other raw images | `ClassicMac.Files.Hfs` |
+| [cd-images.md](disk-images/cd-images.md) | Raw CD images, cue sheets and multisession discs | `ClassicMac.Files.Iso` |
+| [rom.md](disk-images/rom.md) | Macintosh ROM images: the ROM resource table, combinations, the resources listed as a synthesised resource fork; the NewWorld "Mac OS ROM" file and its LZSS image | `ClassicMac.Files.Rom` |
+
+### File systems
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [partition-map.md](file-systems/partition-map.md) | Apple partition maps | `ClassicMac.Files.Hfs` |
+| [mfs.md](file-systems/mfs.md) | MFS volumes | `ClassicMac.Files.Hfs` |
+| [hfs.md](file-systems/hfs.md) | HFS volumes; finding a volume; conservative HFS writing | `ClassicMac.Files.Hfs` |
+| [hfs-plus.md](file-systems/hfs-plus.md) | HFS Plus and HFSX | `ClassicMac.Files.Hfs` |
+| [mbr.md](file-systems/mbr.md) | DOS partition tables | `ClassicMac.Files.Fat` |
+| [fat.md](file-systems/fat.md) | FAT12/16/32 with long names | `ClassicMac.Files.Fat` |
+| [pc-exchange.md](file-systems/pc-exchange.md) | PC Exchange and File Exchange data on FAT volumes and host folders: `RESOURCE.FRK`, `FINDER.DAT`, name conversion, the extension map | `ClassicMac.Files.Fat`, `ClassicMac.Files.Containers` (`PcExchange`, `ExtensionMap`) |
+| [iso9660.md](file-systems/iso9660.md) | ISO 9660 and High Sierra as Mac OS 9 reads them, Apple's extensions | `ClassicMac.Files.Iso` |
+
+### Resources
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [resource-fork.md](resources/resource-fork.md) | Resource forks: header, map, attributes; how Mac OS 9 and the 68k ROM open and write them | `ClassicMac.Resources` |
+| [compressed-resources.md](resources/compressed-resources.md) | Compressed resources (`dcmp` 0–3) | `ClassicMac.Resources` |
+| [strings.md](resources/strings.md) | `STR `, `STR#` | `ClassicMac.Resources.Decoders.Text` |
+| [styled-text.md](resources/styled-text.md) | Mac OS Roman, `TEXT` and `styl`, SimpleText documents | `ClassicMac.Resources.Decoders.Text` |
+| [version.md](resources/version.md) | `vers` | `ClassicMac.Resources.Decoders.Text` |
+| [menus.md](resources/menus.md) | `MENU`, `MBAR` | `ClassicMac.Resources.Decoders.Interface` |
+| [windows-dialogs.md](resources/windows-dialogs.md) | `WIND`, `DLOG`, `ALRT`, positioning, their colour tables and Appearance extensions; the JSON output and the viewer's previews | `ClassicMac.Resources.Decoders.Interface` |
+| [dialog-items.md](resources/dialog-items.md) | `DITL` | `ClassicMac.Resources.Decoders.Interface` |
+| [controls.md](resources/controls.md) | `CNTL` | `ClassicMac.Resources.Decoders.Interface` |
+| [bitmap-fonts.md](resources/bitmap-fonts.md) | `NFNT`/`FONT` strikes, `fctb`; the glyph sheet, BDF and JSON output | `ClassicMac.Graphics.Fonts`, `ClassicMac.Resources.Decoders.Fonts` |
+| [font-families.md](resources/font-families.md) | `FOND` families; finding a family's strikes | `ClassicMac.Graphics.Fonts` |
+| [outline-fonts.md](resources/outline-fonts.md) | `sfnt` | `ClassicMac.Graphics.Fonts` |
+| [icons.md](resources/icons.md) | Icon resources (`ICON`, `ICN#`, `ics#`, `icm#`, `SICN`, `icl4`/`icl8` and the rest, `cicn`); writing icons and cursors | `ClassicMac.Resources.Decoders.Images` |
+| [icon-families.md](resources/icon-families.md) | Drawing icon suites; icon families (`icns`, 48 × 48, 32-bit, 8-bit masks) | `ClassicMac.Resources.Decoders.Images` |
+| [cursors.md](resources/cursors.md) | `CURS`, `crsr` | `ClassicMac.Resources.Decoders.Images` |
+| [patterns.md](resources/patterns.md) | `PAT `, `PAT#`, `ppat`, `ppt#` | `ClassicMac.Resources.Decoders.Images` |
+| [sound.md](resources/sound.md) | `snd ` resources; the WAV output | `ClassicMac.Resources.Decoders.Sound` |
+| [palettes.md](resources/palettes.md) | `clut` colour tables and `pltt` palettes; the JSON and `.act` output | `ClassicMac.Resources.Decoders.Colors` |
+| [templates.md](resources/templates.md) | `TMPL` resource templates, as ResEdit 2.1.3 reads and writes resources through them | `ClassicMac.Resources.Decoders.Templates` |
+| [finder.md](resources/finder.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
+| [documents.md](resources/documents.md) | DOCMaker stand-alone documents and SimpleText documents with pictures | `ClassicMac.Resources.Decoders.Documents` |
+
+### Graphics
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [pict.md](graphics/pict.md) | QuickDraw pictures (PICT v1, v2, extended v2): container, opcodes, operands, DrawPicture's play state; writing pictures | `ClassicMac.Graphics.Pict` |
+| [quickdraw.md](graphics/quickdraw.md) | How QuickDraw draws (Mac OS 9 and the 68k ROM): shapes, patterns, transfer modes, CopyBits, bitmap text and the Font Manager, screen depths | `ClassicMac.Graphics.QuickDraw` |
+| [quicktime.md](graphics/quicktime.md) | QuickTime still images in pictures, the codecs, QTIF files | `ClassicMac.Graphics.QuickTime` |
+| [macpaint.md](graphics/macpaint.md) | MacPaint documents | `ClassicMac.Graphics` |
+
+### Codecs
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [adc.md](codecs/adc.md) | Apple Data Compression (NDIF, UDIF) | `ClassicMac.Files.Compression` |
+| [kencode.md](codecs/kencode.md) | KenCode (NDIF; the System's `dcmp` 3) | `ClassicMac.Files.Compression` |
+| [dart-rle.md](codecs/dart-rle.md) | DART RLE (DART, NDIF) | `ClassicMac.Files.Compression` |
+| [lzhuf.md](codecs/lzhuf.md) | DART LZH, Okumura and Yoshizaki's LZHUF (DART, NDIF) | `ClassicMac.Files.Compression` |
+| [bzip2.md](codecs/bzip2.md) | bzip2 (UDIF) | `ClassicMac.Files.Compression` |
+| [packbits.md](codecs/packbits.md) | PackBits scan lines (PICT) | `ClassicMac.Graphics` |
+| [stuffit-methods.md](codecs/stuffit-methods.md) | The compression methods StuffIt 1.x–4.x and StuffIt 5 share | `ClassicMac.Files.Archives` |
+| [mace.md](codecs/mace.md) | MACE 3:1 and 6:1 | `ClassicMac.Resources.Decoders.Sound` |
+| [ima4.md](codecs/ima4.md) | IMA 4:1 | `ClassicMac.Resources.Decoders.Sound` |
+| [ulaw.md](codecs/ulaw.md) | µ-law | `ClassicMac.Resources.Decoders.Sound` |
+
+### Output
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [export-manifest.md](output/export-manifest.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
+| [text-output.md](output/text-output.md) | The text, JSON and RTF output of the text resources | `ClassicMac.Resources.Decoders.Text` |
+| [html.md](output/html.md) | The HTML output of documents | `ClassicMac.Resources.Decoders.Documents` |
 
 Pictures, icons, cursors and patterns are drawn by `ClassicMac.Graphics` (`.QuickDraw`, `.Pict`), which
-[PICT.md](PICT.md) and [QUICKDRAW.md](QUICKDRAW.md) specify ([ICONS.md](ICONS.md) for icons, cursors and patterns).
-[EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) covers what ClassicMac adds: masks, cursor JSON and numbered list outputs.
+[pict.md](graphics/pict.md) and [quickdraw.md](graphics/quickdraw.md) specify ([icons.md](resources/icons.md),
+[icon-families.md](resources/icon-families.md), [cursors.md](resources/cursors.md) and
+[patterns.md](resources/patterns.md) for icons, cursors and patterns). [export-manifest.md](output/export-manifest.md)
+covers what ClassicMac adds: masks, cursor JSON and numbered list outputs.
 
 ## Conventions
 

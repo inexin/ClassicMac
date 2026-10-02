@@ -475,7 +475,7 @@ public static partial class HfsWriter
     private static ushort[] BuildCatalogNameWeights()
     {
         // Inside Macintosh: Text, RelString; the exceptions here follow the Mac OS 9 ROM rules
-        // recorded in docs/formats/HFS-MFS.md section 6.6. Unlisted Mac Roman bytes keep their code order.
+        // recorded in docs/formats/file-systems/hfs.md §4.6. Unlisted Mac Roman bytes keep their code order.
         var weights = new ushort[256];
         for (int value = 0; value < weights.Length; value++) weights[value] = (ushort)(value << 8);
         for (char value = 'a'; value <= 'z'; value++) Set(value.ToString(), (ushort)((value - 32) << 8));

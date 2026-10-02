@@ -66,7 +66,8 @@ namespace ClassicMac.Resources.Decoders.Images
     /// An icon suite as the Icon Utilities draw it (<c>PlotIconSuite</c>, <c>PlotIconID</c>): the 1-bit, 4-bit and 8-bit
     /// icons of one ID in three sizes (and, from an icon family, the 48 × 48 and 32-bit ones), drawn into a
     /// <see cref="QuickDrawPort"/> with the member the rect size and screen depth select, aligned and transformed by the
-    /// chosen QuickDraw's rules (Mac OS 9's native Icon Utilities, or the ROM's). See ICONS.md.
+    /// chosen QuickDraw's rules (Mac OS 9's native Icon Utilities, or the ROM's). See
+    /// docs/formats/resources/icon-families.md.
     /// </summary>
     public sealed class IconSuite
     {

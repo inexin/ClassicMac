@@ -10,7 +10,7 @@ namespace ClassicMac.Resources.Decoders.Interface
     /// <see cref="Top"/> rows are drawn as they are at the left and top, <see cref="Right"/> and <see cref="Bottom"/> at the
     /// right and bottom, and the one column and row between them repeat to fill the size asked for [Verified: measured
     /// from Mac OS 9.0's screen with Appearance 1.1.1, Platinum theme; every piece below repeats exactly along its middle in
-    /// the captures, ClassicMac's dialog test fork, docs/formats/INTERFACE.md §12].
+    /// the captures, ClassicMac's dialog test fork, docs/formats/resources/windows-dialogs.md §8].
     /// </summary>
     /// <remarks>
     /// One character per pixel: a hexadecimal digit <c>n</c> is the grey $nnnnnn ('0' black, 'F' white); 'r' $FF9999 and

@@ -31,7 +31,7 @@ namespace ClassicMac.Files.Rom
     /// <summary>
     /// The resource table of a Macintosh ROM image (the ROM resources the Resource Manager adds to the System map): the
     /// pointer at ROMBase+$1A, the table header and the linked list of entries, each followed by data with a 32-bit
-    /// Memory Manager block header in front. Layout and rules: docs/formats/ROM.md.
+    /// Memory Manager block header in front. Layout and rules: docs/formats/disk-images/rom.md.
     /// </summary>
     public sealed class RomResourceTable
     {

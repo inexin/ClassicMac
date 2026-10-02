@@ -12,7 +12,7 @@ namespace ClassicMac.Files.Rom
     /// Raw Macintosh ROM images (64 KiB to 4 MiB, a power of two) with a ROM resource table (<see cref="RomResourceTable"/>).
     /// The result is one file with no data fork whose resource fork holds the ROM's resources, every entry of the table
     /// whatever machine combination it belongs to; a type and ID listed again (for other combinations) keeps the first
-    /// entry and reports the others. Layout and rules: docs/formats/ROM.md.
+    /// entry and reports the others. Layout and rules: docs/formats/disk-images/rom.md.
     /// </summary>
     public sealed class MacRomReader : IContainerReader
     {

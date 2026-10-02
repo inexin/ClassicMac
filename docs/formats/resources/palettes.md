@@ -22,8 +22,8 @@ Contents
 
 ## 1. Conventions
 
-The shared conventions of [README.md](README.md) hold. An `RGBColor` is three `u16` (red, green, blue), each 0–65535.
-Tags are those of [README.md](README.md); **[ClassicMac]** marks ClassicMac's own choices.
+The shared conventions of [README.md](../README.md) hold. An `RGBColor` is three `u16` (red, green, blue), each 0–65535.
+Tags are those of [README.md](../README.md); **[ClassicMac]** marks ClassicMac's own choices.
 
 ---
 
@@ -41,8 +41,8 @@ A `ColorTable` [Doc] (*Imaging With QuickDraw*):
 In a pixel map's table (bit 15 clear) each entry's value is the pixel value it stands for. In a device's table (bit 15
 set) the entries are in pixel-value order, and the value field holds other information [Doc].
 
-The same structure appears inside pictures, colour icons and pixel patterns ([PICT.md](PICT.md), [ICONS.md](ICONS.md)),
-and as the window, dialog and control colour tables of [INTERFACE.md](INTERFACE.md) §10, where the value is a part
+The same structure appears inside pictures, colour icons and pixel patterns ([pict.md](../graphics/pict.md), [icons.md](icons.md)),
+and as the window, dialog and control colour tables of [windows-dialogs.md §6](windows-dialogs.md#6-colour-and-extension-resources), where the value is a part
 code.
 
 ---

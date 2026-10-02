@@ -20,7 +20,7 @@ public sealed class StuffItReader : IContainerReader
     private const byte FolderFlag = 0x40;
     private const byte EncryptedFlag = 0x20;
     // A legacy member's method byte marks encryption with $10, or with $80 as StuffIt Deluxe 4.5 writes it
-    // ([Verified], ARCHIVES.md).
+    // ([Verified], docs/formats/archives/stuffit.md).
     private const byte EncryptedMethodBits = 0x90;
     private const ushort HasResourceForkFlag = 0x0001;
     private const int Method6MaximumPackBitsLength = 32_768;
@@ -68,7 +68,8 @@ public sealed class StuffItReader : IContainerReader
 
         int rootCount = reader.ReadUInt16At(92);
         // The root list starts at +88. +94 holds the same offset until StuffIt Deluxe 7.0 prepends a member (its return
-        // receipt): then +88 points to the new first member and +94 still to the old one ([Verified], ARCHIVES.md).
+        // receipt): then +88 points to the new first member and +94 still to the old one ([Verified],
+        // docs/formats/archives/stuffit5.md).
         int firstMember = ReadPosition(reader.ReadUInt32At(88), "first member");
         if (rootCount > context.Options.MaxVolumeEntries)
             throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
@@ -234,7 +235,8 @@ public sealed class StuffItReader : IContainerReader
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
 
             LegacyMember member = ParseLegacyMember(archive, list.Position, context);
-            // StuffIt Deluxe 4.5 links a folder's first member back to the folder ([Verified], ARCHIVES.md).
+            // StuffIt Deluxe 4.5 links a folder's first member back to the folder ([Verified],
+            // docs/formats/archives/stuffit.md).
             if (member.Previous != list.Previous && !(list.Previous == 0 && member.Previous == list.Parent))
                 context.Report(DiagnosticSeverity.Warning, "archive.previous-link-mismatch",
                     $"The legacy StuffIt member at offset {list.Position} has a previous-member link that does not match its list position.", list.Position);
@@ -452,7 +454,7 @@ public sealed class StuffItReader : IContainerReader
 
         uint firstChildRaw = headerReader.ReadUInt32At(62);
         // A folder is a folder-start record (method 32). A file's +62 is not a link: StuffIt Deluxe 4.5 leaves
-        // other bytes there ([Verified], ARCHIVES.md).
+        // other bytes there ([Verified], docs/formats/archives/stuffit.md).
         bool isFolder = header.Span[0] == 32 || header.Span[1] == 32;
         int firstChild = isFolder && firstChildRaw != 0 ? ReadPosition(firstChildRaw, "first child") : 0;
         uint previous = headerReader.ReadUInt32At(50);
@@ -585,7 +587,7 @@ public sealed class StuffItReader : IContainerReader
         int headerEnd = checked(offset + headerLength);
         // The Finder block after the header is 36 bytes in a version-1 member (StuffIt Deluxe 6.5 and 7.0 for Mac,
         // DropStuff 7.0.3) and 32 bytes in the version-3 members StuffIt 7.0 for Windows writes ([Verified],
-        // ARCHIVES.md).
+        // docs/formats/archives/stuffit5.md).
         int finderBlockLength = archive[offset + 4] == 1 ? 36 : 32;
         Require(archive, headerEnd, finderBlockLength, "StuffIt Finder information");
         ushort fileFlags = reader.ReadUInt16At(headerEnd);
@@ -614,7 +616,8 @@ public sealed class StuffItReader : IContainerReader
         long dataOffsetLong = resourceOffsetLong + resourceCompressedLength;
         long forksEnd = dataOffsetLong + member.DataCompressedLength;
         // The next link bounds the forks only when it points forward: StuffIt 7.0.3 writes a folder's end marker
-        // before the folder's children, and the last child links back to it ([Verified], ARCHIVES.md).
+        // before the folder's children, and the last child links back to it ([Verified],
+        // docs/formats/archives/stuffit5.md).
         int archiveEnd = member.Next > offset ? member.Next : archive.Length;
         if (resourceOffsetLong > archiveEnd || forksEnd > archiveEnd)
             throw new InvalidDataException("A StuffIt member's fork data overlaps its next entry or exceeds the archive.");

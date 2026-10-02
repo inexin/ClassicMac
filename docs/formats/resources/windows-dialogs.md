@@ -1,4 +1,4 @@
-# Interface resources — an implementer's specification
+# Window, dialog and alert templates
 
 This document describes the classic Mac OS Toolbox's interface resources: menus (`'MENU'`, `'MBAR'`), window, dialog
 and alert templates (`'WIND'`, `'DLOG'`, `'ALRT'`), dialog item lists (`'DITL'`), control templates (`'CNTL'`), and
@@ -19,94 +19,33 @@ References:
 Contents
 
 1. [Conventions](#1-conventions)
-2. [Menus (MENU)](#2-menus-menu)
-3. [Menu bars (MBAR)](#3-menu-bars-mbar)
-4. [Window templates (WIND)](#4-window-templates-wind)
-5. [Dialog templates (DLOG)](#5-dialog-templates-dlog)
-6. [Alert templates (ALRT)](#6-alert-templates-alrt)
-7. [Positioning](#7-positioning)
-8. [Dialog item lists (DITL)](#8-dialog-item-lists-ditl)
-9. [Control templates (CNTL)](#9-control-templates-cntl)
-10. [Colour and extension resources](#10-colour-and-extension-resources)
-11. [JSON output](#11-json-output)
-12. [Viewer previews](#12-viewer-previews)
-13. [Writing templates](#13-writing-templates)
-14. [Diagnostics](#14-diagnostics)
-15. [Not covered yet](#15-not-covered-yet)
+2. [Window templates (WIND)](#2-window-templates-wind)
+3. [Dialog templates (DLOG)](#3-dialog-templates-dlog)
+4. [Alert templates (ALRT)](#4-alert-templates-alrt)
+5. [Positioning](#5-positioning)
+6. [Colour and extension resources](#6-colour-and-extension-resources)
+7. [JSON output](#7-json-output)
+8. [Viewer previews](#8-viewer-previews)
+9. [Writing templates](#9-writing-templates)
+10. [Diagnostics](#10-diagnostics)
+11. [Not covered yet](#11-not-covered-yet)
 
 ---
 
 ## 1. Conventions
 
-The shared conventions of [README.md](README.md) hold: big-endian values, `Rect` as four `i16` (top, left, bottom,
-right), Pascal strings, Mac OS Roman text. Tags are those of [README.md](README.md); **[Code]** here is Mac OS 9.0's
+The shared conventions of [README.md](../README.md) hold: big-endian values, `Rect` as four `i16` (top, left, bottom,
+right), Pascal strings, Mac OS Roman text. Tags are those of [README.md](../README.md); **[Code]** here is Mac OS 9.0's
 native managers unless it names the 68k code. **[ClassicMac]** marks ClassicMac's own choices, as in
-[TEXT.md](TEXT.md).
+[styled-text.md](styled-text.md).
 
 The Toolbox checks almost nothing: it never compares a template's counts with its size and reads past the end of
 a short one [Code]. ClassicMac reads short data as far as it goes, with zeros for missing fields, and reports it
-(§14) [ClassicMac].
+(§10) [ClassicMac].
 
 ---
 
-## 2. Menus (MENU)
-
-| Offset | Size | Type | Meaning |
-| --- | --- | --- | --- |
-| +$00 | 2 | `i16` | Menu ID |
-| +$02 | 2 | `i16` | Width: ignored; `GetMenu` recalculates it [Code] |
-| +$04 | 2 | `i16` | Height: likewise |
-| +$06 | 2 | `i16` | Menu definition: the `'MDEF'` resource ID itself (0 the standard one; 63 Appearance's, which Mac OS 9 draws the same way) [Code] |
-| +$08 | 2 | `i16` | Filler |
-| +$0A | 4 | `u32` | Enable flags: bit 0 the menu, bit *n* item *n* (1–31) |
-| +$0E | 1 + *n* | Pascal string | Title (the apple character $14 for the Apple menu) |
-| … | | | Items, then a 0 byte (an item with an empty text ends the list) |
-
-Each item [Doc] (*Toolbox Essentials*, Menu Manager):
-
-| Size | Type | Meaning |
-| --- | --- | --- |
-| 1 + *n* | Pascal string | Text |
-| 1 | `u8` | Icon number: the icon is resource 256 + number (0 none); a script code with key equivalent $1C |
-| 1 | `u8` | Key equivalent: the Command-key character (0 none), or one of the codes below |
-| 1 | `u8` | Mark character (0 none); a submenu's menu ID with key equivalent $1B |
-| 1 | `u8` | Style: QuickDraw face bits 0–6 ([TEXT.md](TEXT.md) §6.2); bit 7 reserved |
-
-Key equivalents $1A–$1E are codes, not keys, and are cleared once read [Code] (MenusLib, and the 68k standard MDEF):
-
-| Value | Meaning |
-| --- | --- |
-| $1A | A small icon with no mark column: `'SICN'` −4000 + icon number (Mac OS 9 tries an icon suite of that ID first) |
-| $1B | A submenu: the mark byte is its menu ID. `GetNewMBar` does not load submenus; the application does |
-| $1C | The icon byte is the item's script code, not an icon |
-| $1D | The large icon (`'cicn'` or `'ICON'` 256 + icon number) drawn at half size |
-| $1E | A small icon: `'cicn'` 256 + icon number at half size, else `'SICN'` 256 + icon number |
-
-$1F and every other value are ordinary keys. Icons are looked up as `'cicn'` first on a colour machine (never for
-$1A), then `'ICON'` or `'SICN'`; with $1A, $1D or $1E an icon is looked up even when the icon number is 0 [Code].
-
-- **Dividers.** An item is drawn as a divider line when its text starts with "-" (any length) and it has no icon and
-  no Command key once the codes are read [Code]. ClassicMac counts an item as a divider when its text starts with "-",
-  its icon number is 0 and its key equivalent is 0, $1B or $1C (the others look an icon up) [ClassicMac].
-- **Enabling.** A divider is always disabled [Code]. Items past 31 have no enable bit and are enabled whenever the menu
-  is [Code].
-- **Marks.** Chicago draws $11 as the Command key ⌘, $12 as a check mark ✓, $13 as a diamond ◆ and $14 as the Apple
-  logo [Doc] (*Toolbox Essentials*: `commandMark`, `checkMark`, `diamondMark`, `appleMark`); the JSON shows them as
-  those Unicode characters.
-- **Colours and extensions.** `GetMenu` also applies the `'mctb'` of the same ID, and Mac OS 9's reads an `'xmnu'`
-  (extended item data) of the same ID [Code]. ClassicMac reads them as their own resources (§10).
-
----
-
-## 3. Menu bars (MBAR)
-
-A count (`i16`), then that many menu IDs (`i16`), in the order the menus appear [Doc]. Nothing else [Code]. The 68k
-`GetNewMBar` reads one ID even when the count is 0 (its loop tests at the end) [Code: 68k]; ClassicMac reads none
-[ClassicMac].
-
----
-
-## 4. Window templates (WIND)
+## 2. Window templates (WIND)
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
@@ -118,7 +57,7 @@ A count (`i16`), then that many menu IDs (`i16`), in the order the menus appear 
 | +$0D | 1 | | Filler |
 | +$0E | 4 | `i32` | Reference value, for the application |
 | +$12 | 1 + *n* | Pascal string | Title |
-| (even) | 2 | `u16` | Positioning (§7), when the resource holds it |
+| (even) | 2 | `u16` | Positioning (§5), when the resource holds it |
 
 A `'wctb'` of the same ID gives the window's colours [Code].
 
@@ -129,40 +68,40 @@ Classic definition IDs [Doc], and the Appearance ones Mac OS 9 draws them with (
 
 ---
 
-## 5. Dialog templates (DLOG)
+## 3. Dialog templates (DLOG)
 
-As `'WIND'` (§4), with the item list's ID inserted before the title [Doc]:
+As `'WIND'` (§2), with the item list's ID inserted before the title [Doc]:
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
 | +$00–$11 | 18 | | As `'WIND'`: rectangle, definition ID, visible, filler, close box, filler, reference value |
 | +$12 | 2 | `i16` | The item list: `'DITL'` ID |
 | +$14 | 1 + *n* | Pascal string | Title |
-| (even) | 2 | `u16` | Positioning (§7), when the resource holds it |
+| (even) | 2 | `u16` | Positioning (§5), when the resource holds it |
 
 The Dialog Manager also reads, by the `'DLOG'`'s ID, a `'dctb'` (colours) and a `'dlgx'` (Appearance flags), and by
-the `'DITL'`'s ID an `'ictb'` (item colours and fonts) [Code] (§10).
+the `'DITL'`'s ID an `'ictb'` (item colours and fonts) [Code] (§6).
 
 ---
 
-## 6. Alert templates (ALRT)
+## 4. Alert templates (ALRT)
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
 | +$00 | 8 | `Rect` | The alert's rectangle, in global coordinates |
 | +$08 | 2 | `i16` | The item list: `'DITL'` ID |
 | +$0A | 2 | `u16` | Stages |
-| +$0C | 2 | `u16` | Positioning (§7), when the resource holds it |
+| +$0C | 2 | `u16` | Positioning (§5), when the resource holds it |
 
 The stages word holds four 4-bit entries, stage 1 in the lowest and stage 4 in the highest [Doc] (Rez `Types.r`)
 [Code]. Each entry: bit 3, the default button (0 item 1, 1 item 2); bit 2, the alert is drawn at this stage; bits 0–1,
 the number of beeps (`SysBeep` through `ErrorSound`; not a `'snd '` ID) [Code].
 
-An `'actb'` and an `'alrx'` of the same ID give the colours and the Appearance flags [Code] (§10).
+An `'actb'` and an `'alrx'` of the same ID give the colours and the Appearance flags [Code] (§6).
 
 ---
 
-## 7. Positioning
+## 5. Positioning
 
 System 7 added a positioning word after the templates [Doc] (*Toolbox Essentials*; Rez `Types.r`) [Code]:
 
@@ -202,79 +141,7 @@ it to the reference's top-left corner [Code].
 
 ---
 
-## 8. Dialog item lists (DITL)
-
-An `i16` count **less one**, then the items [Doc]:
-
-| Size | Type | Meaning |
-| --- | --- | --- |
-| 4 | | Placeholder: should be 0 (Mac OS 9 keeps a user item's non-zero value and calls it as a drawing procedure) [Code] |
-| 8 | `Rect` | The item's rectangle, in the dialog's local coordinates |
-| 1 | `u8` | Type; bit 7 ($80, `itemDisable`) disables it, the only flag |
-| 1 | `u8` | Data length |
-| *n* | | Data, then a pad byte when *n* is odd, for every type [Code] |
-
-- **Count.** A signed number: −1 ($FFFF) or any negative count is an empty list [Code]. It is never checked against
-  the resource's size: a count past the data makes the Dialog Manager read past the end [Code]. ClassicMac stops at the
-  end of the data (§14) [ClassicMac].
-- **Types.** Mac OS 9 accepts exactly these values of the type less bit 7; any other item draws nothing but still
-  takes space and clicks [Code]. The 68k Dialog Manager tested bits in the order control, editable text, static text,
-  icon, picture, so combined values took the first that matched [Code: 68k].
-
-| Type | Name | Data |
-| --- | --- | --- |
-| 0 | user item | none; the application draws it |
-| 1 | help item | `i16` kind, `i16` resource ID (kind 1: an `'hdlg'`; 2: an `'hrct'`; 8: an `'hdlg'` appended, with an `i16` offset that the Dialog Manager overwrites) [Code] |
-| 4 | button | its title |
-| 5 | check box | its title |
-| 6 | radio button | its title |
-| 7 | control | a `'CNTL'` ID |
-| 8 | static text | the text |
-| 16 | editable text | the initial text |
-| 32 | icon | an icon ID: `'cicn'` first in a colour dialog, else `'ICON'`; Mac OS 9 draws IDs 0, 1 and 2 as the system's stop, note and caution icons [Code] |
-| 64 | picture | a `'PICT'` ID |
-
-- **IDs.** A control's, icon's or picture's ID is the `i16` at the start of the data, whatever the length says [Code];
-  ClassicMac reads it only when the length is at least 2 [ClassicMac].
-- **Text.** The data is the text itself, with no length byte of its own. In static text, `^0`–`^3` are replaced by
-  `ParamText`'s strings when drawn, on a copy (a missing string deletes the citation) [Code].
-
----
-
-## 9. Control templates (CNTL)
-
-| Offset | Size | Type | Meaning |
-| --- | --- | --- | --- |
-| +$00 | 8 | `Rect` | The control's rectangle, in the window's local coordinates |
-| +$08 | 2 | `i16` | Initial value |
-| +$0A | 1 | `u8` | Visible (non-zero) |
-| +$0B | 1 | | Filler |
-| +$0C | 2 | `i16` | Maximum |
-| +$0E | 2 | `i16` | Minimum |
-| +$10 | 2 | `i16` | Control definition ID: the `'CDEF'` resource × 16 + a 4-bit variation (`'CDEF'` 0 when missing) |
-| +$12 | 4 | `i32` | Reference value |
-| +$16 | 1 + *n* | Pascal string | Title |
-
-A `'cctb'` of the same ID gives the control's colours [Code].
-
-Classic definition IDs [Doc]: 0 `pushButProc`, 1 `checkBoxProc`, 2 `radioButProc` (+8 `useWFont`: the window's
-font), 16 `scrollBarProc`, 1008 `popupMenuProc` (+1 `popupFixedWidth`, +4 `popupUseAddResMenu`, +8 `popupUseWFont`).
-Mac OS 9 draws the first three with Appearance's buttons (368–370) [Code].
-
-A **pop-up menu** reads the fields otherwise [Code]:
-
-| Field | Meaning |
-| --- | --- |
-| Minimum | The `'MENU'` ID |
-| Maximum | The title's width in pixels |
-| Value | Low byte: the title's justification (0 left, 1 centre, −1 right); bits 8–14: its style (face bits × 256); bit 15: no style |
-| Reference value | With `popupUseAddResMenu`, the resource type whose names are added to the menu |
-
-Once made, the control sets its minimum to 1, its maximum to the number of items and its value to 1 [Code].
-
----
-
-## 10. Colour and extension resources
+## 6. Colour and extension resources
 
 Each is found by the ID of what it belongs to [Code].
 
@@ -327,7 +194,7 @@ system's, −2 the item's own), two `i32` reference values, `u16` submenu ID (us
 
 ---
 
-## 11. JSON output
+## 7. JSON output
 
 One `.json` file per resource, UTF-8, indented by two spaces, LF line ends [ClassicMac]. Every stored field is kept;
 names for known codes are added beside the numbers. Rectangles are objects `{"top", "left", "bottom", "right"}`.
@@ -343,7 +210,7 @@ names for known codes are added beside the numbers. Rectangles are objects `{"to
 | `CNTL` | `ui.control` | `title`, `bounds`, `definition`, `definitionName`, `value`, `minimum`, `maximum`, `visible`, `refCon`; a pop-up menu adds `popup`: `menu`, `titleWidth`, `titleJustification`, `titleNoStyle`, `titleStyle`, `addResMenu` |
 
 `position` is `null` when the resource has no positioning word, else `{"code", "name", "used"}`, `name` only for the
-values of §7, and for a used word `screen` (`main`, `parentWindowScreen`, `parentWindow`, `parent`),
+values of §5, and for a used word `screen` (`main`, `parentWindowScreen`, `parentWindow`, `parent`),
 `centerHorizontally` and `vertical` (`none`, `center`, `alertPosition`, `stagger`). All decoders are version 1; those
 above record the encoding (`macintosh`).
 
@@ -360,14 +227,14 @@ Without its `'DITL'`, an `'ictb'`'s entries are listed without their colours or 
 
 ---
 
-## 12. Viewer previews
+## 8. Viewer previews
 
 Dialogs, alerts and lone item lists are drawn as Mac OS 9.0 with Appearance 1.1.1 and the Platinum theme draws them
 (`DialogDrawings.Read` builds the model from the resources, `DialogRenderer.Render` draws it through a
 `QuickDrawPort` at any screen depth); menus are drawn in the System 7 style [ClassicMac: an approximation drawn by the
 viewer]. The other interface resources preview as their JSON.
 
-### 12.1 Dialogs and alerts
+### 8.1 Dialogs and alerts
 
 The reference is a set of screen captures of `GetNewDialog` + `DrawDialog` (and `ModalDialog`) and of `Alert`,
 `StopAlert`, `NoteAlert` and `CautionAlert` on Mac OS 9.0 (Appearance 1.1.1, Platinum, system font Charcoal 12), at 32
@@ -404,7 +271,7 @@ gated by `CLASSICMAC_DIALOG_CAPTURES`).
   0, 1 and 2) at (10, 20, 42, 52) [Verified: the place]. They are the System file's; ClassicMac draws them only when an
   open file supplies them, and a grey 1-pixel frame in their place otherwise [ClassicMac]. An icon item with ID 0–2
   takes the same icons.
-- **Default ring:** an alert's default item (stage 1's bold item, §6) is drawn as Appearance's default button, a ring
+- **Default ring:** an alert's default item (stage 1's bold item, §4) is drawn as Appearance's default button, a ring
   3 pixels outside the button [Verified]. Dialogs drawn with `DrawDialog`/`ModalDialog` have no ring [Verified].
 - **Items** [Verified unless marked]:
   - Buttons (and `'CNTL'` `pushButProc`): the Platinum button, rounded, $DDDDDD; the title centred, its baseline at
@@ -437,15 +304,9 @@ gated by `CLASSICMAC_DIALOG_CAPTURES`).
 
 The viewer previews an `'ALRT'` as `Alert` shows it (no icon), and redraws the preview as an edit form changes.
 
-### 12.2 Menus
-
-The title highlighted on a strip of menu bar, then the items with their marks, styles (bold), Command keys, submenu
-arrows and dividers; disabled items grey. Item icons are not drawn. Text is drawn in Chicago 12 where installed, else a
-font of similar width; the zoom applies [ClassicMac].
-
 ---
 
-## 13. Writing templates
+## 9. Writing templates
 
 ClassicMac's editor writes `MENU`, `WIND`, `DLOG`, `ALRT`, `DITL` and `CNTL` back from their fields
 (`InterfaceWriter`), in the layouts above [ClassicMac]:
@@ -455,17 +316,14 @@ ClassicMac's editor writes `MENU`, `WIND`, `DLOG`, `ALRT`, `DITL` and `CNTL` bac
 - Filler fields (the `MENU` word after the MDEF ID, the bytes after `WIND`/`DLOG`'s visible and close-box flags,
   a `DITL` item's placeholder long and the pad byte after odd-length data, the pad before a `DLOG`'s positioning
   word) are written as 0; the Toolbox does not read them.
-- **`MENU`:** the enable flags are those read, with the bits of items 1–31 set from each item's enabled state, except
-  for dividers (which are read as disabled whatever their bit) and for items the menu does not have, whose stored bits
-  are kept. An item must have text: a zero length byte ends the item list.
-- **`DITL`:** an item's data is made from its kind: the text of buttons, check boxes, radio buttons, static and
-  editable text; the resource ID of controls, icons and pictures; help and user items keep their data as stored.
 - **`DLOG`/`WIND`/`ALRT`:** the positioning word is written when the template had one (or the editor adds it), at the
   next even offset for `WIND` and `DLOG`.
 - Read back and written again, every `WIND`, `ALRT` and `CNTL` of the test corpus comes out byte for byte, and every
   `MENU` but one; `DLOG` and `DITL` differ only in their filler and pad bytes [Verified: ClassicMac's corpus].
 
-## 14. Diagnostics
+---
+
+## 10. Diagnostics
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
@@ -473,7 +331,7 @@ ClassicMac's editor writes `MENU`, `WIND`, `DLOG`, `ALRT`, `DITL` and `CNTL` bac
 
 ---
 
-## 15. Not covered yet
+## 11. Not covered yet
 
 - `'dftb'` (Appearance's dialog font table) and `'hdlg'`/`'hrct'` (the Help Manager's).
 - In the previews: `'ictb'` item colours and fonts; `'dftb'`; Appearance themes other than Platinum, accent colours

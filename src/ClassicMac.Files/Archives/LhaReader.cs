@@ -132,7 +132,8 @@ public sealed class LhaReader : IContainerReader
                     throw new InvalidDataException("An LHA level-0 header has an invalid filename length.");
                 pathData = header.Slice(22, nameLength).ToArray();
                 // The OS identifier is an optional extension after the CRC. MacLHA 2.24 writes level-0 headers
-                // without one; such a name is read as MacRoman like an 'm' one ([Verified], ARCHIVES.md).
+                // without one; such a name is read as MacRoman like an 'm' one ([Verified],
+                // docs/formats/archives/lha.md).
                 osIdentifier = headerLength > LevelZeroHeaderMinimumLength + nameLength
                     ? header[24 + nameLength]
                     : (byte)'m';
@@ -414,7 +415,7 @@ public sealed class LhaReader : IContainerReader
     {
         if (directoryName is null || directoryName.Length == 0) return fileName.ToArray();
         // The directory extension separates its names with $FF (LHa's header.doc; MacLHA 2.24 writes them so, with a
-        // leading $FF before a volume name, [Verified], ARCHIVES.md).
+        // leading $FF before a volume name, [Verified], docs/formats/archives/lha.md).
         directoryName = [.. directoryName.Select(value => value == 0xFF ? (byte)'/' : value)];
         bool hasSeparator = directoryName[^1] is (byte)'/' or (byte)'\\';
         byte[] path = new byte[directoryName.Length + (hasSeparator ? 0 : 1) + fileName.Length];

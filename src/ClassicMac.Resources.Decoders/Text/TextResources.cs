@@ -9,7 +9,8 @@ namespace ClassicMac.Resources.Decoders.Text
     /// <summary>
     /// Text resources as values to edit and write back: <c>'STR '</c> (one Pascal string), <c>'STR#'</c> (a count, then
     /// Pascal strings), <c>'vers'</c> and <c>'TEXT'</c> with its <c>'styl'</c>. Text is Mac OS Roman; a line break is a
-    /// carriage return in the resource and <c>\n</c> here. Formats: TEXT.md.
+    /// carriage return in the resource and <c>\n</c> here. Formats: docs/formats/resources/strings.md,
+    /// styled-text.md and version.md.
     /// </summary>
     public static class TextResources
     {

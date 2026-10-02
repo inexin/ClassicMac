@@ -1,8 +1,8 @@
 # QuickTime still images
 
 QuickTime images as QuickDraw pictures carry them (the CompressedQuickTime and UncompressedQuickTime opcodes), the
-built-in codecs, and QuickTime image files (QTIF). Conventions are those of [PICT.md](PICT.md) section 1; drawing the
-decoded image is CopyBits ([QUICKDRAW.md](QUICKDRAW.md) section 6). ClassicMac implements it in
+built-in codecs, and QuickTime image files (QTIF). Conventions are those of [pict.md §1](pict.md#1-conventions); drawing the
+decoded image is CopyBits ([quickdraw.md §6](quickdraw.md#6-bitmaps-copybits--stretchbits)). ClassicMac implements it in
 `ClassicMac.Graphics.QuickTime` and `ClassicMac.Graphics.Pict`.
 
 ## 1. CompressedQuickTime (0x8200)
@@ -61,7 +61,7 @@ Standard tables:
 - Map the corners of srcRect through the matrix: `h' = x·a + y·c + h`, `v' = x·b + y·d + vOff`, then
   `(value + $8000) >> 16`.
 - Draw the decoded image into their bounding box (rotation and skew are not modelled), then map that box to the
-  canvas ([PICT.md](PICT.md) §6).
+  canvas ([pict.md §6](pict.md#6-play-state-and-coordinate-mapping)).
 - Use the opcode's transfer mode, and its mask region intersected with the clip.
 
 **Fallback drawing:**
@@ -198,7 +198,7 @@ After the u32 length:
 | Rect | matteRect |
 | bytes | the matte (matteSize bytes), then a pad byte to an even offset |
 | u16 | a bitmap opcode: `0098`, `0099`, `009A` or `009B` (`0090`–`0093` read the same way) |
-| — | that opcode's operands ([PICT.md](PICT.md) §4.5) and pixel data ([PICT.md](PICT.md) §5) |
+| — | that opcode's operands ([pict.md §4.5](pict.md#45-bitmap-pixmap-and-bitmap-opcode-operands)) and pixel data ([pict.md §5](pict.md#5-pixel-data)) |
 
 - Draw the bitmap as that opcode would, with its own mode and mask region.
 - **Placement:** with an identity matrix, the opcode's dstRect. Otherwise, as for 0x8200, the bounding box of the

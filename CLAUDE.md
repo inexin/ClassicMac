@@ -29,9 +29,10 @@ QuickDraw.Pict (formerly <https://github.com/inexin/QuickDraw.Pict>) moved into 
 `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` adapters. It decodes and encodes QuickDraw PICT pictures and draws
 **exactly the pixels a Macintosh draws**. The public drawing API is `QuickDrawPort`, whose members carry QuickDraw's names.
 
-- The specs: `docs/formats/PICT.md` (the picture format and playback), `docs/formats/QUICKDRAW.md` (the drawing
-  rules), `QUICKTIME.md`, `MACPAINT.md`, `ICONS.md`. Update the matching section in the same change as any behaviour
-  change (each has a "Not covered" and a "Mac OS 9 differences" section; screen depths are QUICKDRAW.md §8).
+- The specs: `docs/formats/graphics/pict.md` (the picture format and playback), `docs/formats/graphics/quickdraw.md`
+  (the drawing rules), `graphics/quicktime.md`, `graphics/macpaint.md`, and `resources/icons.md`, `icon-families.md`,
+  `cursors.md`, `patterns.md`. Update the matching section in the same change as any behaviour change (each has a "Not
+  covered" and a "Mac OS 9 differences" section; screen depths are `docs/formats/graphics/quickdraw.md` §8).
 - **Two QuickDraws:** `PictDecodeOptions.QuickDraw` selects `MacOS9` (default) or `MacRom` (the 68k ROM $077D). Any
   behaviour change must keep **both** correct.
 - Match QuickDraw's integer behaviour exactly: signed 16-bit wraps, truncating versus rounding divides, Fixed maths.
@@ -141,4 +142,5 @@ checks subtract-first (`offset > length - size`), as the Mac OS code does.
 ## Conventions
 
 - Work on `main` (no feature branches).
-- A change to how a format is read or written updates its document in `docs/formats/` in the same commit.
+- A change to how a format is read or written updates its document in `docs/formats/<category>/` in the same commit;
+  the authoring rules are in `docs/formats/CLAUDE.md`.

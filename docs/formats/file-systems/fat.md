@@ -1,4 +1,4 @@
-# FAT volumes and their Mac data — an implementer's specification
+# FAT volumes
 
 This document describes FAT volumes as classic Mac OS reads them, completely enough to write a reader without
 ClassicMac's code: the DOS partition table that may hold them, the FAT12, FAT16 and FAT32 on-disk format with VFAT
@@ -27,31 +27,25 @@ Contents
 
 1. [Conventions](#1-conventions)
 2. [Finding a FAT volume](#2-finding-a-fat-volume)
-3. [DOS partition tables](#3-dos-partition-tables)
-4. [The boot sector](#4-the-boot-sector)
-5. [Layout and FAT type](#5-layout-and-fat-type)
-6. [The allocation table and cluster chains](#6-the-allocation-table-and-cluster-chains)
-7. [Directories](#7-directories)
-8. [Long names (VFAT)](#8-long-names-vfat)
-9. [DOS dates and times](#9-dos-dates-and-times)
-10. [The Mac data: `RESOURCE.FRK` and `FINDER.DAT`](#10-the-mac-data-resourcefrk-and-finderdat)
-11. [The Mac view of a file](#11-the-mac-view-of-a-file)
-12. [Long names as File Exchange converts them](#12-long-names-as-file-exchange-converts-them)
-13. [Types by name ending](#13-types-by-name-ending)
-14. [The listing, compared with Mac OS 9's](#14-the-listing-compared-with-mac-os-9s)
-15. [What File Exchange writes](#15-what-file-exchange-writes)
-16. [Diagnostics](#16-diagnostics)
-17. [Not covered](#17-not-covered)
+3. [The boot sector](#3-the-boot-sector)
+4. [Layout and FAT type](#4-layout-and-fat-type)
+5. [The allocation table and cluster chains](#5-the-allocation-table-and-cluster-chains)
+6. [Directories](#6-directories)
+7. [Long names (VFAT)](#7-long-names-vfat)
+8. [DOS dates and times](#8-dos-dates-and-times)
+9. [The listing, compared with Mac OS 9's](#9-the-listing-compared-with-mac-os-9s)
+10. [Diagnostics](#10-diagnostics)
+11. [Not covered](#11-not-covered)
 
 ---
 
 ## 1. Conventions
 
-The shared conventions of [README.md](README.md) apply, with these exceptions and additions.
+The shared conventions of [README.md](../README.md) apply, with these exceptions and additions.
 
 - **FAT values are little-endian.** Every multi-byte field of the partition table, boot sector, allocation table and
   directory entries is little-endian, as on the PC. This is the exception to README.md's big-endian rule. The Mac
-  data inside `FINDER.DAT` (section 10) is big-endian, like every Mac structure.
+  data inside `FINDER.DAT` ([pc-exchange.md §1](pc-exchange.md#1-the-mac-data-resourcefrk-and-finderdat)) is big-endian, like every Mac structure.
 - Offsets are hex (`$0B`), sizes decimal. A **sector** is the boot sector's bytes-per-sector value (normally 512); a
   partition table's sector numbers are always in 512-byte sectors.
 - A **cluster** is the allocation unit: sectors per cluster × bytes per sector. Clusters are numbered from 2.
@@ -63,7 +57,7 @@ The shared conventions of [README.md](README.md) apply, with these exceptions an
 - [Doc] on a FAT rule means the FAT specification; on a partition-table rule, the UEFI specification or Microsoft's
   partition-type constants.
 - What ClassicMac does with damage (loops, missing clusters, limits) is ClassicMac's own policy, not a rule of the
-  format; it is described in section 16 and carries a tag only where the Mac's behaviour is known.
+  format; it is described in §10 and carries a tag only where the Mac's behaviour is known.
 
 ---
 
@@ -72,8 +66,8 @@ The shared conventions of [README.md](README.md) apply, with these exceptions an
 A FAT volume comes either **bare** (a floppy image, a volume dump: the boot sector is at offset 0) or **inside a DOS
 partition table** (a hard-disk or removable-media image). The two are told apart by sector 0:
 
-1. If sector 0 passes the boot-sector test of section 4.3, the image is a bare FAT volume.
-2. Otherwise, if sector 0 passes the partition-table test of section 3.2, each FAT partition it lists is a FAT volume,
+1. If sector 0 passes the boot-sector test of §3.3, the image is a bare FAT volume.
+2. Otherwise, if sector 0 passes the partition-table test of [mbr.md §2](mbr.md#2-recognising-a-table), each FAT partition it lists is a FAT volume,
    read as a bare one from its first sector.
 
 A partitioned disk's sector 0 rarely passes the boot-sector test, and a boot sector's bytes at $1BE rarely pass the
@@ -84,77 +78,9 @@ ClassicMac tries Apple's formats (Apple partition map, HFS, MFS) before the DOS 
 
 ---
 
-## 3. DOS partition tables
+## 3. The boot sector
 
-### 3.1 Layout
-
-Sector 0 (512 bytes) of a partitioned disk holds boot code, four partition entries and a signature [Doc]:
-
-| Offset | Size | Type | Meaning |
-| --- | --- | --- | --- |
-| $000 | 446 | bytes | Boot code; ignored |
-| $1BE | 16 | entry | Partition 1 |
-| $1CE | 16 | entry | Partition 2 |
-| $1DE | 16 | entry | Partition 3 |
-| $1EE | 16 | entry | Partition 4 |
-| $1FE | 2 | bytes | Signature `55 AA` |
-
-Each entry [Doc]:
-
-| Offset | Size | Type | Meaning |
-| --- | --- | --- | --- |
-| $0 | 1 | u8 | Status: `$80` bootable, `$00` not |
-| $1 | 3 | bytes | CHS address of the first sector; ignored |
-| $4 | 1 | u8 | Partition type; `$00` for an unused entry |
-| $5 | 3 | bytes | CHS address of the last sector; ignored |
-| $8 | 4 | u32 | First sector (LBA), in 512-byte sectors from the start of the disk |
-| $C | 4 | u32 | Number of sectors, in 512-byte sectors |
-
-UEFI firmware ignores the CHS fields and uses the LBA ones [Doc]; so does ClassicMac.
-
-### 3.2 Recognising a table
-
-ClassicMac takes sector 0 as a DOS partition table when all of these hold:
-
-- it ends in `55 AA` [Doc];
-- it is not a FAT boot sector (section 4.3);
-- every entry's status byte is `$00` or `$80` [Doc];
-- at least one entry has a FAT type (3.3) and a non-zero first sector.
-
-The last two conditions are ClassicMac's heuristic; the Mac's own partition recognition for DOS disks is not traced.
-
-### 3.3 Partition types
-
-| Type | Meaning | Read |
-| --- | --- | --- |
-| `$01` | FAT12 | yes |
-| `$04` | FAT16, under 32 MB | yes |
-| `$06` | FAT16, 32 MB and over ("huge") | yes |
-| `$0B` | FAT32 | yes |
-| `$0C` | FAT32, LBA addressing | yes |
-| `$0E` | FAT16, LBA addressing | yes |
-| `$05`, `$0F` | Extended partition | no |
-| anything else | Not FAT (`$07` NTFS, `$83` Linux, `$EE` GPT protective, …) | no |
-
-The values are Microsoft's [Doc]. File Exchange's formatter writes `$01`, `$04`, `$06`, `$0B` or `$0C` by size
-[Code, not verified]. The partition type is only a hint: the volume's own boot sector decides the FAT type (5.2) [Doc].
-
-### 3.4 Reading
-
-- An entry of type `$00` is unused and skipped silently.
-- An entry of another non-FAT type is skipped (`mbr.skipped`).
-- A FAT entry whose first sector is 0 or lies past the end of the image is skipped (`mbr.outside`).
-- A FAT entry running past the end of the image is cut to the image (`mbr.truncated`) and read.
-- Each remaining entry is a FAT volume from byte `first × 512`, `count × 512` bytes long. ClassicMac names it
-  `Partition n`, where n is the entry's slot, 1–4.
-
-Extended partitions and the logical partitions inside them are not read; neither is a GUID partition table.
-
----
-
-## 4. The boot sector
-
-### 4.1 Common fields (the BPB)
+### 3.1 Common fields (the BPB)
 
 Sector 0 of the volume. All FAT types share the first 36 bytes [Doc]:
 
@@ -176,7 +102,7 @@ Sector 0 of the volume. All FAT types share the first 36 bytes [Doc]:
 | $20 | 4 | u32 | `BPB_TotSec32`: total sectors when `BPB_TotSec16` is 0 |
 | $1FE | 2 | bytes | Signature `55 AA` |
 
-### 4.2 Extended fields
+### 3.2 Extended fields
 
 FAT12 and FAT16 [Doc]:
 
@@ -210,7 +136,7 @@ FAT32 [Doc]:
 Two fields have 16- and 32-bit forms: total sectors is `BPB_TotSec16`, or `BPB_TotSec32` when that is 0; sectors per
 FAT is `BPB_FATSz16`, or `BPB_FATSz32` when that is 0 [Doc].
 
-### 4.3 Recognising a boot sector
+### 3.3 Recognising a boot sector
 
 ClassicMac accepts sector 0 as a FAT boot sector when all of these hold; each is a requirement of the FAT
 specification [Doc], but the selection is ClassicMac's (the Mac's own mount test is not traced):
@@ -220,17 +146,17 @@ specification [Doc], but the selection is ClassicMac's (the Mac's own mount test
 - bytes per sector is 512, 1024, 2048 or 4096;
 - sectors per cluster is a non-zero power of two;
 - reserved sectors, total sectors and sectors per FAT are non-zero, and there are 1 or 2 FATs;
-- the first data sector (5.1) lies before the end of the volume;
-- a volume found to be FAT32 (5.2) has `BPB_RootEntCnt` = 0;
+- the first data sector (§4.1) lies before the end of the volume;
+- a volume found to be FAT32 (§4.2) has `BPB_RootEntCnt` = 0;
 - the image holds at least the reserved sectors and the first FAT.
 
 DOS 1.x floppies without a BPB are not recognised.
 
 ---
 
-## 5. Layout and FAT type
+## 4. Layout and FAT type
 
-### 5.1 Regions
+### 4.1 Regions
 
 In sectors from the start of the volume [Doc]:
 
@@ -245,7 +171,7 @@ CountOfClusters = floor(DataSec / BPB_SecPerClus)
 
 Cluster n (n ≥ 2) starts at sector `FirstDataSec + (n − 2) × BPB_SecPerClus` [Doc].
 
-### 5.2 The FAT type
+### 4.2 The FAT type
 
 The type is decided by the cluster count **alone** [Doc]:
 
@@ -260,7 +186,7 @@ reader that is off by one misreads volumes a formatter deliberately placed near 
 
 PC Exchange reads FAT12 and FAT16 only; FAT32 needs File Exchange [Code].
 
-### 5.3 The root directory
+### 4.3 The root directory
 
 - **FAT12 and FAT16:** the root directory is a fixed region of `BPB_RootEntCnt` entries starting at `RootDir`,
   outside the cluster area [Doc].
@@ -268,9 +194,9 @@ PC Exchange reads FAT12 and FAT16 only; FAT32 needs File Exchange [Code].
 
 ---
 
-## 6. The allocation table and cluster chains
+## 5. The allocation table and cluster chains
 
-### 6.1 Entries
+### 5.1 Entries
 
 The allocation table (FAT) has one entry per cluster, indexed by cluster number; entries 0 and 1 are reserved [Doc].
 
@@ -289,9 +215,9 @@ Values [Doc]:
 | `$FF7` | `$FFF7` | `$FFFFFF7` | Bad cluster |
 | `$FF8`–`$FFF` | `$FFF8`–`$FFFF` | `$FFFFFF8`–`$FFFFFFF` | End of chain |
 
-### 6.2 Following a chain
+### 5.2 Following a chain
 
-A file or directory starts at the cluster in its directory entry (7.1) and continues through the table until an
+A file or directory starts at the cluster in its directory entry (§6.1) and continues through the table until an
 end-of-chain value [Doc]. A file's data is the chain's clusters in order, cut to the entry's file size [Doc]; a reader
 may stop once it has the file size in clusters, without reaching the end marker. A directory's size is its whole
 chain.
@@ -307,19 +233,19 @@ A file of size 0 has no clusters; its first-cluster field is 0 [Doc].
 
 ---
 
-## 7. Directories
+## 6. Directories
 
-### 7.1 Directory entries
+### 6.1 Directory entries
 
 A directory is an array of 32-byte entries [Doc]:
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
 | $00 | 11 | bytes | `DIR_Name`: the 8.3 name, stem then extension, space-padded |
-| $0B | 1 | u8 | `DIR_Attr`: attributes (7.2) |
+| $0B | 1 | u8 | `DIR_Attr`: attributes (§6.2) |
 | $0C | 1 | u8 | `DIR_NTRes`: reserved for Windows NT (lower-case flags); ignored, by File Exchange too [Code] |
 | $0D | 1 | u8 | `DIR_CrtTimeTenth`: creation time, hundredths of a second 0–199; ignored |
-| $0E | 2 | u16 | `DIR_CrtTime`: creation time (section 9) |
+| $0E | 2 | u16 | `DIR_CrtTime`: creation time (§8) |
 | $10 | 2 | u16 | `DIR_CrtDate`: creation date |
 | $12 | 2 | u16 | `DIR_LstAccDate`: last access date; ignored |
 | $14 | 2 | u16 | `DIR_FstClusHI`: high 16 bits of the first cluster (FAT32 only; 0 on FAT12/16) |
@@ -331,7 +257,7 @@ A directory is an array of 32-byte entries [Doc]:
 The first cluster is `DIR_FstClusLO`, with `DIR_FstClusHI << 16` added on FAT32 only [Doc]. ClassicMac ignores
 `DIR_FstClusHI` on FAT12 and FAT16.
 
-### 7.2 Attributes
+### 6.2 Attributes
 
 | Bit | Name | Meaning |
 | --- | --- | --- |
@@ -341,9 +267,9 @@ The first cluster is `DIR_FstClusLO`, with `DIR_FstClusHI << 16` added on FAT32 
 | `$08` | `ATTR_VOLUME_ID` | The volume label; only in the root directory [Doc] |
 | `$10` | `ATTR_DIRECTORY` | A directory [Doc] |
 | `$20` | `ATTR_ARCHIVE` | Changed since backup [Doc] |
-| `$0F` | `ATTR_LONG_NAME` | All four low bits: a long-name entry (section 8) [Doc] |
+| `$0F` | `ATTR_LONG_NAME` | All four low bits: a long-name entry (§7) [Doc] |
 
-### 7.3 Reading a directory
+### 6.3 Reading a directory
 
 Entries are read in order [Doc]:
 
@@ -351,7 +277,7 @@ Entries are read in order [Doc]:
 - A first name byte of `$E5` marks a deleted entry: skip it. It also discards any long-name parts gathered so far.
 - A first name byte of `$05` stands for a real `$E5` (a Kanji lead byte): show it as `$E5` in the name, but keep the
   stored bytes for `FINDER.DAT` and `RESOURCE.FRK` lookups.
-- An entry with attributes `$0F` is a long-name part (section 8). ClassicMac tests the attribute byte for exactly
+- An entry with attributes `$0F` is a long-name part (§7). ClassicMac tests the attribute byte for exactly
   `$0F`; the FAT specification masks it with `$3F` first, which differs only for entries with reserved bits set.
 - An entry with `ATTR_VOLUME_ID` and without `ATTR_DIRECTORY` is the volume label: not a file, skip it.
 - The entries `.` and `..` at the start of every subdirectory point at the directory itself and its parent: skip them.
@@ -364,9 +290,9 @@ make the walk loop; ClassicMac skips it (`fat.folder-loop`).
 
 ---
 
-## 8. Long names (VFAT)
+## 7. Long names (VFAT)
 
-### 8.1 Long-name entries
+### 7.1 Long-name entries
 
 A long name is stored in one or more 32-byte entries directly **before** the 8.3 entry it belongs to, last part first
 [Doc]:
@@ -377,7 +303,7 @@ A long name is stored in one or more 32-byte entries directly **before** the 8.3
 | $01 | 10 | u16 × 5 | Characters 1–5 of this part |
 | $0B | 1 | u8 | `LDIR_Attr`: `$0F` |
 | $0C | 1 | u8 | `LDIR_Type`: 0 |
-| $0D | 1 | u8 | `LDIR_Chksum`: checksum of the 8.3 name (8.2) |
+| $0D | 1 | u8 | `LDIR_Chksum`: checksum of the 8.3 name (§7.2) |
 | $0E | 12 | u16 × 6 | Characters 6–11 |
 | $1A | 2 | u16 | `LDIR_FstClusLO`: 0 |
 | $1C | 4 | u16 × 2 | Characters 12–13 |
@@ -385,7 +311,7 @@ A long name is stored in one or more 32-byte entries directly **before** the 8.3
 Each part holds 13 UTF-16 code units, little-endian; part n holds characters `(n − 1) × 13 + 1` to `n × 13` [Doc]. A
 name that does not fill its last part is ended by `$0000` and padded with `$FFFF` [Doc].
 
-### 8.2 The checksum
+### 7.2 The checksum
 
 The 8.3 entry's 11 name bytes, as stored (a leading `$05` included) [Doc]:
 
@@ -395,7 +321,7 @@ for each of the 11 bytes b:
     sum = ((sum & 1) << 7) + (sum >> 1) + b     (all in 8 bits)
 ```
 
-### 8.3 Assembling a name
+### 7.3 Assembling a name
 
 As ClassicMac reads them:
 
@@ -413,9 +339,9 @@ Long names exist on volumes File Exchange reads; PC Exchange ignores them [Code]
 
 ---
 
-## 9. DOS dates and times
+## 8. DOS dates and times
 
-### 9.1 The fields
+### 8.1 The fields
 
 [Doc]:
 
@@ -429,7 +355,7 @@ Long names exist on volumes File Exchange reads; PC Exchange ignores them [Code]
 
 A date of 0 means none [Doc]. DOS times have no time zone; they are the local time of whoever wrote them [Doc].
 
-### 9.2 How the Mac reads them
+### 8.2 How the Mac reads them
 
 - A DOS date and time is read as a Mac local date: no time zone conversion, since Mac dates are local time too
   [Code].
@@ -463,378 +389,36 @@ A date of 0 means none [Doc]. DOS times have no time zone; they are the local ti
   The one exception is the creation date: a creation date word of 0 shows as **now** (only the date word is tested,
   not the time) [Code] [Verified]. A modification date of 0 is not special and shows as 1979-12-01 [Code] [Verified].
 - ClassicMac converts every DOS date the same way, rollover included. The one difference is a creation date word of
-  0: ClassicMac has no "now" to match and uses the record's creation date instead (11.3).
+  0: ClassicMac has no "now" to match and uses the record's creation date instead ([pc-exchange.md §2.3](pc-exchange.md#23-dates)).
 
 ---
 
-## 10. The Mac data: `RESOURCE.FRK` and `FINDER.DAT`
+## 9. The listing, compared with Mac OS 9's
 
-PC Exchange and File Exchange keep everything a FAT file lacks in two hidden items **in every directory** [Code]. The
-format is the same in PC Exchange 1.0.4 and File Exchange 3.0.2 [Code]; PC Exchange 2.x (Mac OS 7.5–8.x) was not
-available for tracing, and with the same code at both ends of the range its format is taken to be the same. No Apple
-file-system code in Mac OS 7.1–9 reads or writes AppleSingle or AppleDouble [Code]: this is what a Mac wrote to DOS
-disks.
+### 9.1 What ClassicMac lists
 
-### 10.1 `RESOURCE.FRK`
+Walking from the root directory (§4.3), for each directory:
 
-- A subdirectory named `RESOURCE.FRK`, attributes `$12` (hidden, directory) [Code] [Verified].
-- It holds one file per data file that has a resource fork, under **the same 8.3 name** as the data file [Code]
-  [Verified]. Only the 8.3 name matters; long names on these files are not used.
-- The file's content is the **raw resource fork, with no header** [Code] [Verified].
-- Its attributes are the data file's with `$20` added, and its dates are the time it was written [Code].
-- It is created on the first write to the resource fork, deleted with the data file, and moved and renamed with it;
-  `RESOURCE.FRK` itself is removed when it becomes empty [Code].
-- A file with no entry in `RESOURCE.FRK`, or an empty one, has an empty resource fork [Code].
-
-### 10.2 `FINDER.DAT`
-
-A hidden file named `FINDER.DAT` (attributes `$02` when created; `$22` once written, with the archive bit [Verified])
-holding **92-byte records**, big-endian, with no header and no version [Code]:
-
-| Offset | Size | Type | Meaning |
-| --- | --- | --- | --- |
-| $00 | 32 | Str31 | Mac name: a length byte (0–31) and the name in Mac OS Roman; garbage after the name |
-| $20 | 16 | FInfo | Finder info: type, creator, flags, location, folder (DInfo for a folder) |
-| $30 | 16 | FXInfo | Extended Finder info (DXInfo for a folder) |
-| $40 | 4 | u32 | Creation date, Mac seconds, local time |
-| $44 | 4 | u32 | Modification date, Mac seconds, local time, full precision |
-| $48 | 4 | u32 | Backup date; written only when non-zero |
-| $4C | 4 | u32 | File number (catalog node ID) |
-| $50 | 11 | bytes | The item's 8.3 name as stored in its directory entry, space-padded, no dot: **the lookup key** |
-| $5B | 1 | u8 | Unused; garbage |
-
-- An item's record is in its **parent directory's** `FINDER.DAT` [Code]. Folders have records like files, in the
-  directory that contains them.
-- A record is found by comparing its 11 bytes at $50 with the directory entry's 11 name bytes [Code] [Verified]. The
-  comparison is **byte for byte**, with no case folding, on the name bytes as stored in the directory, a leading
-  `$05` included [Code]. ClassicMac compares the same way.
-- A record can also be found by its Mac name, as when a file is created: that comparison ignores case and respects
-  diacritical marks (`EqualString`) [Code].
-- File numbers come from a per-volume counter that starts at `$7FFFFFFF` and counts **down** [Code] [Verified]. The
-  counter is kept in a **root record**, keyed by the volume label [Code] [Verified]; it matches no file.
-- **Nothing is validated.** The Mac uses a corrupt record as it is [Code].
-
-### 10.3 Record packing
-
-- Records are packed `floor(clusterSize / 92)` to a cluster and **never straddle a cluster** [Code] [Verified]: with
-  512-byte clusters, 5 records fill bytes 0–459, the 52 bytes to 512 are left as they were, and the 6th record starts
-  at 512 (so a file of 6 records is 604 bytes, not 552). The gap holds garbage: File Exchange writes into a new cluster
-  without clearing it [Code] [Verified].
-- Read only whole 92-byte slots that lie within the file's size. Bytes past the end of the file, and cluster slack,
-  may hold copies of other records [Code] [Verified].
-- The file does not record the cluster size; on a FAT volume the reader takes it from the boot sector. (For a
-  `FINDER.DAT` copied off its volume, see [HOST-FOLDERS.md](HOST-FOLDERS.md), where the cluster size is guessed.)
-
-### 10.4 Free records
-
-- A record whose name length (byte $00) is 0 is free [Code]. Deleting an item clears its name length and 8.3 name;
-  the file never shrinks [Code].
-- ClassicMac also treats a record whose first 8.3-name byte ($50) is 0 as free [Fitted]: File Exchange leaves stray
-  records with a garbage name and an empty 8.3 name [Verified], which match no directory entry anyway.
-- Records are searched in file order and **the first match wins**, for reading and for writing, so a later record
-  with the same 8.3 name is dead; free slots are skipped even when their 8.3 name matches [Code]. (A 32-record cache
-  is checked first, but it is filled only from the same search, so it gives the same record [Code].) ClassicMac uses
-  the first used record in file order too.
-
-### 10.5 When records exist
-
-A reader cannot assume that a file has a record, nor that a record's contents were set by an application:
-
-- Records are created **lazily**. Merely listing a writable FAT disk on the Mac creates a record for every item that
-  has none, because the Mac asks for a file number [Code] [Verified]. Such a record has the file's Mac name, type
-  `TEXT`, creator `dosa`, Finder flags 0, put-away folder 2, **zero dates** and a file number `$7FFFFFxx` from the
-  counter [Verified], even for a file whose name ending the Mac shows mapped (13.3): the mapped type is not written
-  back [Verified]. (The code leaves the dates uninitialised [Code]; they were zero in every record seen.)
-- A record is also created when a file's Mac name differs from its 8.3 name, and whenever Finder info is set [Code].
-- Records are written only while the volume's "save info" setting is on [Code].
-- A new record takes the first free slot, but never offset 0 (a quirk), else it is appended [Code].
-- A record made for a file that has a resource fork but no record can get a **garbage Mac name** (seen as `P"P`,
-  with control characters) [Verified]; the Mac then shows that name (11.1). The name routine gives up without filling
-  its buffer when its search of the directory misses, and the new record takes its name from that uninitialised
-  buffer [Code]; why the search misses is not traced.
-- A record's type can revert to an earlier value around a close [Verified]; see 13.3.
-
-### 10.6 `FILEID.DAT`
-
-A hidden file in the root directory only, holding 64-byte records {file ID, parent directory ID, Pascal name}, record 0
-being a header (`$00010000`) [Code]. It is created only when an application asks for a file ID reference, carries
-nothing a reader needs, and ClassicMac does not read it.
-
----
-
-## 11. The Mac view of a file
-
-For each directory entry other than the hidden items (11.5), the Mac shows the following. ClassicMac shows the same.
-
-### 11.1 Name
-
-In this order [Code] [Verified]:
-
-1. **The record's Mac name**, when the item has a record (10.2) — even a garbage one, which the Mac shows as it is
-   [Verified]. ClassicMac shows it too, with `fat.suspect-name` when it contains bytes `$00`–`$1F`.
-2. **The long name**, converted as in section 12, when the entry has one whose checksum matches (8.3).
-3. **The 8.3 name**, byte for byte [Code]:
-   - The bytes are shown **as stored**: no case change (the `DIR_NTRes` lower-case flags are ignored, so a Windows NT
-     `readme.txt` stored as an 8.3 entry shows as `README.TXT`), and no code page conversion: each byte is shown as
-     the Mac byte of the same value (in the system script, Mac OS Roman on a Roman system), with no `?`. CP437 `$82`
-     (`é`) shows as Mac OS Roman `$82` (`Ç`). A leading `$05` shows as `$E5` (`Â`).
-   - The stem stops at its **first byte of `$20` or less**, so `A B     TXT` shows as `A.TXT`.
-   - A `.` is added when any extension byte is above `$20`; the extension bytes are copied while they are `$20` or
-     more, and trailing spaces are then trimmed.
-
-   ClassicMac shows 8.3 names the same way: the stored bytes as Mac OS Roman, case kept, nothing replaced, the stem and
-   extension cut as above (`NAME    A B` shows as `NAME.A B`, `NAME     AB` as `NAME. AB`). `FINDER.DAT` and
-   `RESOURCE.FRK` keys are compared with the stored bytes, a leading `$05` included.
-
-A folder's name follows the same order, using the folder's record in its parent's `FINDER.DAT`.
-
-### 11.2 Finder info
-
-- With a record: the record's FInfo and FXInfo, as stored [Code] [Verified].
-- Without a record: the blank Finder info, type `TEXT`, creator `dosa`, flags 0, location 0, and in the FXInfo
-  everything 0 but the put-away folder, 2 (the root directory's ID; File Exchange never reads it) [Code] [Verified].
-  The record the Mac creates on first listing the file (10.5) starts from the same blank. ClassicMac gives the same
-  placeholder.
-- Then, for a `TEXT`/`dosa` file with a record only, the Mac may show a mapped type (section 13) [Code]. A file with
-  no record never gets one; on a writable volume with "save info" on, though, the Mac makes the record before it
-  reads the Finder info, so the mapped type shows there [Code] [Verified: `.TXT` → `TEXT`/`ttxt`, `.BIN` →
-  `BINA`/`SITx`, `.JPG` → `JPEG`/`ogle`]. On a locked or read-only volume, or with "save info" off, the file shows
-  plain `TEXT`/`dosa` [Code]; File Exchange has only one mapping path, and it needs a record [Code]. This is not yet
-  checked on a volume the Mac sees as locked. An image that was read-only only on the host is no such test: the Mac
-  saw it writable, File Exchange made `FINDER.DAT` and records in its cache, the writes failed (the Finder reported
-  a problem with the disk), and a `.JPG` file with no record on disk showed `JPEG`/`ogle` [Verified], mapped through
-  a stale cached record [Code], while a file with a `RESOURCE.FRK` fork and no record showed `TEXT`/`dosa`, flags 0,
-  put-away folder 2 [Verified]. The run needs repeating with the image write-protected in the emulator. "Save info"
-  off was not tested.
-- DOS **hidden** or **system** makes the file invisible: the Finder flag `isInvisible` (`$4000`) is ORed onto the
-  stored flags and never cleared, so a record that stores `$4000` keeps the file invisible after the PC clears the
-  hidden attribute [Code]. (Making a file invisible on the Mac sets DOS hidden and stores the flags in the record
-  [Code].) The archive attribute is ignored [Code]. ClassicMac sets the invisible flag the same way.
-- DOS **read-only** or **system** makes the file locked [Code]. ClassicMac has no locked attribute yet and does not
-  report it.
-- File Exchange sets the alias flag (`$8000`) on a file whose type and creator, after the record and the mapping, are
-  exactly `'scut'`/`'dosa'` [Code]. Nothing ties this to the `.lnk` ending: Mac OS 9's default Internet Config map has
-  no `.lnk` entry, so a Windows shortcut shows as a plain `TEXT`/`dosa` document, and its contents are never
-  translated into an alias [Code]. ClassicMac does not set the alias flag.
-
-### 11.3 Dates
-
-File Exchange [Code] [Verified]:
-
-- **Creation:** from the DOS entry's creation fields (section 9). The record's creation date ($40) is written but
-  never read. When the DOS creation date word is 0, whatever the time word, File Exchange shows the current time
-  [Code] [Verified]; ClassicMac, which has no "now" to match, uses the record's creation date instead (PC
-  Exchange's rule), or none.
-- **Modification:** the later of the DOS entry's modification date and the record's ($44), compared as unsigned
-  Mac dates [Code]. A record date of 0 counts as earlier than any DOS date. A DOS date of 0 is not special: it reads
-  as 1979-12-01 (9.2) [Verified], on the Mac and in ClassicMac.
-- **Backup:** the record's ($48) [Code]. ClassicMac does not carry backup dates.
-
-PC Exchange [Code]: creation from the record's $40 (0 without a record); modification the later of the DOS date and
-$44. DOS entries written by PC Exchange carry the modification date only.
-
-Because DOS keeps only even seconds and the record keeps full precision, a file modified on the Mac shows the record's
-exact modification time [Verified].
-
-### 11.4 Forks
-
-- **Data fork:** the entry's cluster chain, `DIR_FileSize` bytes [Doc].
-- **Resource fork:** the file in this directory's `RESOURCE.FRK` whose 8.3 name equals the entry's (10.1), its full
-  size [Code] [Verified].
-
-### 11.5 Hidden items
-
-The Mac hides these entries **by name**, whatever their attributes, in every directory [Code]:
-
-- `FINDER.DAT` (8.3 key `FINDER  DAT`)
-- `FILEID.DAT` (`FILEID  DAT`)
-- `RESOURCE.FRK` (`RESOURCEFRK`)
-
-Other hidden or system entries are listed, invisible (11.2).
-
-### 11.6 Folders
-
-A folder contributes its name (11.1) to the path of everything inside it. Its record's DInfo and DXInfo and its dates
-are not used by ClassicMac, whose output is files; a folder with no files in it produces nothing.
-
----
-
-## 12. Long names as File Exchange converts them
-
-A file with no record but a long name gets a Mac name from the long name, converted as File Exchange converts it
-[Code] [Verified]. PC Exchange does not read long names [Code].
-
-### 12.1 Mac Roman or low bytes
-
-1. File Exchange does **no Unicode normalization**: the UTF-16 from the long-name entries goes to the Text Encoding
-   Converter unchanged, from Unicode 2.1 to the **system script's** encoding (Mac OS Roman on a Roman system;
-   MacIcelandic, MacJapanese and so on elsewhere) [Code]. The converter does **not** compose a decomposed sequence
-   (`e` + U+0301 into `é`): the combining mark has no byte, so step 3 applies [Verified: `Cafe`+U+0301`.txt` shows
-   as `Cafe`, `$01`, `.txt` (the low byte of U+0301), while the precomposed `Café.txt` stays `Café.txt`]. The
-   low bytes can include `$00`: a Mac name can hold a NUL byte (12.2). ClassicMac converts to Mac OS Roman, as on
-   a Roman system, and takes the name as stored, with no normalization, the same way.
-2. If **every** character has a Mac OS Roman equivalent, the name is its Mac Roman bytes [Code] [Verified]. A `:` is
-   kept as it is, even though it is the Mac's path separator [Verified: `a:b c.txt`].
-3. If **any** character has none, the converter reports that it used fallbacks, and the **whole** name takes the other
-   path: each UTF-16 code unit becomes its low byte, and `:` becomes `_` [Code] [Verified]. `漢字 kanji.txt` becomes
-   `"W kanji.txt` (U+6F22 → `$22`, U+5B57 → `$57`); `漢:.txt` becomes `"_.txt`. File Exchange's own `_` fallback
-   character never takes effect [Code].
-
-### 12.2 Names over 31 bytes
-
-If the result of 12.1 is at most 31 bytes, it is the name. Otherwise it is shortened to exactly 31 bytes [Code]
-[Verified]:
-
-```
-extension = from the last '.' among the name's final six characters to the end; none if there is no '.' there
-name      = first (27 − length(extension)) characters, '#', three upper-case hex digits of the CRC, extension
-```
-
-- The characters and the extension are converted by the same path as the whole name (Mac Roman or low bytes).
-- The **CRC** is CRC-16 with polynomial `$1021`, initial value 0, no reflection and no final XOR, computed over the
-  long name's own UTF-16 units as stored, **not normalized**, all of them, as **big-endian** UTF-16 [Code]
-  [Verified]; the three digits are its low 12 bits. ClassicMac computes it the same way, so a decomposed and a
-  precomposed spelling of one name get different digits, as on the Mac. This is the unique-name checksum of the OSTA
-  UDF specification, which File Exchange borrowed [Code].
-- `This is a very long Windows file name.txt` becomes `This is a very long Win#7C7.txt` [Verified].
-- `Crème brûlée with a very long name.txt`, 38 characters precomposed, becomes `Crème brûlée with a ver#F28.txt`
-  (Mac Roman); the same name decomposed, 41 characters, takes the low-byte path and becomes `Cre`, `$00`,
-  `me bru`, `$02`, `le`, `$01`, `e with a #366.txt` (U+0300, U+0302 and U+0301 give `$00`, `$02` and `$01`)
-  [Verified].
-- `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef.jpeg` becomes `ABCDEFGHIJKLMNOPQRSTUV#` + 3 digits + `.jpeg` (22 + 4 + 5).
-- In `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh.eleven` the last `.` is seven characters from the end, so there is no
-  extension: the first 27 characters, `#` and the digits.
-
-The extension search follows File Exchange's `FindExtension` [Code]. For names shorter than seven characters its window
-is smaller, but such names are never shortened.
-
----
-
-## 13. Types by name ending
-
-### 13.1 The File Exchange table is empty
-
-File Exchange keeps a per-volume table of extension → type and creator, but in Mac OS 9.0 it is **always empty**: at
-startup its INIT moves any old PC Exchange mappings (the `'dMap'` resource, ID −4040) into Internet Config and then
-builds the table with a count of 0, and nothing fills it later [Code].
-
-PC Exchange 1.0.4 used only its own table, matched on the 3-character DOS extension, whose default entry is `.TXT` →
-`TEXT`/`ttxt` [Code].
-
-### 13.2 Internet Config's map
-
-The only mapping File Exchange applies is Internet Config's map of file-name endings [Code] [Verified]:
-
-- It applies **only** when the file's type and creator are exactly `TEXT`/`dosa` [Code] [Verified]. A stored type is
-  never overridden: a `.TXT` file whose record says `APPL`/`abcd` stays `APPL`/`abcd` [Verified].
-- It applies only to a file that has a record; a file with none keeps the placeholder, unless the Mac makes its
-  record first, as it does on a writable volume (11.2) [Code].
-- It matches the end of the file's Mac name (11.1), ignoring case; the **longest** matching ending wins, and among
-  endings of the same length the earlier entry [Code]. The entries' flags are ignored [Code].
-- It applies only while File Exchange's "map extensions" preference is on (Gestalt `'pcxg'` bit 3), which is the
-  default [Code].
-- Examples from Mac OS 9's default map: `.txt` → `TEXT`/`ttxt`, `.bin` → `BINA`/`SITx`, `.jpg` → `JPEG`/`ogle`,
-  `.gif` → `GIFf`/`ogle`, `.doc` → `WDBN`/`MSWD` [Verified]; `.pdf` → `'PDF '`/`CARO`, `.sit` → `SITD`/`SITx`
-  [Code].
-  The default map has 313 entries, and a user can change it.
-
-### 13.3 What is on the disk
-
-The mapped type is shown, not stored, until the file's data fork is closed or flushed: File Exchange then reads the
-Finder info (mapping applied) and writes it back to the record [Code]. So:
-
-- a file only listed on the Mac keeps `TEXT`/`dosa` in its record [Verified];
-- a file opened on the Mac usually has its mapped type stored, indistinguishable from a type an application set;
-- that close-time round trip can also write back a stale copy of the record, reverting a type set just before
-  [Verified; the exact trigger is not traced]. A record's dates and file number are more trustworthy than its type.
-
-### 13.4 ClassicMac: opt-in
-
-The map belongs to the Mac that reads the disk, not to the disk, so ClassicMac shows the **stored** type by default.
-An application may supply a map (`ContainerReadOptions.ExtensionMap`); ClassicMac then applies it as in 13.2, after
-the record and before the DOS attributes, to every `TEXT`/`dosa` file, with a record or not, as a writable volume
-shows them. No map derived from Apple's ships with ClassicMac.
-
----
-
-## 14. The listing, compared with Mac OS 9's
-
-### 14.1 What ClassicMac lists
-
-Walking from the root directory (5.3), for each directory:
-
-1. Read the entries (7.3), skipping free and deleted entries, the volume label, `.` and `..`, and assembling long names.
-2. Read the directory's `FINDER.DAT` records (10.2–10.4) and its `RESOURCE.FRK` entries (10.1), if present.
-3. For each entry other than the hidden items (11.5): a subdirectory is walked with its Mac name (11.1) added to the
-   path; a file is listed with its name, Finder info, dates and forks (section 11), then the extension map if one was
-   supplied (13.4), then the invisible flag from DOS attributes (11.2).
+1. Read the entries (§6.3), skipping free and deleted entries, the volume label, `.` and `..`, and assembling long names.
+2. Read the directory's `FINDER.DAT` records ([pc-exchange.md §§1.2–1.4](pc-exchange.md#12-finderdat)) and its `RESOURCE.FRK` entries ([pc-exchange.md §1.1](pc-exchange.md#11-resourcefrk)), if present.
+3. For each entry other than the hidden items ([pc-exchange.md §2.5](pc-exchange.md#25-hidden-items)): a subdirectory is walked with its Mac name ([pc-exchange.md §2.1](pc-exchange.md#21-name)) added to the
+   path; a file is listed with its name, Finder info, dates and forks ([pc-exchange.md §2](pc-exchange.md#2-the-mac-view-of-a-file)), then the extension map if one was
+   supplied ([pc-exchange.md §4.4](pc-exchange.md#44-classicmac-opt-in)), then the invisible flag from DOS attributes ([pc-exchange.md §2.2](pc-exchange.md#22-finder-info)).
 
 Items the Finder creates when it mounts a disk writable — `TheVolumeSettingsFolder`, `Desktop Folder`, `Trash` and a
 hidden `Desktop` file with a resource fork — are ordinary FAT entries, and are listed like any other [Verified].
 
-### 14.2 Verification
+### 9.2 Verification
 
 On two FAT12 floppies written by File Exchange in SheepShaver, Mac OS 9.0, ClassicMac's listing, with the
 extension-map entries the Mac showed, matches Mac OS 9's own for every file the Mac listed: folder, name, data and
 resource fork lengths, type, creator, Finder flags, creation and modification dates [Verified]. The only exception is
 the Finder's `Desktop` file, which the Finder rewrote after the listing was taken. The only diagnostics are
-`fat.suspect-name` for the garbage names of 10.5, which match the Mac's listing byte for byte.
+`fat.suspect-name` for the garbage names of [pc-exchange.md §1.5](pc-exchange.md#15-when-records-exist), which match the Mac's listing byte for byte.
 
 ---
 
-## 15. What File Exchange writes
-
-ClassicMac does not write FAT volumes. For a writer, and for reading what File Exchange wrote, its rules are
-[Code] [Verified] unless marked; [HOST-FOLDERS.md](HOST-FOLDERS.md) covers the same names on host folders.
-
-### 15.1 Mac name to 8.3 name, on creating a file
-
-1. A record with the same Mac name, compared without regard to case, already in the directory: the create fails with
-   `dupFNErr` (−48) [Verified: `readme.txt` then `README.TXT`].
-2. The Mac name is sanitized: control characters, `" * / : < > ? \ |` and `$7F` become `_`; trailing dots and spaces
-   are removed; leading spaces are kept. **The sanitized name replaces the Mac name** [Verified: `a/b` → `a_b`,
-   `trail.` → `trail`].
-3. The 8.3 name: characters DOS forbids, and every byte from `$80` up, become `_`; spaces are dropped; letters are
-   upper-cased. A name that does not fit 8.3 exactly is cut to 6 characters plus `~1`, the extension to 3; on a
-   collision the number grows and the `~` moves left. Device names (`CON`, `COM1`) are not checked.
-4. A record and a long name (the Mac name as precomposed UTF-16) are always written, even when the name fits 8.3.
-
-| Mac name | 8.3 name |
-| --- | --- |
-| `Hello World` | `HELLOW~1` |
-| `a/b` | `A_B` |
-| `Résumé` | `R_SUM_~1` |
-| `readme.txt` | `README.TXT` |
-| `a.b.c` | `AB~1.C` |
-| `   lead` | `LEAD~1` |
-| `trail.` | `TRAIL` |
-| `12345678.1234` | `123456~1.123` |
-| `.profile` | `~1.PRO` |
-| `COM1` | `COM1` |
-| `CON.txt` | `CON.TXT` |
-| `ÄÖÜ ß` | `____~1` |
-| `™®©` | `___~1` |
-| a 31-character name starting `ABCDEF` | `ABCDEF~1` |
-
-Dates are written exactly into the record and truncated to even seconds in the DOS entry, with Mac years 1904–1979
-stored as DOS 2032–2107 (9.2).
-
-### 15.2 Formatting
-
-From the code only [Code, not verified]:
-
-- OEM name `PCX_3.0 `; FAT12 below 16 MB, FAT16 below 1 GB, FAT32 above.
-- A 1.44 MB floppy: 1 sector per cluster, 224 root entries, media `$F0`, 9 sectors per FAT, 18 sectors per track,
-  2 heads.
-- Serial number: the tick count at format time. Label: upper-cased, at $2B.
-- Root directory: entries 0 and 1 marked deleted (`$E5`), then the label entry with attributes `$28`. No `FINDER.DAT`
-  or `RESOURCE.FRK` is written at format time.
-- Floppies and file-backed devices get no partition table. Other disks get one partition at sector 32, with a geometry
-  of 64 heads × 32 sectors per track, of type `$01`, `$04`, `$06`, `$0B` or `$0C` by size.
-
----
-
-## 16. Diagnostics
+## 10. Diagnostics
 
 ClassicMac reports each problem and reads on; it throws only when the input is not a FAT volume or partition table at
 all, or when one fork or directory would exceed the per-input size limit
@@ -843,30 +427,17 @@ all, or when one fork or directory would exceed the per-input size limit
 
 | Code | Severity | Meaning | ClassicMac does | The Mac |
 | --- | --- | --- | --- | --- |
-| `mbr.skipped` | Info | A partition entry has a type that is not FAT (3.3) | Skips it | Not traced |
-| `mbr.outside` | Error | A FAT partition starts at sector 0 or past the end of the image | Skips it | Not traced |
-| `mbr.truncated` | Error | A FAT partition runs past the end of the image | Reads the part that is there | Not traced |
 | `fat.bad-chain` | Error | A cluster chain reaches a free cluster, a cluster number outside the volume (including the bad-cluster mark) or a cluster it already passed | Ends the chain there; the fork is short (`fat.short` follows when a size was expected) | Not traced |
 | `fat.short` | Error | A file, fork, `FINDER.DAT` or directory has fewer bytes in the image than its size or chain calls for | Returns the bytes that are there | Not traced |
 | `fat.folder-loop` | Error | A subdirectory's first cluster is 0 or was already read as a directory | Skips the subdirectory and its contents | Not traced |
 | `fat.too-many-entries` | Error | The volume holds more files and folders than `ContainerReadOptions.MaxVolumeEntries` (default 1,000,000) | Stops the walk; files read so far are kept | No such limit |
 | `fat.suspect-name` | Warning | A `FINDER.DAT` record's Mac name contains bytes `$00`–`$1F` | Shows the name as it is | Shows it as it is [Verified] |
 
-Corrupt `FINDER.DAT` records are not diagnosed: the Mac uses them as they are [Code], and so does ClassicMac, except
-for the free-record rules of 10.4.
-
 ---
 
-## 17. Not covered
+## 11. Not covered
 
-- Writing FAT volumes (section 15 describes what File Exchange writes, for reference).
-- Extended partitions, logical drives, GUID partition tables and hidden partition types (`$11`, `$14`, `$16`, `$1B`,
-  `$1C`, `$1E`).
-- FAT32 FSInfo, the backup boot sector, and active-FAT selection by `BPB_ExtFlags` (6.2).
-- The locked state from DOS attributes and the `'scut'`/`'dosa'` alias (11.2); backup dates (11.3); folder Finder
-  info (11.6).
-- Open on the Mac side, to be checked on a running Mac OS 9.0: a file with no record on a volume the Mac sees as
-  locked (an image write-protected in the emulator), and with "save info" off (11.2).
+- Writing FAT volumes ([pc-exchange.md §5](pc-exchange.md#5-what-file-exchange-writes) describes what File Exchange writes, for reference).
+- FAT32 FSInfo, the backup boot sector, and active-FAT selection by `BPB_ExtFlags` (§5.2).
 - ProDOS volumes, which File Exchange also mounts with ProDOS's own extended files, and ISO 9660
-  ([ISO9660.md](ISO9660.md)).
-- PC Exchange 2.x (Mac OS 7.5–8.x), not available for tracing; its creation-date rule is unknown.
+  ([iso9660.md](iso9660.md)).

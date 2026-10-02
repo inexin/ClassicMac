@@ -35,9 +35,9 @@ namespace ClassicMac.Resources.Decoders.Interface
 
     /// <summary>
     /// Draws dialogs and alerts as Mac OS 9.0 with Appearance 1.1.1 and the Platinum theme draws them
-    /// (docs/formats/INTERFACE.md §12): the window's frame for its definition, the content colour, then each item, all
-    /// through a <see cref="QuickDrawPort"/>. Frames and controls are the theme's pixels; text is drawn with the fonts
-    /// given (the system font is Charcoal 12), so it matches only when they are the Mac's.
+    /// (docs/formats/resources/windows-dialogs.md §8): the window's frame for its definition, the content colour, then
+    /// each item, all through a <see cref="QuickDrawPort"/>. Frames and controls are the theme's pixels; text is drawn
+    /// with the fonts given (the system font is Charcoal 12), so it matches only when they are the Mac's.
     /// </summary>
     public static class DialogRenderer
     {

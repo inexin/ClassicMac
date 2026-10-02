@@ -14,9 +14,9 @@ References:
 
 - *Inside Macintosh* Volume IV, the Resource Manager chapter (ROM resources, from the 128K ROM on) and Volume V.
 - *Inside Macintosh: Memory*, the Memory Manager chapter (the 32-bit block header).
-- Haruhiko Okumura, `lzss.c` (1989), the LZSS coder the "Mac OS ROM" file uses ([Author] in section 6).
-- Shared conventions and source tags: [README.md](README.md). Resource forks and attributes:
-  [RESOURCE-FORK.md](RESOURCE-FORK.md). How the unwrapper chooses readers: [CONTAINERS.md](CONTAINERS.md) section 7.
+- Haruhiko Okumura, `lzss.c` (1989), the LZSS coder the "Mac OS ROM" file uses ([Author] in §6).
+- Shared conventions and source tags: [README.md](../README.md). Resource forks and attributes:
+  [resource-fork.md](../resources/resource-fork.md). How the unwrapper chooses readers: [unwrapping.md §3](../containers/unwrapping.md#3-unwrapping-nested-containers).
 
 Contents
 
@@ -33,15 +33,15 @@ Contents
 
 ## 1. Conventions
 
-The conventions of [README.md](README.md) hold. In this document:
+The conventions of [README.md](../README.md) hold. In this document:
 
 - **[Code]** is the 68k code of the ROM with version `$077D` (the PowerPC ROM, as the "Mac OS ROM" file of Mac OS
   9.x expands it), traced in disassembly. The layout was also checked against that image's own data: every entry
-  walks, and the sizes come out exactly (section 3.3).
+  walks, and the sizes come out exactly (§3.3).
 - "ROMBase" is the address the ROM is mapped at; every offset in the table is from ROMBase, which is offset 0 of the
   image.
 - Older ROMs (the 128K ROM of the Mac Plus through the 68040 machines) also carry ROM resources [Doc: IM IV], but
-  whether their table has this layout is unverified. A reader that follows section 3's checks simply does not
+  whether their table has this layout is unverified. A reader that follows §3's checks simply does not
   recognise an image whose table is not plausible.
 
 ## 2. The ROM image
@@ -76,7 +76,7 @@ The entries form a linked list; an entry's "next" offset of 0 ends it. Each entr
 
 | Offset | Size | Type | Meaning |
 | --- | --- | --- | --- |
-| `+0` | *n* | bytes | combination field (*n* from the header's `+5`; section 4) |
+| `+0` | *n* | bytes | combination field (*n* from the header's `+5`; §4) |
 | `+n` | 4 | u32 | offset of the next entry, 0 for the last |
 | `+n+4` | 4 | u32 | offset of the resource's data |
 | `+n+8` | 4 | `OSType` | resource type |
@@ -148,7 +148,7 @@ ClassicMac lists **every** entry, whatever its combinations [ClassicMac]:
   as `rom.duplicate` (Warning), with both entries' combinations. (A resource fork holds one resource per type and ID;
   renaming the others would invent IDs the ROM never had.)
 
-The unwrapper tries the ROM readers after the archives and before the disk images (CONTAINERS.md section 7.1): their
+The unwrapper tries the ROM readers after the archives and before the disk images ([unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order)): their
 tests are strict, and some disk-image tests are weak enough that ROM code could pass them.
 
 ## 6. The NewWorld "Mac OS ROM" file
@@ -182,7 +182,7 @@ The `$077D` file never reads a window byte before writing it, so the initial fil
 not change its output.
 
 ClassicMac yields one file named `ROM $vvvv` (from the expanded image's version word) whose data fork is the expanded
-image; the ROM image reader (section 5) then opens it. Expansion stops with an error past `MaxExpandedBytesPerInput`.
+image; the ROM image reader (§5) then opens it. Expansion stops with an error past `MaxExpandedBytesPerInput`.
 
 ## 7. Diagnostics
 
@@ -192,11 +192,11 @@ image; the ROM image reader (section 5) then opens it. Expansion stops with an e
 | `rom.duplicate` | Warning | a type and ID listed again (for other combinations) | keeps the first entry in list order |
 | `rom.bad-entry` | Error | an entry's data offset or block-header size falls outside the image | lists the resource with no data |
 
-An image whose table is not plausible (section 3.4) is not recognised and stays a plain file.
+An image whose table is not plausible (§3.4) is not recognised and stays a plain file.
 
 ## 8. Not covered
 
-- ROMs whose table does not follow section 3 (possibly the 68k ROMs before the PowerPC ROM; unverified): not
+- ROMs whose table does not follow §3 (possibly the 68k ROMs before the PowerPC ROM; unverified): not
   recognised.
 - 24-bit Memory Manager block headers (header length 8): not recognised.
 - The later "Mac OS ROM" files that carry "parcels" (`parcels-offset` instead of `lzss-offset` in the boot script):

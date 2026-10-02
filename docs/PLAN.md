@@ -266,7 +266,7 @@ DOCMaker's private resources (`pInf`, `Wndo`, `foot`, `conp`, …) have no publi
 from the reader code each document carries (disassembly), checked against real documents. Both readers draw a
 picture over the text at its anchor's line; the HTML puts it in the text flow instead (side by side for anchors on one
 line, the blank lines left for it dropped), since a browser's line breaks differ from the Mac's
-([formats/DOCUMENTS.md](formats/DOCUMENTS.md) §6.2).
+([html.md §2](formats/output/html.md#2-pictures-reflowed)).
 
 App-specific types (a game's data records, an application's private resources) plug in as custom decoders
 registered by the application.
@@ -434,7 +434,8 @@ Dialog Manager draws them, icons scaled with CopyBits, `cicn` masks, cursors and
 later QuickDraw GX or 3DMF work reusing regions and colour. Exposing the renderer's drawing API (today internal and
 shaped around PICT playback) is part of the merge work. The specification is split the same way (done, 2026-09-29): QuickDraw.Pict's
 `PICT-FORMAT.md` became `docs/formats/PICT.md` (opcodes, operands, play state) and `docs/formats/QUICKDRAW.md` (the
-drawing rules), with `QUICKTIME.md`, `MACPAINT.md` and `ICONS.md` beside them, one spec per format.
+drawing rules), with `QUICKTIME.md`, `MACPAINT.md` and `ICONS.md` beside them, one spec per format (since 2026-10-02 in
+`docs/formats/graphics/` and `docs/formats/resources/`, with icons, icon families, cursors and patterns one file each).
 
 **Where icons live (settled by this layering):** icons, cursors and patterns are resources, so their decoders go in
 `ClassicMac.Resources.Decoders`. Plain decoding (`ICN#`, `icl8`, `cicn`, …) needs only Graphics (colour tables,
@@ -498,7 +499,7 @@ stereo); playback stops when the selection changes. **Icons (built):** an icon r
 3. **Writing disk images:** add, replace and delete files in HFS images, with type/creator, dates and both forks.
    Archives (StuffIt, Compact Pro) stay read-only.
 
-**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** **built** (2026-09-29): the library (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified; [formats/CONTAINERS.md](formats/CONTAINERS.md) §6.5) and the app (Edit and Resource menus, Save/Save As/Revert, prompts for unsaved edits). Hex editing is a dialog (the bytes as editable hex) for now; editing in the hex view itself is later.
+**Editor I design (confirmed 2026-09-29: `.orig` once per file, MacBinary saved as III, Ctrl+S Save and Ctrl+E Save Resource As):** **built** (2026-09-29): the library (`ClassicMac.Resources.Editing`: the edits, `EditSession`, the rules, fork comparison; `ClassicMac.Files.Editing.ForkSaver`: saving back and Save As, verified; [writing.md §1](formats/containers/writing.md#1-saving-edited-resources-back)) and the app (Edit and Resource menus, Save/Save As/Revert, prompts for unsaved edits). Hex editing is a dialog (the bytes as editable hex) for now; editing in the hex view itself is later.
 
 - **Edits live in the library.** `ClassicMac.Resources.Editing`: each edit is a command on a `ResourceFork` that can be
   applied and undone (add, delete, duplicate, rename, renumber, set attributes, set data, set the fork's attributes), and
@@ -534,9 +535,9 @@ Apple's documentation decides first; where it is silent or ambiguous, the answer
 code that handles the format (the Resource Manager, Sound Manager, Icon Utilities, HFS) — never from another
 implementation's guess. A rule fitted to real data instead is marked as such.
 
-**Format documentation:** `docs/formats/` holds an implementer's specification per format family (resource forks,
-containers, host folders, HFS/MFS, disk images, FAT, ISO 9660, sound, text, the export manifest), each rule tagged
-with its source ([Doc], [Code], [Verified], [Author], [Fitted]). They are written in our own words, never cite the
+**Format documentation:** `docs/formats/` holds an implementer's specification per format, one file each in a category
+folder (`containers/`, `archives/`, `disk-images/`, `file-systems/`, `resources/`, `graphics/`, `codecs/`, `output/`;
+decided 2026-10-02, authoring rules in `docs/formats/CLAUDE.md`), each rule tagged with its source ([Doc], [Code], [Verified], [Author], [Fitted]). They are written in our own words, never cite the
 private harness, and change in the same commit as the behaviour they describe.
 
 The Resource Manager model is the native Mac OS 9 one (plus the 68k ROM where selected) without the trap patches that
@@ -604,7 +605,7 @@ They change what running applications see, not what a file contains.
   (optional). No UDIF samples yet: Disk Copy 6.5b13 offers UDIF only for devices (its hidden debug menu, Option at
   launch, has UDIF test items; its conversion fails on OS 9.0); they need OS 9.1–9.2.2, real 2000–2002 `.dmg` files
   or `hdiutil`. (Disk Copy cannot mount images on SheepShaver's shared volume, -8812.)
-- **UDIF (built; `docs/formats/DISK-IMAGES.md` §12):** Disk Copy 6.5b13's read-only, compressed and "entire device"
+- **UDIF (built; `docs/formats/disk-images/udif.md`):** Disk Copy 6.5b13's read-only, compressed and "entire device"
   images decode to their source device exactly, every checksum matching; Mac OS X's XML-plist images are read as
   dmg2img describes them, tested on synthetic images (no OS X-made `.dmg` in the corpus yet). Runs: zeros, raw, ADC,
   zlib, bzip2 (our own decoder); LZFSE reads as zeros with an error; segmented and encrypted images are refused.
@@ -751,7 +752,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically). The classic HFS reader also
    reports damaged B-tree headers and node maps, out-of-order or duplicate keys and IDs, and malformed or misplaced
-   extents-overflow records as diagnostics while reading on ([formats/HFS-MFS.md](formats/HFS-MFS.md) §6, §8, §12).
+   extents-overflow records as diagnostics while reading on ([hfs.md §4](formats/file-systems/hfs.md#4-hfs-b-trees), [§6](formats/file-systems/hfs.md#6-the-extents-overflow-file), [§10](formats/file-systems/hfs.md#10-diagnostics)).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
@@ -760,17 +761,17 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    and the corpus (Realmz, the Divinity manual, the harness runs: 321 inputs, 13,890 resources) exports with no decoder
    failure, pinned by a committed baseline. DOCMaker was deferred at the exit and has since been built: DOCMaker
    and SimpleText documents to HTML, in `extract`, the `convert` command and the viewer
-   ([formats/DOCUMENTS.md](formats/DOCUMENTS.md)).
+   ([documents.md](formats/resources/documents.md), [html.md](formats/output/html.md)).
 4. **Viewer app** — read-only: browse disk images, files and resources with previews and export; grows with later
    decoders. First version built (browse, details, diagnostics, previews, hex, export, drag-out).
 5. **Decoders II** — UI resources to JSON and dialog previews, then fonts; palettes and Finder resources; `pack`.
    *Exit:* extract → `pack` is byte-identical for unchanged resources. **Built:** UI resources and their colour and
-   extension resources to JSON with dialog, alert and menu previews ([formats/INTERFACE.md](formats/INTERFACE.md)),
+   extension resources to JSON with dialog, alert and menu previews ([formats/README.md](formats/README.md#resources): menus, windows and dialogs, dialog items, controls),
    palettes, Finder resources, and `pack` with MacBinary III, BinHex 4.0 and AppleSingle writers; the exit check passes
    on the whole corpus (the corpus test packs every export back); fonts through the new `ClassicMac.Graphics.Fonts`
-   ([formats/FONTS.md](formats/FONTS.md)).
+   ([bitmap-fonts.md](formats/resources/bitmap-fonts.md), [font-families.md](formats/resources/font-families.md), [outline-fonts.md](formats/resources/outline-fonts.md)).
 6. **Editor I** — resource-level edits and saving back into forks and single-file containers. **Built** (2026-09-29).
-7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders). **Built** (2026-09-29): the Edit tab's forms for `STR `, `STR#`, `TEXT` (its `styl` kept in step), `vers` and the UI templates (`DLOG`, `DITL`, `ALRT`, `MENU`, `WIND`, `CNTL`, with the dialog or menu preview redrawn as the form changes), applied as undoable edits; and import (Resource ▸ Import Image or Sound): an image (PNG, JPEG, BMP, GIF, through Avalonia) becomes a `PICT`, `cicn`, icon (`ICON`, `ICN#`, `icl4`/`icl8`, the small and mini icons, or a whole icon family) or cursor (`CURS`, `crsr`), a WAV file a `snd ` (`ImageImport`, `SoundImport`; [formats/ICONS.md](formats/ICONS.md), [formats/PICT.md](formats/PICT.md) §9, [formats/SOUND.md](formats/SOUND.md) §12), replacing the data of a resource of that type and ID after asking. **Templates** (2026-09-29): a resource with no form of its own is edited through a `TMPL` found by name in its own file or any other open file (so a user's copy of ResEdit supplies ResEdit's templates; ClassicMac ships none; a check box shows a resource that has a form of its own through its `TMPL` too), read and written as ResEdit 2.1.3's template editor does ([formats/TEMPLATES.md](formats/TEMPLATES.md); all 471 templated resources in ResEdit's own fork read and write back byte for byte).
+7. **Editor II** — typed editors and PNG/WAV import (image and sound encoders). **Built** (2026-09-29): the Edit tab's forms for `STR `, `STR#`, `TEXT` (its `styl` kept in step), `vers` and the UI templates (`DLOG`, `DITL`, `ALRT`, `MENU`, `WIND`, `CNTL`, with the dialog or menu preview redrawn as the form changes), applied as undoable edits; and import (Resource ▸ Import Image or Sound): an image (PNG, JPEG, BMP, GIF, through Avalonia) becomes a `PICT`, `cicn`, icon (`ICON`, `ICN#`, `icl4`/`icl8`, the small and mini icons, or a whole icon family) or cursor (`CURS`, `crsr`), a WAV file a `snd ` (`ImageImport`, `SoundImport`; [icons.md](formats/resources/icons.md), [pict.md §9](formats/graphics/pict.md#9-writing-pictures), [sound.md §9](formats/resources/sound.md#9-writing-sounds)), replacing the data of a resource of that type and ID after asking. **Templates** (2026-09-29): a resource with no form of its own is edited through a `TMPL` found by name in its own file or any other open file (so a user's copy of ResEdit supplies ResEdit's templates; ClassicMac ships none; a check box shows a resource that has a form of its own through its `TMPL` too), read and written as ResEdit 2.1.3's template editor does ([templates.md](formats/resources/templates.md); all 471 templated resources in ResEdit's own fork read and write back byte for byte).
 8. **Editor III** — writing HFS disk images. Build a verified HFS volume writer and connect it to the editor, preserving
    the other fork and Finder metadata when a file is edited. Work in these increments:
    - First, replace the data or resource fork of an existing file in a plain HFS volume. Read the original
@@ -802,7 +803,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
      JotaRandom/hfsutils, with exported contents compared byte for byte.
    *Exit:* edit, save, reopen and compare the target volume; verify both forks, Finder info, dates, folder paths and
    counts, then confirm unrelated files are byte-identical at the logical-file level. Source images remain untouched
-   on errors. Update [formats/HFS-MFS.md](formats/HFS-MFS.md) with each implemented write rule.
+   on errors. Update [hfs.md](formats/file-systems/hfs.md) with each implemented write rule.
 9. **Merge** — QuickDraw.Pict moves into the ClassicMac repo, split into the target layering (Graphics, QuickTime,
    MacPaint, the QuickDraw renderer with a public drawing API, the PICT format, one ImageSharp and one SkiaSharp
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
@@ -812,7 +813,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **HFS+ and archives** — read-only: HFS+ and HFSX volumes (also inside an HFS wrapper) in
     `ClassicMac.Files.Hfs`, and the classic archive formats in `ClassicMac.Files.Archives`. The rules each reader follows
-    are in [formats/HFS-MFS.md](formats/HFS-MFS.md#11-hfs-plus) §11 and [formats/ARCHIVES.md](formats/ARCHIVES.md);
+    are in [hfs-plus.md](formats/file-systems/hfs-plus.md) and the [archives documents](formats/README.md#archives);
     this entry tracks only what is built and what is verified. "Fitted" means built from published descriptions or
     other implementations and hand-built vectors, without an archive made by the original application.
 
@@ -829,7 +830,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
     Other segmented archive formats remain, and anything from row 5 of Inputs is built only on request.
     *Exit:* every format in the table reads its original-application fixtures with both forks and Finder info byte for
-    byte, a method still without one is marked fitted in [formats/ARCHIVES.md](formats/ARCHIVES.md), the journaled
+    byte, a method still without one is marked fitted in its [archive document](formats/README.md#archives), the journaled
     HFS+ image lists and reads, and the corpus unpack baseline holds. **Passed 2026-10-01:** the Files tests with every
     original-app fixture, every remaining method marked **[Fitted]** or **[Reference]**, the `nps-2009-hfsjtest1` image
     (SHA-256 pinned), and the corpus baseline over the Realmz, harness and `.rsrc` corpora. The table's Remaining column
@@ -889,7 +890,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager): all
   14 types load; PlotIconID draws every family member with 0 mismatched pixels at depths 1–32 (2026-10-02).
 - [x] **Real Dialog Manager previews** for `DLOG`/`ALRT`: drawn as Mac OS 9.0 with Appearance (Platinum) draws them,
-  every non-text pixel matching the captures (INTERFACE.md §12.1; 2026-10-02).
+  every non-text pixel matching the captures ([windows-dialogs.md §8.1](formats/resources/windows-dialogs.md#81-dialogs-and-alerts); 2026-10-02).
 - [x] **8-bit icon masks in icon suites** (Mac OS 9's CopyMask through an 8-bit mask in `IconSuite.Plot`), from a Mac OS 9
   oracle run (2026-10-02).
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
@@ -900,9 +901,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   installer, PackIt III a System 6/7 68k emulator (it does not run on Mac OS 9).
 - [x] **Archive bugs from the samples** (2026-10-02): LHA `-lh1-` (position code and tree), StuffIt method 15's last
   symbol, DiskDoubler split files (`SPLT`), and `list` paths through single-file wrappers.
-- [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] (DISK-IMAGES.md §6).
+- [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] ([raw-images.md](formats/disk-images/raw-images.md)).
 - [ ] **PCE MAR** input (Inputs, priority 3). Blocked: no sample, and its layout is published only in GPL source.
-- [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files (ROM.md; 68k ROMs
+- [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files ([rom.md](formats/disk-images/rom.md); 68k ROMs
   unverified).
 - [x] **Fork repair beyond `fork.map-recovered`:** not needed: no corpus fork reports a `fork.*` diagnostic
   (checked 2026-10-02); reopen if one does.

@@ -2,19 +2,19 @@
 
 This document specifies how QuickDraw draws, completely enough to reproduce it pixel for pixel: fixed-point
 arithmetic, how shapes become pixels, patterns and transfer modes, CopyBits, bitmap text and the Font Manager, and
-drawing on indexed and 16-bit screens. Pictures ([PICT.md](PICT.md)) are recordings of these calls, and
+drawing on indexed and 16-bit screens. Pictures ([pict.md](pict.md)) are recordings of these calls, and
 ClassicMac's `QuickDrawPort` makes them directly; both draw by these
 rules, implemented in `ClassicMac.Graphics.QuickDraw`.
 
 There are two reference implementations, and they differ in details:
 
-- **Mac OS 9** (9.0; see [README.md](README.md#reference-builds)) replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
+- **Mac OS 9** (9.0; see [README.md](../README.md#reference-builds)) replaced most of QuickDraw (DrawPicture, CopyBits, the shape procedures, text and the Font Manager)
   with a native PowerPC rewrite. This is what current Macs-in-emulation (SheepShaver, and anything running Mac OS 9)
   show, and it is the **default** of ClassicMac.
 - **The Macintosh ROM** (Mac OS ROM 1.6, `$077D`) holds the last Apple revision of the classic 68k QuickDraw, which
   every Mac before Mac OS 9 used.
 
-Sections 2–8 describe the ROM behaviour, marked **ROM** where it is surprising. Section 9 lists every point where
+§§2–8 describe the ROM behaviour, marked **ROM** where it is surprising. §9 lists every point where
 Mac OS 9 differs.
 
 Contents
@@ -427,7 +427,7 @@ polygons, lines; PatExpand) [Code]. For pixel (x, y) in local coordinates:
 - **Pixel patterns (ROM):** `((x + patAlign.h) mod w, y mod h)`. patAlign.v is not applied.
 
 So SetOrigin (§3.4) shifts patterns on the screen. patAlign itself changes only in InitGraf, DrawPicture (saved,
-zeroed and restored) and the ROM's Origin opcode ([PICT.md](PICT.md) §6.4); PortChanged does nothing [Code].
+zeroed and restored) and the ROM's Origin opcode ([pict.md §6.4](pict.md#64-origin)); PortChanged does nothing [Code].
 
 ---
 
@@ -535,7 +535,7 @@ by rendering an outline font at the same position.
 ### 7.1 Font resources
 
 **`FONT` / `NFNT`** (a bitmap strike; both have the same layout). The two QuickDraws read three fields differently,
-each marked below; [FONTS.md](FONTS.md) specifies the resource in full.
+each marked below; [bitmap-fonts.md](../resources/bitmap-fonts.md) specifies the resource in full.
 
 | Offset | Type | Field |
 |---|---|---|
@@ -622,10 +622,10 @@ of old-style fonts.
 
 **Inputs:**
 
-- family (TxFont, after font-name mapping, [PICT.md](PICT.md) §7);
+- family (TxFont, after font-name mapping, [pict.md §7](pict.md#7-text-opcodes));
 - size (TxSize; 0 means 12);
 - face (TxFace);
-- the text ratio numer/denom ([PICT.md](PICT.md) §7);
+- the text ratio numer/denom ([pict.md §7](pict.md#7-text-opcodes));
 - the space extra;
 - the fractional-widths and scaling-disabled flags (glyphState).
 
@@ -764,7 +764,7 @@ Then, for all three sources:
 ### 7.5 Drawing text (DrText, ROM)
 
 **Input:** the pen at (h, v) plus a fraction `frac` (16 bits), the text, the Font Manager output, the mode, and the
-character extra `cx` (Fixed, [PICT.md](PICT.md) §7).
+character extra `cx` (Fixed, [pict.md §7](pict.md#7-text-opcodes)).
 
 **1. Character extra in strike pixels** (if non-zero):
 
@@ -943,7 +943,7 @@ The standard `clut` 4 and 8 have no hidden colours at resolution 4.
 
 - **Fore and back:**
   - fgI = Color2Index(fore) and bkI = Color2Index(back), from the exact 16-bit colours. The classic `FgColor`/`BkColor`
-    constants map to the QDColors table ([PICT.md](PICT.md) §4.7).
+    constants map to the QDColors table ([pict.md §4.7](pict.md#47-classic-colour-constants-fgcolor--bkcolor)).
   - On 1- and 2-bit screens, if fgI = bkI while the colours differ, fgI = Color2Index(complement of fore). For example,
     yellow on white draws black on a 1-bit screen.
 - **Hilite:** hiI = Color2Index(hilite). If that equals bkI, use Color2Index of the complement instead.
@@ -1066,7 +1066,7 @@ truncates.
 
 ## 9. Mac OS 9 differences
 
-Mac OS 9's native QuickDraw is a rewrite, not a port. Where it differs from sections 2–8 and the picture rules of [PICT.md](PICT.md), a picture shown on Mac OS 9
+Mac OS 9's native QuickDraw is a rewrite, not a port. Where it differs from §§2–8 and the picture rules of [pict.md](pict.md), a picture shown on Mac OS 9
 follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul and FixRatio.
 
 ### 9.1 Bitmaps
@@ -1192,7 +1192,7 @@ follows the rules below. It still uses the ROM's MapPt, MapRect, ScalePt, FixMul
   in a FOND the association's style high byte is the depth code):
   - At a chosen size and style, the last association of the same size and low style byte with depth code 1–4 is
     used instead of the plain strike.
-  - Colours: the `fctb` with the NFNT's id (a ColorTable, [PICT.md](PICT.md) §4.6), else the standard `clut` of the strike's depth.
+  - Colours: the `fctb` with the NFNT's id (a ColorTable, [pict.md §4.6](pict.md#46-colortable)), else the standard `clut` of the strike's depth.
   - Each glyph is drawn on its own with **opaque srcCopy**, whatever the text mode and style: its whole box
     (image width × font rect height, top at `pen.v − ascent`) is copied from the strike through the colours, clipped.
   - Glyph x = `HiWord(penFixed + scaled) + kernMax + offset`, where penFixed = `(pen.h << 16) | fraction`, `scaled`

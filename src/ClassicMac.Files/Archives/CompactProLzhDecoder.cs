@@ -4,7 +4,8 @@ using System.IO;
 namespace ClassicMac.Files.Archives;
 
 /// <summary>Decodes a Compact Pro LZH+RLE fork.</summary>
-/// <remarks>The bitstream and window rules are fitted against the independent format description in ARCHIVES.md.</remarks>
+/// <remarks>The bitstream and window rules are fitted against the independent format description in
+/// docs/formats/archives/compact-pro.md.</remarks>
 internal static class CompactProLzhDecoder
 {
     private const int WindowSize = 0x2000;

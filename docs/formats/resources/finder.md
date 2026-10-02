@@ -3,7 +3,7 @@
 This document describes the resources an application gives the Finder and the Process Manager: its bundle
 (`'BNDL'`), file references (`'FREF'`) and size resource (`'SIZE'`), completely enough to write a reader without
 reading ClassicMac's code, and it specifies the JSON ClassicMac writes for them. Version resources (`'vers'`) are in
-[TEXT.md](TEXT.md) §8; icons in [ICONS.md](ICONS.md).
+[version.md](version.md); icons in [icons.md](icons.md).
 
 References:
 
@@ -24,7 +24,7 @@ Contents
 
 ## 1. Conventions
 
-The shared conventions of [README.md](README.md) hold. Tags are those of [README.md](README.md); **[ClassicMac]**
+The shared conventions of [README.md](../README.md) hold. Tags are those of [README.md](../README.md); **[ClassicMac]**
 marks ClassicMac's own choices.
 
 ---

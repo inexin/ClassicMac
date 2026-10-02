@@ -8,8 +8,8 @@ Basilisk II / SheepShaver shared folders, AppleDouble companion files, macOS nam
 `FINDER.DAT` data PC Exchange and File Exchange kept on DOS disks. It then specifies how ClassicMac turns Mac names
 into host names and back, and what `unpack` writes.
 
-The FAT volume itself (directory entries, VFAT long names, clusters) is in [FAT.md](FAT.md); the AppleDouble header
-format in full is in [CONTAINERS.md](CONTAINERS.md). This document covers what lies on top of them.
+The FAT volume itself (directory entries, VFAT long names, clusters) is in [fat.md](../file-systems/fat.md); the AppleDouble header
+format in full is in [applesingle-appledouble.md](applesingle-appledouble.md). This document covers what lies on top of them.
 
 References:
 
@@ -33,21 +33,18 @@ Contents
 4. [Basilisk II and SheepShaver shared folders](#4-basilisk-ii-and-sheepshaver-shared-folders)
 5. [AppleDouble companion files](#5-appledouble-companion-files)
 6. [macOS named forks](#6-macos-named-forks)
-7. [PC Exchange and File Exchange folders](#7-pc-exchange-and-file-exchange-folders)
-8. [File Exchange names](#8-file-exchange-names)
-9. [The extension map](#9-the-extension-map)
-10. [Host names](#10-host-names)
-11. [Reading a host file](#11-reading-a-host-file)
-12. [Writing a Mac file to the host](#12-writing-a-mac-file-to-the-host)
-13. [What unpack writes](#13-what-unpack-writes)
-14. [Diagnostics](#14-diagnostics)
-15. [Not covered](#15-not-covered)
+7. [Host names](#7-host-names)
+8. [Reading a host file](#8-reading-a-host-file)
+9. [Writing a Mac file to the host](#9-writing-a-mac-file-to-the-host)
+10. [What unpack writes](#10-what-unpack-writes)
+11. [Diagnostics](#11-diagnostics)
+12. [Not covered](#12-not-covered)
 
 ---
 
 ## 1. Conventions
 
-The conventions and source tags of [README.md](README.md) apply: big-endian values, offsets in hex, Mac dates as
+The conventions and source tags of [README.md](../README.md) apply: big-endian values, offsets in hex, Mac dates as
 `u32` seconds since 1904 in local time, and **[Doc]**, **[Code]**, **[Verified]**, **[Author]** and **[Fitted]** on
 every rule. In this document:
 
@@ -57,7 +54,7 @@ every rule. In this document:
 - **[ClassicMac]** marks a rule that is ClassicMac's own choice: how it picks among layouts, the names it makes and
   what `unpack` writes. It claims nothing about what a Mac did; it defines output that only ClassicMac specifies.
 - **[Fitted?]** marks a rule whose source is uncertain.
-- DOS dates and times (section 7.6) are **little-endian**, as everything on a FAT volume is. Everything else is
+- DOS dates and times ([pc-exchange.md §6.6](../file-systems/pc-exchange.md#66-dates)) are **little-endian**, as everything on a FAT volume is. Everything else is
   big-endian.
 - "Host" is the computer ClassicMac runs on; a "host name" is a file name on its disk (UTF-16 on Windows and .NET).
 
@@ -119,7 +116,7 @@ For a file `name` in host folder `F` [Author] [Verified]:
 | --- | --- |
 | `F/name` | the data fork, raw. A file with an empty data fork is an empty host file. |
 | `F/.rsrc/name` | the resource fork, raw, no header. Missing means an empty fork. |
-| `F/.finf/name` | 32 bytes of Finder info (section 3). |
+| `F/.finf/name` | 32 bytes of Finder info (§3). |
 
 - The companions carry exactly the data file's host name [Verified].
 - A folder's `DInfo` and `DXInfo` (32 bytes) are in `.finf/<folder name>` in the **parent** folder, not inside the
@@ -128,7 +125,7 @@ For a file `name` in host folder `F` [Author] [Verified]:
 - A file with no `.finf` gets a type guessed by the emulator from its name ending: a `.txt` file shows as
   `TEXT`/`ttxt` [Verified]. ClassicMac leaves type and creator zero in that case [ClassicMac].
 - A missing `.rsrc` file reads as an empty resource fork in the emulator [Verified]; ClassicMac writes none for an
-  empty fork (section 12) [ClassicMac].
+  empty fork (§9) [ClassicMac].
 - Resource forks written this way open normally through the Resource Manager in the emulator [Verified].
 
 ### 4.2 Dates
@@ -141,7 +138,7 @@ file's host times [Verified].
 - A creation date before 1970 does not survive: 1904-01-02 read back as 2036-02-07 06:28:16 (a negative `time_t`
   taken as unsigned) [Verified].
 - ClassicMac writes the data file's creation and modification times from the Mac dates, converted with the rules
-  for that date (section 12) [ClassicMac]. It does not read the host times back as Mac dates for this layout: a file
+  for that date (§9) [ClassicMac]. It does not read the host times back as Mac dates for this layout: a file
   read from a Basilisk II folder has no dates [ClassicMac].
 
 ### 4.3 Names: SheepShaver on Windows
@@ -170,7 +167,7 @@ The Mac name and the host name are the same bytes [Verified]:
 - Host names written with `%2E`, `%20` or a device name escaped as `%XX` decode back to the forbidden name and the
   file is then missing (`trail%2E`, `space%20`) or reads as an empty device (`co%6E.txt`, `COM%31`: both forks
   0 bytes, location −1,−1, date 0, type `TEXT`/`ttxt` or `????`/`????`) [Verified]. A name the emulator cannot hold
-  therefore has no escape; it must be changed (section 10.2).
+  therefore has no escape; it must be changed (§7.2).
 - Bytes Windows-1252 leaves undefined ($81, $8D, $8F, $90, $9D) were not tested in the emulator. ClassicMac
   escapes them as `%XX`, expecting the emulator to decode them like any other escape [Fitted?].
 - Other builds (Linux, macOS hosts) may convert names differently, for example to UTF-8; only the Windows build
@@ -182,7 +179,7 @@ The Mac name and the host name are the same bytes [Verified]:
 
 An AppleDouble header file holds everything of a Mac file except its data fork, which is the plain file beside it.
 The header format (magic `$00051607`, versions 1 and 2, entry table) is Apple's [Doc] and is specified in
-[CONTAINERS.md](CONTAINERS.md). No Mac OS 7.1–9 file-system code reads or writes AppleSingle or AppleDouble; on
+[applesingle-appledouble.md](applesingle-appledouble.md). No Mac OS 7.1–9 file-system code reads or writes AppleSingle or AppleDouble; on
 Mac OS 9 only mail clients and the StuffIt Engine handle them [Code].
 
 ### 5.1 Where the header file is
@@ -197,7 +194,7 @@ Mac OS 9 only mail clients and the StuffIt Engine handle them [Code].
 - `name.rsrc` is taken only when it is a valid AppleDouble header, silently otherwise, since plenty of `.rsrc` files
   are raw forks or other data [ClassicMac]. `._name` wins when both exist [ClassicMac].
 - The Mac name is the header's Real Name entry (ID 3); without one, the host name read as Mac OS Roman
-  (section 11.2) [ClassicMac].
+  (§8.2) [ClassicMac].
 - The data fork is always the host file. A Data Fork entry in the header (which AppleDouble should not have) is
   reported by the AppleDouble reader and then replaced by the host file [ClassicMac].
 - Version 2 File Dates Info (ID 8) holds signed seconds from 2000-01-01 00:00 **UTC**, `$80000000` for unknown
@@ -226,7 +223,7 @@ AppleDouble version 2 with four entries, the resource fork last so it can be str
 | +$4E+`n` | 4 | `i32` | modification date, the same way |
 | +$52+`n` | 4 | `i32` | backup date: always `$80000000` |
 | +$56+`n` | 4 | `i32` | access date: always `$80000000` |
-| +$5A+`n` | 32 | bytes | Finder info (section 3) |
+| +$5A+`n` | 32 | bytes | Finder info (§3) |
 | +$7A+`n` | … | bytes | the resource fork |
 
 An entry is 12 bytes: `u32` ID, `u32` offset from the start of the file, `u32` length [Doc].
@@ -249,255 +246,13 @@ resource fork but no type, creator or flags, and no dates [ClassicMac]. It never
 
 ---
 
-## 7. PC Exchange and File Exchange folders
-
-PC Exchange (System 7.1–Mac OS 8) and File Exchange (Mac OS 9) let the Mac use DOS disks. They keep what FAT cannot
-hold in two hidden items in **every directory**. The format is the same in PC Exchange 1.0.4 and File Exchange
-3.0.2 [Code]; PC Exchange 2.x was not examined, and the same record code at both ends of the range suggests it is the
-same [Fitted?]. No header or version number exists anywhere [Code].
-
-### 7.1 `RESOURCE.FRK`
-
-- A subdirectory named `RESOURCE.FRK` with the attributes hidden + directory ($12) [Code] [Verified].
-- It holds one file per data file that has a resource fork, under **the data file's 8.3 name**, containing the raw
-  fork with no header [Code] [Verified]. Its attributes are the data file's with archive ($20) added; its dates are
-  when it was written [Code].
-- It is created at the first resource-fork write; deleting the data file deletes the fork file; move and rename carry
-  it along; `RESOURCE.FRK` is removed when nothing else is left in its directory [Code].
-- A missing fork file means an empty resource fork [Code]. A fork file made by hand opens normally [Verified].
-
-### 7.2 `FINDER.DAT`
-
-A hidden file ($02; the archive bit, $22, appears after the Mac writes it) of 92-byte records, one per item of the
-directory that has one [Code] [Verified]. An item's record is in its **parent's** `FINDER.DAT` [Code].
-
-| Offset | Size | Type | Meaning |
-| --- | --- | --- | --- |
-| +$00 | 1 | `u8` | length of the Mac name, 0–31; **0 marks a free record** [Code] |
-| +$01 | 31 | bytes | the Mac name, Mac OS Roman. Bytes after the name are garbage [Code] [Verified] |
-| +$20 | 16 | `FInfo` | Finder info (`DInfo` for a folder), section 3 [Code] |
-| +$30 | 16 | `FXInfo` | extended Finder info (`DXInfo`) [Code] |
-| +$40 | 4 | `u32` | creation date, Mac seconds, local time; 0 when unset [Code] |
-| +$44 | 4 | `u32` | modification date, full precision (odd seconds kept) [Code] [Verified] |
-| +$48 | 4 | `u32` | backup date; written only when non-zero [Code] |
-| +$4C | 4 | `u32` | file number (catalog node ID): the volume's counter starts at `$7FFFFFFF` and counts **down** [Code] [Verified] |
-| +$50 | 11 | chars | the item's DOS 8.3 name, upper case, space-padded, no dot (`FANTAS~1EML`): **the lookup key** [Code] |
-| +$5B | 1 | — | unused; garbage [Code] |
-
-Other files [Code]:
-
-- The root directory's `FINDER.DAT` holds a record keyed by the volume label that keeps the volume's next file number
-  [Code] [Verified].
-- `FILEID.DAT`, in the root only and hidden, holds 64-byte records of file ID, parent directory ID and a Pascal name,
-  record 0 being a header (`$00010000`). Only `PBCreateFileIDRef` creates it [Code]. ClassicMac does not read it.
-- The Mac hides `FINDER.DAT`, `FILEID.DAT` and `RESOURCE.FRK` from listings **by name** as well as by the hidden
-  attribute [Code]. "Desktop" is a synthetic root entry [Code].
-- Mounting a FAT disk writable makes the Finder add `TheVolumeSettingsFolder` (with `DesktopPrinters DB`),
-  `Desktop Folder`, `Trash` and a hidden `DESKTOP` file with a resource fork [Verified].
-
-### 7.3 Packing and free records
-
-- Records are packed **floor(cluster size / 92) per cluster and never straddle a cluster**. The bytes between the
-  last record of a cluster and the cluster's end are undefined [Code] [Verified] (with 512-byte clusters, records
-  sit at 0, 92, …, 368, then 512).
-- A record is free when its name length is 0. Deleting an item clears the name and the DOS name; the file never
-  shrinks [Code].
-- A new record takes the first free slot, but **never offset 0** (a quirk), or is appended [Code].
-- Stray records with a garbage name and an empty DOS name appear; treat a record whose first DOS-name byte is 0 as
-  free [Verified].
-- Nothing is validated. A corrupt record is used as it stands [Code].
-- Parse only whole 92-byte slots before the end of the file. Cluster slack in `FINDER.DAT`, and in data files, can
-  hold stale copies of other records [Verified].
-
-**Cluster size.** The file does not record it. On a FAT volume the reader knows it (see [FAT.md](FAT.md)). For a
-`FINDER.DAT` found on the host, ClassicMac tries tight packing (every 92 bytes) and cluster sizes of 512 to 65,536
-bytes (powers of two), counts the used records under each, and keeps the size under which every used record is
-plausible — name length 1–31 and all eleven DOS-name bytes in $20–$7E — with the most used records; the smaller size
-wins a tie. If no size gives only plausible records, no records are read [Fitted].
-
-### 7.4 When records are made
-
-- Getting catalog information for an item with no file number creates a record, so **browsing a writable disk
-  creates records** [Code] [Verified]. Records are also made when the Mac name differs from the 8.3 name and
-  whenever Finder info is set [Code], but only while the volume's "save info" flag is set [Code].
-- A new record has type `TEXT`, creator `'dosa'`, flags 0 and `fdPutAway` 2 [Code] [Verified], and a file number
-  `$7FFFFFxx` from the counter, which counts down [Verified]. The mapped type (section 9) is not written back to it
-  [Verified]. Its dates are 0 in File Exchange 3.0.2 [Verified]; the code of both versions leaves them from
-  uninitialised memory [Code].
-- A record File Exchange created for a file that had a resource fork but no record got a **garbage Mac name**
-  [Verified]: its name routine gives up without filling its buffer when its directory search misses, and the record
-  takes its name from that uninitialised buffer [Code]. File Exchange shows such names as they are; see
-  [FAT.md](FAT.md) for the warning ClassicMac gives.
-- File Exchange creates a record and a VFAT long name for every file the Mac creates, even one whose name fits 8.3
-  [Verified].
-
-### 7.5 Finding an item's record
-
-- The Mac looks items up by the record's Mac name, then by the VFAT long name (whose checksum must match), then by
-  the 8.3 name [Code] [Verified]. Records are matched to directory entries by the 8.3 key at +$50, **byte for byte**
-  with no case folding; with duplicate keys the first in file order wins, for reading and writing, and free records
-  are skipped [Code]. Looked up by Mac name, a record matches ignoring case but not diacritical marks [Code].
-- On the host, the 8.3 name may not be visible. ClassicMac forms the key from the host name when it is a valid 8.3
-  name — a stem of 1–8 and an extension of 0–3 characters, all in $21–$7E, one dot at most — upper-cased and
-  space-padded to 8 + 3 (`FANTAS~1.EML` → `FANTAS~1EML`, `readme` → `README     `). Otherwise (a long host name)
-  it matches the record's Mac name against the host name, ignoring case [Fitted].
-- `RESOURCE.FRK` and `FINDER.DAT` are found whatever their case, as on FAT [ClassicMac]. The fork file is looked up
-  under the host name [ClassicMac].
-
-Advice from the traces [Verified]: trust a record's dates and file number more than its type, which can revert to
-an earlier value around a close; ignore records whose DOS key matches no directory entry.
-
-### 7.6 Dates
-
-DOS directory entries hold local time [Code], in two little-endian `u16` fields [Doc] (fatgen103):
-
-| Field | Bits | Meaning |
-| --- | --- | --- |
-| date | 15–9 | year − 1980 (0–127) |
-| date | 8–5 | month, 1–12 |
-| date | 4–0 | day, 1–31 |
-| time | 15–11 | hours, 0–23 |
-| time | 10–5 | minutes, 0–59 |
-| time | 4–0 | seconds / 2, 0–29 |
-
-- DOS keeps even seconds only: writing stores the exact date in the record and the 2-second-truncated date in the
-  directory entry ($B0000001 reads back as $B0000000) [Verified].
-- **Year wrap (File Exchange):** DOS years 2032–2107 read as 128 years earlier, 1904–1979, and Mac years 1904–1979
-  are written that way (Mac 1950 → DOS 2078; DOS 2040 reads as 1912) [Code] [Verified]. PC Exchange 1.0.4 has no
-  wrap; pre-1980 dates come out as garbage [Code].
-- File Exchange checks nothing: impossible fields roll over through `Date2Secs` arithmetic (month 13 is January of
-  the next year, day 0 the day before the 1st), a zero creation date shows as now and a zero modification date as
-  1979-12-01 [Code] [Verified]; see [FAT.md](FAT.md) section 9.2. ClassicMac's FAT reader does the same, except that
-  a zero creation date takes the record's +$40 [ClassicMac].
-
-Which date the Mac shows:
-
-| Date | File Exchange 3.0.2 | PC Exchange 1.0.4 |
-| --- | --- | --- |
-| Created | the DOS entry's creation fields ("now" if zero); the record's +$40 is written but never read [Code] [Verified] | the record's +$40, or 0 without a record; DOS entries carry no creation date for it [Code] |
-| Modified | the later of the DOS modification time and the record's +$44 [Code] [Verified] | the same [Code] |
-| Backup | the record's +$48 [Code] [Verified] | the record's +$48 [Code] |
-
-ClassicMac follows File Exchange: created from the DOS entry (the record's +$40 only when the entry has none),
-modified the later of the two; it keeps no backup date [ClassicMac]. For a `FINDER.DAT` folder on the host, the
-host file's creation and modification times stand for the DOS entry's: truncated to even seconds, and years from
-2032 moved back 128 [ClassicMac].
-
-### 7.7 Flags from DOS attributes
-
-- DOS hidden or system → the file is invisible (`$4000`) [Code]. The flag is ORed onto the stored Finder flags and
-  never cleared, so a record storing `$4000` keeps the file invisible after the PC clears hidden [Code]. ClassicMac
-  adds the invisible flag the same way [ClassicMac].
-- DOS read-only or system → the file is locked [Code]. ClassicMac does not carry a locked attribute [ClassicMac].
-- The archive attribute is ignored [Code].
-- Type and creator `'scut'`/`'dosa'` make the file an alias (File Exchange only); a `.lnk` file is not mapped to them
-  by the default map, and its contents are never translated [Code]. ClassicMac does not set the alias flag.
-
-### 7.8 Without a record
-
-File Exchange gives a file with no record the blank Finder info: `TEXT`/`'dosa'`, flags 0, and a put-away folder of
-2 (the root directory's ID, never read) [Code]. A `RESOURCE.FRK` fork plays no part in it: it only gives the fork's
-length [Code]. The extension map (section 9) applies only when a record exists; on a writable volume with "save
-info" on, the Mac creates the record before reading the Finder info, so the mapped type shows there [Code]
-[Verified], while on a locked or read-only volume, or with "save info" off, the file stays `TEXT`/`'dosa'`: the
-only mapping path needs a record [Code]. A volume the Mac sees as locked is not yet checked; an image read-only only
-on the host is not one (the Mac mounts it writable, makes records in its cache and maps through them), and "save
-info" off was not tested. See [FAT.md](FAT.md) section 11.2.
-
-ClassicMac gives the same placeholder with the DOS dates, on a FAT volume [ClassicMac] and in a host folder, where a
-file with a `RESOURCE.FRK` fork but no record gets the placeholder and the host file's times as its dates (section
-7.6). The extension map applies to such a file, as on a writable volume, on FAT volumes and in host folders alike
-[ClassicMac].
-
----
-
-## 8. File Exchange names
-
-ClassicMac does not write FAT volumes; the Mac-to-FAT rules are given for completeness and for writers.
-
-### 8.1 Creating a file: Mac name to FAT
-
-File Exchange 3.0.2, in order [Code] [Verified: 14 names, every 8.3 name exact]:
-
-1. A record in the directory with the same Mac name, ignoring case, refuses the create with −48 (`dupFNErr`).
-2. **Sanitise:** control characters, `" * / : < > ? \ |` and $7F become `_`; trailing dots and spaces are removed;
-   leading spaces stay. **The sanitised name replaces the Mac name** (`a/b` becomes `a_b`, `trail.` becomes `trail`).
-3. **Short name:** characters DOS does not allow, including every byte ≥ $80, become `_`; spaces are dropped;
-   letters are upper-cased. A name that does not fit 8.3 exactly is cut to 6 characters and `~1`, with the extension
-   cut to 3. On a collision the number grows and the `~` moves left. Device names are not checked.
-4. A `FINDER.DAT` record and a VFAT long name are always written. The long name is the Mac name converted from Mac OS
-   Roman to UTF-16, precomposed.
-
-| Mac name | 8.3 name | Mac name | 8.3 name |
-| --- | --- | --- | --- |
-| `Hello World` | `HELLOW~1` | `trail.` | `TRAIL` |
-| `a/b` | `A_B` | `12345678.1234` | `123456~1.123` |
-| `Résumé` | `R_SUM_~1` | `.profile` | `~1.PRO` |
-| `readme.txt` | `README.TXT` | `COM1` | `COM1` |
-| `a.b.c` | `AB~1.C` | `CON.txt` | `CON.TXT` |
-| `   lead` | `LEAD~1` | `ÄÖÜ ß` | `____~1` |
-| `™®©` | `___~1` | a 31-character name | `ABCDEF~1` |
-
-### 8.2 Reading a file with no record: long name to Mac name
-
-[Code] [Verified]:
-
-- The long name is converted as stored, with no Unicode normalization, to the system script's encoding (Mac OS
-  Roman on a Roman system) [Code]. The converter does not compose a decomposed name: a combining mark has no byte,
-  so the name takes the low-byte path below, and can hold a `$00` [Verified: `Cafe`+U+0301`.txt` shows as `Cafe`,
-  `$01`, `.txt`]. ClassicMac converts to Mac OS Roman, as stored, the same way [ClassicMac].
-- If **every** character has a Mac OS Roman byte, the Mac OS Roman bytes are the name, **`:` included**
-  (`a:b c.txt` shows with its colon).
-- If even one character has none, the whole name takes another path: each UTF-16 unit's **low byte**, with `:`
-  becoming `_` (`漢字 kanji.txt` shows as `"W kanji.txt`). File Exchange's own `_` fallback never takes effect.
-- A result over 31 bytes is shortened to exactly 31: the start of the name, `#`, three upper-case hex digits, and the
-  extension (`This is a very long Win#7C7.txt`).
-  - The extension is from the last `.` among the final six characters of the name; among the final `length − 2` for
-    names of 3–6 characters; none for shorter names.
-  - The start keeps `27 − extension length` characters (the extension counting its dot).
-  - The digits are the low 12 bits of a CRC-16 over the whole long name as stored (not normalized), as big-endian
-    UTF-16: polynomial `$1021`, initial value 0, no reflection, no final XOR (the UDF unique-name checksum).
-  - Both parts are converted the same way as the whole name would have been (Mac OS Roman, or low bytes).
-- With no long name, the 8.3 name is the Mac name, byte for byte: no case change and no code page conversion, the
-  stem cut at its first byte of `$20` or less (see [FAT.md](FAT.md) section 11.1).
-
----
-
-## 9. The extension map
-
-What File Exchange 3.0.2 does [Code] [Verified]:
-
-- Its per-volume extension table is **always empty**: at startup it moves the old PC Exchange `'dMap'` −4040 entries
-  into Internet Config and builds its table with a count of 0 [Code].
-- The only mapping is therefore Internet Config's map of name endings, applied **only when type and creator are
-  exactly `TEXT`/`'dosa'`** [Code] [Verified]. A stored type is never overridden (`APPTEST.TXT` stored as
-  `APPL`/`abcd` stays so) [Verified].
-- The ending is matched against the end of the Mac long name, ignoring case; the longest ending wins, the earlier
-  entry on a tie; the entries' flags are ignored [Code].
-- It needs the "map extensions" preference (Gestalt `'pcxg'` bit 3), on by default [Code].
-- Examples from the default map: `.txt` → `TEXT`/`ttxt`, `.bin` → `BINA`/`SITx`, `.jpg` → `JPEG`/`ogle`, `.gif` →
-  `GIFf`/`ogle`, `.doc` → `WDBN`/`MSWD` [Verified]; `.pdf` → `'PDF '`/`CARO`, `.sit` → `SITD`/`SITx` [Code].
-- **Only shown, rarely stored:** when a data fork is closed or flushed, File Exchange reads the Finder info (mapping
-  applied) and writes it back, so files that were opened keep the mapped type in `FINDER.DAT`; records created only by
-  browsing keep `TEXT`/`'dosa'` on disk [Code] [Verified].
-
-PC Exchange 1.0.4 uses only its own table, matched on the 3-character DOS extension, with the default `.TXT` →
-`TEXT`/`ttxt`. Its code applies the table only when a record exists and lets it override the stored type; this was
-not checked on a running system [Code].
-
-ClassicMac shows stored types. It applies a map only when the application supplies one (`ExtensionMap` in the read
-options), with File Exchange's matching rules; none ships with ClassicMac [ClassicMac]. The FAT reader matches the Mac
-name; the host-folder reader matches the host name [ClassicMac].
-
----
-
-## 10. Host names
+## 7. Host names
 
 ClassicMac makes host names from Mac names in two ways: a **portable** name valid on Windows, macOS and Linux, used
 for AppleDouble output and by `extract`, and **SheepShaver's** naming for Basilisk II folders. Both work on the Mac
 name's bytes.
 
-### 10.1 Portable names
+### 7.1 Portable names
 
 [ClassicMac], with the forbidden characters and device names from Microsoft's naming rules [Doc]:
 
@@ -507,7 +262,7 @@ name's bytes.
 3. A Windows device name — `CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, ignoring case, as the part
    before the first dot with trailing spaces ignored — gets the last character of that part escaped.
 4. An empty name is `%00`.
-5. The name is fitted to the length limit (section 10.3).
+5. The name is fitted to the length limit (§7.3).
 
 | Mac name | Host name | Mac name | Host name |
 | --- | --- | --- | --- |
@@ -516,13 +271,13 @@ name's bytes.
 | `Icon` + CR | `Icon%0D` | `Résumé ƒ` | `Résumé ƒ` |
 | `trail.` | `trail%2E` | `space ` | `space%20` |
 
-The escapes are one-way: a reader does not decode `%XX` in a portable name (section 11.2). AppleDouble output keeps
+The escapes are one-way: a reader does not decode `%XX` in a portable name (§8.2). AppleDouble output keeps
 the exact Mac name in its Real Name entry.
 
-### 10.2 SheepShaver names
+### 7.2 SheepShaver names
 
 For Basilisk II folders ClassicMac writes what SheepShaver on Windows would write, so the emulator reads the Mac
-name back, and changes only what it cannot hold [Verified] (section 4.3) [ClassicMac] (the replacements):
+name back, and changes only what it cannot hold [Verified] (§4.3) [ClassicMac] (the replacements):
 
 1. Each byte becomes the Windows-1252 character with the same value (bytes $00–$7F and $A0–$FF are the same code
    point; $80–$9F are Windows-1252's `€ ‚ ƒ „ … † ‡ ˆ ‰ Š ‹ Œ Ž ‘ ’ “ ” • – — ˜ ™ š › œ ž Ÿ`).
@@ -530,12 +285,12 @@ name back, and changes only what it cannot hold [Verified] (section 4.3) [Classi
    ($81, $8D, $8F, $90, $9D).
 3. `/`, `\` and `:` become `_`. No escape can be used: the emulator would decode it back to the character [Verified].
 4. Every trailing space or dot becomes `_` (`dots..` → `dots__`).
-5. A Windows device name (as in 10.1, checked after step 4) gets `_` appended to the part before the first dot
+5. A Windows device name (as in §7.1, checked after step 4) gets `_` appended to the part before the first dot
    (`COM1` → `COM1_`, `con.txt` → `con_.txt`). `CLOCK$` is not a device name for this purpose [Verified].
 6. An empty name is `_`.
-7. The name is fitted to the length limit (section 10.3).
+7. The name is fitted to the length limit (§7.3).
 
-Steps 3–6 change the name the Mac will see; `unpack` warns when they do (section 13.3).
+Steps 3–6 change the name the Mac will see; `unpack` warns when they do (§10.3).
 
 | Mac name | Host name | Same name on the Mac |
 | --- | --- | --- |
@@ -548,7 +303,7 @@ Steps 3–6 change the name the Mac will see; `unpack` warns when they do (secti
 | `trail.`, `space ` | `trail_`, `space_` | no |
 | `COM1`, `con.txt` | `COM1_`, `con_.txt` | no |
 
-### 10.3 Length
+### 7.3 Length
 
 [ClassicMac]: a name is limited to a number of UTF-16 characters (255 unless the caller gives less; never less
 than 8). When it is longer:
@@ -560,7 +315,7 @@ than 8). When it is longer:
 
 For example `aaaa…a?.sit` (40 `a`) with a limit of 20 is `aaaaaaaaaaaaaaaa.sit`.
 
-### 10.4 Distinct names
+### 7.4 Distinct names
 
 [ClassicMac]: within one output folder, names are kept distinct **ignoring case**, since Windows and macOS disks
 ignore it. A name already taken gets ` ~2`, ` ~3`, … before its extension (the text from the last dot, unless the dot
@@ -568,15 +323,15 @@ is first): `DUP.TXT`, `DUP ~2.TXT`, `dup ~3.txt`. The numbered name is not fitte
 
 ---
 
-## 11. Reading a host file
+## 8. Reading a host file
 
-### 11.1 Choosing the layout
+### 8.1 Choosing the layout
 
 ClassicMac reads a host file `F/name` with the first layout that applies [ClassicMac]:
 
 1. **PC Exchange:** `F` holds a `RESOURCE.FRK` folder or a `FINDER.DAT` file (any case), `name` is not `FINDER.DAT`,
-   and either `RESOURCE.FRK/name` exists or `FINDER.DAT` has a record for `name` (section 7.5). The record gives the
-   Mac name, Finder info and dates (section 7.6); the map applies if supplied (section 9); DOS hidden or system
+   and either `RESOURCE.FRK/name` exists or `FINDER.DAT` has a record for `name` ([pc-exchange.md §6.5](../file-systems/pc-exchange.md#65-finding-an-items-record)). The record gives the
+   Mac name, Finder info and dates ([pc-exchange.md §6.6](../file-systems/pc-exchange.md#66-dates)); the map applies if supplied ([pc-exchange.md §8](../file-systems/pc-exchange.md#8-the-extension-map)); DOS hidden or system
    makes it invisible.
 2. **Basilisk II:** `F/.rsrc/name` or `F/.finf/name` exists. A `.finf` that is not 32 bytes is reported
    (`host.finf-length`) and read as far as it goes.
@@ -588,21 +343,21 @@ ClassicMac reads a host file `F/name` with the first layout that applies [Classi
 When a format is split across several files, the other files of the folder are offered to it, each read the same
 way; `._` files are companions and are left out [ClassicMac].
 
-### 11.2 Mac names from host names
+### 8.2 Mac names from host names
 
 [ClassicMac]:
 
 - **Plain, AppleDouble without a Real Name, PC Exchange without a record:** each character becomes its Mac OS Roman
   byte (also accepting `¤` for $DB and the ohm sign U+2126 for $BD, from older mappings). `%XX` is **not** decoded.
 - **Basilisk II:** `%` followed by two hex digits (either case) is that byte [Verified]; any other character up to
-  U+00FF is the byte of the same value, and Windows-1252's characters for $80–$9F are those bytes (section 10.2).
+  U+00FF is the byte of the same value, and Windows-1252's characters for $80–$9F are those bytes (§7.2).
   A `%` not followed by two hex digits stays `%`.
 - A character with no byte becomes `?` (`host.name-unmappable`). A name over 255 bytes is cut to 255
   (`host.name-too-long`).
 
 ---
 
-## 12. Writing a Mac file to the host
+## 9. Writing a Mac file to the host
 
 `HostFiles.Write` puts one Mac file into a host folder in one of two layouts [ClassicMac]. The options are the layout
 (AppleDouble, the default, or Basilisk II), the longest path (200 characters), overwrite (off) and the time zone for
@@ -610,11 +365,11 @@ AppleDouble dates (the machine's).
 
 | Layout | Files written, in order |
 | --- | --- |
-| AppleDouble | `name` (the data fork), `._name` (section 5.2) |
-| Basilisk II | `name` (the data fork), `.rsrc/name` (only when the resource fork is non-empty), `.finf/name` (always: the 32 bytes of section 3) |
+| AppleDouble | `name` (the data fork), `._name` (§5.2) |
+| Basilisk II | `name` (the data fork), `.rsrc/name` (only when the resource fork is non-empty), `.finf/name` (always: the 32 bytes of §3) |
 
-- The host name is the caller's, or made from the Mac name: portable (section 10.1) for AppleDouble, SheepShaver's
-  (section 10.2) for Basilisk II.
+- The host name is the caller's, or made from the Mac name: portable (§7.1) for AppleDouble, SheepShaver's
+  (§7.2) for Basilisk II.
 - Before writing anything, every path about to be written is checked; if one exists and overwrite is off, nothing is
   written and the write fails.
 - The target folder, and `.rsrc` and `.finf` as needed, are created.
@@ -625,13 +380,13 @@ AppleDouble dates (the machine's).
 
 ---
 
-## 13. What unpack writes
+## 10. What unpack writes
 
 `unpack` (and the app's Unpack commands) writes every Mac file inside an input — through containers, disk images and
 folders — to a host folder, with both forks and Finder info, in the AppleDouble or Basilisk II layout. All of this
 section is ClassicMac's own [ClassicMac], except where it follows the emulator [Verified].
 
-### 13.1 The output folder
+### 10.1 The output folder
 
 - CLI: `-o <folder>`, or by default `<input name without extension> unpacked` beside the input. The folder may
   already exist; files already there are not replaced unless `--overwrite` is given, and each one that is in the way
@@ -640,7 +395,7 @@ section is ClassicMac's own [ClassicMac], except where it follows the emulator [
   `<name> 2`, `<name> 3`, … is used instead, the first free one, so nothing is ever overwritten. `extract` makes its
   folders the same way, with ` resources`.
 
-### 13.2 Placement
+### 10.2 Placement
 
 The input is a tree: each container node holds the files it read, and each file may be a container again. The output
 folder stands for the input itself. Below it:
@@ -660,35 +415,35 @@ folder stands for the input itself. Below it:
   ends in a single file inside Mac folders, only those folders are made; nothing is named after the chain.
 - An input with nothing inside is written as itself, at the top.
 
-### 13.3 Names
+### 10.3 Names
 
 For each file, in tree order:
 
-1. The host name is made from the Mac name with the layout's naming (section 10), fitted to
+1. The host name is made from the Mac name with the layout's naming (§7), fitted to
    `max(8, longest path − length of the folder path below the output folder − 7)` characters. The folder path counts
    its separators; 7 leaves room for a companion prefix (`.rsrc/`, `._`). The output folder's own path is not
    counted. Folder names are not shortened.
-2. **Basilisk II only:** if reading the host name back as SheepShaver would (section 11.2) does not give the Mac name
+2. **Basilisk II only:** if reading the host name back as SheepShaver would (§8.2) does not give the Mac name
    — a replaced character, a trailing dot or space, a device name, or a shortened name — `unpack.name-changed` is
    reported. The file is still written under the changed name.
-3. The name is made distinct within its folder (section 10.4). Folder names are taken first, so a file named like a
+3. The name is made distinct within its folder (§7.4). Folder names are taken first, so a file named like a
    sibling folder is the one numbered. A numbered name is reported as `unpack.name-collision`.
 
 Names are kept distinct only among the files `unpack` writes; a name already on disk is a failure unless overwriting.
 
-### 13.4 Results
+### 10.4 Results
 
-Each file is written with section 12. A file that cannot be written (it exists, access is denied, a fork cannot be
+Each file is written with §9. A file that cannot be written (it exists, access is denied, a fork cannot be
 read) is recorded as a failure with its path and the reason, and the others continue. The result counts the files
 written and their data and resource fork bytes. The CLI prints `<files> files, <bytes> bytes, to <folder>` and exits
 with the I/O error code when anything failed; the app lists failures as `export.failed`.
 
 ---
 
-## 14. Diagnostics
+## 11. Diagnostics
 
 Reading a host file, and unpacking. The AppleDouble reader's own codes (`applesingle.*`) are in
-[CONTAINERS.md](CONTAINERS.md); the FAT reader's (`fat.*`) in [FAT.md](FAT.md).
+[applesingle-appledouble.md](applesingle-appledouble.md); the FAT reader's (`fat.*`) in [fat.md](../file-systems/fat.md).
 
 | Code | Severity | Meaning | What the Mac or emulator does |
 | --- | --- | --- | --- |
@@ -702,13 +457,10 @@ Reading a host file, and unpacking. The AppleDouble reader's own codes (`applesi
 
 ---
 
-## 15. Not covered
+## 12. Not covered
 
-- Writing PC Exchange / File Exchange data, `FILEID.DAT`, or FAT volumes.
 - Folder Finder info in Basilisk II folders: read neither for folders on the host nor written by `unpack`.
 - Dates of files in Basilisk II folders (the data file's host times) and of macOS named-fork files, which ClassicMac
   does not read; `com.apple.FinderInfo`.
-- The locked flag from DOS read-only, and the backup date.
 - `__MACOSX/` folders in zip archives, and netatalk's `.AppleDouble/` folders.
 - Basilisk II and SheepShaver builds for other hosts, whose name conversion may differ from the Windows build.
-- PC Exchange 2.x, which was not examined.

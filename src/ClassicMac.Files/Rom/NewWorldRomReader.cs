@@ -14,7 +14,7 @@ namespace ClassicMac.Files.Rom
     /// <c>&lt;CHRP-BOOT&gt;</c> script whose <c>lzss-offset</c> and <c>lzss-size</c> constants locate the ROM image,
     /// compressed with Okumura's LZSS (<see cref="Lzss"/>). The result is one file whose data fork is the expanded image,
     /// for <see cref="MacRomReader"/> to open next. Later files that carry "parcels" instead of an LZSS image are not
-    /// recognised. Layout and rules: docs/formats/ROM.md.
+    /// recognised. Layout and rules: docs/formats/disk-images/rom.md.
     /// </summary>
     public sealed partial class NewWorldRomReader : IContainerReader
     {

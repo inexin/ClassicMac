@@ -497,7 +497,7 @@ public sealed class DiskDoublerReader : IContainerReader
     {
         ReadOnlySpan<byte> input = encoded.Span;
         // An empty fork is stored as no bytes at all, whatever its method: DiskDoubler 3.7.7 writes no method-1
-        // prefix or method-8 header for one ([Verified], ARCHIVES.md).
+        // prefix or method-8 header for one ([Verified], docs/formats/archives/diskdoubler.md).
         if (outputLength == 0 && input.IsEmpty) return [];
         if (method == 0) return input.ToArray();
         if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);

@@ -1,7 +1,7 @@
 # MacPaint documents
 
 The MacPaint document format, which ClassicMac reads in `ClassicMac.Graphics` (`MacPaintFile`); the same rows are
-QuickTime's `PNTG` codec ([QUICKTIME.md](QUICKTIME.md)).
+QuickTime's `PNTG` codec ([quicktime.md](quicktime.md)).
 
 MacPaint documents (`.pntg`, `.pnt`, `.mac`; file type `PNTG`) are 576 × 720 at 1 bit per pixel, with 1 = black:
 
@@ -12,7 +12,7 @@ MacPaint documents (`.pntg`, `.pnt`, `.mac`; file type `PNTG`) are 576 × 720 at
 | 308 | 204 | padding (zeros) |
 | 512 | — | 720 rows of 72 bytes, each PackBits-compressed on its own |
 
-- The same rows, without the 512-byte header, are the data of the QuickTime `PNTG` codec ([QUICKTIME.md](QUICKTIME.md) §2).
+- The same rows, without the 512-byte header, are the data of the QuickTime `PNTG` codec ([quicktime.md §2](quicktime.md#2-codecs)).
 - A **MacBinary** wrapper may precede the file:
   - a 128-byte header: byte 0 is 0, a 1–63 character name starts at byte 1, and the file type `PNTG` is at byte 65;
   - the data fork's length is at byte 83;

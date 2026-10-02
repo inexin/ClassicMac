@@ -7,8 +7,9 @@ namespace ClassicMac.Resources.Decoders.Interface
 {
     /// <summary>
     /// Writes the Toolbox's interface resources back from the records <see cref="InterfaceResources"/> reads, in the
-    /// layouts INTERFACE.md gives. Text is Mac OS Roman; text it cannot hold, or a string over 255 bytes, is refused
-    /// (<see cref="ArgumentException"/>). Filler fields are written as 0 [ClassicMac: the Toolbox ignores them].
+    /// layouts docs/formats/resources/ gives (menus.md, windows-dialogs.md, dialog-items.md, controls.md). Text is Mac
+    /// OS Roman; text it cannot hold, or a string over 255 bytes, is refused (<see cref="ArgumentException"/>). Filler
+    /// fields are written as 0 [ClassicMac: the Toolbox ignores them].
     /// </summary>
     public static class InterfaceWriter
     {

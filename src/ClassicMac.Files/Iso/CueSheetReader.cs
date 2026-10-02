@@ -14,8 +14,9 @@ namespace ClassicMac.Files.Iso
     /// it. The disc comes out as one file whose data fork holds its data tracks' 2048-byte blocks (through
     /// <see cref="RawCdReader"/> for raw sectors), each at its absolute sector, for the volume readers to open next;
     /// audio tracks read as zeros. The start of the last session (<c>REM SESSION</c>, or the last data track) goes with
-    /// the disc, as the Mac's CD driver reports it, so the ISO reader reads that session's descriptors (ISO9660.md
-    /// section 15). The referenced files are found among the cue sheet's siblings by name.
+    /// the disc, as the Mac's CD driver reports it, so the ISO reader reads that session's descriptors
+    /// (docs/formats/disk-images/cd-images.md §3). The referenced files are found among the cue sheet's siblings by
+    /// name.
     /// </summary>
     public sealed partial class CueSheetReader : IContainerReader
     {
@@ -85,9 +86,9 @@ namespace ClassicMac.Files.Iso
             }
             var disc = new CdDisc(segments, session);
 
-            // A partition map or an HFS volume at the start of a later session is read from there: the CD driver applies
-            // the session base to the partition map (HFS-MFS.md section 3.4); a bare HFS volume is read the same way
-            // (ClassicMac's choice; the driver's handling of one was not traced).
+            // A partition map or an HFS volume at the start of a later session is read from there: the CD driver
+            // applies the session base to the partition map (docs/formats/file-systems/partition-map.md §4); a bare HFS
+            // volume is read the same way (ClassicMac's choice; the driver's handling of one was not traced).
             ForkData data = disc;
             if (session > 0 && SessionHoldsHfs(disc, session))
                 data = disc.Slice(session * 2048, disc.Length - session * 2048);

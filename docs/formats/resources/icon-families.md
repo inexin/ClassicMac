@@ -1,121 +1,13 @@
-# Icon, cursor and pattern resources
+# Icon suites and families
 
-Decoded by `ClassicMac.Resources.Decoders` (`QuickDrawResources`); what the exports contain is in
-[EXPORT-MANIFEST.md](EXPORT-MANIFEST.md). Colour tables and pixel maps are as in [PICT.md](PICT.md); scaling and screen depths
-as in [QUICKDRAW.md](QUICKDRAW.md).
+Contents
 
-These are the QuickDraw image resources of classic Mac OS resource forks. They are not part of PICT, but they use
-the same structures. All are big-endian.
+1. [Drawing an icon suite (PlotIconID, PlotIconSuite)](#1-drawing-an-icon-suite-ploticonid-ploticonsuite)
+2. [Icon families (Mac OS 9 Icon Services)](#2-icon-families-mac-os-9-icon-services)
+3. [Writing icons and cursors (import)](#3-writing-icons-and-cursors-import)
+4. [Not covered](#4-not-covered)
 
-- **1-bit images:** 1 = black. Where there is a mask, a 0 mask bit is transparent.
-- **Indexed images** are converted with the high byte of each 16-bit colour component, as in PICT.
-
-| Type | Size | Layout |
-|---|---|---|
-| `ICON` | 32×32 | 128 bytes, 1 bit per pixel, unmasked |
-| `ICN#` | 32×32 | 128 bytes icon, then 128 bytes mask |
-| `ics#` | 16×16 | 32 bytes icon, then 32 bytes mask |
-| `icm#` | 16×12 | 24 bytes icon, then 24 bytes mask |
-| `SICN` | 16×16 each | any number of 32-byte 1-bit icons, unmasked |
-| `icl4`, `icl8` | 32×32 | 4- or 8-bit pixels in the standard colour table |
-| `ics4`, `ics8` | 16×16 | 4- or 8-bit pixels in the standard colour table |
-| `icm4`, `icm8` | 16×12 | 4- or 8-bit pixels in the standard colour table |
-| `PAT ` | 8×8 | 8 bytes |
-| `PAT#` | 8×8 each | u16 count, then 8 bytes each |
-| `CURS` | 16×16 | 32 bytes data, 32 bytes mask, then the hotspot as a Point (v, h) |
-
-**4- and 8-bit icons:**
-
-- The standard colour tables are the Mac `clut` 4 and 8. Take their exact 16-bit values' high bytes.
-- `clut` 8 is the 6×6×6 cube **without black** (215 entries, white first, red slowest), then red, green, blue and
-  gray ramps of `EE DD BB AA 88 77 55 44 22 11`, then **black at 255**.
-- There is no mask in the resource. The mask of the 1-bit icon list with the same id and size (`ICN#`, `ics#`,
-  `icm#`) applies. Without an icon list the Icon Utilities draw nothing (noMaskFoundErr, −1000). An all-zero mask
-  draws nothing.
-- **An icon list without its mask half** (the resource is only the icon) gets a computed mask, CalcMask:
-  - flood-fill the white pixels 4-connected to the edges;
-  - the mask is every pixel the flood did not reach, which is the icon's silhouette including enclosed holes.
-- **Which icon is drawn:** see "Drawing an icon suite" below.
-- **`cicn`** (PlotCIcon):
-  - fore/back are forced to black/white;
-  - the 1-bit BitMap is drawn if it exists and the screen depth is at most 2, else the PixMap;
-  - the mask is the icon mask.
-
-**Cursors:**
-
-| Mask bit | Data bit | Result |
-|---|---|---|
-| 1 | 1 | black |
-| 1 | 0 | white |
-| 0 | 0 | transparent |
-| 0 | 1 | **inverts** the screen |
-
-**`cicn`** (colour icon):
-
-- A header, then variable-length data:
-  - a 50-byte PixMap (baseAddr, rowBytes & `$3FFF`, bounds, pmVersion, packType, packSize, hRes, vRes, pixelType,
-    pixelSize, cmpCount, cmpSize, planeBytes, pmTable, pmReserved);
-  - a 14-byte mask BitMap (baseAddr, rowBytes, bounds);
-  - a 14-byte 1-bit BitMap (rowBytes 0 when absent);
-  - a 4-byte iconData;
-  - the mask bits, then the 1-bit bits;
-  - a ColorTable ([PICT.md](PICT.md) §4.6);
-  - the pixels, unpacked, `rowBytes × height` bytes.
-- The mask masks the colour pixels. Rows beyond the mask's data are unmasked.
-
-**`crsr`** (colour cursor):
-
-- Header:
-
-  | Offset | Size | Field |
-  |---|---|---|
-  | 0 | 2 | crsrType: `$8000` monochrome, `$8001` colour |
-  | 2 | 4 | offset of the PixMap |
-  | 6 | 4 | offset of the pixels |
-  | 10 | 10 | reserved |
-  | 20 | 32 | 1-bit data |
-  | 52 | 32 | mask |
-  | 84 | 4 | hotspot, as a Point (v, h) |
-  | 88 | 8 | reserved |
-
-- The PixMap's pmTable is the offset of its ColorTable.
-- SetCCursor **never reads the 1-bit data**. The cursor is drawn as `screen = (screen AND NOT mask) XOR image`:
-  - Mask 1: the colour pixel, converted to the screen depth.
-  - Mask 0 on a 16/32-bit screen: the screen is XORed with the pixel's complement. White is transparent, black
-    inverts, other colours XOR their complement.
-  - Mask 0 on a screen of 8 bits or fewer: the screen index is XORed with the pixel's index.
-- A `CURS`'s data bit 1 under mask 0 inverts (complements) the screen.
-- Hotspots are clamped to 0..15.
-
-**`ppat`** (pixel pattern):
-
-- Header:
-
-  | Offset | Size | Field |
-  |---|---|---|
-  | 0 | 2 | patType |
-  | 2 | 4 | offset of the PixMap |
-  | 6 | 4 | offset of the pixels |
-  | 10 | 10 | reserved |
-  | 20 | 8 | the 1-bit pattern |
-
-- The pixel data runs from the pixels offset to pmTable. A table before the pixel data makes GetPixPat fail, so the
-  resource does not load. The ColorTable (at pmTable) is read unless the PixMap is RGB direct (pixelType 16).
-- The table's ctSize (entries − 1) is signed: $FFFF is an empty 8-byte table. GetPixPat copies (ctSize + 1) × 8 + 8
-  bytes, not bounded by the resource. A 1-bit pattern with an empty table draws 0 white and 1 black, whatever the
-  port's colours; ResEdit 2.1.3's `ppat` 1731 and the `ppt#` 1751/3100 elements end with one and load [Code]
-  [Verified]. No Toolbox routine loads a `ppt#`; ResEdit reads it itself.
-- Types 1 and 3 decode the PixMap.
-- Type 0: the pattern is the **first 8 bytes of the pixel data** (at the pixels offset), not the 1-bit pattern at
-  offset 20.
-- Type 2 (RGB): the colour is the ColorTable's **entry 4** (table + $2A); the resource's pixels are ignored.
-  - A 32-bit screen draws it solid.
-  - Other depths draw PatDither's 2×2 cell ([QUICKDRAW.md](QUICKDRAW.md) §8).
-- Mac OS 9 fails to load types above 3.
-- **`ppt#`:** a u16 count, then that many u32 offsets from the resource start. Each element is a complete flattened
-  `ppat`, whose own offsets are relative to the element's start; element i ends where element i+1 begins.
-
-## Drawing an icon suite (PlotIconID, PlotIconSuite)
+## 1. Drawing an icon suite (PlotIconID, PlotIconSuite)
 
 The Icon Utilities draw a suite (the `ICN#`/`icl4`/`icl8`, `ics#`/`ics4`/`ics8` and `icm#`/`icm4`/`icm8` of one ID;
 on Mac OS 9 a suite may also hold the 48 × 48 and 32-bit members) into a port. Mac OS 9's native Icon Utilities and the
@@ -211,7 +103,7 @@ ClassicMac draws suites with `IconSuite.Plot` (and `PlotIconHandle`, `PlotSICNHa
 IconIDToRgn's region) into a `QuickDrawPort` (the port's depth is the screen depth; a port is
 never a picture or printer, so CopyMask is always used), for either QuickDraw.
 
-## Icon families (Mac OS 9 Icon Services)
+## 2. Icon families (Mac OS 9 Icon Services)
 
 Mac OS 9's Icon Services knows 20 members, and nothing else [Code]:
 
@@ -275,44 +167,26 @@ row; 4-bit pixels high nibble first; 4- and 8-bit colours from the system colour
   the mask becomes a region (8-bit: a pixel is in when its byte is not 0), MapRgn'd to the rect, and CopyBits
   srcCopy draws through it (a hard edge). A family without any mask falls back to the Icon Utilities.
 - **ClassicMac** exports each image member of an `icns` through the mask its own size selects, the 8-bit mask as the
-  image's alpha, as [EXPORT-MANIFEST.md](EXPORT-MANIFEST.md) section 8.3 lists.
+  image's alpha, as [export-manifest.md §8.3](../output/export-manifest.md#83-icons-and-their-masks) lists.
 
-## Writing icons and cursors (import)
+## 3. Writing icons and cursors (import)
 
 ClassicMac's editor makes these resources from an RGBA image, a PNG for example (`ImageImport`), in the layouts
 above. No Mac OS code imports an image, so the conversion rules are ClassicMac's [ClassicMac]:
 
-- **Size:** an image of another size is scaled to fit the resource's (area average of premultiplied colour), its
-  aspect kept and centred on a transparent field. `cicn` keeps the image's size (up to 256 × 256).
-- **Mask:** a pixel is in the mask when its alpha is at least 128.
-- **1-bit data** (`ICON`, the icon lists, a `cicn`'s BitMap, a cursor's data): black where the pixel is in the mask
-  and its luminance `(299 R + 587 G + 114 B) / 1000` is below 128.
-- **Standard-table icons** (`icl4`, `icl8`, `ics4`, …): each pixel the nearest entry of the standard 4- or 8-bit
-  table by RGB distance (the lowest index on a tie), no dithering; pixels outside the mask are white (index 0).
 - **An icon family** makes `ICN#`, `icl4`, `icl8`, `ics#`, `ics4` and `ics8` of one ID, the small ones from the image
   scaled to 16 × 16.
-- **`cicn`, `crsr`:** a colour table of exactly the image's colours (for `crsr`, white first), at the smallest depth
-  of 1, 2, 4 or 8 bits that holds them; beyond 256 colours the standard 8-bit table, nearest colours. `ctSeed` and
-  `ctFlags` are 0 and each entry's value is its index. Pixels outside the mask are white, which leaves the screen
-  under a colour cursor.
-  - `cicn`: the PixMap (pmTable 0), mask and icon BitMaps (rowBytes even), a zero icon data handle, the mask, the
-    1-bit icon, the colour table and the pixels.
-  - `crsr`: type `$8001`, the PixMap at 96, the pixels at 146, the colour table after them (pmTable its offset); the
-    extra fields (`crsrXData`, `crsrXValid`, `crsrXHandle`, `crsrXTable`, `crsrID`) are 0.
-- **`CURS`, `crsr` hotspot:** the centre (8, 8) unless given; clamped to 0–15.
-- Read back by `QuickDrawResources`, a `cicn` or `crsr` gives the image's opaque pixels exactly [Verified:
-  ClassicMac's tests].
 
-## Not covered
+## 4. Not covered
 
 - The export decoders take one resource at a time and do not draw suites; `IconSuite.Plot` does.
 - Not reproduced by `IconSuite`: several screens (DeviceLoop), a gray-scale device's label rule, and the ROM's endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac].
-- **Checked against Mac OS 9.0** ([README.md](README.md#reference-builds)) [Verified]: all 628 cases match pixel for
+- **Checked against Mac OS 9.0** ([README.md](../README.md#reference-builds)) [Verified]: all 628 cases match pixel for
   pixel: every PlotIconID/PlotIconSuite case (alignments, rect sizes 16–52, every transform, labels, member choice,
   missing masks, colour pairs, depths 1/4/8/32, a moved origin), IconIDToRgn, PlotIconHandle, PlotSICNHandle and
   PlotIcon. The ROM column is from the code only.
 - **Mac OS 9 on a 1-bit screen:** a selected icon (or any drawn with colours other than black on white) whose member
-  is scaled comes out as a solid black mask, because of Mac OS 9.0's scaled CopyMask (a bug; later 9.x releases may have fixed it) ([QUICKDRAW.md](QUICKDRAW.md) §9.1);
+  is scaled comes out as a solid black mask, because of Mac OS 9.0's scaled CopyMask (a bug; later 9.x releases may have fixed it) ([quickdraw.md §9.1](../graphics/quickdraw.md#91-bitmaps));
   offline then adds white dots, and disabled changes nothing. The ROM draws it white on black at every size.
 - `icns` variants (`tile`, `over`, `drop`, `open`, `odrp`) are read but not exported; standalone 32-bit, 48 × 48 and
   8-bit mask resources are not decoded (Icon Services never reads them outside an `icns`).

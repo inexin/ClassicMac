@@ -27,7 +27,7 @@ packages.
 | Package or namespace | What it is |
 |---|---|
 | `ClassicMac.Graphics` | The base: the RGBA `RgbaBitmap`, colours, PixMaps, standard colour tables, PackBits, MacPaint documents. |
-| `ClassicMac.Graphics.Fonts` | Bitmap strikes (`NFNT`/`FONT`), families (`FOND`), font colour tables, TrueType `sfnt` data ([docs/formats/FONTS.md](docs/formats/FONTS.md)). |
+| `ClassicMac.Graphics.Fonts` | Bitmap strikes (`NFNT`/`FONT`), families (`FOND`), font colour tables, TrueType `sfnt` data ([bitmap-fonts.md](docs/formats/resources/bitmap-fonts.md), [font-families.md](docs/formats/resources/font-families.md), [outline-fonts.md](docs/formats/resources/outline-fonts.md)). |
 | `ClassicMac.Graphics.QuickTime` | QuickTime still images: the codecs, the codec hook, QTIF files. |
 | `ClassicMac.Graphics.QuickDraw` | The software QuickDraw that draws everything (Mac OS 9 or the 68k ROM), text, screen depths. |
 | `ClassicMac.Graphics.Pict` | `PictReader` decodes to an RGBA `RgbaBitmap` (`Read` also gives the `PictInfo`); `PictWriter` writes pictures; `PictHeader` detects pictures and reads their header. |
@@ -145,9 +145,11 @@ pixel for pixel against it, in both modes. The QuickTime codecs match ffmpeg's d
 Not modelled: TrueType text (it goes to the outline fallback), and QuickTime codecs' own dithering on indexed
 screens.
 
-The format and every rendering rule the library follows are specified in [docs/formats/PICT.md](docs/formats/PICT.md) and
-[docs/formats/QUICKDRAW.md](docs/formats/QUICKDRAW.md) (with [QUICKTIME.md](docs/formats/QUICKTIME.md), [MACPAINT.md](docs/formats/MACPAINT.md)
-and [ICONS.md](docs/formats/ICONS.md)),
+The format and every rendering rule the library follows are specified in [pict.md](docs/formats/graphics/pict.md) and
+[quickdraw.md](docs/formats/graphics/quickdraw.md) (with [quicktime.md](docs/formats/graphics/quicktime.md),
+[macpaint.md](docs/formats/graphics/macpaint.md), and [icons.md](docs/formats/resources/icons.md),
+[icon-families.md](docs/formats/resources/icon-families.md), [cursors.md](docs/formats/resources/cursors.md) and
+[patterns.md](docs/formats/resources/patterns.md)),
 in enough detail to write a compatible decoder and encoder without reading the source.
 
 ## Licence
