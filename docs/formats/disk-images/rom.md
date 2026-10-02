@@ -16,7 +16,7 @@ References:
 - *Inside Macintosh: Memory*, the Memory Manager chapter (the 32-bit block header).
 - Haruhiko Okumura, `lzss.c` (1989), the LZSS coder the "Mac OS ROM" file uses ([Author] in §6).
 - Shared conventions and source tags: [README.md](../README.md). Resource forks and attributes:
-  [resource-fork.md](../resources/resource-fork.md). How the unwrapper chooses readers: [unwrapping.md §3](../containers/unwrapping.md#3-unwrapping-nested-containers).
+  [resource-fork.md](../resources/resource-fork.md). How the unwrapper chooses readers: [unwrapping.md §2](../containers/unwrapping.md#2-reading).
 
 Contents
 
@@ -148,7 +148,7 @@ ClassicMac lists **every** entry, whatever its combinations [ClassicMac]:
   as `rom.duplicate` (Warning), with both entries' combinations. (A resource fork holds one resource per type and ID;
   renaming the others would invent IDs the ROM never had.)
 
-The unwrapper tries the ROM readers after the archives and before the disk images ([unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order)): their
+The unwrapper tries the ROM readers after the archives and before the disk images ([unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order)): their
 tests are strict, and some disk-image tests are weak enough that ROM code could pass them.
 
 ## 6. The NewWorld "Mac OS ROM" file

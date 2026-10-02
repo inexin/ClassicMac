@@ -383,7 +383,7 @@ directory that has one [Code] [Verified]. An item's record is in its **parent's*
 | --- | --- | --- | --- |
 | +$00 | 1 | `u8` | length of the Mac name, 0–31; **0 marks a free record** [Code] |
 | +$01 | 31 | bytes | the Mac name, Mac OS Roman. Bytes after the name are garbage [Code] [Verified] |
-| +$20 | 16 | `FInfo` | Finder info (`DInfo` for a folder), [host-folders.md §3](../containers/host-folders.md#3-finder-info) [Code] |
+| +$20 | 16 | `FInfo` | Finder info (`DInfo` for a folder), [unwrapping.md §1.1](../containers/unwrapping.md#11-finder-information) [Code] |
 | +$30 | 16 | `FXInfo` | extended Finder info (`DXInfo`) [Code] |
 | +$40 | 4 | `u32` | creation date, Mac seconds, local time; 0 when unset [Code] |
 | +$44 | 4 | `u32` | modification date, full precision (odd seconds kept) [Code] [Verified] |
