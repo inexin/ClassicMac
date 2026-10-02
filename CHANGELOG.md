@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Viewer: the diagnostics panel has a header bar with error, warning and info count badges, a "Filter messages"
+  field (message, code or source), the severity filter as a segmented control and a "By file" toggle; column headers,
+  with Severity sortable (errors first, info first, arrival); each severity drawn with its own icon and colour; source
+  and code in mono; the selected row highlighted with an accent bar (D1).
+- Viewer: diagnostics group by file under headers with the file's icon and counts; groups holding only info start
+  collapsed, and a click on a header opens or closes it; "By file" off gives the flat list (D2).
+- Viewer: Ctrl+Shift+D or the header's chevron collapses the diagnostics panel to its header, which then shows the
+  error and warning numbers and the latest problem; the splitter's height comes back when it opens (D3).
 - Editor: unapplied edits (a form whose values differ from the resource's, or bytes changed in the hex view) are no
   longer applied or lost silently: selecting another node (in the tree, from a diagnostic, by opening a file), undo,
   redo, the Resource commands, closing a file and quitting first ask "Apply your changes to 'STR#' 128?" with Apply

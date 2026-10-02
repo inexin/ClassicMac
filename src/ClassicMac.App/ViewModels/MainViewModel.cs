@@ -22,6 +22,12 @@ namespace ClassicMac.App.ViewModels
         public string Code => Diagnostic.Code;
 
         public string Message => Diagnostic.Message;
+
+        public bool IsError => Diagnostic.Severity == DiagnosticSeverity.Error;
+
+        public bool IsWarning => Diagnostic.Severity == DiagnosticSeverity.Warning;
+
+        public bool IsInfo => Diagnostic.Severity == DiagnosticSeverity.Info;
     }
 
     /// <summary>Which diagnostics the list shows.</summary>
@@ -55,13 +61,22 @@ namespace ClassicMac.App.ViewModels
     /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
     public sealed partial class MainViewModel : ObservableObject
     {
-        private readonly List<DiagnosticEntry> allDiagnostics = [];
+        public MainViewModel() => DiagnosticsPanel = new DiagnosticsPanel(entry => SelectedDiagnostic = entry);
 
         public ObservableCollection<InputNode> Roots { get; } = [];
 
-        public ObservableCollection<DiagnosticEntry> Diagnostics { get; } = [];
+        /// <summary>The diagnostics panel: counts, filters, grouping by file, collapsing.</summary>
+        public DiagnosticsPanel DiagnosticsPanel { get; }
 
-        public IReadOnlyList<DiagnosticFilter> Filters { get; } = Enum.GetValues<DiagnosticFilter>();
+        /// <summary>The diagnostics the panel's filters let through, in arrival order.</summary>
+        public ObservableCollection<DiagnosticEntry> Diagnostics => DiagnosticsPanel.Entries;
+
+        /// <summary>The panel's severity filter.</summary>
+        public DiagnosticFilter Filter
+        {
+            get => DiagnosticsPanel.Filter;
+            set => DiagnosticsPanel.Filter = value;
+        }
 
         public IFilePicker? FilePicker { get; set; }
 
@@ -109,9 +124,6 @@ namespace ClassicMac.App.ViewModels
 
         [ObservableProperty]
         private DiagnosticEntry? selectedDiagnostic;
-
-        [ObservableProperty]
-        private DiagnosticFilter filter = DiagnosticFilter.All;
 
         [ObservableProperty]
         private string status = "Open a Mac file, disk image or resource fork (File ▸ Open, or drop it here).";
@@ -208,33 +220,13 @@ namespace ClassicMac.App.ViewModels
         private void RemoveInput(InputNode input)
         {
             Roots.Remove(input);
-            allDiagnostics.RemoveAll(d => d.Node?.Input == input || d.Source == input.BaseTitle && d.Node is null);
-            RefreshDiagnostics();
+            DiagnosticsPanel.RemoveAll(d => d.Node?.Input == input || d.Source == input.BaseTitle && d.Node is null);
             Selected = null;
         }
 
         private bool CanClose() => Selected is not null;
 
-        private void Report(DiagnosticEntry entry)
-        {
-            allDiagnostics.Add(entry);
-            if (Shows(entry)) Diagnostics.Add(entry);
-        }
-
-        private bool Shows(DiagnosticEntry entry) => Filter switch
-        {
-            DiagnosticFilter.Errors => entry.Diagnostic.Severity == DiagnosticSeverity.Error,
-            DiagnosticFilter.WarningsAndErrors => entry.Diagnostic.Severity is DiagnosticSeverity.Error or DiagnosticSeverity.Warning,
-            _ => true,
-        };
-
-        private void RefreshDiagnostics()
-        {
-            Diagnostics.Clear();
-            foreach (var entry in allDiagnostics.Where(Shows)) Diagnostics.Add(entry);
-        }
-
-        partial void OnFilterChanged(DiagnosticFilter value) => RefreshDiagnostics();
+        private void Report(DiagnosticEntry entry) => DiagnosticsPanel.Add(entry);
 
         private void OnSelectedChanged(NodeViewModel? value)
         {

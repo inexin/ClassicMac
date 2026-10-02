@@ -27,6 +27,11 @@ namespace ClassicMac.App.Views
                 model.FilePicker = this;
                 model.EditDialogs ??= new EditDialogs(this);
                 model.AudioPlayer ??= audio;
+                if (!ReferenceEquals(boundPanel, model.DiagnosticsPanel))
+                {
+                    boundPanel = model.DiagnosticsPanel;
+                    DiagnosticsRow.Bind(Body.RowDefinitions[1], Body.RowDefinitions[2], boundPanel);
+                }
             };
             Closing += OnClosing;
             HexList.KeyDown += OnHexKeyDown;
@@ -40,6 +45,8 @@ namespace ClassicMac.App.Views
                 (DataContext as MainViewModel)?.CleanUpDragOut();
             };
         }
+
+        private DiagnosticsPanel? boundPanel;
 
         // Drag out of the tree: a press on a file or resource that moves a few pixels writes it to the drag folder, then
         // hands those files to the platform's drag (a file manager copies them).

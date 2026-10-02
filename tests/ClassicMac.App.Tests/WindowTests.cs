@@ -459,4 +459,53 @@ public class WindowTests
         Assert.Equal(DraftChoice.Cancel, withError.Result);
         owner.Close();
     });
+
+    // The diagnostics panel (design/boards/diagnostics.md): grouped by file, flat with a selected row, and collapsed
+    // to its header by Ctrl+Shift+D, the splitter's height coming back when it opens.
+    [Fact]
+    public void The_diagnostics_panel_groups_selects_and_collapses() => OnUiThread(() =>
+    {
+        static DiagnosticEntry Entry(DiagnosticSeverity severity, string source, string code, string message) =>
+            new(new Diagnostic(severity, code, message), source, null);
+        var model = new MainViewModel();
+        var window = new MainWindow { DataContext = model };
+        var baselines = new List<string>();
+        window.Show();
+        var panel = model.DiagnosticsPanel;
+        panel.Add(Entry(DiagnosticSeverity.Error, "Mac OS 9.hfv › System Folder:Finder", "archive.fork-crc", "The resource fork's CRC does not match."));
+        panel.Add(Entry(DiagnosticSeverity.Warning, "Mac OS 9.hfv › System Folder:Finder", "resource.name-overlap", "Two names share their bytes."));
+        panel.Add(Entry(DiagnosticSeverity.Warning, "Mac OS 9.hfv › System Folder:System", "sound.unknown-format", "Unknown sound format 3."));
+        panel.Add(Entry(DiagnosticSeverity.Info, "Mac OS 9.hfv › Desktop DB", "hfs.desktop-db", "The desktop database is not read."));
+        panel.Add(Entry(DiagnosticSeverity.Info, "Mac OS 9.hfv › Desktop DB", "hfs.desktop-df", "The desktop file is not read."));
+        Dispatcher.UIThread.RunJobs();
+        var list = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "DiagnosticList");
+        Assert.Equal(6, list.GetVisualDescendants().OfType<ListBoxItem>().Count()); // three headers, the info group closed
+        Capture(window, "diagnostics-grouped", baselines);
+
+        panel.ByFile = false;
+        panel.SelectedRow = panel.Rows[1];
+        Dispatcher.UIThread.RunJobs();
+        var selected = list.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected);
+        var presenter = selected.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>().First();
+        Assert.Equal(Avalonia.Media.Color.Parse("#EEF2FD"), ((Avalonia.Media.ISolidColorBrush)presenter.Background!).Color); // CmRowHighlight
+        Assert.Equal(new Thickness(3, 0, 0, 0), presenter.BorderThickness);
+        Capture(window, "diagnostics-flat", baselines);
+
+        var body = window.FindControl<Grid>("Body")!;
+        body.RowDefinitions[2].Height = new GridLength(240);          // the splitter dragged
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPress(Avalonia.Input.Key.D, Avalonia.Input.RawInputModifiers.Control | Avalonia.Input.RawInputModifiers.Shift, Avalonia.Input.PhysicalKey.D, "D");
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(panel.IsExpanded);
+        Assert.Equal(34, body.RowDefinitions[2].Height.Value);
+        Assert.Equal(0, body.RowDefinitions[1].Height.Value);
+        Assert.False(list.IsVisible);
+        Capture(window, "diagnostics-collapsed", baselines);
+
+        panel.ToggleCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(240, body.RowDefinitions[2].Height.Value);
+        window.Close();
+        Baselines.Verify(baselines);
+    });
 }

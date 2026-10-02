@@ -150,6 +150,53 @@
   <Style Selector=":is(TextBlock).warning">
     <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
   </Style>
+  <Style Selector=":is(TextBlock).info">
+    <Setter Property="Foreground" Value="{DynamicResource CmInfo}" />
+  </Style>
+
+  <!-- Codes, OSTypes and paths in mono 12 (CmFontSizeMonoSmall). -->
+  <Style Selector=":is(TextBlock).mono">
+    <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+
+  <!-- Flat buttons: transparent until hovered (toolbar, panel headers). A checked flat toggle stays flat; an outlined
+       one shows its state with CmRowHighlight and CmAccent text. -->
+  <Style Selector=":is(Button).flat">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="6,3" />
+    <Setter Property="MinHeight" Value="0" />
+  </Style>
+  <Style Selector=":is(Button).flat /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+  </Style>
+  <Style Selector=":is(Button).flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector="ToggleButton.flat.outlined">
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="8,2" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+  </Style>
+  <Style Selector="ToggleButton.flat.outlined /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmControlBorder}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+  </Style>
+  <Style Selector="ToggleButton.flat.outlined:checked /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmAccent}" />
+  </Style>
+
+  <!-- A chevron points down when open, right when closed (a collapsed group, an unchecked disclosure toggle). -->
+  <Style Selector="PathIcon.chevron">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+  <Style Selector="PathIcon.chevron.collapsed, ToggleButton:unchecked PathIcon.chevron">
+    <Setter Property="RenderTransform" Value="rotate(-90deg)" />
+  </Style>
 
   <!-- List selection: CmSelectionInactive while focus is elsewhere, CmSelection with CmSelectionText while the list has
        focus. Inside that selected row all text, muted too, reads in CmSelectionText (the TOKENS.md contrast rule). -->
