@@ -53,6 +53,11 @@ An instruction or data line is:
 
 In the 68k text, an empty register list (a mask of 0) is written `#0` (`movem.l #0,-(sp)`), and the immediate of an
 `fmovem.l` of two or three control registers as one `#n` per register (`fmovem.l #0,#1,fpcr/fpsr`) [ClassicMac].
+A full extension word is written with all its parts inside the parentheses (`(16,a0,d0.w)`, `([16,a0],d0.w,4)`), a
+brief one and a 16-bit displacement outside (`16(a0,d0.w)`, `16(a0)`). A full extension word that is not memory
+indirect and has only a base register keeps its base displacement, 0 when it is null: `(0,a0)`, `(0,pc)  ; $1002`,
+`($0000,zpc)`, never `(a0)` or `(pc)`, which are other modes; memory indirect keeps its brackets (`([a0])`)
+[ClassicMac].
 
 A 68k data line holds up to 8 bytes as `dc.w $xxxx,$xxxx…` (a byte at an odd offset, or a last odd byte, as
 `dc.b $xx`), with what the data is (§1.4) on the run's first line and an ASCII preview (`'Main'`, `.` for bytes outside
@@ -283,10 +288,16 @@ a call into the segment. A package's routines are at +$0A + their table offsets
      their indexed forms) with rA = rD;
    - `mftb` with a TBR other than 268 (TBL) or 269 (TBU);
    - `bcctr` with BO bit 2 clear (it would decrement CTR);
+   - `bc`, `bclr` and `bcctr` with a z bit of BO set (001zy, 011zy, 1z00y, 1z01y, 1z1zz): the PEM has them cleared
+     [Doc: PEM, BO operand encodings]; ClassicMac reads such a BO as an invalid form, as code never sets them
+     [ClassicMac];
+   - `lmw` and `lswi` with rA in the range of registers loaded, including the case in which rA = 0 (`lmw`: rD to r31;
+     `lswi`: ceil(NB/4) registers from rD, wrapping from r31 to r0); `lswx` with rD = rA or rD = rB [Doc: PEM, "lmw",
+     "lswi", "lswx"];
    - 64-bit, POWER-only and 601-only operations, and later extensions (`mtocrf`, `lwsync`, L = 1 compares, BH).
 7. A branch is written raw when its extended mnemonic would lose a field: `bc BO,BI,target`, `bclr BO,BI`,
-   `bcctr BO,BI` when BO ignores BI (branch always, or CTR only) and BI is not 0, or a branch-always `bclr`/`bcctr`
-   has a BO other than 20. A branch-always `bc` is always raw; `b` is the I-form. [ClassicMac]
+   `bcctr BO,BI` when BO ignores BI (branch always, or CTR only) and BI is not 0. A branch-always `bc` is always raw;
+   `b` is the I-form. [ClassicMac]
 8. An SPR prints by name in the direction the PEM gives it: `mfspr` of TBL and TBU (284, 285, written with `mtspr`
    and read with `mftb`) and `mtspr` of PVR (287, read only) print the number [Doc: PEM, "mfspr", "mtspr"]. The 603
    and 750 implementation SPRs (HID0 1008, L2CR 1017 …) print their number: the same number names other registers
@@ -305,14 +316,24 @@ the instruction's format draws as 0:
 - bit 15 of a bit-field extension word; bits 14–12 of `bftst`, `bfchg`, `bfclr` and `bfset`; bits 10–9 when Do is
   set and bits 4–3 when Dw is set;
 - bit 3 of a full extension word;
+- bit 15 and bits 9–3 of a 32-bit multiply or divide extension word (`mulu.l`, `muls.l`, `divu.l`, `divs.l`,
+  `divul.l`, `divsl.l`) [Doc: M68000 Family Programmer's Reference Manual, MULS, MULU, DIVS/DIVSL, DIVU/DIVUL];
+- the k-factor (bits 6–0) of `fmove FPn,<ea>` to any format but packed [Doc: MC68881/MC68882 User's Manual, FMOVE];
+- bits 7 and 3–0 of the dynamic register list of `fmovem.x` (0rrr0000, the data register in bits 6–4) [Doc:
+  MC68881/MC68882 User's Manual, FMOVEM];
 - the reserved bits of `cas`, `cas2`, `chk2`/`cmp2`, `moves` and the PMMU extension words;
 - the high byte of the byte immediate of `ori`/`andi`/`eori` to CCR, of a static bit number and of `callm`'s argument
   count.
 
 An ordinary byte immediate (`<ea>` mode 7, register 4, byte size: `ori.b`, `move.b`, `cmp.b`, `fmove.b`, `pmove` of a
 byte register …) is the low byte of its word; the high byte is ignored, as the processor ignores it [Doc: M68000
-Family Programmer's Reference Manual, "Immediate Data"]. Reserved bits 9–3 of a 32-bit multiply or divide extension
-word are ignored too [Reference: Ghidra].
+Family Programmer's Reference Manual, "Immediate Data"].
+
+`move.b` from an address register is `dc.w`, as are `movea.b`, `tst.b`, `cmp.b`, `addq.b`/`subq.b` to and from one
+[Doc: M68000 Family Programmer's Reference Manual, MOVE: byte size does not allow An]. `ptest` with the A bit clear
+ignores the register field (0xxx) at every level, level 0 included; the A bit set at level 0 is `dc.w` [Doc: MC68851
+PMMU User's Manual, PTEST]. `fmovem.x` from memory with a dynamic list takes the control modes, `(d16,pc)` and
+`(d8,pc,xn)` included, and `(an)+` [Doc: MC68881/MC68882 User's Manual, FMOVEM].
 
 The 68060's own forms (`plpa`, `lpstop`, `movec` of BUSCR and PCR) and the CPU32's (`tbl`, `bgnd`) are `dc.w`: no
 Macintosh has those processors [ClassicMac].
@@ -428,7 +449,8 @@ documents). These are its own and the decoders':
   bases after extension words, the reserved bits and byte immediates of §2.7, empty register lists and `fmovem.l` of
   the control registers; each valid 68k vector decodes the same way in at least one independent disassembler. For
   PowerPC, every form and extended mnemonic, each part of every multi-bit reserved field, the invalid update forms,
-  `mftb`'s TBRs, the raw branch forms and every named SPR in both directions.
+  the invalid `lmw`, `lswi` and `lswx` forms, each BO with a z bit set, `mftb`'s TBRs, the raw branch forms and every
+  named SPR in both directions. The full-extension operands with only a base register (§1.1).
 - `M68kCodeMapTests`, `M68kAnnotatorTests`, `MacsBugNamesTests`, `PpcFragmentMapTests`, `TrapTableTests`: §2.
 - `tests/ClassicMac.Resources.Decoders.Tests/CodeDecoderTests.cs`: each decoder's files and model, the application
   rebuilt from the fork, and each diagnostic; `CodeExportTests.cs`: `disasm`'s files, the CPU choice, every fragment
@@ -449,7 +471,7 @@ documents). These are its own and the decoders':
   fragment of the corpus with no decoder error; `PpcCorpusTests` checks the word, `.long`, `blr`, `bl` and return
   counts and sample texts of NQD (no `.long`), Disk Copy 6.1.2 (4) and Disk Copy 6.5 (9,451), which
   agree word for word with an independent disassembler apart from mnemonic spelling and, in data, BO values with a z
-  bit set [Verified]; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
+  bit set, which that disassembler decodes and ClassicMac writes `.long` [Verified]; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
   the counts in [PLAN.md](../../PLAN.md)'s phase 11 exit. `MacsBugCorpusTests` also checks names read off the bytes
   by hand at their offsets (Realmz's `MOT32` at `$842E`), and strings after returns in the System file that are not
   names. Realmz's `'CODE'` resources hold 485 names: 341 variable and 144 fixed-8 with bit 7 clear; resource_dasm
@@ -479,7 +501,7 @@ documents). These are its own and the decoders':
 7. resource_dasm (Martin Michelsen), MIT: the 68k and PowerPC disassemblers ClassicMac's are ported from.
 8. *MC68881/MC68882 Floating-Point Coprocessor User's Manual*, *MC68030 User's Manual*, *MC68040 User's Manual*,
    *MC68851 Paged Memory Management Unit User's Manual*, Motorola.
-9. Ghidra (NSA), Apache 2.0: a behavioural reference for the 68k decoder (the reserved bits of a 32-bit divide).
+9. Ghidra (NSA), Apache 2.0: a behavioural reference for the 68k decoder.
 10. *Inside Macintosh: Devices*, Apple, 1994: the Device Manager's trap bits.
 11. Universal Interfaces 3.x, Apple (`Traps.h`, `Devices.h`, `Resources.h`, `Gestalt.h`): trap words and dispatch
     selectors.

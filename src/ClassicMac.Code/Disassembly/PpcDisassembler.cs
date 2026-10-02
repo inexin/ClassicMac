@@ -112,6 +112,7 @@ public static class PpcDisassembler
             if (toCtr && (bo & 4) == 0) return null;    // bcctr may not decrement CTR
             absolute = false;
         }
+        if (!ZBitsClear(bo)) return null;
         int bd = (short)(w & 0xFFFC);
         uint? branchTarget = primary == 16 ? (absolute ? (uint)bd : address + (uint)bd) : null;
         string register = toLr ? "lr" : toCtr ? "ctr" : "";
@@ -119,14 +120,14 @@ public static class PpcDisassembler
 
         var operands = new List<PpcOperand>();
         string mnemonic;
-        bool always = (bo & 0x14) == 0x14;
-        if (always && primary != 16 && bo == 20 && bi == 0)
+        bool always = bo == 20;
+        if (always && primary != 16 && bi == 0)
             mnemonic = "b" + suffix;   // blr, bctr
         else if (always || (bo & 0x10) != 0 && bi != 0)
         {
-            // BO = 1z1zz (branch always) and the CTR-only BOs 1z00y and 1z01y ignore BI. Where BI is not 0, or (branch
-            // always) BO is not 20, the extended mnemonic would lose it: the raw form keeps BO and BI, so the text
-            // gives the word back. A branch-always bc is always raw (resource_dasm's choice: b is the I-form).
+            // BO = 10100 (branch always) and the CTR-only BOs 1000y and 1001y ignore BI. Where BI is not 0 the
+            // extended mnemonic would lose it: the raw form keeps BO and BI, so the text gives the word back. A
+            // branch-always bc is always raw (resource_dasm's choice: b is the I-form).
             mnemonic = "bc" + suffix;
             operands.Add(Imm(bo));
             operands.Add(Imm(bi));
@@ -134,9 +135,9 @@ public static class PpcDisassembler
         else
         {
             string condition;
-            if ((bo & 0x10) != 0)       // 1z00y / 1z01y: CTR only
+            if ((bo & 0x10) != 0)       // 1000y / 1001y: CTR only
                 condition = (bo & 2) != 0 ? "dz" : "dnz";
-            else if ((bo & 0x04) != 0)  // 001zy / 011zy: the CR bit only
+            else if ((bo & 0x04) != 0)  // 0010y / 0110y: the CR bit only
             {
                 condition = ((bo & 8) != 0 ? TrueConditions : FalseConditions)[bi & 3];
                 if (bi >> 2 != 0) operands.Add(Cr(bi >> 2));
@@ -156,6 +157,16 @@ public static class PpcDisassembler
             | (always ? 0 : PpcFlow.Conditional);
         return new PpcInstruction(address, w, mnemonic, operands, branchFlow, branchTarget);
     }
+
+    // The z bits of BO (001zy, 011zy, 1z00y, 1z01y, 1z1zz) are to be cleared [Doc: PEM, BO operand encodings]; a BO
+    // with one set is read as an invalid form [ClassicMac].
+    private static bool ZBitsClear(int bo) => (bo & 0x14) switch
+    {
+        0x14 => bo == 20,
+        0x10 => (bo & 0x08) == 0,
+        0x04 => (bo & 0x02) == 0,
+        _ => true,
+    };
 
     // ---- everything else ----
 
@@ -203,6 +214,10 @@ public static class PpcDisassembler
             {
                 int primary = (int)(w >> 26);
                 if (primary != 47 && (primary & 1) != 0 && !ValidUpdate(a, d, IntegerLoad(primary)))
+                    return null;
+                // lmw: rA in the range of registers to be loaded (rD-r31), including the case in which rA = 0, is
+                // invalid [Doc: PEM, "lmw"].
+                if (primary == 46 && a >= d)
                     return null;
                 var data = primary >= 48 ? F(d) : R(d);
                 return Op(LoadStoreNames[primary - 32], data, Disp(Simm(w), a));
@@ -355,6 +370,8 @@ public static class PpcDisassembler
             var data = ls.Form switch { Form.Float or Form.FloatUpdate => F(d), Form.Vector => V(d), _ => R(d) };
             bool update = ls.Form is Form.Update or Form.FloatUpdate;
             if (update && !ValidUpdate(a, d, ls.Form == Form.Update && ls.Name[0] == 'l')) return null;
+            // lswx: rD = rA or rD = rB is invalid (the registers loaded depend on XER) [Doc: PEM, "lswx"].
+            if (xo == 533 && (d == a || d == b)) return null;
             var baseRegister = update ? R(a) : RA0(a);
             return Op(ls.Name, data, baseRegister, R(b));
         }
@@ -406,7 +423,14 @@ public static class PpcDisassembler
             case 566: return w == 0x7C00046C ? Op("tlbsync") : null;
             case 598: return w == 0x7C0004AC ? Op("sync") : null;
             case 854: return w == 0x7C0006AC ? Op("eieio") : null;
-            case 597: return Op("lswi", R(d), RA0(a), Imm(b == 0 ? 32 : b));
+            case 597:
+            {
+                // rA in the range of registers to be loaded (ceil(NB/4) from rD, wrapping from r31 to r0), including
+                // the case in which rA = 0, is invalid [Doc: PEM, "lswi"].
+                int n = b == 0 ? 32 : b;
+                if (((a - d) & 31) < (n + 3) / 4) return null;
+                return Op("lswi", R(d), RA0(a), Imm(n));
+            }
             case 725: return Op("stswi", R(d), RA0(a), Imm(b == 0 ? 32 : b));
             case 342 or 374:
             {

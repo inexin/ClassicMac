@@ -64,16 +64,14 @@ public partial class PpcDisassemblerTests
     // The PIC "get the PC" idiom: bcl 20,31 to the next word is a call that always branches.
     [InlineData(0x1000u, 0x429F0005u, "bcl 20,31,0x1004", PpcFlow.Branch | PpcFlow.Call, 0x1004u)]
     [InlineData(0x1000u, 0x42800003u, "bcla 20,0,0x0", PpcFlow.Branch | PpcFlow.Call, 0x0u)]
-    // bclr/bcctr branch-always with BI non-zero, or with a z bit set, keep BO and BI (only BO 20, BI 0 is blr/bctr).
+    // bclr/bcctr branch-always with BI non-zero keep BO and BI (only BO 20, BI 0 is blr/bctr).
     [InlineData(0x1000u, 0x4E810020u, "bclr 20,1", PpcFlow.Branch | PpcFlow.Return, null)]
     [InlineData(0x1000u, 0x4E810021u, "bclrl 20,1", PpcFlow.Branch | PpcFlow.Call, null)]
-    [InlineData(0x1000u, 0x4FE00020u, "bclr 31,0", PpcFlow.Branch | PpcFlow.Return, null)]
     [InlineData(0x1000u, 0x4E9F0420u, "bcctr 20,31", PpcFlow.Branch, null)]
-    [InlineData(0x1000u, 0x4EA00421u, "bcctrl 21,0", PpcFlow.Branch | PpcFlow.Call, null)]
     // A CTR-only BO (1z00y, 1z01y) ignores BI: a non-zero BI keeps the raw form too.
     [InlineData(0x1000u, 0x42410008u, "bc 18,1,0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
     [InlineData(0x1000u, 0x42584765u, "bcl 18,24,0x5764", PpcFlow.Branch | PpcFlow.Call | PpcFlow.Conditional, 0x5764u)]
-    [InlineData(0x1000u, 0x436F6D72u, "bca 27,15,0x6D70", PpcFlow.Branch | PpcFlow.Conditional, 0x6D70u)]
+    [InlineData(0x1000u, 0x426F6D72u, "bca 19,15,0x6D70", PpcFlow.Branch | PpcFlow.Conditional, 0x6D70u)]
     [InlineData(0x1000u, 0x4E010020u, "bclr 16,1", PpcFlow.Branch | PpcFlow.Return | PpcFlow.Conditional, null)]
     [InlineData(0x1000u, 0x4E400021u, "bdzlrl", PpcFlow.Branch | PpcFlow.Call | PpcFlow.Conditional, null)]
     [InlineData(0x1000u, 0x4D820021u, "beqlrl", PpcFlow.Branch | PpcFlow.Call | PpcFlow.Conditional, null)]
@@ -89,6 +87,8 @@ public partial class PpcDisassemblerTests
     [InlineData(0x1000u, 0x4E000021u, "bdnzlrl", PpcFlow.Branch | PpcFlow.Call | PpcFlow.Conditional, null)]
     [InlineData(0x1000u, 0x4C800020u, "bgelr", PpcFlow.Branch | PpcFlow.Return | PpcFlow.Conditional, null)]
     [InlineData(0x1000u, 0x4C9F0020u, "bnslr cr7", PpcFlow.Branch | PpcFlow.Return | PpcFlow.Conditional, null)]
+    // The y bit with a backward bd.
+    [InlineData(0x1000u, 0x4220FFF8u, "bdnz- 0xFF8", PpcFlow.Branch | PpcFlow.Conditional, 0xFF8u)]
     // bd = 0 counts as forward: y = 1 is "+".
     [InlineData(0x1000u, 0x41800000u, "blt 0x1000", PpcFlow.Branch | PpcFlow.Conditional, 0x1000u)]
     [InlineData(0x1000u, 0x41A00000u, "blt+ 0x1000", PpcFlow.Branch | PpcFlow.Conditional, 0x1000u)]
@@ -96,11 +96,6 @@ public partial class PpcDisassemblerTests
     [InlineData(0x1000u, 0x4182FFF8u, "beq 0xFF8", PpcFlow.Branch | PpcFlow.Conditional, 0xFF8u)]
     [InlineData(0x1000u, 0x4182000Bu, "beqla 0x8", PpcFlow.Branch | PpcFlow.Call | PpcFlow.Conditional, 0x8u)]
     [InlineData(0x1000u, 0x40A00008u, "bge+ 0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
-    // BO with a z bit set: 11001 (bdnz, y), 01111 (true, y), 01110 (true, no y).
-    [InlineData(0x1000u, 0x43200008u, "bdnz+ 0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
-    [InlineData(0x1000u, 0x4320FFF8u, "bdnz- 0xFF8", PpcFlow.Branch | PpcFlow.Conditional, 0xFF8u)]
-    [InlineData(0x1000u, 0x41E20008u, "beq+ 0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
-    [InlineData(0x1000u, 0x41C20008u, "beq 0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
     [InlineData(0x1000u, 0x40200008u, "bdnzf+ lt,0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
     [InlineData(0x1000u, 0x4020FFF8u, "bdnzf- lt,0xFF8", PpcFlow.Branch | PpcFlow.Conditional, 0xFF8u)]
     [InlineData(0x1000u, 0x41200008u, "bdnzt+ lt,0x1008", PpcFlow.Branch | PpcFlow.Conditional, 0x1008u)]
@@ -123,7 +118,22 @@ public partial class PpcDisassemblerTests
     }
 
     // bcctr may not decrement CTR (BO bit 2 clear) [Doc: PEM, "bcctrx"]; bclr and bcctr with reserved bits 16–20 set.
+    // A BO with a z bit set (001zy, 011zy, 1z00y, 1z01y, 1z1zz) [Doc: PEM, BO operand encodings: the z bits are to
+    // be cleared; ClassicMac reads them as an invalid form].
     [Theory]
+    [InlineData(0x40C00000u)]   // bc BO 00110
+    [InlineData(0x41C20008u)]   // bc BO 01110
+    [InlineData(0x41E20008u)]   // bc BO 01111
+    [InlineData(0x43000000u)]   // bc BO 11000
+    [InlineData(0x43200008u)]   // bc BO 11001
+    [InlineData(0x436F6D72u)]   // bca BO 11011
+    [InlineData(0x42A00000u)]   // bc BO 10101
+    [InlineData(0x42C00000u)]   // bc BO 10110
+    [InlineData(0x43800000u)]   // bc BO 11100
+    [InlineData(0x4FE00020u)]   // bclr BO 11111
+    [InlineData(0x4DC20020u)]   // bclr BO 01110
+    [InlineData(0x4EA00421u)]   // bcctrl BO 10101
+    [InlineData(0x4CC20420u)]   // bcctr BO 00110
     [InlineData(0x4E000420u)]
     [InlineData(0x4C000420u)]
     [InlineData(0x4C000421u)]
@@ -286,6 +296,34 @@ public partial class PpcDisassemblerTests
     [InlineData(0x7C6324EEu, "lfdux f3,r3,r4")]
     [InlineData(0x8C640000u, "lbzu r3,0(r4)")]
     public void Update_forms_with_rA_0_or_rA_rD_are_long(uint word, string expected) =>
+        Assert.Equal(expected, PpcDisassembler.Decode(word, 0).Text);
+
+    // lmw and lswi: rA in the range of registers to be loaded, including the case in which rA = 0, is invalid; the
+    // lswi range wraps from r31 to r0 and holds ceil(NB/4) registers. lswx: rD = rA or rD = rB is invalid (the
+    // range comes from XER at run time) [Doc: PEM, "lmw", "lswi", "lswx"]. The stores have no invalid form.
+    [Theory]
+    [InlineData(0xB8000000u, ".long 0xB8000000")]   // lmw r0,0(0): r0 is loaded
+    [InlineData(0xB8630000u, ".long 0xB8630000")]   // lmw r3,0(r3)
+    [InlineData(0xB87F0000u, ".long 0xB87F0000")]   // lmw r3,0(r31)
+    [InlineData(0xB8620000u, "lmw r3,0(r2)")]
+    [InlineData(0xB8600000u, "lmw r3,0(0)")]        // r0 is not in r3-r31
+    [InlineData(0xBC630000u, "stmw r3,0(r3)")]
+    [InlineData(0x7C6404AAu, ".long 0x7C6404AA")]   // lswi r3,r4,32: r3-r10
+    [InlineData(0x7CA524AAu, ".long 0x7CA524AA")]   // lswi r5,r5,4: one register
+    [InlineData(0x7CA62CAAu, ".long 0x7CA62CAA")]   // lswi r5,r6,5: two registers
+    [InlineData(0x7FC084AAu, ".long 0x7FC084AA")]   // lswi r30,0,16: r30, r31, r0, r1
+    [InlineData(0x7FC184AAu, ".long 0x7FC184AA")]   // lswi r30,r1,16
+    [InlineData(0x7FC284AAu, "lswi r30,r2,16")]
+    [InlineData(0x7CA624AAu, "lswi r5,r6,4")]
+    [InlineData(0x7CAC04AAu, ".long 0x7CAC04AA")]   // lswi r5,r12,32: r5-r12
+    [InlineData(0x7CAD04AAu, "lswi r5,r13,32")]
+    [InlineData(0x7CA5342Au, ".long 0x7CA5342A")]   // lswx r5,r5,r6
+    [InlineData(0x7CA42C2Au, ".long 0x7CA42C2A")]   // lswx r5,r4,r5
+    [InlineData(0x7C00342Au, ".long 0x7C00342A")]   // lswx r0,0,r6: rD = rA
+    [InlineData(0x7CA4342Au, "lswx r5,r4,r6")]
+    [InlineData(0x7CA5352Au, "stswx r5,r5,r6")]
+    [InlineData(0x7CA525AAu, "stswi r5,r5,4")]
+    public void Multiple_and_string_loads_with_rA_in_range_are_long(uint word, string expected) =>
         Assert.Equal(expected, PpcDisassembler.Decode(word, 0).Text);
 
     // SPR names follow the direction: TBL and TBU (284, 285) are written with mtspr and read with mftb, PVR (287) is

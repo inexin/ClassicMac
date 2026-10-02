@@ -37,9 +37,6 @@ public class M68kDisassemblerTests
     [InlineData("2F3C 434F 4445", "move.l #$434F4445,-(sp)  ; 'CODE'")]
     [InlineData("43F5 7800", "lea 0(a5,d7.l),a1")]
     [InlineData("49C7", "extb.l d7")]
-    // The specification writes divsl.l d3,d4; the size bit (10) is set, which Motorola's manual names
-    // DIVS.L <ea>,Dr:Dq (64/32). Bits 8 and 6 of the extension word are reserved; the processor ignores them.
-    [InlineData("4C43 4D44", "divs.l d3,d4:d4")]
     [InlineData("4C01 0000", "mulu.l d1,d0")]
     [InlineData("4870 0400", "pea 0(a0,d0.w*4)")]
     [InlineData("4EFB 0002", "jmp 2(pc,d0.w)")]
@@ -128,7 +125,7 @@ public class M68kDisassemblerTests
     public void Long_multiply_and_divide_forms()
     {
         Assert.Equal(("extb", M68kSize.Long), (D("49C7").Mnemonic, D("49C7").Size));
-        var div = D("4C43 4D44");
+        var div = D("4C43 4C04");
         Assert.Equal(("divs", M68kSize.Long), (div.Mnemonic, div.Size));
         Assert.Equal(new M68kRegisterPair(new(M68kRegisterKind.Data, 4), new(M68kRegisterKind.Data, 4), false),
             div.Operands[1]);
@@ -580,7 +577,14 @@ public class M68kDisassemblerTests
     [InlineData("3031 1D22 0010 0008", "move.w ([16,a1,d1.l*4],8),d0")]
     [InlineData("3031 1D37 0001 0000 0000 0002", "move.w ([65536,a1],d1.l*4,2),d0")]
     [InlineData("3031 01F1 0000 1234", "move.w ([$1234]),d0")]
-    [InlineData("3031 0150", "move.w (a1),d0")]
+    // A full extension word with only a base register is written with its base displacement, so it is not read as
+    // (An) or (PC): (0,a1), (0,pc), ($0000,zpc); memory indirect keeps its brackets [ClassicMac].
+    [InlineData("3031 0150", "move.w (0,a1),d0")]
+    [InlineData("3031 0160 0000", "move.w (0,a1),d0")]
+    [InlineData("303B 0150", "move.w (0,pc),d0  ; $1002")]
+    [InlineData("303B 01D0", "move.w ($0000,zpc),d0")]
+    [InlineData("3031 0151", "move.w ([a1]),d0")]
+    [InlineData("303B 0151", "move.w ([pc]),d0  ; $1002")]
     [InlineData("303B 0161 FFFE", "move.w ([-2,pc]),d0  ; $1000")]
     [InlineData("303B 0160 0010", "move.w (16,pc),d0  ; $1012")]
     [InlineData("303B 01E0 1234", "move.w ($1234,zpc),d0")]
@@ -813,6 +817,34 @@ public class M68kDisassemblerTests
     [InlineData("00C0 1000")]              // cmp2 on a data register
     [InlineData("4AFA")]                   // the CPU32's bgnd
     [InlineData("4C00 8000")]              // mul.l with bit 15 set
+    // The 32-bit multiply and divide extension words draw bit 15 and bits 9-3 as 0 [Doc: M68000 Family
+    // Programmer's Reference Manual, MULS, MULU, DIVS/DIVSL, DIVU/DIVUL].
+    [InlineData("4C00 0008")]              // mulu.l with bit 3 set
+    [InlineData("4C00 0040")]              // mulu.l with bit 6 set
+    [InlineData("4C00 0200")]              // mulu.l with bit 9 set
+    [InlineData("4C00 0C48")]              // muls.l 64-bit with bits 6 and 3 set
+    [InlineData("4C40 8000")]              // divu.l with bit 15 set
+    [InlineData("4C40 0008")]              // divu.l with bit 3 set
+    [InlineData("4C40 0200")]              // divu.l with bit 9 set
+    [InlineData("4C43 4D44")]              // divs.l with bits 8 and 6 set
+    // fmove FPn,<ea>: the k-factor field (bits 6-0) is used only by the packed formats and is drawn as 0 for the
+    // others [Doc: MC68881/MC68882 User's Manual, FMOVE].
+    [InlineData("F200 6001")]              // fmove.l fp0,d0 with a k-factor
+    [InlineData("F200 6440")]              // fmove.s fp0,d0 with bit 6 set
+    [InlineData("F210 6801")]              // fmove.x fp0,(a0) with a k-factor
+    [InlineData("F200 7001")]              // fmove.w fp0,d0 with a k-factor
+    [InlineData("F210 7401")]              // fmove.d fp0,(a0) with a k-factor
+    [InlineData("F200 7801")]              // fmove.b fp0,d0 with a k-factor
+    // move.b from an address register [Doc: M68000 Family Programmer's Reference Manual, MOVE: "for byte size
+    // operation, address register direct is not allowed"].
+    [InlineData("1008")]                   // move.b a0,d0
+    [InlineData("1088")]                   // move.b a0,(a0)
+    // fmovem.x with a dynamic list: the low byte is 0rrr0000 [Doc: MC68881/MC68882 User's Manual, FMOVEM].
+    [InlineData("F210 D801")]              // fmovem.x (a0),d0 with bit 0 set
+    [InlineData("F210 D808")]              // bit 3 set
+    [InlineData("F210 D880")]              // bit 7 set
+    [InlineData("F210 F801")]              // fmovem.x d0,(a0) with bit 0 set
+    [InlineData("F220 E801")]              // fmovem.x d0,-(a0) with bit 0 set
     [InlineData("E9C0 9108")]              // bit field with bit 15 set
     [InlineData("F210 7C31")]              // fmove.p with a dynamic k-factor and low bits set
     [InlineData("F23C 7C00")]              // fmovecr with an effective address
@@ -879,6 +911,23 @@ public class M68kDisassemblerTests
     [InlineData("F23C 8C00 0000 0002 0000 0003", "fmovem.l #2,#3,fpsr/fpiar")]
     [InlineData("F23C 9C00 0000 0001 0000 0002 0000 0003", "fmovem.l #1,#2,#3,fpcr/fpsr/fpiar")]
     public void Fmovem_of_control_registers(string hex, string expected) => Text(hex, expected);
+
+    // The forms next to the dc.w cases above that stay instructions: move of a word or long from An; fmove FPn,<ea>
+    // with a k-factor in the packed formats; fmovem.x with a dynamic list, from a PC-relative source too (memory to
+    // registers takes the control modes and (An)+, and the control modes include (d16,PC) and (d8,PC,Xn)) [Doc: M68000
+    // Family Programmer's Reference Manual, MOVE; MC68881/MC68882 User's Manual, FMOVE, FMOVEM].
+    [Theory]
+    [InlineData("3008", "move.w a0,d0")]
+    [InlineData("2088", "move.l a0,(a0)")]
+    [InlineData("F210 6C7F", "fmove.p fp0,(a0){#-1}")]
+    [InlineData("F210 7C70", "fmove.p fp0,(a0){d7}")]
+    [InlineData("F200 6000", "fmove.l fp0,d0")]
+    [InlineData("F210 D830", "fmovem.x (a0),d3")]
+    [InlineData("F210 F870", "fmovem.x d7,(a0)")]
+    [InlineData("F220 E820", "fmovem.x d2,-(a0)")]
+    [InlineData("F23A D830 0010", "fmovem.x 16(pc),d3  ; $1014")]
+    [InlineData("F23B D830 0010", "fmovem.x 16(pc,d0.w),d3")]
+    public void Forms_next_to_reserved_bits_decode(string hex, string expected) => Text(hex, expected);
 
     [Fact]
     public void Fmovem_immediate_is_one_long_per_register()

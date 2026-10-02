@@ -330,7 +330,9 @@ public static class M68kDisassembler
         private M68kInstruction? Move(ushort op, int a, int b, int m, int xn)
         {
             var size = ((op >> 12) & 3) switch { 1 => M68kSize.Byte, 3 => M68kSize.Word, _ => M68kSize.Long };
-            if (ReadEa(m, xn, size) is not { } src)
+            // Byte size does not allow an address register source [Doc: M68000 Family Programmer's Reference Manual,
+            // MOVE].
+            if (ReadEa(m, xn, size) is not { } src || (size == M68kSize.Byte && src.Mode == AReg))
                 return null;
             if (b == 1)
                 return size == M68kSize.Byte ? null : Make("movea", size, src.Operand, Ar(a));
@@ -436,9 +438,9 @@ public static class M68kDisassembler
             ushort ext = r.ReadUInt16();
             if (ReadEa(m, xn, M68kSize.Long) is not { IsData: true } ea)
                 return null;
-            // Bits 9-3 are reserved; the processor ignores them, and so do Ghidra and the specification's vector
-            // $4C43 $4D44 (fitted to those, not to Motorola's text, which only marks them 0). Bit 15 is kept 0.
-            if ((ext & 0x8000) != 0)
+            // The extension word draws bit 15 and bits 9-3 as 0, for the multiplies and the divides alike [Doc: M68000
+            // Family Programmer's Reference Manual, MULS, MULU, DIVS/DIVSL, DIVU/DIVUL].
+            if ((ext & 0x83F8) != 0)
                 return null;
             int low = (ext >> 12) & 7, high = ext & 7;
             bool signed = (ext & 0x0800) != 0, quad = (ext & 0x0400) != 0;
@@ -863,11 +865,12 @@ public static class M68kDisassembler
                 }
                 case 4:
                 {
-                    // ptest: 100 LLL R A RRR FFFFF; R 1 is ptestr. The A register field is 0xxx (none) or 1RRR, and
-                    // 0000 at level 0 [Doc: MC68851 PMMU User's Manual, A-22].
+                    // ptest: 100 LLL R A RRR FFFFF; R 1 is ptestr. The A register field is 0xxx (none; the register
+                    // bits are don't care, at every level) or 1RRR; at level 0 no descriptor is fetched, so A is 0
+                    // [Doc: MC68851 PMMU User's Manual, A-22, PTEST].
                     int level = field, an = (ext >> 5) & 7;
                     bool hasAn = (ext & 0x0100) != 0;
-                    if ((level == 0 && (ext & 0x01E0) != 0) || FunctionCode(ext) is not { } fc
+                    if ((level == 0 && hasAn) || FunctionCode(ext) is not { } fc
                         || ReadEa(m, xn, M68kSize.None) is not { IsControlAlterable: true } ea)
                         return null;
                     string name = toMemory ? "ptestr" : "ptestw";
@@ -1035,6 +1038,10 @@ public static class M68kDisassembler
                     var dn = Dr((k >> 4) & 7);
                     return Build("fmove", format, Join(Fp(fp), ea.Operand) + "{" + Format(dn) + "}", [Fp(fp), ea.Operand, dn]);
                 }
+                // Only the packed formats use the k-factor; for the others it is drawn as 0 [Doc: MC68881/MC68882
+                // User's Manual, FMOVE].
+                if (k != 0)
+                    return null;
                 return Make("fmove", format, Fp(fp), ea.Operand);
             }
 
@@ -1115,6 +1122,10 @@ public static class M68kDisassembler
                 bool ok = toMemory ? ea.IsControlAlterable || ea.Mode == PreDec : ea.IsControl || ea.Mode == PostInc;
                 bool predecrement = (mode & 2) == 0;
                 if (!ok || predecrement != (ea.Mode == PreDec))
+                    return null;
+                // A dynamic list is 0rrr0000: the data register in bits 6-4 [Doc: MC68881/MC68882 User's Manual,
+                // FMOVEM].
+                if ((mode & 1) != 0 && (args & 0x8F) != 0)
                     return null;
                 // The postincrement/control mask has FP0 in bit 7; the predecrement mask has FP0 in bit 0.
                 M68kOperand registers = (mode & 1) != 0
@@ -1475,6 +1486,9 @@ public static class M68kDisassembler
             case M68kAddressingMode.PcIndexed:
                 if (!ea.FullExtension)
                     return Decimal(ea.BaseDisplacement) + "(" + an + "," + index + ")";
+                // A base register alone keeps its displacement, so the full format is not read as (An) or (PC).
+                if (index is null && bd is null)
+                    bd = ea.BaseSuppressed ? "$0000" : "0";
                 return "(" + Parts(bd, baseName, index) + ")";
             case M68kAddressingMode.MemoryIndirectPostIndexed:
             case M68kAddressingMode.PcMemoryIndirectPostIndexed:

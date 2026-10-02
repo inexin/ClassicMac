@@ -199,7 +199,6 @@ public partial class PpcDisassemblerTests
     [InlineData(0x7CA0352A, "stswx r5,0,r6")]
     [InlineData(0x7CA4FCAA, "lswi r5,r4,31")]
     [InlineData(0x7CA4FDAA, "stswi r5,r4,31")]
-    [InlineData(0x7C6404AA, "lswi r3,r4,32")]
     [InlineData(0xB8610000, "lmw r3,0(r1)")]
     [InlineData(0xBC010000, "stmw r0,0(r1)")]
     [InlineData(0x7C602C2C, "lwbrx r3,0,r5")]

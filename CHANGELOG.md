@@ -5,6 +5,12 @@
 - Files: a disk image or volume whose first file is a `.hqx` or `.uu` file within 64 KB of its start is read as the
   disk, not as that file: BinHex and uuencode are recognised only when text alone precedes their marker or `begin`
   line (containers/binhex.md §5, uuencode.md §5).
+- Disassembly: more invalid forms are data, as Motorola's and IBM's manuals draw them: 68k `mul.l`/`div.l` with bits
+  9–3 of the extension word set, `fmove FPn,<ea>` with a k-factor to a non-packed format, `move.b` from an address
+  register and `fmovem.x` with a dynamic list outside 0rrr0000 are `dc.w`; PowerPC `lmw`/`lswi` with rA among the
+  registers loaded, `lswx` with rD = rA or rB, and conditional branches with a BO z bit set are `.long`. `ptest` at
+  level 0 ignores the register field when A is clear. A 68k full extension word with only a base register is written
+  `(0,a0)`, `(0,pc)` or `($0000,zpc)` instead of `(a0)`, `(pc)` or `(zpc)` (output/disassembly.md §1.1, §2.6, §2.7).
 - Files: a container's files are probed for formats in parallel, all probes of a file sharing one read of its head and
   tail: opening a 500 MB disk of 5,170 files takes 0.4 s, and unwrapping everything on it (`list`) 2.4 s instead of 11 s.
 - StuffIt: archives decode about ten times faster: forks decode in parallel, method 15 (Arsenic) writes into arrays
