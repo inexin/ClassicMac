@@ -13,10 +13,22 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels
 {
+    /// <summary>A line of the template panel's field list: the field, indented by its list nesting.</summary>
+    public sealed record TemplateOutlineLine(int Depth, string Label, string Type)
+    {
+        /// <summary>The indent in DIPs: 16 per level.</summary>
+        public int Indent => Depth * 16;
+    }
+
     /// <summary>A resource shown through a <c>TMPL</c>: one row per field, lists with their items, as ResEdit's
-    /// template editor shows it.</summary>
+    /// template editor shows it. On the read-then-edit host (design/boards/template-form.md, E6): values read only, inputs
+    /// while editing; counts always read only, kept in step with their lists.</summary>
     public sealed class TemplateForm : ResourceForm
     {
+        /// <summary>Which template is used when several open files hold one (<see cref="MainViewModel"/>'s FindTemplate).</summary>
+        public static string SourceRule =>
+            "The resource’s own file is searched first, then the other open files whose resources are read, in the order they were opened; the first 'TMPL' named for the type is used.";
+
         private readonly ResourceTemplate template;
         private readonly ReadOnlyMemory<byte> extra;
 
@@ -24,6 +36,14 @@ namespace ClassicMac.App.ViewModels
         {
             this.template = template;
             Source = source;
+            Outline = MakeOutline(template);
+            PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(IsEditing))
+                {
+                    TemplateRows.SetEditing(Fields, IsEditing);
+                }
+            };
             if (template.Problems.Count > 0)
             {
                 Note = "The template cannot be used: " + string.Join(" ", template.Problems);
@@ -47,12 +67,47 @@ namespace ClassicMac.App.ViewModels
             Note = notes.Count > 0 ? string.Join(" ", notes) : null;
         }
 
-        // Every field's value, and every list's items (added or removed, and their own fields), count as edits.
+        public override bool HasReadOnlyView => true;
+
+        public override string EditHint => "Counts follow their lists. Esc cancels, Ctrl+Enter applies.";
+
+        /// <summary>The template's fields, indented by nesting, for the template panel.</summary>
+        public IReadOnlyList<TemplateOutlineLine> Outline { get; }
+
+        private static List<TemplateOutlineLine> MakeOutline(ResourceTemplate template)
+        {
+            var lines = new List<TemplateOutlineLine>();
+            var depth = 0;
+            foreach (var field in template.Fields)
+            {
+                if (field.Type == "LSTE")
+                {
+                    depth = Math.Max(0, depth - 1);
+                }
+
+                lines.Add(new TemplateOutlineLine(depth, field.Label, field.Type));
+                if (field.Type is "LSTB" or "LSTC" or "LSTZ")
+                {
+                    depth++;
+                }
+            }
+
+            return lines;
+        }
+
+        // Every field's value, and every list's items (added or removed, and their own fields), count as edits; the
+        // rows' mode and display texts do not.
         private void WatchRows(ObservableCollection<TemplateRow> rows)
         {
             foreach (var row in rows)
             {
-                row.PropertyChanged += (_, _) => RaiseEdited();
+                row.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(TemplateScalarRow.Text))
+                    {
+                        RaiseEdited();
+                    }
+                };
                 if (row is not TemplateListRow list)
                 {
                     continue;
@@ -78,6 +133,9 @@ namespace ClassicMac.App.ViewModels
         /// <summary>Where the template comes from ("TMPL 'DLOG' in ResEdit").</summary>
         public string Source { get; }
 
+        /// <summary>The header's fact: "'TMPL' 1000 “BNDL” in ResEdit"; null when not known.</summary>
+        public string? ShownThrough { get; init; }
+
         /// <summary>What does not fit the template, or why it cannot be used.</summary>
         public string? Note { get; }
 
@@ -99,9 +157,13 @@ namespace ClassicMac.App.ViewModels
     }
 
     /// <summary>One field of a <see cref="TemplateForm"/>.</summary>
-    public abstract class TemplateRow(TemplateNode node) : ObservableObject
+    public abstract partial class TemplateRow(TemplateNode node) : ObservableObject
     {
         public TemplateNode Node { get; } = node;
+
+        /// <summary>Whether the host is editing the form (inputs) or showing it read only; set through the form.</summary>
+        [ObservableProperty]
+        private bool isEditing;
 
         public string Label => Node.Label.Length > 0 ? Node.Label : Node.Type;
 
@@ -114,8 +176,20 @@ namespace ClassicMac.App.ViewModels
     public sealed partial class TemplateScalarRow(TemplateNode node, string text) : TemplateRow(node)
     {
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Flag))]
+        [NotifyPropertyChangedFor(nameof(Flag), nameof(DisplayText))]
         private string text = text;
+
+        /// <summary>The value read only: four-character codes quoted, flags as Yes or No.</summary>
+        public string DisplayText => Node.IsFlag ? (Flag ? "Yes" : "No") : Node.Type == "TNAM" ? $"'{Text}'" : Text;
+
+        /// <summary>Whether editing shows a text input: text fields other than counts.</summary>
+        public bool IsEditableText => IsText && !IsReadOnly;
+
+        /// <summary>A four-character code (shown quoted, in mono).</summary>
+        public bool IsCode => Node.Type == "TNAM";
+
+        /// <summary>A count's note; null for other fields.</summary>
+        public string? CountNote => IsReadOnly ? "kept in step with the list" : null;
 
         public bool IsFlag => Node.IsFlag;
 
@@ -148,11 +222,47 @@ namespace ClassicMac.App.ViewModels
                 Items.Add(new TemplateItemRow(this, TemplateRows.Make(item, depth + 1)));
             }
 
-            Items.CollectionChanged += (_, _) => Renumber();
+            Items.CollectionChanged += (_, e) =>
+            {
+                // New items take the list's mode.
+                foreach (var item in e.NewItems?.OfType<TemplateItemRow>() ?? [])
+                {
+                    TemplateRows.SetEditing(item.Fields, IsEditing);
+                }
+
+                Renumber();
+            };
             Renumber();
         }
 
         public ObservableCollection<TemplateItemRow> Items { get; } = [];
+
+        /// <summary>The list's heading: its label, or its count's label for a "*****" list ("Number of types"), else "Items".</summary>
+        public string Heading => !Node.Label.All(c => c == '*') && Node.Label.Length > 0 ? Node.Label : count?.Label ?? "Items";
+
+        /// <summary>The add button's label, from the list's own items: "Add Type".</summary>
+        public string AddLabel => Node.Children.FirstOrDefault(c => !c.IsCount && !c.IsList && !c.IsHidden) is { } first && first.Label.Length > 0
+            ? $"Add {first.Label}"
+            : "Add item";
+
+        /// <summary>A list inside a list's item: shown as a compact table.</summary>
+        public bool IsCompact => depth > 0;
+
+        /// <summary>The compact table's columns: the item's fields.</summary>
+        public IReadOnlyList<string> Columns => [.. Node.Children.Where(c => !c.IsList && !c.IsHidden).Select(c => c.Label.Length > 0 ? c.Label : c.Type)];
+
+        // The mode passes on to the items' fields.
+        protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            base.OnPropertyChanged(e);
+            if (e.PropertyName == nameof(IsEditing))
+            {
+                foreach (var item in Items)
+                {
+                    TemplateRows.SetEditing(item.Fields, IsEditing);
+                }
+            }
+        }
 
         public string Summary => Items.Count == 1 ? "1 item" : $"{Items.Count} items";
 
@@ -185,11 +295,41 @@ namespace ClassicMac.App.ViewModels
     }
 
     /// <summary>One item of a list.</summary>
-    public sealed partial class TemplateItemRow(TemplateListRow list, ObservableCollection<TemplateRow> fields) : ObservableObject
+    public sealed partial class TemplateItemRow : ObservableObject
     {
-        public TemplateListRow List { get; } = list;
+        public TemplateItemRow(TemplateListRow list, ObservableCollection<TemplateRow> fields)
+        {
+            List = list;
+            Fields = fields;
+            foreach (var field in fields)
+            {
+                field.PropertyChanged += (_, e) =>
+                {
+                    if (field is TemplateListRow && e.PropertyName == nameof(TemplateListRow.Summary))
+                    {
+                        OnPropertyChanged(nameof(ItemSummary));
+                    }
+                    else if (ReferenceEquals(field, KeyField) && e.PropertyName == nameof(TemplateScalarRow.DisplayText))
+                    {
+                        OnPropertyChanged(nameof(KeyText));
+                    }
+                };
+            }
+        }
 
-        public ObservableCollection<TemplateRow> Fields { get; } = fields;
+        public TemplateListRow List { get; }
+
+        public ObservableCollection<TemplateRow> Fields { get; }
+
+        private TemplateScalarRow? KeyField => Fields.OfType<TemplateScalarRow>().FirstOrDefault(f => !f.IsReadOnly);
+
+        /// <summary>The item's key field, shown in its card's header ("'ICN#'").</summary>
+        public string? KeyText => KeyField?.DisplayText;
+
+        /// <summary>Its lists' sizes, in the card's header ("3 items"); null without lists.</summary>
+        public string? ItemSummary => Fields.OfType<TemplateListRow>().Select(l => l.Summary).ToList() is { Count: > 0 } summaries
+            ? string.Join(" · ", summaries)
+            : null;
 
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(Title))]
@@ -223,13 +363,22 @@ namespace ClassicMac.App.ViewModels
         }
 
         public static List<TemplateValue> Values(IEnumerable<TemplateRow> rows) => rows.Select(r => r.ToValue()).ToList();
+
+        // The host's mode, to every row (a list passes it on to its items).
+        public static void SetEditing(IEnumerable<TemplateRow> rows, bool editing)
+        {
+            foreach (var row in rows)
+            {
+                row.IsEditing = editing;
+            }
+        }
     }
 
     public sealed partial class MainViewModel
     {
         // The TMPL for a type, as ResEdit finds one: in the resource's own file, then in the other open files whose
         // resources are loaded; else ClassicMac's built-in template for the type; null when there is none.
-        private (ResourceTemplate Template, string Source)? FindTemplate(FourCC type, ResourceFork own, NodeViewModel? ownFile)
+        private (ResourceTemplate Template, string Source, string ShownThrough)? FindTemplate(FourCC type, ResourceFork own, NodeViewModel? ownFile)
         {
             var forks = new List<(ResourceFork Fork, string Name)> { (own, ownFile?.BaseTitle ?? "this file") };
             foreach (var root in Roots)
@@ -253,14 +402,14 @@ namespace ClassicMac.App.ViewModels
                 try
                 {
                     var data = ResourceDecompression.Default.GetData(tmpl, fork, ReadOptions, []);
-                    return (ResourceTemplate.Parse(data.Span), $"Template: TMPL {tmpl.Id} “{type}” in {name}");
+                    return (ResourceTemplate.Parse(data.Span), $"Template: TMPL {tmpl.Id} “{type}” in {name}", $"'TMPL' {tmpl.Id} “{type}” in {name}");
                 }
                 catch (InvalidDataException)
                 {
                     continue;
                 }
             }
-            return BuiltInTemplates.For(type) is { } builtIn ? (builtIn.Template, $"Template: built in, from {builtIn.Source}") : null;
+            return BuiltInTemplates.For(type) is { } builtIn ? (builtIn.Template, $"Template: built in, from {builtIn.Source}", $"ClassicMac's built-in '{type}' template") : null;
         }
 
         /// <summary>
@@ -300,7 +449,7 @@ namespace ClassicMac.App.ViewModels
             }
 
             var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, ReadOptions, []);
-            return new TemplateForm(node.Resource, found.Template, found.Source, data.Span);
+            return new TemplateForm(node.Resource, found.Template, found.Source, data.Span) { ShownThrough = found.ShownThrough };
         }
 
         private static IEnumerable<(ResourceFork Fork, string Name)> Loaded(NodeViewModel node)

@@ -483,6 +483,79 @@
       <Setter Property="VerticalAlignment" Value="Top" />
     </Style>
 
+    <!-- The template form (boards/template-form.md, E6): the note on CmWarningTint, fields in a card with their type
+         codes, list headings, item cards with a header strip, nested lists as compact tables, the template panel 300 wide. -->
+    <Style Selector="Border.note-banner">
+      <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="Margin" Value="0,0,0,12" />
+    </Style>
+    <Style Selector="Border.note-banner TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
+    </Style>
+    <Style Selector="Grid.template-field TextBlock.type-code">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+      <Setter Property="Margin" Value="8,0,0,0" />
+    </Style>
+    <Style Selector="Grid.template-field TextBlock.value.code">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    </Style>
+    <Style Selector="TextBlock.count-note">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="StackPanel.template-list">
+      <Setter Property="Margin" Value="14,10" />
+    </Style>
+    <Style Selector="TextBlock.list-heading">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
+      <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.item-card">
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector="Border.item-header">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="Padding" Value="12,6" />
+    </Style>
+    <Style Selector="TextBlock.item-key">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="StackPanel.compact-table :is(Control).table-cell">
+      <Setter Property="Width" Value="112" />
+      <Setter Property="Margin" Value="0,2" />
+    </Style>
+    <Style Selector="StackPanel.compact-table Panel.table-cell TextBlock">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.link.danger">
+      <Setter Property="Foreground" Value="{DynamicResource CmError}" />
+    </Style>
+    <Style Selector="Border.template-panel">
+      <Setter Property="Width" Value="300" />
+      <Setter Property="Margin" Value="16,0,0,0" />
+      <Setter Property="Padding" Value="16,12" />
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusLarge}" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="Border.template-panel TextBlock.outline">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    </Style>
+    <Style Selector="Border.template-panel TextBlock.note">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    </Style>
+
     <!-- The menu form (E2): summary, table rows 32 high with CmDivider between, the selected row CmRowHighlight with a
          3 px CmAccent bar, disabled items muted, dividers as a short rule; key fields that clash in CmError on
          CmErrorTint; the preview panel 420 wide. -->
@@ -1916,43 +1989,131 @@
                         </StackPanel>
                       </ScrollViewer>
                     </DataTemplate>
+                    <!-- The template form (boards/template-form.md, E6): the note banner, the fields in a card, each list as a
+                         heading and item cards (a list inside an item as a compact table); the template panel on the right. -->
                     <DataTemplate DataType="vm:TemplateForm">
-                      <DockPanel>
-                        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,8">
-                          <TextBlock Text="{Binding Source}" Classes="muted" />
-                          <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" TextWrapping="Wrap" Classes="warning" />
-                        </StackPanel>
-                        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-                          <ItemsControl ItemsSource="{Binding Fields}" />
-                        </ScrollViewer>
-                      </DockPanel>
-                    </DataTemplate>
-                    <DataTemplate DataType="vm:TemplateScalarRow">
-                      <Grid ColumnDefinitions="220,*" Margin="0,2">
-                        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Type}" Margin="0,0,8,0" />
-                        <TextBox Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding IsText}" IsReadOnly="{Binding IsReadOnly}" Classes.readonly="{Binding IsReadOnly}" TextWrapping="Wrap" />
-                        <CheckBox Grid.Column="1" IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" />
+                      <Grid x:Name="TemplateCards" ColumnDefinitions="*,Auto">
+                        <DockPanel>
+                          <Border x:Name="TemplateNote" DockPanel.Dock="Top" Classes="note-banner" IsVisible="{Binding HasNote}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <views:SeverityIcon Severity="Warning" Width="14" Height="14" VerticalAlignment="Top" />
+                              <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
+                            </StackPanel>
+                          </Border>
+                          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+                            <Border Classes="card">
+                              <ItemsControl ItemsSource="{Binding Fields}" Margin="0,4" />
+                            </Border>
+                          </ScrollViewer>
+                        </DockPanel>
+                        <Border Grid.Column="1" Classes="template-panel">
+                          <StackPanel Spacing="8">
+                            <TextBlock Classes="caption" Text="TEMPLATE" />
+                            <TextBlock Text="{Binding Source}" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted note" Text="{x:Static vm:TemplateForm.SourceRule}" TextWrapping="Wrap" />
+                            <ItemsControl ItemsSource="{Binding Outline}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:TemplateOutlineLine">
+                                  <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent, Converter={x:Static views:TemplateViews.Indent}}">
+                                    <TextBlock Classes="outline" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Classes="outline muted" Text="{Binding Type}" Margin="8,0,0,0" />
+                                  </Grid>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Classes="muted note" Text="“Edit with template” off: the resource opens in Hex only." TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Border>
                       </Grid>
                     </DataTemplate>
+                    <DataTemplate DataType="vm:TemplateScalarRow">
+                      <Border Classes="card-line">
+                        <Grid Classes="card-row form-row template-field" ColumnDefinitions="180,*,Auto">
+                          <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
+                            <TextBlock Classes="value" Classes.code="{Binding IsCode}" Text="{Binding DisplayText}" TextWrapping="Wrap" />
+                            <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" />
+                          </StackPanel>
+                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEditing}">
+                            <TextBox Text="{Binding Text}" IsVisible="{Binding IsEditableText}" MinWidth="160" TextWrapping="Wrap" AutomationProperties.Name="{Binding Label}" />
+                            <CheckBox IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" AutomationProperties.Name="{Binding Label}" />
+                            <TextBlock Classes="value" Text="{Binding DisplayText}" IsVisible="{Binding IsReadOnly}" />
+                            <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="2" Classes="type-code" Text="{Binding Type}" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
                     <DataTemplate DataType="vm:TemplateListRow">
-                      <StackPanel Margin="0,4" Spacing="4">
+                      <StackPanel Classes="template-list" Spacing="6">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                          <TextBlock Text="{Binding Label}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                          <TextBlock Text="{Binding Summary}" Classes="muted" VerticalAlignment="Center" />
-                          <Button Content="Add Item" Command="{Binding AddCommand}" />
+                          <TextBlock Classes="list-heading" Text="{Binding Heading}" />
+                          <TextBlock Classes="muted" Text="{Binding Summary}" VerticalAlignment="Center" />
+                          <Button Content="{Binding AddLabel}" Command="{Binding AddCommand}" IsVisible="{Binding IsEditing}" />
                         </StackPanel>
-                        <ItemsControl ItemsSource="{Binding Items}" Margin="16,0,0,0" />
+                        <!-- Top-level lists: a card per item. -->
+                        <ItemsControl ItemsSource="{Binding Items}" IsVisible="{Binding !IsCompact}" />
+                        <!-- A list inside an item: a compact table. -->
+                        <StackPanel Classes="compact-table" IsVisible="{Binding IsCompact}">
+                          <ItemsControl ItemsSource="{Binding Columns}">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="x:String">
+                                <TextBlock Classes="caption table-cell" Text="{Binding}" />
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <ItemsControl ItemsSource="{Binding Items}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="vm:TemplateItemRow">
+                                <StackPanel Classes="form-row" Orientation="Horizontal">
+                                  <ItemsControl ItemsSource="{Binding Fields}">
+                                    <ItemsControl.ItemsPanel>
+                                      <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                      </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate DataType="vm:TemplateRow">
+                                        <Panel Classes="table-cell">
+                                          <TextBlock Text="{Binding $parent[Panel].((vm:TemplateScalarRow)DataContext).DisplayText, FallbackValue={x:Null}}"
+                                                     IsVisible="{Binding !IsEditing}" />
+                                          <TextBox Text="{Binding $parent[Panel].((vm:TemplateScalarRow)DataContext).Text, FallbackValue={x:Null}}"
+                                                   IsVisible="{Binding IsEditing}" MinWidth="0" Width="104" />
+                                        </Panel>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                  <Button Classes="link danger" Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}"
+                                          IsVisible="{Binding List.IsEditing}" />
+                                </StackPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
                       </StackPanel>
                     </DataTemplate>
                     <DataTemplate DataType="vm:TemplateItemRow">
-                      <Border BorderThickness="1,0,0,0" BorderBrush="{DynamicResource CmBorder}" Padding="8,2,0,2" Margin="0,2">
-                        <StackPanel Spacing="2">
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <TextBlock Text="{Binding Title}" Classes="muted" VerticalAlignment="Center" />
-                            <Button Content="Insert Before" Command="{Binding List.InsertCommand}" CommandParameter="{Binding}" />
-                            <Button Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}" />
-                          </StackPanel>
-                          <ItemsControl ItemsSource="{Binding Fields}" />
+                      <Border Classes="card item-card">
+                        <StackPanel>
+                          <Border Classes="item-header form-row">
+                            <DockPanel>
+                              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" IsVisible="{Binding List.IsEditing}">
+                                <Button Classes="link" Content="Insert before" Command="{Binding List.InsertCommand}" CommandParameter="{Binding}" />
+                                <Button Classes="link danger" Content="Remove" Command="{Binding List.RemoveCommand}" CommandParameter="{Binding}" />
+                              </StackPanel>
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Classes="muted" Text="{Binding Title}" />
+                                <TextBlock Classes="item-key" Text="{Binding KeyText}" />
+                                <TextBlock Classes="muted" Text="{Binding ItemSummary}" />
+                              </StackPanel>
+                            </DockPanel>
+                          </Border>
+                          <ItemsControl ItemsSource="{Binding Fields}" Margin="0,2" />
                         </StackPanel>
                       </Border>
                     </DataTemplate>

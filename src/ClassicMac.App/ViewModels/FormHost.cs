@@ -79,11 +79,35 @@ namespace ClassicMac.App.ViewModels
             {
                 form.IsEditing = value;
             }
+
+            OnPropertyChanged(nameof(Header));
+        }
+
+        private ResourceForm? sizedForm;
+
+        // While editing, the header's Size follows the draft.
+        private void OnFormEditedForHeader(object? sender, EventArgs e)
+        {
+            if (IsEditingForm)
+            {
+                OnPropertyChanged(nameof(Header));
+            }
         }
 
         // A new form (another selection, a discard, the template choice) takes the host's mode.
         private void HostForm(ResourceForm? form)
         {
+            if (sizedForm is not null)
+            {
+                sizedForm.Edited -= OnFormEditedForHeader;
+            }
+
+            sizedForm = form;
+            if (form is not null)
+            {
+                form.Edited += OnFormEditedForHeader;
+            }
+
             if (form is not null)
             {
                 form.IsEditing = IsEditingForm;
@@ -91,6 +115,7 @@ namespace ClassicMac.App.ViewModels
 
             OnPropertyChanged(nameof(ShowsForm));
             OnPropertyChanged(nameof(FormHint));
+            OnPropertyChanged(nameof(Header));
         }
 
         partial void OnFormErrorChanged(string? value) => ApplyFormCommand.NotifyCanExecuteChanged();

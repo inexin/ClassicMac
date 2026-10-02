@@ -50,8 +50,11 @@ public sealed class FormHostTests : IDisposable
         await Select(model, input, "CNTL");
         Assert.True(model.ShowsForm);                                      // moved (E4): its property cards
 
-        // A form without a read-only view (the template form until E6 moves it): its preview until Edit.
         await Select(model, input, "Rsrc");
+        Assert.True(model.ShowsForm);                                      // moved (E6): its fields and lists
+
+        // A form without a read-only view (every form has one now; the host still shows the preview until Edit).
+        model.Form = new NoReadOnlyView(model.Form!.Resource);
         Assert.False(model.Form!.HasReadOnlyView);
         Assert.False(model.ShowsForm);
         model.EditFormCommand.Execute(null);
@@ -173,5 +176,10 @@ public sealed class FormHostTests : IDisposable
         Assert.IsType<StringListForm>(model.Form);
         Assert.False(model.IsEditingForm);
         Assert.True(input.IsUnsaved);
+    }
+
+    private sealed class NoReadOnlyView(ClassicMac.Resources.Resource resource) : ResourceForm(resource)
+    {
+        public override byte[] BuildData() => Resource.GetData().ToArray();
     }
 }

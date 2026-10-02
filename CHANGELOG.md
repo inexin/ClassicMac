@@ -18,6 +18,13 @@
   mctb (`BuiltInTemplates`, `ResourceTemplate.FromFields`), from Inside Macintosh and the ResEdit Reference; the
   template form and the hex view's byte meanings use them when no open file has a `TMPL` for the type, which still
   wins (templates.md §5).
+- Editor: resources shown through a template (`'TMPL'`) open read only on the form host: a note banner for what the
+  template does not cover, the fields in a card with their values (four-character codes quoted, flags as Yes/No) and
+  type codes, counts always read only and "kept in step with the list", each list as a heading with its item count and
+  one card per item (its number, key field and size), a list inside an item as a compact table, and a template panel
+  with where the template was found, which one wins when several open files have one, and its fields. Edit shows
+  inputs and Add/Insert before/Remove; counts and the header's Size follow at once. The header names the template
+  ("Shown through 'TMPL' 128 “Rsrc” in Forms.rsrc").
 - Editor: window, dialog, alert and control forms open read only as property cards (bounds; title, definition,
   visibility, close box, reference constant, auto-position) and switch to inputs with Edit. Window and control
   definitions and positioning words are named ("Document window", `documentProc · 0`; "Stagger on parent window’s

@@ -233,13 +233,13 @@ public class WindowTests
                 Assert.IsType(form, model.Form);
                 model.EditFormCommand.Execute(null);
                 Dispatcher.UIThread.RunJobs();
-                Capture(window, "edit-" + type.TrimEnd('#'), type == "DITL" ? baselines : null);
+                Capture(window, "edit-" + type.TrimEnd('#'), type is "DITL" or "Rsrc" ? baselines : null);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
             }
 
-            // The template's count field is read only and shown muted by its class, not an opacity.
-            var count = window.GetVisualDescendants().OfType<TextBox>().Single(t => t.IsReadOnly && t.IsEffectivelyVisible);
-            Assert.Contains("readonly", count.Classes);
+            // The template's count field stays text while editing (no input), with its note (E6).
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsReadOnly && t.IsEffectivelyVisible);
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text == "kept in step with the list");
 
             // The item list's preview follows its form before Apply.
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "DITL").Children[0];

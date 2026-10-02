@@ -40,9 +40,10 @@ namespace ClassicMac.App.ViewModels
         };
 
         /// <summary>The header for <paramref name="node"/>; null for none and the loading placeholder.</summary>
-        public static InspectorHeader? For(NodeViewModel? node) => node switch
+        /// <summary>The header for <paramref name="node"/>; <paramref name="draftSize"/>, while a form is edited, is its resource's Size.</summary>
+        public static InspectorHeader? For(NodeViewModel? node, long? draftSize = null) => node switch
         {
-            ResourceNode resource => Resource(resource),
+            ResourceNode resource => Resource(resource, draftSize),
             ResourceTypeNode type => Type(type),
             FileNode file => new InspectorHeader(file, file.Name, $"{(ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? "Application" : "Document")} in {OwnerName(file)}",
                 [TypeCreator(file.File), Size(file.File.DataFork.Length + file.File.ResourceFork.Length), Resources(file)]),
@@ -56,7 +57,7 @@ namespace ClassicMac.App.ViewModels
             _ => null,
         };
 
-        private static InspectorHeader Resource(ResourceNode node)
+        private static InspectorHeader Resource(ResourceNode node, long? draftSize)
         {
             var resource = node.Resource;
             var type = resource.Type.ToString();
@@ -76,7 +77,7 @@ namespace ClassicMac.App.ViewModels
                 facts.AddRange(ItemListFacts(node));
             }
 
-            facts.Add(Bytes(resource.Length));
+            facts.Add(Bytes(draftSize ?? resource.Length));
             facts.Add(new("Attributes", resource.Attributes == ResourceAttributes.None ? "none" : resource.Attributes.ToString(), false));
             return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}", facts);
         }
@@ -183,7 +184,17 @@ namespace ClassicMac.App.ViewModels
     public sealed partial class MainViewModel
     {
         /// <summary>The selection's header; null with nothing selected.</summary>
-        public InspectorHeader? Header => InspectorHeader.For(Selected);
+        public InspectorHeader? Header
+        {
+            get
+            {
+                var header = InspectorHeader.For(Selected, IsEditingForm ? Form?.DraftLength : null);
+                // A resource shown through a template says which (boards/template-form.md).
+                return header is not null && Form is TemplateForm { ShownThrough: { } through }
+                    ? header with { Facts = [.. header.Facts, new InspectorFact("Shown through", through, false)] }
+                    : header;
+            }
+        }
 
         /// <summary>What the header's Export… does for the selection: save a resource, export a file's or type's resources, or extract all.</summary>
         public IRelayCommand HeaderExportCommand => Selected switch

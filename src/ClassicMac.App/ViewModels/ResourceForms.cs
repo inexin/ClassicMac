@@ -126,6 +126,9 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
+        /// <summary>The length of the bytes the values make now; null while they have an error.</summary>
+        internal int? DraftLength => Snapshot().Data?.Length;
+
         private (byte[]? Data, string? Error) Snapshot()
         {
             try
