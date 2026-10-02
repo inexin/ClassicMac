@@ -202,6 +202,40 @@ public sealed partial class EditTests
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
     }
 
+    // "Show item" on a diagnostic's row (design/boards/diagnostics.md): selects its node through the same question,
+    // opens its ancestors and asks the view to show it; nothing is shown when the user cancels.
+    [Fact]
+    public async Task Show_item_selects_the_diagnostic_s_node_and_shows_it()
+    {
+        var (model, file, dialogs, _, _) = await Open();
+        var shown = new List<NodeViewModel>();
+        model.ItemShown += shown.Add;
+        var target = Resource(file, 129);
+        var entry = new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Warning, "test", "a warning"), "Prefs", target);
+        Assert.False(model.ShowItemCommand.CanExecute(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "input.unreadable", "gone"), "x", null)));
+        Assert.True(model.ShowItemCommand.CanExecute(entry));
+        Assert.True(entry.HasNode);
+
+        model.Selected = Resource(file, 128);
+        target.Parent!.IsExpanded = false;
+        Assert.IsType<StringForm>(model.Form).Text = "edited";
+        dialogs.Draft = DraftChoice.Cancel;
+        await model.ShowItemCommand.ExecuteAsync(entry);
+        Assert.Single(dialogs.DraftAsked);
+        Assert.Equal(128, ((ResourceNode)model.Selected!).Resource.Id);
+        Assert.Empty(shown);
+
+        dialogs.Draft = DraftChoice.Discard;
+        await model.ShowItemCommand.ExecuteAsync(entry);
+        Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
+        Assert.True(model.Selected!.Parent!.IsExpanded);
+        Assert.Same(model.Selected, Assert.Single(shown));
+
+        // With no draft it shows at once, even the node already selected.
+        await model.ShowItemCommand.ExecuteAsync(entry);
+        Assert.Equal(2, shown.Count);
+    }
+
     [Fact]
     public async Task Opening_a_file_asks_before_selecting_it()
     {

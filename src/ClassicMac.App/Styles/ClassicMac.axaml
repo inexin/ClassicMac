@@ -175,6 +175,23 @@
   <Style Selector=":is(Button).flat:pointerover /template/ ContentPresenter#PART_ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
   </Style>
+  <!-- Links: accent text, no button chrome ("Show item"). -->
+  <Style Selector=":is(Button).link">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector=":is(Button).link /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+  </Style>
+  <Style Selector=":is(Button).link:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+  </Style>
   <Style Selector="ToggleButton.flat.outlined">
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Padding" Value="8,2" />

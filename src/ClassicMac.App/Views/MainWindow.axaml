@@ -60,6 +60,31 @@
     <Style Selector="Grid.diagnostic-columns">
       <Setter Property="Margin" Value="11,0,8,0" />
     </Style>
+    <Style Selector="Border.diagnostics-header">
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Border.diagnostics-header.collapsed">
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+    </Style>
+    <Style Selector="ListBox.diagnostics Button.show-item">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ListBox.diagnostics ListBoxItem:selected Button.show-item">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+
+    <!-- The diagnostics' drag handle: a 6 px chrome strip under a CmBorder line, a 36 x 2 grip in its middle. -->
+    <Style Selector="GridSplitter.handle">
+      <Setter Property="Background" Value="{DynamicResource CmChromeBackground}" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Background="{TemplateBinding Background}" BorderBrush="{DynamicResource CmBorder}" BorderThickness="0,1,0,0">
+            <Border Width="36" Height="2" CornerRadius="1" Background="{DynamicResource CmControlBorder}"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </Style>
     <Style Selector="Grid.diagnostic-columns.grouped">
       <Setter Property="Margin" Value="35,0,8,0" />
     </Style>
@@ -127,7 +152,7 @@
       <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
     </Border>
 
-    <Grid x:Name="Body" RowDefinitions="*,5,196">
+    <Grid x:Name="Body" RowDefinitions="*,6,196">
       <Grid ColumnDefinitions="380,5,*">
         <TreeView x:Name="Tree" Classes="sidebar" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
           <TreeView.KeyBindings>
@@ -602,12 +627,14 @@
         </TabControl>
       </Grid>
 
-      <GridSplitter Grid.Row="1" ResizeDirection="Rows" IsVisible="{Binding DiagnosticsPanel.IsExpanded}" />
+      <!-- The drag handle: a 6 px strip with a 36 x 2 grip; hidden while the panel is collapsed. -->
+      <GridSplitter Grid.Row="1" Classes="handle" ResizeDirection="Rows" IsVisible="{Binding DiagnosticsPanel.IsExpanded}"
+                    AutomationProperties.Name="Resize the diagnostics" />
 
       <!-- The diagnostics panel (design/boards/diagnostics.md): header bar, column headers, rows grouped by file. -->
       <DockPanel Grid.Row="2" DataContext="{Binding DiagnosticsPanel}" x:DataType="vm:DiagnosticsPanel">
-        <Border DockPanel.Dock="Top" Classes="chrome" Height="{DynamicResource CmPanelHeader}" Padding="4,0,8,0"
-                BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CmBorder}">
+        <Border DockPanel.Dock="Top" Classes="chrome diagnostics-header" Classes.collapsed="{Binding !IsExpanded}"
+                Height="{DynamicResource CmPanelHeader}" Padding="4,0,8,0" BorderBrush="{DynamicResource CmBorder}">
           <DockPanel>
             <ToggleButton DockPanel.Dock="Left" Classes="flat" IsChecked="{Binding IsExpanded, Mode=TwoWay}" VerticalAlignment="Center"
                           ToolTip.Tip="Show or hide the diagnostics (Ctrl+Shift+D)" AutomationProperties.Name="Diagnostics">
@@ -674,7 +701,7 @@
         <!-- Column headers. -->
         <Border DockPanel.Dock="Top" Classes="pane" Height="26" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CmDivider}"
                 IsVisible="{Binding IsExpanded}">
-          <Grid ColumnDefinitions="110,260,210,*" Classes.grouped="{Binding ByFile}" Classes="diagnostic-columns">
+          <Grid ColumnDefinitions="110,260,210,*,90" Classes.grouped="{Binding ByFile}" Classes="diagnostic-columns">
             <Button Classes="flat" Padding="0" VerticalAlignment="Center" Command="{Binding SortBySeverityCommand}"
                     ToolTip.Tip="Sort by severity" AutomationProperties.Name="Sort by severity">
               <StackPanel Orientation="Horizontal" Spacing="4">
@@ -703,7 +730,7 @@
             </DataTemplate>
             <DataTemplate DataType="vm:DiagnosticEntry">
               <Border Classes="diagnostic-row">
-                <Grid ColumnDefinitions="110,260,210,*" VerticalAlignment="Center">
+                <Grid ColumnDefinitions="110,260,210,*,90" VerticalAlignment="Center">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <views:SeverityIcon Severity="{Binding Diagnostic.Severity}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Severity}" FontWeight="{DynamicResource CmFontWeightStrong}"
@@ -712,6 +739,12 @@
                   <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Source}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
                   <TextBlock Grid.Column="2" Classes="mono muted" Text="{Binding Code}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
                   <TextBlock Grid.Column="3" Text="{Binding Message}" TextTrimming="CharacterEllipsis" />
+                  <!-- On the selected row only (style), for an entry with a node. -->
+                  <Panel Grid.Column="4" IsVisible="{Binding HasNode}">
+                    <Button Classes="link show-item" Content="Show item" HorizontalAlignment="Right"
+                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowItemCommand, FallbackValue={x:Null}}"
+                            CommandParameter="{Binding}" ToolTip.Tip="Select it in the tree" />
+                  </Panel>
                 </Grid>
               </Border>
             </DataTemplate>

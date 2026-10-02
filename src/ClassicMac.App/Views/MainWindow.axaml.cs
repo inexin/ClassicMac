@@ -31,6 +31,7 @@ namespace ClassicMac.App.Views
                 {
                     boundPanel = model.DiagnosticsPanel;
                     DiagnosticsRow.Bind(Body.RowDefinitions[1], Body.RowDefinitions[2], boundPanel);
+                    model.ItemShown += ShowInTree;
                 }
             };
             Closing += OnClosing;
@@ -47,6 +48,24 @@ namespace ClassicMac.App.Views
         }
 
         private DiagnosticsPanel? boundPanel;
+
+        // "Show item": once the opened ancestors have their rows, the node's row scrolls into view and takes the focus.
+        private void ShowInTree(NodeViewModel node) => Dispatcher.UIThread.Post(() =>
+        {
+            Tree.UpdateLayout();
+            if (ContainerOf(node) is not { } row) return;
+            row.BringIntoView();
+            row.Focus();
+        }, DispatcherPriority.Background);
+
+        // The tree row of a node: each ancestor's container holds the next one.
+        private TreeViewItem? ContainerOf(NodeViewModel node)
+        {
+            if (node.Parent is null) return Tree.ContainerFromItem(node) as TreeViewItem;
+            if (ContainerOf(node.Parent) is not { } parent) return null;
+            parent.UpdateLayout();
+            return parent.ContainerFromItem(node) as TreeViewItem;
+        }
 
         // Drag out of the tree: a press on a file or resource that moves a few pixels writes it to the drag folder, then
         // hands those files to the platform's drag (a file manager copies them).

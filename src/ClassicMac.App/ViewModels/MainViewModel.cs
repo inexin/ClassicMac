@@ -28,6 +28,9 @@ namespace ClassicMac.App.ViewModels
         public bool IsWarning => Diagnostic.Severity == DiagnosticSeverity.Warning;
 
         public bool IsInfo => Diagnostic.Severity == DiagnosticSeverity.Info;
+
+        /// <summary>Whether it belongs to a tree node, which "Show item" can show.</summary>
+        public bool HasNode => Node is not null;
     }
 
     /// <summary>Which diagnostics the list shows.</summary>
@@ -311,5 +314,26 @@ namespace ClassicMac.App.ViewModels
             for (var at = node.Parent; at is not null; at = at.Parent) at.IsExpanded = true;
             Selected = node;
         }
+
+        /// <summary>Raised when "Show item" has selected a node: the view brings its tree row into view.</summary>
+        public event Action<NodeViewModel>? ItemShown;
+
+        /// <summary>
+        /// "Show item" on a diagnostic's row: selects its node as a row click does (its ancestors open, and unapplied
+        /// edits are asked about first), then has the view show it in the tree. Nothing is shown when the user cancels.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanShowItem))]
+        private async Task ShowItem(DiagnosticEntry? entry)
+        {
+            if (entry?.Node is not { } node) return;
+            var before = Selected;
+            for (var at = node.Parent; at is not null; at = at.Parent) at.IsExpanded = true;
+            Selected = node;
+            await SelectionTask;
+            if (Selected is not { } shown || ReferenceEquals(shown, before) && !ReferenceEquals(before, node)) return;
+            ItemShown?.Invoke(shown);
+        }
+
+        private static bool CanShowItem(DiagnosticEntry? entry) => entry?.Node is not null;
     }
 }

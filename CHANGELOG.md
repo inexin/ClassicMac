@@ -5,6 +5,9 @@
 - Core: `PackBits` (`Unpack` with the unit size and the `$80` flag's meaning, reporting why it stopped; `Pack`) is the
   one PackBits codec; pictures, MacPaint, QuickTime's planar codec and StuffIt's method 6 share it instead of their own
   copies (codecs/packbits.md §5).
+- Viewer: the selected diagnostic has a "Show item" link (when it belongs to a tree node) that selects its node,
+  asking about unapplied edits first, opens its ancestors and scrolls the tree to it; the diagnostics panel's splitter
+  is a 6-pixel drag handle with a grip, hidden while the panel is collapsed.
 - Viewer: the diagnostics panel has a header bar with error, warning and info count badges, a "Filter messages"
   field (message, code or source), the severity filter as a segmented control and a "By file" toggle; column headers,
   with Severity sortable (errors first, info first, arrival); each severity drawn with its own icon and colour; source

@@ -460,6 +460,83 @@ public class WindowTests
         owner.Close();
     });
 
+    // "Show item" on the selected diagnostic (design/boards/diagnostics.md) scrolls the tree to its node and focuses it;
+    // the link shows on the selected row only, and the panel has its drag handle.
+    [Fact]
+    public void Show_item_brings_the_diagnostic_s_node_into_view() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            // A fork with 40 types: the last type's resource is far below the tree's view.
+            var path = Path.Combine(folder, "Many.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork([.. Enumerable.Range(0, 40).Select(i => ($"Z{i:000}", (short)128, (string?)null, new byte[] { (byte)i }))]));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            Dispatcher.UIThread.RunJobs();
+            var last = open.Result!.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "Z039").Children[0];
+            Assert.False(last.Parent!.IsExpanded);
+            var panel = model.DiagnosticsPanel;
+            panel.Add(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Warning, "file.odd-dates", "Created after it was modified."), last.Source, last));
+            panel.Add(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "input.unreadable", "No such file."), "Gone.img", null));
+            panel.ByFile = false;
+            Dispatcher.UIThread.RunJobs();
+            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+            var list = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "DiagnosticList");
+            Button[] Links() => list.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("show-item") && b.IsEffectivelyVisible).ToArray();
+            Assert.Empty(Links());                                            // nothing selected
+
+            panel.SelectedRow = panel.Rows[1];                                // no node: no link
+            Dispatcher.UIThread.RunJobs();
+            Assert.Empty(Links());
+            panel.SelectedRow = panel.Rows[0];
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(last, model.Selected);
+            var link = Assert.Single(Links());
+            bool InView()
+            {
+                // The node's own row (its header), within the tree's scroll viewport.
+                var row = tree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(i => i.DataContext == last);
+                var header = row?.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_Header");
+                var viewer = tree.GetVisualDescendants().OfType<ScrollViewer>().First();
+                if (header?.TranslatePoint(default, viewer) is not { } at) return false;
+                return at.Y >= 0 && at.Y + header.Bounds.Height <= viewer.Viewport.Height + 0.5;
+            }
+            // The tree scrolled back to its top, away from the node.
+            tree.GetVisualDescendants().OfType<ScrollViewer>().First().Offset = default;
+            window.UpdateLayout();
+            Assert.False(InView());
+
+            link.Command!.Execute(link.CommandParameter);
+            Pump(model.SelectionTask);
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.True(InView());
+            Assert.True(tree.IsKeyboardFocusWithin);
+
+            // The selected row and its link, and the drag handle (the focus moved to the tree, as Show item leaves it).
+            var handle = window.GetVisualDescendants().OfType<GridSplitter>().Single(s => s.Classes.Contains("handle"));
+            Assert.Equal(6, handle.Bounds.Height);
+            Assert.True(Assert.Single(Links()).IsEffectivelyVisible);
+            Capture(window, "diagnostics-show-item", null);
+            Baselines.Check(window, "diagnostics-show-item", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+            panel.ToggleCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(handle.IsVisible);
+            window.Close();
+            Baselines.Verify(baselines);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
     // The diagnostics panel (design/boards/diagnostics.md): grouped by file, flat with a selected row, and collapsed
     // to its header by Ctrl+Shift+D, the splitter's height coming back when it opens.
     [Fact]

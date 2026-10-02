@@ -93,7 +93,7 @@ namespace ClassicMac.App.Views
         {
             void Apply()
             {
-                splitter.Height = new GridLength(panel.IsExpanded ? 5 : 0);
+                splitter.Height = new GridLength(panel.IsExpanded ? 6 : 0); // the drag handle
                 row.Height = new GridLength(panel.PanelHeight);
             }
             Apply();
