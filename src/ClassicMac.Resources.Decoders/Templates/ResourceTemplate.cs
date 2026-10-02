@@ -125,6 +125,13 @@ namespace ClassicMac.Resources.Decoders.Templates
             return new ResourceTemplate(fields);
         }
 
+        /// <summary>A template from its fields, checked as a <c>TMPL</c>'s are (ClassicMac's built-in templates).</summary>
+        public static ResourceTemplate FromFields(IReadOnlyList<TemplateField> fields)
+        {
+            ArgumentNullException.ThrowIfNull(fields);
+            return new ResourceTemplate([.. fields]);
+        }
+
         /// <summary>The <c>TMPL</c> in <paramref name="fork"/> for resources of <paramref name="type"/>: the one named
         /// with the type's four characters, as ResEdit finds it (Get1NamedResource); null when there is none.</summary>
         public static Resource? Find(ResourceFork fork, FourCC type)

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Resources: built-in templates for MBAR, BNDL, FREF, SIZE, TMPL, CURS, PAT , PAT#, clut, wctb, actb, dctb, cctb and
+  mctb (`BuiltInTemplates`, `ResourceTemplate.FromFields`), from Inside Macintosh and the ResEdit Reference; the
+  template form and the hex view's byte meanings use them when no open file has a `TMPL` for the type, which still
+  wins (templates.md §5).
 - Editor: the dialog item list ('DITL') form on the read-then-edit host (E3): a read-only table (#, kind, text or
   resource, bounds, enabled), inputs while editing (bounds as mono text boxes), and a preview panel drawing the list in
   the 'DLOG' or 'ALRT' that uses it ("Drawn from 'DLOG' 128 · 300 × 106"; the header names it as Used by), redrawn on

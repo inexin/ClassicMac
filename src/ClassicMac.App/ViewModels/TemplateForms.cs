@@ -228,7 +228,7 @@ namespace ClassicMac.App.ViewModels
     public sealed partial class MainViewModel
     {
         // The TMPL for a type, as ResEdit finds one: in the resource's own file, then in the other open files whose
-        // resources are loaded; null when none has one.
+        // resources are loaded; else ClassicMac's built-in template for the type; null when there is none.
         private (ResourceTemplate Template, string Source)? FindTemplate(FourCC type, ResourceFork own, NodeViewModel? ownFile)
         {
             var forks = new List<(ResourceFork Fork, string Name)> { (own, ownFile?.BaseTitle ?? "this file") };
@@ -260,10 +260,9 @@ namespace ClassicMac.App.ViewModels
                     continue;
                 }
             }
-            return null;
+            return BuiltInTemplates.For(type) is { } builtIn ? (builtIn.Template, $"Template: built in, from {builtIn.Source}") : null;
         }
 
-        // A template form for a resource without a typed form, when a TMPL for its type is at hand.
         /// <summary>
         /// What the byte at <paramref name="offset"/> of a resource's data (the bytes the hex view shows) means, with the
         /// field's range, for the hex inspector (design/boards/hex.md E8): <c>'STR '</c> and <c>'STR#'</c> by their
@@ -292,6 +291,7 @@ namespace ClassicMac.App.ViewModels
             return (data, offset) => ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, data, offset, template);
         }
 
+        // A template form for a resource without a typed form, when a template for its type is at hand.
         private TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)
         {
             if (FindTemplate(node.Resource.Type, node.Fork, owner) is not { } found)

@@ -985,6 +985,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - **Own core:** written here rather than built on ResourceForkReader/HfsReader, which are read-only; they serve as
   cross-checks.
 - **Target framework:** .NET 10 (LTS; .NET 8 support ends November 2026).
+- **Built-in templates (2026-10-02):** ClassicMac ships its own templates for common types with no form of their own
+  (MBAR, BNDL, FREF, SIZE, TMPL, CURS, PAT , PAT#, clut, wctb, actb, dctb, cctb, mctb), as a C# table written from
+  Inside Macintosh and the ResEdit Reference in its own words; ResEdit's `TMPL` resources are never copied (they are
+  a cross-check only, and a layout known only from them is tagged `[Reference: ResEdit]`). A `TMPL` in an open file
+  wins over a built-in one (templates.md §5).
 - **Disk images early:** phase 2, right after the core, because much classic software survives only as disk images.
 - **Decoder priority after images:** text, sound, UI, fonts.
 - **Fonts package:** part of `ClassicMac.Graphics` (`ClassicMac.Graphics.Fonts`), on Core only (2026-09-29, revising

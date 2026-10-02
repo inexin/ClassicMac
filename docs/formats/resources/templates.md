@@ -158,7 +158,25 @@ its bottom or whose left is right of its right. [Code: ResEdit 2.1.3]
   ("Length of Name of item 1", "Character 2 of Name of item 1"); "Byte *k* of" a hex field; "Bits: a, b" for a byte of
   bit fields; "Filler", "Alignment", "End of" a list or C string; "After the template's fields" for data past it.
   [ClassicMac]
-- ClassicMac ships no templates: none of ResEdit's are built in. [ClassicMac]
+- ClassicMac ships its own templates (`BuiltInTemplates`, made with `ResourceTemplate.FromFields`) for common types
+  with no form of their own, written in its own words from Apple's documentation of each layout; none of ResEdit's
+  `TMPL` resources are copied, and ResEdit's templates served only as a cross-check of field order and kinds. A `TMPL`
+  in the resource's file or another open file wins over a built-in one; the template form and the byte meanings use
+  both. [ClassicMac]
+
+  | Type | Fields | Layout from |
+  | --- | --- | --- |
+  | `MBAR` | count, then menu IDs | [Doc: Inside Macintosh: Macintosh Toolbox Essentials, The Menu Bar Resource] |
+  | `BNDL` | owner signature and ID, types (count − 1), each with its local and resource ID pairs (count − 1) | [Doc: Macintosh Toolbox Essentials, The Bundle Resource] |
+  | `FREF` | file type, local icon ID, file name (unused) | [Doc: Macintosh Toolbox Essentials, The File Reference Resource] |
+  | `SIZE` | the 16 flag bits (bit 15 first), preferred and minimum memory size | [Doc: Inside Macintosh: Processes, The Size Resource] |
+  | `TMPL` | label and type pairs to the end | [Doc: ResEdit Reference, Templates] |
+  | `CURS` | 32-byte image, 32-byte mask, hot spot (vertical, horizontal) | [Doc: Inside Macintosh: Imaging With QuickDraw, The Cursor Resource] |
+  | `PAT ` | 8-byte pattern | [Doc: Imaging With QuickDraw, The Pattern Resource] |
+  | `PAT#` | count, then 8-byte patterns | [Doc: Imaging With QuickDraw, The Pattern List Resource] |
+  | `clut` | seed, flags, entries (count − 1): value and RGB each | [Doc: Imaging With QuickDraw, The Color Table Resource] |
+  | `wctb`, `actb`, `dctb`, `cctb` | as `clut` (the window, alert, dialog and control colour tables) | [Doc: Macintosh Toolbox Essentials, the colour table resources] |
+  | `mctb` | count, then per entry menu ID, item, four RGB colours, a reserved word | [Doc: Macintosh Toolbox Essentials, The Menu Color Information Table Resource] |
 
 ## 6. Diagnostics
 
