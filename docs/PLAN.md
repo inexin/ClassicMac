@@ -859,6 +859,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **`.sea` self-extracting archive detection** (phase 2): the archive is the data fork, read like any other.
 - [ ] **Original-app fixtures still missing** (phase 10's Remaining column; StuffIt, DiskDoubler, Compact Pro, PackIt
   and MacLHA samples added 2026-10-02): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types.
+  None is on GitHub or in the CC0 corpora (searched 2026-10-02); method 14 probably needs a pre-7 StuffIt InstallerMaker
+  installer, PackIt III a System 6/7 68k emulator (it does not run on Mac OS 9).
 - [x] **Archive bugs from the samples** (2026-10-02): LHA `-lh1-` (position code and tree), StuffIt method 15's last
   symbol, DiskDoubler split files (`SPLT`), and `list` paths through single-file wrappers.
 - [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] (DISK-IMAGES.md §6).
