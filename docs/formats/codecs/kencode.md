@@ -7,7 +7,7 @@ decodes it with its own decoder.
 
 | | |
 | --- | --- |
-| Used by | [ndif.md](../disk-images/ndif.md) (chunk type `$80`); the same codec as [compressed-resources.md §4](../resources/compressed-resources.md#4-dcmp-3) (`'dcmp'` 3), with the difference of §4 |
+| Used by | [ndif.md](../disk-images/ndif.md) (chunk type `$80`); the same codec as [compressed-resources.md §2.8](../resources/compressed-resources.md#28-dcmp-3) (`'dcmp'` 3), with the difference of §4 |
 | ClassicMac | Reads; `ClassicMac.Files.Compression.KenCode` |
 | Verified against | Images made by Disk Copy 6.1.2 and 6.3.3, with 20-, 32- and 512-sector chunks, decoding to their CRC |
 | Sources | Disk Copy 6.3.3's codec, traced; Disk Copy 6.1.2, 6.5b13 and the self-mounting `oneb` code compared; the Mac OS 9.0 System's `'dcmp'` 3 |
@@ -124,7 +124,7 @@ None.
 
 ## 4. Variants
 
-- `'dcmp'` 3 ([compressed-resources.md §4](../resources/compressed-resources.md#4-dcmp-3)) has identical length,
+- `'dcmp'` 3 ([compressed-resources.md §2.8](../resources/compressed-resources.md#28-dcmp-3)) has identical length,
   literal and distance codes [Code: Mac OS 9.0 System, Disk Copy 6.3.3]; a model of `'dcmp'` 3 verified in emulation
   decodes real KenCode chunks of up to 33 sectors byte for byte [Verified].
 - The two choose the same distance class up to `$5400` bytes of output. From `$5401`, `'dcmp'` 3 moves on to classes

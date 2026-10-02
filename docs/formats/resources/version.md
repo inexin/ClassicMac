@@ -2,7 +2,7 @@
 
 A `'vers'` resource gives the version of a file (ID 1) or of the product it belongs to (ID 2): a `NumVersion` record,
 a region code, and short and long version strings. The Finder shows the strings in Get Info and the list view.
-ClassicMac decodes `'vers'` to JSON with a display string ([text-output.md §2.4](../output/text-output.md#24-vers)),
+ClassicMac decodes `'vers'` to JSON with a display string ([text-output.md §1.5](../output/text-output.md#15-vers-json)),
 and edits and writes it back.
 
 | | |
@@ -105,7 +105,7 @@ shows the strings, not this number (§2). [ClassicMac]
 
 ### 5.2 Reading and writing
 
-- Output: JSON ([text-output.md §2.4](../output/text-output.md#24-vers)). [ClassicMac]
+- Output: JSON ([text-output.md §1.5](../output/text-output.md#15-vers-json)). [ClassicMac]
 - BCD nibbles above 9 are not rejected; they simply add (`$1A` → 20). The region code is kept as a number.
   [ClassicMac]
 - Under 7 bytes (the 6-byte header and a length byte): no output, `text.vers-short`; `VersionResource.Read` returns

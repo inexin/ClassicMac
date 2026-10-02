@@ -82,7 +82,7 @@ None. ClassicMac does not read its HTML back.
 
 ### 3.2 Pictures: reflowed
 
-The Mac's placement ([documents.md §4](../resources/documents.md#4-picture-placement-on-the-mac)) depends on its
+The Mac's placement ([documents.md §2.3](../resources/documents.md#23-picture-placement)) depends on its
 bitmap fonts' line breaks, which a browser does not reproduce. Instead of drawing over the text, each picture goes in
 the text flow at its anchor [ClassicMac]:
 

@@ -686,7 +686,7 @@ as a raw resource fork (formats `["raw resource fork"]`); otherwise each file in
 data fork that holds one. Only forks with at least one resource of the chosen types are kept. They are exported as
 §3.2 says: straight into the output folder when there is one, a folder each when there are several. Files without
 resources get no folder. A file that is a document also gets its `document/` folder (§3.14); the `convert` command
-writes documents alone ([documents.md §6](../resources/documents.md#6-where-documents-are-converted)).
+writes documents alone ([documents.md §5](../resources/documents.md#5-classicmac)).
 
 Output: one line on stdout, `<n> resources from <m> files, to <folder>`. Diagnostics go to stderr, one per line:
 `<source>: <severity>[ at <offset>]: <message> [<code>]`, where `<source>` is the input's name, followed by
@@ -743,7 +743,7 @@ for `extract`. When the pack has an error, nothing is written ("Nothing written:
   - Both convert a file that is a document into `document/` (§3.14), as `extract` does; *Export Resources* of one
     type does not.
   - *Convert Documents* (an input, a container, a folder or a file): folder `<item's host name> documents`, by
-    `DocumentConverter.Convert` ([documents.md §6](../resources/documents.md#6-where-documents-are-converted)); when
+    `DocumentConverter.Convert` ([documents.md §5](../resources/documents.md#5-classicmac)); when
     the item holds no document, the new folder is removed again.
   - *Save Resource As* writes one resource's decoded file (or its data as `.bin`) to a file the user chooses, with no
     manifest. Its suggested name is the stem of §3.5 cut to 200 characters. It offers one file per kind, by its last

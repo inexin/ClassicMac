@@ -257,7 +257,7 @@ How ClassicMac's editor moves runs when the text changes is in §5.4.
   and records none ([export-manifest.md](../output/export-manifest.md)). [ClassicMac]
 - The control bytes $11–$14 decode to the control code points U+0011–U+0014, not to Chicago's glyphs. [ClassicMac]
 - How CRs are written in each output is set by the LineEndings option
-  ([text-output.md §1](../output/text-output.md#1-text-output)). [ClassicMac]
+  ([text-output.md §1.1](../output/text-output.md#11-text-files)). [ClassicMac]
 - Encoding (resource and file names, edited text): a character with no Mac OS Roman byte is an error; nothing is
   replaced silently. [ClassicMac]
 - Text in the Symbol font is decoded as Mac OS Roman, so its Greek and mathematical glyphs come out as Roman letters.
@@ -266,10 +266,10 @@ How ClassicMac's editor moves runs when the text changes is in §5.4.
 ### 5.2 TEXT and styl
 
 - A `'TEXT'` is read whole, whatever its length, and always written as `.txt`
-  ([text-output.md §1](../output/text-output.md#1-text-output)). When the fork holds a `'styl'` of the same ID, the
-  text is styled by it and also written as `.rtf` ([text-output.md §3](../output/text-output.md#3-rtf-output)). A
+  ([text-output.md §1.1](../output/text-output.md#11-text-files)). When the fork holds a `'styl'` of the same ID, the
+  text is styled by it and also written as `.rtf` ([text-output.md §1.6](../output/text-output.md#16-rtf-files)). A
   `'styl'` is written as JSON whether or not a `'TEXT'` pairs with it
-  ([text-output.md §2.3](../output/text-output.md#23-styl)). [ClassicMac]
+  ([text-output.md §1.4](../output/text-output.md#14-styl-json)). [ClassicMac]
 - A compressed `'styl'` is decompressed like any resource ([resource-fork.md](resource-fork.md#2-reading)).
   [ClassicMac]
 - The count is read unsigned. When the data ends inside an element, the complete elements before it are used and
@@ -374,7 +374,7 @@ The editor (`TextResources`) writes `'TEXT'` and its `'styl'` back [ClassicMac]:
 3. Apple, *Inside Macintosh: Imaging With QuickDraw* (1994): the `Style` set.
 4. Unicode, `VENDORS/APPLE/ROMAN.TXT` (version c02, 2005): Mac OS Roman to Unicode. Mapping data.
 5. Microsoft, *Rich Text Format (RTF) Specification*, version 1.9.1 (2008): the RTF output
-   ([text-output.md §3](../output/text-output.md#3-rtf-output)).
+   ([text-output.md §1.6](../output/text-output.md#16-rtf-files)).
 6. Code traced: Mac OS 9.0's TextEdit `TEUseStyleScrap` (the ROM and its copy in the System file), Help Manager
    (`'PACK'` 14) and SimpleText 1.4; DOCMaker 4.8.4's stand-alone reader; the System 7.1-era Font
    Manager (default sizes); the 68k ROM and Mac OS ROM 1.6 (the style table).

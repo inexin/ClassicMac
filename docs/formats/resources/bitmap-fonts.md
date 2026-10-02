@@ -82,7 +82,7 @@ Meanings [Doc]; which code tests each bit [Code].
 
 ### 1.4 Font colour table (fctb)
 
-A colour table with the layout of a `'clut'` ([palettes.md §2](palettes.md#2-colour-tables-clut)), of the same ID as
+A colour table with the layout of a `'clut'` ([palettes.md §1.1](palettes.md#11-colour-tables-clut)), of the same ID as
 the deeper `'NFNT'` it colours, indexed by pixel value [Doc] [Code]:
 
 | Offset | Size | Field | Notes |

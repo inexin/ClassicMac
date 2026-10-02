@@ -47,7 +47,7 @@ line break is added. Line breaks are written as §3.1 says.
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `strings` | array of string | The strings in stored order (element 0 is `GetIndString` index 1), as read ([strings.md §2](../resources/strings.md#2-string-lists-str)), with line breaks as §3.1 says |
+| `strings` | array of string | The strings in stored order (element 0 is `GetIndString` index 1), as read ([strings.md §1.2](../resources/strings.md#12-string-lists-str)), with line breaks as §3.1 says |
 
 ```json
 {
@@ -70,8 +70,8 @@ stored values unchanged:
 | `height` | integer | `scrpHeight` |
 | `ascent` | integer | `scrpAscent` |
 | `font` | integer | `scrpFont` |
-| `fontName` | string | The font's name ([styled-text.md §4.3](../resources/styled-text.md#43-fonts-by-id)) |
-| `face` | integer | `scrpFace`, 0–255 ([styled-text.md §4.2](../resources/styled-text.md#42-face-bits)) |
+| `fontName` | string | The font's name ([styled-text.md §1.5](../resources/styled-text.md#15-fonts-by-id)) |
+| `face` | integer | `scrpFace`, 0–255 ([styled-text.md §1.4](../resources/styled-text.md#14-face-bits)) |
 | `size` | integer | `scrpSize`, 0 kept as 0 |
 | `color` | array of 3 integers | Red, green, blue, 0–65535 |
 
@@ -104,7 +104,7 @@ run shown):
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `display` | string | The display string ([version.md §3](../resources/version.md#3-the-display-string)) |
+| `display` | string | The display string ([version.md §5.1](../resources/version.md#51-the-display-string)) |
 | `major` | integer | Major version (BCD decoded) |
 | `minor` | integer | Minor version (0–15) |
 | `bugFix` | integer | Bug-fix version (0–15) |
@@ -137,7 +137,7 @@ The golden `'vers'` 1:
 ### 1.6 RTF files
 
 A `'TEXT'` with a `'styl'` of the same ID is also written as RTF, built from the runs of
-[styled-text.md §4.4](../resources/styled-text.md#44-how-runs-map-onto-the-text). The file is ASCII only (all other
+[styled-text.md §2.3](../resources/styled-text.md#23-how-runs-map-onto-the-text). The file is ASCII only (all other
 characters are escaped, §3.3), with LF line breaks:
 
 ```
@@ -150,7 +150,7 @@ characters are escaped, §3.3), with LF line breaks:
 | Part | Content |
 | --- | --- |
 | Header | RTF version 1, ANSI character set, code page 1252, default font `\f0`, one fallback character after each `\u` escape [Author]. The code page never matters, since no byte above `$7E` is written raw |
-| Font table | One entry per distinct font ID, in order of first use by the runs, named as in [styled-text.md §4.3](../resources/styled-text.md#43-fonts-by-id); entry *i* is `\fi`. No font family or character set is given, so readers pick a substitute for fonts they lack. Two IDs with the same name (1 and 3, both Geneva) get two entries |
+| Font table | One entry per distinct font ID, in order of first use by the runs, named as in [styled-text.md §1.5](../resources/styled-text.md#15-fonts-by-id); entry *i* is `\fi`. No font family or character set is given, so readers pick a substitute for fonts they lack. Two IDs with the same name (1 and 3, both Geneva) get two entries |
 | Colour table | An empty first entry (`;`, the reader's automatic colour [Author]), then one entry per distinct 8-bit colour, in order of first use; the colour of table position *j* (1-based) is `\cfj` |
 | Runs | §3.2 |
 | End | `}` and LF |
@@ -207,8 +207,8 @@ For example `é` (U+00E9) is `\u233?`, `“` (U+201C) `舠?`, and the Apple logo
 
 ### 3.4 RTF example
 
-The golden `'TEXT'` 128 with `'styl'` 128 ([styled-text.md §3](../resources/styled-text.md#3-plain-text-text),
-[styled-text.md §4.4](../resources/styled-text.md#44-how-runs-map-onto-the-text)) gives:
+The golden `'TEXT'` 128 with `'styl'` 128 ([styled-text.md §1.2](../resources/styled-text.md#12-plain-text-text),
+[styled-text.md §2.3](../resources/styled-text.md#23-how-runs-map-onto-the-text)) gives:
 
 ```
 {\rtf1\ansi\ansicpg1252\deff0\uc1
@@ -230,7 +230,7 @@ None.
   `text.style`, `text.version`, each version 1.
 - Differences from the Mac, accepted:
   - QuickDraw's condense and extend change each character's width by one pixel, 1 point at 72 dpi
-    ([styled-text.md §4.2](../resources/styled-text.md#42-face-bits)), not 0.5 pt;
+    ([styled-text.md §1.4](../resources/styled-text.md#14-face-bits)), not 0.5 pt;
   - QuickDraw's underline breaks around descenders; RTF's `\ul` is continuous.
 
 ## 6. Diagnostics

@@ -77,8 +77,8 @@ None.
 
 ## 5. ClassicMac
 
-- Output: a `'STR '` as a `.txt` file ([text-output.md §1](../output/text-output.md#1-text-output)), a `'STR#'` as
-  JSON ([text-output.md §2.2](../output/text-output.md#22-str)), whose array is 0-based: element *i* is string
+- Output: a `'STR '` as a `.txt` file ([text-output.md §1.1](../output/text-output.md#11-text-files)), a `'STR#'` as
+  JSON ([text-output.md §1.3](../output/text-output.md#13-str-json)), whose array is 0-based: element *i* is string
   *i* + 1. [ClassicMac]
 - `'STR '`: bytes after the string are ignored. When the length byte says more than the resource holds, the text is
   cut to the bytes present and `text.string-short` is reported; an empty resource gives an empty text and the same
