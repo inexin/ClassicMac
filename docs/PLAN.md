@@ -808,7 +808,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    package); the old packages are deprecated. Brought forward, in stages: **1. moved in with its history (done,
    2026-09-29)**, the decoders using it directly; **2. layered as one `ClassicMac.Graphics` package with a namespace per
    layer (done, 2026-09-29)**; 3. shared types (Core's geometry; the renderer on `.Fonts`, done 2026-09-29, pixel-identical
-   on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done, [QUICKDRAW-API.md](QUICKDRAW-API.md)). The old repo is archived and the
+   on the corpus's fonts; icons as resource decoders) and a public drawing API (`QuickDrawPort`, built 2026-09-29; `DrawPicture` onto a port built; spec split done). The old repo is archived and the
    NuGet packages deprecated when the new ones are published (by the owner).
 10. **HFS+ and archives** — read-only: HFS+ and HFSX volumes (also inside an HFS wrapper) in
     `ClassicMac.Files.Hfs`, and the classic archive formats in `ClassicMac.Files.Archives`. The rules each reader follows
@@ -943,7 +943,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   (`ClassicMac.Graphics.Pict`) are separate layers of one package (see the layering).
 - **Drawing API (2026-09-29):** a public `QuickDrawPort` with QuickDraw's own names over the renderer, everything the
   engine already draws; `RgbaBitmap`/`RgbaColor` (formerly `PictBitmap`/`PictColor`) as the base image and pixel
-  colour, 16-bit `RgbColor` on the port; design in [QUICKDRAW-API.md](QUICKDRAW-API.md).
+  colour (`Bitmap`/`Color` would clash with host libraries), 16-bit `RgbColor` on the port, as QuickDraw's. Not in the
+  first cut: ScrollRect, recording regions and polygons (OpenRgn/OpenPoly) and pictures (`OpenPicture`).
 - **Integrations:** one package per host library (`ClassicMac.Graphics.ImageSharp`, `ClassicMac.Graphics.SkiaSharp`) covering every
   image format, instead of one per format.
 - **Package naming:** `ClassicMac.<Area>`, named after the Apple technology (QuickDraw, QuickTime); namespaces start

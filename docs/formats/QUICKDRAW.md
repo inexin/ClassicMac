@@ -3,7 +3,7 @@
 This document specifies how QuickDraw draws, completely enough to reproduce it pixel for pixel: fixed-point
 arithmetic, how shapes become pixels, patterns and transfer modes, CopyBits, bitmap text and the Font Manager, and
 drawing on indexed and 16-bit screens. Pictures ([PICT.md](PICT.md)) are recordings of these calls, and
-ClassicMac's `QuickDrawPort` ([QUICKDRAW-API.md](../QUICKDRAW-API.md)) makes them directly; both draw by these
+ClassicMac's `QuickDrawPort` makes them directly; both draw by these
 rules, implemented in `ClassicMac.Graphics.QuickDraw`.
 
 There are two reference implementations, and they differ in details:

@@ -27,7 +27,7 @@ it in the same change when a decision changes.
 QuickDraw.Pict (formerly <https://github.com/inexin/QuickDraw.Pict>) moved into this repo with its history on
 2026-09-29 and became one package, `ClassicMac.Graphics`, in layers (a folder and namespace each), with the
 `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` adapters. It decodes and encodes QuickDraw PICT pictures and draws
-**exactly the pixels a Macintosh draws**. The public drawing API is `QuickDrawPort` ([docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)).
+**exactly the pixels a Macintosh draws**. The public drawing API is `QuickDrawPort`, whose members carry QuickDraw's names.
 
 - The specs: `docs/formats/PICT.md` (the picture format and playback), `docs/formats/QUICKDRAW.md` (the drawing
   rules), `QUICKTIME.md`, `MACPAINT.md`, `ICONS.md`. Update the matching section in the same change as any behaviour
@@ -53,7 +53,7 @@ and may use only the layers below it, which `LayeringTests` checks. The adapters
 | root, `MacPaint/` (`ClassicMac.Graphics`) | `RgbaBitmap`, `RgbaColor`, `PixMap` records, standard colour tables, PackBits, `MacPaintFile` (also QuickTime's `PNTG` codec) | Core |
 | `Fonts/` (`.Fonts`) | The Font Manager's resources: `BitmapFont` (`NFNT`/`FONT`), `FontFamily` (`FOND`), `fctb`, `OutlineFont` (`sfnt`) | base |
 | `QuickTime/` (`.QuickTime`) | Image descriptions, the codecs, `IPictImageCodec`, QTIF files | base |
-| `QuickDraw/` (`.QuickDraw`) | The renderer: the public `QuickDrawPort` (state and verbs, [docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)) over `Engine/`, `Regions/`, `Text/`; `QuickDrawPattern`, `Region`, `FontLibrary`, `QuickDrawOptions` | base, Fonts |
+| `QuickDraw/` (`.QuickDraw`) | The renderer: the public `QuickDrawPort` (state and verbs) over `Engine/`, `Regions/`, `Text/`; `QuickDrawPattern`, `Region`, `FontLibrary`, `QuickDrawOptions` | base, Fonts |
 | `Pict/` (`.Pict`) | The PICT format: `PictReader` (`Decode`, or `Read` with the `PictInfo`), `GrafPort`, `PictWriter`, `PictHeader`/`PictInfo`, options, the `$8200` opcode | all of the above |
 
 `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are separate packages (the ImageSharp format plugin and the
