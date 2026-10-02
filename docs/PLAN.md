@@ -41,7 +41,7 @@ Proposed priority:
 | 2 | Zip / MacZip (`.zip`, stored and DEFLATE) with Mac extra fields (Info-ZIP 0x07c8, `M3`, ZipIt) and `__MACOSX/` pairing; tar/gzip (`.tar`, `.gz`, `.tgz`, MacGzip) with `._` pairing | Modern re-uploads, Unix-era transfers | Built (read); Mac extra fields fitted, no Mac-made zip checked yet |
 | 2 | uuencode (`.uu`, `begin-base64`) | Usenet and mail transfers | Built |
 | 3 | HFS+ images | Mac OS 8.1–9 disks | Built, read-only (phase 10) |
-| 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads | Archives built (phase 10); self-extractors not started (Todo) |
+| 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads | Built (phase 10; self-extractors through their data fork) |
 | 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives | Not started (Todo) |
 | 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators | Not started (Todo) |
 | 4 | DiskDoubler (`.dd`), StuffIt SegmentIt archives, PackIt (`.pit`), standalone LHA/LZH (`.lzh`) | Early 1990s downloads, multi-floppy BBS files | Built (phase 10) |
@@ -726,7 +726,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | # | Phase | Status |
 |---|---|---|
 | 1 | Core | Done |
-| 2 | Disk images | Done except `.sea` detection (Todo) |
+| 2 | Disk images | Done |
 | 3 | Decoders I | Done (exit passed; DOCMaker and SimpleText built after) |
 | 4 | Viewer app | Done (drag-out built) |
 | 5 | Decoders II | Done (exit passed) |
@@ -746,7 +746,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    NDIF (with ADC in `ClassicMac.Files.Compression`), DART and UDIF `.dmg` (zlib, bzip2, ADC; LZFSE if needed) (built); CD
    images (`ClassicMac.Files.Iso`: ISO 9660, High Sierra, raw sectors, cue sheets and multisession built);
    self-mounting `.smi` images read as NDIF (built); recursive unwrapping through all of them (built); zip, tar and gzip with
-   Mac data and uuencode (built). `.sea` detection is a Todo. *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
+   Mac data, uuencode and `.sea` self-extractors (built). *Exit:* every file of the corpus images (`RealmzClassicHD.img` and the other HFS
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically). The classic HFS reader also
    reports damaged B-tree headers and node maps, out-of-order or duplicate keys and IDs, and malformed or misplaced
@@ -855,7 +855,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **8-bit icon masks in icon suites** (Mac OS 9's CopyMask through an 8-bit mask in `IconSuite.Plot`), from a Mac OS 9
   oracle run (2026-10-02).
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
-- [ ] **`.sea` self-extracting archive detection** (phase 2).
+- [x] **`.sea` self-extracting archive detection** (phase 2): the archive is the data fork, read like any other.
 - [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column): StuffIt v1 and method 6,
   StuffIt 5 method 14, a SegmentIt set, Compact Pro archives and segmented sets, PackIt, DiskDoubler methods 2–5 and 7
   and the delta types, LHa archives. Each needs a redistributable archive made by the original application.

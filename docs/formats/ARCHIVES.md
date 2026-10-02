@@ -408,5 +408,24 @@ Warning). The `__MACOSX` folder itself is not part of the result.
 Not covered: empty folders (a `MacFile` has no folder record, so folders exist only in their files' paths) and folder
 Finder info; zip methods other than stored and deflate (deflate64, bzip2, LZMA, …) and any encryption; the Info-ZIP
 Unicode path field `0x7075`; macOS tar's extended attributes in pax records (`SCHILY.xattr.com.apple.*`,
-`LIBARCHIVE.xattr.*`), since only `._` entries are read; `.sea` self-extractors. The Mac extra-field rules are tested on
+`LIBARCHIVE.xattr.*`), since only `._` entries are read. The Mac extra-field rules are tested on
 hand-built archives only; no zip made by Info-ZIP's Mac port or ZipIt has been checked yet.
+
+## Self-extracting archives (`.sea`)
+
+A self-extracting archive is an application (type `APPL`) whose resource fork holds the extractor and whose data fork
+is the archive, from offset 0 to the end of the fork:
+
+- StuffIt's classic extractor (creator `aust`): the data fork is a `SIT!` archive whose archive length equals the
+  fork's length. The extractor opens its own data fork by name and reads from offset 0 without checking the
+  signature [Code] [Verified on StuffIt SEA 3.5 samples].
+- StuffIt 5 extractors: the data fork is a complete StuffIt 5 archive whose length field equals the fork's length
+  [Verified].
+- Compact Pro extractors: the archive at data-fork offset 0 [Doc]; no sample checked, and the creator code is
+  unverified.
+
+ClassicMac needs no special rule: the unwrapper tries every reader on a file's data fork whatever its type, so a
+`.sea` lists as the application with the archive's files inside it. The extractor's own resources are often
+compressed with Aladdin's own `dcmp` (128) and are listed, not decompressed.
+
+Not covered: InstallerMaker installers (creator `STi0`, data fork signature `ST65`) and other installer formats.

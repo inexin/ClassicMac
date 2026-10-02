@@ -277,9 +277,9 @@ namespace ClassicMac.Resources.Decoders.Images
 
         // The 8-bit mask Mac OS 9's Icon Utilities use with colour data at 8 bits or more (not when recording a picture
         // or printing): h8mk for a rect 48 or more wide or tall, s8mk for one under 32 both ways, else l8mk, the first
-        // present of that list; used only when its bounds equal the data's, else the 1-bit mask [Code] [Verified] (the
-        // order after the first is ClassicMac's, as the 1-bit lists). It replaces the 1-bit mask. Only a colour member draws through it; the 1-bit path ignores it (undefined on the
-        // Mac) [ClassicMac].
+        // present of that list; used only when its bounds equal the data's, else the 1-bit mask (the next 8-bit mask is
+        // not tried) [Code] [Verified]. It replaces the 1-bit mask. Only a colour member draws through it; the 1-bit
+        // path ignores it (undefined on the Mac) [ClassicMac].
         private byte[]? DeepMask(MacRect rect, string data)
         {
             int w = rect.Width, h = rect.Height;

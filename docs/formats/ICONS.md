@@ -161,10 +161,11 @@ ROM's differ where noted [Code]. PlotIconID never reads `ICON` or `SICN`.
        mask), the screen has 8 bits or more, the port is not recording a picture or printing, and the mask's bounds
        equal the data's. The ROM has none.
      - The mask: width or height ≥ 48 → `h8mk` `l8mk` `s8mk`; both under 32 → `s8mk` `l8mk` `h8mk`; otherwise `l8mk`
-       `h8mk` `s8mk` [ClassicMac: the order after the first, as the 1-bit lists]; the first present is taken, and if its
-       size is not the data's the 1-bit mask is used.
+       `h8mk` `s8mk`, from the caller's rect before alignment; the first present is taken, and if its size is not the
+       data's the 1-bit mask is used, without trying the next 8-bit mask [Code].
      - It **replaces** the 1-bit mask (an all-$00 `l8mk` draws nothing inside the `ICN#` mask; an all-$FF one draws the
-       whole square, outside it too). Alignment still uses the 1-bit mask's box.
+       whole square, outside it too). Alignment still uses the 1-bit mask's box, and an all-zero 1-bit mask draws
+       nothing, whatever the 8-bit mask holds (MakeBoundary finds no boundary) [Code] [Verified].
      - IconUtils calls CopyMask (not CopyDeepMask) with the data and an 8-bit mask PixMap using clut 40 (a grey ramp).
        Both are stretched alike, nearest pixel (no filtering). Per 8-bit component, `out = m = $FF ? s : d + (((s − d)
        × m) >> 8)` (s − d signed, an arithmetic shift: a floor, not ÷ 255). A 16-bit screen truncates the result to 5

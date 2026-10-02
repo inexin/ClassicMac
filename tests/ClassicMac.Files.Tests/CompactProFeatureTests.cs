@@ -59,6 +59,27 @@ public sealed class CompactProFeatureTests
     }
 
     [Fact]
+    // A self-extracting archive: the archive is the application's data fork from offset 0.
+    public void CompactProSeaUnwrapsTheArchiveInItsDataFork()
+    {
+        byte[] archive = CompactProFixture.BuildFile("payload", [], "inside"u8.ToArray(),
+            encodedResource: [], encodedData: "inside"u8.ToArray());
+        var sea = new MacFile
+        {
+            Name = MacString.FromMacRoman("Archive.sea"),
+            FinderInfo = new FinderInfo { Type = FourCC.FromString("APPL"), Creator = FourCC.FromString("EXTR") },
+            DataFork = ForkData.FromBytes(archive),
+            ResourceFork = ForkData.FromBytes(new byte[16]),
+        };
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(sea, "host", new ContainerContext());
+
+        MacFile unpacked = Assert.Single(result.Children).File;
+        Assert.Equal("payload", unpacked.MacPath);
+        Assert.Equal("inside"u8.ToArray(), unpacked.DataFork.ToArray());
+    }
+
+    [Fact]
     public void CompactProNestedDirectoryEntriesBecomeMacFileFolderPaths()
     {
         byte[] archive = CompactProFixture.BuildNestedFile();
