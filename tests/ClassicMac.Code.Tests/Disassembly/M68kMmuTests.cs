@@ -3,7 +3,8 @@ using ClassicMac.Code.Disassembly;
 namespace ClassicMac.Code.Tests.Disassembly;
 
 // The 68030's and 68851's PMMU instructions (coprocessor 0, $F0xx), hand-built from the encodings [Doc: MC68030
-// User's Manual (Motorola), 9 and 11; MC68851 Paged Memory Management Unit User's Manual (Motorola), 6].
+// User's Manual (Motorola), 9 and 11; MC68851 PMMU User's Manual (Motorola), 6 and appendix A]. A word is decoded when
+// it is an instruction on either processor.
 public class M68kMmuTests
 {
     private const uint At = 0x1000;
@@ -56,6 +57,13 @@ public class M68kMmuTests
     [InlineData("F009 4200", "pmove tc,a1")]
     [InlineData("F02E 6200 FFFE", "pmove mmusr,-2(a6)")]
     [InlineData("F039 4A00 0000 1000", "pmove srp,($00001000).l")]
+    // 68851 memory to register: any mode, Dn and An too except for CRP, SRP, DRP [Doc: MC68851 PMMU User's Manual, A-12]
+    [InlineData("F008 5000", "pmove a0,cal")]
+    [InlineData("F00A 4000", "pmove a2,tc")]
+    [InlineData("F001 7004", "pmove d1,bad1")]
+    [InlineData("F03A 4800 0010", "pmove 16(pc),srp  ; $1014")]
+    // register to memory: alterable modes, An included
+    [InlineData("F00B 5600", "pmove val,a3")]
     // pflush: mode 001 all, 100 by function code, 101 shared, 110 by function code and address, 111 shared
     [InlineData("F000 2400", "pflusha")]
     [InlineData("F000 30F5", "pflush #5,#7")]
@@ -82,9 +90,12 @@ public class M68kMmuTests
     [InlineData("F010 8F55", "ptestr #5,(a0),#3,a2")]
     [InlineData("F010 8409", "ptestw d1,(a0),#1")]
     [InlineData("F02E 9C00 0010", "ptestw sfc,16(a6),#7")]
+    [InlineData("F010 8A20", "ptestr sfc,(a0),#2")]       // A clear above level 0: the register field is ignored (0xxx)
+    [InlineData("F039 8210 0000 1000", "ptestr #0,($00001000).l,#0")]
     // the 68851's conditional instructions
     [InlineData("F050 0003", "pslc (a0)")]
     [InlineData("F040 000E", "pscs d0")]
+    // cpDBcc branches from its displacement word, the scanPC [Doc: MC68030 User's Manual, 10.2.2.3, 10.4.1]
     [InlineData("F048 0001 FFFC", "pdbbc d0,$1000")]
     [InlineData("F07A 0008 1234", "ptrapws.w #$1234")]
     [InlineData("F07B 0009 0001 0000", "ptrapwc.l #$00010000")]
@@ -124,7 +135,6 @@ public class M68kMmuTests
     [InlineData("F03A 4200 0000")]         // pmove tc to PC space
     [InlineData("F000 4800")]              // pmove srp from a data register (64 bits)
     [InlineData("F008 4C00")]              // pmove crp from an address register
-    [InlineData("F008 5000")]              // pmove cal (a byte) from an address register
     [InlineData("F03C 5000 0105")]         // pmove #imm,cal with the immediate's high byte set
     [InlineData("F010 2400")]              // pflusha with an effective address
     [InlineData("F000 2410")]              // pflusha with a function code
@@ -160,6 +170,39 @@ public class M68kMmuTests
     [InlineData("F180")]                   // coprocessor 0 type 6
     [InlineData("F1C0")]                   // coprocessor 0 type 7
     [InlineData("F010 40")]                // pmove cut short
+    // FD (bit 8) is the 68030's, only in the pmoves that write CRP, SRP, TC, TT0 or TT1 [Doc: MC68030 User's Manual,
+    // 9.7.5.1]; the 68851's formats have bit 8 zero [Doc: MC68851 PMMU User's Manual, A-11, A-13]
+    [InlineData("F010 4500")]              // FD with drp
+    [InlineData("F010 5500")]              // FD with val
+    [InlineData("F010 5900")]              // FD with scc
+    [InlineData("F010 5D00")]              // FD with ac
+    [InlineData("F010 5300")]              // FD with cal to memory
+    [InlineData("F010 6700")]              // FD with pcsr
+    [InlineData("F010 6300")]              // FD with mmusr to memory
+    [InlineData("F010 7100")]              // FD with bad0
+    [InlineData("F010 7700")]              // FD with bac0 to memory
+    // 64-bit registers take no Dn or An either way [Doc: MC68851 PMMU User's Manual, A-12]
+    [InlineData("F000 4400")]              // pmove drp from d0
+    [InlineData("F000 4600")]              // pmove drp to d0
+    [InlineData("F008 4E00")]              // pmove crp to a0
+    // register to memory: alterable modes only
+    [InlineData("F03B 5A00 0000")]         // pmove scc to (d8,pc,xn)
+    [InlineData("F03C 7600")]              // pmove bac0 to an immediate
+    [InlineData("F03A 6200 0000")]         // pmove mmusr to PC space
+    // pload, pvalid, ptest, pflush: control alterable modes only, on both processors
+    [InlineData("F03A 2010 0000")]         // pload (d16,pc)
+    [InlineData("F03C 2010 0000")]         // pload #imm
+    [InlineData("F03A 2800 0000")]         // pvalid (d16,pc)
+    [InlineData("F020 2C00")]              // pvalid -(a0)
+    [InlineData("F03A 8210 0000")]         // ptest (d16,pc)
+    [InlineData("F020 8210")]              // ptest -(a0)
+    [InlineData("F008 8210")]              // ptest a0
+    [InlineData("F03A 3810 0000")]         // pflush by address (d16,pc)
+    [InlineData("F020 3810")]              // pflush by address -(a0)
+    // pflusha (mode 001): mask 0000 and function code 00000 [Doc: MC68851 PMMU User's Manual, A-7]
+    [InlineData("F000 2420")]              // pflusha with a mask
+    [InlineData("F000 2401")]              // pflusha with function code DFC
+    [InlineData("F000 2408")]              // pflusha with function code D0
     public void Invalid_words_are_dc_w(string hex)
     {
         var ins = D(hex);

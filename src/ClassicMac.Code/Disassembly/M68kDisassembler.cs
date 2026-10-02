@@ -756,10 +756,10 @@ public static class M68kDisassembler
             return null;
         }
 
-        // ---- coprocessor 0: the 68030's MMU and the 68851 PMMU [Doc: MC68030 User's Manual, 9; MC68851 Paged
-        // Memory Management Unit User's Manual, 6]. A word that is an instruction on either processor is decoded:
-        // the 68851's wider forms (4-bit masks and function codes, every addressing mode for pmove) and the 68030's
-        // own (TT0/TT1, pmovefd, which allow control alterable modes only). ----
+        // ---- coprocessor 0: the 68030's MMU and the 68851 PMMU [Doc: MC68030 User's Manual, 9; MC68851 PMMU User's
+        // Manual, 6 and appendix A]. A word that is an instruction on either processor is decoded: the 68851's wider
+        // forms (4-bit masks and function codes, every addressing mode for pmove from memory) and the 68030's own
+        // (TT0/TT1, pmovefd, which allow control alterable modes only). ----
 
         private M68kInstruction? Mmu(ushort op, int b, int m, int xn)
         {
@@ -776,7 +776,9 @@ public static class M68kDisassembler
                     string cc = MmuConditions[ext];
                     if (m == 1)
                     {
-                        // pdbcc: the displacement is from its own word, as fdbcc's.
+                        // pdbcc: the displacement is from its own word, as fdbcc's: the CPU runs it as cpDBcc and adds
+                        // it to the scanPC, which points at the displacement [Doc: MC68030 User's Manual, 10.2.2.3,
+                        // 10.4.1]. (The 68851 manual's A-4 says the instruction's address plus two.)
                         uint target = unchecked(PcHere() + (uint)r.ReadInt16());
                         flags |= M68kFlags.Branch | M68kFlags.Conditional;
                         AddFlowReference(target, M68kReferenceKind.Branch);
@@ -826,8 +828,9 @@ public static class M68kDisassembler
                     return LoadValidFlush(op, ext, field, m, xn);
                 case 2:
                 {
-                    // pmove TC, DRP, SRP, CRP, CAL, VAL, SCC, AC: 010 PPP R FD 00000000; FD is the 68030's, for
-                    // TC, SRP and CRP.
+                    // pmove TC, DRP, SRP, CRP, CAL, VAL, SCC, AC: 010 PPP R FD 00000000. FD is the 68030's, only
+                    // in the forms that write TC, SRP and CRP [Doc: MC68030 User's Manual, 9.7.5.1]; the 68851's
+                    // format 1 has bit 8 zero [Doc: MC68851 PMMU User's Manual, A-11].
                     if ((ext & 0xFF) != 0)
                         return null;
                     bool fd = (ext & 0x0100) != 0;
@@ -838,10 +841,11 @@ public static class M68kDisassembler
                 }
                 case 3:
                 {
-                    // pmove MMUSR (PSR), PCSR: 011 PPP R 000000000; BADn, BACn: 011 PPP R 0000 NNN 00.
+                    // pmove MMUSR (PSR), PCSR: 011 PPP R 000000000; BADn, BACn: 011 PPP R 0000 NNN 00. No FD (bit 8
+                    // zero) [Doc: MC68851 PMMU User's Manual, A-13].
                     if (field is 0 or 1)
                     {
-                        // PCSR is read-only.
+                        // PCSR is read-only: R/W must be 1 [Doc: MC68851 PMMU User's Manual, A-13].
                         if ((ext & 0x01FF) != 0 || (field == 1 && !toMemory))
                             return null;
                         return PMove(0x18 | field, toMemory, false, M68kSize.Word, false, m, xn);
@@ -852,10 +856,11 @@ public static class M68kDisassembler
                 }
                 case 4:
                 {
-                    // ptest: 100 LLL R A RRR FFFFF; the A register only with a level above 0.
+                    // ptest: 100 LLL R A RRR FFFFF; R 1 is ptestr. The A register field is 0xxx (none) or 1RRR, and
+                    // 0000 at level 0 [Doc: MC68851 PMMU User's Manual, A-22].
                     int level = field, an = (ext >> 5) & 7;
                     bool hasAn = (ext & 0x0100) != 0;
-                    if ((hasAn ? level == 0 : an != 0) || FunctionCode(ext) is not { } fc
+                    if ((level == 0 && (ext & 0x01E0) != 0) || FunctionCode(ext) is not { } fc
                         || ReadEa(m, xn, M68kSize.None) is not { IsControlAlterable: true } ea)
                         return null;
                     string name = toMemory ? "ptestr" : "ptestw";
@@ -896,6 +901,7 @@ public static class M68kDisassembler
             }
             if ((ext & 0x0200) != 0)
                 return null;
+            // pflusha: mask 0000 and function code 00000 [Doc: MC68851 PMMU User's Manual, A-7].
             if (mode == 1)
                 return ext == 0x2400 && (op & 0x3F) == 0 ? Make("pflusha", M68kSize.None) : null;
             // pflush: 001 MMM 0 MMMM FFFFF; the 68030's mask is 3 bits (bit 8 zero), the 68851's 4.
@@ -908,9 +914,9 @@ public static class M68kDisassembler
             return ReadEa(m, xn, M68kSize.None) is { IsControlAlterable: true } at ? Make(name, M68kSize.None, code, mask, at.Operand) : null;
         }
 
-        // pmove <ea>,MRn or MRn,<ea>. The 68030's forms (TT0/TT1 and pmovefd) take control alterable modes only;
-        // the 68851 takes every mode from memory and alterable ones to it, no address register for a byte register
-        // and no register at all for a 64-bit root pointer.
+        // pmove <ea>,MRn or MRn,<ea>. The 68030's forms (TT0/TT1 and pmovefd) take control alterable modes only
+        // [Doc: MC68030 User's Manual, 9]; the 68851 takes every mode from memory and alterable ones to it, and no
+        // Dn or An for a 64-bit root pointer [Doc: MC68851 PMMU User's Manual, A-12].
         private M68kInstruction? PMove(int register, bool toMemory, bool fd, M68kSize size, bool controlOnly, int m, int xn)
         {
             if (fd && toMemory)
@@ -921,7 +927,6 @@ public static class M68kDisassembler
                 ? ea.IsControlAlterable
                 : (!toMemory || ea.IsAlterable)
                     && !(size == M68kSize.Double && ea.Mode is DReg or AReg)
-                    && !(size == M68kSize.Byte && ea.Mode == AReg)
                     && !(ea.Operand is M68kImmediate { Size: M68kSize.Byte } imm && imm.Bytes[0] != 0);
             if (!ok)
                 return null;
