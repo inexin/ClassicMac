@@ -634,9 +634,11 @@ public class WindowTests
         try
         {
             var model = new MainViewModel();
-            var window = new MainWindow { DataContext = model, Width = 1200, Height = 800 };
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
             window.Show();
             Pump(model.OpenAsync(TreeDisplayTests.Disk(folder)));
+            Pump(model.PreviewTask);
             var realmz = model.Roots[0].Children.OfType<FolderNode>().Single(f => f.Title == "Realmz");
             model.Roots[0].IsExpanded = realmz.IsExpanded = true;
             Dispatcher.UIThread.RunJobs();
@@ -647,7 +649,12 @@ public class WindowTests
             var group = texts.Single(t => t.Text == "No name");
             Assert.Equal(Avalonia.Media.FontStyle.Italic, group.FontStyle);
             Assert.Contains(texts, t => t.Text == "4 files" && t.FontSize == 11);
+            // Light and dark: the header's Tree display button, the italic "No name" row with its muted count, the
+            // group open with its names in mono, and the footer.
+            realmz.Children.OfType<NoNameGroupNode>().Single().IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
             Capture(window, "tree-no-name");
+            Baselines.Check(window, "tree-no-name", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
 
             footer.GetVisualDescendants().OfType<Button>().Single().Command!.Execute(null);   // Show
             Dispatcher.UIThread.RunJobs();
@@ -669,6 +676,7 @@ public class WindowTests
             Assert.DoesNotContain(realmz.Children, c => c is NoNameGroupNode);
             options.Flyout.Hide();
             window.Close();
+            Baselines.Verify(baselines);
         }
         finally
         {

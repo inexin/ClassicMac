@@ -13,9 +13,22 @@
     <Style Selector="TreeViewItem" x:DataType="vm:NodeViewModel">
       <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
     </Style>
-    <!-- The tree's rows: no-name titles in italics, whitespace made visible in mono, a muted count (tokens from design/Tokens.axaml once loaded). -->
+    <!-- The tree's rows (design/boards/tree-no-name.md): no-name titles in italics, whitespace made visible in mono
+         (.mono), the group's count as the row's meta ("4 files"). The tree's header (the Tree display button) and footer
+         ("N invisible items hidden · Show") sit on CmSidebarBackground with CmDivider rules; Show is a CmAccent link. -->
     <Style Selector="TextBlock.italic">
       <Setter Property="FontStyle" Value="Italic" />
+    </Style>
+    <Style Selector="Border.tree-bar">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    </Style>
+    <Style Selector="Button.link /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    </Style>
+    <Style Selector="FlyoutPresenter.tree-display">
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
     </Style>
     <Style Selector="ListBox.hex ListBoxItem">
       <Setter Property="Padding" Value="12,1" />
@@ -159,11 +172,11 @@
     <Grid x:Name="Body" RowDefinitions="*,6,196">
       <Grid ColumnDefinitions="380,5,*">
         <DockPanel>
-        <Border DockPanel.Dock="Top" Padding="4,2" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CmDivider}">
-          <Button x:Name="TreeDisplayButton" HorizontalAlignment="Right" Padding="6,2" ToolTip.Tip="Tree display" AutomationProperties.Name="Tree display">
+        <Border DockPanel.Dock="Top" Classes="tree-bar" Padding="4,2" BorderThickness="0,0,0,1">
+          <Button x:Name="TreeDisplayButton" Classes="flat" HorizontalAlignment="Right" ToolTip.Tip="Tree display" AutomationProperties.Name="Tree display">
             <PathIcon Width="12" Height="12" Data="M1,2 H15 V4 H1 Z M1,7 H15 V9 H1 Z M1,12 H15 V14 H1 Z" />
             <Button.Flyout>
-              <Flyout Placement="BottomEdgeAlignedRight">
+              <Flyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="tree-display">
                 <StackPanel x:Name="TreeDisplayPanel" Spacing="8" MinWidth="220">
                   <TextBlock Text="Tree display" FontWeight="SemiBold" />
                   <CheckBox Content="Group files with no name" IsChecked="{Binding TreeDisplay.GroupNoName}" />
@@ -173,13 +186,11 @@
             </Button.Flyout>
           </Button>
         </Border>
-        <Border x:Name="HiddenFooter" DockPanel.Dock="Bottom" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CmDivider}"
-                Background="{DynamicResource CmSidebarBackground}" IsVisible="{Binding HiddenSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Border x:Name="HiddenFooter" DockPanel.Dock="Bottom" Classes="tree-bar" Padding="8,3" BorderThickness="0,1,0,0" IsVisible="{Binding HiddenSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <PathIcon Width="12" Height="12" Data="M1,8 C4,3 12,3 15,8 C12,13 4,13 1,8 Z M2,13 L13,2 L14,3 L3,14 Z" />
-            <TextBlock Text="{Binding HiddenSummary}" Foreground="{DynamicResource CmTextMuted}" VerticalAlignment="Center" />
-            <Button Content="Show" Command="{Binding ShowHiddenCommand}" Padding="4,0" Background="Transparent" BorderThickness="0"
-                    Foreground="{DynamicResource CmAccent}" Cursor="Hand" />
+            <TextBlock Text="{Binding HiddenSummary}" Classes="muted" VerticalAlignment="Center" />
+            <Button Content="Show" Command="{Binding ShowHiddenCommand}" Classes="flat link" Padding="4,0" Cursor="Hand" />
           </StackPanel>
         </Border>
         <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
