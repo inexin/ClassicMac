@@ -2,12 +2,16 @@
 
 ## Unreleased
 
-- Viewer: the tree hides files with the invisible flag (`Icon`, the desktop database; folders such as `Desktop
+- Editor: Save and the unapplied-edits question follow every edit: typing in a `STR#` item, adding or removing one, a
+  template field inside a list item, adding list items, and bytes typed in the hex view.
+- Viewer: the tree hides files with the invisible flag (`Icon
+`, the desktop database; folders such as `Desktop
   Folder` and `Trash` still show), with a footer "N invisible items hidden · Show", and folds a folder's files with no
   name (empty or only whitespace) into one collapsed "No name" node when there are two or more, their names shown with
   the whitespace visible (␣ ⍽ ↵); a single one is titled "(no name)". A "Tree display" popover switches both; the
   choice is kept in `%AppData%/ClassicMac/settings.json`. Exports, previews and the Volume commands still see every file.
-- Files: `HfsWriter` finds files whose names contain control characters (a folder's `Icon`, a name that is a tab):
+- Files: `HfsWriter` finds files whose names contain control characters (a folder's `Icon
+`, a name that is a tab):
   replacing a fork or deleting one no longer says the file was not found.
 - Editor: "Edit with template" and Save also ask about unapplied edits first: the check box stays until the question is
   answered; Save applies the draft (or saves without it, or does nothing on Cancel), and is available for a draft alone.

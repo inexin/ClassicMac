@@ -32,10 +32,27 @@ namespace ClassicMac.App.ViewModels
             var read = template.Read(data);
             extra = read.Extra;
             Fields = TemplateRows.Make(read.Values, 0);
+            WatchRows(Fields);
             var notes = new List<string>();
             if (read.MissingBytes > 0) notes.Add($"The data is {read.MissingBytes} byte{(read.MissingBytes == 1 ? "" : "s")} shorter than the template; Apply adds them as zeros.");
             if (read.Extra.Length > 0) notes.Add($"{read.Extra.Length} byte{(read.Extra.Length == 1 ? "" : "s")} after the template's last field are kept.");
             Note = notes.Count > 0 ? string.Join(" ", notes) : null;
+        }
+
+        // Every field's value, and every list's items (added or removed, and their own fields), count as edits.
+        private void WatchRows(ObservableCollection<TemplateRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                row.PropertyChanged += (_, _) => RaiseEdited();
+                if (row is not TemplateListRow list) continue;
+                foreach (var item in list.Items) WatchRows(item.Fields);
+                list.Items.CollectionChanged += (_, e) =>
+                {
+                    foreach (var item in e.NewItems?.OfType<TemplateItemRow>() ?? []) WatchRows(item.Fields);
+                    RaiseEdited();
+                };
+            }
         }
 
         /// <summary>Where the template comes from ("TMPL 'DLOG' in ResEdit").</summary>

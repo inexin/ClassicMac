@@ -66,7 +66,13 @@ namespace ClassicMac.App.ViewModels
                 half = false;
             }
             Reload();
+            RaiseEdited();
         }
+
+        /// <summary>Raised after each change to the bytes (typing, Delete, Backspace).</summary>
+        public event EventHandler? Edited;
+
+        private void RaiseEdited() => Edited?.Invoke(this, EventArgs.Empty);
 
         /// <summary>Removes the byte under the cursor.</summary>
         public void Delete()
@@ -74,6 +80,7 @@ namespace ClassicMac.App.ViewModels
             half = false;
             if (Cursor < bytes.Count) bytes.RemoveAt(Cursor);
             Reload();
+            RaiseEdited();
         }
 
         /// <summary>Removes the byte before the cursor.</summary>
@@ -82,6 +89,7 @@ namespace ClassicMac.App.ViewModels
             half = false;
             if (Cursor > 0) bytes.RemoveAt(--Cursor);
             Reload();
+            RaiseEdited();
         }
 
         /// <summary>Moves the cursor to <paramref name="offset"/>, kept between 0 and the length.</summary>

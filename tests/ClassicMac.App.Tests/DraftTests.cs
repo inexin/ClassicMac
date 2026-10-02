@@ -426,4 +426,91 @@ public sealed partial class EditTests
         Assert.Equal("hello", Assert.IsType<StringForm>(model.Form).Text);
         Assert.False(model.HasDraft);
     }
+
+    // Save follows edits made deep in a form or in the hex view: each one re-evaluates it, and it can then save.
+    private static Func<int> Watch(System.Windows.Input.ICommand command)
+    {
+        var count = 0;
+        command.CanExecuteChanged += (_, _) => count++;
+        return () => count;
+    }
+
+    [Fact]
+    public async Task Save_follows_edits_to_string_list_items()
+    {
+        var path = Path.Combine(folder, "List.rsrc");
+        var fork = new ResourceFork();
+        fork.Add(new Resource(FourCC.FromString("STR#"), 128, new byte[] { 0, 1, 1, (byte)'a' }));
+        File.WriteAllBytes(path, fork.ToArray());
+        var model = new MainViewModel { EditDialogs = new Dialogs() };
+        var input = (await model.OpenAsync(path))!;
+        await input.EnsureLoadedAsync();
+        model.Selected = input.Children.OfType<ResourceTypeNode>().Single().Children[0];
+        var form = Assert.IsType<StringListForm>(model.Form);
+        var edited = 0;
+        form.Edited += (_, _) => edited++;
+        var changes = Watch(model.SaveCommand);
+        Assert.False(model.SaveCommand.CanExecute(null));
+
+        form.Strings[0].Text = "b";                                         // an item's text
+        Assert.Equal((1, 1), (edited, changes()));
+        Assert.True(model.SaveCommand.CanExecute(null));
+        form.Strings[0].Text = "a";
+        Assert.False(model.SaveCommand.CanExecute(null));
+
+        form.AddCommand.Execute(null);                                      // a new item, then its text
+        Assert.True(model.SaveCommand.CanExecute(null));
+        var before = changes();
+        form.Strings[1].Text = "c";
+        Assert.True(changes() > before);
+        form.RemoveCommand.Execute(form.Strings[1]);
+        Assert.False(model.SaveCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Save_follows_edits_to_template_rows()
+    {
+        var path = Path.Combine(folder, "Data.rsrc");
+        var rsrc = FourCC.FromString("Rsrc");
+        var fork = new ResourceFork();
+        fork.Add(new Resource(rsrc, 128, new byte[] { 0, 7, 0, 0, 0, 2 }));     // id, ZCNT 0 (one item), the item
+        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("ID", "DWRD"), ("Count", "ZCNT"), ("*****", "LSTC"), ("Value", "HWRD"), ("*****", "LSTE")))
+            { Name = MacString.FromMacRoman("Rsrc") });
+        File.WriteAllBytes(path, fork.ToArray());
+        var model = new MainViewModel { EditDialogs = new Dialogs() };
+        var input = (await model.OpenAsync(path))!;
+        await input.EnsureLoadedAsync();
+        model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type == rsrc).Children[0];
+        var form = Assert.IsType<TemplateForm>(model.Form);
+        var changes = Watch(model.SaveCommand);
+        var list = (TemplateListRow)form.Fields[2];
+
+        ((TemplateScalarRow)list.Items[0].Fields[0]).Text = "$0003";         // a field inside a list item
+        Assert.True(changes() > 0);
+        Assert.True(model.SaveCommand.CanExecute(null));
+        ((TemplateScalarRow)list.Items[0].Fields[0]).Text = "$0002";
+        Assert.False(model.SaveCommand.CanExecute(null));
+
+        var before = changes();
+        list.AddCommand.Execute(null);                                      // a new item, then its field
+        Assert.True(changes() > before);
+        Assert.True(model.SaveCommand.CanExecute(null));
+        before = changes();
+        ((TemplateScalarRow)list.Items[1].Fields[0]).Text = "$0009";
+        Assert.True(changes() > before);
+    }
+
+    [Fact]
+    public async Task Save_follows_edits_in_the_hex_view()
+    {
+        var (model, file, _, _, _) = await Open();
+        model.Selected = Resource(file, 129);
+        model.BeginHexEditCommand.Execute(null);
+        var changes = Watch(model.SaveCommand);
+        Assert.False(model.SaveCommand.CanExecute(null));
+        model.HexEdit!.TypeDigit(4);
+        Assert.True(changes() > 0);
+        Assert.True(model.SaveCommand.CanExecute(null));
+        Assert.True(model.HasDraft);
+    }
 }

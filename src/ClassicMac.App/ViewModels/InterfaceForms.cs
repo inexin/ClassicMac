@@ -17,28 +17,6 @@ namespace ClassicMac.App.ViewModels
     /// <summary>A form whose values write the whole resource (the interface templates): its bytes, for the edit and the live preview.</summary>
     public abstract partial class DataForm(Resource resource) : ResourceForm(resource)
     {
-        /// <summary>Raised whenever a value changes (including in its lists), for the live preview.</summary>
-        public event EventHandler? Edited;
-
-        protected void RaiseEdited() => Edited?.Invoke(this, EventArgs.Empty);
-
-        protected override void OnPropertyChanged(PropertyChangedEventArgs e)
-        {
-            base.OnPropertyChanged(e);
-            RaiseEdited();
-        }
-
-        // A list whose items' and own changes count as edits.
-        protected void Watch<T>(ObservableCollection<T> list) where T : INotifyPropertyChanged
-        {
-            foreach (var item in list) item.PropertyChanged += (_, _) => RaiseEdited();
-            list.CollectionChanged += (_, e) =>
-            {
-                foreach (var item in e.NewItems?.OfType<T>() ?? []) item.PropertyChanged += (_, _) => RaiseEdited();
-                RaiseEdited();
-            };
-        }
-
         protected static MacRect Rect(decimal top, decimal left, decimal bottom, decimal right) =>
             new((short)top, (short)left, (short)bottom, (short)right);
 

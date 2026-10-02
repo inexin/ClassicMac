@@ -23,6 +23,31 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The resource's bytes for the form's values (throws <see cref="ArgumentException"/> for values it cannot hold).</summary>
         public abstract byte[] BuildData();
 
+        /// <summary>
+        /// Raised whenever a value changes, in the form or in its lists' items (for the live preview, and for Save and the
+        /// draft guard, which compare the bytes).
+        /// </summary>
+        public event EventHandler? Edited;
+
+        protected void RaiseEdited() => Edited?.Invoke(this, EventArgs.Empty);
+
+        protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            base.OnPropertyChanged(e);
+            RaiseEdited();
+        }
+
+        // A list whose items' and own changes count as edits.
+        protected void Watch<T>(ObservableCollection<T> list) where T : System.ComponentModel.INotifyPropertyChanged
+        {
+            foreach (var item in list) item.PropertyChanged += (_, _) => RaiseEdited();
+            list.CollectionChanged += (_, e) =>
+            {
+                foreach (var item in e.NewItems?.OfType<T>() ?? []) item.PropertyChanged += (_, _) => RaiseEdited();
+                RaiseEdited();
+            };
+        }
+
         /// <summary>The edit that stores the form's values (throws <see cref="ArgumentException"/> for values the resource cannot hold).</summary>
         public virtual IResourceEdit BuildEdit(ResourceFork fork) => new SetResourceData(Resource, BuildData(), $"Edit {Resource}");
 
@@ -102,6 +127,7 @@ namespace ClassicMac.App.ViewModels
         public StringListForm(Resource resource, System.Collections.Generic.IReadOnlyList<string> strings) : base(resource)
         {
             foreach (var s in strings) Strings.Add(new StringItem(s));
+            Watch(Strings);
         }
 
         public ObservableCollection<StringItem> Strings { get; } = [];
@@ -175,7 +201,7 @@ namespace ClassicMac.App.ViewModels
     {
         /// <summary>The typed editor for the selection, or null.</summary>
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand), nameof(SaveCommand))]
         private ResourceForm? form;
 
         public bool HasForm => Form is not null;
@@ -194,8 +220,7 @@ namespace ClassicMac.App.ViewModels
             var form = UseTemplate ? template ?? typed : typed ?? template;
             form?.MarkClean();
             // A draft can be saved (Save applies it first): Save's state follows the form's values.
-            if (form is not null) form.PropertyChanged += (_, _) => SaveCommand.NotifyCanExecuteChanged();
-            if (form is DataForm data) data.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
+            if (form is not null) form.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
             Form = form;
             WatchForm(Form, node as ResourceNode);
         }

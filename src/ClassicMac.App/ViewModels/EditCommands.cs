@@ -294,7 +294,7 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsHexEditing))]
         [NotifyPropertyChangedFor(nameof(HasHex))]
-        [NotifyCanExecuteChangedFor(nameof(BeginHexEditCommand))]
+        [NotifyCanExecuteChangedFor(nameof(BeginHexEditCommand), nameof(SaveCommand))]
         private HexEditor? hexEdit;
 
         private (Resource Resource, NodeViewModel Owner)? hexEditTarget;
@@ -307,6 +307,7 @@ namespace ClassicMac.App.ViewModels
             if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
             hexEditTarget = (node.Resource, owner);
             HexEdit = new HexEditor(node.Resource.GetData());
+            HexEdit.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
             HexLines = HexEdit.Lines;
             SelectedTab = 2;
         }
