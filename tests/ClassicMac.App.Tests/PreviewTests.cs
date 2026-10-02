@@ -112,6 +112,10 @@ public class PreviewTests : IDisposable
         var strings = await Select(model, Resource(file, "STR#", 128));
         Assert.Equal((PreviewKind.Text, "   1  hi\n   2  hi"), (strings.Kind, strings.Text));
 
+        // A resource with a preview has no hex view.
+        Assert.False(model.HasHex);
+        Assert.Empty(model.Hex.Sources);
+
         var text = await Select(model, Resource(file, "TEXT", 128));
         Assert.True(text.IsStyledText);
         Assert.Equal(["Times", "Monaco"], text.Styled!.Runs.Select(r => r.FontName));
@@ -127,9 +131,12 @@ public class PreviewTests : IDisposable
         Assert.StartsWith("; 'CODE' 1: 68k segment, near header\n", code.Text, StringComparison.Ordinal);
         Assert.Contains("00000004  4E75                      rts", code.Text, StringComparison.Ordinal);
 
+        // An unknown resource: its bytes, in the hex view, which opens.
         var data = await Select(model, Resource(file, "DATA", 0));
         Assert.Equal(PreviewKind.None, data.Kind);
-        Assert.Equal(0, model.SelectedTab); // back to details
+        Assert.True(model.HasHex);
+        Assert.Equal(["'DATA' 0"], model.Hex.Sources.Select(s => s.Label.Split(" (")[0]));
+        Assert.Equal(2, model.SelectedTab);
     }
 
     [Fact]
@@ -161,18 +168,21 @@ public class PreviewTests : IDisposable
     public async Task Hex_lines_show_offsets_bytes_and_characters_and_read_lazily()
     {
         var (model, file) = await Open(Disk());
-        model.Selected = Resource(file, "STR#", 128);
+        await Select(model, Resource(file, "DATA", 0));
 
         var line = Assert.Single(model.HexLines!);
-        Assert.Equal(("00000000", "00 02 02 68 69 02 68 69", "···hi·hi"), (line.Offset, line.Hex, line.Characters));
+        Assert.Equal(("00000000", "4E 75", "Nu"), (line.Offset, line.Hex.TrimEnd(), line.Characters));
 
         var big = new HexLines(ForkData.FromBytes(new byte[10 * 1024 * 1024]));
         Assert.Equal(10 * 1024 * 1024 / 16, big.Count);
         _ = big[big.Count - 1];
         Assert.Equal(64 * 1024, big.BytesRead);
 
-        model.Selected = file;
-        Assert.Equal(["Resource fork"], model.Hex.Sources.Select(s => s.Label.Split(" (")[0]));
+        // Files, folders and containers have none.
+        await Select(model, file);
+        Assert.Empty(model.Hex.Sources);
+        Assert.False(model.HasHex);
+        Assert.Null(model.HexLines);
     }
 
     // A container (an opened disk image or archive, or one inside it) has no hex view: its contents are what to look at.

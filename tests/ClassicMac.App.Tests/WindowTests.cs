@@ -308,14 +308,16 @@ public class WindowTests
             disk.File(disk.Folder(HfsBuilder.Root, "Empty"), "Note", [1], []);
             var path = Path.Combine(folder, "disk.img");
             File.WriteAllBytes(path, disk.Build("Disk"));
-            var big = Path.Combine(folder, "big.bin");
-            File.WriteAllBytes(big, [.. Enumerable.Range(0, 8 << 20).Select(i => (byte)(i % 251))]);
+            // A fork with an 8 MB resource of a type nothing previews: shown in hex.
+            var big = Path.Combine(folder, "big.rsrc");
+            File.WriteAllBytes(big, PreviewTests.Fork(("ZZZZ", 128, null, [.. Enumerable.Range(0, 8 << 20).Select(i => (byte)(i % 251))])));
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
             window.Show();
             Pump(model.OpenAsync(path));
             Pump(model.OpenAsync(big));
-            model.Selected = model.Roots[1];
+            Pump(model.Roots[1].EnsureLoadedAsync());
+            model.Selected = model.Roots[1].Children.OfType<ResourceTypeNode>().Single().Children[0];
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
             var lines = model.HexLines!;

@@ -487,7 +487,7 @@ that leads to its node. View-models carry no Avalonia types and are tested; a he
 (zoom, screen depth, nearest-neighbour on a checkerboard), styled `TEXT` drawn with its fonts and colours (through the
 public `StyledText` model), strings, `vers` as JSON, PICT/TEXT files, dialogs, alerts and menus drawn in the System 7 style, and documents (DOCMaker, SimpleText with
 pictures) a chapter at a time with their pictures reflowed as in the HTML output, at 72 dpi, picture links followed
-(chapter, next, previous, back); hex over any fork or resource, read on demand. **Export (built):** Export menu and tree context menu, each command enabled for the nodes it applies to —
+(chapter, next, previous, back); hex for resources no preview shows (the Hex tab appears only for them, or while bytes are edited), read on demand. **Export (built):** Export menu and tree context menu, each command enabled for the nodes it applies to —
 Save Resource As (decoded or `.bin`, current screen depth), Export Resources (a file, or one type, with a manifest),
 Extract All Resources (input, container or folder), Convert Documents (the documents under an input, container,
 folder or file, as HTML) and Unpack as AppleDouble or Basilisk II (input, container, folder or file). They run the CLI's code (`ClassicMac.Files.Export`) off the UI thread, one at a time, into a new subfolder

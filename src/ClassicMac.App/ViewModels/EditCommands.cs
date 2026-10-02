@@ -268,6 +268,7 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The bytes being edited in the hex view, or null.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(IsHexEditing))]
+        [NotifyPropertyChangedFor(nameof(HasHex))]
         [NotifyCanExecuteChangedFor(nameof(BeginHexEditCommand))]
         private HexEditor? hexEdit;
 

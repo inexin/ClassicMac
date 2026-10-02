@@ -226,12 +226,12 @@ public class FolderPreviewTests : IDisposable
     {
         var model = new MainViewModel();
         var input = (await model.OpenAsync(Disk()))!;
+        var art = input.Children.OfType<FolderNode>().Single(f => f.Title == "Art");
+        var before = Decode((await Select(model, art)).Images[0]);
+
         var other = Path.Combine(folder, "icons.rsrc");
         File.WriteAllBytes(other, PreviewTests.Fork(("ICN#", -4000, null, LeftHalf())));
         var icons = (await model.OpenAsync(other))!;
-        var art = input.Children.OfType<FolderNode>().Single(f => f.Title == "Art");
-
-        var before = Decode((await Select(model, art)).Images[0]);
         await icons.EnsureLoadedAsync();
         model.Selected = null;
         var after = Decode((await Select(model, art)).Images[0]);

@@ -102,7 +102,13 @@ namespace ClassicMac.App.ViewModels
         private IReadOnlyList<ImageItem> images = [];
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(HasHex))]
         private HexViewModel hex = HexViewModel.Empty;
+
+        /// <summary>
+        /// Whether the Hex tab shows: for a resource with no preview (an unknown type), or while bytes are edited there.
+        /// </summary>
+        public bool HasHex => Hex.Sources.Count > 0 || IsHexEditing;
 
         [ObservableProperty]
         private HexSource? hexSource;
@@ -200,8 +206,9 @@ namespace ClassicMac.App.ViewModels
         {
             var pendingHexEdit = TakeHexEdit();
             Details = DetailsViewModel.For(value);
-            Hex = HexViewModel.For(value);
-            HexSource = Hex.Sources.FirstOrDefault();
+            // The hex view comes once the preview is known: only a resource without one shows its bytes.
+            Hex = HexViewModel.Empty;
+            HexSource = null;
             PreviewTask = MakePreviewAsync(value);
             if (pendingHexEdit is { } pending) CommitHexEdit(pending, value);
         }
@@ -256,8 +263,20 @@ namespace ClassicMac.App.ViewModels
             else if (result.Kind is PreviewKind.Dialog or PreviewKind.Menu) Zoom = 2;
             else if (result.Kind == PreviewKind.Folder) Zoom = 1;
             Preview = result;
-            if (result.HasPreview) SelectedTab = 1;
-            else if (SelectedTab == 1) SelectedTab = 0;
+            if (result.HasPreview)
+            {
+                SelectedTab = 1;
+            }
+            else if (node is ResourceNode unknown)
+            {
+                Hex = HexViewModel.For(unknown);
+                HexSource = Hex.Sources.FirstOrDefault();
+                SelectedTab = 2;
+            }
+            else if (SelectedTab is 1 or 2)
+            {
+                SelectedTab = 0;
+            }
         }
 
         // Selecting a diagnostic shows its node: its ancestors open and it becomes the selection.

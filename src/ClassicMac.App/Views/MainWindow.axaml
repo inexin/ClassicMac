@@ -230,7 +230,7 @@
             </DockPanel>
           </TabItem>
 
-          <TabItem Header="Hex">
+          <TabItem Header="Hex" IsVisible="{Binding HasHex}">
             <DockPanel>
               <ComboBox DockPanel.Dock="Top" Margin="12,8" MinWidth="260"
                         ItemsSource="{Binding Hex.Sources}" SelectedItem="{Binding HexSource, Mode=TwoWay}">

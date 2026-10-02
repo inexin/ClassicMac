@@ -160,21 +160,8 @@ namespace ClassicMac.App.ViewModels
 
         public IReadOnlyList<HexSource> Sources { get; }
 
-        public static HexViewModel For(NodeViewModel? node) => node switch
-        {
-            ResourceNode r => new([new HexSource($"{r.Resource} ({r.Resource.Length:N0} bytes)", ForkData.FromBytes(r.Resource.GetData()))]),
-            FileNode f => Forks(f.File),
-            // Containers (a disk image or archive, opened or inside one) show their contents, not their bytes.
-            InputNode i when i.Root.Children.Count == 0 => Forks(i.Root.File),
-            _ => Empty,
-        };
-
-        private static HexViewModel Forks(MacFile file)
-        {
-            var sources = new List<HexSource>();
-            if (file.DataFork.Length > 0) sources.Add(new HexSource($"Data fork ({file.DataFork.Length:N0} bytes)", file.DataFork));
-            if (file.ResourceFork.Length > 0) sources.Add(new HexSource($"Resource fork ({file.ResourceFork.Length:N0} bytes)", file.ResourceFork));
-            return new HexViewModel(sources);
-        }
+        /// <summary>A resource's bytes; the view shows them for resources with no preview.</summary>
+        public static HexViewModel For(ResourceNode node) =>
+            new([new HexSource($"{node.Resource} ({node.Resource.Length:N0} bytes)", ForkData.FromBytes(node.Resource.GetData()))]);
     }
 }
