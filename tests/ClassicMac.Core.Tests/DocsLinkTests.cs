@@ -48,6 +48,26 @@ public partial class DocsLinkTests
         Assert.True(broken.Count == 0, "Broken links:\n" + string.Join("\n", broken));
     }
 
+    // Every format document follows docs/formats/TEMPLATE.md: the nine numbered sections, in order.
+    [Fact]
+    public void Format_documents_follow_the_template()
+    {
+        string[] sections = ["Layout", "Reading", "Writing", "Variants", "ClassicMac", "Diagnostics", "Verification",
+            "Not covered", "References"];
+        string formats = Path.Combine(RepositoryRoot(), "docs", "formats");
+        var wrong = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(formats, "*.md", SearchOption.AllDirectories)
+                     .Where(f => Path.GetDirectoryName(f) != formats))
+        {
+            var found = TopSectionPattern().Matches(StripFences(File.ReadAllText(file)))
+                .Select(m => m.Groups[1].Value.TrimEnd()).ToArray();
+            string[] expected = sections.Select((s, i) => $"{i + 1}. {s}").ToArray();
+            if (!found.SequenceEqual(expected))
+                wrong.Add($"{Path.GetRelativePath(formats, file)}: {string.Join(" | ", found)}");
+        }
+        Assert.True(wrong.Count == 0, "Not following TEMPLATE.md:\n" + string.Join("\n", wrong));
+    }
+
     private static IEnumerable<string> MarkdownFiles(string root) =>
         Directory.EnumerateFiles(root, "*.md", SearchOption.AllDirectories).Where(f =>
         {
@@ -91,6 +111,9 @@ public partial class DocsLinkTests
 
     [GeneratedRegex(@"^#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*\r?$", RegexOptions.Multiline)]
     private static partial Regex HeadingPattern();
+
+    [GeneratedRegex(@"^## (\d+\. [^\r\n]*)", RegexOptions.Multiline)]
+    private static partial Regex TopSectionPattern();
 
     [GeneratedRegex(@"\[([^\]]*)\]\([^)]*\)")]
     private static partial Regex LinkTextPattern();

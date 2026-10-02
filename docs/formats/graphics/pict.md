@@ -437,11 +437,7 @@ A picture that every PICT reader, the ROM and Mac OS 9 decode alike:
 
 ### 3.2 PackBits encoding
 
-- A run of 3 or more equal units, or 2 or more when packing words, is written as `(1 − count, unit)`.
-- Anything else goes in literal blocks `(count − 1, units…)`. A literal block ends where a run of 3 begins.
-- At most 128 units per run or block.
-
-[ClassicMac]
+Rows are packed as [packbits.md §3](../codecs/packbits.md#3-writing) describes.
 
 ## 4. Variants
 

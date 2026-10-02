@@ -149,7 +149,7 @@ internal static class GoldenFixtures
         yield return Res("pltt", 128, [0, 2, .. new byte[14], 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0x02, 0x10, 0x00, .. new byte[6],
             0x33, 0x33, 0x66, 0x66, 0x99, 0x99, 0, 0x24, 0, 0, .. new byte[6]]);
 
-        // Finder resources: a bundle with icon and file reference maps (local icon 1 → ICN# 128, a TEXT FREF with no icon
+        // Finder resources: a bundle with icon and file reference maps (local icons 0 and 1 → ICN# 128 and 129, a TEXT FREF with no icon
         // mapped), its FREFs, and a size resource.
         yield return Res("BNDL", 128, [.. "RLMZ"u8, 0, 0, 0, 1, .. "ICN#"u8, 0, 1, 0, 0, 0, 128, 0, 1, 0, 129, .. "FREF"u8, 0, 1, 0, 0, 0, 128, 0, 1, 0, 129]);
         yield return Res("FREF", 128, [.. "APPL"u8, 0, 0, 0]);
