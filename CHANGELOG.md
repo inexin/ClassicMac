@@ -15,7 +15,7 @@
 - CD images: multisession discs are read by their last session's descriptors, as the Mac reads them, from cue sheets
   and whole-disc raw images (disk-images/cd-images.md §2.2 and §5.3).
 - HFS: catalog keys whose length leaves out the pad byte, as Mac OS writes them, are no longer rejected; most files on
-  Mac-written volumes were missing from listings (file-systems/hfs.md §5.1).
+  Mac-written volumes were missing from listings (file-systems/hfs.md §1.9).
 - Editor III: Volume ▸ New File, Import File, New Folder and Delete on plain HFS images, saved with Save As.
 - Viewer: files and resources drag out to the desktop (files as data fork plus AppleDouble, or MacBinary).
 - Core: `BigEndianReader` is a class over `ReadOnlyMemory<byte>`, with a constructor that reads a stream from its

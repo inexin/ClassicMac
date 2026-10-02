@@ -87,7 +87,7 @@ namespace ClassicMac.Files.Iso
             var disc = new CdDisc(segments, session);
 
             // A partition map or an HFS volume at the start of a later session is read from there: the CD driver
-            // applies the session base to the partition map (docs/formats/file-systems/partition-map.md §4); a bare HFS
+            // applies the session base to the partition map (docs/formats/file-systems/partition-map.md §2.2); a bare HFS
             // volume is read the same way (ClassicMac's choice; the driver's handling of one was not traced).
             ForkData data = disc;
             if (session > 0 && SessionHoldsHfs(disc, session))

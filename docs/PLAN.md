@@ -752,7 +752,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    images) lists and unpacks with both forks and Finder info, and file and folder counts match each volume's
    (`classicmac unpack`, built: every corpus image unpacks and reads back identically). The classic HFS reader also
    reports damaged B-tree headers and node maps, out-of-order or duplicate keys and IDs, and malformed or misplaced
-   extents-overflow records as diagnostics while reading on ([hfs.md §4](formats/file-systems/hfs.md#4-hfs-b-trees), [§6](formats/file-systems/hfs.md#6-the-extents-overflow-file), [§10](formats/file-systems/hfs.md#10-diagnostics)).
+   extents-overflow records as diagnostics while reading on ([hfs.md §5.3](formats/file-systems/hfs.md#53-checks-and-recovery), [§6](formats/file-systems/hfs.md#6-diagnostics)).
 3. **Decoders I** — images through QuickDraw.Pict; text (`STR `, `STR#`, `TEXT` + `styl`, `vers`); `snd ` to WAV
    including MACE and IMA4; the manifest; document decoders for SimpleText and DOCMaker. Text decoders built (with the
    decoder interface and `extract` decoding by default); image decoders built through QuickDraw.Pict (NuGet), with a
