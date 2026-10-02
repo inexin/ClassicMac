@@ -151,6 +151,13 @@ its bottom or whose left is right of its right. [Code: ResEdit 2.1.3]
   template from the resource's own file, then from any other open file whose resources are loaded, so opening a copy
   of ResEdit makes its templates available. Apply makes an undoable edit. A resource that has a form of its own and a
   template also gets an "Edit with template" check box that swaps between the two. [ClassicMac]
+- `Map` gives where each field lies in the data (`TemplateSpan`: its offset, length, the 1-based numbers of the list
+  items it is in, and its value), fillers, alignment and the 0 byte ending an `LSTZ` included; a `BBIT` lies in the
+  byte holding it. `ByteMeanings.MeaningAt` turns it into what a byte means, for the hex inspector: the field's label
+  with its item numbers ("ID of item 3", "Value of item 2.1"); for strings their length, characters and padding
+  ("Length of Name of item 1", "Character 2 of Name of item 1"); "Byte *k* of" a hex field; "Bits: a, b" for a byte of
+  bit fields; "Filler", "Alignment", "End of" a list or C string; "After the template's fields" for data past it.
+  [ClassicMac]
 - ClassicMac ships no templates: none of ResEdit's are built in. [ClassicMac]
 
 ## 6. Diagnostics

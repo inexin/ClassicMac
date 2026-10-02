@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Viewer: byte meanings for the hex inspector (E8, model only): `MainViewModel.MeaningAt(node, offset)` says what a
+  byte of a resource is ("Character 1 of string 1, “Untitled”", "Length of string 2", "ID of item 3") with the field's
+  range and value, for `'STR '`, `'STR#'` and any type a `TMPL` in an open file describes (`ByteMeanings`,
+  `ResourceTemplate.Map`); other types and compressed resources have none.
 - Viewer: the inspector header's tile shows the selection's large icon drawn 1:1 at any display scaling: an icon
   resource's family at 32 × 32 (16 when it has only small members), a cicn fitted into 32, a cursor, or a file's
   Finder icon at 32; the kind icon otherwise. Icon families list their members ("ICN# · icl8 · ics#", or an icns's

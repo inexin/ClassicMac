@@ -93,6 +93,10 @@ None.
 - The editor (`TextResources.WriteString`, `WriteStringList`) writes as §3 and refuses text Mac OS Roman cannot hold, a
   string over 255 bytes and a list over 65535 strings, with `ArgumentException`; a line break (`\n` or `\r\n`) is
   written as CR, and read back as `\n`. [ClassicMac]
+- Byte meanings (`ByteMeanings.MeaningAt`, for the hex inspector): a `'STR '`'s length byte, then "Character *k* of the
+  string" over its text, then "After the string"; a `'STR#'`'s count word ("Number of strings"), each string's length
+  byte and characters ("Length of string *i*", "Character *k* of string *i*"), then "After the strings". A length
+  byte that runs past the data names the characters present. [ClassicMac]
 
 ## 6. Diagnostics
 

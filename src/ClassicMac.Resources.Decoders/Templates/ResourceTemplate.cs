@@ -60,6 +60,15 @@ namespace ClassicMac.Resources.Decoders.Templates
     /// <summary>A list's items, each the values of the list's fields.</summary>
     public sealed record TemplateList(TemplateNode Node, IReadOnlyList<IReadOnlyList<TemplateValue>> Items) : TemplateValue(Node);
 
+    /// <summary>Where one field of a template lies in resource data (<see cref="ResourceTemplate.Map"/>).</summary>
+    /// <param name="Node">The field (a list's node for <paramref name="IsListEnd"/>).</param>
+    /// <param name="Offset">Its first byte.</param>
+    /// <param name="Length">Its bytes (bit fields: the byte holding the bit).</param>
+    /// <param name="Items">The 1-based numbers of the list items it is in, from the outermost list in.</param>
+    /// <param name="Text">Its value as the template editor shows it.</param>
+    /// <param name="IsListEnd">The 0 byte that ends an <c>LSTZ</c> list.</param>
+    public sealed record TemplateSpan(TemplateNode Node, int Offset, int Length, IReadOnlyList<int> Items, string Text, bool IsListEnd = false);
+
     /// <summary>What <see cref="ResourceTemplate.Read"/> found.</summary>
     /// <param name="Values">The values of the template's fields (hidden fields left out).</param>
     /// <param name="MissingBytes">Bytes the template needed past the end of the data, read as zeros.</param>
@@ -280,11 +289,40 @@ namespace ClassicMac.Resources.Decoders.Templates
             return new TemplateReadResult(values, reader.Missing, data[end..].ToArray());
         }
 
+        /// <summary>
+        /// Where each field lies in resource data read through the template, in data order (hidden fields, alignment
+        /// and the ends of zero-terminated lists included; bytes the template needed past the end lie past it).
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The template has <see cref="Problems"/>.</exception>
+        public IReadOnlyList<TemplateSpan> Map(ReadOnlySpan<byte> data)
+        {
+            if (Problems.Count > 0)
+            {
+                throw new InvalidOperationException(Problems[0]);
+            }
+
+            var reader = new Reader(data.ToArray()) { Spans = [] };
+            reader.Items(Nodes);
+            return reader.Spans;
+        }
+
         private sealed class Reader(byte[] data)
         {
             public int Position;
             public int Bit = 7;
             public int Missing;
+
+            // Where the fields lie, when mapping (Map); the item numbers of the lists being read.
+            public List<TemplateSpan>? Spans;
+            private readonly List<int> path = [];
+
+            private List<TemplateValue> Item(IReadOnlyList<TemplateNode> children, int number)
+            {
+                path.Add(number);
+                var values = Items(children);
+                path.RemoveAt(path.Count - 1);
+                return values;
+            }
 
             private int End => data.Length;
 
@@ -313,14 +351,14 @@ namespace ClassicMac.Resources.Decoders.Templates
                             case "LSTC":
                                 for (int i = 0; i < count; i++)
                                 {
-                                    items.Add(Items(node.Children));
+                                    items.Add(Item(node.Children, items.Count + 1));
                                 }
 
                                 break;
                             case "LSTB":
                                 while (Position < End)
                                 {
-                                    items.Add(Items(node.Children));
+                                    items.Add(Item(node.Children, items.Count + 1));
                                 }
 
                                 break;
@@ -329,17 +367,27 @@ namespace ClassicMac.Resources.Decoders.Templates
                                 {
                                     if (data[Position] == 0)
                                     {
+                                        Spans?.Add(new TemplateSpan(node, Position, 1, [.. path], "", IsListEnd: true));
                                         Position++;
                                         break;
                                     }
-                                    items.Add(Items(node.Children));
+                                    items.Add(Item(node.Children, items.Count + 1));
                                 }
                                 break;
                         }
                         values.Add(new TemplateList(node, items));
                         continue;
                     }
+                    int start = Position;
                     var text = Field(node.Type);
+                    if (Spans is not null)
+                    {
+                        int length = node.Type == "BBIT" ? 1 : Position - start;
+                        if (length > 0)
+                        {
+                            Spans.Add(new TemplateSpan(node, start, length, [.. path], text));
+                        }
+                    }
                     if (node.IsCount)
                     {
                         int value = int.Parse(text, CultureInfo.InvariantCulture);

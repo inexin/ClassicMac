@@ -264,6 +264,25 @@ namespace ClassicMac.App.ViewModels
         }
 
         // A template form for a resource without a typed form, when a TMPL for its type is at hand.
+        /// <summary>
+        /// What the byte at <paramref name="offset"/> of a resource's data (the bytes the hex view shows) means, with the
+        /// field's range, for the hex inspector (design/boards/hex.md E8): <c>'STR '</c> and <c>'STR#'</c> by their
+        /// layout, other types through a <c>TMPL</c> found as the template form finds one; null for other types, for a
+        /// compressed resource (the hex view shows its compressed bytes) and outside the data.
+        /// </summary>
+        public ByteMeaning? MeaningAt(ResourceNode node, int offset)
+        {
+            ArgumentNullException.ThrowIfNull(node);
+            if ((node.Resource.Attributes & ResourceAttributes.Compressed) != 0)
+            {
+                return null;
+            }
+            var data = node.Resource.GetData().Span;
+            var type = node.Resource.Type;
+            var template = type.ToString() is "STR " or "STR#" ? null : FindTemplate(type, node.Fork, FileOwner(node))?.Template;
+            return ByteMeanings.MeaningAt(type, data, offset, template);
+        }
+
         private TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)
         {
             if (FindTemplate(node.Resource.Type, node.Fork, owner) is not { } found)
