@@ -40,6 +40,7 @@
       <Color x:Key="CmCheckerDarkColor">#ECECE8</Color>
       <Color x:Key="CmLoopRegionColor">#E5EAFB</Color>
       <Color x:Key="CmPlayheadColor">#B42318</Color>
+      <Color x:Key="CmTokenOnSelectionColor">#5871CE</Color>
       <Color x:Key="SystemAccentColor">#2E4EC2</Color>
     </ResourceDictionary>
     <ResourceDictionary x:Key="Dark">
@@ -76,6 +77,7 @@
       <Color x:Key="CmCheckerDarkColor">#323236</Color>
       <Color x:Key="CmLoopRegionColor">#263058</Color>
       <Color x:Key="CmPlayheadColor">#FF8A7A</Color>
+      <Color x:Key="CmTokenOnSelectionColor">#5C6795</Color>
       <Color x:Key="SystemAccentColor">#8FA3FF</Color>
     </ResourceDictionary>
   </ResourceDictionary.ThemeDictionaries>
@@ -115,6 +117,8 @@
   <SolidColorBrush x:Key="CmCheckerDark" Color="{DynamicResource CmCheckerDarkColor}" />
   <SolidColorBrush x:Key="CmLoopRegion" Color="{DynamicResource CmLoopRegionColor}" />
   <SolidColorBrush x:Key="CmPlayhead" Color="{DynamicResource CmPlayheadColor}" />
+  <!-- A whitespace token inside the selected tree row: CmSelection under a 20% white tint. -->
+  <SolidColorBrush x:Key="CmTokenOnSelection" Color="{DynamicResource CmTokenOnSelectionColor}" />
 
   <x:Double x:Key="CmSpace1">4</x:Double>
   <x:Double x:Key="CmSpace2">8</x:Double>

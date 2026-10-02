@@ -54,9 +54,16 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         private bool isItalic;
 
-        /// <summary>Whether the tree shows the title in a monospaced font (a name of whitespace made visible).</summary>
+        /// <summary>A name of whitespace as the tree shows it: a token per run of one character ("sp×3", "tab"), or null.</summary>
         [ObservableProperty]
-        private bool isMono;
+        [NotifyPropertyChangedFor(nameof(HasNameTokens))]
+        private IReadOnlyList<NameToken>? nameTokens;
+
+        /// <summary>The name's bytes in hex ("20 20 CA"), shown on hover over its tokens; null for other names.</summary>
+        [ObservableProperty]
+        private string? nameBytes;
+
+        public bool HasNameTokens => NameTokens is { Count: > 0 };
 
         /// <summary>The title without the unsaved-edits mark.</summary>
         public string BaseTitle { get; }

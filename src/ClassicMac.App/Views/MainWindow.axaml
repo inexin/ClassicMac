@@ -1126,8 +1126,24 @@
                     <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
                   </Panel>
                   <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
+                    <!-- A whitespace name as token chips (boards/tree-no-name.md), its bytes on hover. -->
+                    <ItemsControl Classes="name-tokens" ItemsSource="{Binding NameTokens}" IsVisible="{Binding HasNameTokens}"
+                                  ToolTip.Tip="{Binding NameBytes}" VerticalAlignment="Center">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:NameToken">
+                          <Border Classes="name-token">
+                            <TextBlock Text="{Binding Label}" />
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}"
-                               Classes.mono="{Binding IsMono}" Classes.dimmed="{Binding IsDimmed}" TextTrimming="CharacterEllipsis">
+                               Classes.dimmed="{Binding IsDimmed}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !HasNameTokens}">
                       <Run Text="{Binding NameBefore}" /><Run Classes="match" Classes.on="{Binding HasMatch}" Classes.current="{Binding IsCurrentMatch}" Text="{Binding NameMatch}" /><Run Text="{Binding NameAfter}" />
                     </TextBlock>
                     <TextBlock Grid.Column="1" Classes="unsaved" Text=" •" IsVisible="{Binding IsUnsaved}" />

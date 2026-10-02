@@ -102,7 +102,7 @@ public sealed class TreeSearchTests : IDisposable
         var (model, input) = await Open();
         var art = Node(input, "Art");
         var group = Assert.IsType<NoNameGroupNode>(Assert.Single(art.Children));
-        model.FilterText = "␣";
+        model.FilterText = "sp";
         await model.FilterTask;
         Assert.True(art.IsFilteredOut);
         Assert.All(group.Children, c => Assert.True(c.IsFilteredOut));
@@ -115,7 +115,7 @@ public sealed class TreeSearchTests : IDisposable
 
         model.FilterText = "";
         await model.FilterTask;
-        model.TypeAhead("␣");
+        model.TypeAhead("sp");
         Assert.Equal(0, model.MatchCount);
     }
 
@@ -203,7 +203,7 @@ public sealed class TreeSearchTests : IDisposable
     public async Task The_filter_applies_to_trees_laid_out_again()
     {
         var (model, input) = await Open();
-        model.FilterText = "␣";
+        model.FilterText = "sp";
         await model.FilterTask;
         model.TreeDisplay.GroupNoName = false;                               // the files show as "(no name)" rows
         model.FilterText = "(no";

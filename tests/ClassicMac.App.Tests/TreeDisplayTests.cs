@@ -85,15 +85,17 @@ public sealed class TreeDisplayTests : IDisposable
         Assert.Equal(TreeIconKind.NoNameGroup, group.IconKind);
         Assert.Equal(("No name", true, "4 files"), (group.Name, group.IsItalic, group.Meta));
         Assert.False(group.IsExpanded);
-        Assert.Equal(new[] { "␣", "␣␣", "␉", "⍽␉" }.Order(), Names(group).Order());
-        Assert.All(group.Children, c => Assert.True(c.IsMono));
+        Assert.Equal(new[] { "sp", "sp×2", "tab", "nbsp tab" }.Order(), Names(group).Order());
+        Assert.Equal(["nbsp", "tab"], group.Children.Single(c => c.Name == "nbsp tab").NameTokens!.Select(t => t.Label));
+        Assert.Equal("CA 09", group.Children.Single(c => c.Name == "nbsp tab").NameBytes);  // the bytes on hover
+        Assert.All(group.Children, c => Assert.True(c.HasNameTokens));
         Assert.All(group.Children, c => Assert.Same(group, c.Parent));
         Assert.Contains("Realmz", Names(realmz));
         Assert.Equal(3, realmz.Children.Count);                             // Sub, the group, Realmz
 
         // One file with no name in a folder stays a row of its own.
         var alone = Assert.IsType<FileNode>(Assert.Single(Folder(realmz, "Sub").Children));
-        Assert.Equal(("(no name)", true, false), (alone.Name, alone.IsItalic, alone.IsMono));
+        Assert.Equal(("(no name)", true, false), (alone.Name, alone.IsItalic, alone.HasNameTokens));
         Assert.Equal("\r", alone.File.Name.ToMacRoman());
     }
 
@@ -103,8 +105,12 @@ public sealed class TreeDisplayTests : IDisposable
         Assert.True(Tree.HasNoName(MacString.FromMacRoman("")));
         Assert.True(Tree.HasNoName(new MacString([0x20, 0xCA, 0x09, 0x0D, 0x01, 0x7F])));
         Assert.False(Tree.HasNoName(MacString.FromMacRoman(" a ")));
-        Assert.Equal("(empty)", Tree.VisibleName(MacString.FromMacRoman("")));
-        Assert.Equal("␣⍽↵␉␁", Tree.VisibleName(new MacString([0x20, 0xCA, 0x0D, 0x09, 0x01])));
+        Assert.Empty(Tree.NameTokens(MacString.FromMacRoman("")));                // shown as "(empty)"
+        Assert.Equal(["sp", "nbsp", "cr", "lf", "tab", "^A", "^?"],
+            Tree.NameTokens(new MacString([0x20, 0xCA, 0x0D, 0x0A, 0x09, 0x01, 0x7F])).Select(t => t.Label));
+        Assert.Equal(["sp×3", "nbsp", "sp×2"], Tree.NameTokens(new MacString([0x20, 0x20, 0x20, 0xCA, 0x20, 0x20])).Select(t => t.Label));
+        Assert.Equal("20 20 20 CA", Tree.NameBytes(new MacString([0x20, 0x20, 0x20, 0xCA])));
+        Assert.Equal("", Tree.NameBytes(MacString.FromMacRoman("")));
     }
 
     [Fact]
@@ -113,7 +119,7 @@ public sealed class TreeDisplayTests : IDisposable
         var (model, input, _) = await Open();
         var realmz = Folder(input, "Realmz");
         var group = realmz.Children.OfType<NoNameGroupNode>().Single();
-        var tab = (FileNode)group.Children.Single(c => c.Name == "␉");
+        var tab = (FileNode)group.Children.Single(c => c.Name == "tab");
         Assert.Equal("Realmz.img:Realmz:\t", tab.Source);
         Assert.True(MainViewModel.CanDragOut(tab));
         await tab.EnsureLoadedAsync();
@@ -138,7 +144,7 @@ public sealed class TreeDisplayTests : IDisposable
         realmz.IsExpanded = true;
         var group = realmz.Children.OfType<NoNameGroupNode>().Single();
         group.IsExpanded = true;
-        var space = group.Children.Single(c => c.Name == "␣");
+        var space = group.Children.Single(c => c.Name == "sp");
         model.Selected = space;
 
         model.TreeDisplay.GroupNoName = false;
@@ -146,7 +152,7 @@ public sealed class TreeDisplayTests : IDisposable
         Assert.DoesNotContain(realmz.Children, c => c is NoNameGroupNode);
         Assert.Same(space, model.Selected);
         Assert.Same(realmz, space.Parent);
-        Assert.Equal(("(no name)", true, false), (space.Name, space.IsItalic, space.IsMono));
+        Assert.Equal(("(no name)", true, false), (space.Name, space.IsItalic, space.HasNameTokens));
         Assert.Equal(6, realmz.Children.Count);
         Assert.True(realmz.IsExpanded);
 
@@ -154,7 +160,7 @@ public sealed class TreeDisplayTests : IDisposable
         var regrouped = realmz.Children.OfType<NoNameGroupNode>().Single();
         Assert.Same(regrouped, space.Parent);
         Assert.Same(space, model.Selected);
-        Assert.Equal("␣", space.Name);
+        Assert.Equal("sp", space.Name);
 
         // A shown invisible file selected, then hidden: its folder is selected.
         model.TreeDisplay.HideInvisible = false;
@@ -227,7 +233,7 @@ public sealed partial class EditTests
         var group = realmz.Children.OfType<NoNameGroupNode>().Single();
 
         // A grouped file is deleted by its own name.
-        model.Selected = group.Children.Single(c => c.Name == "␉");
+        model.Selected = group.Children.Single(c => c.Name == "tab");
         Assert.True(model.DeleteItemCommand.CanExecute(null));
         await model.DeleteItemCommand.ExecuteAsync(null);
         Assert.Same(realmz, model.Selected);
@@ -242,7 +248,7 @@ public sealed partial class EditTests
         Assert.Contains(Files(input), f => PathOf(f) == "Realmz:\r\r");
         var made = Assert.IsType<FileNode>(model.Selected);
         Assert.Same(realmz.Children.OfType<NoNameGroupNode>().Single(), made.Parent);
-        Assert.Equal("↵↵", made.Name);
+        Assert.Equal("cr×2", made.Name);
 
         // Deleting the folder deletes the invisible Icon\r and the grouped files too.
         model.Selected = realmz;

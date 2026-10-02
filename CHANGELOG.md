@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Viewer: the files in a "No name" group show their names as ASCII token chips instead of symbol glyphs the UI font may
+  lack (boards/tree-no-name.md): `sp`, `nbsp`, `tab`, `cr`, `lf`, other control characters as `^A`/`^?`, a run of
+  one character as `sp×3`; mono 10 on CmSegmentTrack, on the new CmTokenOnSelection in the selected row; hovering
+  shows the bytes in hex ("20 20 CA"); an empty name reads "(empty)" in italics.
 - Editor: editing a dialog item list gives the table the room: the live preview narrows to 216 (it scrolls), the
   bounds inputs are compact, and the Text column is at least 160 wide in a 1200-pixel window. Dialog, alert, item
   list and menu previews keep their scroll bars in view, so a dialog wider than its pane scrolls at 1:1; the dialog

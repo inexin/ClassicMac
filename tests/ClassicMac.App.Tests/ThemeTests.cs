@@ -60,6 +60,7 @@ public class ThemeTests
         { "CmCheckerDark", 0xECECE8, 0x323236 },
         { "CmLoopRegion", 0xE5EAFB, 0x263058 },
         { "CmPlayhead", 0xB42318, 0xFF8A7A },
+        { "CmTokenOnSelection", 0x5871CE, 0x5C6795 },                  // CmSelection under a 20% white tint
     };
 
     private static Color Rgb(uint rgb) => Color.FromUInt32(0xFF000000 | rgb);

@@ -11,6 +11,9 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels
 {
+    /// <summary>One token of a whitespace name (boards/tree-no-name.md): an ASCII label for a run of one character.</summary>
+    public sealed record NameToken(string Label);
+
     /// <summary>The tree's display options (Tree display popover); both on by default and kept between sessions.</summary>
     public sealed partial class TreeDisplayOptions : ObservableObject
     {
@@ -56,29 +59,43 @@ namespace ClassicMac.App.ViewModels
             return true;
         }
 
-        /// <summary>A name with its whitespace made visible: ␣ space, ⍽ option-space, ↵ return, control pictures for the other control characters.</summary>
-        public static string VisibleName(MacString name)
+        /// <summary>
+        /// A name's whitespace as tokens, ASCII only so nothing depends on glyphs the UI font may lack: <c>sp</c> space,
+        /// <c>nbsp</c> option-space, <c>tab</c>, <c>cr</c>, <c>lf</c>, other control characters in caret form (<c>^A</c>,
+        /// <c>^?</c>); a run of one character is one token with its count (<c>sp×3</c>). None for an empty name.
+        /// </summary>
+        public static IReadOnlyList<NameToken> NameTokens(MacString name)
         {
-            if (name.Bytes.Length == 0)
+            var bytes = name.Bytes;
+            var tokens = new List<NameToken>();
+            for (var i = 0; i < bytes.Length;)
             {
-                return "(empty)";
+                var run = 1;
+                while (i + run < bytes.Length && bytes[i + run] == bytes[i])
+                {
+                    run++;
+                }
+
+                var label = bytes[i] switch
+                {
+                    0x20 => "sp",
+                    0xCA => "nbsp",
+                    0x09 => "tab",
+                    0x0D => "cr",
+                    0x0A => "lf",
+                    0x7F => "^?",
+                    < 0x20 => "^" + (char)(bytes[i] + 0x40),
+                    _ => MacRoman.Decode([bytes[i]]),
+                };
+                tokens.Add(new NameToken(run > 1 ? string.Create(CultureInfo.InvariantCulture, $"{label}×{run}") : label));
+                i += run;
             }
 
-            var text = new StringBuilder();
-            foreach (var b in name.Bytes)
-            {
-                text.Append(b switch
-                {
-                    0x20 => "␣",
-                    0xCA => "⍽",
-                    0x0D => "↵",
-                    0x7F => "␡",
-                    < 0x20 => ((char)(0x2400 + b)).ToString(),
-                    _ => MacRoman.Decode([b]),
-                });
-            }
-            return text.ToString();
+            return tokens;
         }
+
+        /// <summary>A name's bytes in hex, "20 20 CA".</summary>
+        public static string NameBytes(MacString name) => string.Join(" ", name.Bytes.ToArray().Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
 
         private static MacFile? FileOf(NodeViewModel node) => node switch
         {
@@ -114,7 +131,7 @@ namespace ClassicMac.App.ViewModels
             foreach (var item in items.Where(i => FileOf(i) is not null))
             {
                 item.Parent = node;
-                (item.Alias, item.IsItalic, item.IsMono) = (null, false, false);
+                (item.Alias, item.IsItalic, item.NameTokens, item.NameBytes) = (null, false, null, null);
             }
             var group = node.Children.OfType<NoNameGroupNode>().FirstOrDefault();
             List<NodeViewModel> desired;
@@ -124,7 +141,10 @@ namespace ClassicMac.App.ViewModels
                 foreach (var file in noName)
                 {
                     file.Parent = group;
-                    (file.Alias, file.IsMono) = (VisibleName(FileOf(file)!.Name), true);
+                    var name = FileOf(file)!.Name;
+                    var tokens = NameTokens(name);
+                    (file.Alias, file.IsItalic) = tokens.Count == 0 ? ("(empty)", true) : (string.Join(" ", tokens.Select(t => t.Label)), false);
+                    (file.NameTokens, file.NameBytes) = (tokens.Count == 0 ? null : tokens, tokens.Count == 0 ? null : NameBytes(name));
                 }
                 desired = shown.Except(noName).ToList();
                 var firstFile = desired.FindIndex(i => i is not FolderNode);

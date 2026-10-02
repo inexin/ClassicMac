@@ -1116,8 +1116,24 @@ public class WindowTests
             Assert.Contains(texts, t => t.Text == "4 files" && t.FontSize == 11);
             // Light and dark: the header's Tree display button, the italic "No name" row with its muted count, the
             // group open with its names in mono, and the footer.
-            realmz.Children.OfType<NoNameGroupNode>().Single().IsExpanded = true;
+            var noName = realmz.Children.OfType<NoNameGroupNode>().Single();
+            noName.IsExpanded = true;
             Dispatcher.UIThread.RunJobs();
+            // Whitespace names as ASCII token chips (mono 10 SemiBold on CmSegmentTrack), the bytes on hover; inside the
+            // selected row, CmSelectionText on CmTokenOnSelection.
+            var chips = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("name-token") && b.IsEffectivelyVisible).ToList();
+            Assert.Equal(new[] { "sp", "sp×2", "tab", "nbsp", "tab" }.Order(), chips.Select(c => ((TextBlock)c.Child!).Text).Order());
+            Assert.All(chips, c => Assert.Equal(10, ((TextBlock)c.Child!).FontSize));
+            var tokens = window.GetVisualDescendants().OfType<ItemsControl>().First(i => i.Classes.Contains("name-tokens") && i.IsEffectivelyVisible);
+            Assert.Matches("^[0-9A-F]{2}( [0-9A-F]{2})*$", (string)ToolTip.GetTip(tokens)!);
+            model.Selected = noName.Children.Single(c => c.Name == "nbsp tab");
+            Dispatcher.UIThread.RunJobs();
+            window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => i.IsSelected).Focus();
+            Dispatcher.UIThread.RunJobs();
+            var selected = window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => i.IsSelected)
+                .GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("name-token"));
+            Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmTokenOnSelection"), selected.Background);
+            Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmSelectionText"), ((TextBlock)selected.Child!).Foreground);
             Capture(window, "tree-no-name");
             Baselines.Check(window, "tree-no-name", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
 

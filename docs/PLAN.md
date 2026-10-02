@@ -518,7 +518,7 @@ tree) steps through the matches among the loaded rows (F3, Shift+F3) without hid
 `, the desktop database; never folders: `Desktop Folder` and `Trash` show), with a footer "N invisible items
 hidden · Show"; a folder's files whose names are empty or only whitespace (space, option-space, control characters)
 fold into one collapsed "No name" node when there are two or more, their names shown with the whitespace made visible
-(␣ ⍽ ↵); one alone is titled "(no name)". A "Tree display" popover switches both (on by default). Only the tree
+as ASCII token chips (`sp`, `nbsp`, `tab`, `cr`, `lf`, `^X`; runs as `sp×3`; the bytes in hex on hover); one alone is titled "(no name)". A "Tree display" popover switches both (on by default). Only the tree
 changes: each folder node keeps all its items for exports, previews, Details and the Volume commands. A third option, "Show details column"
 (off by default), shows the rows' right-hand details (type · creator, sizes). Rows fit the pane (names trim, the chip
 and details stay whole) and the tree's vertical scroll bar is laid out beside the rows (Fluent's overlay auto-hide is
