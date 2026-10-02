@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -21,8 +22,9 @@ public readonly record struct TrapInfo(ushort Word, string? Name, bool IsToolbox
 /// Names of A-line traps ($Axxx) [Doc: Inside Macintosh: Operating System Utilities, "Trap Manager"]. A Toolbox trap
 /// (bit 11 set) is numbered by bits 0–9, bit 10 being auto-pop; an OS trap (bit 11 clear) by bits 0–7, bit 8
 /// meaning "don't preserve A0" and bits 9–10 being flags whose meaning depends on the manager (Memory Manager $400
-/// SYS and $200 CLEAR, File Manager $400 ASYNC and $200 HFS). The names come from Multiversal Interfaces with
-/// Apple's trap-macro names supplemented (tools/TrapTables).
+/// SYS and $200 CLEAR, Device Manager $400 ASYNC and $200 IMMED, File Manager $400 ASYNC and $200 the HFS variant,
+/// which ClassicMac writes HFS). The names come from Multiversal Interfaces with Apple's trap-macro names
+/// supplemented (tools/TrapTables). docs/formats/output/disassembly.md §2.4.
 /// </summary>
 public static partial class TrapNames
 {
@@ -85,9 +87,13 @@ public static partial class TrapNames
     /// word (<c>_A123</c>) when the trap is unknown.
     /// </summary>
     /// <param name="word">The trap word.</param>
-    /// <returns>The trap macro text.</returns>
+    /// <returns>The trap macro text. Bit 8 of an OS trap has no operand: <see cref="TrapInfo.DontPreserveA0"/>
+    /// carries it.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="word"/> is not an A-line word.</exception>
     public static string Describe(ushort word)
     {
+        if (!IsTrap(word))
+            throw new ArgumentOutOfRangeException(nameof(word), word, "Not an A-line trap word.");
         var info = Lookup(word);
         if (info.Name is null)
             return "_" + word.ToString("X4", System.Globalization.CultureInfo.InvariantCulture);
@@ -171,7 +177,8 @@ internal enum TrapModifierKind
     None,
     /// <summary>Memory Manager: $400 SYS (system heap), $200 CLEAR (zero the block).</summary>
     Memory,
-    /// <summary>File Manager: $400 ASYNC, $200 HFS.</summary>
+    /// <summary>File Manager: $400 ASYNC, $200 the HFS variant (Apple's assembler names the bit newHFS; HFS is
+    /// ClassicMac's label).</summary>
     File,
     /// <summary>Device Manager: $400 ASYNC, $200 IMMED.</summary>
     Device,

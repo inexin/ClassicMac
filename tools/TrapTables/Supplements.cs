@@ -2,18 +2,22 @@
 /// What Multiversal does not give: trap words it lacks, the assembler trap-macro name where Multiversal uses the C
 /// routine's name (<c>PBGetFInfo</c> is the trap <c>_GetFileInfo</c>, <c>InvertRect</c> is <c>_InverRect</c>), the
 /// modifier bits of traps outside the Memory and File Managers, the dispatchers it does not declare, and the
-/// selector names of dispatchers it leaves empty. These override Multiversal's entry for the same word or selector. All are Apple's names and rules [Doc: Inside Macintosh, the
-/// trap macros of each manager's assembly-language summary, and the "Routine descriptors" chapter of Mac OS Runtime
-/// Architectures for _MixedModeMagic].
+/// selector names of dispatchers it leaves empty. These override Multiversal's entry for the same word or selector;
+/// Removed drops Multiversal's words that Apple gives another. All are Apple's names and rules [Doc: Inside Macintosh,
+/// the trap macros of each manager's assembly-language summary, and the "Routine descriptors" chapter of Mac OS
+/// Runtime Architectures for _MixedModeMagic; Apple's Universal Interfaces 3.x (Traps.h, Devices.h, Resources.h);
+/// Technical Q&amp;A FL07 for _FSDispatch].
 /// </summary>
 static class Supplements
 {
     /// <summary>Trap word, macro name and modifier kind (null: keep the kind derived from Multiversal).</summary>
     public static readonly (ushort Word, string Name, string? Kind)[] Traps =
     [
-        // File Manager and Device Manager (Inside Macintosh: Files; Devices). $400 = ASYNC; for _Control, _Status
-        // and _KillIO $200 = IMMED.
-        (0xA000, "Open", "File"), (0xA001, "Close", "File"), (0xA002, "Read", "File"), (0xA003, "Write", "File"),
+        // File Manager and Device Manager (Inside Macintosh: Files; Devices). $400 = ASYNC. For _Close, _Read,
+        // _Write, _Control, _Status and _KillIO $200 = IMMED (Inside Macintosh: Devices, PBRead and PBWrite: "set bit
+        // 9 to execute it immediately"; Universal Interfaces 3.x Devices.h, PBCloseImmed $A201 … PBKillIOImmed
+        // $A206). For the File Manager's own traps $200 is the HFS variant ($A200 _HOpen, $A20F _MountVol).
+        (0xA000, "Open", "File"), (0xA001, "Close", "Device"), (0xA002, "Read", "Device"), (0xA003, "Write", "Device"),
         (0xA004, "Control", "Device"), (0xA005, "Status", "Device"), (0xA006, "KillIO", "Device"),
         (0xA007, "GetVolInfo", "File"), (0xA008, "Create", "File"), (0xA009, "Delete", "File"),
         (0xA00A, "OpenRF", "File"), (0xA00B, "Rename", "File"), (0xA00C, "GetFileInfo", "File"),
@@ -28,12 +32,16 @@ static class Supplements
         (0xA20E, "HUnmountVol", "File"), (0xA210, "AllocContig", "File"), (0xA214, "HGetVol", "File"),
         (0xA215, "HSetVol", "File"), (0xA241, "HSetFLock", "File"), (0xA242, "HRstFLock", "File"),
         (0xA260, "HFSDispatch", "File"),
+        // _FSDispatch | kAsyncMask is its asynchronous call (Technical Q&A FL07).
+        (0xA060, "FSDispatch", "File"),
 
         // Memory Manager (Inside Macintosh: Memory). $400 = SYS, $200 = CLEAR.
         (0xA019, "InitZone", "Memory"), (0xA027, "ReallocHandle", "Memory"), (0xA040, "ResrvMem", "Memory"),
         (0xA05C, "MemoryDispatch", "None"), (0xA15C, "MemoryDispatchA0Result", "None"),
         (0xA0A4, "HeapDispatch", "None"), (0xA22E, "BlockMoveData", "None"), (0xA055, "StripAddress", "None"),
         (0xA091, "Translate24To32", "None"),
+        // Apple's word for _PurgeSpace (Universal Interfaces 3.x Traps.h); Multiversal's $A062 is removed (Removed).
+        (0xA162, "PurgeSpace", "Memory"),
 
         // Trap Manager (Inside Macintosh: Operating System Utilities): $200 = new OS table, $600 = new Toolbox table.
         (0xA146, "GetTrapAddress", "None"), (0xA047, "SetTrapAddress", "None"), (0xA247, "SetOSTrapAddress", "None"),
@@ -64,6 +72,10 @@ static class Supplements
         (0xA092, "EgretDispatch", "None"), (0xA09F, "PowerDispatch", "None"), (0xA0AE, "VADBProc", "None"),
         (0xA0DD, "PPC", "None"), (0xA0FE, "TEFindWord", "None"), (0xA0FF, "TEFindLine", "None"),
         (0xA193, "Microseconds", "None"), (0xA1AD, "Gestalt", "None"), (0xA7AD, "GetGestaltProcPtr", "None"),
+        // Universal Interfaces 3.x: Traps.h (_PowerMgrDispatch, _FSMDispatch) and Devices.h (DriverInstallReserveMem,
+        // ONEWORDINLINE(0xA43D), which has no _ macro there).
+        (0xA09E, "PowerMgrDispatch", "None"), (0xA0AC, "FSMDispatch", "None"),
+        (0xA43D, "DriverInstallReserveMem", "None"),
 
         // Toolbox traps: the macro names (Inside Macintosh: More Macintosh Toolbox; Imaging With QuickDraw;
         // Macintosh Toolbox Essentials; Processes).
@@ -94,7 +106,12 @@ static class Supplements
         // Easy Open).
         (0xA82A, "ComponentDispatch", null), (0xA825, "MenuDispatch", null), (0xAA73, "ControlDispatch", null),
         (0xABF2, "ThreadDispatch", null), (0xABFC, "TranslationDispatch", null),
+        // Mac OS 8 (Universal Interfaces 3.x Traps.h).
+        (0xAA74, "AppearanceDispatch", null),
     ];
+
+    /// <summary>Multiversal's words that Apple's interfaces give another word: _PurgeSpace is $A162.</summary>
+    public static readonly ushort[] Removed = [0xA062];
 
     // Dispatchers Multiversal does not declare (the selector is a word in D0: MOVE.W or MOVEQ before the trap), and
     // conventions that replace Multiversal's: _FP68K's selector is its whole opword (see Fp68k below), where
@@ -105,6 +122,9 @@ static class Supplements
         (0xA825, "MenuDispatch", "D0", "Word", 0xFFFF), (0xAA73, "ControlDispatch", "D0", "Word", 0xFFFF),
         (0xABF2, "ThreadDispatch", "D0", "Word", 0xFFFF), (0xABFC, "TranslationDispatch", "D0", "Word", 0xFFFF),
         (0xA9EB, "Pack4", "Stack", "Word", 0xFFFF),
+        // _ResourceDispatch: MOVEQ #sel,D0, the whole word (Universal Interfaces 3.x Resources.h: $7001
+        // ReadPartialResource … $7010 FSpResourceFileAlreadyOpen), where Multiversal masks to $F.
+        (0xA822, "ResourceDispatch", "D0", "Word", 0xFFFF),
     ];
 
     /// <summary>
@@ -113,7 +133,10 @@ static class Supplements
     /// </summary>
     public static IEnumerable<(ushort Trap, uint Selector, string Name)> Selectors =>
         Fp68k().Concat(Elems68k).Concat(Pack7).Concat(Components).Concat(Menus).Concat(Controls).Concat(Threads)
-            .Concat(Translation);
+            .Concat(Translation).Concat(Resources);
+
+    // _ResourceDispatch selectors Multiversal lacks [Doc: Universal Interfaces 3.x Resources.h].
+    private static readonly (ushort, uint, string)[] Resources = [(0xA822, 0x10, "FSpResourceFileAlreadyOpen")];
 
     /// <summary>
     /// _FP68K (_Pack4) opwords, named as the SANE assembler macros name them [Doc: Apple Numerics Manual, second

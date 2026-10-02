@@ -39,6 +39,8 @@ public static class TrapTablesGenerator
         }
         foreach (var (word, name, kind) in Supplements.Traps)
             traps[word] = (name, kind ?? (traps.TryGetValue(word, out var old) ? old.Kind : "None"));
+        foreach (ushort word in Supplements.Removed)
+            traps.Remove(word);
 
         void AddTrap(ushort word, string name, string file, Item? f = null)
         {

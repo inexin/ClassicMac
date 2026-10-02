@@ -14,7 +14,7 @@ JSON.
 | Identified by | A `.s` file whose first line starts `; ` and names the code (`; 'CODE' 1 "Main": 68k segment, near header`); a `.json` beside it; `code.json` in a `disasm` folder |
 | ClassicMac | Writes; `ClassicMac.Code.Disassembly` (`CodeListing`, `CodeFunction`, `CodeReference`, `MacsBugNames`, `TrapNames`, `SelectorNames`, `LowMemoryGlobals`), `ClassicMac.Resources.Decoders.Code` (the decoders, `CodeExport`) |
 | Verified against | ResEdit 2.1.3 (MPW near model), Realmz 7.1.2 (CodeWarrior), a Retro68 application, Disk Copy 6.1.2 (MPW far model and a data-fork fragment), Disk Copy 6.5, the Mac OS 9 System file and 90 Mac OS 9.2.2 fragments |
-| Sources | *M68000 Family Programmer's Reference Manual* (Motorola); *PowerPC Microprocessor Family: The Programming Environments* and *AltiVec Technology Programming Environments Manual* (IBM, Motorola); *Mac OS Runtime Architectures*; *Inside Macintosh* (the Segment Loader, the Trap Manager, each manager's dispatch selectors); *MacsBug Reference and Debugging Guide*; Multiversal Interfaces (trap, selector and low-memory names); resource_dasm (the disassemblers, ported; MIT) |
+| Sources | *M68000 Family Programmer's Reference Manual* (Motorola); *PowerPC Microprocessor Family: The Programming Environments* and *AltiVec Technology Programming Environments Manual* (IBM, Motorola); *Mac OS Runtime Architectures*; *Inside Macintosh* (the Segment Loader, the Trap Manager, each manager's dispatch selectors); *MacsBug Reference and Debugging Guide*; Multiversal Interfaces (trap, selector and low-memory names); Apple's Universal Interfaces 3.x and Technical Q&A FL07 (trap words and selectors Multiversal lacks); resource_dasm (the disassemblers, ported; MIT) |
 
 Contents
 
@@ -218,9 +218,21 @@ descent: the code from the end of the previous name (or the segment's code start
 
 - A Toolbox trap (bit 11 set) is numbered by bits 0–9; bit 10 is auto-pop, written `,AUTOPOP` (`_GetResource ,AUTOPOP`).
 - An OS trap (bit 11 clear) is numbered by bits 0–7; bit 8 means A0 is not preserved; bits 9 and 10 are flags whose
-  names depend on the manager: `,SYS` and `,CLEAR` for the Memory Manager, `,ASYNC` and `,HFS` for the File Manager,
-  `$200`/`$400` where the trap names none. A table entry may itself carry modifier bits (`$A11E` `_NewPtr`): the
-  most specific entry whose bits are all in the word is used, and only the remaining bits are written.
+  names depend on the manager:
+  - the Memory Manager: `,SYS` ($400) and `,CLEAR` ($200);
+  - the Device Manager's `_Close`, `_Read`, `_Write`, `_Control`, `_Status` and `_KillIO`: `,ASYNC` ($400) and
+    `,IMMED` ($200) [Doc: Inside Macintosh: Devices, PBRead and PBWrite; Universal Interfaces 3.x Devices.h,
+    PBCloseImmed $A201 … PBKillIOImmed $A206];
+  - the File Manager: `,ASYNC` ($400) and `,HFS` ($200, the HFS variant; Apple's assembler names the bit `newHFS`,
+    `,HFS` is ClassicMac's label [ClassicMac]); `_FSDispatch ,ASYNC` is `_FSDispatch | kAsyncMask` [Doc: Technical
+    Q&A FL07];
+  - string comparison: `,MARKS` ($200, diacriticals stripped) and `,CASE` ($400, no upcasing) [Code: the 68k ROM,
+    `_CmpString`, `_RelString`, `_UprString`];
+  - `$200`/`$400` where the trap names none.
+
+  A table entry may itself carry modifier bits (`$A11E` `_NewPtr`): the most specific entry whose bits are all in the
+  word is used, and only the remaining bits are written. Bit 8 has no operand and is not written (`$A01E` and `$A11E`
+  are both `_NewPtr`); the listing's hex column shows the word. [ClassicMac]
 - An unknown trap is written as its word, `_A0FF`.
 
 A dispatcher trap (`_Pack0`–`_Pack15`, `_OSDispatch`, `_ScriptUtil`, `_HFSDispatch`, `_Gestalt`, `_PrGlue`, …) takes
@@ -228,11 +240,16 @@ a selector on the stack (`move.w #n,-(sp)`, `move.l #n,-(sp)`, `clr.w -(sp)`) or
 `move.w #n,d0`, `move.l #n,d0`), as each manager's chapter of *Inside Macintosh* says. The selector is looked for in
 the three instructions before the trap, within its basic block: a branch, return, call or other trap, a block start, or
 another push (another write to D0) ends the search. The bits of the value that select the routine are masked (the
-rest are parameter sizes). The look-back of three is [ClassicMac].
+rest are parameter sizes). The look-back of three is [ClassicMac]. `_ResourceDispatch` takes the whole word in D0
+(`moveq #1,d0` `ReadPartialResource` … `moveq #$10,d0` `FSpResourceFileAlreadyOpen`) [Doc: Universal Interfaces 3.x
+Resources.h]. An OS dispatcher called with bit 10 set is the same dispatcher only where bit 10 is its modifier
+(`_HFSDispatch ,ASYNC`); `_NewGestalt` ($A3AD), `_ReplaceGestalt` ($A5AD) and `_GetGestaltProcPtr` ($A7AD) are calls
+of their own and take no `_Gestalt` selector. [ClassicMac]
 
 The trap, selector and low-memory names come from Multiversal Interfaces (MIT), with Apple's trap-macro names added
-where Multiversal has none; `tools/TrapTables` generates `TrapNames.g.cs`, `SelectorNames.g.cs` and
-`LowMemoryGlobals.g.cs`.
+where Multiversal has none, from *Inside Macintosh* and Apple's Universal Interfaces 3.x (`Traps.h`, and
+`Devices.h`'s `DriverInstallReserveMem` for `$A43D`); `_PurgeSpace` is Apple's `$A162`, not Multiversal's `$A062`.
+`tools/TrapTables` generates `TrapNames.g.cs`, `SelectorNames.g.cs` and `LowMemoryGlobals.g.cs`.
 
 ### 2.5 Relocations
 
@@ -463,3 +480,7 @@ documents). These are its own and the decoders':
 8. *MC68881/MC68882 Floating-Point Coprocessor User's Manual*, *MC68030 User's Manual*, *MC68040 User's Manual*,
    *MC68851 Paged Memory Management Unit User's Manual*, Motorola.
 9. Ghidra (NSA), Apache 2.0: a behavioural reference for the 68k decoder (the reserved bits of a 32-bit divide).
+10. *Inside Macintosh: Devices*, Apple, 1994: the Device Manager's trap bits.
+11. Universal Interfaces 3.x, Apple (`Traps.h`, `Devices.h`, `Resources.h`, `Gestalt.h`): trap words and dispatch
+    selectors.
+12. Technical Q&A FL07, "PBXGetVolInfo Glue", Apple: `_FSDispatch` and `kAsyncMask`.

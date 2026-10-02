@@ -46,7 +46,20 @@ public sealed class TrapTablesGeneratorTests : IDisposable
     [InlineData("(0xA004, \"Control\", TrapModifierKind.Device),")]
     [InlineData("(0xA03C, \"CmpString\", TrapModifierKind.String),")]
     [InlineData("(0xAAFE, \"MixedModeMagic\", TrapModifierKind.None),")]
+    [InlineData("(0xA0F1, \"PBAsyncBitOnly\", TrapModifierKind.File),")]  // TrapBit<0x400> alone
+    [InlineData("(0xA0F2, \"PBFileTrapOnly\", TrapModifierKind.File),")]  // file_trap alone
+    [InlineData("(0xA0F3, \"PBNeither\", TrapModifierKind.None),")]
+    [InlineData("(0xA5AD, \"ReplaceGestalt\", TrapModifierKind.None),")]  // TrapBits dispatcher: $A1AD | $400
+    [InlineData("(0xA162, \"PurgeSpace\", TrapModifierKind.Memory),")]    // supplement: Apple's word
+    [InlineData("(0xA001, \"Close\", TrapModifierKind.Device),")]
+    [InlineData("(0xA002, \"Read\", TrapModifierKind.Device),")]
+    [InlineData("(0xA003, \"Write\", TrapModifierKind.Device),")]
+    [InlineData("(0xA060, \"FSDispatch\", TrapModifierKind.File),")]
     public void TrapEntries(string line) => Assert.Contains(line, _traps);
+
+    // Multiversal's word for PurgeSpace ($A062) is replaced by Apple's ($A162).
+    [Fact]
+    public void TrapsRemoved() => Assert.DoesNotContain("(0xA062,", _traps);
 
     [Theory]
     [InlineData("SecondDefinition")]   // a later definition of the same word loses
@@ -67,7 +80,8 @@ public sealed class TrapTablesGeneratorTests : IDisposable
     [Theory]
     [InlineData("(0xA9EE, \"Pack7\", SelectorLocation.Stack, SelectorWidth.Word, 0xFFFF),")]
     [InlineData("(0xA8B5, \"ScriptUtil\", SelectorLocation.Stack, SelectorWidth.Long, 0xFFFFFFFF),")]
-    [InlineData("(0xA822, \"ResourceDispatch\", SelectorLocation.D0, SelectorWidth.Word, 0xF),")]
+    [InlineData("(0xA822, \"ResourceDispatch\", SelectorLocation.D0, SelectorWidth.Word, 0xFFFF),")] // supplement over D0<0xF>
+    [InlineData("(0xA822, 0x10, \"FSpResourceFileAlreadyOpen\"),")]
     [InlineData("(0xA1AD, \"Gestalt\", SelectorLocation.D0, SelectorWidth.OSType, 0xFFFFFFFF),")]
     [InlineData("(0xA260, \"HFSDispatch\", SelectorLocation.D0, SelectorWidth.Word, 0xFFFF),")] // supplement
     [InlineData("(0xA9EE, 0x0, \"NumToString\"),")]
@@ -208,6 +222,28 @@ public sealed class TrapTablesGeneratorTests : IDisposable
         Assert.DoesNotContain("executorlabel", _lowmem);   // Executor's lower-case labels
         Assert.DoesNotContain("0x0999", _lowmem);          // inside a block scalar
         Assert.True(_lowmem.IndexOf("0x014A", StringComparison.Ordinal) < _lowmem.IndexOf("0x0904", StringComparison.Ordinal));
+    }
+
+    // The committed tables were generated with the current supplements: every supplement's trap, convention and
+    // selector is in them, and the removed words are not (a supplement edited without rerunning the tool fails here).
+    [Fact]
+    public void Committed_tables_hold_every_supplement()
+    {
+        string dir = Path.Combine(Fixture(""), "..", "..", "..", "src", "ClassicMac.Code", "Disassembly");
+        string traps = File.ReadAllText(Path.Combine(dir, "TrapNames.g.cs"));
+        string selectors = File.ReadAllText(Path.Combine(dir, "SelectorNames.g.cs"));
+        foreach (var (word, name, kind) in Supplements.Traps)
+        {
+            string head = FormattableString.Invariant($"(0x{word:X4}, \"{name}\", TrapModifierKind.");
+            Assert.Contains(kind is null ? head : head + kind + "),", traps);
+        }
+        foreach (ushort word in Supplements.Removed)
+            Assert.DoesNotContain(FormattableString.Invariant($"(0x{word:X4}, \""), traps);
+        foreach (var (trap, name, location, width, mask) in Supplements.Conventions)
+            Assert.Contains(FormattableString.Invariant(
+                $"(0x{trap:X4}, \"{name}\", SelectorLocation.{location}, SelectorWidth.{width}, 0x{mask:X}),"), selectors);
+        foreach (var (trap, selector, name) in Supplements.Selectors)
+            Assert.Contains(FormattableString.Invariant($"(0x{trap:X4}, 0x{selector:X}, \"{name}\"),"), selectors);
     }
 
     [Fact]

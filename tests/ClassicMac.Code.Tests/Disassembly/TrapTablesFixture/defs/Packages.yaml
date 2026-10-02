@@ -90,6 +90,29 @@
 
 # ####
 
+- function:
+    name: PBAsyncBitOnly
+    args:
+      - name: async
+        type: Boolean
+        register: TrapBit<0x400>
+    trap: 0xA0F1
+
+# ####
+
+- function:
+    name: PBFileTrapOnly
+    file_trap: true
+    trap: 0xA0F2
+
+# ####
+
+- function:
+    name: PBNeither
+    trap: 0xA0F3
+
+# ####
+
 - api: carbon
   function:
     name: CarbonOnly

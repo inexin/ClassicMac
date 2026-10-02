@@ -16,6 +16,12 @@
 
 # ####
 
+- function:
+    name: PurgeSpace
+    trap: 0xA062
+
+# ####
+
 - lowmem:
     name: CurrentA5
     type: Ptr

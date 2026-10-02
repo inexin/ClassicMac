@@ -21,6 +21,21 @@ public class TrapNamesTests
     [InlineData(0xA1AD, "_Gestalt")]
     [InlineData(0xA3AD, "_NewGestalt")]
     [InlineData(0xA22E, "_BlockMoveData")]
+    // Traps.h of Universal Interfaces 3.x (the Mac OS 9 interfaces).
+    [InlineData(0xA09E, "_PowerMgrDispatch")]
+    [InlineData(0xA0AC, "_FSMDispatch")]
+    [InlineData(0xAA74, "_AppearanceDispatch")]
+    [InlineData(0xA162, "_PurgeSpace")]
+    [InlineData(0xA43D, "_DriverInstallReserveMem")]   // Devices.h: DriverInstallReserveMem, ONEWORDINLINE(0xA43D)
+    // $AA00–$ABFF.
+    [InlineData(0xAA00, "_OpenCPort")]
+    [InlineData(0xAA1F, "_PlotCIcon")]
+    [InlineData(0xAB1D, "_QDExtensions")]
+    [InlineData(0xABCA, "_DeviceLoop")]
+    [InlineData(0xABF8, "_StdOpcodeProc")]
+    [InlineData(0xABFF, "_DebugStr")]
+    [InlineData(0xAFFF, "_DebugStr ,AUTOPOP")]
+    [InlineData(0xAC00, "_SoundDispatch ,AUTOPOP")]
     public void SpotChecks(int word, string expected) => Assert.Equal(expected, TrapNames.Describe((ushort)word));
 
     [Theory]
@@ -35,19 +50,45 @@ public class TrapNamesTests
     [InlineData(0xA660, "_HFSDispatch ,ASYNC")]
     [InlineData(0xA41E, "_NewPtr ,SYS")]       // without bit 8: found by the key, $A11E's bit 8 not required
     [InlineData(0xA01E, "_NewPtr")]
-    [InlineData(0xA162, "_PurgeSpace")]        // $A062 entry; bit 8 is not a named modifier
     [InlineData(0xA562, "_PurgeSpace ,SYS")]
     [InlineData(0xA400, "_Open ,ASYNC")]
     [InlineData(0xA20F, "_MountVol ,HFS")]
     [InlineData(0xA60F, "_MountVol ,ASYNC,HFS")]
     [InlineData(0xA204, "_Control ,IMMED")]
     [InlineData(0xA604, "_Control ,ASYNC,IMMED")]
+    // The Device Manager's immediate bit [Doc: Inside Macintosh: Devices, PBRead and PBWrite; Universal Interfaces
+    // 3.x Devices.h, PBCloseImmed $A201, PBReadImmed $A202, PBWriteImmed $A203].
+    [InlineData(0xA201, "_Close ,IMMED")]
+    [InlineData(0xA202, "_Read ,IMMED")]
+    [InlineData(0xA203, "_Write ,IMMED")]
+    [InlineData(0xA602, "_Read ,ASYNC,IMMED")]
+    [InlineData(0xA403, "_Write ,ASYNC")]
+    // _FSDispatch | kAsyncMask [Doc: Technical Q&A FL07].
+    [InlineData(0xA460, "_FSDispatch ,ASYNC")]
+    // String comparison: the ROM strips diacriticals when bit 9 is set and does not upcase when bit 10 is set
+    // [Code: the 68k ROM, _CmpString/_RelString/_UprString].
     [InlineData(0xA63C, "_CmpString ,MARKS,CASE")]
     [InlineData(0xA43C, "_CmpString ,CASE")]
+    [InlineData(0xA250, "_RelString ,MARKS")]
+    [InlineData(0xA450, "_RelString ,CASE")]
     [InlineData(0xA254, "_UprString ,MARKS")]
     [InlineData(0xA42F, "_PostEvent ,$400")]   // a trap whose bits have no names
-    [InlineData(0xA63D, "_DrvrInstall ,$400,$200")]
+    [InlineData(0xA62F, "_PostEvent ,$400,$200")]
+    [InlineData(0xA63D, "_DriverInstallReserveMem ,$200")]
     public void OsModifiers(int word, string expected) => Assert.Equal(expected, TrapNames.Describe((ushort)word));
+
+    // Bit 8 (A0 not preserved) has no assembler operand: the text is the same with and without it, and TrapInfo
+    // carries it. [ClassicMac]
+    [Fact]
+    public void Bit_8_is_not_in_the_text()
+    {
+        Assert.Equal("_NewPtr", TrapNames.Describe(0xA01E));
+        Assert.Equal("_NewPtr", TrapNames.Describe(0xA11E));
+        Assert.False(TrapNames.Lookup(0xA01E).DontPreserveA0);
+        Assert.True(TrapNames.Lookup(0xA11E).DontPreserveA0);
+        Assert.Equal("_PurgeSpace", TrapNames.Describe(0xA062));
+        Assert.False(TrapNames.Lookup(0xA062).DontPreserveA0);
+    }
 
     // Words with their own entries win over the key's entry plus modifiers.
     [Theory]
@@ -137,11 +178,19 @@ public class TrapNamesTests
     [InlineData(0xA0FA, "_A0FA")]
     [InlineData(0xAB00, "_AB00")]
     [InlineData(0xAF00, "_AF00")]
-    [InlineData(0x4E75, "_4E75")]
+    [InlineData(0xA829, "_A829")]   // no public name (Apple's interfaces leave it out)
     public void Unknown(int word, string expected)
     {
         Assert.Equal(expected, TrapNames.Describe((ushort)word));
         Assert.False(TrapNames.TryGetName((ushort)word, out _));
+    }
+
+    // A word that is not an A-line trap has no trap text.
+    [Fact]
+    public void Describe_needs_a_trap_word()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => TrapNames.Describe(0x4E75));
+        Assert.False(TrapNames.TryGetName(0x4E75, out _));
     }
 }
 
@@ -159,7 +208,8 @@ public class SelectorNamesTests
     [InlineData(0xAB1D, 0x40001u, "LockPixels")]   // QDExtensions, D0 long
     [InlineData(0xAB1D, 0x14u, "OffscreenVersion")]
     [InlineData(0xA8FD, 0x04000C00u, "PrOpenDoc")] // PrGlue, stack long
-    [InlineData(0xA822, 0xFFFFFFF1u, "ReadPartialResource")] // ResourceDispatch: D0 masked to $F
+    [InlineData(0xA822, 1u, "ReadPartialResource")]          // ResourceDispatch: moveq #1,d0 (Resources.h $7001)
+    [InlineData(0xA822, 0x10u, "FSpResourceFileAlreadyOpen")] // moveq #$10,d0 (Resources.h $7010)
     [InlineData(0xAAA2, 0x1200u, "Entry2Index")]   // PaletteDispatch: D0 masked to $FF
     [InlineData(0xAA59, 0u, "NewRoutineDescriptor")] // MixedModeDispatch, D0 word
     [InlineData(0xA816, 0x0204u, "AEDisposeDesc")] // Pack8, D0 word
@@ -216,7 +266,7 @@ public class SelectorNamesTests
     public void Masks()
     {
         Assert.True(SelectorNames.TryGetConvention(0xA822, out var c));
-        Assert.Equal((0xA822, "ResourceDispatch", 0xFu), (c.Trap, c.Name, c.Mask));
+        Assert.Equal((0xA822, "ResourceDispatch", 0xFFFFu), (c.Trap, c.Name, c.Mask));
         Assert.True(SelectorNames.TryGetConvention(0xA9EB, out c));     // Pack4: the whole opword
         Assert.Equal(0xFFFFu, c.Mask);
         Assert.True(SelectorNames.TryGetConvention(0xA9EC, out c));     // Pack5: the low byte
@@ -238,6 +288,23 @@ public class SelectorNamesTests
         Assert.False(SelectorNames.TryGet(0xA9EB, 0x4000, out _));      // a bit outside the opword fields
         Assert.False(SelectorNames.TryGet(0xA9EC, 0x22, out _));        // past FORANDX
         Assert.False(SelectorNames.TryGet(0xA1AD, 0x7A7A7A7A, out _));  // 'zzzz'
+        Assert.False(SelectorNames.TryGet(0xA822, 0xFFFFFFF1, out _));  // ResourceDispatch: -15 is no selector
+        Assert.False(SelectorNames.TryGet(0xA822, 0x11, out _));        // nor $11 (not $1 under a $F mask)
+    }
+
+    // _NewGestalt ($A3AD), _ReplaceGestalt ($A5AD) and _GetGestaltProcPtr ($A7AD) are calls of their own, picked by
+    // the trap word's bits, not _Gestalt with a modifier: none takes _Gestalt's selector convention. The bit 10 of an
+    // OS trap is stripped only where it is a modifier of the same trap (_HFSDispatch ,ASYNC).
+    [Fact]
+    public void Trap_bits_dispatchers()
+    {
+        Assert.True(SelectorNames.TryGetConvention(0xA1AD, out _));
+        Assert.False(SelectorNames.TryGetConvention(0xA3AD, out _));
+        Assert.False(SelectorNames.TryGetConvention(0xA5AD, out _));
+        Assert.False(SelectorNames.TryGetConvention(0xA7AD, out _));
+        Assert.False(SelectorNames.TryGet(0xA5AD, 0x73797376, out _));
+        Assert.True(SelectorNames.TryGetConvention(0xA460, out var c));   // _FSDispatch ,ASYNC
+        Assert.Equal(0xA060, c.Trap);
     }
 }
 

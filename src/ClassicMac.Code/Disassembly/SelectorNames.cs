@@ -98,13 +98,21 @@ public static partial class SelectorNames
         return false;
     }
 
-    // The exact word, then without bit 10 (ASYNC on an OS trap, auto-pop on a Toolbox trap), then the bare number.
+    // The exact word, then without bit 10 (auto-pop on a Toolbox trap, ASYNC on an OS trap), then the bare number.
+    // An OS trap's bits are stripped only where they are modifiers of the same trap: _NewGestalt ($A3AD) and
+    // _ReplaceGestalt ($A5AD) are calls of their own, not _Gestalt ($A1AD) with modifiers.
     private static IEnumerable<ushort> Candidates(ushort trap)
     {
         yield return trap;
-        yield return (ushort)(trap & 0xFBFF);
-        if ((trap & 0x0800) == 0)
-            yield return (ushort)(trap & 0xF8FF);
+        if ((trap & 0x0800) != 0)
+        {
+            yield return (ushort)(trap & 0xFBFF);
+            yield break;
+        }
+        string? name = TrapNames.Lookup(trap).Name;
+        foreach (ushort t in new[] { (ushort)(trap & 0xFBFF), (ushort)(trap & 0xF8FF) })
+            if (t != trap && TrapNames.Lookup(t).Name == name)
+                yield return t;
     }
 
     private static Dictionary<ushort, SelectorConvention> BuildConventions()

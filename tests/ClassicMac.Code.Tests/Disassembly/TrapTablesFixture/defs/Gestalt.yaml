@@ -20,6 +20,13 @@
 
 # ####
 
+- function:
+    name: ReplaceGestalt
+    dispatcher: GestaltDispatch
+    selector: 0x400
+
+# ####
+
 - enum:
     values:
       - name: gestaltSystemVersion
