@@ -8,6 +8,17 @@ namespace ClassicMac.Code.Tests.M68k;
 // [Verified: the samples named in each test].
 public class M68kCorpusTests
 {
+    [Fact]
+    public void Disk_Copy_6_1_2_carries_the_HDI_driver()
+    {
+        var fork = ResourceFork.Read(CodeCorpus.Require("DC612"));
+        var diagnostics = new List<Diagnostic>();
+        var header = DriverHeader.Read(fork.Find(FourCC.FromString("DRVR"), 0)!.GetData(), diagnostics)!;
+        Assert.Empty(diagnostics);
+        Assert.True(header.IsStandard);
+        Assert.Equal((".HDI", (ushort)0x18, (ushort)0x30), (header.Name, header.Open, header.Close));
+    }
+
     private static (CodeApplication App, List<Diagnostic> Diagnostics) Read(string name, long? length = null)
     {
         var fork = ResourceFork.Read(CodeCorpus.Require(name, length));

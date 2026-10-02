@@ -406,6 +406,38 @@ public class CodeApplicationTests
     }
 
     [Fact]
+    public void A_CodeWarrior_DATA_0_shorter_than_its_first_long_is_reported()
+    {
+        var fork = new ResourceFork();
+        fork.Add("CODE", 0, Code0([NearEntry(0, 1)]));
+        fork.Add("CODE", 1, Near(0, 1, [0x9D, 0xCE, 0x59, 0x8F, 0x2F, 0x3C, (byte)'C', (byte)'O', (byte)'D', (byte)'E']));
+        fork.Add("DATA", 0, Zeros(2));
+        var diagnostics = new List<Diagnostic>();
+        var app = Read(fork, diagnostics);
+        Assert.Equal(CodeModel.CodeWarrior, app.Model);
+        Assert.Null(app.CodeWarriorData);
+        Assert.Equal("m68k.cw-data-truncated", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void A_CODE_0_that_cannot_be_decompressed_is_no_application()
+    {
+        var fork = NearApp();
+        var code0 = fork.Find(CodeBuilder.Code, 0)!;
+        code0.SetData(Compressed(code0.GetData().ToArray(), dcmp: 99));
+        code0.Attributes = ResourceAttributes.Compressed;
+        Assert.Throws<InvalidDataException>(() => Read(fork));
+    }
+
+    [Fact]
+    public void Segments_keep_their_attributes()
+    {
+        var fork = NearApp();
+        fork.Find(CodeBuilder.Code, 1)!.Attributes = ResourceAttributes.Purgeable | ResourceAttributes.Locked;
+        Assert.Equal(ResourceAttributes.Purgeable | ResourceAttributes.Locked, Read(fork).FindSegment(1)!.Attributes);
+    }
+
+    [Fact]
     public void A_cfrg_0_makes_a_fat_application()
     {
         var fork = FarApp();
