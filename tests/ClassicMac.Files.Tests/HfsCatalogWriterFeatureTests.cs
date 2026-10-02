@@ -95,6 +95,22 @@ public sealed class HfsCatalogWriterFeatureTests
         Assert.Equal(recordsBefore - 2, BinaryPrimitives.ReadUInt32BigEndian(output.AsSpan(catalog + 14 + 6)));
     }
 
+    // Names with control characters (a folder's "Icon\r", folder art named with a tab) are found by their Mac OS
+    // Roman bytes, as the catalog stores them.
+    [Fact]
+    public void FilesNamedWithControlCharactersCanBeDeleted()
+    {
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, "Icon\r", [], Bytes(HfsBuilder.Block, 41));
+        builder.File(HfsBuilder.Root, "\t", Bytes(HfsBuilder.Block, 42), []);
+        builder.File(HfsBuilder.Root, "Other", [7], []);
+        byte[] source = builder.Build("Volume");
+
+        byte[] output = HfsWriter.DeleteFile(ForkData.FromBytes(HfsWriter.DeleteFile(ForkData.FromBytes(source), "Icon\r")), "\t");
+
+        Assert.Equal(["Other"], Read(output).Select(f => f.MacPath));
+    }
+
     [Fact]
     public void DeletingAFragmentedFileReclaimsOverflowExtentsAndPreservesOtherFiles()
     {

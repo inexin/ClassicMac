@@ -541,7 +541,9 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 
 - `HfsWriter.ReplaceFork(image, path, fork, bytes)` replaces a data or resource fork; `CreateFile` and `DeleteFile` add
   or remove a file record and both forks; `CreateFolder` and `DeleteFolder` add or remove a folder record and its
-  thread. Paths are colon-separated with no empty part. Each returns a new image; the input is never modified.
+  thread. Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
+  included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
+  image; the input is never modified.
   `ForkSaver.SaveHfsImageAs` writes the result to another file through a temporary file and a rename, and refuses the
   source image as its destination. The editor offers it as Save As ▸ HFS Volume Image.
 - Only plain HFS is written: not partition maps, disk image formats, MFS, HFS Plus or HFS wrappers. A volume with

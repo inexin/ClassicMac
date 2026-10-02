@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
 using System.Text;
+using ClassicMac.Core;
+using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Files.Tests;
 
@@ -135,8 +137,9 @@ internal sealed class HfsBuilder
         }
 
         // Catalog: records in the leaves, linked in order, under one index node.
-        var keyed = records.OrderBy(r => r.Parent).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(r => Keyed(r.Parent, r.Name, r.Record, UncountedKeyPadding)).ToList();
+        // In the catalog's order: by parent, then by name as the Mac OS compares them (RelString's weights).
+        var keyed = records.Select(r => Keyed(r.Parent, r.Name, r.Record, UncountedKeyPadding)).ToList();
+        keyed.Sort(HfsWriter.CompareCatalogKeys);
         var perLeaf = (keyed.Count + CatalogLeaves - 1) / CatalogLeaves;
         var index = new List<byte[]>();
         for (var leaf = 1; leaf <= CatalogLeaves; leaf++)
@@ -237,7 +240,7 @@ internal sealed class HfsBuilder
         r[0] = kind;
         BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(10), parent);
         r[14] = (byte)name.Length;
-        Encoding.ASCII.GetBytes(name).CopyTo(r, 15);
+        MacRoman.Encode(name).CopyTo(r, 15);
         return r;
     }
 
@@ -249,7 +252,7 @@ internal sealed class HfsBuilder
         BinaryPrimitives.WriteUInt32BigEndian(id, parent);
         key.AddRange(id);
         key.Add((byte)name.Length);
-        key.AddRange(Encoding.ASCII.GetBytes(name));
+        key.AddRange(MacRoman.Encode(name));
         if (key.Count % 2 != 0) key.Add(0);
         key[0] = checked((byte)(uncountedPadding ? 6 + name.Length : key.Count - 1));
         return [.. key, .. record];

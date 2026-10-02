@@ -58,12 +58,17 @@ namespace ClassicMac.Files.Hfs
             var catalog = ReadFork(source, firstBlock, blockSize, blockCount, catalogExtents, U32(mdb, 0x92), overflow, 0, 4, true);
             ValidateCatalogTree(catalog);
             var catalogRecords = LeafRecords(catalog).ToArray();
+            // Names as Mac OS Roman text to match the caller's path, and escaped as MacFile.MacPath shows them.
             var folders = new Dictionary<uint, (uint Parent, string Name)>();
+            var shownFolders = new Dictionary<uint, (uint Parent, string Name)>();
             foreach (var entry in catalogRecords)
             {
                 if (entry.Key.Length >= 7 && entry.Data.Length >= 70 && entry.Data[0] == 1)
-                    folders[U32(new BigEndianReader(entry.Data), 6)] =
-                        (U32(new BigEndianReader(entry.Key), 2), DecodeName(entry.Key));
+                {
+                    uint folderId = U32(new BigEndianReader(entry.Data), 6), folderParent = U32(new BigEndianReader(entry.Key), 2);
+                    folders[folderId] = (folderParent, DecodeName(entry.Key));
+                    shownFolders[folderId] = (folderParent, ShownName(entry.Key));
+                }
             }
 
             string wanted = macPath;
@@ -71,7 +76,7 @@ namespace ClassicMac.Files.Hfs
                 HfsPathEquals(PathOf(U32(new BigEndianReader(entry.Key), 2), DecodeName(entry.Key), folders), wanted));
             if (match is null) throw new InvalidDataException($"The HFS file '{macPath}' was not found.");
             if ((match.Data[2] & 1) != 0) throw new InvalidDataException($"The HFS file '{macPath}' is locked.");
-            string canonicalPath = PathOf(U32(new BigEndianReader(match.Key), 2), DecodeName(match.Key), folders);
+            string canonicalPath = PathOf(U32(new BigEndianReader(match.Key), 2), ShownName(match.Key), shownFolders);
 
             int forkLengthOffset = fork == HfsFork.Data ? 26 : 36;
             int forkPhysicalLengthOffset = fork == HfsFork.Data ? 30 : 40;
@@ -1172,7 +1177,11 @@ namespace ClassicMac.Files.Hfs
             return true;
         }
 
-        private static string DecodeName(byte[] key) => key.Length >= 7 ? new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7))).ToString() : "";
+        // A key's name as Mac OS Roman text, which paths given by callers match (control characters included).
+        private static string DecodeName(byte[] key) => key.Length >= 7 ? new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7))).ToMacRoman() : "";
+
+        // A key's name as MacFile.MacPath shows it (control characters escaped).
+        private static string ShownName(byte[] key) => key.Length >= 7 ? new MacString(key.AsSpan(7, Math.Min(key[6], key.Length - 7))).ToString() : "";
         // An offset outside the data throws ArgumentOutOfRangeException.
         private static ushort U16(BigEndianReader b, int o) =>
             b.TryReadUInt16At(o, out ushort value) ? value : throw new ArgumentOutOfRangeException(nameof(o));

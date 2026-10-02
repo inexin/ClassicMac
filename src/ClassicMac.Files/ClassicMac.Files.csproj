@@ -13,6 +13,9 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.Files.Tests" />
+    <!-- HfsBuilder (linked into these) orders catalog records with HfsWriter.CompareCatalogKeys. -->
+    <InternalsVisibleTo Include="ClassicMac.App.Tests" />
+    <InternalsVisibleTo Include="ClassicMac.Resources.Cli.Tests" />
   </ItemGroup>
 
 </Project>
