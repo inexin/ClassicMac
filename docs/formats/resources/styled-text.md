@@ -91,7 +91,7 @@ Example (the `'STR '` 128 golden output): the bytes `43 61 66 8E 20 C4 AA` decod
 - The Chicago font draws glyphs for some control bytes ($11 command key, $12 check mark, $13 diamond, $14 Apple logo)
   [Doc] (ROMAN.TXT notes). They are still control characters in Mac OS Roman, and ClassicMac decodes them as the
   control code points U+0011–U+0014 [ClassicMac].
-- How CRs are written in each output is set by the **LineEndings** option ([text-output.md §1](../output/text-output.md#1-text-output)).
+- How CRs are written in each output is set by the **LineEndings** option ([text-output.md §3.1](../output/text-output.md#31-line-breaks)).
 
 ### 2.3 Encoding
 
@@ -115,9 +115,9 @@ A `'TEXT'` resource is text with no header and no length field: its length is th
 (*Inside Macintosh: Text*). TextEdit keeps at most 32,767 characters in one record [Doc], but a `'TEXT'` resource
 itself has no limit, and ClassicMac reads it whole [ClassicMac].
 
-- Output: the text as a `.txt` file ([text-output.md §1](../output/text-output.md#1-text-output)), always [ClassicMac].
+- Output: the text as a `.txt` file ([text-output.md §1.1](../output/text-output.md#11-text-files)), always [ClassicMac].
 - When the same resource fork holds a `'styl'` resource **with the same ID**, the text is styled by it (§4) and is also
-  written as `.rtf` ([text-output.md §3](../output/text-output.md#3-rtf-output)) [ClassicMac]. Pairing by ID is how styled text is stored: the Help Manager's styled-text
+  written as `.rtf` ([text-output.md §1.6](../output/text-output.md#16-rtf-files)) [ClassicMac]. Pairing by ID is how styled text is stored: the Help Manager's styled-text
   items name one ID for both resources [Doc] (*More Macintosh Toolbox*), and DOCMaker's reader loads chapter *k*'s
   `'TEXT'` and `'styl'` from the same ID and passes both to TextEdit [Code] (DOCMaker 4.8.4 stand-alone reader).
 - A compressed `'styl'` is decompressed like any resource (see [resource-fork.md](resource-fork.md)) [ClassicMac].

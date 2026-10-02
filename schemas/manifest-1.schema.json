@@ -13,7 +13,7 @@
       "type": "object",
       "required": ["name", "formats", "type", "creator", "flags"],
       "properties": {
-        "name": { "type": "string", "description": "Mac name; bytes outside printable Mac Roman as \\xHH." },
+        "name": { "type": "string", "description": "Mac name as Mac OS Roman; bytes $00-$1F, $7F and backslash as \\xHH." },
         "formats": { "type": "array", "items": { "type": "string" }, "description": "Containers it was found through, outermost first." },
         "type": { "type": "string" },
         "creator": { "type": "string" },
@@ -34,7 +34,7 @@
         "type": "object",
         "required": ["type", "typeBytes", "id", "name", "attributes", "size", "storedSize", "dcmp", "decoder", "decoderVersion", "path", "sha256", "storedSha256", "rawPath", "warnings"],
         "properties": {
-          "type": { "type": "string", "description": "Four characters; \\xHH for bytes outside printable Mac Roman." },
+          "type": { "type": "string", "description": "Four Mac OS Roman characters; bytes $00-$1F, $7F and backslash as \\xHH." },
           "typeBytes": { "type": "string", "pattern": "^[0-9A-F]{8}$" },
           "id": { "type": "integer", "minimum": -32768, "maximum": 32767 },
           "name": { "type": ["string", "null"] },

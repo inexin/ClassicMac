@@ -266,7 +266,7 @@ DOCMaker's private resources (`pInf`, `Wndo`, `foot`, `conp`, …) have no publi
 from the reader code each document carries (disassembly), checked against real documents. Both readers draw a
 picture over the text at its anchor's line; the HTML puts it in the text flow instead (side by side for anchors on one
 line, the blank lines left for it dropped), since a browser's line breaks differ from the Mac's
-([html.md §2](formats/output/html.md#2-pictures-reflowed)).
+([html.md §3.2](formats/output/html.md#32-pictures-reflowed)).
 
 App-specific types (a game's data records, an application's private resources) plug in as custom decoders
 registered by the application.

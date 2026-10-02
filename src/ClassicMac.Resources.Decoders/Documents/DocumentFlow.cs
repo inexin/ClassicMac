@@ -21,7 +21,7 @@ namespace ClassicMac.Resources.Decoders.Documents
 
     /// <summary>
     /// A chapter's pictures reflowed into its text [ClassicMac], as the HTML output and the viewer show it (the Mac
-    /// draws them over the text instead; see <c>docs/formats/output/html.md</c> §2): anchors on one line with only
+    /// draws them over the text instead; see <c>docs/formats/output/html.md</c> §3.2): anchors on one line with only
     /// spaces between them make a row; the text on the line before the first anchor stays above it, without its
     /// trailing spaces (or not at all when blank); the rest of the anchors' line when blank, and the blank lines after
     /// it, are dropped, and text after the anchors on their line continues without its leading spaces.

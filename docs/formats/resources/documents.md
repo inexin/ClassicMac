@@ -181,7 +181,7 @@ The converter is `document.html`, version 1 (`ResourceDecoders.CreateDocumentCon
 [ClassicMac]. It reads the data fork only for a `'TEXT'` or `'ttro'` file, up to the `--max-resource-size` limit.
 
 - **`extract`** writes a document's folder as `document/` in the file's export folder, and records it in the
-  manifest's `document` field (format 1.2, [export-manifest.md §6.10](../output/export-manifest.md#610-document)). `--no-documents`, `--raw`
+  manifest's `document` field (format 1.2, [export-manifest.md §1.10](../output/export-manifest.md#110-document)). `--no-documents`, `--raw`
   and `-t` leave it out.
 - **`convert`** writes only the documents:
 
@@ -199,7 +199,7 @@ The converter is `document.html`, version 1 (`ResourceDecoders.CreateDocumentCon
   chapter's background. A picture whose action goes to a chapter (1), the next or previous one (14, 15) or back (10)
   does so when clicked; the others show what they would do as a tooltip. A SimpleText document without pictures is
   shown as styled text. *Convert Documents* writes the HTML, and *Export Resources* and *Extract All Resources*
-  include `document/` ([export-manifest.md §3.3](../output/export-manifest.md#33-folders-chosen-by-the-cli-and-the-viewer)).
+  include `document/` ([export-manifest.md §5.5](../output/export-manifest.md#55-folders-chosen-by-the-cli-and-the-viewer)).
 
 ---
 

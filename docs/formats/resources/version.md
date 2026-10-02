@@ -87,7 +87,7 @@ An unknown stage byte uses the letter `?` and the stage name `unknown ($XX)` (tw
 | `01 20 80 00` | 1.2 | final |
 | `01 00 80 02` | 1.0f2 | final |
 
-Output: JSON ([text-output.md §2.4](../output/text-output.md#24-vers)) [ClassicMac].
+Output: JSON ([text-output.md §1.5](../output/text-output.md#15-vers-json)) [ClassicMac].
 
 ---
 

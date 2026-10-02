@@ -22,7 +22,7 @@ Resource).
 - Bytes after the string are ignored [ClassicMac].
 - If the length byte says more than the resource holds, the text is cut to the bytes present and `text.string-short`
   is reported; an empty resource gives an empty text and the same diagnostic [ClassicMac].
-- Output: the text as a `.txt` file ([text-output.md §1](../output/text-output.md#1-text-output)) [ClassicMac].
+- Output: the text as a `.txt` file ([text-output.md §1.1](../output/text-output.md#11-text-files)) [ClassicMac].
 
 Example (golden `'STR '` 128, "Greeting"):
 
@@ -54,7 +54,7 @@ A `'STR#'` resource is a count followed by that many Pascal strings, packed with
   `text.string-list-short` is reported [ClassicMac].
 - A resource shorter than 2 bytes gives no output and no diagnostic [ClassicMac].
 - Bytes after the last counted string are ignored [ClassicMac].
-- Output: JSON ([text-output.md §2.2](../output/text-output.md#22-str)) [ClassicMac].
+- Output: JSON ([text-output.md §1.3](../output/text-output.md#13-str-json)) [ClassicMac].
 
 Example (golden `'STR#'` 128):
 
