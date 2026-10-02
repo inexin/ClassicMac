@@ -22,7 +22,8 @@ public class WindowTests
 
     private static void Pump(Task task) => Headless.Pump(task);
 
-    private static void Capture(MainWindow window, string name)
+    // Draws the window; with a list, also compares the frame with its baselines in light, dark and at 150% (Baselines).
+    private static void Capture(MainWindow window, string name, List<string>? baselines = null)
     {
         var frame = window.CaptureRenderedFrame();
         Assert.NotNull(frame);
@@ -33,6 +34,7 @@ public class WindowTests
             frame.Save(Path.Combine(Path.GetDirectoryName(shot)!, $"{Path.GetFileNameWithoutExtension(shot)}-{name}.png"));
 #pragma warning restore CS0618
         }
+        if (baselines is not null) Baselines.Check(window, name, baselines);
     }
 
     [Fact]
@@ -57,21 +59,22 @@ public class WindowTests
 
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
             window.Show();
             Pump(model.OpenAsync(path));
             var manual = model.Roots[0].Children.OfType<FileNode>().Single(f => f.Title == "Manual");
             manual.IsExpanded = true;
             Pump(manual.EnsureLoadedAsync());
-            Capture(window, "tree");
+            Capture(window, "tree", baselines);
 
             var types = manual.Children.OfType<ResourceTypeNode>().ToList();
             model.Selected = types.Single(t => t.Type.ToString() == "ICN#").Children[0];
             Pump(model.PreviewTask);
-            Capture(window, "icon");
+            Capture(window, "icon", baselines);
 
             model.Selected = types.Single(t => t.Type.ToString() == "TEXT").Children[0];
             Pump(model.PreviewTask);
-            Capture(window, "text");
+            Capture(window, "text", baselines);
 
             model.SelectedTab = 2;
             Dispatcher.UIThread.RunJobs();
@@ -92,8 +95,9 @@ public class WindowTests
             model.Selected = types.Single(t => t.Type.ToString() == "snd ").Children[0];
             Pump(model.PreviewTask);
             Assert.True(model.Preview.IsSound);
-            Capture(window, "sound");
+            Capture(window, "sound", baselines);
             window.Close();
+            Baselines.Verify(baselines);
         }
         finally
         {
@@ -111,16 +115,18 @@ public class WindowTests
         {
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
             window.Show();
             Pump(model.OpenAsync(DocumentTests.Disk(folder)));
             model.Selected = model.Roots[0].Children.Single(c => c.Title == "Manual");
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            Capture(window, "document");
+            Capture(window, "document", baselines);
             var pictures = window.GetVisualDescendants().OfType<DocumentPictureView>().ToList();
             Assert.Equal(3, pictures.Count);
             Assert.Equal(new Size(260, 65), pictures[2].Bounds.Size); // scaled to the column
             window.Close();
+            Baselines.Verify(baselines);
         }
         finally
         {
@@ -138,6 +144,7 @@ public class WindowTests
         {
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
             window.Show();
             Pump(model.OpenAsync(InterfacePreviewTests.Disk(folder)));
             var file = model.Roots[0].Children.OfType<FileNode>().Single();
@@ -145,18 +152,19 @@ public class WindowTests
             model.Selected = InterfacePreviewTests.Resource(file, "DLOG", 128);
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            Capture(window, "dialog");
+            Capture(window, "dialog", baselines);
             var dialog = new DialogView { Dialog = model.Preview.Dialog, Scale = 2 };
             dialog.Measure(Size.Infinity);
             Assert.Equal((2 * (280 + 13 + 24), 2 * (120 + 34 + 24)), (dialog.DesiredSize.Width, dialog.DesiredSize.Height)); // the frame, gutters
             model.Selected = InterfacePreviewTests.Resource(file, "MENU", 128);
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            Capture(window, "menu");
+            Capture(window, "menu", baselines);
             var menu = new MenuView { Menu = model.Preview.Menu, Scale = 1 };
             menu.Measure(Size.Infinity);
             Assert.Equal(20 + 3 * 16 + 24 + 3, menu.DesiredSize.Height); // the bar, three rows, gutters and frame
             window.Close();
+            Baselines.Verify(baselines);
         }
         finally
         {
@@ -189,7 +197,7 @@ public class WindowTests
     [Fact]
     public void The_edit_tab_shows_a_form_for_text_resources() => OnUiThread(() =>
     {
-        var path = Path.Combine(Path.GetTempPath(), $"cm-forms-{Guid.NewGuid():N}.rsrc");
+        var path = Path.Combine(Directory.CreateTempSubdirectory("cm-forms-").FullName, "Forms.rsrc"); // a fixed name, as it is drawn
         byte[] vers = [0x01, 0x20, 0x60, 0x03, 0, 0, 5, .. "1.2b3"u8, 9, .. "1.2b3 (c)"u8];
         var items = InterfaceWriter.WriteDialogItems([
             new DialogItem(new MacRect(70, 150, 90, 220), 4, true, "OK", null, ReadOnlyMemory<byte>.Empty),
@@ -205,6 +213,7 @@ public class WindowTests
         {
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
             window.Show();
             var open = model.OpenAsync(path);
             Pump(open);
@@ -219,7 +228,7 @@ public class WindowTests
                 Assert.IsType(form, model.Form);
                 model.SelectedTab = 3;
                 Dispatcher.UIThread.RunJobs();
-                Capture(window, "edit-" + type.TrimEnd('#'));
+                Capture(window, "edit-" + type.TrimEnd('#'), type == "DITL" ? baselines : null);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
             }
 
@@ -232,22 +241,24 @@ public class WindowTests
             ditl.Items[0].Text = "日本";
             Assert.Contains("Mac OS Roman", model.FormError);
             window.Close();
+            Baselines.Verify(baselines);
         }
         finally
         {
-            File.Delete(path);
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
         }
     });
 
     [Fact]
     public void The_hex_tab_edits_bytes_with_the_keyboard() => OnUiThread(() =>
     {
-        var path = Path.Combine(Path.GetTempPath(), $"cm-hexedit-{Guid.NewGuid():N}.rsrc");
+        var path = Path.Combine(Directory.CreateTempSubdirectory("cm-hexedit-").FullName, "Hex.rsrc");
         File.WriteAllBytes(path, PreviewTests.Fork(("TEXT", 128, null, "Hello, hex editing works across lines"u8.ToArray())));
         try
         {
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
             window.Show();
             var open = model.OpenAsync(path);
             Pump(open);
@@ -264,12 +275,13 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             Assert.Equal((byte)'H', model.HexEdit!.ToArray()[0]);
             Assert.Equal(1, model.HexEdit.Cursor);
-            Capture(window, "hex-edit");
+            Capture(window, "hex-edit", baselines);
             window.Close();
+            Baselines.Verify(baselines);
         }
         finally
         {
-            File.Delete(path);
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
         }
     });
 

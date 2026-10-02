@@ -1,4 +1,26 @@
-# Emulator goldens
+# Goldens
+
+## App screenshot baselines
+
+`app/` holds the viewer's own UI drawn headless (`tests/ClassicMac.App.Tests`, `WindowTests` through `Baselines`):
+`<frame>-light.png`, `<frame>-dark.png` and `<frame>-150.png` (light theme at 150% display scaling) for the frames
+tree, icon, text, sound, document, dialog, menu, edit-DITL and hex-edit. They are ClassicMac's own UI, so they are
+committed.
+
+- Compared on Windows only; elsewhere the window tests end skipped with a message (text rasterisation differs by
+  platform). A pixel matches when no channel differs by more than 2 (Skia's CPU-specific blending rounds a level or
+  two apart); anything more fails.
+- A failure lists every frame that differs and writes `<frame>-<variant>-actual.png` and `-diff.png` (differences in
+  magenta on the faded frame) to `%TEMP%\classicmac-baselines\`.
+- After an intended UI change, regenerate them all with one command and review the PNG diff before committing:
+
+  ```sh
+  CLASSICMAC_UPDATE_BASELINES=1 dotnet run --project tests/ClassicMac.App.Tests -- -class ClassicMac.App.Tests.WindowTests
+  ```
+
+  (PowerShell: `$env:CLASSICMAC_UPDATE_BASELINES=1; dotnet run --project tests/ClassicMac.App.Tests -- -class ClassicMac.App.Tests.WindowTests; Remove-Item Env:CLASSICMAC_UPDATE_BASELINES`.)
+
+## Emulator goldens
 
 `pict/` holds feature pictures written by `tools/GoldenPictures`:
 
@@ -16,7 +38,7 @@
 
 Each picture is 240 x 160 with a 1-pixel black frame around it, so the test can find it in a screenshot.
 
-## Capturing
+### Capturing
 
 1. In Basilisk II or SheepShaver, run System 7.5 to Mac OS 9 with the monitor set to **millions of colors**, and copy
    `pict/` into the emulated Mac (through the shared folder). If the files have no type, set them to `PICT`, e.g. with
@@ -29,7 +51,7 @@ Each picture is 240 x 160 with a 1-pixel black frame around it, so the test can 
 For `text`, copy the Mac's font suitcases or System file resource forks (Chicago, Geneva, New York, Monaco) into
 `fonts/` (any file names; resource-fork data, e.g. from `..namedfork/rsrc` or a `.rsrc` export). They are not committed.
 
-## Checking
+### Checking
 
 `dotnet test` runs `GoldenTests`: every screenshot must match QuickDraw.Pict's rendering exactly. On a mismatch it
 writes `golden-diff-<name>.png` next to the test binaries (differences in magenta).

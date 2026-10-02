@@ -7,6 +7,9 @@
   redo, the Resource commands, closing a file and quitting first ask "Apply your changes to 'STR#' 128?" with Apply
   (one undoable edit), Discard and Cancel (stay, nothing changes); a draft with an error offers no Apply and names it.
   Applied but unsaved edits still go to the Save prompt only.
+- Viewer tests: the window tests compare their frames with screenshot baselines in light, dark and 150% display
+  scaling (`tests/golden/app`, Windows only); `CLASSICMAC_UPDATE_BASELINES=1` rewrites them, and a mismatch writes the
+  actual frame and a diff image (tests/golden/README.md).
 - Viewer: image previews, dialogs, menus and document pictures stay sharp at any display scaling: each Mac pixel is a
   whole number of device pixels (max(1, floor(zoom × scaling)): one at 125% and 150%, three at 2× zoom and 150%),
   drawn from a whole device pixel without smoothing, so 1-pixel detail no longer blurs or doubles.
