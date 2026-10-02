@@ -10,5 +10,17 @@
     "type": "ppat",
     "id": 302,
     "reason": "Harness case: an RGB (type 2) pattern the Mac draws; QuickDraw.Pict reads it as truncated (a QuickDraw.Pict gap)."
+  },
+  {
+    "sha256": "adf4259be232a3eb6c521f2a2749433d0b495d14461b30cde6988431ad22fa9c",
+    "type": "icns",
+    "id": -16455,
+    "reason": "HAX1R3.BIN, Hax's aml.jpeg: a custom icon whose 15 elements are all 8 bytes long with unknown types (32-bit values such as $032F9B10, not member types). Icon Services ignores them (icon-families.md §2.2 step 3), so the family is empty and there is nothing to draw."
+  },
+  {
+    "sha256": "6a9015c13e98b2b41bf766c69a20e862c248dac1c1b2f15955e63cd05c665d22",
+    "type": "icns",
+    "id": -16455,
+    "reason": "RealmzClassicHD.img, the four copies of Hax's aml.jpeg: the same empty icon family as in HAX1R3.BIN (byte for byte)."
   }
 ]
