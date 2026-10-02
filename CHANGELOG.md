@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Editor: editing a dialog item list gives the table the room: the live preview narrows to 216 (it scrolls), the
+  bounds inputs are compact, and the Text column is at least 160 wide in a 1200-pixel window. Dialog, alert, item
+  list and menu previews keep their scroll bars in view, so a dialog wider than its pane scrolls at 1:1; the dialog
+  beside a form's cards keeps a 16 margin from the window's edge.
 - Editor: the hex byte inspector fits under the Find bar at 1200 × 780 with diagnostics open (rows without spacing,
   8 px padding); "In this resource" scrolls inside the panel when it does not fit.
 - Viewer: a sound's header has Save as WAV… (the decoded sound, as `extract` writes it) and Replace from WAV… (the

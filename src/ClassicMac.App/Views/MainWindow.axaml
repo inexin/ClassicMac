@@ -743,7 +743,7 @@
       <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
       <Setter Property="BorderThickness" Value="1,0,0,0" />
     </Style>
-    <!-- The item list's preview panel is 400 wide (boards/dialog-item-list.md); its bounds inputs are mono, 40 wide. -->
+    <!-- The item list's preview panel is 400 wide (boards/dialog-item-list.md); its bounds inputs are mono, 38 wide. -->
     <Style Selector="Border.ditl-preview">
       <Setter Property="MaxWidth" Value="400" />
     </Style>
@@ -753,9 +753,17 @@
     <Style Selector="Border.ditl-row">
       <Setter Property="MinHeight" Value="34" />
     </Style>
+    <!-- While editing, the table takes the room and the live preview narrows to 216 (it scrolls), so the text column
+         is at least 160 wide in a 1200-pixel window. -->
+    <Style Selector="Border.ditl-preview">
+      <Setter Property="Width" Value="320" />
+    </Style>
+    <Style Selector="Grid.ditl-form.editing > Border.ditl-preview">
+      <Setter Property="Width" Value="216" />
+    </Style>
     <Style Selector="TextBox.bound">
-      <Setter Property="Width" Value="40" />
-      <Setter Property="MinWidth" Value="40" />
+      <Setter Property="Width" Value="38" />
+      <Setter Property="MinWidth" Value="38" />
       <Setter Property="Padding" Value="4,4" />
     </Style>
     <!-- The sound preview (boards/sound.md): a 40 px round play button, chips with a 1 px CmCardBorder and radius 6, the
@@ -1460,10 +1468,10 @@
                     </ScrollViewer>
                   </Panel>
                 </DockPanel>
-                <ScrollViewer IsVisible="{Binding Preview.IsDialog}" HorizontalScrollBarVisibility="Auto">
+                <ScrollViewer IsVisible="{Binding Preview.IsDialog}" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False">
                   <views:DialogView Dialog="{Binding Preview.Dialog}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
-                <ScrollViewer IsVisible="{Binding Preview.IsMenu}" HorizontalScrollBarVisibility="Auto">
+                <ScrollViewer IsVisible="{Binding Preview.IsMenu}" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False">
                   <views:MenuView Menu="{Binding Preview.Menu}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
                 <DockPanel IsVisible="{Binding Preview.IsDocument}">
@@ -1609,7 +1617,7 @@
                 </Border>
                 <Border Classes="host-values">
                 <DockPanel>
-                <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="560"
+                <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Margin="16,0,16,0" MaxWidth="560"
                               IsVisible="{Binding ShowsHostDialog}">
                   <views:DialogView Dialog="{Binding FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
@@ -1941,7 +1949,7 @@
                          preview on the right (the dialog that uses the list, live from the values), its outlined item the
                          selected row, a click on an item selecting its row. -->
                     <DataTemplate DataType="vm:DialogItemsForm">
-                      <Grid x:Name="ItemListForm" Classes="menu-form" ColumnDefinitions="3*,2*">
+                      <Grid x:Name="ItemListForm" Classes="menu-form ditl-form" Classes.editing="{Binding IsEditing}" ColumnDefinitions="*,Auto">
                         <Border Grid.Column="1" Classes="preview-panel ditl-preview">
                           <DockPanel>
                             <Border DockPanel.Dock="Top" Classes="preview-header">
@@ -1953,7 +1961,7 @@
                             </Border>
                             <TextBlock DockPanel.Dock="Top" Classes="muted preview-note"
                                        Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormDialogNote, FallbackValue={x:Null}}" />
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{DynamicResource CmCheckerboard}">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Background="{DynamicResource CmCheckerboard}">
                               <views:DialogView x:Name="ItemListPreview" Dialog="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormDialog, FallbackValue={x:Null}}"
                                                 SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
                             </ScrollViewer>
@@ -1968,10 +1976,10 @@
                               <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
                               <TextBlock Grid.Column="4" Classes="caption" Text="ENABLED" />
                             </Grid>
-                            <Grid Classes="menu-columns editing" ColumnDefinitions="24,136,*,172,24,24">
+                            <Grid Classes="menu-columns editing" ColumnDefinitions="24,136,*,160,24,24">
                               <TextBlock Classes="caption" Text="#" />
                               <TextBlock Grid.Column="1" Classes="caption" Text="KIND" />
-                              <TextBlock Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE ID" TextTrimming="CharacterEllipsis" />
+                              <TextBlock x:Name="ItemTextCaption" Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE ID" TextTrimming="CharacterEllipsis" />
                               <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
                               <TextBlock Grid.Column="4" Classes="caption" Text="ON" />
                             </Grid>
@@ -1988,13 +1996,13 @@
                                         <TextBlock Grid.Column="3" Classes="mono" Text="{Binding BoundsText}" />
                                         <TextBlock Grid.Column="4" Text="{Binding EnabledText}" Classes.muted="{Binding IsDimmed}" />
                                       </Grid>
-                                      <Grid Classes="editing" ColumnDefinitions="24,136,*,172,24,24">
+                                      <Grid Classes="editing" ColumnDefinitions="24,136,*,160,24,24">
                                         <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
                                         <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" AutomationProperties.Name="Kind" />
                                         <TextBox x:Name="ItemText" Grid.Column="2" Text="{Binding Text}" IsVisible="{Binding HasText}" AutomationProperties.Name="Text" />
                                         <NumericUpDown Grid.Column="2" Classes="mono" Value="{Binding ResourceId}" FormatString="0" ShowButtonSpinner="False"
                                                        Minimum="-32768" Maximum="32767" IsVisible="{Binding HasResource}" AutomationProperties.Name="Resource ID" />
-                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
                                           <TextBox x:Name="TopBox" Classes="mono bound" Text="{Binding TopText}" AutomationProperties.Name="Top" />
                                           <TextBox x:Name="LeftBox" Classes="mono bound" Text="{Binding LeftText}" AutomationProperties.Name="Left" />
                                           <TextBox x:Name="BottomBox" Classes="mono bound" Text="{Binding BottomText}" AutomationProperties.Name="Bottom" />
@@ -2029,7 +2037,7 @@
                                 <TextBlock Classes="muted" Text="2× · Mac OS 8/9" />
                               </WrapPanel>
                             </Border>
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{DynamicResource CmCheckerboard}">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Background="{DynamicResource CmCheckerboard}">
                               <views:MenuView x:Name="MenuPreview" Menu="{Binding Preview}" SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="2"
                                               HorizontalAlignment="Left" VerticalAlignment="Top" />
                             </ScrollViewer>
