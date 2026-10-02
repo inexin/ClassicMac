@@ -953,6 +953,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **Archive bugs from the samples** (2026-10-02): LHA `-lh1-` (position code and tree), StuffIt method 15's last
   symbol, DiskDoubler split files (`SPLT`), and `list` paths through single-file wrappers.
 - [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] ([raw-images.md](formats/disk-images/raw-images.md)).
+- [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
+  then character and paragraph styles. `WDBN` (Word 3–5.1, a Mac-only format; its specification source is still to be
+  found, else the layout is fitted to documents and marked so), `W6BN` (Word 6, as Word 6 for Windows) and `W8BN`
+  (Word 98, as Word 97: Microsoft's [MS-DOC]). Needs Word sample documents of each version as fixtures.
 - [ ] **PCE MAR** input (Inputs, priority 3). Blocked: no sample, and its layout is published only in GPL source.
 - [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files ([rom.md](formats/disk-images/rom.md); 68k ROMs
   unverified).
