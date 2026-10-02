@@ -70,7 +70,8 @@ public sealed class SearchWindowTests : IDisposable
         // A click on a recent file opens it; the empty state goes.
         var rows = empty.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("recent")).ToList();
         Assert.Equal(2, rows.Count);
-        rows[0].Command!.Execute(rows[0].CommandParameter);
+        // The open runs in the background: wait for it, then for the preview it starts.
+        Pump(((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand<RecentFile?>)rows[0].Command!).ExecuteAsync((RecentFile?)rows[0].CommandParameter));
         Pump(model.PreviewTask);
         Dispatcher.UIThread.RunJobs();
         Assert.Single(model.Roots);
