@@ -8,6 +8,12 @@
   loop. A sound that cannot be decoded shows why, with Show in Hex and Save raw data….
 - Viewer: the audio player (A1) reports its position, seeks, and repeats a loop (`IAudioPlayer.Position`, `Seek`,
   `SetLoop`; SoundFlow's time, seek and loop points).
+- Viewer: the dialogs share one frame (drawn by the app: rounded, shadowed, a 42-pixel header with the title and ×, a
+  footer with Cancel then the primary action on the right and a destructive choice on the left): Get Info and New
+  Resource (Type and ID in mono, the attributes in two columns with Compressed shown but not settable), Import Image or
+  Sound (what to make as a list: picture, colour icon, icon family, one icon kind, cursors, sound, with why a choice
+  is not offered), New File, New Folder; the unsaved-changes, unapplied-changes and yes/no questions are alerts with an
+  icon, the question and its detail (P5).
 - Resources: built-in templates for MBAR, BNDL, FREF, SIZE, TMPL, CURS, PAT , PAT#, clut, wctb, actb, dctb, cctb and
   mctb (`BuiltInTemplates`, `ResourceTemplate.FromFields`), from Inside Macintosh and the ResEdit Reference; the
   template form and the hex view's byte meanings use them when no open file has a `TMPL` for the type, which still

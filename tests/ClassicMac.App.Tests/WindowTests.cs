@@ -440,11 +440,11 @@ public class WindowTests
             var texts = dialog.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
             Assert.Contains("Apply your changes to 'STR#' 128?", texts);
             Assert.Contains("You edited this resource but haven't applied the changes.", texts);
-            var buttons = dialog.GetVisualDescendants().OfType<Button>().ToList();
-            Assert.Equal(["Discard", "Cancel", "Apply"], buttons.Select(b => (string)b.Content!));
+            var buttons = dialog.GetVisualDescendants().OfType<Button>().OrderBy(b => b.TranslatePoint(default, dialog)!.Value.X).ToList();
+            Assert.Equal(["Discard", "Cancel", "Apply"], buttons.Select(b => (string)b.Content!));       // left to right
             Assert.True(buttons.Single(b => (string)b.Content! == "Apply").IsDefault);
             Assert.True(buttons.Single(b => (string)b.Content! == "Cancel").IsCancel);
-            buttons.Single(b => (string)b.Content! == label).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            buttons.Single(b => (string)b.Content! == label).Command!.Execute(null);
             Pump(asked);
             Assert.Equal(expected, asked.Result);
         }
