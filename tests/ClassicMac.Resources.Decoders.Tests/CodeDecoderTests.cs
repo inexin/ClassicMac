@@ -340,7 +340,8 @@ public class CodeDecoderTests
         var package = json.GetProperty("package");
         Assert.Equal(("PACK", 3, 0, 1), (package.GetProperty("type").GetString(), package.GetProperty("id").GetInt32(),
             package.GetProperty("firstSelector").GetInt32(), package.GetProperty("lastSelector").GetInt32()));
-        Assert.Equal([(0, 0x12), (1, 0)], package.GetProperty("entries").EnumerateArray().Select(e => (e.GetProperty("selector").GetInt32(), e.GetProperty("offset").GetInt32())));
+        Assert.Equal([(0, 8, (int?)0x12), (1, 0, null)], package.GetProperty("entries").EnumerateArray().Select(e => (e.GetProperty("selector").GetInt32(),
+            e.GetProperty("offset").GetInt32(), e.GetProperty("target").ValueKind == JsonValueKind.Null ? null : (int?)e.GetProperty("target").GetInt32())));
     }
 
     [Fact]

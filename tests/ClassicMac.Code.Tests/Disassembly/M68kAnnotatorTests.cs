@@ -148,20 +148,21 @@ public class M68kAnnotatorTests
     }
 
     [Fact]
-    public void Relocation_bases_for_data()
+    public void Retro68_data_relocations_are_A5_offsets()
     {
-        var code = Bytes("41F9 0000 0010 43F9 0000 0020 4E75");
+        // Retro68's kinds 1 and 2 add the A5 displacement: the stored longs are A5 offsets into the data and the BSS.
+        var code = Bytes("41F9 FFFF E85C 43F9 FFFF FE68 4E75");
         var context = new M68kContext
         {
             Relocations = new Dictionary<long, M68kRelocation>
             {
-                [2] = new(M68kRelocationBase.InitializedData, 0),
-                [8] = new(M68kRelocationBase.UninitializedData, 0),
+                [2] = new(M68kRelocationBase.A5, 0),
+                [8] = new(M68kRelocationBase.A5, 0),
             },
         };
         var map = Map(code);
-        Assert.Equal([(CodeReferenceKind.Relocation, "DATA+$10")], At(map, 0, context));
-        Assert.Equal([(CodeReferenceKind.Relocation, "BSS+$20")], At(map, 6, context));
+        Assert.Equal([(CodeReferenceKind.Relocation, "A5-$17A4")], At(map, 0, context));
+        Assert.Equal([(CodeReferenceKind.Relocation, "A5-$198")], At(map, 6, context));
     }
 
     [Fact]
@@ -230,16 +231,17 @@ public class M68kAnnotatorTests
     {
         var fork = new ResourceFork();
         fork.Add("CODE", 0, CodeBuilder.Code0([CodeBuilder.FarEntry(1, 0x28), CodeBuilder.FarMarker]));
-        fork.Add("CODE", 1, CodeBuilder.Far(0, 0, 0, 1, Bytes("41F9 0000 0010 43F9 0000 0020 45F9 0000 0030 47F9 0000 0040 4E75")));
-        // RELA 1: positions from the code start (first step from -1): 2 (code), 8 (data), 14 (bss), 20 (A5).
-        fork.Add("RELA", 1, Bytes("0C 19 1A 1B 00"));
+        fork.Add("CODE", 1, CodeBuilder.Far(0, 0, 0, 1, Bytes("41F9 0000 0010 43F9 FFFF FF00 45F9 FFFF FFF0 47F9 0000 0022 4E75")));
+        // RELA 1: positions from the code start (first step from -1): 2 (kind 0, the segment), 8 (1, data), 14 (2, BSS),
+        // 20 (3, jump table). Kind 0 adds the segment's address; kinds 1 to 3 the A5 displacement.
+        fork.Add("RELA", 1, Bytes("0C 19 1A 1B 00 00"));
         var app = CodeApplication.Read(fork, new List<Diagnostic>());
         var context = M68kContext.ForApplication(app, 1);
         Assert.Equal(
         [
-            (0x2AL, M68kRelocationBase.Segment), (0x30L, M68kRelocationBase.InitializedData),
-            (0x36L, M68kRelocationBase.UninitializedData), (0x3CL, M68kRelocationBase.A5),
-        ], context.Relocations.OrderBy(r => r.Key).Select(r => (r.Key, r.Value.Base)));
+            (0x2AL, new M68kRelocation(M68kRelocationBase.Segment, 1)), (0x30L, new M68kRelocation(M68kRelocationBase.A5, 0)),
+            (0x36L, new M68kRelocation(M68kRelocationBase.A5, 0)), (0x3CL, new M68kRelocation(M68kRelocationBase.A5, 0)),
+        ], context.Relocations.OrderBy(r => r.Key).Select(r => (r.Key, r.Value)));
     }
 
     [Fact]

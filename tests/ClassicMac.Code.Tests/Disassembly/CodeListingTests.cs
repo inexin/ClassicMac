@@ -110,7 +110,8 @@ public class CodeListingTests
         var fork = new ResourceFork();
         fork.Add("CODE", 0, CodeBuilder.Code0([CodeBuilder.FarEntry(1, 0x28), CodeBuilder.FarMarker]));
         var code = Bytes("41F9 0000 0100 4EB9 0000 0034 4E75 1500 1800");
-        fork.Add("CODE", 1, CodeBuilder.Far(0, 1, 0, 0, code, a5Relocations: 0x36, pcRelocations: 0x38));
+        fork.Add("CODE", 1, CodeBuilder.Far(0, 1, 0, 0, code, a5Relocations: 0x36, pcRelocations: 0x38,
+            a5AtLast: 0, addressAtLast: 0, reserved: 0));
         var app = CodeApplication.Read(fork, new List<Diagnostic>());
         var listing = CodeListing.ForSegment(app, 1);
         Assert.Equal(Lines(
@@ -191,8 +192,8 @@ public class CodeListingTests
     [Fact]
     public void Package()
     {
-        // _Debugger, 'PACK' 3, version 1, flags 0, selectors 0 to 1, offsets $12 and 0; then rts.
-        var data = Bytes("A9FF 5041 434B 0003 0001 0000 0001 0012 0000 4E75");
+        // _Debugger, 'PACK' 3, version 1, flags 0, selectors 0 to 1, offsets 8 (the rts at $0A + 8 = $12) and 0 (none).
+        var data = Bytes("A9FF 5041 434B 0003 0001 0000 0001 0008 0000 4E75");
         var listing = CodeListing.ForCodeResource(FourCC.FromString("PACK"), 3, data);
         Assert.Equal([new CodeFunction(0, 0x12, "selector_0", CodeFunctionSource.PackageRoutine)], listing.Functions);
         Assert.Contains("; Package: 'PACK' 3, selectors 0 to 1", listing.Text, StringComparison.Ordinal);

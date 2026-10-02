@@ -85,4 +85,41 @@ public class FarRelocationsTests
         Assert.Equal(2, FarRelocations.ListLength(Segment(0x40, 0x30, 0x80, 0x00, 0x00), 0x30)); // the escape stops it
         Assert.Equal(0, FarRelocations.ListLength(Segment(0x10, 0), 0x20));                      // outside
     }
+
+    [Fact]
+    public void A_two_byte_delta_with_a_high_byte_of_0_is_not_the_escape()
+    {
+        // 80 05: 2 × 5 = $A.
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal([0xAL], FarRelocations.Read(Segment(0x40, 0x30, 0x80, 0x05, 0x00), 0x30, diagnostics));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void The_largest_two_byte_delta()
+    {
+        // FF FF: 2 × $7FFF = $FFFE, inside a segment of $10002 bytes.
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal([0xFFFEL], FarRelocations.Read(Segment(0x10002, 0x10, 0xFF, 0xFF, 0x00), 0x10, diagnostics));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void Two_lists_back_to_back()
+    {
+        // The A5 list at $30 (02 00), the PC list right after it at $32 (04 00).
+        var data = Segment(0x40, 0x30, 0x02, 0x00, 0x04, 0x00);
+        Assert.Equal([4L], FarRelocations.Read(data, 0x30, []));
+        Assert.Equal([8L], FarRelocations.Read(data, 0x32, []));
+        Assert.Equal(2, FarRelocations.ListLength(data, 0x30));
+    }
+
+    [Fact]
+    public void Longs_outside_the_segment_are_reported_once_per_list()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var offsets = FarRelocations.Read(Segment(0x40, 0x30, 0x1E, 0x01, 0x01, 0x01, 0x00), 0x30, diagnostics);
+        Assert.Equal([0x3CL], offsets);
+        Assert.Equal("m68k.far-reloc-range", Assert.Single(diagnostics).Code);
+    }
 }

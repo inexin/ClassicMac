@@ -72,7 +72,10 @@ Each entry is 8 bytes, written here as words:
 
 [Doc: Inside Macintosh II, the Segment Loader; Mac OS Runtime Architectures, the far model] A table is far when entry
 1 is the far marker; entry 0, the entry point, stays in the near form [Verified: Disk Copy 6.1.2, a Retro68
-application]. The first routine of a far segment is at `$28`, just after its header [Verified: Disk Copy 6.1.2].
+application]. The first routine of a far segment is at `$28`, just after its header [Verified: Disk Copy 6.1.2]. A
+far entry's offset counts from the resource start also when it points into a near segment: Retro68's far entries into
+`'CODE'` 1 `Runtime` land on routine starts that way [Verified: a Retro68 application]. The marker is only the marker at
+entry 1; the same bytes anywhere else are none of the forms.
 
 A call goes to the entry plus 2 (the `MOVE.W` or the `_LoadSeg`): `JSR n(A5)` with n = jtOffset + 8i + 2. `PEA` or
 `LEA` of the same address is a procedure pointer [Doc: Inside Macintosh II, the Segment Loader] [Verified: ResEdit
@@ -146,8 +149,8 @@ segment that installs a patch, copies the original entry 0 back into the table a
 ### 1.7 Resolving `n(A5)`
 
 1. d = n − 2 − jtOffset.
-2. If d ≥ 0, d is a multiple of 8 and d / 8 is below the entry count, `n(A5)` is the call target of entry d / 8: its
-   segment and offset.
+2. If d ≥ 0, d is a multiple of 8, d / 8 is below the entry count and that entry is in one of the entry forms (not
+   the far marker), `n(A5)` is the call target of entry d / 8: its segment and offset.
 3. Otherwise `n(A5)` is data: a global when n < 0, an application parameter when n is 0 to `$1F` (`0(A5)` is the
    QuickDraw globals pointer).
 
@@ -225,9 +228,13 @@ None.
 - Jump-table bytes past the last whole entry are ignored; entries past `'CODE'` 0's end are not read. [ClassicMac]
 - A loaded entry is reported as far only after the far marker, from entry 2. [ClassicMac]
 - `JumpTableEntry.ResourceOffset` gives an unloaded entry's offset in its resource (near offset + 4). [ClassicMac]
-- `ResolveA5` resolves a displacement by §1.7. [ClassicMac]
-- A far relocation list using the `$80 $00` form is reported and reading stops there, rather than guessing at it. A
-  relocated long outside the segment is reported and left out; the list goes on. [ClassicMac]
+- `ResolveA5` resolves a displacement by §1.7; an unrecognized entry is not a call target either. [ClassicMac]
+- An unloaded entry pointing into its segment's header (below +$04 near, +$28 far) is reported and kept. [ClassicMac]
+- The globals an initializer writes (MPW's belowA5Size, Retro68's `'DATA'` 0 image) larger than `'CODE'` 0's belowA5
+  are reported. [ClassicMac]
+- A far relocation list using the `$80 $00` form is reported and reading stops there, rather than guessing at it.
+  Relocated longs outside the segment are left out and reported once per list, with their count; the list goes on.
+  A long patched inside the far header is kept without a diagnostic. [ClassicMac]
 - `SegmentHeader.EntryIndices` caps a pair at 65,536 entries. [ClassicMac]
 - When both CodeWarrior and Retro68 shapes are present, Retro68 wins (§2.1's order). [ClassicMac]
 
@@ -239,11 +246,13 @@ Segments are exported with a listing and a model as [disassembly.md](../output/d
 | --- | --- | --- | --- | --- |
 | `code.compressed` | Error | A segment, `'RELA'` or `'DATA'` 0 is compressed and cannot be decompressed | Leaves it unread | [compressed-resources.md §2.5](../resources/compressed-resources.md#25-failures) |
 | `m68k.above-a5` | Warning | aboveA5 is smaller than jtOffset + jtSize | Reads on | Not traced |
+| `m68k.below-a5` | Warning | An initializer's globals (MPW's belowA5Size, Retro68's `'DATA'` 0) are larger than belowA5 | Reads on | Not traced |
+| `m68k.entry-header` | Warning | An unloaded entry's offset is inside its segment's header | Keeps the entry | Not traced |
 | `m68k.entry-missing` | Warning | The jump table is empty | No entry point | Not traced |
 | `m68k.entry-range` | Error | An unloaded entry's offset is past its segment's end | Keeps the entry | Not traced |
 | `m68k.far-reloc-escape` | Error | A far relocation list uses `$80 $00` | Stops the list | Not traced |
 | `m68k.far-reloc-offset` | Error | A relocation list's offset is outside the segment | Reads no list | Not traced |
-| `m68k.far-reloc-range` | Error | A relocated long lies outside the segment | Leaves it out; reads on | Not traced |
+| `m68k.far-reloc-range` | Error | Relocated longs lie outside the segment | Leaves them out, reported once per list; reads on | Not traced |
 | `m68k.far-reloc-truncated` | Error | A list runs past the segment without its `$00` | Keeps what was read | Not traced |
 | `m68k.jt-entry` | Warning | An entry is none of the forms | Keeps it as unrecognized | Not traced |
 | `m68k.jt-size` | Warning | jtSize is not a multiple of 8 | Ignores the remainder | Not traced |
@@ -257,13 +266,19 @@ The data initializers' codes are in [code-data.md §6](code-data.md#6-diagnostic
 ## 7. Verification
 
 - Hand-built forks (`tests/ClassicMac.Code.Tests/M68k`, built with `CodeBuilder`):
-  - `CodeApplicationTests`: `'CODE'` 0; near unloaded and loaded entries; the far marker; far segments with their
-    relocation lists; entry 0 and a bootstrap's saved entry; `n(A5)` resolution; segment names, attributes and headers;
-    compressed segments, and ones that cannot be decompressed; each model's detection and the unknown model; `'cfrg'`
-    0 making a fat application; each damage case.
-  - `SegmentHeaderTests`: the near header; the far header with each pair, both and neither; damage.
-  - `FarRelocationsTests`: one- and two-byte deltas, the empty list, truncation, the `$80 $00` escape, out-of-range
-    longs and list offsets.
+  - `CodeApplicationTests`: `'CODE'` 0; near unloaded and loaded entries; the far marker, and its bytes away from entry
+    1 or with a nonzero last word; far entries into far and near segments (from the resource start); far segments with
+    their relocation lists (landing in the code, and one in the header); entry 0 and a bootstrap's saved entry, with
+    another jtOffset and each part of the shape broken; `n(A5)` resolution, also with jtOffset `$30`, and the marker
+    and unrecognized entries refused; entries into a header; segment names, attributes and headers; compressed
+    `'CODE'` 0 and segments, ones that cannot be decompressed, and the attribute without the signature; each model's
+    detection, Retro68 over CodeWarrior, far headers with only the second pair and no `'RELA'`, and the unknown model;
+    belowA5 against the initializers; `'cfrg'` 0 making a fat application; each damage case. `CodeBuilder.Far` writes
+    distinct nonzero longs at +$18, +$20 and +$24.
+  - `SegmentHeaderTests`: the near header; the far header with each pair, both and neither, every field at its own
+    offset; damage.
+  - `FarRelocationsTests`: one- and two-byte deltas (`$80 $05`, `$FF $FF`), the empty list, lists back to back,
+    truncation, the `$80 $00` escape, out-of-range longs (reported once) and list offsets.
 - Gated on `CLASSICMAC_CODE_CORPUS` (`M68kCorpusTests`; skipped without it), each read with no warnings:
   - ResEdit 2.1.3: MPW near; aboveA5 `$EC0`, belowA5 `$AA0`, 468 entries; 25 near segments, 18 compressed; entry 0
     `'CODE'` 66 +$0C (resource +$10), saved entry `'CODE'` 1 +$3634; `'CODE'` 2's header (`$2E8`, 15); the `%A5Init`
@@ -273,8 +288,9 @@ The data initializers' codes are in [code-data.md §6](code-data.md#6-diagnostic
     entry into `'CODE'` 17; the `%A5Init` in `'CODE'` 2.
   - A CodeWarrior application: one entry, one near segment of 485,276 bytes, entry `'CODE'` 1 +0 (resource +4); no
     `'cfrg'`.
-  - A Retro68 application: the far marker; `'CODE'` 1 `Runtime` near, the rest far; `'CODE'` 2 `Main` filling the
-    second pair (`$D8`, 1); for the build the numbers were counted on, 28 entries and 8 segments.
+  - A Retro68 application, the build the numbers were counted on (found by its length, 117,059 bytes): the far marker;
+    `'CODE'` 1 `Runtime` near, the rest far; `'CODE'` 2 `Main` filling the second pair (`$D8`, 1); aboveA5 `$100`,
+    belowA5 `$17A4`, 28 entries and 8 segments.
 
 ## 8. Not covered
 

@@ -80,8 +80,8 @@ internal static class CodeFixtures
     // A driver ".D": open $18, prime $1A, control $1A, status 0, close $1C.
     public static readonly byte[] Driver = Bytes("4F00 0000 0000 0000 0018 001A 001A 0000 001C 022E 4400 0000 7000 4E75 4E75");
 
-    // A package: _Debugger, 'PACK' 3, version 1, selectors 0 to 1 at $12 and 0; rts.
-    public static readonly byte[] Package = Bytes("A9FF 5041 434B 0003 0001 0000 0001 0012 0000 4E75");
+    // A package: _Debugger, 'PACK' 3, version 1, selectors 0 to 1 at offsets 8 (the rts at $0A + 8 = $12) and 0 (none).
+    public static readonly byte[] Package = Bytes("A9FF 5041 434B 0003 0001 0000 0001 0008 0000 4E75");
 
     // A fat code resource: a routine descriptor with one relative PowerPC routine at $20, the fragment.
     public static byte[] Fat()

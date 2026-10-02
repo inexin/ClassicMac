@@ -302,8 +302,8 @@ public sealed class CodeListing
             int end = Math.Min(data.Length, PackageHeader.TableOffset + 2 * package.Entries.Count);
             regions.Add(new M68kDataRegion(0, end, M68kDataKind.Header, "package header"));
             foreach (var entry in package.Entries)
-                if (entry.Offset >= end)
-                    entries.Add(new M68kEntry(entry.Offset,
+                if (entry.TargetOffset is { } target && target >= end && target < data.Length)
+                    entries.Add(new M68kEntry((int)target,
                         "selector_" + (entry.Selector < 0 ? "m" : "") + Math.Abs(entry.Selector).ToString(CultureInfo.InvariantCulture),
                         CodeFunctionSource.PackageRoutine));
             entersAtStart = false;

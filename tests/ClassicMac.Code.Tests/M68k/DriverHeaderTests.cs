@@ -43,6 +43,41 @@ public class DriverHeaderTests
     }
 
     [Fact]
+    public void Flag_bits_outside_the_named_ones_are_kept()
+    {
+        // .PCCardSRAMDisk: 6F04 003C 0000 0000 0022 0028 002E 0034 003A 0F '.PCCardSRAMDisk'; .DSP's flags are $4440.
+        var diagnostics = new List<Diagnostic>();
+        var header = DriverHeader.Read(Driver(0x6F04, [0x22, 0x28, 0x2E, 0x34, 0x3A], ".PCCardSRAMDisk"), diagnostics)!;
+        Assert.Empty(diagnostics);
+        Assert.True(header.IsStandard);
+        Assert.Equal((ushort)0x6F04, (ushort)header.Flags);
+        Assert.Equal((DriverFlags)0x0004, header.Flags & ~(DriverFlags.Read | DriverFlags.Write | DriverFlags.Control
+            | DriverFlags.Status | DriverFlags.NeedTime | DriverFlags.NeedLock));
+        Assert.Equal((ushort)0x4440, (ushort)DriverHeader.Read(Driver(0x4440, [0x80, 0x82, 0x84, 0x86, 0x88], ".DSP", 0x90), [])!.Flags);
+    }
+
+    [Fact]
+    public void A_routine_offset_of_0_is_standard()
+    {
+        // The System's video drivers have prime = 0.
+        var diagnostics = new List<Diagnostic>();
+        var header = DriverHeader.Read(Driver(0x4C00, [0x20, 0, 0x22, 0x24, 0x26], ".VSC_Video"), diagnostics)!;
+        Assert.True(header.IsStandard);
+        Assert.Equal((ushort)0, header.Prime);
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void An_offset_at_the_last_byte_is_standard_and_one_at_the_length_is_not()
+    {
+        var data = Driver(0, [0x20, 0x20, 0x20, 0x20, 0x20], ".X", codeLength: 0x20);
+        Assert.True(DriverHeader.Read(Driver(0, [0x20, 0x20, 0x20, 0x20, (ushort)(data.Length - 1)], ".X", codeLength: 0x20), [])!.IsStandard);
+        var diagnostics = new List<Diagnostic>();
+        Assert.False(DriverHeader.Read(Driver(0, [0x20, 0x20, 0x20, 0x20, (ushort)data.Length], ".X", codeLength: 0x20), diagnostics)!.IsStandard);
+        Assert.Equal("m68k.drvr-nonstandard", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
     public void Offsets_outside_the_resource_make_a_non_standard_DRVR()
     {
         // The shape of a driver that starts with code: 6000 0102 0000 0001 6000 0102 2324 ...

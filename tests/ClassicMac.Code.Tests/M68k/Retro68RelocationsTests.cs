@@ -3,7 +3,8 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Code.Tests.M68k;
 
-// Retro68 'RELA': ULEB128 values ended by 0; pos starts at -1, pos += v >> 2, base = v & 3, patch at codeStart + pos.
+// Retro68 'RELA' (Retro68ApplyRelocations): ULEB128 values to a 0 byte; pos starts at -1, pos += v >> 2, kind = v & 3,
+// patch at codeStart + pos. A nonzero byte after that 0 starts a second, PC-relative list, again from -1.
 public class Retro68RelocationsTests
 {
     private static byte[] Uleb(params uint[] values)
@@ -34,7 +35,7 @@ public class Retro68RelocationsTests
     [Fact]
     public void Positions_start_at_minus_one_and_step_by_the_value_shifted_right_two()
     {
-        var rela = Uleb(V(3, Retro68RelocationBase.Code), V(4, Retro68RelocationBase.A5),
+        var rela = Uleb(V(3, Retro68RelocationBase.Segment), V(4, Retro68RelocationBase.A5),
             V(200, Retro68RelocationBase.UninitializedData), V(2, Retro68RelocationBase.InitializedData), 0).Append((byte)0).ToArray();
         // V(200, 2) = 802 = $322: two ULEB bytes, $A2 $06.
         Assert.Equal(new byte[] { 0xA2, 0x06 }, Uleb(802));
@@ -43,7 +44,7 @@ public class Retro68RelocationsTests
         Assert.Empty(diagnostics);
         Assert.Equal(
         [
-            new Retro68Relocation(4 + 2, Retro68RelocationBase.Code),
+            new Retro68Relocation(4 + 2, Retro68RelocationBase.Segment),
             new Retro68Relocation(4 + 6, Retro68RelocationBase.A5),
             new Retro68Relocation(4 + 206, Retro68RelocationBase.UninitializedData),
             new Retro68Relocation(4 + 208, Retro68RelocationBase.InitializedData),
@@ -73,10 +74,65 @@ public class Retro68RelocationsTests
     }
 
     [Fact]
+    public void A_nonzero_byte_after_the_terminator_starts_the_relative_list()
+    {
+        // 0D: pos 2, kind 1 (absolute) at 4 + 2; 00; 17: pos -1 + 5 = 4, kind 3, relative, at 4 + 4; 00.
+        var diagnostics = new List<Diagnostic>();
+        var relocations = Retro68Relocations.Read(new byte[] { 0x0D, 0x00, 0x17, 0x00 }, 4, 0x100, diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal(
+        [
+            new Retro68Relocation(6, Retro68RelocationBase.InitializedData),
+            new Retro68Relocation(8, Retro68RelocationBase.A5, Relative: true),
+        ], relocations);
+        Assert.False(relocations[0].Relative);
+    }
+
+    [Fact]
+    public void A_second_0_after_the_terminator_is_an_empty_relative_list()
+    {
+        // The real files end 00 00; what follows the second 0 is not read.
+        var diagnostics = new List<Diagnostic>();
+        var relocations = Retro68Relocations.Read(new byte[] { 0x0D, 0x00, 0x00, 0x17, 0x00 }, 4, 0x100, diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal([new Retro68Relocation(6, Retro68RelocationBase.InitializedData)], relocations);
+    }
+
+    [Fact]
+    public void An_empty_first_list_can_be_followed_by_a_relative_one()
+    {
+        var relocations = Retro68Relocations.Read(new byte[] { 0x00, 0x0C, 0x00 }, 0x28, 0x100, []);
+        Assert.Equal([new Retro68Relocation(0x2A, Retro68RelocationBase.Segment, Relative: true)], relocations);
+    }
+
+    [Fact]
+    public void A_relative_list_without_its_terminator_is_truncated()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var relocations = Retro68Relocations.Read(new byte[] { 0x00, 0x0C }, 4, 0x100, diagnostics);
+        Assert.Equal([new Retro68Relocation(6, Retro68RelocationBase.Segment, Relative: true)], relocations);
+        Assert.Equal("m68k.rela-truncated", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void A_non_canonical_zero_is_a_value_not_the_terminator()
+    {
+        // The runtime ends a list on a 0 byte, not a 0 value: 80 00 is a step of 0 with kind 0.
+        var diagnostics = new List<Diagnostic>();
+        var relocations = Retro68Relocations.Read(new byte[] { 0x0D, 0x80, 0x00, 0x00 }, 4, 0x100, diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal(
+        [
+            new Retro68Relocation(6, Retro68RelocationBase.InitializedData),
+            new Retro68Relocation(6, Retro68RelocationBase.Segment),
+        ], relocations);
+    }
+
+    [Fact]
     public void A_missing_terminator_is_reported_and_the_relocations_read_are_kept()
     {
         var diagnostics = new List<Diagnostic>();
-        var relocations = Retro68Relocations.Read(Uleb(V(3, Retro68RelocationBase.Code)), 4, 0x100, diagnostics);
+        var relocations = Retro68Relocations.Read(Uleb(V(3, Retro68RelocationBase.Segment)), 4, 0x100, diagnostics);
         Assert.Single(relocations);
         Assert.Equal("m68k.rela-truncated", Assert.Single(diagnostics).Code);
     }
@@ -101,8 +157,8 @@ public class Retro68RelocationsTests
     public void An_odd_position_is_reported_but_kept()
     {
         var diagnostics = new List<Diagnostic>();
-        var relocations = Retro68Relocations.Read(Uleb(V(2, Retro68RelocationBase.Code), 0), 4, 0x100, diagnostics);
-        Assert.Equal([new Retro68Relocation(5, Retro68RelocationBase.Code)], relocations);
+        var relocations = Retro68Relocations.Read(Uleb(V(2, Retro68RelocationBase.Segment), 0), 4, 0x100, diagnostics);
+        Assert.Equal([new Retro68Relocation(5, Retro68RelocationBase.Segment)], relocations);
         Assert.Equal("m68k.rela-odd", Assert.Single(diagnostics).Code);
     }
 

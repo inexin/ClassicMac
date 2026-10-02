@@ -81,7 +81,7 @@ Each annotation is a `CodeReference`: the instruction's address, a kind, and the
 | `lowMemory` | An absolute address inside a low-memory global | Its name, `+offset` when inside it | `move.l ($016A).w,d0  ; Ticks` |
 | `trap` | An A-line word | Not written: the mnemonic is the trap's name (§2.4) | `_GetResource ,AUTOPOP` |
 | `selector` | A dispatcher trap whose selector was found (§2.4) | The routine's name; `'code' name` for `_Gestalt`; `selector $n` when the number has no name | `_Pack7  ; NumToString` |
-| `relocation` | An absolute long or long immediate the loader patches (§2.5) | `A5+$n` (with the jump-table entry when it is one), `CODE s+$n` and the function there, `DATA+$n`, `BSS+$n` | `lea ($00000100).l,a0  ; A5+$100` |
+| `relocation` | An absolute long or long immediate the loader patches (§2.5) | `A5+$n` / `A5-$n` (with the jump-table entry when it is one), `CODE s+$n` and the function there | `lea ($00000100).l,a0  ; A5+$100` |
 | `string` | A PC-relative operand (not `jsr`/`jmp`) at a Pascal or C string | `P'text'` or `C'text'`, cut after 40 characters with `...` | `pea 12(pc)  ; P'Hello'` |
 | `call` | A call or unconditional branch to a labelled function | The label | `bsr.w $0034  ; sub_0034` |
 | `glue` | A PowerPC call or branch to a cross-TOC glue stub | `library::symbol` | `bl 0x18  ; InterfaceLib::InitGraf` |
@@ -134,7 +134,7 @@ as JSON numbers (offsets are decimal there). Shared parts:
 | --- | --- |
 | `functions` | Array, in address order: `offset`, `name`, `source` (§1.5); `section` for PowerPC code |
 | `references` | Array, in address order: `offset`, `kind` (§1.3), `text`; `section` for PowerPC code |
-| `relocations` | Array: `offset` (of the patched long, in the resource), `base`: `a5`, `segment`, `initializedData`, `uninitializedData` |
+| `relocations` | Array: `offset` (of the patched long, in the resource), `base`: `a5` or `segment` (what is added) |
 | A fragment | `architecture`, `formatVersion`, `currentVersion`, `oldDefVersion`, `oldImpVersion`; `sections` (`index`, `name` when it has one, `kind`, `share`, `totalLength`, `unpackedLength`, `containerLength`, `containerOffset`, `alignment`); `main`, `init`, `term` (`section`, `offset`: the transition vector) when present; `imports` (`library`, `name`, `class`, `weak`); `exports` (`name`, `class`, `section`, `value`) |
 
 The models per output:
@@ -144,7 +144,7 @@ The models per output:
 | `'CODE'` 0 | `aboveA5`, `belowA5`, `jumpTableSize`, `jumpTableOffset`; `model` (`mpwNear`, `mpwFar`, `retro68`, `codeWarrior`, `unknown`); `farModel`; `powerPC` (a `'cfrg'` 0 exists); `entry` and, for a bootstrap, `originalEntry` (`segment`, `offset` as the entry gives it, `resourceOffset`); `a5Init` (`segment`, `belowA5Size`, `runs`, `relocations`) for MPW; `codeWarriorData` (`relocations`: `kind`, `count` per list); `dataRelocations` (Retro68's `'RELA'` 0 count); `entries`: `index`, `a5Offset`, `kind` (`nearUnloaded`, `nearLoaded`, `farMarker`, `farUnloaded`, `farLoaded`, `unrecognized`), `segment`, `offset` (unloaded), `resourceOffset` (unloaded), `address` (loaded), `raw` (unrecognized, 16 hex digits) |
 | `'CODE'` n | `segment`, `name`; `model` (with an application); `readable`; `header` (`far`, `firstNearOffset`, `nearCount`, and when far `firstFarOffset`, `farCount`, `a5RelocationOffset`, `pcRelocationOffset`; `null` when the segment is too short); `jumpTableEntries` (`index`, `resourceOffset`); `relocations`; `functions`; `references` |
 | `'cfrg'` | `version`; `members`: `name`, `architecture`, `updateLevel`, `currentVersion`, `oldDefVersion`, `usage` (`importLibrary`, `application`, `dropIn`, `stubLibrary`, `weakStubLibrary`), `usage1`, `usage2`, `where` (`memory`, `dataFork`, `resource`, `byteStream`, `namedFragment`), `offset`, `length`, `where1`, `where2`, `resourceType` and `resourceId` (where = resource), `search` (`libraryKind`, `qualifiers`), `extensions` (`kind`, `length`) |
-| A code resource | `type`, `id`, `format` (`pef` or `68k`). PEF: `fragment`, `functions`, `references`. 68k: `driver` (`name`, `flags`, `delay`, `eventMask`, `menu`, `open`, `prime`, `control`, `status`, `close`), `package` (`type`, `id`, `version`, `flags`, `firstSelector`, `lastSelector`, `entries`: `selector`, `offset`) or `standardHeader` (`type`, `id`, `version`, `flags`, `entry`: the branch target); `routineDescriptor` (`offset`, `version`, `routines`: `procInfo`, `powerPC`, `flags`, `targetOffset` or `procDescriptor`, `pef`); `functions`; `references`; `fragments` (each a fragment with its `functions` and `references`) |
+| A code resource | `type`, `id`, `format` (`pef` or `68k`). PEF: `fragment`, `functions`, `references`. 68k: `driver` (`name`, `flags`, `delay`, `eventMask`, `menu`, `open`, `prime`, `control`, `status`, `close`), `package` (`type`, `id`, `version`, `flags`, `firstSelector`, `lastSelector`, `entries`: `selector`, `offset` as stored, `target`: the routine's offset in the resource or `null`) or `standardHeader` (`type`, `id`, `version`, `flags`, `entry`: the branch target); `routineDescriptor` (`offset`, `version`, `routines`: `procInfo`, `powerPC`, `flags`, `targetOffset` or `procDescriptor`, `pef`); `functions`; `references`; `fragments` (each a fragment with its `functions` and `references`) |
 | `code.json` (`disasm`) | `application` (the `'CODE'` 0 model, or `null`); `segments` (`id`, `name`, `file`, `readable`, `functions`); `codeResources` (`type`, `id`, `name`, `format`, `file`, `functions`); `fragments` (`cfrg`: the `'cfrg'` resource's ID, `index` in it, `name`, `where`, `offset`, `length`, `resourceType`/`resourceId`, `file` or `null`, the fragment's members, `functions`) |
 
 ## 2. Reading
@@ -225,8 +225,11 @@ where Multiversal has none; `tools/TrapTables` generates `TrapNames.g.cs`, `Sele
 
 What the loader patches is annotated where the patched long lies inside an instruction and holds the operand's value:
 an MPW far segment's A5 and PC lists ([code-segments.md](../code/code-segments.md)), Retro68's `'RELA'` and
-CodeWarrior's `'DATA'` 0 lists for `'CODE'` 1 ([code-data.md](../code/code-data.md)). A segment's own PC relocations
-make `jsr`/`jmp (xxx).l` a call into the segment.
+CodeWarrior's `'DATA'` 0 lists for `'CODE'` 1 ([code-data.md](../code/code-data.md)). Retro68's kind 0 is the
+segment's address and kinds 1 to 3 are A5 (their longs are A5 offsets); a relocation from Retro68's relative list is
+annotated by the target its long names, like an absolute one. A segment's own PC relocations make `jsr`/`jmp (xxx).l`
+a call into the segment. A package's routines are at +$0A + their table offsets
+([code-resources.md §1.3](../code/code-resources.md#13-the-a9ff-package-form)).
 
 ### 2.6 PowerPC
 

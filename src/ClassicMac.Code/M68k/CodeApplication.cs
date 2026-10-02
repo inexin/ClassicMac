@@ -155,14 +155,17 @@ namespace ClassicMac.Code.M68k
 
         /// <summary>
         /// What <c>n(A5)</c> refers to when <paramref name="displacement"/> is a jump-table call target (the entry plus 2):
-        /// that entry; otherwise null, and <c>n(A5)</c> is a global (below A5) or an application parameter.
+        /// that entry; otherwise null, and <c>n(A5)</c> is a global (below A5) or an application parameter. The far marker
+        /// and unrecognized entries are not call targets.
         /// </summary>
         public JumpTableEntry? ResolveA5(int displacement)
         {
             long d = (long)displacement - 2 - JumpTableOffset;
             if (d < 0 || d % EntryLength != 0) return null;
             long index = d / EntryLength;
-            return index < JumpTable.Count ? JumpTable[(int)index] : null;
+            return index < JumpTable.Count
+                && JumpTable[(int)index] is { Kind: not (JumpTableEntryKind.FarMarker or JumpTableEntryKind.Unrecognized) } entry
+                ? entry : null;
         }
 
         /// <summary>
@@ -211,24 +214,37 @@ namespace ClassicMac.Code.M68k
                 {
                     app.A5Init = MpwA5Init.Read(segment.Data, diagnostics);
                     app.A5InitSegment = segment.Id;
+                    app.CheckBelowA5(app.A5Init.BelowA5Size, "The %A5Init globals", diagnostics);
                     break;
                 }
             }
 
             var relas = fork.OfType(RelaType).OrderBy(r => r.Id).ToList();
             var data0 = fork.Find(DataType, 0);
+            ReadOnlyMemory<byte>? data0Image = null;
             if (relas.Count > 0)
             {
                 app.Model = CodeModel.Retro68;
+                if (data0 is not null && TryGetData(data0, out var image))
+                {
+                    app.CheckBelowA5((uint)image.Length, "'DATA' 0's initialized data", diagnostics);
+                    data0Image = image;
+                }
                 foreach (var rela in relas)
                 {
                     if (!TryGetData(rela, out var relaData)) continue;
                     if (rela.Id == 0)
                     {
-                        if (data0 is not null && TryGetData(data0, out var image))
-                            app.DataRelocations = Retro68Relocations.Read(relaData, 0, image.Length, diagnostics);
+                        if (data0 is null)
+                            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.rela-target",
+                                "'RELA' 0 has no 'DATA' 0 to relocate; not read."));
+                        else if (data0Image is { } readable)
+                            app.DataRelocations = Retro68Relocations.Read(relaData, 0, readable.Length, diagnostics);
                     }
-                    else if (app.FindSegment(rela.Id) is { IsReadable: true } target)
+                    else if (app.FindSegment(rela.Id) is not { } target)
+                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.rela-target",
+                            $"'RELA' {rela.Id} has no 'CODE' {rela.Id} to relocate; not read."));
+                    else if (target.IsReadable)
                         target.Retro68Relocations = Retro68Relocations.Read(relaData,
                             Retro68Relocations.CodeStart(target.Data.Span), target.Data.Length, diagnostics);
                 }
@@ -337,7 +353,18 @@ namespace ClassicMac.Code.M68k
                 else if (segment.IsReadable && offset >= segment.Data.Length)
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.entry-range",
                         $"Jump-table entry {entry.Index} points at {offset:X} in 'CODE' {entry.Segment}, past its {segment.Data.Length} bytes."));
+                else if (segment.Header is { } header && offset < header.Length)
+                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.entry-header",
+                        $"Jump-table entry {entry.Index} points at {offset:X} in 'CODE' {entry.Segment}, inside its {header.Length}-byte header."));
             }
+        }
+
+        // The globals an initializer writes must fit in CODE 0's belowA5.
+        private void CheckBelowA5(uint size, string what, ICollection<Diagnostic> diagnostics)
+        {
+            if (size > BelowA5)
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.below-a5",
+                    $"{what} take {size} bytes; 'CODE' 0 has {BelowA5} below A5."));
         }
 
         // Entry 0; and the bootstrap shape: a near segment entered at +$10 that holds the table's A5 offset at +4 and the

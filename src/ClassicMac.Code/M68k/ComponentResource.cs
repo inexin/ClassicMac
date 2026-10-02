@@ -44,7 +44,10 @@ namespace ClassicMac.Code.M68k
         /// <summary>The flags mask.</summary>
         public uint FlagsMask { get; private init; }
 
-        /// <summary>The code resource (the 68k one in an extended resource that lists platforms).</summary>
+        /// <summary>
+        /// The code resource, as stored. With <see cref="HasMultiplePlatforms"/> each platform entry names its own code;
+        /// this one may name any platform's code (the PowerPC <c>'cdek'</c> in the Mac OS 9 System's <c>'thng'</c> −21003).
+        /// </summary>
         public ResourceSpec Code { get; private init; } = null!;
 
         /// <summary>The name resource (a <c>'STR '</c>).</summary>
@@ -59,6 +62,15 @@ namespace ClassicMac.Code.M68k
         /// <summary>Whether the extended fields are there.</summary>
         public bool IsExtended { get; private init; }
 
+        /// <summary>
+        /// Whether the registration flags have componentHasMultiplePlatforms (<c>$08</c>), which says the platform entries
+        /// are in use [Doc: Components.h, componentHasMultiplePlatforms].
+        /// </summary>
+        public bool HasMultiplePlatforms => (RegisterFlags & MultiplePlatformsFlag) != 0;
+
+        /// <summary>componentHasMultiplePlatforms in the registration flags.</summary>
+        public const uint MultiplePlatformsFlag = 0x08;
+
         /// <summary>The component version (extended form).</summary>
         public uint Version { get; private init; }
 
@@ -72,7 +84,8 @@ namespace ClassicMac.Code.M68k
         public IReadOnlyList<ComponentPlatform> Platforms { get; private init; } = [];
 
         /// <summary>
-        /// Reads a <c>'thng'</c>. Extended fields or platform entries cut short are reported (<c>m68k.thng-*</c>).
+        /// Reads a <c>'thng'</c>. Extended fields or platform entries cut short, and platform entries without
+        /// componentHasMultiplePlatforms (read all the same), are reported (<c>m68k.thng-*</c>).
         /// </summary>
         /// <exception cref="System.IO.InvalidDataException">The resource is shorter than the 44-byte basic form.</exception>
         public static ComponentResource Read(ReadOnlyMemory<byte> data, ICollection<Diagnostic> diagnostics)
@@ -123,6 +136,9 @@ namespace ClassicMac.Code.M68k
                 var platformCode = Spec(reader);
                 platforms.Add(new ComponentPlatform(componentFlags, platformCode, reader.ReadInt16()));
             }
+            if (count != 0 && (registerFlags & MultiplePlatformsFlag) == 0)
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.thng-platforms-unflagged",
+                    $"The 'thng' lists {count} platforms without componentHasMultiplePlatforms ($08), which says they are in use.", 0x30));
             return new ComponentResource
             {
                 Type = type, SubType = subType, Manufacturer = manufacturer, Flags = flags, FlagsMask = flagsMask,

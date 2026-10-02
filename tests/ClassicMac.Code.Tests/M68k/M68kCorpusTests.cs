@@ -30,6 +30,63 @@ public class M68kCorpusTests
         Assert.True(!diagnostics.Any(d => d.Severity != DiagnosticSeverity.Info),
             string.Join("; ", diagnostics.Select(d => d.Code + " " + d.Message)));
 
+    // The MPW initializer's data in the Mac OS 9 System's resources: (type, id, header, belowA5Size, runs, relocations,
+    // data end, relocation end, first relocation).
+    private static readonly (string Type, short Id, int Header, uint Below, int Runs, int Relocations, long DataEnd, long RelocationEnd,
+        int FirstRelocation)[] Initializers =
+    [
+        ("AINI", 2017, 0xAD6, 0x154, 6, 3, 2833, 2838, -0x11C),
+        ("DRVR", -20268, 0x3C90, 0x690, 38, 9, 15975, 15981, -0x5E0),
+        ("DRVR", -20267, 0x35F0, 0x660, 38, 9, 14279, 14285, -0x5B0),
+        ("DRVR", 22, 0xAE2, 0x212, 21, 9, 2945, 2957, -0xCE),
+        ("DRVR", 53, 0x3550, 0x660, 38, 9, 14119, 14125, -0x5B0),
+        ("enet", 1648, 0x2A3E, 0x330, 63, 31, 11182, 11191, -0x29A),
+        ("otdr", 9, 0x2358, 0x1BE, 32, 13, 9316, 9325, -0xE6),
+        ("otlm", 9, 0x2192, 0x26C, 33, 14, 8810, 8820, -0x10C),
+        ("ptch", -20917, 0x1028, 0xFA, 17, 7, 4288, 4294, -0x92),
+        ("scod", -16476, 0x1AE, 0x294, 5, 3, 567, 573, -0x11C),
+        ("scod", -16472, 0x1AE, 0x28A, 5, 3, 567, 573, -0x11C),
+        ("scod", -16467, 0x1AE, 0xEFA, 235, 172, 1614, 1625, -0xEFA),
+        ("wart", 1, 0xACA, 0xAE, 10, 4, 2863, 2869, -0x68),
+    ];
+
+    public static TheoryData<string, short, int, uint, int, int, long, long, int> SystemInitializers
+    {
+        get
+        {
+            var data = new TheoryData<string, short, int, uint, int, int, long, long, int>();
+            foreach (var i in Initializers)
+                data.Add(i.Type, i.Id, i.Header, i.Below, i.Runs, i.Relocations, i.DataEnd, i.RelocationEnd, i.FirstRelocation);
+            return data;
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(SystemInitializers))]
+    public void System_resources_carry_the_MPW_initializer(string type, short id, int header, uint below, int runs, int relocations,
+        long dataEnd, long relocationEnd, int firstRelocation)
+    {
+        var fork = ResourceFork.Read(CodeCorpus.Require("MacOS9_System.rsrc", 8021864));
+        var data = ResourceDecompression.Default.GetData(fork.Find(FourCC.FromString(type), id)!, fork);
+        Assert.True(MpwA5Init.HasTrailer(data.Span));
+        var diagnostics = new List<Diagnostic>();
+        var init = MpwA5Init.Read(data, diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal((header, below, runs, relocations), (init.HeaderOffset, init.BelowA5Size, init.Runs.Count, init.Relocations.Count));
+        Assert.Equal((dataEnd, relocationEnd, firstRelocation), (init.DataEnd, init.RelocationEnd, init.Relocations[0]));
+        // The relocations end at the trailer or one pad byte before it.
+        Assert.InRange(data.Length - 8 - init.RelocationEnd, 0, 1);
+    }
+
+    [Fact]
+    public void Thirteen_System_resources_carry_the_MPW_initializer()
+    {
+        var fork = ResourceFork.Read(CodeCorpus.Require("MacOS9_System.rsrc", 8021864));
+        var found = fork.Resources.Where(r => MpwA5Init.HasTrailer(ResourceDecompression.Default.GetData(r, fork).Span))
+            .Select(r => $"{r.Type} {r.Id}").Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(Initializers.Select(i => $"{i.Type} {i.Id}").Order(StringComparer.Ordinal), found);
+    }
+
     [Fact]
     public void ResEdit_is_MPW_near_with_a_bootstrap_entry_and_compressed_segments()
     {
@@ -84,10 +141,47 @@ public class M68kCorpusTests
         Assert.Equal([25, 10, 0, 26862, 391, 0], data.Relocations.Select(r => r.Offsets.Count));
     }
 
+    // Checks every Retro68 relocation against the stored long it patches: kind 0 is an offset in the segment's resource;
+    // kinds 1 to 3 are A5 offsets (initialized data, zero-filled data, the jump table).
+    private static void AssertRetro68Kinds(CodeApplication app, ResourceFork fork)
+    {
+        int dataLength = fork.Find(FourCC.FromString("DATA"), 0)!.GetData().Length;
+        long below = app.BelowA5, bss = below - dataLength;
+        foreach (var segment in app.Segments)
+        {
+            var reader = new BigEndianReader(segment.Data);
+            foreach (var r in segment.Retro68Relocations)
+            {
+                Assert.True(r.Offset % 2 == 0 && r.Offset >= segment.Header!.Length && r.Offset <= segment.Data.Length - 4);
+                Assert.False(r.Relative);
+                int value = reader.ReadInt32At((int)r.Offset);
+                switch (r.Base)
+                {
+                    case Retro68RelocationBase.Segment:
+                        Assert.InRange(value, 0, segment.Data.Length);
+                        break;
+                    case Retro68RelocationBase.InitializedData:
+                        Assert.InRange(value, -below, -bss);
+                        break;
+                    case Retro68RelocationBase.UninitializedData:
+                        Assert.InRange(value, -bss, 0);
+                        break;
+                    default:
+                        Assert.Equal(2, (value - (int)app.JumpTableOffset) % 8);
+                        Assert.InRange(value, (int)app.JumpTableOffset, (int)app.AboveA5);
+                        break;
+                }
+            }
+        }
+    }
+
     [Fact]
     public void QDHarness_is_Retro68()
     {
-        var (app, diagnostics) = Read("QDHarness.APPL");
+        // The build the numbers were counted on: 117,059 bytes (a rebuilt harness has other sizes and is skipped).
+        var fork = ResourceFork.Read(CodeCorpus.Require("QDHarness.APPL", 117059));
+        var diagnostics = new List<Diagnostic>();
+        var app = CodeApplication.Read(fork, diagnostics);
         AssertClean(diagnostics);
         Assert.Equal(CodeModel.Retro68, app.Model);
         Assert.True(app.IsFarModel);
@@ -99,19 +193,40 @@ public class M68kCorpusTests
         Assert.All(app.Segments.Skip(1), s => Assert.True(s.Header!.IsFar));
         var main = app.FindSegment(2)!;
         Assert.Equal("Main", main.Name);
-        Assert.Equal((0u, 0u, 1u), (main.Header!.NearCount, main.Header.FirstNearOffset, main.Header.FarCount));
-        // Every relocation of every segment is even and inside its segment (checked by the reader, so no diagnostics).
-        Assert.NotEmpty(app.DataRelocations);
-
-        // The build the expected numbers were counted on; a rebuilt harness has other sizes.
-        if (app.AboveA5 != 0x100) Assert.Skip($"QDHarness.APPL is another build (above A5 ${app.AboveA5:X}); the counted build has $100.");
+        Assert.Equal((0u, 0u, 1u, 0xD8u), (main.Header!.NearCount, main.Header.FirstNearOffset, main.Header.FarCount, main.Header.FirstFarOffset));
         Assert.Equal((0x100u, 0x17A4u), (app.AboveA5, app.BelowA5));
         Assert.Equal(28, app.JumpTable.Count);
         Assert.Equal(8, app.Segments.Count);
-        Assert.Equal(0xD8u, main.Header.FirstFarOffset);
-        var relocations = app.FindSegment(1)!.Retro68Relocations;
-        Assert.Equal(1291, relocations.Count);
-        Assert.Equal([863, 256, 97, 75], Enum.GetValues<Retro68RelocationBase>().Select(b => relocations.Count(r => r.Base == b)));
+
+        // 'RELA' 1 (Runtime): 1,291 relocations, 863, 256, 97 and 75 of kinds 0 to 3; 'RELA' 2 (Main): 497, no kind 0;
+        // 'RELA' 0: 18 in 'DATA' 0. Every stream ends 00 00: no relative list.
+        int[] Kinds(IReadOnlyList<Retro68Relocation> relocations) =>
+            [.. Enum.GetValues<Retro68RelocationBase>().Select(b => relocations.Count(r => r.Base == b))];
+        Assert.Equal([863, 256, 97, 75], Kinds(app.FindSegment(1)!.Retro68Relocations));
+        Assert.Equal([0, 189, 38, 270], Kinds(main.Retro68Relocations));
+        Assert.Equal([0, 12, 4, 2], Kinds(app.DataRelocations));
+        Assert.All(app.Segments.Skip(2), s => Assert.Empty(s.Retro68Relocations));
+        AssertRetro68Kinds(app, fork);
+        // The largest kind-0 value in Runtime is its own length: offsets count from the resource start.
+        var runtime = app.FindSegment(1)!;
+        var r1 = new BigEndianReader(runtime.Data);
+        Assert.Equal(0x13F70, runtime.Retro68Relocations.Where(r => r.Base == Retro68RelocationBase.Segment).Max(r => r1.ReadInt32At((int)r.Offset)));
+        Assert.Equal(0x13F70, runtime.Data.Length);
+    }
+
+    [Fact]
+    public void A_QDHarness_build_with_a_segment_relocation_in_a_far_segment()
+    {
+        // Another build (121,214 bytes): 'RELA' 2 holds one kind-0 relocation, so kind 0 is not only the Runtime's.
+        var fork = ResourceFork.Read(CodeCorpus.Require("QDHarness", 121214));
+        var diagnostics = new List<Diagnostic>();
+        var app = CodeApplication.Read(fork, diagnostics);
+        AssertClean(diagnostics);
+        var main = app.FindSegment(2)!;
+        Assert.Equal(576, main.Retro68Relocations.Count);
+        var segment = Assert.Single(main.Retro68Relocations, r => r.Base == Retro68RelocationBase.Segment);
+        Assert.Equal(0x3D2E, new BigEndianReader(main.Data).ReadInt32At((int)segment.Offset));
+        AssertRetro68Kinds(app, fork);
     }
 
     [Fact]

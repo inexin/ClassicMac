@@ -167,4 +167,47 @@ public class RoutineDescriptorTests
         Assert.Single(descriptor.Routines);
         Assert.Equal("m68k.routine-descriptor-version", Assert.Single(diagnostics).Code);
     }
+
+    [Fact]
+    public void Descriptor_flags_selector_info_and_each_routines_selector_are_kept()
+    {
+        // rdFlags $01 (kSelectorsAreIndexable), selectorInfo $12, two records with selectors 3 and 9.
+        var data = Convert.FromHexString("AAFE0701" + "00000000" + "00" + "12" + "0001"
+            + "00003BB0" + "00" + "00" + "0000" + "00400000" + "00000000" + "00000003"
+            + "00003BB0" + "00" + "00" + "0000" + "00400100" + "00000000" + "00000009");
+        var diagnostics = new List<Diagnostic>();
+        var descriptor = RoutineDescriptor.Read(data, diagnostics)!;
+        Assert.Empty(diagnostics);
+        Assert.Equal(((byte)0x01, (byte)0x12), (descriptor.Flags, descriptor.SelectorInfo));
+        Assert.Equal([3u, 9u], descriptor.Routines.Select(r => r.Selector));
+        Assert.Equal([0x00400000u, 0x00400100u], descriptor.Routines.Select(r => r.ProcDescriptor));
+    }
+
+    [Fact]
+    public void A_CFM_68k_routine_is_not_PowerPC_but_its_relative_container_is_read()
+    {
+        // ISA $10: kCFM68kRTA with the 68k ISA.
+        var w = new BigEndianWriter();
+        Descriptor(w, 0, routines: (0x3BB0, 0x10, 1, 0x20));
+        w.WriteBytes(Pef);
+        var routine = Assert.Single(RoutineDescriptor.Read(w.ToArray(), [])!.Routines);
+        Assert.False(routine.IsPowerPC);
+        Assert.Equal(0x20L, routine.TargetOffset);
+        Assert.NotNull(routine.Pef);
+    }
+
+    [Fact]
+    public void A_procedure_that_is_an_index_has_no_target()
+    {
+        // routineFlags $21: kProcDescriptorIsIndex with the relative bit; procDescriptor is an index, not an offset.
+        var w = new BigEndianWriter();
+        Descriptor(w, 0, routines: (0x3BB0, 1, 0x21, 0x20));
+        w.WriteBytes(Pef);
+        var diagnostics = new List<Diagnostic>();
+        var routine = Assert.Single(RoutineDescriptor.Read(w.ToArray(), diagnostics)!.Routines);
+        Assert.Empty(diagnostics);
+        Assert.True(routine.IsIndex);
+        Assert.Null(routine.TargetOffset);
+        Assert.Null(routine.Pef);
+    }
 }

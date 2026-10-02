@@ -12,11 +12,13 @@
     "entries": [
       {
         "selector": 0,
-        "offset": 18
+        "offset": 8,
+        "target": 18
       },
       {
         "selector": 1,
-        "offset": 0
+        "offset": 0,
+        "target": null
       }
     ]
   },

@@ -6,14 +6,19 @@ namespace ClassicMac.Code.M68k
 {
     /// <summary>One entry of a package's dispatch table.</summary>
     /// <param name="Selector">The selector.</param>
-    /// <param name="Offset">The routine's offset as stored (from the resource start in the samples; 0 for none).</param>
-    public readonly record struct PackageEntry(int Selector, ushort Offset);
+    /// <param name="Offset">The routine's offset as stored: from the flags word at <see cref="PackageHeader.DispatchBase"/>; 0 for none.</param>
+    public readonly record struct PackageEntry(int Selector, ushort Offset)
+    {
+        /// <summary>Where the routine is in the resource (<see cref="PackageHeader.DispatchBase"/> + the offset), or null for none.</summary>
+        public long? TargetOffset => Offset == 0 ? null : PackageHeader.DispatchBase + (long)Offset;
+    }
 
     /// <summary>
     /// The <c>$A9FF</c> form of a package or procedure resource (<c>'PACK'</c>, <c>'proc'</c>, <c>'dimg'</c>): <c>_Debugger</c>
     /// guarding the header, the type and ID, then a version, a flags word, the first and last selector bytes and a table of
-    /// word offsets, one per selector (every second selector when flags bit 0 is set). The layout after the ID is fitted
-    /// to the Mac OS 9 System's resources, not read from documentation or code, so the table is kept as stored.
+    /// word offsets, one per selector (every second selector when flags bit 0 is set), each from the flags word at
+    /// <c>$0A</c>. The layout after the ID is fitted to the Mac OS 9 System's resources, not read from documentation or
+    /// code (docs/formats/code/code-resources.md §1.3).
     /// </summary>
     /// <param name="Type">The type in the header.</param>
     /// <param name="Id">The ID in the header.</param>
@@ -30,6 +35,13 @@ namespace ClassicMac.Code.M68k
 
         /// <summary>Where the table starts.</summary>
         public const int TableOffset = 14;
+
+        /// <summary>
+        /// What the table's offsets count from: the flags word. Counted from there, the Mac OS 9 System's routines start
+        /// on a <c>LINK</c> or right after the previous routine's return [Fitted: the Mac OS 9 System's 14 <c>$A9FF</c>
+        /// resources].
+        /// </summary>
+        public const int DispatchBase = 0x0A;
 
         /// <summary>
         /// Reads the <c>$A9FF</c> form, or returns null when the resource does not start with it. A table running past the

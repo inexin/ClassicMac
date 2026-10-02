@@ -161,4 +161,67 @@ public class CodeWarriorDataTests
     {
         Assert.Throws<InvalidDataException>(() => CodeWarriorData.Read(new byte[3], []));
     }
+
+    // codeRelocOffset, three blocks, six lists, with the fourth list at codeRelocOffset.
+    private static byte[] Build(byte[][] blocks, byte[][] lists)
+    {
+        var w = new BigEndianWriter();
+        w.WriteUInt32(0);
+        foreach (var block in blocks) w.WriteBytes(block);
+        for (int i = 0; i < lists.Length; i++)
+        {
+            if (i == 3) w.WriteUInt32At(0, w.Length);
+            w.WriteBytes(lists[i]);
+        }
+        return w.ToArray();
+    }
+
+    private static readonly byte[] EmptyList = [0, 0, 0, 0];
+
+    [Fact]
+    public void Each_short_op_at_its_limits()
+    {
+        // Block 1 at A5 + 0: FF copies 128; 7F skips 64; 3F 55 fills $55 × 33; 1F fills $FF × 16.
+        var literal = Enumerable.Range(0, 128).Select(i => (byte)i).ToArray();
+        byte[] block1 = [0, 0, 0, 0, 0xFF, .. literal, 0x7F, 0x3F, 0x55, 0x1F, 0x00];
+        // Block 2 at A5 + $200: 80 copies 1; 40 skips 1; 20 55 fills $55 × 2; 10 fills $FF × 1.
+        byte[] block2 = [0, 0, 2, 0, 0x80, 0xEE, 0x40, 0x20, 0x55, 0x10, 0x00];
+        var diagnostics = new List<Diagnostic>();
+        var cw = CodeWarriorData.Read(Build([block1, block2, [0, 0, 0, 0, 0]], [.. Enumerable.Repeat(EmptyList, 6)]), diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal((0, 0xF1), (cw.Blocks[0].Start, cw.Blocks[0].End));
+        Assert.Equal(
+        [
+            (0, Convert.ToHexString(literal)),
+            (0xC0, new string('5', 66)),
+            (0xE1, new string('F', 32)),
+        ], cw.Blocks[0].Runs.Select(r => (r.A5Offset, Convert.ToHexString(r.Bytes.Span))));
+        Assert.Equal((0x200, 0x205), (cw.Blocks[1].Start, cw.Blocks[1].End));
+        Assert.Equal([(0x200, "EE"), (0x202, "5555"), (0x204, "FF")],
+            cw.Blocks[1].Runs.Select(r => (r.A5Offset, Convert.ToHexString(r.Bytes.Span))));
+    }
+
+    [Fact]
+    public void The_delta_forms_at_their_limits()
+    {
+        // 40 00 +0; 5F FF +$3FFE; 60 00 -$4000; 20 00 00 00 = -$40000000; 1F FF FF FF = $3FFFFFFE; BF +$7E; C0 -$80.
+        byte[] list = [0, 0, 0, 7, 0x40, 0x00, 0x5F, 0xFF, 0x60, 0x00, 0x20, 0x00, 0x00, 0x00, 0x1F, 0xFF, 0xFF, 0xFF, 0xBF, 0xC0];
+        var empty = new byte[] { 0, 0, 0, 0, 0 };
+        var cw = CodeWarriorData.Read(Build([empty, empty, empty], [list, .. Enumerable.Repeat(EmptyList, 5)]), []);
+        Assert.Equal([0, 0x3FFE, -2, -0x40000000, 0x3FFFFFFE, 0x4000007C, 0x3FFFFFFC], cw.Relocations[0].Offsets);
+    }
+
+    [Fact]
+    public void A_count_with_its_top_bit_set_reads_no_entries_and_goes_on()
+    {
+        // The startup loops while the count is above 0, signed: $80000000 reads nothing; the five lists after it are read.
+        var empty = new byte[] { 0, 0, 0, 0, 0 };
+        var diagnostics = new List<Diagnostic>();
+        var data = Build([empty, empty, empty], [[0x80, 0, 0, 0], .. Enumerable.Repeat(EmptyList, 5)]);
+        var cw = CodeWarriorData.Read(data, diagnostics);
+        Assert.Equal(6, cw.Relocations.Count);
+        Assert.All(cw.Relocations, r => Assert.Empty(r.Offsets));
+        Assert.Equal(data.Length, cw.End);
+        Assert.Equal("m68k.cw-reloc-count", Assert.Single(diagnostics).Code);
+    }
 }

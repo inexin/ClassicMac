@@ -1,3 +1,4 @@
+using ClassicMac.Code.Disassembly;
 using ClassicMac.Code.M68k;
 using ClassicMac.Code.Ppc;
 using ClassicMac.Core;
@@ -44,8 +45,8 @@ public class CodeResourceCorpusTests
         // 29 + 7 + 5 × 1 = 41 (the count of 40 in the expected numbers was a slip; its own per-type list sums to 41).
         var fork = System();
         var diagnostics = new List<Diagnostic>();
-        var descriptors = fork.Resources.Where(r => (r.Attributes & ResourceAttributes.Compressed) == 0)
-            .Select(r => (Resource: r, Descriptor: RoutineDescriptor.Read(r.GetData(), diagnostics)))
+        var descriptors = fork.Resources
+            .Select(r => (Resource: r, Descriptor: RoutineDescriptor.Read(ResourceDecompression.Default.GetData(r, fork), diagnostics)))
             .Where(d => d.Descriptor is not null).ToList();
         Assert.Empty(diagnostics);
         Assert.Equal("CDEF=29 LDEF=1 MBDF=1 MDEF=1 WDEF=7 expt=1 nsrd=1", string.Join(" ", descriptors
@@ -100,14 +101,37 @@ public class CodeResourceCorpusTests
     {
         var fork = System();
         var diagnostics = new List<Diagnostic>();
-        var packages = fork.Resources.Where(r => (r.Attributes & ResourceAttributes.Compressed) == 0)
-            .Select(r => (Resource: r, Header: PackageHeader.Read(r.GetData(), diagnostics)))
+        var packages = fork.Resources
+            .Select(r => (Resource: r, Data: ResourceDecompression.Default.GetData(r, fork)))
+            .Select(r => (r.Resource, r.Data, Header: PackageHeader.Read(r.Data, diagnostics)))
             .Where(p => p.Header is not null).ToList();
         Assert.Empty(diagnostics);
         Assert.Equal(14, packages.Count);
         Assert.All(packages, p => Assert.Equal(p.Resource.Type, p.Header!.Type));
-        Assert.All(packages, p => Assert.All(p.Header!.Entries, e => Assert.True(e.Offset % 2 == 0 && e.Offset < p.Resource.Length)));
-        var pack15 = packages.Single(p => p.Resource.Type == FourCC.FromString("PACK") && p.Resource.Id == 15).Header!;
-        Assert.Equal(7, pack15.Entries.Count);
+        var pack15 = packages.Single(p => p.Resource.Type == FourCC.FromString("PACK") && p.Resource.Id == 15);
+        Assert.Equal(7, pack15.Header!.Entries.Count);
+        // Selector 0: offset $7E0, the routine at $0A + $7E0 = $7EA: LINK A6,#-4, right after the previous one's UNLK; RTS.
+        var select0 = pack15.Header.Entries[0];
+        Assert.Equal(((ushort)0x7E0, (long?)0x7EA), (select0.Offset, select0.TargetOffset));
+        var reader = new BigEndianReader(pack15.Data);
+        Assert.Equal((0x4E5Eu, 0x4E75u, 0x4E56FFFCu), (reader.ReadUInt16At(0x7E6), reader.ReadUInt16At(0x7E8), reader.ReadUInt32At(0x7EA)));
+
+        // Every routine is even, inside the resource and a valid instruction; most are a LINK or follow a return
+        // (RTS, RTD or JMP (A0)). Counted from the resource start or from the table, far fewer would.
+        int targets = 0, links = 0, afterReturn = 0;
+        foreach (var (resource, data, header) in packages)
+        {
+            var r = new BigEndianReader(data);
+            foreach (var entry in header!.Entries)
+            {
+                if (entry.TargetOffset is not { } target) continue;
+                targets++;
+                Assert.True(target % 2 == 0 && target < data.Length, $"{resource}: selector {entry.Selector} at {target:X}");
+                Assert.False(M68kDisassembler.Decode(data, (int)target).IsInvalid, $"{resource}: selector {entry.Selector} at {target:X}");
+                if (r.ReadUInt16At((int)target) == 0x4E56) links++;
+                else if (r.ReadUInt16At((int)target - 2) is 0x4E75 or 0x4ED0 || r.ReadUInt16At((int)target - 4) == 0x4E74) afterReturn++;
+            }
+        }
+        Assert.Equal((277, 196, 22), (targets, links, afterReturn));
     }
 }

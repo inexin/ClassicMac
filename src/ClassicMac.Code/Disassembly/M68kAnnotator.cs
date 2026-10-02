@@ -15,10 +15,6 @@ internal enum M68kRelocationBase
     A5,
     /// <summary>A segment's address: the long is an offset in that <c>'CODE'</c> resource.</summary>
     Segment,
-    /// <summary>The initialized data (Retro68).</summary>
-    InitializedData,
-    /// <summary>The zero-filled data (Retro68).</summary>
-    UninitializedData,
 }
 
 /// <summary>A relocation of a long in the code.</summary>
@@ -56,14 +52,12 @@ internal sealed class M68kContext
                 relocations[offset] = new M68kRelocation(M68kRelocationBase.A5, 0);
             foreach (long offset in s.PcRelocations)
                 relocations[offset] = new M68kRelocation(M68kRelocationBase.Segment, segment);
+            // Retro68: kind 0 adds the segment's address, kinds 1 to 3 the A5 displacement (docs/formats/code/code-data.md
+            // §1.3). A relative relocation's long names the same target, as a distance once patched.
             foreach (var r in s.Retro68Relocations)
-                relocations[r.Offset] = r.Base switch
-                {
-                    Retro68RelocationBase.Code => new M68kRelocation(M68kRelocationBase.Segment, segment),
-                    Retro68RelocationBase.InitializedData => new M68kRelocation(M68kRelocationBase.InitializedData, 0),
-                    Retro68RelocationBase.UninitializedData => new M68kRelocation(M68kRelocationBase.UninitializedData, 0),
-                    _ => new M68kRelocation(M68kRelocationBase.A5, 0),
-                };
+                relocations[r.Offset] = r.Base == Retro68RelocationBase.Segment
+                    ? new M68kRelocation(M68kRelocationBase.Segment, segment)
+                    : new M68kRelocation(M68kRelocationBase.A5, 0);
             if (segment == 1 && app.CodeWarriorData is { } cw)
                 foreach (var list in cw.Relocations)
                 {
@@ -208,16 +202,12 @@ internal static class M68kAnnotator
                 int a5 = unchecked((int)value);
                 string text = Signed("A5", a5);
                 return context.Application?.ResolveA5(a5) is { } entry ? text + " " + JumpTable(entry, context) : text;
-            case M68kRelocationBase.Segment:
+            default:
                 string code = $"CODE {relocation.Segment}+${value:X}";
                 string? name = relocation.Segment == context.Segment && value < (uint)map.Code.Length
                     ? map.NameAt((int)value) : null;
                 name ??= context.FunctionName(relocation.Segment, value);
                 return name is null ? code : code + " " + name;
-            case M68kRelocationBase.InitializedData:
-                return $"DATA+${value:X}";
-            default:
-                return $"BSS+${value:X}";
         }
     }
 

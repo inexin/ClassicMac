@@ -87,7 +87,7 @@ namespace ClassicMac.Code.M68k
                     if (i == (int)CodeWarriorRelocationKind.CodePlusA5 && reader.Position != codeRelocationOffset)
                         diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.cw-code-reloc-offset",
                             $"The code relocations start at {reader.Position:X}, not at {codeRelocationOffset:X} as the first long says.", reader.Position));
-                    relocations.Add(new CodeWarriorRelocations((CodeWarriorRelocationKind)i, ReadRelocations(reader)));
+                    relocations.Add(new CodeWarriorRelocations((CodeWarriorRelocationKind)i, ReadRelocations(reader, diagnostics)));
                 }
             }
             catch (EndOfStreamException)
@@ -168,14 +168,22 @@ namespace ClassicMac.Code.M68k
         }
 
         // A list: a count, then per entry 1xxxxxxx (a signed 7-bit delta, doubled), 01xxxxxx xxxxxxxx (a signed 14-bit
-        // delta, doubled) or 00xxxxxx and 3 bytes (a signed 30-bit offset, doubled: absolute).
-        private static IReadOnlyList<int> ReadRelocations(BigEndianReader reader)
+        // delta, doubled) or 00xxxxxx and 3 bytes (a signed 30-bit offset, doubled: absolute). The startup loops while the
+        // count is above 0, signed (TST.L; BGT): a count with its top bit set reads no entries.
+        private static IReadOnlyList<int> ReadRelocations(BigEndianReader reader, ICollection<Diagnostic> diagnostics)
         {
-            uint count = reader.ReadUInt32();
+            int at = reader.Position;
+            int count = reader.ReadInt32();
+            if (count < 0)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.cw-reloc-count",
+                    $"A relocation list's count {(uint)count:X8} is negative; the startup reads no entries for it.", at));
+                return [];
+            }
             if (count > reader.Remaining) throw new EndOfStreamException();
-            var offsets = new List<int>((int)count);
+            var offsets = new List<int>(count);
             int d = 0;
-            for (uint i = 0; i < count; i++)
+            for (int i = 0; i < count; i++)
             {
                 byte b = reader.ReadByte();
                 if ((b & 0x80) != 0) d += (sbyte)(b << 1);

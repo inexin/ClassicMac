@@ -102,7 +102,8 @@ namespace ClassicMac.Code.M68k
 
         // The data unpacker: each run's first byte holds a count (low nibble, in words; 0 = a varint in bytes, 0 again
         // = the end) and a skip (high nibble, in words; 0 = a varint in bytes). A varint's repeat form repeats the
-        // skip-and-copy. The destination starts at A5 − belowA5.
+        // skip-and-copy. The destination starts at A5 − belowA5. A repeat of 0 is done once, then the routine's count
+        // (SUBQ.L #1; BNE) wraps and it runs away: reported, and the data stops there.
         private static (List<MpwDataRun> Runs, long End) ReadData(BigEndianReader reader, long offset, uint below,
             ICollection<Diagnostic> diagnostics)
         {
@@ -136,7 +137,7 @@ namespace ClassicMac.Code.M68k
                         if (r is { } rs) repeat = rs;
                     }
                     else skip = (b >> 4) * 2;
-                    for (uint i = 0; i < repeat; i++)
+                    for (uint i = 0; i < Math.Max(repeat, 1u); i++)
                     {
                         q += skip;
                         if (q + n > below)
@@ -150,6 +151,11 @@ namespace ClassicMac.Code.M68k
                         reader.Skip((int)n);
                         q += n;
                     }
+                    if (repeat == 0)
+                    {
+                        CountZero(diagnostics, "data run", at);
+                        return (runs, reader.Position);
+                    }
                 }
             }
             catch (EndOfStreamException)
@@ -161,7 +167,8 @@ namespace ClassicMac.Code.M68k
 
         // The relocator: a position from A5 − belowA5 steps by twice each delta: a byte below $80; $80–$FF with the next
         // byte (15 bits); 0 then a byte below $80 and a varint repeat count; 0 then a 4-byte delta whose first byte has
-        // its top bit set (doubled in 32 bits, so that bit drops out); 0 0 ends.
+        // its top bit set (doubled in 32 bits, so that bit drops out); 0 0 ends. A count of 0 patches once, then runs
+        // away like a repeat of 0: reported, and the relocations stop there.
         private static (List<int> Relocations, long End) ReadRelocations(BigEndianReader reader, long offset, uint below,
             ICollection<Diagnostic> diagnostics)
         {
@@ -173,6 +180,9 @@ namespace ClassicMac.Code.M68k
             }
             reader.Position = (int)offset;
             uint position = 0;
+            int outside = 0;
+            long firstOutside = 0;
+            int firstOutsideAt = 0;
             try
             {
                 while (true)
@@ -198,17 +208,28 @@ namespace ClassicMac.Code.M68k
                     }
                     else if ((b & 0x80) != 0) delta = (uint)((b & 0x7F) << 8) | reader.ReadByte();
                     else delta = b;
-                    for (uint i = 0; i < count; i++)
+                    // More positions than the globals have words (a delta of 0 repeated, say) cannot be real: reported, and
+                    // reading stops.
+                    if (count > below / 2)
+                    {
+                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.a5init-reloc-range",
+                            $"A relocation count of {count} is more than the {below}-byte globals hold; reading stopped.", at));
+                        break;
+                    }
+                    for (uint i = 0; i < Math.Max(count, 1u); i++)
                     {
                         position = unchecked(position + 2 * delta);
-                        // A delta of 0 repeated, or a long run past the globals, cannot be real: report it once.
-                        if (position > below - 4L || relocations.Count > below)
+                        if (position > below - 4L)
                         {
-                            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.a5init-reloc-range",
-                                $"A relocation at {position:X} from the globals' start lies outside the {below}-byte globals; left out.", at));
-                            break;
+                            if (outside++ == 0) (firstOutside, firstOutsideAt) = (position, at);
+                            continue;
                         }
                         relocations.Add((int)(position - (long)below));
+                    }
+                    if (count == 0)
+                    {
+                        CountZero(diagnostics, "relocation", at);
+                        break;
                     }
                 }
             }
@@ -216,8 +237,16 @@ namespace ClassicMac.Code.M68k
             {
                 Truncated(diagnostics, "relocations", reader.Position);
             }
+            if (outside > 0)
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.a5init-reloc-range",
+                    $"{outside} relocations, the first at {firstOutside:X} from the globals' start, lie outside the {below}-byte globals; left out.",
+                    firstOutsideAt));
             return (relocations, reader.Position);
         }
+
+        private static void CountZero(ICollection<Diagnostic> diagnostics, string what, long at) =>
+            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.a5init-count-zero",
+                $"A %A5Init {what} has a count of 0: the routine does it once, then its count wraps and it runs away; reading stopped.", at));
 
         private static void Truncated(ICollection<Diagnostic> diagnostics, string what, long at) =>
             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.a5init-truncated",

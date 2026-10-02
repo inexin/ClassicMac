@@ -26,9 +26,22 @@ public class SegmentHeaderTests
         Assert.True(header.IsFar);
         Assert.Equal(0x28, header.Length);
         Assert.Equal((0x10u, 0x47u, 0u, 0u), (header.FirstNearOffset, header.NearCount, header.FirstFarOffset, header.FarCount));
-        Assert.Equal((0x2C78u, 0u, 0x2CD6u, 0u),
+        Assert.Equal((0x2C78u, 0x11111111u, 0x2CD6u, 0x22222222u),
             (header.A5RelocationOffset, header.A5AtLastRelocation, header.PcRelocationOffset, header.AddressAtLastRelocation));
         Assert.Equal(Enumerable.Range(2, 0x47), header.EntryIndices);
+    }
+
+    [Fact]
+    public void Every_far_field_is_read_from_its_own_offset()
+    {
+        // FFFF 0000 | 00000010 00000047 | 00000018 00000002 | 00002C78 11111111 | 00002CD6 22222222 | 33333333
+        var data = Convert.FromHexString("FFFF0000" + "0000001000000047" + "0000001800000002" + "00002C7811111111"
+            + "00002CD622222222" + "33333333" + "4E75");
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(new SegmentHeader(true, 0x10, 0x47, 0x18, 2, 0x2C78, 0x11111111, 0x2CD6, 0x22222222),
+            SegmentHeader.Read(data, diagnostics));
+        Assert.Empty(diagnostics);
+        Assert.Equal(Enumerable.Range(2, 0x47), SegmentHeader.Read(data, [])!.EntryIndices);
     }
 
     [Fact]

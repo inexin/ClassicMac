@@ -46,8 +46,9 @@ internal static class CodeBuilder
         return w.ToArray();
     }
 
+    // +$18, +$20 and +$24 get distinct nonzero values by default, so a reader that swaps or skips them is seen.
     public static byte[] Far(uint firstNear, uint nearCount, uint firstFar, uint farCount, byte[] code, uint a5Relocations = 0,
-        uint pcRelocations = 0)
+        uint pcRelocations = 0, uint a5AtLast = 0x11111111, uint addressAtLast = 0x22222222, uint reserved = 0x33333333)
     {
         var w = new BigEndianWriter();
         w.WriteUInt16(0xFFFF);
@@ -57,10 +58,10 @@ internal static class CodeBuilder
         w.WriteUInt32(firstFar);
         w.WriteUInt32(farCount);
         w.WriteUInt32(a5Relocations);
-        w.WriteUInt32(0);
+        w.WriteUInt32(a5AtLast);
         w.WriteUInt32(pcRelocations);
-        w.WriteUInt32(0);
-        w.WriteUInt32(0);
+        w.WriteUInt32(addressAtLast);
+        w.WriteUInt32(reserved);
         w.WriteBytes(code);
         return w.ToArray();
     }

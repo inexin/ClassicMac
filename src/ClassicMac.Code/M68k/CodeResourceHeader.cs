@@ -22,7 +22,7 @@ namespace ClassicMac.Code.M68k
     /// </summary>
     /// <param name="Branch">The branch form.</param>
     /// <param name="BranchTarget">Where the branch lands, from the resource start.</param>
-    /// <param name="Flags">The flags word of the <c>BRA.S</c> form (0 in the samples); 0 for the other forms, whose second word is the displacement.</param>
+    /// <param name="Flags">The flags word of the <c>BRA.S</c> form (0 in most of the System's, 1 in <c>'CDEF'</c> −1 and 1); 0 for the other forms, whose second word is the displacement.</param>
     /// <param name="Type">The resource type the header names.</param>
     /// <param name="Id">The ID the header names (usually, not always, the resource's own).</param>
     /// <param name="Version">The version.</param>
@@ -33,8 +33,8 @@ namespace ClassicMac.Code.M68k
 
         /// <summary>
         /// Reads the header, or returns null for raw code. With <paramref name="type"/> the header must name it; without,
-        /// it must name four printable characters. A branch landing outside the resource is reported
-        /// (<c>m68k.code-header-branch</c>).
+        /// it must name four printable characters. A branch landing outside the resource, or inside the header's fields, is
+        /// reported (<c>m68k.code-header-branch</c>).
         /// </summary>
         public static CodeResourceHeader? Read(ReadOnlyMemory<byte> data, FourCC? type, ICollection<Diagnostic> diagnostics)
         {
@@ -60,6 +60,9 @@ namespace ClassicMac.Code.M68k
             if (target < 0 || target >= reader.Length)
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.code-header-branch",
                     $"The standard header's branch lands at {target:X}, outside the {reader.Length}-byte resource.", 0));
+            else if (target < Length)
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.code-header-branch",
+                    $"The standard header's branch lands at {target:X}, inside the header.", 0));
             return new CodeResourceHeader(branch, target, flags, named, reader.ReadInt16At(8), reader.ReadUInt16At(10));
         }
 

@@ -31,6 +31,9 @@ namespace ClassicMac.Code.M68k
             }
             reader.Position = (int)listOffset;
             long offset = 0;
+            int outside = 0;
+            long firstOutside = 0;
+            int firstOutsideAt = 0;
             while (true)
             {
                 int at = reader.Position;
@@ -52,12 +55,15 @@ namespace ClassicMac.Code.M68k
                 offset += delta;
                 if (offset > reader.Length - 4L)
                 {
-                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-range",
-                        $"A relocation at {offset:X} lies outside the {reader.Length}-byte segment; left out.", at));
+                    // Offsets only grow, so every later one is outside too: reported once, with the count.
+                    if (outside++ == 0) (firstOutside, firstOutsideAt) = (offset, at);
                     continue;
                 }
                 offsets.Add(offset);
             }
+            if (outside > 0)
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-range",
+                    $"{outside} relocations, the first at {firstOutside:X}, lie outside the {reader.Length}-byte segment; left out.", firstOutsideAt));
             return offsets;
 
             void Truncated(int at) => diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-truncated",

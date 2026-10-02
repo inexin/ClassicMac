@@ -112,7 +112,7 @@ namespace ClassicMac.Resources.Decoders.Code
             foreach (long at in segment.A5Relocations) yield return (at, "a5");
             foreach (long at in segment.PcRelocations) yield return (at, "segment");
             foreach (var r in segment.Retro68Relocations)
-                yield return (r.Offset, r.Base == Retro68RelocationBase.Code ? "segment" : CodeJson.Name(r.Base));
+                yield return (r.Offset, r.Base == Retro68RelocationBase.Segment ? "segment" : "a5");
             if (segment.Id == 1 && app.CodeWarriorData is { } cw)
                 foreach (var list in cw.Relocations)
                 {
@@ -284,6 +284,8 @@ namespace ClassicMac.Resources.Decoders.Code
                     w.WriteStartObject();
                     w.WriteNumber("selector", e.Selector);
                     w.WriteNumber("offset", e.Offset);
+                    if (e.TargetOffset is { } target) w.WriteNumber("target", target);
+                    else w.WriteNull("target");
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();

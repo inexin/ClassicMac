@@ -8,10 +8,10 @@ namespace ClassicMac.Code.M68k
     /// <summary>One routine of a routine descriptor (MixedMode.h RoutineRecord).</summary>
     /// <param name="ProcInfo">The calling convention and parameter sizes.</param>
     /// <param name="Isa">The instruction set and run-time architecture (low nibble: 0 68k, 1 PowerPC).</param>
-    /// <param name="Flags">The routine flags (bit 0: the procedure is relative to the descriptor).</param>
+    /// <param name="Flags">The routine flags (bit 0: the procedure is relative to the descriptor; <c>$20</c>: it is an index).</param>
     /// <param name="ProcDescriptor">The procedure: an offset from the descriptor when relative, else an address.</param>
     /// <param name="Selector">The selector, for a dispatched routine.</param>
-    /// <param name="TargetOffset">For a relative procedure, where it is in the resource; otherwise null.</param>
+    /// <param name="TargetOffset">For a relative procedure that is not an index, where it is in the resource; otherwise null.</param>
     /// <param name="Pef">The PEF container there, when the target starts with one.</param>
     public sealed record RoutineRecord(uint ProcInfo, byte Isa, ushort Flags, uint ProcDescriptor, uint Selector, long? TargetOffset,
         PefContainer? Pef)
@@ -24,6 +24,12 @@ namespace ClassicMac.Code.M68k
 
         /// <summary>Whether the procedure is relative to the descriptor.</summary>
         public bool IsRelative => (Flags & RelativeFlag) != 0;
+
+        /// <summary>The flag for a procedure that is an index, not an address or offset (kProcDescriptorIsIndex).</summary>
+        public const ushort IndexFlag = 0x0020;
+
+        /// <summary>Whether the procedure is an index (then it has no target in the resource).</summary>
+        public bool IsIndex => (Flags & IndexFlag) != 0;
     }
 
     /// <summary>
@@ -104,7 +110,7 @@ namespace ClassicMac.Code.M68k
                 var selector = reader.ReadUInt32();
                 long? target = null;
                 PefContainer? pef = null;
-                if ((routineFlags & RoutineRecord.RelativeFlag) != 0)
+                if ((routineFlags & (RoutineRecord.RelativeFlag | RoutineRecord.IndexFlag)) == RoutineRecord.RelativeFlag)
                 {
                     target = at + (long)proc;
                     if (target >= reader.Length)

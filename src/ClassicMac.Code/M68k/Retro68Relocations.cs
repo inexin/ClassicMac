@@ -4,28 +4,38 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Code.M68k
 {
-    /// <summary>What a Retro68 relocation adds to the long it patches (the low 2 bits of each <c>'RELA'</c> value).</summary>
+    /// <summary>
+    /// The kind of a Retro68 relocation (the low 2 bits of each <c>'RELA'</c> value): kind 0 adds the segment's address,
+    /// kinds 1 to 3 add the A5 displacement and say what the long, an A5 offset, points at
+    /// [Code: Retro68's runtime (Retro68Relocate, the segment loader); Verified: two builds of a Retro68 application].
+    /// </summary>
     public enum Retro68RelocationBase : byte
     {
-        /// <summary>The start of the segment's code (seen only in the near runtime segment).</summary>
-        Code = 0,
-        /// <summary>The initialized data, below A5.</summary>
+        /// <summary>The segment's address (its resource start; nothing in <c>'DATA'</c> 0): the long is an offset in the <c>'CODE'</c> resource.</summary>
+        Segment = 0,
+        /// <summary>The A5 displacement: the long is an A5 offset into the initialized data.</summary>
         InitializedData = 1,
-        /// <summary>The zero-filled data (BSS), below A5.</summary>
+        /// <summary>The A5 displacement: the long is an A5 offset into the zero-filled data (BSS).</summary>
         UninitializedData = 2,
-        /// <summary>A5: the long is a jump-table or application-parameter offset.</summary>
+        /// <summary>The A5 displacement: the long is an A5 offset above A5 (a jump-table entry + 2, or the application parameters).</summary>
         A5 = 3,
     }
 
-    /// <summary>One Retro68 relocation: the long at <paramref name="Offset"/> gets <paramref name="Base"/>'s address added.</summary>
+    /// <summary>
+    /// One Retro68 relocation: the long at <paramref name="Offset"/> gets <paramref name="Base"/>'s displacement added; a
+    /// relative one also gets its own address subtracted.
+    /// </summary>
     /// <param name="Offset">The patched long's offset in the resource (the segment's code start included).</param>
-    /// <param name="Base">What is added.</param>
-    public readonly record struct Retro68Relocation(long Offset, Retro68RelocationBase Base);
+    /// <param name="Base">The kind: what is added.</param>
+    /// <param name="Relative">From the second, PC-relative list.</param>
+    public readonly record struct Retro68Relocation(long Offset, Retro68RelocationBase Base, bool Relative = false);
 
     /// <summary>
     /// Retro68's relocations (<c>'RELA'</c> n for <c>'CODE'</c> n; <c>'RELA'</c> 0 for <c>'DATA'</c> 0): unsigned LEB128
-    /// values, ended by 0. Each value's high bits are a step from the previous position (the first from −1) and its low 2
-    /// bits the base [Verified: a Retro68 application; the bases' meaning is fitted to its data].
+    /// values, each list ended by a 0 byte. Each value's high bits are a step from the previous position (the first from
+    /// −1) and its low 2 bits the kind. A nonzero byte after the first list's 0 starts a second, PC-relative list
+    /// [Code: Retro68's runtime, Retro68ApplyRelocations; Verified: a Retro68 application]
+    /// (docs/formats/code/code-data.md §1.3).
     /// </summary>
     public static class Retro68Relocations
     {
@@ -53,23 +63,38 @@ namespace ClassicMac.Code.M68k
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(rela);
             var relocations = new List<Retro68Relocation>();
+            // The absolute list, then, when the byte after its 0 is not 0, the relative one (Retro68ApplyRelocations).
+            if (ReadList(reader, codeStart, targetLength, relative: false, relocations, diagnostics)
+                && reader.Position + 1 < reader.Length && reader.ReadByteAt(reader.Position + 1) != 0)
+            {
+                reader.Position++;
+                ReadList(reader, codeStart, targetLength, relative: true, relocations, diagnostics);
+            }
+            return relocations;
+        }
+
+        // One list, to its 0 byte (left as the next byte to read). False when it ends otherwise.
+        private static bool ReadList(BigEndianReader reader, int codeStart, int targetLength, bool relative,
+            List<Retro68Relocation> relocations, ICollection<Diagnostic> diagnostics)
+        {
             long position = -1;
             while (true)
             {
                 int at = reader.Position;
+                // The runtime ends a list on a 0 byte, not on a value of 0: 80 00 is a step of 0.
+                if (at < reader.Length && reader.ReadByteAt(at) == 0) return true;
                 if (!TryReadUleb(reader, out var value, out var overflow))
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.rela-truncated",
                         $"The 'RELA' list ends without its 0 terminator; {relocations.Count} relocations read.", at));
-                    break;
+                    return false;
                 }
                 if (overflow)
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.rela-value",
                         "A 'RELA' value is wider than 32 bits; reading stopped.", at));
-                    break;
+                    return false;
                 }
-                if (value == 0) break;
 
                 position += value >> 2;
                 var kind = (Retro68RelocationBase)(value & 3);
@@ -83,9 +108,8 @@ namespace ClassicMac.Code.M68k
                 if ((offset & 1) != 0)
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.rela-odd",
                         $"A relocation at odd offset {offset:X} would fault on a 68000.", at));
-                relocations.Add(new Retro68Relocation(offset, kind));
+                relocations.Add(new Retro68Relocation(offset, kind, relative));
             }
-            return relocations;
         }
 
         // Little-endian 7-bit groups, the high bit set on all but the last.
