@@ -262,8 +262,8 @@ internal sealed class M68kCodeMap
         return null;
     }
 
-    // The instruction that ends where ins starts.
-    private M68kInstruction? Previous(M68kInstruction ins)
+    /// <summary>The instruction that ends where <paramref name="ins"/> starts, or null.</summary>
+    public M68kInstruction? Previous(M68kInstruction ins)
     {
         for (int back = 2; back <= 22 && back <= ins.Address; back += 2)
             if (Instructions.TryGetValue((int)ins.Address - back, out var p))

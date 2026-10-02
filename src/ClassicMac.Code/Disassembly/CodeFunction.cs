@@ -37,3 +37,35 @@ public enum CodeFunctionSource
 /// <param name="Name">Its label.</param>
 /// <param name="Source">Why it is a function.</param>
 public sealed record CodeFunction(int Section, uint Offset, string Name, CodeFunctionSource Source);
+
+/// <summary>What an annotation in a listing says about an instruction.</summary>
+public enum CodeReferenceKind
+{
+    /// <summary>A call or reference through the jump table (<c>jsr n(A5)</c>): the segment and offset it reaches.</summary>
+    JumpTable,
+    /// <summary>An A5-relative global or application parameter (<c>A5-$1F3A</c>).</summary>
+    A5Global,
+    /// <summary>A low-memory global by its absolute address.</summary>
+    LowMemory,
+    /// <summary>An A-line trap (the mnemonic already names it; the listing does not repeat it).</summary>
+    Trap,
+    /// <summary>The routine a dispatcher trap's selector names.</summary>
+    Selector,
+    /// <summary>An operand the loader relocates: what it is relative to.</summary>
+    Relocation,
+    /// <summary>A Pascal or C string a PC-relative operand points at.</summary>
+    String,
+    /// <summary>A call or branch to a labelled function.</summary>
+    Call,
+    /// <summary>A call through a cross-fragment glue stub: the import it reaches.</summary>
+    Glue,
+    /// <summary>A load from the TOC: what the slot holds.</summary>
+    TocSlot,
+}
+
+/// <summary>An annotation: what an instruction refers to.</summary>
+/// <param name="Section">The PEF section of a fragment's instruction; 0 for 68k code.</param>
+/// <param name="Offset">The instruction's offset in the resource (68k) or the section (PowerPC).</param>
+/// <param name="Kind">What it says.</param>
+/// <param name="Text">The annotation as the listing writes it.</param>
+public sealed record CodeReference(int Section, uint Offset, CodeReferenceKind Kind, string Text);
