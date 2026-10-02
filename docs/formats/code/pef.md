@@ -1,0 +1,451 @@
+# PEF containers
+
+The Preferred Executable Format: the container of a PowerPC (or CFM-68K) code fragment, which the Code Fragment
+Manager loads. A 40-byte header, the section headers, a section name table and the sections: code, data (stored as
+is or as pattern-initialization instructions) and the loader section, which holds the entry points, the imports, the
+relocations and the exports with their hash table. A fragment lives in a data fork (located by a `'cfrg'` member,
+[cfrg.md](cfrg.md)), in a resource of its own, or behind a routine descriptor in a fat code resource
+([code-resources.md](code-resources.md)). ClassicMac reads the container and the loader section, builds each
+section's image, runs the relocations, finds exports through the hash table, reads transition vectors and finds
+traceback tables in the code.
+
+| | |
+| --- | --- |
+| Identified by | `Joy!peff` at +$00. In a data fork at a `'cfrg'` member's offset; native code resources (`ncod`, `ndrv`, `nlib`, …) at offset 0 |
+| ClassicMac | Reads; `ClassicMac.Code.Ppc` (`PefContainer`, `PefLoader`, `PatternData`, `PefRelocator`, `TracebackTable`) |
+| Verified against | The Mac OS 9 System file's fragments (its data fork and native resources); Mac OS 9.2.2's 90 fragments; Disk Copy 6.1.2 and Disk Copy 6.5 |
+| Sources | *Mac OS Runtime Architectures* (Apple, 1997), "PEF Structure" and the CFM-based runtime chapters; `PEFBinaryFormat.h` and `CodeFragments.h` (Universal Interfaces). The traceback table is AIX's `tbtable.h` layout |
+
+Contents
+
+1. [Layout](#1-layout)
+2. [Reading](#2-reading)
+3. [Writing](#3-writing)
+4. [Variants](#4-variants)
+5. [ClassicMac](#5-classicmac)
+6. [Diagnostics](#6-diagnostics)
+7. [Verification](#7-verification)
+8. [Not covered](#8-not-covered)
+9. [References](#9-references)
+
+## 1. Layout
+
+### 1.1 Container header
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | tag1 | `'Joy!'` |
+| +$04 | 4 | tag2 | `'peff'` |
+| +$08 | 4 | architecture | `'pwpc'` (PowerPC) or `'m68k'` (CFM-68K) |
+| +$0C | 4 | formatVersion | 1 |
+| +$10 | 4 | dateTimeStamp | Mac date; 0 when not set |
+| +$14 | 4 | oldDefVersion | The oldest definition version the fragment is compatible with |
+| +$18 | 4 | oldImpVersion | The oldest implementation version |
+| +$1C | 4 | currentVersion | Equals the `'cfrg'` member's currentVersion [Verified: the Mac OS 9 System file] |
+| +$20 | 2 | sectionCount | |
+| +$22 | 2 | instSectionCount | The sections placed in memory: the first this many |
+| +$24 | 4 | reservedA | 0 |
+
+[Doc: Mac OS Runtime Architectures]
+
+The section headers follow at +$28, 28 bytes each; the section name table follows them, at
+$28 + 28 × sectionCount [Doc: Mac OS Runtime Architectures].
+
+### 1.2 Section header
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | nameOffset | `i32`: into the section name table (a C string); −1 for no name |
+| +$04 | 4 | defaultAddress | The address the section was built for |
+| +$08 | 4 | totalLength | The section's length in memory |
+| +$0C | 4 | unpackedLength | The initialized part; the rest, to totalLength, is zero (bss) |
+| +$10 | 4 | containerLength | The stored contents' length |
+| +$14 | 4 | containerOffset | From the start of the container |
+| +$18 | 1 | sectionKind | §1.3 |
+| +$19 | 1 | shareKind | §1.3 |
+| +$1A | 1 | alignment | A power of 2 |
+| +$1B | 1 | reservedA | 0 |
+
+[Doc: Mac OS Runtime Architectures] Every section in the samples has nameOffset −1 [Verified: Mac OS 9.2.2's 90
+fragments].
+
+### 1.3 Section kinds and share kinds
+
+| sectionKind | Name | Placed in memory | Contents |
+| --- | --- | --- | --- |
+| 0 | Code | Yes | Read-only, executable |
+| 1 | UnpackedData | Yes | Stored as is |
+| 2 | PatternInitData | Yes | Pattern-initialization instructions (§1.4) |
+| 3 | Constant | Yes | Read-only data |
+| 4 | Loader | No | §1.5 |
+| 5 | Debug | No | Reserved |
+| 6 | ExecutableData | Yes | Data that is also executable |
+| 7 | Exception | No | Exception-handling tables |
+| 8 | Traceback | No | Traceback tables |
+
+| shareKind | Name | Meaning |
+| --- | --- | --- |
+| 1 | ProcessShare | One copy per process |
+| 4 | GlobalShare | One copy for the whole system |
+| 5 | ProtectedShare | One copy for the whole system, writable only by privileged code |
+
+[Doc: Mac OS Runtime Architectures] Kinds 0, 1, 2, 4 and 7 occur in the samples; a stub library is a single loader
+section [Verified: Mac OS 9.2.2's 90 fragments].
+
+### 1.4 Pattern-initialized data
+
+A PatternInitData section's contents are instructions that build the initialized part. Each instruction is an opcode
+byte (the opcode in bits 5–7, a count in bits 0–4) and its arguments. A count of 0 means the count follows as an
+argument. An argument is a big-endian run of 7-bit groups, bit 7 set on every byte but the last.
+
+| Opcode | Name | Arguments after the count | Output |
+| --- | --- | --- | --- |
+| 0 | Zero | | `count` zero bytes |
+| 1 | BlockCopy | | The next `count` bytes |
+| 2 | RepeatedBlock | `repeatCount` | The next `count` bytes, `repeatCount` + 1 times |
+| 3 | InterleaveRepeatBlockWithBlockCopy | `customSize`, `repeatCount` | A common block of `count` bytes, then `repeatCount` custom blocks of `customSize` bytes; out goes common, custom 1, common, custom 2, …, custom n, common |
+| 4 | InterleaveRepeatBlockWithZero | `customSize`, `repeatCount` | As 3, with a common block of `count` zero bytes that is not stored |
+| 5–7 | | | Undefined |
+
+[Doc: Mac OS Runtime Architectures, "Pattern-Initialized Data"] Every opcode 0–4 occurs, and every pidata section
+unpacks to exactly its unpackedLength [Verified: Mac OS 9.2.2's 90 fragments].
+
+### 1.5 Loader section header
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | mainSection | `i32`; −1 for none |
+| +$04 | 4 | mainOffset | |
+| +$08 | 4 | initSection | `i32`; −1 for none |
+| +$0C | 4 | initOffset | |
+| +$10 | 4 | termSection | `i32`; −1 for none |
+| +$14 | 4 | termOffset | |
+| +$18 | 4 | importedLibraryCount | |
+| +$1C | 4 | totalImportedSymbolCount | |
+| +$20 | 4 | relocSectionCount | The number of relocation headers |
+| +$24 | 4 | relocInstrOffset | From the start of the loader section |
+| +$28 | 4 | loaderStringsOffset | From the start of the loader section |
+| +$2C | 4 | exportHashOffset | From the start of the loader section |
+| +$30 | 4 | exportHashTablePower | The hash table has 2^power entries |
+| +$34 | 4 | exportedSymbolCount | |
+
+[Doc: Mac OS Runtime Architectures]
+
+The entry points (main, init, term) are a section and an offset; each names a transition vector (§1.11) [Doc: Mac OS
+Runtime Architectures] [Verified: Mac OS 9.2.2's 90 fragments: always section 1].
+
+After the header, in order: the imported libraries, the imported symbols, the relocation headers. The relocation
+instructions, the string table and the export tables are where the header's offsets say [Doc: Mac OS Runtime
+Architectures].
+
+### 1.6 Imported libraries and symbols
+
+An imported library, 24 bytes:
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | nameOffset | Into the string table: a C string, the library's fragment name |
+| +$04 | 4 | oldImpVersion | The oldest implementation version the importer accepts |
+| +$08 | 4 | currentVersion | The version it was linked against |
+| +$0C | 4 | importedSymbolCount | |
+| +$10 | 4 | firstImportedSymbol | Index into the imported symbol table |
+| +$14 | 1 | options | Bit 7 (`$80`): initialize the library before the importer. Bit 6 (`$40`): every import from it is weak |
+| +$15 | 1 | reservedA | 0 |
+| +$16 | 2 | reservedB | 0 |
+
+An imported symbol, 4 bytes:
+
+| Bits | Field | Notes |
+| --- | --- | --- |
+| 28–31 | flags | `$8` (bit 31): the symbol is weak: the fragment loads without it |
+| 24–27 | symbolClass | 0 code, 1 data, 2 transition vector, 3 TOC, 4 glue |
+| 0–23 | nameOffset | Into the string table: a C string |
+
+The symbols are numbered from 0 in table order (the import index the relocations use); each library owns
+importedSymbolCount of them from firstImportedSymbol [Doc: Mac OS Runtime Architectures]. Options `$00`, `$40`, `$80`
+and `$C0` all occur; imports are of class 1 or 2 [Verified: Mac OS 9.2.2's 90 fragments].
+
+### 1.7 Relocation headers
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 2 | sectionIndex | The section the instructions relocate |
+| +$02 | 2 | reservedA | 0 |
+| +$04 | 4 | relocCount | The number of 16-bit instruction words |
+| +$08 | 4 | firstRelocOffset | From relocInstrOffset |
+
+[Doc: Mac OS Runtime Architectures]
+
+### 1.8 Relocation instructions
+
+The instructions run a small machine over the target section. Its state starts as: relocAddress at the start of the
+section, importIndex 0, sectionC the address of section 0, sectionD the address of section 1. "Add X" adds X to the
+32-bit word at relocAddress and moves relocAddress on 4 bytes [Doc: Mac OS Runtime Architectures, "Relocation
+Instruction Set"].
+
+The encodings, bits from the top of the first word (the mnemonics are ClassicMac's short names):
+
+| Encoding | Mnemonic | Name | Action |
+| --- | --- | --- | --- |
+| `00` skip:8 count:6 | DDAT | RelocBySectDWithSkip | relocAddress += 4 × skip; add sectionD, count times |
+| `010 0000` n:9 | CODE | RelocBySectC | Add sectionC, n + 1 times |
+| `010 0001` n:9 | DATA | RelocBySectD | Add sectionD, n + 1 times |
+| `010 0010` n:9 | DESC | RelocTVector12 | n + 1 times: add sectionC, add sectionD, relocAddress += 4 |
+| `010 0011` n:9 | DSC2 | RelocTVector8 | n + 1 times: add sectionC, add sectionD |
+| `010 0100` n:9 | VTBL | RelocVTable8 | n + 1 times: add sectionD, relocAddress += 4 |
+| `010 0101` n:9 | SYMR | RelocImportRun | n + 1 times: add import importIndex; importIndex += 1 |
+| `011 0000` i:9 | SYMB | RelocSmByImport | Add import i; importIndex = i + 1 |
+| `011 0001` i:9 | CDIS | RelocSmSetSectC | sectionC = section i's address |
+| `011 0010` i:9 | DTIS | RelocSmSetSectD | sectionD = section i's address |
+| `011 0011` i:9 | SECN | RelocSmBySection | Add section i's address |
+| `1000` b:12 | DELTA | RelocIncrPosition | relocAddress += b + 1 |
+| `1001` c:4 r:8 | RPT | RelocSmRepeat | Run the c + 1 instructions before this one r + 1 more times |
+| `101000` o:26 | LABS | RelocSetPosition | relocAddress = o (two words) |
+| `101001` i:26 | LSYM | RelocLgByImport | Add import i; importIndex = i + 1 (two words) |
+| `101100` c:4 r:22 | LRPT | RelocLgRepeat | Run the c + 1 instructions before this one r more times (two words; r is not stored minus 1) |
+| `101101 0000` i:22 | LSEC | RelocLgBySection | Add section i's address (two words) |
+| `101101 0001` i:22 | LSEC | RelocLgSetSectC | sectionC = section i's address (two words) |
+| `101101 0010` i:22 | LSEC | RelocLgSetSectD | sectionD = section i's address (two words) |
+
+[Doc: Mac OS Runtime Architectures, "Relocation Instruction Set"] Every other encoding is undefined. A repeat counts
+instructions, not words (a two-word instruction is one) [Verified: Mac OS 9.2.2's 90 fragments].
+
+DELTA moves by bytes, so relocated words are 2-byte aligned in places, not always 4: 1,110 of the samples' fixups are
+[Verified: Mac OS 9.2.2's 90 fragments, the Mac OS 9 System file]. CDIS, SECN, LRPT and LSEC occur in none of the samples.
+
+### 1.9 String table
+
+C strings in Mac OS Roman: library names, import names. Export names are in the same table but are **not**
+NUL-terminated; their length is the high 16 bits of their hash word (§1.10) [Doc: Mac OS Runtime Architectures]
+[Verified: Mac OS 9.2.2's 90 fragments].
+
+### 1.10 Exports
+
+At exportHashOffset, three tables:
+
+| Table | Entry size | Count | Entry |
+| --- | --- | --- | --- |
+| Hash table | 4 | 2^exportHashTablePower | Bits 18–31: the chain's length. Bits 0–17: the index of its first export |
+| Key table | 4 | exportedSymbolCount | The export's hash word |
+| Symbol table | 10 | exportedSymbolCount | Below |
+
+A symbol table entry:
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | classAndName | Top byte: the symbol class (§1.6). Low 24 bits: the name's offset in the string table |
+| +$04 | 4 | symbolValue | An offset in the section; for sectionIndex −2 or −3, below |
+| +$08 | 2 | sectionIndex | `i16`. −2: absolute (the value is the address). −3: a re-exported import (the value is the import index) |
+
+[Doc: Mac OS Runtime Architectures] A re-export has the same name as the import it passes on [Verified: the Mac OS 9
+System file's NQD, 26 re-exports]; a stub library's exports are all re-exports [Verified: Mac OS 9.2.2's 90
+fragments].
+
+The hash word of a name of n bytes:
+
+1. hash = 0, as a signed 32-bit value.
+2. For each byte c of the name: hash = (hash << 1) − (hash >> 16), the shift right arithmetic; then hash = hash XOR c.
+3. The word is (n << 16) OR ((hash XOR (hash >> 16)) AND $FFFF).
+
+The hash table index of a word w for a table of 2^p entries is (w XOR (w >> p)) AND (2^p − 1)
+[Doc: Mac OS Runtime Architectures, "Hash Word"].
+
+To find an export by name, as the Code Fragment Manager does:
+
+1. Compute the name's hash word and its index; read that hash table entry.
+2. Walk the chain's exports, from its first index, its length long.
+3. The export is the one whose key equals the hash word and whose name bytes equal the name.
+
+[Doc: Mac OS Runtime Architectures] Every key equals its name's hash word, every export is found this way, and the
+chains, taken in table order, tile the export table in order [Verified: Mac OS 9.2.2's 90 fragments].
+
+### 1.11 Transition vectors and the TOC
+
+A transition vector is two words in a data section: the code address, then the TOC base the function runs with
+(r2). A call across fragments goes through one [Doc: Mac OS Runtime Architectures, "Transition Vectors"]. In the
+file, before relocation, they hold offsets: the first into the code section, the second into the data section; DESC
+or DSC2 then add sectionC and sectionD [Verified: Mac OS 9.2.2's 90 fragments]. The main, init and term entry points
+and every export of class 2 point at one.
+
+The TOC base is that second word: an offset into the data section (`$87C` in Mac OS 9's NQD; 0 in some Apple
+libraries). CodeWarrior centres the TOC, so its base is `$8000` into the data section [Verified: Disk Copy 6.5].
+
+### 1.12 Traceback tables
+
+The compilers put a traceback table after each function's final `blr` (`$4E800020`), in the code section: a zero
+word, 8 flag bytes, then optional fields in this order [Doc: Mac OS Runtime Architectures; the layout is AIX's
+`tbtable.h`]:
+
+| Field | Size | Present when |
+| --- | --- | --- |
+| Zero word | 4 | Always |
+| Flags | 8 | Always. Byte 0: version (0). Byte 1: language (0 C, 1 FORTRAN, 2 Pascal, 9 C++). Byte 2: `$20` has tb_offset, `$08` has ctl_info. Byte 3: `$80` interrupt handler, `$40` has the name, `$20` uses alloca. Byte 6: fixed-point parameter count. Byte 7 bits 1–7: floating-point parameter count |
+| parminfo | 4 | There are fixed-point or floating-point parameters |
+| tb_offset | 4 | Byte 2 bit `$20`: the distance from the function's first instruction to the zero word |
+| hand_mask | 4 | Byte 3 bit `$80` |
+| ctl_info | 4 + 4n | Byte 2 bit `$08`: a count n, then n words |
+| Name | 2 + n | Byte 3 bit `$40`: a 16-bit length, then the name in Mac OS Roman |
+| alloca_reg | 1 | Byte 3 bit `$20` |
+
+Apple's libraries carry no names; Disk Copy 6.5 names 1,619 functions [Verified: the Mac OS 9 System file, Disk
+Copy 6.5].
+
+## 2. Reading
+
+### 2.1 The container
+
+1. Check the 40-byte header and the `Joy!peff` tag.
+2. Read sectionCount section headers from +$28 and their names from the name table.
+3. Read the loader section (the first of kind 4), §2.3.
+4. A section's stored contents are containerLength bytes at containerOffset.
+
+[Doc: Mac OS Runtime Architectures]
+
+### 2.2 A section's image
+
+1. A PatternInitData section: unpack its contents (§1.4); the result should be unpackedLength bytes.
+2. Any other kind: take the first unpackedLength bytes of its contents.
+3. Zero-fill to totalLength.
+
+[Doc: Mac OS Runtime Architectures]
+
+### 2.3 The loader section
+
+1. Read the 56-byte header.
+2. From +$38, read the imported libraries, then the imported symbols, then the relocation headers. Each relocation
+   header's words are at relocInstrOffset + firstRelocOffset.
+3. Read the names from the string table at loaderStringsOffset (§1.9).
+4. At exportHashOffset, read the hash table, then the key table, then the symbol table (§1.10).
+
+[Doc: Mac OS Runtime Architectures]
+
+### 2.4 Relocating
+
+For each relocation header, run its instructions (§1.8) over a copy of its section's image, with each section at its
+chosen address and each import resolved to its symbol's address. Every relocated word must lie inside its section
+[Doc: Mac OS Runtime Architectures]. Before relocation every word an import is added to holds 0, and no word is
+relocated twice [Verified: Mac OS 9.2.2's 90 fragments].
+
+## 3. Writing
+
+None.
+
+## 4. Variants
+
+- CFM-68K containers have architecture `'m68k'` and the same structure [Doc: Mac OS Runtime Architectures]; none was
+  read.
+- Mac OS 9.2.2's fragments are newer builds of 9.0's (NQD, FontManager and the others; the
+  [reference builds](../README.md#reference-builds)); the container format is the same.
+
+## 5. ClassicMac
+
+- `PefContainer.Read` takes the bytes from the `Joy!peff` tag; slicing a data fork at a `'cfrg'` member's offset is the
+  caller's. A header shorter than 40 bytes or without the tag throws; everything after is read as far as it goes and
+  reported. [ClassicMac]
+- A section is placed in memory by its kind (§1.3), not by instSectionCount. [ClassicMac]
+- A section's contents are clipped to the container. An image is built at most max(unpackedLength, stored length) +
+  16 MB long, and pidata unpacking stops at 256 MB, so a damaged length is not allocated. Images are cached and
+  built once. [ClassicMac]
+- The relocator lists fixups (where each word is, what is added) without an image, with every section and import at
+  0; given addresses, it applies them to copies (`Instantiate`). [ClassicMac]
+- A relocated word outside its section is skipped and the run goes on; the out-of-range words are reported once per
+  section. [ClassicMac]
+- A repeat whose block holds another repeat is an error and stops the run. [ClassicMac]
+- A run making more fixups than half the section's length in bytes plus 4,096 is a runaway and stops. [ClassicMac]
+- An export hash power above 18 cannot index an 18-bit first-export field: it is reported and the exports are not
+  read. [ClassicMac]
+- `GetTransitionVector` returns the two words before relocation with the section each one's fixup adds (−1 when none
+  does, or when an import is added). [ClassicMac]
+- Traceback tables are found by a scan: every word-aligned zero word after a `blr`, with version byte 0 and its 8
+  flag bytes inside the code [Verified: Disk Copy 6.5]. A tb_offset reaching before the code leaves the function
+  start unknown. [ClassicMac]
+- Mnemonics (DDAT, CODE, …) are ClassicMac's names for the opcodes. [ClassicMac]
+
+## 6. Diagnostics
+
+| Code | Severity | When | ClassicMac does | The Mac does |
+| --- | --- | --- | --- | --- |
+| `pef.export-hash-chains` | Warning | The hash chains do not tile the exports in order, or cover a different number of them | Keeps the exports; lookup still walks the chains | Not traced |
+| `pef.export-hash-mismatch` | Warning | An export's key is not its name's hash word | Keeps the export; the hash lookup will not find it | Not traced |
+| `pef.export-name-out-of-range` | Error | An export's name lies outside the loader section | Keeps the export with an empty name | Not traced |
+| `pef.export-reexport-out-of-range` | Error | A re-export names an import that does not exist | Keeps the export | Not traced |
+| `pef.format-version` | Warning | formatVersion is not 1 | Reads on | Not traced |
+| `pef.loader-hash-power` | Error | exportHashTablePower is above 18 | Reads no exports | Not traced |
+| `pef.loader-library-symbols` | Error | A library's symbols run past the imported symbols | Keeps the library | Not traced |
+| `pef.loader-string-out-of-range` | Error | A library or import name lies outside the loader section | Uses an empty name | Not traced |
+| `pef.loader-truncated` | Error | The loader section is shorter than its header, a table, or a relocation header's words | Reads what fits | Not traced |
+| `pef.pidata-bad-opcode` | Error | A pidata opcode is 5–7 | Stops unpacking; keeps the image so far | Not traced |
+| `pef.pidata-length` | Error | The unpacked pidata is not unpackedLength bytes | Keeps what was unpacked | Not traced |
+| `pef.pidata-too-long` | Error | The pidata would unpack past the limit (§5) | Stops unpacking | Not traced |
+| `pef.pidata-truncated` | Error | A pidata instruction runs past the contents, or an argument is wider than 32 bits | Stops unpacking | Not traced |
+| `pef.relocation-bad-import` | Error | An instruction names an import that does not exist | Skips the word | Not traced |
+| `pef.relocation-bad-opcode` | Error | An undefined encoding | Stops the header's run; the fixups before it stand | Not traced |
+| `pef.relocation-bad-section` | Error | An instruction or a relocation header names a section that does not exist | Skips the instruction (or the header) | Not traced |
+| `pef.relocation-nested-repeat` | Error | A repeat's block holds another repeat | Stops the run | Not traced |
+| `pef.relocation-out-of-range` | Error | Relocated words fall outside the section | Skips them; one report per section with the count and the first | Not traced |
+| `pef.relocation-repeat-at-start` | Error | A repeat names more instructions than precede it | Stops the run | Not traced |
+| `pef.relocation-runaway` | Error | A run makes more fixups than the limit (§5) | Stops the run | Not traced |
+| `pef.relocation-truncated` | Error | A two-word instruction is the last word | Stops the run | Not traced |
+| `pef.section-name-out-of-range` | Warning | A section's nameOffset is outside the container | No name | Not traced |
+| `pef.section-out-of-range` | Error | A section's contents run past the container | Clips them | Not traced |
+| `pef.sections-truncated` | Error | The section headers run past the container | Reads the headers that fit | Not traced |
+| `pef.string-unterminated` | Warning | A section name or loader string has no NUL before the end | Takes the bytes to the end | Not traced |
+| `traceback.bad-offset` | Warning | A tb_offset reaches before the start of the code | Keeps the table without a function start | Not traced |
+| `traceback.truncated` | Error | A traceback table runs past the code | Leaves the table out | Not traced |
+
+## 7. Verification
+
+Hand-built containers (`tests/ClassicMac.Code.Tests`, built with `PefBuilder`):
+
+- `PefContainerTests`: the header and section headers, names, which kinds are placed in memory, images zero-filled
+  to totalLength and copying only unpackedLength, pidata sections unpacked and checked, a huge totalLength capped,
+  the header and tag checks, damaged section tables.
+- `PatternDataTests`: every opcode, the count argument, big-endian 7-bit arguments, empty repeats and interleaves, and
+  each damage case (undefined opcodes, truncation, the length limit without allocating it).
+- `PefLoaderTests`: entry points, libraries, imports with class, weak flag and library, relocation headers, exports
+  with keys, absolute exports and re-exports, the hash word and index, lookup through colliding chains, names read
+  by the key's length, and each damage case.
+- `PefRelocatorTests`: every opcode's action and operand decoding, mnemonics, 2-byte-aligned DELTA fixups, repeats
+  counting instructions, undefined and truncated instructions, repeats at the start and of repeats, out-of-range words,
+  imports and sections, runaways, listing without an image.
+- `TransitionVectorTests`: main, init and tvector exports read as code and TOC offsets with their sections.
+- `TracebackTableTests`: each optional field alone and all in order, the scan after `blr`, truncation and a
+  tb_offset before the code.
+
+Real fragments, gated on `CLASSICMAC_CODE_CORPUS` (they skip without it; Apple's files are never committed).
+`CorpusTests` checks each fragment the way the Code Fragment Manager would use it: every section image builds to
+totalLength, every relocation applies inside its section with no diagnostic, every export is found through the hash
+table. On top of that:
+
+- the Mac OS 9 System file's NQD fragment: its three sections (code, pidata, loader), its 199 imports from four
+  libraries, 269 exports (239 transition vectors, 4 data, 26 re-exports, each named as its import), hash power 5,
+  init 1:$1470 and no main or term, 1,715 fixups, TOC base `$87C`, every transition vector export in the code
+  section; a second NQD build (200 imports, 269 exports, init 1:$1478);
+- the Mac OS 9 System file's FontManager: 114 exports, 231 imports from 14 libraries, hash power 4, 1,312 fixups;
+- Disk Copy 6.1.2's PowerPC application: main 1:$BB8, 446 imports from eight named libraries, no exports, 871 fixups;
+- Disk Copy 6.5's: main 1:$22D0, 688 imports, 2,921 fixups, TOC base `$8000`;
+- Mac OS 9.2.2's 90 fragments (`FragmentFacts`, counted by an independent reader): imports, libraries, exports,
+  re-exports, hash power, main, init, term, the fixup count and the count of each relocation mnemonic, for every one;
+- every `.pef` in the corpus verifies.
+
+`PpcCorpusTests` scans the code sections of NQD (no names), Disk Copy 6.1.2 (one) and Disk Copy 6.5 (1,619 names,
+the first `.TradHighestUnitNumber` at `$1C` with tb_offset `$28`): every located function starts on a valid
+instruction and ends with the `blr` before its table. The System file's `'cfrg'` members and fat code resources are
+in [cfrg.md §7](cfrg.md#7-verification) and [code-resources.md §7](code-resources.md#7-verification).
+
+## 8. Not covered
+
+- Writing PEF.
+- CFM-68K containers: read as the same structure, never seen.
+- Section kinds 3, 5, 6 and 8, named sections and the CDIS, SECN, LRPT and LSEC opcodes: read as documented, not
+  seen in a sample.
+- The exception section's contents.
+- What the Code Fragment Manager does with a damaged container (every "The Mac does" above).
+- Resolving imports against other fragments: addresses are the caller's.
+
+## 9. References
+
+1. Apple Computer, *Mac OS Runtime Architectures* (1997): "PEF Structure", "Transition Vectors", the CFM-based
+   runtime architecture.
+2. Apple Computer, Universal Interfaces 3.4: `PEFBinaryFormat.h`, `CodeFragments.h`.
+3. IBM, AIX `sys/debug.h` / `tbtable.h`: the traceback table layout the Mac OS compilers use.

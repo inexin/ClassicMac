@@ -136,6 +136,16 @@ One file per format, in its category folder. A codec used by more than one forma
 | [quicktime.md](graphics/quicktime.md) | QuickTime still images in pictures, the codecs, QTIF files | `ClassicMac.Graphics.QuickTime` |
 | [macpaint.md](graphics/macpaint.md) | MacPaint documents | `ClassicMac.Graphics` |
 
+### Code
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [pef.md](code/pef.md) | PEF containers: sections, pattern-initialized data, the loader section (imports, relocations, exports and their hash), transition vectors, traceback tables | `ClassicMac.Code.Ppc` |
+| [cfrg.md](code/cfrg.md) | `'cfrg'` code fragment resources | `ClassicMac.Code.Ppc` |
+| [code-segments.md](code/code-segments.md) | 68k applications: `'CODE'` 0 and the jump table, near and far segments, far relocation lists, the entry point, the build models | `ClassicMac.Code.M68k` |
+| [code-data.md](code/code-data.md) | 68k global-data initializers: MPW `%A5Init`, CodeWarrior `'DATA'` 0, Retro68 `'RELA'` | `ClassicMac.Code.M68k` |
+| [code-resources.md](code/code-resources.md) | Code resources: the standard header, `DRVR`, the `$A9FF` package form, `thng` components, `$AAFE` routine descriptors, native PEF resources | `ClassicMac.Code.M68k`, `ClassicMac.Code.Ppc` |
+
 ### Codecs
 
 | Document | Formats | Code |
