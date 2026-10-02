@@ -25,7 +25,7 @@ internal sealed class HfsBuilder
     public FolderFinderInfo? RootInfo { get; init; }
 
     private readonly List<(uint Id, uint Parent, string Name, FolderFinderInfo? Info)> folders = [];
-    private readonly List<(uint Parent, string Name, string Type, string Creator, byte[] Data, byte[] Resource, int Fragments, uint Id, bool Thread, FinderInfo? Info)> files = [];
+    private readonly List<(uint Parent, string Name, string Type, string Creator, byte[] Data, byte[] Resource, int Fragments, uint Id, bool Thread, FinderInfo? Info, bool Locked)> files = [];
     private uint nextId = 16;
 
     /// <summary>A folder; with <paramref name="info"/>, its DInfo, DXInfo and dates are set (created 1984-01-24, modified a minute later).</summary>
@@ -36,10 +36,13 @@ internal sealed class HfsBuilder
         return id;
     }
 
-    /// <summary>A file; <paramref name="info"/>, when given, replaces the type, creator and the default flags (hasBeenInited).</summary>
+    /// <summary>
+    /// A file; <paramref name="info"/>, when given, replaces the type, creator and the default flags (hasBeenInited);
+    /// <paramref name="locked"/> sets <c>filFlags</c> bit 0.
+    /// </summary>
     public void File(uint parent, string name, byte[] data, byte[] resource, string type = "TEXT", string creator = "ttxt",
-        int fragments = 1, bool thread = false, FinderInfo? info = null) =>
-        files.Add((parent, name, type, creator, data, resource, fragments, nextId++, thread, info));
+        int fragments = 1, bool thread = false, FinderInfo? info = null, bool locked = false) =>
+        files.Add((parent, name, type, creator, data, resource, fragments, nextId++, thread, info, locked));
 
     // Where the first file's first data extent starts, for tests that patch it.
     public int FirstFileRecordOffset { get; private set; }
@@ -109,6 +112,7 @@ internal sealed class HfsBuilder
             var r = new byte[102];
             r[0] = 2;
             if (f.Thread) r[2] = 2;
+            if (f.Locked) r[2] |= 1;
             Encoding.ASCII.GetBytes(f.Type).CopyTo(r, 4);
             Encoding.ASCII.GetBytes(f.Creator).CopyTo(r, 8);
             BinaryPrimitives.WriteUInt16BigEndian(r.AsSpan(12), 0x0100);

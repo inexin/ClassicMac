@@ -50,6 +50,17 @@ public sealed class HfsPlusFeatureTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Code == "hfs.plus-counts");
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void HfsPlusFileIsLockedWhenItsRecordSetsTheLockedFlag(bool locked)
+    {
+        MacFile file = Assert.Single(HfsReader.Instance.Read(ForkData.FromBytes(HfsPlusFixture.Build(lockedFile: locked)),
+            new ContainerContext()));
+
+        Assert.Equal(locked, file.IsLocked);
+    }
+
     [Fact]
     public void HfsPlusCatalogHonorsTheConfiguredVolumeEntryLimit()
     {
@@ -4088,7 +4099,7 @@ public sealed class HfsPlusFeatureTests
             uint catalogFolderParentId = 2, int? catalogSplitIndex = null,
             bool emptySecondCatalogLeaf = false, bool emptyExtentsRootLeaf = false,
             bool emptyOverflowSecondLeaf = false, bool includeJournalFiles = false,
-            FolderFinderInfo? folderFinderInfo = null)
+            FolderFinderInfo? folderFinderInfo = null, bool lockedFile = false)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -4159,6 +4170,8 @@ public sealed class HfsPlusFeatureTests
             U16(file, 2, missingFileThreadFlag ? (ushort)0 : (ushort)2); // file thread exists
             if (fileHasUnexpectedLinkChainFlag)
                 U16(file, 2, (ushort)(BinaryPrimitives.ReadUInt16BigEndian(file.AsSpan(2)) | 0x0020));
+            if (lockedFile)
+                U16(file, 2, (ushort)(BinaryPrimitives.ReadUInt16BigEndian(file.AsSpan(2)) | 0x0001)); // kHFSFileLockedMask
             uint fileId = catalogFileId ?? (duplicateCatalogId ? 16u : 17u);
             U32(file, 8, fileId);
             if (catalogFileLinkCount is { } linkCount) U32(file, 44, linkCount);

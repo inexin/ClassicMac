@@ -293,6 +293,7 @@ namespace ClassicMac.Files.Hfs
                     Name = name,
                     FolderPath = FolderPath(parent, folders, label),
                     FinderInfo = info,
+                    IsLocked = (r[2] & 0x01) != 0, // filFlags bit 0 (Inside Macintosh: Files, cdrFilRec)
                     Created = Date(reader.ReadUInt32At(44)),
                     Modified = Date(reader.ReadUInt32At(48)),
                     DataFork = data ?? ForkData.Empty,

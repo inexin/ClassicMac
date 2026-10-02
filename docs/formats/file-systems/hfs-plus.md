@@ -418,7 +418,8 @@ None.
 - `HfsReader` recognises `'H+'` and `'HX'` at 1024, and a wrapper by `drEmbedSigWord`; both go to `HfsPlusReader`
   ([hfs.md §5.1](hfs.md#51-recognising-a-volume)). HFSX is read like HFS Plus, independently of Mac OS 9.0. A wrapper
   read returns the embedded volume's entries, not the wrapper's placeholder.
-- Each visible file comes out with its path, Finder information, dates and both forks. Unicode names are kept in
+- Each visible file comes out with its path, Finder information, dates, both forks, and the file-locked catalog flag
+  (bit 0) as `MacFile.IsLocked`. Unicode names are kept in
   `MacFile.MacPath`; the Mac OS Roman `Name` is a best-effort rendering.
 - Hard links keep their visible path and take the indirect node's forks and metadata; the reference is
   `MacFile.HardLinkReference`. Directory hard links expose the inode's files at every valid alias path. The two private

@@ -47,6 +47,19 @@ public class HfsTests
     }
 
     [Fact]
+    public void A_file_whose_filFlags_bit_0_is_set_is_locked()
+    {
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, "Locked", [], [], locked: true);
+        builder.File(HfsBuilder.Root, "Open", [], [], thread: true);
+
+        var (files, _) = Read(builder.Build("Disk"));
+
+        Assert.True(files.Single(f => f.Name.ToMacRoman() == "Locked").IsLocked);
+        Assert.False(files.Single(f => f.Name.ToMacRoman() == "Open").IsLocked);
+    }
+
+    [Fact]
     public void Folders_come_out_with_their_window_and_icon_info()
     {
         var info = FolderFinderInfo.Read(FolderFinderInfoTests.Sample);

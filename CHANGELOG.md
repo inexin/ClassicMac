@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Files: HFS and HFS Plus files say whether they are locked (`MacFile.IsLocked`: `filFlags` bit 0, the catalog's
+  file-locked flag) (file-systems/hfs.md §5.2, hfs-plus.md §5.1).
 - Files: a disk image or volume whose first file is a `.hqx` or `.uu` file within 64 KB of its start is read as the
   disk, not as that file: BinHex and uuencode are recognised only when text alone precedes their marker or `begin`
   line (containers/binhex.md §5, uuencode.md §5).
@@ -12,7 +14,8 @@
   `(0,a0)`, `(0,pc)` or `($0000,zpc)` instead of `(a0)`, `(pc)` or `(zpc)` (output/disassembly.md §1.1, §2.6, §2.7).
 - Viewer: a folder, a volume's root or a container read open previews as the Finder's icon view of its window: the
   window's size and scroll from the folder record, each icon where the Finder put it (so folder art shows as it was
-  arranged), invisible items left out; icons are the item's custom icon (a folder's in its `Icon` file), its
+  arranged), invisible items left out; icons are the item's custom icon (a folder's in its `Icon
+` file), its
   application's bundle icon or the System's generic icon, found on the same volume or in the open files; names in
   Geneva 9 from the volume's System file. Items with no place, and folders in archives, are arranged in a grid
   (file-systems/finder-windows.md).

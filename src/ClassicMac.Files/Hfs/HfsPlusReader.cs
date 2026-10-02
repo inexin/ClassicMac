@@ -496,6 +496,7 @@ internal static class HfsPlusReader
                     FolderPath = path.Select(LegacyName).ToArray(),
                     UnicodeFolderPath = path,
                     FinderInfo = content.FinderInfo,
+                    IsLocked = (content.RecordFlags & 0x0001) != 0, // kHFSFileLockedMask (TN1150)
                     Created = content.Created,
                     Modified = content.Modified,
                     DataFork = content.DataFork,

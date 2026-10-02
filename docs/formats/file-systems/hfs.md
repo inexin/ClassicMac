@@ -469,7 +469,7 @@ are [ClassicMac].
 
 - One entry per file record: the name (the raw bytes of the key's name), the folder path from the root down without
   the volume name, the Finder information (`filUsrWds` then `filFndrInfo`, 32 bytes), the creation and modification
-  dates (a stored 0 is "no date") and both forks.
+  dates (a stored 0 is "no date"), both forks, and `filFlags` bit 0 as `MacFile.IsLocked`.
 - Folder records serve for paths: folders do not come out as entries of `Read`, so an empty folder is not listed.
   Thread records are skipped.
 - `HfsReader.ReadFolders` reads the volume the same way, with the same checks and diagnostics, and returns its folder

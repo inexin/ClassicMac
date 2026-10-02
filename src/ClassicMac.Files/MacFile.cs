@@ -27,6 +27,12 @@ namespace ClassicMac.Files
         /// <summary>Type, creator, flags and icon position.</summary>
         public FinderInfo FinderInfo { get; init; } = FinderInfo.Empty;
 
+        /// <summary>
+        /// Whether the file is locked (HFS <c>filFlags</c> bit 0, HFS Plus <c>kHFSFileLockedMask</c>): the Finder's Get Info
+        /// "Locked" box, shown as a lock badge. False where the container records no such flag.
+        /// </summary>
+        public bool IsLocked { get; init; }
+
         /// <summary>When the file was created, if the container records it.</summary>
         public MacDate? Created { get; init; }
 
