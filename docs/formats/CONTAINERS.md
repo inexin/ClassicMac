@@ -656,7 +656,7 @@ yes. The order:
 2. AppleSingle, AppleDouble;
 3. MacBinary III, MacBinary II, MacBinary I;
 4. BinHex 4.0, uuencode;
-5. archives: DiskDoubler, PackIt, StuffIt split files and archives, Compact Pro, LHA, zip, gzip, tar (see
+5. archives: DiskDoubler and its split files, PackIt, StuffIt split files and archives, Compact Pro, LHA, zip, gzip, tar (see
    [ARCHIVES.md](ARCHIVES.md));
 6. NewWorld "Mac OS ROM" files and Mac ROM images (see [ROM.md](ROM.md));
 7. UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS, MFS, DOS partition tables (MBR), FAT, raw CD images, cue

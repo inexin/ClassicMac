@@ -174,6 +174,36 @@ data checksums, unsupported-method and unsupported-encoding continuation, input-
   bits; a space-filled 4 KiB window (positions are relative, so LZHUF's start at 4096−60 changes nothing). lhasa's
   `test/compressed/lh1.bin` decodes to its CRC-32 too.
 
+## DiskDoubler split files (`SPLT`)
+
+DiskDoubler's Split command (3.7.7 and Pro 4.1.1) cuts a file into parts named `name.1`, `name.2` …, each a 94-byte
+header and then a slice of the source's data fork followed by its resource fork. Header fields (big-endian):
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 4 | `SPLT` |
+| 4 | 4 | Set identifier, the same in every part (Pro 4.1.1 `$0002xxxx`, 3.7.7 `$0000xxxx`) |
+| 8 | 4 | Data-fork length |
+| 12 | 4 | Resource-fork length |
+| 16 | 16 | Finder info (`FInfo`) |
+| 32 | 4 | Creation date |
+| 36 | 4 | Modification date |
+| 40 | 2 | Part count |
+| 42 | 2 | Part index, from 0 |
+| 44 | 4 | Payload length (the part's size less 94) |
+| 48 | 2 | CRC-16/XMODEM of the payload |
+| 50 | 40 | Zero |
+| 90 | 4 | `SPLT` |
+
+The header carries no name: the reassembled file takes the host name less its `.N` extension. The reader opens a set
+from any part and takes as siblings the files of the same name whose bytes 4–41 match; it reports a missing part as
+`archive.missing-volume` (returning nothing rather than truncated forks), and a payload CRC mismatch as
+`archive.fork-checksum`, keeping the data. The reassembled file (a `DDA2`/`DDAR` archive or a `.sea`) unwraps as
+usual. **[Fitted]** to the CC0 DiskDoubler corpus's 3.7.7 (`sources.dd377.ad.dd.1`/`.2`) and Pro 4.1.1
+(`sources.ddpro411.ad1.dd.1`/`.2`, `sources.ddpro411.ad1.sea.1`/`.2`) sets: the payloads concatenate to the corpus's
+unsplit file and its resource fork. Not covered: BinHex-wrapped parts (`.1.hqx`), whose siblings are not unwrapped
+before matching; the meaning of the identifier's bytes.
+
 ## DiskDoubler (DDA2)
 
 Original-application coverage: DiskDoubler 3.7.7 writes methods 1 (DiskDoubler A), 8 (DiskDoubler B), 9 (AutoDoubler
@@ -182,8 +212,7 @@ apart by the file header's +60 byte, 1–3). Every file of the CC0 corpus (stand
 4.1.1 `DDA2` archives and their `.sea`/`.prompt.sea` copies, BinHex and StuffIt-wrapped copies) expands to the source
 forks **[Verified]**, including the StuffIt 6.5.1 (method 15) copies. No sample uses methods 2–5 or 7 or a nonzero delta type. An empty fork is stored as no bytes
 whatever its method (DiskDoubler 3.7.7 writes no method-1 prefix or method-8 header for one) and its checksum is 0
-**[Verified]**. Pro 4.1.1 writes 0 in the fork checksum fields of methods 6, 9 and 10. Its split files (`.1`, `.2`,
-data forks starting `SPLT`) are not read.
+**[Verified]**. Pro 4.1.1 writes 0 in the fork checksum fields of methods 6, 9 and 10. Its split files are read (see DiskDoubler split files).
 
 The DDA2 archive header is 62 bytes; its big-endian checksum at +60 is CRC-16/XMODEM over bytes 0–59 **[Fitted]**
 against [XADMaster's parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/). A bad header

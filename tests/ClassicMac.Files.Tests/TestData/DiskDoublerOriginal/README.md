@@ -39,3 +39,6 @@ The test expands every file through both containers and compares the forks with 
 `sources` folder after DiskDoubler Pro 4.1.1 compressed each file with AD1 or AD2. Their Arsenic streams need a model's
 last symbol to own the rest of the coder's range. The test expands every file through both containers and compares the
 forks with the sources.
+
+`sources.ddpro411.ad1.dd.1` and `sources.ddpro411.ad1.dd.2` are the corpus's DiskDoubler Pro 4.1.1 split (`SPLT`) set
+of `build/sources.ddpro411.ad1.dd`, kept under their original names because the set is named and matched by them.

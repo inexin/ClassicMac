@@ -33,7 +33,7 @@ namespace ClassicMac.Files
 
         /// <summary>
         /// The built-in readers, in the order they are tried: AppleSingle, AppleDouble, MacBinary III, II and I, BinHex
-        /// 4.0, uuencode, DiskDoubler, PackIt, StuffIt split files and archives, Compact Pro, LHA, zip, gzip, tar, NewWorld "Mac OS ROM" files and Mac ROM images, UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS and MFS volumes, DOS partition tables, FAT volumes
+        /// 4.0, uuencode, DiskDoubler and its split files, PackIt, StuffIt split files and archives, Compact Pro, LHA, zip, gzip, tar, NewWorld "Mac OS ROM" files and Mac ROM images, UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS and MFS volumes, DOS partition tables, FAT volumes
         /// with PC Exchange data, raw CD images, cue sheets, and ISO 9660 / High Sierra volumes.
         /// </summary>
         public static ContainerUnwrapper Default { get; } = new([]);
@@ -53,6 +53,7 @@ namespace ClassicMac.Files
                 BinHexReader.Instance,
                 UuencodeReader.Instance,
                 DiskDoublerReader.Instance,
+                DiskDoublerSplitReader.Instance,
                 PackItReader.Instance,
                 StuffItSplitReader.Instance,
                 StuffItReader.Instance,
