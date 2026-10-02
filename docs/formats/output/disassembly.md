@@ -183,13 +183,26 @@ each a case (at most 256). [Fitted]
 
 [Doc: MacsBug Reference and Debugging Guide, "Procedure names"] After a return (`rts` `$4E75`, `jmp (a0)` `$4ED0`, or
 `rtd #n` `$4E74 nnnn`) at an even offset, a compiler may put the routine's name in one of three forms; the characters
-are `A`–`Z`, `a`–`z`, `0`–`9`, `_`, `%`, `.`, space and `$`:
+are `A`–`Z`, `a`–`z`, `0`–`9`, `_`, `%`, `.` and space:
 
 | Form | Encoding | Then |
 | --- | --- | --- |
 | Variable | A byte `$80` + n (n 1–31) and n characters; or `$80`, a length byte n (1–255) and n characters | A pad byte to an even offset, then a word: the size of the literals (constants) that follow |
-| Fixed, 8 | 8 characters, the first with bit 7 set (`$A0`–`$FA`) | Nothing; trailing spaces are not part of the name |
-| Fixed, 16 | 16 characters, the first two with bit 7 set | Nothing |
+| Fixed, 8 | 8 characters; bit 7 of the first may be set (`$A0`–`$FA`) or clear | Nothing; trailing spaces are not part of the name |
+| Fixed, 16 | 16 characters, bit 7 of the first two set: the method's 8 characters, then the class's | Nothing; shown as `Class.Method` (`TView.DRAW`), each part without its spaces |
+
+What ClassicMac takes as a name, where the reference leaves room for text that only looks like one:
+
+- A fixed name that starts with a space (or is all spaces) is not one. [ClassicMac]
+- A fixed-8 name whose first character has bit 7 clear is upper case: a letter or `_`, then letters, digits and `_`,
+  then spaces to 8 characters. The word after it must not continue the text: the code ends there, or it is a `link`
+  (`$4E50`–`$4E57`, the next routine), or its first byte is none of those characters. This keeps the 144 such names
+  of Realmz's MADPlayer library (each followed by `link a6` or `bsr`) and leaves out strings after returns in ResEdit
+  and the System file (`Apple_Driver`, `File_Mgr_S…`, `0123456789`, lower-case text). [Fitted]
+- A variable name whose literal-size word would put the literals past the end of the code (or that has no word) has
+  no literals: the name ends at its pad byte, and what follows is code (Disk Copy 6.1.2's `%__MAIN`). [Fitted]
+- Code is word-aligned [Doc: M68000 Family Programmer's Reference Manual], so odd literals end at the next even
+  offset. [ClassicMac]
 
 A name whose return lies inside the previous name's literals, or whose bytes are already data, is not taken. A name
 labels the routine it ends: the last function known (an entry or a call target) between the end of the previous name
@@ -420,7 +433,10 @@ documents). These are its own and the decoders':
   counts and sample texts of NQD (no `.long`), Disk Copy 6.1.2 (4) and Disk Copy 6.5 (9,451), which
   agree word for word with an independent disassembler apart from mnemonic spelling and, in data, BO values with a z
   bit set [Verified]; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
-  the counts in [PLAN.md](../../PLAN.md)'s phase 11 exit.
+  the counts in [PLAN.md](../../PLAN.md)'s phase 11 exit. `MacsBugCorpusTests` also checks names read off the bytes
+  by hand at their offsets (Realmz's `MOT32` at `$842E`), and strings after returns in the System file that are not
+  names. Realmz's `'CODE'` resources hold 485 names: 341 variable and 144 fixed-8 with bit 7 clear; resource_dasm
+  finds the same 485 [Verified].
 
 ## 8. Not covered
 

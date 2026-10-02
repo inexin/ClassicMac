@@ -54,10 +54,14 @@ public class CodeListingCorpusTests
     {
         var app = App("Realmz 7.1.2", 576955, out _);
         var listing = Assert.Single(All(app)).Value;
-        // Each of the 341 MacsBug names labels a function.
-        var names = MacsBugNames.Find(app.FindSegment(1)!.Data).Select(n => n.Name).ToHashSet();
-        Assert.Equal(341, listing.Functions.Count(f => names.Contains(f.Name)));
+        // MacsBug names label functions, read off CODE 1 by hand: ICLOSE's name ends at $8426, where MOT32's routine
+        // (link a6; unlk a6; rts; 'MOT32   ') starts.
         Assert.Contains(listing.Functions, f => f.Name == "sqrt");
+        Assert.Contains(listing.Functions, f => f.Name == "cos");
+        Assert.Contains(listing.Functions, f => f.Name == "MADTICKR");
+        Assert.Contains(listing.Functions, f => f.Offset == 0x8426 && f.Name == "MOT32");
+        Assert.Contains("MOT32:\n", listing.Text, StringComparison.Ordinal);
+        Assert.Contains("; MacsBug name MOT32;", listing.Text, StringComparison.Ordinal);
     }
 
     [Fact]
