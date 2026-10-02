@@ -90,7 +90,8 @@ fragments].
 | 5 | ProtectedShare | One copy for the whole system, writable only by privileged code |
 
 [Doc: Mac OS Runtime Architectures] Kinds 0, 1, 2, 4 and 7 occur in the samples; a stub library is a single loader
-section [Verified: Mac OS 9.2.2's 90 fragments].
+section [Verified: Mac OS 9.2.2's 90 fragments]. Kind 3 occurs once, in the Mac OS 9 System file's `'ncod'` 3: a
+$41-byte Constant section, process-shared, alignment 3 [Verified: the Mac OS 9 System file].
 
 ### 1.4 Pattern-initialized data
 
@@ -132,7 +133,9 @@ unpacks to exactly its unpackedLength [Verified: Mac OS 9.2.2's 90 fragments].
 [Doc: Mac OS Runtime Architectures]
 
 The entry points (main, init, term) are a section and an offset; each names a transition vector (§1.11) [Doc: Mac OS
-Runtime Architectures] [Verified: Mac OS 9.2.2's 90 fragments: always section 1].
+Runtime Architectures]. In Mac OS 9.2.2's 90 fragments they are always in section 1 [Verified: Mac OS 9.2.2's 90
+fragments]; the Mac OS 9 System file's `'ntrb'` resources are data-only containers (a pidata section, then the loader)
+with main in section 0 [Verified: the Mac OS 9 System file].
 
 After the header, in order: the imported libraries, the imported symbols, the relocation headers. The relocation
 instructions, the string table and the export tables are where the header's offsets say [Doc: Mac OS Runtime
@@ -170,11 +173,14 @@ and `$C0` all occur; imports are of class 1 or 2 [Verified: Mac OS 9.2.2's 90 fr
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
 | +$00 | 2 | sectionIndex | The section the instructions relocate |
-| +$02 | 2 | reservedA | 0 |
+| +$02 | 2 | reservedA | 0; ignored. `$CBCC` in some of the Mac OS 9 System file's `'ndrv'` resources [Verified: the Mac OS 9 System file] |
 | +$04 | 4 | relocCount | The number of 16-bit instruction words |
 | +$08 | 4 | firstRelocOffset | From relocInstrOffset |
 
 [Doc: Mac OS Runtime Architectures]
+
+A section's instructions are those of the first header that names it; a later header for the same section is never
+run [Code: the Code Fragment Manager in the Mac OS ROM].
 
 ### 1.8 Relocation instructions
 
@@ -199,19 +205,37 @@ The encodings, bits from the top of the first word (the mnemonics are ClassicMac
 | `011 0010` i:9 | DTIS | RelocSmSetSectD | sectionD = section i's address |
 | `011 0011` i:9 | SECN | RelocSmBySection | Add section i's address |
 | `1000` b:12 | DELTA | RelocIncrPosition | relocAddress += b + 1 |
-| `1001` c:4 r:8 | RPT | RelocSmRepeat | Run the c + 1 instructions before this one r + 1 more times |
+| `1001` c:4 r:8 | RPT | RelocSmRepeat | Run the c + 1 words before this one r + 1 more times (below) |
 | `101000` o:26 | LABS | RelocSetPosition | relocAddress = o (two words) |
 | `101001` i:26 | LSYM | RelocLgByImport | Add import i; importIndex = i + 1 (two words) |
-| `101100` c:4 r:22 | LRPT | RelocLgRepeat | Run the c + 1 instructions before this one r more times (two words; r is not stored minus 1) |
+| `101100` c:4 r:22 | LRPT | RelocLgRepeat | Run the c + 1 words before this one r more times (two words; r is not stored minus 1; below) |
 | `101101 0000` i:22 | LSEC | RelocLgBySection | Add section i's address (two words) |
 | `101101 0001` i:22 | LSEC | RelocLgSetSectC | sectionC = section i's address (two words) |
 | `101101 0010` i:22 | LSEC | RelocLgSetSectD | sectionD = section i's address (two words) |
 
-[Doc: Mac OS Runtime Architectures, "Relocation Instruction Set"] Every other encoding is undefined. A repeat counts
-instructions, not words (a two-word instruction is one) [Verified: Mac OS 9.2.2's 90 fragments].
+[Doc: Mac OS Runtime Architectures, "Relocation Instruction Set"] Every other encoding is undefined.
+
+The instructions are 16-bit "relocation blocks", and a repeat counts blocks, not instructions [Doc: Mac OS Runtime
+Architectures; `PEFBinaryFormat.h`, PEFRelocChunk]. The Code Fragment Manager runs them through a word pointer
+[Code: the Code Fragment Manager in the Mac OS ROM, RelocSmRepeat and RelocLgRepeat]:
+
+1. A repeat moves the pointer back c + 1 words from its own first word; decoding goes on from there, even when that
+   word is the second word of a two-word instruction.
+2. One counter serves every repeat, 0 when none is running. A repeat reached with the counter at 0 sets it to r + 1
+   (RPT) or r (LRPT). Each time a repeat is reached the counter goes down by 1 first; while it is not 0 the pointer
+   goes back, and when it reaches 0 decoding goes on after the repeat.
+3. So RPT runs its block r + 1 more times and LRPT r more times. LRPT with r = 0, or a repeat inside another's
+   block, never brings the counter to 0: the load does not end.
+
+None of the samples' 150 repeats has a two-word instruction in its block, so they read the same either way [Verified:
+Mac OS 9.2.2's 90 fragments, the Mac OS 9 System file].
+
+SECN, like every "add", moves relocAddress on 4 [Code: the Code Fragment Manager in the Mac OS ROM]. The Mac OS 9
+System file's `'ncod'` 3 has one SECN 2, repeated twice by an RPT: the words at $188, $18C and $190 hold $0, $10 and
+$18 before relocation, offsets into its $41-byte Constant section [Verified: the Mac OS 9 System file].
 
 DELTA moves by bytes, so relocated words are 2-byte aligned in places, not always 4: 1,110 of the samples' fixups are
-[Verified: Mac OS 9.2.2's 90 fragments, the Mac OS 9 System file]. CDIS, SECN, LRPT and LSEC occur in none of the samples.
+[Verified: Mac OS 9.2.2's 90 fragments, the Mac OS 9 System file]. CDIS, LRPT and LSEC occur in none of the samples.
 
 ### 1.9 String table
 
@@ -355,7 +379,10 @@ None.
   0; given addresses, it applies them to copies (`Instantiate`). [ClassicMac]
 - A relocated word outside its section is skipped and the run goes on; the out-of-range words are reported once per
   section. [ClassicMac]
-- A repeat whose block holds another repeat is an error and stops the run. [ClassicMac]
+- Where the Mac would never finish, ClassicMac reports and moves on: a repeat reached while another runs stops the
+  run; LRPT with r = 0 is not repeated. A repeat reaching back before the first word stops the run. [ClassicMac]
+- Every undefined encoding stops the header's run, LSEC sub-opcodes 3–15 included (the Code Fragment Manager skips
+  those). [ClassicMac]
 - A run making more fixups than half the section's length in bytes plus 4,096 is a runaway and stops. [ClassicMac]
 - An export hash power above 18 cannot index an 18-bit first-export field: it is reported and the exports are not
   read. [ClassicMac]
@@ -385,14 +412,16 @@ Fragments are listed and modelled as [disassembly.md](../output/disassembly.md) 
 | `pef.pidata-length` | Error | The unpacked pidata is not unpackedLength bytes | Keeps what was unpacked | Not traced |
 | `pef.pidata-too-long` | Error | The pidata would unpack past the limit (§5) | Stops unpacking | Not traced |
 | `pef.pidata-truncated` | Error | A pidata instruction runs past the contents, or an argument is wider than 32 bits | Stops unpacking | Not traced |
-| `pef.relocation-bad-import` | Error | An instruction names an import that does not exist | Skips the word | Not traced |
-| `pef.relocation-bad-opcode` | Error | An undefined encoding | Stops the header's run; the fixups before it stand | Not traced |
-| `pef.relocation-bad-section` | Error | An instruction or a relocation header names a section that does not exist | Skips the instruction (or the header) | Not traced |
-| `pef.relocation-nested-repeat` | Error | A repeat's block holds another repeat | Stops the run | Not traced |
-| `pef.relocation-out-of-range` | Error | Relocated words fall outside the section | Skips them; one report per section with the count and the first | Not traced |
-| `pef.relocation-repeat-at-start` | Error | A repeat names more instructions than precede it | Stops the run | Not traced |
+| `pef.relocation-bad-import` | Error | An instruction names an import that does not exist | Skips the word | No check [Code: the Code Fragment Manager in the Mac OS ROM] |
+| `pef.relocation-bad-opcode` | Error | An undefined encoding | Stops the header's run; the fixups before it stand | Marks the load failed (−4) and decodes on from the next word; LSEC sub-opcodes 3–15 it skips, both words, with no error [Code: the Code Fragment Manager in the Mac OS ROM] |
+| `pef.relocation-bad-section` | Error | An instruction or a relocation header names a section that does not exist | Skips the instruction (or the header) | No check on an instruction's section; a header for no section is never looked up [Code: the Code Fragment Manager in the Mac OS ROM] |
+| `pef.relocation-duplicate-header` | Warning | A second relocation header names a section | Runs only the first | Runs only the first [Code: the Code Fragment Manager in the Mac OS ROM] |
+| `pef.relocation-nested-repeat` | Error | A repeat is reached while another runs | Stops the run | Never finishes: one counter serves every repeat (§1.8) [Code: the Code Fragment Manager in the Mac OS ROM] |
+| `pef.relocation-out-of-range` | Error | Relocated words fall outside the section | Skips them; one report per section with the count and the first | No check: writes where relocAddress points [Code: the Code Fragment Manager in the Mac OS ROM] |
+| `pef.relocation-repeat-at-start` | Error | A repeat goes back more words than precede it | Stops the run | Not traced |
+| `pef.relocation-repeat-zero` | Error | LRPT with r = 0 | Does not repeat; runs on | Never finishes (§1.8) [Code: the Code Fragment Manager in the Mac OS ROM] |
 | `pef.relocation-runaway` | Error | A run makes more fixups than the limit (§5) | Stops the run | Not traced |
-| `pef.relocation-truncated` | Error | A two-word instruction is the last word | Stops the run | Not traced |
+| `pef.relocation-truncated` | Error | A two-word instruction is the last word | Stops the run | Reads the word after the list as its second word [Code: the Code Fragment Manager in the Mac OS ROM] |
 | `pef.section-name-out-of-range` | Warning | A section's nameOffset is outside the container | No name | Not traced |
 | `pef.section-out-of-range` | Error | A section's contents run past the container | Clips them | Not traced |
 | `pef.sections-truncated` | Error | The section headers run past the container | Reads the headers that fit | Not traced |
@@ -413,9 +442,12 @@ Hand-built containers (`tests/ClassicMac.Code.Tests`, built with `PefBuilder`):
 - `PefLoaderTests`: entry points, libraries, imports with class, weak flag and library, relocation headers, exports
   with keys, absolute exports and re-exports, the hash word and index, lookup through colliding chains, names read
   by the key's length, and each damage case.
-- `PefRelocatorTests`: every opcode's action and operand decoding, mnemonics, 2-byte-aligned DELTA fixups, repeats
-  counting instructions, undefined and truncated instructions, repeats at the start and of repeats, out-of-range words,
-  imports and sections, runaways, listing without an image.
+- `PefRelocatorTests`: every opcode's action and operand decoding, the opcode boundaries, mnemonics, every "add"
+  moving on 4, DDAT, DESC, DSC2 and VTBL with sectionC and sectionD changed, the largest SYMR and a large LSYM,
+  2-byte-aligned DELTA fixups; repeats counting words (over two-word instructions, starting inside one, of SECN, the
+  largest block and count, the import index carried through), each against the Code Fragment Manager's own result;
+  undefined and truncated instructions (LSEC 3 among them), repeats at the start, of repeats and LRPT 0, out-of-range
+  words, imports and sections, runaways, a second header for a section, listing without an image.
 - `TransitionVectorTests`: main, init and tvector exports read as code and TOC offsets with their sections.
 - `TracebackTableTests`: each optional field alone and all in order, bytes 4 and 5 and parmsonstk adding no field,
   has_vec and has_ext_table reported, the scan after `blr` (and not after `b` or `bctr`), truncation (an offset at the
@@ -449,13 +481,13 @@ in [cfrg.md §7](cfrg.md#7-verification) and [code-resources.md §7](code-resour
 
 - Writing PEF.
 - CFM-68K containers: read as the same structure, never seen.
-- Section kinds 3, 5, 6 and 8, named sections and the CDIS, SECN, LRPT and LSEC opcodes: read as documented, not
-  seen in a sample.
+- Section kinds 5, 6 and 8, named sections and the CDIS, LRPT and LSEC opcodes: read as documented, not seen in a
+  sample.
 - The exception section's contents.
 - A traceback table's vec_ext and ext_table: reported, not read (§1.12).
 - A traceback table after a function that does not end in `blr` (a tail call `b`, or `bctr`): the scan does not find
   it.
-- What the Code Fragment Manager does with a damaged container (every "The Mac does" above).
+- What the Code Fragment Manager does with the damage marked "Not traced" in §6.
 - Resolving imports against other fragments: addresses are the caller's.
 
 ## 9. References

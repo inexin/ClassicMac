@@ -34,13 +34,13 @@ namespace ClassicMac.Code.Ppc
         BySection,
         /// <summary><c>1000 b:12</c> (DELTA, RelocIncrPosition): move on b + 1 bytes.</summary>
         IncrPosition,
-        /// <summary><c>1001 c:4 r:8</c> (RPT, RelocSmRepeat): run the c + 1 instructions before it r + 1 more times.</summary>
+        /// <summary><c>1001 c:4 r:8</c> (RPT, RelocSmRepeat): run the c + 1 16-bit words (relocation blocks) before it r + 1 more times.</summary>
         Repeat,
         /// <summary><c>101000 o:26</c> (LABS, RelocSetPosition, two words): move to offset o.</summary>
         SetPosition,
         /// <summary><c>101001 i:26</c> (LSYM, RelocLgByImport, two words): add import i; the next import is i + 1.</summary>
         LgByImport,
-        /// <summary><c>101100 c:4 r:22</c> (LRPT, RelocLgRepeat, two words): run the c + 1 instructions before it r more times.</summary>
+        /// <summary><c>101100 c:4 r:22</c> (LRPT, RelocLgRepeat, two words): run the c + 1 16-bit words (relocation blocks) before it r more times.</summary>
         LgRepeat,
         /// <summary><c>101101 0000 i:22</c> (LSEC 0, RelocLgBySection, two words): add section i's address.</summary>
         LgBySection,
@@ -53,7 +53,7 @@ namespace ClassicMac.Code.Ppc
     /// <summary>A decoded relocation instruction.</summary>
     /// <param name="Opcode">The opcode.</param>
     /// <param name="Position">The index of its first word in the header's instructions.</param>
-    /// <param name="Operand">Skip words (BySectDWithSkip), import or section index, byte offset (SetPosition), or the number of instructions a repeat runs; 0 otherwise.</param>
+    /// <param name="Operand">Skip words (BySectDWithSkip), import or section index, byte offset (SetPosition), or the number of 16-bit words a repeat goes back; 0 otherwise.</param>
     /// <param name="Count">Words to relocate, run length, bytes to move (IncrPosition) or repeat count, as the instruction does them (the stored +1 applied); 0 otherwise.</param>
     public readonly record struct PefRelocationInstruction(PefRelocationOpcode Opcode, int Position, uint Operand, uint Count)
     {
@@ -107,8 +107,9 @@ namespace ClassicMac.Code.Ppc
     public static class PefRelocator
     {
         /// <summary>
-        /// Decodes a relocation header's instruction words. An undefined opcode or a two-word instruction cut short is
-        /// reported (<c>pef.relocation-bad-opcode</c>, <c>pef.relocation-truncated</c>) and decoding stops there.
+        /// Decodes a relocation header's instruction words, in order from the first. An undefined opcode or a two-word
+        /// instruction cut short is reported (<c>pef.relocation-bad-opcode</c>, <c>pef.relocation-truncated</c>) and
+        /// decoding stops there.
         /// </summary>
         public static IReadOnlyList<PefRelocationInstruction> Decode(IReadOnlyList<ushort> words, ICollection<Diagnostic> diagnostics)
         {
@@ -117,69 +118,71 @@ namespace ClassicMac.Code.Ppc
             var result = new List<PefRelocationInstruction>(words.Count);
             for (int k = 0; k < words.Count;)
             {
-                int w = words[k];
-                PefRelocationInstruction? one = null;
-                if (w >> 14 == 0) one = new(PefRelocationOpcode.BySectDWithSkip, k, (uint)(w >> 6) & 0xFF, (uint)w & 0x3F);
-                else if (w >> 13 == 2)
-                {
-                    int sub = (w >> 9) & 0xF;
-                    uint run = (uint)(w & 0x1FF) + 1;
-                    if (sub <= 5) one = new((PefRelocationOpcode)((int)PefRelocationOpcode.BySectC + sub), k, 0, run);
-                }
-                else if (w >> 13 == 3)
-                {
-                    int sub = (w >> 9) & 0xF;
-                    uint index = (uint)w & 0x1FF;
-                    if (sub <= 3) one = new((PefRelocationOpcode)((int)PefRelocationOpcode.ByImport + sub), k, index, 0);
-                }
-                else if (w >> 12 == 8) one = new(PefRelocationOpcode.IncrPosition, k, 0, (uint)(w & 0xFFF) + 1);
-                else if (w >> 12 == 9) one = new(PefRelocationOpcode.Repeat, k, (uint)((w >> 8) & 0xF) + 1, (uint)(w & 0xFF) + 1);
-
-                if (one is { } single)
-                {
-                    result.Add(single);
-                    k++;
-                    continue;
-                }
-
-                int top = w >> 10;
-                PefRelocationOpcode? opcode = top switch
-                {
-                    0x28 => PefRelocationOpcode.SetPosition,
-                    0x29 => PefRelocationOpcode.LgByImport,
-                    0x2C => PefRelocationOpcode.LgRepeat,
-                    0x2D => ((w >> 6) & 0xF) switch
-                    {
-                        0 => PefRelocationOpcode.LgBySection,
-                        1 => PefRelocationOpcode.LgSetSectC,
-                        2 => PefRelocationOpcode.LgSetSectD,
-                        _ => null,
-                    },
-                    _ => null,
-                };
-                if (opcode is not { } op)
-                {
-                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-bad-opcode",
-                        $"Relocation word {k} (0x{w:X4}) is not a defined instruction; relocation stopped there."));
-                    break;
-                }
-                if (k + 1 >= words.Count)
-                {
-                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-truncated",
-                        $"Relocation word {k} (0x{w:X4}) starts a two-word instruction at the end of the list."));
-                    break;
-                }
-                uint second = words[k + 1];
-                result.Add(op switch
-                {
-                    PefRelocationOpcode.SetPosition or PefRelocationOpcode.LgByImport =>
-                        new(op, k, ((uint)(w & 0x3FF) << 16) | second, 0),
-                    PefRelocationOpcode.LgRepeat => new(op, k, (uint)((w >> 6) & 0xF) + 1, ((uint)(w & 0x3F) << 16) | second),
-                    _ => new(op, k, ((uint)(w & 0x3F) << 16) | second, 0),
-                });
-                k += 2;
+                if (DecodeAt(words, k, diagnostics) is not { } instruction) break;
+                result.Add(instruction);
+                k += WordCount(instruction.Opcode);
             }
             return result;
+        }
+
+        // The words an instruction takes: 2 for LABS, LSYM, LRPT and LSEC, 1 for the others.
+        private static int WordCount(PefRelocationOpcode opcode) => opcode >= PefRelocationOpcode.SetPosition ? 2 : 1;
+
+        // The instruction starting at word k; null (reported) when it is undefined or cut short.
+        private static PefRelocationInstruction? DecodeAt(IReadOnlyList<ushort> words, int k, ICollection<Diagnostic> diagnostics)
+        {
+            int w = words[k];
+            if (w >> 14 == 0) return new(PefRelocationOpcode.BySectDWithSkip, k, (uint)(w >> 6) & 0xFF, (uint)w & 0x3F);
+            if (w >> 13 == 2)
+            {
+                int sub = (w >> 9) & 0xF;
+                uint run = (uint)(w & 0x1FF) + 1;
+                if (sub <= 5) return new((PefRelocationOpcode)((int)PefRelocationOpcode.BySectC + sub), k, 0, run);
+            }
+            else if (w >> 13 == 3)
+            {
+                int sub = (w >> 9) & 0xF;
+                uint index = (uint)w & 0x1FF;
+                if (sub <= 3) return new((PefRelocationOpcode)((int)PefRelocationOpcode.ByImport + sub), k, index, 0);
+            }
+            else if (w >> 12 == 8) return new(PefRelocationOpcode.IncrPosition, k, 0, (uint)(w & 0xFFF) + 1);
+            else if (w >> 12 == 9) return new(PefRelocationOpcode.Repeat, k, (uint)((w >> 8) & 0xF) + 1, (uint)(w & 0xFF) + 1);
+
+            int top = w >> 10;
+            PefRelocationOpcode? opcode = top switch
+            {
+                0x28 => PefRelocationOpcode.SetPosition,
+                0x29 => PefRelocationOpcode.LgByImport,
+                0x2C => PefRelocationOpcode.LgRepeat,
+                0x2D => ((w >> 6) & 0xF) switch
+                {
+                    0 => PefRelocationOpcode.LgBySection,
+                    1 => PefRelocationOpcode.LgSetSectC,
+                    2 => PefRelocationOpcode.LgSetSectD,
+                    _ => null,
+                },
+                _ => null,
+            };
+            if (opcode is not { } op)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-bad-opcode",
+                    $"Relocation word {k} (0x{w:X4}) is not a defined instruction; relocation stopped there."));
+                return null;
+            }
+            if (k + 1 >= words.Count)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-truncated",
+                    $"Relocation word {k} (0x{w:X4}) starts a two-word instruction at the end of the list."));
+                return null;
+            }
+            uint second = words[k + 1];
+            return op switch
+            {
+                PefRelocationOpcode.SetPosition or PefRelocationOpcode.LgByImport =>
+                    new(op, k, ((uint)(w & 0x3FF) << 16) | second, 0),
+                PefRelocationOpcode.LgRepeat => new(op, k, (uint)((w >> 6) & 0xF) + 1, ((uint)(w & 0x3F) << 16) | second),
+                _ => new(op, k, ((uint)(w & 0x3F) << 16) | second, 0),
+            };
         }
 
         /// <summary>
@@ -187,9 +190,14 @@ namespace ClassicMac.Code.Ppc
         /// <see cref="PefContainer.GetImage"/>, copied) each fixup is applied to it; without one they are only listed.
         /// Section addresses come from <paramref name="sectionAddresses"/> and import addresses from
         /// <paramref name="importAddress"/> (both 0 when null). Problems — a word outside the section, an import or
-        /// section index out of range, a repeat with too few instructions before it — are reported as
+        /// section index out of range, a repeat reaching before the first word — are reported as
         /// <c>pef.relocation-*</c> diagnostics; out-of-range words are skipped and an unrunnable repeat stops the run.
         /// </summary>
+        /// <remarks>
+        /// The words are run as the Code Fragment Manager runs them, through a word pointer: a repeat moves the pointer
+        /// back its block count of 16-bit words, and decoding goes on from there, even in the middle of a two-word
+        /// instruction [Code: the Code Fragment Manager in the Mac OS ROM, RelocSmRepeat and RelocLgRepeat].
+        /// </remarks>
         /// <returns>Every fixup made, in order.</returns>
         public static IReadOnlyList<PefFixup> Run(PefContainer container, PefRelocationHeader header, byte[]? image,
             IReadOnlyList<uint>? sectionAddresses, Func<int, uint>? importAddress, ICollection<Diagnostic> diagnostics)
@@ -197,7 +205,6 @@ namespace ClassicMac.Code.Ppc
             ArgumentNullException.ThrowIfNull(container);
             ArgumentNullException.ThrowIfNull(header);
             ArgumentNullException.ThrowIfNull(diagnostics);
-            var instructions = Decode(header.Instructions, diagnostics);
             int section = header.SectionIndex;
             if ((uint)section >= (uint)container.Sections.Count)
             {
@@ -209,33 +216,58 @@ namespace ClassicMac.Code.Ppc
             var machine = new Machine(container, section, length, image, sectionAddresses, importAddress,
                 container.Loader?.ImportedSymbols.Count ?? 0, diagnostics);
 
-            for (int i = 0; i < instructions.Count && !machine.Stopped; i++)
+            var words = header.Instructions;
+            // The repeat being run (its first word; −1 for none) and how many more times it goes back. The Code Fragment
+            // Manager keeps one counter for every repeat.
+            int repeating = -1;
+            long left = 0;
+            for (int k = 0; k < words.Count && !machine.Stopped;)
             {
-                var instruction = instructions[i];
-                if (instruction.Opcode is PefRelocationOpcode.Repeat or PefRelocationOpcode.LgRepeat)
+                if (DecodeAt(words, k, diagnostics) is not { } instruction) break;
+                int next = k + WordCount(instruction.Opcode);
+                if (instruction.Opcode is not (PefRelocationOpcode.Repeat or PefRelocationOpcode.LgRepeat))
                 {
-                    int blocks = (int)instruction.Operand;
-                    if (blocks > i)
+                    machine.Execute(instruction);
+                    k = next;
+                    continue;
+                }
+
+                int blocks = (int)instruction.Operand;
+                if (blocks > k)
+                {
+                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-repeat-at-start",
+                        $"Relocation word {k} repeats {blocks} words; only {k} come before it. Relocation stopped there."));
+                    break;
+                }
+                if (repeating != k)
+                {
+                    if (repeating >= 0)
                     {
-                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-repeat-at-start",
-                            $"Relocation word {instruction.Position} repeats {blocks} instructions; only {i} come before it. Relocation stopped there."));
+                        // The shared counter makes the Code Fragment Manager loop for ever.
+                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-nested-repeat",
+                            $"Relocation word {repeating} repeats another repeat (word {k}). Relocation stopped there."));
                         break;
                     }
-                    for (int j = i - blocks; j < i; j++)
-                        if (instructions[j].Opcode is PefRelocationOpcode.Repeat or PefRelocationOpcode.LgRepeat)
-                        {
-                            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-nested-repeat",
-                                $"Relocation word {instruction.Position} repeats another repeat. Relocation stopped there."));
-                            machine.Stop();
-                            break;
-                        }
-                    for (uint t = 0; t < instruction.Count && !machine.Stopped; t++)
-                        for (int j = i - blocks; j < i && !machine.Stopped; j++)
-                            machine.Execute(instructions[j]);
+                    if (instruction.Count == 0)
+                    {
+                        // LRPT 0: the Code Fragment Manager's counter never reaches 0.
+                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-repeat-zero",
+                            $"Relocation word {k} repeats its block 0 times, which never ends on a Mac; it was not repeated."));
+                        k = next;
+                        continue;
+                    }
+                    repeating = k;
+                    left = instruction.Count;
+                }
+                if (left > 0)
+                {
+                    left--;
+                    k -= blocks;
                 }
                 else
                 {
-                    machine.Execute(instruction);
+                    repeating = -1;
+                    k = next;
                 }
             }
             machine.Finish();

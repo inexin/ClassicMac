@@ -265,10 +265,28 @@ namespace ClassicMac.Code.Ppc
             ArgumentNullException.ThrowIfNull(diagnostics);
             if (fixups is not null) return fixups;
             var all = new List<PefFixup>();
-            if (Loader is not null)
-                foreach (var header in Loader.RelocationHeaders)
-                    all.AddRange(PefRelocator.Run(this, header, null, null, null, diagnostics));
+            foreach (var header in HeadersRun(diagnostics))
+                all.AddRange(PefRelocator.Run(this, header, null, null, null, diagnostics));
             return fixups = all;
+        }
+
+        // The relocation headers that run: the first for each section. The Code Fragment Manager looks a section's header
+        // up by its index and takes the first match [Code: the Code Fragment Manager in the Mac OS ROM]; later ones are
+        // reported.
+        private List<PefRelocationHeader> HeadersRun(ICollection<Diagnostic> diagnostics)
+        {
+            var run = new List<PefRelocationHeader>();
+            if (Loader is null) return run;
+            var seen = new HashSet<int>();
+            foreach (var header in Loader.RelocationHeaders)
+            {
+                if (seen.Add(header.SectionIndex))
+                    run.Add(header);
+                else
+                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "pef.relocation-duplicate-header",
+                        $"Section {header.SectionIndex} has more than one relocation header; only the first runs."));
+            }
+            return run;
         }
 
         /// <summary>
@@ -287,13 +305,12 @@ namespace ClassicMac.Code.Ppc
             for (int i = 0; i < relocated.Length; i++)
                 relocated[i] = Sections[i].IsInstantiable ? GetImage(i, diagnostics).ToArray() : [];
             var made = new List<PefFixup>();
-            if (Loader is not null)
-                foreach (var header in Loader.RelocationHeaders)
-                {
-                    if ((uint)header.SectionIndex >= (uint)relocated.Length) continue;
-                    made.AddRange(PefRelocator.Run(this, header, relocated[header.SectionIndex], sectionAddresses,
-                        importAddress, diagnostics));
-                }
+            foreach (var header in HeadersRun(diagnostics))
+            {
+                if ((uint)header.SectionIndex >= (uint)relocated.Length) continue;
+                made.AddRange(PefRelocator.Run(this, header, relocated[header.SectionIndex], sectionAddresses,
+                    importAddress, diagnostics));
+            }
             return new PefInstance(relocated, made);
         }
 
