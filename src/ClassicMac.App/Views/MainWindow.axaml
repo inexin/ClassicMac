@@ -770,6 +770,14 @@
     <Style Selector="Grid.ditl-form.editing > Border.ditl-preview">
       <Setter Property="Width" Value="216" />
     </Style>
+    <!-- The menu form likewise: its preview a third of a 1200-pixel window read only, 166 while editing (it scrolls, 2×),
+         so the Text column is at least 160 wide. -->
+    <Style Selector="Border.menu-preview">
+      <Setter Property="Width" Value="272" />
+    </Style>
+    <Style Selector="Grid.menu-edit-form.editing > Border.menu-preview">
+      <Setter Property="Width" Value="166" />
+    </Style>
     <Style Selector="TextBox.bound">
       <Setter Property="Width" Value="38" />
       <Setter Property="MinWidth" Value="38" />
@@ -2344,12 +2352,12 @@
                     <!-- The menu form (boards/read-then-edit.md, E2): a summary and a table read only, inputs while
                          editing; the live preview on the right, its highlighted item the selected row. -->
                     <DataTemplate DataType="vm:MenuForm">
-                      <Grid x:Name="MenuForm" Classes="menu-form" ColumnDefinitions="2*,*">
-                        <Border Grid.Column="1" Classes="preview-panel">
+                      <Grid x:Name="MenuForm" Classes="menu-form menu-edit-form" Classes.editing="{Binding IsEditing}" ColumnDefinitions="*,Auto">
+                        <Border Grid.Column="1" Classes="preview-panel menu-preview">
                           <DockPanel>
                             <Border DockPanel.Dock="Top" Classes="preview-header">
                               <WrapPanel>
-                                <TextBlock x:Name="PreviewTitle" Classes="strong" Margin="0,0,10,0"
+                                <TextBlock x:Name="PreviewTitle" Classes="strong" Margin="0,0,10,0" TextWrapping="Wrap"
                                            Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormPreviewTitle, FallbackValue=Preview}" />
                                 <TextBlock Classes="muted" Text="2× · Mac OS 8/9" />
                               </WrapPanel>
@@ -2400,7 +2408,7 @@
                                 <TextBlock Grid.Column="6" Classes="caption" Text="ENABLED" />
                               </Grid>
                               <Grid Classes="menu-columns editing" ColumnDefinitions="28,*,40,130,40,126,28,28">
-                                <TextBlock Grid.Column="1" Classes="caption" Text="TEXT" />
+                                <TextBlock x:Name="MenuTextCaption" Grid.Column="1" Classes="caption" Text="TEXT" />
                                 <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
                                 <TextBlock Grid.Column="3" Classes="caption" Text="MARK" />
                                 <TextBlock Grid.Column="4" Classes="caption" Text="ICON" />
@@ -2439,7 +2447,7 @@
                                               <PathIcon Classes="row-chevron" Data="M1,3.5 L5,7.5 L9,3.5 L7.6,2.1 L5,4.7 L2.4,2.1 Z" />
                                             </Button>
                                           </StackPanel>
-                                          <TextBox Grid.Column="1" Text="{Binding Text}" AutomationProperties.Name="Text" />
+                                          <TextBox x:Name="MenuItemText" Grid.Column="1" Text="{Binding Text}" AutomationProperties.Name="Text" />
                                           <TextBox Grid.Column="2" Classes="mono key" Classes.conflict="{Binding HasKeyConflict}" Text="{Binding Key}"
                                                    HorizontalContentAlignment="Center" AutomationProperties.Name="Command key" />
                                           <!-- The marks in words; the list adds each one's Mac character code. Other… shows a code field. -->

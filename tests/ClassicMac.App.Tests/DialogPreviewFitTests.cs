@@ -78,6 +78,36 @@ public sealed class DialogPreviewFitTests : IDisposable
     });
 
     [Fact]
+    public void Editing_a_menu_leaves_the_text_column_room() => OnUiThread(() =>
+    {
+        var path = Path.Combine(folder, "Menu.rsrc");
+        File.WriteAllBytes(path, PreviewTests.Fork(("MENU", 129, null, InterfaceWriter.WriteMenu(MenuFormTests.File()))));
+        var model = new MainViewModel();
+        var window = new MainWindow { DataContext = model };
+        window.Show();
+        Pump(model.OpenAsync(path));
+        Pump(model.Roots[0].EnsureLoadedAsync());
+        model.Selected = model.Roots[0].Children.OfType<ResourceTypeNode>().Single().Children[0];
+        Pump(model.PreviewTask);
+        model.EditFormCommand.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(model.IsEditingForm);
+        Assert.Equal(1200, window.Bounds.Width);
+        var text = window.GetVisualDescendants().OfType<TextBox>().First(t => t.Name == "MenuItemText" && t.IsEffectivelyVisible);
+        Assert.True(text.Bounds.Width >= 160, $"the text box is {text.Bounds.Width} wide");
+        var caption = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "MenuTextCaption" && t.IsEffectivelyVisible);
+        var whole = new TextBlock { Text = caption.Text, FontFamily = caption.FontFamily, FontSize = caption.FontSize, FontWeight = caption.FontWeight, LetterSpacing = caption.LetterSpacing };
+        whole.Measure(Size.Infinity);
+        Assert.True(whole.DesiredSize.Width <= caption.Bounds.Width + 0.5, $"the caption needs {whole.DesiredSize.Width}, has {caption.Bounds.Width}");
+        var preview = window.GetVisualDescendants().OfType<MenuView>().Single(v => v.Name == "MenuPreview");
+        var scroller = preview.FindAncestorOfType<ScrollViewer>()!;
+        Assert.True(Right(scroller, window) <= window.Bounds.Width);
+        Assert.False(scroller.AllowAutoHide);                                          // the preview scrolls, its bars in view
+        Assert.True(scroller.Extent.Width >= preview.Bounds.Width);
+        window.Close();
+    });
+
+    [Fact]
     public void Editing_an_item_list_leaves_the_text_column_room() => OnUiThread(() =>
     {
         var (window, model) = Open("DITL");

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Editor: editing a menu gives the table the room: the live preview narrows to 166 while editing (272 read only; it
+  scrolls at 2× with its scroll bars shown, its title wrapping), so the Text column is at least 160 wide in a
+  1200-pixel window.
 - Editor: the menu form's rows move with chevron icon buttons and with Alt+Up / Alt+Down on the selected row; the Mark
   select reads in words with each mark's Mac character code in the list (None, Check mark `$12`, Diamond `$13`,
   Bullet `$A5`, Other…, which shows a field for any other code such as `$2A`), and the table's Mark column names the
