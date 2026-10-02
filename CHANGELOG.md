@@ -9,6 +9,12 @@
   byte of a resource is ("Character 1 of string 1, “Untitled”", "Length of string 2", "ID of item 3") with the field's
   range and value, for `'STR '`, `'STR#'` and any type a `TMPL` in an open file describes (`ByteMeanings`,
   `ResourceTemplate.Map`); other types and compressed resources have none.
+- Editor: Edit Hex (Ctrl+H) edits a resource's bytes in place in the Hex tab, already in editing, instead of in a
+  dialog (retired): a grid of 24-pixel byte cells with a column header, zero bytes lighter, changed bytes tinted and in
+  SemiBold in both columns, the cursor highlighted, a click on a byte moving the cursor; an Overwrite | Insert switch, a
+  status line ("0x000A = 32 · 1 byte changed"), Discard and Apply in the footer; a byte inspector reading the bytes at the
+  cursor as UInt8, Int8, UInt16/Int16/UInt32 BE, OSType and binary; Go to a hex offset. When editing ends on a resource
+  with a preview, the preview shows again. The inspector shows a byte's meaning when a meaning provider is set (for E8).
 - Viewer: the inspector header's tile shows the selection's large icon drawn 1:1 at any display scaling: an icon
   resource's family at 32 × 32 (16 when it has only small members), a cicn fitted into 32, a cursor, or a file's
   Finder icon at 32; the kind icon otherwise. Icon families list their members ("ICN# · icl8 · ics#", or an icns's

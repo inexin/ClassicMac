@@ -34,7 +34,6 @@ public sealed partial class EditTests : IDisposable
         public Func<ResourceInfo, ResourceInfo?> Info { get; set; } = i => i;
         public SaveChanges Choice { get; set; } = SaveChanges.Discard;
         public bool Confirm { get; set; } = true;
-        public byte[]? Hex { get; set; }
         public List<string> Asked { get; } = [];
 
         public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew) => Task.FromResult(Info(initial));
@@ -61,8 +60,6 @@ public sealed partial class EditTests : IDisposable
             Log.Add("draft " + what);
             return Pending?.Task ?? Task.FromResult(Draft);
         }
-
-        public Task<byte[]?> EditHexAsync(string title, byte[] data) => Task.FromResult(Hex);
 
         public Func<ImportChoice, ImportChoice?> Import { get; set; } = c => c;
         public IReadOnlyList<string> ImportTypes { get; private set; } = [];
@@ -105,6 +102,26 @@ public sealed partial class EditTests : IDisposable
         var file = input.Children.OfType<FileNode>().Single();
         await file.EnsureLoadedAsync();
         return (model, file, dialogs, picker, path);
+    }
+
+    // Edit Hex in place: the selected resource's bytes replaced by typing, then applied.
+    internal static async Task EditBytes(MainViewModel model, byte[] data)
+    {
+        await model.EditHexCommand.ExecuteAsync(null);
+        var editor = model.HexEdit!;
+        editor.MoveTo(0);
+        while (editor.Length > 0)
+        {
+            editor.Delete();
+        }
+
+        foreach (var b in data)
+        {
+            editor.TypeDigit(b >> 4);
+            editor.TypeDigit(b & 0xF);
+        }
+
+        model.ApplyHexEditCommand.Execute(null);
     }
 
     private static ResourceNode Resource(FileNode file, short id) =>
@@ -203,8 +220,7 @@ public sealed partial class EditTests : IDisposable
         await model.GetInfoCommand.ExecuteAsync(null);
         Assert.Equal((200, "renamed"), ((int)((ResourceNode)model.Selected!).Resource.Id, ((ResourceNode)model.Selected).Resource.Name!.Value.ToMacRoman()));
 
-        dialogs.Hex = [1, 2, 3];
-        await model.EditHexCommand.ExecuteAsync(null);
+        await EditBytes(model, [1, 2, 3]);
         model.UndoCommand.Execute(null);
         model.UndoCommand.Execute(null);
         model.RedoCommand.Execute(null);                       // back to the renamed copy with its old data
@@ -228,8 +244,7 @@ public sealed partial class EditTests : IDisposable
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 129);
-        dialogs.Hex = [1, 2, 3];
-        await model.EditHexCommand.ExecuteAsync(null);
+        await EditBytes(model, [1, 2, 3]);
 
         Assert.True(file.IsUnsaved);
         Assert.Equal(("129", true), (Resource(file, 129).Name, Resource(file, 129).IsUnsaved));
@@ -454,14 +469,14 @@ public sealed partial class EditTests : IDisposable
         var original = disk.Build("Volume");
         File.WriteAllBytes(sourcePath, original);
 
-        var dialogs = new Dialogs { Hex = [3, (byte)'b', (byte)'y', (byte)'e'] };
+        var dialogs = new Dialogs();
         var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
         var input = (await model.OpenAsync(sourcePath))!;
         var folderNode = Assert.IsType<FolderNode>(input.Children.Single(n => n.Title == "Folder"));
         var fileNode = Assert.IsType<FileNode>(folderNode.Children.Single(n => n.Title == "Prefs"));
         await fileNode.EnsureLoadedAsync();
         model.Selected = Resource(fileNode, 128);
-        await model.EditHexCommand.ExecuteAsync(null);
+        await EditBytes(model, [3, (byte)'b', (byte)'y', (byte)'e']);
 
         await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
 

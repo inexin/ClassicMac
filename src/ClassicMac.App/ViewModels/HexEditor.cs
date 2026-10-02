@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Avalonia.Input;
+using ClassicMac.Core;
 using ClassicMac.Files;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -16,12 +17,18 @@ namespace ClassicMac.App.ViewModels
     {
         private readonly byte[] original;
         private readonly List<byte> bytes;
+        private readonly Func<byte[], int, string?>? meaning;
         private bool half;
 
-        public HexEditor(ReadOnlyMemory<byte> data)
+        /// <summary>
+        /// An editor of <paramref name="data"/>; <paramref name="meaning"/>, when given, says what the byte at an offset
+        /// of the bytes means (design/boards/hex.md, E8), shown by the <see cref="Inspector"/>.
+        /// </summary>
+        public HexEditor(ReadOnlyMemory<byte> data, Func<byte[], int, string?>? meaning = null)
         {
             original = data.ToArray();
             bytes = [.. original];
+            this.meaning = meaning;
             Lines = new HexLines(ForkData.FromBytes(original));
             Reload();
         }
@@ -37,15 +44,73 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Whether typing inserts bytes instead of overwriting them.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(Status))]
+        [NotifyPropertyChangedFor(nameof(Status), nameof(ModeIndex))]
         private bool insertMode;
+
+        /// <summary>The footer's switch, in <see cref="Modes"/> order: 0 overwrite, 1 insert.</summary>
+        public int ModeIndex
+        {
+            get => InsertMode ? 1 : 0;
+            set => InsertMode = value == 1;
+        }
+
+        /// <summary>The switch's segments.</summary>
+        public static IReadOnlyList<string> Modes { get; } = ["Overwrite", "Insert"];
 
         public int Length => bytes.Count;
 
         public bool IsModified => !bytes.SequenceEqual(original);
 
-        public string Status => string.Create(CultureInfo.InvariantCulture,
-            $"Offset ${Cursor:X} of {bytes.Count:N0} bytes · {(InsertMode ? "insert" : "overwrite")}{(IsModified ? " · changed" : "")}");
+        /// <summary>"0x000A = 32 · 1 byte changed · hex digits type, Insert toggles, Delete removes".</summary>
+        public string Status
+        {
+            get
+            {
+                var value = Cursor < bytes.Count ? bytes[Cursor].ToString(CultureInfo.InvariantCulture) : "end";
+                var changed = ChangedCount switch
+                {
+                    0 => "no changes",
+                    1 => "1 byte changed",
+                    var n => string.Create(CultureInfo.InvariantCulture, $"{n:N0} bytes changed"),
+                };
+                return string.Create(CultureInfo.InvariantCulture, $"0x{Cursor:X4} = {value} · {changed} · hex digits type, Insert toggles, Delete removes");
+            }
+        }
+
+        /// <summary>Whether the byte at <paramref name="offset"/> differs from the original's at that offset (or is past its end).</summary>
+        public bool IsChanged(int offset) => offset >= 0 && offset < bytes.Count && (offset >= original.Length || bytes[offset] != original[offset]);
+
+        /// <summary>How many bytes differ from the original's at their offsets.</summary>
+        public int ChangedCount { get; private set; }
+
+        /// <summary>The byte inspector: the bytes at the cursor read as numbers, and their meaning when known.</summary>
+        public HexInspection Inspector { get; private set; } = HexInspection.Empty;
+
+        /// <summary>
+        /// Moves the cursor to a hex offset ("0x1A", "$1A" or "1A"; past the end goes to the end); false, and no move,
+        /// when the text is not one.
+        /// </summary>
+        public bool GoTo(string text)
+        {
+            var digits = text.Trim();
+            if (digits.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                digits = digits[2..];
+            }
+            else if (digits.StartsWith('$'))
+            {
+                digits = digits[1..];
+            }
+
+            if (digits.Length == 0 || !digits.All(Uri.IsHexDigit)
+                || !long.TryParse(digits, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var offset) || offset > int.MaxValue)
+            {
+                return false;
+            }
+
+            MoveTo((int)Math.Min(offset, bytes.Count));
+            return true;
+        }
 
         public byte[] ToArray() => [.. bytes];
 
@@ -185,10 +250,57 @@ namespace ClassicMac.App.ViewModels
 
         private void Reload()
         {
-            Lines.Reload(ForkData.FromBytes(bytes.ToArray()), Cursor);
+            ChangedCount = Enumerable.Range(0, bytes.Count).Count(IsChanged);
+            var data = bytes.ToArray();
+            Inspector = HexInspection.At(data, Cursor, meaning);
+            OnPropertyChanged(nameof(Inspector));
+            OnPropertyChanged(nameof(ChangedCount));
+            Lines.Reload(ForkData.FromBytes(data), Cursor, IsChanged);
             OnPropertyChanged(nameof(Status));
             OnPropertyChanged(nameof(IsModified));
             OnPropertyChanged(nameof(Length));
         }
+    }
+
+    /// <summary>One reading of the bytes at the cursor: a label and its value ("—" when there are too few bytes).</summary>
+    public sealed record HexReading(string Label, string Value);
+
+    /// <summary>
+    /// The byte inspector (design/boards/hex.md): "At 0x0003", the bytes at the cursor as UInt8, Int8, UInt16 BE,
+    /// Int16 BE, UInt32 BE, OSType and binary, and what the byte means in its resource when a provider knows (E8).
+    /// </summary>
+    public sealed record HexInspection(string Heading, IReadOnlyList<HexReading> Rows, string? Meaning)
+    {
+        public static HexInspection Empty { get; } = new("", [], null);
+
+        public static HexInspection At(byte[] data, int offset, Func<byte[], int, string?>? meaning)
+        {
+            const string None = "—";
+            var reader = new BigEndianReader(data);
+            string Number<T>(bool read, T value) where T : IFormattable =>
+                read ? value.ToString("N0", CultureInfo.InvariantCulture) : None;
+            var hasByte = reader.TryReadByteAt(offset, out var b);
+            var rows = new List<HexReading>
+            {
+                new("UInt8", hasByte ? b.ToString(CultureInfo.InvariantCulture) : None),
+                new("Int8", hasByte ? ((sbyte)b).ToString(CultureInfo.InvariantCulture) : None),
+                new("UInt16 BE", Number(reader.TryReadUInt16At(offset, out var u16), u16)),
+                new("Int16 BE", Number(reader.TryReadInt16At(offset, out var i16), i16)),
+                new("UInt32 BE", Number(reader.TryReadUInt32At(offset, out var u32), u32)),
+                new("OSType", reader.TryReadUInt32At(offset, out var type) ? $"'{new FourCC(type)}'" : None),
+                new("Binary", hasByte ? $"{Convert.ToString(b >> 4, 2).PadLeft(4, '0')} {Convert.ToString(b & 0xF, 2).PadLeft(4, '0')}" : None),
+            };
+            return new HexInspection(string.Create(CultureInfo.InvariantCulture, $"At 0x{offset:X4}"), rows, meaning?.Invoke(data, offset));
+        }
+    }
+
+    /// <summary>
+    /// Says what a byte of a resource is ("Character 1 of string 1, “Untitled”"), from a field map per type
+    /// (design/boards/hex.md, E8); the hex inspector shows it when the app has one.
+    /// </summary>
+    public interface IByteMeaningProvider
+    {
+        /// <summary>The meaning of the byte at <paramref name="offset"/> of a <paramref name="type"/> resource's <paramref name="data"/>; null when unknown.</summary>
+        string? MeaningOf(FourCC type, short id, ReadOnlySpan<byte> data, int offset);
     }
 }

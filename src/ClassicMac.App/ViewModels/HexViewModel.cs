@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Files;
@@ -13,6 +14,12 @@ namespace ClassicMac.App.ViewModels
     /// <param name="CursorColumn">The character column of the byte the edit cursor is on (in <see cref="Hex"/>), or -1.</param>
     public sealed record HexLine(string Offset, string Hex, string Characters, int CursorColumn = -1)
     {
+        /// <summary>The offset as the grid shows it: "0x" and six hex digits, more when needed.</summary>
+        public string DisplayOffset => "0x" + Offset.TrimStart('0').PadLeft(6, '0');
+
+        /// <summary>The line's bytes one by one, for the grid; while editing, the append position too.</summary>
+        public IReadOnlyList<HexCell> Cells { get; init; } = [];
+
         private string Padded => Hex.PadRight(CursorColumn + 2);
 
         /// <summary>The hex text before the cursor byte (all of it when the cursor is elsewhere).</summary>
@@ -26,6 +33,17 @@ namespace ClassicMac.App.ViewModels
     }
 
     /// <summary>
+    /// One byte of the hex grid (design/boards/hex.md): its two digits and Mac OS Roman character ("·" for non-printables),
+    /// whether it is zero (drawn lighter), changed (tinted), under the cursor, and the last of a group of eight (a gap
+    /// follows). The append position at the end is a cell with no digits.
+    /// </summary>
+    public sealed record HexCell(long Offset, string Hex, string Character, bool IsZero, bool IsChanged, bool IsCursor, bool IsGroupEnd)
+    {
+        /// <summary>A non-printable byte, shown as a muted "·".</summary>
+        public bool IsPlaceholder => Character == "·";
+    }
+
+    /// <summary>
     /// The hex view of some data: a list of 16-byte lines made when shown, read 64 KB at a time, so a disk image's whole
     /// data fork scrolls without being loaded. (A non-generic <see cref="IList"/>, so list controls can virtualise it.)
     /// </summary>
@@ -35,6 +53,7 @@ namespace ClassicMac.App.ViewModels
         private ForkData data;
         private bool editing;
         private int cursor = -1;
+        private Func<int, bool>? changed;
         private long cachedBlock = -1;
         private byte[] cache = [];
 
@@ -44,6 +63,10 @@ namespace ClassicMac.App.ViewModels
         /// becomes another list does not, so the list never goes null.
         /// </summary>
         public static HexLines None { get; } = new(ForkData.Empty);
+
+        /// <summary>The grid's column header: 00 to 0F, a gap after the eighth.</summary>
+        public static IReadOnlyList<HexCell> HeaderCells { get; } =
+            [.. Enumerable.Range(0, BytesPerLine).Select(i => new HexCell(i, i.ToString("X2", CultureInfo.InvariantCulture), "", false, false, false, i == 7))];
 
         public HexLines(ForkData data)
         {
@@ -57,11 +80,12 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Shows edited bytes, with the edit cursor on byte <paramref name="cursorOffset"/> (which may be the
         /// length, to append). There is always a line for the cursor at the end.</summary>
-        public void Reload(ForkData newData, int cursorOffset)
+        public void Reload(ForkData newData, int cursorOffset, Func<int, bool>? isChanged = null)
         {
             data = newData;
             editing = true;
             cursor = cursorOffset;
+            changed = isChanged;
             cachedBlock = -1;
             Count = (int)Math.Min(int.MaxValue, data.Length / BytesPerLine + 1);
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
@@ -89,8 +113,21 @@ namespace ClassicMac.App.ViewModels
                 var line = cache.AsSpan(at, (int)Math.Min(BytesPerLine, cache.Length - at));
                 var hex = new StringBuilder(BytesPerLine * 3);
                 var text = new StringBuilder(BytesPerLine);
+                var cells = new List<HexCell>(BytesPerLine);
                 for (var i = 0; i < BytesPerLine; i++)
                 {
+                    var byteOffset = offset + i;
+                    if (i < line.Length)
+                    {
+                        var ch = MacRoman.ToChar(line[i]);
+                        cells.Add(new HexCell(byteOffset, line[i].ToString("X2", CultureInfo.InvariantCulture), ch < ' ' || ch == '\u007F' ? "·" : ch.ToString(),
+                            line[i] == 0, editing && byteOffset <= int.MaxValue && changed?.Invoke((int)byteOffset) == true, editing && byteOffset == cursor, i == 7));
+                    }
+                    else if (editing && byteOffset == cursor)
+                    {
+                        cells.Add(new HexCell(byteOffset, "", "", false, false, true, i == 7));
+                    }
+
                     if (i == 8)
                     {
                         hex.Append(' ');
@@ -108,7 +145,10 @@ namespace ClassicMac.App.ViewModels
                     }
                 }
                 var column = cursor >= offset && cursor < offset + BytesPerLine ? (int)(cursor - offset) * 3 + (cursor - offset >= 8 ? 1 : 0) : -1;
-                return new HexLine(offset.ToString("X8", CultureInfo.InvariantCulture), hex.ToString().TrimEnd(), text.ToString(), editing ? column : -1);
+                return new HexLine(offset.ToString("X8", CultureInfo.InvariantCulture), hex.ToString().TrimEnd(), text.ToString(), editing ? column : -1)
+                {
+                    Cells = cells,
+                };
             }
         }
 

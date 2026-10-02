@@ -137,8 +137,89 @@
       <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
     </Style>
     <Style Selector="ListBox.hex ListBoxItem">
-      <Setter Property="Padding" Value="12,1" />
+      <Setter Property="Padding" Value="12,0" />
       <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="{DynamicResource CmRowList}" />
+    </Style>
+
+    <!-- The hex grid (boards/hex.md): mono 13, 24 high lines; byte cells 24 wide with a gap after the eighth, characters
+         9 wide; zero bytes lighter; changed bytes on CmWarningTint in SemiBold; the cursor on CmHexCursor. -->
+    <Style Selector="Border.hex-bar">
+      <Setter Property="Padding" Value="12,8" />
+    </Style>
+    <Style Selector="TextBox.go-to">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+      <Setter Property="Width" Value="110" />
+    </Style>
+    <Style Selector="StackPanel.hex-header">
+      <Setter Property="Margin" Value="12,0,12,2" />
+    </Style>
+    <Style Selector="StackPanel.hex-header TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="TextBlock.hex-offset">
+      <Setter Property="Width" Value="80" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.hex-text">
+      <Setter Property="Margin" Value="16,0,0,0" />
+    </Style>
+    <Style Selector="Border.hex-cell">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="20" />
+    </Style>
+    <Style Selector="Border.hex-cell.group-end">
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <Style Selector="Border.hex-cell > TextBlock">
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.hex-char">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Width" Value="9" />
+      <Setter Property="Height" Value="20" />
+    </Style>
+    <Style Selector="Border.hex-char > TextBlock">
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.hex-cell.zero > TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="Border.changed">
+      <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+    </Style>
+    <Style Selector="Border.changed > TextBlock">
+      <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+    </Style>
+    <Style Selector="Border.cursor">
+      <Setter Property="Background" Value="{DynamicResource CmHexCursor}" />
+    </Style>
+    <Style Selector="Border.cursor > TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource CmOnAccent}" />
+    </Style>
+    <Style Selector="Border.hex-inspector">
+      <Setter Property="Width" Value="260" />
+      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+      <Setter Property="BorderThickness" Value="1,0,0,0" />
+    </Style>
+    <Style Selector="Border.hex-inspector TextBlock.mono">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    </Style>
+    <Style Selector="TextBlock.hex-status">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="12,0" />
     </Style>
 
     <!-- The diagnostics list: 26 px rows divided by CmDivider, indented 32 under their group; the selected row is
@@ -1057,32 +1138,114 @@
           </TabItem>
 
           <TabItem Header="Hex" IsVisible="{Binding HasHex}">
-            <DockPanel>
-              <ComboBox DockPanel.Dock="Top" Margin="12,8" MinWidth="260"
-                        ItemsSource="{Binding Hex.Sources}" SelectedItem="{Binding HexSource, Mode=TwoWay}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate DataType="vm:HexSource">
-                    <TextBlock Text="{Binding Label}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
-              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,0,12,8">
-                <Button Content="Edit Bytes" Command="{Binding BeginHexEditCommand}" IsVisible="{Binding !IsHexEditing}" />
-                <Button Content="Apply" Command="{Binding ApplyHexEditCommand}" IsVisible="{Binding IsHexEditing}" />
-                <Button Content="Discard" Command="{Binding DiscardHexEditCommand}" IsVisible="{Binding IsHexEditing}" />
-                <TextBlock Text="{Binding HexEdit.Status}" IsVisible="{Binding IsHexEditing}" VerticalAlignment="Center" Classes="muted" />
-                <TextBlock Text="Hex digits type; Insert toggles insert; Delete, Backspace remove." IsVisible="{Binding IsHexEditing}"
-                           VerticalAlignment="Center" Classes="muted" />
+            <!-- The hex view (boards/hex.md, E7): the resource's bytes in a grid, edited in place with Edit Hex (Ctrl+H) or
+                 Edit Bytes; while editing, the byte inspector on the right and the footer with the mode switch, status,
+                 Discard and Apply. -->
+            <DockPanel x:Name="HexPane">
+              <Border DockPanel.Dock="Top" Classes="hex-bar">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding GoToError}" Classes="error" VerticalAlignment="Center"
+                               IsVisible="{Binding GoToError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Text="Go to" Classes="muted" VerticalAlignment="Center" />
+                    <TextBox x:Name="GoToBox" Classes="go-to" PlaceholderText="0x0000" Text="{Binding GoToText}" IsEnabled="{Binding IsHexEditing}"
+                             AutomationProperties.Name="Go to offset">
+                      <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding GoToCommand}" />
+                      </TextBox.KeyBindings>
+                    </TextBox>
+                  </StackPanel>
+                  <Panel HorizontalAlignment="Left">
+                    <Button Content="Edit Bytes" Command="{Binding BeginHexEditCommand}" IsVisible="{Binding !IsHexEditing}" />
+                    <Border Classes="editing-badge" IsVisible="{Binding IsHexEditing}" VerticalAlignment="Center">
+                      <TextBlock Text="Editing bytes" />
+                    </Border>
+                  </Panel>
+                </DockPanel>
+              </Border>
+              <Border x:Name="HexFooter" DockPanel.Dock="Bottom" Classes="readonly-bar" IsVisible="{Binding IsHexEditing}">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Discard" Command="{Binding DiscardHexEditCommand}" />
+                    <Button Classes="accent" Content="Apply" Command="{Binding ApplyHexEditCommand}" />
+                  </StackPanel>
+                  <ListBox x:Name="HexMode" DockPanel.Dock="Left" Classes="segmented" ItemsSource="{x:Static vm:HexEditor.Modes}"
+                           SelectedIndex="{Binding HexEdit.ModeIndex, Mode=TwoWay, FallbackValue=0}" AutomationProperties.Name="Overwrite or insert" />
+                  <TextBlock Classes="hex-status" Text="{Binding HexEdit.Status, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+              </Border>
+              <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding IsHexEditing}">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="caption" Text="{Binding HexEdit.Inspector.Heading, FallbackValue={x:Null}}" />
+                  <ItemsControl ItemsSource="{Binding HexEdit.Inspector.Rows, FallbackValue={x:Null}}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="vm:HexReading">
+                        <Grid ColumnDefinitions="90,*" Margin="0,2">
+                          <TextBlock Text="{Binding Label}" Classes="muted" />
+                          <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="mono" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <StackPanel Spacing="4" Margin="0,12,0,0"
+                              IsVisible="{Binding HexEdit.Inspector.Meaning, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}">
+                    <TextBlock Classes="caption" Text="IN THIS RESOURCE" />
+                    <TextBlock Text="{Binding HexEdit.Inspector.Meaning, FallbackValue={x:Null}}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Classes="hex-header">
+                <TextBlock Classes="hex-offset" Text="Offset" />
+                <ItemsControl ItemsSource="{x:Static vm:HexLines.HeaderCells}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:HexCell">
+                      <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}">
+                        <TextBlock Text="{Binding Hex}" />
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="hex-text" Text="Mac OS Roman" />
               </StackPanel>
               <ListBox x:Name="HexList" Classes="hex pane" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="vm:HexLine">
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                      <TextBlock Text="{Binding Offset}" Classes="muted" />
-                      <TextBlock>
-                        <Run Text="{Binding Before}" /><Run Text="{Binding At}" Background="{DynamicResource CmHexCursor}" Foreground="{DynamicResource CmOnAccent}" /><Run Text="{Binding After}" />
-                      </TextBlock>
-                      <TextBlock Text="{Binding Characters}" Classes="muted" />
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Classes="hex-offset" Text="{Binding DisplayOffset}" />
+                      <ItemsControl ItemsSource="{Binding Cells}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:HexCell">
+                            <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}" Classes.zero="{Binding IsZero}"
+                                    Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                              <TextBlock Text="{Binding Hex}" />
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                      <ItemsControl ItemsSource="{Binding Cells}" Margin="16,0,0,0">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:HexCell">
+                            <Border Classes="hex-char" Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
+                              <TextBlock Text="{Binding Character}" Classes.muted="{Binding IsPlaceholder}" />
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
                     </StackPanel>
                   </DataTemplate>
                 </ListBox.ItemTemplate>

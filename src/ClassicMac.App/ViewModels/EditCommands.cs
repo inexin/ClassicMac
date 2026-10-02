@@ -55,9 +55,6 @@ namespace ClassicMac.App.ViewModels
         /// <summary>Asks a yes/no question; true for yes.</summary>
         Task<bool> ConfirmAsync(string title, string message);
 
-        /// <summary>Edits bytes as hex: the new bytes, or null when cancelled.</summary>
-        Task<byte[]?> EditHexAsync(string title, byte[] data);
-
         /// <summary>Import: the type (one of <paramref name="types"/>), ID and name to make from <paramref name="fileName"/>, or null when cancelled.</summary>
         Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial);
 
@@ -409,31 +406,48 @@ namespace ClassicMac.App.ViewModels
             Execute(owner, new SetResourceData(node.Resource, data, $"Replace data of {node.Resource}"), () => node.Resource);
         }
 
+        /// <summary>
+        /// Edit Hex (Ctrl+H): the selected resource's bytes in the Hex tab, already in editing (design/boards/hex.md, E7);
+        /// while they are, it only shows the tab. A form's unapplied values are asked about first.
+        /// </summary>
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task EditHex()
         {
+            if (IsHexEditing)
+            {
+                SelectedTab = 2;
+                return;
+            }
+
             if (!await ResolveDraftAsync())
             {
                 return;
             }
 
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null)
+            BeginHexEdit();
+        }
+
+        /// <summary>What bytes mean in their resource (E8), shown by the hex inspector; null while there is no field map.</summary>
+        public IByteMeaningProvider? ByteMeanings { get; set; }
+
+        /// <summary>The Hex tab's Go to box: a hex offset.</summary>
+        [ObservableProperty]
+        private string goToText = "";
+
+        /// <summary>Why the Go to box's text was refused, or null.</summary>
+        [ObservableProperty]
+        private string? goToError;
+
+        /// <summary>Moves the hex cursor to the offset in <see cref="GoToText"/>.</summary>
+        [RelayCommand]
+        private void GoTo()
+        {
+            if (HexEdit is not { } editor)
             {
                 return;
             }
 
-            var resource = node.Resource;
-            if (await EditDialogs.EditHexAsync($"Edit {resource}", resource.GetData().ToArray()) is not { } data)
-            {
-                return;
-            }
-
-            if (data.AsSpan().SequenceEqual(resource.GetData().Span))
-            {
-                return;
-            }
-
-            Execute(owner, new SetResourceData(resource, data, $"Edit {resource}"), () => resource);
+            GoToError = editor.GoTo(GoToText) ? null : "Not a hex offset";
         }
 
         /// <summary>The bytes being edited in the hex view, or null.</summary>
@@ -456,7 +470,11 @@ namespace ClassicMac.App.ViewModels
             }
 
             hexEditTarget = (node.Resource, owner);
-            HexEdit = new HexEditor(node.Resource.GetData());
+            var resource = node.Resource;
+            var meanings = ByteMeanings;
+            HexEdit = new HexEditor(resource.GetData(),
+                meanings is null ? null : (data, offset) => meanings.MeaningOf(resource.Type, resource.Id, data, offset));
+            GoToError = null;
             HexEdit.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
             HexLines = HexEdit.Lines;
             SelectedTab = 2;
@@ -492,6 +510,12 @@ namespace ClassicMac.App.ViewModels
 
             HexEdit = null;
             hexEditTarget = null;
+            // A resource with a preview has no Hex tab once its bytes are not being edited: back to the preview.
+            if (SelectedTab == 2 && Hex.Sources.Count == 0)
+            {
+                SelectedTab = Preview.HasPreview ? 1 : 0;
+            }
+
             return editor.IsModified ? (target.Resource, target.Owner, editor.ToArray()) : null;
         }
 

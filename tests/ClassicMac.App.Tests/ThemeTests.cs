@@ -362,16 +362,17 @@ public class ThemeTests
             }
             model.Selected = Resource("ZZZZ");
             Pump(model.PreviewTask);
-            model.SelectedTab = 2;
+            model.BeginHexEditCommand.Execute(null);   // the cursor shows while editing
             Dispatcher.UIThread.RunJobs();
-            var cursor = window.GetVisualDescendants().OfType<TextBlock>().SelectMany(t => t.Inlines ?? []).OfType<Run>().First(r => r.Background is not null);
+            var cursor = window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("hex-cell") && b.Classes.Contains("cursor"));
+            var cursorText = cursor.GetVisualDescendants().OfType<TextBlock>().Single();
             var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
             InEachTheme(variant =>
             {
                 Assert.Equal(Expected("CmWindowBackground", variant), BrushColour(window.Background));
                 Assert.Equal(Expected("CmSidebarBackground", variant), BrushColour(tree.Background));
                 Assert.Equal(Expected("CmHexCursor", variant), BrushColour(cursor.Background));
-                Assert.Equal(Expected("CmOnAccent", variant), BrushColour(cursor.Foreground));
+                Assert.Equal(Expected("CmOnAccent", variant), BrushColour(cursorText.Foreground));
                 Capture(window, "theme-" + variant.Key.ToString()!.ToLowerInvariant());
             });
             window.Close();

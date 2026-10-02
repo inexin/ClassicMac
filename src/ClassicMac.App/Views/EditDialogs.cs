@@ -189,61 +189,6 @@ namespace ClassicMac.App.Views
         public Task<bool> ConfirmAsync(string title, string message) =>
             Show(title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 }, "Yes", "No");
 
-        public async Task<byte[]?> EditHexAsync(string title, byte[] data)
-        {
-            var box = new TextBox
-            {
-                Text = Format(data),
-                AcceptsReturn = true,
-                TextWrapping = TextWrapping.NoWrap,
-                FontFamily = AppFonts.Mono,
-                Width = 560,
-                Height = 360,
-            };
-            var note = new TextBlock { Classes = { "muted" }, Text = "Hex bytes; spaces and line breaks are ignored." };
-            while (await Show(title, new StackPanel { Spacing = 6, Children = { note, box } }, "OK"))
-            {
-                if (Parse(box.Text ?? "") is { } bytes)
-                {
-                    return bytes;
-                }
-
-                note.Text = "That is not whole hex bytes (0-9, A-F, two digits a byte).";
-            }
-            return null;
-        }
-
-        private static string Format(byte[] data)
-        {
-            var text = new StringBuilder();
-            for (var i = 0; i < data.Length; i++)
-            {
-                text.Append(data[i].ToString("X2", CultureInfo.InvariantCulture));
-                text.Append(i % 16 == 15 ? '\n' : ' ');
-            }
-            return text.ToString().TrimEnd();
-        }
-
-        private static byte[]? Parse(string text)
-        {
-            var digits = new string(text.Where(c => !char.IsWhiteSpace(c)).ToArray());
-            if (digits.Length % 2 != 0)
-            {
-                return null;
-            }
-
-            var bytes = new byte[digits.Length / 2];
-            for (var i = 0; i < bytes.Length; i++)
-            {
-                if (!byte.TryParse(digits.AsSpan(2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out bytes[i]))
-                {
-                    return null;
-                }
-            }
-
-            return bytes;
-        }
-
         private async Task<bool> Show(string title, Control body, string ok, string cancel = "Cancel")
         {
             var result = false;
