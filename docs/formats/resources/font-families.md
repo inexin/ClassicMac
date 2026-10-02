@@ -129,7 +129,7 @@ What Mac OS 9 and the ROM use [Code]:
 - Only the Script Manager's justification reads the style-mapping table, and only the font class's bit 10 ($0400, no
   extra space between characters).
 - Nothing in Mac OS 9 or the ROM reads the offset and bounding-box tables.
-- The Font Manager's use of the width tables and style extras is [quickdraw.md §7](../graphics/quickdraw.md#7-text).
+- The Font Manager's use of the width tables and style extras is [quickdraw.md §2.22](../graphics/quickdraw.md#222-drawing-text).
 
 ### 2.2 Finding a family's strikes
 

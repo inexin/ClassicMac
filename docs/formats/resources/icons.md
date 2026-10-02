@@ -67,13 +67,13 @@ A colour icon (`CIcon`) [Doc: *Imaging With QuickDraw*]:
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
-| +$00 | 50 | iconPMap | A PixMap record ([pict.md §4.5](../graphics/pict.md#45-bitmap-pixmap-and-bitmap-opcode-operands)): baseAddr, rowBytes (the low 14 bits), bounds, pmVersion, packType, packSize, hRes, vRes, pixelType, pixelSize, cmpCount, cmpSize, planeBytes, pmTable, pmReserved |
+| +$00 | 50 | iconPMap | A PixMap record ([quickdraw.md §1.7](../graphics/quickdraw.md#17-bitmaps-and-pixmaps)): baseAddr, rowBytes (the low 14 bits), bounds, pmVersion, packType, packSize, hRes, vRes, pixelType, pixelSize, cmpCount, cmpSize, planeBytes, pmTable, pmReserved |
 | +$32 | 14 | iconMask | A BitMap: baseAddr, rowBytes, bounds |
 | +$40 | 14 | iconBMap | A BitMap; rowBytes 0 when there is no 1-bit icon |
 | +$4E | 4 | iconData | A handle, 0 in the resource |
 | +$52 | iconMask rowBytes × height | mask bits | |
 | follows | iconBMap rowBytes × height | 1-bit icon bits | |
-| follows | 8 + 8 × entries | colour table | A ColorTable ([pict.md §4.6](../graphics/pict.md#46-colortable)) |
+| follows | 8 + 8 × entries | colour table | A ColorTable ([quickdraw.md §1.8](../graphics/quickdraw.md#18-colour-tables)) |
 | follows | iconPMap rowBytes × height | pixels | Unpacked |
 
 ## 2. Reading

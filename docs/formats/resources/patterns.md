@@ -49,9 +49,9 @@ A flattened PixPat [Doc: *Imaging With QuickDraw*]:
 | +$0E | 2 | patXValid | Reserved |
 | +$10 | 4 | patXMap | Reserved, 0 |
 | +$14 | 8 | pat1Data | The 1-bit pattern for 1-bit screens |
-| patMap | 50 | PixMap | A PixMap record ([pict.md §4.5](../graphics/pict.md#45-bitmap-pixmap-and-bitmap-opcode-operands)); pmTable is the offset of its colour table |
+| patMap | 50 | PixMap | A PixMap record ([quickdraw.md §1.7](../graphics/quickdraw.md#17-bitmaps-and-pixmaps)); pmTable is the offset of its colour table |
 | patData | to pmTable | pixel data | |
-| pmTable | 8 + 8 × (ctSize + 1) | colour table | A ColorTable ([pict.md §4.6](../graphics/pict.md#46-colortable)) |
+| pmTable | 8 + 8 × (ctSize + 1) | colour table | A ColorTable ([quickdraw.md §1.8](../graphics/quickdraw.md#18-colour-tables)) |
 
 ### 1.3 ppt#
 
@@ -79,7 +79,7 @@ GetPixPat [Code]:
    - 0: the pattern is the first 8 bytes of the pixel data (at patData), not pat1Data.
    - 1 and 3: the PixMap.
    - 2 (RGB): the colour is the ColorTable's entry 4 (table + $2A); the resource's pixels are ignored. A 32-bit screen
-     draws it solid; other depths draw PatDither's 2 × 2 cell ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths)).
+     draws it solid; other depths draw PatDither's 2 × 2 cell ([quickdraw.md §4.6](../graphics/quickdraw.md#46-screen-depths)).
    - Above 3: Mac OS 9 fails to load it.
 
 ### 2.2 ppt#
@@ -124,7 +124,7 @@ The four pattern types (§2.1 step 4). The ROM's GetPixPat was not traced.
 ## 8. Not covered
 
 - Writing patterns.
-- A type 2 `ppat` at depths below 32 bits (PatDither) in the export; the renderer draws it ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths)).
+- A type 2 `ppat` at depths below 32 bits (PatDither) in the export; the renderer draws it ([quickdraw.md §4.6](../graphics/quickdraw.md#46-screen-depths)).
 
 ## 9. References
 

@@ -4,7 +4,7 @@ The Font Manager's bitmap font strikes, `'NFNT'` and `'FONT'`, and the font colo
 colour strikes. A strike is one size and style of a font: a header, every glyph's image side by side in one bitmap,
 and per-character tables. Strikes live in the System file, font suitcases and applications; a family record
 ([font-families.md](font-families.md)) ties them together. ClassicMac reads strikes and colour tables, draws text with
-them ([quickdraw.md §7](../graphics/quickdraw.md#7-text)), and exports a strike as a glyph sheet, a BDF font and JSON.
+them ([quickdraw.md §2.22](../graphics/quickdraw.md#222-drawing-text)), and exports a strike as a glyph sheet, a BDF font and JSON.
 
 | | |
 | --- | --- |
@@ -112,7 +112,7 @@ As Mac OS 9 reads it [Code], the layout from [Doc]:
 ### 2.2 Placing a glyph
 
 The pen advances by the glyph's advance; the image's left edge is at pen + kernMax + offset; its top row is the font's
-ascent above the baseline [Doc]. How QuickDraw draws the glyph is [quickdraw.md §7](../graphics/quickdraw.md#7-text).
+ascent above the baseline [Doc]. How QuickDraw draws the glyph is [quickdraw.md §2.22](../graphics/quickdraw.md#222-drawing-text).
 
 ### 2.3 A colour strike's colours
 
@@ -198,7 +198,7 @@ None.
 - Golden outputs in `tests/ClassicMac.Resources.Decoders.Tests/Golden` (`GoldenFixtures`, made in code): `FONT-1033`
   and `NFNT-1036` (`.json`, `.bdf`, and the sheet's hash; 1036 with width and height tables), `FONT-1024` (a family
   name only), `fctb-1036`.
-- The renderer's use of strikes is verified as [quickdraw.md §7](../graphics/quickdraw.md#7-text) records.
+- The renderer's use of strikes is verified as [quickdraw.md §2.22](../graphics/quickdraw.md#222-drawing-text) records.
 
 ## 8. Not covered
 

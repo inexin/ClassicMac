@@ -104,7 +104,7 @@ None.
 ## 8. Not covered
 
 - Drawing with outline fonts: the renderer approximates text without a bitmap strike
-  ([quickdraw.md §7](../graphics/quickdraw.md#7-text)).
+  ([quickdraw.md §2.22](../graphics/quickdraw.md#222-drawing-text)).
 - Checking table checksums.
 
 ## 9. References

@@ -51,9 +51,9 @@ Contents
 | +$54 | 4 | crsrHotSpot | A Point (v, h) |
 | +$58 | 4 | crsrXTable | Reserved, 0 |
 | +$5C | 4 | crsrID | Reserved, 0 |
-| crsrMap | 50 | PixMap | A PixMap record ([pict.md §4.5](../graphics/pict.md#45-bitmap-pixmap-and-bitmap-opcode-operands)); its pmTable is the offset of its ColorTable |
+| crsrMap | 50 | PixMap | A PixMap record ([quickdraw.md §1.7](../graphics/quickdraw.md#17-bitmaps-and-pixmaps)); its pmTable is the offset of its ColorTable |
 | crsrData | rowBytes × height | pixels | |
-| pmTable | 8 + 8 × entries | colour table | A ColorTable ([pict.md §4.6](../graphics/pict.md#46-colortable)) |
+| pmTable | 8 + 8 × entries | colour table | A ColorTable ([quickdraw.md §1.8](../graphics/quickdraw.md#18-colour-tables)) |
 
 [Doc]
 

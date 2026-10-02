@@ -239,7 +239,7 @@ The ROM's Icon Utilities differ from §2.1 [Code: 68k ROM]:
 
 A selected icon, or any drawn with colours other than black on white, whose member is scaled comes out as a solid
 black mask, because of Mac OS 9.0's scaled CopyMask (a bug;
-[quickdraw.md §9.1](../graphics/quickdraw.md#91-bitmaps)); offline then adds white dots, and disabled changes nothing
+[quickdraw.md §4.1](../graphics/quickdraw.md#41-mac-os-9-bitmaps)); offline then adds white dots, and disabled changes nothing
 [Verified]. The ROM draws it white on black at every size [Code: 68k ROM].
 
 ### 4.3 Mac OS 9.2.2
