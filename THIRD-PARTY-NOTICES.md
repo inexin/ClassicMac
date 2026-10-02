@@ -266,3 +266,10 @@ The app (not the libraries) references these NuGet packages, which ship their ow
 - [SoundFlow](https://github.com/LSXPrime/SoundFlow) 1.4.1, MIT, for sound playback. It bundles native
   [miniaudio](https://miniaud.io) builds (MIT or public domain, at your choice).
 - Avalonia and CommunityToolkit.Mvvm, MIT.
+
+The app also bundles fonts as assets:
+
+- [IBM Plex](https://github.com/IBM/plex) Sans 1.1.0 (Regular, Italic, SemiBold, SemiBold Italic) and Plex Mono 2.5.0
+  (Regular, SemiBold), TrueType files from IBM's releases, in `src/ClassicMac.App/Assets/Fonts/`. Copyright © 2017
+  IBM Corp. with Reserved Font Name "Plex", under the SIL Open Font License 1.1, whose text is beside them in
+  `OFL.txt`. The fonts are unmodified.

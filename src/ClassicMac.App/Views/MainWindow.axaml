@@ -173,7 +173,7 @@
                   <views:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
-                  <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
+                  <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding Preview.IsDialog}" HorizontalScrollBarVisibility="Auto">
                   <views:DialogView Dialog="{Binding Preview.Dialog}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
@@ -248,7 +248,7 @@
                 <TextBlock Text="Hex digits type; Insert toggles insert; Delete, Backspace remove." IsVisible="{Binding IsHexEditing}"
                            VerticalAlignment="Center" Opacity="0.5" />
               </StackPanel>
-              <ListBox x:Name="HexList" Classes="hex" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13">
+              <ListBox x:Name="HexList" Classes="hex" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="vm:HexLine">
                     <StackPanel Orientation="Horizontal" Spacing="16">

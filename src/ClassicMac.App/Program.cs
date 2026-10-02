@@ -13,7 +13,7 @@ namespace ClassicMac.App
         public static AppBuilder BuildAvaloniaApp() =>
             AppBuilder.Configure<App>()
                 .UsePlatformDetect()
-                .WithInterFont()
+                .WithAppFonts()
                 .LogToTrace();
     }
 }

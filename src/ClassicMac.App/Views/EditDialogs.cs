@@ -166,7 +166,7 @@ namespace ClassicMac.App.Views
         {
             var box = new TextBox
             {
-                Text = Format(data), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = new FontFamily("Cascadia Mono, Consolas, Menlo, monospace"),
+                Text = Format(data), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = AppFonts.Mono,
                 Width = 560, Height = 360,
             };
             var note = new TextBlock { Opacity = 0.65, Text = "Hex bytes; spaces and line breaks are ignored." };
