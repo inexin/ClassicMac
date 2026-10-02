@@ -22,6 +22,10 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         private bool hideInvisible = true;
 
+        /// <summary>Whether rows show their details column on the right (type · creator, sizes, the input's format and size, the "No name" count); off by default.</summary>
+        [ObservableProperty]
+        private bool showDetails;
+
         /// <summary>Raised after a part of the tree was laid out (files read or changed).</summary>
         internal event Action? LaidOut;
 
@@ -221,9 +225,19 @@ namespace ClassicMac.App.ViewModels
             this.settings = settings;
             DiagnosticsPanel = new DiagnosticsPanel(entry => SelectedDiagnostic = entry);
             var saved = settings.Load();
-            TreeDisplay = new TreeDisplayOptions { GroupNoName = saved.GroupNoName, HideInvisible = saved.HideInvisible };
+            TreeDisplay = new TreeDisplayOptions { GroupNoName = saved.GroupNoName, HideInvisible = saved.HideInvisible, ShowDetails = saved.ShowDetails };
             theme = saved.Theme;
-            TreeDisplay.PropertyChanged += (_, _) => OnTreeDisplayChanged();
+            TreeDisplay.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(TreeDisplayOptions.ShowDetails))
+                {
+                    OnShowDetailsChanged();
+                }
+                else
+                {
+                    OnTreeDisplayChanged();
+                }
+            };
             TreeDisplay.LaidOut += UpdateHiddenCount;
             WatchSummary();
             TreeDisplay.LaidOut += ReapplySearch;
@@ -236,6 +250,7 @@ namespace ClassicMac.App.ViewModels
             {
                 GroupNoName = TreeDisplay.GroupNoName,
                 HideInvisible = TreeDisplay.HideInvisible,
+                ShowDetails = TreeDisplay.ShowDetails,
                 RecentFiles = RecentFiles.Select(r => r.Path).ToList(),
             });
 
@@ -260,6 +275,16 @@ namespace ClassicMac.App.ViewModels
         private void ShowHidden() => TreeDisplay.HideInvisible = false;
 
         private void UpdateHiddenCount() => HiddenCount = Roots.Sum(Tree.HiddenCount);
+
+        // The details column switched: saved, and every row's meta shown or hidden.
+        private void OnShowDetailsChanged()
+        {
+            SaveSettings();
+            foreach (var row in AllRows())
+            {
+                row.OnMetaChanged();
+            }
+        }
 
         // An option changed: it is saved and every tree laid out again; the selection stays, or moves to its folder
         // when it is now hidden.

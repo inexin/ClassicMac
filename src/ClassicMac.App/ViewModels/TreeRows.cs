@@ -79,7 +79,23 @@ namespace ClassicMac.App.ViewModels
         /// The row's right-aligned meta: type · creator for a file, the size for a resource, format and size for the
         /// input; null for the others.
         /// </summary>
-        public string? Meta => this switch
+        public string? Meta => DetailsShown ? Details : null;
+
+        // Whether the tree shows the details column (Tree display ▸ Show details column; off when the node is in no input).
+        private bool DetailsShown
+        {
+            get
+            {
+                var at = this;
+                while (at.Parent is { } parent)
+                {
+                    at = parent;
+                }
+                return at is InputNode { Display.ShowDetails: true };
+            }
+        }
+
+        private string? Details => this switch
         {
             FileNode file => FormatTypeCreator(file.File.FinderInfo.Type, file.File.FinderInfo.Creator),
             ContainerFileNode container => FormatTypeCreator(container.File.FinderInfo.Type, container.File.FinderInfo.Creator),

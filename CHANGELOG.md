@@ -6,6 +6,11 @@
   resource's family at 32 × 32 (16 when it has only small members), a cicn fitted into 32, a cursor, or a file's
   Finder icon at 32; the kind icon otherwise. Icon families list their members ("ICN# · icl8 · ics#", or an icns's
   member types). The toolbar's Export… now does what the header's does for the selection.
+- Viewer: tree rows fit the pane: no sideways scrolling; a long name trims with an ellipsis while the "not read" chip
+  and the right-hand details stay whole; the vertical scroll bar no longer covers the details (it is laid out beside
+  the rows, not over them).
+- Viewer: Tree display ▸ Show details column (also in View, off by default, remembered): the rows' right-hand details
+  (type · creator, resource sizes, the input's format and size, the "No name" count) show only when it is on.
 - Viewer: the inspector has a header above its tabs: the selection's icon on a checkerboard tile, its name, its kind
   and owner ("String list in Prefs") and its facts (type, ID, size and attributes for a resource; type / creator, total
   size and resources for a file), with Export… and, for resources with a form, Edit. The Edit tab is gone: Edit opens

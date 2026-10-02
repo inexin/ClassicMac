@@ -510,7 +510,10 @@ tree) steps through the matches among the loaded rows (F3, Shift+F3) without hid
 hidden · Show"; a folder's files whose names are empty or only whitespace (space, option-space, control characters)
 fold into one collapsed "No name" node when there are two or more, their names shown with the whitespace made visible
 (␣ ⍽ ↵); one alone is titled "(no name)". A "Tree display" popover switches both (on by default). Only the tree
-changes: each folder node keeps all its items for exports, previews, Details and the Volume commands.
+changes: each folder node keeps all its items for exports, previews, Details and the Volume commands. A third option, "Show details column"
+(off by default), shows the rows' right-hand details (type · creator, sizes). Rows fit the pane (names trim, the chip
+and details stay whole) and the tree's vertical scroll bar is laid out beside the rows (Fluent's overlay auto-hide is
+off for the tree), so it never covers the details.
 
 **Settings:** what the app remembers between sessions (the tree display options, the recent files) is kept as JSON in
 `%AppData%/ClassicMac/settings.json` (`Environment.SpecialFolder.ApplicationData`, so `~/.config` on Linux and

@@ -77,7 +77,8 @@ public sealed class TreeDisplayTests : IDisposable
     [Fact]
     public async Task Files_with_no_name_are_grouped_first_among_the_files()
     {
-        var (_, input, _) = await Open();
+        var (model, input, _) = await Open();
+        model.TreeDisplay.ShowDetails = true;                                // the count is in the details column
         var realmz = Folder(input, "Realmz");
         var group = Assert.IsType<NoNameGroupNode>(realmz.Children.First(c => c is not FolderNode));
         Assert.Equal(NodeKind.NoNameGroup, group.Kind);

@@ -345,6 +345,7 @@
         <Separator />
         <MenuItem Header="_Group Files with No Name" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.GroupNoName, Mode=TwoWay}" />
         <MenuItem Header="_Hide Invisible Files" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.HideInvisible, Mode=TwoWay}" />
+        <MenuItem Header="Show _Details Column" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.ShowDetails, Mode=TwoWay}" />
         <Separator />
         <MenuItem Header="_Theme">
           <MenuItem Header="_System" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsSystemTheme, Mode=OneWay}"
@@ -500,6 +501,7 @@
                   <TextBlock Text="Tree display" FontWeight="SemiBold" />
                   <CheckBox Content="Group files with no name" IsChecked="{Binding TreeDisplay.GroupNoName}" />
                   <CheckBox Content="Hide invisible files" IsChecked="{Binding TreeDisplay.HideInvisible}" />
+                  <CheckBox Content="Show details column" IsChecked="{Binding TreeDisplay.ShowDetails}" />
                 </StackPanel>
               </Flyout>
             </Button.Flyout>
@@ -525,7 +527,8 @@
           </StackPanel>
         </Border>
         <Panel>
-        <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
+        <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+                  ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
           <TreeView.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
           </TreeView.KeyBindings>
@@ -534,25 +537,28 @@
               <!-- A row (boards/browse-tree.md): icon or spinner, name, unsaved mark, "not read" chip; meta on the right. -->
               <Panel Classes="tree-row">
                 <Rectangle Classes="drag-outline" IsVisible="{Binding IsDragSource}" />
+                <!-- The row fits the pane: the meta and the chip keep their width on the right, the name trims with an
+                     ellipsis (a left-aligned grid: the name's star column is as wide as the name until the row is
+                     full), the unsaved mark right after it. -->
                 <DockPanel>
                   <TextBlock DockPanel.Dock="Right" Classes="meta" Text="{Binding Meta}"
                              IsVisible="{Binding Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                  <StackPanel Orientation="Horizontal" Spacing="4">
-                    <views:TreeIcon Node="{Binding}" IsVisible="{Binding !IsLoading}" />
-                    <Panel Classes="spinner" IsVisible="{Binding IsLoading}">
-                      <Ellipse Classes="track" />
-                      <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
-                    </Panel>
+                  <Panel DockPanel.Dock="Right" Classes="not-read" IsVisible="{Binding IsUnread}">
+                    <Rectangle />
+                    <TextBlock Text="not read" />
+                  </Panel>
+                  <views:TreeIcon DockPanel.Dock="Left" Margin="0,0,4,0" Node="{Binding}" IsVisible="{Binding !IsLoading}" />
+                  <Panel DockPanel.Dock="Left" Margin="0,0,4,0" Classes="spinner" IsVisible="{Binding IsLoading}">
+                    <Ellipse Classes="track" />
+                    <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
+                  </Panel>
+                  <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
                     <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}"
-                               Classes.mono="{Binding IsMono}" Classes.dimmed="{Binding IsDimmed}">
+                               Classes.mono="{Binding IsMono}" Classes.dimmed="{Binding IsDimmed}" TextTrimming="CharacterEllipsis">
                       <Run Text="{Binding NameBefore}" /><Run Classes="match" Classes.on="{Binding HasMatch}" Classes.current="{Binding IsCurrentMatch}" Text="{Binding NameMatch}" /><Run Text="{Binding NameAfter}" />
                     </TextBlock>
-                    <TextBlock Classes="unsaved" Text=" •" IsVisible="{Binding IsUnsaved}" />
-                    <Panel Classes="not-read" IsVisible="{Binding IsUnread}">
-                      <Rectangle />
-                      <TextBlock Text="not read" />
-                    </Panel>
-                  </StackPanel>
+                    <TextBlock Grid.Column="1" Classes="unsaved" Text=" •" IsVisible="{Binding IsUnsaved}" />
+                  </Grid>
                 </DockPanel>
               </Panel>
             </TreeDataTemplate>

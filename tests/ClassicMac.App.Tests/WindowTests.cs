@@ -778,6 +778,7 @@ public class WindowTests
         try
         {
             var model = new MainViewModel();
+            model.TreeDisplay.ShowDetails = true;                            // the group's count is in the details column
             var window = new MainWindow { DataContext = model };
             var baselines = new List<string>();
             window.Show();
@@ -811,8 +812,8 @@ public class WindowTests
             Dispatcher.UIThread.RunJobs();
             var panel = (StackPanel)((Flyout)options.Flyout).Content!;
             var boxes = panel.Children.OfType<CheckBox>().ToList();
-            Assert.Equal(["Group files with no name", "Hide invisible files"], boxes.Select(b => (string)b.Content!));
-            Assert.Equal([true, false], boxes.Select(b => b.IsChecked == true));
+            Assert.Equal(["Group files with no name", "Hide invisible files", "Show details column"], boxes.Select(b => (string)b.Content!));
+            Assert.Equal([true, false, true], boxes.Select(b => b.IsChecked == true));
             boxes[0].IsChecked = false;
             boxes[1].IsChecked = true;
             Dispatcher.UIThread.RunJobs();

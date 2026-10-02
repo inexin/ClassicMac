@@ -183,6 +183,7 @@ public class TreeViewTests
         try
         {
             var model = new MainViewModel();
+            model.TreeDisplay.ShowDetails = true;                            // the details column (off by default)
             var window = new MainWindow { DataContext = model };
             window.Show();
             Pump(model.OpenAsync(TreeRowTests.Disk(folder)));

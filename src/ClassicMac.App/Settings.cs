@@ -20,8 +20,9 @@ namespace ClassicMac.App
     /// <param name="HideInvisible">Whether the tree leaves out files with the Finder's invisible flag.</param>
     /// <param name="Theme">The theme chosen in View ▸ Theme.</param>
     /// <param name="RecentFiles">The files opened last, newest first (the empty state's Recent list).</param>
+    /// <param name="ShowDetails">Whether the tree shows its rows' details column (type · creator, sizes).</param>
     public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true, AppTheme Theme = AppTheme.System,
-        IReadOnlyList<string>? RecentFiles = null)
+        IReadOnlyList<string>? RecentFiles = null, bool ShowDetails = false)
     {
         /// <summary>The files opened last, newest first; empty when none.</summary>
         public IReadOnlyList<string> RecentFiles { get; init; } = RecentFiles ?? [];
@@ -29,6 +30,7 @@ namespace ClassicMac.App
         // The list compares by its paths, so equal settings are equal records.
         public bool Equals(AppSettings? other) =>
             other is not null && GroupNoName == other.GroupNoName && HideInvisible == other.HideInvisible && Theme == other.Theme
+            && ShowDetails == other.ShowDetails
             && RecentFiles.SequenceEqual(other.RecentFiles);
 
         public override int GetHashCode()
@@ -37,6 +39,7 @@ namespace ClassicMac.App
             hash.Add(GroupNoName);
             hash.Add(HideInvisible);
             hash.Add(Theme);
+            hash.Add(ShowDetails);
             foreach (var path in RecentFiles)
             {
                 hash.Add(path);

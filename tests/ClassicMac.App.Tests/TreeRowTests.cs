@@ -88,6 +88,7 @@ public class TreeRowTests : IDisposable
     public async Task The_meta_is_type_and_creator_for_files_size_for_resources_format_and_size_for_the_input()
     {
         var model = new MainViewModel();
+        model.TreeDisplay.ShowDetails = true;                                // the details column (off by default)
         var path = Disk(folder);
         var input = (await model.OpenAsync(path))!;
         var icons = Child<FileNode>(input, "Icons");
