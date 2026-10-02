@@ -463,6 +463,143 @@ public class WindowTests
         owner.Close();
     });
 
+    // The shell (design/boards/main-window.md): the title bar (S1), the toolbar bound to the commands (S2), the View,
+    // Window and Help menus and the About box (S7).
+    [Fact]
+    public void The_title_bar_toolbar_menus_and_about_box_work() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Shell.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("ICN#", 128, null, new byte[256]), ("TEXT", 128, null, "hello"u8.ToArray())));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            var input = open.Result!;
+            Pump(input.EnsureLoadedAsync());
+            Dispatcher.UIThread.RunJobs();
+
+            // S1: on Windows and macOS the window extends into its decorations and shows its own title bar.
+            var titleBar = window.FindControl<Border>("TitleBar")!;
+            Assert.Equal(!OperatingSystem.IsLinux(), window.ExtendClientAreaToDecorationsHint);
+            Assert.Equal(!OperatingSystem.IsLinux(), titleBar.IsVisible);
+            Assert.Equal(Avalonia.Input.WindowDecorationsElementRole.TitleBar, Avalonia.Controls.Chrome.WindowDecorationProperties.GetElementRole(titleBar));
+            Assert.Equal("Shell.rsrc — ClassicMac", window.Title);
+            Assert.Contains(titleBar.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Shell.rsrc" && t.IsEffectivelyVisible);
+
+            // S2: each toolbar button runs its command and follows its enabled state.
+            var tools = window.FindControl<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("tool"))
+                .ToDictionary(b => Avalonia.Automation.AutomationProperties.GetName(b)!);
+            Assert.Equal(["Open", "Save", "Get Info", "Edit Hex", "Export", "Extract All", "Play"], tools.Keys);
+            Assert.Same(model.OpenCommand, tools["Open"].Command);
+            Assert.Same(model.SaveCommand, tools["Save"].Command);
+            Assert.Same(model.GetInfoCommand, tools["Get Info"].Command);
+            Assert.Same(model.EditHexCommand, tools["Edit Hex"].Command);
+            Assert.Same(model.ExportResourcesCommand, tools["Export"].Command);
+            Assert.Same(model.ExtractAllCommand, tools["Extract All"].Command);
+            Assert.Same(model.PlaySoundCommand, tools["Play"].Command);
+            void EnabledFollowCommands()
+            {
+                Dispatcher.UIThread.RunJobs();
+                Assert.All(tools.Values, b => Assert.Equal(b.Command!.CanExecute(null), b.IsEffectivelyEnabled));
+            }
+
+            EnabledFollowCommands();
+            Assert.False(tools["Edit Hex"].IsEffectivelyEnabled);              // the input: no resource
+            var zoom = window.FindControl<ListBox>("ZoomChoice")!;
+            var depth = window.FindControl<ComboBox>("DepthChoice")!;
+            model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ICN#").Children[0];
+            Pump(model.PreviewTask);
+            EnabledFollowCommands();
+            Assert.True(tools["Edit Hex"].IsEffectivelyEnabled);
+            Assert.True(zoom.IsEffectivelyEnabled);
+            Assert.True(depth.IsEffectivelyEnabled);
+            zoom.SelectedIndex = 3;
+            Assert.Equal(8, model.Zoom);
+            depth.SelectedIndex = 3;
+            Assert.Equal(8, model.ScreenDepth);
+            Pump(model.PreviewTask);
+            Capture(window, "shell", baselines);
+            model.SetScreenDepthCommand.Execute(32);
+            Pump(model.PreviewTask);
+            model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "TEXT").Children[0];
+            Pump(model.PreviewTask);
+            EnabledFollowCommands();
+            Assert.False(zoom.IsEffectivelyEnabled);
+            Assert.False(depth.IsEffectivelyEnabled);
+
+            // S7: the menus, in the board's order; the View menu's theme and depth items; the Window menu's inputs.
+            var menu = window.GetVisualDescendants().OfType<Menu>().First();
+            var top = menu.Items.OfType<MenuItem>().ToList();
+            Assert.Equal(["_File", "_Edit", "_View", "_Resource", "_Volume", "E_xport", "_Window", "_Help"], top.Select(m => (string)m.Header!));
+            MenuItem Item(MenuItem parent, string header) => parent.Items.OfType<MenuItem>().Single(m => (string?)m.Header == header);
+            var view = top[2];
+            Assert.Same(model.ZoomInCommand, Item(view, "Zoom _In").Command);
+            Assert.Same(model.ZoomOutCommand, Item(view, "Zoom _Out").Command);
+            Assert.Same(model.ActualSizeCommand, Item(view, "_Actual Size").Command);
+            var dark = Item(Item(view, "_Theme"), "_Dark");
+            dark.Command!.Execute(dark.CommandParameter);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(Avalonia.Styling.ThemeVariant.Dark, Application.Current!.RequestedThemeVariant);
+            Assert.True(dark.IsChecked);
+            var system = Item(Item(view, "_Theme"), "_System");
+            system.Command!.Execute(system.CommandParameter);
+            Assert.Equal(Avalonia.Styling.ThemeVariant.Default, Application.Current!.RequestedThemeVariant);
+            Item(view, "Show _Diagnostics").IsChecked = false;
+            Assert.False(model.DiagnosticsPanel.IsExpanded);
+            model.DiagnosticsPanel.IsExpanded = true;
+            Item(view, "_Hide Invisible Files").IsChecked = false;
+            Assert.False(model.TreeDisplay.HideInvisible);
+            view.Open();
+            Dispatcher.UIThread.RunJobs();
+            var depths = Item(view, "Screen _Depth");
+            depths.Open();
+            Dispatcher.UIThread.RunJobs();
+            var depthItems = Avalonia.LogicalTree.LogicalExtensions.GetLogicalChildren(depths).OfType<MenuItem>().ToList();
+            Assert.Equal(["1-bit", "2-bit", "4-bit", "8-bit (256)", "16-bit", "32-bit"], depthItems.Select(m => (string)m.Header!));
+            Assert.True(depthItems[5].IsChecked);
+            depthItems[2].Command!.Execute(depthItems[2].CommandParameter);
+            Assert.Equal(4, model.ScreenDepth);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(depthItems[2].IsChecked);
+            depths.Close();
+            view.Close();
+
+            var windowMenu = top[6].Items.OfType<MenuItem>().ToList();
+            Assert.Equal(["_Minimize", "_Zoom", "Shell.rsrc"], windowMenu.Select(m => (string)m.Header!));
+            Assert.True(windowMenu[2].IsChecked);
+            windowMenu[1].Command!.Execute(null);
+            Assert.Equal(WindowState.Maximized, window.WindowState);
+            windowMenu[1].Command!.Execute(null);
+            Assert.Equal(WindowState.Normal, window.WindowState);
+            Assert.Same(model.ShowInputCommand, windowMenu[2].Command);
+
+            var help = top[7].Items.OfType<MenuItem>().ToList();
+            Assert.Same(model.OpenHelpCommand, help[0].Command);
+            Assert.Same(model.ReportProblemCommand, help[1].Command);
+            Assert.Same(model.AboutCommand, help[2].Command);
+            var about = model.AboutCommand.ExecuteAsync(null);
+            Dispatcher.UIThread.RunJobs();
+            var box = window.About!;
+            Assert.Contains(box.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == $"Version {AboutInfo.Current.Version}");
+            Assert.Contains("IBM Plex", box.GetVisualDescendants().OfType<SelectableTextBlock>().Single(t => t.Name == "Notices").Text);
+            Baselines.Check(box, "about", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+            box.Close();
+            Pump(about);
+            Assert.Null(window.About);
+            window.Close();
+            Baselines.Verify(baselines);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
     // "Show item" on the selected diagnostic (design/boards/diagnostics.md) scrolls the tree to its node and focuses it;
     // the link shows on the selected row only, and the panel has its drag handle.
     [Fact]

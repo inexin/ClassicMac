@@ -29,6 +29,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The About box's licence and third-party notices. -->
+    <EmbeddedResource Include="..\..\LICENSE" LogicalName="LICENSE" Link="About\LICENSE" />
+    <EmbeddedResource Include="..\..\THIRD-PARTY-NOTICES.md" LogicalName="THIRD-PARTY-NOTICES.md" Link="About\THIRD-PARTY-NOTICES.md" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.App.Tests" />
   </ItemGroup>
 

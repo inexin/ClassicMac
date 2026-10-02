@@ -5,10 +5,19 @@ using System.Text.Json.Serialization;
 
 namespace ClassicMac.App
 {
+    /// <summary>The app's theme (View ▸ Theme): the system's light or dark, or one of them always.</summary>
+    public enum AppTheme
+    {
+        System,
+        Light,
+        Dark,
+    }
+
     /// <summary>The app's settings that last between sessions.</summary>
     /// <param name="GroupNoName">Whether the tree groups a folder's files with no name under one "No name" node.</param>
     /// <param name="HideInvisible">Whether the tree leaves out files with the Finder's invisible flag.</param>
-    public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true);
+    /// <param name="Theme">The theme chosen in View ▸ Theme.</param>
+    public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true, AppTheme Theme = AppTheme.System);
 
     /// <summary>Where settings are kept: a JSON file for the app, memory for tests.</summary>
     public interface ISettingsStore

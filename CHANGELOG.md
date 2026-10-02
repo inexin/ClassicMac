@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Viewer: a custom title bar on Windows and macOS (the window extends into its decorations; the platform's caption
+  buttons stay, the bar drags the window), with the selected file's name, a " •" while it has unsaved edits, and the
+  app's name; Linux keeps the system title bar (S1).
+- Viewer: a toolbar with Open, Save, Get Info, Edit Hex, Export…, Extract All and Play, each following its command's
+  enabled state, and the preview's Zoom (1× 2× 4× 8×) and screen Depth, moved there from the Preview tab (S2).
+- Viewer: View menu (Zoom In, Zoom Out, Actual Size, Screen Depth, Show Diagnostics, the tree's display options, Theme:
+  System, Light or Dark, remembered), Window menu (Minimize, Zoom, one item per open file) and Help menu (ClassicMac
+  Help, Report a Problem…, About ClassicMac); the About box shows the version, what the app does, the repository, the
+  MIT licence and the third-party notices (S7).
 - Viewer: each resource that differs from the file as saved (new, renamed, other attributes or data) carries the
   unsaved " •" in the tree, not only its file; it clears on Save, or when undo brings the resource back (T6).
 - Viewer: a file never given a type or creator (zeros) shows no type · creator in the tree, and a dash for the one

@@ -152,13 +152,16 @@ namespace ClassicMac.App.ViewModels
         public IReadOnlyList<int> Zooms { get; } = [1, 2, 4, 8];
 
         [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(SelectedDepthChoice))]
         private int screenDepth = 32;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ZoomInCommand), nameof(ZoomOutCommand), nameof(ActualSizeCommand))]
         private int zoom = 1;
 
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(PlaySoundCommand))]
+        [NotifyCanExecuteChangedFor(nameof(PlaySoundCommand), nameof(ZoomInCommand), nameof(ZoomOutCommand), nameof(ActualSizeCommand))]
+        [NotifyPropertyChangedFor(nameof(IsZoomable))]
         private PreviewViewModel preview = PreviewViewModel.None;
 
         [ObservableProperty]

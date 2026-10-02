@@ -3,9 +3,11 @@
         xmlns:vm="using:ClassicMac.App.ViewModels"
         xmlns:views="using:ClassicMac.App.Views"
         xmlns:editing="using:ClassicMac.Files.Editing"
+        xmlns:app="using:ClassicMac.App"
+        xmlns:chrome="using:Avalonia.Controls.Chrome"
         x:Class="ClassicMac.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="ClassicMac"
+        Title="{Binding WindowTitle}"
         Width="1200" Height="780" MinWidth="700" MinHeight="450"
         DragDrop.AllowDrop="True">
 
@@ -105,6 +107,102 @@
     <Style Selector="Grid.diagnostic-columns.grouped">
       <Setter Property="Margin" Value="35,0,8,0" />
     </Style>
+
+    <!-- Title bar (S1): CmBarTitle high on CmTitleBarBackground, the title in CmFontMeta and CmTextMuted, the unsaved
+         mark in CmAccent. The platform's caption buttons sit over its right end (Windows, 3 x 46) or left end (macOS). -->
+    <Style Selector="Border.titlebar">
+      <Setter Property="Height" Value="{DynamicResource CmBarTitle}" />
+      <Setter Property="Background" Value="{DynamicResource CmTitleBarBackground}" />
+      <Setter Property="Padding" Value="12,0,146,0" />
+    </Style>
+    <Style Selector="Border.titlebar.mac">
+      <Setter Property="Padding" Value="78,0,12,0" />
+    </Style>
+    <Style Selector="Border.titlebar TextBlock">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.titlebar TextBlock.unsaved">
+      <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+      <Setter Property="Margin" Value="-4,0,0,0" />
+    </Style>
+    <Style Selector="Path.app-icon">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+      <Setter Property="Stroke" Value="{DynamicResource CmText}" />
+      <Setter Property="StrokeThickness" Value="1" />
+    </Style>
+
+    <!-- Toolbar (S2): CmBarTool high, a CmBorder line below; 34-high buttons with an 18 px stroke icon over a CmFontMeta
+         label, transparent until hovered, 40% opacity when disabled; groups split by 1 x 24 CmBorder lines. -->
+    <Style Selector="Border.toolbar">
+      <Setter Property="Height" Value="{DynamicResource CmBarTool}" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
+    </Style>
+    <Style Selector="Button.tool">
+      <Setter Property="Height" Value="40" />
+      <Setter Property="MinWidth" Value="52" />
+      <Setter Property="Padding" Value="6,2" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.tool StackPanel">
+      <Setter Property="Spacing" Value="2" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.tool TextBlock">
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.tool:disabled">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="Button.tool:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Path.tool-icon">
+      <Setter Property="Width" Value="18" />
+      <Setter Property="Height" Value="18" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Stroke" Value="{DynamicResource CmText}" />
+      <Setter Property="StrokeThickness" Value="1.5" />
+      <Setter Property="StrokeLineCap" Value="Round" />
+      <Setter Property="StrokeJoin" Value="Round" />
+    </Style>
+    <Style Selector="Border.tool-divider">
+      <Setter Property="Width" Value="1" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Margin" Value="6,0" />
+      <Setter Property="Background" Value="{DynamicResource CmBorder}" />
+    </Style>
+    <Style Selector="TextBlock.tool-label">
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="StackPanel:disabled TextBlock.tool-label">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="StackPanel:disabled ListBox.segmented">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+
+    <!-- View ▸ Screen Depth: one radio item per depth. -->
+    <Style Selector="MenuItem.depths > MenuItem" x:DataType="vm:ScreenDepthChoice">
+      <Setter Property="Header" Value="{Binding Label}" />
+      <Setter Property="ToggleType" Value="Radio" />
+      <Setter Property="GroupName" Value="depth" />
+      <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainViewModel)DataContext).SetScreenDepthCommand, FallbackValue={x:Null}}" />
+      <Setter Property="CommandParameter" Value="{Binding Depth}" />
+      <Setter Property="IsChecked">
+        <MultiBinding Converter="{x:Static views:ShellConverters.AreEqual}">
+          <Binding Path="Depth" />
+          <Binding Path="$parent[Window].((vm:MainViewModel)DataContext).ScreenDepth" FallbackValue="0" />
+        </MultiBinding>
+      </Setter>
+    </Style>
   </Window.Styles>
 
   <Window.KeyBindings>
@@ -112,6 +210,19 @@
   </Window.KeyBindings>
 
   <DockPanel>
+    <!-- The custom title bar (S1) on Windows and macOS, where the window extends into its decorations; a drag area for
+         the platform, which keeps its own caption buttons (right on Windows, left on macOS). Linux keeps the system's. -->
+    <Border x:Name="TitleBar" DockPanel.Dock="Top" Classes="titlebar" chrome:WindowDecorationProperties.ElementRole="TitleBar"
+            IsVisible="{Binding $parent[Window].ExtendClientAreaToDecorationsHint}">
+      <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <!-- The app's icon: a compact Mac, drawn on whole pixels. -->
+        <Path Classes="app-icon" Data="M3.5,1.5 H12.5 V11.5 H3.5 Z M5.5,3.5 H10.5 V7.5 H5.5 Z M3.5,11.5 V14.5 H12.5 V11.5 M9,13 H11" />
+        <TextBlock Text="{Binding TitleFile}" IsVisible="{Binding TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding TitleUnsaved}" />
+        <TextBlock Text="—" IsVisible="{Binding TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Text="ClassicMac" />
+      </StackPanel>
+    </Border>
     <Menu DockPanel.Dock="Top" Classes="chrome">
       <MenuItem Header="_File">
         <MenuItem Header="_Open…" Command="{Binding OpenCommand}" InputGesture="Ctrl+O" HotKey="Ctrl+O" />
@@ -134,6 +245,26 @@
       <MenuItem Header="_Edit">
         <MenuItem Header="{Binding UndoTitle}" Command="{Binding UndoCommand}" InputGesture="Ctrl+Z" HotKey="Ctrl+Z" />
         <MenuItem Header="{Binding RedoTitle}" Command="{Binding RedoCommand}" InputGesture="Ctrl+Y" HotKey="Ctrl+Y" />
+      </MenuItem>
+      <MenuItem Header="_View">
+        <MenuItem Header="Zoom _In" Command="{Binding ZoomInCommand}" InputGesture="Ctrl+OemPlus" HotKey="Ctrl+OemPlus" />
+        <MenuItem Header="Zoom _Out" Command="{Binding ZoomOutCommand}" InputGesture="Ctrl+OemMinus" HotKey="Ctrl+OemMinus" />
+        <MenuItem Header="_Actual Size" Command="{Binding ActualSizeCommand}" InputGesture="Ctrl+D0" HotKey="Ctrl+D0" />
+        <MenuItem Header="Screen _Depth" Classes="depths" ItemsSource="{Binding ScreenDepthChoices}" />
+        <Separator />
+        <MenuItem Header="Show _Diagnostics" ToggleType="CheckBox" IsChecked="{Binding DiagnosticsPanel.IsExpanded, Mode=TwoWay}" InputGesture="Ctrl+Shift+D" />
+        <Separator />
+        <MenuItem Header="_Group Files with No Name" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.GroupNoName, Mode=TwoWay}" />
+        <MenuItem Header="_Hide Invisible Files" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.HideInvisible, Mode=TwoWay}" />
+        <Separator />
+        <MenuItem Header="_Theme">
+          <MenuItem Header="_System" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsSystemTheme, Mode=OneWay}"
+                    Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.System}" />
+          <MenuItem Header="_Light" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsLightTheme, Mode=OneWay}"
+                    Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Light}" />
+          <MenuItem Header="_Dark" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsDarkTheme, Mode=OneWay}"
+                    Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.Dark}" />
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_Resource">
         <MenuItem Header="_New Resource…" Command="{Binding NewResourceCommand}" InputGesture="Ctrl+K" HotKey="Ctrl+K" />
@@ -163,7 +294,88 @@
         <Separator />
         <MenuItem Header="_Drag Files Out as MacBinary" ToggleType="CheckBox" IsChecked="{Binding DragOutAsMacBinary, Mode=TwoWay}" />
       </MenuItem>
+      <!-- Filled by the window: Minimize, Zoom, then one item per open input. -->
+      <MenuItem x:Name="WindowMenu" Header="_Window" />
+      <MenuItem Header="_Help">
+        <MenuItem Header="ClassicMac _Help" Command="{Binding OpenHelpCommand}" />
+        <MenuItem Header="_Report a Problem…" Command="{Binding ReportProblemCommand}" />
+        <Separator />
+        <MenuItem Header="_About ClassicMac" Command="{Binding AboutCommand}" />
+      </MenuItem>
     </Menu>
+
+    <!-- The toolbar (design/boards/main-window.md, S2): each button follows its command's enabled state. -->
+    <Border x:Name="Toolbar" DockPanel.Dock="Top" Classes="chrome toolbar">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsEnabled="{Binding IsZoomable}">
+          <TextBlock Text="Zoom" Classes="tool-label" VerticalAlignment="Center" />
+          <ListBox x:Name="ZoomChoice" Classes="segmented" ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}"
+                   AutomationProperties.Name="Zoom">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="x:Int32">
+                <TextBlock Text="{Binding StringFormat={}{0}×}" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <TextBlock Text="Depth" Classes="tool-label" VerticalAlignment="Center" Margin="8,0,0,0" />
+          <ComboBox x:Name="DepthChoice" ItemsSource="{Binding ScreenDepthChoices}" SelectedItem="{Binding SelectedDepthChoice, Mode=TwoWay}"
+                    MinWidth="120" AutomationProperties.Name="Screen depth">
+            <ComboBox.ItemTemplate>
+              <DataTemplate DataType="vm:ScreenDepthChoice">
+                <TextBlock Text="{Binding Label}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+          <Button Classes="flat tool" Command="{Binding OpenCommand}" ToolTip.Tip="Open (Ctrl+O)" AutomationProperties.Name="Open">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M2,5 V14 H14 L16,8 H5 L3,14 M2,5 H7 L8.5,6.5 H14 V8" />
+              <TextBlock Text="Open" />
+            </StackPanel>
+          </Button>
+          <Button Classes="flat tool" Command="{Binding SaveCommand}" ToolTip.Tip="Save (Ctrl+S)" AutomationProperties.Name="Save">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M9,2 V11 M5.5,7.5 L9,11 L12.5,7.5 M2,11 V15 H16 V11" />
+              <TextBlock Text="Save" />
+            </StackPanel>
+          </Button>
+          <Border Classes="tool-divider" />
+          <Button Classes="flat tool" Command="{Binding GetInfoCommand}" ToolTip.Tip="Get Info (Ctrl+I)" AutomationProperties.Name="Get Info">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M9,1.75 A7.25,7.25 0 1 1 8.99,1.75 Z M9,8 V13 M9,5 V5.6" />
+              <TextBlock Text="Get Info" />
+            </StackPanel>
+          </Button>
+          <Button Classes="flat tool" Command="{Binding EditHexCommand}" ToolTip.Tip="Edit Hex (Ctrl+H)" AutomationProperties.Name="Edit Hex">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M6,5 L2,9 L6,13 M12,5 L16,9 L12,13 M10.5,4 L7.5,14" />
+              <TextBlock Text="Edit Hex" />
+            </StackPanel>
+          </Button>
+          <Border Classes="tool-divider" />
+          <Button Classes="flat tool" Command="{Binding ExportResourcesCommand}" ToolTip.Tip="Export the selection's resources" AutomationProperties.Name="Export">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M9,11 V2 M5.5,5.5 L9,2 L12.5,5.5 M2,11 V15 H16 V11" />
+              <TextBlock Text="Export…" />
+            </StackPanel>
+          </Button>
+          <Button Classes="flat tool" Command="{Binding ExtractAllCommand}" ToolTip.Tip="Extract all resources" AutomationProperties.Name="Extract All">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M2,7 H16 V16 H2 Z M3.5,4.5 H14.5 M5,2 H13 M9,9 V14 M7,12 L9,14 L11,12" />
+              <TextBlock Text="Extract All" />
+            </StackPanel>
+          </Button>
+          <Border Classes="tool-divider" />
+          <Button Classes="flat tool" Command="{Binding PlaySoundCommand}" ToolTip.Tip="Play the sound" AutomationProperties.Name="Play">
+            <StackPanel>
+              <Path Classes="tool-icon" Data="M5,3 L15,9 L5,15 Z" />
+              <TextBlock Text="Play" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </DockPanel>
+    </Border>
 
     <Border DockPanel.Dock="Bottom" Classes="chrome" Padding="8,3" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource CmBorder}">
       <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" />
@@ -272,12 +484,6 @@
 
           <TabItem Header="Preview">
             <DockPanel>
-              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8" IsVisible="{Binding Preview.IsZoomable}">
-                <TextBlock Text="Zoom" VerticalAlignment="Center" />
-                <ComboBox ItemsSource="{Binding Zooms}" SelectedItem="{Binding Zoom, Mode=TwoWay}" />
-                <TextBlock Text="Screen depth" VerticalAlignment="Center" Margin="12,0,0,0" />
-                <ComboBox ItemsSource="{Binding ScreenDepths}" SelectedItem="{Binding ScreenDepth, Mode=TwoWay}" />
-              </StackPanel>
               <Panel>
                 <TextBlock Text="{Binding Preview.Message}" Margin="16" Classes="muted" IsVisible="{Binding Preview.IsMessage}" />
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Preview.IsImage}">

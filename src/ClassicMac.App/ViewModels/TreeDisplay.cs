@@ -222,6 +222,7 @@ namespace ClassicMac.App.ViewModels
             DiagnosticsPanel = new DiagnosticsPanel(entry => SelectedDiagnostic = entry);
             var saved = settings.Load();
             TreeDisplay = new TreeDisplayOptions { GroupNoName = saved.GroupNoName, HideInvisible = saved.HideInvisible };
+            theme = saved.Theme;
             TreeDisplay.PropertyChanged += (_, _) => OnTreeDisplayChanged();
             TreeDisplay.LaidOut += UpdateHiddenCount;
         }
@@ -252,7 +253,7 @@ namespace ClassicMac.App.ViewModels
         // when it is now hidden.
         private void OnTreeDisplayChanged()
         {
-            settings.Save(new AppSettings(TreeDisplay.GroupNoName, TreeDisplay.HideInvisible));
+            settings.Save(settings.Load() with { GroupNoName = TreeDisplay.GroupNoName, HideInvisible = TreeDisplay.HideInvisible });
             var kept = Selected;
             foreach (var root in Roots)
             {

@@ -220,6 +220,7 @@ namespace ClassicMac.App.ViewModels
 
             OnPropertyChanged(nameof(UndoTitle));
             OnPropertyChanged(nameof(RedoTitle));
+            NotifyTitle();
         }
 
         private void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)

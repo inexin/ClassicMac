@@ -14,11 +14,20 @@ using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views
 {
-    internal sealed partial class MainWindow : Window, IFilePicker
+    internal sealed partial class MainWindow : Window, IFilePicker, IShell
     {
         public MainWindow()
         {
             InitializeComponent();
+            // The custom title bar (S1): Windows and macOS extend the client area into the decorations; Linux keeps the
+            // system title bar, whose support for this varies by desktop.
+            if (!OperatingSystem.IsLinux())
+            {
+                ExtendClientAreaToDecorationsHint = true;
+                ExtendClientAreaTitleBarHeightHint = 34;
+            }
+
+            TitleBar.Classes.Set("mac", OperatingSystem.IsMacOS());
             AddHandler(DragDrop.DropEvent, OnDrop);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             DataContextChanged += (_, _) =>
@@ -38,6 +47,7 @@ namespace ClassicMac.App.Views
                     boundPanel = model.DiagnosticsPanel;
                     DiagnosticsRow.Bind(Body.RowDefinitions[1], Body.RowDefinitions[2], boundPanel);
                     model.ItemShown += ShowInTree;
+                    BindShell(model);
                 }
             };
             Closing += OnClosing;
