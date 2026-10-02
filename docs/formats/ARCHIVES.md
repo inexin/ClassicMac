@@ -97,8 +97,14 @@ Header and fork CRC mismatches are reported; a failed encrypted fork checksum re
 damaged ciphertext. `PMa3` and `PMa7` are reserved and other markers are reported as unsupported, stopping parsing at
 that record. Tests cover stored and Huffman entries with both forks, Finder metadata and dates, CRC diagnostics, correct
 and wrong passwords for raw and Huffman XOR/DES entries, weak DES keys, encrypted stream alignment, unsupported methods,
-truncated headers, and enforcing `MaxVolumeEntries` before decoding an over-limit record. Original-application
-verification remains.
+truncated headers, and enforcing `MaxVolumeEntries` before decoding an over-limit record.
+
+Stored `PMag` entries and `PEnd` are **[Verified against PackIt 1.0]** (`TestData/PackIt10`, made on Mac OS 9): the
+94-byte header (a 64-byte Str63 name field, type, creator, Finder flags, a locked word, data and resource lengths,
+creation and modification dates, then the CRC-16/XMODEM of the 92 bytes after the magic), the data fork, the resource
+fork and the CRC-16/XMODEM of data then resource (0 for an empty file). PackIt 1.0 leaves whatever was in memory after
+the name in its 64-byte field, so the reader uses only the Pascal length's bytes. `PMa4` and the encrypted records
+stay **[Fitted]**: PackIt III 1.3, which writes them, does not run on Mac OS 9.
 
 ## LHA / LArc (level-0 through level-3 records; stored and compressed methods)
 
