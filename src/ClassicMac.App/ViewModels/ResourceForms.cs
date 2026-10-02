@@ -153,7 +153,10 @@ namespace ClassicMac.App.ViewModels
                 "WIND" => new WindowForm(resource, InterfaceResources.ReadWindow(data, false, DecodeOptions.Default, [], ""), false),
                 "DLOG" => new WindowForm(resource, InterfaceResources.ReadWindow(data, true, DecodeOptions.Default, [], ""), true),
                 "ALRT" => new AlertForm(resource, InterfaceResources.ReadAlert(data, [], "")),
-                "DITL" => new DialogItemsForm(resource, InterfaceResources.ReadDialogItems(data, DecodeOptions.Default, [], "")),
+                "DITL" => new DialogItemsForm(resource, InterfaceResources.ReadDialogItems(data, DecodeOptions.Default, [], ""))
+                {
+                    User = DialogItemsForm.FindUser(fork, resource.Id, readOptions),
+                },
                 "MENU" => new MenuForm(resource, InterfaceResources.ReadMenu(data, DecodeOptions.Default, [], "")),
                 "CNTL" => new ControlForm(resource, InterfaceResources.ReadControl(data, DecodeOptions.Default, [], "")),
                 _ => null,

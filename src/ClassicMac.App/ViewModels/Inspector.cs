@@ -71,9 +71,35 @@ namespace ClassicMac.App.ViewModels
                 facts.Add(new("Members", members, true));
             }
 
+            if (type == "DITL")
+            {
+                facts.AddRange(ItemListFacts(node));
+            }
+
             facts.Add(Bytes(resource.Length));
             facts.Add(new("Attributes", resource.Attributes == ResourceAttributes.None ? "none" : resource.Attributes.ToString(), false));
             return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}", facts);
+        }
+
+        // An item list's items, and the dialog or alert that uses it (boards/dialog-item-list.md).
+        private static IEnumerable<InspectorFact> ItemListFacts(ResourceNode node)
+        {
+            IReadOnlyList<ClassicMac.Resources.Decoders.Interface.DialogItem> items;
+            try
+            {
+                var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, []);
+                items = ClassicMac.Resources.Decoders.Interface.InterfaceResources.ReadDialogItems(data, ClassicMac.Resources.Decoders.DecodeOptions.Default, [], "");
+            }
+            catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+            {
+                yield break;
+            }
+
+            yield return new("Items", items.Count.ToString(CultureInfo.InvariantCulture), false);
+            if (DialogItemsForm.FindUser(node.Fork, node.Resource.Id, node.Input.Options) is { } user)
+            {
+                yield return new("Used by", $"'{user.Type}' {user.Id}", true);
+            }
         }
 
         private static readonly string[] SuiteTypes = ["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8", "icm#", "icm4", "icm8"];

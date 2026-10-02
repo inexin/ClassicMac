@@ -52,14 +52,21 @@ namespace ClassicMac.App.Views
 
         public static readonly StyledProperty<double> ScaleProperty = AvaloniaProperty.Register<DialogView, double>(nameof(Scale), 1);
 
+        /// <summary>The outlined item (an item list form's selected row), or -1; a click on an item selects it.</summary>
+        public static readonly StyledProperty<int> SelectedIndexProperty =
+            AvaloniaProperty.Register<DialogView, int>(nameof(SelectedIndex), -1, defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
         private const double Gutter = 12;
+
+        // The outline: 1 px dashed CmAccent, 3 px outside the item's bounds (boards/dialog-item-list.md).
+        private const double OutlineGap = 3;
 
         private Bitmap? bitmap;
 
         static DialogView()
         {
             AffectsMeasure<DialogView>(DialogProperty, ScaleProperty);
-            AffectsRender<DialogView>(DialogProperty, ScaleProperty);
+            AffectsRender<DialogView>(DialogProperty, ScaleProperty, SelectedIndexProperty);
         }
 
         public DialogPreview? Dialog
@@ -72,6 +79,42 @@ namespace ClassicMac.App.Views
         {
             get => GetValue(ScaleProperty);
             set => SetValue(ScaleProperty, value);
+        }
+
+        public int SelectedIndex
+        {
+            get => GetValue(SelectedIndexProperty);
+            set => SetValue(SelectedIndexProperty, value);
+        }
+
+        // An item's rectangle in the control, from its bounds in the window's content.
+        private Rect ItemRect(DialogPreview dialog, int index, double scale)
+        {
+            var b = dialog.Drawing.Items[index].Item.Bounds;
+            return new Rect((Gutter + dialog.ContentLeft + b.Left) * scale, (Gutter + dialog.ContentTop + b.Top) * scale,
+                (b.Right - b.Left) * scale, (b.Bottom - b.Top) * scale);
+        }
+
+        // A click selects the first item whose bounds hold the point, as the Dialog Manager's FindDialogItem finds it.
+        protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            if (Dialog is not { } dialog)
+            {
+                return;
+            }
+
+            var scale = PixelScaling.Scale(Scale, RenderScaling);
+            var point = e.GetPosition(this);
+            for (var i = 0; i < dialog.Drawing.Items.Count; i++)
+            {
+                if (ItemRect(dialog, i, scale).Contains(point))
+                {
+                    SelectedIndex = i;
+                    e.Handled = true;
+                    return;
+                }
+            }
         }
 
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
@@ -99,6 +142,13 @@ namespace ClassicMac.App.Views
             var scale = PixelScaling.Scale(Scale, RenderScaling);
             using var snap = PushSnap(context);
             context.DrawImage(bitmap, new Rect(Gutter * scale, Gutter * scale, dialog.PixelWidth * scale, dialog.PixelHeight * scale));
+            if (SelectedIndex >= 0 && SelectedIndex < dialog.Drawing.Items.Count
+                && this.TryFindResource("CmAccent", ActualThemeVariant, out var accent) && accent is IBrush brush)
+            {
+                var gap = OutlineGap * scale;
+                var outline = ItemRect(dialog, SelectedIndex, scale).Inflate(gap - 0.5);
+                context.DrawRectangle(null, new Pen(brush, 1, new DashStyle([3, 2], 0)), outline);
+            }
         }
     }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Editor: the dialog item list ('DITL') form on the read-then-edit host (E3): a read-only table (#, kind, text or
+  resource, bounds, enabled), inputs while editing (bounds as mono text boxes), and a preview panel drawing the list in
+  the 'DLOG' or 'ALRT' that uses it ("Drawn from 'DLOG' 128 · 300 × 106"; the header names it as Used by), redrawn on
+  each keystroke; a click on a row outlines its item in the preview (dashed CmAccent), a click on an item in the preview
+  selects its row. A click on any form's row now selects it.
 - Editor: the hex inspector says what the byte at the cursor is in its resource ("Character 1 of string 1,
   “Untitled”", with its value) for `STR `, `STR#` and types with a `TMPL` in an open file, read from the bytes as
   edited, and the field's bytes are highlighted in the grid. Without editing, a click selects a byte (highlighted in

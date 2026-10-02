@@ -19,7 +19,9 @@ namespace ClassicMac.App.ViewModels
     /// <param name="Png">The drawn window (frame, shadow, content), PNG.</param>
     /// <param name="PixelWidth">The image's width.</param>
     /// <param name="PixelHeight">The image's height.</param>
-    public sealed record DialogPreview(DialogDrawing Drawing, byte[] Png, int PixelWidth, int PixelHeight);
+    /// <param name="ContentLeft">Where the window's content starts in the picture (items' coordinates are from there).</param>
+    /// <param name="ContentTop">See <paramref name="ContentLeft"/>.</param>
+    public sealed record DialogPreview(DialogDrawing Drawing, byte[] Png, int PixelWidth, int PixelHeight, int ContentLeft = 0, int ContentTop = 0);
 
     /// <summary>
     /// What the user's open files supply to draw dialogs with: the System's stand-ins (forks with the stop, note and caution
@@ -116,6 +118,34 @@ namespace ClassicMac.App.ViewModels
                 return null;
             }
 
+            return Render(drawing, options, sources);
+        }
+
+        /// <summary>
+        /// An item list's preview: in the window of <paramref name="user"/> (the <c>'DLOG'</c> or <c>'ALRT'</c> that uses it)
+        /// when there is one, else on its own in a plain box; the items always from <paramref name="data"/>.
+        /// </summary>
+        public static DialogPreview? ItemList(Resource resource, ReadOnlyMemory<byte> data, Resource? user, ResourceFork fork, DecodeOptions options,
+            ReadOptions readOptions, ICollection<Diagnostic> diagnostics, DialogSources? sources = null)
+        {
+            sources ??= DialogSources.None;
+            if (DialogDrawings.Read(resource, data, fork, options, readOptions, diagnostics, DialogKind.Alert, sources.SystemForks) is not { } items)
+            {
+                return null;
+            }
+
+            var drawing = items;
+            if (user is not null && DialogDrawings.Read(user, ResourceDecompression.Default.GetData(user, fork, readOptions, diagnostics), fork, options, readOptions,
+                    diagnostics, DialogKind.Alert, sources.SystemForks) is { } window)
+            {
+                drawing = window with { Items = items.Items };
+            }
+
+            return Render(drawing, options, sources);
+        }
+
+        private static DialogPreview Render(DialogDrawing drawing, DecodeOptions options, DialogSources sources)
+        {
             var rendering = DialogRenderer.Render(drawing, new DialogRenderOptions
             {
                 ScreenDepth = options.ScreenDepth,
@@ -123,7 +153,8 @@ namespace ClassicMac.App.ViewModels
                 TextFallback = SystemTextFallback.Instance,
             });
             var bitmap = rendering.Bitmap;
-            return new DialogPreview(drawing, PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height);
+            return new DialogPreview(drawing, PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height,
+                rendering.ContentLeft, rendering.ContentTop);
         }
     }
 }

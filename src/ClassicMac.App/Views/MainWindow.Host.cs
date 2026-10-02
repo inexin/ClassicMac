@@ -15,6 +15,28 @@ namespace ClassicMac.App.Views
         {
             FormHost.AddHandler(KeyDownEvent, OnHostKeyDown, RoutingStrategies.Tunnel);
             FormHost.AddHandler(DoubleTappedEvent, OnHostDoubleTapped, RoutingStrategies.Bubble, handledEventsToo: true);
+            FormHost.AddHandler(PointerPressedEvent, (_, e) => SelectFormRow(e.Source), RoutingStrategies.Tunnel, handledEventsToo: true);
+            FormHost.AddHandler(GotFocusEvent, (_, e) => SelectFormRow(e.Source), RoutingStrategies.Bubble);
+        }
+
+        // A click on a "form-row", or the focus going into one of its inputs, selects its row (and its item in the preview).
+        private void SelectFormRow(object? source)
+        {
+            if (DataContext is MainViewModel { Form: { } form } && FormRow(source) is { DataContext: { } item })
+            {
+                form.SelectRow(item);
+            }
+        }
+
+        private static Control? FormRow(object? source)
+        {
+            var row = (source as Visual)?.FindAncestorOfType<Control>(includeSelf: true);
+            while (row is not null && !row.Classes.Contains("form-row"))
+            {
+                row = row.FindAncestorOfType<Control>();
+            }
+
+            return row;
         }
 
         private void OnHostKeyDown(object? sender, KeyEventArgs e)
@@ -48,12 +70,7 @@ namespace ClassicMac.App.Views
                 return;
             }
 
-            var row = source.FindAncestorOfType<Control>(includeSelf: true);
-            while (row is not null && !row.Classes.Contains("form-row"))
-            {
-                row = row.FindAncestorOfType<Control>();
-            }
-
+            var row = FormRow(source);
             if (row?.DataContext is { } item && model.EditFormCommand.CanExecute(item))
             {
                 model.EditFormCommand.Execute(item);

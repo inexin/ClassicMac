@@ -564,6 +564,21 @@
       <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
       <Setter Property="BorderThickness" Value="1,0,0,0" />
     </Style>
+    <!-- The item list's preview panel is 400 wide (boards/dialog-item-list.md); its bounds inputs are mono, 40 wide. -->
+    <Style Selector="Border.ditl-preview">
+      <Setter Property="MaxWidth" Value="400" />
+    </Style>
+    <Style Selector="TextBlock.preview-note">
+      <Setter Property="Margin" Value="12,6" />
+    </Style>
+    <Style Selector="Border.ditl-row">
+      <Setter Property="MinHeight" Value="34" />
+    </Style>
+    <Style Selector="TextBox.bound">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="MinWidth" Value="40" />
+      <Setter Property="Padding" Value="4,4" />
+    </Style>
     <Style Selector="Border.preview-header">
       <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
@@ -1080,7 +1095,7 @@
                 <Border Classes="host-values">
                 <DockPanel>
                 <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" Margin="16,0,0,0" MaxWidth="560"
-                              IsVisible="{Binding FormDialog, Converter={x:Static ObjectConverters.IsNotNull}}">
+                              IsVisible="{Binding ShowsHostDialog}">
                   <views:DialogView Dialog="{Binding FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
                 <ContentControl Classes="form-content" Content="{Binding Form}">
@@ -1266,37 +1281,84 @@
                         </StackPanel>
                       </StackPanel>
                     </DataTemplate>
+                    <!-- The dialog item list form (boards/dialog-item-list.md, E3): a table read only, inputs while editing; the
+                         preview on the right (the dialog that uses the list, live from the values), its outlined item the
+                         selected row, a click on an item selecting its row. -->
                     <DataTemplate DataType="vm:DialogItemsForm">
-                      <DockPanel>
-                        <Button DockPanel.Dock="Bottom" Content="Add Item" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto">
-                          <ItemsControl ItemsSource="{Binding Items}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate DataType="vm:DialogItemRow">
-                                <Border BorderThickness="0,0,0,1" BorderBrush="{DynamicResource CmBorder}" Padding="0,4">
-                                  <StackPanel Spacing="4">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                      <ComboBox ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" Width="150" />
-                                      <CheckBox Content="enabled" IsChecked="{Binding Enabled}" />
-                                      <Button Content="↑" Command="{Binding $parent[ItemsControl].((vm:DialogItemsForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
-                                      <Button Content="Remove" Command="{Binding $parent[ItemsControl].((vm:DialogItemsForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
-                                      <NumericUpDown Value="{Binding Top}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
-                                      <NumericUpDown Value="{Binding Left}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
-                                      <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
-                                      <NumericUpDown Value="{Binding Right}" FormatString="0" Width="64" ShowButtonSpinner="False" Minimum="-32768" Maximum="32767" />
-                                    </StackPanel>
-                                    <TextBox Text="{Binding Text}" IsVisible="{Binding HasText}" AcceptsReturn="True" TextWrapping="Wrap" />
-                                    <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasResource}">
-                                      <TextBlock Text="Resource ID" VerticalAlignment="Center" />
-                                      <NumericUpDown Value="{Binding ResourceId}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" />
-                                    </StackPanel>
-                                  </StackPanel>
-                                </Border>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
+                      <Grid x:Name="ItemListForm" Classes="menu-form" ColumnDefinitions="3*,2*">
+                        <Border Grid.Column="1" Classes="preview-panel ditl-preview">
+                          <DockPanel>
+                            <Border DockPanel.Dock="Top" Classes="preview-header">
+                              <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Classes="muted" Text="1× · Mac OS 8/9" />
+                                <TextBlock x:Name="ItemListPreviewTitle" Classes="strong"
+                                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormPreviewTitle, FallbackValue=Preview}" />
+                              </DockPanel>
+                            </Border>
+                            <TextBlock DockPanel.Dock="Top" Classes="muted preview-note"
+                                       Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormDialogNote, FallbackValue={x:Null}}" />
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{DynamicResource CmCheckerboard}">
+                              <views:DialogView x:Name="ItemListPreview" Dialog="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormDialog, FallbackValue={x:Null}}"
+                                                SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                            </ScrollViewer>
+                          </DockPanel>
+                        </Border>
+                        <ScrollViewer Padding="18,12" HorizontalScrollBarVisibility="Disabled">
+                          <StackPanel Classes="menu-table" Classes.editing="{Binding IsEditing}">
+                            <Grid Classes="menu-columns read-only" ColumnDefinitions="24,96,*,132,56">
+                              <TextBlock Classes="caption" Text="#" />
+                              <TextBlock Grid.Column="1" Classes="caption" Text="KIND" />
+                              <TextBlock Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="4" Classes="caption" Text="ENABLED" />
+                            </Grid>
+                            <Grid Classes="menu-columns editing" ColumnDefinitions="24,104,*,172,24,24">
+                              <TextBlock Classes="caption" Text="#" />
+                              <TextBlock Grid.Column="1" Classes="caption" Text="KIND" />
+                              <TextBlock Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE ID" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="4" Classes="caption" Text="ON" />
+                            </Grid>
+                            <ItemsControl x:Name="ItemRows" ItemsSource="{Binding Items}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:DialogItemRow">
+                                  <Border Classes="table-row ditl-row form-row" Classes.selected="{Binding IsSelected}">
+                                    <Panel>
+                                      <Border Classes="bar" />
+                                      <Grid Classes="read-only" ColumnDefinitions="24,96,*,132,56">
+                                        <TextBlock Classes="muted mono" Text="{Binding Number}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding KindName}" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Content}" Classes.muted="{Binding HasNoContent}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="3" Classes="mono" Text="{Binding BoundsText}" />
+                                        <TextBlock Grid.Column="4" Text="{Binding EnabledText}" Classes.muted="{Binding IsDimmed}" />
+                                      </Grid>
+                                      <Grid Classes="editing" ColumnDefinitions="24,104,*,172,24,24">
+                                        <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
+                                        <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" AutomationProperties.Name="Kind" />
+                                        <TextBox x:Name="ItemText" Grid.Column="2" Text="{Binding Text}" IsVisible="{Binding HasText}" AutomationProperties.Name="Text" />
+                                        <NumericUpDown Grid.Column="2" Classes="mono" Value="{Binding ResourceId}" FormatString="0" ShowButtonSpinner="False"
+                                                       Minimum="-32768" Maximum="32767" IsVisible="{Binding HasResource}" AutomationProperties.Name="Resource ID" />
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                                          <TextBox x:Name="TopBox" Classes="mono bound" Text="{Binding TopText}" AutomationProperties.Name="Top" />
+                                          <TextBox x:Name="LeftBox" Classes="mono bound" Text="{Binding LeftText}" AutomationProperties.Name="Left" />
+                                          <TextBox x:Name="BottomBox" Classes="mono bound" Text="{Binding BottomText}" AutomationProperties.Name="Bottom" />
+                                          <TextBox x:Name="RightBox" Classes="mono bound" Text="{Binding RightText}" AutomationProperties.Name="Right" />
+                                        </StackPanel>
+                                        <CheckBox Grid.Column="4" IsChecked="{Binding Enabled}" AutomationProperties.Name="Enabled" />
+                                        <Button Grid.Column="5" Classes="flat row-tool remove" Content="×" ToolTip.Tip="Remove" AutomationProperties.Name="Remove"
+                                                Command="{Binding $parent[ItemsControl].((vm:DialogItemsForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                                      </Grid>
+                                    </Panel>
+                                  </Border>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Classes="editing" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                              <Button Content="Add item" Command="{Binding AddCommand}" />
+                            </StackPanel>
+                          </StackPanel>
                         </ScrollViewer>
-                      </DockPanel>
+                      </Grid>
                     </DataTemplate>
                     <!-- The menu form (boards/read-then-edit.md, E2): a summary and a table read only, inputs while
                          editing; the live preview on the right, its highlighted item the selected row. -->
