@@ -80,6 +80,22 @@ namespace ClassicMac.App.ViewModels
         public MacFile File { get; internal set; } = file;
 
         public bool ForkInDataFork { get; } = forkInDataFork;
+
+        // Each resource as last read or saved, which the tree's per-resource unsaved mark compares with.
+        private Dictionary<(FourCC Type, short Id), (ReadOnlyMemory<byte> Data, MacString? Name, ResourceAttributes Attributes)> saved = Snapshot(session.Fork);
+
+        /// <summary>Records the fork as it is now as the saved state (when the session is clean: read, saved, or undone back).</summary>
+        internal void RecordSaved() => saved = Snapshot(Session.Fork);
+
+        /// <summary>Whether a resource differs from the file as saved: new, or another name, attributes or data.</summary>
+        internal bool IsUnsaved(Resource resource) =>
+            !saved.TryGetValue((resource.Type, resource.Id), out var was)
+            || was.Name != resource.Name
+            || was.Attributes != resource.Attributes
+            || !was.Data.Span.SequenceEqual(resource.GetData().Span);
+
+        private static Dictionary<(FourCC, short), (ReadOnlyMemory<byte>, MacString?, ResourceAttributes)> Snapshot(ResourceFork fork) =>
+            fork.Resources.ToDictionary(r => (r.Type, r.Id), r => (r.GetData(), r.Name, r.Attributes));
     }
 
     public sealed partial class MainViewModel
@@ -176,7 +192,20 @@ namespace ClassicMac.App.ViewModels
         private void Refresh(NodeViewModel owner, EditState state)
         {
             FileNode.ShowTypes(owner, state.Session.Fork);
+            if (!state.Session.IsDirty)
+            {
+                state.RecordSaved();
+            }
+
             owner.Title = state.Session.IsDirty ? owner.BaseTitle + " •" : owner.BaseTitle;
+            foreach (var resource in owner.Children.OfType<ResourceTypeNode>().SelectMany(t => t.Children).OfType<ResourceNode>())
+            {
+                if (state.IsUnsaved(resource.Resource))
+                {
+                    resource.Title = resource.BaseTitle + " •";
+                }
+            }
+
             NotifyEditCommands();
         }
 

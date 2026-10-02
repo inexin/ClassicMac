@@ -221,6 +221,46 @@ public sealed partial class EditTests : IDisposable
         Assert.Equal(saved.Find(Str, 128)!.GetData().ToArray(), saved.Find(Str, 200)!.GetData().ToArray());
     }
 
+    // T6 (design/boards/browse-tree.md): each resource that differs from the file as saved carries the unsaved mark, not
+    // only its file; it clears on Save, or when undo brings the resource back.
+    [Fact]
+    public async Task Each_edited_resource_carries_the_unsaved_mark()
+    {
+        var (model, file, dialogs, _, _) = await Open();
+        model.Selected = Resource(file, 129);
+        dialogs.Hex = [1, 2, 3];
+        await model.EditHexCommand.ExecuteAsync(null);
+
+        Assert.True(file.IsUnsaved);
+        Assert.Equal(("129", true), (Resource(file, 129).Name, Resource(file, 129).IsUnsaved));
+        Assert.Equal(("128 “greeting”", false), (Resource(file, 128).Name, Resource(file, 128).IsUnsaved));
+        Assert.False(file.Children.OfType<ResourceTypeNode>().Single().IsUnsaved);
+
+        // A new resource is unsaved; a rename marks the resource too.
+        model.Selected = Resource(file, 128);
+        model.DuplicateResourceCommand.Execute(null);
+        Assert.True(Resource(file, 130).IsUnsaved);
+        model.Selected = Resource(file, 128);
+        dialogs.Info = i => i with { Name = "renamed" };
+        await model.GetInfoCommand.ExecuteAsync(null);
+        Assert.True(Resource(file, 128).IsUnsaved);
+
+        // Undo back to the saved resource clears its mark; the others keep theirs.
+        model.UndoCommand.Execute(null);
+        Assert.False(Resource(file, 128).IsUnsaved);
+        Assert.True(Resource(file, 129).IsUnsaved);
+
+        await model.SaveCommand.ExecuteAsync(null);
+        Assert.False(file.IsUnsaved);
+        Assert.All(file.Children.OfType<ResourceTypeNode>().Single().Children, r => Assert.False(r.IsUnsaved));
+
+        // After a save, the saved file is what edits compare with: undoing past it marks the resource again.
+        model.UndoCommand.Execute(null);
+        Assert.Null(file.Children.OfType<ResourceTypeNode>().Single().Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == 130));
+        model.UndoCommand.Execute(null);
+        Assert.True(Resource(file, 129).IsUnsaved);
+    }
+
     [Fact]
     public async Task Clashing_ids_are_refused_and_new_resources_added()
     {

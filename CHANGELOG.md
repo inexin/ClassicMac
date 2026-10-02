@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viewer: each resource that differs from the file as saved (new, renamed, other attributes or data) carries the
+  unsaved " •" in the tree, not only its file; it clears on Save, or when undo brings the resource back (T6).
 - Viewer: a file never given a type or creator (zeros) shows no type · creator in the tree, and a dash for the one
   that is zero, not "\x00\x00\x00\x00".
 - Editor: Save and the unapplied-edits question follow every edit: typing in a `STR#` item, adding or removing one, a
