@@ -108,11 +108,14 @@ public class QuickDrawResourceTests
     public void PixelPattern_CtSizeMinusOne_IsAnEmptyTable()
     {
         // ResEdit 2.1.3's ppat 1731: ctSize $FFFF (-1), an 8-byte table with no entries ending the resource. GetPixPat
-        // loads it; every index is unlisted, so black.
+        // loads it, and FillCRect draws the 1-bit pattern 0 white, 1 black.
         var b = new PictBuilder().U16(1).U16(0).U16(28).U16(0).U16(78).Zeros(4).U16(0).Zeros(4).Zeros(8);
-        PixMap8x1(b, 86).Bytes(0, 1, 0, 1, 0, 1, 0, 1).U16(0).U16(0).U16(0).U16(0xFFFF);
+        // A 1-bit 8 x 1 PixMap (rowBytes 2), pixels $55 at 78, the table at 80.
+        b.U16(0).U16(0).U16(0x8002).Rect(0, 0, 1, 8).U16(0).U16(0).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0)
+            .U16(0).U16(1).U16(1).U16(1).U16(0).U16(0).U16(0).U16(80).U16(0).U16(0);
+        b.Bytes(0x55, 0).U16(0).U16(0).U16(0).U16(0xFFFF);
         var pattern = QuickDrawResources.DecodePixelPattern(b.ToArray());
-        Assert.Equal(Black, pattern[0, 0]);
+        Assert.Equal(White, pattern[0, 0]);
         Assert.Equal(Black, pattern[1, 0]);
     }
 

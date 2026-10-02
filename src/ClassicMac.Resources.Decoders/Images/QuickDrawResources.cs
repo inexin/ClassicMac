@@ -233,6 +233,10 @@ namespace ClassicMac.Resources.Decoders.Images
                 if (tableAt + 8 > data.Length) throw Truncated("ppat");
                 var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(tableAt));
                 pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
+                // An empty table (ctSize -1, ResEdit's ppats) draws a 1-bit pattern 0 white, 1 black, whatever the
+                // port's colours [Verified].
+                if (pm.PixelSize == 1 && (short)U16(data, tableAt + 6) < 0)
+                    pm.Palette = [new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0)];
             }
             return Render(pm, null, 0, 0);
         }
