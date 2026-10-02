@@ -736,6 +736,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | HFS+ and archives | Done (exit passed 2026-10-01); fixtures still missing for the fitted methods (Todo) |
 | 11 | Code (`ClassicMac.Code`) | Planned, not started |
+| 12 | Runtime (`ClassicMac.Runtime`) | Idea, not started (after phase 11) |
 
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
    `ClassicMac.Files`: Finder info, AppleDouble/AppleSingle, MacBinary, BinHex, Basilisk II shared folders; raw forks;
@@ -846,6 +847,37 @@ Each phase ships something usable and ends when its exit check passes; no dates 
    - Testing: hand-built vectors and, where a corpus is at hand, a comparison with `resource_dasm`'s output (syntax
      normalised). Real binaries and the tool's outputs are not committed; private analysis material is not cited.
    - Order: PEF and `cfrg` first (self-contained), then 68k segments and the jump table, then the disassemblers.
+12. **Runtime** — `ClassicMac.Runtime`: run classic Mac applications without Apple's ROM or System, by high-level
+    emulation. **Idea, not started; depends on phase 11.**
+    - Approach: the application's code runs on a CPU core; the Toolbox is ClassicMac's own .NET implementation, the
+      way Executor and Advanced Mac Substitute work. A full-machine emulator (Mini vMac, Basilisk II, SheepShaver)
+      needs Apple's ROM and System and uses none of this code, so it is not the goal.
+    - Already built: QuickDraw (pixel-exact, both QuickDraws), the Resource Manager's reading, the Font Manager's
+      choice and bitmap text, HFS/MFS reading and HFS writing (the File Manager's backing), the interface templates,
+      the Platinum dialog drawing and icon drawing; phase 11's `CODE`, jump-table and `%A5Init` loading.
+    - To build, in order:
+      1. A 68000/020 interpreter (MIT-compatible: Moira (MIT) or a C# core; GPL cores are reference only), the A-trap
+         dispatcher with `SetTrapAddress`, and the low-memory globals at their fixed addresses.
+      2. The Memory Manager (zones, handles, master pointers, locking and purging), Segment Loader and Resource
+         Manager calls.
+      3. A headless harness: run an application's code, log every trap, draw into an `RgbaBitmap`; a trap census over
+         the corpus picks which traps to write first.
+      4. The Event, Window, Menu, Control, Dialog and TextEdit Managers, Scrap and Standard File; built-in definition
+         procedures native, an application's own `WDEF`/`CDEF`/`MDEF`/`LDEF` run as 68k code.
+      5. The File Manager over host folders and disk images; the Sound Manager; printing stubbed.
+      6. An Avalonia window with input, the screen as a `QuickDrawPort` canvas.
+    - Target: System 6/7-era 68k applications, one at a time (a small Realmz utility or game first), implementing only
+      the traps each uses.
+    - PowerPC (later): PEF code calls the Toolbox by name through the Code Fragment Manager, so a ClassicMac
+      `InterfaceLib` binds its exports to the same .NET managers. It needs a PowerPC core (FPU; AltiVec for later
+      applications) and mixed mode, since PowerPC applications still carry 68k code (definition procedures, plug-ins)
+      through routine descriptors.
+    - Ground truth: the Mac OS 9 harness answers each trap's behaviour, as it did for QuickDraw; Inside Macintosh is
+      the specification.
+    - Hard parts: undocumented behaviour and private globals, applications that write the screen directly or read
+      the ROM, timing, copy protection, and the size of the API (most applications use 150–300 traps).
+    - Licensing: Executor's MIT release may be ported with a notice; Advanced Mac Substitute (AGPL 3) and the GPL
+      emulators are reference only.
 
 ### Todo (not in a phase)
 
