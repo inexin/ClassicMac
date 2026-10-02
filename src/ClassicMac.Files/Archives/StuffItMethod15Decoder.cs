@@ -309,8 +309,10 @@ internal static class StuffItMethod15Decoder
             int scale = _range / model.Total;
             if (scale == 0)
                 throw new InvalidDataException("A StuffIt method 15 arithmetic model exceeds its range.");
-            int frequency = _code / scale;
-            if ((uint)frequency >= model.Total)
+            // The last symbol owns the rest of the range (range - scale * Total, below), so a code past
+            // scale * Total selects it rather than being invalid.
+            int frequency = Math.Min(_code / scale, model.Total - 1);
+            if (frequency < 0)
                 throw new InvalidDataException("A StuffIt method 15 arithmetic code is invalid.");
 
             (int symbol, int low, int high) = model.FindSymbol(frequency);

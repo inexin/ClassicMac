@@ -33,3 +33,9 @@ has method 8 selected for both forks. Its extracted forks are compared with the 
 the `sources` folder after DiskDoubler 3.7.7 compressed each file with DiskDoubler A (method 1). It is a version-2
 StuffIt archive with a folder, and its `Test Image`, `testfile.jpg` and `testfile.png` have an empty method-1 fork.
 The test expands every file through both containers and compares the forks with the sources.
+
+`StuffIt651DiskDoublerPro411Ad1Files.sit` and `StuffIt651DiskDoublerPro411Ad2Files.sit` are the corpus's
+`build/sources.ddpro411.ad1.sit` and `build/sources.ddpro411.ad2.sit`: StuffIt 6.5.1 archives (method 15) of the
+`sources` folder after DiskDoubler Pro 4.1.1 compressed each file with AD1 or AD2. Their Arsenic streams need a model's
+last symbol to own the rest of the coder's range. The test expands every file through both containers and compares the
+forks with the sources.

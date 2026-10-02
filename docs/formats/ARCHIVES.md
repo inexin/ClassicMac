@@ -180,7 +180,7 @@ Original-application coverage: DiskDoubler 3.7.7 writes methods 1 (DiskDoubler A
 A, `ad`) and 6 (AutoDoubler B, `ads`); DiskDoubler Pro 4.1.1 writes 9 (AD1), 6 (AD2) and 10 (DD1, DD2, DD3, told
 apart by the file header's +60 byte, 1–3). Every file of the CC0 corpus (standalone files, 3.7.7 `DDAR` combines, Pro
 4.1.1 `DDA2` archives and their `.sea`/`.prompt.sea` copies, BinHex and StuffIt-wrapped copies) expands to the source
-forks **[Verified]**, except two StuffIt 6.5.1 copies that stop in method 15 (see StuffIt 5). No sample uses methods 2–5 or 7 or a nonzero delta type. An empty fork is stored as no bytes
+forks **[Verified]**, including the StuffIt 6.5.1 (method 15) copies. No sample uses methods 2–5 or 7 or a nonzero delta type. An empty fork is stored as no bytes
 whatever its method (DiskDoubler 3.7.7 writes no method-1 prefix or method-8 header for one) and its checksum is 0
 **[Verified]**. Pro 4.1.1 writes 0 in the fork checksum fields of methods 6, 9 and 10. Its split files (`.1`, `.2`,
 data forks starting `SPLT`) are not read.
@@ -428,11 +428,12 @@ Vectors use original StuffIt Deluxe 6.5.1 archives from the CC0 test corpus and 
 bytes, including randomized blocks. The v5 member layout and per-fork integration are **[Fitted]** against those
 original-application archives.
 
-Open: in the DiskDoubler corpus's StuffIt 6.5.1 archives `sources.ddpro411.ad1.sit` and `ad2.sit`, one method-15
-member each (`testfile.jpg`, 388 → 223 bytes; `testfile.PICT`, 6376 → 2259) fails about 50 bits before the end of its
-stream: the selector model's decoded frequency equals its total. The decoder matches XADMaster's arithmetic decoder
-step for step, and the same members are stored or decode in the other copies, so the cause is not known; the
-archive is reported unreadable.
+A symbol is found from `code / (range / total)`; the last symbol owns the rest of the range (`range` less the other
+symbols' share, which can exceed its `frequency × scale`), so a quotient of `total` or more selects the last symbol
+rather than being invalid, as munbox's `sit15.c` (MIT) does. Without this, the DiskDoubler corpus's StuffIt 6.5.1
+archives `sources.ddpro411.ad1.sit` and `ad2.sit` (fixtures `StuffIt651DiskDoublerPro411Ad1Files.sit`/`Ad2Files.sit`)
+failed about 50 bits before the end of `testfile.jpg`'s and `testfile.PICT`'s streams; every file of both now expands
+to the sources **[Verified]**.
 
 The legacy v1/v2 reader is implemented. Original-application coverage currently includes a flat version-2 archive;
 version 1, nested-folder metadata, and broader legacy interoperability remain unverified. Archive-level comment

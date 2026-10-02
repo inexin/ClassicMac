@@ -277,6 +277,46 @@ public sealed class DiskDoublerFeatureTests
         Assert.Empty(diagnostics);
     }
 
+    // StuffIt 6.5.1 archives (method 15) of the files DiskDoubler Pro 4.1.1 compressed with AD1 and AD2. Their
+    // Arsenic streams hold a code past scale * total, which belongs to the model's last symbol.
+    [Theory]
+    [InlineData("StuffIt651DiskDoublerPro411Ad1Files.sit", "sources.ddpro11.ad1")]
+    [InlineData("StuffIt651DiskDoublerPro411Ad2Files.sit", "sources.ddpro11.ad2")]
+    public void DiskDoublerPro411FilesInAStuffIt651ArchiveExpandToTheOriginals(string fixtureName, string folder)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        string crossVersion = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItOriginalCrossVersion");
+        string legacy = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItLegacy45");
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode archive = ContainerUnwrapper.Default.Unwrap(Path.Combine(fixtureDirectory, fixtureName),
+            diagnostics: diagnostics);
+
+        Assert.Equal(7, archive.Children.Count);
+        Assert.All(archive.Children, node =>
+            Assert.Equal([folder], node.File.FolderPath.Select(name => name.ToMacRoman())));
+        MacFile Expanded(string name)
+        {
+            ContainerNode node = Assert.Single(archive.Children, node => node.File.Name.ToMacRoman() == name);
+            return node.Children.Count == 0 ? node.File : Assert.Single(node.Children).File;
+        }
+        Assert.Equal(File.ReadAllBytes(Path.Combine(legacy, "ExpectedTestImageResource.bin")),
+            Expanded("Test Image").ResourceFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestText.bin")),
+            Expanded("Test Text").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict")),
+            Expanded("testfile.PICT").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin")),
+            Expanded("testfile.PICT").ResourceFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestFile.jpg")),
+            Expanded("testfile.jpg").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestFile.png")),
+            Expanded("testfile.png").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestFile.txt")),
+            Expanded("testfile.txt").DataFork.ToArray());
+        Assert.Empty(diagnostics);
+    }
+
     private static int FindDda2Record(byte[] archive, ushort entryType, string name)
     {
         int offset = 62;
