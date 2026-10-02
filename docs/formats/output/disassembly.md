@@ -341,6 +341,11 @@ documents). These are its own and the decoders':
 - `tests/ClassicMac.Resources.Cli.Tests/DisasmTests.cs`: the command on a raw fork and an HFS disk with a fat
   application (data-fork fragment), `--cpu`, exit codes. `PackTests.Decoded_code_packs_back_from_its_bin_files`.
 - `tests/ClassicMac.App.Tests/PreviewTests.cs`: a `'CODE'` resource previews as its listing.
+- Compared outside the repository with an independent disassembler [Verified]: every PowerPC instruction both decode
+  in Disk Copy 6.5's code (172,278) has the same mnemonic and operands; all 19,562 AltiVec words of Mac OS 9.2.2's
+  vecLib and ASPAltivecPlug-in match, apart from writing a base register of 0 as `0`; the 68k decoder gives the same
+  instruction lengths at every address of a CodeWarrior application and Disk Copy 6.1.2. The 68030 PMMU forms agree
+  where that disassembler decodes them; the 68851-only forms rest on Motorola's manuals.
 - `tests/ClassicMac.Resources.Decoders.Tests/CodeCorpusTests.cs`, with `CLASSICMAC_CODE_CORPUS` set: every code
   resource of ResEdit, Realmz, QDHarness, Disk Copy 6.1.2 and the Mac OS 9 System file decodes and `disasm` lists it
   (the System's 162 data-fork fragments included) with no error.

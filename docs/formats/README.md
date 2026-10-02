@@ -169,7 +169,7 @@ How ClassicMac lists this code (the disassembly, its annotations and the code mo
 
 | Document | Formats | Code |
 | --- | --- | --- |
-| [export-manifest.md](output/export-manifest.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
+| [export-manifest.md](output/export-manifest.md) | What `extract` writes: folders, file names, `manifest.json` format 1.2, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 | [text-output.md](output/text-output.md) | The text, JSON and RTF output of the text resources | `ClassicMac.Resources.Decoders.Text` |
 | [html.md](output/html.md) | The HTML output of documents | `ClassicMac.Resources.Decoders.Documents` |
 | [disassembly.md](output/disassembly.md) | The `.s` listings and `.json` models of 68k and PowerPC code; the `disasm` command | `ClassicMac.Code.Disassembly`, `ClassicMac.Resources.Decoders.Code` |
