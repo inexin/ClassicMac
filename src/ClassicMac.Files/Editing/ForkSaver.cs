@@ -171,12 +171,19 @@ namespace ClassicMac.Files.Editing
                 {
                     var backup = location.Path + ".orig";
                     if (!File.Exists(backup)) File.Copy(location.Path, backup);
+                    ForkData.CloseHostFile(temp);
+                    ForkData.CloseHostFile(location.Path);
                     File.Replace(temp, location.Path, null);
                 }
-                else File.Move(temp, location.Path);
+                else
+                {
+                    ForkData.CloseHostFile(temp);
+                    File.Move(temp, location.Path);
+                }
             }
             finally
             {
+                ForkData.CloseHostFile(temp);
                 if (File.Exists(temp)) File.Delete(temp);
             }
             return location with { File = file, Stamp = FileStamp.Of(location.Path) };
@@ -267,6 +274,7 @@ namespace ClassicMac.Files.Editing
                 }
                 VerifyHfsForks(image, written);
                 File.WriteAllBytes(temporary, image);
+                ForkData.CloseHostFile(destination);
                 File.Move(temporary, destination, overwrite: true);
                 return destination;
             }

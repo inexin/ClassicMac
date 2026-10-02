@@ -79,6 +79,98 @@ public class ForkSliceTests
     {
         Assert.Equal(Bytes[..3], ForkData.FromBytes(Bytes[..3]).ReadPrefix(128));
     }
+
+    public static TheoryData<string> AllKinds => ["memory", "file", "slice", "file slice", "extents", "file extents"];
+
+    // Every kind of fork, each holding Bytes[10..60].
+    private static ForkData Fifty(string kind) => kind switch
+    {
+        "memory" => ForkData.FromBytes(Bytes[10..60]),
+        "file" => FileOf(Bytes[10..60]),
+        "slice" => ForkData.FromBytes(Bytes).Slice(10, 50),
+        "file slice" => Source("file").Slice(5, 60).Slice(5, 50),
+        "extents" => new ExtentForkData(ForkData.FromBytes(Bytes), [(10, 7), (17, 30), (47, 20)], 50),
+        _ => new ExtentForkData(Source("file"), [(10, 25), (35, 25)], 50),
+    };
+
+    private static ForkData FileOf(byte[] bytes)
+    {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, bytes);
+        return ForkData.FromFile(path);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllKinds))]
+    public void ReadAt_reads_from_any_offset(string kind)
+    {
+        var fork = Fifty(kind);
+        var buffer = new byte[12];
+        Assert.Equal(12, fork.ReadAt(3, buffer));
+        Assert.Equal(Bytes[13..25], buffer);
+        Assert.Equal(Bytes[10..60], fork.ToArray());
+        Assert.Equal(Bytes[30..34], fork.Slice(20, 10).ReadPrefix(4));
+    }
+
+    [Theory]
+    [MemberData(nameof(AllKinds))]
+    public void ReadAt_stops_at_the_end(string kind)
+    {
+        var fork = Fifty(kind);
+        var buffer = new byte[8];
+        Assert.Equal(5, fork.ReadAt(45, buffer));
+        Assert.Equal(Bytes[55..60], buffer[..5]);
+        Assert.Equal(0, fork.ReadAt(50, buffer));
+        Assert.Equal(0, fork.ReadAt(70, buffer));
+        Assert.Equal(0, fork.ReadAt(0, Span<byte>.Empty));
+    }
+
+    [Theory]
+    [MemberData(nameof(AllKinds))]
+    public void ReadAt_rejects_a_negative_offset(string kind) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => Fifty(kind).ReadAt(-1, new byte[1]));
+
+    // Reads keep the host file open between them (opening it costs more than a small read), and close it once idle.
+    [Fact]
+    public async Task A_host_file_stays_open_between_reads_and_closes_when_idle()
+    {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, Bytes);
+        var fork = ForkData.FromFile(path, idle: TimeSpan.FromMilliseconds(100));
+        Assert.False(ForkData.IsHostFileOpen(fork));
+
+        var buffer = new byte[4];
+        fork.Slice(10, 50).ReadAt(2, buffer);
+        Assert.Equal(Bytes[12..16], buffer);
+        Assert.True(ForkData.IsHostFileOpen(fork));
+
+        for (var waited = 0; ForkData.IsHostFileOpen(fork) && waited < 5000; waited += 50) await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.False(ForkData.IsHostFileOpen(fork));
+        fork.ReadAt(96, buffer);
+        Assert.Equal(Bytes[96..100], buffer);
+        File.Delete(path);
+    }
+
+    // Saving replaces the file: the handles reads keep on it are closed first, and the next read opens the new file.
+    [Fact]
+    public void Closing_a_host_file_lets_it_be_replaced()
+    {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, Bytes);
+        var fork = ForkData.FromFile(path);
+        fork.ReadAt(0, new byte[1]);
+
+        ForkData.CloseHostFile(path.ToUpperInvariant());
+        Assert.False(ForkData.IsHostFileOpen(fork));
+        var replacement = path + ".new";
+        File.WriteAllBytes(replacement, [.. Bytes.Reverse()]);
+        File.Replace(replacement, path, null);
+        var buffer = new byte[1];
+        fork.ReadAt(0, buffer);
+        Assert.Equal(99, buffer[0]);
+        ForkData.CloseHostFile(path);
+        File.Delete(path);
+    }
 }
 
 public class ExtentForkTests

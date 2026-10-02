@@ -32,6 +32,24 @@ namespace ClassicMac.Files
 
         public override Stream Open() => new ExtentStream(parent.Open(), ranges, length);
 
+        protected override void ReadAtCore(long offset, Span<byte> buffer)
+        {
+            long start = 0;
+            foreach (var (rangeOffset, rangeLength) in ranges)
+            {
+                if (buffer.IsEmpty) return;
+                if (offset < start + rangeLength)
+                {
+                    var within = offset - start;
+                    var take = (int)Math.Min(rangeLength - within, buffer.Length);
+                    if (parent.ReadAt(rangeOffset + within, buffer[..take]) != take) throw new EndOfStreamException();
+                    buffer = buffer[take..];
+                    offset += take;
+                }
+                start += rangeLength;
+            }
+        }
+
         private sealed class ExtentStream(Stream inner, (long Offset, long Length)[] ranges, long length) : Stream
         {
             private long position;
