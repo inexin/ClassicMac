@@ -63,7 +63,7 @@ sectors) then 480 tag bytes (40 × 12)** [Code: 6.3.3], [Verified: DART 1.5.3]. 
 | --- | --- | --- | --- |
 | −1, or any with compression 2 | none | 20,960 | — |
 | *n* > 0 | 0 (RLE) | *n* × 2 | [dart-rle.md](../codecs/dart-rle.md) |
-| *n* > 0 | 1 (LZH) | *n* | [lzhuf.md](../codecs/lzhuf.md); the window's tail carries from one block to the next ([lzhuf.md §4](../codecs/lzhuf.md#4-decoding-a-block)) |
+| *n* > 0 | 1 (LZH) | *n* | [lzhuf.md](../codecs/lzhuf.md); the window's tail carries from one block to the next ([lzhuf.md §2.3](../codecs/lzhuf.md#23-decoding-a-block)) |
 
 ### 1.3 Checksums
 

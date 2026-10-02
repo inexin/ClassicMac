@@ -104,7 +104,7 @@ Disk Copy 6.3.3's field-name strings and validator [Code: 6.3.3], values from re
   ([dart.md §2](dart.md#2-reading)); no NDIF file with them has been seen.
 - The codecs are plug-ins, `'hdi1'` (68k) and `'hdi2'` (PowerPC) resources 128–131 for types `$80`–`$83`; the PowerPC
   set is used when the machine has one [Code: 6.3.3]. No codec keeps state from one chunk to the next, except LZH's
-  window tail ([lzhuf.md §4](../codecs/lzhuf.md#4-decoding-a-block)) [Code: 6.3.3].
+  window tail ([lzhuf.md §2.3](../codecs/lzhuf.md#23-decoding-a-block)) [Code: 6.3.3].
 - A compressed image stores any chunk that would not shrink as raw (`$02`), so types mix within one image
   [Verified: 6.1.2, 6.3.3].
 
@@ -362,7 +362,7 @@ segmented image is NDIF version 12 cut into parts ([§1.6](#16-segmented-images)
 - **Reading**: the disk is read on demand, one decoded chunk kept, as Disk Copy's driver does. A compressed chunk that
   fails to decode (ADC overrun, truncated input or match before the start; KenCode overread or match before the start;
   RLE or LZH short) is reported once as `ndif.bad-chunk`, and the rest of it reads as zeros. Each LZH chunk starts
-  with a clear window ([lzhuf.md §4](../codecs/lzhuf.md#4-decoding-a-block)), and an LZH chunk one byte short is not
+  with a clear window ([lzhuf.md §2.3](../codecs/lzhuf.md#23-decoding-a-block)), and an LZH chunk one byte short is not
   reported.
 - **Checksum**: checked only when asked (`ContainerReadOptions.VerifyChecksums`, the CLI's `--verify`), and only when
   `+$50` is not 0; a mismatch is `ndif.bad-checksum` and the disk is read anyway.

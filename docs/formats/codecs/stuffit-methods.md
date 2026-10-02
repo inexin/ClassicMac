@@ -140,12 +140,12 @@ LZSS with Okumura and Yoshizaki's LZHUF adaptive tree [Reference: macutils]:
 
 1. The 4,096-byte window starts at position 0 with bytes 0–17 zero, then 13 copies of each byte value 0–255, then the
    values 0–255, then 255–0, then 128 zero bytes, then 110 spaces.
-2. Read a symbol from the adaptive tree of [lzhuf.md §3](lzhuf.md#3-the-adaptive-tree) (314 symbols, bits most
+2. Read a symbol from the adaptive tree of [lzhuf.md §2.2](lzhuf.md#22-the-adaptive-tree) (314 symbols, bits most
    significant first) and update the tree; the tree is rebuilt when the root's count reaches `$8000`.
 3. Symbols 0–255 are literals: output them and put them in the window.
 4. Symbols 256–313 are matches of length symbol − 253 (3–60). The upper six bits of the distance are a canonical code
    of 1, 3, 8, 12, 24 and 16 codes of 3 to 8 bits (LZHUF's `d_code`/`d_len`,
-   [lzhuf.md §1](lzhuf.md#1-constants-and-tables)); six raw bits follow for the lower six. Copy `length` bytes from window position (current − distance − 1),
+   [lzhuf.md §1.1](lzhuf.md#11-constants-and-tables)); six raw bits follow for the lower six. Copy `length` bytes from window position (current − distance − 1),
    putting each in the window.
 5. Stop at the expanded length.
 
