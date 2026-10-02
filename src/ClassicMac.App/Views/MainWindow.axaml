@@ -159,9 +159,7 @@
                       <DataTemplate DataType="vm:ImageItem">
                         <StackPanel Margin="0,0,16,16" Spacing="4">
                           <Border Background="{x:Static views:Images.Checkerboard}" HorizontalAlignment="Left">
-                            <Image Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}"
-                                   Width="{Binding Width}" Height="{Binding Height}" Stretch="Fill"
-                                   RenderOptions.BitmapInterpolationMode="None" />
+                            <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}" />
                           </Border>
                           <TextBlock Text="{Binding Image.Caption}" Opacity="0.65" FontSize="12" />
                         </StackPanel>

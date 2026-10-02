@@ -32,8 +32,11 @@ namespace ClassicMac.App.ViewModels
         Errors,
     }
 
-    /// <summary>An image of the preview at the chosen zoom.</summary>
-    public sealed record ImageItem(PreviewImage Image, double Width, double Height);
+    /// <summary>
+    /// An image of the preview at the chosen zoom: its size at 100% display scaling (the view draws it in whole device
+    /// pixels per Mac pixel at any scaling).
+    /// </summary>
+    public sealed record ImageItem(PreviewImage Image, double Width, double Height, int Zoom);
 
     /// <summary>Picks files to open; the window provides it, tests replace it.</summary>
     public interface IFilePicker
@@ -252,7 +255,7 @@ namespace ClassicMac.App.ViewModels
         partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
 
         private static IReadOnlyList<ImageItem> ItemsAt(PreviewViewModel preview, int zoom) =>
-            preview.Images.Select(i => new ImageItem(i, i.Width * zoom, i.Height * zoom)).ToList();
+            preview.Images.Select(i => new ImageItem(i, i.Width * zoom, i.Height * zoom, zoom)).ToList();
 
         // Decodes the selection's preview off the UI thread; a newer selection cancels an older one.
         private async Task MakePreviewAsync(NodeViewModel? node)

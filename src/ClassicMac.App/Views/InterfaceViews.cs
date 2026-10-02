@@ -42,7 +42,7 @@ namespace ClassicMac.App.Views
     /// drawn by ClassicMac's QuickDraw (docs/formats/resources/windows-dialogs.md §5.3), shown with a margin and zoomed
     /// without smoothing.
     /// </summary>
-    internal sealed class DialogView : Control
+    internal sealed class DialogView : PixelControl
     {
         public static readonly StyledProperty<DialogPreview?> DialogProperty = AvaloniaProperty.Register<DialogView, DialogPreview?>(nameof(Dialog));
 
@@ -57,8 +57,6 @@ namespace ClassicMac.App.Views
             AffectsMeasure<DialogView>(DialogProperty, ScaleProperty);
             AffectsRender<DialogView>(DialogProperty, ScaleProperty);
         }
-
-        public DialogView() => RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.None);
 
         public DialogPreview? Dialog
         {
@@ -82,14 +80,17 @@ namespace ClassicMac.App.Views
             }
         }
 
+        // The gutters are in Mac pixels too, so the dialog starts on a whole device pixel.
         protected override Size MeasureOverride(Size availableSize) => Dialog is { } d
-            ? new Size((d.PixelWidth + 2 * Gutter) * Scale, (d.PixelHeight + 2 * Gutter) * Scale)
+            ? PixelScaling.Size(new Size(d.PixelWidth + 2 * Gutter, d.PixelHeight + 2 * Gutter), Scale, RenderScaling)
             : default;
 
         public override void Render(DrawingContext context)
         {
             if (Dialog is not { } dialog || bitmap is null) return;
-            context.DrawImage(bitmap, new Rect(Gutter * Scale, Gutter * Scale, dialog.PixelWidth * Scale, dialog.PixelHeight * Scale));
+            var scale = PixelScaling.Scale(Scale, RenderScaling);
+            using var snap = PushSnap(context);
+            context.DrawImage(bitmap, new Rect(Gutter * scale, Gutter * scale, dialog.PixelWidth * scale, dialog.PixelHeight * scale));
         }
     }
 
@@ -97,7 +98,7 @@ namespace ClassicMac.App.Views
     /// A menu drawn pulled down in the System 7 style [ClassicMac: an approximation]: its title in a menu bar strip, then
     /// the items with their marks, styles, Command keys, submenu arrows and dividers; disabled items grey.
     /// </summary>
-    internal sealed class MenuView : Control
+    internal sealed class MenuView : PixelControl
     {
         public static readonly StyledProperty<MenuResource?> MenuProperty = AvaloniaProperty.Register<MenuView, MenuResource?>(nameof(Menu));
 
@@ -128,7 +129,7 @@ namespace ClassicMac.App.Views
                 menu.Items.Select(i => Left + MacLook.Text(i.Text, typeface: Face(i.Face)).Width + (i.Submenu is not null || KeyText(i) is not null ? 40 : 12)).DefaultIfEmpty(80).Max());
 
         protected override Size MeasureOverride(Size availableSize) => Menu is { } menu
-            ? new Size((MenuWidth(menu) + 2 * Gutter + 2) * Scale, (Bar + menu.Items.Count * Row + 2 * Gutter + 3) * Scale)
+            ? PixelScaling.Size(new Size(MenuWidth(menu) + 2 * Gutter + 2, Bar + menu.Items.Count * Row + 2 * Gutter + 3), Scale, RenderScaling)
             : default;
 
         private static string Title(MenuResource menu) => InterfaceNames.Chicago(menu.Title);
@@ -140,7 +141,9 @@ namespace ClassicMac.App.Views
         public override void Render(DrawingContext context)
         {
             if (Menu is not { } menu) return;
-            using var scale = context.PushTransform(Matrix.CreateScale(Scale, Scale));
+            var pixel = PixelScaling.Scale(Scale, RenderScaling);
+            using var snap = PushSnap(context);
+            using var scale = context.PushTransform(Matrix.CreateScale(pixel, pixel));
             var width = MenuWidth(menu);
 
             // The title, highlighted as when the menu is pulled down, on a strip of menu bar.

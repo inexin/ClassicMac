@@ -102,7 +102,7 @@ namespace ClassicMac.App.Views
     }
 
     /// <summary>A document's picture at its size, pixels unsmoothed; a dashed box when it was not drawn. A link opens on a click.</summary>
-    internal sealed class DocumentPictureView : Control
+    internal sealed class DocumentPictureView : PixelControl
     {
         public static readonly StyledProperty<DocumentPictureItem?> ItemProperty =
             AvaloniaProperty.Register<DocumentPictureView, DocumentPictureItem?>(nameof(Item));
@@ -118,8 +118,6 @@ namespace ClassicMac.App.Views
             ItemProperty.Changed.AddClassHandler<DocumentPictureView>((view, _) => view.Load());
         }
 
-        public DocumentPictureView() => RenderOptions.SetBitmapInterpolationMode(this, Avalonia.Media.Imaging.BitmapInterpolationMode.None);
-
         public DocumentPictureItem? Item
         {
             get => GetValue(ItemProperty);
@@ -134,11 +132,21 @@ namespace ClassicMac.App.Views
             ToolTip.SetTip(this, string.IsNullOrEmpty(Item?.ToolTip) ? null : Item.ToolTip);
         }
 
-        protected override Size MeasureOverride(Size availableSize) => Item is { } item ? new Size(item.Width, item.Height) : default;
+        // At its size, or zoomed by the column, in whole device pixels per Mac pixel (PixelScaling); shrunk below one
+        // device pixel per Mac pixel, at the size the layout gave it.
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            if (Item is not { } item) return default;
+            if (bitmap is null || bitmap.PixelSize.Width == 0) return new Size(item.Width, item.Height);
+            var zoom = (double)item.Width / bitmap.PixelSize.Width;
+            var scale = PixelScaling.Scale(zoom, RenderScaling);
+            return scale == zoom ? new Size(item.Width, item.Height) : new Size(bitmap.PixelSize.Width * scale, bitmap.PixelSize.Height * scale);
+        }
 
         public override void Render(DrawingContext context)
         {
             var rect = new Rect(Bounds.Size);
+            using var snap = PushSnap(context);
             if (bitmap is not null) context.DrawImage(bitmap, rect);
             else if (rect.Width > 0 && rect.Height > 0) context.DrawRectangle(null, Missing, rect.Deflate(0.5));
         }

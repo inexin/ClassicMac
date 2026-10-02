@@ -7,6 +7,9 @@
   redo, the Resource commands, closing a file and quitting first ask "Apply your changes to 'STR#' 128?" with Apply
   (one undoable edit), Discard and Cancel (stay, nothing changes); a draft with an error offers no Apply and names it.
   Applied but unsaved edits still go to the Save prompt only.
+- Viewer: image previews, dialogs, menus and document pictures stay sharp at any display scaling: each Mac pixel is a
+  whole number of device pixels (max(1, floor(zoom × scaling)): one at 125% and 150%, three at 2× zoom and 150%),
+  drawn from a whole device pixel without smoothing, so 1-pixel detail no longer blurs or doubles.
 - Viewer: the app bundles IBM Plex Sans (the default font) and IBM Plex Mono (hex, plain text, the hex dialog; the
   `CmFontSans` and `CmFontMono` resources), so Windows, macOS and Linux show the same type; Inter is no longer used.
 - Viewer: the first selection after opening a disk no longer freezes the app (20 s on a 500 MB disk): the hex list's
