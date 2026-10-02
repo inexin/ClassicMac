@@ -297,6 +297,20 @@ public class FinderIconResolverTests
         Assert.Equal((short)id, new FinderIconResolver([], []).SystemIconId(F(type)));
     }
 
+    // A window's title icon: the System's icon of a type, such as a hard disk's for a volume's root.
+    [Fact]
+    public void The_System_s_icon_of_one_of_its_types_is_there_to_ask_for()
+    {
+        var resolver = new FinderIconResolver([], [System(("ICN#", -3995, Icon(0x4D)))]);
+
+        var disk = resolver.SystemTypeIcon(F("hdsk"));
+
+        Assert.Equal(FinderIconSource.Generic, disk.Source);
+        Assert.Equal(0x4D, Marker(disk));
+        Assert.Null(resolver.SystemTypeIcon(F("cddr")).Suite);
+        Assert.Equal(FinderIconSource.None, resolver.SystemTypeIcon(F("zzzz")).Source);
+    }
+
     [Fact]
     public void A_system_icon_family_comes_before_separate_icons()
     {

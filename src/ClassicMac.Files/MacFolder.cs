@@ -23,6 +23,13 @@ namespace ClassicMac.Files
         /// <summary>The <c>DInfo</c> and <c>DXInfo</c>.</summary>
         public FolderFinderInfo FinderInfo { get; init; } = FolderFinderInfo.Empty;
 
+        /// <summary>
+        /// On the root folder, the volume's free space as its header records it: free allocation blocks times the block
+        /// size (HFS <c>drFreeBks</c> × <c>drAlBlkSiz</c>, HFS Plus <c>freeBlocks</c> × <c>blockSize</c>), the figure the
+        /// Finder's window header shows as available; null on other folders.
+        /// </summary>
+        public long? FreeBytes { get; init; }
+
         /// <summary>When the folder was created, if recorded.</summary>
         public MacDate? Created { get; init; }
 

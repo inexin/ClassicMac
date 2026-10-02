@@ -358,6 +358,124 @@ namespace ClassicMac.Resources.Decoders.Interface
             "0mnnnnnnnnnnnnn0",
             "0000000000000000");
 
+        /// <summary>The scroll box without its grip, stretched to any length (a proportional thumb).</summary>
+        public static readonly PlatinumArt ThumbBody = new(8, 2, 7, 2,
+            "0000000000000000",
+            "0Ellllllllllllm0",
+            "0lmmmmmmmmmmmmn0",
+            "0mnnnnnnnnnnnnn0",
+            "0000000000000000");
+
+        /// <summary>The scroll box's grip, 8 rows, centred in it.</summary>
+        public static readonly PlatinumArt Grip = new(8, 4, 7, 3,
+            "0lmmEllllllmmmn0",
+            "0lmmmooooooommn0",
+            "0lmmEllllllmmmn0",
+            "0lmmmooooooommn0",
+            "0lmmEllllllmmmn0",
+            "0lmmmooooooommn0",
+            "0lmmEllllllmmmn0",
+            "0lmmmooooooommn0");
+
+        /// <summary>
+        /// The Finder's folder window (a zoomable document window): the close box at the left of the 22-row title bar,
+        /// the zoom and collapse boxes at the right, the content framed by a black line, a 6-pixel border and the shadow;
+        /// the grow box's corner in the bottom border. Measured from a Mac OS 9.0 Finder window [Verified].
+        /// </summary>
+        public static readonly PlatinumArt FinderFrame = new(22, 22, 39, 7,
+            "0000000000000000000000000000000000000000000000000000000000000 ",
+            "0FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC0 ",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0FCC888888888888CCCCCFFCCCCC888888888888CCCC888888888888CCC900",
+            "0FCC822222222222FCCCCC77CCCC822222222222FCCC822222222222FCC900",
+            "0FCC82FCCCCCCCC2FCCCCFFCCCCC82FCCCC2CCC2FCCC82FCCCCCCCC2FCC900",
+            "0FCC82C99AABBC82FCCCCC77CCCC82C99AA2BC82FCCC82C99AABBC82FCC900",
+            "0FCC82C9AABBCC82FCCCCFFCCCCC82C9AAB2CC82FCCC82C9AABBCC82FCC900",
+            "0FCC82CAABBCCD82FCCCCC77CCCC82CAABB2CD82FCCC822222222222FCC900",
+            "0FCC82CABBCCDD82FCCCCFFCCCCC82CABBC2DD82FCCC82CABBCCDD82FCC900",
+            "0FCC82CBBCCDDE82FCCCCC77CCCC82222222DE82FCCC822222222222FCC900",
+            "0FCC82CBCCDDEE82FCCCCFFCCCCC82CBCCDDEE82FCCC82CBCCDDEE82FCC900",
+            "0FCC82CCCDDEEF82FCCCCC77CCCC82CCCDDEEF82FCCC82CCCDDEEF82FCC900",
+            "0FCC82C888888882FCCCCFFCCCCC82C888888882FCCC82C888888882FCC900",
+            "0FCC822222222222FCCCCC77CCCC822222222222FCCC822222222222FCC900",
+            "0FCCCFFFFFFFFFFFFCCCCCCCCCCCCFFFFFFFFFFFFCCCCFFFFFFFFFFFFCC900",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0FCC9999999999999999999999999999999999999999999999999999CCC900",
+            "0FCC9000000000000000000000000000000000000000000000000000FCC900",
+            "0FCC90~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~0FCC900",
+            "0FCC9000000000000000000000000000000000000FCCCCCCCCCCCCCCCCC900",
+            "0FCCCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFCCCCCCCCCCCCCCCCC900",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0FCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC900",
+            "0C999999999999999999999999999999999999999999999999999999999900",
+            "00000000000000000000000000000000000000000000000000000000000000",
+            "  000000000000000000000000000000000000000000000000000000000000");
+
+        /// <summary>The grow box, 16 × 16 from its top-left black corner, in the content's bottom-right corner.</summary>
+        public static readonly PlatinumArt GrowBox = new(7, 7, 8, 8,
+            "0000000000000000",
+            "0FFFFFFFFFFFFFFF",
+            "0FCCCCCCCCCCCCCC",
+            "0FCCCCCCCCCCCCCC",
+            "0FCCCCCCCFFCCCCC",
+            "0FCCCCCCFC7CCCCC",
+            "0FCCCCCFC7CFFCCC",
+            "0FCCCCFC7CFC7CCC",
+            "0FCCCFC7CFC7CFFC",
+            "0FCCFC7CFC7CFC7C",
+            "0FCCA7CFC7CFC7CC",
+            "0FCCCCFC7CFC7CCC",
+            "0FCCCCA7CFC7CCCC",
+            "0FCCCCCCFC7CCCCC",
+            "0FCCCCCCA7CCCCCC",
+            "0FCCCCCCCCCCCCCC");
+
+        /// <summary>A scroll bar with nothing to scroll: an empty  trough under a 555 line.</summary>
+        public static readonly PlatinumArt InactiveTrack = new(7, 1, 8, 0,
+            "0555555555555550",
+            "0EEEEEEEEEEEEEE0");
+
+        /// <summary>A scroll bar's up arrow with nothing to scroll: grey (888) on the trough.</summary>
+        public static readonly PlatinumArt InactiveUpArrow = new(7, 7, 8, 8,
+            "0555555555555550",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEE88EEEEEE0",
+            "0EEEEE8888EEEEE0",
+            "0EEEE888888EEEE0",
+            "0EEE88888888EEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0888888888888880");
+
+        /// <summary>The down arrow with nothing to scroll.</summary>
+        public static readonly PlatinumArt InactiveDownArrow = new(7, 7, 8, 8,
+            "0888888888888880",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEE88888888EEE0",
+            "0EEEE888888EEEE0",
+            "0EEEEE8888EEEEE0",
+            "0EEEEEE88EEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0EEEEEEEEEEEEEE0",
+            "0000000000000000");
+
         /// <summary>The up arrow, 16 × 16 including the black lines it shares.</summary>
         public static readonly PlatinumArt UpArrow = new(8, 8, 7, 7,
             "0000000000000000",

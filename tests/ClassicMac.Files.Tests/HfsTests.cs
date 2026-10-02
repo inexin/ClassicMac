@@ -78,6 +78,7 @@ public class HfsTests
         var root = folders.Single(f => f.IsRoot);
         Assert.Equal("Test Disk", root.Name.ToMacRoman());
         Assert.Equal(rootInfo, root.FinderInfo);
+        Assert.All(folders.Where(f => !f.IsRoot), f => Assert.Null(f.FreeBytes));
         var read = folders.Single(f => f.MacPath == "Games");
         Assert.False(read.IsRoot);
         Assert.Empty(read.FolderPath);
@@ -89,6 +90,19 @@ public class HfsTests
         Assert.Null(inner.Created);
         // Read is unchanged: files only.
         Assert.Equal(["Games:Read Me"], HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()).Select(f => f.MacPath));
+    }
+
+    // The root carries the volume's free space as the MDB records it: drFreeBks (+$22) × drAlBlkSiz (+$14).
+    [Fact]
+    public void The_root_folder_carries_the_volumes_free_space()
+    {
+        var image = new HfsBuilder().Build("Disk");
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1024 + 0x22), 7);
+        uint blockSize = BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(1024 + 0x14));
+
+        var root = HfsReader.Instance.ReadFolders(ForkData.FromBytes(image), new ContainerContext()).Single(f => f.IsRoot);
+
+        Assert.Equal(7L * blockSize, root.FreeBytes);
     }
 
     [Fact]

@@ -730,4 +730,113 @@ public class FinderWindowTests
                 if (bitmap[x, y] != White) n++;
         return n;
     }
+    // ---- The whole window: the Platinum document frame around the content (finder-windows.md §2.9) ----
+
+    [Fact]
+    public void The_window_is_the_content_in_a_Platinum_frame()
+    {
+        var window = Window(Item("a", 20, 30)) with { Title = MacString.FromMacRoman("Art") };
+
+        var content = FinderWindowRenderer.Render(window);
+        var whole = FinderWindowRenderer.RenderWindow(window);
+
+        // 6 columns left and 22 rows above the content; 7 right and below, the shadow included [Verified: Mac OS 9.0 Finder].
+        Assert.Equal((content.Width + 13, content.Height + 29), (whole.Width, whole.Height));
+        for (int y = 0; y < content.Height; y++)
+            for (int x = 0; x < content.Width; x++)
+                Assert.True(content[x, y] == whole[x + 6, y + 22], $"content pixel ({x}, {y})");
+        Assert.Equal(Black, whole[0, 0]);
+        Assert.Equal(Black, whole[5, 21]);
+        // The shadow's corners show what is behind the window.
+        Assert.Equal(0, whole[whole.Width - 1, 0].A);
+        Assert.Equal(0, whole[0, whole.Height - 1].A);
+        Assert.Equal(Black, whole[whole.Width - 1, whole.Height - 1]);
+    }
+
+    [Fact]
+    public void The_title_bar_has_the_close_zoom_and_collapse_boxes()
+    {
+        var whole = FinderWindowRenderer.RenderWindow(Window());
+        var box = new RgbaColor(0x88, 0x88, 0x88);
+
+        // Each box's frame starts with an $8888 line: the close box at (4, 4), the zoom and collapse boxes 34 and 18 from the right.
+        Assert.Equal(box, whole[4, 4]);
+        Assert.Equal(box, whole[whole.Width - 34, 4]);
+        Assert.Equal(box, whole[whole.Width - 18, 4]);
+        // Between them, the title bar's stripes: white and $7777 rows.
+        Assert.Equal(White, whole[100, 4]);
+        Assert.Equal(new RgbaColor(0x77, 0x77, 0x77), whole[100, 5]);
+    }
+
+    [Fact]
+    public void The_title_and_its_icon_sit_centred_in_a_gap_in_the_stripes()
+    {
+        var text = new BlockText(6);
+        var window = Window() with { Title = MacString.FromMacRoman("Art"), TitleIcon = Solid() };
+
+        var whole = FinderWindowRenderer.RenderWindow(window, new FinderWindowOptions { TextFallback = text });
+
+        Assert.Contains(text.Calls, c => c.Text == "Art" && c.Style.Size == 12);
+        // The icon (16) and 4 pixels, then the title (18 wide): centred in the window; the gap 5 before, 3 after.
+        int start = (whole.Width - (16 + 4 + 18)) / 2;
+        Assert.Equal(Black, whole[start + 8, 10]);
+        Assert.Equal(new RgbaColor(0xCC, 0xCC, 0xCC), whole[start - 2, 4]);
+        Assert.Equal(White, whole[start - 6, 4]);
+        Assert.Equal(new RgbaColor(0xCC, 0xCC, 0xCC), whole[start + 38 + 2, 4]);
+        Assert.Equal(White, whole[start + 38 + 3, 4]);
+    }
+
+    [Theory]
+    [InlineData(1, null, "1 item")]
+    [InlineData(2, null, "2 items")]
+    [InlineData(20, 1431552L, "20 items, 1.3 MB available")]
+    [InlineData(7, 1849344L, "7 items, 1.7 MB available")]
+    [InlineData(3, 1048576L, "3 items, 1 MB available")]
+    [InlineData(3, 524288L, "3 items, 512K available")]
+    [InlineData(3, 5368709120L, "3 items, 5 GB available")]
+    [InlineData(0, 0L, "0 items, zero K available")]
+    public void The_header_gives_the_items_and_the_volume_s_free_space(int count, long? free, string expected) =>
+        Assert.Equal(expected, FinderWindowRenderer.HeaderText(count, free));
+
+    [Theory]
+    [InlineData(635, 665, 11, 11, 11, 624)]      // Art: everything but 11 pixels shown, scrolled to the end
+    [InlineData(635, 665, 11, 0, 0, 624)]
+    [InlineData(100, 100, 100, 50, 25, 50)]
+    [InlineData(100, 10, 990, 0, 0, 16)]          // never shorter than a thumb's art
+    public void A_thumb_is_as_long_as_the_shown_part_of_the_track(int track, int visible, int range, int value, int at, int length) =>
+        Assert.Equal((at, length), FinderWindowRenderer.Thumb(track, visible, range, value));
+
+    [Fact]
+    public void Nothing_to_scroll_gives_no_thumb() => Assert.Null(FinderWindowRenderer.Thumb(635, 665, 0, 0));
+
+    [Fact]
+    public void Items_beyond_the_shown_area_make_it_scroll()
+    {
+        // A 32 x 32 icon takes 64 x 54 with its margins, from 4 above and 16 left of it [Fitted: Mac OS 9.0 Finder].
+        var inside = Window(Item("a", 100, 100));
+        var left = Window(Item("a", 100, 5));
+        var below = Window(Item("a", 500, 100));
+
+        Assert.Equal((new FinderScrollBar(0, 0), new FinderScrollBar(0, 0)), FinderWindowRenderer.Scrolling(inside));
+        Assert.Equal(new FinderScrollBar(11, 11), FinderWindowRenderer.Scrolling(left).Horizontal);
+        var (_, vertical) = FinderWindowRenderer.Scrolling(below);
+        // The window shows 260 - 21 - 15 = 224 rows; the item reaches 500 + 50.
+        Assert.Equal(new FinderScrollBar(550 - 224, 0), vertical);
+    }
+
+    [Fact]
+    public void A_window_that_scrolls_draws_an_active_bar_with_its_thumb_and_one_that_does_not_an_empty_one()
+    {
+        var still = FinderWindowRenderer.Render(Window(Item("a", 100, 100)));
+        var scrolls = FinderWindowRenderer.Render(Window(Item("a", 600, 100)));
+        var thumb = new RgbaColor(0x99, 0x99, 0xFF);
+
+        // Inactive: the trough and grey arrows; active: the blue thumb at the top, black arrows.
+        Assert.Equal(Trough, still[480, 100]);
+        Assert.Equal(thumb, scrolls[482, 40]);
+        Assert.Equal(new RgbaColor(0x88, 0x88, 0x88), still[482, 260 - 15 - 30 + 9]);
+        Assert.Equal(Black, scrolls[482, 260 - 15 - 30 + 9]);
+        // The grow box in the corner.
+        Assert.Equal(new RgbaColor(0xCC, 0xCC, 0xCC), scrolls[489, 259]);
+    }
 }

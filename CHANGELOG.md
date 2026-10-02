@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Viewer: a folder's preview is the whole Finder window: the Platinum frame with the close, zoom and collapse boxes,
+  the title with the folder's or the disk's icon, "n items, x MB available" in the header, scroll bars with
+  proportional thumbs where the items reach beyond the window, and the grow box; checked against Mac OS 9.0
+  screenshots, every pixel but the anti-aliased title matching (file-systems/finder-windows.md §2.9). Selecting an
+  archive or disk image not yet read reads it and shows its contents; a wrapper (MacBinary, a disk image) shows the
+  window of what it holds.
+- Files: `MacFolder.FreeBytes` gives a volume's free space on its root folder.
 - Viewer: folders in small icon, large button and small button views preview as the Finder draws them: 16 × 16 icons
   with names flush left (condensed, then truncated in the middle, past a 167-pixel pane) arranged down 192 × 24
   columns; Platinum bevel buttons (48 or 28 pixels) with the icon centred by its mask and the name centred below,

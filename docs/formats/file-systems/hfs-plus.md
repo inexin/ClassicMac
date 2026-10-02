@@ -427,7 +427,8 @@ None.
 - Symbolic links keep their data fork and expose it as `MacFile.SymbolicLinkTarget`, strict UTF-8.
 - `HfsReader.ReadFolders` returns the folder records, the root included, as on HFS
   ([hfs.md §5.2](hfs.md#52-what-comes-out)): Mac OS Roman names and paths as for files, `userInfo` and `finderInfo`,
-  `createDate` and `contentModDate`. The private folders and their subtrees are left out.
+  `createDate` and `contentModDate`. The private folders and their subtrees are left out. The root's `FreeBytes` is the
+  volume header's `freeBlocks` × `blockSize`.
 - Catalog lookup by name is not offered; key order is only validated, with the volume's comparison. The comparison
   uses fixed Unicode 3.2 tables, decomposition and Hangul included, not the host runtime's.
 - The catalog B-tree is read into memory within `ContainerReadOptions.MaxExpandedBytesPerInput`; more file and folder

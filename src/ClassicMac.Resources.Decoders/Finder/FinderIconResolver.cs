@@ -231,6 +231,12 @@ namespace ClassicMac.Resources.Decoders.Finder
         // [Code: Icon Services 9.2.2; Verified: Mac OS 9.0 Finder, stationery].
         private FinderIcon Generic(FourCC type) => System(type == Appl || type == Appc || type == Appd ? type : Docu);
 
+        /// <summary>
+        /// The System's icon of one of its own types (<c>hdsk</c> a hard disk, <c>fldr</c> a folder, …: the table above),
+        /// for a window's title; none when the open System files lack it.
+        /// </summary>
+        public FinderIcon SystemTypeIcon(FourCC type) => System(type);
+
         private FinderIcon System(FourCC type) =>
             SystemIcon(type) is { } suite ? new FinderIcon(suite, FinderIconSource.Generic) : new FinderIcon(null, FinderIconSource.None);
 

@@ -6,6 +6,7 @@ using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Resources.Decoders.Images;
+using ClassicMac.Resources.Decoders.Interface;
 
 namespace ClassicMac.Resources.Decoders.Finder
 {
@@ -87,7 +88,21 @@ namespace ClassicMac.Resources.Decoders.Finder
 
         /// <summary>Whether the window has a recorded rectangle: <c>kHasBeenInited</c> and a non-empty <c>frRect</c> [Code: Finder 9.2.2].</summary>
         public bool HasBounds => (Flags & FinderWindowItem.HasBeenInitedFlag) != 0 && !Bounds.IsEmpty;
+
+        /// <summary>The window's title: the folder's (or the volume's) name.</summary>
+        public MacString Title { get; init; } = MacString.FromMacRoman("");
+
+        /// <summary>The small icon drawn before the title (the folder's or volume's own); null draws none.</summary>
+        public IconSuite? TitleIcon { get; init; }
+
+        /// <summary>The volume's free space for the header ("… available"); null leaves it out.</summary>
+        public long? FreeBytes { get; init; }
     }
+
+    /// <summary>How far a window scrolls one way: the range beyond what it shows, and how far into it the window is.</summary>
+    /// <param name="Range">The pixels the items reach beyond the shown area; 0 when nothing scrolls.</param>
+    /// <param name="Value">How far the shown area is from the items' first pixel.</param>
+    public sealed record FinderScrollBar(int Range, int Value);
 
     /// <summary>Where an item's icon is drawn.</summary>
     /// <param name="Item">The item.</param>
@@ -166,8 +181,7 @@ namespace ClassicMac.Resources.Decoders.Finder
             "Temporary Items", "Trash", "Desktop Folder", "Move&Rename", "TheVolumeSettingsFolder",
         };
 
-        private static readonly RgbColor HeaderFill = new(0xDDDD, 0xDDDD, 0xDDDD), HeaderShadow = new(0xAAAA, 0xAAAA, 0xAAAA),
-            Trough = new(0xEEEE, 0xEEEE, 0xEEEE);
+        private static readonly RgbColor HeaderFill = new(0xDDDD, 0xDDDD, 0xDDDD), HeaderShadow = new(0xAAAA, 0xAAAA, 0xAAAA);
 
         /// <summary>
         /// The rectangle of a label <paramref name="width"/> pixels wide under an icon whose top-left is
@@ -186,6 +200,163 @@ namespace ClassicMac.Resources.Decoders.Finder
             ArgumentNullException.ThrowIfNull(window);
             options ??= FinderWindowOptions.Default;
             return Place(window, Port(new RgbaBitmap(1, 1), options), options).Select(p => p.Placement).ToList();
+        }
+
+        /// <summary>
+        /// Draws the whole window as the Finder shows it, active: the content (<see cref="Render"/>) in the Platinum
+        /// document frame, 6 pixels left and 22 above it (the title bar), 7 right and below (the border and the shadow),
+        /// with the close, zoom and collapse boxes, and the title after its icon centred in a gap in the stripes
+        /// [Verified: Mac OS 9.0 Finder; Fitted: the title's place]. Pixels the window does not cover (the shadow's
+        /// corners) are left transparent.
+        /// </summary>
+        public static RgbaBitmap RenderWindow(FinderWindow window, FinderWindowOptions? options = null)
+        {
+            ArgumentNullException.ThrowIfNull(window);
+            options ??= FinderWindowOptions.Default;
+            var content = Render(window, options);
+            var canvas = new RgbaBitmap(content.Width + FrameLeft + FrameRight, content.Height + FrameTop + FrameBottom);
+            var port = Port(canvas, options);
+            port.PenNormal();
+            PlatinumArt.FinderFrame.Paint(port, 0, 0, canvas.Width, canvas.Height, RgbColor.White);
+            for (int y = 0; y < content.Height; y++)
+                for (int x = 0; x < content.Width; x++)
+                    canvas[x + FrameLeft, y + FrameTop] = content[x, y];
+            // The grow box reaches over the content's right line into the frame [Verified: Mac OS 9.0 Finder].
+            PlatinumArt.GrowBox.Paint(port, FrameLeft + content.Width - ScrollBarSize, FrameTop + content.Height - ScrollBarSize, RgbColor.White);
+            port.ForeColor = PlatinumArt.TitleBar;
+            port.PaintRect(PlatinumArt.Rect(FrameTop + content.Height - 13, FrameLeft + content.Width + 1, FrameTop + content.Height, FrameLeft + content.Width + 2));
+            Title(port, window, canvas.Width, options);
+            return canvas;
+        }
+
+        // The frame's widths around the content [Verified: Mac OS 9.0 Finder].
+        private const int FrameLeft = 6, FrameTop = 22, FrameRight = 7, FrameBottom = 7;
+
+        // The title: its icon (16 x 16, 3 below the frame's top) and 4 pixels, then the name in the system font, all
+        // centred in the window; the stripes cleared from 5 before the icon to 3 after the name, as for a dialog's title
+        // [Fitted: Mac OS 9.0 Finder, the pen's place; the title is drawn by the Window Manager in the anti-aliased
+        // system font there, here in the bitmap one].
+        private static void Title(QuickDrawPort port, FinderWindow window, int width, FinderWindowOptions options)
+        {
+            var name = window.Title.ToMacRoman();
+            int textWidth = TitleWidth(port, name, options);
+            int iconWidth = window.TitleIcon is null ? 0 : 20;
+            int total = iconWidth + textWidth;
+            if (total == 0) return;
+            int start = (width - total) / 2;
+            port.PenNormal();
+            port.ForeColor = PlatinumArt.TitleBar;
+            port.PaintRect(PlatinumArt.Rect(4, Math.Max(22, start - 5), 16, Math.Min(width - 39, start + total + 3)));
+            if (window.TitleIcon is { } icon)
+            {
+                (port.ForeColor, port.BackColor) = (RgbColor.Black, RgbColor.White);
+                icon.Plot(port, new MacRect(3, (short)start, 19, (short)(start + 16)), IconAlignment.None, IconTransform.None, null);
+            }
+            if (name.Length == 0) return;
+            port.Clip = Region.FromRect(PlatinumArt.Rect(1, 22, 20, width - 39));
+            TitleStyle(port);
+            port.MoveTo(start + iconWidth, 15);
+            if (port.StringWidth(name) > 0) port.DrawString(name);
+            else if (options.TextFallback is not null) port.DrawString(name);
+            port.Clip = null;
+        }
+
+        private static void TitleStyle(QuickDrawPort port)
+        {
+            port.TextFont = 0;
+            port.TextSize = 12;
+            port.TextFace = 0;
+            port.TextMode = TransferMode.SrcOr;
+            port.ForeColor = RgbColor.Black;
+        }
+
+        // The title's width in the system font, measured by what draws it.
+        private static int TitleWidth(QuickDrawPort port, string name, FinderWindowOptions options)
+        {
+            if (name.Length == 0) return 0;
+            TitleStyle(port);
+            if (port.StringWidth(name) is > 0 and var width) return width;
+            if (options.TextFallback?.Render(name, new TextFallbackStyle(0, 0, 12)) is { } mask) return (int)Math.Round(mask.Advance);
+            return name.Length * 7;                             // [ClassicMac: Charcoal 12's average width, for layout without fonts]
+        }
+
+        /// <summary>
+        /// The header's text: "n items", then ", " and the volume's free space with " available" [Verified: Mac OS 9.0
+        /// Finder, "1.3 MB" for 1,431,552 bytes]: megabytes (2^20) and gigabytes (2^30) to one decimal, truncated, the
+        /// decimal left out when it is 0; below a megabyte whole kilobytes ("512K"), "zero K" for none [Fitted: the units
+        /// below and above megabytes].
+        /// </summary>
+        public static string HeaderText(int count, long? freeBytes)
+        {
+            var items = string.Create(CultureInfo.InvariantCulture, $"{count} item{(count == 1 ? "" : "s")}");
+            if (freeBytes is not { } free) return items;
+            static string Tenths(long bytes, long unit, string name)
+            {
+                long tenths = bytes * 10 / unit;
+                return tenths % 10 == 0
+                    ? string.Create(CultureInfo.InvariantCulture, $"{tenths / 10} {name}")
+                    : string.Create(CultureInfo.InvariantCulture, $"{tenths / 10}.{tenths % 10} {name}");
+            }
+            string amount = free switch
+            {
+                <= 0 => "zero K",
+                < 1L << 20 => string.Create(CultureInfo.InvariantCulture, $"{free >> 10}K"),
+                < 1L << 30 => Tenths(free, 1L << 20, "MB"),
+                _ => Tenths(free, 1L << 30, "GB"),
+            };
+            return $"{items}, {amount} available";
+        }
+
+        /// <summary>
+        /// Where a scroll bar's thumb goes: its offset from the track's start line and its length between its two black
+        /// lines, for a track <paramref name="track"/> pixels from its start line to the arrows' line. The thumb is as long
+        /// as the shown part of the track (<paramref name="visible"/> of <paramref name="visible"/> + <paramref name="range"/>),
+        /// never shorter than the thumb's art (16), and placed by <paramref name="value"/> of <paramref name="range"/> in
+        /// what is left [Verified: Mac OS 9.0 Finder, 624 of a 635-pixel track for 11 pixels of range]. Null when nothing
+        /// scrolls.
+        /// </summary>
+        public static (int At, int Length)? Thumb(int track, int visible, int range, int value)
+        {
+            if (range <= 0 || track <= 0) return null;
+            int length = (int)Math.Max(16, (long)track * visible / ((long)visible + range));
+            length = Math.Min(length, track);
+            int at = (int)((long)(track - length) * Math.Clamp(value, 0, range) / range);
+            return (at, length);
+        }
+
+        /// <summary>
+        /// How far the window scrolls each way: the items' extent (each large icon with its margins, 4 above and 16 left of
+        /// the icon to 64 × 54 [Fitted: Mac OS 9.0 Finder], and its name) joined with the shown area, less the shown area.
+        /// Other views take each item's icon or button and name as they are [ClassicMac].
+        /// </summary>
+        public static (FinderScrollBar Horizontal, FinderScrollBar Vertical) Scrolling(FinderWindow window, FinderWindowOptions? options = null)
+        {
+            ArgumentNullException.ThrowIfNull(window);
+            options ??= FinderWindowOptions.Default;
+            var placed = Place(window, Port(new RgbaBitmap(1, 1), options), options);
+            return Scrolling(window, placed);
+        }
+
+        private static (FinderScrollBar Horizontal, FinderScrollBar Vertical) Scrolling(FinderWindow window, List<(FinderWindowPlacement Placement, Name Name)> placed)
+        {
+            var layout = Layout.Of(window.View.Kind);
+            var scroll = Scroll(window);
+            int shownWidth = Width(window) - ScrollBarSize, shownHeight = Height(window) - HeaderHeight - ScrollBarSize;
+            var shown = new Box(scroll.V, scroll.H, scroll.V + shownHeight, scroll.H + shownWidth);
+            var extent = shown;
+            foreach (var (placement, name) in placed)
+            {
+                int v = placement.Location.V, h = placement.Location.H;
+                var body = layout.Kind switch
+                {
+                    FinderViewKind.LargeIcon => new Box(v - 4, h - 16, v + 50, h + 48),
+                    FinderViewKind.SmallIcon => new Box(v - 1, h - 8, v + 19, h + 88),
+                    _ => layout.Body(v, h),
+                };
+                extent = extent.Union(body).Union(layout.LabelBox(v, h, name.Width));
+            }
+            return (new FinderScrollBar(extent.Right - extent.Left - shownWidth, shown.Left - extent.Left),
+                new FinderScrollBar(extent.Bottom - extent.Top - shownHeight, shown.Top - extent.Top));
         }
 
         /// <summary>Draws the window's content.</summary>
@@ -220,8 +391,9 @@ namespace ClassicMac.Resources.Decoders.Finder
                 port.MoveTo(penH, baseline);
                 port.DrawText(name.Text.Bytes);
             }
-            Header(port, width, placed.Count, options);
-            ScrollBars(port, width, height);
+            Header(port, width, HeaderText(placed.Count, window.FreeBytes), options);
+            var (horizontal, vertical) = Scrolling(window, placed);
+            ScrollBars(port, width, height, horizontal, vertical);
             return canvas;
         }
 
@@ -474,9 +646,9 @@ namespace ClassicMac.Resources.Decoders.Finder
             }
         }
 
-        // The header pane in the Platinum appearance's colours, with "n items" centred in the views font [Verified: Mac OS
-        // 9.0 Finder, the pane's geometry and colours; ClassicMac: the text's place, and no free space].
-        private static void Header(QuickDrawPort port, int width, int count, FinderWindowOptions options)
+        // The header pane in the Platinum appearance's colours, with its text in the views font, its pen 2 right of centre, the baseline 14
+        // below the top [Verified: Mac OS 9.0 Finder, the pane's geometry and colours, the text in Geneva 10].
+        private static void Header(QuickDrawPort port, int width, string header, FinderWindowOptions options)
         {
             void Fill(int top, int left, int bottom, int right, RgbColor colour)
             {
@@ -490,23 +662,62 @@ namespace ClassicMac.Resources.Decoders.Finder
             Fill(1, width - 1, HeaderHeight - 1, width, HeaderShadow);
             Fill(HeaderHeight - 2, 1, HeaderHeight - 1, width, HeaderShadow);
             Fill(HeaderHeight - 1, 0, HeaderHeight, width, RgbColor.Black);
-            var text = MacString.FromMacRoman(string.Create(CultureInfo.InvariantCulture, $"{count} item{(count == 1 ? "" : "s")}"));
+            var text = MacString.FromMacRoman(header);
             int textWidth = TextWidth(port, text, QuickDrawStyle.Plain, options);
-            port.MoveTo((width - textWidth) / 2, 14);
+            port.MoveTo((width - textWidth) / 2 + 2, 14);
             port.DrawText(text.Bytes);
         }
 
-        // The scroll bars' place: a black edge and an empty trough, 15 pixels at the right and the bottom [Verified: Mac OS
-        // 9.0 Finder, the geometry; ClassicMac: no arrows, thumb or grow box].
-        private static void ScrollBars(QuickDrawPort port, int width, int height)
+        // The scroll bars inside the content at its right and bottom, sharing their outer lines with the header and the
+        // frame, the grow box in the corner [Verified: Mac OS 9.0 Finder]: a bar with nothing to scroll is an empty
+        // trough with grey arrows; one that scrolls has the shaded track, the proportional thumb and black arrows, the
+        // arrows together at its end.
+        private static void ScrollBars(QuickDrawPort port, int width, int height, FinderScrollBar horizontal, FinderScrollBar vertical)
         {
             port.PenNormal();
-            port.ForeColor = Trough;
-            port.PaintRect(new MacRect(HeaderHeight, (short)(width - ScrollBarSize), (short)height, (short)width));
-            port.PaintRect(new MacRect((short)(height - ScrollBarSize), 0, (short)height, (short)width));
-            port.ForeColor = RgbColor.Black;
-            port.PaintRect(new MacRect(HeaderHeight, (short)(width - ScrollBarSize), (short)height, (short)(width - ScrollBarSize + 1)));
-            port.PaintRect(new MacRect((short)(height - ScrollBarSize), 0, (short)(height - ScrollBarSize + 1), (short)width));
+            int shownWidth = width - ScrollBarSize, shownHeight = height - HeaderHeight - ScrollBarSize;
+            ScrollBar(port, true, width - ScrollBarSize, HeaderHeight - 1, height - ScrollBarSize, shownHeight, vertical);
+            ScrollBar(port, false, height - ScrollBarSize, -1, width - ScrollBarSize, shownWidth, horizontal);
+            PlatinumArt.GrowBox.Paint(port, width - ScrollBarSize, height - ScrollBarSize, RgbColor.White);
+        }
+
+        // One bar, from its start line to its end line (the grow box's), across from `across`.
+        private static void ScrollBar(QuickDrawPort port, bool vertical, int across, int start, int end, int visible, FinderScrollBar bar)
+        {
+            void Paint(PlatinumArt art, int at, int length)
+            {
+                if (length <= 0) return;
+                if (vertical) art.Paint(port, across, at, 16, length, RgbColor.White);
+                else art.Paint(port, at, across, length, 16, RgbColor.White);
+            }
+            int arrows = end - 30;
+            var pieces = vertical ? Pieces.Vertical : Pieces.Horizontal;
+            if (Thumb(arrows - start, visible, bar.Range, bar.Value) is not { } thumb)
+            {
+                Paint(pieces.InactiveTrack, start, arrows - start);
+                Paint(pieces.InactiveUp, arrows, 16);
+                Paint(pieces.InactiveDown, end - 15, 16);
+                return;
+            }
+            int at = start + thumb.At;
+            Paint(pieces.Track, start, at - start + 1);
+            Paint(pieces.Track, at + thumb.Length, arrows - at - thumb.Length + 1);
+            Paint(pieces.ThumbBody, at, thumb.Length + 1);
+            Paint(pieces.Grip, at + (thumb.Length + 1 - 8) / 2, 8);
+            Paint(pieces.Up, arrows, 16);
+            Paint(pieces.Down, end - 15, 16);
+        }
+
+        // The scroll bars' pieces, vertical as measured and turned for the horizontal bar.
+        private sealed record Pieces(PlatinumArt Track, PlatinumArt ThumbBody, PlatinumArt Grip, PlatinumArt Up, PlatinumArt Down,
+            PlatinumArt InactiveTrack, PlatinumArt InactiveUp, PlatinumArt InactiveDown)
+        {
+            public static readonly Pieces Vertical = new(PlatinumArt.Track, PlatinumArt.ThumbBody, PlatinumArt.Grip, PlatinumArt.UpArrow,
+                PlatinumArt.DownArrow, PlatinumArt.InactiveTrack, PlatinumArt.InactiveUpArrow, PlatinumArt.InactiveDownArrow);
+
+            public static readonly Pieces Horizontal = new(PlatinumArt.Track.Transposed(), PlatinumArt.ThumbBody.Transposed(),
+                PlatinumArt.Grip.Transposed(), PlatinumArt.UpArrow.Transposed(), PlatinumArt.DownArrow.Transposed(),
+                PlatinumArt.InactiveTrack.Transposed(), PlatinumArt.InactiveUpArrow.Transposed(), PlatinumArt.InactiveDownArrow.Transposed());
         }
 
         // A neutral outline for an item with no icon [ClassicMac]: a page with a turned corner, a folder, or a diamond.

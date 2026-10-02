@@ -290,6 +290,34 @@ From `frView`, `frScript` and `frOpenChain` [Code: Finder 9.2.2; Verified: Mac O
 4. A button's icon is centred in its rectangle by its mask (`kAlignAbsoluteCenter`): a shaped icon sits where its
    mask's bounds centre [Fitted: Mac OS 9.0 Finder, an arrow icon a pixel higher than plotted unaligned].
 
+### 2.9 The window
+
+[Verified: Mac OS 9.0 Finder, an active window; measured on four windows, every pixel but the title's matching]
+
+1. **Frame**: the Platinum document window with a zoom box: 6 pixels left of the content rectangle and 22 above it
+   (the title bar, its top black line included), 7 right and below (border and shadow). The close box is at (4, 4)
+   from the frame's corner, the zoom and collapse boxes 34 and 18 from its right edge, each 13 × 13 with the $8888
+   frame and the $9999–$FFFF gradient. The title bar's stripes are white and $7777 rows on $CCCC.
+2. **Title**: the folder's (or volume's) small icon, 4 pixels, then its name in the system font, centred in the frame
+   width; the stripes are cleared 5 pixels before the icon to 3 after the name [Fitted: the icon at the pen's place
+   less 20]. The Finder's title is anti-aliased.
+3. **Header**: the 21-pixel pane at the content's top: white top and left edges, $DDDD, a $AAAA bottom and right edge,
+   a black line. Its text is "n items, x available" in the views font (Geneva 10), the pen 2 right of
+   (width − text width) / 2, the baseline 14 below the pane's top. The free space is the volume's free allocation
+   blocks times the block size, in megabytes (2^20) to one decimal, truncated: 1,431,552 bytes is "1.3 MB"
+   [Fitted: the decimal left out when 0, "K" below a megabyte, "GB" above a gigabyte, "zero K"].
+4. **Scroll bars**: 15 pixels inside the content's right and bottom, the vertical one from the header's line to the
+   grow box, the horizontal one from the frame's left line to it, the arrows together at the end. The items' extent is
+   each item's frame joined with its name's rectangle and the shown area: a large icon's frame runs from 4 above and
+   16 left of the icon to 50 below and 48 right (64 × 54), a small icon's from 1 above and 8 left to 19 below and 88
+   right [Fitted: the four windows]. A bar with nothing beyond the shown area is inactive: an empty $EEEE trough under
+   a $5555 line, grey ($8888) arrows. Otherwise the track is shaded and the thumb is as long as the shown part,
+   ⌊track × shown / (shown + range)⌋ pixels between its lines, placed at ⌊(track − length) × value / range⌋, its grip
+   centred, ⌊(length + 1 − 8) / 2⌋ in; the track runs from the bar's start line to the arrows' line. The Art window's
+   horizontal bar: 11 pixels of range (an item at h 5), a 635-pixel track, a 624-pixel thumb at 11.
+5. **Grow box**: 16 × 16 from the scroll bars' meeting corner, reaching over the content's right line; the frame
+   column outside it is $CCCC.
+
 ## 3. Writing
 
 None.
@@ -316,10 +344,13 @@ None.
 
 ### 5.2 Layout
 
-- The bitmap is the window's content rectangle (§2.1). The header pane is drawn in the Platinum appearance's colours
-  (a white top and left edge, $DDDD grey, a $AAAA bottom and right edge, a black line) with "n items" centred on a
-  baseline 14 down, in the views font; the free space is not shown. The scroll bars are their 15-pixel place: a black
-  edge and an empty $EEEE trough, no arrows, thumb or grow box. [ClassicMac]
+- `FinderWindowRenderer.RenderWindow` draws the whole window (§2.9), active, the shadow's corners transparent;
+  `Render` draws its content rectangle (§2.1). The title is drawn in the bitmap system font (Charcoal or Chicago from
+  the open files, else `ITextFallback`), not anti-aliased. A volume's root window takes the System's `hdsk` icon in its
+  title, a folder its own icon, an archive's top level its name and the folder icon; only volume windows show the free
+  space. Buttons' frames for the scroll extent are their button and name. [ClassicMac]
+- In the viewer, selecting a container that has not been read reads it, as expanding it does; a container holding one
+  file that holds others (MacBinary or a disk image around a disk) shows that file's window. [ClassicMac]
 - Large and small icons and buttons are drawn as §2.7 and §2.8 say; a list view is drawn as large icons, and the
   preview's caption says so ("list view, shown as icons"). [ClassicMac]
 - A button's and a small icon's name rectangle, for arranging, runs from the ascent above the baseline to 3 below it,
@@ -380,6 +411,10 @@ None of its own. `ReadFolders` reports what `Read` reports ([hfs.md §6](hfs.md#
   generic documents and applications, a custom-icon folder, two items arranged; 347,936 pixels); small icons (16 items,
   names to 31 characters, two arranged; 413,253); large buttons and small buttons (5 items, one arranged; 72,800 each);
   a window scrolled to (60, 100) (72,800); a folder without `kHasBeenInited` in the default window (70,798).
+- The whole windows (§2.9) against the same screenshots, the title's gap left out: folder art (406,555 pixels) and
+  small icons (473,006) match in every pixel, the scrolled window's but its corner the screenshot's application
+  switcher covers, the default window's but one column at the title's gap; `FinderWindowTests` checks the frame, the
+  boxes, the title's place, the header text, thumbs and the extent.
 
 ## 8. Not covered
 
@@ -389,7 +424,8 @@ None of its own. `ReadFolders` reports what `Read` reports ([hfs.md §6](hfs.md#
 - The desktop database (`Desktop DB`, `Desktop DF`): its icons, comments and application list; bundles stand in.
 - Package folders' icons (`kHasBundle` on a folder); a volume's own icon (`hdsk`) is not drawn, as no window shows it.
 - Resolving aliases to their originals; the mounted and shared badges; a custom badge's window badge.
-- Selection and dimming (§2.7's rules are not drawn); the header's free space.
+- Selection and dimming (§2.7's rules are not drawn); inactive windows; the anti-aliased title.
+- The free space's units below a megabyte and above a gigabyte (§2.9).
 - The invisible bit of `ioFlAttrib` (bit 6), which the Finder also tests, is not read.
 - Folder records of MFS, FAT and ISO 9660.
 

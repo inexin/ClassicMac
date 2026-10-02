@@ -51,7 +51,7 @@ namespace ClassicMac.App.ViewModels
                 Fonts = fonts,
                 TextFallback = SystemTextFallback.Instance,
             };
-            var bitmap = FinderWindowRenderer.Render(window, finderOptions);
+            var bitmap = FinderWindowRenderer.RenderWindow(window, finderOptions);
             int count = FinderWindowRenderer.Place(window, finderOptions).Count;
             // A list view is drawn as large icons; the caption says so.
             var view = window.View.Kind == FinderViewKind.List ? $"; {window.View.Name}, shown as icons" : "";
@@ -75,6 +75,9 @@ namespace ClassicMac.App.ViewModels
                 ContainerFileNode container => container.Node,
                 _ => null,
             };
+            // A container holding one file that holds others (MacBinary or a disk image around a disk) shows that file's
+            // contents: the window the Finder would open for it [ClassicMac].
+            while (path.Count == 0 && holder is { Children: [{ Children.Count: > 0 } only] }) holder = only;
             return holder is { Children.Count: > 0 } ? (holder, path) : null;
         }
 
@@ -92,9 +95,12 @@ namespace ClassicMac.App.ViewModels
             private FinderIconResolver? resolver;
             private IReadOnlyList<ResourceFork> openForks = [];
 
+            private readonly MacString holderName;
+
             public Volume(ContainerNode holder, ReadOptions readOptions)
             {
                 this.readOptions = readOptions;
+                holderName = holder.File.Name;
                 files = holder.Children.Select(c => c.File).ToList();
                 if (holder.Children.Any(c => c.Format == HfsReader.Instance.FormatName))
                 {
@@ -155,8 +161,18 @@ namespace ClassicMac.App.ViewModels
                 }
                 var self = folders.GetValueOrDefault(key);
                 var record = self?.FinderInfo ?? FolderFinderInfo.Empty;
+                var root = folders.Values.FirstOrDefault(f => f.IsRoot);
+                // The title: the folder's name with its icon, or at the top the volume's (a disk's icon) or the
+                // container's name [ClassicMac: an archive's top level has no Finder window; its own name and a folder].
+                var title = path.Count > 0 ? MacString.FromMacRoman(path[^1]) : root?.Name ?? holderName;
+                var titleIcon = path.Count == 0 && root is not null
+                    ? resolver.SystemTypeIcon(FourCC.FromString("hdsk")).Suite
+                    : resolver.Find(FinderItemKind.Folder, default, default, (ushort)record.Flags, path.Count > 0 ? () => IconFile(self?.Path ?? []) : null).Suite;
                 var window = new FinderWindow
                 {
+                    Title = title,
+                    TitleIcon = titleIcon,
+                    FreeBytes = root?.FreeBytes,
                     Bounds = record.WindowBounds,
                     ScrollPosition = record.ScrollPosition,
                     Flags = (ushort)record.Flags,

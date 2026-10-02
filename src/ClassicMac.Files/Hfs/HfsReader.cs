@@ -310,6 +310,7 @@ namespace ClassicMac.Files.Hfs
                 {
                     Name = name,
                     IsRoot = id == RootFolderId,
+                    FreeBytes = id == RootFolderId ? (long)freeBlockCount * blockSize : null,
                     FolderPath = id == RootFolderId ? [] : FolderPath(parent, folders, $"Folder \"{name}\""),
                     FinderInfo = FolderFinderInfo.Read(r.AsSpan(22, FolderFinderInfo.Length)),
                     Created = Date(reader.ReadUInt32At(10)),

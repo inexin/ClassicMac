@@ -2652,7 +2652,11 @@ public sealed class HfsPlusFeatureTests
         MacFolder root = folders.Single(f => f.IsRoot);
         Assert.Equal("Volume", root.Name.ToMacRoman());
         Assert.Equal(FolderFinderInfo.Empty, root.FinderInfo);
+        // freeBlocks × blockSize from the volume header.
+        var header = new BigEndianReader(image.AsMemory(1024, 512));
+        Assert.Equal((long)header.ReadUInt32At(48) * header.ReadUInt32At(40), root.FreeBytes);
         MacFolder documents = folders.Single(f => !f.IsRoot);
+        Assert.Null(documents.FreeBytes);
         Assert.Equal(info, documents.FinderInfo);
         Assert.Equal(new MacDate(2_500_000_000), documents.Created);
         Assert.Equal(new MacDate(2_600_000_000), documents.Modified);
@@ -2675,6 +2679,7 @@ public sealed class HfsPlusFeatureTests
             new ContainerContext());
 
         Assert.Equal(["", "Documents"], folders.Select(f => f.MacPath).Order());
+        Assert.True(folders.Single(f => f.IsRoot).FreeBytes >= 0);
     }
 
     [Fact]

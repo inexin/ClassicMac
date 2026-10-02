@@ -232,6 +232,9 @@ namespace ClassicMac.App.ViewModels
             PreviewViewModel result;
             try
             {
+                // An unread container is read first, as expanding it does, so its contents show.
+                if (node is ContainerFileNode { Node.UnreadFormat: not null } unread) await unread.EnsureLoadedAsync();
+                if (cancellation.IsCancellationRequested) return;
                 result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
                     ReadOptions, diagnostics, cancellation.Token,
                     node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL"

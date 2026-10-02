@@ -94,8 +94,8 @@ public class FolderPreviewTests : IDisposable
         return model.Preview;
     }
 
-    // The preview's PNG as RGBA pixels.
-    private static RgbaBitmap Decode(PreviewImage image)
+    // The preview's PNG as RGBA pixels: the whole window.
+    private static RgbaBitmap Whole(PreviewImage image)
     {
         using var decoded = SkiaSharp.SKBitmap.Decode(image.Png);
         var bitmap = new RgbaBitmap(decoded.Width, decoded.Height);
@@ -106,6 +106,20 @@ public class FolderPreviewTests : IDisposable
                 bitmap[x, y] = new RgbaColor(c.Red, c.Green, c.Blue, c.Alpha);
             }
         return bitmap;
+    }
+
+    // The frame around the content: 6 left, 22 above (the title bar), 7 right and below.
+    private const int FrameLeft = 6, FrameTop = 22, FrameWidth = 13, FrameHeight = 29;
+
+    // The window's content (header, icons, scroll bars), cut out of the whole window.
+    private static RgbaBitmap Decode(PreviewImage image)
+    {
+        var whole = Whole(image);
+        var content = new RgbaBitmap(whole.Width - FrameWidth, whole.Height - FrameHeight);
+        for (int y = 0; y < content.Height; y++)
+            for (int x = 0; x < content.Width; x++)
+                content[x, y] = whole[x + FrameLeft, y + FrameTop];
+        return content;
     }
 
     [Fact]
@@ -124,7 +138,7 @@ public class FolderPreviewTests : IDisposable
         Assert.Equal(1, model.Zoom);
         Assert.Equal(1, model.SelectedTab);
         var image = Assert.Single(preview.Images);
-        Assert.Equal((320, 200), (image.Width, image.Height));
+        Assert.Equal((320 + FrameWidth, 200 + FrameHeight), (image.Width, image.Height));
         var bitmap = Decode(image);
         // Custom: its own icon, solid, at (v 20, h 30) less the scroll (10, 5), below the header.
         Assert.Equal(Black, bitmap[25, Top + 10]);
@@ -170,7 +184,7 @@ public class FolderPreviewTests : IDisposable
 
         Assert.Equal(PreviewKind.Folder, preview.Kind);
         var image = Assert.Single(preview.Images);
-        Assert.Equal((200, 100), (image.Width, image.Height));
+        Assert.Equal((200 + FrameWidth, 100 + FrameHeight), (image.Width, image.Height));
         var bitmap = Decode(image);
         // Writer: an application, its own bundle's icon (solid) at (20, 30).
         Assert.Equal(Black, bitmap[30, Top + 20]);
@@ -199,8 +213,8 @@ public class FolderPreviewTests : IDisposable
         Assert.Equal(PreviewKind.Folder, preview.Kind);
         var image = Assert.Single(preview.Images);
         Assert.Equal("3 items", image.Caption);
-        Assert.Equal((ClassicMac.Resources.Decoders.Finder.FinderWindowRenderer.DefaultWidth,
-            ClassicMac.Resources.Decoders.Finder.FinderWindowRenderer.DefaultHeight), (image.Width, image.Height));
+        Assert.Equal((ClassicMac.Resources.Decoders.Finder.FinderWindowRenderer.DefaultWidth + FrameWidth,
+            ClassicMac.Resources.Decoders.Finder.FinderWindowRenderer.DefaultHeight + FrameHeight), (image.Width, image.Height));
         var bitmap = Decode(image);
         // Three placeholders arranged from (0, 1): (0, 1), (0, 129), then (64, 1), drawn less the default scroll (-8, -16).
         foreach (var (top, left) in new[] { (0, 1), (0, 129), (64, 1) })
@@ -244,14 +258,60 @@ public class FolderPreviewTests : IDisposable
         var input = (await model.OpenAsync(path))!;
         var container = input.Children.OfType<ContainerFileNode>().Single(c => c.File.Name.ToMacRoman() == "disk.img");
 
-        var unread = await Select(model, container);
-        await container.EnsureLoadedAsync();
-        model.Selected = null;
-        var read = await Select(model, container);
+        Assert.NotNull(container.Node.UnreadFormat);
 
-        Assert.Equal(PreviewKind.None, unread.Kind);
-        Assert.Equal(PreviewKind.Folder, read.Kind);
-        Assert.Equal((200, 100), (read.Images[0].Width, read.Images[0].Height));
+        // Selecting an unread container reads it, as expanding it does, and shows the disk's root window.
+        var preview = await Select(model, container);
+
+        Assert.Null(container.Node.UnreadFormat);
+        Assert.Equal(PreviewKind.Folder, preview.Kind);
+        Assert.Equal((200 + FrameWidth, 100 + FrameHeight), (preview.Images[0].Width, preview.Images[0].Height));
+        Assert.Equal("2 items", preview.Images[0].Caption);
+    }
+
+    // A container holding one file (MacBinary around a disk image) shows that file's contents: the disk's root window.
+    [Fact]
+    public async Task A_wrapper_shows_the_window_of_what_it_wraps()
+    {
+        var path = Path.Combine(folder, "wrapped.tar");
+        var image = ClassicMac.Files.Containers.MacBinaryWriter.ToArray(new MacFile
+        {
+            Name = MacString.FromMacRoman("disk.img"), DataFork = ForkData.FromBytes(File.ReadAllBytes(Disk())),
+        });
+        using (var stream = File.Create(path))
+        using (var tar = new TarWriter(stream, TarEntryFormat.Pax))
+        {
+            tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "disk.bin") { DataStream = new MemoryStream(image) });
+            tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "other") { DataStream = new MemoryStream("x"u8.ToArray()) });
+        }
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(path))!;
+        var wrapper = input.Children.OfType<ContainerFileNode>().Single();
+
+        var preview = await Select(model, wrapper);
+
+        Assert.Equal(PreviewKind.Folder, preview.Kind);
+        Assert.Equal((200 + FrameWidth, 100 + FrameHeight), (preview.Images[0].Width, preview.Images[0].Height));
+        Assert.Equal("2 items", preview.Images[0].Caption);
+    }
+
+    // The preview is the whole Finder window: the Platinum frame with the boxes, and the folder's name in the title bar.
+    [Fact]
+    public async Task The_preview_is_the_whole_Finder_window()
+    {
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(Disk(withSystem: true)))!;
+        var art = input.Children.OfType<FolderNode>().Single(f => f.Title == "Art");
+
+        var whole = Whole((await Select(model, art)).Images[0]);
+
+        Assert.Equal(Black, whole[0, 0]);
+        Assert.Equal(new RgbaColor(0x88, 0x88, 0x88), whole[4, 4]);                 // the close box
+        Assert.Equal(new RgbaColor(0x88, 0x88, 0x88), whole[whole.Width - 34, 4]);  // the zoom box
+        Assert.Equal(0, whole[whole.Width - 1, 0].A);                                // the shadow's corner
+        // The title's gap in the stripes, centred.
+        Assert.Equal(new RgbaColor(0xCC, 0xCC, 0xCC), whole[whole.Width / 2, 4]);
+        Assert.Equal(White, whole[30, 4]);
     }
 
     private async Task<RgbaBitmap> Render(string disk, string folderTitle = "Art", MainViewModel? model = null)
@@ -485,8 +545,25 @@ public class FolderPreviewTests : IDisposable
                 difference[x, y] = same ? new RgbaColor((byte)(expected.R / 2 + 127), (byte)(expected.G / 2 + 127), (byte)(expected.B / 2 + 127))
                     : iconArea ? new RgbaColor(255, 0, 255) : new RgbaColor(255, 200, 255);
             }
+        // The whole window against the screen around it, but for the title's gap (the Finder's title is anti-aliased
+        // there): the frame, the header, the scroll bars and the grow box.
+        var whole = Whole((await Select(model, node)).Images[0]);
+        int windowCompared = 0, windowMatched = 0;
+        var gap = Enumerable.Range(0, whole.Width).Where(x => whole[x, 4] == new RgbaColor(0xCC, 0xCC, 0xCC) && x > 22 && x < whole.Width - 39).ToList();
+        int gapLeft = gap.Count > 0 ? gap.Min() : 0, gapRight = gap.Count > 0 ? gap.Max() : -1;
+        var windowDifference = new RgbaBitmap(whole.Width, whole.Height);
+        for (int y = 0; y < whole.Height; y++)
+            for (int x = 0; x < whole.Width; x++)
+            {
+                if (whole[x, y].A == 0 || (y < 21 && x >= gapLeft && x <= gapRight)) continue;
+                var c = screen.GetPixel(bounds.Left - FrameLeft + x, bounds.Top - FrameTop + y);
+                bool same = whole[x, y] == new RgbaColor(c.Red, c.Green, c.Blue);
+                windowCompared++;
+                if (same) windowMatched++;
+                windowDifference[x, y] = same ? new RgbaColor((byte)(c.Red / 2 + 127), (byte)(c.Green / 2 + 127), (byte)(c.Blue / 2 + 127)) : new RgbaColor(255, 0, 255);
+            }
         var report = string.Create(System.Globalization.CultureInfo.InvariantCulture,
-            $"{folderName}: {matched} of {compared} icon-area pixels match ({100.0 * matched / compared:F2}%).");
+            $"{folderName}: {matched} of {compared} icon-area pixels match ({100.0 * matched / compared:F2}%); {windowMatched} of {windowCompared} window pixels ({100.0 * windowMatched / windowCompared:F2}%).");
         TestContext.Current.SendDiagnosticMessage(report);
         if (Environment.GetEnvironmentVariable("CLASSICMAC_FINDER_GOLDEN_OUT") is { Length: > 0 } output)
         {
@@ -494,6 +571,8 @@ public class FolderPreviewTests : IDisposable
             File.WriteAllText(Path.Combine(output, "report.txt"), report);
             File.WriteAllBytes(Path.Combine(output, "drawn.png"), ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(drawn.Width, drawn.Height, drawn.Pixels));
             File.WriteAllBytes(Path.Combine(output, "difference.png"), ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(difference.Width, difference.Height, difference.Pixels));
+            File.WriteAllBytes(Path.Combine(output, "window.png"), ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(whole.Width, whole.Height, whole.Pixels));
+            File.WriteAllBytes(Path.Combine(output, "window-difference.png"), ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(windowDifference.Width, windowDifference.Height, windowDifference.Pixels));
         }
     }
 

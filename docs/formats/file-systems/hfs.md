@@ -475,7 +475,8 @@ are [ClassicMac].
 - `HfsReader.ReadFolders` reads the volume the same way, with the same checks and diagnostics, and returns its folder
   records instead (`MacFolder`): the name (the volume name for the root, `IsRoot`), the folder path above it, the
   `DInfo` and `DXInfo` (`FolderFinderInfo`, 32 bytes) and the creation and modification dates. A folder whose parent
-  is missing is reported (`hfs.orphan`) and its path starts there. The viewer's folder previews use them
+  is missing is reported (`hfs.orphan`) and its path starts there. The root also carries the volume's free space
+  (`FreeBytes`: `drFreeBks` × `drAlBlkSiz` as the MDB records them). The viewer's folder previews use them
   ([finder-windows.md](finder-windows.md)).
 - The volume name is cut to 27 bytes. The MDB fields used are `drNmAlBlks`, `drAlBlkSiz`, `drAlBlSt`, `drVBMSt`,
   `drFreeBks`, `drVN`, `drFilCnt`, `drDirCnt`, the two B-tree files' lengths and extents, and `drEmbedSigWord`.
