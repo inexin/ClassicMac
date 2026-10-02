@@ -15,7 +15,13 @@ A folder can hold many files whose names are empty or only whitespace (often fol
 ## Look
 
 - Group row: a stacked pair of document icons, the title "No name" in italics, a count "15 files" right-aligned in CmTextMuted 11. Placed first among the folder's files.
-- Expanded, each child shows its stored name with whitespace made visible, in mono: ␣ for a space, ⍽ for an option-space, ↵ for a return, "(empty)" in italics for an empty name; plus size and kind on the right. Children open, preview, export and drag like any file.
+- Expanded, each child shows its stored name with every whitespace character made visible as a small token, so nothing depends on symbol glyphs the UI font may lack:
+  - Token look: mono 10 SemiBold, CmTextMuted on CmSegmentTrack, radius 3, 3 px side padding, 2 px apart; inside a selected row, CmSelectionText on a 20% white tint.
+  - Labels, ASCII only: `sp` space ($20), `nbsp` option-space ($CA), `tab` ($09), `cr` return ($0D), `lf` line feed ($0A), any other control character in caret form (`^A` for $01, `^?` for $7F).
+  - Runs of the same character collapse to one token with a count: `sp×3`.
+  - Hovering the name shows the raw bytes in hex (`20 20 CA`).
+  - An empty name shows "(empty)" in italics.
+  - Plus size and kind on the right. Children open, preview, export and drag like any file.
 - Selecting the group row shows the parent folder's preview (the folder art, if any, is already covered there).
 - Footer under the tree when anything is hidden: eye-slash icon, "1 invisible item hidden", link "Show" (turns the option off).
 

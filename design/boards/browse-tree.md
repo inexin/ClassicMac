@@ -42,5 +42,5 @@ Replaces the 14 px vector glyphs in `Views/NodeIcons.cs`.
 
 - Filter field at the top of the tree pane: 28 high, search icon, placeholder "Filter tree", hint "Ctrl+F" in mono 11 on the right.
 - Type-ahead: typing while the tree has focus opens a pill at the bottom of the tree (CmPaneBackground, 1 px CmAccent border, CmShadowPopover): search icon, the typed text in mono with a caret, "1 of 2 loaded matches", key hints F3 and Esc.
-- Matching rows highlight the matched letters (tint #FFE58A on the current match, lighter on others); non-matching siblings dim to CmTextMuted. Only loaded nodes are searched; the Ctrl+F filter also reads unread containers.
+- Matching rows highlight the matched letters (CmMatch on the current match, CmMatchSoft on the others); non-matching siblings dim to CmTextMuted. Only loaded nodes are searched; the Ctrl+F filter also reads unread containers.
 - Hidden and grouped files ([tree-no-name.md](tree-no-name.md)) are skipped.

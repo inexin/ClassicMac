@@ -11,12 +11,14 @@ As the app does today: the Hex tab exists only for a resource with no preview (a
 ## Grid
 
 - Mono 13, line height 24, virtualised as today.
-- Columns: offset `0x000000` (CmTextMuted) · 16 byte cells 24 wide with an extra 8 gap after the 8th · Mac OS Roman text column (one 9 px cell per byte; non-printables as "·" in muted).
+- Columns: offset `0x000000` (CmTextMuted) · 16 byte cells 22 wide with an extra 8 gap after the 8th · Mac OS Roman text column (one 9 px cell per byte; non-printables as "·" in muted).
 - Column header row in 11 muted: "Offset", `00 … 0F`, "Mac OS Roman".
 - Zero bytes in a lighter colour. Clicking a byte (or its character) selects it; the pair highlights in both columns with CmSelectionInactive.
 - Right of the tab strip: **Go to** (mono input, placeholder `0x0000`). Find is a follow-up, not in the first release.
 
-## Byte inspector (right panel, 260, CmSidebarBackground)
+## Byte inspector (right panel, 200, CmSidebarBackground)
+
+Shown while editing, or once a byte has been clicked; hidden otherwise, so the grid and the Mac OS Roman column fit at 1200 px. The bytes of the field under the cursor (E8) are tinted CmRowHighlight in both columns. When the panel is shown the grid keeps its width; the panel scrolls if "In this resource" overflows.
 
 - **E7:** "At 0x0003" followed by plain interpretations of the bytes at the cursor: UInt8, Int8, UInt16 BE, Int16 BE, UInt32 BE, OSType (`'Unti'`), Binary.
 - **E8, sized separately:** "In this resource" says what the byte is, e.g. "Character 1 of string 1, “Untitled”" or "Length byte of string 2". This needs a field map per resource type (from the typed decoders or a `TMPL`), so it is its own item and may start with `STR#`, `STR ` and template-backed types only.

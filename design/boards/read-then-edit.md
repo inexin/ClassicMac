@@ -23,7 +23,7 @@ The Edit tab goes away. Every editable resource opens read only in **Preview**, 
 
 ## Menu form (E2)
 
-Layout: values on the left, a 420 px preview panel on the right (CmSidebarBackground header "Preview" + "2× · Mac OS 8/9"; checkerboard behind the rendered menu from `MenuView`).
+Layout: values on the left, the preview panel on the right at one third of the width, at most 420 px (CmSidebarBackground header "Preview" + "2× · Mac OS 8/9"; checkerboard behind the rendered menu from `MenuView`).
 
 Read only:
 - Summary line: Menu title **File**, Enabled **Yes**, Menu ID **129**, MDEF **0**.
@@ -31,7 +31,7 @@ Read only:
 
 Editing:
 - Title (text), Enabled (check box), ID and MDEF (mono inputs), **Add item**, **Add divider**.
-- Rows: drag handle, Text input, ⌘ key (1 char, mono, centred), Mark select (None, ✓, •, ◆), Icon number, Style as toggle buttons for all seven face bits: B, I, U, Outline, Shadow, Condense, Extend (the first three as letters, the rest in a "More" popover). Editing must keep every bit it does not change, Enabled check box, remove (×).
+- Rows: move up / move down buttons with chevron icons, not text glyphs (also Alt+Up / Alt+Down), Text input, ⌘ key (1 char, mono, centred), Mark select in words with the Mac character code (None, Check mark `$12`, Diamond `$13`, Bullet `$A5`, Other…), so the list needs no symbol glyphs, Icon number, Style as toggle buttons for all seven face bits: B, I, U, Outline, Shadow, Condense, Extend (the first three as letters, the rest in a "More" popover). Editing must keep every bit it does not change, Enabled check box, remove (×).
 - Duplicate ⌘ keys: both key fields get a CmError border and CmErrorTint ring; error line "Item 6 (“Save As…”) uses ⌘S, already used by item 5 (“Save”)."
 - Hint: "Text “-” makes a divider. Esc cancels, Ctrl+Enter applies."
 

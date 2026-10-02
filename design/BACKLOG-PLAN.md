@@ -85,7 +85,7 @@ Gate after M0: screenshot baselines pass in light, dark and 150%. M1 and M2 can 
 | E7 | Hex editing in place: Edit Hex (Ctrl+H) opens the Hex tab in editing; changed-byte tint, overwrite and insert switch, numeric byte inspector, Go to | The hex dialog is retired; Ctrl+H keeps working; Find is a follow-up | L | [boards/hex.md](boards/hex.md) |
 | E8 | Byte meanings in the hex inspector ("Character 1 of string 1") from a per-type field map | Works for `STR `, `STR#` and template-backed types; other types show only the numeric view | L | [boards/hex.md](boards/hex.md) |
 
-### M4 · Previews and dialogs (6 items)
+### M4 · Previews and dialogs (7 items)
 
 | ID | Item | Done when | Size | Spec |
 | --- | --- | --- | --- | --- |
@@ -95,6 +95,7 @@ Gate after M0: screenshot baselines pass in light, dark and 150%. M1 and M2 can 
 | P4 | Details tab in groups, Finder flag chips, "how it was read" chain, Copy all | Copy all puts plain text on the clipboard | M | [boards/details.md](boards/details.md) |
 | P5 | Dialogs restyled: Get Info, Import Image or Sound, New File, New Folder, Unsaved changes | Same header, footer and button order in all of them | M | [boards/dialogs.md](boards/dialogs.md) |
 | A1 | `IAudioPlayer`: playback position, seek and loop repeat (SoundFlow) | The sound preview's playhead follows playback, a click seeks, Repeat the loop loops | M | [boards/sound.md](boards/sound.md) |
+| P6 | Font family (`FOND`) preview: sample from the strikes, association matrix, metrics, style and kerning cards | Every FOND in the System file shows a sample when a strike exists; association cells select their NFNT/sfnt | M | [boards/font-family.md](boards/font-family.md) |
 
 ## Risks
 

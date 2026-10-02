@@ -29,6 +29,8 @@ Each token becomes a `Color` (`<Name>Color`) per theme in `ThemeDictionaries` an
 | CmSelectionInactive | #DCE3FA | #2C3354 | Selected row, focus elsewhere | |
 | CmRowHighlight | #EEF2FD | #24283A | Row tied to preview, Editing badge | |
 | CmHexCursor | #2E4EC2 | #8FA3FF | Hex byte under the cursor | `#5A80B0FF` in MainWindow.axaml |
+| CmMatch | #FFE58A | #6B5714 | Current search match: tree filter and type-ahead letters, hex Find | `#FFE58A` on the browse-tree board |
+| CmMatchSoft | #FFF3C4 | #3F3618 | Other matches of the same search | |
 | **Controls** | | | | |
 | CmControlBackground | #FFFFFF | #2C2C30 | Buttons, inputs, selects | |
 | CmControlBorder | #CFCEC8 | #45454A | Buttons, inputs, selects | |
@@ -48,6 +50,8 @@ Each token becomes a `Color` (`<Name>Color`) per theme in `ThemeDictionaries` an
 | CmPlayhead | #B42318 | #FF8A7A | Sound playhead | |
 
 Contrast, checked against WCAG AA: body text 16.9:1 light / 15.0:1 dark; muted text 5.7:1 or better on every surface; severity text on its tint 5.6:1 or better; accent buttons 7.0:1 light / 7.6:1 dark.
+
+Match tints carry normal text: CmText on CmMatch 13.5:1 light / 6.0:1 dark, on CmMatchSoft 15.2:1 / 10.2:1; CmTextMuted on CmMatchSoft 6.0:1 / 5.0:1.
 
 **One exception, handled by a rule:** CmTextMuted on the dark CmSelection is 4.0:1, below AA (worse at reduced opacity). Inside a selected row, all text uses CmSelectionText, including the tree's right-aligned meta and diagnostics codes; never lower its opacity.
 
