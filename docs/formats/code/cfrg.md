@@ -47,7 +47,7 @@ The members follow at +$20, each starting where the previous one's memberSize en
 | +$00 | 4 | architecture | `'pwpc'`; `'m68k'` for CFM-68K |
 | +$04 | 2 | reservedA | 0 |
 | +$06 | 1 | reservedB | 0 |
-| +$07 | 1 | updateLevel | |
+| +$07 | 1 | updateLevel | 0 (kIsCompleteCFrag): a complete fragment; 1 and up (kFirstCFragUpdate …): an update to one |
 | +$08 | 4 | currentVersion | Equals the container's currentVersion ([pef.md §1.1](pef.md#11-container-header)) |
 | +$0C | 4 | oldDefVersion | |
 | +$10 | 4 | usage1 | An application's stack size (appStackSize) |
@@ -56,13 +56,14 @@ The members follow at +$20, each starting where the previous one's memberSize en
 | +$17 | 1 | where | §1.4 |
 | +$18 | 4 | offset | The container's offset in the fork; 0 its start |
 | +$1C | 4 | length | The container's length; 0 the rest of the fork |
-| +$20 | 4 | where1 | The locator's first word: a memory space ID; for `where` 2, the resource type |
-| +$24 | 2 | where2 | The locator's second word; for `where` 2, the resource ID |
+| +$20 | 4 | where1 | uWhere1: an address space ID (spaceID) or a fork kind (forkKind) |
+| +$24 | 2 | where2 | uWhere2: reserved, or a fork instance (forkInstance) |
 | +$26 | 2 | extensionCount | |
 | +$28 | 2 | memberSize | The whole member, name and extensions included |
 | +$2A | 1 + n | name | Pascal string, Mac OS Roman: the fragment's name |
 
-[Doc: CodeFragments.h]
+[Doc: CodeFragments.h] Every member of the samples has updateLevel 0, where1 and where2 0, and its reserved fields 0
+[Verified: the Mac OS 9 System file, Disk Copy 6.1.2].
 
 ### 1.3 Padding and extensions
 
@@ -101,7 +102,7 @@ The search extension, kind `$30EE` (kCFragResourceSearchExtensionKind):
 | --- | --- | --- |
 | 0 | kMemoryCFragLocator | Already in memory |
 | 1 | kDataForkCFragLocator | In the file's data fork, at offset, length bytes |
-| 2 | kResourceCFragLocator | In a resource of the file: type where1, ID where2 |
+| 2 | kResourceCFragLocator | In a resource of the file |
 | 3 | kByteStreamCFragLocator | A byte stream |
 | 4 | kNamedFragmentCFragLocator | Another fragment, by name |
 
@@ -154,9 +155,11 @@ A `'cfrg'` is exported as JSON and its data-fork fragments listed as [disassembl
 
 ## 7. Verification
 
-- `tests/ClassicMac.Code.Tests/CfrgTests.cs` (hand-built resources): every member field; member sizes without
-  extensions (43 + the name, padded to 4); extensions after the padded name; the search extension and the short ones
-  that give none; unknown usage and where values; the header and version checks; each damage case.
+- `tests/ClassicMac.Code.Tests/CfrgTests.cs` (hand-built resources): every member field; the next member found
+  memberSize bytes on, for the stored sizes 43 + the name padded to 4 and with slack; extensions after the padded
+  name and after a name that needs no padding, ending at memberSize or leaving a gap; the search extension and the
+  short ones that give none; no members; reserved fields ignored; a resource locator's fields kept as read; unknown
+  usage and where values; the header and version checks; each damage case.
 - Gated on `CLASSICMAC_CODE_CORPUS` (`CorpusTests`; skipped without it):
   - the Mac OS 9 System file: its twelve `'cfrg'` (IDs 0, 1, 4, 16, 25, 34, 49, 52, 55, 61, 64, 70) read without
     diagnostics with the expected member and extension counts, 162 members in all; every member is a `'pwpc'` import
@@ -170,7 +173,8 @@ A `'cfrg'` is exported as JSON and its data-fork fragments listed as [disassembl
 - Writing `'cfrg'`.
 - Versions other than 1.
 - What `libFlags`, the update level and the qualifiers mean to the Code Fragment Manager's search.
-- Locators other than the data fork were never seen; ClassicMac reads their fields but does not follow them.
+- Locators other than the data fork were never seen; ClassicMac reads their fields but does not follow them. Which
+  fields name a kResourceCFragLocator's resource is not settled.
 
 ## 9. References
 

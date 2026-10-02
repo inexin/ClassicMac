@@ -27,8 +27,7 @@ namespace ClassicMac.Code.Ppc
         Memory = 0,
         /// <summary>In the file's data fork (kDataForkCFragLocator).</summary>
         DataFork = 1,
-        /// <summary>In a resource of the file (kResourceCFragLocator): <see cref="CfrgMember.Where1"/> the type,
-        /// <see cref="CfrgMember.Where2"/> the ID.</summary>
+        /// <summary>In a resource of the file (kResourceCFragLocator).</summary>
         Resource = 2,
         /// <summary>A byte stream (kByteStreamCFragLocator).</summary>
         ByteStream = 3,
@@ -51,7 +50,7 @@ namespace ClassicMac.Code.Ppc
 
     /// <summary>One code fragment a <c>'cfrg'</c> describes (CFragResourceMember).</summary>
     /// <param name="Architecture">The instruction set: <c>'pwpc'</c>, or <c>'m68k'</c> for CFM-68K.</param>
-    /// <param name="UpdateLevel">The update level (0 for a fragment the Code Fragment Manager may replace).</param>
+    /// <param name="UpdateLevel">The update level: 0 for a complete fragment (kIsCompleteCFrag), 1 and up for an update to one (kFirstCFragUpdate …).</param>
     /// <param name="CurrentVersion">The current version.</param>
     /// <param name="OldDefVersion">The oldest definition version it is compatible with.</param>
     /// <param name="Usage1">The first usage word: an application's stack size.</param>
@@ -60,8 +59,8 @@ namespace ClassicMac.Code.Ppc
     /// <param name="Where">Where the container is.</param>
     /// <param name="Offset">The container's offset in its fork (0 its start).</param>
     /// <param name="Length">The container's length (0 the rest of the fork).</param>
-    /// <param name="Where1">The first locator word: a memory space ID, or the resource type for <see cref="CfrgWhere.Resource"/>.</param>
-    /// <param name="Where2">The second locator word: the resource ID for <see cref="CfrgWhere.Resource"/>.</param>
+    /// <param name="Where1">The first locator word (uWhere1): an address space ID (spaceID) or a fork kind (forkKind).</param>
+    /// <param name="Where2">The second locator word (uWhere2): reserved, or a fork instance (forkInstance).</param>
     /// <param name="Name">The fragment's name.</param>
     /// <param name="Extensions">The member's extensions.</param>
     /// <param name="MemberSize">The member's stored size, name and extensions included.</param>

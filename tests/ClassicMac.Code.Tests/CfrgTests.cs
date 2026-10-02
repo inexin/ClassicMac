@@ -6,25 +6,26 @@ namespace ClassicMac.Code.Tests;
 // 'cfrg' version 1 (CodeFragments.h CFragResource): a 32-byte header, then members of memberSize bytes each.
 public class CfrgTests
 {
-    private static byte[] Header(int memberCount, ushort version = 1)
+    private static byte[] Header(int memberCount, ushort version = 1, byte reserved = 0)
     {
         var w = new BigEndianWriter();
-        w.WriteZeros(10);
+        for (int i = 0; i < 10; i++) w.WriteByte(reserved);
         w.WriteUInt16(version);
-        w.WriteZeros(18);
+        for (int i = 0; i < 18; i++) w.WriteByte(reserved);
         w.WriteUInt16(memberCount);
         return w.ToArray();
     }
 
-    // One member: the 42 fixed bytes, the name, then (with extensions) padding to 4 and the extensions; padded to 4.
+    // One member: the 42 fixed bytes, the name, then (with extensions) padding to 4 and the extensions; padded to 4, then
+    // with zeros to padTo.
     private static byte[] Member(string name, CfrgUsage usage = CfrgUsage.ImportLibrary, CfrgWhere where = CfrgWhere.DataFork,
         uint offset = 0, uint length = 0, uint where1 = 0, ushort where2 = 0, byte[][]? extensions = null, int? memberSize = null,
-        int? extensionCount = null)
+        int? extensionCount = null, bool reserved = false, int padTo = 0)
     {
         var w = new BigEndianWriter();
         w.WriteFourCC(FourCC.FromString("pwpc"));
-        w.WriteUInt16(0);
-        w.WriteByte(0);
+        w.WriteUInt16(reserved ? 0xFFFF : 0);
+        w.WriteByte(reserved ? 0xFF : 0);
         w.WriteByte(1);              // updateLevel
         w.WriteUInt32(0x01108000);   // currentVersion
         w.WriteUInt32(0x01000000);   // oldDefVersion
@@ -47,6 +48,7 @@ public class CfrgTests
             foreach (var e in extensions) w.WriteBytes(e);
         }
         while (w.Length % 4 != 0) w.WriteByte(0);
+        while (w.Length < padTo) w.WriteByte(0);
         w.WriteUInt16At(sizeAt, memberSize ?? w.Length);
         return w.ToArray();
     }
@@ -103,20 +105,78 @@ public class CfrgTests
         Assert.Equal(32, m.Position);
     }
 
+    // The linkers store memberSize as 43 + the name, padded to 4 [Verified: the Mac OS 9 System file]; the sizes are
+    // literals here, and the reader takes the next member from memberSize.
     [Theory]
     [InlineData("", 44)]        // 43 → 44
     [InlineData("A", 44)]       // 44
     [InlineData("AB", 48)]      // 45 → 48
     [InlineData("ABCDE", 48)]   // 48
     [InlineData("ABCDEF", 52)]  // 49 → 52
-    public void Members_without_extensions_are_43_plus_the_name_padded_to_4(string name, int size)
+    public void The_next_member_starts_memberSize_bytes_on(string name, int size)
     {
-        var (cfrg, diagnostics) = Read(Header(2), Member(name), Member("Next"));
+        var (cfrg, diagnostics) = Read(Header(2), Member(name, memberSize: size), Member("Next"));
         Assert.Empty(diagnostics);
         Assert.Equal(size, cfrg.Members[0].MemberSize);
         Assert.Equal(name, cfrg.Members[0].Name);
         Assert.Equal("Next", cfrg.Members[1].Name);
         Assert.Equal(32 + size, cfrg.Members[1].Position);
+    }
+
+    [Fact]
+    public void Slack_after_a_member_is_skipped()
+    {
+        var (cfrg, diagnostics) = Read(Header(2), Member("A", memberSize: 64, padTo: 64), Member("Next"));
+        Assert.Empty(diagnostics);
+        Assert.Equal((64, 32 + 64), (cfrg.Members[0].MemberSize, cfrg.Members[1].Position));
+        Assert.Equal("Next", cfrg.Members[1].Name);
+    }
+
+    [Fact]
+    public void Extensions_after_a_name_that_needs_no_padding()
+    {
+        // 43 + "A" = 44, already a multiple of 4: the extension starts at +$2C.
+        var member = Member("A", extensions: [Extension(0x1234, [1, 2, 3, 4])]);
+        Assert.Equal(0x1234, new BigEndianReader(member).ReadUInt16At(0x2C));
+        var (cfrg, diagnostics) = Read(Header(1), member);
+        Assert.Empty(diagnostics);
+        Assert.Equal([1, 2, 3, 4], Assert.Single(cfrg.Members[0].Extensions).Data.ToArray());
+        Assert.Equal(52, cfrg.Members[0].MemberSize);
+    }
+
+    [Fact]
+    public void Extensions_may_leave_a_gap_before_the_member_ends()
+    {
+        var (cfrg, diagnostics) = Read(Header(2), Member("A", extensions: [Extension(0x1234, [1, 2, 3, 4])], memberSize: 64, padTo: 64), Member("Next"));
+        Assert.Empty(diagnostics);
+        Assert.Single(cfrg.Members[0].Extensions);
+        Assert.Equal(32 + 64, cfrg.Members[1].Position);
+    }
+
+    [Fact]
+    public void No_members()
+    {
+        var (cfrg, diagnostics) = Read(Header(0));
+        Assert.Empty(diagnostics);
+        Assert.Empty(cfrg.Members);
+    }
+
+    [Fact]
+    public void Reserved_fields_are_ignored()
+    {
+        var (cfrg, diagnostics) = Read(Header(1, reserved: 0xFF), Member("A", reserved: true));
+        Assert.Empty(diagnostics);
+        Assert.Equal(("A", 1), (Assert.Single(cfrg.Members).Name, cfrg.Members[0].UpdateLevel));
+    }
+
+    // No sample has a resource locator; its words are kept as read, their meaning is not settled.
+    [Fact]
+    public void A_resource_locator_member_keeps_its_raw_fields()
+    {
+        var (cfrg, diagnostics) = Read(Header(1), Member("R", where: CfrgWhere.Resource, offset: 0x6E636F64, length: 3, where1: 5, where2: 6));
+        Assert.Empty(diagnostics);
+        var m = cfrg.Members[0];
+        Assert.Equal((CfrgWhere.Resource, 0x6E636F64u, 3u, 5u, (ushort)6), (m.Where, m.Offset, m.Length, m.Where1, m.Where2));
     }
 
     [Fact]

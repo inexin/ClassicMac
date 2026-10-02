@@ -108,8 +108,10 @@ argument. An argument is a big-endian run of 7-bit groups, bit 7 set on every by
 | 4 | InterleaveRepeatBlockWithZero | `customSize`, `repeatCount` | As 3, with a common block of `count` zero bytes that is not stored |
 | 5–7 | | | Undefined |
 
-[Doc: Mac OS Runtime Architectures, "Pattern-Initialized Data"] Every opcode 0–4 occurs, and every pidata section
-unpacks to exactly its unpackedLength [Verified: Mac OS 9.2.2's 90 fragments].
+[Doc: Mac OS Runtime Architectures, "Pattern-Initialized Data"] The Code Fragment Manager's unpacker writes opcode 2's
+block repeatCount + 1 times and opcodes 3 and 4 as common, then (custom, common) repeatCount times [Code: the Code
+Fragment Manager in the Mac OS ROM]. Every opcode 0–4 occurs, and every pidata section unpacks to exactly its
+unpackedLength [Verified: Mac OS 9.2.2's 90 fragments, the Mac OS 9 System file].
 
 ### 1.5 Loader section header
 
@@ -385,8 +387,10 @@ None.
   reported. [ClassicMac]
 - A section is placed in memory by its kind (§1.3), not by instSectionCount. [ClassicMac]
 - A section's contents are clipped to the container. An image is built at most max(unpackedLength, stored length) +
-  16 MB long, and pidata unpacking stops at 256 MB, so a damaged length is not allocated. Images are cached and
-  built once. [ClassicMac]
+  16 MB long, and pidata unpacking stops at 256 MB, so a damaged length is not allocated. An image is never shorter
+  than its unpacked pidata. Images are cached and built once. [ClassicMac]
+- Pidata that unpacks to more or to less than unpackedLength is reported either way (the Code Fragment Manager
+  accepts less), and an argument wider than 32 bits is damage rather than wrapped. [ClassicMac]
 - The relocator lists fixups (where each word is, what is added) without an image, with every section and import at
   0; given addresses, it applies them to copies (`Instantiate`). [ClassicMac]
 - A relocated word outside its section is skipped and the run goes on; the out-of-range words are reported once per
@@ -421,9 +425,9 @@ Fragments are listed and modelled as [disassembly.md](../output/disassembly.md) 
 | `pef.loader-string-out-of-range` | Error | A library or import name lies outside the loader section | Uses an empty name | Not traced |
 | `pef.loader-truncated` | Error | The loader section is shorter than its header, a table, or a relocation header's words | Reads what fits | Not traced |
 | `pef.pidata-bad-opcode` | Error | A pidata opcode is 5–7 | Stops unpacking; keeps the image so far | Not traced |
-| `pef.pidata-length` | Error | The unpacked pidata is not unpackedLength bytes | Keeps what was unpacked | Not traced |
+| `pef.pidata-length` | Error | The unpacked pidata is not unpackedLength bytes | Keeps what was unpacked | Unpacking past unpackedLength fails the load; ending short of it is accepted [Code: the Code Fragment Manager in the Mac OS ROM] |
 | `pef.pidata-too-long` | Error | The pidata would unpack past the limit (§5) | Stops unpacking | Not traced |
-| `pef.pidata-truncated` | Error | A pidata instruction runs past the contents, or an argument is wider than 32 bits | Stops unpacking | Not traced |
+| `pef.pidata-truncated` | Error | A pidata instruction runs past the contents, or an argument is wider than 32 bits | Stops unpacking | Reads at most 5 argument bytes, the fifth whole, and keeps the low 32 bits [Code: the Code Fragment Manager in the Mac OS ROM]; running past the contents not traced |
 | `pef.relocation-bad-import` | Error | An instruction names an import that does not exist | Skips the word | No check [Code: the Code Fragment Manager in the Mac OS ROM] |
 | `pef.relocation-bad-opcode` | Error | An undefined encoding | Stops the header's run; the fixups before it stand | Marks the load failed (−4) and decodes on from the next word; LSEC sub-opcodes 3–15 it skips, both words, with no error [Code: the Code Fragment Manager in the Mac OS ROM] |
 | `pef.relocation-bad-section` | Error | An instruction or a relocation header names a section that does not exist | Skips the instruction (or the header) | No check on an instruction's section; a header for no section is never looked up [Code: the Code Fragment Manager in the Mac OS ROM] |
@@ -446,11 +450,14 @@ Fragments are listed and modelled as [disassembly.md](../output/disassembly.md) 
 
 Hand-built containers (`tests/ClassicMac.Code.Tests`, built with `PefBuilder`):
 
-- `PefContainerTests`: the header and section headers, names, which kinds are placed in memory, images zero-filled
-  to totalLength and copying only unpackedLength, pidata sections unpacked and checked, a huge totalLength capped,
-  the header and tag checks, damaged section tables.
-- `PatternDataTests`: every opcode, the count argument, big-endian 7-bit arguments, empty repeats and interleaves, and
-  each damage case (undefined opcodes, truncation, the length limit without allocating it).
+- `PefContainerTests`: the header and section headers (every field a distinct value), names, which kinds are placed
+  in memory (by kind, whatever instSectionCount says), the first loader section wherever it is, a loader with lengths
+  0, images zero-filled to totalLength, copying only unpackedLength or nothing, pidata sections unpacked and checked
+  in both directions, a huge totalLength capped, no sections, a `'m68k'` container, the header and tag checks,
+  damaged section tables.
+- `PatternDataTests`: every opcode, the count argument (with opcodes 3 and 4 too), big-endian 7-bit arguments of 1–5
+  bytes, the largest 5-bit count, empty repeats and interleaves, and each damage case (undefined opcodes, truncation,
+  the length limit without allocating it).
 - `PefLoaderTests`: entry points, libraries, imports with class, weak flag and library, relocation headers, exports
   with keys, absolute exports and re-exports, the hash word (stopping at a NUL) and index against hand-worked
   values, lookup through colliding chains and between names with the same hash word, names read by the key's length,
@@ -463,7 +470,8 @@ Hand-built containers (`tests/ClassicMac.Code.Tests`, built with `PefBuilder`):
   largest block and count, the import index carried through), each against the Code Fragment Manager's own result;
   undefined and truncated instructions (LSEC 3 among them), repeats at the start, of repeats and LRPT 0, out-of-range
   words, imports and sections, runaways, a second header for a section, listing without an image.
-- `TransitionVectorTests`: main, init and tvector exports read as code and TOC offsets with their sections.
+- `TransitionVectorTests`: main, init and tvector exports read as code and TOC offsets with their sections, a TOC
+  in another section (DTIS), 12-byte vectors (DESC).
 - `TracebackTableTests`: each optional field alone and all in order, bytes 4 and 5 and parmsonstk adding no field,
   has_vec and has_ext_table reported, the scan after `blr` (and not after `b` or `bctr`), truncation (an offset at the
   end of the code included) and a tb_offset before the code.

@@ -70,6 +70,34 @@ public class PatternDataTests
     }
 
     [Fact]
+    public void Op4_with_a_count_argument_puts_the_custom_block_between_zero_runs()
+    {
+        // Count 0, so the count is the argument $82 $00 = 256; customSize 1, repeat 1: 256 zeros, AA, 256 zeros.
+        var (image, diagnostics) = Unpack([0x80, 0x82, 0x00, 0x01, 0x01, 0xAA]);
+        Assert.Empty(diagnostics);
+        Assert.Equal([.. new byte[256], 0xAA, .. new byte[256]], image);
+    }
+
+    [Fact]
+    public void Op3_with_a_count_argument() =>
+        // Count argument 2 (common 43 43), customSize 1, repeat 2.
+        Clean([0x60, 0x02, 0x01, 0x02, 0x43, 0x43, 0x01, 0x02], [0x43, 0x43, 0x01, 0x43, 0x43, 0x02, 0x43, 0x43]);
+
+    [Fact]
+    public void A_three_byte_argument() =>
+        // $81 $80 $00 = 1 << 14.
+        Clean([0x00, 0x81, 0x80, 0x00], new byte[16384]);
+
+    [Fact]
+    public void Op4_with_no_repeats_writes_the_zeros_once_and_reads_no_custom_block() => Clean([0x83, 0x05, 0x00], [0, 0, 0]);
+
+    [Fact]
+    public void The_largest_count_in_the_opcode_byte_is_31() => Clean([0x1F], new byte[31]);
+
+    [Fact]
+    public void A_count_argument_of_0_writes_nothing() => Clean([0x00, 0x00], []);
+
+    [Fact]
     public void Instructions_follow_each_other() => Clean([0x02, 0x22, 9, 8, 0x01], [0, 0, 9, 8, 0]);
 
     [Theory]
@@ -82,8 +110,14 @@ public class PatternDataTests
     [Fact]
     public void A_count_argument_cut_short_is_truncated() => Fails([0x21, 7, 0x00, 0x81], "pef.pidata-truncated", [7]);
 
+    // The Code Fragment Manager reads at most 5 argument bytes, the fifth whole, and keeps the low 32 bits [Code: the
+    // Code Fragment Manager in the Mac OS ROM]; ClassicMac reports a wider argument as damage.
     [Fact]
     public void An_argument_longer_than_32_bits_is_damage() => Fails([0x00, 0x9F, 0xFF, 0xFF, 0xFF, 0x7F], "pef.pidata-truncated");
+
+    [Fact]
+    public void An_argument_of_exactly_32_bits_reads() =>
+        Fails([0x00, 0x8F, 0xFF, 0xFF, 0xFF, 0x7F], "pef.pidata-too-long", [], maxLength: 16);
 
     [Fact]
     public void A_block_copy_past_the_end_is_truncated() => Fails([0x24, 1, 2], "pef.pidata-truncated", []);

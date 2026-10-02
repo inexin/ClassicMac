@@ -9,7 +9,7 @@ namespace ClassicMac.Code.Tests;
 internal sealed class PefBuilder
 {
     public sealed record Section(PefSectionKind Kind, byte[] Contents, uint UnpackedLength, uint TotalLength, string? Name = null,
-        PefShareKind Share = PefShareKind.Process, byte Alignment = 4);
+        PefShareKind Share = PefShareKind.Process, byte Alignment = 4, uint DefaultAddress = 0);
 
     public sealed record Import(string Name, PefSymbolClass Class = PefSymbolClass.TVector, byte Flags = 0);
 
@@ -190,7 +190,7 @@ internal sealed class PefBuilder
             w.WriteBytes(all[i].Contents);
             int h = headers + 28 * i;
             w.WriteInt32At(h, nameOffsets[i]);
-            w.WriteUInt32At(h + 4, 0u);
+            w.WriteUInt32At(h + 4, all[i].DefaultAddress);
             w.WriteUInt32At(h + 8, all[i].TotalLength);
             w.WriteUInt32At(h + 12, all[i].UnpackedLength);
             w.WriteInt32At(h + 16, all[i].Contents.Length);

@@ -36,23 +36,125 @@ public class PefContainerTests
     [Fact]
     public void Reads_the_section_headers()
     {
-        var builder = CodeAndData();
-        builder.Sections[1] = builder.Sections[1] with { Share = PefShareKind.Global, Alignment = 3 };
-        var (pef, _) = Read(builder.Build());
+        // Every field distinct: defaultAddress $12345678, totalLength $40, unpackedLength $C, containerLength $10.
+        var builder = new PefBuilder()
+            .AddSection(PefSectionKind.Code, new byte[0x10], unpacked: 0xC, total: 0x40)
+            .AddSection(PefSectionKind.UnpackedData, PefBuilder.Words(1, 2), total: 16);
+        builder.Sections[0] = builder.Sections[0] with { DefaultAddress = 0x12345678, Share = PefShareKind.Protected, Alignment = 2 };
+        builder.Sections[1] = builder.Sections[1] with { DefaultAddress = 0x9ABCDEF0, Share = PefShareKind.Global, Alignment = 3 };
+        var data = builder.Build();
+        var (pef, diagnostics) = Read(data);
+        Assert.Empty(diagnostics);
         var code = pef.Sections[0];
         Assert.Equal(0, code.Index);
         Assert.Null(code.Name);
-        Assert.Equal(0u, code.DefaultAddress);
-        Assert.Equal(PefSectionKind.Code, code.Kind);
-        Assert.Equal(8u, code.TotalLength);
-        Assert.Equal(8u, code.UnpackedLength);
-        Assert.Equal(8u, code.ContainerLength);
-        Assert.Equal(0, (int)code.ContainerOffset % 16);
-        var data = pef.Sections[1];
-        Assert.Equal(16u, data.TotalLength);
-        Assert.Equal(PefShareKind.Global, data.ShareKind);
-        Assert.Equal(3, data.Alignment);
+        Assert.Equal(0x12345678u, code.DefaultAddress);
+        Assert.Equal(0x40u, code.TotalLength);
+        Assert.Equal(0xCu, code.UnpackedLength);
+        Assert.Equal(0x10u, code.ContainerLength);
+        Assert.Equal(new BigEndianReader(data).ReadUInt32At(40 + 20), code.ContainerOffset);
+        Assert.Equal((PefSectionKind.Code, PefShareKind.Protected, (byte)2), (code.Kind, code.ShareKind, code.Alignment));
+        var data1 = pef.Sections[1];
+        Assert.Equal(1, data1.Index);
+        Assert.Equal(0x9ABCDEF0u, data1.DefaultAddress);
+        Assert.Equal((16u, 8u, 8u), (data1.TotalLength, data1.UnpackedLength, data1.ContainerLength));
+        Assert.Equal((PefSectionKind.UnpackedData, PefShareKind.Global, (byte)3), (data1.Kind, data1.ShareKind, data1.Alignment));
         Assert.Equal(PefSectionKind.Loader, pef.Sections[2].Kind);
+    }
+
+    [Fact]
+    public void A_section_is_placed_by_its_kind_not_by_instSectionCount()
+    {
+        var data = CodeAndData().Build();
+        new BigEndianWriter(data).WriteUInt16At(0x22, (ushort)0);
+        var (pef, diagnostics) = Read(data);
+        Assert.Equal(0, pef.InstantiatedSectionCount);
+        var instance = pef.Instantiate([0, 0, 0], _ => 0, diagnostics);
+        Assert.Empty(diagnostics);
+        Assert.Equal(8, instance.Images[0].Length);
+        Assert.Equal(16, instance.Images[1].Length);
+        Assert.Empty(instance.Images[2]);
+    }
+
+    [Fact]
+    public void The_first_loader_section_is_used_wherever_it_is()
+    {
+        var first = new PefBuilder { Main = (1, 4) }.BuildLoader();
+        var second = new PefBuilder { Main = (1, 8) }.BuildLoader();
+        var b = new PefBuilder { WithLoader = false };
+        b.Sections.Add(new PefBuilder.Section(PefSectionKind.Loader, first, (uint)first.Length, (uint)first.Length));
+        b.AddSection(PefSectionKind.Code, [0, 0, 0, 0]);
+        b.Sections.Add(new PefBuilder.Section(PefSectionKind.Loader, second, (uint)second.Length, (uint)second.Length));
+        var (pef, diagnostics) = Read(b.Build());
+        Assert.Empty(diagnostics);
+        Assert.Equal(0, pef.Loader!.SectionIndex);
+        Assert.Equal(new PefEntryPoint(1, 4), pef.Loader.Main);
+    }
+
+    // Every real loader section has totalLength and unpackedLength 0 [Verified: Mac OS 9.2.2's 90 fragments]: it is
+    // read from its stored contents.
+    [Fact]
+    public void A_loader_section_with_lengths_0_is_read_from_its_contents()
+    {
+        var data = CodeAndData().Build();
+        var w = new BigEndianWriter(data);
+        w.WriteUInt32At(40 + 2 * 28 + 8, 0u);
+        w.WriteUInt32At(40 + 2 * 28 + 12, 0u);
+        var (pef, diagnostics) = Read(data);
+        Assert.Empty(diagnostics);
+        Assert.Equal((0u, 0u), (pef.Sections[2].TotalLength, pef.Sections[2].UnpackedLength));
+        Assert.NotNull(pef.Loader);
+    }
+
+    [Fact]
+    public void A_section_with_no_stored_contents_is_all_zeros()
+    {
+        var (pef, diagnostics) = Read(new PefBuilder { WithLoader = false }
+            .AddSection(PefSectionKind.UnpackedData, [], unpacked: 0, total: 8)
+            .AddSection(PefSectionKind.UnpackedData, [], unpacked: 0, total: 0).Build());
+        Assert.Equal(new byte[8], pef.GetImage(0, diagnostics).ToArray());
+        Assert.Equal(0, pef.GetImage(1, diagnostics).Length);
+        Assert.Empty(diagnostics);
+    }
+
+    // [ClassicMac] An image is never shorter than what the pidata unpacks to.
+    [Fact]
+    public void Pattern_data_longer_than_the_total_length_is_kept()
+    {
+        var (pef, _) = Read(new PefBuilder { WithLoader = false }.AddSection(PefSectionKind.PatternInitData, [0x04], unpacked: 4, total: 2).Build());
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(new byte[4], pef.GetImage(0, diagnostics).ToArray());
+        Assert.Empty(diagnostics);
+    }
+
+    // Unpacking past unpackedLength is an error to the Code Fragment Manager, and so is it here; ending short of it the
+    // Code Fragment Manager accepts, which ClassicMac reports too [Code: the Code Fragment Manager in the Mac OS ROM].
+    [Fact]
+    public void Pattern_data_longer_than_the_unpacked_length_is_reported()
+    {
+        var (pef, _) = Read(new PefBuilder { WithLoader = false }.AddSection(PefSectionKind.PatternInitData, [0x05], unpacked: 4, total: 4).Build());
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(5, pef.GetImage(0, diagnostics).Length);
+        Assert.Equal("pef.pidata-length", Assert.Single(diagnostics).Code);
+    }
+
+    [Fact]
+    public void A_container_with_no_sections_reads()
+    {
+        var (pef, diagnostics) = Read(new PefBuilder { WithLoader = false }.Build());
+        Assert.Empty(diagnostics);
+        Assert.Empty(pef.Sections);
+        Assert.Null(pef.Loader);
+        Assert.Empty(pef.GetFixups(diagnostics));
+    }
+
+    [Fact]
+    public void A_CFM_68K_container_reads_the_same_way()
+    {
+        var (pef, diagnostics) = Read(new PefBuilder { Architecture = FourCC.FromString("m68k") }.AddSection(PefSectionKind.Code, [0, 0, 0, 0]).Build());
+        Assert.Empty(diagnostics);
+        Assert.Equal(FourCC.FromString("m68k"), pef.Architecture);
+        Assert.NotNull(pef.Loader);
     }
 
     [Theory]

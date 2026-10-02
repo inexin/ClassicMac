@@ -14,6 +14,7 @@ public class TransitionVectorTests
         var b = new PefBuilder { HashPower = 0, Main = (1, 0x10), Init = (1, 0x18) };
         b.AddSection(PefSectionKind.Code, new byte[0x80]);
         b.AddSection(PefSectionKind.UnpackedData, data, total: 0x1000);
+        b.AddSection(PefSectionKind.UnpackedData, new byte[0x40]);
         b.Libraries.Add(new PefBuilder.Library("Lib", [new("i0")]));
         b.Exports.Add(new("f", 0x00010066, PefSymbolClass.TVector, 0x18, 1));
         b.Relocations.Add((1, program));
@@ -36,6 +37,23 @@ public class TransitionVectorTests
         Assert.Equal(new PefTransitionVector(0, 0x44, 1, 0x800), pef.GetTransitionVector(pef.Loader!.Init, diagnostics));
         var f = pef.Loader.FindExport("f")!;
         Assert.Equal(new PefTransitionVector(0, 0x44, 1, 0x800), pef.GetTransitionVector(f.SectionIndex, f.Value, diagnostics));
+    }
+
+    [Fact]
+    public void A_TOC_in_another_section_is_named_by_DTIS()
+    {
+        var pef = Read([0x6402, 0x800F, 0x4600], out var diagnostics);   // DTIS 2; DELTA 16; DSC2
+        Assert.Equal(new PefTransitionVector(0, 0x40, 2, 0x800), pef.GetTransitionVector(pef.Loader!.Main, diagnostics));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void A_12_byte_vector_from_DESC_reads_the_same_way()
+    {
+        // DELTA 16; DESC: code at $10, TOC at $14, the third word ($18, init's code word) skipped.
+        var pef = Read([0x800F, 0x4400], out var diagnostics);
+        Assert.Equal(new PefTransitionVector(0, 0x40, 1, 0x800), pef.GetTransitionVector(pef.Loader!.Main, diagnostics));
+        Assert.Equal(new PefTransitionVector(-1, 0x44, -1, 0x800), pef.GetTransitionVector(pef.Loader.Init, diagnostics));
     }
 
     [Fact]
