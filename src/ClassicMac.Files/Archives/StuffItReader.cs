@@ -870,32 +870,30 @@ public sealed class StuffItReader : IContainerReader
         }
     }
 
+    // A method 6 PackBits block (ClassicMac.Core.PackBits): the whole block is decoded; a run the block or the fork
+    // cannot hold makes the fork unreadable.
     private static void DecodePackBits(ReadOnlySpan<byte> input, byte[] output, ref int outputOffset)
     {
-        int inputOffset = 0;
-        while (inputOffset < input.Length)
+        var result = PackBits.Unpack(input, output.AsSpan(outputOffset));
+        outputOffset += result.Written;
+        var end = result.End;
+        if (end == PackBitsEnd.OutputFull)
         {
-            sbyte control = unchecked((sbyte)input[inputOffset++]);
-            if (control == sbyte.MinValue) continue;
-
-            if (control >= 0)
-            {
-                int count = control + 1;
-                if (count > input.Length - inputOffset || count > output.Length - outputOffset)
-                    throw new InvalidDataException("A StuffIt method 6 literal run exceeds its block or fork.");
-                input.Slice(inputOffset, count).CopyTo(output.AsSpan(outputOffset));
-                inputOffset += count;
-                outputOffset += count;
-                continue;
-            }
-
-            if (inputOffset == input.Length)
+            // Input is left with the fork full: only no-op flags may follow.
+            int next = result.Read;
+            while (next < input.Length && input[next] == 0x80) next++;
+            if (next == input.Length) return;
+            end = input[next] < 0x80 ? PackBitsEnd.LiteralPastOutput
+                : next + 1 == input.Length ? PackBitsEnd.RepeatPastInput : PackBitsEnd.RepeatPastOutput;
+        }
+        switch (end)
+        {
+            case PackBitsEnd.LiteralPastInput or PackBitsEnd.LiteralPastOutput:
+                throw new InvalidDataException("A StuffIt method 6 literal run exceeds its block or fork.");
+            case PackBitsEnd.RepeatPastInput:
                 throw new InvalidDataException("A StuffIt method 6 repeat run has no value byte.");
-            int repeatCount = 1 - control;
-            if (repeatCount > output.Length - outputOffset)
+            case PackBitsEnd.RepeatPastOutput:
                 throw new InvalidDataException("A StuffIt method 6 repeat run exceeds its declared fork length.");
-            output.AsSpan(outputOffset, repeatCount).Fill(input[inputOffset++]);
-            outputOffset += repeatCount;
         }
     }
 

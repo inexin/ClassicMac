@@ -115,8 +115,7 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 int count = (data[2 * l] << 8) | data[2 * l + 1];
                 if (p + count > data.Length) return null;
-                var row = new BigEndianReader(data.AsMemory(p, count));
-                PackBits.Unpack(row, planes.AsSpan(l * d.Width, d.Width));
+                PackBits.Unpack(data.AsSpan(p, count), planes.AsSpan(l * d.Width, d.Width));
                 p += count;
             }
             var palette = Palette(d);

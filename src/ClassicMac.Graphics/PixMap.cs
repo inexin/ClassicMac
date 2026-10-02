@@ -319,28 +319,9 @@ namespace ClassicMac.Graphics
         private static void UnpackRow(ClassicMac.Core.BigEndianReader b, byte[] outRow, bool sizesAreWords, bool wordChunks, bool macOS9)
         {
             int packedBytes = sizesAreWords ? b.ReadUInt16() : b.ReadByte();
-            var src = b.ReadBytes(packedBytes).ToArray();
+            var src = b.ReadBytes(packedBytes);
             Array.Clear(outRow);
-            int unit = wordChunks ? 2 : 1;
-            int ip = 0, op = 0;
-            while (ip < src.Length && op < outRow.Length)
-            {
-                sbyte flag = (sbyte)src[ip++];
-                if (flag == -128 && !macOS9) continue;
-                if (flag < 0)
-                {
-                    int n = 1 - flag;
-                    if (ip + unit > src.Length) break;
-                    for (int i = 0; i < n && op + unit <= outRow.Length; i++)
-                        for (int k = 0; k < unit; k++) outRow[op++] = src[ip + k];
-                    ip += unit;
-                }
-                else
-                {
-                    int n = (flag + 1) * unit;
-                    for (int i = 0; i < n && ip < src.Length && op < outRow.Length; i++) outRow[op++] = src[ip++];
-                }
-            }
+            ClassicMac.Core.PackBits.Unpack(src, outRow, new ClassicMac.Core.PackBitsOptions { UnitSize = wordChunks ? 2 : 1, Flag80IsRun = macOS9 });
         }
     }
 }

@@ -421,7 +421,7 @@ the public drawing API, icons as full resource decoders; the renderer draws text
 
 | Layer (namespace) | Contains | Depends on |
 | --- | --- | --- |
-| `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), PackBits, colour-table and PixMap reading | Core (`MacRect`, `MacPoint`, `Fixed`) |
+| `ClassicMac.Graphics` (base) | The RGBA bitmap type, standard colour tables (`clut` 1–8, greys), colour-table and PixMap reading | Core (`MacRect`, `MacPoint`, `Fixed`, `PackBits`) |
 | `.Fonts` | `NFNT`/`FONT`, `FOND`, `fctb`, `sfnt` | base |
 | `.QuickTime` | ImageDescription, the codecs (`raw `, `rle `, `rpza`, `smc `, `cvid`, `8BPS`, `yuv2`, `YVU9`, `tga `), the codec plugin hook, QTIF files | Graphics, MacPaint (its `PNTG` codec) |
 | MacPaint (in the base) | PNTG files and the `PNTG` codec's decoder | base |

@@ -6,8 +6,8 @@ its planes. ClassicMac decodes it in all three and encodes it when it writes pic
 
 | | |
 | --- | --- |
-| Used by | [pict.md](../graphics/pict.md) (packed scan lines), [macpaint.md](../graphics/macpaint.md) (the image rows), [quicktime.md](../graphics/quicktime.md) (`8BPS` planes, the `PNTG` codec) |
-| ClassicMac | Reads and writes; `ClassicMac.Graphics` (`PackBits`, `PixMap`, `PictWriter`) |
+| Used by | [pict.md](../graphics/pict.md) (packed scan lines), [macpaint.md](../graphics/macpaint.md) (the image rows), [quicktime.md](../graphics/quicktime.md) (`8BPS` planes, the `PNTG` codec), StuffIt's method 6 ([stuffit.md](../archives/stuffit.md)) |
+| ClassicMac | Reads and writes; `ClassicMac.Core.PackBits` (`Unpack`, `Pack`), used by `ClassicMac.Graphics` (`PixMap`, `PictWriter`, `MacPaintFile`, QuickTime) and `StuffItReader` |
 | Verified against | Pictures drawn on Mac OS 9.0 ([pict.md](../graphics/pict.md)) |
 | Sources | Technical Note 1023, *Understanding PackBits*; *Inside Macintosh: Imaging With QuickDraw*; Mac OS 9.0's native QuickDraw, traced |
 
@@ -84,6 +84,14 @@ The byte count before each row is [pict.md §3](../graphics/pict.md#3-writing)'s
 
 ## 5. ClassicMac
 
+- One decoder and one packer, `ClassicMac.Core.PackBits`: `Unpack(source, destination, options)` takes the unit size
+  (1, or 2 for word packing) and whether the flag −128 is a run (§4.1), and reports the bytes read and written and why
+  it stopped: the input used up, the output full, or a run that the input or the output cannot complete
+  (`PackBitsEnd`). Each format decides what a short stop means: pictures, MacPaint and QuickTime keep what was
+  written; StuffIt's method 6 makes the fork unreadable. A repeat writes whole units only, so a word that does not fit
+  at a row's end is left out. `Pack(data, unitSize)` is §3's packer. [ClassicMac]
+- Mac OS 9's component-plane reader (32-bit pictures, packType 4) keeps its own loop, as it reproduces Mac OS 9's
+  overlapping buffers ([pict.md](../graphics/pict.md)). [ClassicMac]
 - Picture scan lines follow `PictDecodeOptions.QuickDraw` for the `$80` flag (§4.1): a no-op for `MacRom`, a run of
   129 for `MacOS9`. [ClassicMac]
 - MacPaint rows and `8BPS` planes always treat `$80` as a no-op. [ClassicMac]
@@ -96,6 +104,8 @@ None. A short or malformed run leaves the rest of the row zero; it is not report
 
 ## 7. Verification
 
+- `tests/ClassicMac.Core.Tests/PackBitsTests.cs`: Technical Note 1023's example, the `$80` flag both ways, word units,
+  each way of stopping, and packing (runs, literal blocks, the 128-unit cap, no `$80` flag, round trips).
 - `tests/ClassicMac.Graphics.Tests/PictParserTests.cs`, pictures built with `PictBuilder`:
   `PackBits_OnMacOS9_FlagMinus128_IsARunOf129` (§4.1), `IndexedPixMap_PackType1_IsStillPacked`,
   `DirectBits16_PackType0_OnMacOS9_IsWordPackBits` (word packing), `DirectBits32_PackType4_OnMacOS9_OverflowingRowRepeatsItsFirstByte`

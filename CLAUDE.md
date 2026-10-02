@@ -52,7 +52,7 @@ and may use only the layers below it, which `LayeringTests` checks. The adapters
 
 | Folder (namespace) | Contains | Uses |
 | --- | --- | --- |
-| root, `MacPaint/` (`ClassicMac.Graphics`) | `RgbaBitmap`, `RgbaColor`, `PixMap` records, standard colour tables, PackBits, `MacPaintFile` (also QuickTime's `PNTG` codec) | Core |
+| root, `MacPaint/` (`ClassicMac.Graphics`) | `RgbaBitmap`, `RgbaColor`, `PixMap` records, standard colour tables, `MacPaintFile` (also QuickTime's `PNTG` codec) | Core (`PackBits`, shared with StuffIt's method 6) |
 | `Fonts/` (`.Fonts`) | The Font Manager's resources: `BitmapFont` (`NFNT`/`FONT`), `FontFamily` (`FOND`), `fctb`, `OutlineFont` (`sfnt`) | base |
 | `QuickTime/` (`.QuickTime`) | Image descriptions, the codecs, `IPictImageCodec`, QTIF files | base |
 | `QuickDraw/` (`.QuickDraw`) | The renderer: the public `QuickDrawPort` (state and verbs) over `Engine/`, `Regions/`, `Text/`; `QuickDrawPattern`, `Region`, `FontLibrary`, `QuickDrawOptions` | base, Fonts |

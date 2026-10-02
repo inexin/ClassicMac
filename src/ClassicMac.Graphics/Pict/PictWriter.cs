@@ -429,37 +429,11 @@ namespace ClassicMac.Graphics.Pict
             return line;
         }
 
-        // PackBits: runs of 3 or more equal bytes as (1 - count, byte), otherwise literal blocks (count - 1, bytes);
-        // at most 128 bytes per run or block.
-        internal static byte[] PackBits(byte[] data) => Pack(data, 1);
+        // PackBits (ClassicMac.Core.PackBits.Pack, packbits.md §3), over bytes or over 16-bit units (16-bit pixel rows,
+        // packType 3), whose counts are in words.
+        internal static byte[] PackBits(byte[] data) => ClassicMac.Core.PackBits.Pack(data, 1);
 
-        // PackBits over 16-bit units (16-bit pixel rows, packType 3): counts are in words.
-        internal static byte[] PackWords(byte[] data) => Pack(data, 2);
-
-        private static byte[] Pack(byte[] data, int unit)
-        {
-            var output = new List<byte>(data.Length + data.Length / 64 + 2);
-            int n = data.Length / unit;
-            bool Same(int a, int b) => data.AsSpan(a * unit, unit).SequenceEqual(data.AsSpan(b * unit, unit));
-            int i = 0;
-            while (i < n)
-            {
-                int run = 1;
-                while (i + run < n && run < 128 && Same(i, i + run)) run++;
-                if (run >= 3 || (run == 2 && unit == 2))
-                {
-                    output.Add((byte)(1 - run));
-                    output.AddRange(data.AsSpan(i * unit, unit).ToArray());
-                    i += run;
-                    continue;
-                }
-                int start = i++;
-                while (i < n && i - start < 128 && !(i + 2 < n && Same(i, i + 1) && Same(i, i + 2))) i++;
-                output.Add((byte)(i - start - 1));
-                output.AddRange(data.AsSpan(start * unit, (i - start) * unit).ToArray());
-            }
-            return output.ToArray();
-        }
+        internal static byte[] PackWords(byte[] data) => ClassicMac.Core.PackBits.Pack(data, 2);
 
     }
 }

@@ -74,8 +74,9 @@ namespace ClassicMac.Graphics
         {
             const int rowBytes = Width / 8;
             var bits = new byte[rowBytes * Height];
-            int consumed = PackBits.Unpack(data, bits);
-            if (consumed == 0) return null;
+            var unpacked = PackBits.Unpack(data.Source.Span[data.Position..], bits);
+            data.Skip(unpacked.Read);
+            if (unpacked.Read == 0) return null;
             var img = new RgbaBitmap(Width, Height);
             var px = img.Pixels;
             for (int y = 0; y < Height; y++)
