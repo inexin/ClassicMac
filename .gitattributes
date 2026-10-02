@@ -28,3 +28,6 @@ tests/ClassicMac.Resources.Decoders.Tests/Golden/** -text
 
 # Original-application archives and their source forks: byte for byte.
 tests/ClassicMac.Files.Tests/TestData/StuffIt151/** -text
+tests/ClassicMac.Files.Tests/TestData/StuffIt703/*.sit* -text
+tests/ClassicMac.Files.Tests/TestData/StuffItOriginalCrossVersion/*.sit -text
+tests/ClassicMac.Files.Tests/TestData/DiskDoublerOriginal/*.sit -text

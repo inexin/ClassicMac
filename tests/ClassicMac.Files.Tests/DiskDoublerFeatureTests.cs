@@ -179,6 +179,104 @@ public sealed class DiskDoublerFeatureTests
         Assert.Equal(resource, file.ResourceFork.ToArray());
     }
 
+    [Theory]
+    [InlineData("DiskDoublerPro411Dda2Dd1Archive.dd")]
+    [InlineData("DiskDoublerPro411Dda2Dd2Archive.dd")]
+    [InlineData("DiskDoublerPro411Dda2Dd3Archive.dd")]
+    public void DiskDoublerPro411Dda2RecordChecksumsMatchEveryRecord(string fixtureName)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFile> files = DiskDoublerReader.Instance.Read(
+            ForkData.FromBytes(File.ReadAllBytes(Path.Combine(fixtureDirectory, fixtureName))),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal(7, files.Count);
+        Assert.Empty(diagnostics);
+    }
+
+    [Theory]
+    [InlineData(0x9000, "sources", 46)]       // a directory record's CRC covers bytes 0-85
+    [InlineData(0x5000, "testfile.PICT", 46)] // a file record's covers bytes 0-53
+    [InlineData(0x1000, "testfile.png", 46)]  // a raw record's covers bytes 0-87
+    public void DiskDoublerDda2RecordWithADamagedHeaderIsReported(ushort entryType, string name, int damagedByte)
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "DiskDoublerPro411Dda2Dd3Archive.dd"));
+        int offset = FindDda2Record(archive, entryType, name);
+        Assert.NotEqual(-1, offset);
+        archive[offset + damagedByte] ^= 0x01;
+        var diagnostics = new List<Diagnostic>();
+
+        _ = DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext(diagnostics: diagnostics));
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("archive.header-crc", diagnostic.Code);
+        Assert.Contains(name, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DiskDoublerDda2RawRecordWithADamagedDataForkIsReported()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        byte[] archive = File.ReadAllBytes(Path.Combine(fixtureDirectory, "DiskDoublerPro411Dda2Dd3Archive.dd"));
+        int offset = FindDda2Record(archive, 0x1000, "testfile.jpg");
+        archive[offset + 46 + 44 + 100] ^= 0x01;
+        var diagnostics = new List<Diagnostic>();
+
+        _ = DiskDoublerReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext(diagnostics: diagnostics));
+
+        Diagnostic diagnostic = Assert.Single(diagnostics);
+        Assert.Equal("archive.fork-checksum", diagnostic.Code);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
+    // StuffIt Deluxe 4.5 archive of the files DiskDoubler 3.7.7 compressed with DiskDoubler A (method 1): a folder
+    // whose files carry other bytes where a folder's first-child link would be, a first file linked back to its
+    // folder, and method-1 files with empty forks.
+    [Fact]
+    public void DiskDoubler377FilesInAStuffIt45ArchiveExpandToTheOriginals()
+    {
+        string fixtureDirectory = Path.Combine(AppContext.BaseDirectory, "TestData", "DiskDoublerOriginal");
+        string crossVersion = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItOriginalCrossVersion");
+        string legacy = Path.Combine(AppContext.BaseDirectory, "TestData", "StuffItLegacy45");
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(
+            Path.Combine(fixtureDirectory, "StuffIt45DiskDoubler377DdaFiles.sit"), diagnostics: diagnostics);
+
+        ContainerNode archive = result;
+        Assert.Equal(7, archive.Children.Count);
+        Assert.All(archive.Children, node =>
+        {
+            Assert.Equal(["sources"], node.File.FolderPath.Select(folder => folder.ToMacRoman()));
+            Assert.Equal(FourCC.FromString("DDAP"), node.File.FinderInfo.Creator);
+            Assert.Equal(DiskDoublerReader.Instance.FormatName, Assert.Single(node.Children).Format);
+        });
+        MacFile Expanded(string name) =>
+            Assert.Single(archive.Children, node => node.File.Name.ToMacRoman() == name).Children[0].File;
+        Assert.Empty(Expanded("Test Image").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(legacy, "ExpectedTestImageResource.bin")),
+            Expanded("Test Image").ResourceFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestText.bin")),
+            Expanded("Test Text").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedDataFork.pict")),
+            Expanded("testfile.PICT").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(fixtureDirectory, "ExpectedResourceFork.bin")),
+            Expanded("testfile.PICT").ResourceFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestFile.jpg")),
+            Expanded("testfile.jpg").DataFork.ToArray());
+        Assert.Empty(Expanded("testfile.jpg").ResourceFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestFile.png")),
+            Expanded("testfile.png").DataFork.ToArray());
+        Assert.Equal(File.ReadAllBytes(Path.Combine(crossVersion, "ExpectedTestFile.txt")),
+            Expanded("testfile.txt").DataFork.ToArray());
+        Assert.Equal(FourCC.FromString("JPEG"), Expanded("testfile.jpg").FinderInfo.Type);
+        Assert.Equal(FourCC.FromString("GKON"), Expanded("testfile.jpg").FinderInfo.Creator);
+        Assert.Empty(diagnostics);
+    }
+
     private static int FindDda2Record(byte[] archive, ushort entryType, string name)
     {
         int offset = 62;

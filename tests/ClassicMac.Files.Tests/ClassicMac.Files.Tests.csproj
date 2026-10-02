@@ -27,6 +27,7 @@
     <None Update="TestData\StuffItMethod15\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\StuffItLegacy45\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\StuffIt151\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="TestData\StuffIt703\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\StuffItOriginalCrossVersion\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\DiskDoublerOriginal\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

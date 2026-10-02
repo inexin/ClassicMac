@@ -19,6 +19,9 @@ public sealed class StuffItReader : IContainerReader
     private const uint MemberSignature = 0xA5A5A5A5;
     private const byte FolderFlag = 0x40;
     private const byte EncryptedFlag = 0x20;
+    // A legacy member's method byte marks encryption with $10, or with $80 as StuffIt Deluxe 4.5 writes it
+    // ([Verified], ARCHIVES.md).
+    private const byte EncryptedMethodBits = 0x90;
     private const ushort HasResourceForkFlag = 0x0001;
     private const int Method6MaximumPackBitsLength = 32_768;
     private static readonly int[] Method6Weights = CreateMethod6Weights();
@@ -64,7 +67,9 @@ public sealed class StuffItReader : IContainerReader
             throw new InvalidDataException("The StuffIt archive's reported size extends past the input.");
 
         int rootCount = reader.ReadUInt16At(92);
-        int firstMember = ReadPosition(reader.ReadUInt32At(94), "first member");
+        // The root list starts at +88. +94 holds the same offset until StuffIt Deluxe 7.0 prepends a member (its return
+        // receipt): then +88 points to the new first member and +94 still to the old one ([Verified], ARCHIVES.md).
+        int firstMember = ReadPosition(reader.ReadUInt32At(88), "first member");
         if (rootCount > context.Options.MaxVolumeEntries)
             throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
         if (rootCount != 0 && (firstMember < ArchiveHeaderLength || firstMember >= archive.Length))
@@ -229,7 +234,8 @@ public sealed class StuffItReader : IContainerReader
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
 
             LegacyMember member = ParseLegacyMember(archive, list.Position, context);
-            if (member.Previous != list.Previous)
+            // StuffIt Deluxe 4.5 links a folder's first member back to the folder ([Verified], ARCHIVES.md).
+            if (member.Previous != list.Previous && !(list.Previous == 0 && member.Previous == list.Parent))
                 context.Report(DiagnosticSeverity.Warning, "archive.previous-link-mismatch",
                     $"The legacy StuffIt member at offset {list.Position} has a previous-member link that does not match its list position.", list.Position);
             if (member.Parent != list.Parent)
@@ -360,7 +366,7 @@ public sealed class StuffItReader : IContainerReader
             }
             else
             {
-                bool encrypted = (resourceMethod & 0x10) != 0 || (dataMethod & 0x10) != 0;
+                bool encrypted = (resourceMethod & EncryptedMethodBits) != 0 || (dataMethod & EncryptedMethodBits) != 0;
                 if (encrypted)
                 {
                     context.Report(DiagnosticSeverity.Warning, "archive.encrypted",
@@ -445,7 +451,9 @@ public sealed class StuffItReader : IContainerReader
             "legacy StuffIt fork data");
 
         uint firstChildRaw = headerReader.ReadUInt32At(62);
-        bool isFolder = firstChildRaw != uint.MaxValue;
+        // A folder is a folder-start record (method 32). A file's +62 is not a link: StuffIt Deluxe 4.5 leaves
+        // other bytes there ([Verified], ARCHIVES.md).
+        bool isFolder = header.Span[0] == 32 || header.Span[1] == 32;
         int firstChild = isFolder && firstChildRaw != 0 ? ReadPosition(firstChildRaw, "first child") : 0;
         uint previous = headerReader.ReadUInt32At(50);
         int next = ReadPosition(headerReader.ReadUInt32At(54), "next member");
@@ -469,7 +477,7 @@ public sealed class StuffItReader : IContainerReader
             previous,
             next,
             parent,
-            (header.Span[0] & 0x10) != 0 || (header.Span[1] & 0x10) != 0,
+            (header.Span[0] & EncryptedMethodBits) != 0 || (header.Span[1] & EncryptedMethodBits) != 0,
             checked((byte)(header.Span[0] & 0x0F)),
             checked((byte)(header.Span[1] & 0x0F)),
             resourceLength,
@@ -575,12 +583,16 @@ public sealed class StuffItReader : IContainerReader
         }
 
         int headerEnd = checked(offset + headerLength);
-        Require(archive, headerEnd, 36, "StuffIt Finder information");
+        // The Finder block after the header is 36 bytes in a version-1 member (StuffIt Deluxe 6.5 and 7.0 for Mac,
+        // DropStuff 7.0.3) and 32 bytes in the version-3 members StuffIt 7.0 for Windows writes ([Verified],
+        // ARCHIVES.md).
+        int finderBlockLength = archive[offset + 4] == 1 ? 36 : 32;
+        Require(archive, headerEnd, finderBlockLength, "StuffIt Finder information");
         ushort fileFlags = reader.ReadUInt16At(headerEnd);
         var finder = new byte[FinderInfo.Length];
         archive.AsSpan(headerEnd + 4, 8).CopyTo(finder);
         new BigEndianWriter(finder).WriteUInt16At(8, reader.ReadUInt16At(headerEnd + 12));
-        int forkInfo = headerEnd + 36;
+        int forkInfo = headerEnd + finderBlockLength;
         int resourceLength = 0;
         int resourceCompressedLength = 0;
         ushort resourceCrc = 0;
@@ -601,7 +613,9 @@ public sealed class StuffItReader : IContainerReader
         long resourceOffsetLong = forkInfo;
         long dataOffsetLong = resourceOffsetLong + resourceCompressedLength;
         long forksEnd = dataOffsetLong + member.DataCompressedLength;
-        int archiveEnd = member.Next == 0 ? archive.Length : member.Next;
+        // The next link bounds the forks only when it points forward: StuffIt 7.0.3 writes a folder's end marker
+        // before the folder's children, and the last child links back to it ([Verified], ARCHIVES.md).
+        int archiveEnd = member.Next > offset ? member.Next : archive.Length;
         if (resourceOffsetLong > archiveEnd || forksEnd > archiveEnd)
             throw new InvalidDataException("A StuffIt member's fork data overlaps its next entry or exceeds the archive.");
         int resourceOffset = (int)resourceOffsetLong;

@@ -1193,7 +1193,7 @@ public sealed class StuffItFeatureTests
     public void StuffItArchiveRejectsRootMemberOffsetBeyondAddressableInput()
     {
         byte[] image = StuffItFixture.BuildFile("file", [], []);
-        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(94), uint.MaxValue);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(88), uint.MaxValue);
 
         Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(
             ForkData.FromBytes(image), new ContainerContext()));
@@ -1322,6 +1322,7 @@ public sealed class StuffItFeatureTests
 
             Span<byte> member = image.AsSpan(ArchiveHeaderLength, memberHeaderLength);
             U32(member, 0, 0xA5A5A5A5);
+            member[4] = 1; // member version 1, as the Mac StuffIt applications write it
             U16(member, 6, checked((ushort)memberHeaderLength));
             member[9] = encrypted ? (byte)0x20 : (byte)0;
             U32(member, 10, CreateSeconds);
@@ -1429,6 +1430,8 @@ public sealed class StuffItFeatureTests
         {
             Span<byte> member = image.AsSpan(offset, 112);
             byte[] nameBytes = Encoding.ASCII.GetBytes(name);
+            // A folder is a folder-start record (method 32), as StuffIt Deluxe 4.5 writes it.
+            if (firstChild != uint.MaxValue) member[0] = member[1] = 32;
             member[2] = checked((byte)nameBytes.Length);
             nameBytes.CopyTo(member[3..]);
             U16(member, 48, childCount);
@@ -1528,6 +1531,7 @@ public sealed class StuffItFeatureTests
 
             Span<byte> folder = image.AsSpan(ArchiveHeaderLength, 48 + folderName.Length);
             U32(folder, 0, 0xA5A5A5A5);
+            folder[4] = 1;
             U16(folder, 6, checked((ushort)folder.Length));
             folder[9] = 0x40;
             U32(folder, 10, CreateSeconds);
@@ -1550,6 +1554,7 @@ public sealed class StuffItFeatureTests
             "StuffIt "u8.CopyTo(image);
             image[82] = 5;
             U32(image, 84, 0);
+            U32(image, 88, firstEntry);
             U16(image, 92, rootEntries);
             U32(image, 94, firstEntry);
         }

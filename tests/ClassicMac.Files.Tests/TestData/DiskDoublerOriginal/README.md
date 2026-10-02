@@ -28,3 +28,8 @@ has method 1 selected for both forks. Its extracted forks are compared with the 
 
 `DiskDoubler377DdbTestFile.dd` is the original standalone file at `build/sources.dd377.ddb/testfile.PICT`; the fixture
 has method 8 selected for both forks. Its extracted forks are compared with the same uncompressed source files.
+
+`StuffIt45DiskDoubler377DdaFiles.sit` is the corpus's `build/sources.dd377.dda.sit`: StuffIt Deluxe 4.5's archive of
+the `sources` folder after DiskDoubler 3.7.7 compressed each file with DiskDoubler A (method 1). It is a version-2
+StuffIt archive with a folder, and its `Test Image`, `testfile.jpg` and `testfile.png` have an empty method-1 fork.
+The test expands every file through both containers and compares the forks with the sources.

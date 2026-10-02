@@ -14,6 +14,13 @@ public sealed class DiskDoublerReader : IContainerReader
     private const int StandaloneHeaderLength = 84;
     private const int RecordHeaderLength = 46;
     private const int FileHeaderLength = 80;
+
+    // [Fitted] Each DDA2 record ends its fixed part with a CRC-16/XMODEM of the record's bytes before it: at +54 in a
+    // file record (before its file header), +86 in a directory record and +88 in a raw (0x1000) record. Every record
+    // of the DiskDoubler Pro 4.1.1 archives in the CC0 corpus matches.
+    private const int FileRecordCrcOffset = 54;
+    private const int DirectoryRecordCrcOffset = 86;
+    private const int RawRecordCrcOffset = 88;
     private const uint FileHeaderMagic = 0xABCD0054;
 
     /// <summary>The built-in reader.</summary>
@@ -113,6 +120,8 @@ public sealed class DiskDoublerReader : IContainerReader
                 const int directoryMetadataLength = 16;
                 if (recordLength < RecordHeaderLength + directoryMetadataLength)
                     throw new InvalidDataException("A DiskDoubler DDA2 directory record is truncated.");
+                if (recordLength >= DirectoryRecordCrcOffset + 2)
+                    CheckRecordCrc(archive, reader, offset, DirectoryRecordCrcOffset, name, context);
                 folders.Add(name);
                 offset = recordEnd;
                 continue;
@@ -144,7 +153,12 @@ public sealed class DiskDoublerReader : IContainerReader
                 var rawType = new FourCC(archive.AsSpan(metadataOffset + 16, 4));
                 var rawCreator = new FourCC(archive.AsSpan(metadataOffset + 20, 4));
                 var rawFinderFlags = (FinderFlags)reader.ReadUInt16At(metadataOffset + 24);
+                CheckRecordCrc(archive, reader, offset, RawRecordCrcOffset, name, context);
                 byte[] rawData = archive.AsSpan(rawPayloadOffset, rawDataLength).ToArray();
+                // [Fitted] +40 of the metadata is the XOR of the data fork's bytes (both Pro 4.1.1 raw records).
+                if (ByteXor(rawData) != archive[metadataOffset + 40])
+                    context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
+                        $"The DiskDoubler data-fork checksum is incorrect for '{name}'.", metadataOffset + 40);
                 byte[] rawResource = archive.AsSpan(rawPayloadOffset + rawDataLength, rawResourceLength).ToArray();
                 files.Add(new MacFile
                 {
@@ -165,6 +179,7 @@ public sealed class DiskDoublerReader : IContainerReader
                 throw new InvalidDataException("A DiskDoubler DDA2 file header is truncated.");
             if (reader.ReadUInt32At(fileHeaderOffset) != FileHeaderMagic)
                 throw new InvalidDataException("A DiskDoubler DDA2 file has an invalid file-header marker.");
+            CheckRecordCrc(archive, reader, offset, FileRecordCrcOffset, name, context);
             int header = fileHeaderOffset + 4;
             int dataLength = ReadLength(reader.ReadUInt32At(header), "data fork");
             int compressedDataLength = ReadLength(reader.ReadUInt32At(header + 4), "compressed data fork");
@@ -305,6 +320,14 @@ public sealed class DiskDoublerReader : IContainerReader
         return new MacString(bytes);
     }
 
+    private static void CheckRecordCrc(byte[] archive, BigEndianReader reader, int offset, int crcOffset,
+        MacString name, ContainerContext context)
+    {
+        if (reader.ReadUInt16At(offset + crcOffset) != Crc16Xmodem(archive.AsSpan(offset, crcOffset)))
+            context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
+                $"The DiskDoubler DDA2 record header checksum is incorrect for '{name}'.", offset);
+    }
+
     private static void ReportForkChecksum(BigEndianReader header, int checksumOffset,
         ReadOnlySpan<byte> encoded, ReadOnlySpan<byte> decoded, int method, byte info1, byte info2,
         string forkName, string fileName, ContainerContext context)
@@ -315,7 +338,7 @@ public sealed class DiskDoublerReader : IContainerReader
         switch (method)
         {
             case 1:
-                calculated = MacCompressChecksum(decoded, encoded, info1, info2);
+                calculated = encoded.IsEmpty ? (ushort)0 : MacCompressChecksum(decoded, encoded, info1, info2);
                 code = "archive.fork-checksum";
                 break;
             case 2:
@@ -473,6 +496,9 @@ public sealed class DiskDoublerReader : IContainerReader
         byte info1, byte info2)
     {
         ReadOnlySpan<byte> input = encoded.Span;
+        // An empty fork is stored as no bytes at all, whatever its method: DiskDoubler 3.7.7 writes no method-1
+        // prefix or method-8 header for one ([Verified], ARCHIVES.md).
+        if (outputLength == 0 && input.IsEmpty) return [];
         if (method == 0) return input.ToArray();
         if (method == 1) return DecodeMacCompress(input, outputLength, info1, info2);
         if (method == 2) return DecodeAdaptiveHuffman(input, outputLength, info1, info2);

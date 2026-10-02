@@ -41,6 +41,17 @@ lengths 32 and 256 in three of the four samples, as in the folder-start entry); 
 lengths. Method 6 is still **[Fitted]**: StuffIt 1.5.1 cannot write it, and it has hand-built tests only. Encrypted
 entries are reported and skipped.
 
+Version 2 as StuffIt Deluxe 4.5 writes it is **[Verified]** against the CC0 corpora's archives
+(`TestData/DiskDoublerOriginal/StuffIt45DiskDoubler377DdaFiles.sit`, `TestData/StuffItOriginalCrossVersion`):
+- A folder is a folder-start record: method `$20` in both method bytes, its first member at +62 and its member count
+  at +48 (the folder's fork lengths hold the total of its contents). A file's +62 is not a link: Deluxe 4.5 leaves
+  other bytes there (`$00400001` and the like), so +62 never marks a folder; only the method does. The folder's
+  closing record (method `$21`) follows its last member and is not in any list.
+- A folder's first member's previous link is the folder's own offset (a root member's is 0); later members link to
+  the member before them.
+- Encryption sets bit 7 of the method byte (`$8D`: encrypted method 13; `$80`: encrypted stored, padded to 16-byte
+  blocks); the older `$10` bit is honoured too. Such entries are reported (`archive.encrypted`) and skipped.
+
 ## StuffIt split files (SegmentIt)
 
 Each segment begins with a 100-byte `$B0 56 00` header. Byte 3 is its one-based volume number; byte 4 and the following
@@ -141,6 +152,15 @@ Compressed methods are currently verified with hand-built vectors rather than ar
 
 ## DiskDoubler (DDA2)
 
+Original-application coverage: DiskDoubler 3.7.7 writes methods 1 (DiskDoubler A), 8 (DiskDoubler B), 9 (AutoDoubler
+A, `ad`) and 6 (AutoDoubler B, `ads`); DiskDoubler Pro 4.1.1 writes 9 (AD1), 6 (AD2) and 10 (DD1, DD2, DD3, told
+apart by the file header's +60 byte, 1–3). Every file of the CC0 corpus (standalone files, 3.7.7 `DDAR` combines, Pro
+4.1.1 `DDA2` archives and their `.sea`/`.prompt.sea` copies, BinHex and StuffIt-wrapped copies) expands to the source
+forks **[Verified]**, except two StuffIt 6.5.1 copies that stop in method 15 (see StuffIt 5). No sample uses methods 2–5 or 7 or a nonzero delta type. An empty fork is stored as no bytes
+whatever its method (DiskDoubler 3.7.7 writes no method-1 prefix or method-8 header for one) and its checksum is 0
+**[Verified]**. Pro 4.1.1 writes 0 in the fork checksum fields of methods 6, 9 and 10. Its split files (`.1`, `.2`,
+data forks starting `SPLT`) are not read.
+
 The DDA2 archive header is 62 bytes; its big-endian checksum at +60 is CRC-16/XMODEM over bytes 0–59 **[Fitted]**
 against [XADMaster's parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADDiskDoublerParser.m/). A bad header
 checksum prevents recognition and makes direct reads fail. Records begin with `DDA2`, a record type, a 31-byte Pascal
@@ -217,8 +237,13 @@ The record layout is **[Fitted]** against [XADMaster's DiskDoubler parser](https
 Original DiskDoubler Pro 4.1.1 DDA2 archives can contain entry-type `0x1000` records whose payload does not use the
 standard file-header layout. In the corpus archive noted below, these records use a 44-byte metadata block followed by
 the raw data and resource forks. The metadata includes creation and modification times, Finder information and fork
-lengths. This layout is **[Fitted]** to the original Pro 4.1.1 JPEG and PNG entries; their checksum fields remain
-unverified and are not checked. Tests verify both image signatures, fork lengths and Finder type/creator values.
+lengths. This layout is **[Fitted]** to the original Pro 4.1.1 JPEG and PNG entries; their checksum fields are
+described next. Tests verify both image signatures, fork lengths and Finder type/creator values.
+Each DDA2 record's fixed part ends in a CRC-16/XMODEM of the record bytes before it: at +54 in a file record (just
+before its `0xABCD0054` file header), +86 in a directory record and +88 in a raw `0x1000` record; byte +40 of a raw
+record's metadata is the XOR of its data-fork bytes. These are **[Fitted]** to every record of the five DiskDoubler
+Pro 4.1.1 archives in the CC0 corpus (not read from code). A record CRC mismatch is a warning (`archive.header-crc`),
+a raw data XOR mismatch an error (`archive.fork-checksum`).
 Tests use hand-built records to check DDAR stored forks and directory markers, and DDA2 stored, MacCompress, adaptive
 Huffman (methods 2 and 5), method-3 RLE literals and repeats, Huffman, Stac LZS literals and backreferences, and method-8 fork bytes, including LZW dictionary references, variable-width transitions, block-mode reset, XOR
 variants, checksum mismatch reporting, Finder metadata, dates, nested paths, unsupported-method recovery, truncation,
@@ -268,7 +293,10 @@ unsupported, and an authentic segmented archive from Compact Pro has not yet bee
 ## StuffIt 5 (initial subset)
 
 StuffIt 5 is recognized by the eight-byte `StuffIt ` signature and version byte 5 at offset 82. The 100-byte archive
-header stores its total length at 84, the root member count at 92, and the first root member's absolute offset at 94.
+header stores its total length at 84, the first root member's absolute offset at 88, and the root member count at 92.
+The offset at 94 is the same until StuffIt Deluxe 7.0 prepends a member (its return receipt,
+`StuffItReturnReceipt.txt`): then 88 points to the receipt, whose next link is the old first member, and 94 still to
+the old first member, so 94 would lose the receipt **[Verified]** (Deluxe 7.0, `testfile.stuffit7_dlx.mac9.rreceipt.sit`).
 An archive member begins with `A5 A5 A5 A5`; the `u16` at +6 gives its header length. The member header has flags at +9,
 Mac creation and modification seconds at +10 and +14, the next sibling offset at +22, the name byte count at +30, and
 the header CRC at +32. These field positions and encodings are **[Fitted]** by comparison with
@@ -278,7 +306,9 @@ The member flag `$40` denotes a folder and `$20` denotes an encrypted member **[
 first child offset at +34 and child count at +46. A file header stores logical and compressed data-fork lengths at
 +34/+38, data-fork CRC at +42, and compression method at +46. The UTF-8 name follows the fixed fields (and any
 password bytes). File-specific Finder information starts after the variable header: resource-fork presence is flag bit
-0 of its `flags2`; type, creator and Finder flags follow. When present, resource-fork lengths, CRC and method precede
+0 of its `flags2`; type, creator and Finder flags follow. That block is 36 bytes in a member whose version byte (+4)
+is 1, as every Mac StuffIt writes (Deluxe 6.5 and 7.0, DropStuff 7.0.3), and 32 bytes in the version-3 members of
+StuffIt 7.0 for Windows **[Verified]**; a Windows member's type and creator fields hold Windows data (`$00000020`). When present, resource-fork lengths, CRC and method precede
 resource bytes, which precede data-fork bytes. These member details are **[Fitted]** against Deark's independent
 parser and the hand-built vectors in `StuffItFeatureTests`; they have not yet been checked against a corpus created by
 the original StuffIt application.
@@ -293,6 +323,15 @@ through the normal `ContainerUnwrapper` pipeline, preserving UTF-8 paths, Finder
 forks. Original v5 archives made with StuffIt Deluxe 6.5 and 7.0 for Macintosh verify the member listing and exact
 data/resource fork bytes across the Mac OS 9 and Mac OS X archive variants; the specific compression method of each
 member is not part of that acceptance test.
+
+Folders are **[Verified]** against DropStuff 7.0.3 (StuffIt Standard 7.0.3) archives of a synthetic file set
+(`TestData/StuffIt703`; Better Compression writes methods 15 and 0, Faster Compression 13 and 0). A folder header is
+followed by the same 36-byte Finder block as a file. Right after it StuffIt writes the folder's end marker: a
+48-byte folder header with no name, first child `$FFFFFFFF` and no Finder block; the folder's first member follows
+the marker, and the folder's last member's next link points back to the marker. The reader walks each list by its
+declared count, so it never reaches the marker, and it bounds a member's forks by its next link only when that link
+points forward. StuffIt X (`.sitx`, signature `StuffIt!`) is not this format and is not recognised (on request
+only).
 
 Method 2 uses the Compress-style LZW stream: codes are least-significant-bit first, begin at 9 bits and grow to 14;
 in block mode, code 256 clears the dictionary and the remainder of its eight-code group is skipped before reading
@@ -352,6 +391,12 @@ compcol's MIT-licensed interoperability data (see `THIRD-PARTY-NOTICES.md`). The
 Vectors use original StuffIt Deluxe 6.5.1 archives from the CC0 test corpus and assert exact data- and resource-fork
 bytes, including randomized blocks. The v5 member layout and per-fork integration are **[Fitted]** against those
 original-application archives.
+
+Open: in the DiskDoubler corpus's StuffIt 6.5.1 archives `sources.ddpro411.ad1.sit` and `ad2.sit`, one method-15
+member each (`testfile.jpg`, 388 → 223 bytes; `testfile.PICT`, 6376 → 2259) fails about 50 bits before the end of its
+stream: the selector model's decoded frequency equals its total. The decoder matches XADMaster's arithmetic decoder
+step for step, and the same members are stored or decode in the other copies, so the cause is not known; the
+archive is reported unreadable.
 
 The legacy v1/v2 reader is implemented. Original-application coverage currently includes a flat version-2 archive;
 version 1, nested-folder metadata, and broader legacy interoperability remain unverified. Archive-level comment
