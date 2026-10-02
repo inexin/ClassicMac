@@ -39,7 +39,7 @@ namespace ClassicMac.App.Views
 
     /// <summary>
     /// A dialog or alert as Mac OS 9's Appearance (Platinum) draws it: the image <see cref="DialogPreview"/> holds,
-    /// drawn by ClassicMac's QuickDraw (docs/formats/resources/windows-dialogs.md §8), shown with a margin and zoomed
+    /// drawn by ClassicMac's QuickDraw (docs/formats/resources/windows-dialogs.md §5.3), shown with a margin and zoomed
     /// without smoothing.
     /// </summary>
     internal sealed class DialogView : Control

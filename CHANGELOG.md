@@ -5,7 +5,7 @@
 - Docs: the format documents are in category folders under `docs/formats/` (`containers/`, `archives/`,
   `disk-images/`, `file-systems/`, `resources/`, `graphics/`, `codecs/`, `output/`), one file per format.
 - Interface previews: dialogs and alerts are drawn as Mac OS 9 with Appearance (Platinum) draws them, frames and
-  controls pixel for pixel; text through the fonts in open files (resources/windows-dialogs.md §8.1).
+  controls pixel for pixel; text through the fonts in open files (resources/windows-dialogs.md §2.4).
 - Icons: Mac OS 9's 8-bit icon masks (`l8mk`, `s8mk`, `h8mk`) in icon suites at 8 bits and more (resources/icon-families.md).
 - Inputs: Mac ROM images (the ROM's resource table, and the New World `Mac OS ROM` file; disk-images/rom.md); `.sea`
   self-extracting archives through their data fork; StuffIt 1.5.1 segment sets.

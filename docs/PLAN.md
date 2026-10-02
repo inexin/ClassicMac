@@ -890,7 +890,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager): all
   14 types load; PlotIconID draws every family member with 0 mismatched pixels at depths 1–32 (2026-10-02).
 - [x] **Real Dialog Manager previews** for `DLOG`/`ALRT`: drawn as Mac OS 9.0 with Appearance (Platinum) draws them,
-  every non-text pixel matching the captures ([windows-dialogs.md §8.1](formats/resources/windows-dialogs.md#81-dialogs-and-alerts); 2026-10-02).
+  every non-text pixel matching the captures ([windows-dialogs.md §2.4](formats/resources/windows-dialogs.md#24-how-mac-os-90-draws-dialogs-and-alerts); 2026-10-02).
 - [x] **8-bit icon masks in icon suites** (Mac OS 9's CopyMask through an 8-bit mask in `IconSuite.Plot`), from a Mac OS 9
   oracle run (2026-10-02).
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
