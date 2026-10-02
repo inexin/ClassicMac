@@ -472,6 +472,14 @@ like ResEdit, read-only at first.
 - **Export:** selected resources, a whole file or a whole volume, through the same code as the CLI; drag and drop out
   of the app.
 - **Later:** editing, in stages (below), starting once `pack` round-trips cleanly.
+- **App icon (built for Windows; packaging later):** the design session's icon (`design/icon/`, the diagonal-stripes
+  monitor). The app carries `Assets/icon/classicmac.ico` (`ApplicationIcon`, `Window.Icon`) and the PNGs it draws: the
+  title bar's hand-drawn 16, 20, 24 and 32 px versions picked by display scaling and drawn 1:1, and the About box's
+  128. Packaging steps, not scripted yet: on macOS copy `classicmac.icns` into the bundle's `Contents/Resources` and set
+  `CFBundleIconFile` to `classicmac`; on Linux install `png/classicmac-<n>.png` as
+  `share/icons/hicolor/<n>x<n>/apps/classicmac.png` (16, 24, 32, 48, 64, 128, 256, 512) and `source/classicmac.svg`
+  as `share/icons/hicolor/scalable/apps/classicmac.svg`, with `Icon=classicmac` in the `.desktop` file. Check the
+  trademark question (six stripes echo Apple's old logo) before a public release.
 
 **Structure:** the app adds nothing format-specific — it sits on the same `ClassicMac.Resources` and `Decoders`
 packages as the CLI. MVVM with plain C# view-models (testable without a UI), one preview control per kind (image, hex,

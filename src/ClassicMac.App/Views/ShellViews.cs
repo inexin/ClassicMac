@@ -48,15 +48,17 @@ namespace ClassicMac.App.Views
                 CanResize = false,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
             };
-            var icon = new Avalonia.Controls.Shapes.Path
+            // The app's icon: the 128 PNG in the compact 64 DIP layout (design/icon/README.md), sharp at 200%.
+            using var iconStream = Avalonia.Platform.AssetLoader.Open(new Uri("avares://ClassicMac/Assets/icon/classicmac-128.png"));
+            var icon = new Image
             {
-                Data = Geometry.Parse("M6,2 H26 V22 H6 Z M10,6 H22 V15 H10 Z M6,22 V29 H26 V22 M17,26 H22"),
-                StrokeThickness = 2,
-                Width = 32,
-                Height = 32,
-                Classes = { "about-icon" },
+                Name = "AppIcon",
+                Source = new Avalonia.Media.Imaging.Bitmap(iconStream),
+                Width = 64,
+                Height = 64,
+                VerticalAlignment = VerticalAlignment.Top,
             };
-            icon.Bind(Avalonia.Controls.Shapes.Shape.StrokeProperty, icon.GetResourceObservable("CmText"));
+            RenderOptions.SetBitmapInterpolationMode(icon, Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
             var link = new Button { Content = about.Repository.ToString(), Classes = { "link" }, Name = "RepositoryLink" };
             link.Click += (_, _) => open(about.Repository);
             var heading = new StackPanel

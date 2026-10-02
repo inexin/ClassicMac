@@ -9,6 +9,7 @@
         x:DataType="vm:MainViewModel"
         Title="{Binding WindowTitle}"
         Width="1200" Height="780" MinWidth="700" MinHeight="450"
+        Icon="/Assets/icon/classicmac.ico"
         DragDrop.AllowDrop="True">
 
   <Window.Resources>
@@ -318,12 +319,6 @@
       <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
       <Setter Property="Margin" Value="-4,0,0,0" />
     </Style>
-    <Style Selector="Path.app-icon">
-      <Setter Property="Width" Value="16" />
-      <Setter Property="Height" Value="16" />
-      <Setter Property="Stroke" Value="{DynamicResource CmText}" />
-      <Setter Property="StrokeThickness" Value="1" />
-    </Style>
 
     <!-- Toolbar (S2): CmBarTool high, a CmBorder line below; 34-high buttons with an 18 px stroke icon over a CmFontMeta
          label, transparent until hovered, 40% opacity when disabled; groups split by 1 x 24 CmBorder lines. -->
@@ -615,8 +610,8 @@
     <Border x:Name="TitleBar" DockPanel.Dock="Top" Classes="titlebar" chrome:WindowDecorationProperties.ElementRole="TitleBar"
             IsVisible="{Binding $parent[Window].ExtendClientAreaToDecorationsHint}">
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <!-- The app's icon: a compact Mac, drawn on whole pixels. -->
-        <Path Classes="app-icon" Data="M3.5,1.5 H12.5 V11.5 H3.5 Z M5.5,3.5 H10.5 V7.5 H5.5 Z M3.5,11.5 V14.5 H12.5 V11.5 M9,13 H11" />
+        <!-- The app's icon: the hand-drawn pixel size for the scaling, drawn 1:1 (AppIconView). -->
+        <views:AppIconView x:Name="TitleIcon" Slot="16" VerticalAlignment="Center" />
         <TextBlock Text="{Binding TitleFile}" IsVisible="{Binding TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
         <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding TitleUnsaved}" />
         <TextBlock Text="—" IsVisible="{Binding TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />

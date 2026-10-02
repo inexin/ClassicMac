@@ -9,6 +9,7 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\icon\classicmac.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
