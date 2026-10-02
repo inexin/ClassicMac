@@ -62,7 +62,8 @@ public class PreviewTests : IDisposable
             ("TEXT", 128, null, text),
             ("styl", 128, null, Styl((0, 20, 1, 18, 0, 0, 0), (6, 4, 0, 10, 0xFFFF, 0, 0))),
             ("vers", 1, null, [1, 0x20, 0x80, 0, 0, 0, .. Pascal, .. Pascal]),
-            ("CODE", 1, null, [0x4E, 0x75])));
+            ("CODE", 1, null, [0, 0, 0, 0, 0x4E, 0x75]),
+            ("DATA", 0, null, [0x4E, 0x75])));
         var pict = new byte[512 + Picture.Length];
         Picture.CopyTo(pict, 512);
         disk.File(HfsBuilder.Root, "Picture", pict, [], type: "PICT", creator: "ttxt");
@@ -119,8 +120,15 @@ public class PreviewTests : IDisposable
         Assert.Equal(PreviewKind.Json, version.Kind);
         Assert.Contains("\"display\": \"1.2\"", version.Text);
 
+        // Code shows its listing as text.
         var code = await Select(model, Resource(file, "CODE", 1));
-        Assert.Equal(PreviewKind.None, code.Kind);
+        Assert.Equal(PreviewKind.Text, code.Kind);
+        Assert.True(code.IsPlainText);
+        Assert.StartsWith("; 'CODE' 1: 68k segment, near header\n", code.Text, StringComparison.Ordinal);
+        Assert.Contains("00000004  4E75                      rts", code.Text, StringComparison.Ordinal);
+
+        var data = await Select(model, Resource(file, "DATA", 0));
+        Assert.Equal(PreviewKind.None, data.Kind);
         Assert.Equal(0, model.SelectedTab); // back to details
     }
 

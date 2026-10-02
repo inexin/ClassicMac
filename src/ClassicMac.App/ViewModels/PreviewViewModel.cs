@@ -251,6 +251,9 @@ namespace ClassicMac.App.ViewModels
                     }).ToList(),
                 };
             }
+            // Code: its listing.
+            if (files.FirstOrDefault(f => f.Extension == ".s") is { } listing)
+                return new PreviewViewModel(PreviewKind.Text, "") { Text = Encoding.UTF8.GetString(listing.Content.Span).TrimEnd('\n') };
             if (files.FirstOrDefault(f => f.Extension == ".txt") is { } text)
                 return new PreviewViewModel(PreviewKind.Text, "") { Text = Encoding.UTF8.GetString(text.Content.Span) };
             if (files.FirstOrDefault(f => f.Extension == ".json") is { } other)
