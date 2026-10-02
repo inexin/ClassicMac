@@ -96,7 +96,7 @@ One file per format, in its category folder. A codec used by more than one forma
 | [mfs.md](file-systems/mfs.md) | MFS volumes | `ClassicMac.Files.Hfs` |
 | [hfs.md](file-systems/hfs.md) | HFS volumes; finding a volume; conservative HFS writing | `ClassicMac.Files.Hfs` |
 | [hfs-plus.md](file-systems/hfs-plus.md) | HFS Plus and HFSX | `ClassicMac.Files.Hfs` |
-| [finder-windows.md](file-systems/finder-windows.md) | Folders' windows and icon positions (`DInfo`, `DXInfo`, `fdLocation`), invisible items, custom icons and how the Finder picks an icon; the viewer's folder previews | `ClassicMac.Files` (`MacFolder`, `HfsReader.ReadFolders`), `ClassicMac.Resources.Decoders.Finder` |
+| [finder-windows.md](file-systems/finder-windows.md) | Folders' windows, views and icon positions (`DInfo`, `DXInfo`, `fdLocation`), how the Finder arranges and draws items and picks their icons and badges; the viewer's folder previews | `ClassicMac.Files` (`MacFolder`, `HfsReader.ReadFolders`), `ClassicMac.Resources.Decoders.Finder` |
 | [mbr.md](file-systems/mbr.md) | DOS partition tables | `ClassicMac.Files.Fat` |
 | [fat.md](file-systems/fat.md) | FAT12/16/32 with long names | `ClassicMac.Files.Fat` |
 | [pc-exchange.md](file-systems/pc-exchange.md) | PC Exchange and File Exchange data on FAT volumes and host folders: `RESOURCE.FRK`, `FINDER.DAT`, name conversion, the extension map | `ClassicMac.Files.Fat`, `ClassicMac.Files.Containers` (`PcExchange`, `ExtensionMap`) |

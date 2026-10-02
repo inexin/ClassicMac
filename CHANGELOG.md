@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Viewer: folders in small icon, large button and small button views preview as the Finder draws them: 16 × 16 icons
+  with names flush left (condensed, then truncated in the middle, past a 167-pixel pane) arranged down 192 × 24
+  columns; Platinum bevel buttons (48 or 28 pixels) with the icon centred by its mask and the name centred below,
+  arranged in 128 × 86 or 128 × 62 rows. Each matches a Mac OS 9.0 Finder screenshot in every icon-area pixel
+  (file-systems/finder-windows.md §2.5, §2.8).
 - Viewer: folder previews follow the Mac OS 9 Finder's own rules (traced in Finder 9.2.2, checked on Mac OS 9.0, where
   a folder-art window now matches the Finder's screenshot pixel for pixel): the window is `frRect`'s content with the
   21-pixel header pane and the scroll bars' place, used only when the folder has been inited (else the Finder's

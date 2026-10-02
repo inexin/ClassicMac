@@ -523,6 +523,198 @@ public class FinderWindowTests
         Assert.Equal(FinderViewKind.LargeIcon, new FinderWindow().View.Kind);
     }
 
+    private static FinderWindow In(FinderViewKind kind, FinderWindow window) => window with { View = new FinderView(kind, 0, 0) };
+
+    private static RgbaColor Grey(int v) => new((byte)v, (byte)v, (byte)v);
+
+    // A fallback whose condensed text is a pixel a character narrower, as the Font Manager's condense.
+    private sealed class CondensingText : ITextFallback
+    {
+        public List<(string Text, TextFallbackStyle Style)> Calls { get; } = [];
+
+        public TextFallbackMask Render(string text, TextFallbackStyle style)
+        {
+            Calls.Add((text, style));
+            int advance = (style.Face & (int)QuickDrawStyle.Condense) != 0 ? 4 : 5, w = text.Length * advance;
+            return new TextFallbackMask(w, 9, 0, 9, Enumerable.Repeat((byte)1, w * 9).ToArray(), w);
+        }
+    }
+
+    [Fact]
+    public void Small_icons_are_16_pixels_with_the_name_flush_left_beside_them()
+    {
+        var window = In(FinderViewKind.SmallIcon, Window(Item("AB", 20, 30)));
+
+        var bitmap = FinderWindowRenderer.Render(window, Blocks());
+        var placement = Assert.Single(FinderWindowRenderer.Place(window, Blocks()));
+
+        Assert.Equal(new MacRect(Top + 20, 30, Top + 36, 46), placement.IconRect);
+        Assert.Equal(Black, bitmap[30, Top + 20]);
+        Assert.Equal(Black, bitmap[45, Top + 35]);
+        Assert.Equal(White, bitmap[30, Top + 36]);
+        Assert.Equal(White, bitmap[46, Top + 30]);
+        // The pen at h + 18 on a baseline 11 below the icon's top: "AB" from 48 to 57, in the 9 rows above it.
+        int baseline = Top + 20 + 11;
+        Assert.Equal(Black, bitmap[48, baseline - 1]);
+        Assert.Equal(Black, bitmap[57, baseline - 9]);
+        Assert.Equal(White, bitmap[47, baseline - 1]);
+        Assert.Equal(White, bitmap[58, baseline - 1]);
+        Assert.Equal(White, bitmap[48, baseline]);
+    }
+
+    [Fact]
+    public void A_small_icon_s_name_too_wide_for_its_pane_is_condensed()
+    {
+        var text = new CondensingText();
+        var name = new string('x', 34);   // 170 plain, 136 condensed; the pane takes 165
+
+        FinderWindowRenderer.Render(In(FinderViewKind.SmallIcon, Window(Item(name, 20, 30))), new FinderWindowOptions { TextFallback = text });
+
+        Assert.Contains(text.Calls, c => c.Text == name && c.Style.Face == (int)QuickDrawStyle.Condense);
+        Assert.DoesNotContain(text.Calls, c => c.Text.Contains('…'));
+    }
+
+    [Fact]
+    public void A_small_icon_s_name_too_wide_even_condensed_is_truncated_in_the_middle()
+    {
+        var text = new BlockText();
+        var name = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh";   // 34 characters, 170 pixels either way
+
+        FinderWindowRenderer.Render(In(FinderViewKind.SmallIcon, Window(Item(name, 20, 30))), new FinderWindowOptions { TextFallback = text });
+
+        var drawn = text.Calls.Last(c => c.Text.Contains('…')).Text;
+        Assert.Equal("ABCDEFGHIJKLMNOP…STUVWXYZabcdefgh", drawn);
+        Assert.True(drawn.Length * 5 <= FinderWindowRenderer.SmallNameWidth - 2);
+    }
+
+    [Fact]
+    public void Small_icons_are_arranged_down_columns_from_the_grid_s_origin()
+    {
+        var window = In(FinderViewKind.SmallIcon, new FinderWindow
+        {
+            Bounds = new MacRect(0, 0, 84, 340), Flags = FinderWindowItem.HasBeenInitedFlag,   // 48 visible: two rows
+            Items = [Unplaced("a"), Unplaced("b"), Unplaced("c")],
+        });
+
+        Assert.Equal([new MacPoint(0, 2), new MacPoint(24, 2), new MacPoint(0, 194)], FinderWindowRenderer.Place(window, Blocks()).Select(p => p.Location));
+    }
+
+    [Fact]
+    public void A_window_lower_than_a_small_icon_row_takes_one_item_a_column()
+    {
+        var window = In(FinderViewKind.SmallIcon, new FinderWindow
+        {
+            Bounds = new MacRect(0, 0, 50, 340), Flags = FinderWindowItem.HasBeenInitedFlag,   // 14 visible
+            Items = [Unplaced("a"), Unplaced("b")],
+        });
+
+        Assert.Equal([new MacPoint(0, 2), new MacPoint(0, 194)], FinderWindowRenderer.Place(window, Blocks()).Select(p => p.Location));
+    }
+
+    [Fact]
+    public void Small_icons_are_arranged_clear_of_all_the_placed_items_together()
+    {
+        // Placed at (10, 200) and (150, 400): together they cover v 10..166, so column 194 is free only from v 168,
+        // although no item is near (48, 194).
+        var window = In(FinderViewKind.SmallIcon, new FinderWindow
+        {
+            Bounds = new MacRect(0, 0, 400, 340), Flags = FinderWindowItem.HasBeenInitedFlag,
+            Items = [Item("A", 10, 200), Item("B", 150, 400), Unplaced("a")],
+        });
+
+        Assert.Equal(new MacPoint(168, 194), FinderWindowRenderer.Place(window, Blocks())[2].Location);
+    }
+
+    [Fact]
+    public void Large_buttons_are_bevelled_48_pixel_buttons_with_the_icon_centred_and_the_name_below()
+    {
+        var window = In(FinderViewKind.Button, Window(Item("AB", 20, 30)));
+
+        var bitmap = FinderWindowRenderer.Render(window, Blocks());
+        var placement = Assert.Single(FinderWindowRenderer.Place(window, Blocks()));
+
+        // The button from (41, 22) to (88, 69): three rings, light at the top and left, dark at the bottom and right.
+        Assert.Equal((Grey(0x66), Grey(0x55), Grey(0x55), Grey(0x33)), (bitmap[22, 41], bitmap[69, 41], bitmap[22, 88], bitmap[69, 88]));
+        Assert.Equal((Grey(0x66), Grey(0x33), Grey(0x66), Grey(0x33)), (bitmap[40, 41], bitmap[40, 88], bitmap[22, 60], bitmap[69, 60]));
+        Assert.Equal((Grey(0xCC), Grey(0xAA), Grey(0xAA), Grey(0x77)), (bitmap[23, 42], bitmap[68, 42], bitmap[23, 87], bitmap[68, 87]));
+        Assert.Equal((Grey(0xFF), Grey(0xCC), Grey(0xCC), Grey(0x99)), (bitmap[24, 43], bitmap[67, 43], bitmap[24, 86], bitmap[67, 86]));
+        Assert.Equal(Grey(0xCC), bitmap[26, 46]);
+        Assert.Equal(White, bitmap[21, 60]);
+        Assert.Equal(White, bitmap[70, 60]);
+        // The icon 8 down in it, at the item's h.
+        Assert.Equal(new MacRect(Top + 28, 30, Top + 60, 62), placement.IconRect);
+        Assert.Equal(Black, bitmap[30, Top + 28]);
+        Assert.Equal(Grey(0xCC), bitmap[29, Top + 28]);
+        // The name centred on h + 16, on a baseline 60 below the item's top: "AB" from 41 to 50.
+        int baseline = Top + 20 + 60;
+        Assert.Equal(Black, bitmap[41, baseline - 1]);
+        Assert.Equal(Black, bitmap[50, baseline - 9]);
+        Assert.Equal(White, bitmap[40, baseline - 1]);
+        Assert.Equal(White, bitmap[51, baseline - 1]);
+    }
+
+    [Theory]
+    [InlineData(FinderViewKind.Button)]
+    [InlineData(FinderViewKind.SmallButton)]
+    public void A_button_s_icon_is_centred_by_its_mask(FinderViewKind kind)
+    {
+        // An ICN# whose image and mask leave the top 4 rows empty: centred, its 28 rows start 2 down.
+        var lower = SolidIcon();
+        Array.Clear(lower, 0, 16);
+        Array.Clear(lower, 128, 16);
+        var icon = IconSuite.FromResources((type, _) => type.ToString() == "ICN#" ? lower : null, 1);
+        var window = In(kind, Window(Item("", 20, 30, icon)));
+
+        var bitmap = FinderWindowRenderer.Render(window);
+        var rect = Assert.Single(FinderWindowRenderer.Place(window)).IconRect;
+
+        int size = rect.Height, top = rect.Top + size * 2 / 32, x = rect.Left + size / 2;
+        Assert.Equal(Black, bitmap[x, top]);
+        Assert.Equal(Grey(0xCC), bitmap[x, top - 1]);
+        Assert.Equal(Grey(0xCC), bitmap[x, rect.Bottom - 1]);
+    }
+
+    [Fact]
+    public void Small_buttons_are_28_pixels_with_a_16_pixel_icon()
+    {
+        var window = In(FinderViewKind.SmallButton, Window(Item("AB", 20, 30)));
+
+        var bitmap = FinderWindowRenderer.Render(window, Blocks());
+        var placement = Assert.Single(FinderWindowRenderer.Place(window, Blocks()));
+
+        // The button from (41, 32) to (68, 59); the icon at (47, 38).
+        Assert.Equal((Grey(0x66), Grey(0x33)), (bitmap[32, 41], bitmap[59, 68]));
+        Assert.Equal(White, bitmap[31, 50]);
+        Assert.Equal(White, bitmap[60, 50]);
+        Assert.Equal(new MacRect(Top + 26, 38, Top + 42, 54), placement.IconRect);
+        Assert.Equal(Black, bitmap[38, Top + 26]);
+        Assert.Equal(Black, bitmap[53, Top + 41]);
+        Assert.Equal(Grey(0xCC), bitmap[37, Top + 26]);
+        // The name on a baseline 40 below the item's top.
+        Assert.Equal(Black, bitmap[41, Top + 20 + 40 - 1]);
+        Assert.Equal(White, bitmap[41, Top + 20 + 40]);
+    }
+
+    [Theory]
+    [InlineData(FinderViewKind.Button, 86)]
+    [InlineData(FinderViewKind.SmallButton, 62)]
+    public void Buttons_are_arranged_in_rows_of_their_cells(FinderViewKind kind, int height)
+    {
+        var window = In(kind, Window400(Item("", 300, 300), Unplaced("a"), Unplaced("b"), Unplaced("c")));
+
+        Assert.Equal([new MacPoint((short)height, 129), new MacPoint((short)height, 257), new MacPoint((short)(2 * height), 129)],
+            FinderWindowRenderer.Place(window, Blocks()).Skip(1).Select(p => p.Location));
+    }
+
+    [Fact]
+    public void A_list_view_is_drawn_as_large_icons()
+    {
+        var items = new[] { Item("AB", 20, 30), Unplaced("c") };
+
+        Assert.Equal(FinderWindowRenderer.Render(Window(items), Blocks()).Pixels,
+            FinderWindowRenderer.Render(In(FinderViewKind.List, Window(items)), Blocks()).Pixels);
+    }
+
     [Fact]
     public void Arguments_must_be_given()
     {

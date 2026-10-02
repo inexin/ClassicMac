@@ -4,13 +4,13 @@ What a volume records about how the Finder shows a folder: each folder's window 
 view), each item's icon position, the flags that hide an item or give it a custom icon, badge or colour label, and
 where the Finder finds the icon it draws. Mac users arranged icons with care, and some made "folder art": empty files
 with custom icons, set side by side to make a picture. ClassicMac reads these fields from HFS and HFS Plus catalogs and
-draws a folder as the Finder's large-icon view of its window, for the viewer's folder previews.
+draws a folder as the Finder's icon or button view of its window, for the viewer's folder previews.
 
 | | |
 | --- | --- |
 | Identified by | The Finder fields of catalog folder and file records ([hfs.md §1.9](hfs.md#19-catalog-records), [hfs-plus.md](hfs-plus.md)) |
 | ClassicMac | Reads; `ClassicMac.Files` (`MacFolder`, `FolderFinderInfo`, `HfsReader.ReadFolders`, `MacFile.IsLocked`), `ClassicMac.Resources.Decoders.Finder` (`FinderIconResolver`, `FinderWindowRenderer`, `FinderView`, `FinderPreferences`); the viewer's folder preview |
-| Verified against | The Mac OS 9.0 Finder: a synthetic folder-art volume's window, pixel for pixel in the icon area (§7) |
+| Verified against | The Mac OS 9.0 Finder: synthetic volumes' windows in large icon, small icon, large and small button views, scrolled and default, pixel for pixel in the icon area (§7) |
 | Sources | *Inside Macintosh: Macintosh Toolbox Essentials* (Finder Interface), *Inside Macintosh: More Macintosh Toolbox* (Icon Utilities), Universal Interfaces `Finder.h` and `Icons.h`; the Mac OS 9.2.2 Finder and Icon Services as traced, checked on Mac OS 9.0 |
 
 Contents
@@ -218,9 +218,9 @@ badge: when the extended flags have `kExtendedFlagHasCustomBadge` and not `kExte
 `'badg'` (§1.6), whose icon is the family of its ID in the same fork, else the icon registered for its type and
 creator.
 
-### 2.5 Arranging items without a position (large icons)
+### 2.5 Arranging items without a position
 
-[Code: Finder 9.2.2; Verified: Mac OS 9.0 Finder, both arranged items where §7's fixture predicts]
+Large icons [Code: Finder 9.2.2; Verified: Mac OS 9.0 Finder, both arranged items where §7's fixture predicts]:
 
 1. The grid's cell is 128 wide and 64 high; its origin is (v 0, h 1).
 2. Every placed item occupies its icon rectangle and its label rectangle (§2.7), each widened left and right by the
@@ -233,7 +233,14 @@ creator.
 5. An arranged item occupies its rectangles too, for the next. Snapping to the grid (Clean Up) rounds to the nearest
    point, halves away from zero.
 
-Other views use other cells (§4).
+Buttons do the same with cells 128 × 86 (large) and 128 × 62 (small), an item occupying its button and its name
+(§2.8) [Code: Finder 9.2.2; Verified: Mac OS 9.0 Finder, an arranged item in each].
+
+Small icons use cells 192 wide and 24 high and scan down columns: v steps by 24 while the cell fits the visible height,
+then h steps by 192 and v returns to the start [Code: Finder 9.2.2]. The grid's origin is (v 0, h 2), and the scan
+starts at the first grid point at or past (visible top, visible left + 16), keeping clear of the union of all the
+placed items, not only of each [Fitted: Mac OS 9.0 Finder, two arranged items placed at (v 0, h 386) and (v 24, h 386)
+beside a column of placed names, where each item's rectangles alone leave room in the column at h 194].
 
 ### 2.6 The view
 
@@ -247,7 +254,7 @@ From `frView`, `frScript` and `frOpenChain` [Code: Finder 9.2.2; Verified: Mac O
    buttons, large by default. The Finder writes $50 for small icons, $68 for small buttons, $20 for large buttons.
 4. `frView` bits 0–2 are the arrangement: 0 name, 4 kind, 5 label, 6 position, 7 none.
 
-### 2.7 Drawing an item (large icons)
+### 2.7 Drawing an item: large icons
 
 [Code: Finder 9.2.2; Verified: Mac OS 9.0 Finder, 18 labels of 18]
 
@@ -261,6 +268,28 @@ From `frView`, `frScript` and `frOpenChain` [Code: Finder 9.2.2; Verified: Mac O
    `grayishTextOr`; a selected item's label rectangle is painted black and the name drawn `srcBic`, white on black.
 4. An alias's name is in italics [Doc: Macintosh Toolbox Essentials].
 
+### 2.8 Drawing an item: small icons and buttons
+
+[Verified: Mac OS 9.0 Finder, unless tagged]
+
+| View | Button | Icon | Pen (h, baseline) |
+| --- | --- | --- | --- |
+| Small icon | None | 16 × 16 at (v, h) | (h + 18, v + 11), flush left |
+| Large button | 48 × 48 at (v, h − 8) | 32 × 32 at (v + 8, h) | (h + 16 + ((−tw) >> 1), v + 60), centred |
+| Small button | 28 × 28 at (v, h + 2) | 16 × 16 at (v + 6, h + 8) | (h + 16 + ((−tw) >> 1), v + 40), centred |
+
+(v, h) is the item's position. A small icon's name rectangle starts at h + 17 and v + 1.
+
+1. A small icon's name has a pane 167 wide [Fitted: from h + 17 to h + 184]. When the name and 2 pixels are wider, it
+   is drawn condensed; when that is still too wide, `TruncString(165, smTruncMiddle)` shortens it [Code: Finder 9.2.2].
+   "WWWWWWWWWWWWWWWW" (160 pixels) stays plain; "ThirtyOneCharactersWithoutSpace" (168) is condensed to 137.
+2. Buttons' names are never truncated.
+3. A button is the Appearance Manager's bevel (`ApplyThemeBackground` 3 in the Finder): a $CCCC face in three rings,
+   each lighter at the top and left and darker at the bottom and right, its top-right and bottom-left corners between:
+   $6666, $3333 and $5555 outside, then $CCCC, $7777, $AAAA, then $FFFF, $9999, $CCCC.
+4. A button's icon is centred in its rectangle by its mask (`kAlignAbsoluteCenter`): a shaped icon sits where its
+   mask's bounds centre [Fitted: Mac OS 9.0 Finder, an arrow icon a pixel higher than plotted unaligned].
+
 ## 3. Writing
 
 None.
@@ -271,8 +300,6 @@ None.
   System 7, desktop items are in the invisible `Desktop Folder` of each volume. [Doc: Macintosh Toolbox Essentials]
 - **Mac OS 8 and later** let the user choose the views font and the grid spacing (§1.5) and add the header pane.
 - **Mac OS 8.5 and later** take an `'icns'` −16455 as a custom icon (§2.3).
-- **Other views' cells**: large buttons 128 × 86, small buttons 128 × 62, small icons rows 24 high
-  [Verified: Mac OS 9.0 Finder].
 
 ## 5. ClassicMac
 
@@ -285,7 +312,7 @@ None.
 - Other containers (archives, FAT, ISO 9660) record no folder windows: their folders preview as a default window with
   every item arranged (§2.5). Folders that only files' paths name are items too. [ClassicMac]
 - `FinderView.Read` decodes §2.6; Finder Preferences' standard views are not read, so a folder without its own options
-  is large. [ClassicMac]
+  is large icons or large buttons. [ClassicMac]
 
 ### 5.2 Layout
 
@@ -293,8 +320,12 @@ None.
   (a white top and left edge, $DDDD grey, a $AAAA bottom and right edge, a black line) with "n items" centred on a
   baseline 14 down, in the views font; the free space is not shown. The scroll bars are their 15-pixel place: a black
   edge and an empty $EEEE trough, no arrows, thumb or grow box. [ClassicMac]
-- Every view is drawn as large icons; the preview's caption names the view the Finder would use ("list view, shown as
-  icons"). [ClassicMac]
+- Large and small icons and buttons are drawn as §2.7 and §2.8 say; a list view is drawn as large icons, and the
+  preview's caption says so ("list view, shown as icons"). [ClassicMac]
+- A button's and a small icon's name rectangle, for arranging, runs from the ascent above the baseline to 3 below it,
+  2 pixels either side of the text. Badges are plotted unaligned in a button's icon rectangle. [ClassicMac]
+- Truncation keeps the most characters about an ellipsis, the first half's extra one first; it was not compared with
+  the Script Manager's `TruncText`. [ClassicMac]
 - A window with no recorded rectangle grows taller to show all its arranged items. A window narrower than one cell takes
   one item a row. [ClassicMac]
 - Items are drawn subfolders first, by name, then files in the order the volume lists them; a later item covers an
@@ -335,21 +366,26 @@ None of its own. `ReadFolders` reports what `Read` reports ([hfs.md §6](hfs.md#
 - `tests/ClassicMac.Resources.Decoders.Tests/FinderWindowTests.cs`: the content rectangle, header and scroll bars, the
   default window, positions (§2.2's every branch), the root's own items, arranging (§2.5, with an equivalent of the
   fixture below: the two items land at (v 320, h 129) and (v 320, h 257)), label geometry, label tints, badges, the
-  view decode. `FinderIconResolverTests.cs`: each step of §2.3, the mapping table and its fallback, exact member
+  view decode; small icons (geometry, condensing, truncation, columns, the union) and buttons (bevel, icon centring,
+  names, rows). `FinderIconResolverTests.cs`: each step of §2.3, the mapping table and its fallback, exact member
   sizes, badges, `'badg'`, label colours. `FinderPreferencesTests.cs`: §1.5.
 - `tests/ClassicMac.App.Tests/FolderPreviewTests.cs`: folders, a volume's root, a disk inside an archive and an
   archive's folders in the viewer, with icons, badges, label colours, the views font and the caption;
   `A_real_volume_s_folder_renders` draws a folder of the volume `CLASSICMAC_FOLDER_VOLUME` names;
   `A_folder_matches_the_Finder_s_screenshot` compares a folder with a screenshot in the folder
   `CLASSICMAC_FINDER_GOLDEN` names (neither committed).
-- A synthetic HFS volume of folder art (custom icons, long names, a label 2 and a label 6 item, a locked file, an
-  alias, stationery, generic documents and applications, a custom-icon folder, two items without a position), after a
-  Mac OS 9.0 Finder session, drawn with Mac OS 9.0's System, System Resources and Geneva suitcase: its 679 × 560 window
-  matches the Finder's screenshot in all 347,936 pixels of the icon area.
+- Two synthetic HFS volumes, after Mac OS 9.0 Finder sessions, drawn with Mac OS 9.0's System, System Resources and
+  Geneva suitcase and compared with the Finder's screenshots in every pixel of the icon area, all matching:
+  folder art in large icons (custom icons, long names, label 2 and label 6 items, a locked file, an alias, stationery,
+  generic documents and applications, a custom-icon folder, two items arranged; 347,936 pixels); small icons (16 items,
+  names to 31 characters, two arranged; 413,253); large buttons and small buttons (5 items, one arranged; 72,800 each);
+  a window scrolled to (60, 100) (72,800); a folder without `kHasBeenInited` in the default window (70,798).
 
 ## 8. Not covered
 
-- Small icon, button and list views (drawn as large icons, §5.2); the Finder Preferences' standard views.
+- List views (drawn as large icons, §5.2); the Finder Preferences' standard views.
+- Why small icons keep clear of all the placed items together, and the arranging rules of the other views beyond the
+  cases §7 checks.
 - The desktop database (`Desktop DB`, `Desktop DF`): its icons, comments and application list; bundles stand in.
 - Package folders' icons (`kHasBundle` on a folder); a volume's own icon (`hdsk`) is not drawn, as no window shows it.
 - Resolving aliases to their originals; the mounted and shared badges; a custom badge's window badge.

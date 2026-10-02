@@ -271,13 +271,32 @@ public class FolderPreviewTests : IDisposable
     }
 
     [Fact]
-    public async Task A_view_other_than_large_icons_is_named_in_the_caption()
+    public async Task A_list_view_is_named_in_the_caption()
     {
         var disk = Disk(more: (d, art) => d.File(d.Folder(HfsBuilder.Root, "Listed", Window with { View = 0x0300 }), "Item", [], []));
 
         var image = await Image(disk, "Listed");
 
         Assert.Equal("1 item; list view, shown as icons", image.Caption);
+    }
+
+    [Fact]
+    public async Task Button_and_small_icon_views_are_drawn_as_they_are()
+    {
+        var disk = Disk(more: (d, art) =>
+        {
+            d.File(d.Folder(HfsBuilder.Root, "Buttons", Window with { Script = 0x20 }), "Item", [], [], info: Info("TEXT", "QQQQ", 20, 30));
+            d.File(d.Folder(HfsBuilder.Root, "Small", Window with { View = 0x0147, Script = 0x50 }), "Item", [], [], info: Info("TEXT", "QQQQ", 20, 30));
+        });
+
+        var buttons = await Image(disk, "Buttons");
+        var small = await Image(disk, "Small");
+
+        Assert.Equal("1 item", buttons.Caption);
+        Assert.Equal("1 item", small.Caption);
+        // The button's bevel from (v 20, h 22) less the scroll (10, 5): its top-left corner.
+        Assert.Equal(new RgbaColor(0x66, 0x66, 0x66), Decode(buttons)[17, Top + 10]);
+        Assert.Equal(White, Decode(small)[17, Top + 10]);
     }
 
     [Fact]
@@ -441,6 +460,13 @@ public class FolderPreviewTests : IDisposable
 
         using var screen = SkiaSharp.SKBitmap.Decode(screenshot);
         var bounds = folderInfo.WindowBounds;
+        // A window opened at the default size records no rectangle: CLASSICMAC_FINDER_GOLDEN_ORIGIN gives its content's
+        // top-left corner on the screen, as "left,top".
+        if (Environment.GetEnvironmentVariable("CLASSICMAC_FINDER_GOLDEN_ORIGIN") is { Length: > 0 } origin)
+        {
+            var corner = origin.Split(',').Select(n => short.Parse(n, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+            bounds = new MacRect(corner[1], corner[0], (short)(corner[1] + drawn.Height), (short)(corner[0] + drawn.Width));
+        }
         Assert.Equal((bounds.Width, bounds.Height), (drawn.Width, drawn.Height));
         var difference = new RgbaBitmap(drawn.Width, drawn.Height);
         int compared = 0, matched = 0;

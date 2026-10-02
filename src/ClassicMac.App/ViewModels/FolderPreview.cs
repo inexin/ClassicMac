@@ -53,8 +53,8 @@ namespace ClassicMac.App.ViewModels
             };
             var bitmap = FinderWindowRenderer.Render(window, finderOptions);
             int count = FinderWindowRenderer.Place(window, finderOptions).Count;
-            // Views other than large icons are drawn as large icons; the caption says which the Finder would use.
-            var view = window.View.Kind == FinderViewKind.LargeIcon ? "" : $"; {window.View.Name}, shown as icons";
+            // A list view is drawn as large icons; the caption says so.
+            var view = window.View.Kind == FinderViewKind.List ? $"; {window.View.Name}, shown as icons" : "";
             var caption = string.Create(CultureInfo.InvariantCulture, $"{count} item{(count == 1 ? "" : "s")}{view}");
             return new PreviewImage(PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height, caption);
         }
