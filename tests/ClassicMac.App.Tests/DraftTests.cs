@@ -13,6 +13,7 @@ public sealed partial class EditTests
     {
         var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 128);
+        await model.PreviewTask;                                            // its preview done, so only the refusal could change it
         var form = Assert.IsType<StringForm>(model.Form);
         var details = model.Details;
         Assert.False(model.HasDraft);
