@@ -17,8 +17,9 @@ namespace ClassicMac.Code.Disassembly;
 /// branches, CR and floating point), the operating-environment and virtual-environment operations drivers use (cache,
 /// TLB, segment registers, MSR, time base, synchronisation) and AltiVec. Extended mnemonics are used where they apply
 /// (<c>mflr</c>, <c>li</c>, <c>mr</c>, <c>subi</c>, <c>cmpwi</c>, <c>nop</c>, <c>blr</c>, <c>beq+</c> ...). POWER-only
-/// and 601-only operations, 64-bit operations, undefined opcodes and words with reserved bits set decode as
-/// <c>.long</c>.
+/// and 601-only operations, 64-bit operations, undefined opcodes, words with reserved bits set and the forms the PEM
+/// calls invalid (an update with rA = 0, mftb of another TBR ...) decode as <c>.long</c>
+/// (docs/formats/output/disassembly.md §2.6).
 /// </summary>
 public static class PpcDisassembler
 {
@@ -119,17 +120,16 @@ public static class PpcDisassembler
         var operands = new List<PpcOperand>();
         string mnemonic;
         bool always = (bo & 0x14) == 0x14;
-        if (always)
+        if (always && primary != 16 && bo == 20 && bi == 0)
+            mnemonic = "b" + suffix;   // blr, bctr
+        else if (always || (bo & 0x10) != 0 && bi != 0)
         {
-            // BO = 1z1zz: branch always. bclr/bcctr are blr/bctr; a bc stays bc BO,BI (resource_dasm's choice: b is
-            // the I-form).
-            if (primary == 16)
-            {
-                mnemonic = "bc" + (link ? "l" : "") + (absolute ? "a" : "");
-                operands.Add(Imm(bo));
-                operands.Add(Imm(bi));
-            }
-            else mnemonic = "b" + suffix;
+            // BO = 1z1zz (branch always) and the CTR-only BOs 1z00y and 1z01y ignore BI. Where BI is not 0, or (branch
+            // always) BO is not 20, the extended mnemonic would lose it: the raw form keeps BO and BI, so the text
+            // gives the word back. A branch-always bc is always raw (resource_dasm's choice: b is the I-form).
+            mnemonic = "bc" + suffix;
+            operands.Add(Imm(bo));
+            operands.Add(Imm(bi));
         }
         else
         {
@@ -202,6 +202,8 @@ public static class PpcDisassembler
             case >= 32 and <= 55:
             {
                 int primary = (int)(w >> 26);
+                if (primary != 47 && (primary & 1) != 0 && !ValidUpdate(a, d, IntegerLoad(primary)))
+                    return null;
                 var data = primary >= 48 ? F(d) : R(d);
                 return Op(LoadStoreNames[primary - 32], data, Disp(Simm(w), a));
             }
@@ -210,6 +212,13 @@ public static class PpcDisassembler
             default: return null;   // 0-2, 5, 6, 9 (dozi), 22 (rlmi), 30 and 58/62 (64-bit), 56, 57, 60, 61
         }
     }
+
+    // An update form with rA = 0, or an integer load with update with rA = rD, is invalid [Doc: PEM, "lwzu" ...
+    // "stfdux"].
+    private static bool ValidUpdate(int a, int d, bool integerLoad) => a != 0 && !(integerLoad && a == d);
+
+    // lwzu, lbzu, lhzu, lhau (primaries 33, 35, 41, 43).
+    private static bool IntegerLoad(int primary) => primary is 33 or 35 or 41 or 43;
 
     private static readonly string[] LoadStoreNames =
     [
@@ -344,7 +353,9 @@ public static class PpcDisassembler
         if (IndexedLoadsAndStores.TryGetValue(xo, out var ls))
         {
             var data = ls.Form switch { Form.Float or Form.FloatUpdate => F(d), Form.Vector => V(d), _ => R(d) };
-            var baseRegister = ls.Form is Form.Update or Form.FloatUpdate ? R(a) : RA0(a);
+            bool update = ls.Form is Form.Update or Form.FloatUpdate;
+            if (update && !ValidUpdate(a, d, ls.Form == Form.Update && ls.Name[0] == 'l')) return null;
+            var baseRegister = update ? R(a) : RA0(a);
             return Op(ls.Name, data, baseRegister, R(b));
         }
         if (CacheOps.TryGetValue(xo, out var cache)) return d != 0 ? null : Op(cache, RA0(a), R(b));
@@ -370,20 +381,27 @@ public static class PpcDisassembler
                 return spr switch
                 {
                     1 => Op("mfxer", R(d)), 8 => Op("mflr", R(d)), 9 => Op("mfctr", R(d)),
+                    // TBL and TBU are written with mtspr, read with mftb [Doc: PEM, "mfspr"]
+                    284 or 285 => Op("mfspr", R(d), Imm(spr)),
                     _ => Op("mfspr", R(d), Spr(spr)),
                 };
             case 467:
                 return spr switch
                 {
                     1 => Op("mtxer", R(d)), 8 => Op("mtlr", R(d)), 9 => Op("mtctr", R(d)),
+                    287 => Op("mtspr", Imm(spr), R(d)),   // PVR is read only [Doc: PEM, "mtspr"]
                     _ => Op("mtspr", Spr(spr), R(d)),
                 };
-            case 371: return spr switch { 268 => Op("mftb", R(d)), 269 => Op("mftbu", R(d)), _ => Op("mftb", R(d), Imm(spr)) };
+            // Any TBR but TBL (268) and TBU (269) makes the form invalid [Doc: PEM, "mftb"].
+            case 371: return spr switch { 268 => Op("mftb", R(d)), 269 => Op("mftbu", R(d)), _ => null };
             case 595: return (w & 0x0010F800) != 0 ? null : Op("mfsr", R(d), Imm(a & 15));
             case 210: return (w & 0x0010F800) != 0 ? null : Op("mtsr", Imm(a & 15), R(d));
             case 659: return a != 0 ? null : Op("mfsrin", R(d), R(b));
             case 242: return a != 0 ? null : Op("mtsrin", R(d), R(b));
             case 306: return (w & 0x03FF0000) != 0 ? null : Op("tlbie", R(b));
+            // The 603's software table walk [Doc: PEM, "tlbld", "tlbli" (603e)]: rD and rA reserved.
+            case 978: return (w & 0x03FF0000) != 0 ? null : Op("tlbld", R(b));
+            case 1010: return (w & 0x03FF0000) != 0 ? null : Op("tlbli", R(b));
             case 370: return w == 0x7C0002E4 ? Op("tlbia") : null;
             case 566: return w == 0x7C00046C ? Op("tlbsync") : null;
             case 598: return w == 0x7C0004AC ? Op("sync") : null;
@@ -458,7 +476,8 @@ public static class PpcDisassembler
             case 38 or 70:
                 return (w & 0x001FF800) != 0 ? null : Op((xo == 38 ? "mtfsb1" : "mtfsb0") + dot, Imm(d));
             case 64: return (w & 0x0063F801) != 0 ? null : Op("mcrfs", Cr(CrfD(w)), Cr(a >> 2));
-            case 134: return (w & 0x007F0800) != 0 ? null : Op("mtfsfi" + dot, Cr(CrfD(w)), Hex((w >> 12) & 15));
+            // crfD here numbers an FPSCR field, so it prints as a number, not cr7 [Doc: PEM, "mtfsfi"].
+            case 134: return (w & 0x007F0800) != 0 ? null : Op("mtfsfi" + dot, Imm(CrfD(w)), Hex((w >> 12) & 15));
             case 583: return (w & 0x001FF800) != 0 ? null : Op("mffs" + dot, F(d));
             case 711: return (w & 0x02010000) != 0 ? null : Op("mtfsf" + dot, Hex((w >> 17) & 0xFF), F(b));
         }
@@ -520,6 +539,9 @@ public static class PpcDisassembler
         [838] = "vcmpgtsh", [902] = "vcmpgtsw", [966] = "vcmpbfp",
     };
 
+    private static int SplatReserved(string name) =>
+        name switch { "vspltb" => 0x10, "vsplth" => 0x18, "vspltw" => 0x1C, _ => 0 };
+
     private static (string, PpcOperand[])? AltiVec(uint w)
     {
         int d = D(w), a = A(w), b = B(w), c = C(w);
@@ -548,7 +570,8 @@ public static class PpcDisassembler
         {
             VectorForm.DAB => Op(vx.Name, V(d), V(a), V(b)),
             VectorForm.DB => a != 0 ? null : Op(vx.Name, V(d), V(b)),
-            VectorForm.DBUimm => Op(vx.Name, V(d), V(b), Imm(a)),
+            // vspltb, vsplth and vspltw take a 4-, 3- and 2-bit UIMM; the bits above it are reserved.
+            VectorForm.DBUimm => (a & SplatReserved(vx.Name)) != 0 ? null : Op(vx.Name, V(d), V(b), Imm(a)),
             VectorForm.DSimm => b != 0 ? null : Op(vx.Name, V(d), Imm((a ^ 0x10) - 0x10)),
             VectorForm.D => a != 0 || b != 0 ? null : Op(vx.Name, V(d)),
             _ => d != 0 || a != 0 ? null : Op(vx.Name, V(b)),

@@ -240,6 +240,26 @@ make `jsr`/`jmp (xxx).l` a call into the segment.
    [Doc: Mac OS Runtime Architectures, "Cross-TOC glue"]; the import is the one whose relocation fills the TOC slot at
    TOC base + N. A slot no import fills is written `?slot s:0xoff`.
 5. A `lwz` from `d(r2)` is annotated with what the slot at TOC base + d holds.
+6. Each word decodes by the field layouts of the PEM and the AltiVec PEM, with the extended mnemonics of the PEM's
+   appendix F where they apply (`mflr`, `li`, `subi`, `slwi`, `beq+`, `blr` …) [Doc: PEM; AltiVec PEM]. A word is
+   `.long 0x…` when it is not a 32-bit PowerPC or AltiVec instruction or the PEM calls its form invalid [Doc: PEM,
+   each instruction's page]:
+   - a reserved field or bit is set, bit 31 included where there is no Rc; the bits of vspltb's, vsplth's and
+     vspltw's UIMM above its 4, 3 and 2 bits;
+   - a load or store with update with rA = 0, or an integer load with update (`lwzu`, `lbzu`, `lhzu`, `lhau` and
+     their indexed forms) with rA = rD;
+   - `mftb` with a TBR other than 268 (TBL) or 269 (TBU);
+   - `bcctr` with BO bit 2 clear (it would decrement CTR);
+   - 64-bit, POWER-only and 601-only operations, and later extensions (`mtocrf`, `lwsync`, L = 1 compares, BH).
+7. A branch is written raw when its extended mnemonic would lose a field: `bc BO,BI,target`, `bclr BO,BI`,
+   `bcctr BO,BI` when BO ignores BI (branch always, or CTR only) and BI is not 0, or a branch-always `bclr`/`bcctr`
+   has a BO other than 20. A branch-always `bc` is always raw; `b` is the I-form. [ClassicMac]
+8. An SPR prints by name in the direction the PEM gives it: `mfspr` of TBL and TBU (284, 285, written with `mtspr`
+   and read with `mftb`) and `mtspr` of PVR (287, read only) print the number [Doc: PEM, "mfspr", "mtspr"]. The 603
+   and 750 implementation SPRs (HID0 1008, L2CR 1017 …) print their number: the same number names other registers
+   on other processors. [ClassicMac]
+9. `mtfsfi`'s first operand is an FPSCR field, printed as a number (`mtfsfi 7,0x5`) [Doc: PEM, "mtfsfi"]. The 603's
+   `tlbld` and `tlbli` decode [Doc: PEM, "tlbld", "tlbli"].
 
 ### 2.7 68k instructions
 
@@ -371,9 +391,11 @@ documents). These are its own and the decoders':
   each code-resource form, `'CODE'` 0, fragments with glue and TOC slots, a fat resource, a CFM-68K fragment, the
   bootstrap entry, Retro68 and CodeWarrior models.
 - `M68kDisassemblerTests`, `M68kMmuTests`, `PpcDisassemblerTests`, `PpcDisassemblerFormTests`: the instruction
-  vectors; for the 68k, every opcode line, every `movec` register, FPU register fields other than FP0, PC-relative
+  vectors. For the 68k, every opcode line, every `movec` register, FPU register fields other than FP0, PC-relative
   bases after extension words, the reserved bits and byte immediates of §2.7, empty register lists and `fmovem.l` of
-  the control registers. Each valid 68k vector decodes the same way in at least one independent disassembler.
+  the control registers; each valid 68k vector decodes the same way in at least one independent disassembler. For
+  PowerPC, every form and extended mnemonic, each part of every multi-bit reserved field, the invalid update forms,
+  `mftb`'s TBRs, the raw branch forms and every named SPR in both directions.
 - `M68kCodeMapTests`, `M68kAnnotatorTests`, `MacsBugNamesTests`, `PpcFragmentMapTests`, `TrapTableTests`: §2.
 - `tests/ClassicMac.Resources.Decoders.Tests/CodeDecoderTests.cs`: each decoder's files and model, the application
   rebuilt from the fork, and each diagnostic; `CodeExportTests.cs`: `disasm`'s files, the CPU choice, every fragment
@@ -391,7 +413,10 @@ documents). These are its own and the decoders':
   resource of ResEdit, Realmz, QDHarness, Disk Copy 6.1.2 and the Mac OS 9 System file decodes and `disasm` lists it
   (the System's 162 data-fork fragments included) with no error.
 - With `CLASSICMAC_CODE_CORPUS` set (not committed): `CodeListingCorpusTests` lists every `'CODE'`, code resource and
-  fragment of the corpus with no decoder error; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
+  fragment of the corpus with no decoder error; `PpcCorpusTests` checks the word, `.long`, `blr`, `bl` and return
+  counts and sample texts of NQD (no `.long`), Disk Copy 6.1.2 (4) and Disk Copy 6.5 (9,451), which
+  agree word for word with an independent disassembler apart from mnemonic spelling and, in data, BO values with a z
+  bit set [Verified]; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
   the counts in [PLAN.md](../../PLAN.md)'s phase 11 exit.
 
 ## 8. Not covered
@@ -401,6 +426,8 @@ documents). These are its own and the decoders':
 - Code reached only through computed addresses (function pointers in data, `jsr (a0)`) is found by the gap sweep, not
   named.
 - Selectors set further back than three instructions, or through registers, are not named.
+- PowerPC forms the PEM calls invalid for a register range are decoded: `lmw` with rA among the registers loaded,
+  `lswi`/`lswx` whose registers overlap rA or rB.
 - No re-assembly: the listing is for reading; `pack` takes the `.bin`.
 - The 68060's and the CPU32's own instructions are `dc.w` (§2.7).
 

@@ -144,6 +144,63 @@ public class PpcFragmentMapTests
         Assert.Equal("?slot 1:0xC", map.Glue[(0, 0)]);
     }
 
+    // A CodeWarrior-style fragment: the TOC base is past its slots, so they are reached at negative displacements.
+    // Section 0 (code):
+    //   00 bl $10 (glue); 04 lwz r3,-4(r2); 08 beq $28; 0C b $28 (a tail call)
+    //   10 glue: lwz r12,-8(r2) ...; 28 mflr r0; 2C blr; 30 a traceback table naming ".Traced" (tb_offset 8)
+    // Section 1 (data): 00 tvector (code 0, TOC $10) = main; 08 TOC[-8] = InterfaceLib::InitGraf; 0C TOC[-4] = 1:$14
+    private static PpcFragmentMap CentredToc()
+    {
+        var code = PefBuilder.Words(
+            0x48000011, 0x8062FFFC, 0x41820020, 0x4800001C,
+            0x8182FFF8, 0x90410014, 0x800C0000, 0x804C0004, 0x7C0903A6, 0x4E800420,
+            0x7C0802A6, 0x4E800020,
+            0x00000000, 0x00002040, 0x00000000, 0x00000008, 0x00072E54, 0x72616365, 0x64000000);
+        var data = PefBuilder.Words(0x00000000, 0x00000010, 0x00000000, 0x00000014, 0x00000000, 0x12345678);
+        var b = new PefBuilder();
+        b.AddSection(PefSectionKind.Code, code);
+        b.AddSection(PefSectionKind.UnpackedData, data);
+        b.Libraries.Add(new PefBuilder.Library("InterfaceLib", [new PefBuilder.Import("InitGraf")]));
+        b.Relocations.Add((1, [0x4600, 0x4A00, 0x4200]));   // DSC2 1; SYMR 1; DATA 1
+        b.Main = (1, 0);
+        return PpcFragmentMap.Build(Read(b.Build()), new List<Diagnostic>());
+    }
+
+    private static List<(CodeReferenceKind, string)> CentredAt(PpcFragmentMap map, uint word, uint offset) =>
+        PpcAnnotator.Annotate(PpcDisassembler.Decode(word, offset), 0, map).Select(r => (r.Kind, r.Text)).ToList();
+
+    [Fact]
+    public void A_centred_TOC_reaches_its_slots_at_negative_displacements()
+    {
+        var map = CentredToc();
+        Assert.Equal(0x10u, map.TocBase);
+        Assert.Equal("InterfaceLib::InitGraf", Assert.Single(map.Glue, g => g.Key == (0, 0x10)).Value);
+        Assert.Equal([(CodeReferenceKind.Glue, "InterfaceLib::InitGraf")], CentredAt(map, 0x48000011, 0));
+        Assert.Equal([(CodeReferenceKind.TocSlot, "1:0x14")], CentredAt(map, 0x8062FFFC, 4));
+        Assert.Equal([(CodeReferenceKind.TocSlot, "InterfaceLib::InitGraf")], CentredAt(map, 0x8182FFF8, 0x10));
+    }
+
+    [Fact]
+    public void A_function_named_only_by_its_traceback()
+    {
+        Assert.Equal(
+        [
+            new CodeFunction(0, 0, "main", CodeFunctionSource.Main),
+            new CodeFunction(0, 0x10, ".InitGraf", CodeFunctionSource.Glue),
+            new CodeFunction(0, 0x28, ".Traced", CodeFunctionSource.Traceback),
+        ], CentredToc().Functions.Values);
+    }
+
+    // A conditional branch to a function is not a call and is not annotated; an unconditional b (a tail call) is.
+    [Fact]
+    public void Only_unconditional_branches_and_calls_name_their_target()
+    {
+        var map = CentredToc();
+        Assert.Empty(CentredAt(map, 0x41820020, 8));
+        Assert.Equal([(CodeReferenceKind.Call, ".Traced")], CentredAt(map, 0x4800001C, 0x0C));
+        Assert.Equal([(CodeReferenceKind.Call, ".Traced")], CentredAt(map, 0x41820021, 8));   // beql
+    }
+
     [Fact]
     public void A_fragment_without_transition_vectors_has_no_TOC()
     {
