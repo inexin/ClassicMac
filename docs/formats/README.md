@@ -81,9 +81,9 @@ One file per format, in its category folder. A codec used by more than one forma
 | --- | --- | --- |
 | [diskcopy42.md](disk-images/diskcopy42.md) | Disk Copy 4.2 | `ClassicMac.Files.Hfs` |
 | [dart.md](disk-images/dart.md) | DART | `ClassicMac.Files.Hfs` |
-| [ndif.md](disk-images/ndif.md) | NDIF (Disk Copy 6), self-mounting and segmented images; how an image is recognised | `ClassicMac.Files.Hfs` |
+| [ndif.md](disk-images/ndif.md) | NDIF (Disk Copy 6), self-mounting and segmented images | `ClassicMac.Files.Hfs` |
 | [udif.md](disk-images/udif.md) | UDIF (`.dmg`) | `ClassicMac.Files.Hfs` |
-| [raw-images.md](disk-images/raw-images.md) | ShrinkWrap 2.1, DiskDup+ and other raw images | `ClassicMac.Files.Hfs` |
+| [raw-images.md](disk-images/raw-images.md) | Raw disk images (ShrinkWrap 2.1, DiskDup+ and others); how Disk Copy chooses a format by file type | `ClassicMac.Files.Hfs` |
 | [cd-images.md](disk-images/cd-images.md) | Raw CD images, cue sheets and multisession discs | `ClassicMac.Files.Iso` |
 | [rom.md](disk-images/rom.md) | Macintosh ROM images: the ROM resource table, combinations, the resources listed as a synthesised resource fork; the NewWorld "Mac OS ROM" file and its LZSS image | `ClassicMac.Files.Rom` |
 
