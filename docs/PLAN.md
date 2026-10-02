@@ -856,8 +856,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
       choice and bitmap text, HFS/MFS reading and HFS writing (the File Manager's backing), the interface templates,
       the Platinum dialog drawing and icon drawing; phase 11's `CODE`, jump-table and `%A5Init` loading.
     - To build, in order:
-      1. A 68000/020 interpreter (MIT-compatible: Moira (MIT) or a C# core; GPL cores are reference only), the A-trap
-         dispatcher with `SetTrapAddress`, and the low-memory globals at their fixed addresses.
+      1. A 68k interpreter: a C# port of syn68k's interpreter (MIT, 68LC040; Executor's core), or Moira (MIT); the
+         A-trap dispatcher with `SetTrapAddress`, and the low-memory globals at their fixed addresses. Trap numbers,
+         signatures, structs and globals generated from Multiversal Interfaces (Executor's API definitions in YAML;
+         check its licence before use) rather than typed in.
       2. The Memory Manager (zones, handles, master pointers, locking and purging), Segment Loader and Resource
          Manager calls.
       3. A headless harness: run an application's code, log every trap, draw into an `RgbaBitmap`; a trap census over
@@ -876,8 +878,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
       the specification.
     - Hard parts: undocumented behaviour and private globals, applications that write the screen directly or read
       the ROM, timing, copy protection, and the size of the API (most applications use 150–300 traps).
-    - Licensing: Executor's MIT release may be ported with a notice; Advanced Mac Substitute (AGPL 3) and the GPL
-      emulators are reference only.
+    - References: Executor 2000 (github.com/autc04/executor, MIT-style; its cxmon debugger is GPL and stays out) is
+      the portable guide to the managers and how they fit together, with a notice in `THIRD-PARTY-NOTICES.md` for
+      anything ported. Its behaviour is a 1990s clean-room guess, so Inside Macintosh and the Mac OS 9 harness still
+      decide. Its PowerPC core (PowerCore) is incomplete and unlicensed. Advanced Mac Substitute (AGPL 3) and the GPL
+      emulators are reference only: their behaviour may be studied, their code never copied.
 
 ### Todo (not in a phase)
 
