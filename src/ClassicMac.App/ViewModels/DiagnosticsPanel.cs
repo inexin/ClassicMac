@@ -75,6 +75,9 @@ namespace ClassicMac.App.ViewModels
         public const double DefaultHeight = 196;
 
         private readonly List<DiagnosticEntry> all = [];
+
+        /// <summary>Every diagnostic, whatever the filters.</summary>
+        internal IReadOnlyList<DiagnosticEntry> All => all;
         private readonly Dictionary<string, DiagnosticGroup> groupsByPath = new(StringComparer.Ordinal);
         private readonly List<DiagnosticGroup> groups = [];
         private readonly Action<DiagnosticEntry>? select;

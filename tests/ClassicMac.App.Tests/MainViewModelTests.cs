@@ -160,12 +160,12 @@ public class MainViewModelTests : IDisposable
         model.Selected = realmz;
         var rows = model.Details.Rows.ToDictionary(r => r.Label, r => r.Value);
         Assert.Equal("Realmz", model.Details.Heading);
-        Assert.Equal(("Games:Realmz:Realmz", "'APPL' / 'RLMZ'", "HFS volume"), (rows["Mac path"], rows["Type / creator"], rows["Found in"]));
+        Assert.Equal(("Games:Realmz:Realmz", "'APPL' / 'RLMZ'", "disk.img › Games › Realmz"), (rows["Mac path"], rows["Type / creator"], rows["In"]));
         Assert.StartsWith("3 in 2 types, from the resource fork", rows["Resources"]);
 
         model.Selected = realmz.Children[1].Children[0];
         rows = model.Details.Rows.ToDictionary(r => r.Label, r => r.Value);
-        Assert.Equal(("'STR#'", "128", "Races", "2 bytes"), (rows["Type"], rows["ID"], rows["Name"], rows["Stored size"]));
+        Assert.Equal(("'STR#'", "128", "Races", "2 bytes"), (rows["Type"], rows["ID"], rows["Name"], rows["Size"]));
 
         model.Selected = input;
         Assert.Equal("host file", model.Details.Rows.Single(r => r.Label == "Read as").Value);

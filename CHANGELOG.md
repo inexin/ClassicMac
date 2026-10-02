@@ -8,6 +8,12 @@
   loop. A sound that cannot be decoded shows why, with Show in Hex and Save raw data….
 - Viewer: the audio player (A1) reports its position, seeks, and repeats a loop (`IAudioPlayer.Position`, `Seek`,
   `SetLoop`; SoundFlow's time, seek and loop points).
+- Viewer: the Details tab in cards (File, Forks, Dates, Finder flags, How it was read): fork sizes with bars relative
+  to the larger fork, the resource types a fork holds, compressed resources with their 'dcmp's, the dates with a note on
+  their time zone (Mac local time for HFS and MFS, UTC for HFS Plus, zip and tar), the Finder flags as chips with the
+  raw word, label and icon position, the container chain the file was read through with the file's problem count
+  (a link to the diagnostics), "In" as a link to the folder holding the file; inputs, resources, types and folders
+  get cards of their own; Copy all puts the details on the clipboard as plain "Label: value" lines.
 - Viewer: the dialogs share one frame (drawn by the app: rounded, shadowed, a 42-pixel header with the title and ×, a
   footer with Cancel then the primary action on the right and a destructive choice on the left): Get Info and New
   Resource (Type and ID in mono, the attributes in two columns with Compressed shown but not settable), Import Image or

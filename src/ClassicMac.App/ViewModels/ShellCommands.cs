@@ -21,6 +21,9 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Maximizes the window, or restores it when maximized (Window ▸ Zoom).</summary>
         void ToggleZoom();
+
+        /// <summary>Puts plain text on the clipboard (Details ▸ Copy all).</summary>
+        Task CopyTextAsync(string text);
     }
 
     /// <summary>A screen depth for the toolbar's Depth select and View ▸ Screen Depth.</summary>

@@ -515,4 +515,74 @@
   <Style Selector="Border.dialog-body TextBox, Border.dialog-body NumericUpDown">
     <Setter Property="MinHeight" Value="30" />
   </Style>
+
+  <!-- The Details tab (design/boards/details.md, P4): cards with a caption header on CmSidebarBackground, label and
+       value rows, fork bars (6 px, CmAccent on CmSegmentTrack), Finder flag chips (set: CmRowHighlight; unset: dashed and
+       muted), the container chain as chips with arrows (the last highlighted). -->
+  <Style Selector="Border.detail-card">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusLarge}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <Style Selector="Border.detail-card-header">
+    <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="Border.detail-card StackPanel.detail-rows">
+    <Setter Property="Margin" Value="12,8,12,10" />
+    <Setter Property="Spacing" Value="6" />
+  </Style>
+  <Style Selector="Border.detail-card SelectableTextBlock.mono">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+  </Style>
+  <Style Selector="ProgressBar.fork-bar">
+    <Setter Property="Height" Value="6" />
+    <Setter Property="MinHeight" Value="6" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    <Setter Property="Minimum" Value="0" />
+    <Setter Property="Maximum" Value="1" />
+  </Style>
+  <Style Selector="Panel.chip">
+    <Setter Property="Margin" Value="0,0,6,6" />
+  </Style>
+  <Style Selector="Panel.chip > Border">
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadiusSmall}" />
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+  </Style>
+  <Style Selector="Panel.chip > Rectangle">
+    <Setter Property="Stroke" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="StrokeThickness" Value="1" />
+    <Setter Property="StrokeDashArray" Value="3,2" />
+    <Setter Property="RadiusX" Value="4" />
+    <Setter Property="RadiusY" Value="4" />
+  </Style>
+  <Style Selector="Panel.chip > TextBlock">
+    <Setter Property="Margin" Value="8,2" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMeta}" />
+    <Setter Property="Foreground" Value="{DynamicResource CmText}" />
+  </Style>
+  <Style Selector="Panel.chip.unset > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="Panel.chip.unset > Border">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Panel.chip.set > Rectangle">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Panel.chip.step > Border">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Panel.chip.step.last > Border">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
 </Styles>

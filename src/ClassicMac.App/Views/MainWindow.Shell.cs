@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Styling;
 using ClassicMac.App.ViewModels;
 
@@ -94,6 +95,8 @@ namespace ClassicMac.App.Views
         }
 
         public void Minimize() => WindowState = WindowState.Minimized;
+
+        public Task CopyTextAsync(string text) => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
 
         public void ToggleZoom() => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
     }

@@ -137,6 +137,7 @@ namespace ClassicMac.App.ViewModels
         internal Task DraftTask { get; private set; } = Task.CompletedTask;
 
         [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CopyDetailsCommand), nameof(GoToInCommand), nameof(ShowProblemsCommand))]
         private DetailsViewModel details = DetailsViewModel.Empty;
 
         [ObservableProperty]
@@ -279,7 +280,7 @@ namespace ClassicMac.App.ViewModels
         private void OnSelectedChanged(NodeViewModel? value)
         {
             TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
-            Details = DetailsViewModel.For(value);
+            Details = DetailsViewModel.For(value, ProblemsIn(value));
             OnSelectionChangedForInspector();
             // The hex view comes once the preview is known: only a resource without one shows its bytes.
             Hex = HexViewModel.Empty;

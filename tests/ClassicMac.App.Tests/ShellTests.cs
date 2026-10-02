@@ -32,6 +32,8 @@ public sealed class ShellTests : IDisposable
         public void Minimize() => Minimized++;
 
         public void ToggleZoom() => Zoomed++;
+
+        public Task CopyTextAsync(string text) => Task.CompletedTask;
     }
 
     private string Fork(string name)
