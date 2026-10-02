@@ -1,0 +1,151 @@
+<!--
+  ClassicMac design tokens: starting point for task F1 (design/BACKLOG-PLAN.md).
+  Values come from design/TOKENS.md. Move to src/ClassicMac.App/Styles/Tokens.axaml
+  and merge it in App.axaml after <FluentTheme />. Font assets (F2) must be added
+  under Assets/Fonts before CmFontSans / CmFontMono resolve.
+-->
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <Color x:Key="CmWindowBackgroundColor">#F3F3F0</Color>
+      <Color x:Key="CmTitleBarBackgroundColor">#E6E6E1</Color>
+      <Color x:Key="CmChromeBackgroundColor">#ECECE8</Color>
+      <Color x:Key="CmPaneBackgroundColor">#FFFFFF</Color>
+      <Color x:Key="CmSidebarBackgroundColor">#F7F7F4</Color>
+      <Color x:Key="CmBorderColor">#D9D8D2</Color>
+      <Color x:Key="CmDividerColor">#E6E5E0</Color>
+      <Color x:Key="CmCardBorderColor">#DEDDD7</Color>
+      <Color x:Key="CmTextColor">#1D1D1B</Color>
+      <Color x:Key="CmTextMutedColor">#5D5C57</Color>
+      <Color x:Key="CmAccentColor">#2E4EC2</Color>
+      <Color x:Key="CmOnAccentColor">#FFFFFF</Color>
+      <Color x:Key="CmSelectionColor">#2E4EC2</Color>
+      <Color x:Key="CmSelectionTextColor">#FFFFFF</Color>
+      <Color x:Key="CmSelectionInactiveColor">#DCE3FA</Color>
+      <Color x:Key="CmRowHighlightColor">#EEF2FD</Color>
+      <Color x:Key="CmHexCursorColor">#2E4EC2</Color>
+      <Color x:Key="CmControlBackgroundColor">#FFFFFF</Color>
+      <Color x:Key="CmControlBorderColor">#CFCEC8</Color>
+      <Color x:Key="CmSegmentTrackColor">#E2E1DC</Color>
+      <Color x:Key="CmSegmentOnColor">#FFFFFF</Color>
+      <Color x:Key="CmErrorColor">#B42318</Color>
+      <Color x:Key="CmErrorTintColor">#FCE9E7</Color>
+      <Color x:Key="CmWarningColor">#8A5300</Color>
+      <Color x:Key="CmWarningTintColor">#FDF1DA</Color>
+      <Color x:Key="CmInfoColor">#245C9E</Color>
+      <Color x:Key="CmInfoTintColor">#E6EFF9</Color>
+      <Color x:Key="CmCheckerLightColor">#FFFFFF</Color>
+      <Color x:Key="CmCheckerDarkColor">#ECECE8</Color>
+      <Color x:Key="CmLoopRegionColor">#E5EAFB</Color>
+      <Color x:Key="CmPlayheadColor">#B42318</Color>
+      <Color x:Key="SystemAccentColor">#2E4EC2</Color>
+    </ResourceDictionary>
+    <ResourceDictionary x:Key="Dark">
+      <Color x:Key="CmWindowBackgroundColor">#1E1E20</Color>
+      <Color x:Key="CmTitleBarBackgroundColor">#202023</Color>
+      <Color x:Key="CmChromeBackgroundColor">#252528</Color>
+      <Color x:Key="CmPaneBackgroundColor">#19191B</Color>
+      <Color x:Key="CmSidebarBackgroundColor">#1F1F22</Color>
+      <Color x:Key="CmBorderColor">#38383C</Color>
+      <Color x:Key="CmDividerColor">#2C2C30</Color>
+      <Color x:Key="CmCardBorderColor">#3A3A3E</Color>
+      <Color x:Key="CmTextColor">#EDEDEA</Color>
+      <Color x:Key="CmTextMutedColor">#A9A8A3</Color>
+      <Color x:Key="CmAccentColor">#8FA3FF</Color>
+      <Color x:Key="CmOnAccentColor">#0F1530</Color>
+      <Color x:Key="CmSelectionColor">#33417A</Color>
+      <Color x:Key="CmSelectionTextColor">#F2F4FF</Color>
+      <Color x:Key="CmSelectionInactiveColor">#2C3354</Color>
+      <Color x:Key="CmRowHighlightColor">#24283A</Color>
+      <Color x:Key="CmHexCursorColor">#8FA3FF</Color>
+      <Color x:Key="CmControlBackgroundColor">#2C2C30</Color>
+      <Color x:Key="CmControlBorderColor">#45454A</Color>
+      <Color x:Key="CmSegmentTrackColor">#2C2C30</Color>
+      <Color x:Key="CmSegmentOnColor">#45454B</Color>
+      <Color x:Key="CmErrorColor">#FF8A7A</Color>
+      <Color x:Key="CmErrorTintColor">#3A1D1A</Color>
+      <Color x:Key="CmWarningColor">#F2B45A</Color>
+      <Color x:Key="CmWarningTintColor">#3A2C14</Color>
+      <Color x:Key="CmInfoColor">#8CBEF5</Color>
+      <Color x:Key="CmInfoTintColor">#18283C</Color>
+      <Color x:Key="CmCheckerLightColor">#2A2A2D</Color>
+      <Color x:Key="CmCheckerDarkColor">#323236</Color>
+      <Color x:Key="CmLoopRegionColor">#263058</Color>
+      <Color x:Key="CmPlayheadColor">#FF8A7A</Color>
+      <Color x:Key="SystemAccentColor">#8FA3FF</Color>
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <SolidColorBrush x:Key="CmWindowBackground" Color="{DynamicResource CmWindowBackgroundColor}" />
+  <SolidColorBrush x:Key="CmTitleBarBackground" Color="{DynamicResource CmTitleBarBackgroundColor}" />
+  <SolidColorBrush x:Key="CmChromeBackground" Color="{DynamicResource CmChromeBackgroundColor}" />
+  <SolidColorBrush x:Key="CmPaneBackground" Color="{DynamicResource CmPaneBackgroundColor}" />
+  <SolidColorBrush x:Key="CmSidebarBackground" Color="{DynamicResource CmSidebarBackgroundColor}" />
+  <SolidColorBrush x:Key="CmBorder" Color="{DynamicResource CmBorderColor}" />
+  <SolidColorBrush x:Key="CmDivider" Color="{DynamicResource CmDividerColor}" />
+  <SolidColorBrush x:Key="CmCardBorder" Color="{DynamicResource CmCardBorderColor}" />
+  <SolidColorBrush x:Key="CmText" Color="{DynamicResource CmTextColor}" />
+  <SolidColorBrush x:Key="CmTextMuted" Color="{DynamicResource CmTextMutedColor}" />
+  <SolidColorBrush x:Key="CmAccent" Color="{DynamicResource CmAccentColor}" />
+  <SolidColorBrush x:Key="CmOnAccent" Color="{DynamicResource CmOnAccentColor}" />
+  <SolidColorBrush x:Key="CmSelection" Color="{DynamicResource CmSelectionColor}" />
+  <SolidColorBrush x:Key="CmSelectionText" Color="{DynamicResource CmSelectionTextColor}" />
+  <SolidColorBrush x:Key="CmSelectionInactive" Color="{DynamicResource CmSelectionInactiveColor}" />
+  <SolidColorBrush x:Key="CmRowHighlight" Color="{DynamicResource CmRowHighlightColor}" />
+  <SolidColorBrush x:Key="CmHexCursor" Color="{DynamicResource CmHexCursorColor}" />
+  <SolidColorBrush x:Key="CmControlBackground" Color="{DynamicResource CmControlBackgroundColor}" />
+  <SolidColorBrush x:Key="CmControlBorder" Color="{DynamicResource CmControlBorderColor}" />
+  <SolidColorBrush x:Key="CmSegmentTrack" Color="{DynamicResource CmSegmentTrackColor}" />
+  <SolidColorBrush x:Key="CmSegmentOn" Color="{DynamicResource CmSegmentOnColor}" />
+  <SolidColorBrush x:Key="CmError" Color="{DynamicResource CmErrorColor}" />
+  <SolidColorBrush x:Key="CmErrorTint" Color="{DynamicResource CmErrorTintColor}" />
+  <SolidColorBrush x:Key="CmWarning" Color="{DynamicResource CmWarningColor}" />
+  <SolidColorBrush x:Key="CmWarningTint" Color="{DynamicResource CmWarningTintColor}" />
+  <SolidColorBrush x:Key="CmInfo" Color="{DynamicResource CmInfoColor}" />
+  <SolidColorBrush x:Key="CmInfoTint" Color="{DynamicResource CmInfoTintColor}" />
+  <SolidColorBrush x:Key="CmCheckerLight" Color="{DynamicResource CmCheckerLightColor}" />
+  <SolidColorBrush x:Key="CmCheckerDark" Color="{DynamicResource CmCheckerDarkColor}" />
+  <SolidColorBrush x:Key="CmLoopRegion" Color="{DynamicResource CmLoopRegionColor}" />
+  <SolidColorBrush x:Key="CmPlayhead" Color="{DynamicResource CmPlayheadColor}" />
+
+  <x:Double x:Key="CmSpace1">4</x:Double>
+  <x:Double x:Key="CmSpace2">8</x:Double>
+  <x:Double x:Key="CmSpace3">12</x:Double>
+  <x:Double x:Key="CmSpace4">16</x:Double>
+  <x:Double x:Key="CmSpace6">24</x:Double>
+  <x:Double x:Key="CmRowTree">22</x:Double>
+  <x:Double x:Key="CmRowList">24</x:Double>
+  <x:Double x:Key="CmRowGroup">26</x:Double>
+  <x:Double x:Key="CmRowForm">34</x:Double>
+  <x:Double x:Key="CmControlHeight">30</x:Double>
+  <x:Double x:Key="CmBarTitle">34</x:Double>
+  <x:Double x:Key="CmBarMenu">26</x:Double>
+  <x:Double x:Key="CmBarTool">48</x:Double>
+  <x:Double x:Key="CmBarTabs">36</x:Double>
+  <x:Double x:Key="CmBarStatus">26</x:Double>
+  <x:Double x:Key="CmPanelHeader">34</x:Double>
+  <x:Double x:Key="CmTreeIndent">16</x:Double>
+  <x:Double x:Key="CmTreeWidth">340</x:Double>
+  <x:Double x:Key="CmDiagnosticsHeight">196</x:Double>
+  <x:Double x:Key="CmFontSizeTitle">22</x:Double>
+  <x:Double x:Key="CmFontSizeHeading">17</x:Double>
+  <x:Double x:Key="CmFontSizeBody">13</x:Double>
+  <x:Double x:Key="CmFontSizeMeta">12</x:Double>
+  <x:Double x:Key="CmFontSizeCaption">11</x:Double>
+  <x:Double x:Key="CmFontSizeMono">13</x:Double>
+  <x:Double x:Key="CmFontSizeMonoSmall">12</x:Double>
+  <x:Double x:Key="CmLetterSpacingCaption">0.66</x:Double>
+  <FontWeight x:Key="CmFontWeightStrong">SemiBold</FontWeight>
+
+  <CornerRadius x:Key="CmRadiusSmall">4</CornerRadius>
+  <CornerRadius x:Key="CmRadius">6</CornerRadius>
+  <CornerRadius x:Key="CmRadiusLarge">8</CornerRadius>
+  <CornerRadius x:Key="CmRadiusDialog">10</CornerRadius>
+
+  <BoxShadows x:Key="CmShadowPopover">0 10 28 0 #2E14141E</BoxShadows>
+  <BoxShadows x:Key="CmShadowDialog">0 18 50 0 #59000000</BoxShadows>
+
+  <FontFamily x:Key="CmFontSans">avares://ClassicMac.App/Assets/Fonts#IBM Plex Sans</FontFamily>
+  <FontFamily x:Key="CmFontMono">avares://ClassicMac.App/Assets/Fonts#IBM Plex Mono</FontFamily>
+</ResourceDictionary>
