@@ -11,7 +11,7 @@ using ClassicMac.Resources;
 namespace ClassicMac.App.Tests;
 
 // Editing resources in the app: the Resource commands, undo and redo, saving and closing.
-public sealed class EditTests : IDisposable
+public sealed partial class EditTests : IDisposable
 {
     private readonly string folder = Directory.CreateTempSubdirectory("cm-edit").FullName;
 
@@ -42,10 +42,25 @@ public sealed class EditTests : IDisposable
         public Task<SaveChanges> AskSaveChangesAsync(string fileName)
         {
             Asked.Add(fileName);
+            Log.Add("save " + fileName);
             return Task.FromResult(Choice);
         }
 
         public Task<bool> ConfirmAsync(string title, string message) => Task.FromResult(Confirm);
+
+        // The unapplied-draft question: every ask is logged (with the save questions, in order); Pending, when set, is
+        // the answer still to come.
+        public DraftChoice Draft { get; set; } = DraftChoice.Discard;
+        public TaskCompletionSource<DraftChoice>? Pending { get; set; }
+        public List<(string What, string? Error)> DraftAsked { get; } = [];
+        public List<string> Log { get; } = [];
+
+        public Task<DraftChoice> AskApplyDraftAsync(string what, string? error)
+        {
+            DraftAsked.Add((what, error));
+            Log.Add("draft " + what);
+            return Pending?.Task ?? Task.FromResult(Draft);
+        }
 
         public Task<byte[]?> EditHexAsync(string title, byte[] data) => Task.FromResult(Hex);
 
@@ -134,7 +149,7 @@ public sealed class EditTests : IDisposable
     [Fact]
     public async Task Bytes_edited_in_the_hex_view_are_an_undoable_edit()
     {
-        var (model, file, _, _, _) = await Open();
+        var (model, file, dialogs, _, _) = await Open();
         model.Selected = Resource(file, 129);
         Assert.True(model.BeginHexEditCommand.CanExecute(null));
         model.BeginHexEditCommand.Execute(null);
@@ -150,7 +165,8 @@ public sealed class EditTests : IDisposable
         Assert.Equal("Ai"u8.ToArray(), Resource(file, 129).Resource.GetData().ToArray());
         Assert.Equal("_Undo Edit 'STR ' 129", model.UndoTitle);
 
-        // Clicking another resource applies the edit instead of losing it.
+        // Clicking another resource asks; Apply applies the edit, then selects it.
+        dialogs.Draft = DraftChoice.Apply;
         model.Selected = Resource(file, 129);
         model.BeginHexEditCommand.Execute(null);
         model.HexEdit!.Delete();

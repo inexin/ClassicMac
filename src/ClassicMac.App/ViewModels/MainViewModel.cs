@@ -66,9 +66,40 @@ namespace ClassicMac.App.ViewModels
 
         public ReadOptions ReadOptions { get; init; } = ReadOptions.Default;
 
-        [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(CloseCommand), nameof(SaveResourceAsCommand), nameof(ExportResourcesCommand), nameof(ExtractAllCommand), nameof(UnpackAppleDoubleCommand), nameof(UnpackBasiliskCommand))]
         private NodeViewModel? selected;
+
+        /// <summary>
+        /// The selected node. While a form or the hex view holds unapplied edits, a new selection asks what to do with
+        /// them first (<see cref="ResolveDraftAsync"/>) and is made only once they are applied or discarded: until then
+        /// (and when cancelled) the old node stays selected and nothing is rebuilt.
+        /// </summary>
+        public NodeViewModel? Selected
+        {
+            get => selected;
+            set
+            {
+                if (ReferenceEquals(selected, value)) return;
+                if (askingDraft || HasDraft)
+                {
+                    if (!askingDraft) SelectionTask = SelectAfterDraftAsync(value);
+                    // The tree (bound two-way) already shows the new node: told again, it shows the kept one.
+                    if (!ReferenceEquals(selected, value)) OnPropertyChanged(nameof(Selected));
+                    return;
+                }
+                var old = selected;
+                OnPropertyChanging(nameof(Selected));
+                selected = value;
+                OnPropertyChanged(nameof(Selected));
+                foreach (var command in new IRelayCommand[] { CloseCommand, SaveResourceAsCommand, ExportResourcesCommand, ExtractAllCommand, UnpackAppleDoubleCommand,
+                    UnpackBasiliskCommand })
+                    command.NotifyCanExecuteChanged();
+                OnSelectedChanged(value);
+                OnSelectedChanged(old, value);
+            }
+        }
+
+        /// <summary>The last selection made after asking about a draft (tests wait for it).</summary>
+        internal Task SelectionTask { get; private set; } = Task.CompletedTask;
 
         [ObservableProperty]
         private DetailsViewModel details = DetailsViewModel.Empty;
@@ -202,15 +233,14 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnFilterChanged(DiagnosticFilter value) => RefreshDiagnostics();
 
-        partial void OnSelectedChanged(NodeViewModel? value)
+        private void OnSelectedChanged(NodeViewModel? value)
         {
-            var pendingHexEdit = TakeHexEdit();
+            TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
             Details = DetailsViewModel.For(value);
             // The hex view comes once the preview is known: only a resource without one shows its bytes.
             Hex = HexViewModel.Empty;
             HexSource = null;
             PreviewTask = MakePreviewAsync(value);
-            if (pendingHexEdit is { } pending) CommitHexEdit(pending, value);
         }
 
         partial void OnScreenDepthChanged(int value) => PreviewTask = MakePreviewAsync(Selected);

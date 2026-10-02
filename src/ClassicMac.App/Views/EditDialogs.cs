@@ -119,6 +119,46 @@ namespace ClassicMac.App.Views
             return result;
         }
 
+        // An alert: the question and its detail; Discard on the left, Cancel (Esc) and Apply (Enter) on the right. With an
+        // error Apply is unavailable and the detail names it.
+        public async Task<DraftChoice> AskApplyDraftAsync(string what, string? error)
+        {
+            var result = DraftChoice.Cancel;
+            var dialog = MakeWindow("Unapplied changes");
+            Button Choice(string label, DraftChoice choice)
+            {
+                var button = new Button { Content = label };
+                button.Click += (_, _) => { result = choice; dialog.Close(); };
+                return button;
+            }
+            var discard = Choice("Discard", DraftChoice.Discard);
+            var cancel = Choice("Cancel", DraftChoice.Cancel);
+            var apply = Choice("Apply", DraftChoice.Apply);
+            cancel.IsCancel = true;
+            apply.IsDefault = error is null;
+            apply.IsEnabled = error is null;
+            var buttons = new DockPanel { LastChildFill = false };
+            DockPanel.SetDock(discard, Dock.Left);
+            var right = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { cancel, apply } };
+            DockPanel.SetDock(right, Dock.Right);
+            buttons.Children.Add(discard);
+            buttons.Children.Add(right);
+            var detail = error is null
+                ? "You edited this resource but haven't applied the changes."
+                : $"You edited this resource but the changes can't be applied: {error}";
+            dialog.Content = Layout(new StackPanel
+            {
+                Spacing = 6, MaxWidth = 420,
+                Children =
+                {
+                    new TextBlock { Text = $"Apply your changes to {what}?", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap },
+                    new TextBlock { Text = detail, Opacity = 0.65, TextWrapping = TextWrapping.Wrap },
+                },
+            }, buttons);
+            await dialog.ShowDialog(owner);
+            return result;
+        }
+
         public Task<bool> ConfirmAsync(string title, string message) =>
             Show(title, new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap, MaxWidth = 420 }, "Yes", "No");
 

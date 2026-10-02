@@ -28,11 +28,6 @@ namespace ClassicMac.App.ViewModels
             RaiseEdited();
         }
 
-        /// <summary>The resource's bytes for the form's values (throws <see cref="ArgumentException"/> for values it cannot hold).</summary>
-        public abstract byte[] BuildData();
-
-        public override IResourceEdit BuildEdit(ResourceFork fork) => new SetResourceData(Resource, BuildData(), $"Edit {Resource}");
-
         // A list whose items' and own changes count as edits.
         protected void Watch<T>(ObservableCollection<T> list) where T : INotifyPropertyChanged
         {

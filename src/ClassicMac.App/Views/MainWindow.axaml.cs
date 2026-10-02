@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ClassicMac.App.Audio;
 using ClassicMac.App.ViewModels;
@@ -29,6 +30,7 @@ namespace ClassicMac.App.Views
             };
             Closing += OnClosing;
             HexList.KeyDown += OnHexKeyDown;
+            Tree.SelectionChanged += OnTreeSelectionChanged;
             Tree.AddHandler(PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
             Tree.AddHandler(PointerMovedEvent, OnTreePointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
             Tree.AddHandler(PointerReleasedEvent, (_, _) => dragPress = null, RoutingStrategies.Tunnel, handledEventsToo: true);
@@ -88,12 +90,20 @@ namespace ClassicMac.App.Views
             HexList.ScrollIntoView(editor.CursorLine);
         }
 
+        // A selection the view-model refused (it asks about unapplied edits first) is undone once the tree's own
+        // selection handling is over: the tree shows the node that is still selected.
+        private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e) => Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is MainViewModel model && !ReferenceEquals(Tree.SelectedItem, model.Selected)) Tree.SelectedItem = model.Selected;
+        });
+
         private bool quitting;
 
-        // Unsaved edits: the window stays open while the user decides, then closes when they are saved or discarded.
+        // Unapplied or unsaved edits: the window stays open while the user decides, then closes when they are applied or
+        // discarded, and saved or discarded.
         private async void OnClosing(object? sender, WindowClosingEventArgs e)
         {
-            if (quitting || DataContext is not MainViewModel { HasUnsavedChanges: true } model) return;
+            if (quitting || DataContext is not MainViewModel model || !model.HasDraft && !model.HasUnsavedChanges) return;
             e.Cancel = true;
             if (!await model.ConfirmQuitAsync()) return;
             quitting = true;

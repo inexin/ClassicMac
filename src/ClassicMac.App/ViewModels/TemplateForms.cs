@@ -50,10 +50,10 @@ namespace ClassicMac.App.ViewModels
 
         public ObservableCollection<TemplateRow> Fields { get; } = [];
 
-        public override IResourceEdit BuildEdit(ResourceFork fork)
+        public override byte[] BuildData()
         {
             if (!IsUsable) throw new ArgumentException(Note);
-            return new SetResourceData(Resource, template.Write(TemplateRows.Values(Fields), extra.Span), $"Edit {Resource}");
+            return template.Write(TemplateRows.Values(Fields), extra.Span);
         }
     }
 

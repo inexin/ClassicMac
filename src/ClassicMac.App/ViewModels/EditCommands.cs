@@ -24,6 +24,19 @@ namespace ClassicMac.App.ViewModels
         Cancel,
     }
 
+    /// <summary>What to do with a form's or the hex view's unapplied edits before the selection moves.</summary>
+    public enum DraftChoice
+    {
+        /// <summary>Make them one undoable edit, then go on.</summary>
+        Apply,
+
+        /// <summary>Drop them, then go on.</summary>
+        Discard,
+
+        /// <summary>Stay, with the edits and the selection as they are.</summary>
+        Cancel,
+    }
+
     /// <summary>The editing dialogs; the window provides them, tests replace them.</summary>
     public interface IEditDialogs
     {
@@ -32,6 +45,12 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Asks whether to save <paramref name="fileName"/>'s edits before it closes.</summary>
         Task<SaveChanges> AskSaveChangesAsync(string fileName);
+
+        /// <summary>
+        /// Asks what to do with the unapplied edits to <paramref name="what"/> (<c>'STR#' 128</c>); <paramref name="error"/>,
+        /// when not null, is why they cannot be applied, and Apply is not offered.
+        /// </summary>
+        Task<DraftChoice> AskApplyDraftAsync(string what, string? error);
 
         /// <summary>Asks a yes/no question; true for yes.</summary>
         Task<bool> ConfirmAsync(string title, string message);
@@ -144,7 +163,7 @@ namespace ClassicMac.App.ViewModels
             OnPropertyChanged(nameof(RedoTitle));
         }
 
-        partial void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
+        private void OnSelectedChanged(NodeViewModel? oldValue, NodeViewModel? newValue)
         {
             NotifyEditCommands();
             UpdateForm(newValue);
@@ -210,6 +229,7 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanNewResource))]
         private async Task NewResource()
         {
+            if (!await ResolveDraftAsync()) return;
             if (FileOwner(Selected) is not { } owner || EditDialogs is null) return;
             var fork = StateFor(owner).Session.Fork;
             var type = Selected switch { ResourceNode r => r.Resource.Type, ResourceTypeNode t => t.Type, _ => FourCC.FromString("STR ") };
@@ -221,16 +241,18 @@ namespace ClassicMac.App.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanEditResource))]
-        private void DuplicateResource()
+        private async Task DuplicateResource()
         {
+            if (!await ResolveDraftAsync()) return;
             if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
             var duplicate = new DuplicateResource(node.Resource);
             Execute(owner, duplicate, () => duplicate.Copy);
         }
 
         [RelayCommand(CanExecute = nameof(CanEditResource))]
-        private void DeleteResource()
+        private async Task DeleteResource()
         {
+            if (!await ResolveDraftAsync()) return;
             if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
             Execute(owner, new DeleteResource(node.Resource), () => null);
         }
@@ -238,6 +260,7 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task GetInfo()
         {
+            if (!await ResolveDraftAsync()) return;
             if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null) return;
             var resource = node.Resource;
             var initial = new ResourceInfo(resource.Type.ToString(), resource.Id, resource.Name?.ToMacRoman() ?? "", resource.Attributes);
@@ -249,6 +272,7 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task ReplaceData()
         {
+            if (!await ResolveDraftAsync()) return;
             if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || FilePicker is null) return;
             if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path) return;
             var data = await File.ReadAllBytesAsync(path);
@@ -258,6 +282,7 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task EditHex()
         {
+            if (!await ResolveDraftAsync()) return;
             if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null) return;
             var resource = node.Resource;
             if (await EditDialogs.EditHexAsync($"Edit {resource}", resource.GetData().ToArray()) is not { } data) return;
@@ -311,14 +336,6 @@ namespace ClassicMac.App.ViewModels
             return editor.IsModified ? (target.Resource, target.Owner, editor.ToArray()) : null;
         }
 
-        // The selection moved while bytes were being edited: they are applied as an undoable edit, then the selection goes where the user clicked.
-        private void CommitHexEdit((Resource Resource, NodeViewModel Owner, byte[] Data) pending, NodeViewModel? clicked)
-        {
-            Execute(pending.Owner, new SetResourceData(pending.Resource, pending.Data, $"Edit {pending.Resource}"), () => pending.Resource);
-            if (clicked is ResourceNode other && ReferenceEquals(FileOwner(other), pending.Owner)) SelectResource(pending.Owner, other.Resource);
-            else if (clicked is not null && FileOwner(clicked) is { } owner && !ReferenceEquals(owner, pending.Owner)) Selected = clicked;
-        }
-
         private EditState? SelectedState => FileOwner(Selected) is { } owner ? EditingOf(owner) : null;
 
         public string UndoTitle => SelectedState?.Session.NextUndo is { } edit ? $"_Undo {edit.Description}" : "_Undo";
@@ -330,8 +347,9 @@ namespace ClassicMac.App.ViewModels
         private bool CanRedo() => SelectedState?.Session.NextRedo is not null;
 
         [RelayCommand(CanExecute = nameof(CanUndo))]
-        private void Undo()
+        private async Task Undo()
         {
+            if (!await ResolveDraftAsync()) return;
             if (SelectedState is { } state && FileOwner(Selected) is { } owner && state.Session.NextUndo is { } edit)
             {
                 state.Session.Undo();
@@ -341,8 +359,9 @@ namespace ClassicMac.App.ViewModels
         }
 
         [RelayCommand(CanExecute = nameof(CanRedo))]
-        private void Redo()
+        private async Task Redo()
         {
+            if (!await ResolveDraftAsync()) return;
             if (SelectedState is { } state && FileOwner(Selected) is { } owner && state.Session.NextRedo is { } edit)
             {
                 state.Session.Redo();
@@ -465,6 +484,7 @@ namespace ClassicMac.App.ViewModels
             if (Selected?.Input is not { } input) return;
             if (EditDialogs is not null && !await EditDialogs.ConfirmAsync("Revert", $"Discard the edits to {input.BaseTitle} and read it again from disk?"))
                 return;
+            DiscardDraft();
             var index = Roots.IndexOf(input);
             RemoveInput(input);
             if (await OpenAsync(input.Path) is { } reopened && index >= 0 && index < Roots.Count - 1)
@@ -478,6 +498,8 @@ namespace ClassicMac.App.ViewModels
         internal async Task<bool> ConfirmCloseAsync(IEnumerable<InputNode> inputs)
         {
             inputs = inputs.ToList();
+            // Unapplied edits in a closing file are applied or discarded first, then its saving is asked.
+            if (Selected?.Input is { } selectedInput && inputs.Contains(selectedInput) && !await ResolveDraftAsync()) return false;
             foreach (var input in inputs.Where(i => i.EditedVolume is not null))
             {
                 var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle);

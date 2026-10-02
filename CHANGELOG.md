@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Editor: unapplied edits (a form whose values differ from the resource's, or bytes changed in the hex view) are no
+  longer applied or lost silently: selecting another node (in the tree, from a diagnostic, by opening a file), undo,
+  redo, the Resource commands, closing a file and quitting first ask "Apply your changes to 'STR#' 128?" with Apply
+  (one undoable edit), Discard and Cancel (stay, nothing changes); a draft with an error offers no Apply and names it.
+  Applied but unsaved edits still go to the Save prompt only.
 - Viewer: the first selection after opening a disk no longer freezes the app (20 s on a 500 MB disk): the hex list's
   source never goes null, which made Avalonia walk every line of the previous fork. Only resources with no preview
   (unknown types) have a hex view, which opens for them; the Hex tab is hidden otherwise (Edit Hex… still edits any

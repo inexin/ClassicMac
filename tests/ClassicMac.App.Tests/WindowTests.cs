@@ -336,4 +336,130 @@ public class WindowTests
             Directory.Delete(folder, recursive: true);
         }
     }
+
+    // The unapplied-draft question, answered when the test says so.
+    private sealed class DraftDialogs : IEditDialogs
+    {
+        public TaskCompletionSource<DraftChoice> Pending { get; set; } = new();
+        public int Asked { get; private set; }
+
+        public Task<DraftChoice> AskApplyDraftAsync(string what, string? error)
+        {
+            Asked++;
+            return Pending.Task;
+        }
+
+        public Task<ResourceInfo?> ResourceInfoAsync(string title, ResourceInfo initial, bool isNew) => throw new NotSupportedException();
+        public Task<SaveChanges> AskSaveChangesAsync(string fileName) => Task.FromResult(SaveChanges.Discard);
+        public Task<bool> ConfirmAsync(string title, string message) => throw new NotSupportedException();
+        public Task<byte[]?> EditHexAsync(string title, byte[] data) => throw new NotSupportedException();
+        public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial) => throw new NotSupportedException();
+        public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => throw new NotSupportedException();
+        public Task<string?> NewFolderAsync(string initial) => throw new NotSupportedException();
+    }
+
+    // Clicking or arrowing to another tree node with an unapplied form: the tree keeps the old node selected and nothing
+    // changes until the question is answered.
+    [Fact]
+    public void The_tree_keeps_its_selection_while_a_draft_is_asked_about() => OnUiThread(The_tree_keeps_its_selection_while_a_draft_is_asked_aboutBody);
+
+    private static void The_tree_keeps_its_selection_while_a_draft_is_asked_aboutBody()
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "strings.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("STR ", 128, null, [5, .. "hello"u8]), ("STR ", 129, null, [2, .. "hi"u8])));
+            var dialogs = new DraftDialogs();
+            var model = new MainViewModel { EditDialogs = dialogs };
+            var window = new MainWindow { DataContext = model, Width = 1200, Height = 800 };
+            window.Show();
+            Pump(model.OpenAsync(path));
+            Pump(model.Roots[0].EnsureLoadedAsync());
+            var type = model.Roots[0].Children.OfType<ResourceTypeNode>().Single();
+            type.IsExpanded = true;
+            model.Selected = type.Children[0];
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+            Assert.Same(type.Children[0], tree.SelectedItem);
+            var form = Assert.IsType<StringForm>(model.Form);
+            form.Text = "edited";
+            var details = model.Details;
+
+            // A click on 'STR ' 129.
+            var item = Assert.IsType<TreeViewItem>(tree.TreeContainerFromItem(type.Children[1]));
+            var header = item.GetVisualDescendants().OfType<Control>().First(c => c.Bounds.Height > 0);
+            var point = header.TranslatePoint(new Point(10, header.Bounds.Height / 2), window)!.Value;
+            window.MouseDown(point, Avalonia.Input.MouseButton.Left);
+            window.MouseUp(point, Avalonia.Input.MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(1, dialogs.Asked);
+            Assert.Same(type.Children[0], model.Selected);
+            Assert.Same(type.Children[0], tree.SelectedItem);
+            Assert.Same(form, model.Form);
+            Assert.Same(details, model.Details);
+            dialogs.Pending.SetResult(DraftChoice.Cancel);
+            Pump(model.SelectionTask);
+            Assert.Same(type.Children[0], tree.SelectedItem);
+            Assert.Equal("edited", form.Text);
+
+            // The down arrow, from the focused 'STR ' 128.
+            dialogs.Pending = new TaskCompletionSource<DraftChoice>();
+            Assert.IsType<TreeViewItem>(tree.TreeContainerFromItem(type.Children[0])).Focus();
+            window.KeyPress(Avalonia.Input.Key.Down, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.ArrowDown, null);
+            window.KeyRelease(Avalonia.Input.Key.Down, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.ArrowDown, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(2, dialogs.Asked);
+            Assert.Same(type.Children[0], model.Selected);
+            Assert.Same(type.Children[0], tree.SelectedItem);
+            dialogs.Pending.SetResult(DraftChoice.Discard);
+            Pump(model.SelectionTask);
+            Assert.Same(type.Children[1], model.Selected);
+            Assert.Same(type.Children[1], tree.SelectedItem);
+            Assert.Equal("hi", Assert.IsType<StringForm>(model.Form).Text);
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    // The question as the window asks it: Apply (Enter), Discard, Cancel (Esc); no Apply when the draft has an error.
+    [Fact]
+    public void The_draft_question_offers_apply_discard_and_cancel() => OnUiThread(() =>
+    {
+        var owner = new Window();
+        owner.Show();
+        var dialogs = new EditDialogs(owner);
+        foreach (var (label, expected) in new[] { ("Apply", DraftChoice.Apply), ("Discard", DraftChoice.Discard), ("Cancel", DraftChoice.Cancel) })
+        {
+            var asked = dialogs.AskApplyDraftAsync("'STR#' 128", null);
+            Dispatcher.UIThread.RunJobs();
+            var dialog = Assert.Single(owner.OwnedWindows);
+            var texts = dialog.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+            Assert.Contains("Apply your changes to 'STR#' 128?", texts);
+            Assert.Contains("You edited this resource but haven't applied the changes.", texts);
+            var buttons = dialog.GetVisualDescendants().OfType<Button>().ToList();
+            Assert.Equal(["Discard", "Cancel", "Apply"], buttons.Select(b => (string)b.Content!));
+            Assert.True(buttons.Single(b => (string)b.Content! == "Apply").IsDefault);
+            Assert.True(buttons.Single(b => (string)b.Content! == "Cancel").IsCancel);
+            buttons.Single(b => (string)b.Content! == label).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Pump(asked);
+            Assert.Equal(expected, asked.Result);
+        }
+
+        var withError = dialogs.AskApplyDraftAsync("'STR ' 128", "The text must be Mac OS Roman.");
+        Dispatcher.UIThread.RunJobs();
+        var errorDialog = Assert.Single(owner.OwnedWindows);
+        Assert.Contains(errorDialog.GetVisualDescendants().OfType<TextBlock>(), t => t.Text?.Contains("The text must be Mac OS Roman.") == true);
+        var apply = errorDialog.GetVisualDescendants().OfType<Button>().Single(b => (string)b.Content! == "Apply");
+        Assert.False(apply.IsEnabled);
+        Assert.False(apply.IsDefault);
+        errorDialog.Close();
+        Pump(withError);
+        Assert.Equal(DraftChoice.Cancel, withError.Result);
+        owner.Close();
+    });
 }

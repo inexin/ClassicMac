@@ -19,8 +19,42 @@ namespace ClassicMac.App.ViewModels
 
         public Resource Resource { get; }
 
+        /// <summary>The resource's bytes for the form's values (throws <see cref="ArgumentException"/> for values it cannot hold).</summary>
+        public abstract byte[] BuildData();
+
         /// <summary>The edit that stores the form's values (throws <see cref="ArgumentException"/> for values the resource cannot hold).</summary>
-        public abstract IResourceEdit BuildEdit(ResourceFork fork);
+        public virtual IResourceEdit BuildEdit(ResourceFork fork) => new SetResourceData(Resource, BuildData(), $"Edit {Resource}");
+
+        private (byte[]? Data, string? Error) clean;
+
+        /// <summary>Takes the values as they are as the unedited ones (when the form is made, and once they are applied).</summary>
+        internal void MarkClean() => clean = Snapshot();
+
+        /// <summary>
+        /// Whether the values differ from the unedited ones (an unapplied draft), and why they cannot be written when so.
+        /// Values changed back are no draft.
+        /// </summary>
+        internal (bool IsDraft, string? Error) Draft
+        {
+            get
+            {
+                var now = Snapshot();
+                var isDraft = now.Data is { } data ? clean.Data is not { } old || !data.AsSpan().SequenceEqual(old) : now.Error != clean.Error;
+                return (isDraft, now.Error);
+            }
+        }
+
+        private (byte[]? Data, string? Error) Snapshot()
+        {
+            try
+            {
+                return (BuildData(), null);
+            }
+            catch (Exception e) when (e is ArgumentException or OverflowException)
+            {
+                return (null, e.Message);
+            }
+        }
 
         /// <summary>A form for the resource's type, or null when there is none.</summary>
         public static ResourceForm? For(Resource resource, ResourceFork fork, ReadOptions readOptions)
@@ -51,7 +85,7 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         private string text = text;
 
-        public override IResourceEdit BuildEdit(ResourceFork fork) => new SetResourceData(Resource, TextResources.WriteString(Text), $"Edit {Resource}");
+        public override byte[] BuildData() => TextResources.WriteString(Text);
     }
 
     /// <summary>One string of a <c>'STR#'</c>.</summary>
@@ -84,8 +118,7 @@ namespace ClassicMac.App.ViewModels
             if (i > 0) Strings.Move(i, i - 1);
         }
 
-        public override IResourceEdit BuildEdit(ResourceFork fork) =>
-            new SetResourceData(Resource, TextResources.WriteStringList(Strings.Select(s => s.Text).ToList()), $"Edit {Resource}");
+        public override byte[] BuildData() => TextResources.WriteStringList(Strings.Select(s => s.Text).ToList());
     }
 
     /// <summary><c>'TEXT'</c>, with its <c>'styl'</c> kept in step when there is one.</summary>
@@ -95,6 +128,9 @@ namespace ClassicMac.App.ViewModels
         private string text = TextResources.ReadText(data);
 
         public bool HasStyles => styl is not null;
+
+        // The 'styl' follows from the text, so the text's bytes are the draft's.
+        public override byte[] BuildData() => TextResources.WriteText(data, styl?.Data ?? [], Text, styl is not null).Text;
 
         public override IResourceEdit BuildEdit(ResourceFork fork)
         {
@@ -130,9 +166,8 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty] private string shortVersion;
         [ObservableProperty] private string longVersion;
 
-        public override IResourceEdit BuildEdit(ResourceFork fork) =>
-            new SetResourceData(Resource, new VersionResource((int)Major, (int)Minor, (int)BugFix, Stage.Value, (int)NonRelease, (short)Region,
-                ShortVersion, LongVersion).Write(), $"Edit {Resource}");
+        public override byte[] BuildData() =>
+            new VersionResource((int)Major, (int)Minor, (int)BugFix, Stage.Value, (int)NonRelease, (short)Region, ShortVersion, LongVersion).Write();
     }
 
     public sealed partial class MainViewModel
@@ -155,7 +190,9 @@ namespace ClassicMac.App.ViewModels
                 template = TemplateFormFor(r, owner);
             }
             HasTemplateChoice = typed is not null && template is not null;
-            Form = UseTemplate ? template ?? typed : typed ?? template;
+            var form = UseTemplate ? template ?? typed : typed ?? template;
+            form?.MarkClean();
+            Form = form;
             WatchForm(Form, node as ResourceNode);
         }
 
@@ -186,6 +223,8 @@ namespace ClassicMac.App.ViewModels
                 return;
             }
             var resource = form.Resource;
+            // Applied: no longer a draft, so the selection the edit moves to is not refused.
+            form.MarkClean();
             Execute(owner, edit, () => resource);
         }
     }

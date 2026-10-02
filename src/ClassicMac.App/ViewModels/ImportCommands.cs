@@ -32,6 +32,7 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanNewResource))]
         private async Task Import()
         {
+            if (!await ResolveDraftAsync()) return;
             if (FileOwner(Selected) is not { } owner || FilePicker is null || EditDialogs is null) return;
             if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path) return;
             var fileName = Path.GetFileName(path);
