@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Viewer: the image preview (P1) shows cards: each image on a checkerboard with its type and size under it
+  ("'icl8'", "32×32 · 8-bit"); an icon shows every member of its family, its masks with "Show masks", and the Finder
+  states strip (five states, seven labels, captioned; 2× from zoom 2) with "Finder states"; a summary line ("3 members ·
+  4× · nearest neighbour · 32-bit screen"). The cards are cut into rows for the pane's width in a virtualising list, so
+  a 500-icon 'SICN' scrolls smoothly; a new preview starts at the top.
 - Viewer: the sound preview (P3) has a round Play/Stop button (Space too), the playhead's time over the length, detail
   chips (rate, channels, sample, length, loop, base note, format), one 170 px lane per channel with the loop as a
   band, a 2 px playhead and a time ruler; a click on the waveform plays from there, "Repeat the loop" loops the sound's

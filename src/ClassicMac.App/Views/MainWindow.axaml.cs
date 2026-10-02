@@ -38,6 +38,14 @@ namespace ClassicMac.App.Views
             AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
             Tree.AddHandler(TextInputEvent, OnTreeTextInput, RoutingStrategies.Tunnel);
             Tree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
+            // The image grid's rows hold as many cards as fit the scroller (P1).
+            ImageScroller.SizeChanged += (_, e) =>
+            {
+                if (DataContext is MainViewModel model)
+                {
+                    model.ImageViewportWidth = e.NewSize.Width;
+                }
+            };
             DataContextChanged += (_, _) =>
             {
                 if (DataContext is not MainViewModel model)
@@ -45,6 +53,8 @@ namespace ClassicMac.App.Views
                     return;
                 }
 
+                model.PropertyChanged -= OnPreviewChanged;
+                model.PropertyChanged += OnPreviewChanged;
                 model.ChangeRefused -= OnChangeRefused;
                 model.ChangeRefused += OnChangeRefused;
                 model.FilePicker = this;
@@ -189,6 +199,15 @@ namespace ClassicMac.App.Views
         // A change the view-model refused (a selection or the template box, while it asks about unapplied edits) is
         // undone in the control once its own handling is over: a binding ignores the source while writing to it, and
         // afterwards does not push a value it thinks the control has.
+        // A new preview's images start at the top.
+        private void OnPreviewChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(MainViewModel.Preview))
+            {
+                ImageScroller.Offset = default;
+            }
+        }
+
         private void OnChangeRefused(object? sender, string property)
         {
             if (sender is not MainViewModel model)

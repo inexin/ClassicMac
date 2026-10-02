@@ -40,7 +40,13 @@ namespace ClassicMac.App.ViewModels
     public sealed record SoundFact(string Label, string Value);
 
     /// <summary>One decoded image: PNG bytes, its size, and a caption (a list item's number, a cursor's hotspot).</summary>
-    public sealed record PreviewImage(byte[] Png, int Width, int Height, string? Caption);
+    /// <param name="Title">The card's title: the resource type in quotes ("'icl8'", "'SICN' #3").</param>
+    /// <param name="Detail">The card's detail: "32×32 · 8-bit".</param>
+    public sealed record PreviewImage(byte[] Png, int Width, int Height, string? Caption, string? Title = null, string? Detail = null)
+    {
+        /// <summary>The card's second line: the detail, else the caption.</summary>
+        public string? CardDetail => Detail ?? Caption;
+    }
 
     /// <summary>
     /// The preview of a resource or file, made by the same decoders as <c>extract</c>: images (pictures, icons, cursors,
@@ -67,6 +73,15 @@ namespace ClassicMac.App.ViewModels
         public string Message { get; }
 
         public IReadOnlyList<PreviewImage> Images { get; private init; } = [];
+
+        /// <summary>An icon family's 1-bit masks, shown with "Show masks".</summary>
+        public IReadOnlyList<PreviewImage> Masks { get; private init; } = [];
+
+        /// <summary>An icon's suite as the Finder draws it: the five states, then the seven labels, each captioned.</summary>
+        public IReadOnlyList<PreviewImage> FinderStates { get; private init; } = [];
+
+        /// <summary>Whether the images are an icon family's members (the summary says "members").</summary>
+        public bool IsFamily { get; private init; }
 
         public StyledText? Styled { get; private init; }
 
@@ -200,7 +215,7 @@ namespace ClassicMac.App.ViewModels
             {
                 var entries = type == "clut" ? Resources.Decoders.Colors.Palettes.ReadColorTable(data, out _, out _, out _)
                     : Resources.Decoders.Colors.Palettes.ReadPalette(data, out _);
-                return entries.Count == 0 ? Nothing($"'{type}'") : Swatches(entries);
+                return entries.Count == 0 ? Nothing($"'{type}'") : Swatches(entries, type);
             }
             if (type == "MENU")
             {
@@ -214,11 +229,17 @@ namespace ClassicMac.App.ViewModels
             }
 
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));
-            var preview = FromFiles(files, $"'{type}'");
-            // Icons: the suite of their ID as the Finder draws it, after the member itself.
+            var preview = FromFiles(files, $"'{type}'", type);
+            // Icons: every member of their ID's family, its masks, and the suite as the Finder draws it.
             if (preview.Kind == PreviewKind.Image && FinderIcons.Applies(resource))
             {
-                preview = new PreviewViewModel(PreviewKind.Image, "") { Images = [.. preview.Images, .. FinderIcons.Draw(resource, fork, options, readOptions, diagnostics)] };
+                preview = new PreviewViewModel(PreviewKind.Image, "")
+                {
+                    Images = type == "icns" ? preview.Images : Members(resource, fork, options, readOptions, diagnostics),
+                    Masks = FinderIcons.Masks(resource, fork, readOptions, diagnostics),
+                    FinderStates = FinderIcons.FinderStates(resource, fork, options, readOptions, diagnostics),
+                    IsFamily = true,
+                };
             }
 
             return preview;
@@ -240,7 +261,7 @@ namespace ClassicMac.App.ViewModels
                 var fork = new ResourceFork();
                 fork.Add(picture);
                 var decoder = ResourceDecoders.Create(options).First(d => d.CanDecode(picture.Type));
-                return FromFiles(decoder.Decode(new DecodeInput(picture, picture.GetData(), fork, readOptions, diagnostics)), "this picture");
+                return FromFiles(decoder.Decode(new DecodeInput(picture, picture.GetData(), fork, readOptions, diagnostics)), "this picture", "PICT");
             }
             if (type == "TEXT" && file.DataFork.Length is > 0 and <= MaxTextFile)
             {
@@ -275,7 +296,7 @@ namespace ClassicMac.App.ViewModels
         }
 
         // A palette as a grid of 16 × 16-pixel swatches, 16 to a row, in entry order, captioned with the count.
-        private static PreviewViewModel Swatches(IReadOnlyList<Resources.Decoders.Colors.PaletteEntry> entries)
+        private static PreviewViewModel Swatches(IReadOnlyList<Resources.Decoders.Colors.PaletteEntry> entries, string type)
         {
             const int Cell = 16, Columns = 16;
             var width = Math.Min(entries.Count, Columns) * Cell;
@@ -298,7 +319,7 @@ namespace ClassicMac.App.ViewModels
                 }
             }
             var png = Resources.Decoders.Images.PngEncoder.Instance.Encode(width, height, rgba);
-            return new PreviewViewModel(PreviewKind.Image, "") { Images = [new PreviewImage(png, width, height, $"{entries.Count} colours")] };
+            return new PreviewViewModel(PreviewKind.Image, "") { Images = [new PreviewImage(png, width, height, $"{entries.Count} colours", $"'{type}'")] };
         }
 
         // A diagnostic's message without the resource it names (the card's title names it): "Format 3 is neither 1 nor 2."
@@ -362,7 +383,40 @@ namespace ClassicMac.App.ViewModels
 
         private static PreviewViewModel StyledPreview(StyledText styled) => new(PreviewKind.Text, "") { Styled = styled, Text = styled.Text.Replace('\r', '\n') };
 
-        private static PreviewViewModel FromFiles(IReadOnlyList<DecodedFile> files, string what)
+        // An icon's family: the first image of each member of its ID, as their decoders draw them.
+        private static IReadOnlyList<PreviewImage> Members(Resource resource, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
+            ICollection<Diagnostic> diagnostics)
+        {
+            var decoders = ResourceDecoders.Create(options);
+            var members = new List<PreviewImage>();
+            foreach (var type in FinderIcons.MemberTypes)
+            {
+                var fourCC = FourCC.FromString(type);
+                if (fork.Find(fourCC, resource.Id) is not { } member || decoders.FirstOrDefault(d => d.CanDecode(fourCC)) is not { } decoder)
+                {
+                    continue;
+                }
+
+                var data = ResourceDecompression.Default.GetData(member, fork, readOptions, diagnostics);
+                if (FromFiles(decoder.Decode(new DecodeInput(member, data, fork, readOptions, diagnostics)), $"'{type}'", type).Images.FirstOrDefault() is { } image)
+                {
+                    members.Add(image);
+                }
+            }
+
+            return members;
+        }
+
+        // How many bits a pixel has in an image type (empty for types whose depth varies or is not a pixel depth).
+        private static string Depth(string? type) => type switch
+        {
+            "ICN#" or "ics#" or "icm#" or "ICON" or "SICN" or "CURS" or "PAT " or "PAT#" => " · 1-bit",
+            "icl4" or "ics4" or "icm4" => " · 4-bit",
+            "icl8" or "ics8" or "icm8" => " · 8-bit",
+            _ => "",
+        };
+
+        private static PreviewViewModel FromFiles(IReadOnlyList<DecodedFile> files, string what, string? type = null)
         {
             var images = files.Where(f => f.Extension.EndsWith(".png", StringComparison.Ordinal)).ToList();
             if (images.Count > 0)
@@ -374,8 +428,12 @@ namespace ClassicMac.App.ViewModels
                     {
                         var png = f.Content.ToArray();
                         var (width, height) = PngSize(png);
-                        var number = f.Extension.Length > 4 ? $"#{f.Extension[1..^4]}" : caption;
-                        return new PreviewImage(png, width, height, number);
+                        var listed = f.Extension.Length > 4;
+                        var number = listed ? $"#{f.Extension[1..^4]}" : caption;
+                        var title = type is null ? null : listed ? $"'{type}' {number}" : $"'{type}'";
+                        var detail = string.Create(CultureInfo.InvariantCulture, $"{width}×{height}{Depth(type)}")
+                            + (!listed && caption is not null ? " · " + caption : "");
+                        return new PreviewImage(png, width, height, number, title, detail);
                     }).ToList(),
                 };
             }

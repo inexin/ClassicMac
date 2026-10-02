@@ -27,5 +27,6 @@ public class PalettePreviewTests : IDisposable
 
         var image = Assert.Single(model.Preview.Images);
         Assert.Equal((256, 32, "18 colours"), (image.Width, image.Height, image.Caption));
+        Assert.Equal(("'clut'", "18 colours"), (image.Title, image.CardDetail)); // the card: type, then the count
     }
 }

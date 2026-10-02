@@ -43,6 +43,65 @@ public class WindowTests
     }
 
     [Fact]
+    public void The_image_grid_draws_a_family_and_virtualises_hundreds_of_cards() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-grid-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Icons.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(
+                ("ICN#", 128, null, [.. Enumerable.Range(0, 128).Select(i => (byte)(i % 8 < 4 ? 0xF0 : 0x0F)), .. Enumerable.Repeat((byte)0xFF, 128)]),
+                ("icl8", 128, null, Enumerable.Range(0, 1024).Select(i => (byte)(i / 32 * 8)).ToArray()),
+                ("ics#", 128, null, [.. Enumerable.Repeat((byte)0x3C, 32), .. Enumerable.Repeat((byte)0xFF, 32)]),
+                ("SICN", 128, null, Enumerable.Range(0, 500 * 32).Select(i => (byte)(i * 7)).ToArray())));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            var types = open.Result!.Children.OfType<ResourceTypeNode>().ToList();
+            model.Selected = types.Single(t => t.Type.ToString() == "ICN#").Children[0];
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            var cards = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("image-card")).ToList();
+            Assert.Equal(3, cards.Count);
+            Assert.Equal(model.ImageCardWidth, cards[0].Bounds.Width);
+            Capture(window, "image-family", baselines);
+
+            window.FindControl<CheckBox>("ShowMasksBox")!.IsChecked = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(5, window.GetVisualDescendants().OfType<Border>().Count(b => b.Classes.Contains("image-card")));
+            window.FindControl<ScrollViewer>("ImageScroller")!.ScrollToEnd();       // the Finder states, wrapped to the width
+            Dispatcher.UIThread.RunJobs();
+            Capture(window, "image-states", baselines);
+
+            // 500 icons: only the rows on screen are realised, and scrolling realises the later ones.
+            model.Selected = types.Single(t => t.Type.ToString() == "SICN").Children[0];
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(500, model.Images.Count);
+            List<string?> Shown() => window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("image-card") && b.IsEffectivelyVisible)
+                .Select(b => ((ImageItem)b.DataContext!).Image.Title).ToList();
+            var shown = Shown();
+            Assert.InRange(shown.Count, 1, 100);
+            Assert.Contains("'SICN' #1", shown);
+            Assert.DoesNotContain("'SICN' #500", shown);
+            var scroller = window.FindControl<ScrollViewer>("ImageScroller")!;
+            scroller.ScrollToEnd();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Contains("'SICN' #500", Shown());
+            window.Close();
+            Baselines.Verify(baselines);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
+    [Fact]
     public void The_main_window_draws_the_tree_and_previews() => OnUiThread(The_main_window_draws_the_tree_and_previewsBody);
 
     private static void The_main_window_draws_the_tree_and_previewsBody()

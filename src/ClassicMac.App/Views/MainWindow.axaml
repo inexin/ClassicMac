@@ -769,6 +769,28 @@
       <Setter Property="Margin" Value="16" />
       <Setter Property="MaxWidth" Value="520" />
     </Style>
+    <!-- The image grid (boards/main-window.md, P1): cards with a 1 px CmCardBorder, a checkerboard area with 12 padding and
+         a caption strip under a CmCardBorder rule; the Finder states strip on checkerboard with captions on a plate. -->
+    <Style Selector="Border.image-card">
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="ClipToBounds" Value="True" />
+      <Setter Property="VerticalAlignment" Value="Bottom" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+    <Style Selector="Border.image-caption">
+      <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
+      <Setter Property="BorderThickness" Value="0,1,0,0" />
+      <Setter Property="Padding" Value="8,4" />
+    </Style>
+    <Style Selector="Border.state-plate">
+      <Setter Property="Background" Value="{DynamicResource CmPaneBackground}" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="4,1" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
     <Style Selector="Border.preview-header">
       <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
@@ -1256,25 +1278,82 @@
             <DockPanel IsVisible="{Binding !ShowsForm}">
               <Panel>
                 <TextBlock Text="{Binding Preview.Message}" Margin="16" Classes="muted" IsVisible="{Binding Preview.IsMessage}" />
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" IsVisible="{Binding Preview.IsImage}">
-                  <ItemsControl ItemsSource="{Binding Images}" Margin="12">
-                    <ItemsControl.ItemsPanel>
-                      <ItemsPanelTemplate>
-                        <WrapPanel />
-                      </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate DataType="vm:ImageItem">
-                        <StackPanel Margin="0,0,16,16" Spacing="4">
-                          <Border Background="{DynamicResource CmCheckerboard}" HorizontalAlignment="Left">
-                            <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}" />
-                          </Border>
-                          <TextBlock Text="{Binding Image.Caption}" Classes="muted" FontSize="{DynamicResource CmFontSizeMeta}" />
-                        </StackPanel>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
+                <!-- The image grid (boards/main-window.md, P1): the sub-bar, then the cards cut into rows by the view-model
+                     for the viewport's width, in a virtualising list so hundreds of images scroll smoothly. -->
+                <DockPanel IsVisible="{Binding Preview.IsImage}">
+                  <DockPanel DockPanel.Dock="Top" Margin="12,8,12,0">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="12">
+                      <CheckBox Name="ShowMasksBox" Content="Show masks" IsChecked="{Binding ShowMasks}" IsVisible="{Binding HasMasks}" />
+                      <CheckBox Name="FinderStatesBox" Content="Finder states" IsChecked="{Binding ShowFinderStates}" IsVisible="{Binding HasFinderStates}" />
+                    </StackPanel>
+                    <TextBlock Name="ImageSummaryText" Text="{Binding ImageSummary}" Classes="muted" VerticalAlignment="Center" />
+                  </DockPanel>
+                  <ScrollViewer Name="ImageScroller" HorizontalScrollBarVisibility="Auto">
+                    <ItemsControl Name="ImageRowsList" ItemsSource="{Binding ImageRows}" Margin="12">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                          <VirtualizingStackPanel />
+                        </ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.DataTemplates>
+                        <DataTemplate DataType="vm:ImageRow">
+                          <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,0,12">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                              </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate DataType="vm:ImageItem">
+                                <Border Classes="image-card"
+                                        Width="{Binding $parent[Window].((vm:MainViewModel)DataContext).ImageCardWidth, FallbackValue=112}">
+                                  <DockPanel>
+                                    <Border DockPanel.Dock="Bottom" Classes="image-caption">
+                                      <StackPanel>
+                                        <TextBlock Text="{Binding Image.Title}" FontFamily="{StaticResource CmFontMono}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                                   IsVisible="{Binding Image.Title, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        <TextBlock Text="{Binding Image.CardDetail}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                      </StackPanel>
+                                    </Border>
+                                    <Border Background="{DynamicResource CmCheckerboard}" Padding="12">
+                                      <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Bottom" />
+                                    </Border>
+                                  </DockPanel>
+                                </Border>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </DataTemplate>
+                        <DataTemplate DataType="vm:FinderStatesRow">
+                          <StackPanel Spacing="6" Margin="0,8,0,12">
+                            <TextBlock Text="Finder states" Classes="muted" FontSize="12" FontWeight="SemiBold" />
+                            <Border Background="{DynamicResource CmCheckerboard}" HorizontalAlignment="Left" Padding="12" CornerRadius="6" MaxWidth="{Binding MaxWidth}">
+                              <ItemsControl ItemsSource="{Binding Items}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                  </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate DataType="vm:ImageItem">
+                                    <StackPanel Margin="0,0,12,4" Spacing="4">
+                                      <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
+                                                        HorizontalAlignment="Center" />
+                                      <Border Classes="state-plate">
+                                        <TextBlock Text="{Binding Image.Caption}" FontSize="11" />
+                                      </Border>
+                                    </StackPanel>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </Border>
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.DataTemplates>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </DockPanel>
                 <ScrollViewer IsVisible="{Binding Preview.IsStyledText}" Padding="16,12">
                   <views:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
                 </ScrollViewer>

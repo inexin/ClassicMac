@@ -176,6 +176,7 @@ public class FolderPreviewTests : IDisposable
         Assert.Contains(Enumerable.Range(0, 32).SelectMany(y => Enumerable.Range(124, 32).Select(x => bitmap[x, Top + 54 + y])), c => c != White);
         Assert.Equal(PreviewKind.Folder, preview.Kind);
         Assert.Equal("5 items", image.Caption);
+        Assert.Equal((null, "5 items"), (image.Title, image.CardDetail));    // the card has no type, only the count
     }
 
     [Fact]

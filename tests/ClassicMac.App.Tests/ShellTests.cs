@@ -61,11 +61,9 @@ public sealed class ShellTests : IDisposable
         Assert.False(model.ZoomInCommand.CanExecute(null));             // the input: no zoomable preview yet
         model.Selected = Resource(input, "ICN#");
         await model.PreviewTask;
-        Assert.Equal(2, model.Zoom);                                      // small icons open enlarged
+        Assert.Equal(4, model.Zoom);                                      // small icons open enlarged
         Assert.True(model.IsZoomable);
         Assert.True(model.ZoomInCommand.CanExecute(null));
-        model.ZoomInCommand.Execute(null);
-        Assert.Equal(4, model.Zoom);
         model.ZoomInCommand.Execute(null);
         Assert.Equal(8, model.Zoom);
         Assert.False(model.ZoomInCommand.CanExecute(null));

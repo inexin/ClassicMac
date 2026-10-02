@@ -300,8 +300,10 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
 
-        private static IReadOnlyList<ImageItem> ItemsAt(PreviewViewModel preview, int zoom) =>
-            preview.Images.Select(i => new ImageItem(i, i.Width * zoom, i.Height * zoom, zoom)).ToList();
+        // The cards: each image at the zoom, with its mask after it when "Show masks" is on.
+        private IReadOnlyList<ImageItem> ItemsAt(PreviewViewModel preview, int zoom) =>
+            preview.Images.SelectMany(i => ShowMasks ? preview.Masks.Where(m => m.Title == i.Title + " mask").Prepend(i) : [i])
+                .Select(i => new ImageItem(i, i.Width * zoom, i.Height * zoom, zoom)).ToList();
 
         // Decodes the selection's preview off the UI thread; a newer selection cancels an older one.
         private async Task MakePreviewAsync(NodeViewModel? node)
