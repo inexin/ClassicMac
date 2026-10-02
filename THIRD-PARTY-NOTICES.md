@@ -68,6 +68,10 @@ authorization of the copyright holder.
   disassembly of the Mac OS 9.0 System's `'dcmp'` 3.
 - The constant tables in `Dcmp01.cs` and `Dcmp2.cs` were cross-checked against its `System01.cc` and `System2.cc`.
   The tables themselves come from the Mac OS 9.0 System's decompressors.
+- `src/ClassicMac.Code/Disassembly/PpcDisassembler.cs` was ported from the disassembler half (the `dasm_*`
+  functions) of its `src/Emulators/PPC32Emulator.cc` (commit 5cbf27e): the opcode tables, field layouts and
+  reserved-bit checks. The output is standard assembler syntax with structured operands; AltiVec and most extended
+  mnemonics were added from the PowerPC and AltiVec programming environments manuals.
 
 ```
 The MIT License (MIT)
