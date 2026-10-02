@@ -818,9 +818,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     | Format | Built | Verified against the original application | Remaining |
     |---|---|---|---|
     | HFS+ / HFSX | Catalog files with Unicode paths, Finder info, dates and both forks (with overflow extents); symbolic links; file and directory hard links; journal metadata checked, not replayed; a bounded read-path validation of TN1150 (§11) | A journaled Mac OS X image from Digital Corpora's `nps-2009-hfsjtest1` (optional test) | Broader cross-version and layout interoperability. `fsck_hfs` parity and repair are not targets |
-    | StuffIt 1.x–4 | v1 sequential records with folder markers, v2 linked entries; stored, method 6 (fixed Huffman + PackBits), method 13; `SitC` comments | StuffIt Deluxe 4.5 (v2 traversal, method 13); a `.comment.sit` with its AppleDouble companion (`SitC`) | v1 and method 6 |
+    | StuffIt 1.x–4 | v1 sequential records with folder markers, v2 linked entries; stored, method 6 (fixed Huffman + PackBits), method 13; `SitC` comments | StuffIt Deluxe 4.5 (v2 traversal, method 13); a `.comment.sit` with its AppleDouble companion (`SitC`); StuffIt 1.5.1 (v1 with folders, methods 0, 1, 2, 3) | Method 6 (StuffIt 1.5.1 cannot write it) |
     | StuffIt 5 | Stored, RLE90 (1), LZW (2), Huffman (3), LZAH (5), method 6, LZMW (8), LZ + Huffman (13), Installer (14), Arsenic (15); encrypted archives reported, not opened | Deluxe 6.5 and 7.0, Mac OS 9 and Mac OS X variants (listings and exact forks); method 15 with Deluxe 6.5.1 | Method 14 (hand-built vectors only) |
-    | StuffIt split files | SegmentIt volumes reassembled, both forks and Finder info, the `.sit` inside unwrapped | — | An original SegmentIt volume set |
+    | StuffIt split files | SegmentIt (`$B056`) and StuffIt 1.5.1 (`$41A7`) segments reassembled, both forks and Finder info, the `.sit` inside unwrapped | StuffIt 1.5.1's Segment command | An original SegmentIt volume set |
     | Compact Pro | Directory and folders; RLE and LZH + RLE forks; multi-volume sets through sibling files, missing volumes reported per entry; comments as diagnostics | — (fitted) | An archive and a segmented set made by Compact Pro |
     | PackIt | Stored (`PMag`), XOR- and DES-encrypted stored (`PMa1`, `PMa2`), Huffman (`PMa4`), encrypted Huffman (`PMa5`, `PMa6`) | — (fitted) | Reserved `PMa3`/`PMa7`; any other documented methods |
     | DiskDoubler | DDAR stored entries; DDA2 archives and standalone files with methods 0–10; delta types 1 and 2; header CRCs (fitted) | Standalone methods 1 and 8 (DiskDoubler 3.7.7) and 6, 9, 10 (Pro 4.1.1); 6, 9, 10 in DDA2 records; a Pro 4.1.1 DDA2 archive (its `0x1000` layout fitted) | Methods 2, 3, 4, 5, 7 and the delta types; DDA2 checksum fields; other delta types |
@@ -851,15 +851,19 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
 - [x] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager): all
   14 types load; PlotIconID draws every family member with 0 mismatched pixels at depths 1–32 (2026-10-02).
-- [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
+- [x] **Real Dialog Manager previews** for `DLOG`/`ALRT`: drawn as Mac OS 9.0 with Appearance (Platinum) draws them,
+  every non-text pixel matching the captures (INTERFACE.md §12.1; 2026-10-02).
 - [x] **8-bit icon masks in icon suites** (Mac OS 9's CopyMask through an 8-bit mask in `IconSuite.Plot`), from a Mac OS 9
   oracle run (2026-10-02).
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
 - [x] **`.sea` self-extracting archive detection** (phase 2): the archive is the data fork, read like any other.
-- [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column): StuffIt v1 and method 6,
-  StuffIt 5 method 14, a SegmentIt set, Compact Pro archives and segmented sets, PackIt, DiskDoubler methods 2–5 and 7
-  and the delta types, LHa archives. Each needs a redistributable archive made by the original application.
-- [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3).
+- [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column; StuffIt v1 done with
+  StuffIt 1.5.1, 2026-10-02): StuffIt method 6, StuffIt 5 method 14, a SegmentIt set, Compact Pro archives and segmented sets, PackIt, DiskDoubler methods 2–5 and 7
+  and the delta types, LHa archives. Each needs a redistributable archive made by the original application. Blocked:
+  the applications are not at hand (the download from Macintosh Garden needs the owner's approval), and the StuffIt
+  7.0.3 installer needs more free space on the emulator's boot disk.
+- [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3). Blocked: no sample of either, and MAR's layout is
+  published only in GPL source; DiskDup+ images are said to be raw sectors, which the raw-image path already reads.
 - [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files (ROM.md; 68k ROMs
   unverified).
 - [x] **Fork repair beyond `fork.map-recovered`:** not needed: no corpus fork reports a `fork.*` diagnostic

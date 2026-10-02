@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Interface previews: dialogs and alerts are drawn as Mac OS 9 with Appearance (Platinum) draws them, frames and
+  controls pixel for pixel; text through the fonts in open files (INTERFACE.md section 12.1).
+- Icons: Mac OS 9's 8-bit icon masks (`l8mk`, `s8mk`, `h8mk`) in icon suites at 8 bits and more (ICONS.md).
+- Inputs: Mac ROM images (the ROM's resource table, and the New World `Mac OS ROM` file; ROM.md); `.sea`
+  self-extracting archives through their data fork; StuffIt 1.5.1 segment sets.
+- Pixel patterns: a colour table's size is signed, so ResEdit's `ppat`s with an empty table load and draw.
 - Inputs: uuencode (`.uu`, `begin-base64`); zip (stored, DEFLATE, ZIP64) and tar/gzip with Mac data: AppleDouble `._`
   and `__MACOSX/` pairing, Info-ZIP and ZipIt Mac extra fields (ARCHIVES.md, CONTAINERS.md section 8).
 - CD images: multisession discs are read by their last session's descriptors, as the Mac reads them, from cue sheets
