@@ -222,28 +222,367 @@ namespace ClassicMac.App.Views
             ],
         };
 
+        public const int LargeSize = 32;
+
+        /// <summary>
+        /// The same kinds drawn at 32 × 32 for the inspector header's tile (never the 16-pixel art scaled up), in the same
+        /// palette and style.
+        /// </summary>
+        public static IReadOnlyDictionary<TreeIconKind, string[]> LargeArt { get; } = new Dictionary<TreeIconKind, string[]>
+        {
+            // A hard disk: grey body with a highlight, vents, a green light and feet.
+            [TreeIconKind.HardDisk] =
+            [
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..",
+                ".KWWWWWWWWWWWWWWWWWWWWWWWWWWWWK.",
+                ".KWGGGGGGGGGGGGGGGGGGGGGGGGGGDK.",
+                ".KWGGGGGGGGGGGGGGGGGGGGGGGGGGDK.",
+                ".KWGGGGGGGGGGGGGGGGGGGGGGGGGGDK.",
+                ".KWGGGGGGGGGGGGGGGGGGGGGGGGGGDK.",
+                ".KWGGDGGDGGDGGDGGDGGGGGGGGGGGDK.",
+                ".KWGGDGGDGGDGGDGGDGGGGGGgggGGDK.",
+                ".KWGGDGGDGGDGGDGGDGGGGGGgggGGDK.",
+                ".KWGGDGGDGGDGGDGGDGGGGGGGGGGGDK.",
+                ".KWGGGGGGGGGGGGGGGGGGGGGGGGGGDK.",
+                ".KWGGGGGGGGGGGGGGGGGGGGGGGGGGDK.",
+                ".KDDDDDDDDDDDDDDDDDDDDDDDDDDDDK.",
+                ".KDDDDDDDDDDDDDDDDDDDDDDDDDDDDK.",
+                "..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..",
+                "....KKKK................KKKK....",
+                "....KKKK................KKKK....",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+            ],
+            // A floppy disk: dark body with a bevelled corner, the metal shutter, a white label.
+            [TreeIconKind.Floppy] =
+            [
+                "................................",
+                "................................",
+                "..KKKKKKKKKKKKKKKKKKKKKKKKKK....",
+                "..KDDDDDKGGGGGGGGGGGGGKDDDDDK...",
+                "..KDDDDDKGGGGGGGDDDDGGKDDDDDDK..",
+                "..KDDDDDKGGGGGGGDDDDGGKDDDDDDK..",
+                "..KDDDDDKGGGGGGGDDDDGGKDDDDDDK..",
+                "..KDDDDDKGGGGGGGDDDDGGKDDDDDDK..",
+                "..KDDDDDKGGGGGGGDDDDGGKDDDDDDK..",
+                "..KDDDDDKGGGGGGGDDDDGGKDDDDDDK..",
+                "..KDDDDDKGGGGGGGGGGGGGKDDDDDDK..",
+                "..KDDDDDKKKKKKKKKKKKKKKDDDDDDK..",
+                "..KDDDDDDDDDDDDDDDDDDDDDDDDDDK..",
+                "..KDDDDDDDDDDDDDDDDDDDDDDDDDDK..",
+                "..KDDDDDDDDDDDDDDDDDDDDDDDDDDK..",
+                "..KDDDKKKKKKKKKKKKKKKKKKKKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWDDDDDDDDDDDDDDWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWDDDDDDDDDDDDDDWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWDDDDDDDDDWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KDDDKWWWWWWWWWWWWWWWWWWKDDDK..",
+                "..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..",
+                "................................",
+                "................................",
+            ],
+            // A parcel: a tan box tied with string and a bow.
+            [TreeIconKind.Parcel] =
+            [
+                "................................",
+                "................................",
+                "........SSSSSSS..SSSSSSS........",
+                "........S.....S..S.....S........",
+                "........S.....S..S.....S........",
+                "........S.....SSSS.....S........",
+                "........S.....SSSS.....S........",
+                "........SSSSSSSSSSSSSSSS........",
+                "..KKKKKKKKKKKKSSSSKKKKKKKKKKKK..",
+                "..KWWWWWWWWWWWWSSWWWWWWWWWWWWK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KSSSSSSSSSSSSSSSSSSSSSSSSSSK..",
+                "..KSSSSSSSSSSSSSSSSSSSSSSSSSSK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KTTTTTTTTTTTTSSTTTTTTTTTTTTK..",
+                "..KKKKKKKKKKKKKKKKKKKKKKKKKKKK..",
+                "................................",
+                "................................",
+            ],
+            // A folder with its tab, lavender.
+            [TreeIconKind.Folder] =
+            [
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+                "...KKKKKKKKKK...................",
+                "..KWWWWWWWWWWK..................",
+                "..KLLLLLLLLLLK..................",
+                "..KLLLLLLLLLLK..................",
+                ".KKLLLLLLLLLLLKKKKKKKKKKKKKKKKK.",
+                ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+                ".KWWWWWWWWWWWWWWWWWWWWWWWWWWWLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KWLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KLLLLLLLLLLLLLLLLLLLLLLLLLLLLK.",
+                ".KKKKKKKKKKKKKKKKKKKKKKKKKKKKKK.",
+                "................................",
+                "................................",
+                "................................",
+                "................................",
+            ],
+            // An application: a purple diamond with a light core.
+            [TreeIconKind.Application] =
+            [
+                "................................",
+                "...............KK...............",
+                "..............KWPK..............",
+                ".............KWPPPK.............",
+                "............KWPPPPPK............",
+                "...........KWPPPPPPPK...........",
+                "..........KWPPPPPPPPPK..........",
+                ".........KWPPPPPPPPPPPK.........",
+                "........KWPPPPPPPPPPPPPK........",
+                ".......KWPPPPPPPPPPPPPPPK.......",
+                "......KWPPPPPPPPPPPPPPPPPK......",
+                ".....KWPPPPPPPPPPPPPPPPPPPK.....",
+                "....KWPPPPPPPPPLLPPPPPPPPPPK....",
+                "...KWPPPPPPPPPLLLLPPPPPPPPPPK...",
+                "..KWPPPPPPPPPLLLLLLPPPPPPPPPPK..",
+                ".KWPPPPPPPPPLLLLLLLLPPPPPPPPPPK.",
+                ".KPPPPPPPPPPLLLLLLLLPPPPPPPPPPK.",
+                "..KPPPPPPPPPPLLLLLLPPPPPPPPPPK..",
+                "...KPPPPPPPPPPLLLLPPPPPPPPPPK...",
+                "....KPPPPPPPPPPLLPPPPPPPPPPK....",
+                ".....KPPPPPPPPPPPPPPPPPPPPK.....",
+                "......KPPPPPPPPPPPPPPPPPPK......",
+                ".......KPPPPPPPPPPPPPPPPK.......",
+                "........KPPPPPPPPPPPPPPK........",
+                ".........KPPPPPPPPPPPPK.........",
+                "..........KPPPPPPPPPPK..........",
+                "...........KPPPPPPPPK...........",
+                "............KPPPPPPK............",
+                ".............KPPPPK.............",
+                "..............KPPK..............",
+                "...............KK...............",
+                "................................",
+            ],
+            // A document: a page with a folded corner and lines of text.
+            [TreeIconKind.Document] =
+            [
+                "................................",
+                ".....KKKKKKKKKKKKKKK............",
+                ".....KWWWWWWWWWWWWWKK...........",
+                ".....KWWWWWWWWWWWWWKWK..........",
+                ".....KWWWWWWWWWWWWWKWWK.........",
+                ".....KWWWWWWWWWWWWWKWWWK........",
+                ".....KWWWWWWWWWWWWWKWWWWK.......",
+                ".....KWWWWWWWWWWWWWKWWWWWK......",
+                ".....KWWWWWWWWWWWWWKKKKKKKK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWDDDDDDDDDDDDWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWDDDDDDDDDDDDDDWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWDDDDDDDDDDDDDWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWDDDDDDDDDDDDDDWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWDDDDDDDDDWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KWWWWWWWWWWWWWWWWWWWWK.....",
+                ".....KKKKKKKKKKKKKKKKKKKKKK.....",
+                "................................",
+            ],
+            // A "No name" group: two pages with folded corners, the back one up and to the right.
+            [TreeIconKind.NoNameGroup] =
+            [
+                "................................",
+                "...........KKKKKKKKKKKKK........",
+                "...........KWWWWWWWWWWWKK.......",
+                "...........KWWWWWWWWWWWKWK......",
+                "...........KWWWWWWWWWWWKWWK.....",
+                "...........KWWWWWWWWWWWKWWWK....",
+                "...........KWWWWWWWWWWWKKKKKK...",
+                "...........KWWWWWWWWWWWWWWWWK...",
+                "...KKKKKKKKKKKKKK.....WWWWWWK...",
+                "...KWWWWWWWWWWWWKK....WWWWWWK...",
+                "...KWWWWWWWWWWWWKWK...DWWWWWK...",
+                "...KWWWWWWWWWWWWKWWK..WWWWWWK...",
+                "...KWWWWWWWWWWWWKWWWK.WWWWWWK...",
+                "...KWWWWWWWWWWWWKKKKKKDDWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKWWWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKWWWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKDDWWWWK...",
+                "...KWWDDDDDDDDDWWWWWWKWWWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKWWWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKWWWWWWK...",
+                "...KWWDDDDDDDDDDDWWWWKWWWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKWWWWWWK...",
+                "...KWWWWWWWWWWWWWWWWWKKKKKKKK...",
+                "...KWWDDDDDDDDDDDWWWWK..........",
+                "...KWWWWWWWWWWWWWWWWWK..........",
+                "...KWWWWWWWWWWWWWWWWWK..........",
+                "...KWWDDDDDDDDDDDWWWWK..........",
+                "...KWWWWWWWWWWWWWWWWWK..........",
+                "...KWWWWWWWWWWWWWWWWWK..........",
+                "...KWWWWWWWWWWWWWWWWWK..........",
+                "...KKKKKKKKKKKKKKKKKKK..........",
+                "................................",
+            ],
+            // A resource type: two stacked cards with blue lines.
+            [TreeIconKind.ResourceType] =
+            [
+                "................................",
+                "................................",
+                ".........KKKKKKKKKKKKKKKKKKKKK..",
+                ".........KWWWWWWWWWWWWWWWWWWWK..",
+                ".........KWWWWWWWWWWWWWWWWWWWK..",
+                ".........KWWbbbbbbbbbbbbbWWWWK..",
+                ".........KWWbbbbbbbbbbbbbWWWWK..",
+                ".........KWWWWWWWWWWWWWWWWWWWK..",
+                ".........KWWWWWWWWWWWWWWWWWWWK..",
+                "..KKKKKKKKKKKKKKKKKKKKKWWWWWWK..",
+                "..KWWWWWWWWWWWWWWWWWWWKWWWWWWK..",
+                "..KWWWWWWWWWWWWWWWWWWWKWWWWWWK..",
+                "..KWWBBBBBBBBBBBBBWWWWKWWWWWWK..",
+                "..KWWBBBBBBBBBBBBBWWWWKbbWWWWK..",
+                "..KWWWWWWWWWWWWWWWWWWWKbbWWWWK..",
+                "..KWWWWWWWWWWWWWWWWWWWKWWWWWWK..",
+                "..KWWBBBBBBBBBWWWWWWWWKWWWWWWK..",
+                "..KWWBBBBBBBBBWWWWWWWWKWWWWWWK..",
+                "..KWWWWWWWWWWWWWWWWWWWKWWWWWWK..",
+                "..KWWWWWWWWWWWWWWWWWWWKWWWWWWK..",
+                "..KWWBBBBBBBBBBBBBWWWWKWWWWWWK..",
+                "..KWWBBBBBBBBBBBBBWWWWKKKKKKKK..",
+                "..KWWWWWWWWWWWWWWWWWWWK.........",
+                "..KWWWWWWWWWWWWWWWWWWWK.........",
+                "..KWWBBBBBBBWWWWWWWWWWK.........",
+                "..KWWBBBBBBBWWWWWWWWWWK.........",
+                "..KWWWWWWWWWWWWWWWWWWWK.........",
+                "..KWWWWWWWWWWWWWWWWWWWK.........",
+                "..KWWWWWWWWWWWWWWWWWWWK.........",
+                "..KKKKKKKKKKKKKKKKKKKKK.........",
+                "................................",
+                "................................",
+            ],
+            // A resource: a card with a blue edge and a 3 × 4 grid of black bytes.
+            [TreeIconKind.Resource] =
+            [
+                "................................",
+                "................................",
+                "................................",
+                "......KKKKKKKKKKKKKKKKKKKK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWWWWWWWWWWWWWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KBBBWWKKKWKKKWKKKWWK......",
+                "......KKKKKKKKKKKKKKKKKKKK......",
+                "................................",
+                "................................",
+                "................................",
+            ],
+        };
+
         private static readonly Dictionary<TreeIconKind, Bitmap> Bitmaps = [];
+        private static readonly Dictionary<TreeIconKind, Bitmap> LargeBitmaps = [];
 
         /// <summary>The art's pixels as ARGB words, row by row.</summary>
-        public static uint[] Pixels(TreeIconKind kind)
+        public static uint[] Pixels(TreeIconKind kind) => Pixels(kind, Art[kind], Size);
+
+        /// <summary>The 32-pixel art's pixels as ARGB words, row by row.</summary>
+        public static uint[] LargePixels(TreeIconKind kind) => Pixels(kind, LargeArt[kind], LargeSize);
+
+        private static uint[] Pixels(TreeIconKind kind, string[] art, int size)
         {
-            var art = Art[kind];
-            if (art.Length != Size)
+            if (art.Length != size)
             {
                 throw new InvalidOperationException($"{kind}: {art.Length} rows");
             }
 
-            var pixels = new uint[Size * Size];
-            for (int y = 0; y < Size; y++)
+            var pixels = new uint[size * size];
+            for (int y = 0; y < size; y++)
             {
-                if (art[y].Length != Size)
+                if (art[y].Length != size)
                 {
                     throw new InvalidOperationException($"{kind}: row {y} has {art[y].Length} pixels");
                 }
 
-                for (int x = 0; x < Size; x++)
+                for (int x = 0; x < size; x++)
                 {
-                    pixels[y * Size + x] = Palette[art[y][x]];
+                    pixels[y * size + x] = Palette[art[y][x]];
                 }
             }
             return pixels;
@@ -264,30 +603,33 @@ namespace ClassicMac.App.Views
             _ => TreeIconKind.Folder,
         }));
 
-        /// <summary>The kind's icon as a bitmap (made once, on the UI thread); none for the loading placeholder.</summary>
-        public static Bitmap? For(TreeIconKind kind)
-        {
-            if (!Art.ContainsKey(kind))
-            {
-                return null;
-            }
+        /// <summary>A kind's 32-pixel icon (the inspector header's tile, when the selection has no large icon of its own).</summary>
+        public static IValueConverter LargeConverter { get; } = new FuncValueConverter<TreeIconKind, Bitmap?>(LargeFor);
 
-            if (Bitmaps.TryGetValue(kind, out var bitmap))
+        /// <summary>The kind's icon as a bitmap (made once, on the UI thread); none for the loading placeholder.</summary>
+        public static Bitmap? For(TreeIconKind kind) => Art.ContainsKey(kind) ? Make(Bitmaps, kind, Pixels, Size) : null;
+
+        /// <summary>The kind's 32-pixel icon as a bitmap (made once, on the UI thread); none for the loading placeholder.</summary>
+        public static Bitmap? LargeFor(TreeIconKind kind) => LargeArt.ContainsKey(kind) ? Make(LargeBitmaps, kind, LargePixels, LargeSize) : null;
+
+        private static Bitmap Make(Dictionary<TreeIconKind, Bitmap> made, TreeIconKind kind, Func<TreeIconKind, uint[]> art, int size)
+        {
+            if (made.TryGetValue(kind, out var bitmap))
             {
                 return bitmap;
             }
 
-            var writeable = new WriteableBitmap(new PixelSize(Size, Size), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
-            var pixels = Pixels(kind);
+            var writeable = new WriteableBitmap(new PixelSize(size, size), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
+            var pixels = art(kind);
             using (var locked = writeable.Lock())
             {
-                for (int y = 0; y < Size; y++)
+                for (int y = 0; y < size; y++)
                 {
-                    Marshal.Copy((int[])(object)pixels, y * Size, locked.Address + y * locked.RowBytes, Size);
+                    Marshal.Copy((int[])(object)pixels, y * size, locked.Address + y * locked.RowBytes, size);
                 }
             }
 
-            return Bitmaps[kind] = writeable;
+            return made[kind] = writeable;
         }
     }
 

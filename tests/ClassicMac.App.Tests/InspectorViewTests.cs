@@ -54,16 +54,27 @@ public sealed class InspectorViewTests
             Assert.Equal(["Type", "ID", "Size", "Attributes"], texts.Where(t => t.Classes.Contains("label")).Select(t => t.Text));
             var type = texts.Single(t => t.Classes.Contains("value") && t.Text == "'STR#'");
             Assert.Equal("IBM Plex Mono", type.FontFamily.Name.Split('#')[^1]);
-            Assert.Same(strings, header.GetVisualDescendants().OfType<TreeIcon>().Single().Node);
-            // No large icon of its own: the kind icon shows in the tile.
-            Assert.True(header.GetVisualDescendants().OfType<TreeIcon>().Single().IsEffectivelyVisible);
-            Assert.False(header.GetVisualDescendants().OfType<PixelImage>().Single().IsEffectivelyVisible);
+            // No large icon of its own: the kind's 32-pixel icon shows in the tile, 1:1.
+            var kindIcon = window.FindControl<PixelImage>("HeaderKindIcon")!;
+            var ownIcon = window.FindControl<PixelImage>("HeaderOwnIcon")!;
+            Assert.True(kindIcon.IsEffectivelyVisible);
+            Assert.Same(TreeIcons.LargeFor(TreeIconKind.Resource), kindIcon.Source);
+            Assert.Equal(1.0, kindIcon.Zoom);
+            Assert.False(ownIcon.IsEffectivelyVisible);
+            Assert.Empty(header.GetVisualDescendants().OfType<TreeIcon>());
             model.HeaderIconPng = ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(32, 32, new byte[32 * 32 * 4]);
             Dispatcher.UIThread.RunJobs();
-            var large = header.GetVisualDescendants().OfType<PixelImage>().Single();
-            Assert.True(large.IsEffectivelyVisible);
-            Assert.Equal((32, 1.0), (large.Source!.PixelSize.Width, large.Zoom));
-            Assert.False(header.GetVisualDescendants().OfType<TreeIcon>().Single().IsEffectivelyVisible);
+            Assert.True(ownIcon.IsEffectivelyVisible);
+            Assert.Equal((32, 1.0), (ownIcon.Source!.PixelSize.Width, ownIcon.Zoom));
+            Assert.False(kindIcon.IsEffectivelyVisible);
+
+            // The input (a disk) shows its kind at 32 too.
+            model.Selected = input;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(TreeIcons.LargeFor(TreeIconKind.HardDisk), kindIcon.Source);
+            model.Selected = strings;
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
             // The toolbar's Export… does what the header's does.
             var toolbarExport = window.FindControl<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>()
                 .Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Export");

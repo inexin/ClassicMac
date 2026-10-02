@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Avalonia;
@@ -319,30 +320,55 @@ namespace ClassicMac.App.Views
             }
         }
 
-        /// <summary>
-        /// The ruler's labels from 0 to <paramref name="duration"/> in <paramref name="steps"/> steps, with two decimals,
-        /// or as many more as make the steps differ (a 0.02 s sound reads "0.005 s", not "0.00 s" twice).
-        /// </summary>
-        internal static string[] RulerLabels(double duration, int steps)
+        /// <summary>The smallest step of 1, 2 or 5 × 10^n that is at least <paramref name="minimum"/>.</summary>
+        internal static double NiceStep(double minimum)
         {
-            var step = duration / Math.Max(1, steps);
-            var decimals = step > 0 ? Math.Clamp((int)Math.Ceiling(-Math.Log10(step) - 1e-9), 2, 6) : 2;
-            var format = "{0:F" + decimals.ToString(System.Globalization.CultureInfo.InvariantCulture) + "} s";
-            return Enumerable.Range(0, steps + 1)
-                .Select(i => string.Format(System.Globalization.CultureInfo.InvariantCulture, format, duration * i / steps)).ToArray();
+            var power = Math.Pow(10, Math.Floor(Math.Log10(minimum)));
+            foreach (var factor in new[] { 1.0, 2.0, 5.0, 10.0 })
+            {
+                if (factor * power >= minimum * (1 - 1e-9))
+                {
+                    return factor * power;
+                }
+            }
+
+            return 10 * power;
         }
 
-        // The time ruler: a tick and a label in mono 11 at about every 80 px, 0.00 s to the end.
+        /// <summary>
+        /// The ruler's ticks over <paramref name="duration"/> seconds drawn <paramref name="width"/> px wide: every nice step
+        /// (<see cref="NiceStep"/>) at least <paramref name="spacing"/> px apart, from 0 s, labelled with the decimals the
+        /// step needs ("0.002 s", "0.5 s", "50 s").
+        /// </summary>
+        internal static IReadOnlyList<(double Seconds, string Label)> RulerTicks(double duration, double width, double spacing = 80)
+        {
+            if (duration <= 0 || width <= 0)
+            {
+                return [(0, "0 s")];
+            }
+
+            var step = NiceStep(duration * spacing / width);
+            var decimals = Math.Max(0, (int)Math.Ceiling(-Math.Log10(step) - 1e-9));
+            var format = "{0:F" + decimals.ToString(System.Globalization.CultureInfo.InvariantCulture) + "} s";
+            var ticks = new List<(double, string)>();
+            for (var i = 0; i * step <= duration * (1 + 1e-9); i++)
+            {
+                var seconds = i * step;
+                ticks.Add((seconds, i == 0 ? "0 s" : string.Format(System.Globalization.CultureInfo.InvariantCulture, format, seconds)));
+            }
+
+            return ticks;
+        }
+
+        // The time ruler: a tick and a label in mono 11 at each nice step (at least 80 px apart), from 0 s.
         private void DrawRuler(DrawingContext context, DecodedSound sound, double top, double width)
         {
             var text = Token("CmTextMuted") ?? Brushes.Gray;
             var font = this.TryFindResource("CmFontMono", ActualThemeVariant, out var family) && family is FontFamily mono ? mono : FontFamily.Default;
-            var steps = Math.Max(1, (int)(width / 80));
-            var labels = RulerLabels(sound.Duration, steps);
-            for (var i = 0; i <= steps; i++)
+            foreach (var (seconds, labelText) in RulerTicks(sound.Duration, width))
             {
-                var x = Math.Round(width * i / steps);
-                var label = new FormattedText(labels[i], System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface(font), 11, text);
+                var x = sound.Duration > 0 ? Math.Round(width * seconds / sound.Duration) : 0;
+                var label = new FormattedText(labelText, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface(font), 11, text);
                 context.FillRectangle(text, new Rect(Math.Min(x, width - 1), top, 1, 4));
                 var at = Math.Clamp(x - label.Width / 2, 0, Math.Max(0, width - label.Width));
                 context.DrawText(label, new Point(at, top + 5));

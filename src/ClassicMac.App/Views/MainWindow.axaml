@@ -1222,11 +1222,14 @@
             </StackPanel>
             <Border Classes="icon-tile">
               <Panel>
-                <views:PixelImage Source="{Binding HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
+                <!-- The selection's own large icon (an icon's image, a picture's thumbnail, a file's Finder icon), else its
+                     kind's 32-pixel icon; both 1:1. -->
+                <views:PixelImage x:Name="HeaderOwnIcon" Source="{Binding HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
                                   IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                <views:TreeIcon Node="{Binding Header.Node, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
+                <views:PixelImage x:Name="HeaderKindIcon" Source="{Binding Header.Node.IconKind, Converter={x:Static views:TreeIcons.LargeConverter}, FallbackValue={x:Null}}" Zoom="1"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
               </Panel>
             </Border>
             <StackPanel Classes="titles">

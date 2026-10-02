@@ -86,42 +86,103 @@ namespace ClassicMac.App.Views
 
         private DiagnosticsPanel? boundPanel;
 
-        // "Show item": once the opened ancestors have their rows, the node's row scrolls into view and takes the focus.
+        // "Show item" and type-ahead: once the opened ancestors have their rows, the node's row scrolls into view and takes
+        // the focus.
         private void ShowInTree(NodeViewModel node) => Dispatcher.UIThread.Post(() => ShowNode(node), DispatcherPriority.Background);
 
         /// <summary>Scrolls the node's row into view and focuses it (its ancestors already open).</summary>
         internal void ShowNode(NodeViewModel node)
         {
-            Tree.UpdateLayout();
-            if (ContainerOf(node) is not { } row)
+            if (RevealNode(node) is { } row)
             {
-                return;
+                row.Focus();
+            }
+        }
+
+        // Any selection made away from the tree (the Details tab's "In", a diagnostic's row, a form's link) scrolls the tree
+        // to it once its ancestors' rows are made; a click in the tree is already in view.
+        private void OnSelectedChanged(MainViewModel model)
+        {
+            if (model.Selected is { } node)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (ReferenceEquals(model.Selected, node))
+                    {
+                        RevealNode(node);
+                    }
+                }, DispatcherPriority.Background);
+            }
+        }
+
+        /// <summary>
+        /// Scrolls the node's row into view and returns it. The rows are virtualized and sized only once made, so the first
+        /// scroll lands on an estimate: it is repeated until the row sits inside the tree's viewport.
+        /// </summary>
+        private TreeViewItem? RevealNode(NodeViewModel node)
+        {
+            TreeViewItem? row = null;
+            for (var attempt = 0; attempt < 4; attempt++)
+            {
+                Tree.UpdateLayout();
+                row = ContainerOf(node);
+                if (row is null)
+                {
+                    continue;
+                }
+
+                row.BringIntoView(HeaderBounds(row));
+                Tree.UpdateLayout();
+                if (IsInView(row, node))
+                {
+                    return row;
+                }
             }
 
-            row.BringIntoView();
-            row.Focus();
+            return row;
+        }
+
+        // A row's own line (its header), not its open children.
+        private static Rect HeaderBounds(TreeViewItem row) =>
+            row.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_Header") is { } header
+                ? new Rect(header.Bounds.Size)
+                : new Rect(row.Bounds.Size);
+
+        private bool IsInView(TreeViewItem row, NodeViewModel node)
+        {
+            if (!ReferenceEquals(row.DataContext, node) || row.TranslatePoint(default, Tree) is not { } at)
+            {
+                return false;
+            }
+
+            return at.Y >= -1 && at.Y + HeaderBounds(row).Height <= Tree.Bounds.Height + 1;
         }
 
         // The tree row of a node: each ancestor's container holds the next one.
         // The rows are virtualized (only those on screen exist): each level scrolls the next row into view first.
         private TreeViewItem? ContainerOf(NodeViewModel node)
         {
-            if (node.Parent is null)
-            {
-                Tree.ScrollIntoView(node);
-                Tree.UpdateLayout();
-                return Tree.ContainerFromItem(node) as TreeViewItem;
-            }
-
-            if (ContainerOf(node.Parent) is not { } parent)
+            ItemsControl? owner = node.Parent is null ? Tree : ContainerOf(node.Parent);
+            if (owner is null)
             {
                 return null;
             }
 
-            parent.UpdateLayout();
-            parent.ScrollIntoView(node);
-            parent.UpdateLayout();
-            return parent.ContainerFromItem(node) as TreeViewItem;
+            // A row already made is used where it is (scrolling to each ancestor would jump the tree back up); one not
+            // made is scrolled to, again when the first scroll's estimate of the rows above it left it unmade.
+            for (var attempt = 0; attempt < 3; attempt++)
+            {
+                owner.UpdateLayout();
+                if (owner.ContainerFromItem(node) is TreeViewItem row)
+                {
+                    return row;
+                }
+
+                owner.ScrollIntoView(node);
+            }
+
+            owner.UpdateLayout();
+            return owner.ContainerFromItem(node) as TreeViewItem;
         }
 
         // Drag out of the tree: a press on a file or resource that moves a few pixels writes it to the drag folder, then
@@ -257,6 +318,11 @@ namespace ClassicMac.App.Views
             if (e.PropertyName == nameof(MainViewModel.Preview))
             {
                 ImageScroller.Offset = default;
+            }
+
+            if (e.PropertyName == nameof(MainViewModel.Selected) && sender is MainViewModel model)
+            {
+                OnSelectedChanged(model);
             }
         }
 

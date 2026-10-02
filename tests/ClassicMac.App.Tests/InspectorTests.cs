@@ -322,6 +322,40 @@ public sealed class InspectorTests : IDisposable
         Assert.Null(await Select(input));
     }
 
+    // A picture's header icon is its thumbnail, fitted into 32 by nearest neighbour; a small one stays 1:1.
+    [Theory]
+    [InlineData(64, 32, 32, 16)]
+    [InlineData(20, 10, 20, 10)]
+    public async Task A_picture_s_header_icon_is_its_thumbnail(int width, int height, int iconWidth, int iconHeight)
+    {
+        var picture = new ClassicMac.Graphics.RgbaBitmap(width, height);
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                picture[x, y] = new ClassicMac.Graphics.RgbaColor(0, 0, 0);
+            }
+        }
+
+        using var pict = new MemoryStream();
+        ClassicMac.Graphics.Pict.PictWriter.Write(pict, picture);
+        var path = Path.Combine(folder, "Picture.rsrc");
+        File.WriteAllBytes(path, PreviewTests.Fork(("PICT", 128, null, pict.ToArray()), ("PICT", 129, null, [0, 1, 2])));
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(path))!;
+        await input.EnsureLoadedAsync();
+        var pictures = input.Children.OfType<ResourceTypeNode>().Single().Children.OfType<ResourceNode>().ToList();
+
+        model.Selected = pictures[0];
+        await model.HeaderIconTask;
+        Assert.Equal((iconWidth, iconHeight, Black, Black), Png(model.HeaderIconPng!));
+
+        // A picture that does not decode has none (the kind icon shows).
+        model.Selected = pictures[1];
+        await model.HeaderIconTask;
+        Assert.Null(model.HeaderIconPng);
+    }
+
     [Theory]
     [InlineData(64, 32, 32, 16)]
     [InlineData(32, 32, 32, 32)]

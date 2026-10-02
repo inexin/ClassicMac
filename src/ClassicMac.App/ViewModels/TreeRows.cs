@@ -204,9 +204,26 @@ namespace ClassicMac.App.ViewModels
         internal static byte[]? LargeIcon(NodeViewModel node) => node switch
         {
             ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => ResourceIcon(resource, large: true),
+            ResourceNode { Resource.Type: var type } resource when type.ToString() == "PICT" => Thumbnail(resource),
             FileNode file => FolderPreviews.FinderIcon(file, 32),
             _ => null,
         };
+
+        // A picture fitted into 32 × 32 by nearest neighbour; none when it does not decode.
+        private static byte[]? Thumbnail(ResourceNode node)
+        {
+            var diagnostics = new List<Diagnostic>();
+            try
+            {
+                var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, diagnostics);
+                return Fit(ClassicMac.Graphics.Pict.PictReader.Decode(data), 32);
+            }
+            catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or NotSupportedException or ArgumentException
+                or InvalidOperationException or IndexOutOfRangeException or OverflowException)
+            {
+                return null;
+            }
+        }
 
         private static readonly HashSet<string> LargeMembers = ["ICN#", "icl4", "icl8", "il32"];
 

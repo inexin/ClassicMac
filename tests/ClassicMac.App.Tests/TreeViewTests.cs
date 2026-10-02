@@ -115,6 +115,26 @@ public class TreeViewTests
         Assert.False(TreeIcons.Art.ContainsKey(TreeIconKind.Loading));
     }
 
+    // The inspector header's tile (48 px) shows a kind at 32 × 32, drawn for 32 (never the 16-pixel art doubled).
+    [Fact]
+    public void Every_kind_has_32_by_32_art_drawn_for_the_size() => OnUiThread(() =>
+    {
+        foreach (var kind in Enum.GetValues<TreeIconKind>().Where(k => k != TreeIconKind.Loading))
+        {
+            var large = TreeIcons.LargePixels(kind);
+            Assert.Equal(32 * 32, large.Length);
+            Assert.Contains(0xFF000000u, large);
+            Assert.Contains(large, p => p >> 24 == 0);
+            var small = TreeIcons.Pixels(kind);
+            Assert.False(Enumerable.Range(0, 32 * 32).All(i => large[i] == small[i / 32 / 2 * 16 + i % 32 / 2]), $"{kind} is the 16-pixel art doubled");
+        }
+
+        Assert.False(TreeIcons.LargeArt.ContainsKey(TreeIconKind.Loading));
+        Assert.Null(TreeIcons.LargeFor(TreeIconKind.Loading));
+        Assert.Equal(new Avalonia.PixelSize(32, 32), TreeIcons.LargeFor(TreeIconKind.Folder)!.PixelSize);
+        Assert.Same(TreeIcons.LargeFor(TreeIconKind.Folder), TreeIcons.LargeFor(TreeIconKind.Folder));
+    });
+
     // Lets layout, rendering and the background icon work finish.
     private static void Settle(Window window)
     {

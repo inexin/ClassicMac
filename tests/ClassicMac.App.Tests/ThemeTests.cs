@@ -214,12 +214,36 @@ public class ThemeTests
         ((Window)TopLevel.GetTopLevel(view)!).Close();
     });
 
+    // The ruler steps by 1, 2 or 5 × 10^n seconds, the smallest such step at least 80 px apart, labelled with only the
+    // decimals the step needs.
     [Theory]
-    [InlineData(0.02, 4, "0.000 s|0.005 s|0.010 s|0.015 s|0.020 s")]
-    [InlineData(2.0, 4, "0.00 s|0.50 s|1.00 s|1.50 s|2.00 s")]
-    [InlineData(120.0, 2, "0.00 s|60.00 s|120.00 s")]
-    public void The_ruler_labels_are_precise_enough_to_differ(double duration, int steps, string expected) =>
-        Assert.Equal(expected, string.Join("|", WaveformView.RulerLabels(duration, steps)));
+    [InlineData(0.0193, 980, "0 s|0.002 s|0.004 s|0.006 s|0.008 s|0.010 s|0.012 s|0.014 s|0.016 s|0.018 s")]
+    [InlineData(2.0, 400, "0 s|0.5 s|1.0 s|1.5 s|2.0 s")]
+    [InlineData(120.0, 200, "0 s|50 s|100 s")]
+    [InlineData(3.0, 1000, "0 s|0.5 s|1.0 s|1.5 s|2.0 s|2.5 s|3.0 s")]
+    [InlineData(10.0, 300, "0 s|5 s|10 s")]
+    [InlineData(0.0, 300, "0 s")]
+    public void The_ruler_ticks_at_nice_steps(double duration, double width, string expected) =>
+        Assert.Equal(expected, string.Join("|", WaveformView.RulerTicks(duration, width).Select(t => t.Label)));
+
+    [Fact]
+    public void The_ruler_ticks_sit_at_their_times()
+    {
+        var ticks = WaveformView.RulerTicks(2.0, 400);
+        Assert.Equal([0, 0.5, 1.0, 1.5, 2.0], ticks.Select(t => t.Seconds));
+        Assert.All(ticks.Zip(ticks.Skip(1)), pair => Assert.True((pair.Second.Seconds - pair.First.Seconds) / 2.0 * 400 >= 80));
+    }
+
+    [Theory]
+    [InlineData(0.0016, 0.002)]
+    [InlineData(0.002, 0.002)]
+    [InlineData(0.0021, 0.005)]
+    [InlineData(0.3, 0.5)]
+    [InlineData(0.6, 1)]
+    [InlineData(1.5, 2)]
+    [InlineData(40, 50)]
+    public void A_nice_step_is_1_2_or_5_times_a_power_of_ten(double minimum, double step) =>
+        Assert.Equal(step, WaveformView.NiceStep(minimum), 12);
 
     // Muted text is a colour, not an opacity; inside a selected row of a focused list it reads in CmSelectionText.
     [Fact]

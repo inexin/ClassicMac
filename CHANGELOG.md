@@ -23,6 +23,14 @@
   computer's time zone, and a file's time note follows its volume's real format (HFS Plus read as "HFS volume" said
   local time). The hex inspector's readings and meaning stay clear of its scroll bar and fit "4,284,572,259", and a
   byte of template bit fields says which bits are on and which off.
+- Viewer: the inspector header's tile shows a 32-pixel image: a picture's thumbnail (fitted by nearest neighbour), an
+  icon's own image, a file's Finder icon, else the kind's own 32 × 32 art (disk, floppy, parcel, folder, application,
+  document, "No name" group, resource type, resource), drawn for the size and shown 1:1, never the 16-pixel icon.
+- Viewer: the sound's time ruler steps by 1, 2 or 5 × 10^n seconds (at least 80 px apart), labelled with only the
+  decimals the step needs ("0.002 s", "0.5 s", "50 s").
+- Viewer: a selection made away from the tree (type-ahead, the Details tab's "In", Show item, a diagnostic's row, a
+  form's link) scrolls the tree to the selected row, however deep: each level's row is made, and the scroll repeats
+  until the row sits in view.
 - Editor: the hex byte inspector fits under the Find bar at 1200 × 780 with diagnostics open (rows without spacing,
   8 px padding); "In this resource" scrolls inside the panel when it does not fit.
 - Viewer: a sound's header has Save as WAV… (the decoded sound, as `extract` writes it) and Replace from WAV… (the
