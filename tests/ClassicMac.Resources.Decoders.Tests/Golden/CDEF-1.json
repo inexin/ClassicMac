@@ -1,0 +1,127 @@
+{
+  "type": "CDEF",
+  "id": 1,
+  "format": "68k",
+  "routineDescriptor": {
+    "offset": 0,
+    "version": 7,
+    "routines": [
+      {
+        "procInfo": 15280,
+        "powerPC": true,
+        "flags": 1,
+        "targetOffset": 32,
+        "pef": true
+      }
+    ]
+  },
+  "functions": [],
+  "references": [],
+  "fragments": [
+    {
+      "architecture": "pwpc",
+      "formatVersion": 1,
+      "currentVersion": 17858560,
+      "oldDefVersion": 16777216,
+      "oldImpVersion": 16809984,
+      "sections": [
+        {
+          "index": 0,
+          "kind": "code",
+          "share": "process",
+          "totalLength": 80,
+          "unpackedLength": 80,
+          "containerLength": 80,
+          "containerOffset": 128,
+          "alignment": 4
+        },
+        {
+          "index": 1,
+          "kind": "unpackedData",
+          "share": "process",
+          "totalLength": 28,
+          "unpackedLength": 28,
+          "containerLength": 28,
+          "containerOffset": 208,
+          "alignment": 4
+        },
+        {
+          "index": 2,
+          "kind": "loader",
+          "share": "0",
+          "totalLength": 158,
+          "unpackedLength": 158,
+          "containerLength": 158,
+          "containerOffset": 240,
+          "alignment": 4
+        }
+      ],
+      "main": {
+        "section": 1,
+        "offset": 0
+      },
+      "imports": [
+        {
+          "library": "InterfaceLib",
+          "name": "InitGraf",
+          "class": "tVector",
+          "weak": false
+        }
+      ],
+      "exports": [
+        {
+          "name": "Helper",
+          "class": "tVector",
+          "section": 1,
+          "value": 20
+        }
+      ],
+      "functions": [
+        {
+          "section": 0,
+          "offset": 0,
+          "name": "main",
+          "source": "main"
+        },
+        {
+          "section": 0,
+          "offset": 24,
+          "name": ".InitGraf",
+          "source": "glue"
+        },
+        {
+          "section": 0,
+          "offset": 48,
+          "name": "Helper",
+          "source": "export"
+        }
+      ],
+      "references": [
+        {
+          "section": 0,
+          "offset": 4,
+          "kind": "glue",
+          "text": "InterfaceLib::InitGraf"
+        },
+        {
+          "section": 0,
+          "offset": 12,
+          "kind": "call",
+          "text": "Helper"
+        },
+        {
+          "section": 0,
+          "offset": 16,
+          "kind": "tocSlot",
+          "text": "1:0x10"
+        },
+        {
+          "section": 0,
+          "offset": 24,
+          "kind": "tocSlot",
+          "text": "InterfaceLib::InitGraf"
+        }
+      ]
+    }
+  ]
+}

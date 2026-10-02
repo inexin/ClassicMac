@@ -361,6 +361,8 @@ None.
   start unknown. [ClassicMac]
 - Mnemonics (DDAT, CODE, …) are ClassicMac's names for the opcodes. [ClassicMac]
 
+Fragments are listed and modelled as [disassembly.md](../output/disassembly.md) describes.
+
 ## 6. Diagnostics
 
 | Code | Severity | When | ClassicMac does | The Mac does |

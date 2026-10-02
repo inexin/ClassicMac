@@ -38,7 +38,8 @@ namespace ClassicMac.Resources.Export
     /// Rebuilds a resource fork from an export folder and its <c>manifest.json</c> (format 1): type, ID, name and
     /// attributes from the manifest, the fork's attributes from its <c>fork</c>, the resources in its order. A resource
     /// whose main file is unchanged (same SHA-256) takes its stored data, byte for byte, from its <c>raw/</c> copy or from
-    /// the base fork; a <c>raw</c> resource can also take the data from its file. A changed decoded file needs an encoder,
+    /// the base fork; a resource whose main file is its data (<c>raw</c>, or a decoder's <c>.bin</c>) can also take the
+    /// data from its file, changed or not. A changed decoded file needs an encoder,
     /// which none of the built-in decoders has yet.
     /// </summary>
     public static class ResourcePacker
@@ -97,20 +98,20 @@ namespace ClassicMac.Resources.Export
                             Report(DiagnosticSeverity.Warning, "pack.other-changed", $"{other.Path} changed, but only the main file is packed; the change is ignored.");
                     }
                 }
-                else if (entry.Decoder != "raw")
+                else if (!IsData(entry))
                 {
                     Report(DiagnosticSeverity.Error, "pack.no-encoder", $"{entry.Path} changed, and the {entry.Decoder} decoder has no encoder to turn it back into resource data.");
                     continue;
                 }
                 if (stored is null)
                 {
-                    if (entry.Decoder != "raw")
+                    if (!IsData(entry))
                     {
                         Report(DiagnosticSeverity.Error, "pack.no-stored-data",
                             "its stored data is neither in raw/ nor in the base fork (extract with --keep-raw, or give the original fork as the base).");
                         continue;
                     }
-                    // A raw resource's file is its data after decompression: written as it is, no longer compressed.
+                    // A data file (.bin) is the resource's data after decompression: written as it is, no longer compressed.
                     stored = file;
                     if ((attributes & ResourceAttributes.Compressed) != 0)
                     {
@@ -145,6 +146,11 @@ namespace ClassicMac.Resources.Export
             }
             return null;
         }
+
+        // Whether the main file is the resource's data: a raw resource's, or a decoder's .bin (code decoders write the
+        // data as their main file and the listings beside it), so it packs back as raw data does.
+        private static bool IsData(ManifestResource entry) =>
+            entry.Decoder == "raw" || entry.Path.EndsWith(".bin", StringComparison.OrdinalIgnoreCase);
 
         private static string Local(string directory, string path) => Path.Combine([directory, .. path.Split('/')]);
 

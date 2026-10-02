@@ -936,6 +936,898 @@
           "file": "fctb-1036.json"
         }
       ]
+    },
+    {
+      "key": "CODE-0",
+      "decoder": "code.segment 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "ad713051755805aed5ca82ecee70d4ba4cc007369b74ada6a6065c3691738bec",
+          "length": 32
+        },
+        {
+          "extension": ".json",
+          "file": "CODE-0.json"
+        }
+      ]
+    },
+    {
+      "key": "CODE-1",
+      "decoder": "code.segment 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "cc86903d7627e46f7008a05f9473b7530f2b3bbc5326b51a9bcd319b4f07072a",
+          "length": 14
+        },
+        {
+          "extension": ".s",
+          "file": "CODE-1.s"
+        },
+        {
+          "extension": ".json",
+          "file": "CODE-1.json"
+        }
+      ]
+    },
+    {
+      "key": "cfrg-0",
+      "decoder": "code.cfrg 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "0ea9c1e2a10f9d4272dab9d1073c7c74948b50f3be469f30bf044526defa119f",
+          "length": 80
+        },
+        {
+          "extension": ".json",
+          "file": "cfrg-0.json"
+        }
+      ]
+    },
+    {
+      "key": "ncod-5",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "ef3f59f24c78d54f58abccc2d68d3e2d416348b4c7fbf600601a2ca264c54acc",
+          "length": 398
+        },
+        {
+          "extension": ".s",
+          "file": "ncod-5.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ncod-5.json"
+        }
+      ]
+    },
+    {
+      "key": "CDEF-0",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "3989ef688add71d957a386b3c57f385d4349187bea821cd6dc6cebed167f5d8e",
+          "length": 16
+        },
+        {
+          "extension": ".s",
+          "file": "CDEF-0.s"
+        },
+        {
+          "extension": ".json",
+          "file": "CDEF-0.json"
+        }
+      ]
+    },
+    {
+      "key": "CDEF-1",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "24b33c95ab6f0ff99c1342a6ca8d4ca3e7c21902e8fa502fd12fed3a773b3f06",
+          "length": 430
+        },
+        {
+          "extension": ".s",
+          "file": "CDEF-1.s"
+        },
+        {
+          "extension": ".json",
+          "file": "CDEF-1.json"
+        }
+      ]
+    },
+    {
+      "key": "DRVR-12",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "d5805e21ea6846d568f5ddcdcea7d88d29d709a642d504eb02b36d34db3e45b6",
+          "length": 30
+        },
+        {
+          "extension": ".s",
+          "file": "DRVR-12.s"
+        },
+        {
+          "extension": ".json",
+          "file": "DRVR-12.json"
+        }
+      ]
+    },
+    {
+      "key": "PACK-3",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c18901fd10e5e14119080e7b3573a0ff23ff54d5ceedbd52807f244eb52a507f",
+          "length": 20
+        },
+        {
+          "extension": ".s",
+          "file": "PACK-3.s"
+        },
+        {
+          "extension": ".json",
+          "file": "PACK-3.json"
+        }
+      ]
+    },
+    {
+      "key": "nlib-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "nlib-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "nlib-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ndrv-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "ndrv-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ndrv-128.json"
+        }
+      ]
+    },
+    {
+      "key": "nift-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "nift-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "nift-128.json"
+        }
+      ]
+    },
+    {
+      "key": "fovr-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "fovr-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "fovr-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ncmp-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "ncmp-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ncmp-128.json"
+        }
+      ]
+    },
+    {
+      "key": "cdek-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "cdek-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "cdek-128.json"
+        }
+      ]
+    },
+    {
+      "key": "dcod-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "dcod-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "dcod-128.json"
+        }
+      ]
+    },
+    {
+      "key": "scal-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "scal-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "scal-128.json"
+        }
+      ]
+    },
+    {
+      "key": "vdig-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "vdig-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "vdig-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ntrb-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "ntrb-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ntrb-128.json"
+        }
+      ]
+    },
+    {
+      "key": "nitt-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "nitt-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "nitt-128.json"
+        }
+      ]
+    },
+    {
+      "key": "sfvr-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "sfvr-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "sfvr-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ppct-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "ppct-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ppct-128.json"
+        }
+      ]
+    },
+    {
+      "key": "pthg-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "pthg-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "pthg-128.json"
+        }
+      ]
+    },
+    {
+      "key": "qtcm-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "qtcm-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "qtcm-128.json"
+        }
+      ]
+    },
+    {
+      "key": "hqda-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "hqda-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "hqda-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ndmc-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "ndmc-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ndmc-128.json"
+        }
+      ]
+    },
+    {
+      "key": "nsnd-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "c9bc842f130c30f60e414a93b7b8144ee890de4ba5b7b7438c3d7d2cae372607",
+          "length": 84
+        },
+        {
+          "extension": ".s",
+          "file": "nsnd-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "nsnd-128.json"
+        }
+      ]
+    },
+    {
+      "key": "WDEF-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "WDEF-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "WDEF-128.json"
+        }
+      ]
+    },
+    {
+      "key": "MDEF-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "MDEF-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "MDEF-128.json"
+        }
+      ]
+    },
+    {
+      "key": "MBDF-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "MBDF-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "MBDF-128.json"
+        }
+      ]
+    },
+    {
+      "key": "LDEF-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "LDEF-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "LDEF-128.json"
+        }
+      ]
+    },
+    {
+      "key": "expt-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "expt-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "expt-128.json"
+        }
+      ]
+    },
+    {
+      "key": "nsrd-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "nsrd-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "nsrd-128.json"
+        }
+      ]
+    },
+    {
+      "key": "proc-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "proc-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "proc-128.json"
+        }
+      ]
+    },
+    {
+      "key": "sift-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "sift-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "sift-128.json"
+        }
+      ]
+    },
+    {
+      "key": "FKEY-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "FKEY-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "FKEY-128.json"
+        }
+      ]
+    },
+    {
+      "key": "INIT-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "INIT-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "INIT-128.json"
+        }
+      ]
+    },
+    {
+      "key": "cdev-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "cdev-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "cdev-128.json"
+        }
+      ]
+    },
+    {
+      "key": "RDEV-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "RDEV-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "RDEV-128.json"
+        }
+      ]
+    },
+    {
+      "key": "XCMD-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "XCMD-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "XCMD-128.json"
+        }
+      ]
+    },
+    {
+      "key": "XFCN-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "XFCN-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "XFCN-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ADBS-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "ADBS-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ADBS-128.json"
+        }
+      ]
+    },
+    {
+      "key": "PTCH-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "PTCH-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "PTCH-128.json"
+        }
+      ]
+    },
+    {
+      "key": "ptch-129",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "ptch-129.s"
+        },
+        {
+          "extension": ".json",
+          "file": "ptch-129.json"
+        }
+      ]
+    },
+    {
+      "key": "dcmp-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "dcmp-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "dcmp-128.json"
+        }
+      ]
+    },
+    {
+      "key": "snth-128",
+      "decoder": "code.resource 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".bin",
+          "sha256": "b20b9296c0ac3519c13af1dcb9c5b580cb17f9bce0698411a3e31b04f7e30437",
+          "length": 4
+        },
+        {
+          "extension": ".s",
+          "file": "snth-128.s"
+        },
+        {
+          "extension": ".json",
+          "file": "snth-128.json"
+        }
+      ]
     }
   ]
 }

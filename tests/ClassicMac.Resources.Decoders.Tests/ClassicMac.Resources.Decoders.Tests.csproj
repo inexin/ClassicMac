@@ -20,5 +20,7 @@
   <ItemGroup>
     <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
     <Compile Include="..\ClassicMac.Graphics.Tests\Fonts\FontBuilder.cs" Link="Builders\FontBuilder.cs" />
+    <Compile Include="..\ClassicMac.Code.Tests\PefBuilder.cs" Link="Builders\PefBuilder.cs" />
+    <Compile Include="..\ClassicMac.Code.Tests\CodeCorpus.cs" Link="Shared\CodeCorpus.cs" />
   </ItemGroup>
 </Project>

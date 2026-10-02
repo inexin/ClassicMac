@@ -20,8 +20,8 @@ public class PackTests : IDisposable
         return (code, output.ToString(), error.ToString());
     }
 
-    // A fork with a named, locked string (decoded), an icon list (decoded), a CODE resource (raw) with attributes, a
-    // name with a backslash, and fork attributes.
+    // A fork with a named, locked string (decoded), an icon list (decoded), a CODE segment (decoded, its .bin the data)
+    // with attributes, a name with a backslash, and fork attributes.
     private static ResourceFork Original()
     {
         var fork = new ResourceFork { Attributes = (ResourceForkAttributes)0x0080 };
@@ -31,7 +31,7 @@ public class PackTests : IDisposable
             Attributes = ResourceAttributes.Locked,
         });
         fork.Add(new Resource(FourCC.FromString("ICN#"), 128, Enumerable.Range(0, 256).Select(i => (byte)i).ToArray()));
-        fork.Add(new Resource(FourCC.FromString("CODE"), 1, new byte[] { 0x4E, 0x75 }) { Attributes = ResourceAttributes.Preload | ResourceAttributes.Purgeable });
+        fork.Add(new Resource(FourCC.FromString("CODE"), 1, new byte[] { 0, 0, 0, 0, 0x4E, 0x75 }) { Attributes = ResourceAttributes.Preload | ResourceAttributes.Purgeable });
         return fork;
     }
 
@@ -100,6 +100,34 @@ public class PackTests : IDisposable
         Assert.Contains("[pack.missing-file]", Run("pack", export, "-o", packed, "--overwrite").Error);
         Assert.Equal(ExitCodes.Success, Run("pack", export, "-o", packed, "--overwrite", "--allow-deletes").Code);
         Assert.Equal(2, ResourceFork.Read(File.ReadAllBytes(packed)).Resources.Count);
+    }
+
+    // Decoded code's main file is its data (.bin): an application packs back from its export alone, and an edited .bin
+    // is packed as it is.
+    [Fact]
+    public void Decoded_code_packs_back_from_its_bin_files()
+    {
+        var app = new ResourceFork();
+        app.Add(new Resource(FourCC.FromString("CODE"), 0, Decoders.Tests.CodeFixtures.Application0) { Attributes = ResourceAttributes.Preload });
+        app.Add(new Resource(FourCC.FromString("CODE"), 1, Decoders.Tests.CodeFixtures.Code1) { Name = MacString.FromMacRoman("Main") });
+        app.Add(new Resource(FourCC.FromString("DRVR"), 12, Decoders.Tests.CodeFixtures.Driver));
+        app.Add(new Resource(FourCC.FromString("cfrg"), 0, Decoders.Tests.CodeFixtures.Cfrg(("App", Code.Ppc.CfrgWhere.DataFork, 0, 0, 0, 0))));
+        var input = Path.Combine(folder, "App.rsrc");
+        File.WriteAllBytes(input, app.ToArray());
+        var export = Path.Combine(folder, "export");
+        var (extracted, _, extractError) = Run("extract", input, "-o", export);
+        Assert.True(extracted == ExitCodes.Success, extractError);
+        Assert.True(File.Exists(Path.Combine(export, "CODE", "1 Main.s")));
+        var packed = Path.Combine(folder, "packed.rsrc");
+
+        var (code, _, error) = Run("pack", export, "-o", packed);
+
+        Assert.True(code == ExitCodes.Success, error);
+        AssertSameResources(app, ResourceFork.Read(File.ReadAllBytes(packed)));
+
+        File.WriteAllBytes(Path.Combine(export, "CODE", "1 Main.bin"), [0, 0, 0, 1, 0x4E, 0x75]);
+        Assert.Equal(ExitCodes.Success, Run("pack", export, "-o", packed, "--overwrite").Code);
+        Assert.Equal([0, 0, 0, 1, 0x4E, 0x75], ResourceFork.Read(File.ReadAllBytes(packed)).Find(FourCC.FromString("CODE"), 1)!.GetData().ToArray());
     }
 
     [Fact]

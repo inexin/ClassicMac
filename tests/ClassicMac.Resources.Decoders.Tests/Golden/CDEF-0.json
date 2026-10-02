@@ -1,0 +1,32 @@
+{
+  "type": "CDEF",
+  "id": 0,
+  "format": "68k",
+  "standardHeader": {
+    "type": "CDEF",
+    "id": 0,
+    "version": 1,
+    "flags": 0,
+    "entry": 12
+  },
+  "functions": [
+    {
+      "offset": 0,
+      "name": "entry",
+      "source": "entry"
+    },
+    {
+      "offset": 12,
+      "name": "main",
+      "source": "entry"
+    }
+  ],
+  "references": [
+    {
+      "offset": 0,
+      "kind": "call",
+      "text": "main"
+    }
+  ],
+  "fragments": []
+}

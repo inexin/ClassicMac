@@ -1,0 +1,36 @@
+{
+  "type": "DRVR",
+  "id": 12,
+  "format": "68k",
+  "driver": {
+    "name": ".D",
+    "flags": 20224,
+    "delay": 0,
+    "eventMask": 0,
+    "menu": 0,
+    "open": 24,
+    "prime": 26,
+    "control": 26,
+    "status": 0,
+    "close": 28
+  },
+  "functions": [
+    {
+      "offset": 24,
+      "name": "Open",
+      "source": "driverRoutine"
+    },
+    {
+      "offset": 26,
+      "name": "Prime",
+      "source": "driverRoutine"
+    },
+    {
+      "offset": 28,
+      "name": "Close",
+      "source": "driverRoutine"
+    }
+  ],
+  "references": [],
+  "fragments": []
+}

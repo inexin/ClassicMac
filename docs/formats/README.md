@@ -146,6 +146,9 @@ One file per format, in its category folder. A codec used by more than one forma
 | [code-data.md](code/code-data.md) | 68k global-data initializers: MPW `%A5Init`, CodeWarrior `'DATA'` 0, Retro68 `'RELA'` | `ClassicMac.Code.M68k` |
 | [code-resources.md](code/code-resources.md) | Code resources: the standard header, `DRVR`, the `$A9FF` package form, `thng` components, `$AAFE` routine descriptors, native PEF resources | `ClassicMac.Code.M68k`, `ClassicMac.Code.Ppc` |
 
+How ClassicMac lists this code (the disassembly, its annotations and the code model) is in
+[disassembly.md](output/disassembly.md).
+
 ### Codecs
 
 | Document | Formats | Code |
@@ -169,6 +172,7 @@ One file per format, in its category folder. A codec used by more than one forma
 | [export-manifest.md](output/export-manifest.md) | What `extract` writes: folders, file names, `manifest.json` format 1.1, image outputs | `ClassicMac.Resources.Export`, `ClassicMac.Resources.Decoders.Images` |
 | [text-output.md](output/text-output.md) | The text, JSON and RTF output of the text resources | `ClassicMac.Resources.Decoders.Text` |
 | [html.md](output/html.md) | The HTML output of documents | `ClassicMac.Resources.Decoders.Documents` |
+| [disassembly.md](output/disassembly.md) | The `.s` listings and `.json` models of 68k and PowerPC code; the `disasm` command | `ClassicMac.Code.Disassembly`, `ClassicMac.Resources.Decoders.Code` |
 
 Pictures, icons, cursors and patterns are drawn by `ClassicMac.Graphics` (`.QuickDraw`, `.Pict`), which
 [pict.md](graphics/pict.md) and [quickdraw.md](graphics/quickdraw.md) specify ([icons.md](resources/icons.md),

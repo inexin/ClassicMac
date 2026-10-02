@@ -1,0 +1,32 @@
+{
+  "type": "PACK",
+  "id": 3,
+  "format": "68k",
+  "package": {
+    "type": "PACK",
+    "id": 3,
+    "version": 1,
+    "flags": 0,
+    "firstSelector": 0,
+    "lastSelector": 1,
+    "entries": [
+      {
+        "selector": 0,
+        "offset": 18
+      },
+      {
+        "selector": 1,
+        "offset": 0
+      }
+    ]
+  },
+  "functions": [
+    {
+      "offset": 18,
+      "name": "selector_0",
+      "source": "packageRoutine"
+    }
+  ],
+  "references": [],
+  "fragments": []
+}

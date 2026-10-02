@@ -64,6 +64,8 @@ One export folder per fork:
 Realmz resources/
   manifest.json
   CODE/1 Main.bin
+  CODE/1 Main.s
+  CODE/1 Main.json
   PICT/128 Title Screen.png
   snd%20/200 Door.wav
   snd%20/200 Door.json
@@ -217,7 +219,7 @@ A diagnostic's offset in the file, which the CLI prints, is not recorded.
 
 ### 1.11 Example
 
-An excerpt of the manifest of a fixture fork exported with the built-in decoders (three of its 38 resources; §7):
+An excerpt of the manifest of a fixture fork exported with the built-in decoders (three of its 116 resources; §7):
 
 ```json
 {
@@ -284,19 +286,28 @@ An excerpt of the manifest of a fixture fork exported with the built-in decoders
       "type": "CODE",
       "typeBytes": "434F4445",
       "id": 1,
-      "name": null,
+      "name": "Main",
       "attributes": 0,
-      "size": 2,
-      "storedSize": 2,
+      "size": 14,
+      "storedSize": 14,
       "dcmp": null,
-      "decoder": "raw",
+      "decoder": "code.segment",
       "decoderVersion": 1,
-      "path": "CODE/1.bin",
-      "sha256": "1ceeabf0c6a5a30bad12cdac0e3ab015a7188a42e6aebb556aad00bb9cd693ad",
-      "storedSha256": "1ceeabf0c6a5a30bad12cdac0e3ab015a7188a42e6aebb556aad00bb9cd693ad",
+      "path": "CODE/1 Main.bin",
+      "sha256": "cc86903d7627e46f7008a05f9473b7530f2b3bbc5326b51a9bcd319b4f07072a",
+      "storedSha256": "cc86903d7627e46f7008a05f9473b7530f2b3bbc5326b51a9bcd319b4f07072a",
       "rawPath": null,
       "warnings": [],
-      "otherFiles": [],
+      "otherFiles": [
+        {
+          "path": "CODE/1 Main.s",
+          "sha256": "bb6d41ab35c192549e55b2a289e033b59875c56420d7557a72fd231a66dd858f"
+        },
+        {
+          "path": "CODE/1 Main.json",
+          "sha256": "fb925490faecfde9fdb95762caf5ab172534b9a9ab780dbd16c2c7358a1a5a34"
+        }
+      ],
       "encoding": null
     }
   ],
@@ -305,7 +316,8 @@ An excerpt of the manifest of a fixture fork exported with the built-in decoders
 }
 ```
 
-A compressed resource exported with raw copies has, for instance, `"attributes": 1`, `"dcmp": 0`, `"size"` the
+A resource no decoder handles (the fixture's `DATA` 0) has `"decoder": "raw"`, `"path": "DATA/0.bin"` and
+`sha256` equal to `storedSha256`. A compressed resource exported with raw copies has, for instance, `"attributes": 1`, `"dcmp": 0`, `"size"` the
 decompressed length, `"storedSize"` the stored length, and `"rawPath": "raw/CODE/1.bin"`.
 
 ### 1.12 PNG files
@@ -358,10 +370,11 @@ The JSON is written indented by two spaces, with non-ASCII characters as they ar
    when its hash equals `storedSha256`. A `raw/` copy that no longer matches `storedSha256` is packed as it is, with a
    warning; a base resource that does not match is not used, with a warning. Changes to `otherFiles` are ignored,
    with a warning.
-5. A `raw` resource with neither (or whose file changed) takes its main file as the data. That is the data after
+5. A resource whose main file is its data, a `raw` resource or one whose main file is `.bin` (the code decoders,
+   §3.8), takes its main file as the data when it has neither (or when the file changed). That is the data after
    decompression, so a compressed resource loses its compressed attribute (`$01`), with a warning.
-6. A decoded resource whose main file changed needs an encoder for its decoder; none of the built-in decoders has
-   one, so it is an error. One with no stored data (no `raw/` copy, no base) is an error too.
+6. Any other decoded resource whose main file changed needs an encoder for its decoder; none of the built-in decoders
+   has one, so it is an error. One with no stored data (no `raw/` copy, no base) is an error too.
 7. A missing main file is an error, or, when deletes are allowed, the resource is left out.
 8. Files in the folder the manifest does not list are ignored: resources are not added this way.
 
@@ -519,9 +532,12 @@ The built-in decoders, in this order; each type is handled by exactly one, and a
 | `color.table`, `color.palette` | `clut`, `pltt` | `.json` | `.act` | null | [palettes.md](../resources/palettes.md) |
 | `finder.bundle`, `finder.file-reference`, `finder.size` | `BNDL`, `FREF`, `SIZE` | `.json` | — | `macintosh` | [finder.md](../resources/finder.md) |
 | `font.bitmap`, `font.family`, `font.outline`, `font.colors` | `NFNT`, `FONT`; `FOND`; `sfnt`; `fctb` | strikes `.png`; `.json`; `.ttf`; `.json` | strikes `.bdf`, `.json`; `sfnt` `.json` | `FOND`: `macintosh` | [bitmap-fonts.md](../resources/bitmap-fonts.md) |
+| `code.segment` | `CODE` | `.bin`, the data | `.s`, `.json`; `'CODE'` 0: `.json` | null | [disassembly.md](disassembly.md) |
+| `code.cfrg` | `cfrg` | `.bin`, the data | `.json` | null | [disassembly.md](disassembly.md) |
+| `code.resource` | Native and 68k code resources ([disassembly.md §5.1](disassembly.md#51-the-decoded-types)) | `.bin`, the data | `.s`, `.json` | null | [disassembly.md](disassembly.md) |
 
-The image extensions are those of the configured image encoder (`.png` by default, §1.12). Every other type, `CODE`
-included, is written raw.
+The image extensions are those of the configured image encoder (`.png` by default, §1.12). The code decoders' main
+file is the data itself, so `pack` takes it back without raw copies (§2.2). Every other type is written raw.
 
 ### 3.9 Pictures
 
@@ -786,7 +802,7 @@ The exporter, the image decoders and the packer report these codes. Each exporte
 | `pack.decompressed` | Warning | A compressed `raw` resource is written from its decompressed file | Clears its compressed attribute | Not applicable |
 | `pack.deleted` | Info | A resource's main file is gone, with deletes allowed | Leaves the resource out | Not applicable |
 | `pack.missing-file` | Error | A resource's main file is gone, without deletes allowed | Writes nothing | Not applicable |
-| `pack.no-encoder` | Error | A decoded resource's main file changed, and its decoder has no encoder | Writes nothing | Not applicable |
+| `pack.no-encoder` | Error | A decoded resource's main file (not a `.bin`) changed, and its decoder has no encoder | Writes nothing | Not applicable |
 | `pack.no-stored-data` | Error | An unchanged decoded resource has no `raw/` copy and no matching resource in the base | Writes nothing | Not applicable |
 | `pack.other-changed` | Warning | A decoder's other file changed | Ignores it; only the main file counts | Not applicable |
 | `pack.raw-changed` | Warning | A `raw/` copy no longer matches `storedSha256` | Packs it as it is | Not applicable |
@@ -801,6 +817,8 @@ Other codes reach the manifest from the code the exporter calls:
 - the palette decoders (`color.*`): [palettes.md](../resources/palettes.md);
 - the Finder decoders (`finder.*`): [finder.md](../resources/finder.md);
 - the font decoders (`font.*`): [bitmap-fonts.md](../resources/bitmap-fonts.md);
+- the code decoders (`code.*`, `m68k.*`, `pef.*`, `cfrg.*`): [disassembly.md](disassembly.md) and the documents it
+  links;
 - the document converter (`document.*`): [documents.md](../resources/documents.md), [html.md](html.md).
 
 ## 7. Verification
@@ -819,7 +837,7 @@ Other codes reach the manifest from the code the exporter calls:
   nor forks.
 - `tests/ClassicMac.Resources.Cli.Tests/PackTests.cs`: an export with raw copies packs back byte for byte; the base
   fork gives the stored data without raw copies; raw files can change, decoded ones cannot, and deletes need
-  allowing; containers carry the name and Finder info.
+  allowing; decoded code packs back from its `.bin` files; containers carry the name and Finder info.
 - `tests/ClassicMac.Resources.Cli.Tests/CorpusExportTests.cs`, `Corpus_exports_without_decoder_errors`: with
   `CLASSICMAC_CORPUS` set, every export of the corpus, with raw copies, packs back with each resource's stored bytes
   and attributes unchanged. Not committed.

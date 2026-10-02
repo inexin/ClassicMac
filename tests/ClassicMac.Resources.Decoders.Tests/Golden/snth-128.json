@@ -1,0 +1,14 @@
+{
+  "type": "snth",
+  "id": 128,
+  "format": "68k",
+  "functions": [
+    {
+      "offset": 0,
+      "name": "entry",
+      "source": "entry"
+    }
+  ],
+  "references": [],
+  "fragments": []
+}

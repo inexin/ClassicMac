@@ -142,6 +142,8 @@ None.
   information. [ClassicMac]
 - Slicing the data fork and reading the container is the caller's ([pef.md](pef.md)). [ClassicMac]
 
+A `'cfrg'` is exported as JSON and its data-fork fragments listed as [disassembly.md](../output/disassembly.md) describes.
+
 ## 6. Diagnostics
 
 | Code | Severity | When | ClassicMac does | The Mac does |

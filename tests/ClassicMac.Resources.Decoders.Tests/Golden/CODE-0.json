@@ -1,0 +1,32 @@
+{
+  "aboveA5": 48,
+  "belowA5": 256,
+  "jumpTableSize": 16,
+  "jumpTableOffset": 32,
+  "model": "unknown",
+  "farModel": false,
+  "powerPC": true,
+  "entry": {
+    "segment": 1,
+    "offset": 0,
+    "resourceOffset": 4
+  },
+  "entries": [
+    {
+      "index": 0,
+      "a5Offset": 32,
+      "kind": "nearUnloaded",
+      "segment": 1,
+      "offset": 0,
+      "resourceOffset": 4
+    },
+    {
+      "index": 1,
+      "a5Offset": 40,
+      "kind": "nearUnloaded",
+      "segment": 1,
+      "offset": 6,
+      "resourceOffset": 10
+    }
+  ]
+}

@@ -180,6 +180,8 @@ None.
 - Retro68: a value wider than 32 bits stops the list; a position outside the target is left out and the list goes
   on; an odd position is reported (a 68000 would fault on it) and kept. [ClassicMac]
 
+The initializers are summarised in the jump table's model and marked as data in listings as [disassembly.md](../output/disassembly.md) describes.
+
 ## 6. Diagnostics
 
 | Code | Severity | When | ClassicMac does | The Mac does |

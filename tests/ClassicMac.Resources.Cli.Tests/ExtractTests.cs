@@ -65,7 +65,7 @@ public class ExtractTests : IDisposable
     public void Disks_extract_a_folder_per_file_with_resources()
     {
         var disk = new HfsBuilder();
-        disk.File(HfsBuilder.Root, "Realmz", [1, 2, 3], Fork(("CODE", 1, "Main", [0x4E, 0x75]), ("vers", 1, null, [1, 0])), type: "APPL", creator: "RLMZ");
+        disk.File(HfsBuilder.Root, "Realmz", [1, 2, 3], Fork(("CODE", 1, "Main", [0, 0, 0, 0, 0x4E, 0x75]), ("vers", 1, null, [1, 0])), type: "APPL", creator: "RLMZ");
         var data = disk.Folder(HfsBuilder.Root, "Data");
         disk.File(data, "Scenario", [], Fork(("TEXT", 128, "Intro", "Once upon a time"u8.ToArray())));
         disk.File(HfsBuilder.Root, "Read Me", "no resources"u8.ToArray(), []);
@@ -79,7 +79,13 @@ public class ExtractTests : IDisposable
         Assert.Contains("3 resources from 2 files", output);
         var realmz = Manifest(Path.Combine(target, "Realmz"));
         Assert.Equal(("Realmz", "APPL", "RLMZ"), (realmz.Source.Name, realmz.Source.Type, realmz.Source.Creator));
-        Assert.Equal([0x4E, 0x75], File.ReadAllBytes(Path.Combine(target, "Realmz", "CODE", "1 Main.bin")));
+        Assert.Equal([0, 0, 0, 0, 0x4E, 0x75], File.ReadAllBytes(Path.Combine(target, "Realmz", "CODE", "1 Main.bin")));
+        // Code is decoded: the data stays the main file, the listing and the model beside it.
+        Assert.StartsWith("; 'CODE' 1 \"Main\": 68k segment", File.ReadAllText(Path.Combine(target, "Realmz", "CODE", "1 Main.s")), StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(target, "Realmz", "CODE", "1 Main.json")));
+        var segment = realmz.Resources.Single(r => r.Type == "CODE");
+        Assert.Equal(("code.segment", "CODE/1 Main.bin"), (segment.Decoder, segment.Path));
+        Assert.Equal(["CODE/1 Main.s", "CODE/1 Main.json"], segment.OtherFiles!.Select(f => f.Path));
         Assert.True(File.Exists(Path.Combine(target, "Realmz", "raw", "CODE", "1.bin")));
         Assert.Equal("Once upon a time", File.ReadAllText(Path.Combine(target, "Data", "Scenario", "TEXT", "128 Intro.txt")));
         Assert.False(Directory.Exists(Path.Combine(target, "Read Me")));

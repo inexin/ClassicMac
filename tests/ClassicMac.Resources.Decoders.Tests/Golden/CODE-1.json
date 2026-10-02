@@ -1,0 +1,41 @@
+{
+  "segment": 1,
+  "name": "Main",
+  "model": "unknown",
+  "readable": true,
+  "header": {
+    "far": false,
+    "firstNearOffset": 0,
+    "nearCount": 2
+  },
+  "jumpTableEntries": [
+    {
+      "index": 0,
+      "resourceOffset": 4
+    },
+    {
+      "index": 1,
+      "resourceOffset": 10
+    }
+  ],
+  "relocations": [],
+  "functions": [
+    {
+      "offset": 4,
+      "name": "entry",
+      "source": "entry"
+    },
+    {
+      "offset": 10,
+      "name": "JT1",
+      "source": "jumpTable"
+    }
+  ],
+  "references": [
+    {
+      "offset": 4,
+      "kind": "jumpTable",
+      "text": "CODE 1:+$A"
+    }
+  ]
+}

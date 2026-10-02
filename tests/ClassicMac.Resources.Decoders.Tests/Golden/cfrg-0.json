@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "members": [
+    {
+      "name": "App",
+      "architecture": "pwpc",
+      "updateLevel": 1,
+      "currentVersion": 17858560,
+      "oldDefVersion": 16777216,
+      "usage": "application",
+      "usage1": 65536,
+      "usage2": 0,
+      "where": "dataFork",
+      "offset": 0,
+      "length": 0,
+      "where1": 0,
+      "where2": 0,
+      "extensions": []
+    }
+  ]
+}

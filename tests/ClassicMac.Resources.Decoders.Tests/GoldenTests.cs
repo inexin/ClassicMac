@@ -8,12 +8,12 @@ using ClassicMac.Resources.Export;
 namespace ClassicMac.Resources.Decoders.Tests;
 
 // Golden outputs: every fixture decoded as extract decodes it, compared with Golden/. Text outputs (.txt, .json, .bdf,
-// .rtf) are kept as files, images and sounds as SHA-256 and length in Golden/golden.json, along with each fixture's
+// .rtf, .s) are kept as files, images and sounds as SHA-256 and length in Golden/golden.json, along with each fixture's
 // decoder and diagnostic codes. With CLASSICMAC_UPDATE_GOLDEN=1 the tests rewrite Golden/ instead; review the change
 // in git.
 public class GoldenTests
 {
-    private static readonly string[] TextExtensions = [".txt", ".json", ".rtf", ".bdf"];
+    private static readonly string[] TextExtensions = [".txt", ".json", ".rtf", ".bdf", ".s"];
 
     private static bool Updating => Environment.GetEnvironmentVariable("CLASSICMAC_UPDATE_GOLDEN") == "1";
 

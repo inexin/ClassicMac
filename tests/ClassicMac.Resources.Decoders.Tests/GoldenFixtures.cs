@@ -166,8 +166,31 @@ internal static class GoldenFixtures
         yield return Res("FONT", 1024, [], "Example");
         yield return Res("fctb", 1036, [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0xFF, 0xFF, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0xFF, 0xFF]);
 
+        // Code: a 68k application (CODE 0 and 1), its 'cfrg' 0, a native fragment, code resources in each header form
+        // (standard, fat, driver, package), and the other code types as a small fragment or two instructions.
+        yield return Res("CODE", 0, CodeFixtures.Application0);
+        yield return Res("CODE", 1, CodeFixtures.Code1, "Main");
+        yield return Res("cfrg", 0, CodeFixtures.Cfrg(("App", ClassicMac.Code.Ppc.CfrgWhere.DataFork, 0, 0, 0, 0)));
+        yield return Res("ncod", 5, CodeFixtures.Fragment());
+        yield return Res("CDEF", 0, CodeFixtures.StandardHeader);
+        yield return Res("CDEF", 1, CodeFixtures.Fat());
+        yield return Res("DRVR", 12, CodeFixtures.Driver, ".D");
+        yield return Res("PACK", 3, CodeFixtures.Package);
+        foreach (var type in Code.CodeResourceDecoder.NativeTypes.Where(t => t != "ncod"))
+            yield return Res(type, 128, SmallFragment());
+        foreach (var type in Code.CodeResourceDecoder.M68kTypes.Where(t => t is not ("CDEF" or "DRVR" or "PACK")))
+            yield return Res(type, (short)(type == "ptch" ? 129 : 128), [0x70, 0x00, 0x4E, 0x75]); // 'ptch' and 'PTCH' apart on any disk
+
         // A type no decoder handles: exported raw.
-        yield return Res("CODE", 1, [0x4E, 0x75]);
+        yield return Res("DATA", 0, [0x4E, 0x75]);
+    }
+
+    // A PEF container with one code section, blr, and no loader.
+    private static byte[] SmallFragment()
+    {
+        var b = new ClassicMac.Code.Tests.PefBuilder { WithLoader = false };
+        b.AddSection(ClassicMac.Code.Ppc.PefSectionKind.Code, ClassicMac.Code.Tests.PefBuilder.Words(0x4E800020));
+        return b.Build();
     }
 
     // An mctb entry: menu, item, four colours (grey levels 1–4), reserved.

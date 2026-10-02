@@ -231,6 +231,8 @@ None.
 - `SegmentHeader.EntryIndices` caps a pair at 65,536 entries. [ClassicMac]
 - When both CodeWarrior and Retro68 shapes are present, Retro68 wins (§2.1's order). [ClassicMac]
 
+Segments are exported with a listing and a model as [disassembly.md](../output/disassembly.md) describes.
+
 ## 6. Diagnostics
 
 | Code | Severity | When | ClassicMac does | The Mac does |

@@ -1,0 +1,33 @@
+{
+  "type": "nitt",
+  "id": 128,
+  "format": "pef",
+  "fragment": {
+    "architecture": "pwpc",
+    "formatVersion": 1,
+    "currentVersion": 17858560,
+    "oldDefVersion": 16777216,
+    "oldImpVersion": 16809984,
+    "sections": [
+      {
+        "index": 0,
+        "kind": "code",
+        "share": "process",
+        "totalLength": 4,
+        "unpackedLength": 4,
+        "containerLength": 4,
+        "containerOffset": 80,
+        "alignment": 4
+      }
+    ]
+  },
+  "functions": [
+    {
+      "section": 0,
+      "offset": 0,
+      "name": "sub_0000",
+      "source": "entry"
+    }
+  ],
+  "references": []
+}

@@ -202,6 +202,8 @@ None.
 - Decompressing a compressed resource is the caller's ([compressed-resources.md](../resources/compressed-resources.md)).
   [ClassicMac]
 
+Code resources are exported with a listing and a model as [disassembly.md](../output/disassembly.md) describes.
+
 ## 6. Diagnostics
 
 | Code | Severity | When | ClassicMac does | The Mac does |
