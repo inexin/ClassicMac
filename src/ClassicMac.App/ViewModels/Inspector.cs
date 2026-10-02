@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Resources;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -60,13 +61,47 @@ namespace ClassicMac.App.ViewModels
             var resource = node.Resource;
             var type = resource.Type.ToString();
             var kind = TypeNames.TryGetValue(type, out var names) ? names.One : $"'{type}' resource";
-            return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}",
-            [
+            var facts = new List<InspectorFact>
+            {
                 new("Type", $"'{type}'", true),
                 new("ID", resource.Id.ToString(CultureInfo.InvariantCulture), false),
-                Bytes(resource.Length),
-                new("Attributes", resource.Attributes == ResourceAttributes.None ? "none" : resource.Attributes.ToString(), false),
-            ]);
+            };
+            if (Members(node) is { } members)
+            {
+                facts.Add(new("Members", members, true));
+            }
+
+            facts.Add(Bytes(resource.Length));
+            facts.Add(new("Attributes", resource.Attributes == ResourceAttributes.None ? "none" : resource.Attributes.ToString(), false));
+            return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}", facts);
+        }
+
+        private static readonly string[] SuiteTypes = ["ICN#", "icl4", "icl8", "ics#", "ics4", "ics8", "icm#", "icm4", "icm8"];
+
+        // An icon family's members: the suite types with the resource's ID, or an icns's member types; null for others.
+        private static string? Members(ResourceNode node)
+        {
+            var resource = node.Resource;
+            var type = resource.Type.ToString();
+            if (SuiteTypes.Contains(type))
+            {
+                return string.Join(" · ", SuiteTypes.Where(t => node.Fork.Find(FourCC.FromString(t), resource.Id) is not null));
+            }
+
+            if (type != "icns")
+            {
+                return null;
+            }
+
+            try
+            {
+                var data = ResourceDecompression.Default.GetData(resource, node.Fork, node.Input.Options, []);
+                return string.Join(" · ", ClassicMac.Resources.Decoders.Images.IconFamily.ReadIcns(data, []).Members.Select(m => m.Key));
+            }
+            catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+            {
+                return null;
+            }
         }
 
         private static InspectorHeader Type(ResourceTypeNode node)
@@ -132,6 +167,28 @@ namespace ClassicMac.App.ViewModels
             _ => ExtractAllCommand,
         };
 
+        /// <summary>The selection's large icon for the header's tile (PNG), once loaded; null while loading or when it has none.</summary>
+        [ObservableProperty]
+        private byte[]? headerIconPng;
+
+        /// <summary>The header icon's loading (tests wait for it).</summary>
+        internal Task HeaderIconTask { get; private set; } = Task.CompletedTask;
+
+        // Loads the selection's large icon off the UI thread; a newer selection wins.
+        private async Task LoadHeaderIconAsync(NodeViewModel? node)
+        {
+            if (node is null)
+            {
+                return;
+            }
+
+            var png = await Task.Run(() => NodeViewModel.LargeIcon(node));
+            if (ReferenceEquals(Selected, node))
+            {
+                HeaderIconPng = png;
+            }
+        }
+
         /// <summary>Whether the selection's form is open for editing (in the Preview tab).</summary>
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(EditFormCommand), nameof(CancelFormCommand))]
@@ -164,6 +221,8 @@ namespace ClassicMac.App.ViewModels
         private void OnSelectionChangedForInspector()
         {
             IsEditingForm = false;
+            HeaderIconPng = null;
+            HeaderIconTask = LoadHeaderIconAsync(Selected);
             OnPropertyChanged(nameof(Header));
             OnPropertyChanged(nameof(HeaderExportCommand));
             EditFormCommand.NotifyCanExecuteChanged();

@@ -68,8 +68,11 @@ namespace ClassicMac.App.ViewModels
         /// resolution as the folder preview's (custom icon, the application's bundle, the generic icon), cached per
         /// volume; null when nothing was found (the row keeps its kind icon).
         /// </summary>
-        public static byte[]? TreeIcon(FileNode node) =>
-            Holder(node) is { } holder ? Volumes.GetValue(holder, h => new Volume(h, node.Input.Options)).TreeIcon(node.File) : null;
+        public static byte[]? TreeIcon(FileNode node) => FinderIcon(node, 16);
+
+        /// <summary>A file's Finder icon at <paramref name="size"/> square (16 for its tree row, 32 for the inspector's header), as for <see cref="TreeIcon"/>.</summary>
+        public static byte[]? FinderIcon(FileNode node, int size) =>
+            Holder(node) is { } holder ? Volumes.GetValue(holder, h => new Volume(h, node.Input.Options)).TreeIcon(node.File, size) : null;
 
         /// <summary>How many file icons the volume holding <paramref name="node"/> has resolved for the tree.</summary>
         public static int ResolvedTreeIcons(NodeViewModel node) =>
@@ -188,24 +191,37 @@ namespace ClassicMac.App.ViewModels
                 }
             }
 
-            private readonly Dictionary<MacFile, byte[]?> treeIcons = new(ReferenceEqualityComparer.Instance);
+            private readonly Dictionary<(MacFile File, int Size), byte[]?> treeIcons = new(new IconKeyComparer());
+
+            // A file by reference, with the icon's size.
+            private sealed class IconKeyComparer : IEqualityComparer<(MacFile File, int Size)>
+            {
+                public bool Equals((MacFile File, int Size) x, (MacFile File, int Size) y) => ReferenceEquals(x.File, y.File) && x.Size == y.Size;
+
+                public int GetHashCode((MacFile File, int Size) key) => HashCode.Combine(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(key.File), key.Size);
+            }
 
             public int ResolvedTreeIcons { get; private set; }
 
             // A file's icon for the tree, once per file; with the resolver the folder preview last made, or one with
             // the volume's own System files.
-            public byte[]? TreeIcon(MacFile file)
+            public byte[]? TreeIcon(MacFile file, int size)
             {
                 lock (systemForks)
                 {
-                    if (treeIcons.TryGetValue(file, out var cached))
+                    if (treeIcons.TryGetValue((file, size), out var cached))
                     {
                         return cached;
                     }
 
-                    ResolvedTreeIcons++;
+                    // Counted for the tree's rows (the header's large icons are asked one selection at a time).
+                    if (size == 16)
+                    {
+                        ResolvedTreeIcons++;
+                    }
+
                     var suite = FileIcon(resolver ?? Resolver(DialogSources.None), file, () => Fork(file)).Suite;
-                    return treeIcons[file] = suite is null ? null : NodeViewModel.Plot16(suite);
+                    return treeIcons[(file, size)] = suite is null ? null : NodeViewModel.Plot(suite, size);
                 }
             }
 

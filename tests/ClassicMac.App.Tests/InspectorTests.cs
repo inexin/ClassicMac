@@ -236,4 +236,99 @@ public sealed class InspectorTests : IDisposable
         model.EditFormCommand.Execute(null);
         Assert.False(model.IsEditingForm);
     }
+
+    // An ICN# 128 (black, full mask) with an icl8 128 (black: colour 255) and an ics# 128 (black left half); an ics# 129 alone; a cicn;
+    // an icns with an ICN# member; a CURS; a TEXT; and a file with a custom icon (ICN# −16455).
+    private string Icons()
+    {
+        byte[] icn = [.. Enumerable.Repeat((byte)0xFF, 256)];
+        byte[] ics = [.. Enumerable.Range(0, 16).SelectMany(_ => new byte[] { 0xFF, 0 }), .. Enumerable.Repeat((byte)0xFF, 32)];
+        byte[] icns = [.. "icns"u8, 0, 0, 1, 0x10, .. "ICN#"u8, 0, 0, 1, 8, .. icn];
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Icons", [], PreviewTests.Fork(("ICN#", 128, null, icn), ("icl8", 128, null, [.. Enumerable.Repeat((byte)0xFF, 1024)]), ("ics#", 128, null, ics),
+            ("ics#", 129, null, ics), ("icns", 130, null, icns), ("CURS", 128, null, [.. Enumerable.Repeat((byte)0xFF, 64), 0, 0, 0, 0]),
+            ("TEXT", 128, null, [1])));
+        disk.File(HfsBuilder.Root, "Custom", [], PreviewTests.Fork(("ICN#", -16455, null, icn)),
+            info: new FinderInfo { Type = FourCC.FromString("TEXT"), Creator = FourCC.FromString("ttxt"), Flags = FinderFlags.HasCustomIcon });
+        disk.File(HfsBuilder.Root, "Plain", [1], []);
+        var path = Path.Combine(folder, "icons.img");
+        File.WriteAllBytes(path, disk.Build("Icons"));
+        return path;
+    }
+
+    private static ResourceNode Resource(FileNode file, string type, short id) =>
+        file.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children.OfType<ResourceNode>().Single(r => r.Resource.Id == id);
+
+    [Fact]
+    public async Task Icon_families_list_their_members()
+    {
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(Icons()))!;
+        var icons = Child<FileNode>(input, "Icons");
+        await icons.EnsureLoadedAsync();
+
+        model.Selected = Resource(icons, "ics#", 128);
+        Assert.Equal(["Type", "ID", "Members", "Size", "Attributes"], model.Header!.Facts.Select(f => f.Label));
+        Assert.Equal(new InspectorFact("Members", "ICN# · icl8 · ics#", true), Facts(model.Header)["Members"]);
+        model.Selected = Resource(icons, "ics#", 129);
+        Assert.Equal("ics#", Facts(model.Header!)["Members"].Value);
+        model.Selected = Resource(icons, "icns", 130);
+        Assert.Equal("ICN#", Facts(model.Header!)["Members"].Value);
+        model.Selected = Resource(icons, "TEXT", 128);
+        Assert.DoesNotContain("Members", Facts(model.Header!).Keys);
+        model.Selected = Resource(icons, "CURS", 128);
+        Assert.DoesNotContain("Members", Facts(model.Header!).Keys);
+    }
+
+    private static (int Width, int Height, uint TopLeft, uint TopRight) Png(byte[] png)
+    {
+        using var bitmap = SkiaSharp.SKBitmap.Decode(png);
+        static uint At(SkiaSharp.SKBitmap b, int x, int y) => (uint)b.GetPixel(x, y);
+        return (bitmap.Width, bitmap.Height, At(bitmap, 1, 1), At(bitmap, bitmap.Width - 2, 1));
+    }
+
+    private const uint Black = 0xFF000000;
+
+    [Fact]
+    public async Task The_header_icon_is_the_large_icon()
+    {
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(Icons()))!;
+        var icons = Child<FileNode>(input, "Icons");
+        await icons.EnsureLoadedAsync();
+
+        async Task<(int Width, int Height, uint TopLeft, uint TopRight)?> Select(NodeViewModel node)
+        {
+            model.Selected = node;
+            Assert.Null(model.HeaderIconPng); // the previous one goes at once
+            await model.HeaderIconTask;
+            return model.HeaderIconPng is { } png ? Png(png) : null;
+        }
+
+        // The family's 32-pixel member (all black), not its small one (left half), whichever member is selected.
+        Assert.Equal((32, 32, Black, Black), await Select(Resource(icons, "ics#", 128)));
+        Assert.Equal((32, 32, Black, Black), await Select(Resource(icons, "ICN#", 128)));
+        // A family without a large member: its small icon at 16.
+        var small = await Select(Resource(icons, "ics#", 129));
+        Assert.Equal((16, 16, Black), (small!.Value.Width, small.Value.Height, small.Value.TopLeft));
+        Assert.NotEqual(Black, small.Value.TopRight);
+        Assert.Equal(32, (await Select(Resource(icons, "icns", 130)))!.Value.Width);
+        Assert.Equal(16, (await Select(Resource(icons, "CURS", 128)))!.Value.Width);
+        Assert.Null(await Select(Resource(icons, "TEXT", 128)));
+
+        // A file's Finder icon at 32; none without one (the kind icon shows); folders and inputs none.
+        Assert.Equal((32, 32, Black, Black), await Select(Child<FileNode>(input, "Custom")));
+        Assert.Null(await Select(Child<FileNode>(input, "Plain")));
+        Assert.Null(await Select(input));
+    }
+
+    [Theory]
+    [InlineData(64, 32, 32, 16)]
+    [InlineData(32, 32, 32, 32)]
+    [InlineData(16, 8, 16, 8)]
+    public void Pictures_are_fitted_by_nearest_neighbour(int width, int height, int fittedWidth, int fittedHeight)
+    {
+        using var fitted = SkiaSharp.SKBitmap.Decode(NodeViewModel.Fit(new ClassicMac.Graphics.RgbaBitmap(width, height), 32));
+        Assert.Equal((fittedWidth, fittedHeight), (fitted.Width, fitted.Height));
+    }
 }

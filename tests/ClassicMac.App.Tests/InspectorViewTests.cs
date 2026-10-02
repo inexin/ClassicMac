@@ -55,6 +55,19 @@ public sealed class InspectorViewTests
             var type = texts.Single(t => t.Classes.Contains("value") && t.Text == "'STR#'");
             Assert.Equal("IBM Plex Mono", type.FontFamily.Name.Split('#')[^1]);
             Assert.Same(strings, header.GetVisualDescendants().OfType<TreeIcon>().Single().Node);
+            // No large icon of its own: the kind icon shows in the tile.
+            Assert.True(header.GetVisualDescendants().OfType<TreeIcon>().Single().IsEffectivelyVisible);
+            Assert.False(header.GetVisualDescendants().OfType<PixelImage>().Single().IsEffectivelyVisible);
+            model.HeaderIconPng = ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(32, 32, new byte[32 * 32 * 4]);
+            Dispatcher.UIThread.RunJobs();
+            var large = header.GetVisualDescendants().OfType<PixelImage>().Single();
+            Assert.True(large.IsEffectivelyVisible);
+            Assert.Equal((32, 1.0), (large.Source!.PixelSize.Width, large.Zoom));
+            Assert.False(header.GetVisualDescendants().OfType<TreeIcon>().Single().IsEffectivelyVisible);
+            // The toolbar's Export… does what the header's does.
+            var toolbarExport = window.FindControl<Border>("Toolbar")!.GetVisualDescendants().OfType<Button>()
+                .Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Export");
+            Assert.Same(model.HeaderExportCommand, toolbarExport.Command);
             var buttons = header.GetVisualDescendants().OfType<Button>().ToList();
             Assert.Same(model.SaveResourceAsCommand, buttons.Single(b => (string?)b.Content == "Export…").Command);
             var edit = buttons.Single(b => (string?)b.Content == "Edit");

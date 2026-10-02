@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Viewer: the inspector header's tile shows the selection's large icon drawn 1:1 at any display scaling: an icon
+  resource's family at 32 × 32 (16 when it has only small members), a cicn fitted into 32, a cursor, or a file's
+  Finder icon at 32; the kind icon otherwise. Icon families list their members ("ICN# · icl8 · ics#", or an icns's
+  member types). The toolbar's Export… now does what the header's does for the selection.
 - Viewer: the inspector has a header above its tabs: the selection's icon on a checkerboard tile, its name, its kind
   and owner ("String list in Prefs") and its facts (type, ID, size and attributes for a resource; type / creator, total
   size and resources for a file), with Export… and, for resources with a form, Edit. The Edit tab is gone: Edit opens

@@ -354,7 +354,7 @@
             </StackPanel>
           </Button>
           <Border Classes="tool-divider" />
-          <Button Classes="flat tool" Command="{Binding ExportResourcesCommand}" ToolTip.Tip="Export the selection's resources" AutomationProperties.Name="Export">
+          <Button Classes="flat tool" Command="{Binding HeaderExportCommand}" ToolTip.Tip="Export the selection" AutomationProperties.Name="Export">
             <StackPanel>
               <Path Classes="tool-icon" Data="M9,11 V2 M5.5,5.5 L9,2 L12.5,5.5 M2,11 V15 H16 V11" />
               <TextBlock Text="Export…" />
@@ -494,7 +494,13 @@
               </Panel>
             </StackPanel>
             <Border Classes="icon-tile">
-              <views:TreeIcon Node="{Binding Header.Node, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <Panel>
+                <views:PixelImage Source="{Binding HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <views:TreeIcon Node="{Binding Header.Node, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                IsVisible="{Binding HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
+              </Panel>
             </Border>
             <StackPanel Classes="titles">
               <TextBlock Classes="heading" Text="{Binding Header.Name, FallbackValue={x:Null}}" />

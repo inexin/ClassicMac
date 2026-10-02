@@ -177,7 +177,23 @@ namespace ClassicMac.App.ViewModels
 
         // An icon resource's 16-pixel icon: the suite of its ID plotted at 16 × 16 (the small member, else the large one
         // shrunk); a cicn shrunk by nearest neighbour; a cursor as it is.
-        private static byte[]? ResourceIcon(ResourceNode node)
+        private static byte[]? ResourceIcon(ResourceNode node) => ResourceIcon(node, large: false);
+
+        /// <summary>
+        /// The node's large icon for the inspector's header, as PNG: an icon resource's family at 32 × 32 (at 16 when it
+        /// has only small members), a cicn fitted into 32, a cursor as it is; a file's Finder icon at 32. Null for the
+        /// others (the header shows the kind icon).
+        /// </summary>
+        internal static byte[]? LargeIcon(NodeViewModel node) => node switch
+        {
+            ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => ResourceIcon(resource, large: true),
+            FileNode file => FolderPreviews.FinderIcon(file, 32),
+            _ => null,
+        };
+
+        private static readonly HashSet<string> LargeMembers = ["ICN#", "icl4", "icl8", "il32"];
+
+        private static byte[]? ResourceIcon(ResourceNode node, bool large)
         {
             var resource = node.Resource;
             var fork = node.Fork;
@@ -185,16 +201,18 @@ namespace ClassicMac.App.ViewModels
             var diagnostics = new List<Diagnostic>();
             ReadOnlyMemory<byte>? Lookup(FourCC type, short id) =>
                 fork.Find(type, id) is { } r ? ResourceDecompression.Default.GetData(r, fork, options, diagnostics) : null;
+            byte[]? Suite(IconSuite suite) =>
+                Plot(suite, large && suite.Members.Keys.Any(LargeMembers.Contains) ? 32 : 16);
             try
             {
                 var type = resource.Type.ToString();
                 var data = Lookup(resource.Type, resource.Id)?.ToArray() ?? [];
                 return type switch
                 {
-                    "cicn" => Shrink16(QuickDrawResources.DecodeCicn(data)),
+                    "cicn" => Fit(QuickDrawResources.DecodeCicn(data), large ? 32 : 16),
                     "CURS" => Png(QuickDrawResources.DecodeCursor(data).Image),
-                    "icns" => Plot16(IconSuite.FromFamily(IconFamily.ReadIcns(data, diagnostics))),
-                    _ => Plot16(IconSuite.FromResources(Lookup, resource.Id)),
+                    "icns" => Suite(IconSuite.FromFamily(IconFamily.ReadIcns(data, diagnostics))),
+                    _ => Suite(IconSuite.FromResources(Lookup, resource.Id)),
                 };
             }
             catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or NotSupportedException or ArgumentException)
@@ -204,23 +222,29 @@ namespace ClassicMac.App.ViewModels
         }
 
         /// <summary>A suite plotted at 16 × 16 on a transparent canvas, as PNG; null when it has no 1-bit member.</summary>
-        internal static byte[]? Plot16(IconSuite suite)
+        internal static byte[]? Plot16(IconSuite suite) => Plot(suite, 16);
+
+        /// <summary>A suite plotted at <paramref name="size"/> square on a transparent canvas, as PNG; null when it has no 1-bit member.</summary>
+        internal static byte[]? Plot(IconSuite suite, int size)
         {
-            var canvas = new RgbaBitmap(16, 16);
+            var canvas = new RgbaBitmap(size, size);
             var port = new QuickDrawPort(canvas, QuickDrawOptions.Default);
-            return suite.Plot(port, new MacRect(0, 0, 16, 16)) ? Png(canvas) : null;
+            return suite.Plot(port, new MacRect(0, 0, (short)size, (short)size)) ? Png(canvas) : null;
         }
 
         /// <summary>A bitmap fitted into 16 × 16 by nearest neighbour (never smoothed), as PNG; one that fits as it is.</summary>
-        internal static byte[] Shrink16(RgbaBitmap bitmap)
+        internal static byte[] Shrink16(RgbaBitmap bitmap) => Fit(bitmap, 16);
+
+        /// <summary>A bitmap fitted into <paramref name="size"/> square by nearest neighbour (never smoothed), as PNG; one that fits as it is.</summary>
+        internal static byte[] Fit(RgbaBitmap bitmap, int size)
         {
-            if (bitmap.Width <= 16 && bitmap.Height <= 16)
+            if (bitmap.Width <= size && bitmap.Height <= size)
             {
                 return Png(bitmap);
             }
 
-            var size = Math.Max(bitmap.Width, bitmap.Height);
-            int w = Math.Max(1, bitmap.Width * 16 / size), h = Math.Max(1, bitmap.Height * 16 / size);
+            var longest = Math.Max(bitmap.Width, bitmap.Height);
+            int w = Math.Max(1, bitmap.Width * size / longest), h = Math.Max(1, bitmap.Height * size / longest);
             var small = new RgbaBitmap(w, h);
             for (int y = 0; y < h; y++)
             {
