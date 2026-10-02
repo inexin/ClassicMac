@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using ClassicMac.Core;
 
@@ -10,7 +11,7 @@ namespace ClassicMac.Files.Archives;
 /// <remarks>All documented LHA methods supported by this reader are implemented.</remarks>
 public sealed class LhaReader : IContainerReader
 {
-    private const int LevelZeroHeaderMinimumLength = 25;
+    private const int LevelZeroHeaderMinimumLength = 24;
     private const int LevelTwoHeaderMinimumLength = 26;
     private const int LevelThreeHeaderMinimumLength = 32;
     private const int MaximumHeaderLength = byte.MaxValue + 2;
@@ -48,7 +49,7 @@ public sealed class LhaReader : IContainerReader
         if (headerLength < LevelZeroHeaderMinimumLength || headerLength > header.Length)
             return false;
         int nameLength = header[21];
-        if (level == 0 && headerLength != LevelZeroHeaderMinimumLength + nameLength ||
+        if (level == 0 && headerLength < LevelZeroHeaderMinimumLength + nameLength ||
             level == 1 && headerLength < 27 + nameLength)
             return false;
         return IsLhaMethod(header.Slice(2, 5));
@@ -127,10 +128,14 @@ public sealed class LhaReader : IContainerReader
             byte osIdentifier;
             if (headerLevel == 0)
             {
-                if (headerLength != LevelZeroHeaderMinimumLength + nameLength)
+                if (headerLength < LevelZeroHeaderMinimumLength + nameLength)
                     throw new InvalidDataException("An LHA level-0 header has an invalid filename length.");
                 pathData = header.Slice(22, nameLength).ToArray();
-                osIdentifier = header[24 + nameLength];
+                // The OS identifier is an optional extension after the CRC. MacLHA 2.24 writes level-0 headers
+                // without one; such a name is read as MacRoman like an 'm' one ([Verified], ARCHIVES.md).
+                osIdentifier = headerLength > LevelZeroHeaderMinimumLength + nameLength
+                    ? header[24 + nameLength]
+                    : (byte)'m';
                 payloadOffset = checked(offset + headerLength);
             }
             else if (headerLevel == 1)
@@ -408,6 +413,9 @@ public sealed class LhaReader : IContainerReader
     private static byte[] CombinePath(byte[]? directoryName, ReadOnlySpan<byte> fileName)
     {
         if (directoryName is null || directoryName.Length == 0) return fileName.ToArray();
+        // The directory extension separates its names with $FF (LHa's header.doc; MacLHA 2.24 writes them so, with a
+        // leading $FF before a volume name, [Verified], ARCHIVES.md).
+        directoryName = [.. directoryName.Select(value => value == 0xFF ? (byte)'/' : value)];
         bool hasSeparator = directoryName[^1] is (byte)'/' or (byte)'\\';
         byte[] path = new byte[directoryName.Length + (hasSeparator ? 0 : 1) + fileName.Length];
         directoryName.CopyTo(path, 0);

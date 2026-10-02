@@ -131,7 +131,8 @@ independently implemented.
 
 A level-0 record's one-byte size is the number of following header bytes, so the full header is that value plus two;
 the header checksum covers the declared number of bytes beginning at the method. The header carries method, packed
-and expanded sizes, DOS date/time, attributes, level, byte filename, file CRC-16 and OS identifier, then its payload.
+and expanded sizes, DOS date/time, attributes, level, byte filename, file CRC-16 and an optional OS identifier, then
+its payload.
 For level 1, the same size and checksum rules apply to a base header with a two-byte next-extension size. Its packed
 size field counts the extension bytes plus file payload. Each extension has a type, data and a two-byte size for the
 following extension. Type 1 supplies the filename and type 2 the directory; those path components are combined before
@@ -154,7 +155,21 @@ LArc literals, preset-window copies and overlapping matches, legacy-Huffman lite
 tree forms, multiple LH3 blocks, literal and back-reference tokens in all four newer static-Huffman methods, multiple
 compressed blocks, output-length and truncation checks, unwrapper integration, header and
 data checksums, unsupported-method and unsupported-encoding continuation, input-size limits, and truncated payloads.
-Compressed methods are currently verified with hand-built vectors rather than archives produced by an original Mac LHA application.
+
+**[Verified against MacLHA 2.24 archives (lhasa test suite)]** (`TestData/MacLha224`): header levels 0, 1 and 2,
+`-lh0-` and `-lh5-`, all 16 of lhasa's MacLHA archives except `-lh1-`:
+- A level-0 header has no OS identifier: it ends with the CRC (24 + name-length bytes in all). The OS byte is an
+  optional extension; an entry without one is read with its name as MacRoman bytes, like an `m` entry.
+- A directory extension separates names with `$FF` (LHa's header.doc). A "full" path starts with `$FF` and the volume
+  name (`$FF Untitled $FF subdir $FF subdir2 $FF`); the reader keeps the volume name as the top folder, as lhasa does,
+  so nothing is lost and the path stays relative.
+- Except with "non-Mac", each entry's data is a MacBinary file carrying both forks, Finder info and dates. The LHA
+  reader returns it as stored and the default pipeline unwraps it as MacBinary one level down (the LHA entry's folders
+  stay on the LHA node and place the Mac file on unpacking); `-lh0-` archives of a MacBinary file that holds a gzip
+  file unwrap one level further.
+- Open: `-lh1-` (`l0_lh1.lzh`, `l1_lh1.lzh`, `l2_lh1.lzh`) decodes 7 bytes correctly, then the first match (a run of
+  zeros the encoder took from the initial window) and everything after it differ, and the CRC check reports it. The
+  `-lh1-` window setup or adaptive tree does not yet match MacLHA's; it stays **[Fitted]**.
 
 ## DiskDoubler (DDA2)
 

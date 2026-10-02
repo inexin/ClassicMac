@@ -33,3 +33,4 @@ tests/ClassicMac.Files.Tests/TestData/StuffItOriginalCrossVersion/*.sit -text
 tests/ClassicMac.Files.Tests/TestData/DiskDoublerOriginal/*.sit -text
 tests/ClassicMac.Files.Tests/TestData/CompactProMunbox/*.cpt -text
 tests/ClassicMac.Files.Tests/TestData/PackIt10/*.pit -text
+tests/ClassicMac.Files.Tests/TestData/MacLha224/*.lzh -text

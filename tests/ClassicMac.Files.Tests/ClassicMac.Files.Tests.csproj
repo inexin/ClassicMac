@@ -30,6 +30,7 @@
     <None Update="TestData\StuffIt703\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\CompactProMunbox\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\PackIt10\**\*" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="TestData\MacLha224\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\StuffItOriginalCrossVersion\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Update="TestData\DiskDoublerOriginal\**\*" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
