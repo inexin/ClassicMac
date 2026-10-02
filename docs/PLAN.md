@@ -229,6 +229,7 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 | `unpack <input>` | Every Mac file inside the input, through containers and disk images, to a folder with both forks and Finder info; folders kept, a container of one file replaced by it, a disk or archive of several becomes a folder (built) | `-o <dir>`, `--layout appledouble\|basilisk`, `--overwrite` | 2 |
 | `extract <input>` | Resources into a folder with a manifest; a folder per file when the input holds several; decoded by default; a DOCMaker or SimpleText document also as HTML in `document/` (built) | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`, `--screen-depth`, `--no-documents`; later `--encoding` | 1 (raw), 3 (decoded) |
 | `convert <input>` | Every DOCMaker and SimpleText document inside the input as an HTML folder; a folder per document when there are several (built) | `-o <dir>`, `--overwrite`, `--screen-depth` | 3 |
+| `disasm <input>` | The code of every Mac file inside the input: a listing (`.s`) per 68k segment, code resource and fragment (the data fork's included) and `code.json`; a folder per file when several have code (built; [disassembly.md](formats/output/disassembly.md)) | `-o <dir>`, `--cpu 68k\|ppc\|both`, `--overwrite` | 11 |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest (built; changed decoded files wait for encoders) | `-o <file>`, `--base <file>`, `--data <file>`, `--allow-deletes`, `--overwrite`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`
@@ -251,9 +252,8 @@ Each decoder turns one resource type into a modern file; anything without a deco
 | UI | `MENU`, `MBAR`, `DLOG`, `DITL`, `ALRT`, `WIND`, `CNTL`, and their colour and extension resources (`wctb`, `dctb`, `actb`, `cctb`, `mctb`, `ictb`, `dlgx`, `alrx`, `xmnu`) (built) | JSON (built), optionally a rendered preview of the dialog |
 | Colour | `clut`, `pltt` (built) | JSON and `.act` palettes (built) |
 | Finder | `BNDL`, `FREF`, `SIZE` (built) | JSON (built) |
-| Unknown | anything else, including `CODE` | raw `.bin` + hex preview in the manifest |
-
-Disassembling `CODE` is out of scope; resource_dasm covers it.
+| Code | `CODE`, `cfrg`, native code resources (`ncod`, `nlib`, `ndrv`, …) and 68k code resources (`CDEF`, `WDEF`, `DRVR`, `PACK`, `INIT`, `XCMD`, …) (built, through `ClassicMac.Code`) | the data as `.bin` (so `pack` takes it back), an annotated listing (`.s`) and a model (`.json`); `CODE` 0 and `cfrg` the data and JSON ([disassembly.md](formats/output/disassembly.md)) |
+| Unknown | anything else | raw `.bin` + hex preview in the manifest |
 
 **Document decoders** turn a whole file's resources into one document, beside the per-resource output:
 
@@ -281,7 +281,9 @@ MyApp/
   PICT/128 Title Screen.png
   snd%20/200 Door.wav
   STR#/1000 Messages.json
-  CODE/1.bin
+  CODE/1 Main.bin
+  CODE/1 Main.s
+  CODE/1 Main.json
 ```
 
 - **Images:** 32-bit RGBA PNG by default; `--screen-depth` renders at a chosen screen depth (1, 2, 4, 8, 16 bit).
@@ -330,7 +332,7 @@ flowchart LR
     end
     subgraph resourcelayer["Resource layer"]
         M["ClassicMac.Resources<br/>resource map, dcmp,<br/>read and write"]
-        D["ClassicMac.Resources.Decoders<br/>images to PNG, sound to WAV,<br/>text, fonts, UI to JSON"]
+        D["ClassicMac.Resources.Decoders<br/>images to PNG, sound to WAV,<br/>text, fonts, UI to JSON,<br/>code to listings"]
     end
     E["CLI · viewer app<br/>unwrap, browse, export,<br/>pack back"]
     B --> F & M & Q
@@ -338,6 +340,8 @@ flowchart LR
     M --> D
     F & D --> E
     Q["ClassicMac.Graphics<br/>QuickDraw, PICT, QuickTime,<br/>MacPaint, fonts"] --> D
+    M --> C["ClassicMac.Code<br/>PEF, cfrg, 68k segments,<br/>code resources, disassembly"]
+    C --> D
     A["App decoders<br/>an app's own formats"] --> D
 ```
 
@@ -367,9 +371,13 @@ flowchart LR
   for text (its own parser, inherited from QuickDraw.Pict, went in stage 3; the ROM's reading rules are an internal
   option). `ClassicMac.Graphics.ImageSharp` and `ClassicMac.Graphics.SkiaSharp` are the
   host-library adapters.
+- **ClassicMac.Code** — classic Mac code: PEF containers and `cfrg` (`.Ppc`), 68k applications, data initialisers
+  and code resources (`.M68k`), and the 68k and PowerPC disassemblers with their annotator and listings
+  (`.Disassembly`); depends on Core and Resources.
 - **ClassicMac.Resources.Decoders** — the built-in decoders, one package with a namespace per area (text, images,
-  sound; decided, like the file layer); depends on Resources and `ClassicMac.Graphics`.
-- **CLI** — a `dotnet tool` with `info`, `list`, `extract` and `pack`; references the file and resource packages.
+  sound, code; decided, like the file layer); depends on Resources, `ClassicMac.Graphics` and `ClassicMac.Code`.
+- **CLI** — a `dotnet tool` with `info`, `list`, `unpack`, `extract`, `convert`, `disasm` and `pack`; references the
+  file and resource packages.
 - **Viewer app** — a cross-platform desktop app on the same packages (below).
 - **Extension points:** an `IContainerReader` per container format and an `IResourceDecoder` per resource type, so
   apps add their own.
@@ -384,7 +392,8 @@ global.json                 .NET 10 SDK, rolling forward to the latest feature b
 Directory.Build.props       shared settings (below) and package metadata
 Directory.Packages.props    every package version, in one place
 src/ClassicMac.<Package>/   one folder per package; the app goes in src/ClassicMac.App/
-                            today: Core, Files, Fonts, Resources, Resources.Decoders, Resources.Cli, App
+                            today: Core, Files, Resources, Graphics (and its two adapters), Code,
+                            Resources.Decoders, Resources.Cli, App
 tests/ClassicMac.<Package>.Tests/   one test project per package
 tests/fixtures/             synthetic fixtures (and their Rez sources)
 schemas/                    manifest JSON Schemas
@@ -642,8 +651,9 @@ They change what running applications see, not what a file contains.
   it cannot store (`/ \ :`, a trailing dot or space, device names) are replaced when unpacking, with a warning; folder
   Finder info lives in the parent's `.finf`. Detection heuristics and name mappings fitted to real files are marked
   in the code.
-- **Behavioural references, not code to copy:** resource_dasm (MIT) and other open tools for container and `dcmp`
-  edge cases.
+- **Behavioural references:** resource_dasm (MIT) and other open tools for container and `dcmp` edge cases. Its
+  `dcmp` 3 and the decoding halves of its 68k and PowerPC emulators were ported (phase 11), with notices in
+  `THIRD-PARTY-NOTICES.md`.
 - **Licence:** MIT, with third-party notices for anything ported; no Apple code or files in the repo.
 
 ### Testing
@@ -722,7 +732,7 @@ slice worth learning from. Licences matter: MIT code may be reused with notice; 
 
 Each phase ships something usable and ends when its exit check passes; no dates set yet.
 
-**Status (2026-10-01):**
+**Status (2026-10-02):**
 
 | # | Phase | Status |
 |---|---|---|
@@ -736,7 +746,7 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 | 8 | Editor III (HFS writing) | Done for plain HFS: the library replaces forks and creates and deletes files and folders (with constrained B-tree growth); the app creates, imports and deletes them too, and Save As saves all edits into a verified copy of the image |
 | 9 | Merge (QuickDraw.Pict) | Done; NuGet publishing is the owner's step |
 | 10 | HFS+ and archives | Done (exit passed 2026-10-01); fixtures still missing for the fitted methods (Todo) |
-| 11 | Code (`ClassicMac.Code`) | In progress: PEF, `cfrg`, 68k segments and code resources, trap tables and both disassemblers built; annotation, integration and the exit check remain |
+| 11 | Code (`ClassicMac.Code`) | Done (exit passed 2026-10-02): PEF, `cfrg`, 68k applications and code resources, both disassemblers, `extract`'s code decoders, `disasm` and the viewer's listing |
 | 12 | Runtime (`ClassicMac.Runtime`) | Idea, not started (after phase 11) |
 
 1. **Core** — `ClassicMac.Core`; `ClassicMac.Resources`: resource map read/write, `dcmp` 0/1/2/3;
@@ -835,19 +845,42 @@ Each phase ships something usable and ends when its exit check passes; no dates 
     original-app fixture, every remaining method marked **[Fitted]** or **[Reference]**, the `nps-2009-hfsjtest1` image
     (SHA-256 pinned), and the corpus baseline over the Realmz, harness and `.rsrc` corpora. The table's Remaining column
     is the Todo item below.
-11. **Code** — `ClassicMac.Code`: parsers for classic Mac code and disassembly. **Planned, not started.**
-   - 68k applications: `CODE` segments and the jump table (MPW near and far models, `%A5Init` data, CodeWarrior's
-     single segment with `DATA 0` relocations, Retro68's relocation stream, Apple's `dcmp` jump-table shim).
-   - Code resources: the standard header, `DRVR`, components, and fat `CDEF`/`WDEF`/`MDEF`/`MBDF`/`LDEF` whose routine
-     descriptor ($AAFE) points at an embedded PEF.
-   - `cfrg` and the PEF container: sections, pattern-data unpacking, imports, all relocation opcodes, the export hash.
-   - Disassembly: 68000/020 with A-traps and MacsBug names; PowerPC with traceback-table names and cross-TOC glue
-     resolved to import names.
-   - Licensing: any MIT-licensed project may be used or ported, with a notice in `THIRD-PARTY-NOTICES.md`
-     (`resource_dasm` is the candidate); GPL projects stay reference only.
-   - Testing: hand-built vectors and, where a corpus is at hand, a comparison with `resource_dasm`'s output (syntax
-     normalised). Real binaries and the tool's outputs are not committed; private analysis material is not cited.
-   - Order: PEF and `cfrg` first (self-contained), then 68k segments and the jump table, then the disassemblers.
+11. **Code** — `ClassicMac.Code`: readers for classic Mac code, the 68k and PowerPC disassemblers, and their use in
+    `extract`, the new `disasm` command and the viewer. The rules each reader follows are in the
+    [code documents](formats/README.md#code) and [disassembly.md](formats/output/disassembly.md); this entry tracks
+    what is built and what is verified. The corpus facts are asserted by tests gated by `CLASSICMAC_CODE_CORPUS`; the
+    samples (Apple's and other vendors' code) are never committed.
+
+    | Format | Built | Verified against | Remaining |
+    |---|---|---|---|
+    | PEF | Header and sections; pattern-initialized data (ops 0–4); the loader: imported libraries and symbols (weak, class), all relocation opcodes, the export hash and lookup by name, re-exported and absolute exports, main/init/term; transition vectors; traceback tables | NQD (199 imports, 269 exports found by their hash), its alternative build, the Font Manager, Disk Copy 6.1.2 (main 1:$BB8) and 6.5, and all 90 Mac OS 9.2.2 fragments | Section kinds 3, 5, 6, 8 and the CDIS, SECN, LRPT, LSEC opcodes (no sample); CFM-68K containers |
+    | `cfrg` | Version 1 members, name padding, extensions, the `0x30EE` search extension | The Mac OS 9 System file: 12 `cfrg` resources, 162 members, each landing on a fragment in the data fork; Disk Copy 6.1.2's member naming its data fork | Locators other than the data fork (no sample) |
+    | 68k applications | `CODE` 0 and every jump-table entry form; near and far headers; the entry point, with the bootstrap shape's saved entry; the MPW near, MPW far, Retro68 and CodeWarrior models | ResEdit 2.1.3 (MPW near: 468 entries, entry CODE 66 +$C, saved entry CODE 1 +$3634); Disk Copy 6.1.2 (MPW far: 88 A5 and 33 PC relocations in CODE 1); Realmz 7.1.2 (CodeWarrior); QDHarness (Retro68) | The far lists' `$80 $00` long form and loaded far entries (no sample) |
+    | Data initialisers | MPW `%A5Init`, CodeWarrior `DATA` 0 (3 blocks, 6 relocation lists), Retro68 `RELA` | ResEdit's `%A5Init` (55 runs, 58 relocations); Realmz's `DATA` 0 (25/10/0/26862/391/0); QDHarness, its old build (1291 `RELA` relocations in `Runtime`) | THINK C and Symantec; multi-segment CodeWarrior |
+    | Code resources | The standard header, `DRVR`, the `$A9FF` package form (fitted), `thng` components, `$AAFE` routine descriptors with their PEF, native PEF resources | The System file: 41 fat descriptors each with a PEF, its `DRVR`s and the non-standard ATADisk, its packages and components; Disk Copy 6.1.2's `.HDI` driver | `gpch`, `ptch` bodies, `scod`, `boot` and other shapes |
+    | Names | Trap, selector and low-memory tables generated from Multiversal Interfaces (`tools/TrapTables`), MacsBug names in their three encodings | ResEdit, Realmz (341 MacsBug names), Disk Copy 6.1.2, QDHarness | — |
+    | 68k disassembler | Ported from resource_dasm: 68000, the 020/030 integer extensions, the 040's cache and `move16`, `movec`/`moves`, the FPU; recursive descent, switch tables, MacsBug-bounded functions, the gap sweep; the annotator | The instruction vectors; ResEdit's CODE 1 (all 145 `jsr n(A5)` resolve); Realmz's CODE 1 | An optional comparison with resource_dasm's listings, syntax normalised (not run) |
+    | PowerPC disassembler | Ported from resource_dasm: UISA, FP, the OEA operations drivers use, AltiVec, extended mnemonics; traceback names, glue to `lib::name`, TOC slots, transition vectors | The instruction vectors; Disk Copy 6.1.2 (440 glue stubs), Disk Copy 6.5 (686 glue stubs, 1619 traceback names), NQD | Code is listed linearly, not by descent; data sections are not disassembled |
+    | Integration | Decoders `code.segment`, `code.cfrg`, `code.resource` (the data stays the `.bin` main file, with `.s` and `.json`); `pack` takes a `.bin` main file back; `disasm`; the viewer's listing preview | Every code resource of ResEdit, Realmz, QDHarness, Disk Copy 6.1.2 and the System file decodes with no error, and `disasm` lists them (the System's 162 data-fork fragments included); the corpus export with raw copies packs back byte for byte | — |
+
+    *Exit:* every corpus sample's facts match:
+    - **ResEdit:** 468 jump-table entries; entry CODE 66 +$C; saved entry CODE 1 +$3634; `%A5Init` with 55 runs and
+      58 relocations; all 145 `jsr n(A5)` resolve.
+    - **Realmz:** CodeWarrior `DATA` 0 with relocation counts 25/10/0/26862/391/0, and 341 MacsBug names.
+    - **QDHarness** (its old build, the one the counts were taken on): 1291 `RELA` relocations.
+    - **Disk Copy 6.1.2:** MPW far, with 88 A5 and 33 PC relocations; its `cfrg` member; PEF main 1:$BB8; 440 glue
+      stubs.
+    - **NQD:** 199 imports and 269 exports, found by their hash.
+    - **The 90 Mac OS 9.2.2 fragments:** all verify.
+    - **Disk Copy 6.5:** 1619 traceback names and 686 glue stubs.
+    - **The System file:** 12 `cfrg` resources with 162 members, and 41 fat descriptors.
+
+    Also: every corpus `CODE` and PEF disassembles with no decoder error, and the instruction vectors pass. **Passed
+    2026-10-02:** `ClassicMac.Code.Tests` with `CLASSICMAC_CODE_CORPUS` set (1449 tests, none skipped), the decoders'
+    `CodeCorpusTests` (every code resource of the five samples decoded and listed with no error), and the
+    `CLASSICMAC_CORPUS` export, where no code resource fails or is left raw and every export packs back (its only
+    failures are five `icns` resources left raw, which predate this phase). The optional comparison with
+    resource_dasm's listings was not run.
 12. **Runtime** — `ClassicMac.Runtime`: run classic Mac applications without Apple's ROM or System, by high-level
     emulation. **Idea, not started; depends on phase 11.**
     - Approach: the application's code runs on a CPU core; the Toolbox is ClassicMac's own .NET implementation, the
@@ -857,7 +890,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
       choice and bitmap text, HFS/MFS reading and HFS writing (the File Manager's backing), the interface templates,
       the Platinum dialog drawing and icon drawing; phase 11's `CODE`, jump-table and `%A5Init` loading.
     - To build, in order:
-      1. A 68k interpreter: a C# port of syn68k's interpreter (MIT, 68LC040; Executor's core), or Moira (MIT); the
+      1. A 68k interpreter: a C# port of syn68k's interpreter (MIT, 68LC040; Executor's core), Moira (MIT), or the
+         emulator half of resource_dasm's `M68KEmulator` (MIT), whose decoding half phase 11 ported (its
+         `PPC32Emulator` is the matching candidate for PowerPC); the
          A-trap dispatcher with `SetTrapAddress`, and the low-memory globals at their fixed addresses. Trap numbers,
          signatures, structs and globals generated from Multiversal Interfaces (Executor's API definitions in YAML;
          check its licence before use) rather than typed in.

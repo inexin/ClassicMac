@@ -142,7 +142,7 @@ The models per output:
 | `'CODE'` n | `segment`, `name`; `model` (with an application); `readable`; `header` (`far`, `firstNearOffset`, `nearCount`, and when far `firstFarOffset`, `farCount`, `a5RelocationOffset`, `pcRelocationOffset`; `null` when the segment is too short); `jumpTableEntries` (`index`, `resourceOffset`); `relocations`; `functions`; `references` |
 | `'cfrg'` | `version`; `members`: `name`, `architecture`, `updateLevel`, `currentVersion`, `oldDefVersion`, `usage` (`importLibrary`, `application`, `dropIn`, `stubLibrary`, `weakStubLibrary`), `usage1`, `usage2`, `where` (`memory`, `dataFork`, `resource`, `byteStream`, `namedFragment`), `offset`, `length`, `where1`, `where2`, `resourceType` and `resourceId` (where = resource), `search` (`libraryKind`, `qualifiers`), `extensions` (`kind`, `length`) |
 | A code resource | `type`, `id`, `format` (`pef` or `68k`). PEF: `fragment`, `functions`, `references`. 68k: `driver` (`name`, `flags`, `delay`, `eventMask`, `menu`, `open`, `prime`, `control`, `status`, `close`), `package` (`type`, `id`, `version`, `flags`, `firstSelector`, `lastSelector`, `entries`: `selector`, `offset`) or `standardHeader` (`type`, `id`, `version`, `flags`, `entry`: the branch target); `routineDescriptor` (`offset`, `version`, `routines`: `procInfo`, `powerPC`, `flags`, `targetOffset` or `procDescriptor`, `pef`); `functions`; `references`; `fragments` (each a fragment with its `functions` and `references`) |
-| `code.json` (`disasm`) | `application` (the `'CODE'` 0 model, or `null`); `segments` (`id`, `name`, `file`, `readable`, `functions`); `codeResources` (`type`, `id`, `name`, `format`, `file`, `functions`); `fragments` (`index` in `'cfrg'` 0, `name`, `where`, `offset`, `length`, `resourceType`/`resourceId`, `file` or `null`, the fragment's members, `functions`) |
+| `code.json` (`disasm`) | `application` (the `'CODE'` 0 model, or `null`); `segments` (`id`, `name`, `file`, `readable`, `functions`); `codeResources` (`type`, `id`, `name`, `format`, `file`, `functions`); `fragments` (`cfrg`: the `'cfrg'` resource's ID, `index` in it, `name`, `where`, `offset`, `length`, `resourceType`/`resourceId`, `file` or `null`, the fragment's members, `functions`) |
 
 ## 2. Reading
 
@@ -247,7 +247,7 @@ make `jsr`/`jmp (xxx).l` a call into the segment.
 | `extract`, decoder `code.segment` (`'CODE'`) | `<id> <name>.bin` (the data, the main file), `.s`, `.json`; `'CODE'` 0: `.bin`, `.json` |
 | `extract`, decoder `code.cfrg` (`'cfrg'`) | `.bin`, `.json` |
 | `extract`, decoder `code.resource` (§5.1) | `.bin`, `.s`, `.json` |
-| `disasm` | Per Mac file with code: `CODE-<id> <name>.s` per segment, `<type>-<id> <name>.s` per code resource, `fragment-<i> <name>.s` per data-fork fragment (i its index in `'cfrg'` 0), and `code.json`; names made host-safe ([export-manifest.md §3.3](export-manifest.md#33-host-safe-names)) and unique without regard to case |
+| `disasm` | Per Mac file with code: `CODE-<id> <name>.s` per segment, `<type>-<id> <name>.s` per code resource, `fragment-<i> <name>.s` per data-fork fragment of `'cfrg'` 0 (i its index there) and `fragment-<id>.<i> <name>.s` for `'cfrg'` <id>, and `code.json`; names made host-safe ([export-manifest.md §3.3](export-manifest.md#33-host-safe-names)) and unique without regard to case |
 
 The main file of the code decoders is the data itself, so `pack` takes it back as it takes a raw resource's
 ([export-manifest.md §2.2](export-manifest.md#22-rebuilding-a-fork)).
@@ -261,7 +261,7 @@ classicmac disasm <input> [-o <dir>] [--cpu 68k|ppc|both] [--overwrite]
 | Option | Effect |
 | --- | --- |
 | `-o`, `--output` | The output folder (default: `<input> code` beside the input). One Mac file with code is written into it; several get a folder each, placed as `unpack` places files |
-| `--cpu` | `68k`: the segments and the 68k code resources (fat ones with their fragments); `ppc`: native code resources and the fragments `'cfrg'` 0 names; `both` (default) |
+| `--cpu` | `68k`: the segments and the 68k code resources (fat ones with their fragments); `ppc`: native code resources and the fragments the `'cfrg'` resources name; `both` (default) |
 | `--overwrite` | Write into a folder that already holds files (refused otherwise) |
 
 The input is read as `extract` reads it (containers, disk images, archives, a raw fork); the limit options and
@@ -269,7 +269,8 @@ The input is read as `extract` reads it (containers, disk images, archives, a ra
 2 usage, 3 not a Mac container or fork, 4 a file-system error. A file with no code writes nothing; an input with none
 prints `No code in <input>.`
 
-`'cfrg'` 0's members are listed by where they are: in the data fork at the member's offset for its length (0: to the
+Every `'cfrg'` resource's members (an application's or library's is `'cfrg'` 0; the System file has others) are listed
+by where they are: in the data fork at the member's offset for its length (0: to the
 end of the fork); in a resource (type `where1`, ID `where2`) as that code resource; elsewhere (memory, a byte stream,
 another fragment) not, with `code.fragment-elsewhere`.
 
@@ -278,7 +279,7 @@ another fragment) not, with `code.fragment-elsewhere`.
 - A segment with no `'CODE'` 0 (a resource copied out of its application) is listed on its own: its header, a far
   segment's A5 relocations, entered at its code start.
 - A CFM-68K fragment (`'m68k'`) is described, not disassembled.
-- A 68k code resource of a type not in §5.1 is not listed by `extract`; `disasm` lists one that `'cfrg'` 0 names.
+- A 68k code resource of a type not in §5.1 is not listed by `extract`; `disasm` lists one that a `'cfrg'` names.
 
 ## 5. ClassicMac
 
@@ -340,6 +341,9 @@ documents). These are its own and the decoders':
 - `tests/ClassicMac.Resources.Cli.Tests/DisasmTests.cs`: the command on a raw fork and an HFS disk with a fat
   application (data-fork fragment), `--cpu`, exit codes. `PackTests.Decoded_code_packs_back_from_its_bin_files`.
 - `tests/ClassicMac.App.Tests/PreviewTests.cs`: a `'CODE'` resource previews as its listing.
+- `tests/ClassicMac.Resources.Decoders.Tests/CodeCorpusTests.cs`, with `CLASSICMAC_CODE_CORPUS` set: every code
+  resource of ResEdit, Realmz, QDHarness, Disk Copy 6.1.2 and the Mac OS 9 System file decodes and `disasm` lists it
+  (the System's 162 data-fork fragments included) with no error.
 - With `CLASSICMAC_CODE_CORPUS` set (not committed): `CodeListingCorpusTests` lists every `'CODE'`, code resource and
   fragment of the corpus with no decoder error; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
   the counts in [PLAN.md](../../PLAN.md)'s phase 11 exit.

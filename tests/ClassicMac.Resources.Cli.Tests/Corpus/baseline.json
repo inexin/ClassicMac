@@ -50,6 +50,16 @@
     "documents": 0
   },
   {
+    "name": "About ResEdit 2.1.3.bin",
+    "sha256": "2f26865b53732a578d18feae119a276f001daa011e8b93ad7777efd4b0c6ca90",
+    "forks": 1,
+    "resources": 2,
+    "decoded": 2,
+    "raw": 0,
+    "outputs": "8c4235e8eaf0564347c6a3a7b91e7366ed5090903d55e08ea0d1b0aedc55bfb4",
+    "documents": 1
+  },
+  {
     "name": "Andale_Mono.rsrc",
     "sha256": "f9a831d0ec6d81c17eec9335dab357a8bd3fdfaf3b0b241a3cdc15d4d5e3c0b1",
     "forks": 1,
@@ -70,6 +80,16 @@
     "documents": 0
   },
   {
+    "name": "Araman\u0026#39;s Ring.sea",
+    "sha256": "eadbb4a9d6a2f1b3a1f22472f43265e7913a41e42acb32e1231eeb19ab1bc8d3",
+    "forks": 2,
+    "resources": 52,
+    "decoded": 52,
+    "raw": 0,
+    "outputs": "b60bb04d032de7ef998949a969e1ed87b52c2ba335ba6eb53171bbf565384003",
+    "documents": 0
+  },
+  {
     "name": "Arial.rsrc",
     "sha256": "9b0b80b96f7317d2e485d426f2ee1b455c23b6449567ef41d2eaa437ad8045ac",
     "forks": 1,
@@ -87,6 +107,66 @@
     "decoded": 4,
     "raw": 1,
     "outputs": "5a34b9e1686b6690c57ad16815122ce3bf6b01f798785e76fd1198cb1e0e39a0",
+    "documents": 0
+  },
+  {
+    "name": "BuildEditor.bin",
+    "sha256": "31a8f128dd364a4365c8e099863f2849f23a9d08d054123a301676752a7689e7",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "50f5311741bc361d55e89a142eddb7b52a8ebad57930aee7a710085b8debb7ef",
+    "documents": 0
+  },
+  {
+    "name": "BuildEditor.bin",
+    "sha256": "74175ee45dbd37f9179319b4ff3f4e5d55e2bdad04e92ffbdd5a68d92a40bc95",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "493a5aa6d4a2eeb030feeec2d64c7862a38681670d8e7b428fa25b82e771e370",
+    "documents": 0
+  },
+  {
+    "name": "BuildLDEF.bin",
+    "sha256": "7590823fac707872e162c273732f003f3187a9ce4bca58994323e7b89945714d",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "829ec4751b5702d44b00a4a663cb84cdfaf77080f32514f1b6b7a17cc5806e99",
+    "documents": 0
+  },
+  {
+    "name": "BuildLDEF.bin",
+    "sha256": "896ee8b36db80c9851f7ff27ffde1e6df9a483ce01a9c103a14b07bb7a9e3179",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "c59d2f996e4449b26ccb7aaf9e405625c4643f6ccd31d23de724b28c65d1d006",
+    "documents": 0
+  },
+  {
+    "name": "BuildPicker.bin",
+    "sha256": "c2f93d0b7ccf73b8455c22292224b5c99679d8fdb3be2a19afe541d6362488ca",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "78e0f52bb224757b7de0599f613cff0a7156588fc07f4c4f67be1275693c4ea6",
+    "documents": 0
+  },
+  {
+    "name": "BuildPicker.bin",
+    "sha256": "ea3134acc29508c9eb1851a92d8d4e61b4da992ab3d41c765b4fae907cd624e6",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "fa2323d602d7cfc3ca430b996f13ad336b25ae6f5579658a9b455dd4ee7c6117",
     "documents": 0
   },
   {
@@ -127,6 +207,16 @@
     "decoded": 5,
     "raw": 1,
     "outputs": "2355176da51c4ac02f2f219266e2a4cb7b7fdcfd42ec8500469bab5e9dc1aa47",
+    "documents": 0
+  },
+  {
+    "name": "City of Port Hyrtin.sea",
+    "sha256": "6359f0b3e29aaffb7174a3aca4a97d8ca00f200e8032bd3e4a55d295ea3fa215",
+    "forks": 2,
+    "resources": 102,
+    "decoded": 102,
+    "raw": 0,
+    "outputs": "6d11c134240276d0182208fa774372239993c96ec2729e33bb2cead87c7e3ed2",
     "documents": 0
   },
   {
@@ -207,6 +297,16 @@
     "decoded": 210,
     "raw": 79,
     "outputs": "74ebb1ec903fa8151782aae490535d3d4d6c0a8a2e868170624ff6dd72629251",
+    "documents": 0
+  },
+  {
+    "name": "Dagger of Shine.sea",
+    "sha256": "18c5e7003ab9312fff99a61fdc163cf5bfd7054535d8a9f7c75b7db8df3abb4f",
+    "forks": 2,
+    "resources": 183,
+    "decoded": 183,
+    "raw": 0,
+    "outputs": "db278df39818d8b9d1fdd750b3f90467c2927c49d716a4d034634a4f0909f5bc",
     "documents": 0
   },
   {
@@ -430,6 +530,16 @@
     "documents": 1
   },
   {
+    "name": "ES1v6.sit",
+    "sha256": "b9a241700784db40d56e1e16c9fc69d7aa5e01c56a4dac35fe85071241a31bf1",
+    "forks": 2,
+    "resources": 203,
+    "decoded": 203,
+    "raw": 0,
+    "outputs": "4dcfc2942e5a09d87850621e56a1efadc16698c08845ccc708abb063d3c8fe4d",
+    "documents": 0
+  },
+  {
     "name": "F800 KC.img",
     "sha256": "c3bedc73ae67e382b29ea0a1f488f8d7d8bb356f126b052cc4e96275c441a6df",
     "forks": 2,
@@ -570,6 +680,16 @@
     "documents": 0
   },
   {
+    "name": "Garden gnomes robber.sit",
+    "sha256": "87057031f722e2d55595533ec2e494da4a623253e1dbce3d2632f3570aed3359",
+    "forks": 11,
+    "resources": 184,
+    "decoded": 183,
+    "raw": 1,
+    "outputs": "c6e44e63dea2b8e869c1a99356038d27f949b8371d2fa28cbdd6476cfee29ea0",
+    "documents": 4
+  },
+  {
     "name": "Geneva.rsrc",
     "sha256": "c40c66098d0457ba9edea625a734892d4a6b3d3b1c96a7d689b0c5a53182f252",
     "forks": 1,
@@ -588,6 +708,16 @@
     "raw": 1,
     "outputs": "0b608a2403cb70cc126fbea8cb7ae2c0ba472b135da5facc5a22350a372c7892",
     "documents": 0
+  },
+  {
+    "name": "HAX1R3.BIN",
+    "sha256": "adf4259be232a3eb6c521f2a2749433d0b495d14461b30cde6988431ad22fa9c",
+    "forks": 55,
+    "resources": 617,
+    "decoded": 593,
+    "raw": 24,
+    "outputs": "d036f2c4d06e5340c10075351a1aff79e264c42534f13c8d996eaae72a7fb86d",
+    "documents": 3
   },
   {
     "name": "HISTORY OF THE GEYSER.RSF",
@@ -617,6 +747,46 @@
     "decoded": 9,
     "raw": 1,
     "outputs": "01d32455c7ae9dd6315e2b0d23042f73588c4349ecaa2d7edff9168433d35972",
+    "documents": 0
+  },
+  {
+    "name": "ICON.LDEF.c.bin",
+    "sha256": "e236e3c2e08fa89fa7db6e25d8a777ee314c23d82b928a369aba5a0129c2ffcf",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "06959f7f9bc596267b3bfb31f4a27e88453f7b7b8369d13b25af07bf36ee9859",
+    "documents": 0
+  },
+  {
+    "name": "ICON.LDEF.p.bin",
+    "sha256": "3e6d0dfc5dcb4fec8cd6ead0d4b8fa675a23538c9bdb73044e05ad716de72e28",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "9fe7b53db378a583c358eeaab26b55dd5e75358d181bb98d1ff1d27d217829b7",
+    "documents": 0
+  },
+  {
+    "name": "ICON.Pick.c.bin",
+    "sha256": "459842b7268ac5fb8881f2ea668a21a964a68347c5dfcd09141f7f010e23323b",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "dfb1c6bcc0f16c415bf6da9ef1a5bd9363ebaacdacd856e19f7c022f3b071169",
+    "documents": 0
+  },
+  {
+    "name": "ICON.Pick.p.bin",
+    "sha256": "de8d1e7997e5ec36093cade40af38e6829ae84dd1fb92037e5374a4cf3f00cf0",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "ab9926c2228a796599b4aa400757e00af152efa048d0ef86b39bf73d6f6678a7",
     "documents": 0
   },
   {
@@ -650,6 +820,46 @@
     "documents": 0
   },
   {
+    "name": "Instructions.bin",
+    "sha256": "ef29c37d9a2e8ee7950b5eb7452d18a75d1ebd9504264e90fa1e81fced83ac38",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "c58e3363e8625984826badfcef5dca70e60525c658a6b2d59bd7472090d5ae74",
+    "documents": 0
+  },
+  {
+    "name": "JitM1v1.sit",
+    "sha256": "28cc06166ab48066c5d10143af20111ce1280899191debb59b1b1e96bbc5909f",
+    "forks": 3,
+    "resources": 160,
+    "decoded": 160,
+    "raw": 0,
+    "outputs": "cd8288625788ca643893c1943d37515413d6c3ac0eb8f9b9b402e787820d79e9",
+    "documents": 0
+  },
+  {
+    "name": "Kalypso\u0026#39;s Island.sea",
+    "sha256": "5fbbb2734928ddcd50cb463e385e52381284f953cbd3cee0ba9e6968c73eed87",
+    "forks": 2,
+    "resources": 154,
+    "decoded": 154,
+    "raw": 0,
+    "outputs": "24e74597d7d2bde475b41fb6598c82d3d897e4b04542698e58acc6d4b8427e48",
+    "documents": 0
+  },
+  {
+    "name": "LDEF.a.bin",
+    "sha256": "60987463c0c92981b5e728f64474ccb016ed2a798be2d991084ea7a65074d9ec",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "66bce8b840bb47e76fea3e8982823f9e2c0129b6783a63ec9b174504f6d0d99e",
+    "documents": 0
+  },
+  {
     "name": "Licensing Info",
     "sha256": "84c01ab1230095e6a8799d8be6c9ba1a590ce39b670e7627c10c52350e0d811a",
     "forks": 1,
@@ -670,6 +880,16 @@
     "documents": 1
   },
   {
+    "name": "Lord of the Abyss - 2.1.1 - MAC.sit",
+    "sha256": "6c786e96ca532c8f9e5a4cfc5b8bfc137cc18ca21ee1d0ab4ffcaba56a812719",
+    "forks": 4,
+    "resources": 225,
+    "decoded": 225,
+    "raw": 0,
+    "outputs": "b7aaf350a63e4848c00a90af9cccb85aa358ee7846218aaaa18665301d21c46c",
+    "documents": 0
+  },
+  {
     "name": "MAGISTRATES TALE.RSF",
     "sha256": "b6f4ad89fa990e0b828695823f3ba20949ff80b33ad53b7e63d6f0fc7250de8a",
     "forks": 1,
@@ -677,6 +897,76 @@
     "decoded": 2,
     "raw": 1,
     "outputs": "c604b37e6be6a12a662de79b28fcac1a381189da47bbbc081864e9d9cb79cb40",
+    "documents": 0
+  },
+  {
+    "name": "MV.sit",
+    "sha256": "227fcd5d39482479a287da7028a652e0a8aa59737308cf3449111a059d89a07a",
+    "forks": 1,
+    "resources": 177,
+    "decoded": 116,
+    "raw": 61,
+    "outputs": "aa79e764ff3d0d5ae9d78d51fc2c65976404cf9e0452fc971bb0f1b1d71ba9dc",
+    "documents": 1
+  },
+  {
+    "name": "MakeEditor.bin",
+    "sha256": "14e0d6afa21a004a2aa22898eeec8868862c6c4ddbff5ad07fee34c0cd6bf2f8",
+    "forks": 1,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "11008023468a06ac632b7aa67e5b59a3936a6d1d9bb08dd74d6101af9f303c75",
+    "documents": 0
+  },
+  {
+    "name": "MakeEditor.bin",
+    "sha256": "a8db42147ac98bd5295bf23e8e5a18378d893af71628561eb3c5ca5e7dcdd932",
+    "forks": 1,
+    "resources": 4,
+    "decoded": 1,
+    "raw": 3,
+    "outputs": "e76c41a5723cc79858f70c7b3341d40cca6ef2fa075694cc5e76ddb8e5cc4352",
+    "documents": 0
+  },
+  {
+    "name": "MakeLDEF.bin",
+    "sha256": "112f13d5bede19be3ca5b68e31d01c87a853ac4a3ee9e40f4dc6f11778a4f5e0",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "61bcc12b839fd13f1c12ea6ddb1f922e6879301a5362b074de5225e3aa050f0a",
+    "documents": 0
+  },
+  {
+    "name": "MakeLDEF.bin",
+    "sha256": "bf78d812e73bb84103e33a38df5d2ac54edad986f177e9dfc7b8da351ef5bf73",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "973560285fd333fdcc392d0c1d59016da53e5afe5df082b76c5477d1563e6727",
+    "documents": 0
+  },
+  {
+    "name": "MakePicker.bin",
+    "sha256": "0863fce858205a54add3980141e11886a59cf280d26cba9ebe6dd7557be465cc",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "fa71629058ee220ab151dc59b04fda1a7a343533fd3d2abfafc56d313f4fbfb2",
+    "documents": 0
+  },
+  {
+    "name": "MakePicker.bin",
+    "sha256": "fb9f9c4ee7f456482a3c145bae75b51451a144caf65ffef9b7d31ce359abb439",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "f7b09c83e6695716ed240b4ecd4fefd037e6c83a97912028e294b97642e3b792",
     "documents": 0
   },
   {
@@ -728,6 +1018,26 @@
     "raw": 0,
     "outputs": "56445131f3dc133b4ef4d75bf0f0ce960bcd85670a41bed6a97e45ac3eb62f3b",
     "documents": 0
+  },
+  {
+    "name": "Prince Of Darkness v1.6.zip",
+    "sha256": "50e83129f0c01ac6de23a80180ebc111ace750d3322352d7fbe6ce9a0c22edd1",
+    "forks": 5,
+    "resources": 153,
+    "decoded": 153,
+    "raw": 0,
+    "outputs": "195ece0dcdf33d414101df1bb534b52b2cb7e2fe78eb18c99763c50392930d36",
+    "documents": 2
+  },
+  {
+    "name": "Ptp.sit",
+    "sha256": "e691c6c84c69b9b16e9d91e53c2c61c30814213965af3b08ef1c7a05e646a3b0",
+    "forks": 1,
+    "resources": 244,
+    "decoded": 159,
+    "raw": 85,
+    "outputs": "11264d3efcbe54bfb3f953d11004f6fcba30e0cd18d620b7c8a515d39a88426a",
+    "documents": 1
   },
   {
     "name": "QDHarness",
@@ -900,6 +1210,16 @@
     "documents": 0
   },
   {
+    "name": "RSSC.a.bin",
+    "sha256": "43b947426babc7d5001dd154cabc12a60b6156342ac2f81ab88aeaffc1a8599e",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "d95c9990e25ffa86aa97128d196c21d3362eeb41d3485b5197d23b898bfb120c",
+    "documents": 0
+  },
+  {
     "name": "Realmz Add PC.rsrc.rsf",
     "sha256": "bfe2240569652e8244b64b0f8c224edbeb00742ad5d8ee2452f3174d3156e9df",
     "forks": 1,
@@ -918,6 +1238,36 @@
     "raw": 0,
     "outputs": "ccfb6684ad3ee38e4518d0bbc5cf2c2e9ebf058b1f4e5a60fd5de3a2a6a89c45",
     "documents": 0
+  },
+  {
+    "name": "RealmzClassicHD.img",
+    "sha256": "6a9015c13e98b2b41bf766c69a20e862c248dac1c1b2f15955e63cd05c665d22",
+    "forks": 718,
+    "resources": 37777,
+    "decoded": 34989,
+    "raw": 2788,
+    "outputs": "a39784392c2dfd3d796269f1f1b4c52ff17b6d629ba861fc60b878eb21f18d4d",
+    "documents": 62
+  },
+  {
+    "name": "RealmzCustomGraphix.sit",
+    "sha256": "50865c01b49803b5c46f1efc31aa2ea32cd6cfc5503213b79a4fb6e2bb58228b",
+    "forks": 1,
+    "resources": 158,
+    "decoded": 158,
+    "raw": 0,
+    "outputs": "69aff6aa30fde857d247aee739aafdbabc53c9217f5028a272fc252e8c8d5182",
+    "documents": 0
+  },
+  {
+    "name": "RealmzOfFire.sit",
+    "sha256": "e76ff34e5e4b884c82d1ef44314a9f820f06f813b137983b1d733c3ad3d65353",
+    "forks": 12,
+    "resources": 196,
+    "decoded": 186,
+    "raw": 10,
+    "outputs": "d2e3b9393820824b4f62bd2198c471ee7e4fc5a4339b2e7b3fe05d770458843b",
+    "documents": 5
   },
   {
     "name": "Register.rsrc",
@@ -947,6 +1297,86 @@
     "decoded": 3,
     "raw": 0,
     "outputs": "4eea5aed03ce9e80f1a69e571bd12f6bc5c13bee0fe4ef50dd2d24fe4245563e",
+    "documents": 0
+  },
+  {
+    "name": "ResDisp.a.bin",
+    "sha256": "8085be4537ed02f553610eec83b8783bdf79d83d807ae6be6feeb8ad191f6948",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "e00b38807192fbd12c76728e07d46a20d5585eac122b5900fc4f1696892ed686",
+    "documents": 0
+  },
+  {
+    "name": "ResEd.h.bin",
+    "sha256": "7576eedcf9633b5bd740798f1c1392ec84c898e06fd1c7b599725b110e1ba531",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "a2a954ef233fd3a5a1a34b6216aeb614a77843d1bb06bc5b5eb57fd671763c53",
+    "documents": 0
+  },
+  {
+    "name": "ResEd.p.bin",
+    "sha256": "7d8451afcbc5526754d283e5dfbcf350e3c5521140188116902519c873d88184",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "f77b9688a43182ea80dca3c811939c5b32e9c3e9b540dd4913a1563268476b6d",
+    "documents": 0
+  },
+  {
+    "name": "ResEdit 2.1.3.dsk",
+    "sha256": "5e08fb1d9279ff63d43bfaa62af6b3febefe68bfc9f7164d8633a10d5fdf016a",
+    "forks": 26,
+    "resources": 970,
+    "decoded": 742,
+    "raw": 228,
+    "outputs": "710ef5fe9d23f7c83f7e283143c1503c3b8c35586c797feac8207b7caf98f1f4",
+    "documents": 1
+  },
+  {
+    "name": "ResEdit 2.1.3.img",
+    "sha256": "8d9a6b08dbfbd4a91a194e2197ea5f0478783693b2f69913ad3c43104cdef681",
+    "forks": 26,
+    "resources": 970,
+    "decoded": 742,
+    "raw": 228,
+    "outputs": "f3f87d68d3a1092dde4ae72c01540bc13ee45469d5f961489c2d425252b0c8dc",
+    "documents": 1
+  },
+  {
+    "name": "ResEdit 2.1.3.img.rsrc",
+    "sha256": "ec18d92c2900f7600651b59ab2b213eb9334a1a59925fc2f4db9ef3be8da1eae",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 2,
+    "raw": 1,
+    "outputs": "24a7df9e17542855ef7ce50b1aa05f99ae3b2d5eda444be88fe67b69ba94bb1f",
+    "documents": 0
+  },
+  {
+    "name": "ResEdit.bin",
+    "sha256": "159ccd4f3275b1f0bfa1ca1f95bcf466f7a1e533b62c399ac0e66f1d8e85d019",
+    "forks": 1,
+    "resources": 894,
+    "decoded": 716,
+    "raw": 178,
+    "outputs": "f728a72594c564f5a7c4d2a095b5f49b9f2de5260a7c17e2e7370d71c7cb837b",
+    "documents": 0
+  },
+  {
+    "name": "ResEdit.rsrc",
+    "sha256": "ac9e6c0edbefcef37b741747b6ca4afbca2831f0e53437aa5bb8f38933e5116a",
+    "forks": 1,
+    "resources": 894,
+    "decoded": 716,
+    "raw": 178,
+    "outputs": "f728a72594c564f5a7c4d2a095b5f49b9f2de5260a7c17e2e7370d71c7cb837b",
     "documents": 0
   },
   {
@@ -1330,6 +1760,26 @@
     "documents": 0
   },
   {
+    "name": "Search for Redemption.sit",
+    "sha256": "c80b547a3d165f9a6a75cbc55c5107fbcaf4821aa223c848e8073da10cc1b16e",
+    "forks": 3,
+    "resources": 142,
+    "decoded": 142,
+    "raw": 0,
+    "outputs": "669934af462db12f2ee93cd900925e9bee686ec61c966bea89c2df2850a1bbac",
+    "documents": 0
+  },
+  {
+    "name": "Search for the Lost City.sea",
+    "sha256": "bbfc1e6d4dbc5689b373540edb42400ca3c1fe2507a7a827cf719780a97ea5bf",
+    "forks": 1,
+    "resources": 344,
+    "decoded": 344,
+    "raw": 0,
+    "outputs": "0c84f007ed53e2039dea1ab578e7fac6c6ae3008a4ee6be2d9a7ba9e507e805c",
+    "documents": 0
+  },
+  {
     "name": "ShrinkWrap\u2122",
     "sha256": "21e74eafc4739db5c109908913a8c40f5f2712be21e7dd3866d3de05b4cf5101",
     "forks": 1,
@@ -1450,6 +1900,16 @@
     "documents": 0
   },
   {
+    "name": "TEQ130.sit",
+    "sha256": "962360fe28a2d10709108be05e56e5e29d32d2ffb72e6d49affd54fd9e6dd0d1",
+    "forks": 6,
+    "resources": 173,
+    "decoded": 173,
+    "raw": 0,
+    "outputs": "d21e05a25fa179de5f3627b75f37c73700f2b7b34a5184c2df4726e2a79fa4de",
+    "documents": 3
+  },
+  {
     "name": "Tacticals.rsf",
     "sha256": "eeafdeea7c6c2e13c34a6edf67b1c1eddb0f24519c43c7ce3f1bf51faf0f1c8b",
     "forks": 1,
@@ -1480,6 +1940,16 @@
     "documents": 0
   },
   {
+    "name": "The End Worlds copy.sit",
+    "sha256": "ec176c143c584bd60674ed54d7f5c61418bdeca5da1a90e5be73eb29111cacc7",
+    "forks": 4,
+    "resources": 65,
+    "decoded": 65,
+    "raw": 0,
+    "outputs": "246468f25b05fa048b13dadfcff0185118a90ba7fbdb0e6619359a206ddc21b7",
+    "documents": 1
+  },
+  {
     "name": "The Family Jewels.rsf",
     "sha256": "baa728a599c2464b43eda0081e6d78bfb25e5752167148c187d48f2c50072415",
     "forks": 1,
@@ -1487,6 +1957,16 @@
     "decoded": 1676,
     "raw": 0,
     "outputs": "49a7c393b62347d806e7298225dcfa031a1c60efdb2b5bf41cb0301759be0b59",
+    "documents": 0
+  },
+  {
+    "name": "The Mod Set.sit",
+    "sha256": "149ba18a0ea14e0cbf69bdacc8047d81528a781cd577b5ef37ea9446500e6c46",
+    "forks": 1,
+    "resources": 1,
+    "decoded": 1,
+    "raw": 0,
+    "outputs": "c809014869b6346347392c42105ca4db92a26721a5c49dc1c69561b81108904a",
     "documents": 0
   },
   {
@@ -1498,6 +1978,16 @@
     "raw": 0,
     "outputs": "972d0fbe15df6cdb11743ce383c8e7c536aac17b02a490ea94d58693d8804045",
     "documents": 0
+  },
+  {
+    "name": "TiSL.sit",
+    "sha256": "b0ec6c51e4537d322055844f800fb6b7c972401bb0a775b3b83026655c76400d",
+    "forks": 2,
+    "resources": 342,
+    "decoded": 234,
+    "raw": 108,
+    "outputs": "ac851887b60d4c7bd3733a10eeae9f5675255217fdd51a6711c41d7cf921b3a3",
+    "documents": 2
   },
   {
     "name": "Times.rsrc",
@@ -1557,6 +2047,56 @@
     "decoded": 4,
     "raw": 1,
     "outputs": "abd8323a7bfb13e05f4ae7982f432fd3bc059691f17c72b1754ea8f02367ccc4",
+    "documents": 0
+  },
+  {
+    "name": "XXXX.Edit.c.bin",
+    "sha256": "5506c689e50634cd33fde6793eda4d7088ffd78ef4af2be6ec8a1d8a595c60ff",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "1e13fd42d2d45622f285b15a52485e291a43445585fef109b5f671911fc75eef",
+    "documents": 0
+  },
+  {
+    "name": "XXXX.Edit.p.bin",
+    "sha256": "abbce075301969bacdf88b44dbee017e1fa5de66f0b855fe397ecf85d12ec726",
+    "forks": 1,
+    "resources": 3,
+    "decoded": 1,
+    "raw": 2,
+    "outputs": "87710896c0f71f8b3239dda53df3584f0fb14dc685b50bb438523d9cf5471033",
+    "documents": 0
+  },
+  {
+    "name": "_Psion_Fonts.sit",
+    "sha256": "8cd6e144f71495767102ca7d16be04214352b519a2d5eb8a19c7f70452e25db9",
+    "forks": 23,
+    "resources": 75,
+    "decoded": 58,
+    "raw": 17,
+    "outputs": "c9a1674213d947935f942888c5950bb62e76b5b6e44e99cea1e938bb8c484a61",
+    "documents": 0
+  },
+  {
+    "name": "_Realmz 3.0 cicns.sit",
+    "sha256": "93841b5a1dfb40c886b44662811062f0becc1b43f0f2bacf4dac2f2cdea2b327",
+    "forks": 1,
+    "resources": 189,
+    "decoded": 189,
+    "raw": 0,
+    "outputs": "d2c3a6f6f465522fea98c8dbbfa22b2230c359132c767fc9a73c62e7b02cbbeb",
+    "documents": 0
+  },
+  {
+    "name": "_old_rsc.sit",
+    "sha256": "4eedac98d48a3389d4367bb02c09ae5fac3e524b9df35b9be15ae9ee3aa4546f",
+    "forks": 1,
+    "resources": 966,
+    "decoded": 966,
+    "raw": 0,
+    "outputs": "64be9c22de4b00693ea8e2ab563924263804ff8a58da35db56e2b55a671ed63f",
     "documents": 0
   },
   {
@@ -1890,6 +2430,16 @@
     "documents": 0
   },
   {
+    "name": "aogm.sit",
+    "sha256": "63526285372765165e2886d36ec79640558d92dc336efdfdf013fcce8299def3",
+    "forks": 1,
+    "resources": 159,
+    "decoded": 114,
+    "raw": 45,
+    "outputs": "863efe11ae5c14feb66aafc81538c259805c44fbec608f1c24386413d576b606",
+    "documents": 1
+  },
+  {
     "name": "b.img",
     "sha256": "acf4a3ac0d9c8a499662aa66c4453dc6c4c5e453280f27dc317e686b0c033d49",
     "forks": 2,
@@ -1960,6 +2510,36 @@
     "documents": 0
   },
   {
+    "name": "citc.sit",
+    "sha256": "fde1f26851b5686ac8f96c7f539e702038729f48bd45e58fccd9f4c06ae023a9",
+    "forks": 1,
+    "resources": 162,
+    "decoded": 117,
+    "raw": 45,
+    "outputs": "1a7eca6e2c730e9dd91cf78e9a6ab1d9d30e405ca0aab6773b8e2d29648d1fbf",
+    "documents": 1
+  },
+  {
+    "name": "city_of_port_hyrtin_mac.zip",
+    "sha256": "970b3a98f9167a0ef2e32f75764362605a3786bd57cfbe541e46737cc47b07c5",
+    "forks": 2,
+    "resources": 102,
+    "decoded": 102,
+    "raw": 0,
+    "outputs": "0bebc3e44f3168e0c7d857a3f3bfe5a55f5e81f862a3efbb6c4be76db110b920",
+    "documents": 0
+  },
+  {
+    "name": "cob.sit",
+    "sha256": "da5ba8e1c52818f96791d3ad60fa03ba9c9aca88fb8be913dc9abf2529d58ec4",
+    "forks": 1,
+    "resources": 70,
+    "decoded": 60,
+    "raw": 10,
+    "outputs": "152d7a856b4353587511a19611b0a7e1b04ff7798874adadad3f5d7e21df11f0",
+    "documents": 1
+  },
+  {
     "name": "d.img",
     "sha256": "d2f5517faceb772437fd988265a76e8efb72c8c4b476a4f47535f0167364b5e5",
     "forks": 2,
@@ -1968,6 +2548,16 @@
     "raw": 3,
     "outputs": "d829570b801119b853f207af97b307f8f91aa968607f3f746defa6dcf059d3a3",
     "documents": 0
+  },
+  {
+    "name": "darkportal.sit",
+    "sha256": "d581a6d50e4ee7033159549b2500caa3dfde5a3c4ed8cbbda716373f1d7ae9a2",
+    "forks": 6,
+    "resources": 210,
+    "decoded": 210,
+    "raw": 0,
+    "outputs": "2c05007331b2fcb42acd68aa52033d99c5d1ea8a9f27d1f0c6e422450aa9e096",
+    "documents": 2
   },
   {
     "name": "dc612.bin",
@@ -2170,6 +2760,16 @@
     "documents": 0
   },
   {
+    "name": "dtn.sit",
+    "sha256": "8888da1cb9bfdacc89a201d3a50acae9095ca4911a76808bb0f575bbeea72020",
+    "forks": 1,
+    "resources": 158,
+    "decoded": 114,
+    "raw": 44,
+    "outputs": "a1b2dba0222ecbe3af59de00e1f1a15b2fd50cd952909ceaab6b914161d0b144",
+    "documents": 1
+  },
+  {
     "name": "e.img",
     "sha256": "f18afc5679180401804a02d9e44f88bf4a3c403ffaea828d807fe9a5c11674cb",
     "forks": 2,
@@ -2250,6 +2850,16 @@
     "documents": 0
   },
   {
+    "name": "gr1.sit",
+    "sha256": "b214e727f2363a50206745d24d49b58b60fc3577bf6dac72671d6e18ba2b13d8",
+    "forks": 1,
+    "resources": 204,
+    "decoded": 127,
+    "raw": 77,
+    "outputs": "dae00b4ff4d6f0548c25a97901fe9743a69b0223889fdc0ea6c2a37ed06faf14",
+    "documents": 1
+  },
+  {
     "name": "grow",
     "sha256": "40c11a21853ff86676f20cf450c9789ba5be4ff4bef02cd5aedd4868dd1dce08",
     "forks": 1,
@@ -2270,6 +2880,16 @@
     "documents": 0
   },
   {
+    "name": "halftruth.sit",
+    "sha256": "51dbedc162007b8d74c9b5586c081e314cdf2fc88202d4ca62b5a89167251788",
+    "forks": 1,
+    "resources": 154,
+    "decoded": 107,
+    "raw": 47,
+    "outputs": "34a3a2a0233a09d71d99ccaa8831ec581d9d07002badf45fa533588f6d8e68df",
+    "documents": 1
+  },
+  {
     "name": "ima4m.snd",
     "sha256": "47967497a8a0f3c704a95ca6c4ee215d24f55523dea7cb5ca5007810ad094cad",
     "forks": 1,
@@ -2287,6 +2907,16 @@
     "decoded": 1,
     "raw": 0,
     "outputs": "ebdc041a22d0f4ae74de80f75d085c355f84766d779de984959e6c7fd57dec6e",
+    "documents": 0
+  },
+  {
+    "name": "journey_into_the_mire_mac.zip",
+    "sha256": "0dd9c700c6d029dbf151c067aa7efee1d57bd413f436339ba9d2a461dc6f2a83",
+    "forks": 2,
+    "resources": 154,
+    "decoded": 154,
+    "raw": 0,
+    "outputs": "f2b1bae6b8a35e56a523f0799f683147f7103c71137674d1f87f1f4d2bd65395",
     "documents": 0
   },
   {
@@ -2408,6 +3038,16 @@
     "raw": 0,
     "outputs": "ce1d7e1a814ef1456d2b0a23ba01c8c26d8abedcf1ba1b1b7d0780a1550c3126",
     "documents": 0
+  },
+  {
+    "name": "outdoor_music.sit.bin",
+    "sha256": "315d7421383996f8d73165f3ae52cdae5e23e439e8d23909c08542539880d70b",
+    "forks": 1,
+    "resources": 1,
+    "decoded": 1,
+    "raw": 0,
+    "outputs": "efc9780a6585d8d4ef80be9e73c3591f7999f5e5dde00dc1b9ab25e06a03f4d0",
+    "documents": 1
   },
   {
     "name": "r.img",
@@ -2980,6 +3620,16 @@
     "documents": 0
   },
   {
+    "name": "stuffit-151.sit",
+    "sha256": "8aa113e76b31d8ab980809f18a52438b62adc13f45000eddf0727f88dc3fed09",
+    "forks": 4,
+    "resources": 224,
+    "decoded": 212,
+    "raw": 12,
+    "outputs": "5c5e3a14b0ca561659ddbdf2bd3c06b66da6ab5f725477255749123331bad482",
+    "documents": 0
+  },
+  {
     "name": "swf.image",
     "sha256": "36e273607e4f6d09567444ca5f5bd92e5adc74b03271de8254d1df9ab25908c1",
     "forks": 2,
@@ -3170,6 +3820,16 @@
     "documents": 0
   },
   {
+    "name": "trial.sit",
+    "sha256": "2fce178e39423a5a5aa9f1af58de4a032b6e218b6506e799313871c6f59d9e15",
+    "forks": 2,
+    "resources": 176,
+    "decoded": 176,
+    "raw": 0,
+    "outputs": "227d9a78943aa736f51503487f0c5db72b766a3c8d9d72009f88dd73d8ef48a9",
+    "documents": 0
+  },
+  {
     "name": "uc.bin",
     "sha256": "4453f1b59ff825f7662bec6f3a3436b95234ba586bccaf533280b2f15a9c53d8",
     "forks": 2,
@@ -3338,5 +3998,15 @@
     "raw": 3,
     "outputs": "d829570b801119b853f207af97b307f8f91aa968607f3f746defa6dcf059d3a3",
     "documents": 0
+  },
+  {
+    "name": "wd.sit",
+    "sha256": "aecf2412b20d89f7074ea090dbc477dfb4dec8c326de87fd6e1b7bb817555890",
+    "forks": 1,
+    "resources": 145,
+    "decoded": 103,
+    "raw": 42,
+    "outputs": "58f9052a3e72a8e4be468111ca33a2c86f5b07ab7978d14d727e6d7152104c98",
+    "documents": 1
   }
 ]

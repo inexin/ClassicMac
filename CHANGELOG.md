@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Code: a new package, `ClassicMac.Code`, reads classic Mac code: PEF containers (sections, pattern-initialized data,
+  the loader's imports, relocations and export hash, transition vectors, traceback tables) and `'cfrg'`
+  (`.Ppc`); 68k applications (`'CODE'` 0 and the jump table, near and far segments, the entry point and the bootstrap
+  shape, MPW `%A5Init`, CodeWarrior `'DATA'` 0, Retro68 `'RELA'`) and code resources (the standard header, `DRVR`, the
+  `$A9FF` package form, components, routine descriptors) (`.M68k`); and disassembles them (`.Disassembly`): the 68k and
+  PowerPC disassemblers ported from resource_dasm, trap, selector and low-memory names from Multiversal Interfaces,
+  MacsBug names, and annotated listings with a function and reference model (code/*.md, output/disassembly.md).
+- Extract: `CODE`, `cfrg` and code resources (native `ncod`, `nlib`, `ndrv`, …; 68k `CDEF`, `WDEF`, `DRVR`, `PACK`,
+  `INIT`, `XCMD`, …) are decoded: the data stays the main file (`.bin`), with the listing (`.s`) and the model
+  (`.json`) beside it; `CODE` 0 and `cfrg` give JSON (output/disassembly.md, output/export-manifest.md §3.8).
+- Pack: a decoded resource whose main file is `.bin` packs back from that file, as a raw resource does, so decoded
+  code round-trips without `--keep-raw` (output/export-manifest.md §2.2).
+- CLI: `disasm <input>` writes a listing per 68k segment, code resource and fragment (the data-fork fragments the
+  `'cfrg'` resources name included) and `code.json`, for every Mac file inside the input; `--cpu 68k|ppc|both`
+  (output/disassembly.md §3.2).
+- Viewer: a code resource's preview is its listing.
 - Docs: the format documents are in category folders under `docs/formats/` (`containers/`, `archives/`,
   `disk-images/`, `file-systems/`, `resources/`, `graphics/`, `codecs/`, `output/`), one file per format.
 - Interface previews: dialogs and alerts are drawn as Mac OS 9 with Appearance (Platinum) draws them, frames and
