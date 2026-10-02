@@ -865,12 +865,14 @@ public static class M68kDisassembler
                 }
                 case 4:
                 {
-                    // ptest: 100 LLL R A RRR FFFFF; R 1 is ptestr. The A register field is 0xxx (none; the register
-                    // bits are don't care, at every level) or 1RRR; at level 0 no descriptor is fetched, so A is 0
-                    // [Doc: MC68851 PMMU User's Manual, A-22, PTEST].
+                    // ptest: 100 LLL R A RRR FFFFF; R 1 is ptestr. The A register field is 0xxx (none; the 68851
+                    // ignores the register bits) or 1RRR. At level 0 the whole field must be 0000 [Doc: MC68851 PMMU
+                    // User's Manual, 3rd ed., A-22, NOTE; M68000 Family Programmer's Reference Manual, 6-66]. Above
+                    // level 0 the 68030 also wants the register bits 0 with A clear [Doc: ibid., 6-67]; the 68851's
+                    // wider form is decoded.
                     int level = field, an = (ext >> 5) & 7;
                     bool hasAn = (ext & 0x0100) != 0;
-                    if ((level == 0 && hasAn) || FunctionCode(ext) is not { } fc
+                    if ((level == 0 && (ext & 0x01E0) != 0) || FunctionCode(ext) is not { } fc
                         || ReadEa(m, xn, M68kSize.None) is not { IsControlAlterable: true } ea)
                         return null;
                     string name = toMemory ? "ptestr" : "ptestw";

@@ -91,10 +91,11 @@ public class M68kMmuTests
     [InlineData("F010 8F55", "ptestr #5,(a0),#3,a2")]
     [InlineData("F010 8409", "ptestw d1,(a0),#1")]
     [InlineData("F02E 9C00 0010", "ptestw sfc,16(a6),#7")]
-    [InlineData("F010 8A20", "ptestr sfc,(a0),#2")]       // A clear above level 0: the register field is ignored (0xxx)
-    // A clear at level 0: the register field is 0xxx, don't care, there too [Doc: MC68851 PMMU User's Manual, PTEST]
-    [InlineData("F010 8220", "ptestr sfc,(a0),#0")]
-    [InlineData("F010 80E0", "ptestw sfc,(a0),#0")]
+    // A clear above level 0: the 68851 ignores the register field (0xxx); the 68030 wants it 0 (decoded, as either
+    // processor's instruction is) [Doc: MC68851 PMMU User's Manual, 3rd ed., A-22; M68000 Family Programmer's
+    // Reference Manual, 6-67]
+    [InlineData("F010 8A20", "ptestr sfc,(a0),#2")]
+    [InlineData("F010 8420", "ptestw sfc,(a0),#1")]
     [InlineData("F039 8210 0000 1000", "ptestr #0,($00001000).l,#0")]
     // the 68851's conditional instructions
     [InlineData("F050 0003", "pslc (a0)")]
@@ -155,6 +156,11 @@ public class M68kMmuTests
     [InlineData("F010 2C08")]              // pvalid An with bit 3 set
     [InlineData("F000 2800")]              // pvalid d0
     [InlineData("F010 8330")]              // ptest with A set at level 0
+    // ptest at level 0 with the register field not 0: the A register field must be 0000 [Doc: MC68851 PMMU User's
+    // Manual, 3rd ed., A-22, NOTE; M68000 Family Programmer's Reference Manual, 6-66]
+    [InlineData("F010 8220")]
+    [InlineData("F010 80E0")]
+    [InlineData("F010 8020")]
     [InlineData("F000 8210")]              // ptest d0
     [InlineData("F010 E000")]              // extension word 111
     [InlineData("F010 C000")]              // extension word 110

@@ -330,9 +330,10 @@ byte register …) is the low byte of its word; the high byte is ignored, as the
 Family Programmer's Reference Manual, "Immediate Data"].
 
 `move.b` from an address register is `dc.w`, as are `movea.b`, `tst.b`, `cmp.b`, `addq.b`/`subq.b` to and from one
-[Doc: M68000 Family Programmer's Reference Manual, MOVE: byte size does not allow An]. `ptest` with the A bit clear
-ignores the register field (0xxx) at every level, level 0 included; the A bit set at level 0 is `dc.w` [Doc: MC68851
-PMMU User's Manual, PTEST]. `fmovem.x` from memory with a dynamic list takes the control modes, `(d16,pc)` and
+[Doc: M68000 Family Programmer's Reference Manual, MOVE: byte size does not allow An]. `ptest` at level 0 with an A register
+field other than 0000 is `dc.w` [Doc: MC68851 PMMU User's Manual, 3rd ed., A-22, NOTE; M68000 Family Programmer's
+Reference Manual, 6-66]; above level 0 with the A bit clear the register bits are ignored, as the 68851 does (the
+68030 wants them 0 [Doc: ibid., 6-67]; the wider form is decoded) [ClassicMac]. `fmovem.x` from memory with a dynamic list takes the control modes, `(d16,pc)` and
 `(d8,pc,xn)` included, and `(an)+` [Doc: MC68881/MC68882 User's Manual, FMOVEM].
 
 The 68060's own forms (`plpa`, `lpstop`, `movec` of BUSCR and PCR) and the CPU32's (`tbl`, `bgnd`) are `dc.w`: no

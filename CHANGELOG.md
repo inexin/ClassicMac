@@ -8,8 +8,7 @@
 - Disassembly: more invalid forms are data, as Motorola's and IBM's manuals draw them: 68k `mul.l`/`div.l` with bits
   9–3 of the extension word set, `fmove FPn,<ea>` with a k-factor to a non-packed format, `move.b` from an address
   register and `fmovem.x` with a dynamic list outside 0rrr0000 are `dc.w`; PowerPC `lmw`/`lswi` with rA among the
-  registers loaded, `lswx` with rD = rA or rB, and conditional branches with a BO z bit set are `.long`. `ptest` at
-  level 0 ignores the register field when A is clear. A 68k full extension word with only a base register is written
+  registers loaded, `lswx` with rD = rA or rB, and conditional branches with a BO z bit set are `.long`. A 68k full extension word with only a base register is written
   `(0,a0)`, `(0,pc)` or `($0000,zpc)` instead of `(a0)`, `(pc)` or `(zpc)` (output/disassembly.md §1.1, §2.6, §2.7).
 - Viewer: a folder, a volume's root or a container read open previews as the Finder's icon view of its window: the
   window's size and scroll from the folder record, each icon where the Finder put it (so folder art shows as it was
