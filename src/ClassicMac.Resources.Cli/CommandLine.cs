@@ -10,7 +10,7 @@ using ClassicMac.Files;
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c> and <c>pack</c>. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
+    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c>, <c>disasm</c> and <c>pack</c>. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
     /// </summary>
     internal sealed class CommandLine(TextWriter output, TextWriter error)
     {
@@ -101,6 +101,7 @@ namespace ClassicMac.Resources.Cli
             root.Subcommands.Add(UnpackCommand());
             root.Subcommands.Add(ExtractCommand());
             root.Subcommands.Add(ConvertCommand());
+            root.Subcommands.Add(DisasmCommand());
             root.Subcommands.Add(PackCommand());
             return root;
         }
@@ -239,6 +240,36 @@ namespace ClassicMac.Resources.Cli
                 result.GetRequiredValue(input), result.GetValue(outputDir),
                 Decoders.ResourceDecoders.CreateDocumentConverters(DecodeOptionsFrom(result, screenDepth)), ReadOptionsFrom(result),
                 ContainerOptionsFrom(result), result.GetValue(overwrite), result.GetValue(strict), result.GetValue(quiet)));
+            return command;
+        }
+
+        private Command DisasmCommand()
+        {
+            var input = InputArgument();
+            var outputDir = new Option<DirectoryInfo>("--output", "-o")
+            {
+                Description = "Output folder (default: \"<input> code\" next to the input)",
+            };
+            var cpu = new Option<string>("--cpu")
+            {
+                Description = "Which code: 68k (segments and 68k code resources), ppc (native code and fragments) or both",
+                DefaultValueFactory = _ => "both",
+            };
+            cpu.AcceptOnlyFromAmong("68k", "ppc", "both");
+            var overwrite = new Option<bool>("--overwrite") { Description = "Write into an output folder that already holds files" };
+            var command = new Command("disasm", "Disassemble the code inside the input: a listing per segment, code resource and fragment, and code.json")
+            {
+                input, outputDir, cpu, overwrite,
+            };
+            command.SetAction(result => new DisasmCommand(output, error).Run(
+                result.GetRequiredValue(input), result.GetValue(outputDir),
+                result.GetValue(cpu) switch
+                {
+                    "68k" => Decoders.Code.CodeCpu.M68k,
+                    "ppc" => Decoders.Code.CodeCpu.PowerPC,
+                    _ => Decoders.Code.CodeCpu.Both,
+                },
+                result.GetValue(overwrite), ReadOptionsFrom(result), ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
             return command;
         }
 
