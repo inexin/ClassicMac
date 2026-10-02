@@ -72,6 +72,10 @@ authorization of the copyright holder.
   functions) of its `src/Emulators/PPC32Emulator.cc` (commit 5cbf27e): the opcode tables, field layouts and
   reserved-bit checks. The output is standard assembler syntax with structured operands; AltiVec and most extended
   mnemonics were added from the PowerPC and AltiVec programming environments manuals.
+- `src/ClassicMac.Code/Disassembly/M68kDisassembler.cs` was ported from the disassembly half of its
+  `src/Emulators/M68KEmulator.cc` and `.hh` (`decode_instruction`, the `DisassemblyState` formatters and the
+  effective-address decoding), then checked against Motorola's M68000 Family Programmer's Reference Manual, which
+  corrected several fields. The emulator half was not ported.
 
 ```
 The MIT License (MIT)
