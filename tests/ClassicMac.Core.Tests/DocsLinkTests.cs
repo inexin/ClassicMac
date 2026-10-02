@@ -39,6 +39,10 @@ public partial class DocsLinkTests
                     slugCache[resolved] = slugs = Slugs(File.ReadAllText(resolved));
                 if (!slugs.Contains(Uri.UnescapeDataString(anchor)))
                     broken.Add($"{where} → no heading #{anchor}");
+                // A link whose text names a section (§6.2) points at that section's heading (#62-…).
+                Match section = SectionPattern().Match(link.Groups[0].Value);
+                if (section.Success && !anchor.StartsWith(section.Groups[1].Value.Replace(".", "") + "-", StringComparison.Ordinal))
+                    broken.Add($"{where} → text says §{section.Groups[1].Value}");
             }
         }
         Assert.True(broken.Count == 0, "Broken links:\n" + string.Join("\n", broken));
@@ -93,6 +97,9 @@ public partial class DocsLinkTests
 
     [GeneratedRegex(@"^[ \t]*(```|~~~).*?^[ \t]*\1[^\n]*$", RegexOptions.Multiline | RegexOptions.Singleline)]
     private static partial Regex FencePattern();
+
+    [GeneratedRegex(@"^\[[^\]]*§(\d+(?:\.\d+)*)[^\]]*\]")]
+    private static partial Regex SectionPattern();
 
     [GeneratedRegex(@"`[^`\n]*`")]
     private static partial Regex CodeSpanPattern();

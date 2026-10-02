@@ -140,9 +140,9 @@ A host file `F/name` is read with the first layout that applies [ClassicMac]:
 
 1. **PC Exchange:** `F` holds a `RESOURCE.FRK` folder or a `FINDER.DAT` file (any case), `name` is not `FINDER.DAT`,
    and either `RESOURCE.FRK/name` exists or `FINDER.DAT` has a record for `name`
-   ([pc-exchange.md §6.5](../file-systems/pc-exchange.md#65-finding-an-items-record)). The record gives the Mac name,
-   Finder information and dates ([pc-exchange.md §6.6](../file-systems/pc-exchange.md#66-dates)); the extension map
-   applies if supplied ([pc-exchange.md §8](../file-systems/pc-exchange.md#8-the-extension-map)); DOS hidden or system
+   ([pc-exchange.md §2.1](../file-systems/pc-exchange.md#21-finding-an-items-record)). The record gives the Mac name,
+   Finder information and dates ([pc-exchange.md §2.6](../file-systems/pc-exchange.md#26-dates)); the extension map
+   applies if supplied ([pc-exchange.md §2.5](../file-systems/pc-exchange.md#25-types-by-name-ending)); DOS hidden or system
    makes the file invisible.
 2. **Basilisk II:** `F/.rsrc/name` or `F/.finf/name` exists. An empty `.rsrc` file is an empty fork. A `.finf` that is
    not 32 bytes is reported (`host.finf-length`, Warning) and read as far as it goes: a short one padded with zeros, a

@@ -170,14 +170,14 @@ None.
   and reported as `rom.duplicate` (Warning), with both entries' combinations. A resource fork holds one resource per
   type and ID; renaming the others would invent IDs the ROM never had.
 - **Order**: the ROM readers are tried after the archives and before the disk images
-  ([unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order)): their tests are strict, and some disk-image
+  ([unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order)): their tests are strict, and some disk-image
   tests are weak enough that ROM code could pass them.
 - **"Mac OS ROM" files** [ClassicMac]: recognised only when the data fork starts with `<CHRP-BOOT>` and the script (in
   the first 64 KiB, before `</CHRP-BOOT>`) has both `h# <1–8 hex digits> constant lzss-offset` and
   `… lzss-size` with the compressed image lying inside the file; fixed offsets are not assumed. The output is one file
   named `ROM $vvvv` (from the expanded image's version word; "ROM image" for an image under 10 bytes) whose data fork
   is the expanded image, which the ROM image reader then opens. Expansion stops with an error past the expanded-bytes
-  limit ([unwrapping.md §3.3](../containers/unwrapping.md#33-expanded-bytes-limit)).
+  limit ([unwrapping.md §5](../containers/unwrapping.md#5-classicmac)).
 
 ## 6. Diagnostics
 

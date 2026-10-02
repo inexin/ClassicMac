@@ -89,7 +89,7 @@ None.
 - **Recognition** [ClassicMac]: a data fork is taken as Disk Copy 4.2 when it is at least 84 bytes, `+$52` is
   `$0100` [Doc], the name length is at most 63, the data size is a nonzero multiple of 512, and the tag size is 0 or
   12 per sector (the last three checks fitted to real images). File types are not used. Where this reader comes in
-  the unwrapper's order is in [unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order).
+  the unwrapper's order is in [unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order).
 - **Output**: one file named by the header's disk name, whose data fork is the data bytes. Tags are dropped.
 - **Short data fork**: when the fork holds fewer than 84 + data size bytes, the whole sectors present are kept and
   `diskcopy.truncated` is reported; neither checksum is checked.

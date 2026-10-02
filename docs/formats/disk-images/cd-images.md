@@ -4,7 +4,7 @@ A raw CD image stores every sector as the disc carries it (2352 bytes, or 2336 w
 the 2048-byte blocks a drive hands the Mac; a cue sheet is the text that lays a disc's tracks out over such images.
 Both come from PC CD-burning and ripping tools, not from the Mac. ClassicMac reads either as one file whose data fork
 is the disc's 2048-byte blocks, numbered by absolute sector and carrying the start of the last session, for the ISO
-9660, partition-map and HFS readers ([iso9660.md §2](../file-systems/iso9660.md#2-from-image-to-volume)) to open next.
+9660, partition-map and HFS readers ([iso9660.md §2.1](../file-systems/iso9660.md#21-from-image-to-volume)) to open next.
 
 | | |
 | --- | --- |
@@ -118,11 +118,11 @@ numbers [Doc]. The Mac [Code: CD driver]:
    of the last session's first track. If the drive refuses the call, the driver answers "one session, starting at
    00:02:00", which gives offset 0.
 2. The file-system plug-in computes D = (start of the last session − start of track 1) and reads the descriptors at
-   sector D + 16 first, then at sector 16 ([iso9660.md §3.1](../file-systems/iso9660.md#31-finding-the-descriptor)).
+   sector D + 16 first, then at sector 16 ([iso9660.md §2.2](../file-systems/iso9660.md#22-finding-the-descriptor)).
 3. The driver checks each session for a descriptor at its start + 16 sectors. When the last session's root extent is at
    or after that session's start, it maps the whole disc from offset 0, so absolute sector numbers work.
 4. The driver applies the session base to a partition map as well
-   ([partition-map.md §4](../file-systems/partition-map.md#4-which-partitions-are-mac-volumes)).
+   ([partition-map.md §2.2](../file-systems/partition-map.md#22-which-partitions-are-volumes)).
 
 ## 3. Writing
 
@@ -181,7 +181,7 @@ None.
 - **Errors**: with no data track the sheet gives nothing (`cue.audio-only`). The track the descriptors come from (the
   last session's first data track, or the first data track when that session has none) must be readable: an unreadable
   mode, a missing file or a track starting past its file's end makes the sheet unreadable (the unwrapper reports
-  `container.unreadable`, [unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order)). Any other data
+  `container.unreadable`, [unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order)). Any other data
   track that cannot be read reads as zeros (`cue.track-unread`).
 
 ### 5.3 Multisession discs
@@ -201,7 +201,7 @@ The disc an image gives has no table of contents, so ClassicMac finds the last s
   kept), a 2336-byte image (no headers) and a cooked image are read from sector 16 only, by their first session's
   descriptors.
 - **Descriptors**: at D + 16 first; when that sector is not an anchor
-  ([iso9660.md §3.1](../file-systems/iso9660.md#31-finding-the-descriptor)), at 16. When the last session's primary
+  ([iso9660.md §2.2](../file-systems/iso9660.md#22-finding-the-descriptor)), at 16. When the last session's primary
   descriptor's root directory record (byte 156, High Sierra 180) gives an extent at or after the session's start, block
   numbers are absolute; otherwise they count from the session's start.
 - **HFS**: a partition map (`ER` or zeros at block D, `PM` at byte 512 or 2048 of it) or an HFS volume (`BD` at byte

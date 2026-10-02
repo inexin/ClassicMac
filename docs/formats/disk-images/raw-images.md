@@ -103,7 +103,7 @@ UDIF ([udif.md §4](udif.md#4-variants)).
 ## 5. ClassicMac
 
 - ClassicMac does not use file types to choose a reader, because images copied through other systems lose them. The
-  readers are tried in the unwrapper's order ([unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order)):
+  readers are tried in the unwrapper's order ([unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order)):
   UDIF, the partition map, Disk Copy 4.2, NDIF and DART come before the volume readers, so a raw image is whatever
   reaches the volume readers with a file system they recognise [ClassicMac].
 - A raw image's resource fork (a self-mounting image's mounter, `'CKSM'` 1) is not read or checked.

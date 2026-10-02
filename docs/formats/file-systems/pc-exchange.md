@@ -52,7 +52,7 @@ A hidden file named `FINDER.DAT` (attributes `$02` when created; `$22`, with the
 | --- | --- | --- | --- |
 | +$00 | 1 | name length | Length of the Mac name, 0–31; **0 marks a free record** (§1.4) |
 | +$01 | 31 | Mac name | Mac OS Roman. Bytes after the name are garbage [Code] [Verified] |
-| +$20 | 16 | `FInfo` | Finder info: type, creator, flags, location, folder; `DInfo` for a folder ([host-folders.md §3](../containers/host-folders.md#3-finder-info)) |
+| +$20 | 16 | `FInfo` | Finder info: type, creator, flags, location, folder; `DInfo` for a folder ([unwrapping.md §1.1](../containers/unwrapping.md#11-finder-information)) |
 | +$30 | 16 | `FXInfo` | Extended Finder info; `DXInfo` for a folder |
 | +$40 | 4 | creation date | Mac seconds, local time; 0 when unset |
 | +$44 | 4 | modification date | Mac seconds, local time, full precision: odd seconds kept [Code] [Verified] |

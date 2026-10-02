@@ -184,12 +184,12 @@ None.
 
 - **Recognition** [ClassicMac]: a data fork of at least 512 bytes whose last 512 bytes start with `'koly'`, or an
   encrypted image (`encrcdsa` in the first 8 bytes, `cdsaencr` in the last 8). UDIF is tried before the partition-map
-  reader ([unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order)), because an image whose runs are all
+  reader ([unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order)), because an image whose runs are all
   raw starts with the device's driver descriptor, which the partition-map reader would otherwise take. The `koly`
   version and flags are not checked or used; the runs are always read through the tables.
 - **Refused** (the read throws): encrypted images; a segment count above 1 (segmented UDIF); no `'blkx'` tables; a
   property list or embedded resource fork lying outside the file; a property list over 64 MiB; XML or base64 that does
-  not parse; a device over the expanded-bytes limit ([unwrapping.md §3.3](../containers/unwrapping.md#33-expanded-bytes-limit)).
+  not parse; a device over the expanded-bytes limit ([unwrapping.md §5](../containers/unwrapping.md#5-classicmac)).
 - **Tables**: from the property list (whitespace in the base64 ignored; an entry without `ID` numbered by its place),
   or from the embedded resource fork, in ID order. A table shorter than `$CC` bytes or not starting `'mish'` is skipped
   (`udif.bad-table`). A run count larger than the table holds is cut to what it holds (`udif.bad-table`). A table

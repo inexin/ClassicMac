@@ -115,10 +115,10 @@ are known.
   used length −1 or 1–20,960 when the file is compressed (compression 2 ignores the lengths), and the blocks ending
   exactly at the end of the data fork. When the Finder info shows creator `'DART'` or a type starting `'DMd'`, the
   blocks may also end before the fork does. The source type byte and the file type are otherwise ignored. Where this
-  reader comes in the unwrapper's order is in [unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order).
+  reader comes in the unwrapper's order is in [unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order).
 - **Output**: one file named after the host file (else the file's own name), whose data fork is the disk; tags are
   dropped. The whole data fork is read into memory, within the expanded-bytes limit
-  ([unwrapping.md §3.3](../containers/unwrapping.md#33-expanded-bytes-limit)).
+  ([unwrapping.md §5](../containers/unwrapping.md#5-classicmac)).
 - **Damaged blocks**: an RLE block that does not decode to 20,960 bytes, or an LZH block that gives fewer than its
   20,480 data bytes, is reported as `dart.bad-block`; the rest of the block reads as zeros. An LZH block short only in
   its tags is not reported.

@@ -330,11 +330,11 @@ segmented image is NDIF version 12 cut into parts ([§1.6](#16-segmented-images)
 - **Recognition** [ClassicMac]: a file whose resource fork (256 bytes or more) parses and holds a `'bcem'` 128 of at
   least `$58` bytes, whatever its version or file type. The data fork alone never says it is NDIF; reading a data fork
   without its resource fork throws. Where this reader comes in the unwrapper's order is in
-  [unwrapping.md §3.1](../containers/unwrapping.md#31-readers-and-order).
+  [unwrapping.md §2.1](../containers/unwrapping.md#21-reader-order).
 - **Maps that are not read** (the read throws): a version above 12 (Disk Copy −8818) or other than 2, 10, 11 and 12
   (−8819); a map shorter than its header; fewer than two entries, by the count or by what the map holds; a disk of 0 or
   `$400000` sectors or more; the segmented flag below version 12 (all −8819 in Disk Copy); a disk larger than the
-  expanded-bytes limit ([unwrapping.md §3.3](../containers/unwrapping.md#33-expanded-bytes-limit)).
+  expanded-bytes limit ([unwrapping.md §5](../containers/unwrapping.md#5-classicmac)).
 - **Version 2** is read as Disk Copy 6.1.2 reads it ([§4.2](#42-version-2)) and reported as `ndif.version-2` (Info)
   with the file's type and creator, the long at `+$54` and the map size, asking for the image, because no real version
   2 image has been seen.
