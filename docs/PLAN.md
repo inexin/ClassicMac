@@ -852,7 +852,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager): all
   14 types load; PlotIconID draws every family member with 0 mismatched pixels at depths 1–32 (2026-10-02).
 - [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
-- [ ] **8-bit icon masks in icon suites** (Mac OS 9's deep CopyMask in `IconSuite.Plot`): needs a Mac OS 9 oracle run for 8-bit-mask cases first.
+- [x] **8-bit icon masks in icon suites** (Mac OS 9's CopyMask through an 8-bit mask in `IconSuite.Plot`), from a Mac OS 9
+  oracle run (2026-10-02).
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
 - [ ] **`.sea` self-extracting archive detection** (phase 2).
 - [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column): StuffIt v1 and method 6,
