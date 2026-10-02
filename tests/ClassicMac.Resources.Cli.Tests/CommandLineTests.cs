@@ -1,5 +1,6 @@
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Tests;
 
 namespace ClassicMac.Resources.Cli.Tests;
 
@@ -183,6 +184,26 @@ public class CommandLineTests
         Assert.Contains("\"Game Data\" (host file > AppleSingle)", output);
         Assert.Contains("\"Title\"", output);
         Assert.Contains("2 resources in 2 types", output);
+    }
+
+    [Fact]
+    public void List_keeps_the_folder_of_a_file_that_is_itself_a_container()
+    {
+        // The AppleSingle's file comes out with no folders of its own; it sits in the volume's Data folder.
+        var disk = new HfsBuilder();
+        var data = disk.Folder(HfsBuilder.Root, "Data");
+        disk.File(data, "Wrapped", File.ReadAllBytes(AppleSingleFile()), []);
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, disk.Build("Disk"));
+
+        var (code, output, error) = Run("list", path);
+        var (jsonCode, json, _) = Run("list", path, "--format", "json");
+
+        Assert.Equal(ExitCodes.Success, code);
+        Assert.Empty(error);
+        Assert.Contains("\"Data:Game Data\" (host file > HFS volume > AppleSingle)", output);
+        Assert.Equal(ExitCodes.Success, jsonCode);
+        Assert.Contains("\"path\": \"Data:Game Data\"", json);
     }
 
     [Fact]

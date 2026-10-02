@@ -51,6 +51,36 @@ namespace ClassicMac.Resources.Cli
             return entries;
         }
 
+        // A leaf's Mac path within the input: its own path, under the folders of the files that wrap it alone. A file
+        // in an archive's folder that is itself a container (a DiskDoubler or MacBinary file) comes out of that
+        // container with no folders; the folders are the wrapper's, as unpacking places it.
+        private Dictionary<ContainerNode, ContainerNode>? parents;
+
+        public string MacPath(ContainerNode leaf)
+        {
+            if (parents is null)
+            {
+                parents = new Dictionary<ContainerNode, ContainerNode>(ReferenceEqualityComparer.Instance);
+                MapParents(Root, parents);
+            }
+            var folders = new List<string>();
+            for (var node = leaf; parents.TryGetValue(node, out var parent) && parent != Root && parent.Children.Count == 1; node = parent)
+            {
+                var file = parent.File;
+                folders.InsertRange(0, file.UnicodeFolderPath ?? file.FolderPath.Select(n => n.ToString()).ToArray());
+            }
+            return string.Join(":", folders.Append(leaf.File.MacPath));
+        }
+
+        private static void MapParents(ContainerNode node, Dictionary<ContainerNode, ContainerNode> parents)
+        {
+            foreach (var child in node.Children)
+            {
+                parents[child] = node;
+                MapParents(child, parents);
+            }
+        }
+
         // Where a diagnostic came from: the input, and the Mac file inside it when that has another name.
         internal static string Source(FileInfo input, MacFile file)
         {

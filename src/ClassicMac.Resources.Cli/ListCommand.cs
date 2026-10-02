@@ -27,7 +27,7 @@ namespace ClassicMac.Resources.Cli
 
                 try
                 {
-                    entries.AddRange(opened.Forks(input, options, reporter).Select(f => new ListEntry(f.Node.File, f.Chain, f.Fork)));
+                    entries.AddRange(opened.Forks(input, options, reporter).Select(f => new ListEntry(f.Node.File, opened.MacPath(f.Node), f.Chain, f.Fork)));
                 }
                 catch (InvalidDataException e)
                 {
@@ -52,7 +52,7 @@ namespace ClassicMac.Resources.Cli
             {
                 // A lone raw fork prints its table only, as before containers existed.
                 if (entries.Count > 1 || entry.Chain[0] != "raw resource fork")
-                    output.WriteLine($"\"{entry.File.MacPath}\" ({string.Join(" > ", entry.Chain)})");
+                    output.WriteLine($"\"{entry.Path}\" ({string.Join(" > ", entry.Chain)})");
                 if (entry.Fork is not { } fork)
                 {
                     output.WriteLine("  no resource fork");
@@ -75,7 +75,7 @@ namespace ClassicMac.Resources.Cli
         {
             var list = new ListOutput(input.Name, entries.Select(e => new ListFile(
                 e.File.Name.ToString(),
-                e.File.MacPath,
+                e.Path,
                 e.Chain.ToList(),
                 e.File.FinderInfo.Type.ToString(),
                 e.File.FinderInfo.Creator.ToString(),
@@ -89,7 +89,7 @@ namespace ClassicMac.Resources.Cli
         private static string Attributes(ResourceAttributes attributes) =>
             attributes == ResourceAttributes.None ? "" : attributes.ToString().Replace(", ", ",");
 
-        private sealed record ListEntry(MacFile File, IReadOnlyList<string> Chain, ResourceFork? Fork);
+        private sealed record ListEntry(MacFile File, string Path, IReadOnlyList<string> Chain, ResourceFork? Fork);
     }
 
     internal sealed record ListOutput(string Input, List<ListFile> Files);
