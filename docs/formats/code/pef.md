@@ -166,7 +166,9 @@ An imported symbol, 4 bytes:
 
 The symbols are numbered from 0 in table order (the import index the relocations use); each library owns
 importedSymbolCount of them from firstImportedSymbol [Doc: Mac OS Runtime Architectures]. Options `$00`, `$40`, `$80`
-and `$C0` all occur; imports are of class 1 or 2 [Verified: Mac OS 9.2.2's 90 fragments].
+and `$C0` all occur; imports are of class 1 or 2, with flags 0 or `$8` [Verified: Mac OS 9.2.2's 90 fragments]. A
+symbol is weak when its own flag is set or its library's options have `$40`; the symbols of a `$40` library keep flags
+0 (Disk Copy 6.1.2's AOCELib, SpeechLib and DragLib) [Doc: Mac OS Runtime Architectures] [Verified: Disk Copy 6.1.2].
 
 ### 1.7 Relocation headers
 
@@ -268,11 +270,21 @@ fragments].
 The hash word of a name of n bytes:
 
 1. hash = 0, as a signed 32-bit value.
-2. For each byte c of the name: hash = (hash << 1) − (hash >> 16), the shift right arithmetic; then hash = hash XOR c.
+2. For each byte c of the name, stopping at a NUL: hash = (hash << 1) − (hash >> 16), the shift right arithmetic;
+   then hash = hash XOR c. n is the number of bytes taken.
 3. The word is (n << 16) OR ((hash XOR (hash >> 16)) AND $FFFF).
 
 The hash table index of a word w for a table of 2^p entries is (w XOR (w >> p)) AND (2^p − 1)
-[Doc: Mac OS Runtime Architectures, "Hash Word"].
+[Doc: Mac OS Runtime Architectures, "Hash Word", PEFComputeHashWord]. With a logical shift instead of the arithmetic
+one, 1,258 of the samples' keys would come out different [Verified: Mac OS 9.2.2's 90 fragments, the Mac OS 9 System
+file]. Different names can share a whole hash word in one chain (MathLib's `exp` and `nan` are both $00030114,
+StdCLib's `feof` and `open` both $0004021C), so the name compare in the lookup below is needed [Verified: Mac OS
+9.2.2's 90 fragments].
+
+The power is the linker's choice and follows no one rule of the export count: the smallest p with n / 2^p under 10
+fits 198 of the 288 sample containers, not AppearanceLib (218 exports, power 7) or a stub with no exports (power 1)
+[Verified: Mac OS 9.2.2's 90 fragments, the Mac OS 9 System file]. A reader takes the stored power. An empty slot's first index is 0 or the next
+chain's first; it is not used [Verified: the Mac OS 9 System file].
 
 To find an export by name, as the Code Fragment Manager does:
 
@@ -440,8 +452,11 @@ Hand-built containers (`tests/ClassicMac.Code.Tests`, built with `PefBuilder`):
 - `PatternDataTests`: every opcode, the count argument, big-endian 7-bit arguments, empty repeats and interleaves, and
   each damage case (undefined opcodes, truncation, the length limit without allocating it).
 - `PefLoaderTests`: entry points, libraries, imports with class, weak flag and library, relocation headers, exports
-  with keys, absolute exports and re-exports, the hash word and index, lookup through colliding chains, names read
-  by the key's length, and each damage case.
+  with keys, absolute exports and re-exports, the hash word (stopping at a NUL) and index against hand-worked
+  values, lookup through colliding chains and between names with the same hash word, names read by the key's length,
+  a weak library's symbols, import classes and flags kept as stored, a relocation header's reserved field, empty
+  slots, the largest hash power, and each damage case. `PefBuilder` takes each export's hash word as a literal, so
+  the loader's own hash does not build its test input.
 - `PefRelocatorTests`: every opcode's action and operand decoding, the opcode boundaries, mnemonics, every "add"
   moving on 4, DDAT, DESC, DSC2 and VTBL with sectionC and sectionD changed, the largest SYMR and a large LSYM,
   2-byte-aligned DELTA fixups; repeats counting words (over two-word instructions, starting inside one, of SECN, the

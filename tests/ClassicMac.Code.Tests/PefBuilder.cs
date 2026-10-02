@@ -16,7 +16,9 @@ internal sealed class PefBuilder
     public sealed record Library(string Name, IReadOnlyList<Import> Symbols, PefLibraryOptions Options = PefLibraryOptions.None,
         uint OldImpVersion = 0, uint CurrentVersion = 0);
 
-    public sealed record Export(string Name, PefSymbolClass Class, uint Value, short Section);
+    // Key is the export's hash word, given as a literal (worked out by hand from the "Hash Word" rule) so the loader's
+    // own Hash is not used to build its test input.
+    public sealed record Export(string Name, uint Key, PefSymbolClass Class, uint Value, short Section);
 
     public List<Section> Sections { get; } = [];
     public List<Library> Libraries { get; } = [];
@@ -61,11 +63,11 @@ internal sealed class PefBuilder
             foreach (var sym in lib.Symbols) CString(sym.Name);
         }
 
-        // Exports go in hash-chain order; their names are packed with no NUL between them.
+        // Exports go in hash-chain order; their names are packed with no NUL between them. The slot is the "Hash Word"
+        // index rule, (key XOR key >> power) AND (2^power - 1), written out here rather than taken from the loader.
         int power = HashPower;
         var ordered = Exports
-            .Select(e => (Export: e, Key: PefLoader.Hash(MacRoman.Encode(e.Name))))
-            .Select((x, i) => (x.Export, x.Key, Slot: PefLoader.HashIndex(x.Key, power), Order: i))
+            .Select((e, i) => (Export: e, e.Key, Slot: (int)((e.Key ^ (e.Key >> power)) & ((1u << power) - 1)), Order: i))
             .OrderBy(x => x.Slot).ThenBy(x => x.Order).ToList();
         var exportNameOffsets = new int[ordered.Count];
         for (int i = 0; i < ordered.Count; i++)

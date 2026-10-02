@@ -68,7 +68,7 @@ internal static class CodeFixtures
         b.AddSection(PefSectionKind.Code, code);
         b.AddSection(PefSectionKind.UnpackedData, data);
         b.Libraries.Add(new PefBuilder.Library("InterfaceLib", [new PefBuilder.Import("InitGraf")]));
-        b.Exports.Add(new PefBuilder.Export("Helper", PefSymbolClass.TVector, 0x14, 1));
+        b.Exports.Add(new PefBuilder.Export("Helper", 0x00060D48, PefSymbolClass.TVector, 0x14, 1));
         b.Relocations.Add((1, [0x4600, 0x4A00, 0x4200, 0x8003, 0x4600]));
         b.Main = (1, 0);
         return b.Build();

@@ -359,10 +359,13 @@ namespace ClassicMac.Code.Ppc
         /// The export hash word of a name: the name's length in the high 16 bits; in the low 16, the hash folded from
         /// 32 bits [Doc: Mac OS Runtime Architectures, ch. 8, "Hash Word"]:
         /// <c>hash = (hash &lt;&lt; 1) − (hash &gt;&gt; 16)</c> (arithmetic shift) then <c>hash ^= byte</c> for each byte, and
-        /// <c>(hash ^ (hash &gt;&gt; 16)) &amp; 0xFFFF</c>.
+        /// <c>(hash ^ (hash &gt;&gt; 16)) &amp; 0xFFFF</c>. Like PEFComputeHashWord it stops at a NUL: the length and the
+        /// hash cover the bytes before it.
         /// </summary>
         public static uint Hash(ReadOnlySpan<byte> name)
         {
+            int nul = name.IndexOf((byte)0);
+            if (nul >= 0) name = name[..nul];
             int hash = 0;
             foreach (var c in name)
                 hash = unchecked((hash << 1) - (hash >> 16)) ^ c;

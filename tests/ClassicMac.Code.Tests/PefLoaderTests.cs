@@ -18,12 +18,12 @@ public class PefLoaderTests
         b.Libraries.Add(new PefBuilder.Library("WeakLib", [new("Maybe")], PefLibraryOptions.WeakImport));
         b.Exports.AddRange(
         [
-            new("alpha", PefSymbolClass.TVector, 0x10, 1),
-            new("beta", PefSymbolClass.Code, 0x20, 0),
-            new("gamma", PefSymbolClass.Data, 0x30, 1),
-            new("Magic", PefSymbolClass.Data, 0x12345678, PefExport.AbsoluteSection),
-            new("NewPtr", PefSymbolClass.TVector, 0, PefExport.ReexportedSection),
-            new("DisposePtr", PefSymbolClass.TVector, 1, PefExport.ReexportedSection),
+            new("alpha", 0x00050401, PefSymbolClass.TVector, 0x10, 1),
+            new("beta", 0x0004020D, PefSymbolClass.Code, 0x20, 0),
+            new("gamma", 0x00050477, PefSymbolClass.Data, 0x30, 1),
+            new("Magic", 0x000506F5, PefSymbolClass.Data, 0x12345678, PefExport.AbsoluteSection),
+            new("NewPtr", 0x00060DF2, PefSymbolClass.TVector, 0, PefExport.ReexportedSection),
+            new("DisposePtr", 0x000ACCA2, PefSymbolClass.TVector, 1, PefExport.ReexportedSection),
         ]);
         b.Relocations.Add((1, [0x4600]));
         return b;
@@ -78,6 +78,32 @@ public class PefLoaderTests
         Assert.True(loader.ImportedSymbols[1].IsWeak);
     }
 
+    // A library's weak option ($40) covers its imports whose own flags are 0 (DC612's AOCELib, SpeechLib and DragLib)
+    // [Verified: Disk Copy 6.1.2]; IsWeak is the symbol's own flag, so a consumer ORs in the library's option.
+    [Fact]
+    public void A_weak_library_leaves_its_symbols_own_flag_clear()
+    {
+        var (loader, _) = Read(Sample().Build());
+        var maybe = loader.ImportedSymbols[3];
+        Assert.False(maybe.IsWeak);
+        Assert.True(loader.ImportedLibraries[maybe.LibraryIndex].Options.HasFlag(PefLibraryOptions.WeakImport));
+    }
+
+    [Fact]
+    public void Import_classes_and_flags_are_kept_as_stored()
+    {
+        var b = Sample();
+        b.Libraries.Add(new PefBuilder.Library("Odd",
+            [new("c0", PefSymbolClass.Code), new("c3", PefSymbolClass.Toc), new("c4", PefSymbolClass.Glue),
+             new("c7", (PefSymbolClass)7, 0x4), new("c15", (PefSymbolClass)15, 0xC)]));
+        var (loader, diagnostics) = Read(b.Build());
+        Assert.Empty(diagnostics);
+        Assert.Equal([PefSymbolClass.Code, PefSymbolClass.Toc, PefSymbolClass.Glue, (PefSymbolClass)7, (PefSymbolClass)15],
+            loader.ImportedSymbols.Skip(4).Select(s => s.Class));
+        Assert.Equal([0, 0, 0, 0x4, 0xC], loader.ImportedSymbols.Skip(4).Select(s => (int)s.Flags));
+        Assert.Equal([false, false, false, false, true], loader.ImportedSymbols.Skip(4).Select(s => s.IsWeak));
+    }
+
     [Fact]
     public void Reads_the_relocation_headers()
     {
@@ -104,9 +130,12 @@ public class PefLoaderTests
         Assert.Equal(2, loader.ExportHashTablePower);
         Assert.Equal(4, loader.ExportHashTable.Count);
         var alpha = loader.FindExport("alpha")!;
-        Assert.Equal(new PefExport("alpha", PefLoader.Hash("alpha"u8), PefSymbolClass.TVector, 0x10, 1), alpha);
+        Assert.Equal(new PefExport("alpha", 0x00050401, PefSymbolClass.TVector, 0x10, 1), alpha);
         Assert.False(alpha.IsAbsolute);
         Assert.False(alpha.IsReexport);
+        Assert.Equal(new PefExport("beta", 0x0004020D, PefSymbolClass.Code, 0x20, 0), loader.FindExport("beta"));
+        Assert.Equal(new PefExport("gamma", 0x00050477, PefSymbolClass.Data, 0x30, 1), loader.FindExport("gamma"));
+        Assert.Equal(new PefExport("Magic", 0x000506F5, PefSymbolClass.Data, 0x12345678, PefExport.AbsoluteSection), loader.FindExport("Magic"));
     }
 
     [Fact]
@@ -134,7 +163,7 @@ public class PefLoaderTests
     public void A_reexport_of_a_missing_import_is_reported()
     {
         var b = Sample();
-        b.Exports.Add(new("Ghost", PefSymbolClass.TVector, 99, PefExport.ReexportedSection));
+        b.Exports.Add(new("Ghost", 0x0005061E, PefSymbolClass.TVector, 99, PefExport.ReexportedSection));
         var (loader, diagnostics) = Read(b.Build());
         Assert.Equal("pef.export-reexport-out-of-range", Assert.Single(diagnostics).Code);
         Assert.Null(loader.ReexportedImport(loader.FindExport("Ghost")!));
@@ -151,11 +180,57 @@ public class PefLoaderTests
     public void The_hash_word_is_the_length_and_the_folded_hash(string name, uint expected) =>
         Assert.Equal(expected, PefLoader.Hash(MacRoman.Encode(name)));
 
+    [Theory]
+    [InlineData(0x12345678u, 0, 0)]
+    [InlineData(0x12345678u, 5, 11)]
+    [InlineData(0x00060DF2u, 5, 29)]   // NewPtr
+    [InlineData(0x00060DF2u, 2, 2)]
+    [InlineData(0x00060DF2u, 1, 1)]
+    [InlineData(0x00020086u, 5, 2)]    // NQD's "qd" [Verified: the Mac OS 9 System file]
+    [InlineData(0x000CCD40u, 5, 10)]   // NQD's "NQDSetCursor" [Verified: the Mac OS 9 System file]
+    public void The_hash_index_folds_the_word_by_the_power(uint word, int power, int index) =>
+        Assert.Equal(index, PefLoader.HashIndex(word, power));
+
+    // PEFComputeHashWord stops at a NUL; the length is the bytes before it [Doc: Mac OS Runtime Architectures, ch. 8,
+    // "Hash Word"].
     [Fact]
-    public void The_hash_index_folds_the_word_by_the_power()
+    public void The_hash_word_stops_at_a_NUL()
     {
-        Assert.Equal(0, PefLoader.HashIndex(0x12345678, 0));
-        Assert.Equal((int)((0x12345678u ^ (0x12345678u >> 5)) & 31), PefLoader.HashIndex(0x12345678, 5));
+        Assert.Equal(0x00010061u, PefLoader.Hash("a\0bc"u8));
+        Assert.Equal(0x00000000u, PefLoader.Hash("\0a"u8));
+    }
+
+    [Fact]
+    public void A_name_with_a_NUL_is_not_found()
+    {
+        var b = new PefBuilder { HashPower = 0 };
+        b.AddSection(PefSectionKind.Code, new byte[4]);
+        b.Exports.Add(new("a", 0x00010061, PefSymbolClass.Code, 0, 0));
+        var (loader, _) = Read(b.Build());
+        Assert.NotNull(loader.FindExport("a"u8));
+        Assert.Null(loader.FindExport("a\0b"u8));
+    }
+
+    // Real libraries hold names with the same hash word in one chain: MathLib's exp and nan, StdCLib's feof and open
+    // [Verified: Mac OS 9.2.2's MathLib and StdCLib]. The lookup must compare the names, not only the keys.
+    [Theory]
+    [InlineData("exp", "nan", 0x00030114u)]
+    [InlineData("feof", "open", 0x0004021Cu)]
+    public void Exports_with_the_same_hash_word_are_told_apart_by_name(string first, string second, uint key)
+    {
+        foreach (int power in new[] { 0, 3 })
+        {
+            var b = new PefBuilder { HashPower = power };
+            b.AddSection(PefSectionKind.Code, new byte[8]);
+            b.Exports.Add(new(first, key, PefSymbolClass.Code, 0, 0));
+            b.Exports.Add(new(second, key, PefSymbolClass.Code, 4, 0));
+            var (loader, diagnostics) = Read(b.Build());
+            Assert.Empty(diagnostics);
+            Assert.Equal(key, PefLoader.Hash(MacRoman.Encode(first)));
+            Assert.Equal(key, PefLoader.Hash(MacRoman.Encode(second)));
+            Assert.Equal((first, 0u), (loader.FindExport(first)!.Name, loader.FindExport(first)!.Value));
+            Assert.Equal((second, 4u), (loader.FindExport(second)!.Name, loader.FindExport(second)!.Value));
+        }
     }
 
     [Fact]
@@ -175,7 +250,8 @@ public class PefLoaderTests
     {
         var b = new PefBuilder { HashPower = 0 };
         b.AddSection(PefSectionKind.Code, new byte[4]);
-        foreach (var n in new[] { "one", "two", "three", "four" }) b.Exports.Add(new(n, PefSymbolClass.Code, 0, 0));
+        foreach (var (n, key) in new[] { ("one", 0x00030105u), ("two", 0x00030151u), ("three", 0x00050567u), ("four", 0x00040214u) })
+            b.Exports.Add(new(n, key, PefSymbolClass.Code, 0, 0));
         var (loader, diagnostics) = Read(b.Build());
         Assert.Empty(diagnostics);
         Assert.Single(loader.ExportHashTable);
@@ -189,8 +265,8 @@ public class PefLoaderTests
         // The builder packs export names with no NUL: "ab" then "abc" share the bytes "ababc".
         var b = new PefBuilder { HashPower = 0 };
         b.AddSection(PefSectionKind.Code, new byte[4]);
-        b.Exports.Add(new("ab", PefSymbolClass.Code, 0, 0));
-        b.Exports.Add(new("abc", PefSymbolClass.Code, 4, 0));
+        b.Exports.Add(new("ab", 0x000200A0, PefSymbolClass.Code, 0, 0));
+        b.Exports.Add(new("abc", 0x00030123, PefSymbolClass.Code, 4, 0));
         var (loader, diagnostics) = Read(b.Build());
         Assert.Empty(diagnostics);
         Assert.Equal(["ab", "abc"], loader.Exports.Select(e => e.Name));
@@ -237,6 +313,48 @@ public class PefLoaderTests
         var (loader, diagnostics) = ReadLoader(Loader((w, _) => w.WriteUInt32At(countAt, 0x00FFFFFFu)));
         Assert.NotNull(loader);
         Assert.Contains(diagnostics, d => d.Code == "pef.loader-truncated");
+    }
+
+    [Fact]
+    public void Exports_past_the_end_keep_those_that_fit()
+    {
+        // Seven exports move the symbol table 4 bytes on (it follows seven keys), leaving room for five of its 10-byte
+        // entries before the section ends.
+        var (loader, diagnostics) = ReadLoader(Loader((w, _) => w.WriteUInt32At(ExportCountAt, 7u)));
+        Assert.Equal(5, loader!.Exports.Count);
+        Assert.Contains(diagnostics, d => d.Code == "pef.loader-truncated");
+    }
+
+    // The Mac OS 9 System file's 'ndrv' resources -20192 to -20195 have $CBCC there [Verified: the Mac OS 9 System file].
+    [Fact]
+    public void A_relocation_header_reserved_field_is_ignored()
+    {
+        var (loader, diagnostics) = ReadLoader(Loader((w, _) => w.WriteUInt16At(56 + 2 * 24 + 4 * 4 + 2, (ushort)0xCBCC)));
+        Assert.Empty(diagnostics);
+        Assert.Equal(1, loader!.RelocationHeaders[0].SectionIndex);
+        Assert.Equal([0x4600], loader.RelocationHeaders[0].Instructions);
+    }
+
+    // An empty hash slot's first index is 0 in some libraries and the next chain's first in others [Verified: the
+    // Mac OS 9 System file]; only nonempty chains are checked.
+    [Fact]
+    public void An_empty_hash_slot_may_hold_any_first_index()
+    {
+        var (loader, diagnostics) = ReadLoader(Loader((w, b) =>
+        {
+            var r = new BigEndianReader(w.WrittenMemory);
+            for (int i = 0; i < 4; i++)
+                if (r.ReadUInt32At(b.LoaderHashOffset + 4 * i) >> 18 == 0) w.WriteUInt32At(b.LoaderHashOffset + 4 * i, 0x3u + (uint)i);
+        }));
+        Assert.Empty(diagnostics);
+        Assert.Equal(6, loader!.Exports.Count(e => loader.FindExport(e.Name) == e));
+    }
+
+    [Fact]
+    public void A_hash_power_of_18_is_allowed()
+    {
+        var (_, diagnostics) = ReadLoader(Loader((w, _) => w.WriteUInt32At(HashPowerAt, 18u)));
+        Assert.DoesNotContain(diagnostics, d => d.Code == "pef.loader-hash-power");
     }
 
     [Fact]

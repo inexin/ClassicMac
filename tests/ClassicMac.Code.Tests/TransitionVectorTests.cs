@@ -15,7 +15,7 @@ public class TransitionVectorTests
         b.AddSection(PefSectionKind.Code, new byte[0x80]);
         b.AddSection(PefSectionKind.UnpackedData, data, total: 0x1000);
         b.Libraries.Add(new PefBuilder.Library("Lib", [new("i0")]));
-        b.Exports.Add(new("f", PefSymbolClass.TVector, 0x18, 1));
+        b.Exports.Add(new("f", 0x00010066, PefSymbolClass.TVector, 0x18, 1));
         b.Relocations.Add((1, program));
         diagnostics = [];
         return PefContainer.Read(b.Build(), diagnostics);
