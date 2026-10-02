@@ -126,6 +126,27 @@ public class UuencodeTests
         Assert.False(UuencodeReader.Instance.CanRead(ForkData.FromBytes(new byte[300])));
     }
 
+    // As BinHex's marker: the begin line must follow text only (binhex.md §2).
+    [Fact]
+    public void A_begin_line_is_recognised_only_after_text()
+    {
+        var uu = Encoding.ASCII.GetBytes(Uu("x", "abc"u8.ToArray()));
+        byte[] text = [.. "Subject: caf\t\f\v\r\n"u8, 0xE9, 0x8E, (byte)'\n'];
+        Assert.True(UuencodeReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, .. uu])));
+        foreach (var control in new byte[] { 0x00, 0x01, 0x08, 0x0E, 0x1B, 0x1F })
+            Assert.False(UuencodeReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, control, (byte)'\n', .. uu])));
+    }
+
+    [Fact]
+    public void Read_finds_a_begin_line_after_binary_data()
+    {
+        var uu = Encoding.ASCII.GetBytes(Uu("x", "abc"u8.ToArray()));
+        var diagnostics = new List<Diagnostic>();
+        var file = Assert.Single(UuencodeReader.Instance.Read(ForkData.FromBytes((byte[])[0, 1, (byte)'\n', .. uu]), new ContainerContext(null, diagnostics)));
+        Assert.Empty(diagnostics);
+        Assert.Equal("abc"u8.ToArray(), file.DataFork.ToArray());
+    }
+
     [Fact]
     public void A_uuencoded_MacBinary_file_unwraps_to_the_Mac_file()
     {

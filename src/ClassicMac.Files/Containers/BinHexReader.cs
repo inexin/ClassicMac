@@ -36,12 +36,18 @@ namespace ClassicMac.Files.Containers
         public string FormatName => "BinHex 4.0";
 
         /// <inheritdoc/>
-        public bool CanRead(ForkData input) => FindStart(input.ReadPrefix(SearchLength)) >= 0;
-
-        // The position just after the colon that opens the encoded text, or -1.
-        private static int FindStart(ReadOnlySpan<byte> text)
+        public bool CanRead(ForkData input)
         {
-            var marker = text.IndexOf(Encoding.ASCII.GetBytes(Marker));
+            // Only text may precede the marker: one after binary data is a .hqx file inside a disk image or archive.
+            // docs/formats/containers/binhex.md §5. [ClassicMac]
+            var text = input.ReadPrefix(SearchLength);
+            return FindStart(text, out var marker) >= 0 && PlainText.IsText(text.AsSpan(0, marker));
+        }
+
+        // The position just after the colon that opens the encoded text, or -1; and where the marker is.
+        private static int FindStart(ReadOnlySpan<byte> text, out int marker)
+        {
+            marker = text.IndexOf(Encoding.ASCII.GetBytes(Marker));
             if (marker < 0) return -1;
             var lineEnd = text[marker..].IndexOfAny((byte)'\r', (byte)'\n');
             if (lineEnd < 0) return -1;
@@ -54,7 +60,7 @@ namespace ClassicMac.Files.Containers
         {
             var limit = context.Options.MaxExpandedBytesPerInput;
             var text = input.ToArray(limit);
-            var start = FindStart(text.AsSpan(0, Math.Min(text.Length, SearchLength)));
+            var start = FindStart(text.AsSpan(0, Math.Min(text.Length, SearchLength)), out _);
             if (start < 0) throw new InvalidDataException("No BinHex 4.0 data found.");
 
             var decoded = Expand(Decode(text, start, context), limit, context);

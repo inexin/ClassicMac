@@ -160,6 +160,12 @@ BinHex 1.0, 2.0 and 3.0 (`.hex`, `.hcx`) are different formats (§8).
 
 - The marker is looked for in the first 64 KiB of the input, so mail and news headers of any usual size precede it.
   [Fitted]
+- To be recognised as BinHex while unwrapping, the input must hold only text before the marker: no control character
+  other than tab, line feed, vertical tab, form feed and return. Bytes from `$20` up, 8-bit characters included, are
+  text. So a disk image, volume or archive holding a `.hqx` file near its start is read as what it is, not as the
+  BinHex file inside it: its structures (boot blocks, a master directory block, a partition map, a header) hold zero
+  bytes before any file's data. Reading a file already taken as BinHex finds the marker wherever it is in the window
+  (§2 step 1). [ClassicMac]
 - The reader reads the whole input into memory, at most the expanded-bytes limit (`ContainerReadOptions.MaxExpandedBytesPerInput`,
   [unwrapping.md §5](unwrapping.md#5-classicmac)); a larger input, or an expansion that grows past it, is unusable.
   [ClassicMac]
@@ -187,11 +193,13 @@ No file made by a BinHex application is in the tests; the inputs are built by `t
 - `tests/ClassicMac.Files.Tests/BinHexTests.cs`: `Decodes_name_Finder_info_and_both_forks` (§1, §2),
   `Long_runs_expand` (§1.3), `A_CRC_mismatch_is_a_warning`, `Truncated_text_keeps_what_was_decoded`,
   `Characters_outside_the_alphabet_stop_decoding`, `Without_a_header_the_input_is_unusable`, `Expansion_is_limited`,
-  `Text_without_the_marker_is_not_BinHex`.
+  `Text_without_the_marker_is_not_BinHex`, `The_marker_is_recognised_only_after_text` and
+  `Read_finds_the_marker_after_binary_data` (§5).
 - `tests/ClassicMac.Files.Tests/ContainerWriterTests.cs`: `BinHex_reads_back` (§3 read back by §2),
   `BinHex_run_length_encoding_marks_literal_90_bytes_and_runs_of_three_or_more` (§3 step 2).
 - `tests/ClassicMac.Files.Tests/UnwrapTests.cs`: `Nested_containers_unwrap_to_a_tree` (BinHex inside AppleSingle,
-  holding MacBinary).
+  holding MacBinary); `A_volume_whose_first_file_is_text_encoded_is_read_as_a_volume` (an HFS volume whose first file,
+  within 64 KiB of its start, is a `.hqx` file, §5).
 
 ## 8. Not covered
 

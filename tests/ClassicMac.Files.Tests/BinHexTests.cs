@@ -90,4 +90,28 @@ public class BinHexTests
         Assert.False(BinHexReader.Instance.CanRead(ForkData.FromBytes(":just a colon:"u8.ToArray())));
         Assert.False(BinHexReader.Instance.CanRead(ForkData.FromBytes(new byte[300])));
     }
+
+    // Text before the marker may be any mail or news text, 8-bit characters, tabs and form feeds included; a
+    // control character other than those, such as a zero byte, means the marker is inside binary data (a disk image
+    // holding a .hqx file).
+    [Fact]
+    public void The_marker_is_recognised_only_after_text()
+    {
+        var hqx = Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), []));
+        byte[] text = [.. "Subject: caf\t\f\v\r\n"u8, 0xE9, 0x8E, (byte)'\n'];
+        Assert.True(BinHexReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, .. hqx])));
+        foreach (var control in new byte[] { 0x00, 0x01, 0x08, 0x0E, 0x1B, 0x1F })
+            Assert.False(BinHexReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, control, .. hqx])));
+    }
+
+    // Read itself, as BinHex decoders do, takes the first marker wherever it is.
+    [Fact]
+    public void Read_finds_the_marker_after_binary_data()
+    {
+        var hqx = Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), []));
+        var diagnostics = new List<Diagnostic>();
+        var file = Assert.Single(BinHexReader.Instance.Read(ForkData.FromBytes((byte[])[0, 1, 2, .. hqx]), new ContainerContext(null, diagnostics)));
+        Assert.Empty(diagnostics);
+        Assert.Equal("note"u8.ToArray(), file.DataFork.ToArray());
+    }
 }

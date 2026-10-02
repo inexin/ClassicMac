@@ -76,12 +76,34 @@ public class UnwrapTests
     {
         var hqx = Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), [], corruptDataCrc: true));
         var builder = new HfsBuilder();
-        // First and past 64 KB, so the BinHex text is not in the part of the disk the BinHex reader searches.
         builder.File(HfsBuilder.Root, "Plain", new byte[70_000], []);
         var docs = builder.Folder(HfsBuilder.Root, "Docs");
         builder.File(docs, "Note.hqx", hqx, []);
         builder.File(docs, "Wrap.bin", MacBinary(2, "Inner.hqx", hqx, []), []);
         return builder.Build("Vol");
+    }
+
+    // A volume's first file sits within 64 KB of its start, inside the window the BinHex and uuencode readers search;
+    // their text follows the boot blocks and the MDB, which are not text, so the volume is read as a volume.
+    [Theory]
+    [InlineData("Note.hqx")]
+    [InlineData("Note.uu")]
+    public void A_volume_whose_first_file_is_text_encoded_is_read_as_a_volume(string name)
+    {
+        var text = name.EndsWith(".hqx")
+            ? Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), []))
+            : "From: someone\r\n\r\nbegin 644 Note\r\n#86)C\r\n`\r\nend\r\n"u8.ToArray();
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, name, text, []);
+        builder.File(HfsBuilder.Root, "Plain", "p"u8.ToArray(), []);
+        var diagnostics = new List<Diagnostic>();
+
+        var root = Unwrap(builder.Build("Vol"), diagnostics);
+
+        Assert.Empty(diagnostics);
+        Assert.All(root.Children, c => Assert.Equal("HFS volume", c.Format));
+        Assert.Equal([name, "Plain"], root.Children.Select(c => c.File.Name.ToMacRoman()).Order());
+        Assert.Equal(name.EndsWith(".hqx") ? "BinHex 4.0" : "uuencode", Assert.Single(Named(root, name).Children).Format);
     }
 
     private static ContainerNode Named(ContainerNode node, string name) =>

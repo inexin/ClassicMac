@@ -38,7 +38,9 @@ namespace ClassicMac.Files.Containers
             var text = input.ReadPrefix(SearchLength);
             foreach (var (start, end) in Lines(text))
             {
-                if (ParseBegin(text.AsSpan(start, end - start), out _, out _)) return true;
+                // Only text may precede the first begin line, as for BinHex (docs/formats/containers/binhex.md §5).
+                // [ClassicMac]
+                if (ParseBegin(text.AsSpan(start, end - start), out _, out _)) return PlainText.IsText(text.AsSpan(0, start));
             }
             return false;
         }

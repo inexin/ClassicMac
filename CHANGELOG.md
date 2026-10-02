@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Files: a disk image or volume whose first file is a `.hqx` or `.uu` file within 64 KB of its start is read as the
+  disk, not as that file: BinHex and uuencode are recognised only when text alone precedes their marker or `begin`
+  line (containers/binhex.md §5, uuencode.md §5).
 - Files: a container's files are probed for formats in parallel, all probes of a file sharing one read of its head and
   tail: opening a 500 MB disk of 5,170 files takes 0.4 s, and unwrapping everything on it (`list`) 2.4 s instead of 11 s.
 - StuffIt: archives decode about ten times faster: forks decode in parallel, method 15 (Arsenic) writes into arrays

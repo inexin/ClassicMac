@@ -100,6 +100,9 @@ The historical encoding (§1.2) and the base64 encoding of `uuencode -m` (§1.3)
 - A file is recognised by a `begin` or `begin-base64` line (§2 step 2) in its first 64 KiB, the same window as
   BinHex's marker search ([binhex.md §5](binhex.md#5-classicmac)). [Fitted] Once recognised, the whole input is
   searched for blocks.
+- As for BinHex, only text may precede the first `begin` line for the input to be recognised while unwrapping
+  ([binhex.md §5](binhex.md#5-classicmac)); reading an input already taken as uuencode finds blocks anywhere.
+  [ClassicMac]
 - The mode is ignored. The name is the `begin` line's path with only its last `/`-separated component kept, cut to
   255 bytes, its bytes taken as Mac OS Roman. [ClassicMac]
 - The reader reads the whole input into memory, at most the expanded-bytes limit
@@ -123,7 +126,10 @@ No file made by a `uuencode` program is in the tests; the inputs are text built 
   backquote for 0), `Known_vector`, `Stripped_trailing_spaces_decode_as_zeros` (§2 step 3.4),
   `Several_blocks_are_several_files`, `Base64_blocks_decode`, `A_bad_line_is_skipped`,
   `A_missing_end_line_is_a_warning`, `Truncated_text_keeps_what_was_decoded`, `Text_without_a_begin_line_is_not_uuencode`,
+  `A_begin_line_is_recognised_only_after_text`, `Read_finds_a_begin_line_after_binary_data` (§5),
   `A_uuencoded_MacBinary_file_unwraps_to_the_Mac_file`.
+- `tests/ClassicMac.Files.Tests/UnwrapTests.cs`: `A_volume_whose_first_file_is_text_encoded_is_read_as_a_volume` (an
+  HFS volume whose first file is a uuencoded file, §5).
 
 ## 8. Not covered
 

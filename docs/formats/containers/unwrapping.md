@@ -125,7 +125,10 @@ Every reader is asked in turn whether the file is in its format, and the first t
 
 The single-file containers come first because their tests are cheap and read only the start of the data fork, and
 because AppleSingle and MacBinary II/III have strong signatures. MacBinary I, the weakest test, comes after the
-stronger MacBinary versions. Most tests look at the data fork only; a reader may also look at the resource fork or the
+stronger MacBinary versions. BinHex and uuencode search the first 64 KiB for their text, so they come before the
+formats with a signature at a fixed place (an HFS master directory block at 1024, `CD001` at 32769), which text could
+match by chance; they accept only an input holding text before their marker, so a disk image or volume with a `.hqx`
+or `.uu` file near its start falls through to its own reader ([binhex.md §5](binhex.md#5-classicmac)). Most tests look at the data fork only; a reader may also look at the resource fork or the
 Finder info (NDIF images need both).
 
 ### 2.2 Unwrapping a file
