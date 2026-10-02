@@ -237,6 +237,7 @@ namespace ClassicMac.App.ViewModels
             HeaderIconTask = LoadHeaderIconAsync(Selected);
             OnPropertyChanged(nameof(Header));
             OnPropertyChanged(nameof(HeaderExportCommand));
+            OnSelectionChangedForSoundHeader();
             EditFormCommand.NotifyCanExecuteChanged();
         }
     }

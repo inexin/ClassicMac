@@ -351,6 +351,62 @@ public sealed partial class EditTests : IDisposable
         Assert.StartsWith("“beep.wav” could not be imported", model.Status);
     }
 
+    // A mono 8-bit 11025 Hz WAV of the samples.
+    private static byte[] Wav(params byte[] samples) =>
+        [.. "RIFF"u8, (byte)(36 + samples.Length), 0, 0, 0, .. "WAVEfmt "u8, 16, 0, 0, 0, 1, 0, 1, 0, 0x11, 0x2B, 0, 0, 0x11, 0x2B, 0, 0, 1, 0, 8, 0,
+            .. "data"u8, (byte)samples.Length, 0, 0, 0, .. samples];
+
+    // The sound header's actions (boards/sound.md): Save as WAV… and Replace from WAV…, for a 'snd ' only.
+    [Fact]
+    public async Task A_sound_saves_as_WAV_and_is_replaced_from_one()
+    {
+        var (model, file, dialogs, picker, _) = await Open();
+        model.Selected = file.Children.OfType<ResourceTypeNode>().First().Children[0];   // a 'STR '
+        await model.PreviewTask;
+        Assert.False(model.IsSoundResource);
+        Assert.False(model.SaveAsWavCommand.CanExecute(null));
+        Assert.False(model.ReplaceFromWavCommand.CanExecute(null));
+
+        picker.Open = Path.Combine(folder, "beep.wav");
+        File.WriteAllBytes(picker.Open, Wav(128, 200, 128, 50));
+        model.Selected = file;
+        dialogs.Import = c => c;
+        await model.ImportCommand.ExecuteAsync(null);
+        await model.PreviewTask;
+        var snd = ((ResourceNode)model.Selected!).Resource;
+        Assert.True(model.IsSoundResource);
+        Assert.True(model.SaveAsWavCommand.CanExecute(null));
+        Assert.True(model.ReplaceFromWavCommand.CanExecute(null));
+
+        // Save as WAV…: the decoded sound, as extract writes it.
+        File.Delete(picker.Open);
+        await model.SaveAsWavCommand.ExecuteAsync(null);
+        var saved = Assert.Single(Directory.GetFiles(folder, "*.wav"));
+        var wav = File.ReadAllBytes(saved);
+        Assert.Equal("RIFF", System.Text.Encoding.ASCII.GetString(wav, 0, 4));
+        Assert.Equal("WAVE", System.Text.Encoding.ASCII.GetString(wav, 8, 4));
+        Assert.StartsWith("Saved ", model.Status);
+        File.Delete(saved);
+
+        // Replace from WAV…: the resource's data, as one undoable edit.
+        var before = snd.GetData().ToArray();
+        picker.Open = Path.Combine(folder, "tone.wav");
+        File.WriteAllBytes(picker.Open, Wav(10, 20, 30, 40, 50));
+        await model.ReplaceFromWavCommand.ExecuteAsync(null);
+        Assert.Equal(new byte[] { 10, 20, 30, 40, 50 }, snd.GetData()[^5..].ToArray());
+        Assert.Equal("_Undo Replace from tone.wav", model.UndoTitle);
+        Assert.Same(snd, ((ResourceNode)model.Selected!).Resource);
+        model.UndoCommand.Execute(null);
+        Assert.Equal(before, snd.GetData().ToArray());
+
+        model.Selected = file.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "snd ").Children[0];  // undo selects the file
+        // A file that is not a WAV is refused.
+        File.WriteAllBytes(picker.Open, [1, 2, 3]);
+        await model.ReplaceFromWavCommand.ExecuteAsync(null);
+        Assert.StartsWith("“tone.wav” could not be read", model.Status);
+        Assert.Equal(before, snd.GetData().ToArray());
+    }
+
     // A TMPL's data from (label, type) pairs.
     internal static byte[] Tmpl(params (string Label, string Type)[] fields) =>
         [.. fields.SelectMany(f => (byte[])[(byte)f.Label.Length, .. MacRoman.Encode(f.Label), .. MacRoman.Encode(f.Type)])];

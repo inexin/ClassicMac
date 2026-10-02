@@ -199,6 +199,8 @@ public class WindowTests
             model.Selected = types.Single(t => t.Type.ToString() == "snd ").Children[0];
             Pump(model.PreviewTask);
             Assert.True(model.Preview.IsSound);
+            Assert.True(window.FindControl<Button>("SaveAsWavButton")!.IsEffectivelyVisible);     // the sound's header actions
+            Assert.True(window.FindControl<Button>("ReplaceFromWavButton")!.IsEffectivelyVisible);
             Capture(window, "sound", baselines);
             window.Close();
             Baselines.Verify(baselines);

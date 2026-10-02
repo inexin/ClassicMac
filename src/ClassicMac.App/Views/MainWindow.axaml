@@ -1161,7 +1161,10 @@
         <Border x:Name="InspectorHeader" DockPanel.Dock="Top" Classes="inspector-header" IsVisible="{Binding Header, Converter={x:Static ObjectConverters.IsNotNull}}">
           <DockPanel>
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
-              <Button Content="Export…" Command="{Binding HeaderExportCommand}" />
+              <Button Content="Export…" Command="{Binding HeaderExportCommand}" IsVisible="{Binding !IsSoundResource}" />
+              <!-- A sound's actions (boards/sound.md): replaced, not edited. -->
+              <Button x:Name="SaveAsWavButton" Content="Save as WAV…" Command="{Binding SaveAsWavCommand}" IsVisible="{Binding IsSoundResource}" />
+              <Button x:Name="ReplaceFromWavButton" Content="Replace from WAV…" Command="{Binding ReplaceFromWavCommand}" IsVisible="{Binding IsSoundResource}" />
               <Panel IsVisible="{Binding HasForm}">
                 <Button Classes="accent" Content="Edit" Command="{Binding EditFormCommand}" IsVisible="{Binding !IsEditingForm}" />
                 <Border Classes="editing-badge" IsVisible="{Binding IsEditingForm}" VerticalAlignment="Center">

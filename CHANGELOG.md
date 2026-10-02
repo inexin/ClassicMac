@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viewer: a sound's header has Save as WAV… (the decoded sound, as `extract` writes it) and Replace from WAV… (the
+  sound's data from a WAV file, one undoable edit) in place of Export….
 - Viewer: resources previewed as JSON with no form (style runs, font families, code fragments and others) read as
   labelled values in cards (P2, `PropertyView`): plain labels, numbers in mono, a name beside its number with the
   number raw ("Times `20`"), yes/no dots, rectangles as coordinates with their size, a card per nested object and per
