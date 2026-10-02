@@ -658,7 +658,8 @@ yes. The order:
 4. BinHex 4.0, uuencode;
 5. archives: DiskDoubler, PackIt, StuffIt split files and archives, Compact Pro, LHA, zip, gzip, tar (see
    [ARCHIVES.md](ARCHIVES.md));
-6. UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS, MFS, DOS partition tables (MBR), FAT, raw CD images, cue
+6. NewWorld "Mac OS ROM" files and Mac ROM images (see [ROM.md](ROM.md));
+7. UDIF, Apple partition maps, Disk Copy 4.2, NDIF, DART, HFS, MFS, DOS partition tables (MBR), FAT, raw CD images, cue
    sheets, ISO 9660 / High Sierra (see [DISK-IMAGES.md](DISK-IMAGES.md), [HFS-MFS.md](HFS-MFS.md),
    [FAT.md](FAT.md), [ISO9660.md](ISO9660.md)).
 

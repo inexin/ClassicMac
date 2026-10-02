@@ -54,6 +54,7 @@ ClassicMac follows 9.0; a 9.2.2 mode would take these differences.
 | [DISK-IMAGES.md](DISK-IMAGES.md) | Disk Copy 4.2, DART, NDIF (Disk Copy 6), ShrinkWrap, UDIF; the ADC, KenCode, LZH and bzip2 codecs | `ClassicMac.Files.Hfs`, `ClassicMac.Files.Compression` |
 | [FAT.md](FAT.md) | DOS partition tables, FAT12/16/32 with long names, PC Exchange and File Exchange data on FAT | `ClassicMac.Files.Fat` |
 | [ISO9660.md](ISO9660.md) | ISO 9660 and High Sierra as Mac OS 9 reads them, Apple's extensions, raw CD images and cue sheets | `ClassicMac.Files.Iso` |
+| [ROM.md](ROM.md) | Macintosh ROM images: the ROM resource table, combinations, the resources listed as a synthesised resource fork; the NewWorld "Mac OS ROM" file and its LZSS image | `ClassicMac.Files.Rom` |
 | [SOUND.md](SOUND.md) | `snd ` resources; MACE 3:1 and 6:1, IMA 4:1, µ-law; the WAV output | `ClassicMac.Resources.Decoders.Sound` |
 | [TEXT.md](TEXT.md) | `STR `, `STR#`, `TEXT` and `styl`, `vers`; the text, RTF and JSON output | `ClassicMac.Resources.Decoders.Text` |
 | [INTERFACE.md](INTERFACE.md) | `MENU`, `MBAR`, `WIND`, `DLOG`, `ALRT`, `DITL`, `CNTL`, their colour tables and Appearance extensions; the JSON output | `ClassicMac.Resources.Decoders.Interface` |

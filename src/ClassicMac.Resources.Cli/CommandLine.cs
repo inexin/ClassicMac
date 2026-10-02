@@ -109,7 +109,7 @@ namespace ClassicMac.Resources.Cli
         {
             Description = "A Mac file or a container holding them: AppleSingle, MacBinary, BinHex, uuencode, a file in a " +
                 "Basilisk II folder or with an AppleDouble ._ file, a raw resource fork, an archive (StuffIt, Compact Pro, " +
-                "DiskDoubler, PackIt, LHA, zip, tar, gzip) or a disk or CD image",
+                "DiskDoubler, PackIt, LHA, zip, tar, gzip), a disk or CD image, or a Mac ROM image or NewWorld Mac OS ROM file",
         }.AcceptExistingOnly();
 
         private Command InfoCommand()
