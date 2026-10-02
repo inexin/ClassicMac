@@ -156,7 +156,7 @@ namespace ClassicMac.Graphics
                 throw new NotSupportedException($"PixMap pixelSize {PixelSize} is not a QuickDraw depth");
         }
 
-        // ColorTable: ctSeed, ctFlags, ctSize (entries - 1), then (value, RGB) entries. A device table (ctFlags bit 15)
+        // ColorTable: ctSeed, ctFlags, ctSize (entries - 1, signed, so -1 is no entries), then (value, RGB) entries. A device table (ctFlags bit 15)
         // is indexed by position; otherwise each entry's value is its pixel index. Unlisted indices are black.
         internal static RgbaColor[] ReadColorTable(ClassicMac.Core.BigEndianReader b, int pixelSize) => ReadColorTableExact(b, pixelSize).palette;
 
@@ -164,7 +164,7 @@ namespace ClassicMac.Graphics
         {
             b.ReadUInt32();                                           // ctSeed
             int ctFlags = b.ReadUInt16();
-            int ctSize = b.ReadUInt16();
+            int ctSize = b.ReadInt16();                               // signed: -1 is an empty table (ResEdit's ppats)
             bool positional = (ctFlags & 0x8000) != 0;
             var palette = new RgbaColor[1 << Math.Min(pixelSize, 8)];
             var exact = new (ushort r, ushort g, ushort b)[palette.Length];

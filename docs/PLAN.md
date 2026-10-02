@@ -857,8 +857,6 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Original-app fixtures for the fitted archive methods** (phase 10's Remaining column): StuffIt v1 and method 6,
   StuffIt 5 method 14, a SegmentIt set, Compact Pro archives and segmented sets, PackIt, DiskDoubler methods 2–5 and 7
   and the delta types, LHa archives. Each needs a redistributable archive made by the original application.
-- [ ] **ResEdit's pixel patterns:** `ppat` 1731 and `ppt#` 1751/3100 in ResEdit 2.1.3 fail to decode (their colour
-  table runs past the data). ResEdit is not in the corpus baseline; find what the Mac draws before fixing or allowlisting.
 - [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3).
 - [ ] **Mac ROM images:** read the ROM's built-in resource map (Inputs, priority 3).
 - [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them

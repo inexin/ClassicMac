@@ -101,6 +101,8 @@ the same structures. All are big-endian.
 
 - The pixel data runs from the pixels offset to pmTable. A table before the pixel data makes GetPixPat fail, so the
   resource does not load. The ColorTable (at pmTable) is read unless the PixMap is RGB direct (pixelType 16).
+- The table's ctSize (entries − 1) is signed: $FFFF is an empty 8-byte table, every index unlisted and so black;
+  ResEdit 2.1.3's `ppat` 1731 and the `ppt#` 1751/3100 elements end with one and load [Code].
 - Types 1 and 3 decode the PixMap.
 - Type 0: the pattern is the **first 8 bytes of the pixel data** (at the pixels offset), not the 1-bit pattern at
   offset 20.

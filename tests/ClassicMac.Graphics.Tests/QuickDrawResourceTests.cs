@@ -105,6 +105,18 @@ public class QuickDrawResourceTests
     }
 
     [Fact]
+    public void PixelPattern_CtSizeMinusOne_IsAnEmptyTable()
+    {
+        // ResEdit 2.1.3's ppat 1731: ctSize $FFFF (-1), an 8-byte table with no entries ending the resource. GetPixPat
+        // loads it; every index is unlisted, so black.
+        var b = new PictBuilder().U16(1).U16(0).U16(28).U16(0).U16(78).Zeros(4).U16(0).Zeros(4).Zeros(8);
+        PixMap8x1(b, 86).Bytes(0, 1, 0, 1, 0, 1, 0, 1).U16(0).U16(0).U16(0).U16(0xFFFF);
+        var pattern = QuickDrawResources.DecodePixelPattern(b.ToArray());
+        Assert.Equal(Black, pattern[0, 0]);
+        Assert.Equal(Black, pattern[1, 0]);
+    }
+
+    [Fact]
     public void PixelPattern_Type0_UsesTheFirstBytesOfThePixelData()
     {
         // Mac OS 9 fills a type-0 ppat with patData's first 8 bytes, not the 1-bit fallback at offset 20.
