@@ -232,7 +232,8 @@ namespace ClassicMac.App.ViewModels
             try
             {
                 result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
-                    ReadOptions, diagnostics, cancellation.Token);
+                    ReadOptions, diagnostics, cancellation.Token,
+                    node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL" ? DialogSources.From(Roots) : null);
             }
             catch (OperationCanceledException)
             {

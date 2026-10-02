@@ -169,7 +169,7 @@ public class WindowTests
             Capture(window, "dialog");
             var dialog = new DialogView { Dialog = model.Preview.Dialog, Scale = 2 };
             dialog.Measure(Size.Infinity);
-            Assert.Equal((2 * (280 + 12 + 24), 2 * (120 + 12 + 19 + 24)), (dialog.DesiredSize.Width, dialog.DesiredSize.Height)); // borders, gutters; the title bar
+            Assert.Equal((2 * (280 + 13 + 24), 2 * (120 + 34 + 24)), (dialog.DesiredSize.Width, dialog.DesiredSize.Height)); // the frame, gutters
             model.Selected = InterfacePreviewTests.Resource(file, "MENU", 128);
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
@@ -249,7 +249,7 @@ public class WindowTests
             Pump(model.PreviewTask);
             var ditl = Assert.IsType<DialogItemsForm>(model.Form);
             ditl.Items[1].Text = "Changed";
-            Assert.Equal("Changed", model.FormDialog!.Items[1].Item.Text);
+            Assert.Equal("Changed", model.FormDialog!.Drawing.Items[1].Item.Text);
             ditl.Items[0].Text = "日本";
             Assert.Contains("Mac OS Roman", model.FormError);
             window.Close();

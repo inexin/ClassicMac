@@ -362,20 +362,86 @@ Without its `'DITL'`, an `'ictb'`'s entries are listed without their colours or 
 
 ## 12. Viewer previews
 
-The viewer draws dialogs, alerts, lone item lists and menus in the System 7 style [ClassicMac]. It is an approximation
-drawn by the viewer, not by the Toolbox (Mac OS 9 draws them with the Appearance Manager's theme), for seeing a
-resource's layout; the other interface resources preview as their JSON.
+Dialogs, alerts and lone item lists are drawn as Mac OS 9.0 with Appearance 1.1.1 and the Platinum theme draws them
+(`DialogDrawings.Read` builds the model from the resources, `DialogRenderer.Render` draws it through a
+`QuickDrawPort` at any screen depth); menus are drawn in the System 7 style [ClassicMac: an approximation drawn by the
+viewer]. The other interface resources preview as their JSON.
 
-- **Dialogs and alerts:** the window frame for the definition ID (a title bar for document and movable windows, the
-  double border of a modal box, altDBox's shadow), filled with the content colour of the `'dctb'` or `'actb'` of the
-  same ID, and the items of the `'DITL'` in their rectangles: buttons (an alert's stage 1 default with its ring),
-  check boxes, radio buttons, controls from their `'CNTL'` (buttons, check boxes, radio buttons, scroll bars, pop-up
-  menus; other definitions as a labelled box), static and editable text (unsubstituted), icons (`'cicn'`, else
-  `'ICON'`), pictures scaled to their rectangle, and user items as a dotted box. A lone `'DITL'` is drawn in a plain box
-  around its items.
-- **Menus:** the title highlighted on a strip of menu bar, then the items with their marks, styles (bold), Command keys,
-  submenu arrows and dividers; disabled items grey. Item icons are not drawn.
-- Text is drawn in Chicago 12 where installed, else a font of similar width; the zoom applies.
+### 12.1 Dialogs and alerts
+
+The reference is a set of screen captures of `GetNewDialog` + `DrawDialog` (and `ModalDialog`) and of `Alert`,
+`StopAlert`, `NoteAlert` and `CautionAlert` on Mac OS 9.0 (Appearance 1.1.1, Platinum, system font Charcoal 12), at 32
+and 8 bits, of a fork of ClassicMac's own test dialogs (`DialogRendererTests.Fork`). Rules read from them are marked
+[Verified]; outside text, the drawing matches the captures pixel for pixel at both depths (the comparison test,
+gated by `CLASSICMAC_DIALOG_CAPTURES`).
+
+- **The bitmap** is the structure region's bounding box: the frame, the shadow and the content; pixels outside the
+  region are transparent.
+- **Frames** by definition ID, as margins around the content (left, top, right, bottom, with the 1-pixel shadow that
+  starts 2 pixels in) [Verified]:
+
+| Definition | Frame | Margins |
+| --- | --- | --- |
+| 1 `dBoxProc` | black line; a bevel ($BBBBBB top-left, $555555 bottom-right; inside it white and $999999); 3 pixels of the content colour | 6, 6, 7, 7 |
+| alerts | as `dBoxProc`, the outer bevel tinted red ($FF9999, $FF6666) | 6, 6, 7, 7 |
+| 5 `movableDBoxProc` | a 22-row title bar (stripes, the title), then the `dBoxProc` frame with a $DDDDDD outer bevel | 6, 27, 7, 7 |
+| 0 `documentProc` | a 22-row title bar with the collapse box at the right; a black line around the content, a 4-pixel bevelled border | 6, 22, 7, 7 |
+| 2 `plainDBox` | a 1-pixel black frame | 1, 1, 1, 1 |
+| 3 `altDBoxProc` | a 1-pixel black frame and a 2-pixel black shadow | 1, 1, 3, 3 |
+
+  Each frame is stored as measured, a few pixels at each corner and edge, with one middle column and row that repeat
+  to any size (`PlatinumArt`); every piece repeats exactly along its middle in the captures [Verified]. 4, 8, 12 and
+  16–23 are drawn as `documentProc` without zoom box or rounded corners, other definitions as `plainDBox`
+  [ClassicMac].
+- **Title bar:** six pairs of stripes (white, $777777) on $CCCCCC. The title is black, its pen at half the structure's
+  width less the title's width, baseline on row 15; the stripes are cleared from 5 pixels before the pen to 3 after the
+  title [Verified: three titles]. The goAway flag's close box is drawn as the collapse box's frame without its bars at
+  the left [ClassicMac: not captured]. The title bar is always drawn active.
+- **Content colour:** the `'dctb'` part 0; the theme background $DDDDDD when the `'dlgx'` sets flag 1; white
+  otherwise. Every alert has the theme background, whatever its `'actb'` says [Verified]. The `'dctb'`/`'actb'` text
+  colour (part 2) is not used: item text and the title are black [Verified].
+- **Alert icon:** none for `Alert`; for the others the system's stop, note and caution icons (`'cicn'`, else `'ICON'`,
+  0, 1 and 2) at (10, 20, 42, 52) [Verified: the place]. They are the System file's; ClassicMac draws them only when an
+  open file supplies them, and a grey 1-pixel frame in their place otherwise [ClassicMac]. An icon item with ID 0–2
+  takes the same icons.
+- **Default ring:** an alert's default item (stage 1's bold item, §6) is drawn as Appearance's default button, a ring
+  3 pixels outside the button [Verified]. Dialogs drawn with `DrawDialog`/`ModalDialog` have no ring [Verified].
+- **Items** [Verified unless marked]:
+  - Buttons (and `'CNTL'` `pushButProc`): the Platinum button, rounded, $DDDDDD; the title centred, its baseline at
+    top + (height − 15) ÷ 2 + 12.
+  - Check boxes and radio buttons (and `'CNTL'` 1 and 2): a 12 × 12 box 2 pixels in, centred vertically; the title's
+    pen 18 pixels in. A control with value 1 draws the check box checked (the mark overhangs the box by 2 pixels);
+    an on radio button's dot is [ClassicMac].
+  - Static text: TextEdit's layout in the item, left-aligned, the first baseline 12 below the top, lines 16 apart,
+    clipped to the item; line breaks at spaces [ClassicMac: TextEdit's own breaking is not reproduced]. A disabled
+    item draws the same. `^0`–`^3` are not substituted.
+  - Editable text: the same, with a 1-pixel black frame 3 pixels outside the item.
+  - Icons: `'cicn'` (masked), else `'ICON'` (`PlotIcon`, srcCopy) at the item's top-left; pictures: `DrawPicture` into
+    the item's rectangle.
+  - User items and help items draw nothing.
+  - Scroll bars (`'CNTL'` 16): the arrows together at the bottom, the track shaded below each black line, the scroll box
+    (16 × 17 with its black lines, in the default accent colour) at (value − min) ÷ (max − min) of the track less the
+    box, rounded [Verified: a vertical bar, one value]; a horizontal bar is the vertical one turned [ClassicMac]. No
+    scroll box when max ≤ min [ClassicMac].
+  - Pop-up menus (`'CNTL'` 1008): the title in its width, then a button with a triangle [ClassicMac: not captured].
+    Other controls, and control items whose `'CNTL'` is missing: a grey frame [ClassicMac].
+  - A control is drawn in its item's rectangle; an invisible one is not drawn.
+- **Text** is the system font, Charcoal 12, black, srcOr. Charcoal is an Apple font: ClassicMac draws it from the
+  `FOND`/`NFNT` of the user's open files when they have it (Chicago, family 0, otherwise), and through the
+  `ITextFallback` (the viewer's: an installed font close to it) when no bitmap font is supplied. Layout uses Charcoal's
+  metrics (ascent 12, line height 16) [Verified] and the widths of whatever draws the text, so wrapping and the title's
+  gap follow the font used. Mac OS 9 smooths Charcoal (anti-aliased greys); bitmap text and the fallback are 1-bit.
+- **Screen depth:** at 8 bits the layout and every frame and control pixel are the same: the Platinum greys and colours
+  are in the 8-bit system palette [Verified].
+- **A lone `'DITL'`** is drawn in a plain box around its items, with a 10-pixel margin [ClassicMac].
+
+The viewer previews an `'ALRT'` as `Alert` shows it (no icon), and redraws the preview as an edit form changes.
+
+### 12.2 Menus
+
+The title highlighted on a strip of menu bar, then the items with their marks, styles (bold), Command keys, submenu
+arrows and dividers; disabled items grey. Item icons are not drawn. Text is drawn in Chicago 12 where installed, else a
+font of similar width; the zoom applies [ClassicMac].
 
 ---
 
@@ -410,5 +476,8 @@ ClassicMac's editor writes `MENU`, `WIND`, `DLOG`, `ALRT`, `DITL` and `CNTL` bac
 ## 15. Not covered yet
 
 - `'dftb'` (Appearance's dialog font table) and `'hdlg'`/`'hrct'` (the Help Manager's).
-- In the previews: `'ictb'` item colours and fonts, menu icons and `'mctb'` colours, and the Appearance look.
+- In the previews: `'ictb'` item colours and fonts; `'dftb'`; Appearance themes other than Platinum, accent colours
+  other than the default, inactive windows and highlighted controls; the zoom box, rounded document windows and
+  `'WDEF'`s of the application's own; disabled (dimmed) controls; menus as Mac OS 9 draws them, menu icons and `'mctb'`
+  colours.
 - Writing these resources from JSON (with `pack`).

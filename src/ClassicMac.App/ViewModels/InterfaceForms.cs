@@ -321,6 +321,7 @@ namespace ClassicMac.App.ViewModels
             FormMenu = null;
             FormError = null;
             if (form is not DataForm data || node is null) return;
+            DialogSources? sources = null;
             void Update()
             {
                 try
@@ -329,7 +330,8 @@ namespace ClassicMac.App.ViewModels
                     FormError = null;
                     if (data is MenuForm menu) FormMenu = menu.ToMenu();
                     else
-                        FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = ScreenDepth }, ReadOptions, []);
+                        FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = ScreenDepth }, ReadOptions, [],
+                            sources ??= DialogSources.From(Roots));
                 }
                 catch (ArgumentException e)
                 {

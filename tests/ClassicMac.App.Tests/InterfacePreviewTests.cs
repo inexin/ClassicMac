@@ -5,6 +5,7 @@ using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
 using ClassicMac.Files.Tests;
+using ClassicMac.Resources.Decoders.Interface;
 
 namespace ClassicMac.App.Tests;
 
@@ -61,23 +62,29 @@ public class InterfacePreviewTests : IDisposable
 
         model.Selected = Resource(file, "DLOG", 128);
         await model.PreviewTask;
-        var dialog = model.Preview.Dialog!;
+        var preview = model.Preview.Dialog!;
+        var dialog = preview.Drawing;
         Assert.True(model.Preview.IsDialog && model.Preview.IsZoomable);
         Assert.Equal(2, model.Zoom);
         Assert.Equal(("Options", 5, 280, 120), (dialog.Title, dialog.Definition, dialog.Width, dialog.Height));
-        Assert.Equal(new(0xCC, 0xCC, 0xCC), dialog.Background);
+        Assert.Equal(new(0xCCCC, 0xCCCC, 0xCCCC), dialog.Content);
         Assert.Equal([4, 5, 7, 32, 7], dialog.Items.Select(i => i.Item.Type));
         Assert.Equal((short)1008, dialog.Items[2].Control!.Definition);
-        Assert.NotNull(dialog.Items[3].Png); // the icon
+        Assert.NotNull(dialog.Items[3].Image); // the icon
         Assert.Null(dialog.Items[4].Control); // CNTL 99 does not exist
+        // Drawn as a movable modal dialog: a 27-row title bar and 6-pixel sides above and beside the content, 7 with the shadow.
+        Assert.Equal((280 + 13, 120 + 34), (preview.PixelWidth, preview.PixelHeight));
+        Assert.Equal([0x89, 0x50, 0x4E, 0x47], preview.Png[..4]);
 
         model.Selected = Resource(file, "ALRT", 129);
         await model.PreviewTask;
-        Assert.Equal((1, 2, 5), (model.Preview.Dialog!.Definition, model.Preview.Dialog.DefaultItem, model.Preview.Dialog.Items.Count));
+        var alert = model.Preview.Dialog!.Drawing;
+        Assert.Equal((DialogKind.Alert, 2, 5), (alert.Kind, alert.DefaultItem, alert.Items.Count));
 
         model.Selected = Resource(file, "DITL", 130);
         await model.PreviewTask;
-        Assert.Equal((2, 210, 40), (model.Preview.Dialog!.Definition, model.Preview.Dialog.Width, model.Preview.Dialog.Height)); // the items plus a margin
+        var list = model.Preview.Dialog!.Drawing;
+        Assert.Equal((2, 210, 40), (list.Definition, list.Width, list.Height)); // the items plus a margin
     }
 
     [Fact]

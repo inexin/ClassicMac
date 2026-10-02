@@ -73,7 +73,7 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A DOCMaker or SimpleText document, a chapter at a time.</summary>
         public DocumentPreview? Document { get; private init; }
 
-        /// <summary>A dialog, alert or item list, drawn by the viewer.</summary>
+        /// <summary>A dialog, alert or item list, drawn as Mac OS 9's Platinum appearance draws it.</summary>
         public DialogPreview? Dialog { get; private init; }
 
         /// <summary>A menu, drawn pulled down.</summary>
@@ -105,13 +105,14 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Makes the preview of <paramref name="node"/> off the UI thread; decoding problems go to <paramref name="diagnostics"/>.</summary>
         public static Task<PreviewViewModel> BuildAsync(NodeViewModel? node, DecodeOptions options, ReadOptions readOptions,
-            ICollection<Diagnostic> diagnostics, CancellationToken cancellation) =>
-            Task.Run(() => Build(node, options, readOptions, diagnostics), cancellation);
+            ICollection<Diagnostic> diagnostics, CancellationToken cancellation, DialogSources? dialogSources = null) =>
+            Task.Run(() => Build(node, options, readOptions, diagnostics, dialogSources), cancellation);
 
-        internal static PreviewViewModel Build(NodeViewModel? node, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics) =>
+        internal static PreviewViewModel Build(NodeViewModel? node, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics,
+            DialogSources? dialogSources = null) =>
             node switch
             {
-                ResourceNode resource => ForResource(resource.Resource, resource.Fork, options, readOptions, diagnostics),
+                ResourceNode resource => ForResource(resource.Resource, resource.Fork, options, readOptions, diagnostics, dialogSources),
                 FileNode file => ForFile(file.File, options, readOptions, diagnostics),
                 ContainerFileNode container => ForFile(container.File, options, readOptions, diagnostics),
                 InputNode input when input.Root.Children.Count == 0 => ForFile(input.Root.File, options, readOptions, diagnostics),
@@ -119,7 +120,7 @@ namespace ClassicMac.App.ViewModels
             };
 
         private static PreviewViewModel ForResource(Resource resource, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
-            ICollection<Diagnostic> diagnostics)
+            ICollection<Diagnostic> diagnostics, DialogSources? dialogSources = null)
         {
             var type = resource.Type.ToString();
             var data = ResourceDecompression.Default.GetData(resource, fork, readOptions, diagnostics);
@@ -132,7 +133,7 @@ namespace ClassicMac.App.ViewModels
             }
             if (type == "snd " && SoundResource.Read(data, diagnostics, resource.ToString()) is { Sound: { } sampled })
                 return SoundPreview(sampled);
-            if (InterfacePreviews.Dialog(resource, data, fork, options, readOptions, diagnostics) is { } dialog)
+            if (InterfacePreviews.Dialog(resource, data, fork, options, readOptions, diagnostics, dialogSources) is { } dialog)
                 return new PreviewViewModel(PreviewKind.Dialog, "") { Dialog = dialog };
             if (type is "clut" or "pltt")
             {
