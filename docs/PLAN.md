@@ -42,7 +42,7 @@ Proposed priority:
 | 2 | uuencode (`.uu`, `begin-base64`) | Usenet and mail transfers | Built |
 | 3 | HFS+ images | Mac OS 8.1–9 disks | Built, read-only (phase 10) |
 | 3 | StuffIt 1.x–5 (`.sit`, `.sea`), including the v1.5 and 1.6–4.5 `SIT!` generations and v5 store/LZ77+Huffman/Deflate/Arsenic-BWT methods; Compact Pro (`.cpt`) and StuffIt/Compact Pro self-extractors | Most classic Mac downloads | Built (phase 10; self-extractors through their data fork) |
-| 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives | Not started (Todo) |
+| 3 | DiskDup+ (`DDim`/`DDp+`, `.dsk`); PCE developer toolkit MAR (`.mar`, TAR/MacBinary hybrid by Hampa Hug) | DiskDup+ disks and PCE toolkit archives | DiskDup+ built (raw sectors, verified); MAR not started (Todo) |
 | 3 | Mac ROM images: the ROM's built-in resource map (its own entry format, selected per machine) | ROM dumps for emulators | Built: PowerPC ROMs and the New World `Mac OS ROM` file; 68k ROMs unverified |
 | 4 | DiskDoubler (`.dd`), StuffIt SegmentIt archives, PackIt (`.pit`), standalone LHA/LZH (`.lzh`) | Early 1990s downloads, multi-floppy BBS files | Built (phase 10) |
 | 5 | Encrypted Mac application formats, only on request: StuffIt X (`.sitx`); FolderBolt; MacSafe II; Crypt for Mac; MacPGP; Apple File Security | Password-protected archives, files and folders | On request only |
@@ -863,8 +863,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Archive bugs from the samples:** LHA `-lh1-` fails on MacLHA 2.24 archives; StuffIt method 15 fails on two
   6.5.1 archives of the DiskDoubler corpus; DiskDoubler split files (`SPLT`) are not read; `list` drops the folder of
   an archive whose files are containers.
-- [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3). Blocked: no sample of either, and MAR's layout is
-  published only in GPL source; DiskDup+ images are said to be raw sectors, which the raw-image path already reads.
+- [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] (DISK-IMAGES.md §6).
+- [ ] **PCE MAR** input (Inputs, priority 3). Blocked: no sample, and its layout is published only in GPL source.
 - [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files (ROM.md; 68k ROMs
   unverified).
 - [x] **Fork repair beyond `fork.map-recovered`:** not needed: no corpus fork reports a `fork.*` diagnostic

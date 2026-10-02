@@ -21,7 +21,7 @@ Contents
 3. [Disk Copy 4.2](#3-disk-copy-42)
 4. [DART](#4-dart)
 5. [NDIF (Disk Copy 6)](#5-ndif-disk-copy-6)
-6. [ShrinkWrap 2.1 and other raw images](#6-shrinkwrap-21-and-other-raw-images)
+6. [ShrinkWrap 2.1, DiskDup+ and other raw images](#6-shrinkwrap-21-diskdup-and-other-raw-images)
 7. [ADC](#7-adc)
 8. [KenCode](#8-kencode)
 9. [DART RLE](#9-dart-rle)
@@ -469,7 +469,7 @@ This is not needed to read images, but explains what readers meet [Verified: 6.1
   samples re-encodes exactly]: ADC with a 65,536-byte window and matches up to 67 bytes; KenCode with a `$2800`-byte
   window and matches up to 64 bytes in 6.3.3 (which ignores Match Len) or up to Match Len in 6.1.2.
 
-## 6. ShrinkWrap 2.1 and other raw images
+## 6. ShrinkWrap 2.1, DiskDup+ and other raw images
 
 ShrinkWrap 2.1 (1996) writes no format of its own [Verified: ShrinkWrap 2.1 in SheepShaver, floppy and 5 MB volume]:
 
@@ -481,6 +481,10 @@ ShrinkWrap 2.1 (1996) writes no format of its own [Verified: ShrinkWrap 2.1 in S
 | Drive Container | `hdrv`/`D:\>` | the raw volume, no header | none |
 | Self-Mounting (floppy) | `APPL`/`sImg` | the raw volume | mounter code; `CKSM` 1 = data checksum (Disk Copy 4.2 sum) |
 | Self-Mounting (volume) | `APPL`/`iImg` | the raw volume | mounter code; no checksum |
+
+DiskDup+ 2.9.2 (creator `DDp+`) saves a "DiskDup+" image as type `DDim`: the raw disk, 512-byte sectors with no
+header, tags or compression, byte-identical to the source volume [Verified: an 800K HFS floppy saved by DiskDup+ 2.9.2
+in SheepShaver]. Its "Disk Copy" option writes Disk Copy 4.2.
 
 The three volume forms have byte-identical data forks. A raw image is recognised by its file system (for HFS, `BD`
 at offset 1024), so ClassicMac's volume readers open these directly [Verified].
