@@ -6,8 +6,8 @@ using ClassicMac.Files.Hfs;
 namespace ClassicMac.Files.Tests;
 
 // Builds a small HFS volume byte by byte from Inside Macintosh: Files: boot blocks, MDB at 1024, 512-byte allocation
-// blocks from block 4; an extents overflow file (header and leaves) and a catalog (header, two leaves and index) linked in
-// order); forks split into the requested number of extents, one free block apart, with extents past the third in
+// blocks from block 4; an extents overflow file (header and leaves) and a catalog (header, two leaves and index, or for
+// many leaves index levels up to one root) linked in order); forks split into the requested number of extents, one free block apart, with extents past the third in
 // overflow records.
 internal sealed class HfsBuilder
 {
@@ -65,7 +65,8 @@ internal sealed class HfsBuilder
             allocated.Add(true);
         }
         var catalogStart = allocation.Count;
-        var catalogNodes = CatalogLeaves + 2; // header, leaves, index
+        var indexNodes = IndexNodesFor(CatalogLeaves);
+        var catalogNodes = CatalogLeaves + 1 + indexNodes; // header, leaves, index
         for (var i = 0; i < catalogNodes; i++)
         {
             allocation.Add(new byte[Block]);
@@ -166,10 +167,29 @@ internal sealed class HfsBuilder
                 index.Add(IndexRecord(chunk[0], (uint)leaf));
             }
         }
+        // One index node above the leaves, or for a big catalog as many levels as it takes.
         var root = (uint)CatalogLeaves + 1;
-        allocation[catalogStart + (int)root] = Leaf(index, forward: 0, backward: 0, kind: 0, height: 2);
+        ushort depth = 2;
+        var nextIndexNode = root;
+        while (index.Count > IndexRecordsPerNode)
+        {
+            var above = new List<byte[]>();
+            for (var i = 0; i < index.Count; i += IndexRecordsPerNode)
+            {
+                var chunk = index.Skip(i).Take(IndexRecordsPerNode).ToList();
+                allocation[catalogStart + (int)nextIndexNode] = Leaf(chunk, forward: 0, backward: 0, kind: 0, height: (byte)depth);
+                above.Add(IndexRecord(chunk[0], nextIndexNode));
+                nextIndexNode++;
+            }
+
+            index = above;
+            depth++;
+        }
+
+        root = nextIndexNode;
+        allocation[catalogStart + (int)root] = Leaf(index, forward: 0, backward: 0, kind: 0, height: (byte)depth);
         allocation[catalogStart] = Header(firstLeaf: 1, lastLeaf: (uint)CatalogLeaves, nodes: (uint)catalogNodes, records: keyed.Count,
-            usedNodes: catalogNodes, maxKeyLength: 37, root: root, depth: 2);
+            usedNodes: catalogNodes, maxKeyLength: 37, root: root, depth: depth);
         FirstFileRecordOffset = -1;
         for (var leaf = 1; leaf <= CatalogLeaves && FirstFileRecordOffset < 0; leaf++)
         {
@@ -238,6 +258,23 @@ internal sealed class HfsBuilder
 
         image.AsSpan(1024, 162).CopyTo(image.AsSpan(image.Length - 1024, 162));
         return image;
+    }
+
+    // Index records per index node: keys of at most 38 bytes and a node pointer, with their offsets, in 512 bytes.
+    private const int IndexRecordsPerNode = 11;
+
+    // The index nodes over that many leaves: one, or each level's nodes up to a single root.
+    private static int IndexNodesFor(int leaves)
+    {
+        var nodes = 0;
+        var records = leaves;
+        while (records > IndexRecordsPerNode)
+        {
+            records = (records + IndexRecordsPerNode - 1) / IndexRecordsPerNode;
+            nodes += records;
+        }
+
+        return nodes + 1;
     }
 
     private static byte[] ExtentRecord(List<(int Start, int Count)> extents)

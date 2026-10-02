@@ -252,6 +252,11 @@
   </Style>
   <Style Selector="TreeView.browse TreeViewItem">
     <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <VirtualizingStackPanel />
+      </ItemsPanelTemplate>
+    </Setter>
   </Style>
   <Style Selector="TreeView.browse TreeViewItem /template/ ContentPresenter#PART_HeaderPresenter">
     <Setter Property="HorizontalAlignment" Value="Stretch" />

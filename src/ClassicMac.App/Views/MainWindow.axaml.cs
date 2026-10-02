@@ -37,6 +37,7 @@ namespace ClassicMac.App.Views
             AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
             AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
             Tree.AddHandler(TextInputEvent, OnTreeTextInput, RoutingStrategies.Tunnel);
+            Tree.SelectionChanged += OnTreeSelectionChanged;
             Tree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
             // The image grid's rows hold as many cards as fit the scroller (P1).
             ImageScroller.SizeChanged += (_, e) =>
@@ -84,7 +85,10 @@ namespace ClassicMac.App.Views
         private DiagnosticsPanel? boundPanel;
 
         // "Show item": once the opened ancestors have their rows, the node's row scrolls into view and takes the focus.
-        private void ShowInTree(NodeViewModel node) => Dispatcher.UIThread.Post(() =>
+        private void ShowInTree(NodeViewModel node) => Dispatcher.UIThread.Post(() => ShowNode(node), DispatcherPriority.Background);
+
+        /// <summary>Scrolls the node's row into view and focuses it (its ancestors already open).</summary>
+        internal void ShowNode(NodeViewModel node)
         {
             Tree.UpdateLayout();
             if (ContainerOf(node) is not { } row)
@@ -94,13 +98,16 @@ namespace ClassicMac.App.Views
 
             row.BringIntoView();
             row.Focus();
-        }, DispatcherPriority.Background);
+        }
 
         // The tree row of a node: each ancestor's container holds the next one.
+        // The rows are virtualized (only those on screen exist): each level scrolls the next row into view first.
         private TreeViewItem? ContainerOf(NodeViewModel node)
         {
             if (node.Parent is null)
             {
+                Tree.ScrollIntoView(node);
+                Tree.UpdateLayout();
                 return Tree.ContainerFromItem(node) as TreeViewItem;
             }
 
@@ -109,6 +116,8 @@ namespace ClassicMac.App.Views
                 return null;
             }
 
+            parent.UpdateLayout();
+            parent.ScrollIntoView(node);
             parent.UpdateLayout();
             return parent.ContainerFromItem(node) as TreeViewItem;
         }
@@ -194,6 +203,38 @@ namespace ClassicMac.App.Views
 
             e.Handled = true;
             HexList.ScrollIntoView(editor.CursorLine);
+        }
+
+        // The tree's selection goes to the view-model (the binding only brings the view-model's to the tree). The rows are
+        // virtualized: when the selected node's rows are rebuilt (an applied edit) the tree drops its selection though the
+        // view-model has moved on to the new node, so a selection gone to nothing is put back rather than passed on.
+        private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (DataContext is not MainViewModel model)
+            {
+                return;
+            }
+
+            if (Tree.SelectedItem is NodeViewModel node)
+            {
+                if (!ReferenceEquals(model.Selected, node))
+                {
+                    model.Selected = node;
+                }
+
+                return;
+            }
+
+            if (model.Selected is { } selected)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (Tree.SelectedItem is null && ReferenceEquals(model.Selected, selected))
+                    {
+                        Tree.SelectedItem = selected;
+                    }
+                });
+            }
         }
 
         // A change the view-model refused (a selection or the template box, while it asks about unapplied edits) is

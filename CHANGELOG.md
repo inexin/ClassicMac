@@ -7,6 +7,9 @@
   states strip (five states, seven labels, captioned; 2× from zoom 2) with "Finder states"; a summary line ("3 members ·
   4× · nearest neighbour · 32-bit screen"). The cards are cut into rows for the pane's width in a virtualising list, so
   a 500-icon 'SICN' scrolls smoothly; a new preview starts at the top.
+- Viewer: the tree makes rows only for what is on screen, at every level, so a folder of 5,000 files opens in a
+  fraction of a second instead of about 20–30 s; going to an item (type-ahead, Show item) scrolls its row into view
+  through the levels, and an applied edit keeps the tree's selection.
 - Viewer: the sound preview (P3) has a round Play/Stop button (Space too), the playhead's time over the length, detail
   chips (rate, channels, sample, length, loop, base note, format), one 170 px lane per channel with the loop as a
   band, a 2 px playhead and a time ruler; a click on the waveform plays from there, "Repeat the loop" loops the sound's

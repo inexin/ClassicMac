@@ -1050,7 +1050,7 @@
           </StackPanel>
         </Border>
         <Panel>
-        <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}"
+        <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=OneWay}"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
           <TreeView.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
