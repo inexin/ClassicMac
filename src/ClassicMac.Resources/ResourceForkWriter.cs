@@ -24,11 +24,16 @@ namespace ClassicMac.Resources
         {
             var groups = fork.Types.Select(type => (Type: type, Resources: fork.OfType(type).ToList())).ToList();
             if (groups.Count > 0x10000)
+            {
                 throw new InvalidOperationException($"A resource fork holds at most 65536 types; this has {groups.Count}.");
+            }
+
             foreach (var (type, resources) in groups)
             {
                 if (resources.Count > 0x10000)
+                {
                     throw new InvalidOperationException($"A type holds at most 65536 resources; '{type}' has {resources.Count}.");
+                }
             }
 
             // Data area: packed in placement order; unmodified data that shared a place still shares one item.
@@ -44,7 +49,11 @@ namespace ClassicMac.Resources
                     continue;
                 }
                 dataOffsets[resource] = (int)dataLength;
-                if (!resource.DataModified) shared[resource.DataPlacement] = (int)dataLength;
+                if (!resource.DataModified)
+                {
+                    shared[resource.DataPlacement] = (int)dataLength;
+                }
+
                 items.Add((resource, (int)dataLength));
                 dataLength += 4 + resource.Length;
             }
@@ -56,7 +65,10 @@ namespace ClassicMac.Resources
             foreach (var resource in named)
             {
                 if (namesLength >= NoName)
+                {
                     throw new InvalidOperationException("The names exceed the 64 KiB a name list can address.");
+                }
+
                 nameOffsets[resource] = namesLength;
                 namesLength += 1 + resource.Name!.Value.Length;
             }
@@ -66,7 +78,10 @@ namespace ClassicMac.Resources
             var referencesLength = fork.Resources.Count * ReferenceEntryLength;
             var nameListOffset = MapHeaderLength + typeListLength + referencesLength;
             if (nameListOffset > ushort.MaxValue)
+            {
                 throw new InvalidOperationException("The type and reference lists exceed the 64 KiB a map can address.");
+            }
+
             var mapLength = nameListOffset + namesLength;
 
             var dataOffset = ReservedEnd;
@@ -76,7 +91,9 @@ namespace ClassicMac.Resources
             // Resource Manager refuses to grow one that far (eofErr): so no fork ends past it (disassembly of CheckMap
             // and CheckGrow).
             if (total > MaxForkEnd)
+            {
                 throw new InvalidOperationException($"The fork would be {total} bytes; the Resource Manager opens none that end past $FFFFFE.");
+            }
 
             // Written in file order; every offset above is already known.
             var writer = new BigEndianWriter((int)total);
@@ -102,13 +119,17 @@ namespace ClassicMac.Resources
             foreach (var (type, resources) in groups)
             {
                 if (referenceOffset > ushort.MaxValue)
+                {
                     throw new InvalidOperationException("The reference lists exceed the 64 KiB a type list can address.");
+                }
+
                 writer.WriteFourCC(type);
                 writer.WriteUInt16(resources.Count - 1);
                 writer.WriteUInt16(referenceOffset);
                 referenceOffset += resources.Count * ReferenceEntryLength;
             }
             foreach (var (_, resources) in groups)
+            {
                 foreach (var resource in resources)
                 {
                     writer.WriteInt16(resource.Id);
@@ -116,6 +137,7 @@ namespace ClassicMac.Resources
                     writer.WriteUInt32((uint)dataOffsets[resource] | (uint)(resource.Attributes & ~ResourceAttributes.Changed) << 24);
                     writer.WriteUInt32(resource.StoredHandle);
                 }
+            }
 
             foreach (var resource in named)
             {

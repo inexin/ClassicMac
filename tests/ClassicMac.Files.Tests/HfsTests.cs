@@ -2,8 +2,8 @@ using System.Buffers.Binary;
 using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Files.Hfs;
-using static ClassicMac.Files.Tests.Fixtures;
 using ClassicMac.Tests;
+using static ClassicMac.Files.Tests.Fixtures;
 
 namespace ClassicMac.Files.Tests;
 
@@ -128,8 +128,10 @@ public class HfsTests
         var builder = new HfsBuilder();
         var finder = new FinderInfo
         {
-            Type = FourCC.FromString("APPL"), Creator = FourCC.FromString("ABCD"),
-            Flags = FinderFlags.HasCustomIcon, Location = new MacPoint(12, 34),
+            Type = FourCC.FromString("APPL"),
+            Creator = FourCC.FromString("ABCD"),
+            Flags = FinderFlags.HasCustomIcon,
+            Location = new MacPoint(12, 34),
         };
         builder.File(HfsBuilder.Root, "App", [], [], info: finder);
 
@@ -244,9 +246,13 @@ public class HfsTests
         byte[] image = Sample().Image;
         int treeOffset = GetHfsTreeOffset(image, catalogTree: true);
         if (invalidRoot)
+        {
             BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(treeOffset + 14 + 2), uint.MaxValue);
+        }
         else
+        {
             BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(treeOffset + 14), 0);
+        }
 
         var (files, diagnostics) = Read(image);
 
@@ -555,9 +561,13 @@ public class HfsTests
     {
         var (image, treeOffset, mapNodeOffset) = ClassicHfsMapContinuationFixture();
         if (cycle)
+        {
             BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(mapNodeOffset), 2048);
+        }
         else
+        {
             BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(treeOffset), 2049);
+        }
 
         var (files, diagnostics) = Read(image);
 
@@ -985,7 +995,9 @@ public class HfsTests
     public void Corpus_disk_images_read_cleanly()
     {
         if (!CorpusFolders.Any)
+        {
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of disk images to run this.");
+        }
 
         string[] extensions = [".img", ".dsk", ".hfv", ".image", ".dc42"];
         var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
@@ -1107,7 +1119,9 @@ public class HfsTests
                 int dataStart = start + 1 + image[nodeOffset + start];
                 dataStart = (dataStart + 1) & ~1;
                 if (dataStart < end && image[nodeOffset + dataStart] == recordType)
+                {
                     offsets.Add(nodeOffset + dataStart);
+                }
             }
         }
         return offsets;

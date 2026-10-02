@@ -38,12 +38,20 @@ namespace ClassicMac.App.Audio
             ArgumentNullException.ThrowIfNull(sound);
             ArgumentNullException.ThrowIfNull(ended);
             Stop();
-            if (!Open()) return;
+            if (!Open())
+            {
+                return;
+            }
+
             provider = new RawDataProvider(Convert(sound), DeviceFormat.SampleRate);
             var current = player = new SoundPlayer(engine!, DeviceFormat, provider);
             current.PlaybackEnded += (_, _) => Dispatcher.UIThread.Post(() =>
             {
-                if (!ReferenceEquals(player, current)) return;
+                if (!ReferenceEquals(player, current))
+                {
+                    return;
+                }
+
                 Stop();
                 ended();
             });
@@ -75,8 +83,16 @@ namespace ClassicMac.App.Audio
 
         private bool Open()
         {
-            if (device is not null) return true;
-            if (unavailable is not null) return false;
+            if (device is not null)
+            {
+                return true;
+            }
+
+            if (unavailable is not null)
+            {
+                return false;
+            }
+
             try
             {
                 engine = new MiniAudioEngine();
@@ -98,7 +114,11 @@ namespace ClassicMac.App.Audio
         {
             var rate = DeviceFormat.SampleRate;
             var inFrames = sound.Frames;
-            if (inFrames == 0 || sound.SampleRate <= 0) return [];
+            if (inFrames == 0 || sound.SampleRate <= 0)
+            {
+                return [];
+            }
+
             var outFrames = (int)Math.Min(int.MaxValue / 2, (long)Math.Ceiling(inFrames * rate / sound.SampleRate));
             var output = new float[outFrames * 2];
             var step = sound.SampleRate / rate;

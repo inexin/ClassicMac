@@ -29,7 +29,11 @@ namespace ClassicMac.App.Views
             {
                 TextAlignment = alignment,
             };
-            if (maxWidth is { } width) formatted.MaxTextWidth = Math.Max(1, width);
+            if (maxWidth is { } width)
+            {
+                formatted.MaxTextWidth = Math.Max(1, width);
+            }
+
             return formatted;
         }
 
@@ -87,7 +91,11 @@ namespace ClassicMac.App.Views
 
         public override void Render(DrawingContext context)
         {
-            if (Dialog is not { } dialog || bitmap is null) return;
+            if (Dialog is not { } dialog || bitmap is null)
+            {
+                return;
+            }
+
             var scale = PixelScaling.Scale(Scale, RenderScaling);
             using var snap = PushSnap(context);
             context.DrawImage(bitmap, new Rect(Gutter * scale, Gutter * scale, dialog.PixelWidth * scale, dialog.PixelHeight * scale));
@@ -140,7 +148,11 @@ namespace ClassicMac.App.Views
 
         public override void Render(DrawingContext context)
         {
-            if (Menu is not { } menu) return;
+            if (Menu is not { } menu)
+            {
+                return;
+            }
+
             var pixel = PixelScaling.Scale(Scale, RenderScaling);
             using var snap = PushSnap(context);
             using var scale = context.PushTransform(Matrix.CreateScale(pixel, pixel));
@@ -172,10 +184,15 @@ namespace ClassicMac.App.Views
                 var text = MacLook.Text(item.Text, brush, Face(item.Face));
                 var baseline = y + (Row - text.Height) / 2;
                 if (item.Mark != 0 && item.Submenu is null && item.KeyEquivalent != 0x1A)
+                {
                     context.DrawText(MacLook.Text(InterfaceNames.Chicago(((char)item.Mark).ToString()), brush), new Point(box.X + 4, baseline));
+                }
+
                 context.DrawText(text, new Point(box.X + Left, baseline));
                 if (item.Submenu is not null)
+                {
                     context.DrawText(MacLook.Text("▶", brush), new Point(box.Right - 16, baseline));
+                }
                 else if (KeyText(item) is { } key)
                 {
                     var keyText = MacLook.Text(key, brush);

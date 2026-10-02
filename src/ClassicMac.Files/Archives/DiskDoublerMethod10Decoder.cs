@@ -14,7 +14,11 @@ internal static class DiskDoublerMethod10Decoder
 
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
-        if (outputLength < 0) throw new ArgumentOutOfRangeException(nameof(outputLength));
+        if (outputLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(outputLength));
+        }
+
         byte[] output = new byte[outputLength];
         int inputOffset = 0;
         int outputOffset = 0;
@@ -22,13 +26,21 @@ internal static class DiskDoublerMethod10Decoder
         while (outputOffset < output.Length)
         {
             if (input.Length - inputOffset < BlockHeaderLength)
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 block header is truncated.");
+            }
 
             ReadOnlySpan<byte> header = input.Slice(inputOffset, BlockHeaderLength);
             int expectedHeaderXor = 0;
-            for (int index = 0; index < BlockHeaderLength - 1; index++) expectedHeaderXor ^= header[index];
+            for (int index = 0; index < BlockHeaderLength - 1; index++)
+            {
+                expectedHeaderXor ^= header[index];
+            }
+
             if (expectedHeaderXor != header[^1])
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 block header checksum is invalid.");
+            }
 
             int blockLength = checked((int)U32(header, 0));
             int literalCount = U16(header, 4);
@@ -39,13 +51,18 @@ internal static class DiskDoublerMethod10Decoder
             byte flags = header[14];
             byte expectedBlockXor = header[19];
             if (blockLength is 0 or > MaximumBlockLength || blockLength > output.Length - outputOffset)
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 block has an invalid expanded length.");
+            }
 
             int dataOffset = checked(inputOffset + BlockHeaderLength);
             if ((flags & 0x40) != 0)
             {
                 if (blockLength > input.Length - dataOffset)
+                {
                     throw new InvalidDataException("A raw DiskDoubler method-10 block is truncated.");
+                }
+
                 input.Slice(dataOffset, blockLength).CopyTo(output.AsSpan(outputOffset));
                 dataOffset += blockLength;
             }
@@ -53,10 +70,15 @@ internal static class DiskDoublerMethod10Decoder
             {
                 long compressedLength = (long)offsetStreamLength + literalStreamLength + lengthStreamLength;
                 if (compressedLength > input.Length - dataOffset)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 block extends past its fork.");
+                }
+
                 if (literalCount > blockLength || offsetCount > blockLength ||
                     literalCount + 2L * offsetCount > MaximumBlockLength)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 block has invalid token counts.");
+                }
 
                 ReadOnlySpan<byte> offsetStream = input.Slice(dataOffset, offsetStreamLength);
                 ReadOnlySpan<byte> literalStream = input.Slice(dataOffset + offsetStreamLength, literalStreamLength);
@@ -68,9 +90,15 @@ internal static class DiskDoublerMethod10Decoder
             }
 
             int actualBlockXor = 0;
-            for (int index = 0; index < blockLength; index++) actualBlockXor ^= output[outputOffset + index];
+            for (int index = 0; index < blockLength; index++)
+            {
+                actualBlockXor ^= output[outputOffset + index];
+            }
+
             if (actualBlockXor != expectedBlockXor)
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 block checksum is invalid.");
+            }
 
             outputOffset = checked(outputOffset + blockLength);
             inputOffset = dataOffset;
@@ -99,7 +127,10 @@ internal static class DiskDoublerMethod10Decoder
 
                 int extraBits = slot / 2 - 1;
                 if (extraBits > 15)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 offset code is out of range.");
+                }
+
                 int start = ((2 + (slot & 1)) << extraBits) + 1;
                 offsets[index] = checked(start + (int)bits.ReadBits(extraBits));
             }
@@ -113,12 +144,17 @@ internal static class DiskDoublerMethod10Decoder
                 var bits = new MsbBitReader(literalStream);
                 HuffmanCode code = ReadCode(ref bits);
                 for (int index = 0; index < literals.Length; index++)
+                {
                     literals[index] = checked((byte)code.ReadSymbol(ref bits));
+                }
             }
             else
             {
                 if (literalCount > literalStream.Length)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 literal stream is truncated.");
+                }
+
                 literalStream[..literalCount].CopyTo(literals);
             }
         }
@@ -135,22 +171,34 @@ internal static class DiskDoublerMethod10Decoder
             if (code == 0)
             {
                 if (literalIndex >= literals.Length)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 token references a missing literal.");
+                }
+
                 output[position++] = literals[literalIndex++];
             }
             else if (code < 128)
             {
                 if (offsetIndex >= offsets.Length)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 token references a missing offset.");
+                }
+
                 int distance = offsets[offsetIndex++];
                 int length = Math.Min(code + 2, blockEnd - position);
                 if (distance <= 0 || distance > position)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 match reaches before its history window.");
+                }
+
                 for (int index = 0; index < length; index++)
                 {
                     int source = position - distance;
                     if (position - source > WindowLength)
+                    {
                         throw new InvalidDataException("A DiskDoubler method-10 match exceeds its history window.");
+                    }
+
                     output[position++] = output[source];
                 }
             }
@@ -158,10 +206,16 @@ internal static class DiskDoublerMethod10Decoder
             {
                 int exponent = code - 128;
                 if (exponent > 16)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 literal run is too long.");
+                }
+
                 int length = Math.Min(1 << exponent, blockEnd - position);
                 if (length > literals.Length - literalIndex)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 literal run is truncated.");
+                }
+
                 literals.AsSpan(literalIndex, length).CopyTo(output.AsSpan(position));
                 literalIndex += length;
                 position += length;
@@ -179,7 +233,9 @@ internal static class DiskDoublerMethod10Decoder
         bool zeroCoded = (header & 0x04) != 0;
         int tableEnd = checked(bits.BytePosition + codeBytes);
         if (maximumLength is 0 or > 31 || lengthBits is 0 or > 31 || tableEnd > bits.Length)
+        {
             throw new InvalidDataException("A DiskDoubler method-10 Huffman table header is invalid.");
+        }
 
         byte[] lengths = new byte[symbolCount];
         for (int index = 0; index < lengths.Length; index++)
@@ -192,7 +248,10 @@ internal static class DiskDoublerMethod10Decoder
             }
             length = checked((int)bits.ReadBits(lengthBits));
             if (length > maximumLength)
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 Huffman code exceeds its maximum length.");
+            }
+
             lengths[index] = (byte)length;
         }
 
@@ -216,14 +275,21 @@ internal static class DiskDoublerMethod10Decoder
         {
             int[] counts = new int[maximumLength + 1];
             foreach (byte length in lengths)
-                if (length != 0) counts[length]++;
+            {
+                if (length != 0)
+                {
+                    counts[length]++;
+                }
+            }
 
             long remaining = 1;
             for (int length = 1; length <= maximumLength; length++)
             {
                 remaining = checked((remaining << 1) - counts[length]);
                 if (remaining < 0)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 Huffman tree is oversubscribed.");
+                }
             }
 
             long[] nextCode = new long[maximumLength + 1];
@@ -238,25 +304,43 @@ internal static class DiskDoublerMethod10Decoder
             for (int symbol = 0; symbol < lengths.Length; symbol++)
             {
                 int length = lengths[symbol];
-                if (length == 0) continue;
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 long symbolCode = nextCode[length]++;
                 if (symbolCode >= 1L << length)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 Huffman code is invalid.");
+                }
+
                 Node node = root ??= new Node();
                 for (int bit = length - 1; bit >= 0; bit--)
                 {
                     if (node.Symbol >= 0)
+                    {
                         throw new InvalidDataException("A DiskDoubler method-10 Huffman tree is not prefix-free.");
+                    }
+
                     bool one = ((symbolCode >> bit) & 1) != 0;
                     Node child;
                     if (one)
+                    {
                         child = node.One ??= new Node();
+                    }
                     else
+                    {
                         child = node.Zero ??= new Node();
+                    }
+
                     node = child;
                 }
                 if (node.Symbol >= 0 || node.Zero is not null || node.One is not null)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 Huffman tree has duplicate codes.");
+                }
+
                 node.Symbol = symbol;
             }
             return new HuffmanCode(root);
@@ -265,13 +349,19 @@ internal static class DiskDoublerMethod10Decoder
         public int ReadSymbol(ref MsbBitReader bits)
         {
             Node? node = _root;
-            if (node is null) throw new InvalidDataException("A DiskDoubler method-10 stream uses an empty Huffman tree.");
+            if (node is null)
+            {
+                throw new InvalidDataException("A DiskDoubler method-10 stream uses an empty Huffman tree.");
+            }
+
             while (node.Symbol < 0)
             {
                 bool one = bits.ReadBit();
                 node = one ? node.One : node.Zero;
                 if (node is null)
+                {
                     throw new InvalidDataException("A DiskDoubler method-10 stream uses an undefined Huffman code.");
+                }
             }
             return node.Symbol;
         }
@@ -295,7 +385,10 @@ internal static class DiskDoublerMethod10Decoder
         public bool ReadBit()
         {
             if (_bitPosition >= _input.Length * 8)
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 Huffman stream is truncated.");
+            }
+
             bool value = (_input[_bitPosition >> 3] & (0x80 >> (_bitPosition & 7))) != 0;
             _bitPosition++;
             return value;
@@ -304,14 +397,21 @@ internal static class DiskDoublerMethod10Decoder
         public uint ReadBits(int count)
         {
             uint value = 0;
-            for (int index = 0; index < count; index++) value = (value << 1) | (ReadBit() ? 1u : 0u);
+            for (int index = 0; index < count; index++)
+            {
+                value = (value << 1) | (ReadBit() ? 1u : 0u);
+            }
+
             return value;
         }
 
         public void SkipToByte(int bytePosition)
         {
             if (bytePosition < BytePosition || bytePosition > _input.Length)
+            {
                 throw new InvalidDataException("A DiskDoubler method-10 Huffman table has an invalid byte length.");
+            }
+
             _bitPosition = checked(bytePosition * 8);
         }
     }

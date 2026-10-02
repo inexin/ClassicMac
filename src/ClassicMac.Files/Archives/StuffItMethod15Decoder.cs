@@ -41,10 +41,15 @@ internal static class StuffItMethod15Decoder
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
         if (outputLength < 0)
+        {
             throw new InvalidDataException("A StuffIt method 15 fork has a negative expanded length.");
+        }
+
         var reader = new ArithmeticReader(input);
         if ((byte)reader.ReadInitialBits(8) != (byte)'A' || (byte)reader.ReadInitialBits(8) != (byte)'s')
+        {
             throw new InvalidDataException("A StuffIt method 15 stream has an invalid signature.");
+        }
 
         // 4 bits: blocks of 2^9 to 2^24 bytes.
         int blockBits = 9 + (int)reader.ReadInitialBits(4);
@@ -59,19 +64,29 @@ internal static class StuffItMethod15Decoder
             int primaryIndex = (int)reader.ReadInitialBits(blockBits);
             int length = DecodeBlock(reader, state, maximumBlockLength);
             if (length == 0 || primaryIndex >= length)
+            {
                 throw new InvalidDataException("A StuffIt method 15 block has an invalid BWT index.");
+            }
 
             Span<byte> block = InverseBurrowsWheeler(state, length, primaryIndex);
             if (randomized)
+            {
                 Derandomize(block);
+            }
+
             written = AppendRunExpanded(block, output, written);
         }
 
         uint storedCrc = reader.ReadInitialBits(32);
         if (storedCrc != Crc32.Compute(output.AsSpan(0, written)))
+        {
             throw new InvalidDataException("A StuffIt method 15 fork has an invalid CRC-32.");
+        }
+
         if (written != outputLength)
+        {
             throw new InvalidDataException($"StuffIt method 15 produced {written} of {outputLength} declared bytes.");
+        }
 
         return output;
     }
@@ -91,14 +106,24 @@ internal static class StuffItMethod15Decoder
         public void Reset()
         {
             Selector.Reset();
-            foreach (var model in Models) model.Reset();
+            foreach (var model in Models)
+            {
+                model.Reset();
+            }
+
             for (int index = 0; index < MoveToFront.Length; index++)
+            {
                 MoveToFront[index] = (byte)index;
+            }
         }
 
         public void Reserve(int length, int maximumLength)
         {
-            if (length <= LastColumn.Length) return;
+            if (length <= LastColumn.Length)
+            {
+                return;
+            }
+
             var larger = new byte[(int)Math.Min(Math.Max((long)LastColumn.Length * 2, length), maximumLength)];
             LastColumn.AsSpan().CopyTo(larger);
             LastColumn = larger;
@@ -126,12 +151,18 @@ internal static class StuffItMethod15Decoder
                 else
                 {
                     if (zeroState > maximumLength / 2)
+                    {
                         throw new InvalidDataException("A StuffIt method 15 zero run exceeds its block size.");
+                    }
+
                     zeroState *= 2;
                     zeroCount += symbol == 0 ? zeroState : 2L * zeroState;
                 }
                 if (zeroCount > maximumLength - count)
+                {
                     throw new InvalidDataException("A StuffIt method 15 block exceeds its declared block size.");
+                }
+
                 continue;
             }
 
@@ -146,11 +177,15 @@ internal static class StuffItMethod15Decoder
             }
 
             if (symbol == 10)
+            {
                 return count;
+            }
 
             int mtfIndex = symbol == 2 ? 1 : reader.Decode(state.Models[symbol - 3]);
             if (count == maximumLength)
+            {
                 throw new InvalidDataException("A StuffIt method 15 block exceeds its declared block size.");
+            }
 
             byte value = moveToFront[mtfIndex];
             state.Reserve(count + 1, maximumLength);
@@ -165,7 +200,10 @@ internal static class StuffItMethod15Decoder
         ReadOnlySpan<byte> lastColumn = state.LastColumn.AsSpan(0, length);
         Span<int> nextPositions = stackalloc int[256];
         foreach (byte value in lastColumn)
+        {
             nextPositions[value]++;
+        }
+
         int cumulative = 0;
         for (int value = 0; value < 256; value++)
         {
@@ -174,11 +212,21 @@ internal static class StuffItMethod15Decoder
             cumulative += count;
         }
 
-        if (state.Next.Length < length) state.Next = new int[Math.Max(length, state.Next.Length * 2)];
-        if (state.Block.Length < length) state.Block = new byte[Math.Max(length, state.Block.Length * 2)];
+        if (state.Next.Length < length)
+        {
+            state.Next = new int[Math.Max(length, state.Next.Length * 2)];
+        }
+
+        if (state.Block.Length < length)
+        {
+            state.Block = new byte[Math.Max(length, state.Block.Length * 2)];
+        }
+
         var next = state.Next;
         for (int index = 0; index < length; index++)
+        {
             next[nextPositions[lastColumn[index]]++] = index;
+        }
 
         var output = state.Block.AsSpan(0, length);
         int row = next[primaryIndex];
@@ -214,19 +262,31 @@ internal static class StuffItMethod15Decoder
             {
                 index += 3;
                 if (index == block.Length)
+                {
                     throw new InvalidDataException("A StuffIt method 15 run is missing its repeat count.");
+                }
+
                 int repeatCount = block[index++];
                 if (output.Length - written < 4)
+                {
                     throw new InvalidDataException("StuffIt method 15 output exceeds its declared fork length.");
+                }
+
                 if (repeatCount > output.Length - written - 4)
+                {
                     throw new InvalidDataException("A StuffIt method 15 run exceeds its declared fork length.");
+                }
+
                 output.AsSpan(written, 4 + repeatCount).Fill(value);
                 written += 4 + repeatCount;
             }
             else
             {
                 if (written == output.Length)
+                {
                     throw new InvalidDataException("StuffIt method 15 output exceeds its declared fork length.");
+                }
+
                 output[written++] = value;
             }
         }
@@ -273,7 +333,9 @@ internal static class StuffItMethod15Decoder
             _frequencies[index] += increment;
             _total += increment;
             if (_total <= frequencyLimit)
+            {
                 return;
+            }
 
             _total = 0;
             for (int frequencyIndex = 0; frequencyIndex < _frequencies.Length; frequencyIndex++)
@@ -301,7 +363,9 @@ internal static class StuffItMethod15Decoder
             _bitLength = _input.LongLength * 8;
             _initialModel.Reset();
             for (int bit = 0; bit < 26; bit++)
+            {
                 _code = (_code << 1) | ReadBit();
+            }
         }
 
         public int ReadInitialBit() => Decode(_initialModel);
@@ -310,7 +374,10 @@ internal static class StuffItMethod15Decoder
         {
             uint value = 0;
             for (int bit = 0; bit < count; bit++)
+            {
                 value |= (uint)Decode(_initialModel) << bit;
+            }
+
             return value;
         }
 
@@ -319,12 +386,16 @@ internal static class StuffItMethod15Decoder
             int total = model.Total;
             int scale = _range / total;
             if (scale == 0)
+            {
                 throw new InvalidDataException("A StuffIt method 15 arithmetic model exceeds its range.");
+            }
             // The last symbol owns the rest of the range (range - scale * Total, below), so a code past
             // scale * Total selects it rather than being invalid.
             int frequency = Math.Min(_code / scale, total - 1);
             if (frequency < 0)
+            {
                 throw new InvalidDataException("A StuffIt method 15 arithmetic code is invalid.");
+            }
 
             int index = model.FindSymbol(frequency, out int low, out int high);
             int lowIncrement = scale * low;
@@ -343,7 +414,10 @@ internal static class StuffItMethod15Decoder
         {
             long position = _bitPosition;
             if (position >= _bitLength)
+            {
                 throw new InvalidDataException("A StuffIt method 15 fork ends inside its arithmetic bitstream.");
+            }
+
             _bitPosition = position + 1;
             return (_input[position >> 3] >> (7 - (int)(position & 7))) & 1;
         }

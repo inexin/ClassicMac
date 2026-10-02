@@ -1,6 +1,6 @@
 using System;
-using System.IO;
 using System.Buffers.Binary;
+using System.IO;
 namespace ClassicMac.Core
 {
     /// <summary>
@@ -24,14 +24,21 @@ namespace ClassicMac.Core
         {
             var raw = Math.Round(value * 65536.0, MidpointRounding.AwayFromZero);
             if (raw is < int.MinValue or > int.MaxValue)
+            {
                 throw new ArgumentOutOfRangeException(nameof(value), "A Fixed holds −32768 up to just under 32768.");
+            }
+
             return new Fixed((int)raw);
         }
 
         /// <summary>Reads a big-endian <c>Fixed</c>.</summary>
         public static Fixed Read(ReadOnlySpan<byte> source)
         {
-            if (source.Length < 4) throw new EndOfStreamException();
+            if (source.Length < 4)
+            {
+                throw new EndOfStreamException();
+            }
+
             return new(BinaryPrimitives.ReadInt32BigEndian(source));
         }
 
@@ -75,14 +82,21 @@ namespace ClassicMac.Core
         {
             var raw = Math.Round(value * 65536.0, MidpointRounding.AwayFromZero);
             if (raw is < 0 or > uint.MaxValue)
+            {
                 throw new ArgumentOutOfRangeException(nameof(value), "An UnsignedFixed holds 0 up to just under 65536.");
+            }
+
             return new UnsignedFixed((uint)raw);
         }
 
         /// <summary>Reads a big-endian <c>UnsignedFixed</c>.</summary>
         public static UnsignedFixed Read(ReadOnlySpan<byte> source)
         {
-            if (source.Length < 4) throw new EndOfStreamException();
+            if (source.Length < 4)
+            {
+                throw new EndOfStreamException();
+            }
+
             return new(BinaryPrimitives.ReadUInt32BigEndian(source));
         }
 

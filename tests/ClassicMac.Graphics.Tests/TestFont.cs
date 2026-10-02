@@ -1,8 +1,8 @@
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
 namespace ClassicMac.Graphics.Tests;
@@ -19,7 +19,11 @@ internal static class TestFont
         int first = glyphs.Min(g => g.Char), last = glyphs.Max(g => g.Char);
         int height = ascent + descent;
         var all = new List<Glyph?>();
-        for (int c = first; c <= last; c++) all.Add(glyphs.FirstOrDefault(g => g.Char == c));
+        for (int c = first; c <= last; c++)
+        {
+            all.Add(glyphs.FirstOrDefault(g => g.Char == c));
+        }
+
         all.Add(missing);                                               // the missing symbol
         int stripWidth = all.Sum(g => g == null ? 0 : ImageWidth(g));
         int rowWords = Math.Max(1, (stripWidth + 15) / 16);
@@ -30,11 +34,23 @@ internal static class TestFont
         foreach (var g in all)
         {
             locs.Add(x);
-            if (g == null) { ows.Add(-1); continue; }
+            if (g == null)
+            {
+                ows.Add(-1);
+                continue;
+            }
             int w = ImageWidth(g);
             for (int r = 0; r < g.Rows.Length && r < height; r++)
+            {
                 for (int i = 0; i < g.Rows[r].Length; i++)
-                    if (g.Rows[r][i] == '#') strike[r * rowWords * 2 + ((x + i) >> 3)] |= (byte)(0x80 >> ((x + i) & 7));
+                {
+                    if (g.Rows[r][i] == '#')
+                    {
+                        strike[r * rowWords * 2 + ((x + i) >> 3)] |= (byte)(0x80 >> ((x + i) & 7));
+                    }
+                }
+            }
+
             ows.Add((g.Offset << 8) | g.Width);
             x += w;
         }
@@ -42,17 +58,45 @@ internal static class TestFont
         ows.Add(-1);
 
         var b = new List<byte>();
-        void W(int v) { b.Add((byte)(v >> 8)); b.Add((byte)v); }
+        void W(int v)
+        {
+            b.Add((byte)(v >> 8));
+            b.Add((byte)v);
+        }
         int entries = last - first + 3;
         int owTLoc = (26 - 16 + strike.Length + entries * 2) / 2;       // words from offset 16 to the OW table
-        W(0x9000 | (heightTable ? 1 : 0)); W(first); W(last); W(glyphs.Max(g => g.Width)); W(kernMax); W(-descent);
-        W(stripWidth); W(height); W(owTLoc); W(ascent); W(descent); W(leading); W(rowWords);
+        W(0x9000 | (heightTable ? 1 : 0));
+        W(first);
+        W(last);
+        W(glyphs.Max(g => g.Width));
+        W(kernMax);
+        W(-descent);
+        W(stripWidth);
+        W(height);
+        W(owTLoc);
+        W(ascent);
+        W(descent);
+        W(leading);
+        W(rowWords);
         b.AddRange(strike);
-        foreach (var l in locs) W(l);
-        foreach (var o in ows) W(o);
+        foreach (var l in locs)
+        {
+            W(l);
+        }
+
+        foreach (var o in ows)
+        {
+            W(o);
+        }
+
         if (heightTable)
+        {
             foreach (var g in all.Append(null))
+            {
                 W(g == null ? 0 : height);                               // top 0, full height
+            }
+        }
+
         return b.ToArray();
     }
 
@@ -84,7 +128,10 @@ internal static class TestFont
             foreach (var (r, i) in group)
             {
                 refLists.AddRange(BE16(r.id));
-                if (r.name == null) refLists.AddRange(BE16(0xFFFF));
+                if (r.name == null)
+                {
+                    refLists.AddRange(BE16(0xFFFF));
+                }
                 else
                 {
                     refLists.AddRange(BE16(names.Count));
@@ -92,7 +139,9 @@ internal static class TestFont
                     names.AddRange(System.Text.Encoding.ASCII.GetBytes(r.name));
                 }
                 refLists.Add(0);
-                refLists.Add((byte)(offsets[i] >> 16)); refLists.Add((byte)(offsets[i] >> 8)); refLists.Add((byte)offsets[i]);
+                refLists.Add((byte)(offsets[i] >> 16));
+                refLists.Add((byte)(offsets[i] >> 8));
+                refLists.Add((byte)offsets[i]);
                 refLists.AddRange(BE32(0));
             }
         }
@@ -105,7 +154,10 @@ internal static class TestFont
         map.AddRange(names);
         int dataOffset = 256, mapOffset = dataOffset + data.Count;
         var fork = new List<byte>();
-        fork.AddRange(BE32(dataOffset)); fork.AddRange(BE32(mapOffset)); fork.AddRange(BE32(data.Count)); fork.AddRange(BE32(map.Count));
+        fork.AddRange(BE32(dataOffset));
+        fork.AddRange(BE32(mapOffset));
+        fork.AddRange(BE32(data.Count));
+        fork.AddRange(BE32(map.Count));
         fork.AddRange(new byte[dataOffset - 16]);
         fork.AddRange(data);
         fork.AddRange(map);
@@ -124,19 +176,47 @@ internal static class TestFont
         params (int size, int style, int fontId)[] entries)
     {
         var b = new List<byte>();
-        void W(int v) { b.Add((byte)(v >> 8)); b.Add((byte)v); }
-        W(flags); W(familyId); W(firstChar); W(lastChar);
-        for (int i = 0; i < 4; i++) W(0);                                  // ascent, descent, leading, widMax
+        void W(int v)
+        {
+            b.Add((byte)(v >> 8));
+            b.Add((byte)v);
+        }
+        W(flags);
+        W(familyId);
+        W(firstChar);
+        W(lastChar);
+        for (int i = 0; i < 4; i++)
+        {
+            W(0);                                  // ascent, descent, leading, widMax
+        }
+
         int wTabOff = widthTables.Length == 0 ? 0 : 54 + 6 * entries.Length;
-        W(wTabOff >> 16); W(wTabOff);                                       // ffWTabOff at 16
-        for (int i = 0; i < 15; i++) W(0);                                 // kern/style offsets, properties, intl
+        W(wTabOff >> 16);
+        W(wTabOff);                                       // ffWTabOff at 16
+        for (int i = 0; i < 15; i++)
+        {
+            W(0);                                 // kern/style offsets, properties, intl
+        }
+
         W(0);                                                              // ffVersion at 50
         W(entries.Length - 1);
-        foreach (var (size, style, id) in entries) { W(size); W(style); W(id); }
+        foreach (var (size, style, id) in entries)
+        {
+            W(size);
+            W(style);
+            W(id);
+        }
         if (widthTables.Length > 0)
         {
             W(widthTables.Length - 1);
-            foreach (var (style, words) in widthTables) { W(style); foreach (var w in words) W(w); }
+            foreach (var (style, words) in widthTables)
+            {
+                W(style);
+                foreach (var w in words)
+                {
+                    W(w);
+                }
+            }
         }
         return b.ToArray();
     }

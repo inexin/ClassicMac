@@ -50,12 +50,19 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanPlaySound))]
         private void PlaySound()
         {
-            if (Preview.Sound is not { } sound || AudioPlayer is not { } player) return;
+            if (Preview.Sound is not { } sound || AudioPlayer is not { } player)
+            {
+                return;
+            }
+
             var playing = Preview;
             IsPlaying = true;
             player.Play(sound, () =>
             {
-                if (ReferenceEquals(Preview, playing)) IsPlaying = false;
+                if (ReferenceEquals(Preview, playing))
+                {
+                    IsPlaying = false;
+                }
             });
             if (player.Unavailable is { } why)
             {
@@ -75,7 +82,8 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnPreviewChanging(PreviewViewModel value)
         {
-            if (IsPlaying) StopSound();
+            if (IsPlaying)
+                StopSound();
         }
     }
 }

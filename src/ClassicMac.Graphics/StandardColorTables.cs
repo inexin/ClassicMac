@@ -58,14 +58,40 @@ namespace ClassicMac.Graphics
             var table = new RgbaColor[256];
             int i = 0;
             for (int r = 5; r >= 0; r--)
+            {
                 for (int g = 5; g >= 0; g--)
+                {
                     for (int b = 5; b >= 0; b--)
-                        if (i < 215) table[i++] = Rgb(r * 0x33, g * 0x33, b * 0x33);
+                    {
+                        if (i < 215)
+                        {
+                            table[i++] = Rgb(r * 0x33, g * 0x33, b * 0x33);
+                        }
+                    }
+                }
+            }
+
             int[] ramp = { 0xEE, 0xDD, 0xBB, 0xAA, 0x88, 0x77, 0x55, 0x44, 0x22, 0x11 };
-            foreach (var v in ramp) table[i++] = Rgb(v, 0, 0);
-            foreach (var v in ramp) table[i++] = Rgb(0, v, 0);
-            foreach (var v in ramp) table[i++] = Rgb(0, 0, v);
-            foreach (var v in ramp) table[i++] = Rgb(v, v, v);
+            foreach (var v in ramp)
+            {
+                table[i++] = Rgb(v, 0, 0);
+            }
+
+            foreach (var v in ramp)
+            {
+                table[i++] = Rgb(0, v, 0);
+            }
+
+            foreach (var v in ramp)
+            {
+                table[i++] = Rgb(0, 0, v);
+            }
+
+            foreach (var v in ramp)
+            {
+                table[i++] = Rgb(v, v, v);
+            }
+
             table[255] = Rgb(0, 0, 0);
             return table;
         }

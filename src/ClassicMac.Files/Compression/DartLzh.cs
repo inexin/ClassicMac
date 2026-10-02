@@ -49,7 +49,11 @@ namespace ClassicMac.Files.Compression
             Array.Clear(text, 0, N - F);
             var r = N - F;
             var written = 0;
-            if (output.Length == 0) return 0;
+            if (output.Length == 0)
+            {
+                return 0;
+            }
+
             while (true)
             {
                 var c = DecodeChar(ref bits, freq, prnt, son);
@@ -65,21 +69,32 @@ namespace ClassicMac.Files.Compression
                     var length = c - 255 + Threshold;
                     for (var k = 0; k < length; k++)
                     {
-                        if (written >= output.Length) return written;
+                        if (written >= output.Length)
+                        {
+                            return written;
+                        }
+
                         var ch = text[(i + k) & (N - 1)];
                         output[written++] = ch;
                         text[r] = ch;
                         r = (r + 1) & (N - 1);
                     }
                 }
-                if (written >= output.Length || bits.PastEnd) return written;
+                if (written >= output.Length || bits.PastEnd)
+                {
+                    return written;
+                }
             }
         }
 
         private static int DecodeChar(ref BitReader bits, ushort[] freq, int[] prnt, int[] son)
         {
             var c = son[R];
-            while (c < T) c = son[c + bits.Bit()];
+            while (c < T)
+            {
+                c = son[c + bits.Bit()];
+            }
+
             c -= T;
             Update(c, freq, prnt, son);
             return c;
@@ -90,13 +105,21 @@ namespace ClassicMac.Files.Compression
             var i = bits.Byte();
             var c = DCode[i] << 6;
             var j = DLen[i] - 2;
-            while (j-- > 0) i = ((i << 1) + bits.Bit()) & 0xFFFF;
+            while (j-- > 0)
+            {
+                i = ((i << 1) + bits.Bit()) & 0xFFFF;
+            }
+
             return c | (i & 0x3F);
         }
 
         private static void Update(int c, ushort[] freq, int[] prnt, int[] son)
         {
-            if (freq[R] == MaxFreq) Reconstruct(freq, prnt, son);
+            if (freq[R] == MaxFreq)
+            {
+                Reconstruct(freq, prnt, son);
+            }
+
             c = prnt[c + T];
             do
             {
@@ -107,17 +130,29 @@ namespace ClassicMac.Files.Compression
                 if (signedK > freq[c + 1])
                 {
                     var l = c + 2;
-                    while (signedK > freq[l]) l++;
+                    while (signedK > freq[l])
+                    {
+                        l++;
+                    }
+
                     l--;
                     freq[c] = freq[l];
                     freq[l] = k;
                     var i = son[c];
                     prnt[i] = l;
-                    if (i < T) prnt[i + 1] = l;
+                    if (i < T)
+                    {
+                        prnt[i + 1] = l;
+                    }
+
                     var j = son[l];
                     son[l] = i;
                     prnt[j] = c;
-                    if (j < T) prnt[j + 1] = c;
+                    if (j < T)
+                    {
+                        prnt[j + 1] = c;
+                    }
+
                     son[c] = j;
                     c = l;
                 }
@@ -142,7 +177,11 @@ namespace ClassicMac.Files.Compression
             {
                 var f = freq[n] = (ushort)(freq[i] + freq[i + 1]);
                 var k = n - 1;
-                while (f < freq[k]) k--;
+                while (f < freq[k])
+                {
+                    k--;
+                }
+
                 k++;
                 Array.Copy(freq, k, freq, k + 1, n - k);
                 freq[k] = f;
@@ -153,7 +192,10 @@ namespace ClassicMac.Files.Compression
             {
                 var k = son[i];
                 prnt[k] = i;
-                if (k < T) prnt[k + 1] = i;
+                if (k < T)
+                {
+                    prnt[k + 1] = i;
+                }
             }
         }
 
@@ -204,16 +246,35 @@ namespace ClassicMac.Files.Compression
             var at = 0;
             void Run(int value, int count)
             {
-                for (var i = 0; i < count; i++) table[at++] = (byte)value;
+                for (var i = 0; i < count; i++)
+                {
+                    table[at++] = (byte)value;
+                }
             }
             Run(0, 32);
             Run(1, 16);
             Run(2, 16);
             Run(3, 16);
-            for (var v = 4; v < 12; v++) Run(v, 8);
-            for (var v = 12; v < 24; v++) Run(v, 4);
-            for (var v = 24; v < 48; v++) Run(v, 2);
-            for (var v = 48; v < 64; v++) Run(v, 1);
+            for (var v = 4; v < 12; v++)
+            {
+                Run(v, 8);
+            }
+
+            for (var v = 12; v < 24; v++)
+            {
+                Run(v, 4);
+            }
+
+            for (var v = 24; v < 48; v++)
+            {
+                Run(v, 2);
+            }
+
+            for (var v = 48; v < 64; v++)
+            {
+                Run(v, 1);
+            }
+
             return table;
         }
 
@@ -224,7 +285,10 @@ namespace ClassicMac.Files.Compression
             var at = 0;
             for (var l = 0; l < counts.Length; l++)
             {
-                for (var i = 0; i < counts[l]; i++) table[at++] = (byte)(l + 3);
+                for (var i = 0; i < counts[l]; i++)
+                {
+                    table[at++] = (byte)(l + 3);
+                }
             }
             return table;
         }

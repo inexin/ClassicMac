@@ -105,28 +105,49 @@ namespace ClassicMac.Graphics.Fonts
         internal static BitmapFont Read(BigEndianReader input, ICollection<Diagnostic>? diagnostics, bool rom)
         {
             var fields = input.ReadSubReader(input.Remaining);
-            if (fields.Length < 26) throw new InvalidDataException($"A font strike needs a 26-byte header; this is {fields.Length} bytes.");
+            if (fields.Length < 26)
+            {
+                throw new InvalidDataException($"A font strike needs a 26-byte header; this is {fields.Length} bytes.");
+            }
+
             var fontType = (ushort)fields.ReadInt16At(0);
             int firstChar = fields.ReadInt16At(2), lastChar = fields.ReadInt16At(4);
             if (lastChar < firstChar || firstChar < 0 || lastChar > 255)
+            {
                 throw new InvalidDataException($"The font's characters run from {firstChar} to {lastChar}.");
+            }
+
             var rowWords = rom ? fields.ReadInt16At(24) : (ushort)fields.ReadInt16At(24) & 0x7FFF; // Mac OS 9 masks the top bit
-            if (rowWords < 0) throw new InvalidDataException($"The strike's row length is {rowWords} words.");
+            if (rowWords < 0)
+            {
+                throw new InvalidDataException($"The strike's row length is {rowWords} words.");
+            }
+
             var rectHeight = Math.Max(0, (int)fields.ReadInt16At(14));
             var depth = 1 << ((fontType >> 2) & (rom ? 7 : 3));
             var strikeLong = (long)rowWords * 2 * depth * rectHeight;
-            if (strikeLong > int.MaxValue / 2) throw new InvalidDataException($"The strike would be {strikeLong} bytes.");
+            if (strikeLong > int.MaxValue / 2)
+            {
+                throw new InvalidDataException($"The strike would be {strikeLong} bytes.");
+            }
+
             var strikeLength = (int)strikeLong;
             var shortData = false;
             var strike = new byte[strikeLength];
             fields.ReadBytesAt(26, Math.Min(strikeLength, fields.Length - 26)).CopyTo(strike);
-            if (26 + strikeLength > fields.Length) shortData = true;
+            if (26 + strikeLength > fields.Length)
+            {
+                shortData = true;
+            }
 
             // owTLoc is the offset in words from itself (+16) to the offset/width table; a positive nDescent (+10) is its
             // high word (Mac OS 9; the ROM takes 0 or more).
             long owTLoc = fields.ReadUInt16At(16);
             var nDescent = fields.ReadInt16At(10);
-            if (nDescent > 0) owTLoc |= (long)nDescent << 16;
+            if (nDescent > 0)
+            {
+                owTLoc |= (long)nDescent << 16;
+            }
             // Every table has one entry per character, then the missing symbol, then one more (the location table's end).
             var entries = lastChar - firstChar + 3;
             // Mac OS 9 finds the location table just before the offset/width table (the ROM, right after the strike;
@@ -142,7 +163,11 @@ namespace ClassicMac.Graphics.Fonts
             var hasWidthTable = (fontType & 0x0002) != 0;
             var hasHeightTable = (fontType & 0x0001) != 0;
             var widths = hasWidthTable ? after : -1;
-            if (hasWidthTable) after += 2L * entries;
+            if (hasWidthTable)
+            {
+                after += 2L * entries;
+            }
+
             var heights = hasHeightTable ? after : -1;
             var rawOffsetWidths = RawOffsetWidthWords(fields, offsetWidths, byte.MaxValue + 1);
             var font = new BitmapFont(strike, rawOffsetWidths)
@@ -164,7 +189,11 @@ namespace ClassicMac.Graphics.Fonts
             for (var i = 0; i < entries - 1; i++)
             {
                 var ow = Entry(fields, offsetWidths, i, ref shortData);
-                if (ow is null or -1) continue; // missing: drawn as the missing symbol
+                if (ow is null or -1)
+                {
+                    continue; // missing: drawn as the missing symbol
+                }
+
                 var left = (ushort)(Entry(fields, locations, i, ref shortData) ?? 0);
                 var right = (ushort)(Entry(fields, locations, i + 1, ref shortData) ?? left);
                 var character = i == entries - 2 ? -1 : firstChar + i;
@@ -178,14 +207,24 @@ namespace ClassicMac.Graphics.Fonts
                 font.glyphs[character] = new BitmapGlyph(character, ow.Value & 0xFF, (ow.Value >> 8) & 0xFF, left, Math.Max(0, right - left), fractional, top, rows);
             }
             if (shortData)
+            {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The font's tables run past its data; the glyphs there are left out or blank."));
+            }
 
             // The raw tables for the renderer, words past the data read as the text code finds them (0; −1 for a
             // missing offset/width entry).
             font.Locations = Words(fields, locations, entries, unsigned: true);
             font.OffsetWidths = Words(fields, offsetWidths, entries, unsigned: false);
-            if (widths >= 0) font.FractionalWidths = Words(fields, widths, entries, unsigned: true);
-            if (heights >= 0) font.Heights = Words(fields, heights, entries, unsigned: true);
+            if (widths >= 0)
+            {
+                font.FractionalWidths = Words(fields, widths, entries, unsigned: true);
+            }
+
+            if (heights >= 0)
+            {
+                font.Heights = Words(fields, heights, entries, unsigned: true);
+            }
+
             return font;
         }
 
@@ -224,7 +263,9 @@ namespace ClassicMac.Graphics.Fonts
             {
                 var at = offset + 2L * i;
                 if (at >= 0 && at + 2 <= reader.Length)
+                {
                     result[i] = reader.ReadInt16At((int)at);
+                }
             }
             return result;
         }
@@ -256,7 +297,11 @@ namespace ClassicMac.Graphics.Fonts
         // A 1-bit strike's pixel.
         internal bool StrikeBit(int row, int column)
         {
-            if (row < 0 || row >= RectHeight || column < 0 || column >= RowBytes * 8) return false;
+            if (row < 0 || row >= RectHeight || column < 0 || column >= RowBytes * 8)
+            {
+                return false;
+            }
+
             var i = row * RowBytes + (column >> 3);
             return i < strike.Length && ((strike[i] >> (7 - (column & 7))) & 1) != 0;
         }
@@ -264,8 +309,12 @@ namespace ClassicMac.Graphics.Fonts
         // The strike as a pixel map of its depth (a colour font), with the given palette.
         internal PixMap StrikeMap(RgbaColor[] palette) => new()
         {
-            Bounds = new PictRect(0, 0, RectHeight, RowWords * 16), RowBytes = RowBytes, PixelSize = Depth,
-            IsPixMap = true, Palette = palette, Data = strike,
+            Bounds = new PictRect(0, 0, RectHeight, RowWords * 16),
+            RowBytes = RowBytes,
+            PixelSize = Depth,
+            IsPixMap = true,
+            Palette = palette,
+            Data = strike,
         };
 
         /// <summary>The glyph for a character, or the missing symbol when the font lacks it (null when it has neither).</summary>
@@ -275,11 +324,19 @@ namespace ClassicMac.Graphics.Fonts
         /// <summary>A pixel of the strike: 0 or 1 for a 1-bit font, else the pixel value (an index into the font's colours).</summary>
         public int Pixel(int x, int y)
         {
-            if (x < 0 || y < 0 || y >= RectHeight || x >= StrikeWidth || Depth > 8) return 0;
+            if (x < 0 || y < 0 || y >= RectHeight || x >= StrikeWidth || Depth > 8)
+            {
+                return 0;
+            }
+
             var rowBytes = RowWords * 2 * Depth;
             var bit = x * Depth;
             var at = y * rowBytes + (bit >> 3);
-            if (at >= strike.Length) return 0;
+            if (at >= strike.Length)
+            {
+                return 0;
+            }
+
             return (strike[at] >> (8 - Depth - (bit & 7))) & ((1 << Depth) - 1);
         }
 
@@ -290,7 +347,10 @@ namespace ClassicMac.Graphics.Fonts
             var pixels = new byte[glyph.ImageWidth * RectHeight];
             for (var y = 0; y < RectHeight; y++)
             {
-                for (var x = 0; x < glyph.ImageWidth; x++) pixels[y * glyph.ImageWidth + x] = (byte)Pixel(glyph.StrikeLeft + x, y);
+                for (var x = 0; x < glyph.ImageWidth; x++)
+                {
+                    pixels[y * glyph.ImageWidth + x] = (byte)Pixel(glyph.StrikeLeft + x, y);
+                }
             }
             return pixels;
         }

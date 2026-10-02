@@ -37,7 +37,11 @@ internal sealed class ArsenicEncoder
 
     public byte[] Run(byte[] data)
     {
-        foreach (var b in Signature) InitialBits(b, 8);
+        foreach (var b in Signature)
+        {
+            InitialBits(b, 8);
+        }
+
         InitialBits((uint)(BlockBits - 9), 4);
         var blockLength = 1 << BlockBits;
         var rle = RunLengthBlocks(data, blockLength);
@@ -47,7 +51,11 @@ internal sealed class ArsenicEncoder
             InitialBits(0, 1);
             var randomized = Randomized(index);
             InitialBits(randomized ? 1u : 0, 1);
-            if (randomized) Randomize(block);
+            if (randomized)
+            {
+                Randomize(block);
+            }
+
             var (last, primary) = Transform(block);
             InitialBits((uint)PrimaryIndex(index, primary), BlockBits);
             Symbols(last);
@@ -67,7 +75,11 @@ internal sealed class ArsenicEncoder
         {
             var value = data[at];
             var run = 1;
-            while (at + run < data.Length && data[at + run] == value && run < 4 + 255) run++;
+            while (at + run < data.Length && data[at + run] == value && run < 4 + 255)
+            {
+                run++;
+            }
+
             List<byte> coded = run >= 4 ? [value, value, value, value, (byte)(run - 4)] : [.. Enumerable.Repeat(value, run)];
             if (current.Count + coded.Count > blockLength)
             {
@@ -77,10 +89,17 @@ internal sealed class ArsenicEncoder
             current.AddRange(coded);
             at += run;
         }
-        if (current.Count > 0) blocks.Add([.. current]);
+        if (current.Count > 0)
+        {
+            blocks.Add([.. current]);
+        }
+
         if (DropLastRunCount)
         {
-            foreach (var i in Enumerable.Range(0, blocks.Count)) blocks[i] = blocks[i][..^1];
+            foreach (var i in Enumerable.Range(0, blocks.Count))
+            {
+                blocks[i] = blocks[i][..^1];
+            }
         }
         return blocks;
     }
@@ -111,7 +130,10 @@ internal sealed class ArsenicEncoder
             for (var k = 0; k < n; k++)
             {
                 var d = block[(a + k) % n].CompareTo(block[(b + k) % n]);
-                if (d != 0) return d;
+                if (d != 0)
+                {
+                    return d;
+                }
             }
             return a.CompareTo(b);
         });
@@ -134,7 +156,10 @@ internal sealed class ArsenicEncoder
             }
             Zeros(selector, zeros);
             zeros = 0;
-            if (index == 1) Encode(selector, 2);
+            if (index == 1)
+            {
+                Encode(selector, 2);
+            }
             else
             {
                 var m = Array.FindIndex(MtfModels, p => index >= p.First && index <= p.Last);
@@ -168,7 +193,10 @@ internal sealed class ArsenicEncoder
 
     private void InitialBits(uint value, int count)
     {
-        for (var bit = 0; bit < count; bit++) Encode(initial, (int)((value >> bit) & 1));
+        for (var bit = 0; bit < count; bit++)
+        {
+            Encode(initial, (int)((value >> bit) & 1));
+        }
     }
 
     private void Encode(Model model, int symbol)
@@ -177,7 +205,11 @@ internal sealed class ArsenicEncoder
         var (lowFrequency, highFrequency) = model.Range(symbol);
         low += (long)scale * lowFrequency;
         range = highFrequency == model.Total ? range - scale * lowFrequency : scale * (highFrequency - lowFrequency);
-        if (low >= Window) Carry();
+        if (low >= Window)
+        {
+            Carry();
+        }
+
         while (range <= Half)
         {
             Emit((int)(low >> 25) & 1);
@@ -191,7 +223,11 @@ internal sealed class ArsenicEncoder
     {
         low -= Window;
         var i = bits.Count - 1;
-        while (bits[i] == 1) bits[i--] = 0;
+        while (bits[i] == 1)
+        {
+            bits[i--] = 0;
+        }
+
         bits[i] = 1;
     }
 
@@ -199,10 +235,22 @@ internal sealed class ArsenicEncoder
 
     private byte[] Finish()
     {
-        for (var bit = 25; bit >= 0; bit--) Emit((int)(low >> bit) & 1);
-        for (var pad = 0; pad < 32; pad++) Emit(0);
+        for (var bit = 25; bit >= 0; bit--)
+        {
+            Emit((int)(low >> bit) & 1);
+        }
+
+        for (var pad = 0; pad < 32; pad++)
+        {
+            Emit(0);
+        }
+
         var bytes = new byte[(bits.Count + 7) / 8];
-        for (var i = 0; i < bits.Count; i++) bytes[i / 8] |= (byte)(bits[i] << (7 - i % 8));
+        for (var i = 0; i < bits.Count; i++)
+        {
+            bytes[i / 8] |= (byte)(bits[i] << (7 - i % 8));
+        }
+
         return bytes;
     }
 
@@ -212,7 +260,10 @@ internal sealed class ArsenicEncoder
         foreach (var b in data)
         {
             crc ^= b;
-            for (var k = 0; k < 8; k++) crc = (crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xEDB88320u);
+            for (var k = 0; k < 8; k++)
+            {
+                crc = (crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xEDB88320u);
+            }
         }
         return ~crc;
     }
@@ -233,7 +284,11 @@ internal sealed class ArsenicEncoder
         {
             frequencies[symbol - first] += increment;
             Total += increment;
-            if (Total <= limit) return;
+            if (Total <= limit)
+            {
+                return;
+            }
+
             Total = 0;
             for (var i = 0; i < frequencies.Length; i++)
             {

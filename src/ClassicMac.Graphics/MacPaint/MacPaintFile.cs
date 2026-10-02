@@ -32,11 +32,27 @@ namespace ClassicMac.Graphics
         public static bool IsMacPaintFile(ReadOnlyMemory<byte> data)
         {
             var reader = new BigEndianReader(data);
-            if (IsMacBinary(reader)) return true;
-            if (data.Length < HeaderSize + 2) return false;
+            if (IsMacBinary(reader))
+            {
+                return true;
+            }
+
+            if (data.Length < HeaderSize + 2)
+            {
+                return false;
+            }
+
             uint version = reader.ReadUInt32At(0);
-            if (version != 0 && version != 2 && version != 3) return false;
-            if (data.Span.Slice(4 + 38 * 8, HeaderSize - 4 - 38 * 8).IndexOfAnyExcept((byte)0) >= 0) return false;
+            if (version != 0 && version != 2 && version != 3)
+            {
+                return false;
+            }
+
+            if (data.Span.Slice(4 + 38 * 8, HeaderSize - 4 - 38 * 8).IndexOfAnyExcept((byte)0) >= 0)
+            {
+                return false;
+            }
+
             reader.Position = HeaderSize;
             var rows = reader.ReadSubReader(reader.Remaining);
             return FirstRowIsWhole(rows);
@@ -52,7 +68,11 @@ namespace ClassicMac.Graphics
                 int forkLength = (int)Math.Min(reader.ReadUInt32At(83), (uint)(data.Length - MacBinaryHeaderSize));
                 data = data.Slice(MacBinaryHeaderSize, forkLength);
             }
-            if (data.Length <= HeaderSize) throw new NotSupportedException("The data is too short to be a MacPaint document.");
+            if (data.Length <= HeaderSize)
+            {
+                throw new NotSupportedException("The data is too short to be a MacPaint document.");
+            }
+
             var image = DecodeRows(new BigEndianReader(data[HeaderSize..]));
             return image ?? throw new NotSupportedException("The MacPaint document has no image data.");
         }
@@ -76,10 +96,15 @@ namespace ClassicMac.Graphics
             var bits = new byte[rowBytes * Height];
             var unpacked = PackBits.Unpack(data.Source.Span[data.Position..], bits);
             data.Skip(unpacked.Read);
-            if (unpacked.Read == 0) return null;
+            if (unpacked.Read == 0)
+            {
+                return null;
+            }
+
             var img = new RgbaBitmap(Width, Height);
             var px = img.Pixels;
             for (int y = 0; y < Height; y++)
+            {
                 for (int x = 0; x < Width; x++)
                 {
                     byte v = ((bits[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1) != 0 ? (byte)0 : (byte)255;
@@ -87,6 +112,8 @@ namespace ClassicMac.Graphics
                     px[i] = px[i + 1] = px[i + 2] = v;
                     px[i + 3] = 255;
                 }
+            }
+
             return img;
         }
 
@@ -101,18 +128,32 @@ namespace ClassicMac.Graphics
             int produced = 0;
             while (produced < Width / 8)
             {
-                if (!rows.TryReadByte(out byte rawFlag)) return false;
+                if (!rows.TryReadByte(out byte rawFlag))
+                {
+                    return false;
+                }
+
                 sbyte flag = (sbyte)rawFlag;
-                if (flag == -128) continue;
+                if (flag == -128)
+                {
+                    continue;
+                }
+
                 if (flag < 0)
                 {
                     produced += 1 - flag;
-                    if (!rows.TrySkip(1)) return false;
+                    if (!rows.TrySkip(1))
+                    {
+                        return false;
+                    }
                 }
                 else
                 {
                     produced += flag + 1;
-                    if (!rows.TrySkip(flag + 1)) return false;
+                    if (!rows.TrySkip(flag + 1))
+                    {
+                        return false;
+                    }
                 }
             }
             return produced == Width / 8;

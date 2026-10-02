@@ -238,7 +238,10 @@ public class PefLoaderTests
     {
         var (loader, _) = Read(Sample().Build());
         foreach (var export in loader.Exports)
+        {
             Assert.Same(export, loader.FindExport(export.Name));
+        }
+
         Assert.Null(loader.FindExport("delta"));
         Assert.Null(loader.FindExport("alph"));
         Assert.Null(loader.FindExport("一"));   // not Mac Roman
@@ -251,12 +254,18 @@ public class PefLoaderTests
         var b = new PefBuilder { HashPower = 0 };
         b.AddSection(PefSectionKind.Code, new byte[4]);
         foreach (var (n, key) in new[] { ("one", 0x00030105u), ("two", 0x00030151u), ("three", 0x00050567u), ("four", 0x00040214u) })
+        {
             b.Exports.Add(new(n, key, PefSymbolClass.Code, 0, 0));
+        }
+
         var (loader, diagnostics) = Read(b.Build());
         Assert.Empty(diagnostics);
         Assert.Single(loader.ExportHashTable);
         Assert.Equal((4u << 18) | 0, loader.ExportHashTable[0]);
-        foreach (var n in new[] { "one", "two", "three", "four" }) Assert.Equal(n, loader.FindExport(n)!.Name);
+        foreach (var n in new[] { "one", "two", "three", "four" })
+        {
+            Assert.Equal(n, loader.FindExport(n)!.Name);
+        }
     }
 
     [Fact]
@@ -344,7 +353,12 @@ public class PefLoaderTests
         {
             var r = new BigEndianReader(w.WrittenMemory);
             for (int i = 0; i < 4; i++)
-                if (r.ReadUInt32At(b.LoaderHashOffset + 4 * i) >> 18 == 0) w.WriteUInt32At(b.LoaderHashOffset + 4 * i, 0x3u + (uint)i);
+            {
+                if (r.ReadUInt32At(b.LoaderHashOffset + 4 * i) >> 18 == 0)
+                {
+                    w.WriteUInt32At(b.LoaderHashOffset + 4 * i, 0x3u + (uint)i);
+                }
+            }
         }));
         Assert.Empty(diagnostics);
         Assert.Equal(6, loader!.Exports.Count(e => loader.FindExport(e.Name) == e));

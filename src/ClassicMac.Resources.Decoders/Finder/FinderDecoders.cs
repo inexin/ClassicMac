@@ -36,7 +36,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             complete = data.Length >= 8;
             var maps = new List<(FourCC, IReadOnlyList<(short, short)>)>();
-            if (!complete) return new Bundle(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, maps);
+            if (!complete)
+            {
+                return new Bundle(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, maps);
+            }
+
             var reader = new BigEndianReader(data);
             var signature = reader.ReadFourCC();
             var signatureId = reader.ReadInt16();
@@ -61,7 +65,10 @@ namespace ClassicMac.Resources.Decoders.Finder
                     ids.Add((reader.ReadInt16(), reader.ReadInt16()));
                 }
                 maps.Add((type, ids));
-                if (!complete) break;
+                if (!complete)
+                {
+                    break;
+                }
             }
             return new Bundle(signature, signatureId, maps);
         }
@@ -70,7 +77,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         public static FileReference ReadFileReference(ReadOnlyMemory<byte> data, DecodeOptions options, out bool complete)
         {
             complete = data.Length >= 6;
-            if (!complete) return new FileReference(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, "");
+            if (!complete)
+            {
+                return new FileReference(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, "");
+            }
+
             var at = 6;
             var name = at < data.Length && MacText.TryReadPascal(data.Span, ref at, out var text) ? MacText.Decode(text, options) : "";
             return new FileReference(new FourCC(data.Span[..4]), new BigEndianReader(data).ReadInt16At(4), name);
@@ -91,7 +102,10 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             for (var bit = 15; bit >= 0; bit--)
             {
-                if ((flags & (1 << bit)) != 0 && SizeFlags[15 - bit] is { } name) yield return name;
+                if ((flags & (1 << bit)) != 0 && SizeFlags[15 - bit] is { } name)
+                {
+                    yield return name;
+                }
             }
         }
 
@@ -132,40 +146,44 @@ namespace ClassicMac.Resources.Decoders.Finder
             switch (handled.ToString())
             {
                 case "BNDL":
-                {
-                    var bundle = FinderResources.ReadBundle(data, out complete);
-                    json = Bundle(bundle, input);
-                    break;
-                }
+                    {
+                        var bundle = FinderResources.ReadBundle(data, out complete);
+                        json = Bundle(bundle, input);
+                        break;
+                    }
                 case "FREF":
-                {
-                    var reference = FinderResources.ReadFileReference(data, options, out complete);
-                    json = MacText.Json(w =>
                     {
-                        w.WriteStartObject();
-                        w.WriteString("fileType", reference.FileType.ToString());
-                        w.WriteNumber("localIconId", reference.LocalIconId);
-                        w.WriteString("fileName", reference.FileName);
-                        w.WriteEndObject();
-                    });
-                    break;
-                }
+                        var reference = FinderResources.ReadFileReference(data, options, out complete);
+                        json = MacText.Json(w =>
+                        {
+                            w.WriteStartObject();
+                            w.WriteString("fileType", reference.FileType.ToString());
+                            w.WriteNumber("localIconId", reference.LocalIconId);
+                            w.WriteString("fileName", reference.FileName);
+                            w.WriteEndObject();
+                        });
+                        break;
+                    }
                 default:
-                {
-                    var size = FinderResources.ReadSize(data, out complete);
-                    json = MacText.Json(w =>
                     {
-                        w.WriteStartObject();
-                        w.WriteNumber("flags", size.Flags);
-                        w.WriteStartArray("flagNames");
-                        foreach (var flag in FinderResources.SizeFlagNames(size.Flags)) w.WriteStringValue(flag);
-                        w.WriteEndArray();
-                        w.WriteNumber("preferredSize", size.Preferred);
-                        w.WriteNumber("minimumSize", size.Minimum);
-                        w.WriteEndObject();
-                    });
-                    break;
-                }
+                        var size = FinderResources.ReadSize(data, out complete);
+                        json = MacText.Json(w =>
+                        {
+                            w.WriteStartObject();
+                            w.WriteNumber("flags", size.Flags);
+                            w.WriteStartArray("flagNames");
+                            foreach (var flag in FinderResources.SizeFlagNames(size.Flags))
+                            {
+                                w.WriteStringValue(flag);
+                            }
+
+                            w.WriteEndArray();
+                            w.WriteNumber("preferredSize", size.Preferred);
+                            w.WriteNumber("minimumSize", size.Minimum);
+                            w.WriteEndObject();
+                        });
+                        break;
+                    }
             }
             if (!complete)
             {
@@ -206,14 +224,25 @@ namespace ClassicMac.Resources.Decoders.Finder
                 w.WriteStartArray("fileTypes");
                 foreach (var (_, freId) in references)
                 {
-                    if (input.Find(FourCC.FromString("FREF"), freId) is not { } fref) continue;
+                    if (input.Find(FourCC.FromString("FREF"), freId) is not { } fref)
+                    {
+                        continue;
+                    }
+
                     var reference = FinderResources.ReadFileReference(fref, options, out _);
                     w.WriteStartObject();
                     w.WriteString("fileType", reference.FileType.ToString());
                     w.WriteNumber("fref", freId);
                     var icon = icons.Where(i => i.Local == reference.LocalIconId).Select(i => (short?)i.Resource).FirstOrDefault();
-                    if (icon is { } id) w.WriteNumber("icon", id);
-                    else w.WriteNull("icon");
+                    if (icon is { } id)
+                    {
+                        w.WriteNumber("icon", id);
+                    }
+                    else
+                    {
+                        w.WriteNull("icon");
+                    }
+
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();

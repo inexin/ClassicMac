@@ -1,13 +1,13 @@
-using Xunit;
-using static ClassicMac.Graphics.Tests.TestFont;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Fonts;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
+using static ClassicMac.Graphics.Tests.TestFont;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -39,7 +39,11 @@ public class TextTests
         var b = PictBuilder.V2(0, 0, height, width);
         beforeFont?.Invoke(b);
         b.Align().U16(0x0003).U16(Family).U16(0x000D).U16(9).U16(0x0004).U8(face).Align();
-        if (spExtra != 0) b.U16(0x0006).U16(spExtra >> 16).U16(spExtra & 0xFFFF);
+        if (spExtra != 0)
+        {
+            b.U16(0x0006).U16(spExtra >> 16).U16(spExtra & 0xFFFF);
+        }
+
         before?.Invoke(b);
         b.Align().U16(0x0028).Point(4, 2).Text(s).Align().U16(0x00FF);
         var bmp = PictReader.Decode(b.ToArray(), new PictDecodeOptions { Fonts = fonts ?? Library(), QuickDraw = quickDraw });
@@ -214,8 +218,12 @@ public class TextTests
             .U16(0x0028).Point(8, 2).Text("A").Align().U16(0x00FF).ToArray();
         var bmp = PictReader.Decode(pict, new PictDecodeOptions { Fonts = Library(), QuickDraw = QuickDrawVersion.MacRom });
         for (int y = 0; y < 12; y++)
+        {
             for (int x = 0; x < 10; x++)
+            {
                 Assert.Equal(y >= 2 && y <= 7 && x >= 2 && x <= 5, bmp[x, y] == new RgbaColor(0, 0, 0));
+            }
+        }
     }
 
     [Fact]
@@ -415,15 +423,26 @@ public class TextTests
         int rb1 = rowWords * 2, rb8 = rb1 * 8;
         var img = new byte[rb8 * height];
         for (int y = 0; y < height; y++)
+        {
             for (int x = 0; x < rb1 * 8; x++)
-                if ((font[26 + y * rb1 + (x >> 3)] & (0x80 >> (x & 7))) != 0) img[y * rb8 + x] = inkIndex;
+            {
+                if ((font[26 + y * rb1 + (x >> 3)] & (0x80 >> (x & 7))) != 0)
+                {
+                    img[y * rb8 + x] = inkIndex;
+                }
+            }
+        }
+
         var tail = font.AsSpan(26 + rb1 * height).ToArray();
         int owTLoc = ((font[16] << 8) | font[17]) + (img.Length - rb1 * height) / 2;
         var header = font.AsSpan(0, 26).ToArray();
         int fontType = ((header[0] << 8) | header[1]) & ~0x1C | (3 << 2) | 0x280;
-        header[0] = (byte)(fontType >> 8); header[1] = (byte)fontType;
-        header[10] = (byte)(owTLoc >> 24); header[11] = (byte)(owTLoc >> 16);             // nDescent = high word
-        header[16] = (byte)(owTLoc >> 8); header[17] = (byte)owTLoc;
+        header[0] = (byte)(fontType >> 8);
+        header[1] = (byte)fontType;
+        header[10] = (byte)(owTLoc >> 24);
+        header[11] = (byte)(owTLoc >> 16);             // nDescent = high word
+        header[16] = (byte)(owTLoc >> 8);
+        header[17] = (byte)owTLoc;
         return header.Concat(img).Concat(tail).ToArray();
     }
 
@@ -436,7 +455,11 @@ public class TextTests
         lib.AddFamily(Family, null, Family(Family, (9, 0x0300, 500)));
         lib.AddNfnt(500, Deep8(Font9, 7));
         var fctb = new PictBuilder().U16(0).U16(0).U16(0).U16(7);
-        for (int i = 0; i < 8; i++) fctb.U16(i).Rgb(i == 7 ? 0 : 0xFFFF, 0xFFFF, i == 7 ? 0 : 0xFFFF);
+        for (int i = 0; i < 8; i++)
+        {
+            fctb.U16(i).Rgb(i == 7 ? 0 : 0xFFFF, 0xFFFF, i == 7 ? 0 : 0xFFFF);
+        }
+
         lib.AddFontColorTable(500, fctb.ToArray());
         var b = PictBuilder.V2(0, 0, 7, 10).U16(0x0003).U16(Family).U16(0x000D).U16(9).U16(0x0005).U16(1)
             .U16(0x0028).Point(4, 2).Text("A").Align().U16(0x00FF);

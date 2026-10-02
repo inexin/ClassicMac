@@ -34,7 +34,11 @@ public class IconFamilyTests
         while (count >= 3)
         {
             int n = Math.Min(count, 130);
-            if (count - n is 1 or 2) n = 127;                   // leave a run of at least 3
+            if (count - n is 1 or 2)
+            {
+                n = 127;                   // leave a run of at least 3
+            }
+
             yield return (byte)(n + 125);
             yield return value;
             count -= n;
@@ -42,7 +46,10 @@ public class IconFamilyTests
         if (count > 0)
         {
             yield return (byte)(count - 1);
-            for (int i = 0; i < count; i++) yield return value;
+            for (int i = 0; i < count; i++)
+            {
+                yield return value;
+            }
         }
     }
 
@@ -51,11 +58,21 @@ public class IconFamilyTests
     {
         var list = new byte[256];
         for (int y = 0; y < 32; y++)
+        {
             for (int x = 0; x < 32; x++)
             {
-                if (x >= 8 && x < 24 && y >= 8 && y < 24) list[y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
-                if (x >= 4 && x < 28 && y >= 4 && y < 28) list[128 + y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
+                if (x >= 8 && x < 24 && y >= 8 && y < 24)
+                {
+                    list[y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
+                }
+
+                if (x >= 4 && x < 28 && y >= 4 && y < 28)
+                {
+                    list[128 + y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
+                }
             }
+        }
+
         return list;
     }
 

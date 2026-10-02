@@ -52,11 +52,22 @@ namespace ClassicMac.App.ViewModels
         /// <summary>Types a hex digit (0–15).</summary>
         public void TypeDigit(int digit)
         {
-            if (digit is < 0 or > 15) throw new ArgumentOutOfRangeException(nameof(digit));
+            if (digit is < 0 or > 15)
+            {
+                throw new ArgumentOutOfRangeException(nameof(digit));
+            }
+
             if (!half)
             {
-                if (InsertMode || Cursor >= bytes.Count) bytes.Insert(Cursor, (byte)(digit << 4));
-                else bytes[Cursor] = (byte)((bytes[Cursor] & 0x0F) | (digit << 4));
+                if (InsertMode || Cursor >= bytes.Count)
+                {
+                    bytes.Insert(Cursor, (byte)(digit << 4));
+                }
+                else
+                {
+                    bytes[Cursor] = (byte)((bytes[Cursor] & 0x0F) | (digit << 4));
+                }
+
                 half = true;
             }
             else
@@ -78,7 +89,11 @@ namespace ClassicMac.App.ViewModels
         public void Delete()
         {
             half = false;
-            if (Cursor < bytes.Count) bytes.RemoveAt(Cursor);
+            if (Cursor < bytes.Count)
+            {
+                bytes.RemoveAt(Cursor);
+            }
+
             Reload();
             RaiseEdited();
         }
@@ -87,7 +102,11 @@ namespace ClassicMac.App.ViewModels
         public void Backspace()
         {
             half = false;
-            if (Cursor > 0) bytes.RemoveAt(--Cursor);
+            if (Cursor > 0)
+            {
+                bytes.RemoveAt(--Cursor);
+            }
+
             Reload();
             RaiseEdited();
         }
@@ -105,7 +124,11 @@ namespace ClassicMac.App.ViewModels
         /// <summary>Handles a key of the hex view; false when it is not one the editor uses.</summary>
         public bool OnKey(Key key, KeyModifiers modifiers)
         {
-            if ((modifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0) return false;
+            if ((modifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
+            {
+                return false;
+            }
+
             var digit = key switch
             {
                 >= Key.D0 and <= Key.D9 when modifiers == KeyModifiers.None => key - Key.D0,
@@ -113,21 +136,48 @@ namespace ClassicMac.App.ViewModels
                 >= Key.A and <= Key.F => key - Key.A + 10,
                 _ => -1,
             };
-            if (digit >= 0) { TypeDigit(digit); return true; }
+            if (digit >= 0)
+            {
+                TypeDigit(digit);
+                return true;
+            }
             switch (key)
             {
-                case Key.Left: Move(-1); return true;
-                case Key.Right: Move(1); return true;
-                case Key.Up: Move(-16); return true;
-                case Key.Down: Move(16); return true;
-                case Key.PageUp: Move(-256); return true;
-                case Key.PageDown: Move(256); return true;
-                case Key.Home: MoveTo(Cursor / 16 * 16); return true;
-                case Key.End: MoveTo(Math.Min(Cursor / 16 * 16 + 15, bytes.Count)); return true;
-                case Key.Insert: ToggleInsert(); return true;
-                case Key.Delete: Delete(); return true;
-                case Key.Back: Backspace(); return true;
-                default: return false;
+                case Key.Left:
+                    Move(-1);
+                    return true;
+                case Key.Right:
+                    Move(1);
+                    return true;
+                case Key.Up:
+                    Move(-16);
+                    return true;
+                case Key.Down:
+                    Move(16);
+                    return true;
+                case Key.PageUp:
+                    Move(-256);
+                    return true;
+                case Key.PageDown:
+                    Move(256);
+                    return true;
+                case Key.Home:
+                    MoveTo(Cursor / 16 * 16);
+                    return true;
+                case Key.End:
+                    MoveTo(Math.Min(Cursor / 16 * 16 + 15, bytes.Count));
+                    return true;
+                case Key.Insert:
+                    ToggleInsert();
+                    return true;
+                case Key.Delete:
+                    Delete();
+                    return true;
+                case Key.Back:
+                    Backspace();
+                    return true;
+                default:
+                    return false;
             }
         }
 

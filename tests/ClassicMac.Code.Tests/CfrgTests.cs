@@ -9,9 +9,17 @@ public class CfrgTests
     private static byte[] Header(int memberCount, ushort version = 1, byte reserved = 0)
     {
         var w = new BigEndianWriter();
-        for (int i = 0; i < 10; i++) w.WriteByte(reserved);
+        for (int i = 0; i < 10; i++)
+        {
+            w.WriteByte(reserved);
+        }
+
         w.WriteUInt16(version);
-        for (int i = 0; i < 18; i++) w.WriteByte(reserved);
+        for (int i = 0; i < 18; i++)
+        {
+            w.WriteByte(reserved);
+        }
+
         w.WriteUInt16(memberCount);
         return w.ToArray();
     }
@@ -44,11 +52,26 @@ public class CfrgTests
         w.WriteBytes(MacRoman.Encode(name));
         if (extensions is { Length: > 0 })
         {
-            while (w.Length % 4 != 0) w.WriteByte(0);
-            foreach (var e in extensions) w.WriteBytes(e);
+            while (w.Length % 4 != 0)
+            {
+                w.WriteByte(0);
+            }
+
+            foreach (var e in extensions)
+            {
+                w.WriteBytes(e);
+            }
         }
-        while (w.Length % 4 != 0) w.WriteByte(0);
-        while (w.Length < padTo) w.WriteByte(0);
+        while (w.Length % 4 != 0)
+        {
+            w.WriteByte(0);
+        }
+
+        while (w.Length < padTo)
+        {
+            w.WriteByte(0);
+        }
+
         w.WriteUInt16At(sizeAt, memberSize ?? w.Length);
         return w.ToArray();
     }

@@ -38,11 +38,27 @@ namespace ClassicMac.Files.Hfs
         private static int Stride(ForkData input)
         {
             var start = input.ReadPrefix(CdBlock + 2);
-            if (start.Length < Block + 2) return 0;
+            if (start.Length < Block + 2)
+            {
+                return 0;
+            }
+
             var reader = new BigEndianReader(start);
-            if (reader.ReadUInt16At(0) is not (DriverSignature or 0)) return 0;
-            if (reader.ReadUInt16At(Block) == EntrySignature) return Block;
-            if (start.Length == CdBlock + 2 && reader.ReadUInt16At(CdBlock) == EntrySignature) return CdBlock;
+            if (reader.ReadUInt16At(0) is not (DriverSignature or 0))
+            {
+                return 0;
+            }
+
+            if (reader.ReadUInt16At(Block) == EntrySignature)
+            {
+                return Block;
+            }
+
+            if (start.Length == CdBlock + 2 && reader.ReadUInt16At(CdBlock) == EntrySignature)
+            {
+                return CdBlock;
+            }
+
             return 0;
         }
 
@@ -50,7 +66,11 @@ namespace ClassicMac.Files.Hfs
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             var stride = Stride(input);
-            if (stride == 0) throw new InvalidDataException("Not an Apple partition map.");
+            if (stride == 0)
+            {
+                throw new InvalidDataException("Not an Apple partition map.");
+            }
+
             var first = input.Slice(stride, Block).ToArray();
             long entries = new BigEndianReader(first).ReadUInt32At(4);
             var files = new List<MacFile>();

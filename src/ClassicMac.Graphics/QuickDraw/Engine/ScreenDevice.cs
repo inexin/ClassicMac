@@ -40,10 +40,20 @@ namespace ClassicMac.Graphics.QuickDraw
             }
             Clut = StandardColorTables.ForId(depth)!;
             Clut16 = StandardColorTables.Exact(depth) ?? Array.ConvertAll(Clut, c => ((ushort)(c.R * 257), (ushort)(c.G * 257), (ushort)(c.B * 257)));
-            for (int i = Clut.Length - 1; i >= 0; i--) indexOfColor[Key(Clut[i])] = i;
+            for (int i = Clut.Length - 1; i >= 0; i--)
+            {
+                indexOfColor[Key(Clut[i])] = i;
+            }
+
             bool isGrey = Array.TrueForAll(Clut, c => c.R == c.G && c.G == c.B);
-            if (isGrey) grey = GreyLinks(Clut);
-            else (table, hidden) = MakeInverseTable(Clut, links);
+            if (isGrey)
+            {
+                grey = GreyLinks(Clut);
+            }
+            else
+            {
+                (table, hidden) = MakeInverseTable(Clut, links);
+            }
         }
 
         public static ScreenDevice? For(int depth, bool macOS9) => depth switch
@@ -80,8 +90,16 @@ namespace ClassicMac.Graphics.QuickDraw
         // The blitters' conversion of an 8-bit RGB color (no hidden-color search).
         public int Lookup(RgbaColor c)
         {
-            if (Depth == 16) return ((c.R >> 3) << 10) | ((c.G >> 3) << 5) | (c.B >> 3);
-            if (Grey) return grey[(5 * c.R + 9 * c.G + 2 * c.B) >> 4];
+            if (Depth == 16)
+            {
+                return ((c.R >> 3) << 10) | ((c.G >> 3) << 5) | (c.B >> 3);
+            }
+
+            if (Grey)
+            {
+                return grey[(5 * c.R + 9 * c.G + 2 * c.B) >> 4];
+            }
+
             return table[((c.R >> (8 - Res)) << (2 * Res)) | ((c.G >> (8 - Res)) << Res) | (c.B >> (8 - Res))];
         }
 
@@ -89,7 +107,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // component's top 4 bits, the luminance of the cell's low corner.
         public int TableLookup(RgbaColor c)
         {
-            if (!Grey) return Lookup(c);
+            if (!Grey)
+            {
+                return Lookup(c);
+            }
+
             return grey[(5 * (c.R & 0xF0) + 9 * (c.G & 0xF0) + 2 * (c.B & 0xF0)) >> 4];
         }
 
@@ -98,20 +120,42 @@ namespace ClassicMac.Graphics.QuickDraw
 
         public int Color2Index(int r, int g, int b)
         {
-            if (Depth == 16) return ((r >> 11) << 10) | ((g >> 11) << 5) | (b >> 11);
+            if (Depth == 16)
+            {
+                return ((r >> 11) << 10) | ((g >> 11) << 5) | (b >> 11);
+            }
             // Grey tables: Mac OS 9 weighs (5R + 9G + 2B) / 16, the ROM halves its way to ((((R + G)/2 + B)/2 + R)/2 + G)/2.
-            if (Grey) return grey[MacOS9 ? (5 * r + 9 * g + 2 * b) >> 12 : ((((((r + g) >> 1) + b) >> 1) + r >> 1) + g >> 1) >> 8];
+            if (Grey)
+            {
+                return grey[MacOS9 ? (5 * r + 9 * g + 2 * b) >> 12 : ((((((r + g) >> 1) + b) >> 1) + r >> 1) + g >> 1) >> 8];
+            }
+
             int idx = Lookup(new RgbaColor((byte)(r >> 8), (byte)(g >> 8), (byte)(b >> 8)));
-            if (hidden == 0 || links[idx] == idx) return idx;
+            if (hidden == 0 || links[idx] == idx)
+            {
+                return idx;
+            }
+
             int best = idx, bestDistance = int.MaxValue, cur = idx;
             for (int n = 256; n >= 1; n--)
             {
                 var e = Clut16[cur];
                 int d = Math.Abs(e.r - r) + Math.Abs(e.g - g) + Math.Abs(e.b - b);
-                if (d == 0) return cur;
-                if (d < bestDistance) (bestDistance, best) = (d, cur);
+                if (d == 0)
+                {
+                    return cur;
+                }
+
+                if (d < bestDistance)
+                {
+                    (bestDistance, best) = (d, cur);
+                }
+
                 cur = links[cur];
-                if (cur == idx) break;
+                if (cur == idx)
+                {
+                    break;
+                }
             }
             return best;
         }
@@ -119,7 +163,10 @@ namespace ClassicMac.Graphics.QuickDraw
         public RgbaColor ColorOf(int value)
         {
             if (Depth == 16)
+            {
                 return new RgbaColor(Expand5((value >> 10) & 31), Expand5((value >> 5) & 31), Expand5(value & 31));
+            }
+
             return value < Clut.Length ? Clut[value] : new RgbaColor(0, 0, 0);
         }
 
@@ -131,7 +178,11 @@ namespace ClassicMac.Graphics.QuickDraw
             int i = (y * canvas.Width + x) * 4;
             var p = canvas.Pixels;
             var c = p[i + 3] == 0 ? new RgbaColor(255, 255, 255) : new RgbaColor(p[i], p[i + 1], p[i + 2]);
-            if (Depth == 16) return Lookup(c);
+            if (Depth == 16)
+            {
+                return Lookup(c);
+            }
+
             return indexOfColor.TryGetValue(Key(c), out int index) ? index : Lookup(c);
         }
 
@@ -147,9 +198,16 @@ namespace ClassicMac.Graphics.QuickDraw
             const int Bound = 0x7FFF, Undefined = 0x8000;
             var cube = new int[S * S * S];
             for (int r = 0; r < S; r++)
+            {
                 for (int g = 0; g < S; g++)
+                {
                     for (int b = 0; b < S; b++)
+                    {
                         cube[(r * S + g) * S + b] = r == 0 || g == 0 || b == 0 || r == S - 1 || g == S - 1 || b == S - 1 ? Bound : Undefined;
+                    }
+                }
+            }
+
             var queue = new Queue<int>();
             int hidden = 0;
             void Seed(int i)
@@ -172,23 +230,39 @@ namespace ClassicMac.Graphics.QuickDraw
             }
             int last = clut.Length - 1;
             Seed(0);
-            if (last > 0) Seed(last);
-            for (int i = 1; i < last; i++) Seed(i);
+            if (last > 0)
+            {
+                Seed(last);
+            }
+
+            for (int i = 1; i < last; i++)
+            {
+                Seed(i);
+            }
+
             int[] deltas = { 1, -1, S, -S, S * S, -S * S };
             while (queue.Count > 0)
             {
                 int p = queue.Dequeue(), owner = cube[p];
                 foreach (int d in deltas)
+                {
                     if (cube[p + d] == Undefined)
                     {
                         cube[p + d] = owner;
                         queue.Enqueue(p + d);
                     }
+                }
             }
             var table = new byte[n * n * n];
             int k = 0;
             foreach (int w in cube)
-                if (w != Bound) table[k++] = (byte)w;
+            {
+                if (w != Bound)
+                {
+                    table[k++] = (byte)w;
+                }
+            }
+
             return (table, hidden);
         }
 
@@ -200,28 +274,44 @@ namespace ClassicMac.Graphics.QuickDraw
             Array.Fill(t, -1);
             t[255] = 0;
             t[0] = 255;
-            for (int i = clut.Length - 1; i >= 0; i--) t[clut[i].R] = i;
+            for (int i = clut.Length - 1; i >= 0; i--)
+            {
+                t[clut[i].R] = i;
+            }
+
             bool changed = true;
             while (changed)
             {
                 changed = false;
-                for (int k = 1; k < 256; )
+                for (int k = 1; k < 256;)
                 {
-                    if (t[k] >= 0) { k++; continue; }
+                    if (t[k] >= 0)
+                    {
+                        k++;
+                        continue;
+                    }
                     t[k] = t[k - 1];
                     changed = true;
                     k += 2;
                 }
-                for (int k = 255; k > 0; )
+                for (int k = 255; k > 0;)
                 {
                     k--;
-                    if (t[k] >= 0) continue;
+                    if (t[k] >= 0)
+                    {
+                        continue;
+                    }
+
                     t[k] = t[k + 1];
                     changed = true;
                     k--;
                 }
             }
-            for (int k = 0; k < 256; k++) t[k] &= 0xFF;
+            for (int k = 0; k < 256; k++)
+            {
+                t[k] &= 0xFF;
+            }
+
             return t;
         }
 
@@ -233,10 +323,14 @@ namespace ClassicMac.Graphics.QuickDraw
             int tr = 0, tg = 0, tb = 0;
             foreach (int slot in new[] { 0, 1, 3, 2 })
             {
-                tr += rgb.r; tg += rgb.g; tb += rgb.b;
+                tr += rgb.r;
+                tg += rgb.g;
+                tb += rgb.b;
                 int i = Color2Index(Math.Clamp(tr, 0, 0xFFFF), Math.Clamp(tg, 0, 0xFFFF), Math.Clamp(tb, 0, 0xFFFF));
                 var got = Index2Color16(i);
-                tr -= got.r; tg -= got.g; tb -= got.b;
+                tr -= got.r;
+                tg -= got.g;
+                tb -= got.b;
                 cell[slot] = i;
             }
             return cell;
@@ -252,8 +346,16 @@ namespace ClassicMac.Graphics.QuickDraw
 
         private static int ForDevice(int m, ScreenDevice d)
         {
-            if (d.Depth != 1) return m;
-            if (TransferModes.IsArithmetic(m)) return OneBitArithmetic[m & 7];
+            if (d.Depth != 1)
+            {
+                return m;
+            }
+
+            if (TransferModes.IsArithmetic(m))
+            {
+                return OneBitArithmetic[m & 7];
+            }
+
             return m == TransferModes.Hilite ? TransferModes.SrcXor : m;
         }
 
@@ -263,14 +365,25 @@ namespace ClassicMac.Graphics.QuickDraw
             var d = c.Device!;
             m = ForDevice(m, d);
             if (m >= TransferModes.Blend)
+            {
                 return Colored(m, bit ? c.Fore : c.Back, bit ? c.FgIndex : c.BkIndex, dst, c, out result);
+            }
+
             bool on = (m & 4) != 0 ? !bit : bit;
             switch (m & 3)
             {
-                case 0: result = on ? c.FgIndex : c.BkIndex; return true;
-                case 1: result = c.FgIndex; return on;
-                case 2: result = dst ^ d.Mask; return on;
-                default: result = c.BkIndex; return on;
+                case 0:
+                    result = on ? c.FgIndex : c.BkIndex;
+                    return true;
+                case 1:
+                    result = c.FgIndex;
+                    return on;
+                case 2:
+                    result = dst ^ d.Mask;
+                    return on;
+                default:
+                    result = c.BkIndex;
+                    return on;
             }
         }
 
@@ -297,9 +410,14 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 var dstColor = d.ColorOf(dst);
                 if (c.MacOS9 && TransferModes.ColorizeBlend(m, s, dstColor, c, direct) is RgbaColor blended)
+                {
                     result = d.TableLookup(blended);
+                }
                 else
+                {
                     result = d.Lookup(TransferModes.ApplyBoolean(m, s, dstColor, c));
+                }
+
                 return true;
             }
             if ((m & 3) == 0)
@@ -314,14 +432,22 @@ namespace ClassicMac.Graphics.QuickDraw
                         ((ushort)e.r, (ushort)e.g, (ushort)e.b), c.Back16);
                 }
                 var (r, g, b) = exact ?? (s.R * 257, s.G * 257, s.B * 257);
-                if ((m & 4) != 0) (r, g, b) = (0xFFFF - r, 0xFFFF - g, 0xFFFF - b);
+                if ((m & 4) != 0)
+                {
+                    (r, g, b) = (0xFFFF - r, 0xFFFF - g, 0xFFFF - b);
+                }
+
                 var f = colors.Fore16;
                 var k = colors.Back16;
                 result = d.Color2Index((r & k.r) | (~r & f.r & 0xFFFF), (g & k.g) | (~g & f.g & 0xFFFF), (b & k.b) | (~b & f.b & 0xFFFF));
                 return true;
             }
             int si = exact is var (er, eg, eb) ? d.Color2Index(er, eg, eb) : d.Color2Index(s);
-            if ((m & 4) != 0) si ^= d.Mask;
+            if ((m & 4) != 0)
+            {
+                si ^= d.Mask;
+            }
+
             result = (m & 3) switch
             {
                 1 => (si & c.FgIndex) | (~si & dst),
@@ -338,8 +464,16 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             var d = c.Device!;
             m = ForDevice(m, d);
-            if (m >= TransferModes.Blend) return Colored(m, rgb, p, dst, c, out result);
-            if ((m & 4) != 0) p ^= d.Mask;
+            if (m >= TransferModes.Blend)
+            {
+                return Colored(m, rgb, p, dst, c, out result);
+            }
+
+            if ((m & 4) != 0)
+            {
+                p ^= d.Mask;
+            }
+
             result = (m & 3) switch
             {
                 0 => p,
@@ -361,9 +495,21 @@ namespace ClassicMac.Graphics.QuickDraw
                     return si != c.BkIndex;
                 case TransferModes.Hilite:
                     result = dst;
-                    if (si == c.BkIndex) return false;
-                    if (dst == c.BkIndex) { result = c.HiliteIndex; return true; }
-                    if (dst == c.HiliteIndex) { result = c.BkIndex; return true; }
+                    if (si == c.BkIndex)
+                    {
+                        return false;
+                    }
+
+                    if (dst == c.BkIndex)
+                    {
+                        result = c.HiliteIndex;
+                        return true;
+                    }
+                    if (dst == c.HiliteIndex)
+                    {
+                        result = c.BkIndex;
+                        return true;
+                    }
                     return false;
             }
             if (d.Depth == 16)
@@ -380,13 +526,25 @@ namespace ClassicMac.Graphics.QuickDraw
         // sources only), or / bic ((32 - s) C + (s + 1) d) >> 5; null where no colorizing applies (as ColorizeBlend).
         private static int? Colorize16(int m, RgbaColor src, int dst, in PortColors c, bool direct)
         {
-            if (TransferModes.ColorizeBlend(m, src, default, c, direct) == null) return null;
+            if (TransferModes.ColorizeBlend(m, src, default, c, direct) == null)
+            {
+                return null;
+            }
+
             int op = m & 3;
             bool not = (m & 4) != 0;
             int Field(int s, int f, int b, int dd)
             {
-                if (op == 0) return not ? ((32 - s) * b + (s + 1) * f) >> 5 : ((32 - s) * f + (s + 1) * b) >> 5;
-                if (not) s = 31 - s;
+                if (op == 0)
+                {
+                    return not ? ((32 - s) * b + (s + 1) * f) >> 5 : ((32 - s) * f + (s + 1) * b) >> 5;
+                }
+
+                if (not)
+                {
+                    s = 31 - s;
+                }
+
                 return ((32 - s) * (op == 1 ? f : b) + (s + 1) * dd) >> 5;
             }
             return (Field(src.R >> 3, c.Fore.R >> 3, c.Back.R >> 3, (dst >> 10) & 31) << 10)
@@ -435,7 +593,11 @@ namespace ClassicMac.Graphics.QuickDraw
             Func<int, int, RgbaColor?> source, Func<int, int, bool> visible)
         {
             int w = right - left;
-            if (w <= 0) return;
+            if (w <= 0)
+            {
+                return;
+            }
+
             bool rom = !d.MacOS9;
             var err = new int[w, 3];
             bool leftToRight = true;
@@ -456,8 +618,11 @@ namespace ClassicMac.Graphics.QuickDraw
                     {
                         int dd = Ordered[(y - top) & 3, i & 3];
                         if (shown)
+                        {
                             d.Write(canvas, x, y, ((Math.Min(c.R + dd, 255) >> 3) << 10) | ((Math.Min(c.G + dd, 255) >> 3) << 5)
                                 | (Math.Min(c.B + dd, 255) >> 3));
+                        }
+
                         continue;
                     }
                     if (d.Grey)
@@ -477,7 +642,11 @@ namespace ClassicMac.Graphics.QuickDraw
                             e = v - d.ColorOf(index).R;
                             err[i, 0] = e >> 1;
                             cr = (e >> 1) + (e & 1);
-                            if (shown) d.Write(canvas, x, y, index);
+                            if (shown)
+                            {
+                                d.Write(canvas, x, y, index);
+                            }
+
                             continue;
                         }
                         else
@@ -488,7 +657,11 @@ namespace ClassicMac.Graphics.QuickDraw
                         }
                         cr = e >> 1;
                         err[i, 0] = e - (e >> 1);
-                        if (shown) d.Write(canvas, x, y, index);
+                        if (shown)
+                        {
+                            d.Write(canvas, x, y, index);
+                        }
+
                         continue;
                     }
                     int vr = Math.Clamp(c.R + cr + err[i, 0], 0, 255), vg = Math.Clamp(c.G + cg + err[i, 1], 0, 255),
@@ -496,7 +669,10 @@ namespace ClassicMac.Graphics.QuickDraw
                     var v3 = new RgbaColor((byte)vr, (byte)vg, (byte)vb);
                     int value = d.Lookup(v3);
                     int ar, ag, ab;
-                    if (d.Depth == 16) (ar, ag, ab) = (vr & 0xF8, vg & 0xF8, vb & 0xF8);
+                    if (d.Depth == 16)
+                    {
+                        (ar, ag, ab) = (vr & 0xF8, vg & 0xF8, vb & 0xF8);
+                    }
                     else
                     {
                         var a = d.ColorOf(value);
@@ -505,15 +681,26 @@ namespace ClassicMac.Graphics.QuickDraw
                     int er = vr - ar, eg = vg - ag, eb = vb - ab;
                     if (rom)
                     {
-                        err[i, 0] = er >> 1; err[i, 1] = eg >> 1; err[i, 2] = eb >> 1;
-                        cr = (er >> 1) + (er & 1); cg = (eg >> 1) + (eg & 1); cb = (eb >> 1) + (eb & 1);
+                        err[i, 0] = er >> 1;
+                        err[i, 1] = eg >> 1;
+                        err[i, 2] = eb >> 1;
+                        cr = (er >> 1) + (er & 1);
+                        cg = (eg >> 1) + (eg & 1);
+                        cb = (eb >> 1) + (eb & 1);
                     }
                     else
                     {
-                        cr = er >> 1; cg = eg >> 1; cb = eb >> 1;
-                        err[i, 0] = (sbyte)(er - (er >> 1)); err[i, 1] = (sbyte)(eg - (eg >> 1)); err[i, 2] = (sbyte)(eb - (eb >> 1));
+                        cr = er >> 1;
+                        cg = eg >> 1;
+                        cb = eb >> 1;
+                        err[i, 0] = (sbyte)(er - (er >> 1));
+                        err[i, 1] = (sbyte)(eg - (eg >> 1));
+                        err[i, 2] = (sbyte)(eb - (eb >> 1));
                     }
-                    if (shown) d.Write(canvas, x, y, value);
+                    if (shown)
+                    {
+                        d.Write(canvas, x, y, value);
+                    }
                 }
             }
         }

@@ -41,7 +41,11 @@ namespace ClassicMac.Core
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(maxLength, 8);
             var bytes = name.Bytes;
-            if (bytes.Length == 0) return "%00";
+            if (bytes.Length == 0)
+            {
+                return "%00";
+            }
+
             var parts = new List<string>(bytes.Length);
             for (var i = 0; i < bytes.Length; i++)
             {
@@ -52,7 +56,11 @@ namespace ClassicMac.Core
 
             // A reserved device name, with or without an extension: escape the last character of its stem.
             var stemParts = ReservedStem(parts);
-            if (stemParts > 0) parts[stemParts - 1] = Escape(bytes[stemParts - 1]);
+            if (stemParts > 0)
+            {
+                parts[stemParts - 1] = Escape(bytes[stemParts - 1]);
+            }
+
             return Fit(parts, maxLength);
         }
 
@@ -68,16 +76,28 @@ namespace ClassicMac.Core
         {
             ArgumentOutOfRangeException.ThrowIfLessThan(maxLength, 8);
             var bytes = name.Bytes;
-            if (bytes.Length == 0) return "_";
+            if (bytes.Length == 0)
+            {
+                return "_";
+            }
+
             var parts = new List<string>(bytes.Length);
             foreach (var b in bytes)
             {
                 var c = FromCp1252(b);
                 parts.Add(c is '/' or '\\' or ':' ? "_" : c == '\0' || c < 0x20 || c == 0x7F || BasiliskEscaped.Contains(c) ? Escape(b) : c.ToString());
             }
-            for (var i = parts.Count - 1; i >= 0 && parts[i] is " " or "."; i--) parts[i] = "_";
+            for (var i = parts.Count - 1; i >= 0 && parts[i] is " " or "."; i--)
+            {
+                parts[i] = "_";
+            }
+
             var stemParts = ReservedStem(parts);
-            if (stemParts > 0) parts.Insert(stemParts, "_");
+            if (stemParts > 0)
+            {
+                parts.Insert(stemParts, "_");
+            }
+
             return Fit(parts, maxLength);
         }
 
@@ -122,7 +142,11 @@ namespace ClassicMac.Core
             var candidate = name;
             var dot = name.LastIndexOf('.');
             var (stem, extension) = dot > 0 ? (name[..dot], name[dot..]) : (name, "");
-            for (var n = 2; Contains(taken, candidate); n++) candidate = $"{stem} ~{n}{extension}";
+            for (var n = 2; Contains(taken, candidate); n++)
+            {
+                candidate = $"{stem} ~{n}{extension}";
+            }
+
             taken.Add(candidate);
             return candidate;
         }
@@ -135,9 +159,17 @@ namespace ClassicMac.Core
             var text = string.Concat(parts);
             var dot = text.IndexOf('.', StringComparison.Ordinal);
             var stem = dot < 0 ? text : text[..dot];
-            if (!Reserved.Contains(stem.TrimEnd(' '))) return 0;
+            if (!Reserved.Contains(stem.TrimEnd(' ')))
+            {
+                return 0;
+            }
+
             var stemParts = 0;
-            for (var length = 0; length < stem.Length; stemParts++) length += parts[stemParts].Length;
+            for (var length = 0; length < stem.Length; stemParts++)
+            {
+                length += parts[stemParts].Length;
+            }
+
             return stemParts;
         }
 
@@ -150,7 +182,11 @@ namespace ClassicMac.Core
         private static string Fit(List<string> parts, int maxLength)
         {
             var total = parts.Sum(p => p.Length);
-            if (total <= maxLength) return string.Concat(parts);
+            if (total <= maxLength)
+            {
+                return string.Concat(parts);
+            }
+
             var dot = parts.LastIndexOf(".");
             var extension = dot > 0 && parts.Count - dot <= 5 ? parts.GetRange(dot, parts.Count - dot) : [];
             var stem = parts.GetRange(0, parts.Count - extension.Count);
@@ -158,7 +194,11 @@ namespace ClassicMac.Core
             var kept = new StringBuilder();
             foreach (var part in stem)
             {
-                if (kept.Length + part.Length > budget) break;
+                if (kept.Length + part.Length > budget)
+                {
+                    break;
+                }
+
                 kept.Append(part);
             }
             // Never end on a space or dot, which Windows drops.

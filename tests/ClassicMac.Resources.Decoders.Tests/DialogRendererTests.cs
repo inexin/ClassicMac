@@ -47,11 +47,20 @@ public class DialogRendererTests(ITestOutputHelper output)
         for (int y = 0; y < 32; y++)
         {
             uint row = y is 0 or 31 ? 0xFFFFFFFF : 0x80000001u | (1u << (31 - y)) | (1u << y);
-            icon[y * 4] = (byte)(row >> 24); icon[y * 4 + 1] = (byte)(row >> 16); icon[y * 4 + 2] = (byte)(row >> 8); icon[y * 4 + 3] = (byte)row;
+            icon[y * 4] = (byte)(row >> 24);
+            icon[y * 4 + 1] = (byte)(row >> 16);
+            icon[y * 4 + 2] = (byte)(row >> 8);
+            icon[y * 4 + 3] = (byte)row;
         }
         Add("ICON", 128, icon);
         var px = new byte[64 * 40 * 4];
-        for (int i = 0; i < 64 * 40; i++) { px[i * 4] = (byte)(i % 64 * 4); px[i * 4 + 1] = (byte)(i / 64 * 6); px[i * 4 + 2] = 128; px[i * 4 + 3] = 255; }
+        for (int i = 0; i < 64 * 40; i++)
+        {
+            px[i * 4] = (byte)(i % 64 * 4);
+            px[i * 4 + 1] = (byte)(i / 64 * 6);
+            px[i * 4 + 2] = 128;
+            px[i * 4 + 3] = 255;
+        }
         Add("PICT", 128, ImageImport.WritePicture(new RgbaBitmap(64, 40, px)));
         // The goAway flags are written as words, so the byte the Toolbox reads is 0: no close box (as captured).
         Add("DLOG", 128, Dlog(60, 40, 260, 400, 1, false, 128, ""));
@@ -281,10 +290,15 @@ public class DialogRendererTests(ITestOutputHelper output)
         (short Id, int Kind)[] jobs = [(128, 0), (129, 0), (130, 0), (131, 0), (132, 0), (133, 0), (200, 2), (200, 3), (200, 4), (200, 5), (201, 2), (201, 4)];
         long total = 0, same = 0;
         foreach (var depth in new[] { 32, 8 })
+        {
             foreach (var (id, kind) in jobs)
             {
                 var path = Path.Combine(folder!, $"y7_{id}_k{kind}_d{depth}.qdr");
-                if (!File.Exists(path)) continue;
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
+
                 var screen = Capture.Read(path);
                 var mask = Capture.Read(Path.Combine(folder!, $"y7_{id}_k{kind}_d{depth}_m.qdr"));
                 var dialogKind = kind switch { 3 => DialogKind.StopAlert, 4 => DialogKind.NoteAlert, 5 => DialogKind.CautionAlert, _ => DialogKind.Alert };
@@ -292,25 +306,46 @@ public class DialogRendererTests(ITestOutputHelper output)
                 var ours = DialogRenderer.Render(drawing, new DialogRenderOptions { ScreenDepth = depth });
                 var masked = TextAreas(drawing, ours);
                 if (Environment.GetEnvironmentVariable("CLASSICMAC_DIALOG_OUT") is { Length: > 0 } outFolder)
+                {
                     File.WriteAllBytes(Path.Combine(outFolder, $"ours_{id}_k{kind}_d{depth}.png"),
                         PngEncoder.Instance.Encode(ours.Bitmap.Width, ours.Bitmap.Height, ours.Bitmap.Pixels));
+                }
+
                 int n = 0, ok = 0;
                 for (int y = 0; y < screen.Height; y++)
+                {
                     for (int x = 0; x < screen.Width; x++)
                     {
-                        if (mask[x, y] != Grey(0) || masked.Contains(x, y)) continue;
+                        if (mask[x, y] != Grey(0) || masked.Contains(x, y))
+                        {
+                            continue;
+                        }
                         // The alert icons are the System's, not in the test fork.
-                        if (kind >= 3 && x >= 26 && x < 58 && y >= 16 && y < 48) continue;
+                        if (kind >= 3 && x >= 26 && x < 58 && y >= 16 && y < 48)
+                        {
+                            continue;
+                        }
+
                         n++;
-                        if (x < ours.Bitmap.Width && y < ours.Bitmap.Height && ours.Bitmap[x, y] == screen[x, y]) ok++;
-                        else if (n - ok <= 5) output.WriteLine($"  differs at ({x}, {y}): {ours.Bitmap[x, y]} vs {screen[x, y]}");
+                        if (x < ours.Bitmap.Width && y < ours.Bitmap.Height && ours.Bitmap[x, y] == screen[x, y])
+                        {
+                            ok++;
+                        }
+                        else if (n - ok <= 5)
+                        {
+                            output.WriteLine($"  differs at ({x}, {y}): {ours.Bitmap[x, y]} vs {screen[x, y]}");
+                        }
                     }
+                }
+
                 output.WriteLine($"{id} kind {kind} depth {depth}: {ok}/{n} ({100.0 * ok / Math.Max(1, n):F2}%) of the pixels outside text match; " +
                     $"size {ours.Bitmap.Width}x{ours.Bitmap.Height} vs {screen.Width}x{screen.Height}");
                 Assert.Equal((screen.Width, screen.Height), (ours.Bitmap.Width, ours.Bitmap.Height));
                 total += n;
                 same += ok;
             }
+        }
+
         output.WriteLine($"All: {same}/{total} ({100.0 * same / Math.Max(1, total):F2}%)");
         Assert.True(same >= total * 0.99, $"{same}/{total} match");
     }
@@ -339,7 +374,10 @@ public class DialogRendererTests(ITestOutputHelper output)
             }
         }
         if (drawing.Kind == DialogKind.Dialog && drawing.Definition is 0 or 5)
+        {
             Add(4, 5, 20, rendering.Bitmap.Width - (drawing.Definition == 0 ? 24 : 7));
+        }
+
         return region;
     }
 
@@ -364,12 +402,16 @@ public class DialogRendererTests(ITestOutputHelper output)
                 count = reader.ReadInt16At(12);
             var clut = new RgbaColor[count];
             for (int i = 0; i < count; i++)
+            {
                 clut[i] = new RgbaColor((byte)(reader.ReadUInt16At(24 + 8 * i + 2) >> 8), (byte)(reader.ReadUInt16At(24 + 8 * i + 4) >> 8),
                     (byte)(reader.ReadUInt16At(24 + 8 * i + 6) >> 8));
+            }
+
             int start = 24 + 8 * count;
             var px = new RgbaColor[w * h];
             var data = reader.Source.Span;
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
                     int o = start + y * rowBytes;
@@ -377,6 +419,8 @@ public class DialogRendererTests(ITestOutputHelper output)
                         ? new RgbaColor(data[o + 4 * x + 1], data[o + 4 * x + 2], data[o + 4 * x + 3])
                         : clut[(data[o + x * depth / 8] >> (8 - depth - x * depth % 8)) & ((1 << depth) - 1)];
                 }
+            }
+
             return new Capture(w, h, px);
         }
     }

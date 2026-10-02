@@ -13,7 +13,11 @@ namespace ClassicMac.Core
         /// <summary>Creates a string from its raw bytes (at most 255, the Pascal string limit).</summary>
         public MacString(ReadOnlySpan<byte> bytes)
         {
-            if (bytes.Length > 255) throw new ArgumentException("A Pascal string holds at most 255 bytes.", nameof(bytes));
+            if (bytes.Length > 255)
+            {
+                throw new ArgumentException("A Pascal string holds at most 255 bytes.", nameof(bytes));
+            }
+
             this.bytes = bytes.ToArray();
         }
 

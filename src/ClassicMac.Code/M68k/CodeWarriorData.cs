@@ -70,7 +70,10 @@ namespace ClassicMac.Code.M68k
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(data);
             if (reader.Length < 4)
+            {
                 throw new InvalidDataException($"A CodeWarrior 'DATA' 0 starts with a long; this one has {reader.Length} bytes.");
+            }
+
             uint codeRelocationOffset = reader.ReadUInt32();
             var blocks = new List<CodeWarriorBlock>(BlockCount);
             var relocations = new List<CodeWarriorRelocations>(RelocationListCount);
@@ -80,13 +83,19 @@ namespace ClassicMac.Code.M68k
                 {
                     var (block, ok) = ReadBlock(reader, diagnostics);
                     blocks.Add(block);
-                    if (!ok) return Result();
+                    if (!ok)
+                    {
+                        return Result();
+                    }
                 }
                 for (int i = 0; i < RelocationListCount; i++)
                 {
                     if (i == (int)CodeWarriorRelocationKind.CodePlusA5 && reader.Position != codeRelocationOffset)
+                    {
                         diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.cw-code-reloc-offset",
                             $"The code relocations start at {reader.Position:X}, not at {codeRelocationOffset:X} as the first long says.", reader.Position));
+                    }
+
                     relocations.Add(new CodeWarriorRelocations((CodeWarriorRelocationKind)i, ReadRelocations(reader, diagnostics)));
                 }
             }
@@ -99,7 +108,10 @@ namespace ClassicMac.Code.M68k
 
             CodeWarriorData Result() => new()
             {
-                CodeRelocationOffset = codeRelocationOffset, Blocks = blocks, Relocations = relocations, End = reader.Position,
+                CodeRelocationOffset = codeRelocationOffset,
+                Blocks = blocks,
+                Relocations = relocations,
+                End = reader.Position,
             };
         }
 
@@ -115,8 +127,14 @@ namespace ClassicMac.Code.M68k
             {
                 int at = reader.Position;
                 byte b = reader.ReadByte();
-                if ((b & 0x80) != 0) Literal((b & 0x7F) + 1, 0);
-                else if ((b & 0x40) != 0) q += (b & 0x3F) + 1;
+                if ((b & 0x80) != 0)
+                {
+                    Literal((b & 0x7F) + 1, 0);
+                }
+                else if ((b & 0x40) != 0)
+                {
+                    q += (b & 0x3F) + 1;
+                }
                 else if ((b & 0x20) != 0)
                 {
                     var fill = new byte[(b & 0x1F) + 2];
@@ -129,11 +147,18 @@ namespace ClassicMac.Code.M68k
                     Array.Fill(fill, (byte)0xFF);
                     Write(fill);
                 }
-                else if (b == 0) break;
-                else if (b == 1) { q += 4; Prefixed([0xFF, 0xFF], 2); }       // skip 4, FF FF, 2 literals
-                else if (b == 2) { q += 4; Prefixed([0xFF], 3); }             // skip 4, FF, 3 literals
-                else if (b == 3) { Write([0xA9, 0xF0]); Literal(2, 2); Literal(1, 1); } // A9F0, skip 2, 2, skip 1, 1
-                else if (b == 4) { Write([0xA9, 0xF0]); Literal(3, 1); Literal(1, 1); } // A9F0, skip 1, 3, skip 1, 1
+                else if (b == 0)
+                {
+                    break;
+                }
+                else if (b == 1)
+                { q += 4; Prefixed([0xFF, 0xFF], 2); }       // skip 4, FF FF, 2 literals
+                else if (b == 2)
+                { q += 4; Prefixed([0xFF], 3); }             // skip 4, FF, 3 literals
+                else if (b == 3)
+                { Write([0xA9, 0xF0]); Literal(2, 2); Literal(1, 1); } // A9F0, skip 2, 2, skip 1, 1
+                else if (b == 4)
+                { Write([0xA9, 0xF0]); Literal(3, 1); Literal(1, 1); } // A9F0, skip 1, 3, skip 1, 1
                 else
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.cw-data-op",
@@ -152,7 +177,11 @@ namespace ClassicMac.Code.M68k
             void Literal(int count, int skipFirst)
             {
                 q += skipFirst;
-                if (count > reader.Remaining) throw new EndOfStreamException();
+                if (count > reader.Remaining)
+                {
+                    throw new EndOfStreamException();
+                }
+
                 runs.Add(new CodeWarriorRun((int)q, reader.Source.Slice(reader.Position, count)));
                 reader.Skip(count);
                 q += count;
@@ -180,14 +209,24 @@ namespace ClassicMac.Code.M68k
                     $"A relocation list's count {(uint)count:X8} is negative; the startup reads no entries for it.", at));
                 return [];
             }
-            if (count > reader.Remaining) throw new EndOfStreamException();
+            if (count > reader.Remaining)
+            {
+                throw new EndOfStreamException();
+            }
+
             var offsets = new List<int>(count);
             int d = 0;
             for (int i = 0; i < count; i++)
             {
                 byte b = reader.ReadByte();
-                if ((b & 0x80) != 0) d += (sbyte)(b << 1);
-                else if ((b & 0x40) != 0) d += (short)(((b << 8) | reader.ReadByte()) << 2) >> 1;
+                if ((b & 0x80) != 0)
+                {
+                    d += (sbyte)(b << 1);
+                }
+                else if ((b & 0x40) != 0)
+                {
+                    d += (short)(((b << 8) | reader.ReadByte()) << 2) >> 1;
+                }
                 else
                 {
                     reader.Position--;

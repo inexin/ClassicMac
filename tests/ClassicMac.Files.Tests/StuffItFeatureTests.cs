@@ -1,8 +1,8 @@
 using System.Buffers.Binary;
 using System.Text;
 using ClassicMac.Core;
-using ClassicMac.Files.Containers;
 using ClassicMac.Files.Archives;
+using ClassicMac.Files.Containers;
 using ClassicMac.Resources;
 
 namespace ClassicMac.Files.Tests;
@@ -1384,7 +1384,11 @@ public sealed class StuffItFeatureTests
             U16(member, 32, HeaderCrc(member));
 
             Span<byte> finder = image.AsSpan(ArchiveHeaderLength + memberHeaderLength, finderInfoLength);
-            if (encodedResource.Length != 0) U16(finder, 0, 1);
+            if (encodedResource.Length != 0)
+            {
+                U16(finder, 0, 1);
+            }
+
             "TEXTttxt"u8.CopyTo(finder[4..]);
             U16(finder, 12, 0x4000);
             int forksAt = ArchiveHeaderLength + memberHeaderLength + finderInfoLength;
@@ -1406,7 +1410,11 @@ public sealed class StuffItFeatureTests
             const int archiveHeaderLength = 22;
             const int memberHeaderLength = 112;
             byte[] nameBytes = Encoding.ASCII.GetBytes(name);
-            if (nameBytes.Length is 0 or > 31) throw new ArgumentOutOfRangeException(nameof(name));
+            if (nameBytes.Length is 0 or > 31)
+            {
+                throw new ArgumentOutOfRangeException(nameof(name));
+            }
+
             int resourceOffset = archiveHeaderLength + memberHeaderLength;
             int dataOffset = resourceOffset + resource.Length;
             byte[] image = new byte[dataOffset + data.Length];
@@ -1478,7 +1486,11 @@ public sealed class StuffItFeatureTests
             Span<byte> member = image.AsSpan(offset, 112);
             byte[] nameBytes = Encoding.ASCII.GetBytes(name);
             // A folder is a folder-start record (method 32), as StuffIt Deluxe 4.5 writes it.
-            if (firstChild != uint.MaxValue) member[0] = member[1] = 32;
+            if (firstChild != uint.MaxValue)
+            {
+                member[0] = member[1] = 32;
+            }
+
             member[2] = checked((byte)nameBytes.Length);
             nameBytes.CopyTo(member[3..]);
             U16(member, 48, childCount);
@@ -1636,8 +1648,12 @@ public sealed class StuffItFeatureTests
             {
                 int bitOffset = index * CodeBits;
                 for (int bit = 0; bit < CodeBits; bit++)
+                {
                     if ((codes[index] & (1 << bit)) != 0)
+                    {
                         encoded[9 + (bitOffset + bit) / 8] |= (byte)(1 << ((bitOffset + bit) & 7));
+                    }
+                }
             }
             return encoded;
         }
@@ -1647,12 +1663,17 @@ public sealed class StuffItFeatureTests
             byte[] encoded = new byte[9 + 256 * 9 / 8 + 2];
             encoded[1] = 1;
             for (int code = 0; code < 256; code++)
+            {
                 for (int bit = 0; bit < 9; bit++)
+                {
                     if ((code & (1 << bit)) != 0)
                     {
                         int bitOffset = code * 9 + bit;
                         encoded[9 + bitOffset / 8] |= (byte)(1 << (bitOffset & 7));
+                    }
+                }
             }
+
             return encoded;
         }
 
@@ -1679,7 +1700,10 @@ public sealed class StuffItFeatureTests
                 if (hasPrevious && nextCode < 1 << 14)
                 {
                     nextCode++;
-                    if (width < 14 && nextCode == 1 << width) width++;
+                    if (width < 14 && nextCode == 1 << width)
+                    {
+                        width++;
+                    }
                 }
                 hasPrevious = true;
             }
@@ -1702,10 +1726,20 @@ public sealed class StuffItFeatureTests
             bits.Add(false); // Root internal node.
             WriteTreeLeaf(bits, symbols.Zero);
             WriteTreeLeaf(bits, symbols.One);
-            foreach (char value in text) bits.Add(value == symbols.Zero ? false : true);
+            foreach (char value in text)
+            {
+                bits.Add(value == symbols.Zero ? false : true);
+            }
+
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int index = 0; index < bits.Count; index++)
-                if (bits[index]) encoded[index / 8] |= (byte)(0x80 >> (index & 7));
+            {
+                if (bits[index])
+                {
+                    encoded[index / 8] |= (byte)(0x80 >> (index & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1743,24 +1777,41 @@ public sealed class StuffItFeatureTests
                 int child = backward[symbol + TreeSize];
                 var path = new List<bool>();
                 for (int parent = backward[child]; parent != 0; child = parent, parent = backward[child])
+                {
                     path.Add(forward[parent] + 1 == child);
+                }
+
                 path.Reverse();
                 bits.AddRange(path);
                 if (frequencies[TreeSize - 1] >= 0x8000)
+                {
                     ReorderLzahTree(frequencies, forward, backward, TreeSize, LeafCount);
+                }
+
                 UpdateLzahTree(symbol, frequencies, forward, backward, TreeSize);
                 if (symbol >= 256)
                 {
                     for (int bit = offsetCodeLength - 1; bit >= 0; bit--)
+                    {
                         bits.Add((offsetCode & (1 << bit)) != 0);
+                    }
+
                     for (int bit = 5; bit >= 0; bit--)
+                    {
                         bits.Add((offsetLowBits & (1 << bit)) != 0);
+                    }
                 }
             }
 
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1771,8 +1822,12 @@ public sealed class StuffItFeatureTests
             foreach (ushort code in codes)
             {
                 for (int bit = 0; bit < 9; bit++, bitPosition++)
+                {
                     if ((code & (1 << bit)) != 0)
+                    {
                         encoded[bitPosition / 8] |= (byte)(1 << (bitPosition & 7));
+                    }
+                }
             }
             return encoded;
         }
@@ -1787,16 +1842,28 @@ public sealed class StuffItFeatureTests
             foreach (byte value in bytes)
             {
                 int requiredBytes = (bitPosition + codeWidth + 7) / 8;
-                while (encoded.Count < requiredBytes) encoded.Add(0);
+                while (encoded.Count < requiredBytes)
+                {
+                    encoded.Add(0);
+                }
+
                 for (int bit = 0; bit < codeWidth; bit++, bitPosition++)
+                {
                     if ((value & (1 << bit)) != 0)
+                    {
                         encoded[bitPosition / 8] |= (byte)(1 << (bitPosition & 7));
+                    }
+                }
+
                 if (nextCode < 16_385 && nextCode == nextWidthBoundary)
                 {
                     nextWidthBoundary <<= 1;
                     codeWidth++;
                 }
-                if (nextCode < 16_385) nextCode++;
+                if (nextCode < 16_385)
+                {
+                    nextCode++;
+                }
             }
             return [.. encoded];
         }
@@ -1811,19 +1878,28 @@ public sealed class StuffItFeatureTests
                 int swap = node + 1;
                 if (frequencies[swap] < weight)
                 {
-                    while (frequencies[++swap] < weight) { }
+                    while (frequencies[++swap] < weight)
+                    { }
                     swap--;
                     frequencies[node] = frequencies[swap];
                     frequencies[swap] = weight;
 
                     int child = forward[node];
                     backward[child] = swap;
-                    if (child < treeSize) backward[child + 1] = swap;
+                    if (child < treeSize)
+                    {
+                        backward[child + 1] = swap;
+                    }
+
                     forward[node] = forward[swap];
                     forward[swap] = child;
                     child = forward[node];
                     backward[child] = node;
-                    if (child < treeSize) backward[child + 1] = node;
+                    if (child < treeSize)
+                    {
+                        backward[child + 1] = node;
+                    }
+
                     node = swap;
                 }
                 node = backward[node];
@@ -1836,7 +1912,11 @@ public sealed class StuffItFeatureTests
             int leaf = 0;
             for (int node = 0; node < treeSize; node++)
             {
-                if (forward[node] < treeSize) continue;
+                if (forward[node] < treeSize)
+                {
+                    continue;
+                }
+
                 frequencies[leaf] = (frequencies[node] + 1) >> 1;
                 forward[leaf++] = forward[node];
             }
@@ -1846,7 +1926,11 @@ public sealed class StuffItFeatureTests
             {
                 int combinedFrequency = frequencies[child] + frequencies[child + 1];
                 int insertAt = nextNode - 1;
-                while (insertAt >= 0 && combinedFrequency < frequencies[insertAt]) insertAt--;
+                while (insertAt >= 0 && combinedFrequency < frequencies[insertAt])
+                {
+                    insertAt--;
+                }
+
                 insertAt++;
                 Array.Copy(frequencies, insertAt, frequencies, insertAt + 1, nextNode - insertAt);
                 Array.Copy(forward, insertAt, forward, insertAt + 1, nextNode - insertAt);
@@ -1858,21 +1942,31 @@ public sealed class StuffItFeatureTests
             {
                 int child = forward[node];
                 backward[child] = node;
-                if (child < treeSize) backward[child + 1] = node;
+                if (child < treeSize)
+                {
+                    backward[child + 1] = node;
+                }
             }
         }
 
         private static void WriteTreeLeaf(List<bool> bits, byte symbol)
         {
             bits.Add(true);
-            for (int bit = 7; bit >= 0; bit--) bits.Add((symbol & (1 << bit)) != 0);
+            for (int bit = 7; bit >= 0; bit--)
+            {
+                bits.Add((symbol & (1 << bit)) != 0);
+            }
         }
 
         private static void WriteCode(Span<byte> output, int bitOffset, ushort value, int width)
         {
             for (int bit = 0; bit < width; bit++)
+            {
                 if ((value & (1 << bit)) != 0)
+                {
                     output[(bitOffset + bit) / 8] |= (byte)(1 << ((bitOffset + bit) & 7));
+                }
+            }
         }
 
         private static ushort HeaderCrc(ReadOnlySpan<byte> header)
@@ -1889,7 +1983,9 @@ public sealed class StuffItFeatureTests
             {
                 crc ^= value;
                 for (int bit = 0; bit < 8; bit++)
+                {
                     crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+                }
             }
             return crc;
         }

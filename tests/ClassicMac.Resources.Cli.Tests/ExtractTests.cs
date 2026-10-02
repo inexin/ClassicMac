@@ -26,7 +26,11 @@ public class ExtractTests : IDisposable
         foreach (var (type, id, name, data) in resources)
         {
             var r = new Resource(FourCC.FromString(type), id, data);
-            if (name is not null) r.Name = MacString.FromMacRoman(name);
+            if (name is not null)
+            {
+                r.Name = MacString.FromMacRoman(name);
+            }
+
             fork.Add(r);
         }
         return fork.ToArray();
@@ -109,7 +113,9 @@ public class ExtractTests : IDisposable
     public void Corpus_images_extract_with_matching_manifests()
     {
         if (!CorpusFolders.Any)
+        {
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of disk images to run this.");
+        }
 
         string[] extensions = [".img", ".dsk", ".iso", ".hfv", ".image", ".smi"];
         var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
@@ -121,9 +127,17 @@ public class ExtractTests : IDisposable
         {
             var target = Path.Combine(folder, $"corpus{extracted++}");
             var (code, _, error) = Run("extract", image, "-o", target, "-q");
-            if (error.Contains("being used by another process", StringComparison.Ordinal)) continue;
+            if (error.Contains("being used by another process", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             Assert.True(code is ExitCodes.Success or ExitCodes.Damaged or ExitCodes.Unreadable, $"{image}: {error}");
-            if (!Directory.Exists(target)) continue;
+            if (!Directory.Exists(target))
+            {
+                continue;
+            }
+
             foreach (var manifestPath in Directory.EnumerateFiles(target, "manifest.json", SearchOption.AllDirectories))
             {
                 var directory = Path.GetDirectoryName(manifestPath)!;

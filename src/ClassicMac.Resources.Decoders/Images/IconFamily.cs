@@ -87,17 +87,38 @@ namespace ClassicMac.Resources.Decoders.Images
             {
                 var type = reader.ReadFourCCAt((int)at).ToString();
                 var size = reader.ReadUInt32At((int)at + 4);
-                if (size < 1) throw new InvalidDataException($"The icon family's '{type}' element has size {size}; the family fails (paramErr).");
-                if (at + size > length) break;                   // an element past the end is skipped
+                if (size < 1)
+                {
+                    throw new InvalidDataException($"The icon family's '{type}' element has size {size}; the family fails (paramErr).");
+                }
+
+                if (at + size > length)
+                {
+                    break;                   // an element past the end is skipped
+                }
+
                 var payload = size >= 8 ? data.Slice((int)at + 8, (int)size - 8) : ReadOnlyMemory<byte>.Empty;
-                if (MemberType(type) is { } member) family.Set(member, payload, diagnostics);
-                else if (FamilyTypes.Contains(type) && type != "icns") family.variants[type] = ReadIcns(data.Slice((int)at, (int)size), diagnostics);
-                else ignored.Add(type);
+                if (MemberType(type) is { } member)
+                {
+                    family.Set(member, payload, diagnostics);
+                }
+                else if (FamilyTypes.Contains(type) && type != "icns")
+                {
+                    family.variants[type] = ReadIcns(data.Slice((int)at, (int)size), diagnostics);
+                }
+                else
+                {
+                    ignored.Add(type);
+                }
+
                 at += size;
             }
             if (ignored.Count > 0)
+            {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Info, "icon.family-ignored",
                     $"Elements Mac OS 9 does not know were skipped: {string.Join(", ", ignored.Select(t => $"'{t}'"))}."));
+            }
+
             return family;
         }
 
@@ -109,10 +130,20 @@ namespace ClassicMac.Resources.Decoders.Images
         public static IconFamily FromResources(Func<FourCC, short, ReadOnlyMemory<byte>?> lookup, short id, ICollection<Diagnostic>? diagnostics = null)
         {
             ArgumentNullException.ThrowIfNull(lookup);
-            if (lookup(FourCC.FromString("icns"), id) is { Length: > 0 } icns) return ReadIcns(icns, diagnostics);
+            if (lookup(FourCC.FromString("icns"), id) is { Length: > 0 } icns)
+            {
+                return ReadIcns(icns, diagnostics);
+            }
+
             var family = new IconFamily();
             foreach (var type in ClassicTypes)
-                if (lookup(FourCC.FromString(type), id) is { Length: > 0 } data) family.Set(MemberType(type)!, data, diagnostics);
+            {
+                if (lookup(FourCC.FromString(type), id) is { Length: > 0 } data)
+                {
+                    family.Set(MemberType(type)!, data, diagnostics);
+                }
+            }
+
             return family;
         }
 
@@ -129,7 +160,10 @@ namespace ClassicMac.Resources.Decoders.Images
                 {
                     // it32 alone carries a compression-format word, which must be 0.
                     if (!new BigEndianReader(payload).TryReadUInt32(out var format) || format != 0)
+                    {
                         throw new InvalidDataException("The 'it32' member's compression format is not 0; the family fails (paramErr).");
+                    }
+
                     payload = payload[4..];
                 }
                 members[member.Type] = Decompress(payload.Span, member.Width * member.Height);
@@ -162,13 +196,25 @@ namespace ClassicMac.Resources.Decoders.Images
                     {
                         int count = control + 1;
                         for (int i = 0; i < count && at < data.Length; i++, at++)
-                            if (filled < pixels) argb[4 * filled++ + plane] = data[at];
+                        {
+                            if (filled < pixels)
+                            {
+                                argb[4 * filled++ + plane] = data[at];
+                            }
+                        }
                     }
                     else
                     {
-                        if (at >= data.Length) break;
+                        if (at >= data.Length)
+                        {
+                            break;
+                        }
+
                         byte value = data[at++];
-                        for (int i = control - 125; i > 0 && filled < pixels; i--) argb[4 * filled++ + plane] = value;
+                        for (int i = control - 125; i > 0 && filled < pixels; i--)
+                        {
+                            argb[4 * filled++ + plane] = value;
+                        }
                     }
                 }
             }
@@ -193,10 +239,15 @@ namespace ClassicMac.Resources.Decoders.Images
         /// <returns>Null when the family lacks the member or it is a mask.</returns>
         public RgbaBitmap? Image(string type)
         {
-            if (MemberType(type) is not { IsMask: false } member || !members.TryGetValue(type, out var data)) return null;
+            if (MemberType(type) is not { IsMask: false } member || !members.TryGetValue(type, out var data))
+            {
+                return null;
+            }
+
             var bitmap = new RgbaBitmap(member.Width, member.Height);
             var palette = member.Depth is 4 or 8 ? StandardColorTables.ForId(member.Depth)! : null;
             for (int y = 0; y < member.Height; y++)
+            {
                 for (int x = 0; x < member.Width; x++)
                 {
                     int i = y * member.Width + x;
@@ -209,6 +260,8 @@ namespace ClassicMac.Resources.Decoders.Images
                     };
                     bitmap[x, y] = c;
                 }
+            }
+
             return bitmap;
         }
 
@@ -219,8 +272,16 @@ namespace ClassicMac.Resources.Decoders.Images
         /// <returns>Null when the family lacks the member or it is a mask; the image opaque when the family has no mask.</returns>
         public RgbaBitmap? Masked(string type)
         {
-            if (Image(type) is not { } image) return null;
-            if (MaskFor(image.Height) is not { } maskType) return image;
+            if (Image(type) is not { } image)
+            {
+                return null;
+            }
+
+            if (MaskFor(image.Height) is not { } maskType)
+            {
+                return image;
+            }
+
             var mask = MemberType(maskType)!;
             var data = members[maskType];
             bool In(int x, int y) => mask.Depth == 1
@@ -229,27 +290,49 @@ namespace ClassicMac.Resources.Decoders.Images
             if (mask.Width == image.Width && mask.Height == image.Height)
             {
                 for (int y = 0; y < image.Height; y++)
+                {
                     for (int x = 0; x < image.Width; x++)
                     {
                         var c = image[x, y];
                         image[x, y] = c with { A = mask.Depth == 1 ? (byte)(In(x, y) ? 255 : 0) : data[y * mask.Width + x] };
                     }
+                }
+
                 return image;
             }
             var region = Region.Empty;
             for (int y = 0; y < mask.Height; y++)
+            {
                 for (int x = 0; x < mask.Width; x++)
                 {
-                    if (!In(x, y)) continue;
+                    if (!In(x, y))
+                    {
+                        continue;
+                    }
+
                     int end = x;
-                    while (end < mask.Width && In(end, y)) end++;
+                    while (end < mask.Width && In(end, y))
+                    {
+                        end++;
+                    }
+
                     region = region.Union(Region.FromRect(new PictRect(y, x, y + 1, end)));
                     x = end;
                 }
+            }
+
             region = PictureMapping.MapRegion(region, new PictRect(0, 0, mask.Height, mask.Width), new PictRect(0, 0, image.Height, image.Width));
             for (int y = 0; y < image.Height; y++)
+            {
                 for (int x = 0; x < image.Width; x++)
-                    if (!region.Contains(x, y)) image[x, y] = image[x, y] with { A = 0 };
+                {
+                    if (!region.Contains(x, y))
+                    {
+                        image[x, y] = image[x, y] with { A = 0 };
+                    }
+                }
+            }
+
             return image;
         }
     }

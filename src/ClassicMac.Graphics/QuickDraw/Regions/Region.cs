@@ -41,7 +41,11 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             get
             {
-                if (bands.Length == 0) return default;
+                if (bands.Length == 0)
+                {
+                    return default;
+                }
+
                 int left = int.MaxValue, right = int.MinValue;
                 foreach (var b in bands)
                 {
@@ -59,14 +63,22 @@ namespace ClassicMac.Graphics.QuickDraw
         // 0x7FFF. A region with no rows is its bounding rectangle.
         internal static Region FromQuickDrawData(PictRect bbox, ReadOnlySpan<short> data)
         {
-            if (data.Length == 0 || data[0] == 0x7FFF) return FromRect(bbox);
+            if (data.Length == 0 || data[0] == 0x7FFF)
+            {
+                return FromRect(bbox);
+            }
+
             var rows = new List<(int y, List<int> xs)>();
             int i = 0;
             while (i < data.Length && data[i] != 0x7FFF)
             {
                 int y = data[i++];
                 var xs = new List<int>();
-                while (i < data.Length && data[i] != 0x7FFF) xs.Add(data[i++]);
+                while (i < data.Length && data[i] != 0x7FFF)
+                {
+                    xs.Add(data[i++]);
+                }
+
                 i++;                                                    // row terminator
                 rows.Add((y, xs));
             }
@@ -82,10 +94,21 @@ namespace ClassicMac.Graphics.QuickDraw
             int size = b.ReadUInt16() & 0x7FFF;
             bbox = PictRect.Read(b);
             if (size <= 10)
+            {
                 return FromRect(bbox);
+            }
+
             var data = new short[(size - 10) / 2];
-            for (int i = 0; i < data.Length; i++) data[i] = b.ReadInt16();
-            if ((size & 1) != 0) b.ReadByte();
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] = b.ReadInt16();
+            }
+
+            if ((size & 1) != 0)
+            {
+                b.ReadByte();
+            }
+
             return FromQuickDrawData(bbox, data);
         }
 
@@ -95,18 +118,37 @@ namespace ClassicMac.Graphics.QuickDraw
             var byY = new SortedDictionary<int, HashSet<int>>();
             foreach (var (y, xs) in rows)
             {
-                if (!byY.TryGetValue(y, out var set)) byY[y] = set = new HashSet<int>();
+                if (!byY.TryGetValue(y, out var set))
+                {
+                    byY[y] = set = new HashSet<int>();
+                }
+
                 foreach (var x in xs)
-                    if (!set.Remove(x)) set.Add(x);
+                {
+                    if (!set.Remove(x))
+                    {
+                        set.Add(x);
+                    }
+                }
             }
             var result = new List<Band>();
             var current = new SortedSet<int>();
             int? top = null;
             foreach (var (y, toggles) in byY)
             {
-                if (top is int t && current.Count > 0) Append(result, t, y, current.ToArray());
+                if (top is int t && current.Count > 0)
+                {
+                    Append(result, t, y, current.ToArray());
+                }
+
                 foreach (var x in toggles)
-                    if (!current.Remove(x)) current.Add(x);
+                {
+                    if (!current.Remove(x))
+                    {
+                        current.Add(x);
+                    }
+                }
+
                 top = y;
             }
             return new Region(result.ToArray());
@@ -120,12 +162,19 @@ namespace ClassicMac.Graphics.QuickDraw
             foreach (var (y, runs) in rows)
             {
                 pairs.Clear();
-                for (int i = 0; i + 1 < runs.Count; i += 2) pairs.Add((runs[i], runs[i + 1]));
+                for (int i = 0; i + 1 < runs.Count; i += 2)
+                {
+                    pairs.Add((runs[i], runs[i + 1]));
+                }
+
                 pairs.Sort();
                 var spans = new List<int>(pairs.Count * 2);
                 foreach (var (x0, x1) in pairs)
                 {
-                    if (spans.Count > 0 && x0 <= spans[^1]) spans[^1] = Math.Max(spans[^1], x1);
+                    if (spans.Count > 0 && x0 <= spans[^1])
+                    {
+                        spans[^1] = Math.Max(spans[^1], x1);
+                    }
                     else
                     {
                         spans.Add(x0);
@@ -140,7 +189,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // Canonical QuickDraw region data (without rgnSize/rgnBBox): empty for a rectangular region.
         internal short[] ToQuickDrawData()
         {
-            if (bands.Length == 0 || (bands.Length == 1 && bands[0].Spans.Length == 2)) return Array.Empty<short>();
+            if (bands.Length == 0 || (bands.Length == 1 && bands[0].Spans.Length == 2))
+            {
+                return Array.Empty<short>();
+            }
+
             var data = new List<short>();
             int[] previous = Array.Empty<int>();
             int previousBottom = int.MinValue;
@@ -170,21 +223,38 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 if (band.Top != previousBottom && previous.Length > 0)
                 {
-                    foreach (var x in Toggles(previous, Array.Empty<int>())) yield return (x, previousBottom);
+                    foreach (var x in Toggles(previous, Array.Empty<int>()))
+                    {
+                        yield return (x, previousBottom);
+                    }
+
                     previous = Array.Empty<int>();
                 }
-                foreach (var x in Toggles(previous, band.Spans)) yield return (x, band.Top);
+                foreach (var x in Toggles(previous, band.Spans))
+                {
+                    yield return (x, band.Top);
+                }
+
                 previous = band.Spans;
                 previousBottom = band.Bottom;
             }
-            foreach (var x in Toggles(previous, Array.Empty<int>())) yield return (x, previousBottom);
+            foreach (var x in Toggles(previous, Array.Empty<int>()))
+            {
+                yield return (x, previousBottom);
+            }
         }
 
         private static SortedSet<int> Toggles(int[] before, int[] after)
         {
             var toggles = new SortedSet<int>(before);
             foreach (var x in after)
-                if (!toggles.Remove(x)) toggles.Add(x);
+            {
+                if (!toggles.Remove(x))
+                {
+                    toggles.Add(x);
+                }
+            }
+
             return toggles;
         }
 
@@ -192,10 +262,24 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             var toggles = new SortedSet<int>(before);
             foreach (var x in after)
-                if (!toggles.Remove(x)) toggles.Add(x);
-            if (toggles.Count == 0) return;
+            {
+                if (!toggles.Remove(x))
+                {
+                    toggles.Add(x);
+                }
+            }
+
+            if (toggles.Count == 0)
+            {
+                return;
+            }
+
             data.Add((short)y);
-            foreach (var x in toggles) data.Add((short)x);
+            foreach (var x in toggles)
+            {
+                data.Add((short)x);
+            }
+
             data.Add(0x7FFF);
         }
 
@@ -204,10 +288,24 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             foreach (var b in bands)
             {
-                if (y < b.Top) return false;
-                if (y >= b.Bottom) continue;
+                if (y < b.Top)
+                {
+                    return false;
+                }
+
+                if (y >= b.Bottom)
+                {
+                    continue;
+                }
+
                 for (int i = 0; i < b.Spans.Length; i += 2)
-                    if (x >= b.Spans[i] && x < b.Spans[i + 1]) return true;
+                {
+                    if (x >= b.Spans[i] && x < b.Spans[i + 1])
+                    {
+                        return true;
+                    }
+                }
+
                 return false;
             }
             return false;
@@ -217,14 +315,22 @@ namespace ClassicMac.Graphics.QuickDraw
         internal IEnumerable<PictRect> Rectangles()
         {
             foreach (var b in bands)
+            {
                 for (int i = 0; i < b.Spans.Length; i += 2)
+                {
                     yield return new PictRect(b.Top, b.Spans[i], b.Bottom, b.Spans[i + 1]);
+                }
+            }
         }
 
         /// <summary>The region moved by (<paramref name="dh"/>, <paramref name="dv"/>) (QuickDraw <c>OffsetRgn</c>).</summary>
         public Region Offset(int dh, int dv)
         {
-            if (dh == 0 && dv == 0) return this;
+            if (dh == 0 && dv == 0)
+            {
+                return this;
+            }
+
             return new Region(bands.Select(b => new Band(b.Top + dv, b.Bottom + dv, b.Spans.Select(x => x + dh).ToArray())).ToArray());
         }
 
@@ -243,15 +349,26 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <summary>The region shrunk by <paramref name="dh"/> and <paramref name="dv"/> on every side, or grown when negative (<c>InsetRgn</c>).</summary>
         public Region Inset(int dh, int dv)
         {
-            if (IsEmpty) return this;
+            if (IsEmpty)
+            {
+                return this;
+            }
+
             var horizontal = new List<Band>();
             foreach (var b in bands)
             {
                 var spans = InsetSpans(b.Spans, dh);
-                if (spans.Length > 0) Append(horizontal, b.Top, b.Bottom, spans);
+                if (spans.Length > 0)
+                {
+                    Append(horizontal, b.Top, b.Bottom, spans);
+                }
             }
             var h = new Region(horizontal.ToArray());
-            if (dv == 0 || h.IsEmpty) return h;
+            if (dv == 0 || h.IsEmpty)
+            {
+                return h;
+            }
+
             return dv < 0 ? h.DilateVertically(-dv) : h.ErodeVertically(dv);
         }
 
@@ -261,9 +378,15 @@ namespace ClassicMac.Graphics.QuickDraw
             for (int i = 0; i < spans.Length; i += 2)
             {
                 int x0 = spans[i] + d, x1 = spans[i + 1] - d;
-                if (x0 >= x1) continue;
+                if (x0 >= x1)
+                {
+                    continue;
+                }
+
                 if (result.Count > 0 && x0 <= result[^1])
+                {
                     result[^1] = Math.Max(result[^1], x1);   // grown spans that now touch merge
+                }
                 else
                 {
                     result.Add(x0);
@@ -278,7 +401,10 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             var result = Empty;
             foreach (var b in bands)
+            {
                 result = result.Union(new Region(new[] { new Band(b.Top - d, b.Bottom + d, b.Spans) }));
+            }
+
             return result;
         }
 
@@ -294,8 +420,16 @@ namespace ClassicMac.Graphics.QuickDraw
         private static Region Combine(Region a, Region b, Func<bool, bool, bool> op)
         {
             var ys = new SortedSet<int>();
-            foreach (var band in a.bands) { ys.Add(band.Top); ys.Add(band.Bottom); }
-            foreach (var band in b.bands) { ys.Add(band.Top); ys.Add(band.Bottom); }
+            foreach (var band in a.bands)
+            {
+                ys.Add(band.Top);
+                ys.Add(band.Bottom);
+            }
+            foreach (var band in b.bands)
+            {
+                ys.Add(band.Top);
+                ys.Add(band.Bottom);
+            }
             var result = new List<Band>();
             int? previous = null;
             int ia = 0, ib = 0;
@@ -303,12 +437,23 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 if (previous is int top)
                 {
-                    while (ia < a.bands.Length && a.bands[ia].Bottom <= top) ia++;
-                    while (ib < b.bands.Length && b.bands[ib].Bottom <= top) ib++;
+                    while (ia < a.bands.Length && a.bands[ia].Bottom <= top)
+                    {
+                        ia++;
+                    }
+
+                    while (ib < b.bands.Length && b.bands[ib].Bottom <= top)
+                    {
+                        ib++;
+                    }
+
                     var sa = ia < a.bands.Length && a.bands[ia].Top <= top ? a.bands[ia].Spans : Array.Empty<int>();
                     var sb = ib < b.bands.Length && b.bands[ib].Top <= top ? b.bands[ib].Spans : Array.Empty<int>();
                     var spans = CombineSpans(sa, sb, op);
-                    if (spans.Length > 0) Append(result, top, y, spans);
+                    if (spans.Length > 0)
+                    {
+                        Append(result, top, y, spans);
+                    }
                 }
                 previous = y;
             }
@@ -323,8 +468,16 @@ namespace ClassicMac.Graphics.QuickDraw
             while (i < a.Length || j < b.Length)
             {
                 int x = Math.Min(i < a.Length ? a[i] : int.MaxValue, j < b.Length ? b[j] : int.MaxValue);
-                while (i < a.Length && a[i] == x) { inA = !inA; i++; }
-                while (j < b.Length && b[j] == x) { inB = !inB; j++; }
+                while (i < a.Length && a[i] == x)
+                {
+                    inA = !inA;
+                    i++;
+                }
+                while (j < b.Length && b[j] == x)
+                {
+                    inB = !inB;
+                    j++;
+                }
                 bool now = op(inA, inB);
                 if (now != inside)
                 {
@@ -338,7 +491,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // Adds a band, merging it with the previous one when they touch and have identical spans.
         private static void Append(List<Band> bands, int top, int bottom, int[] spans)
         {
-            if (bottom <= top || spans.Length == 0) return;
+            if (bottom <= top || spans.Length == 0)
+            {
+                return;
+            }
+
             if (bands.Count > 0)
             {
                 var last = bands[^1];

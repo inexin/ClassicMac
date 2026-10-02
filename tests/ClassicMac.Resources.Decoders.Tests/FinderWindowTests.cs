@@ -203,8 +203,15 @@ public class FinderWindowTests
     {
         var item = Item("", v, h, flags: (ushort)flags);
 
-        if (placed) Assert.Equal(new MacPoint((short)pv, (short)ph), item.Position);
-        else Assert.Null(item.Position);
+        if (placed)
+        {
+            Assert.Equal(new MacPoint((short)pv, (short)ph), item.Position);
+        }
+        else
+        {
+            Assert.Null(item.Position);
+        }
+
         Assert.Equal(placed, item.HasLocation);
     }
 
@@ -390,12 +397,23 @@ public class FinderWindowTests
         // baseline.
         int baseline = Top + 20 + 42, inside = 0, outside = 0;
         for (int y = Top + 52; y < Top + 70; y++)
+        {
             for (int x = 30; x < 62; x++)
+            {
                 if (bitmap[x, y] == Black)
                 {
-                    if (x is >= 41 and < 49 && y >= baseline - 4 && y < baseline) inside++;
-                    else outside++;
+                    if (x is >= 41 and < 49 && y >= baseline - 4 && y < baseline)
+                    {
+                        inside++;
+                    }
+                    else
+                    {
+                        outside++;
+                    }
                 }
+            }
+        }
+
         Assert.True(inside > 0);
         Assert.Equal(0, outside);
     }
@@ -592,7 +610,8 @@ public class FinderWindowTests
     {
         var window = In(FinderViewKind.SmallIcon, new FinderWindow
         {
-            Bounds = new MacRect(0, 0, 84, 340), Flags = FinderWindowItem.HasBeenInitedFlag,   // 48 visible: two rows
+            Bounds = new MacRect(0, 0, 84, 340),
+            Flags = FinderWindowItem.HasBeenInitedFlag,   // 48 visible: two rows
             Items = [Unplaced("a"), Unplaced("b"), Unplaced("c")],
         });
 
@@ -604,7 +623,8 @@ public class FinderWindowTests
     {
         var window = In(FinderViewKind.SmallIcon, new FinderWindow
         {
-            Bounds = new MacRect(0, 0, 50, 340), Flags = FinderWindowItem.HasBeenInitedFlag,   // 14 visible
+            Bounds = new MacRect(0, 0, 50, 340),
+            Flags = FinderWindowItem.HasBeenInitedFlag,   // 14 visible
             Items = [Unplaced("a"), Unplaced("b")],
         });
 
@@ -618,7 +638,8 @@ public class FinderWindowTests
         // although no item is near (48, 194).
         var window = In(FinderViewKind.SmallIcon, new FinderWindow
         {
-            Bounds = new MacRect(0, 0, 400, 340), Flags = FinderWindowItem.HasBeenInitedFlag,
+            Bounds = new MacRect(0, 0, 400, 340),
+            Flags = FinderWindowItem.HasBeenInitedFlag,
             Items = [Item("A", 10, 200), Item("B", 150, 400), Unplaced("a")],
         });
 
@@ -726,8 +747,16 @@ public class FinderWindowTests
     {
         int n = 0;
         for (int y = top; y < top + 32; y++)
+        {
             for (int x = left; x < left + 32; x++)
-                if (bitmap[x, y] != White) n++;
+            {
+                if (bitmap[x, y] != White)
+                {
+                    n++;
+                }
+            }
+        }
+
         return n;
     }
     // ---- The whole window: the Platinum document frame around the content (finder-windows.md §2.9) ----
@@ -743,8 +772,13 @@ public class FinderWindowTests
         // 6 columns left and 22 rows above the content; 7 right and below, the shadow included [Verified: Mac OS 9.0 Finder].
         Assert.Equal((content.Width + 13, content.Height + 29), (whole.Width, whole.Height));
         for (int y = 0; y < content.Height; y++)
+        {
             for (int x = 0; x < content.Width; x++)
+            {
                 Assert.True(content[x, y] == whole[x + 6, y + 22], $"content pixel ({x}, {y})");
+            }
+        }
+
         Assert.Equal(Black, whole[0, 0]);
         Assert.Equal(Black, whole[5, 21]);
         // The shadow's corners show what is behind the window.

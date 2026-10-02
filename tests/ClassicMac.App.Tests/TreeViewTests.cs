@@ -67,12 +67,14 @@ public class TreeViewTests
         var first = Array.FindIndex(pixels, p => p != 0xFFFF0000);
         var (x0, y0) = (first % width - 2 * k, first / width - 2 * k);
         for (var y = 0; y < 16 * k; y++)
+        {
             for (var x = 0; x < 16 * k; x++)
             {
                 var a = art[y / k * 16 + x / k];
                 var expected = a >> 24 == 0 ? 0xFFFF0000 : a;
                 Assert.True(pixels[(y0 + y) * width + x0 + x] == expected, $"({x}, {y}) at {scaling:P0}: {pixels[(y0 + y) * width + x0 + x]:X8}, expected {expected:X8}");
             }
+        }
         // Centred in the slot: as many device pixels left as right, give or take one.
         var slot = (int)Math.Round(16 * scaling);
         var left = (int)Math.Round(icon.TranslatePoint(default, window)!.Value.X * scaling);
@@ -132,8 +134,12 @@ public class TreeViewTests
             var path = System.IO.Path.Combine(folder, "many.tar");
             using (var stream = File.Create(path))
             using (var tar = new System.Formats.Tar.TarWriter(stream, System.Formats.Tar.TarEntryFormat.Pax))
+            {
                 for (var i = 0; i < Files; i++)
+                {
                     tar.WriteEntry(new System.Formats.Tar.PaxTarEntry(System.Formats.Tar.TarEntryType.RegularFile, $"Many/File {i:D4}") { DataStream = new MemoryStream([1]) });
+                }
+            }
 
             var model = new MainViewModel();
             var window = new MainWindow { DataContext = model };

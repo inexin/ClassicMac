@@ -59,7 +59,9 @@ public class HostWriteTests : IDisposable
             Assert.Equal(file.ResourceFork.ToArray(), host.File.ResourceFork.ToArray());
             Assert.Equal(file.Modified!.Value.ToDateTime(), File.GetLastWriteTime(paths[0]));
             if (layout == HostLayout.AppleDouble)
+            {
                 Assert.Equal((file.Created, file.Modified), (host.File.Created, host.File.Modified));
+            }
         }
     }
 

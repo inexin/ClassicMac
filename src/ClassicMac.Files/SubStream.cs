@@ -17,8 +17,14 @@ namespace ClassicMac.Files
             this.inner = inner;
             this.start = start;
             this.length = length;
-            if (inner.CanSeek) inner.Seek(start, SeekOrigin.Begin);
-            else Skip(inner, start);
+            if (inner.CanSeek)
+            {
+                inner.Seek(start, SeekOrigin.Begin);
+            }
+            else
+            {
+                Skip(inner, start);
+            }
         }
 
         public override bool CanRead => true;
@@ -40,8 +46,16 @@ namespace ClassicMac.Files
         public override int Read(Span<byte> buffer)
         {
             var remaining = length - position;
-            if (remaining <= 0) return 0;
-            if (buffer.Length > remaining) buffer = buffer[..(int)remaining];
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            if (buffer.Length > remaining)
+            {
+                buffer = buffer[..(int)remaining];
+            }
+
             var read = inner.Read(buffer);
             position += read;
             return read;
@@ -49,7 +63,11 @@ namespace ClassicMac.Files
 
         public override long Seek(long offset, SeekOrigin origin)
         {
-            if (!inner.CanSeek) throw new NotSupportedException();
+            if (!inner.CanSeek)
+            {
+                throw new NotSupportedException();
+            }
+
             var target = origin switch
             {
                 SeekOrigin.Begin => offset,
@@ -57,7 +75,11 @@ namespace ClassicMac.Files
                 SeekOrigin.End => length + offset,
                 _ => throw new ArgumentOutOfRangeException(nameof(origin)),
             };
-            if (target < 0) throw new IOException("Cannot seek before the start of the stream.");
+            if (target < 0)
+            {
+                throw new IOException("Cannot seek before the start of the stream.");
+            }
+
             inner.Seek(start + target, SeekOrigin.Begin);
             position = target;
             return position;
@@ -73,7 +95,11 @@ namespace ClassicMac.Files
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) inner.Dispose();
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+
             base.Dispose(disposing);
         }
 
@@ -83,7 +109,11 @@ namespace ClassicMac.Files
             while (count > 0)
             {
                 var read = stream.Read(scratch, 0, (int)Math.Min(scratch.Length, count));
-                if (read == 0) break;
+                if (read == 0)
+                {
+                    break;
+                }
+
                 count -= read;
             }
         }

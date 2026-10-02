@@ -93,7 +93,10 @@ namespace ClassicMac.Code.M68k
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(data);
             if (reader.Length < BasicLength)
+            {
                 throw new System.IO.InvalidDataException($"A 'thng' is at least {BasicLength} bytes; this one has {reader.Length}.");
+            }
+
             var type = reader.ReadFourCC();
             var subType = reader.ReadFourCC();
             var manufacturer = reader.ReadFourCC();
@@ -104,19 +107,36 @@ namespace ClassicMac.Code.M68k
             var info = Spec(reader);
             var icon = Spec(reader);
             if (reader.Remaining == 0)
+            {
                 return new ComponentResource
                 {
-                    Type = type, SubType = subType, Manufacturer = manufacturer, Flags = flags, FlagsMask = flagsMask,
-                    Code = code, Name = name, Info = info, Icon = icon,
+                    Type = type,
+                    SubType = subType,
+                    Manufacturer = manufacturer,
+                    Flags = flags,
+                    FlagsMask = flagsMask,
+                    Code = code,
+                    Name = name,
+                    Info = info,
+                    Icon = icon,
                 };
+            }
+
             if (reader.Length < ExtendedLength)
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.thng-truncated",
                     $"The 'thng' has {reader.Length} bytes: more than the basic form, too few for the extended one ({ExtendedLength}).", BasicLength));
                 return new ComponentResource
                 {
-                    Type = type, SubType = subType, Manufacturer = manufacturer, Flags = flags, FlagsMask = flagsMask,
-                    Code = code, Name = name, Info = info, Icon = icon,
+                    Type = type,
+                    SubType = subType,
+                    Manufacturer = manufacturer,
+                    Flags = flags,
+                    FlagsMask = flagsMask,
+                    Code = code,
+                    Name = name,
+                    Info = info,
+                    Icon = icon,
                 };
             }
             var version = reader.ReadUInt32();
@@ -137,13 +157,27 @@ namespace ClassicMac.Code.M68k
                 platforms.Add(new ComponentPlatform(componentFlags, platformCode, reader.ReadInt16()));
             }
             if (count != 0 && (registerFlags & MultiplePlatformsFlag) == 0)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.thng-platforms-unflagged",
                     $"The 'thng' lists {count} platforms without componentHasMultiplePlatforms ($08), which says they are in use.", 0x30));
+            }
+
             return new ComponentResource
             {
-                Type = type, SubType = subType, Manufacturer = manufacturer, Flags = flags, FlagsMask = flagsMask,
-                Code = code, Name = name, Info = info, Icon = icon, IsExtended = true, Version = version,
-                RegisterFlags = registerFlags, IconFamily = iconFamily, Platforms = platforms,
+                Type = type,
+                SubType = subType,
+                Manufacturer = manufacturer,
+                Flags = flags,
+                FlagsMask = flagsMask,
+                Code = code,
+                Name = name,
+                Info = info,
+                Icon = icon,
+                IsExtended = true,
+                Version = version,
+                RegisterFlags = registerFlags,
+                IconFamily = iconFamily,
+                Platforms = platforms,
             };
         }
 

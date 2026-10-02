@@ -49,7 +49,9 @@ public static class MacsBugNames
             ushort word = reader.ReadUInt16At(p);
             int at = word is Rts or JmpA0 ? p + 2 : word == Rtd ? p + 4 : -1;
             if (at >= 0 && Read(reader, at, p) is { } name)
+            {
                 names.Add(name);
+            }
         }
         return names;
     }
@@ -67,7 +69,10 @@ public static class MacsBugNames
     {
         var data = reader.Source.Span;
         if (offset < 0 || offset >= data.Length)
+        {
             return null;
+        }
+
         byte first = data[offset];
         if (first is >= 0x80 and <= 0x9F)
         {
@@ -76,39 +81,64 @@ public static class MacsBugNames
             if (length == 0)
             {
                 if (q >= data.Length)
+                {
                     return null;
+                }
+
                 length = data[q++];
             }
             if (length == 0 || length > data.Length - q || !IsName(data.Slice(q, length)))
+            {
                 return null;
+            }
+
             string name = Latin(data.Slice(q, length));
             q += length;
             if ((q & 1) != 0)
+            {
                 q++;
+            }
             // A word that would put the literals past the end of the code (or no word) is not a literal size: the
             // name ends at the pad [Fitted: Disk Copy 6.1.2's CODE 1, where code follows %__MAIN at $696].
             int literals = q <= data.Length - 2 ? reader.ReadUInt16At(q) : int.MaxValue;
             if (literals > data.Length - (q + 2))
+            {
                 return new MacsBugName(returnOffset, offset, Math.Min(q, data.Length) - offset, 0, name, MacsBugNameForm.Variable);
+            }
+
             return new MacsBugName(returnOffset, offset, q + 2 - offset, literals, name, MacsBugNameForm.Variable);
         }
         if (first < 0x80)
+        {
             return ReadUnmarked(data, offset, returnOffset);
+        }
+
         if (first < 0xA0 || !IsNameChar((byte)(first & 0x7F)))
+        {
             return null;
+        }
+
         bool wide = offset + 1 < data.Length && data[offset + 1] >= 0x80;
         int n = wide ? 16 : 8;
         if (n > data.Length - offset)
+        {
             return null;
+        }
+
         Span<byte> chars = stackalloc byte[16];
         data.Slice(offset, n).CopyTo(chars);
         chars[0] &= 0x7F;
         chars[1] &= 0x7F;
         // A name that starts with a space is none (nor one of spaces only) [ClassicMac].
         if (!IsName(chars[..n]) || chars[0] == (byte)' ')
+        {
             return null;
+        }
+
         if (!wide)
+        {
             return new MacsBugName(returnOffset, offset, 8, 0, Latin(chars[..8]).TrimEnd(' '), MacsBugNameForm.Fixed8);
+        }
         // The method's 8 characters, then the class's; MacsBug shows Class.Method.
         string method = Latin(chars[..8]).TrimEnd(' ');
         string cls = Latin(chars[8..16]).Trim(' ');
@@ -123,23 +153,39 @@ public static class MacsBugNames
     private static MacsBugName? ReadUnmarked(ReadOnlySpan<byte> data, int offset, int returnOffset)
     {
         if (8 > data.Length - offset)
+        {
             return null;
+        }
+
         var chars = data.Slice(offset, 8);
         if (!IsUpperStart(chars[0]))
+        {
             return null;
+        }
+
         int i = 1;
         while (i < 8 && IsUpperChar(chars[i]))
+        {
             i++;
+        }
+
         for (int j = i; j < 8; j++)
+        {
             if (chars[j] != (byte)' ')
+            {
                 return null;
+            }
+        }
+
         int next = offset + 8;
         if (next <= data.Length - 2)
         {
             int word = (data[next] << 8) | data[next + 1];
             bool link = (word & 0xFFF8) == 0x4E50;
             if (!link && (IsUpperChar(data[next]) || data[next] == (byte)' '))
+            {
                 return null;
+            }
         }
         return new MacsBugName(returnOffset, offset, 8, 0, Latin(chars[..i]), MacsBugNameForm.Fixed8);
     }
@@ -151,8 +197,13 @@ public static class MacsBugNames
     private static bool IsName(ReadOnlySpan<byte> chars)
     {
         foreach (byte c in chars)
+        {
             if (!IsNameChar(c))
+            {
                 return false;
+            }
+        }
+
         return true;
     }
 

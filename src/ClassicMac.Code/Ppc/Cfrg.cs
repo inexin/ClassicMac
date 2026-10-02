@@ -75,8 +75,13 @@ namespace ClassicMac.Code.Ppc
             get
             {
                 foreach (var extension in Extensions)
+                {
                     if (extension.Kind == CfrgExtension.SearchKind && Cfrg.TryReadSearch(extension.Data, out var search))
+                    {
                         return search;
+                    }
+                }
+
                 return null;
             }
         }
@@ -115,10 +120,16 @@ namespace ClassicMac.Code.Ppc
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(data);
             if (reader.Length < HeaderSize)
+            {
                 throw new InvalidDataException($"A 'cfrg' header is {HeaderSize} bytes; this resource has {reader.Length}.");
+            }
+
             var version = reader.ReadUInt16At(10);
             if (version != 1)
+            {
                 throw new InvalidDataException($"'cfrg' version {version} is not supported (only version 1 is defined).");
+            }
+
             int count = reader.ReadUInt16At(30);
 
             var members = new List<CfrgMember>(count);
@@ -132,7 +143,11 @@ namespace ClassicMac.Code.Ppc
                     break;
                 }
                 var member = ReadMember(reader, at, diagnostics);
-                if (member is null) break;
+                if (member is null)
+                {
+                    break;
+                }
+
                 members.Add(member);
                 at += member.MemberSize;
             }
@@ -203,11 +218,19 @@ namespace ClassicMac.Code.Ppc
         {
             search = null;
             var reader = new BigEndianReader(data);
-            if (!reader.TryReadFourCC(out var kind)) return false;
+            if (!reader.TryReadFourCC(out var kind))
+            {
+                return false;
+            }
+
             var qualifiers = new List<string>(4);
             for (int i = 0; i < 4; i++)
             {
-                if (!reader.TryReadByte(out var n) || !reader.TryReadBytes(n, out var bytes)) return false;
+                if (!reader.TryReadByte(out var n) || !reader.TryReadBytes(n, out var bytes))
+                {
+                    return false;
+                }
+
                 qualifiers.Add(MacRoman.Decode(bytes));
             }
             search = new CfrgSearchExtension(kind, qualifiers);

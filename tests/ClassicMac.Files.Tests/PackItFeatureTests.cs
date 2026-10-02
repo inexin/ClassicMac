@@ -320,7 +320,11 @@ public sealed class PackItFeatureTests
         public static byte[] BuildStoredFile(string name, byte[] data, byte[] resource)
         {
             byte[] nameBytes = System.Text.Encoding.ASCII.GetBytes(name);
-            if (nameBytes.Length > 63) throw new ArgumentOutOfRangeException(nameof(name));
+            if (nameBytes.Length > 63)
+            {
+                throw new ArgumentOutOfRangeException(nameof(name));
+            }
+
             byte[] archive = new byte[HeaderLength + data.Length + resource.Length + 2 + 4];
             "PMag"u8.CopyTo(archive);
             archive[4] = checked((byte)nameBytes.Length);
@@ -346,11 +350,21 @@ public sealed class PackItFeatureTests
             byte[] expanded = stored.AsSpan(4, stored.Length - 8).ToArray();
             var bits = new List<bool>();
             WriteHuffmanTree(bits, 0, 0);
-            foreach (byte value in expanded) WriteBits(bits, value, 8);
+            foreach (byte value in expanded)
+            {
+                WriteBits(bits, value, 8);
+            }
+
             byte[] compressed = new byte[(bits.Count + 7) / 8 + 8];
             "PMa4"u8.CopyTo(compressed);
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) compressed[4 + bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    compressed[4 + bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             "PEnd"u8.CopyTo(compressed.AsSpan(compressed.Length - 4));
             return compressed;
         }
@@ -364,7 +378,10 @@ public sealed class PackItFeatureTests
             "PMa5"u8.CopyTo(archive);
             byte[] key = DerivePackItXorKey(ClassicMac.Core.MacString.FromMacRoman(password).Bytes);
             for (int index = 0; index < payloadLength; index++)
+            {
                 archive[4 + index] = (byte)(plain[4 + index] ^ key[index % 7]);
+            }
+
             "PEnd"u8.CopyTo(archive.AsSpan(4 + encryptedLength));
             return archive;
         }
@@ -381,7 +398,9 @@ public sealed class PackItFeatureTests
             {
                 byte[] key = DerivePackItXorKey(ClassicMac.Core.MacString.FromMacRoman(password).Bytes);
                 for (int index = 0; index < payloadLength; index++)
+                {
                     archive[4 + index] = (byte)(plain[4 + index] ^ key[index % 7]);
+                }
             }
             else if (method == "PMa2")
             {
@@ -491,7 +510,10 @@ public sealed class PackItFeatureTests
 
         private static void WriteBits(List<bool> bits, int value, int count)
         {
-            for (int bit = count - 1; bit >= 0; bit--) bits.Add((value & (1 << bit)) != 0);
+            for (int bit = count - 1; bit >= 0; bit--)
+            {
+                bits.Add((value & (1 << bit)) != 0);
+            }
         }
 
         private static ushort Crc16(ReadOnlySpan<byte> bytes)
@@ -501,7 +523,9 @@ public sealed class PackItFeatureTests
             {
                 crc ^= (ushort)(value << 8);
                 for (int bit = 0; bit < 8; bit++)
+                {
                     crc = (ushort)((crc << 1) ^ ((crc & 0x8000) == 0 ? 0 : 0x1021));
+                }
             }
             return crc;
         }

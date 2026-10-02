@@ -13,7 +13,11 @@ internal static class DiskDoublerAdnDecoder
 
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
-        if (outputLength < 0) throw new ArgumentOutOfRangeException(nameof(outputLength));
+        if (outputLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(outputLength));
+        }
+
         byte[] output = new byte[outputLength];
         int inputOffset = 0;
         int outputOffset = 0;
@@ -21,27 +25,43 @@ internal static class DiskDoublerAdnDecoder
         while (outputOffset < output.Length)
         {
             if (input.Length - inputOffset < BlockHeaderLength)
+            {
                 throw new InvalidDataException("A DiskDoubler ADn block header is truncated.");
+            }
 
             ReadOnlySpan<byte> header = input.Slice(inputOffset, BlockHeaderLength);
             byte headerXor = 0;
-            for (int index = 0; index < BlockHeaderLength - 1; index++) headerXor ^= header[index];
+            for (int index = 0; index < BlockHeaderLength - 1; index++)
+            {
+                headerXor ^= header[index];
+            }
+
             if (headerXor != header[^1])
+            {
                 throw new InvalidDataException("A DiskDoubler ADn block header checksum is invalid.");
+            }
 
             int compressedLength = U16(header, 0);
             int blockLength = U16(header, 2);
             if (blockLength is 0 or > MaximumBlockLength || blockLength > output.Length - outputOffset)
+            {
                 throw new InvalidDataException("A DiskDoubler ADn block has an invalid expanded length.");
+            }
 
             int dataOffset = checked(inputOffset + BlockHeaderLength);
             if (compressedLength > input.Length - dataOffset)
+            {
                 throw new InvalidDataException("A DiskDoubler ADn block extends past its fork.");
+            }
+
             ReadOnlySpan<byte> compressed = input.Slice(dataOffset, compressedLength);
             if ((header[9] & 1) != 0)
             {
                 if (compressedLength < blockLength)
+                {
                     throw new InvalidDataException("A raw DiskDoubler ADn block is truncated.");
+                }
+
                 compressed[..blockLength].CopyTo(output.AsSpan(outputOffset));
             }
             else
@@ -73,7 +93,9 @@ internal static class DiskDoublerAdnDecoder
             bool farOffset = bits.ReadBit();
             int distance = bits.ReadBits(farOffset ? 12 : 8);
             if (distance <= 0 || distance > position - outputOffset)
+            {
                 throw new InvalidDataException("A DiskDoubler ADn match reaches before the current block.");
+            }
 
             int length;
             if (!bits.ReadBit())
@@ -91,9 +113,15 @@ internal static class DiskDoublerAdnDecoder
 
             length = Math.Min(length, end - position);
             if (length > distance)
+            {
                 throw new InvalidDataException("A DiskDoubler ADn match overlaps its source bytes.");
+            }
+
             for (int index = 0; index < length; index++)
+            {
                 output[position + index] = output[position - distance + index];
+            }
+
             position += length;
         }
     }
@@ -108,7 +136,10 @@ internal static class DiskDoublerAdnDecoder
         public bool ReadBit()
         {
             if (_bitPosition >= _input.Length * 8)
+            {
                 throw new InvalidDataException("A DiskDoubler ADn compressed block is truncated.");
+            }
+
             bool value = (_input[_bitPosition >> 3] & (0x80 >> (_bitPosition & 7))) != 0;
             _bitPosition++;
             return value;
@@ -117,7 +148,11 @@ internal static class DiskDoublerAdnDecoder
         public int ReadBits(int count)
         {
             int value = 0;
-            for (int index = 0; index < count; index++) value = (value << 1) | (ReadBit() ? 1 : 0);
+            for (int index = 0; index < count; index++)
+            {
+                value = (value << 1) | (ReadBit() ? 1 : 0);
+            }
+
             return value;
         }
     }

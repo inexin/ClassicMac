@@ -30,11 +30,20 @@ namespace ClassicMac.Resources.Editing
             ArgumentNullException.ThrowIfNull(fork);
             var problems = new List<Diagnostic>();
             if (fork.Find(type, id) is { } other && other != existing)
+            {
                 problems.Add(new Diagnostic(DiagnosticSeverity.Error, "edit.duplicate-id", $"The file already has a '{type}' {id}."));
+            }
+
             if ((attributes & ResourceAttributes.Compressed) != 0 && !wasCompressed)
+            {
                 problems.Add(new Diagnostic(DiagnosticSeverity.Error, "edit.compressed", "The compressed attribute is set only by compressing the data."));
+            }
+
             if (id < FirstApplicationId)
+            {
                 problems.Add(new Diagnostic(DiagnosticSeverity.Warning, "edit.reserved-id", $"IDs below {FirstApplicationId} are reserved for the system."));
+            }
+
             return problems;
         }
 
@@ -43,9 +52,21 @@ namespace ClassicMac.Resources.Editing
         {
             ArgumentNullException.ThrowIfNull(fork);
             for (int id = FirstApplicationId; id <= short.MaxValue; id++)
-                if (fork.Find(type, (short)id) is null) return (short)id;
+            {
+                if (fork.Find(type, (short)id) is null)
+                {
+                    return (short)id;
+                }
+            }
+
             for (int id = FirstApplicationId - 1; id >= short.MinValue; id--)
-                if (fork.Find(type, (short)id) is null) return (short)id;
+            {
+                if (fork.Find(type, (short)id) is null)
+                {
+                    return (short)id;
+                }
+            }
+
             throw new InvalidOperationException($"Every '{type}' ID is taken.");
         }
     }
@@ -80,7 +101,11 @@ namespace ClassicMac.Resources.Editing
         {
             ArgumentNullException.ThrowIfNull(edit);
             edit.Apply(Fork);
-            if (savedAt > done.Count) savedAt = -1;              // the saved state was undone past: unreachable now
+            if (savedAt > done.Count)
+            {
+                savedAt = -1;              // the saved state was undone past: unreachable now
+            }
+
             done.Add(edit);
             undone.Clear();
             Changed?.Invoke(this, EventArgs.Empty);
@@ -89,7 +114,11 @@ namespace ClassicMac.Resources.Editing
         /// <summary>Reverses the last edit; false when there is none.</summary>
         public bool Undo()
         {
-            if (done.Count == 0) return false;
+            if (done.Count == 0)
+            {
+                return false;
+            }
+
             var edit = done[^1];
             edit.Undo(Fork);
             done.RemoveAt(done.Count - 1);
@@ -101,7 +130,11 @@ namespace ClassicMac.Resources.Editing
         /// <summary>Repeats the last edit undone; false when there is none.</summary>
         public bool Redo()
         {
-            if (undone.Count == 0) return false;
+            if (undone.Count == 0)
+            {
+                return false;
+            }
+
             var edit = undone.Pop();
             edit.Apply(Fork);
             done.Add(edit);
@@ -130,7 +163,10 @@ namespace ClassicMac.Resources.Editing
             ArgumentNullException.ThrowIfNull(actual);
             var differences = new List<string>();
             if (expected.Attributes != actual.Attributes)
+            {
                 differences.Add($"the file attributes are {actual.Attributes}, not {expected.Attributes}");
+            }
+
             foreach (var e in expected.Resources)
             {
                 if (actual.Find(e.Type, e.Id) is not { } a)
@@ -138,13 +174,29 @@ namespace ClassicMac.Resources.Editing
                     differences.Add($"{e} is missing");
                     continue;
                 }
-                if (e.Name != a.Name) differences.Add($"{e}'s name is {a.Name?.ToString() ?? "none"}");
+                if (e.Name != a.Name)
+                {
+                    differences.Add($"{e}'s name is {a.Name?.ToString() ?? "none"}");
+                }
+
                 if ((e.Attributes & ~ResourceAttributes.Changed) != (a.Attributes & ~ResourceAttributes.Changed))
+                {
                     differences.Add($"{e}'s attributes are {a.Attributes}, not {e.Attributes}");
-                if (!e.GetData().Span.SequenceEqual(a.GetData().Span)) differences.Add($"{e}'s data differs");
+                }
+
+                if (!e.GetData().Span.SequenceEqual(a.GetData().Span))
+                {
+                    differences.Add($"{e}'s data differs");
+                }
             }
             foreach (var a in actual.Resources)
-                if (expected.Find(a.Type, a.Id) is null) differences.Add($"{a} should not be there");
+            {
+                if (expected.Find(a.Type, a.Id) is null)
+                {
+                    differences.Add($"{a} should not be there");
+                }
+            }
+
             return differences;
         }
     }

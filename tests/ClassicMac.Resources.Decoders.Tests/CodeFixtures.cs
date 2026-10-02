@@ -15,7 +15,11 @@ internal static class CodeFixtures
     public static byte[] Words(params ushort[] words)
     {
         var w = new BigEndianWriter();
-        foreach (var word in words) w.WriteUInt16(word);
+        foreach (var word in words)
+        {
+            w.WriteUInt16(word);
+        }
+
         return w.ToArray();
     }
 
@@ -30,7 +34,11 @@ internal static class CodeFixtures
         w.WriteUInt32(0x100);
         w.WriteUInt32(8 * entries.Length);
         w.WriteUInt32(0x20);
-        foreach (var e in entries) w.WriteBytes(e);
+        foreach (var e in entries)
+        {
+            w.WriteBytes(e);
+        }
+
         return w.ToArray();
     }
 
@@ -42,14 +50,22 @@ internal static class CodeFixtures
     public static Resource Res(string type, short id, byte[] data, string? name = null, ResourceAttributes attributes = ResourceAttributes.None)
     {
         var r = new Resource(FourCC.FromString(type), id, data) { Attributes = attributes };
-        if (name is not null) r.Name = MacString.FromMacRoman(name);
+        if (name is not null)
+        {
+            r.Name = MacString.FromMacRoman(name);
+        }
+
         return r;
     }
 
     public static ResourceFork Fork(params Resource[] resources)
     {
         var fork = new ResourceFork();
-        foreach (var r in resources) fork.Add(r);
+        foreach (var r in resources)
+        {
+            fork.Add(r);
+        }
+
         return fork;
     }
 
@@ -135,7 +151,11 @@ internal static class CodeFixtures
             w.WriteUInt16(0);
             w.WriteByte(m.Name.Length);
             w.WriteBytes(MacRoman.Encode(m.Name));
-            while ((w.Length - start) % 4 != 0) w.WriteByte(0);
+            while ((w.Length - start) % 4 != 0)
+            {
+                w.WriteByte(0);
+            }
+
             w.WriteUInt16At(sizeAt, w.Length - start);
         }
         return w.ToArray();

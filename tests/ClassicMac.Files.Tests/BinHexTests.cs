@@ -101,7 +101,9 @@ public class BinHexTests
         byte[] text = [.. "Subject: caf\t\f\v\r\n"u8, 0xE9, 0x8E, (byte)'\n'];
         Assert.True(BinHexReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, .. hqx])));
         foreach (var control in new byte[] { 0x00, 0x01, 0x08, 0x0E, 0x1B, 0x1F })
+        {
             Assert.False(BinHexReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, control, .. hqx])));
+        }
     }
 
     // Read itself, as BinHex decoders do, takes the first marker wherever it is.

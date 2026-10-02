@@ -44,7 +44,10 @@ namespace ClassicMac.Graphics.QuickDraw
                 families[familyId] = FontFamily.Read(reader, name ?? "");
             }
             catch (System.IO.InvalidDataException) { families.Remove(familyId); }
-            if (!string.IsNullOrEmpty(name)) familyNames[name] = familyId;
+            if (!string.IsNullOrEmpty(name))
+            {
+                familyNames[name] = familyId;
+            }
         }
 
         /// <summary>Adds an <c>NFNT</c> resource (a bitmap strike referenced by a family's association table).</summary>
@@ -62,7 +65,10 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             ArgumentNullException.ThrowIfNull(data);
             font[resourceId] = data;
-            if (!string.IsNullOrEmpty(familyName) && (resourceId & 127) == 0) familyNames.TryAdd(familyName, resourceId >> 7);
+            if (!string.IsNullOrEmpty(familyName) && (resourceId & 127) == 0)
+            {
+                familyNames.TryAdd(familyName, resourceId >> 7);
+            }
         }
 
         /// <summary>
@@ -88,10 +94,22 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 switch (type)
                 {
-                    case "FOND": AddFamily(id, name, data); added++; break;
-                    case "NFNT": AddNfnt(id, data); added++; break;
-                    case "FONT": AddFont(id, data, name); added++; break;
-                    case "fctb": AddFontColorTable(id, data); added++; break;
+                    case "FOND":
+                        AddFamily(id, name, data);
+                        added++;
+                        break;
+                    case "NFNT":
+                        AddNfnt(id, data);
+                        added++;
+                        break;
+                    case "FONT":
+                        AddFont(id, data, name);
+                        added++;
+                        break;
+                    case "fctb":
+                        AddFontColorTable(id, data);
+                        added++;
+                        break;
                 }
             }
             return added;
@@ -106,15 +124,31 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int? lowest = null;
             foreach (var (id, fond) in families)
-                if (id < 0x4000 && fond.Fonts.Count > 0 && (lowest == null || id < lowest)) lowest = id;
+            {
+                if (id < 0x4000 && fond.Fonts.Count > 0 && (lowest == null || id < lowest))
+                {
+                    lowest = id;
+                }
+            }
+
             return lowest;
         }
 
         internal bool HasFamily(int familyId)
         {
-            if (families.TryGetValue(familyId, out var fond) && fond.Fonts.Count > 0) return true;
+            if (families.TryGetValue(familyId, out var fond) && fond.Fonts.Count > 0)
+            {
+                return true;
+            }
+
             foreach (var id in font.Keys)
-                if ((id >> 7) == familyId && (id & 127) != 0) return true;
+            {
+                if ((id >> 7) == familyId && (id & 127) != 0)
+                {
+                    return true;
+                }
+            }
+
             return false;
         }
 
@@ -122,7 +156,12 @@ namespace ClassicMac.Graphics.QuickDraw
         internal IEnumerable<int> OldStyleSizes(int familyId)
         {
             foreach (var id in font.Keys)
-                if ((id >> 7) == familyId && (id & 127) != 0) yield return id & 127;
+            {
+                if ((id >> 7) == familyId && (id & 127) != 0)
+                {
+                    yield return id & 127;
+                }
+            }
         }
 
         // A color font's palette: its fctb (same id), else the standard table of its depth.
@@ -154,12 +193,18 @@ namespace ClassicMac.Graphics.QuickDraw
         private BitmapFont? Load(bool isNfnt, int id, bool rom)
         {
             lock (parsed)
+            {
                 return LoadLocked(isNfnt, id, rom);
+            }
         }
 
         private BitmapFont? LoadLocked(bool isNfnt, int id, bool rom)
         {
-            if (parsed.TryGetValue((isNfnt, id, rom), out var cached)) return cached;
+            if (parsed.TryGetValue((isNfnt, id, rom), out var cached))
+            {
+                return cached;
+            }
+
             BitmapFont? result = null;
             if ((isNfnt ? nfnt : font).TryGetValue(id, out var data))
             {

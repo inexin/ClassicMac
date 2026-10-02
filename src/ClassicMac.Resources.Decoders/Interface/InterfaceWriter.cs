@@ -24,7 +24,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             var flags = menu.EnableFlags;
             for (var i = 0; i < menu.Items.Count && i < 31; i++)
             {
-                if (menu.Items[i].IsDivider) continue;
+                if (menu.Items[i].IsDivider)
+                {
+                    continue;
+                }
+
                 var bit = 1u << (i + 1);
                 flags = menu.Items[i].Enabled ? flags | bit : flags & ~bit;
             }
@@ -32,7 +36,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             w.I16(menu.Id).I16(menu.Width).I16(menu.Height).I16(menu.Definition).I16(0).I32((int)flags).Pascal(menu.Title);
             foreach (var item in menu.Items)
             {
-                if (item.Text.Length == 0) throw new ArgumentException("A menu item needs text (an empty one would end the menu).", nameof(menu));
+                if (item.Text.Length == 0)
+                {
+                    throw new ArgumentException("A menu item needs text (an empty one would end the menu).", nameof(menu));
+                }
+
                 w.Pascal(item.Text).U8(item.Icon).U8(item.KeyEquivalent).U8(item.Mark).U8(item.Face);
             }
             return w.U8(0).ToArray();
@@ -45,9 +53,17 @@ namespace ClassicMac.Resources.Decoders.Interface
             var w = new Writer();
             w.Rect(window.Bounds).I16(window.Definition).U8(window.Visible ? (byte)1 : (byte)0).U8(0)
                 .U8(window.GoAway ? (byte)1 : (byte)0).U8(0).I32(window.RefCon);
-            if (dialog) w.I16(window.ItemsId ?? 0);
+            if (dialog)
+            {
+                w.I16(window.ItemsId ?? 0);
+            }
+
             w.Pascal(window.Title);
-            if (window.Position is { } position) w.Align().I16((short)position);
+            if (window.Position is { } position)
+            {
+                w.Align().I16((short)position);
+            }
+
             return w.ToArray();
         }
 
@@ -57,7 +73,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             ArgumentNullException.ThrowIfNull(alert);
             var w = new Writer();
             w.Rect(alert.Bounds).I16(alert.ItemsId).I16((short)alert.Stages);
-            if (alert.Position is { } position) w.I16((short)position);
+            if (alert.Position is { } position)
+            {
+                w.I16((short)position);
+            }
+
             return w.ToArray();
         }
 
@@ -68,7 +88,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         public static byte[] WriteDialogItems(IReadOnlyList<DialogItem> items)
         {
             ArgumentNullException.ThrowIfNull(items);
-            if (items.Count == 0) throw new ArgumentException("An item list needs at least one item.", nameof(items));
+            if (items.Count == 0)
+            {
+                throw new ArgumentException("An item list needs at least one item.", nameof(items));
+            }
+
             var w = new Writer();
             w.I16((short)(items.Count - 1));
             foreach (var item in items)
@@ -79,7 +103,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                     7 or 32 or 64 => [(byte)((item.ResourceId ?? 0) >> 8), (byte)(item.ResourceId ?? 0)],
                     _ => item.Data.ToArray(),
                 };
-                if (data.Length > 255) throw new ArgumentException("An item's data is at most 255 bytes.", nameof(items));
+                if (data.Length > 255)
+                {
+                    throw new ArgumentException("An item's data is at most 255 bytes.", nameof(items));
+                }
+
                 w.I32(0).Rect(item.Bounds).U8((byte)((item.Type & 0x7F) | (item.Enabled ? 0 : 0x80))).U8((byte)data.Length).Bytes(data).Align();
             }
             return w.ToArray();
@@ -125,7 +153,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             public Writer Pascal(string text)
             {
                 var bytes = Mac(text);
-                if (bytes.Length > 255) throw new ArgumentException($"“{text}” is over 255 bytes.");
+                if (bytes.Length > 255)
+                {
+                    throw new ArgumentException($"“{text}” is over 255 bytes.");
+                }
+
                 return U8((byte)bytes.Length).Bytes(bytes);
             }
 

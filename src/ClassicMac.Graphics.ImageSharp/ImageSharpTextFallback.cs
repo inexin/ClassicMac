@@ -1,13 +1,13 @@
 using System;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.Graphics.ImageSharp
 {
@@ -31,7 +31,11 @@ namespace ClassicMac.Graphics.ImageSharp
         public TextFallbackMask? Render(string text, TextFallbackStyle style)
         {
             var family = ResolveFontFamily(style.FontId);
-            if (family == null) return null;
+            if (family == null)
+            {
+                return null;
+            }
+
             var font = family.Value.CreateFont(style.Size <= 0 ? 12 : style.Size, FaceToStyle(style.Face));
 
             int ascent = (int)Math.Round(font.Size * 0.8f);        // approximate ascent for baseline placement
@@ -40,7 +44,10 @@ namespace ClassicMac.Graphics.ImageSharp
             float advance = TextMeasurer.MeasureAdvance(text, options).Width;
             int width = (int)Math.Ceiling(advance) + 2 * pad;
             int height = (int)Math.Ceiling(font.Size * 1.6f);
-            if (width <= 0 || height <= 0) return null;
+            if (width <= 0 || height <= 0)
+            {
+                return null;
+            }
 
             using var image = new Image<L8>(configuration, width, height);
             image.Mutate(ctx => ctx.DrawText(Aliased, options, text, Brushes.Solid(Color.White), null));
@@ -51,7 +58,9 @@ namespace ClassicMac.Graphics.ImageSharp
                 {
                     var row = accessor.GetRowSpan(y);
                     for (int x = 0; x < row.Length; x++)
+                    {
                         bits[y * width + x] = row[x].PackedValue >= 128 ? (byte)1 : (byte)0;
+                    }
                 }
             });
             return new TextFallbackMask(width, height, pad, ascent, bits, advance);
@@ -60,20 +69,44 @@ namespace ClassicMac.Graphics.ImageSharp
         private static FontStyle FaceToStyle(int face)
         {
             bool bold = (face & 0x01) != 0, italic = (face & 0x02) != 0;
-            if (bold && italic) return FontStyle.BoldItalic;
-            if (bold) return FontStyle.Bold;
-            if (italic) return FontStyle.Italic;
+            if (bold && italic)
+            {
+                return FontStyle.BoldItalic;
+            }
+
+            if (bold)
+            {
+                return FontStyle.Bold;
+            }
+
+            if (italic)
+            {
+                return FontStyle.Italic;
+            }
+
             return FontStyle.Regular;
         }
 
         private FontFamily? ResolveFontFamily(int fontId)
         {
-            if (fontResolver?.Invoke(fontId) is { } resolved) return resolved;
+            if (fontResolver?.Invoke(fontId) is { } resolved)
+            {
+                return resolved;
+            }
+
             foreach (var name in MacFontNames(fontId))
+            {
                 if (SystemFonts.TryGet(name, out var fam))
+                {
                     return fam;
+                }
+            }
+
             foreach (var fam in SystemFonts.Families)   // any installed font as a last resort
+            {
                 return fam;
+            }
+
             return null;
         }
 

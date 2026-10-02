@@ -20,7 +20,11 @@ public class DiagnosticsPanelTests
     private static DiagnosticsPanel Panel(params DiagnosticEntry[] entries)
     {
         var panel = new DiagnosticsPanel();
-        foreach (var e in entries) panel.Add(e);
+        foreach (var e in entries)
+        {
+            panel.Add(e);
+        }
+
         return panel;
     }
 

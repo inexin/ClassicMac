@@ -28,7 +28,11 @@ public sealed class PackItReader : IContainerReader
     public bool CanRead(ForkData input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        if (input.Length < 4) return false;
+        if (input.Length < 4)
+        {
+            return false;
+        }
+
         byte[] signature = input.ReadPrefix(4);
         return IsPackItSignature(signature);
     }
@@ -39,7 +43,9 @@ public sealed class PackItReader : IContainerReader
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(context);
         if (input.Length > context.Options.MaxExpandedBytesPerInput)
+        {
             throw new InvalidDataException("The PackIt archive exceeds the configured input-size limit.");
+        }
 
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
         var archiveReader = new BigEndianReader(archive);
@@ -58,7 +64,9 @@ public sealed class PackItReader : IContainerReader
                 break;
             }
             if (++entryCount > context.Options.MaxVolumeEntries)
+            {
                 throw new InvalidDataException("The PackIt archive exceeds the configured entry limit.");
+            }
 
             bool huffman = signature.SequenceEqual("PMa4"u8) || signature.SequenceEqual("PMa5"u8) ||
                 signature.SequenceEqual("PMa6"u8);
@@ -112,7 +120,10 @@ public sealed class PackItReader : IContainerReader
                 else
                 {
                     if (entryInput.Length < EntryMetadataLength)
+                    {
                         throw new InvalidDataException("A PackIt encrypted file header is truncated.");
+                    }
+
                     metadataBytes = entryInput[..EntryMetadataLength].ToArray();
                     var entryReader = new BigEndianReader(entryInput);
                     int storedDataLength = ReadLength(entryReader.ReadUInt32At(0x4C), "data fork");
@@ -120,9 +131,15 @@ public sealed class PackItReader : IContainerReader
                     int encryptedForksLength = checked(storedDataLength + storedResourceLength);
                     int crcOffset = checked(EntryMetadataLength + encryptedForksLength);
                     if (crcOffset > entryInput.Length - 2)
+                    {
                         throw new InvalidDataException("A PackIt encrypted fork payload or checksum is truncated.");
+                    }
+
                     if (encryptedForksLength > context.Options.MaxExpandedBytesPerInput - expandedBytes)
+                    {
                         throw new InvalidDataException("PackIt extraction exceeds the configured expanded-size limit.");
+                    }
+
                     decodedData = entryInput.Slice(EntryMetadataLength, storedDataLength).ToArray();
                     decodedResource = entryInput.Slice(EntryMetadataLength + storedDataLength,
                         storedResourceLength).ToArray();
@@ -133,7 +150,10 @@ public sealed class PackItReader : IContainerReader
             else
             {
                 if (offset > archive.Length - EntryHeaderLength)
+                {
                     throw new InvalidDataException("A PackIt file header is truncated.");
+                }
+
                 metadataBytes = archive.AsMemory(offset + 4, EntryMetadataLength).ToArray();
                 int storedDataLength = ReadLength(archiveReader.ReadUInt32At(offset + 0x50), "data fork");
                 int storedResourceLength = ReadLength(archiveReader.ReadUInt32At(offset + 0x54), "resource fork");
@@ -141,7 +161,10 @@ public sealed class PackItReader : IContainerReader
                 int payloadOffset = checked(offset + EntryHeaderLength);
                 int crcOffset = checked(payloadOffset + storedForkLength);
                 if (crcOffset > archive.Length - 2)
+                {
                     throw new InvalidDataException("A PackIt fork payload or checksum extends past the archive.");
+                }
+
                 storedForkCrc = archiveReader.ReadUInt16At(crcOffset);
                 nextOffset = checked(crcOffset + 2);
             }
@@ -150,20 +173,27 @@ public sealed class PackItReader : IContainerReader
             var metadataReader = new BigEndianReader(metadata);
             int nameLength = metadata.Span[0];
             if (nameLength == 0 || nameLength > 63)
+            {
                 throw new InvalidDataException("A PackIt file name length is invalid.");
+            }
+
             ushort storedHeaderCrc = metadataReader.ReadUInt16At(0x5C);
             ushort actualHeaderCrc = Crc16(metadata.Span[..0x5C]);
             if (storedHeaderCrc != actualHeaderCrc)
+            {
                 context.Report(DiagnosticSeverity.Error, "archive.header-crc",
                     $"The PackIt header checksum is incorrect for '{new MacString(metadata.Span.Slice(1, nameLength))}'.",
                     offset + 0x60);
+            }
 
             int dataLength = ReadLength(metadataReader.ReadUInt32At(0x4C), "data fork");
             int resourceLength = ReadLength(metadataReader.ReadUInt32At(0x50), "resource fork");
             int forksLength = checked(dataLength + resourceLength);
             expandedBytes = checked(expandedBytes + forksLength);
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+            {
                 throw new InvalidDataException("PackIt extraction exceeds the configured expanded-size limit.");
+            }
 
             ReadOnlySpan<byte> data;
             ReadOnlySpan<byte> resource;
@@ -190,7 +220,10 @@ public sealed class PackItReader : IContainerReader
             if (storedForkCrc != actualForkCrc)
             {
                 if (encrypted)
+                {
                     throw new InvalidDataException($"The PackIt password is incorrect or the encrypted forks are corrupt for '{name}'.");
+                }
+
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                     $"The PackIt fork checksum is incorrect for '{name}'.", nextOffset - 2);
             }
@@ -202,7 +235,9 @@ public sealed class PackItReader : IContainerReader
                 Name = name,
                 FinderInfo = new FinderInfo
                 {
-                    Type = type, Creator = creator, Flags = (FinderFlags)metadataReader.ReadUInt16At(0x48),
+                    Type = type,
+                    Creator = creator,
+                    Flags = (FinderFlags)metadataReader.ReadUInt16At(0x48),
                 },
                 Created = Date(metadataReader.ReadUInt32At(0x54)),
                 Modified = Date(metadataReader.ReadUInt32At(0x58)),
@@ -212,8 +247,11 @@ public sealed class PackItReader : IContainerReader
             offset = nextOffset;
         }
         if (!ended)
+        {
             context.Report(DiagnosticSeverity.Warning, "archive.truncated",
                 "The PackIt archive has no PEnd marker.", offset);
+        }
+
         return files;
     }
 
@@ -232,22 +270,39 @@ public sealed class PackItReader : IContainerReader
         int leafCount = 0;
         HuffmanNode root = ReadHuffmanNode(ref bits, 0, ref nodeCount, ref leafCount);
         var metadata = new byte[EntryMetadataLength];
-        for (int index = 0; index < metadata.Length; index++) metadata[index] = ReadSymbol(ref bits, root);
+        for (int index = 0; index < metadata.Length; index++)
+        {
+            metadata[index] = ReadSymbol(ref bits, root);
+        }
+
         var metadataReader = new BigEndianReader(metadata);
 
         int nameLength = metadata[0];
         if (nameLength == 0 || nameLength > 63)
+        {
             throw new InvalidDataException("A PackIt file name length is invalid.");
+        }
+
         int dataLength = ReadLength(metadataReader.ReadUInt32At(0x4C), "data fork");
         int resourceLength = ReadLength(metadataReader.ReadUInt32At(0x50), "resource fork");
         int forksLength = checked(dataLength + resourceLength);
         if (forksLength > maxForkBytes)
+        {
             throw new InvalidDataException("PackIt extraction exceeds the configured expanded-size limit.");
+        }
 
         var data = new byte[dataLength];
         var resource = new byte[resourceLength];
-        for (int index = 0; index < data.Length; index++) data[index] = ReadSymbol(ref bits, root);
-        for (int index = 0; index < resource.Length; index++) resource[index] = ReadSymbol(ref bits, root);
+        for (int index = 0; index < data.Length; index++)
+        {
+            data[index] = ReadSymbol(ref bits, root);
+        }
+
+        for (int index = 0; index < resource.Length; index++)
+        {
+            resource[index] = ReadSymbol(ref bits, root);
+        }
+
         ushort storedForkCrc = (ushort)((ReadSymbol(ref bits, root) << 8) | ReadSymbol(ref bits, root));
         return new DecodedHuffmanEntry(metadata, data, resource, storedForkCrc, bits.BytesConsumed);
     }
@@ -273,7 +328,10 @@ public sealed class PackItReader : IContainerReader
     {
         byte[] decoded = new byte[input.Length];
         for (int index = 0; index < input.Length; index++)
+        {
             decoded[index] = (byte)(input[index] ^ key[index % 7]);
+        }
+
         return decoded;
     }
 
@@ -289,7 +347,10 @@ public sealed class PackItReader : IContainerReader
     {
         int blockLength = input.Length & ~7;
         if (blockLength == 0)
+        {
             throw new InvalidDataException("A PackIt DES-encrypted Huffman entry is truncated.");
+        }
+
         byte[] source = input[..blockLength].ToArray();
         byte[] decoded = new byte[blockLength];
         try
@@ -318,7 +379,11 @@ public sealed class PackItReader : IContainerReader
     private static byte ReadSymbol(ref HuffmanBitReader bits, HuffmanNode root)
     {
         HuffmanNode node = root;
-        while (!node.IsLeaf) node = bits.ReadBit() ? node.One! : node.Zero!;
+        while (!node.IsLeaf)
+        {
+            node = bits.ReadBit() ? node.One! : node.Zero!;
+        }
+
         return node.Symbol;
     }
 
@@ -326,11 +391,17 @@ public sealed class PackItReader : IContainerReader
         ref int leafCount)
     {
         if (depth > 255 || ++nodeCount > 511)
+        {
             throw new InvalidDataException("A PackIt Huffman code tree is too large.");
+        }
+
         if (bits.ReadBit())
         {
             if (++leafCount > 256)
+            {
                 throw new InvalidDataException("A PackIt Huffman code tree has too many symbols.");
+            }
+
             return new HuffmanNode(bits.ReadByte());
         }
         HuffmanNode zero = ReadHuffmanNode(ref bits, depth + 1, ref nodeCount, ref leafCount);
@@ -344,7 +415,9 @@ public sealed class PackItReader : IContainerReader
         {
             crc ^= (ushort)(value << 8);
             for (int bit = 0; bit < 8; bit++)
+            {
                 crc = (ushort)((crc << 1) ^ ((crc & 0x8000) == 0 ? 0 : 0x1021));
+            }
         }
         return crc;
     }
@@ -383,10 +456,17 @@ public sealed class PackItReader : IContainerReader
         public bool ReadBit()
         {
             if ((long)bitPosition >= (long)input.Length * 8)
+            {
                 throw new InvalidDataException("A PackIt Huffman entry is truncated.");
+            }
+
             int byteIndex = bitPosition >> 3;
             byte valueByte = input[byteIndex];
-            if (xorKey is not null) valueByte ^= xorKey[byteIndex % 7];
+            if (xorKey is not null)
+            {
+                valueByte ^= xorKey[byteIndex % 7];
+            }
+
             bool value = (valueByte & (0x80 >> (bitPosition & 7))) != 0;
             bitPosition++;
             return value;
@@ -395,7 +475,11 @@ public sealed class PackItReader : IContainerReader
         public byte ReadByte()
         {
             byte value = 0;
-            for (int bit = 0; bit < 8; bit++) value = (byte)((value << 1) | (ReadBit() ? 1 : 0));
+            for (int bit = 0; bit < 8; bit++)
+            {
+                value = (byte)((value << 1) | (ReadBit() ? 1 : 0));
+            }
+
             return value;
         }
     }
@@ -405,7 +489,10 @@ public sealed class PackItReader : IContainerReader
     private static int ReadLength(uint value, string what)
     {
         if (value > int.MaxValue)
+        {
             throw new InvalidDataException($"A PackIt {what} length exceeds the supported size.");
+        }
+
         return (int)value;
     }
 }

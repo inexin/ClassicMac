@@ -43,7 +43,11 @@ public sealed class ZipReader : IContainerReader
     public bool CanRead(ForkData input)
     {
         var prefix = input.ReadPrefix(4);
-        if (prefix.Length < 4) return false;
+        if (prefix.Length < 4)
+        {
+            return false;
+        }
+
         var signature = BinaryPrimitives.ReadUInt32LittleEndian(prefix);
         return signature == LocalSignature || signature == EndSignature && input.Length >= EndLength;
     }
@@ -51,10 +55,17 @@ public sealed class ZipReader : IContainerReader
     /// <inheritdoc/>
     public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
     {
-        if (!CanRead(input)) throw new InvalidDataException("Not a zip archive.");
+        if (!CanRead(input))
+        {
+            throw new InvalidDataException("Not a zip archive.");
+        }
+
         var directory = ReadEndOfCentralDirectory(input);
         if (directory.Size > input.Length || directory.Size > context.Options.MaxExpandedBytesPerInput)
+        {
             throw new InvalidDataException("The zip central directory is larger than the archive.");
+        }
+
         var central = input.Slice(directory.Offset, directory.Size).ToArray();
 
         var entries = new List<UnixArchiveEntry>();
@@ -63,7 +74,10 @@ public sealed class ZipReader : IContainerReader
         for (long index = 0; index < directory.Count; index++)
         {
             if (index >= context.Options.MaxVolumeEntries)
+            {
                 throw new InvalidDataException("The zip archive exceeds the configured entry limit.");
+            }
+
             if (at > central.Length - CentralHeaderLength || BinaryPrimitives.ReadUInt32LittleEndian(central.AsSpan(at)) != CentralSignature)
             {
                 context.Report(DiagnosticSeverity.Error, "archive.count-mismatch",
@@ -73,7 +87,10 @@ public sealed class ZipReader : IContainerReader
             var entry = ReadCentralEntry(central, at, directory.Bias);
             at = entry.Next;
             var read = ReadEntry(input, entry, context, ref expanded);
-            if (read is not null) entries.Add(read);
+            if (read is not null)
+            {
+                entries.Add(read);
+            }
         }
         return UnixArchive.ToMacFiles(entries, context, FormatName);
     }
@@ -97,10 +114,17 @@ public sealed class ZipReader : IContainerReader
                 break;
             }
         }
-        if (end < 0) throw new InvalidDataException("The zip archive has no end-of-central-directory record.");
+        if (end < 0)
+        {
+            throw new InvalidDataException("The zip archive has no end-of-central-directory record.");
+        }
+
         var record = tail.AsSpan(end);
         if (BinaryPrimitives.ReadUInt16LittleEndian(record[4..]) != 0 || BinaryPrimitives.ReadUInt16LittleEndian(record[6..]) != 0)
+        {
             throw new InvalidDataException("Multi-disk (split or spanned) zip archives are not supported.");
+        }
+
         long count = BinaryPrimitives.ReadUInt16LittleEndian(record[10..]);
         long size = BinaryPrimitives.ReadUInt32LittleEndian(record[12..]);
         long offset = BinaryPrimitives.ReadUInt32LittleEndian(record[16..]);
@@ -111,15 +135,24 @@ public sealed class ZipReader : IContainerReader
         {
             var zip64Offset = BinaryPrimitives.ReadUInt64LittleEndian(tail.AsSpan(end - 20 + 8));
             if (zip64Offset > (ulong)(input.Length - Zip64EndLength))
+            {
                 throw new InvalidDataException("The ZIP64 end record lies outside the archive.");
+            }
+
             var zip64 = input.Slice((long)zip64Offset, Zip64EndLength).ToArray();
             if (BinaryPrimitives.ReadUInt32LittleEndian(zip64) != Zip64EndSignature)
+            {
                 throw new InvalidDataException("The ZIP64 end record is missing.");
+            }
+
             var total = BinaryPrimitives.ReadUInt64LittleEndian(zip64.AsSpan(32));
             var zip64Size = BinaryPrimitives.ReadUInt64LittleEndian(zip64.AsSpan(40));
             var zip64Start = BinaryPrimitives.ReadUInt64LittleEndian(zip64.AsSpan(48));
             if (total > int.MaxValue || zip64Size > (ulong)input.Length || zip64Start > (ulong)input.Length)
+            {
                 throw new InvalidDataException("The ZIP64 end record has impossible sizes.");
+            }
+
             count = (long)total;
             size = (long)zip64Size;
             offset = (long)zip64Start;
@@ -127,7 +160,11 @@ public sealed class ZipReader : IContainerReader
         }
 
         var bias = endPosition - (offset + size);
-        if (bias < 0) throw new InvalidDataException("The zip central directory overlaps its end record.");
+        if (bias < 0)
+        {
+            throw new InvalidDataException("The zip central directory overlaps its end record.");
+        }
+
         return new Directory(count, size, offset + bias, bias);
     }
 
@@ -141,7 +178,10 @@ public sealed class ZipReader : IContainerReader
         int extraLength = BinaryPrimitives.ReadUInt16LittleEndian(header[30..]);
         int commentLength = BinaryPrimitives.ReadUInt16LittleEndian(header[32..]);
         if (nameLength + extraLength + commentLength > central.Length - at - CentralHeaderLength)
+        {
             throw new InvalidDataException("A zip central directory entry runs past the directory.");
+        }
+
         var name = header.Slice(CentralHeaderLength, nameLength).ToArray();
         var extra = header.Slice(CentralHeaderLength + nameLength, extraLength).ToArray();
         long compressed = BinaryPrimitives.ReadUInt32LittleEndian(header[20..]);
@@ -152,9 +192,20 @@ public sealed class ZipReader : IContainerReader
         if (FindExtra(extra, Zip64Tag) is { } zip64)
         {
             var z = 0;
-            if (size == uint.MaxValue && z <= zip64.Length - 8) { size = ReadLength(zip64, z); z += 8; }
-            if (compressed == uint.MaxValue && z <= zip64.Length - 8) { compressed = ReadLength(zip64, z); z += 8; }
-            if (local == uint.MaxValue && z <= zip64.Length - 8) local = ReadLength(zip64, z);
+            if (size == uint.MaxValue && z <= zip64.Length - 8)
+            {
+                size = ReadLength(zip64, z);
+                z += 8;
+            }
+            if (compressed == uint.MaxValue && z <= zip64.Length - 8)
+            {
+                compressed = ReadLength(zip64, z);
+                z += 8;
+            }
+            if (local == uint.MaxValue && z <= zip64.Length - 8)
+            {
+                local = ReadLength(zip64, z);
+            }
         }
 
         return new CentralEntry(
@@ -173,7 +224,11 @@ public sealed class ZipReader : IContainerReader
     private static long ReadLength(ReadOnlySpan<byte> bytes, int at)
     {
         var value = BinaryPrimitives.ReadUInt64LittleEndian(bytes[at..]);
-        if (value > long.MaxValue) throw new InvalidDataException("A ZIP64 size is impossibly large.");
+        if (value > long.MaxValue)
+        {
+            throw new InvalidDataException("A ZIP64 size is impossibly large.");
+        }
+
         return (long)value;
     }
 
@@ -183,10 +238,17 @@ public sealed class ZipReader : IContainerReader
         var unixMode = entry.Host == HostUnix ? entry.ExternalAttributes >> 16 : 0;
         var isDirectory = nameText.EndsWith('/') || (unixMode & 0xF000) == 0x4000 ||
             entry.Host == HostMsDos && (entry.ExternalAttributes & 0x10) != 0;
-        if (entry.Host == HostMsDos) nameText = nameText.Replace('\\', '/');
+        if (entry.Host == HostMsDos)
+        {
+            nameText = nameText.Replace('\\', '/');
+        }
+
         var path = UnixArchive.SplitPath(nameText, context, FormatName, entry.LocalOffset);
 
-        if (isDirectory) return new UnixArchiveEntry { Path = path, IsDirectory = true };
+        if (isDirectory)
+        {
+            return new UnixArchiveEntry { Path = path, IsDirectory = true };
+        }
 
         if ((entry.Flags & FlagEncrypted) != 0)
         {
@@ -202,34 +264,57 @@ public sealed class ZipReader : IContainerReader
         }
 
         if (entry.LocalOffset < 0 || entry.LocalOffset > input.Length - LocalHeaderLength)
+        {
             throw new InvalidDataException($"The local header of \"{nameText}\" lies outside the archive.");
+        }
+
         var local = input.Slice(entry.LocalOffset, LocalHeaderLength).ToArray();
         if (BinaryPrimitives.ReadUInt32LittleEndian(local) != LocalSignature)
+        {
             throw new InvalidDataException($"The local header of \"{nameText}\" is missing.");
+        }
+
         long localNameLength = BinaryPrimitives.ReadUInt16LittleEndian(local.AsSpan(26));
         long localExtraLength = BinaryPrimitives.ReadUInt16LittleEndian(local.AsSpan(28));
         var dataOffset = entry.LocalOffset + LocalHeaderLength + localNameLength + localExtraLength;
         if (dataOffset > input.Length || entry.CompressedSize > input.Length - dataOffset)
+        {
             throw new InvalidDataException($"The data of \"{nameText}\" runs past the end of the archive.");
+        }
+
         var localExtra = input.Slice(entry.LocalOffset + LocalHeaderLength + localNameLength, localExtraLength).ToArray();
 
         if (expanded > context.Options.MaxExpandedBytesPerInput - entry.Size)
+        {
             throw new InvalidDataException("Zip extraction exceeds the configured expanded-size limit.");
+        }
+
         expanded += entry.Size;
         var data = Extract(input.Slice(dataOffset, entry.CompressedSize), entry, nameText, context, dataOffset);
         if (Crc32.Compute(data) != entry.Crc)
+        {
             context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                 $"The zip entry \"{nameText}\" has a CRC-32 mismatch; its data is kept.", dataOffset);
+        }
 
         var mac = ReadMacFields(localExtra, entry.Extra, context, nameText, entry.LocalOffset);
         if (mac.ZipItName is { } macName && path.Length > 0)
+        {
             path[^1] = MacRoman.Decode(macName);
+        }
+
         if (mac.IsResourceFork is { } resource)
         {
             // Info-ZIP's old field appends 'd' or 'r' to the name; its new one files the fork under XtraStuf.mac/.
             if (mac.OldStyle && path.Length > 0 && path[^1].Length > 1 && path[^1][^1] == (resource ? 'r' : 'd'))
+            {
                 path[^1] = path[^1][..^1];
-            if (resource && path.Length > 1 && path[0] == ResourceFolder) path = path[1..];
+            }
+
+            if (resource && path.Length > 1 && path[0] == ResourceFolder)
+            {
+                path = path[1..];
+            }
         }
 
         var isLink = (unixMode & 0xF000) == 0xA000;
@@ -247,12 +332,19 @@ public sealed class ZipReader : IContainerReader
 
     private static byte[] Extract(ForkData packed, CentralEntry entry, string name, ContainerContext context, long offset)
     {
-        if (entry.Size > int.MaxValue) throw new InvalidDataException($"The zip entry \"{name}\" is too large to hold in memory.");
+        if (entry.Size > int.MaxValue)
+        {
+            throw new InvalidDataException($"The zip entry \"{name}\" is too large to hold in memory.");
+        }
+
         if (entry.Method == 0)
         {
             if (entry.CompressedSize != entry.Size)
+            {
                 context.Report(DiagnosticSeverity.Error, "archive.truncated",
                     $"The stored zip entry \"{name}\" has different packed ({entry.CompressedSize}) and expanded ({entry.Size}) sizes; the packed bytes are kept.", offset);
+            }
+
             return packed.ToArray();
         }
         using var stream = new DeflateStream(packed.Open(), CompressionMode.Decompress);
@@ -275,9 +367,21 @@ public sealed class ZipReader : IContainerReader
 
     internal static string DecodeName(byte[] name, bool utf8, int host)
     {
-        if (utf8) return Encoding.UTF8.GetString(name);
-        if (Array.TrueForAll(name, b => b < 0x80)) return Encoding.ASCII.GetString(name);
-        if (host == HostMacintosh) return MacRoman.Decode(name);
+        if (utf8)
+        {
+            return Encoding.UTF8.GetString(name);
+        }
+
+        if (Array.TrueForAll(name, b => b < 0x80))
+        {
+            return Encoding.ASCII.GetString(name);
+        }
+
+        if (host == HostMacintosh)
+        {
+            return MacRoman.Decode(name);
+        }
+
         try
         {
             return StrictUtf8.GetString(name);
@@ -285,7 +389,11 @@ public sealed class ZipReader : IContainerReader
         catch (DecoderFallbackException)
         {
             var chars = new char[name.Length];
-            for (var i = 0; i < name.Length; i++) chars[i] = name[i] < 0x80 ? (char)name[i] : Cp437High[name[i] - 0x80];
+            for (var i = 0; i < name.Length; i++)
+            {
+                chars[i] = name[i] < 0x80 ? (char)name[i] : Cp437High[name[i] - 0x80];
+            }
+
             return new string(chars);
         }
     }
@@ -343,7 +451,11 @@ public sealed class ZipReader : IContainerReader
         {
             var tag = BinaryPrimitives.ReadUInt16LittleEndian(extra.AsSpan(at));
             int size = BinaryPrimitives.ReadUInt16LittleEndian(extra.AsSpan(at + 2));
-            if (size > extra.Length - at - 4) yield break;
+            if (size > extra.Length - at - 4)
+            {
+                yield break;
+            }
+
             yield return (tag, extra.AsSpan(at + 4, size).ToArray());
             at += 4 + size;
         }
@@ -352,7 +464,13 @@ public sealed class ZipReader : IContainerReader
     private static byte[]? FindExtra(byte[] extra, ushort tag)
     {
         foreach (var (t, data) in ExtraFields(extra))
-            if (t == tag) return data;
+        {
+            if (t == tag)
+            {
+                return data;
+            }
+        }
+
         return null;
     }
 
@@ -362,7 +480,11 @@ public sealed class ZipReader : IContainerReader
     private static MacFields ReadOldMac(MacFields fields, byte[] data)
     {
         var reader = new BigEndianReader(data);
-        if (reader.ReadUInt32() != 0x4A4C4545) throw new InvalidDataException("no JLEE signature");
+        if (reader.ReadUInt32() != 0x4A4C4545)
+        {
+            throw new InvalidDataException("no JLEE signature");
+        }
+
         var info = FinderInfo.Read(data.AsSpan(4, 16));
         var created = reader.ReadUInt32At(20);
         var modified = reader.ReadUInt32At(24);
@@ -386,14 +508,20 @@ public sealed class ZipReader : IContainerReader
     private static MacFields ReadMac3(MacFields fields, byte[] data, ContainerContext context, string name, long offset)
     {
         var span = data.AsSpan();
-        if (span.Length < 14) throw new InvalidDataException("shorter than its header");
+        if (span.Length < 14)
+        {
+            throw new InvalidDataException("shorter than its header");
+        }
+
         var size = BinaryPrimitives.ReadUInt32LittleEndian(span);
         var flags = BinaryPrimitives.ReadUInt16LittleEndian(span[4..]);
         var type = new FourCC(span[6..10]);
         var creator = new FourCC(span[10..14]);
         fields = fields with { IsResourceFork = fields.IsResourceFork ?? (flags & 1) == 0 };
         if (span.Length == 14)
+        {
             return fields with { FinderInfo = fields.FinderInfo ?? new FinderInfo { Type = type, Creator = creator } };
+        }
 
         byte[] attributes;
         if ((flags & 4) != 0)
@@ -402,11 +530,19 @@ public sealed class ZipReader : IContainerReader
         }
         else
         {
-            if (span.Length < 20) throw new InvalidDataException("shorter than its compressed header");
+            if (span.Length < 20)
+            {
+                throw new InvalidDataException("shorter than its compressed header");
+            }
+
             var method = BinaryPrimitives.ReadUInt16LittleEndian(span[14..]);
             var crc = BinaryPrimitives.ReadUInt32LittleEndian(span[16..]);
             var packed = span[20..].ToArray();
-            if (size > ushort.MaxValue * 4) throw new InvalidDataException("attributes impossibly large");
+            if (size > ushort.MaxValue * 4)
+            {
+                throw new InvalidDataException("attributes impossibly large");
+            }
+
             attributes = method switch
             {
                 0 => packed,
@@ -414,10 +550,15 @@ public sealed class ZipReader : IContainerReader
                 _ => throw new InvalidDataException($"attribute compression type {method} is not supported"),
             };
             if (Crc32.Compute(attributes) != crc)
+            {
                 context.Report(DiagnosticSeverity.Warning, "archive.extra-field-crc",
                     $"The Macintosh attributes of zip entry \"{name}\" fail their CRC-32; they are used.", offset);
+            }
         }
-        if (attributes.Length < 40) throw new InvalidDataException("attributes shorter than 40 bytes");
+        if (attributes.Length < 40)
+        {
+            throw new InvalidDataException("attributes shorter than 40 bytes");
+        }
 
         var a = attributes.AsSpan();
         var fx = new BigEndianWriter(16);
@@ -441,7 +582,11 @@ public sealed class ZipReader : IContainerReader
         MacDate? created, modified;
         if ((flags & 8) != 0)
         {
-            if (a.Length < 42) throw new InvalidDataException("attributes too short for 64-bit dates");
+            if (a.Length < 42)
+            {
+                throw new InvalidDataException("attributes too short for 64-bit dates");
+            }
+
             created = Mac64(BinaryPrimitives.ReadUInt64LittleEndian(a[26..]));
             modified = Mac64(BinaryPrimitives.ReadUInt64LittleEndian(a[34..]));
         }
@@ -472,7 +617,11 @@ public sealed class ZipReader : IContainerReader
     private static MacFields ReadZipIt(MacFields fields, ushort tag, byte[] data)
     {
         var reader = new BigEndianReader(data);
-        if (reader.ReadUInt32() != 0x5A504954) throw new InvalidDataException("no ZPIT signature");
+        if (reader.ReadUInt32() != 0x5A504954)
+        {
+            throw new InvalidDataException("no ZPIT signature");
+        }
+
         byte[]? name = null;
         if (tag == ZipItTag)
         {
@@ -493,13 +642,29 @@ public sealed class ZipReader : IContainerReader
     // times that the flags name (the central copy has at most the modification time), Unix seconds UTC, little-endian.
     private static MacFields ReadExtendedTime(MacFields fields, byte[] data, ContainerContext context)
     {
-        if (data.Length < 1) return fields;
+        if (data.Length < 1)
+        {
+            return fields;
+        }
+
         var flags = data[0];
         var at = 1;
         MacDate? modified = null, created = null;
-        if ((flags & 1) != 0 && at <= data.Length - 4) { modified = UnixArchive.FromUnix(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(at)), context); at += 4; }
-        if ((flags & 2) != 0 && at <= data.Length - 4) at += 4;
-        if ((flags & 4) != 0 && at <= data.Length - 4) created = UnixArchive.FromUnix(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(at)), context);
+        if ((flags & 1) != 0 && at <= data.Length - 4)
+        {
+            modified = UnixArchive.FromUnix(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(at)), context);
+            at += 4;
+        }
+        if ((flags & 2) != 0 && at <= data.Length - 4)
+        {
+            at += 4;
+        }
+
+        if ((flags & 4) != 0 && at <= data.Length - 4)
+        {
+            created = UnixArchive.FromUnix(BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(at)), context);
+        }
+
         return fields with
         {
             UnixModified = fields.UnixModified ?? modified,

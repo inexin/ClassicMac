@@ -25,10 +25,21 @@ namespace ClassicMac.Graphics.QuickDraw
         public static void CopyBits(RgbaBitmap canvas, PixMap src, PictRect srcRect, PictRect dstRect, int mode,
             Region? mask, bool hilitePending, in PortColors colors, bool preserveAlpha)
         {
-            if (srcRect.IsEmpty || dstRect.IsEmpty) return;
+            if (srcRect.IsEmpty || dstRect.IsEmpty)
+            {
+                return;
+            }
+
             var area = Region.FromRect(dstRect).Intersect(Region.FromRect(new PictRect(0, 0, canvas.Height, canvas.Width)));
-            if (mask != null) area = area.Intersect(mask);
-            if (area.IsEmpty) return;
+            if (mask != null)
+            {
+                area = area.Intersect(mask);
+            }
+
+            if (area.IsEmpty)
+            {
+                return;
+            }
 
             int srcW = srcRect.Width, srcH = srcRect.Height, dstW = dstRect.Width, dstH = dstRect.Height;
             int srcTop = srcRect.Top - src.Bounds.Top, srcLeft = srcRect.Left - src.Bounds.Left;
@@ -78,18 +89,34 @@ namespace ClassicMac.Graphics.QuickDraw
                 DeviceModes.Dither(canvas, device, b.Top, b.Bottom, left, right, (x, y) =>
                 {
                     int dy = y - dstRect.Top, dx = x - dstRect.Left;
-                    if (dy < 0 || dy >= dstH || dx < 0 || dx >= dstW) return null;
+                    if (dy < 0 || dy >= dstH || dx < 0 || dx >= dstW)
+                    {
+                        return null;
+                    }
+
                     int[]? group = rowsCopy == null ? new[] { srcTop + dy } : rowsCopy[dy];
-                    if (group == null) return null;
+                    if (group == null)
+                    {
+                        return null;
+                    }
+
                     var (first, end) = colsCopy == null ? (dx, dx + 1) : colsCopy[dx];
                     RgbaColor color;
                     if (!scaled)
                     {
                         int sy = group[0], sx = srcLeft + first;
-                        if (sy < 0 || sy >= src.Height || sx < 0 || sx >= src.Width) return null;
+                        if (sy < 0 || sy >= src.Height || sx < 0 || sx >= src.Width)
+                        {
+                            return null;
+                        }
+
                         color = src.GetPixel(sx, sy);
                     }
-                    else if (!TryDeep(src, group, srcLeft, first, end, macOS9, out color, out _, out _)) return null;
+                    else if (!TryDeep(src, group, srcLeft, first, end, macOS9, out color, out _, out _))
+                    {
+                        return null;
+                    }
+
                     return ApplyColorSource(TransferModes.SrcCopy, false, color, new RgbaColor(255, 255, 255), copyColors, true,
                         out var copied) ? copied : null;
                 }, (x, y) => visible.Contains(x, y));
@@ -97,11 +124,16 @@ namespace ClassicMac.Graphics.QuickDraw
             }
 
             foreach (var r in area.Rectangles())
+            {
                 for (int y = r.Top; y < r.Bottom; y++)
                 {
                     int dy = y - dstRect.Top;
                     int[]? group = rows == null ? new[] { srcTop + dy } : rows[dy];
-                    if (group == null) continue;              // the source ran out before this row
+                    if (group == null)
+                    {
+                        continue;              // the source ran out before this row
+                    }
+
                     for (int x = r.Left; x < r.Right; x++)
                     {
                         int dx = x - dstRect.Left;
@@ -118,28 +150,54 @@ namespace ClassicMac.Graphics.QuickDraw
                         byte alpha = 255;
                         if (src.PixelSize == 1)
                         {
-                            if (!TryBit(src, group, srcLeft, first, end, scaled ? bitCap : srcW, scaled, out bool bit)) continue;
+                            if (!TryBit(src, group, srcLeft, first, end, scaled ? bitCap : srcW, scaled, out bool bit))
+                            {
+                                continue;
+                            }
+
                             if (bilevel)
+                            {
                                 write = TransferModes.ApplyBit(TransferModes.Normalize(mode, hilitePending), bit, dst, colors, out result);
+                            }
                             else
+                            {
                                 write = ApplyColorSource(mode, hilitePending, src.Palette[bit ? 1 : 0], dst, colors, false, out result);
+                            }
                         }
                         else if (!scaled)
                         {
                             int sy = group[0], sx = srcLeft + first;
-                            if (sy < 0 || sy >= src.Height || sx < 0 || sx >= src.Width) continue;
+                            if (sy < 0 || sy >= src.Height || sx < 0 || sx >= src.Width)
+                            {
+                                continue;
+                            }
+
                             write = ApplyColorSource(mode, hilitePending, src.GetPixel(sx, sy), dst, colors, src.IsDirect, out result);
-                            if (keepAlpha) alpha = src.GetAlpha(sx, sy);
+                            if (keepAlpha)
+                            {
+                                alpha = src.GetAlpha(sx, sy);
+                            }
                         }
                         else
                         {
-                            if (!TryDeep(src, group, srcLeft, first, end, macOS9, out var color, out bool averaged, out byte a)) continue;
+                            if (!TryDeep(src, group, srcLeft, first, end, macOS9, out var color, out bool averaged, out byte a))
+                            {
+                                continue;
+                            }
+
                             write = ApplyColorSource(mode, hilitePending, color, dst, colors, src.IsDirect, out result);
-                            if (keepAlpha) alpha = averaged || averagedRows ? (byte)0 : a;
+                            if (keepAlpha)
+                            {
+                                alpha = averaged || averagedRows ? (byte)0 : a;
+                            }
                         }
-                        if (write) Painter.WritePixel(canvas, x, y, result, alpha);
+                        if (write)
+                        {
+                            Painter.WritePixel(canvas, x, y, result, alpha);
+                        }
                     }
                 }
+            }
         }
 
         // One destination pixel on an indexed or 16-bit screen.
@@ -152,7 +210,11 @@ namespace ClassicMac.Graphics.QuickDraw
             bool write;
             if (src.PixelSize == 1)
             {
-                if (!TryBit(src, group, srcLeft, first, end, scaled ? bitCap : src.Width, scaled, out bool bit)) return;
+                if (!TryBit(src, group, srcLeft, first, end, scaled ? bitCap : src.Width, scaled, out bool bit))
+                {
+                    return;
+                }
+
                 write = bilevel
                     ? DeviceModes.Bit(m, bit, dst, colors, out value)
                     : DeviceModes.Source(m, src.Palette[bit ? 1 : 0], false, dst, colors, out value, src.Exact(bit ? 1 : 0));
@@ -164,15 +226,29 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (!scaled)
                 {
                     int sy = group[0], sx = srcLeft + first;
-                    if (sy < 0 || sy >= src.Height || sx < 0 || sx >= src.Width) return;
+                    if (sy < 0 || sy >= src.Height || sx < 0 || sx >= src.Width)
+                    {
+                        return;
+                    }
+
                     color = src.GetPixel(sx, sy);
-                    if (src.PixelSize <= 8) index = src.GetIndex(sx, sy);
+                    if (src.PixelSize <= 8)
+                    {
+                        index = src.GetIndex(sx, sy);
+                    }
                 }
-                else if (!TryDeep(src, group, srcLeft, first, end, colors.MacOS9, out color, out _, out _, out index)) return;
+                else if (!TryDeep(src, group, srcLeft, first, end, colors.MacOS9, out color, out _, out _, out index))
+                {
+                    return;
+                }
+
                 write = DeviceModes.Source(m, color, src.IsDirect, dst, colors, out value,
                     index >= 0 ? src.Exact(index) : null);
             }
-            if (write) device.Write(canvas, x, y, value);
+            if (write)
+            {
+                device.Write(canvas, x, y, value);
+            }
         }
 
         private static bool IsBlackAndWhite(RgbaColor[] palette) =>
@@ -188,14 +264,28 @@ namespace ClassicMac.Graphics.QuickDraw
             bool any = false;
             long rowBits = src.RowBytes * 8L, totalBits = src.Data.Length * 8L;
             foreach (int row in rows)
+            {
                 for (int i = first; i < end && i < cap; i++)
                 {
                     long address = row * rowBits + srcLeft + i;
-                    if (!scaled && (srcLeft + i < 0 || srcLeft + i >= src.Width || row < 0 || row >= src.Height)) continue;
-                    if (address < 0 || address >= totalBits) continue;
+                    if (!scaled && (srcLeft + i < 0 || srcLeft + i >= src.Width || row < 0 || row >= src.Height))
+                    {
+                        continue;
+                    }
+
+                    if (address < 0 || address >= totalBits)
+                    {
+                        continue;
+                    }
+
                     any = true;
-                    if (((src.Data[address >> 3] >> (7 - (int)(address & 7))) & 1) != 0) bit = true;
+                    if (((src.Data[address >> 3] >> (7 - (int)(address & 7))) & 1) != 0)
+                    {
+                        bit = true;
+                    }
                 }
+            }
+
             return any;
         }
 
@@ -216,11 +306,19 @@ namespace ClassicMac.Graphics.QuickDraw
             for (int i = first; i < end; i++)
             {
                 int x = srcLeft + i;
-                if (x < 0 || x >= src.Width) continue;
+                if (x < 0 || x >= src.Width)
+                {
+                    continue;
+                }
+
                 int n = 0, r = 0, g = 0, b = 0;
                 foreach (int row in rows)
                 {
-                    if (row < 0 || row >= src.Height) continue;
+                    if (row < 0 || row >= src.Height)
+                    {
+                        continue;
+                    }
+
                     if (src.PixelSize <= 8)
                     {
                         maxIndex = Math.Max(maxIndex, src.GetIndex(x, row));
@@ -228,28 +326,52 @@ namespace ClassicMac.Graphics.QuickDraw
                         continue;
                     }
                     var (cr, cg, cb) = src.GetComponents(x, row);
-                    if (macOS9 && src.PixelSize == 16) (cr, cg, cb) = (Expand5(cr), Expand5(cg), Expand5(cb));
-                    r += cr; g += cg; b += cb;
+                    if (macOS9 && src.PixelSize == 16)
+                    {
+                        (cr, cg, cb) = (Expand5(cr), Expand5(cg), Expand5(cb));
+                    }
+
+                    r += cr;
+                    g += cg;
+                    b += cb;
                     n++;
                     alpha = src.GetAlpha(x, row);
                 }
-                if (n == 0) continue;
-                if (n > 1) averaged = true;
+                if (n == 0)
+                {
+                    continue;
+                }
+
+                if (n > 1)
+                {
+                    averaged = true;
+                }
+
                 columns++;
                 if (src.PixelSize > 8)
                 {
                     int half = macOS9 ? n / 2 : 0;
-                    sumR += (r + half) / n; sumG += (g + half) / n; sumB += (b + half) / n;
+                    sumR += (r + half) / n;
+                    sumG += (g + half) / n;
+                    sumB += (b + half) / n;
                 }
             }
-            if (columns == 0) return false;
+            if (columns == 0)
+            {
+                return false;
+            }
+
             if (src.PixelSize <= 8)
             {
                 index = maxIndex;
                 color = maxIndex < src.Palette.Length ? src.Palette[maxIndex] : new RgbaColor(0, 0, 0);
                 return true;
             }
-            if (columns > 1) averaged = true;
+            if (columns > 1)
+            {
+                averaged = true;
+            }
+
             if (macOS9)
             {
                 int half = columns / 2;
@@ -273,7 +395,10 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int m = TransferModes.Normalize(mode, hilitePending);
             if (m >= TransferModes.Blend)
+            {
                 return TransferModes.ApplyColor(m, s, d, c, out result);
+            }
+
             if (c.MacOS9 && TransferModes.ColorizeBlend(m, s, d, c, direct) is RgbaColor blended)
             {
                 result = blended;
@@ -288,7 +413,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // one source early). Null otherwise.
         private static int? ClippedStart(int s, int d, int n)
         {
-            if (d > s) return (long)s * (2 * n + 1) % (2L * d) == 0 ? 1 : null;
+            if (d > s)
+            {
+                return (long)s * (2 * n + 1) % (2L * d) == 0 ? 1 : null;
+            }
+
             if (d < s)
             {
                 long t = 2L * n * s;
@@ -299,7 +428,11 @@ namespace ClassicMac.Graphics.QuickDraw
 
         private static int[]? ShiftGroup(int[]? group, int shift, int srcTop, int bitmapHeight)
         {
-            if (group == null || group.Length == 0) return group;
+            if (group == null || group.Length == 0)
+            {
+                return group;
+            }
+
             if (shift > 0)
             {
                 int row = group[0] + 1;
@@ -318,7 +451,10 @@ namespace ClassicMac.Graphics.QuickDraw
             int previous = 0;
             for (int k = 0; k < dstWidth; k++)
             {
-                if (dstWidth == srcWidth) result[k] = (k, k + 1);
+                if (dstWidth == srcWidth)
+                {
+                    result[k] = (k, k + 1);
+                }
                 else if (dstWidth > srcWidth)
                 {
                     int i = (int)((s * (2 * k + 1) + 2 * d - 1) / (2 * d)) - 1;
@@ -360,7 +496,11 @@ namespace ClassicMac.Graphics.QuickDraw
                 do
                 {
                     result[k++] = rows;
-                    if (k == dstHeight) return result;
+                    if (k == dstHeight)
+                    {
+                        return result;
+                    }
+
                     error -= srcHeight;
                 } while (error >= 0);
             }
@@ -378,12 +518,22 @@ namespace ClassicMac.Graphics.QuickDraw
             for (int k = 0; k < dstHeight; k++)
             {
                 var rows = new List<int>();
-                if (dstHeight == srcHeight) rows.Add(k);
-                else if (dstHeight > srcHeight) rows.Add((int)((s * (2 * k + 1) + 2 * d - 1) / (2 * d)) - 1);
+                if (dstHeight == srcHeight)
+                {
+                    rows.Add(k);
+                }
+                else if (dstHeight > srcHeight)
+                {
+                    rows.Add((int)((s * (2 * k + 1) + 2 * d - 1) / (2 * d)) - 1);
+                }
                 else
                 {
                     int next = (int)((2 * (k + 1) * s + d) / (2 * d));
-                    for (int i = previous; i < next; i++) rows.Add(i);
+                    for (int i = previous; i < next; i++)
+                    {
+                        rows.Add(i);
+                    }
+
                     previous = next;
                 }
                 rows.RemoveAll(i => srcTop + i >= bitmapHeight);
@@ -399,7 +549,11 @@ namespace ClassicMac.Graphics.QuickDraw
             var result = new (int first, int end)[dstWidth];
             if (dstWidth == srcWidth)
             {
-                for (int j = 0; j < dstWidth; j++) result[j] = (j, j + 1);
+                for (int j = 0; j < dstWidth; j++)
+                {
+                    result[j] = (j, j + 1);
+                }
+
                 return result;
             }
             if (dstWidth > srcWidth)
@@ -417,7 +571,11 @@ namespace ClassicMac.Graphics.QuickDraw
             for (int i = 0; i < srcWidth; i++)
             {
                 int d = (int)(((fraction >> 1) + (long)i * fraction) >> 16);
-                if (d >= dstWidth) break;
+                if (d >= dstWidth)
+                {
+                    break;
+                }
+
                 result[d] = seen[d] ? (result[d].first, i + 1) : (i, i + 1);
                 seen[d] = true;
             }
@@ -430,7 +588,11 @@ namespace ClassicMac.Graphics.QuickDraw
             var result = new (int first, int end)[dstWidth];
             if (dstWidth == srcWidth)
             {
-                for (int j = 0; j < dstWidth; j++) result[j] = (j, j + 1);
+                for (int j = 0; j < dstWidth; j++)
+                {
+                    result[j] = (j, j + 1);
+                }
+
                 return result;
             }
             if (dstWidth > srcWidth)
@@ -461,10 +623,18 @@ namespace ClassicMac.Graphics.QuickDraw
             switch (fraction)
             {
                 case 0x8000:
-                    for (int j = 0; j < dstWidth; j++) result[j] = (2 * j, 2 * j + 2);
+                    for (int j = 0; j < dstWidth; j++)
+                    {
+                        result[j] = (2 * j, 2 * j + 2);
+                    }
+
                     return result;
                 case 0x4000:
-                    for (int j = 0; j < dstWidth; j++) result[j] = (4 * j, 4 * j + 4);
+                    for (int j = 0; j < dstWidth; j++)
+                    {
+                        result[j] = (4 * j, 4 * j + 4);
+                    }
+
                     return result;
                 case 0xC000:                                   // x3/4: a, b|c, d per 4 source columns
                     for (int j = 0; j < dstWidth; j++)
@@ -479,7 +649,11 @@ namespace ClassicMac.Graphics.QuickDraw
             for (int i = 0; current < dstWidth; i++)
             {
                 int d = (int)(((fraction >> 1) + (long)i * fraction) >> 16);
-                if (d == current) continue;
+                if (d == current)
+                {
+                    continue;
+                }
+
                 result[current] = (start, i);
                 current = d;
                 start = i;

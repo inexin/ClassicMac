@@ -91,8 +91,15 @@ namespace ClassicMac.Resources.Cli
         private static void Collect(ContainerNode node, List<string> chain, List<(ContainerNode, IReadOnlyList<string>)> leaves)
         {
             var here = new List<string>(chain) { node.Format };
-            if (node.Children.Count == 0) leaves.Add((node, here));
-            foreach (var child in node.Children) Collect(child, here, leaves);
+            if (node.Children.Count == 0)
+            {
+                leaves.Add((node, here));
+            }
+
+            foreach (var child in node.Children)
+            {
+                Collect(child, here, leaves);
+            }
         }
     }
 
@@ -108,8 +115,16 @@ namespace ClassicMac.Resources.Cli
         {
             foreach (var d in diagnostics)
             {
-                if (d.Severity == DiagnosticSeverity.Error || (strict && d.Severity == DiagnosticSeverity.Warning)) Failed = true;
-                if (quiet && d.Severity != DiagnosticSeverity.Error) continue;
+                if (d.Severity == DiagnosticSeverity.Error || (strict && d.Severity == DiagnosticSeverity.Warning))
+                {
+                    Failed = true;
+                }
+
+                if (quiet && d.Severity != DiagnosticSeverity.Error)
+                {
+                    continue;
+                }
+
                 var at = d.Offset is { } offset ? $" at {offset}" : "";
                 var where = d.Location is { } location ? $"{source} > {location}" : source;
                 error.WriteLine($"{where}: {d.Severity.ToString().ToLowerInvariant()}{at}: {d.Message} [{d.Code}]");

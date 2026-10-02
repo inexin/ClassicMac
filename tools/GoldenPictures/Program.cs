@@ -51,7 +51,11 @@ Save("shapes", p =>
 // 2. Pen modes with patterns over stripes.
 Save("modes", p =>
 {
-    for (int i = 0; i < 12; i++) p.Op(0x0031).Rect(4 + 12 * i, 4, 10 + 12 * i, 236);
+    for (int i = 0; i < 12; i++)
+    {
+        p.Op(0x0031).Rect(4 + 12 * i, 4, 10 + 12 * i, 236);
+    }
+
     for (int m = 0; m < 8; m++)
     {
         int x = 6 + 29 * m;
@@ -86,7 +90,10 @@ Save("copybits1", p =>
     p.Op(0x0031).Rect(2, 120, 158, 238);                                        // black right half
     int[] modes = { 0, 1, 2, 3, 4, 5, 6, 7 };
     for (int i = 0; i < modes.Length; i++)
+    {
         p.Bits1(bits, 16, 16, (6 + 18 * i, 104), 16, 16, modes[i]);
+    }
+
     p.Bits1(bits, 16, 16, (6, 4), 32, 32, 0);                                   // x2
     p.Bits1(bits, 16, 16, (40, 4), 24, 24, 0);                                  // x1.5
     p.Bits1(bits, 16, 16, (66, 4), 12, 12, 0);                                  // x3/4
@@ -127,7 +134,10 @@ Save("color", p =>
     p.Op(0x001F).Rgb(0x8000, 0x4000, 0xC000);                                   // OpColor
     int[] arithmetic = { 32, 33, 34, 35, 36, 37, 38, 39 };
     for (int i = 0; i < arithmetic.Length; i++)
+    {
         p.Op(0x001A).Rgb(0x6000, 0xA000, 0x2000).Op(0x0008).U16(arithmetic[i]).Op(0x0031).Rect(50 + 12 * i, 10, 58 + 12 * i, 230);
+    }
+
     p.Op(0x0008).U16(8).Op(0x001D).Rgb(0xFFFF, 0xCCCC, 0).Op(0x001C).Op(0x0033).Rect(4, 120, 30, 230);   // hilite
 });
 
@@ -136,7 +146,11 @@ Save("text", p =>
 {
     const string sample = "Sphinx of black quartz 0123";
     (int id, string name)[] fonts = { (0, "Chicago"), (2, "New York"), (3, "Geneva"), (4, "Monaco") };
-    foreach (var (id, name) in fonts) p.FontName(id, name);
+    foreach (var (id, name) in fonts)
+    {
+        p.FontName(id, name);
+    }
+
     int y = 14;
     foreach (var (id, size) in new[] { (0, 12), (3, 9), (3, 12), (2, 12), (4, 9), (3, 10), (2, 18) })
     {
@@ -203,7 +217,7 @@ sealed class Pict
     public Pict Clip(int t, int l, int bt, int r) => Op(0x0001).U16(10).Rect(t, l, bt, r);
 
     // An 8-byte pattern from repeated rows.
-    public Pict Pattern(params int[] rows) { for (int i = 0; i < 8; i++) U8(rows[i % rows.Length]); return this; }
+    public Pict Pattern(params int[] rows) { for (int i = 0; i < 8; i++) { U8(rows[i % rows.Length]); } return this; }
 
     public Pict FontName(int id, string name) =>
         Op(0x002C).U16(3 + name.Length).U16(id).Text(name);
@@ -212,7 +226,11 @@ sealed class Pict
     public Pict Poly(params (int h, int v)[] pts)
     {
         U16(10 + 4 * pts.Length).Rect(pts.Min(p => p.v), pts.Min(p => p.h), pts.Max(p => p.v), pts.Max(p => p.h));
-        foreach (var (h, v) in pts) Point(v, h);
+        foreach (var (h, v) in pts)
+        {
+            Point(v, h);
+        }
+
         return this;
     }
 
@@ -221,21 +239,45 @@ sealed class Pict
     {
         var inside = new bool[bt - t + 1, r - l + 1];
         foreach (var x in rects)
+        {
             for (int y = x.t; y < x.b; y++)
-                for (int h = x.l; h < x.r; h++) inside[y - t, h - l] = true;
+            {
+                for (int h = x.l; h < x.r; h++)
+                {
+                    inside[y - t, h - l] = true;
+                }
+            }
+        }
+
         bool At(int y, int h) => y >= t && h >= l && y < bt && h < r && inside[y - t, h - l];
         var data = new List<int>();
         for (int y = t; y <= bt; y++)
         {
             var xs = new List<int>();
             for (int h = l; h <= r; h++)
-                if (At(y, h) ^ At(y, h - 1) ^ At(y - 1, h) ^ At(y - 1, h - 1)) xs.Add(h);
-            if (xs.Count == 0) continue;
-            data.Add(y); data.AddRange(xs); data.Add(0x7FFF);
+            {
+                if (At(y, h) ^ At(y, h - 1) ^ At(y - 1, h) ^ At(y - 1, h - 1))
+                {
+                    xs.Add(h);
+                }
+            }
+
+            if (xs.Count == 0)
+            {
+                continue;
+            }
+
+            data.Add(y);
+            data.AddRange(xs);
+            data.Add(0x7FFF);
         }
         data.Add(0x7FFF);
         U16(10 + 2 * data.Count).Rect(t, l, bt, r);
-        foreach (var v in data) U16(v);
+        foreach (var v in data)
+        {
+            U16(v);
+        }
+
         return this;
     }
 
@@ -266,7 +308,11 @@ sealed class Pict
             Op(0x0098).U16(rowBytes | 0x8000).Rect(0, 0, h, w);
             PixMapFields(packType: 0, pixelType: 0, depth: 8, cmpCount: 1, cmpSize: 8);
             U32(0).U16(0x8000).U16(255);                                        // ctSeed, device ctFlags, 256 entries
-            for (int i = 0; i < 256; i++) { var (r, g, bl) = Standard8(i); U16(i).Rgb(r * 257, g * 257, bl * 257); }
+            for (int i = 0; i < 256; i++)
+            {
+                var (r, g, bl) = Standard8(i);
+                U16(i).Rgb(r * 257, g * 257, bl * 257);
+            }
         }
         else
         {
@@ -283,19 +329,35 @@ sealed class Pict
                 switch (depth)
                 {
                     case 8:
-                    {
-                        // Nearest color of the 6x6x6 cube (levels from white); the cube's black is entry 255.
-                        int ri = 5 - (r + 25) / 51, gi = 5 - (g + 25) / 51, bi = 5 - (bl + 25) / 51;
-                        int index = ri * 36 + gi * 6 + bi;
-                        row.Add((byte)(index == 215 ? 255 : index));
+                        {
+                            // Nearest color of the 6x6x6 cube (levels from white); the cube's black is entry 255.
+                            int ri = 5 - (r + 25) / 51, gi = 5 - (g + 25) / 51, bi = 5 - (bl + 25) / 51;
+                            int index = ri * 36 + gi * 6 + bi;
+                            row.Add((byte)(index == 215 ? 255 : index));
+                            break;
+                        }
+                    case 16:
+                        {
+                            int v = ((r >> 3) << 10) | ((g >> 3) << 5) | (bl >> 3);
+                            row.Add((byte)(v >> 8));
+                            row.Add((byte)v);
+                            break;
+                        }
+                    default:
+                        row.Add(0);
+                        row.Add((byte)r);
+                        row.Add((byte)g);
+                        row.Add((byte)bl);
                         break;
-                    }
-                    case 16: { int v = ((r >> 3) << 10) | ((g >> 3) << 5) | (bl >> 3); row.Add((byte)(v >> 8)); row.Add((byte)v); break; }
-                    default: row.Add(0); row.Add((byte)r); row.Add((byte)g); row.Add((byte)bl); break;
                 }
             }
-            while (row.Count < rowBytes) row.Add(0);
-            if (depth == 8 && rowBytes >= 8) { U8(rowBytes + 1); U8(rowBytes - 1); }   // one PackBits literal run
+            while (row.Count < rowBytes)
+            {
+                row.Add(0);
+            }
+
+            if (depth == 8 && rowBytes >= 8)
+            { U8(rowBytes + 1); U8(rowBytes - 1); }   // one PackBits literal run
             b.AddRange(row);
         }
         return this;
@@ -308,9 +370,17 @@ sealed class Pict
     // The standard Macintosh 8-bit palette.
     private static (int r, int g, int b) Standard8(int i)
     {
-        if (i < 215) return ((5 - i / 36) * 51, (5 - i / 6 % 6) * 51, (5 - i % 6) * 51);
+        if (i < 215)
+        {
+            return ((5 - i / 36) * 51, (5 - i / 6 % 6) * 51, (5 - i % 6) * 51);
+        }
+
         int[] ramp = { 0xEE, 0xDD, 0xBB, 0xAA, 0x88, 0x77, 0x55, 0x44, 0x22, 0x11 };
-        if (i == 255) return (0, 0, 0);
+        if (i == 255)
+        {
+            return (0, 0, 0);
+        }
+
         int k = (i - 215) % 10, v = ramp[k];
         return ((i - 215) / 10) switch { 0 => (v, 0, 0), 1 => (0, v, 0), 2 => (0, 0, v), _ => (v, v, v) };
     }

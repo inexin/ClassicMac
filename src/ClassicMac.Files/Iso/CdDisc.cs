@@ -106,7 +106,10 @@ namespace ClassicMac.Files.Iso
             {
                 if (disposing)
                 {
-                    foreach (var stream in open) stream?.Dispose();
+                    foreach (var stream in open)
+                    {
+                        stream?.Dispose();
+                    }
                 }
                 base.Dispose(disposing);
             }

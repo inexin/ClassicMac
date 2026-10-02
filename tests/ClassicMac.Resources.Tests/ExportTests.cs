@@ -19,7 +19,11 @@ public class ExportTests : IDisposable
     private static Resource Res(string type, short id, byte[] data, string? name = null, ResourceAttributes attributes = default)
     {
         var resource = new Resource(FourCC.FromString(type), id, data) { Attributes = attributes };
-        if (name is not null) resource.Name = new MacString(MacRoman.Encode(name));
+        if (name is not null)
+        {
+            resource.Name = new MacString(MacRoman.Encode(name));
+        }
+
         return resource;
     }
 
@@ -43,7 +47,11 @@ public class ExportTests : IDisposable
     private static ResourceFork Fork(params Resource[] resources)
     {
         var fork = new ResourceFork();
-        foreach (var r in resources) fork.Add(r);
+        foreach (var r in resources)
+        {
+            fork.Add(r);
+        }
+
         return fork;
     }
 
@@ -76,7 +84,10 @@ public class ExportTests : IDisposable
         var snd = manifest.Resources.Single(r => r.Id == 200);
         Assert.Equal(("snd ", "736E6420", "Door", 2, 2, (short?)null, "raw"), (snd.Type, snd.TypeBytes, snd.Name, snd.Size, snd.StoredSize, snd.Dcmp, snd.Decoder));
         foreach (var r in manifest.Resources)
+        {
             Assert.Equal(r.Sha256, Sha(File.ReadAllBytes(Path.Combine(folder, r.Path))));
+        }
+
         Assert.Contains("\"$schema\"", File.ReadAllText(Path.Combine(folder, "manifest.json")));
     }
 

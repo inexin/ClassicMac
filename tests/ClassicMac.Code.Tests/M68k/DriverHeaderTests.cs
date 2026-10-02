@@ -14,7 +14,11 @@ public class DriverHeaderTests
         w.WriteUInt16(5);
         w.WriteUInt16(0x0102);
         w.WriteInt16(-3);
-        foreach (var o in offsets) w.WriteUInt16(o);
+        foreach (var o in offsets)
+        {
+            w.WriteUInt16(o);
+        }
+
         w.WriteByte(name.Length);
         w.WriteBytes(MacRoman.Encode(name));
         w.WriteZeros(codeLength);

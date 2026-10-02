@@ -42,16 +42,28 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanSaveResource))]
         private Task SaveResourceAs() => Run(async () =>
         {
-            if (Selected is not ResourceNode node || FilePicker is null) return;
+            if (Selected is not ResourceNode node || FilePicker is null)
+            {
+                return;
+            }
+
             var diagnostics = new List<Diagnostic>();
             var (outputs, raw) = await Task.Run(() => Decode(node, diagnostics));
             var extensions = outputs.Select(o => o.Extension).Append(".bin").ToList();
             var stem = HostNames.ToHostName(Stem(node.Resource), 200);
             var path = await FilePicker.PickSaveFileAsync($"Save {node.Resource}", stem + extensions[0], extensions);
-            if (path is null) return;
+            if (path is null)
+            {
+                return;
+            }
+
             var chosen = outputs.FirstOrDefault(o => string.Equals(o.Extension, Path.GetExtension(path), StringComparison.OrdinalIgnoreCase));
             await File.WriteAllBytesAsync(path, (chosen?.Content ?? raw).ToArray());
-            foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
+            foreach (var d in diagnostics)
+            {
+                Report(new DiagnosticEntry(d, node.Source, node));
+            }
+
             Status = $"Saved {node.Resource} to {path}.";
         });
 
@@ -66,19 +78,31 @@ namespace ClassicMac.App.ViewModels
             };
             await fileNode.EnsureLoadedAsync();
             var fork = fileNode switch { FileNode f => f.Resources?.Fork, InputNode i => i.RawResources?.Fork, _ => null };
-            if (fork is null || await PickFolder("Export resources to") is not { } parent) return;
+            if (fork is null || await PickFolder("Export resources to") is not { } parent)
+            {
+                return;
+            }
+
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(file.Name) + " resources");
             var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
             var result = await Task.Run(() => ResourceExporter.Export(fork, target, source, ExportOptionsFor(types),
                 () => file.DataFork.ToArray(ReadOptions.MaxResourceSize)));
-            foreach (var d in result.Diagnostics.Skip(fork.Diagnostics.Count)) Report(new DiagnosticEntry(d, fileNode.Source, fileNode));
+            foreach (var d in result.Diagnostics.Skip(fork.Diagnostics.Count))
+            {
+                Report(new DiagnosticEntry(d, fileNode.Source, fileNode));
+            }
+
             Status = $"{result.Manifest.Resources.Count} resources to {target}.";
         });
 
         [RelayCommand(CanExecute = nameof(CanExtractAll))]
         private Task ExtractAll() => Run(async () =>
         {
-            if (Selected is not { } node || await PickFolder("Extract all resources to") is not { } parent) return;
+            if (Selected is not { } node || await PickFolder("Extract all resources to") is not { } parent)
+            {
+                return;
+            }
+
             var root = await Whole(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
             var total = root.Leaves().Count();
@@ -90,19 +114,34 @@ namespace ClassicMac.App.ViewModels
                 foreach (var leaf in root.Leaves())
                 {
                     var found = MacFileResources.Read(leaf.File, ReadOptions);
-                    if (found.Fork is { Resources.Count: > 0 } fork) forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
+                    if (found.Fork is { Resources.Count: > 0 } fork)
+                    {
+                        forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
+                    }
                 }
                 return Unpacker.Extract(root, forks, target, ExportOptionsFor(null), diagnostics, progress);
             });
-            foreach (var (source, d) in diagnostics) Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
-            foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            foreach (var (source, d) in diagnostics)
+            {
+                Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
+            }
+
+            foreach (var failure in result.Failed)
+            {
+                Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            }
+
             progress.Finish($"{result.Resources} resources from {result.Files} files to {target}.");
         });
 
         [RelayCommand(CanExecute = nameof(CanUnpack))]
         private Task ConvertDocuments() => Run(async () =>
         {
-            if (Selected is not { } node || await PickFolder("Convert documents to") is not { } parent) return;
+            if (Selected is not { } node || await PickFolder("Convert documents to") is not { } parent)
+            {
+                return;
+            }
+
             var root = await Whole(node);
             var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
             var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
@@ -112,17 +151,32 @@ namespace ClassicMac.App.ViewModels
                 foreach (var leaf in root.Leaves())
                 {
                     var found = MacFileResources.Read(leaf.File, ReadOptions);
-                    if (found.Fork is { Resources.Count: > 0 } fork) forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
+                    if (found.Fork is { Resources.Count: > 0 } fork)
+                    {
+                        forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
+                    }
                 }
                 var target = ExportFolders.CreateNew(parent, name + " documents");
                 var result = DocumentConverter.Convert(root, forks, target, ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
                     ReadOptions, overwrite: false, diagnostics);
                 // No documents: the new folder, still empty, is not left behind.
-                if (result.Documents.Count == 0 && result.Failed.Count == 0) Directory.Delete(target);
+                if (result.Documents.Count == 0 && result.Failed.Count == 0)
+                {
+                    Directory.Delete(target);
+                }
+
                 return (target, result);
             });
-            foreach (var (source, d) in diagnostics) Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
-            foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            foreach (var (source, d) in diagnostics)
+            {
+                Report(new DiagnosticEntry(d, $"{node.Source} › {source}", node));
+            }
+
+            foreach (var failure in result.Failed)
+            {
+                Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            }
+
             Status = result.Documents.Count switch
             {
                 0 => $"No documents in {NameOf(node)}.",
@@ -139,15 +193,27 @@ namespace ClassicMac.App.ViewModels
 
         private Task Unpack(HostLayout layout) => Run(async () =>
         {
-            if (Selected is not { } node || await PickFolder("Unpack to") is not { } parent) return;
+            if (Selected is not { } node || await PickFolder("Unpack to") is not { } parent)
+            {
+                return;
+            }
+
             var root = await Whole(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
             var total = root.Leaves().Count();
             var progress = new StatusProgress(this, n => $"Unpacking {n} of {total} files…");
             var diagnostics = new List<Diagnostic>();
             var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout }, diagnostics, progress));
-            foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
-            foreach (var failure in result.Failed) Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            foreach (var d in diagnostics)
+            {
+                Report(new DiagnosticEntry(d, node.Source, node));
+            }
+
+            foreach (var failure in result.Failed)
+            {
+                Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
+            }
+
             progress.Finish($"{result.Files} files ({result.Bytes:N0} bytes) to {target}.");
         });
 
@@ -167,7 +233,10 @@ namespace ClassicMac.App.ViewModels
                 {
                     lock (gate)
                     {
-                        if (!finished) model.Status = text(n);
+                        if (!finished)
+                        {
+                            model.Status = text(n);
+                        }
                     }
                 });
             }
@@ -263,7 +332,11 @@ namespace ClassicMac.App.ViewModels
             var diagnostics = new List<Diagnostic>();
             var options = ContainerOptions;
             var whole = await Task.Run(() => ContainerUnwrapper.Default.Expand(part, new ContainerContext(options, diagnostics)));
-            foreach (var d in diagnostics) Report(new DiagnosticEntry(d, Tree.SourceOf(node, d), node));
+            foreach (var d in diagnostics)
+            {
+                Report(new DiagnosticEntry(d, Tree.SourceOf(node, d), node));
+            }
+
             return whole;
         }
 
@@ -281,7 +354,11 @@ namespace ClassicMac.App.ViewModels
                     return new ContainerNode("selection", file.File, [new ContainerNode(file.Node.Format, file.File with { FolderPath = [] }, [])]);
                 case FolderNode folder:
                     var depth = 0;
-                    for (NodeViewModel? at = folder; at is FolderNode; at = at.Parent) depth++;
+                    for (NodeViewModel? at = folder; at is FolderNode; at = at.Parent)
+                    {
+                        depth++;
+                    }
+
                     var items = new List<ContainerNode>();
                     Collect(folder, items, depth);
                     return new ContainerNode("selection", new MacFile { Name = MacString.FromMacRoman(folder.Title) }, items);
@@ -295,8 +372,14 @@ namespace ClassicMac.App.ViewModels
             foreach (var child in Tree.Contents(folder))
             {
                 var node = child switch { FileNode f => f.Node, ContainerFileNode c => c.Node, _ => null };
-                if (node is not null) items.Add(node with { File = node.File with { FolderPath = node.File.FolderPath.Skip(depth).ToList() } });
-                else if (child is FolderNode) Collect(child, items, depth);
+                if (node is not null)
+                {
+                    items.Add(node with { File = node.File with { FolderPath = node.File.FolderPath.Skip(depth).ToList() } });
+                }
+                else if (child is FolderNode)
+                {
+                    Collect(child, items, depth);
+                }
             }
         }
     }

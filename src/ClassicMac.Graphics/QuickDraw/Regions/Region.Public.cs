@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Graphics.QuickDraw
@@ -21,9 +21,17 @@ namespace ClassicMac.Graphics.QuickDraw
         /// <exception cref="InvalidDataException">Shorter than its 10-byte header, or than its <c>rgnSize</c>.</exception>
         public static Region FromRgnData(ReadOnlyMemory<byte> data)
         {
-            if (data.Length < 10) throw new InvalidDataException($"A region needs a 10-byte header; this is {data.Length} bytes.");
+            if (data.Length < 10)
+            {
+                throw new InvalidDataException($"A region needs a 10-byte header; this is {data.Length} bytes.");
+            }
+
             var size = new ClassicMac.Core.BigEndianReader(data).ReadUInt16At(0) & 0x7FFF;
-            if (size > data.Length) throw new InvalidDataException($"The region says it is {size} bytes; there are {data.Length}.");
+            if (size > data.Length)
+            {
+                throw new InvalidDataException($"The region says it is {size} bytes; there are {data.Length}.");
+            }
+
             var reader = new ClassicMac.Core.BigEndianReader(data[..Math.Max(10, size)]);
             return Read(reader);
         }
@@ -35,7 +43,11 @@ namespace ClassicMac.Graphics.QuickDraw
             var writer = new BigEndianWriter(10 + 2 * rows.Length);
             writer.WriteUInt16(10 + 2 * rows.Length);
             BoundingBox.Write(writer);
-            foreach (var row in rows) writer.WriteInt16(row);
+            foreach (var row in rows)
+            {
+                writer.WriteInt16(row);
+            }
+
             return writer.ToArray();
         }
 
@@ -64,14 +76,25 @@ namespace ClassicMac.Graphics.QuickDraw
             var bounds = bitmap.Bounds;
             var region = Empty;
             for (int y = 0; y < bitmap.Height; y++)
+            {
                 for (int x = 0; x < bitmap.Width; x++)
                 {
-                    if (bitmap.GetIndex(x, y) == 0) continue;
+                    if (bitmap.GetIndex(x, y) == 0)
+                    {
+                        continue;
+                    }
+
                     int end = x;
-                    while (end < bitmap.Width && bitmap.GetIndex(end, y) != 0) end++;
+                    while (end < bitmap.Width && bitmap.GetIndex(end, y) != 0)
+                    {
+                        end++;
+                    }
+
                     region = region.Union(FromRect(new PictRect(bounds.Top + y, bounds.Left + x, bounds.Top + y + 1, bounds.Left + end)));
                     x = end;
                 }
+            }
+
             return region;
         }
 

@@ -25,7 +25,11 @@ public class FolderPreviewTests : IDisposable
     private static byte[] LeftHalf()
     {
         var icon = Solid();
-        for (int row = 0; row < 32; row++) icon[row * 4 + 2] = icon[row * 4 + 3] = 0;
+        for (int row = 0; row < 32; row++)
+        {
+            icon[row * 4 + 2] = icon[row * 4 + 3] = 0;
+        }
+
         return icon;
     }
 
@@ -43,8 +47,10 @@ public class FolderPreviewTests : IDisposable
 
     private static readonly FolderFinderInfo Window = new()
     {
-        WindowBounds = new MacRect(50, 20, 250, 340), ScrollPosition = new MacPoint(10, 5),
-        Location = new MacPoint(40, 100), Flags = FinderFlags.HasBeenInited,
+        WindowBounds = new MacRect(50, 20, 250, 340),
+        ScrollPosition = new MacPoint(10, 5),
+        Location = new MacPoint(40, 100),
+        Flags = FinderFlags.HasBeenInited,
     };
 
     // A white ICN# with a full mask, so badges and tints show on it.
@@ -80,7 +86,10 @@ public class FolderPreviewTests : IDisposable
         disk.File(art, "Unplaced", [], [], info: Info("TEXT", "QQQQ", 0, 0));
         disk.File(HfsBuilder.Root, "Writer", [], Application(), info: Info("APPL", "ABCD", 20, 30, FinderFlags.HasBundle | FinderFlags.HasBeenInited));
         if (withSystem)
+        {
             disk.File(HfsBuilder.Root, "System", [], PreviewTests.Fork(("ICN#", -4000, null, LeftHalf())), info: Info("zsys", "MACS", 20, 130));
+        }
+
         more?.Invoke(disk, art);
         var path = Path.Combine(folder, "disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
@@ -100,11 +109,14 @@ public class FolderPreviewTests : IDisposable
         using var decoded = SkiaSharp.SKBitmap.Decode(image.Png);
         var bitmap = new RgbaBitmap(decoded.Width, decoded.Height);
         for (int y = 0; y < decoded.Height; y++)
+        {
             for (int x = 0; x < decoded.Width; x++)
             {
                 var c = decoded.GetPixel(x, y);
                 bitmap[x, y] = new RgbaColor(c.Red, c.Green, c.Blue, c.Alpha);
             }
+        }
+
         return bitmap;
     }
 
@@ -117,8 +129,13 @@ public class FolderPreviewTests : IDisposable
         var whole = Whole(image);
         var content = new RgbaBitmap(whole.Width - FrameWidth, whole.Height - FrameHeight);
         for (int y = 0; y < content.Height; y++)
+        {
             for (int x = 0; x < content.Width; x++)
+            {
                 content[x, y] = whole[x + FrameLeft, y + FrameTop];
+            }
+        }
+
         return content;
     }
 
@@ -202,7 +219,9 @@ public class FolderPreviewTests : IDisposable
         using (var tar = new TarWriter(stream, TarEntryFormat.Pax))
         {
             foreach (var name in new[] { "Folder/a.txt", "Folder/b.txt", "Folder/Inner/c.txt" })
+            {
                 tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, name) { DataStream = new MemoryStream(Encoding.ASCII.GetBytes(name)) });
+            }
         }
         var model = new MainViewModel();
         var input = (await model.OpenAsync(path))!;
@@ -218,7 +237,9 @@ public class FolderPreviewTests : IDisposable
         var bitmap = Decode(image);
         // Three placeholders arranged from (0, 1): (0, 1), (0, 129), then (64, 1), drawn less the default scroll (-8, -16).
         foreach (var (top, left) in new[] { (0, 1), (0, 129), (64, 1) })
+        {
             Assert.Contains(Enumerable.Range(0, 32).SelectMany(y => Enumerable.Range(left + 16, 32).Select(x => bitmap[x, Top + top + 8 + y])), c => c != White);
+        }
     }
 
     [Fact]
@@ -276,7 +297,8 @@ public class FolderPreviewTests : IDisposable
         var path = Path.Combine(folder, "wrapped.tar");
         var image = ClassicMac.Files.Containers.MacBinaryWriter.ToArray(new MacFile
         {
-            Name = MacString.FromMacRoman("disk.img"), DataFork = ForkData.FromBytes(File.ReadAllBytes(Disk())),
+            Name = MacString.FromMacRoman("disk.img"),
+            DataFork = ForkData.FromBytes(File.ReadAllBytes(Disk())),
         });
         using (var stream = File.Create(path))
         using (var tar = new TarWriter(stream, TarEntryFormat.Pax))
@@ -439,8 +461,12 @@ public class FolderPreviewTests : IDisposable
         {
             d.File(art, "Badged", [], PreviewTests.Fork(("ICN#", -16455, null, Hollow()), ("badg", -16455, null, badge), ("ICN#", 300, null, TopHalf())),
                 info: Info("TEXT", "ttxt", 20, 130, FinderFlags.HasBeenInited | FinderFlags.HasCustomIcon) with { Extended = extended });
-            var folder = d.Folder(art, "Badged folder", new FolderFinderInfo { Location = new MacPoint(20, 230), Flags = FinderFlags.HasBeenInited | FinderFlags.HasCustomIcon,
-                Script = 0x01 });
+            var folder = d.Folder(art, "Badged folder", new FolderFinderInfo
+            {
+                Location = new MacPoint(20, 230),
+                Flags = FinderFlags.HasBeenInited | FinderFlags.HasCustomIcon,
+                Script = 0x01
+            });
             d.File(folder, "Icon\r", [], PreviewTests.Fork(("ICN#", -16455, null, Hollow()), ("badg", -16455, null, badge), ("ICN#", 300, null, TopHalf())),
                 info: Info("TEXT", "ttxt", 0, 0, FinderFlags.IsInvisible));
         });
@@ -480,13 +506,17 @@ public class FolderPreviewTests : IDisposable
         var model = new MainViewModel();
         NodeViewModel node = (await model.OpenAsync(volume!))!;
         foreach (var part in (Environment.GetEnvironmentVariable("CLASSICMAC_FOLDER_PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries))
+        {
             node = node.Children.OfType<FolderNode>().Single(f => f.Title == part);
+        }
 
         var preview = await Select(model, node);
 
         Assert.True(preview.Kind == PreviewKind.Folder, string.Join(" | ", model.Diagnostics.Select(d => d.Diagnostic.Message)));
         if (Environment.GetEnvironmentVariable("CLASSICMAC_FOLDER_OUT") is { Length: > 0 } output)
+        {
             File.WriteAllBytes(output, preview.Images[0].Png);
+        }
     }
 
     /// <summary>
@@ -510,7 +540,13 @@ public class FolderPreviewTests : IDisposable
         // The System files first, so a font suitcase's family (Geneva with its 10-point strike) replaces the System's.
         foreach (var other in Directory.GetFiles(golden!).Where(p => p != disk && p != screenshot && !Path.GetFileName(p).StartsWith("._", StringComparison.Ordinal))
             .OrderBy(p => Path.GetFileName(p).StartsWith("System", StringComparison.Ordinal) ? 0 : 1).ThenBy(p => p, StringComparer.Ordinal))
-            if (await model.OpenAsync(other) is { } input) await input.EnsureLoadedAsync();
+        {
+            if (await model.OpenAsync(other) is { } input)
+            {
+                await input.EnsureLoadedAsync();
+            }
+        }
+
         var volume = (await model.OpenAsync(disk))!;
         var node = volume.Children.OfType<FolderNode>().Single(n => n.Title == folderName);
         var folderInfo = ClassicMac.Files.Hfs.HfsReader.Instance.ReadFolders(ForkData.FromBytes(File.ReadAllBytes(disk)), new ContainerContext())
@@ -531,6 +567,7 @@ public class FolderPreviewTests : IDisposable
         var difference = new RgbaBitmap(drawn.Width, drawn.Height);
         int compared = 0, matched = 0;
         for (int y = 0; y < drawn.Height; y++)
+        {
             for (int x = 0; x < drawn.Width; x++)
             {
                 var c = screen.GetPixel(bounds.Left + x, bounds.Top + y);
@@ -540,11 +577,15 @@ public class FolderPreviewTests : IDisposable
                 if (iconArea)
                 {
                     compared++;
-                    if (same) matched++;
+                    if (same)
+                    {
+                        matched++;
+                    }
                 }
                 difference[x, y] = same ? new RgbaColor((byte)(expected.R / 2 + 127), (byte)(expected.G / 2 + 127), (byte)(expected.B / 2 + 127))
                     : iconArea ? new RgbaColor(255, 0, 255) : new RgbaColor(255, 200, 255);
             }
+        }
         // The whole window against the screen around it, but for the title's gap (the Finder's title is anti-aliased
         // there): the frame, the header, the scroll bars and the grow box.
         var whole = Whole((await Select(model, node)).Images[0]);
@@ -553,15 +594,26 @@ public class FolderPreviewTests : IDisposable
         int gapLeft = gap.Count > 0 ? gap.Min() : 0, gapRight = gap.Count > 0 ? gap.Max() : -1;
         var windowDifference = new RgbaBitmap(whole.Width, whole.Height);
         for (int y = 0; y < whole.Height; y++)
+        {
             for (int x = 0; x < whole.Width; x++)
             {
-                if (whole[x, y].A == 0 || (y < 21 && x >= gapLeft && x <= gapRight)) continue;
+                if (whole[x, y].A == 0 || (y < 21 && x >= gapLeft && x <= gapRight))
+                {
+                    continue;
+                }
+
                 var c = screen.GetPixel(bounds.Left - FrameLeft + x, bounds.Top - FrameTop + y);
                 bool same = whole[x, y] == new RgbaColor(c.Red, c.Green, c.Blue);
                 windowCompared++;
-                if (same) windowMatched++;
+                if (same)
+                {
+                    windowMatched++;
+                }
+
                 windowDifference[x, y] = same ? new RgbaColor((byte)(c.Red / 2 + 127), (byte)(c.Green / 2 + 127), (byte)(c.Blue / 2 + 127)) : new RgbaColor(255, 0, 255);
             }
+        }
+
         var report = string.Create(System.Globalization.CultureInfo.InvariantCulture,
             $"{folderName}: {matched} of {compared} icon-area pixels match ({100.0 * matched / compared:F2}%); {windowMatched} of {windowCompared} window pixels ({100.0 * windowMatched / windowCompared:F2}%).");
         TestContext.Current.SendDiagnosticMessage(report);

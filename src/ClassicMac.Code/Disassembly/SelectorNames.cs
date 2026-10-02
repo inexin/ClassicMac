@@ -52,8 +52,13 @@ public static partial class SelectorNames
     public static bool TryGetConvention(ushort trap, out SelectorConvention convention)
     {
         foreach (ushort t in Candidates(trap))
+        {
             if (Index.Conventions.TryGetValue(t, out convention))
+            {
                 return true;
+            }
+        }
+
         convention = default;
         return false;
     }
@@ -71,7 +76,10 @@ public static partial class SelectorNames
     {
         name = "";
         if (!TryGetConvention(trap, out var convention) || !Index.Names.TryGetValue(convention.Trap, out var table))
+        {
             return false;
+        }
+
         uint value = selector & convention.Mask;
         if (table.TryGetValue(value, out var found))
         {
@@ -84,9 +92,15 @@ public static partial class SelectorNames
             foreach (var (s, n) in table)
             {
                 if ((s & 0xFFFF) != value)
+                {
                     continue;
+                }
+
                 if (unique != null)
+                {
                     return false;
+                }
+
                 unique = n;
             }
             if (unique != null)
@@ -111,15 +125,22 @@ public static partial class SelectorNames
         }
         string? name = TrapNames.Lookup(trap).Name;
         foreach (ushort t in new[] { (ushort)(trap & 0xFBFF), (ushort)(trap & 0xF8FF) })
+        {
             if (t != trap && TrapNames.Lookup(t).Name == name)
+            {
                 yield return t;
+            }
+        }
     }
 
     private static Dictionary<ushort, SelectorConvention> BuildConventions()
     {
         var d = new Dictionary<ushort, SelectorConvention>(Dispatchers.Length);
         foreach (var (trap, name, location, width, mask) in Dispatchers)
+        {
             d[trap] = new SelectorConvention(trap, name, location, width, mask);
+        }
+
         return d;
     }
 
@@ -129,7 +150,10 @@ public static partial class SelectorNames
         foreach (var (trap, selector, name) in Table)
         {
             if (!d.TryGetValue(trap, out var table))
+            {
                 d[trap] = table = [];
+            }
+
             table[selector] = name;
         }
         return d;

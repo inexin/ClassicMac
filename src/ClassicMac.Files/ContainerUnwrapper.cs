@@ -129,8 +129,16 @@ namespace ClassicMac.Files
 
         private ContainerNode Expand(ContainerNode node, ContainerContext context, int depth, int levels, string? location, ref long expanded)
         {
-            if (node.UnreadFormat is not null) return Unwrap(node.File, node.Format, context, depth, levels, location, Probe(node.File), ref expanded);
-            if (node.Children.Count == 0) return node;
+            if (node.UnreadFormat is not null)
+            {
+                return Unwrap(node.File, node.Format, context, depth, levels, location, Probe(node.File), ref expanded);
+            }
+
+            if (node.Children.Count == 0)
+            {
+                return node;
+            }
+
             var files = node.Children.Select(c => c.File).ToList();
             var children = new List<ContainerNode>(node.Children.Count);
             var changed = false;
@@ -161,7 +169,11 @@ namespace ClassicMac.Files
         // head and tail.
         private IContainerReader? Probe(MacFile file)
         {
-            if (file.DataFork.Length == 0) return null;
+            if (file.DataFork.Length == 0)
+            {
+                return null;
+            }
+
             var probe = file with { DataFork = ForkData.ForProbing(file.DataFork), ResourceFork = ForkData.ForProbing(file.ResourceFork) };
             return readers.FirstOrDefault(r => r.CanRead(probe));
         }
@@ -188,11 +200,22 @@ namespace ClassicMac.Files
         private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, int levels, string? location,
             IContainerReader? reader, ref long expanded)
         {
-            if (reader is null) return new ContainerNode(format, file, []);
-            if (levels == 0) return new ContainerNode(format, file, []) { UnreadFormat = reader.FormatName };
+            if (reader is null)
+            {
+                return new ContainerNode(format, file, []);
+            }
+
+            if (levels == 0)
+            {
+                return new ContainerNode(format, file, []) { UnreadFormat = reader.FormatName };
+            }
             // What reading this file's container reports is about this file; the files inside it get their own locations.
             var outer = context;
-            if (location is not null) context = context.WithDiagnostics(new LocatedDiagnostics(context.Diagnostics, location));
+            if (location is not null)
+            {
+                context = context.WithDiagnostics(new LocatedDiagnostics(context.Diagnostics, location));
+            }
+
             if (depth >= context.Options.MaxNestingDepth)
             {
                 context.Report(DiagnosticSeverity.Warning, "container.too-deep",

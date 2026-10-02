@@ -318,13 +318,19 @@ public class ResourceForkReadWriteTests
         for (var i = 0; i < types; i++)
         {
             var entry = typeList + 2 + i * 8;
-            if (new FourCC(fork.AsSpan(entry, 4)) != type) continue;
+            if (new FourCC(fork.AsSpan(entry, 4)) != type)
+            {
+                continue;
+            }
+
             var refs = typeList + BinaryPrimitives.ReadUInt16BigEndian(fork.AsSpan(entry + 6));
             var count = BinaryPrimitives.ReadUInt16BigEndian(fork.AsSpan(entry + 4)) + 1;
             for (var r = 0; r < count; r++)
             {
                 if (BinaryPrimitives.ReadInt16BigEndian(fork.AsSpan(refs + r * 12)) == id)
+                {
                     return (int)(BinaryPrimitives.ReadUInt32BigEndian(fork.AsSpan(refs + r * 12 + 4)) & 0xFFFFFF);
+                }
             }
         }
         throw new InvalidOperationException("Not found.");
@@ -471,7 +477,10 @@ public class ResourceForkReadWriteTests
             // Only what the original already had (shared or overlapping data is kept as it was).
             Assert.Empty(reread.Diagnostics.Select(d => d.Code).Except(read.Diagnostics.Select(d => d.Code)));
             AssertSameModel(read, reread);
-            if (written.AsSpan().SequenceEqual(original)) identical++;
+            if (written.AsSpan().SequenceEqual(original))
+            {
+                identical++;
+            }
         }
         TestContext.Current.SendDiagnosticMessage(
             $"{forks.Count} corpus forks round-trip; {identical} are byte-identical (already canonical); {refused} refused as damaged; {unwritable} past the format's limits.");

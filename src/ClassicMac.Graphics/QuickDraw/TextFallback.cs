@@ -23,8 +23,16 @@ namespace ClassicMac.Graphics.QuickDraw
         public TextFallbackMask(int width, int height, int originX, int originY, byte[] bits, float advance)
         {
             if (bits == null || bits.Length != width * height)
+            {
                 throw new System.ArgumentException("Expected width × height mask bytes.", nameof(bits));
-            Width = width; Height = height; OriginX = originX; OriginY = originY; Bits = bits; Advance = advance;
+            }
+
+            Width = width;
+            Height = height;
+            OriginX = originX;
+            OriginY = originY;
+            Bits = bits;
+            Advance = advance;
         }
 
         /// <summary>Mask width in pixels.</summary>

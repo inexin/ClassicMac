@@ -33,7 +33,9 @@ public sealed class DragOutTests : IDisposable
         fork.Add(new Resource(Str, 129, "\u0002hi"u8.ToArray()));
         var file = new MacFile
         {
-            Name = MacString.FromMacRoman("Prefs"), DataFork = ForkData.FromBytes("data"u8.ToArray()), ResourceFork = ForkData.FromBytes(fork.ToArray()),
+            Name = MacString.FromMacRoman("Prefs"),
+            DataFork = ForkData.FromBytes("data"u8.ToArray()),
+            ResourceFork = ForkData.FromBytes(fork.ToArray()),
             FinderInfo = FinderInfo.Empty with { Type = FourCC.FromString("TEXT"), Creator = FourCC.FromString("ttxt") },
         };
         var path = Path.Combine(folder, "Prefs.bin");
@@ -52,7 +54,7 @@ public sealed class DragOutTests : IDisposable
         var (model, file, _) = await Open();
         model.Status = "Before";
         var statuses = new List<string?>();
-        model.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Status)) statuses.Add(model.Status); };
+        model.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Status)) { statuses.Add(model.Status); } };
 
         await model.PrepareDragOutAsync(file);
         model.DragOutAsMacBinary = true;

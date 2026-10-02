@@ -475,7 +475,7 @@ public sealed partial class EditTests
         var fork = new ResourceFork();
         fork.Add(new Resource(rsrc, 128, new byte[] { 0, 7, 0, 0, 0, 2 }));     // id, ZCNT 0 (one item), the item
         fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("ID", "DWRD"), ("Count", "ZCNT"), ("*****", "LSTC"), ("Value", "HWRD"), ("*****", "LSTE")))
-            { Name = MacString.FromMacRoman("Rsrc") });
+        { Name = MacString.FromMacRoman("Rsrc") });
         File.WriteAllBytes(path, fork.ToArray());
         var model = new MainViewModel { EditDialogs = new Dialogs() };
         var input = (await model.OpenAsync(path))!;

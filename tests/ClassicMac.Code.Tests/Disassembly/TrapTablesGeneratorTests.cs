@@ -238,12 +238,20 @@ public sealed class TrapTablesGeneratorTests : IDisposable
             Assert.Contains(kind is null ? head : head + kind + "),", traps);
         }
         foreach (ushort word in Supplements.Removed)
+        {
             Assert.DoesNotContain(FormattableString.Invariant($"(0x{word:X4}, \""), traps);
+        }
+
         foreach (var (trap, name, location, width, mask) in Supplements.Conventions)
+        {
             Assert.Contains(FormattableString.Invariant(
                 $"(0x{trap:X4}, \"{name}\", SelectorLocation.{location}, SelectorWidth.{width}, 0x{mask:X}),"), selectors);
+        }
+
         foreach (var (trap, selector, name) in Supplements.Selectors)
+        {
             Assert.Contains(FormattableString.Invariant($"(0x{trap:X4}, 0x{selector:X}, \"{name}\"),"), selectors);
+        }
     }
 
     [Fact]

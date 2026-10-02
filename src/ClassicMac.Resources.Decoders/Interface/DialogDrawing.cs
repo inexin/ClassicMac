@@ -92,38 +92,42 @@ namespace ClassicMac.Resources.Decoders.Interface
             switch (resource.Type.ToString())
             {
                 case "DLOG":
-                {
-                    var dialog = InterfaceResources.ReadWindow(data, true, options, diagnostics, what);
-                    var items = Items(dialog.ItemsId ?? 0, fork, options, readOptions, diagnostics, systemForks);
-                    var theme = fork.Find(Dlgx, resource.Id) is { } x && Data(x, fork, readOptions, diagnostics) is { Length: >= 6 } flags
-                        && (new BigEndianReader(flags).ReadUInt32At(2) & 1) != 0;
-                    return new DialogDrawing(DialogKind.Dialog, dialog.Title, dialog.Definition, dialog.GoAway, Width(dialog.Bounds), Height(dialog.Bounds),
-                        items, 0, Content(fork.Find(Dctb, resource.Id), fork, readOptions, diagnostics), theme, null);
-                }
-                case "ALRT":
-                {
-                    var alert = InterfaceResources.ReadAlert(data, diagnostics, what);
-                    var items = Items(alert.ItemsId, fork, options, readOptions, diagnostics, systemForks);
-                    if (alertKind is DialogKind.Dialog or DialogKind.ItemList) alertKind = DialogKind.Alert;
-                    var icon = alertKind switch
                     {
-                        DialogKind.StopAlert => IconImage(0, fork, readOptions, diagnostics, systemForks),
-                        DialogKind.NoteAlert => IconImage(1, fork, readOptions, diagnostics, systemForks),
-                        DialogKind.CautionAlert => IconImage(2, fork, readOptions, diagnostics, systemForks),
-                        _ => null,
-                    };
-                    return new DialogDrawing(alertKind, "", 1, false, Width(alert.Bounds), Height(alert.Bounds), items, alert.Stage(1).BoldItem,
-                        Content(fork.Find(Actb, resource.Id), fork, readOptions, diagnostics), false, icon);
-                }
+                        var dialog = InterfaceResources.ReadWindow(data, true, options, diagnostics, what);
+                        var items = Items(dialog.ItemsId ?? 0, fork, options, readOptions, diagnostics, systemForks);
+                        var theme = fork.Find(Dlgx, resource.Id) is { } x && Data(x, fork, readOptions, diagnostics) is { Length: >= 6 } flags
+                            && (new BigEndianReader(flags).ReadUInt32At(2) & 1) != 0;
+                        return new DialogDrawing(DialogKind.Dialog, dialog.Title, dialog.Definition, dialog.GoAway, Width(dialog.Bounds), Height(dialog.Bounds),
+                            items, 0, Content(fork.Find(Dctb, resource.Id), fork, readOptions, diagnostics), theme, null);
+                    }
+                case "ALRT":
+                    {
+                        var alert = InterfaceResources.ReadAlert(data, diagnostics, what);
+                        var items = Items(alert.ItemsId, fork, options, readOptions, diagnostics, systemForks);
+                        if (alertKind is DialogKind.Dialog or DialogKind.ItemList)
+                        {
+                            alertKind = DialogKind.Alert;
+                        }
+
+                        var icon = alertKind switch
+                        {
+                            DialogKind.StopAlert => IconImage(0, fork, readOptions, diagnostics, systemForks),
+                            DialogKind.NoteAlert => IconImage(1, fork, readOptions, diagnostics, systemForks),
+                            DialogKind.CautionAlert => IconImage(2, fork, readOptions, diagnostics, systemForks),
+                            _ => null,
+                        };
+                        return new DialogDrawing(alertKind, "", 1, false, Width(alert.Bounds), Height(alert.Bounds), items, alert.Stage(1).BoldItem,
+                            Content(fork.Find(Actb, resource.Id), fork, readOptions, diagnostics), false, icon);
+                    }
                 case "DITL":
-                {
-                    var items = Build(InterfaceResources.ReadDialogItems(data, options, diagnostics, what), fork, options, readOptions, diagnostics, systemForks);
-                    // A lone item list: a plain box around its items, with a margin [ClassicMac].
-                    var right = items.Select(i => (int)i.Item.Bounds.Right).DefaultIfEmpty(100).Max() + 10;
-                    var bottom = items.Select(i => (int)i.Item.Bounds.Bottom).DefaultIfEmpty(40).Max() + 10;
-                    return new DialogDrawing(DialogKind.ItemList, "", 2, false, Math.Clamp(right, 1, 4096), Math.Clamp(bottom, 1, 4096), items, 0,
-                        null, false, null);
-                }
+                    {
+                        var items = Build(InterfaceResources.ReadDialogItems(data, options, diagnostics, what), fork, options, readOptions, diagnostics, systemForks);
+                        // A lone item list: a plain box around its items, with a margin [ClassicMac].
+                        var right = items.Select(i => (int)i.Item.Bounds.Right).DefaultIfEmpty(100).Max() + 10;
+                        var bottom = items.Select(i => (int)i.Item.Bounds.Bottom).DefaultIfEmpty(40).Max() + 10;
+                        return new DialogDrawing(DialogKind.ItemList, "", 2, false, Math.Clamp(right, 1, 4096), Math.Clamp(bottom, 1, 4096), items, 0,
+                            null, false, null);
+                    }
                 default:
                     return null;
             }
@@ -132,15 +136,26 @@ namespace ClassicMac.Resources.Decoders.Interface
         // A window colour table's content colour (part 0), if it has one.
         private static RgbColor? Content(Resource? table, ResourceFork fork, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
         {
-            if (table is null) return null;
+            if (table is null)
+            {
+                return null;
+            }
+
             var data = Data(table, fork, readOptions, diagnostics);
-            if (data.Length < 8) return null;
+            if (data.Length < 8)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(data);
             var count = reader.ReadInt16At(6) + 1;
             for (var i = 0; i < count && 16 + i * 8 <= data.Length; i++)
             {
                 var e = 8 + i * 8;
-                if (reader.ReadInt16At(e) == 0) return new RgbColor(reader.ReadUInt16At(e + 2), reader.ReadUInt16At(e + 4), reader.ReadUInt16At(e + 6));
+                if (reader.ReadInt16At(e) == 0)
+                {
+                    return new RgbColor(reader.ReadUInt16At(e + 2), reader.ReadUInt16At(e + 4), reader.ReadUInt16At(e + 6));
+                }
             }
             return null;
         }
@@ -187,9 +202,16 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             IEnumerable<ResourceFork> forks = id is >= 0 and <= 2 ? [.. systemForks, fork] : [fork];
             foreach (var f in forks)
+            {
                 foreach (var type in new[] { Cicn, Icon })
+                {
                     if (f.Find(type, id) is { } r)
+                    {
                         return new DialogImage(type, Data(r, f, readOptions, diagnostics).ToArray());
+                    }
+                }
+            }
+
             return null;
         }
 

@@ -9,14 +9,29 @@ namespace ClassicMac.Graphics.QuickDraw
         // ±0x7FFFFFFF past 2^47. A factor of exactly 1.0 returns the other factor unchanged.
         public static int FixMul(int a, int b)
         {
-            if (b == 0x10000) return a;
-            if (a == 0x10000) return b;
+            if (b == 0x10000)
+            {
+                return a;
+            }
+
+            if (a == 0x10000)
+            {
+                return b;
+            }
+
             long product = (long)a * b;
             if (product >= 1L << 47 || product < -(1L << 47))
+            {
                 return (a < 0) != (b < 0) ? int.MinValue : int.MaxValue;
+            }
+
             long result = product >> 16;
             bool half = (product & 0x8000) != 0;
-            if (half && (result >= 0 || (product & 0x7FFF) != 0)) result++;
+            if (half && (result >= 0 || (product & 0x7FFF) != 0))
+            {
+                result++;
+            }
+
             return unchecked((int)result);
         }
 
@@ -32,9 +47,21 @@ namespace ClassicMac.Graphics.QuickDraw
         // numerator's sign.
         public static int FixRatio(short numer, short denom)
         {
-            if (denom == 0) return numer < 0 ? unchecked((int)0x80000001) : 0x7FFFFFFF;
-            if (numer == denom) return 0x10000;
-            if (numer == short.MinValue && denom == -1) return int.MinValue;
+            if (denom == 0)
+            {
+                return numer < 0 ? unchecked((int)0x80000001) : 0x7FFFFFFF;
+            }
+
+            if (numer == denom)
+            {
+                return 0x10000;
+            }
+
+            if (numer == short.MinValue && denom == -1)
+            {
+                return int.MinValue;
+            }
+
             return (numer << 16) / denom;
         }
 
@@ -69,7 +96,11 @@ namespace ClassicMac.Graphics.QuickDraw
         public static int SlopeFromAngle(int angle)
         {
             int a = (short)angle % 180;
-            if (a < 0) a += 180;
+            if (a < 0)
+            {
+                a += 180;
+            }
+
             return a > 90 ? Tangent[180 - a] : -Tangent[a];
         }
     }

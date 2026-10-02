@@ -37,7 +37,10 @@ namespace ClassicMac.Resources.Decoders.Text
                 Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
             };
             using (var writer = new Utf8JsonWriter(buffer, options))
+            {
                 write(writer);
+            }
+
             return [.. buffer.WrittenSpan, (byte)'\n'];
         }
 
@@ -45,7 +48,11 @@ namespace ClassicMac.Resources.Decoders.Text
         public static bool TryReadPascal(ReadOnlySpan<byte> data, ref int offset, out ReadOnlySpan<byte> text)
         {
             text = default;
-            if (offset >= data.Length) return false;
+            if (offset >= data.Length)
+            {
+                return false;
+            }
+
             var length = data[offset];
             var available = Math.Min(length, data.Length - offset - 1);
             text = data.Slice(offset + 1, available);

@@ -13,7 +13,10 @@ internal static class LhaLh2Decoder
 
     public static byte[] Decode(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0) throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        if (expandedSize < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        }
 
         var bits = new LhaBitReader(packed);
         var literalAndMatchTree = new LhaAdaptiveHuffmanTree(LiteralAndMatchSymbolCount);
@@ -27,7 +30,9 @@ internal static class LhaLh2Decoder
         {
             int symbol = literalAndMatchTree.ReadCode(ref bits);
             if (symbol == ExtendedLengthSymbol)
+            {
                 symbol += bits.ReadBits(8);
+            }
 
             if (symbol < 256)
             {
@@ -40,9 +45,14 @@ internal static class LhaLh2Decoder
 
             int matchLength = symbol - MatchLengthBias;
             if (matchLength is < 3 or > 256)
+            {
                 throw new InvalidDataException("An LH2 match length is outside the method's range.");
+            }
+
             if (matchLength > output.Length - outputOffset)
+            {
                 throw new InvalidDataException("An LH2 match exceeds the declared expanded size.");
+            }
 
             int encodedPosition = positionTree.ReadPosition(ref bits, outputOffset);
             int sourceOffset = (outputOffset - encodedPosition - 1) & (WindowSize - 1);
@@ -75,14 +85,22 @@ internal static class LhaLh2Decoder
 
         public GrowingHuffmanTree(int maximumSymbols)
         {
-            if (maximumSymbols < 1) throw new ArgumentOutOfRangeException(nameof(maximumSymbols));
+            if (maximumSymbols < 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(maximumSymbols));
+            }
+
             _maximumSymbols = maximumSymbols;
             int capacity = maximumSymbols * 2 - 1;
             _nodes = new Node[capacity];
             _symbolNodes = new int[maximumSymbols];
             _freeGroups = new int[capacity];
             _groupLeaders = new int[capacity];
-            for (int index = 0; index < capacity; index++) _freeGroups[index] = index;
+            for (int index = 0; index < capacity; index++)
+            {
+                _freeGroups[index] = index;
+            }
+
             int firstGroup = AllocateGroup();
             _nodes[0] = new Node(true, 0, 1, firstGroup, 0);
             _symbolNodes[0] = 0;
@@ -105,7 +123,9 @@ internal static class LhaLh2Decoder
         {
             int nodeIndex = 0;
             while (!_nodes[nodeIndex].IsLeaf)
+            {
                 nodeIndex = _nodes[nodeIndex].ChildIndex - bits.ReadBit();
+            }
 
             int symbol = _nodes[nodeIndex].Symbol;
             UpdateSymbol(symbol);
@@ -115,7 +135,9 @@ internal static class LhaLh2Decoder
         private void AddSymbol(int symbol)
         {
             if (symbol != _symbolCount || symbol >= _maximumSymbols || !_nodes[_mostRecentNode].IsLeaf)
+            {
                 throw new InvalidDataException("An LH2 position tree cannot add another symbol.");
+            }
 
             int parentIndex = _mostRecentNode;
             Node previous = _nodes[parentIndex];
@@ -128,7 +150,8 @@ internal static class LhaLh2Decoder
             _symbolNodes[previous.Symbol] = oldLeafIndex;
             _symbolNodes[symbol] = newLeafIndex;
             _nodes[parentIndex] = new Node(false, previous.Symbol, previous.Frequency,
-                previous.Group, previous.Parent) { ChildIndex = newLeafIndex };
+                previous.Group, previous.Parent)
+            { ChildIndex = newLeafIndex };
             if (parentIndex == 0)
             {
                 _nodes[0].Frequency = ushort.MaxValue;
@@ -150,7 +173,11 @@ internal static class LhaLh2Decoder
 
         private void UpdateSymbol(int symbol)
         {
-            if (_totalFrequency == ReorderLimit) ReconstructTree();
+            if (_totalFrequency == ReorderLimit)
+            {
+                ReconstructTree();
+            }
+
             int nodeIndex = _symbolNodes[symbol];
             while (nodeIndex != 0)
             {
@@ -164,7 +191,10 @@ internal static class LhaLh2Decoder
         private int MoveToGroupLeader(int nodeIndex)
         {
             int leaderIndex = _groupLeaders[_nodes[nodeIndex].Group];
-            if (leaderIndex == nodeIndex) return nodeIndex;
+            if (leaderIndex == nodeIndex)
+            {
+                return nodeIndex;
+            }
 
             Node current = _nodes[nodeIndex];
             Node leader = _nodes[leaderIndex];
@@ -183,7 +213,9 @@ internal static class LhaLh2Decoder
         {
             Node node = _nodes[nodeIndex];
             if (node.IsLeaf)
+            {
                 _symbolNodes[node.Symbol] = nodeIndex;
+            }
             else
             {
                 _nodes[node.ChildIndex].Parent = nodeIndex;
@@ -199,7 +231,9 @@ internal static class LhaLh2Decoder
             {
                 _groupLeaders[_nodes[nodeIndex].Group]++;
                 if (_nodes[nodeIndex].Frequency == _nodes[nodeIndex - 1].Frequency)
+                {
                     _nodes[nodeIndex].Group = _nodes[nodeIndex - 1].Group;
+                }
                 else
                 {
                     _nodes[nodeIndex].Group = AllocateGroup();
@@ -218,7 +252,11 @@ internal static class LhaLh2Decoder
             int leafCount = 0;
             for (int index = 0; index < _activeNodeCount; index++)
             {
-                if (!_nodes[index].IsLeaf) continue;
+                if (!_nodes[index].IsLeaf)
+                {
+                    continue;
+                }
+
                 Node leaf = _nodes[index];
                 leaf.Frequency = (leaf.Frequency + 1) / 2;
                 _nodes[leafCount++] = leaf;
@@ -253,7 +291,11 @@ internal static class LhaLh2Decoder
             }
 
             _freeGroupCount = 0;
-            for (int group = 0; group < _freeGroups.Length; group++) _freeGroups[group] = group;
+            for (int group = 0; group < _freeGroups.Length; group++)
+            {
+                _freeGroups[group] = group;
+            }
+
             int currentGroup = AllocateGroup();
             _groupLeaders[currentGroup] = 0;
             _nodes[0].Group = currentGroup;

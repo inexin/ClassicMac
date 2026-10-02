@@ -28,9 +28,18 @@ public static class PpcDisassembler
     {
         int primary = (int)(word >> 26);
         if (primary is 16 or 18 || primary == 19 && Xo10(word) is 16 or 528)
-            if (DecodeBranch(word, address) is { } branch) return branch;
+        {
+            if (DecodeBranch(word, address) is { } branch)
+            {
+                return branch;
+            }
+        }
+
         if (DecodeOther(word) is { } other)
+        {
             return new PpcInstruction(address, word, other.Item1, other.Item2, PpcFlow.None, null);
+        }
+
         return new PpcInstruction(address, word, ".long", [Hex(word)], PpcFlow.None, null);
     }
 
@@ -40,16 +49,33 @@ public static class PpcDisassembler
     {
         var reader = new BigEndianReader(code);
         for (uint pc = address; reader.Remaining >= 4; pc += 4)
+        {
             yield return Decode(reader.ReadUInt32(), pc);
+        }
     }
 
     /// <summary>The name of special-purpose register <paramref name="spr"/> (<c>xer</c>, <c>lr</c>, <c>ctr</c>,
     /// <c>srr0</c>, <c>sprg0</c>, <c>vrsave</c>, <c>ibat0u</c> ...), or null for one without a name here.</summary>
     public static string? SprName(int spr) => spr switch
     {
-        1 => "xer", 8 => "lr", 9 => "ctr", 18 => "dsisr", 19 => "dar", 22 => "dec", 25 => "sdr1", 26 => "srr0",
-        27 => "srr1", 256 => "vrsave", 272 => "sprg0", 273 => "sprg1", 274 => "sprg2", 275 => "sprg3", 282 => "ear",
-        284 => "tbl", 285 => "tbu", 287 => "pvr",
+        1 => "xer",
+        8 => "lr",
+        9 => "ctr",
+        18 => "dsisr",
+        19 => "dar",
+        22 => "dec",
+        25 => "sdr1",
+        26 => "srr0",
+        27 => "srr1",
+        256 => "vrsave",
+        272 => "sprg0",
+        273 => "sprg1",
+        274 => "sprg2",
+        275 => "sprg3",
+        282 => "ear",
+        284 => "tbl",
+        285 => "tbu",
+        287 => "pvr",
         >= 528 and <= 543 => ((spr & 8) != 0 ? "dbat" : "ibat") + ((spr >> 1) & 3) + ((spr & 1) != 0 ? "l" : "u"),
         1013 => "dabr",
         _ => null,
@@ -108,11 +134,23 @@ public static class PpcDisassembler
         bool toCtr = primary == 19 && Xo10(w) == 528;
         if (toLr || toCtr)
         {
-            if ((w & 0x0000F800) != 0) return null;     // bits 16-20 reserved
-            if (toCtr && (bo & 4) == 0) return null;    // bcctr may not decrement CTR
+            if ((w & 0x0000F800) != 0)
+            {
+                return null;     // bits 16-20 reserved
+            }
+
+            if (toCtr && (bo & 4) == 0)
+            {
+                return null;    // bcctr may not decrement CTR
+            }
+
             absolute = false;
         }
-        if (!ZBitsClear(bo)) return null;
+        if (!ZBitsClear(bo))
+        {
+            return null;
+        }
+
         int bd = (short)(w & 0xFFFC);
         uint? branchTarget = primary == 16 ? (absolute ? (uint)bd : address + (uint)bd) : null;
         string register = toLr ? "lr" : toCtr ? "ctr" : "";
@@ -122,7 +160,9 @@ public static class PpcDisassembler
         string mnemonic;
         bool always = bo == 20;
         if (always && primary != 16 && bi == 0)
+        {
             mnemonic = "b" + suffix;   // blr, bctr
+        }
         else if (always || (bo & 0x10) != 0 && bi != 0)
         {
             // BO = 10100 (branch always) and the CTR-only BOs 1000y and 1001y ignore BI. Where BI is not 0 the
@@ -136,11 +176,16 @@ public static class PpcDisassembler
         {
             string condition;
             if ((bo & 0x10) != 0)       // 1000y / 1001y: CTR only
+            {
                 condition = (bo & 2) != 0 ? "dz" : "dnz";
+            }
             else if ((bo & 0x04) != 0)  // 0010y / 0110y: the CR bit only
             {
                 condition = ((bo & 8) != 0 ? TrueConditions : FalseConditions)[bi & 3];
-                if (bi >> 2 != 0) operands.Add(Cr(bi >> 2));
+                if (bi >> 2 != 0)
+                {
+                    operands.Add(Cr(bi >> 2));
+                }
             }
             else                        // 0000y / 0001y / 0100y / 0101y: CTR and the CR bit
             {
@@ -152,7 +197,11 @@ public static class PpcDisassembler
             string hint = (bo & 1) == 0 ? "" : primary == 16 && bd < 0 ? "-" : "+";
             mnemonic = "b" + condition + suffix + hint;
         }
-        if (branchTarget is { } t) operands.Add(new PpcOperand(PpcOperandKind.BranchTarget, t));
+        if (branchTarget is { } t)
+        {
+            operands.Add(new PpcOperand(PpcOperandKind.BranchTarget, t));
+        }
+
         var branchFlow = PpcFlow.Branch | (link ? PpcFlow.Call : 0) | (toLr && !link ? PpcFlow.Return : 0)
             | (always ? 0 : PpcFlow.Conditional);
         return new PpcInstruction(address, w, mnemonic, operands, branchFlow, branchTarget);
@@ -175,56 +224,95 @@ public static class PpcDisassembler
         int d = D(w), a = A(w), b = B(w);
         switch (w >> 26)
         {
-            case 3: return Trap(w, true);
-            case 4: return AltiVec(w);
-            case 7: return Op("mulli", R(d), R(a), Imm(Simm(w)));
-            case 8: return Op("subfic", R(d), R(a), Imm(Simm(w)));
+            case 3:
+                return Trap(w, true);
+            case 4:
+                return AltiVec(w);
+            case 7:
+                return Op("mulli", R(d), R(a), Imm(Simm(w)));
+            case 8:
+                return Op("subfic", R(d), R(a), Imm(Simm(w)));
             case 10:
-                if ((w & 0x00600000) != 0) return null;   // bit 9 reserved, L = 1 is cmpldi
+                if ((w & 0x00600000) != 0)
+                {
+                    return null;   // bit 9 reserved, L = 1 is cmpldi
+                }
+
                 return CrfD(w) == 0 ? Op("cmplwi", R(a), Imm(Uimm(w))) : Op("cmplwi", Cr(CrfD(w)), R(a), Imm(Uimm(w)));
             case 11:
-                if ((w & 0x00600000) != 0) return null;
+                if ((w & 0x00600000) != 0)
+                {
+                    return null;
+                }
+
                 return CrfD(w) == 0 ? Op("cmpwi", R(a), Imm(Simm(w))) : Op("cmpwi", Cr(CrfD(w)), R(a), Imm(Simm(w)));
             case 12 or 13:
-            {
-                string dot = (w >> 26) == 13 ? "." : "";
-                return Simm(w) < 0 ? Op("subic" + dot, R(d), R(a), Imm(-Simm(w))) : Op("addic" + dot, R(d), R(a), Imm(Simm(w)));
-            }
+                {
+                    string dot = (w >> 26) == 13 ? "." : "";
+                    return Simm(w) < 0 ? Op("subic" + dot, R(d), R(a), Imm(-Simm(w))) : Op("addic" + dot, R(d), R(a), Imm(Simm(w)));
+                }
             case 14:
-                if (a == 0) return Op("li", R(d), Imm(Simm(w)));
+                if (a == 0)
+                {
+                    return Op("li", R(d), Imm(Simm(w)));
+                }
+
                 return Simm(w) < 0 ? Op("subi", R(d), R(a), Imm(-Simm(w))) : Op("addi", R(d), R(a), Imm(Simm(w)));
             case 15:
-                if (a == 0) return Op("lis", R(d), Imm(Simm(w)));
+                if (a == 0)
+                {
+                    return Op("lis", R(d), Imm(Simm(w)));
+                }
+
                 return Simm(w) < 0 ? Op("subis", R(d), R(a), Imm(-Simm(w))) : Op("addis", R(d), R(a), Imm(Simm(w)));
-            case 17: return w == 0x44000002 ? Op("sc") : null;
-            case 19: return Primary19(w);
-            case 20: return Op("rlwimi" + Dot(w), R(a), R(d), Imm(b), Imm(C(w)), Imm(Xo5(w)));
-            case 21: return Rlwinm(w);
+            case 17:
+                return w == 0x44000002 ? Op("sc") : null;
+            case 19:
+                return Primary19(w);
+            case 20:
+                return Op("rlwimi" + Dot(w), R(a), R(d), Imm(b), Imm(C(w)), Imm(Xo5(w)));
+            case 21:
+                return Rlwinm(w);
             case 23:
                 return C(w) == 0 && Xo5(w) == 31 ? Op("rotlw" + Dot(w), R(a), R(d), R(b))
                     : Op("rlwnm" + Dot(w), R(a), R(d), R(b), Imm(C(w)), Imm(Xo5(w)));
-            case 24: return w == 0x60000000 ? Op("nop") : Op("ori", R(a), R(d), Hex(Uimm(w)));
-            case 25: return Op("oris", R(a), R(d), Hex(Uimm(w)));
-            case 26: return Op("xori", R(a), R(d), Hex(Uimm(w)));
-            case 27: return Op("xoris", R(a), R(d), Hex(Uimm(w)));
-            case 28: return Op("andi.", R(a), R(d), Hex(Uimm(w)));
-            case 29: return Op("andis.", R(a), R(d), Hex(Uimm(w)));
-            case 31: return Primary31(w);
+            case 24:
+                return w == 0x60000000 ? Op("nop") : Op("ori", R(a), R(d), Hex(Uimm(w)));
+            case 25:
+                return Op("oris", R(a), R(d), Hex(Uimm(w)));
+            case 26:
+                return Op("xori", R(a), R(d), Hex(Uimm(w)));
+            case 27:
+                return Op("xoris", R(a), R(d), Hex(Uimm(w)));
+            case 28:
+                return Op("andi.", R(a), R(d), Hex(Uimm(w)));
+            case 29:
+                return Op("andis.", R(a), R(d), Hex(Uimm(w)));
+            case 31:
+                return Primary31(w);
             case >= 32 and <= 55:
-            {
-                int primary = (int)(w >> 26);
-                if (primary != 47 && (primary & 1) != 0 && !ValidUpdate(a, d, IntegerLoad(primary)))
-                    return null;
-                // lmw: rA in the range of registers to be loaded (rD-r31), including the case in which rA = 0, is
-                // invalid [Doc: PEM, "lmw"].
-                if (primary == 46 && a >= d)
-                    return null;
-                var data = primary >= 48 ? F(d) : R(d);
-                return Op(LoadStoreNames[primary - 32], data, Disp(Simm(w), a));
-            }
-            case 59: return FloatSingle(w);
-            case 63: return FloatDouble(w);
-            default: return null;   // 0-2, 5, 6, 9 (dozi), 22 (rlmi), 30 and 58/62 (64-bit), 56, 57, 60, 61
+                {
+                    int primary = (int)(w >> 26);
+                    if (primary != 47 && (primary & 1) != 0 && !ValidUpdate(a, d, IntegerLoad(primary)))
+                    {
+                        return null;
+                    }
+                    // lmw: rA in the range of registers to be loaded (rD-r31), including the case in which rA = 0, is
+                    // invalid [Doc: PEM, "lmw"].
+                    if (primary == 46 && a >= d)
+                    {
+                        return null;
+                    }
+
+                    var data = primary >= 48 ? F(d) : R(d);
+                    return Op(LoadStoreNames[primary - 32], data, Disp(Simm(w), a));
+                }
+            case 59:
+                return FloatSingle(w);
+            case 63:
+                return FloatDouble(w);
+            default:
+                return null;   // 0-2, 5, 6, 9 (dozi), 22 (rlmi), 30 and 58/62 (64-bit), 56, 57, 60, 61
         }
     }
 
@@ -246,11 +334,31 @@ public static class PpcDisassembler
     {
         int s = D(w), a = A(w), sh = B(w), mb = C(w), me = Xo5(w);
         string dot = Dot(w);
-        if (mb == 0 && me == 31) return Op("rotlwi" + dot, R(a), R(s), Imm(sh));
-        if (sh == 0 && me == 31) return Op("clrlwi" + dot, R(a), R(s), Imm(mb));
-        if (sh == 0 && mb == 0) return Op("clrrwi" + dot, R(a), R(s), Imm(31 - me));
-        if (mb == 0 && me == 31 - sh) return Op("slwi" + dot, R(a), R(s), Imm(sh));
-        if (me == 31 && sh == 32 - mb) return Op("srwi" + dot, R(a), R(s), Imm(mb));
+        if (mb == 0 && me == 31)
+        {
+            return Op("rotlwi" + dot, R(a), R(s), Imm(sh));
+        }
+
+        if (sh == 0 && me == 31)
+        {
+            return Op("clrlwi" + dot, R(a), R(s), Imm(mb));
+        }
+
+        if (sh == 0 && mb == 0)
+        {
+            return Op("clrrwi" + dot, R(a), R(s), Imm(31 - me));
+        }
+
+        if (mb == 0 && me == 31 - sh)
+        {
+            return Op("slwi" + dot, R(a), R(s), Imm(sh));
+        }
+
+        if (me == 31 && sh == 32 - mb)
+        {
+            return Op("srwi" + dot, R(a), R(s), Imm(mb));
+        }
+
         return Op("rlwinm" + dot, R(a), R(s), Imm(sh), Imm(mb), Imm(me));
     }
 
@@ -258,13 +366,30 @@ public static class PpcDisassembler
     private static (string, PpcOperand[])? Trap(uint w, bool immediate)
     {
         int to = D(w), a = A(w);
-        if (!immediate && (w & 1) != 0) return null;
-        if (!immediate && to == 31 && a == 0 && B(w) == 0) return Op("trap");
+        if (!immediate && (w & 1) != 0)
+        {
+            return null;
+        }
+
+        if (!immediate && to == 31 && a == 0 && B(w) == 0)
+        {
+            return Op("trap");
+        }
+
         var last = immediate ? Imm(Simm(w)) : R(B(w));
         string? condition = to switch
         {
-            16 => "lt", 20 => "le", 4 => "eq", 12 => "ge", 8 => "gt", 24 => "ne",
-            2 => "llt", 6 => "lle", 5 => "lge", 1 => "lgt", _ => null,
+            16 => "lt",
+            20 => "le",
+            4 => "eq",
+            12 => "ge",
+            8 => "gt",
+            24 => "ne",
+            2 => "llt",
+            6 => "lle",
+            5 => "lge",
+            1 => "lgt",
+            _ => null,
         };
         string i = immediate ? "i" : "";
         return condition is null ? Op("tw" + i, Imm(to), R(a), last) : Op("tw" + condition + i, R(a), last);
@@ -277,20 +402,50 @@ public static class PpcDisassembler
         int d = D(w), a = A(w), b = B(w);
         switch (Xo10(w))
         {
-            case 0: return (w & 0x0063F801) != 0 ? null : Op("mcrf", Cr(CrfD(w)), Cr(a >> 2));
-            case 50: return w == 0x4C000064 ? Op("rfi") : null;
-            case 150: return w == 0x4C00012C ? Op("isync") : null;
+            case 0:
+                return (w & 0x0063F801) != 0 ? null : Op("mcrf", Cr(CrfD(w)), Cr(a >> 2));
+            case 50:
+                return w == 0x4C000064 ? Op("rfi") : null;
+            case 150:
+                return w == 0x4C00012C ? Op("isync") : null;
         }
         string? name = Xo10(w) switch
         {
-            33 => "crnor", 129 => "crandc", 193 => "crxor", 225 => "crnand", 257 => "crand", 289 => "creqv",
-            417 => "crorc", 449 => "cror", _ => null,
+            33 => "crnor",
+            129 => "crandc",
+            193 => "crxor",
+            225 => "crnand",
+            257 => "crand",
+            289 => "creqv",
+            417 => "crorc",
+            449 => "cror",
+            _ => null,
         };
-        if (name is null || Rc(w)) return null;
-        if (d == a && a == b && name == "crxor") return Op("crclr", Bit(d));
-        if (d == a && a == b && name == "creqv") return Op("crset", Bit(d));
-        if (a == b && name == "cror") return Op("crmove", Bit(d), Bit(a));
-        if (a == b && name == "crnor") return Op("crnot", Bit(d), Bit(a));
+        if (name is null || Rc(w))
+        {
+            return null;
+        }
+
+        if (d == a && a == b && name == "crxor")
+        {
+            return Op("crclr", Bit(d));
+        }
+
+        if (d == a && a == b && name == "creqv")
+        {
+            return Op("crset", Bit(d));
+        }
+
+        if (a == b && name == "cror")
+        {
+            return Op("crmove", Bit(d), Bit(a));
+        }
+
+        if (a == b && name == "crnor")
+        {
+            return Op("crnot", Bit(d), Bit(a));
+        }
+
         return Op(name, Bit(d), Bit(a), Bit(b));
     }
 
@@ -300,44 +455,98 @@ public static class PpcDisassembler
 
     private static readonly Dictionary<int, (string Name, Form Form)> IndexedLoadsAndStores = new()
     {
-        [20] = ("lwarx", Form.Indexed), [23] = ("lwzx", Form.Indexed), [55] = ("lwzux", Form.Update),
-        [87] = ("lbzx", Form.Indexed), [119] = ("lbzux", Form.Update), [151] = ("stwx", Form.Indexed),
-        [183] = ("stwux", Form.Update), [215] = ("stbx", Form.Indexed), [247] = ("stbux", Form.Update),
-        [279] = ("lhzx", Form.Indexed), [311] = ("lhzux", Form.Update), [343] = ("lhax", Form.Indexed),
-        [375] = ("lhaux", Form.Update), [407] = ("sthx", Form.Indexed), [439] = ("sthux", Form.Update),
-        [533] = ("lswx", Form.Indexed), [534] = ("lwbrx", Form.Indexed), [661] = ("stswx", Form.Indexed),
-        [662] = ("stwbrx", Form.Indexed), [790] = ("lhbrx", Form.Indexed), [918] = ("sthbrx", Form.Indexed),
-        [310] = ("eciwx", Form.Indexed), [438] = ("ecowx", Form.Indexed),
-        [535] = ("lfsx", Form.Float), [567] = ("lfsux", Form.FloatUpdate), [599] = ("lfdx", Form.Float),
-        [631] = ("lfdux", Form.FloatUpdate), [663] = ("stfsx", Form.Float), [695] = ("stfsux", Form.FloatUpdate),
-        [727] = ("stfdx", Form.Float), [759] = ("stfdux", Form.FloatUpdate), [983] = ("stfiwx", Form.Float),
-        [6] = ("lvsl", Form.Vector), [38] = ("lvsr", Form.Vector), [7] = ("lvebx", Form.Vector),
-        [39] = ("lvehx", Form.Vector), [71] = ("lvewx", Form.Vector), [103] = ("lvx", Form.Vector),
-        [359] = ("lvxl", Form.Vector), [135] = ("stvebx", Form.Vector), [167] = ("stvehx", Form.Vector),
-        [199] = ("stvewx", Form.Vector), [231] = ("stvx", Form.Vector), [487] = ("stvxl", Form.Vector),
+        [20] = ("lwarx", Form.Indexed),
+        [23] = ("lwzx", Form.Indexed),
+        [55] = ("lwzux", Form.Update),
+        [87] = ("lbzx", Form.Indexed),
+        [119] = ("lbzux", Form.Update),
+        [151] = ("stwx", Form.Indexed),
+        [183] = ("stwux", Form.Update),
+        [215] = ("stbx", Form.Indexed),
+        [247] = ("stbux", Form.Update),
+        [279] = ("lhzx", Form.Indexed),
+        [311] = ("lhzux", Form.Update),
+        [343] = ("lhax", Form.Indexed),
+        [375] = ("lhaux", Form.Update),
+        [407] = ("sthx", Form.Indexed),
+        [439] = ("sthux", Form.Update),
+        [533] = ("lswx", Form.Indexed),
+        [534] = ("lwbrx", Form.Indexed),
+        [661] = ("stswx", Form.Indexed),
+        [662] = ("stwbrx", Form.Indexed),
+        [790] = ("lhbrx", Form.Indexed),
+        [918] = ("sthbrx", Form.Indexed),
+        [310] = ("eciwx", Form.Indexed),
+        [438] = ("ecowx", Form.Indexed),
+        [535] = ("lfsx", Form.Float),
+        [567] = ("lfsux", Form.FloatUpdate),
+        [599] = ("lfdx", Form.Float),
+        [631] = ("lfdux", Form.FloatUpdate),
+        [663] = ("stfsx", Form.Float),
+        [695] = ("stfsux", Form.FloatUpdate),
+        [727] = ("stfdx", Form.Float),
+        [759] = ("stfdux", Form.FloatUpdate),
+        [983] = ("stfiwx", Form.Float),
+        [6] = ("lvsl", Form.Vector),
+        [38] = ("lvsr", Form.Vector),
+        [7] = ("lvebx", Form.Vector),
+        [39] = ("lvehx", Form.Vector),
+        [71] = ("lvewx", Form.Vector),
+        [103] = ("lvx", Form.Vector),
+        [359] = ("lvxl", Form.Vector),
+        [135] = ("stvebx", Form.Vector),
+        [167] = ("stvehx", Form.Vector),
+        [199] = ("stvewx", Form.Vector),
+        [231] = ("stvx", Form.Vector),
+        [487] = ("stvxl", Form.Vector),
     };
 
     // XO-form arithmetic, by the 9-bit extended opcode (bit 21, OE, is the 10th): true for rD,rA,rB, false for rD,rA.
     private static readonly Dictionary<int, (string Name, bool ThreeOperands)> Arithmetic = new()
     {
-        [8] = ("subfc", true), [10] = ("addc", true), [40] = ("subf", true), [104] = ("neg", false),
-        [136] = ("subfe", true), [138] = ("adde", true), [200] = ("subfze", false), [202] = ("addze", false),
-        [232] = ("subfme", false), [234] = ("addme", false), [235] = ("mullw", true), [266] = ("add", true),
-        [459] = ("divwu", true), [491] = ("divw", true),
+        [8] = ("subfc", true),
+        [10] = ("addc", true),
+        [40] = ("subf", true),
+        [104] = ("neg", false),
+        [136] = ("subfe", true),
+        [138] = ("adde", true),
+        [200] = ("subfze", false),
+        [202] = ("addze", false),
+        [232] = ("subfme", false),
+        [234] = ("addme", false),
+        [235] = ("mullw", true),
+        [266] = ("add", true),
+        [459] = ("divwu", true),
+        [491] = ("divw", true),
     };
 
     // X-form logical operations rA,rS,rB with Rc.
     private static readonly Dictionary<int, string> Logical = new()
     {
-        [24] = "slw", [28] = "and", [60] = "andc", [124] = "nor", [284] = "eqv", [316] = "xor", [412] = "orc",
-        [444] = "or", [476] = "nand", [536] = "srw", [792] = "sraw",
+        [24] = "slw",
+        [28] = "and",
+        [60] = "andc",
+        [124] = "nor",
+        [284] = "eqv",
+        [316] = "xor",
+        [412] = "orc",
+        [444] = "or",
+        [476] = "nand",
+        [536] = "srw",
+        [792] = "sraw",
     };
 
     // Cache operations RA|0,rB.
     private static readonly Dictionary<int, string> CacheOps = new()
     {
-        [54] = "dcbst", [86] = "dcbf", [246] = "dcbtst", [278] = "dcbt", [470] = "dcbi", [758] = "dcba",
-        [982] = "icbi", [1014] = "dcbz",
+        [54] = "dcbst",
+        [86] = "dcbf",
+        [246] = "dcbtst",
+        [278] = "dcbt",
+        [470] = "dcbi",
+        [758] = "dcba",
+        [982] = "icbi",
+        [1014] = "dcbz",
     };
 
     private static (string, PpcOperand[])? Primary31(uint w)
@@ -346,58 +555,106 @@ public static class PpcDisassembler
         if (Arithmetic.TryGetValue(xo & 0x1FF, out var arith))
         {
             string name = arith.Name + ((w & 0x400) != 0 ? "o" : "") + Dot(w);
-            if (arith.ThreeOperands) return Op(name, R(d), R(a), R(b));
+            if (arith.ThreeOperands)
+            {
+                return Op(name, R(d), R(a), R(b));
+            }
+
             return b != 0 ? null : Op(name, R(d), R(a));
         }
-        if (xo is 11 or 75) return Op((xo == 11 ? "mulhwu" : "mulhw") + Dot(w), R(d), R(a), R(b));
+        if (xo is 11 or 75)
+        {
+            return Op((xo == 11 ? "mulhwu" : "mulhw") + Dot(w), R(d), R(a), R(b));
+        }
+
         if (Logical.TryGetValue(xo, out var logical))
         {
-            if (xo == 444 && d == b) return Op("mr" + Dot(w), R(a), R(d));
-            if (xo == 124 && d == b) return Op("not" + Dot(w), R(a), R(d));
+            if (xo == 444 && d == b)
+            {
+                return Op("mr" + Dot(w), R(a), R(d));
+            }
+
+            if (xo == 124 && d == b)
+            {
+                return Op("not" + Dot(w), R(a), R(d));
+            }
+
             return Op(logical + Dot(w), R(a), R(d), R(b));
         }
         switch (xo)
         {
             case 26 or 922 or 954:
                 return b != 0 ? null : Op((xo == 26 ? "cntlzw" : xo == 922 ? "extsh" : "extsb") + Dot(w), R(a), R(d));
-            case 824: return Op("srawi" + Dot(w), R(a), R(d), Imm(b));
-            case 150: return Rc(w) ? Op("stwcx.", R(d), RA0(a), R(b)) : null;
+            case 824:
+                return Op("srawi" + Dot(w), R(a), R(d), Imm(b));
+            case 150:
+                return Rc(w) ? Op("stwcx.", R(d), RA0(a), R(b)) : null;
         }
         // Everything below has bit 31 reserved.
-        if (Rc(w)) return null;
+        if (Rc(w))
+        {
+            return null;
+        }
+
         if (IndexedLoadsAndStores.TryGetValue(xo, out var ls))
         {
             var data = ls.Form switch { Form.Float or Form.FloatUpdate => F(d), Form.Vector => V(d), _ => R(d) };
             bool update = ls.Form is Form.Update or Form.FloatUpdate;
-            if (update && !ValidUpdate(a, d, ls.Form == Form.Update && ls.Name[0] == 'l')) return null;
+            if (update && !ValidUpdate(a, d, ls.Form == Form.Update && ls.Name[0] == 'l'))
+            {
+                return null;
+            }
             // lswx: rD = rA or rD = rB is invalid (the registers loaded depend on XER) [Doc: PEM, "lswx"].
-            if (xo == 533 && (d == a || d == b)) return null;
+            if (xo == 533 && (d == a || d == b))
+            {
+                return null;
+            }
+
             var baseRegister = update ? R(a) : RA0(a);
             return Op(ls.Name, data, baseRegister, R(b));
         }
-        if (CacheOps.TryGetValue(xo, out var cache)) return d != 0 ? null : Op(cache, RA0(a), R(b));
+        if (CacheOps.TryGetValue(xo, out var cache))
+        {
+            return d != 0 ? null : Op(cache, RA0(a), R(b));
+        }
+
         int spr = a | b << 5;
         switch (xo)
         {
             case 0 or 32:
-                if ((w & 0x00600000) != 0) return null;   // bit 9 reserved, L = 1 is cmpd/cmpld
+                if ((w & 0x00600000) != 0)
+                {
+                    return null;   // bit 9 reserved, L = 1 is cmpd/cmpld
+                }
+
                 string cmp = xo == 0 ? "cmpw" : "cmplw";
                 return CrfD(w) == 0 ? Op(cmp, R(a), R(b)) : Op(cmp, Cr(CrfD(w)), R(a), R(b));
-            case 4: return Trap(w, false);
-            case 19: return (w & 0x001FF800) != 0 ? null : Op("mfcr", R(d));
-            case 83: return (w & 0x001FF800) != 0 ? null : Op("mfmsr", R(d));
-            case 146: return (w & 0x001FF800) != 0 ? null : Op("mtmsr", R(d));
+            case 4:
+                return Trap(w, false);
+            case 19:
+                return (w & 0x001FF800) != 0 ? null : Op("mfcr", R(d));
+            case 83:
+                return (w & 0x001FF800) != 0 ? null : Op("mfmsr", R(d));
+            case 146:
+                return (w & 0x001FF800) != 0 ? null : Op("mtmsr", R(d));
             case 144:
-            {
-                if ((w & 0x00100800) != 0) return null;
-                int crm = (int)(w >> 12) & 0xFF;
-                return crm == 0xFF ? Op("mtcr", R(d)) : Op("mtcrf", Hex(crm), R(d));
-            }
-            case 512: return (w & 0x007FF800) != 0 ? null : Op("mcrxr", Cr(CrfD(w)));
+                {
+                    if ((w & 0x00100800) != 0)
+                    {
+                        return null;
+                    }
+
+                    int crm = (int)(w >> 12) & 0xFF;
+                    return crm == 0xFF ? Op("mtcr", R(d)) : Op("mtcrf", Hex(crm), R(d));
+                }
+            case 512:
+                return (w & 0x007FF800) != 0 ? null : Op("mcrxr", Cr(CrfD(w)));
             case 339:
                 return spr switch
                 {
-                    1 => Op("mfxer", R(d)), 8 => Op("mflr", R(d)), 9 => Op("mfctr", R(d)),
+                    1 => Op("mfxer", R(d)),
+                    8 => Op("mflr", R(d)),
+                    9 => Op("mfctr", R(d)),
                     // TBL and TBU are written with mtspr, read with mftb [Doc: PEM, "mfspr"]
                     284 or 285 => Op("mfspr", R(d), Imm(spr)),
                     _ => Op("mfspr", R(d), Spr(spr)),
@@ -405,43 +662,70 @@ public static class PpcDisassembler
             case 467:
                 return spr switch
                 {
-                    1 => Op("mtxer", R(d)), 8 => Op("mtlr", R(d)), 9 => Op("mtctr", R(d)),
+                    1 => Op("mtxer", R(d)),
+                    8 => Op("mtlr", R(d)),
+                    9 => Op("mtctr", R(d)),
                     287 => Op("mtspr", Imm(spr), R(d)),   // PVR is read only [Doc: PEM, "mtspr"]
                     _ => Op("mtspr", Spr(spr), R(d)),
                 };
             // Any TBR but TBL (268) and TBU (269) makes the form invalid [Doc: PEM, "mftb"].
-            case 371: return spr switch { 268 => Op("mftb", R(d)), 269 => Op("mftbu", R(d)), _ => null };
-            case 595: return (w & 0x0010F800) != 0 ? null : Op("mfsr", R(d), Imm(a & 15));
-            case 210: return (w & 0x0010F800) != 0 ? null : Op("mtsr", Imm(a & 15), R(d));
-            case 659: return a != 0 ? null : Op("mfsrin", R(d), R(b));
-            case 242: return a != 0 ? null : Op("mtsrin", R(d), R(b));
-            case 306: return (w & 0x03FF0000) != 0 ? null : Op("tlbie", R(b));
+            case 371:
+                return spr switch { 268 => Op("mftb", R(d)), 269 => Op("mftbu", R(d)), _ => null };
+            case 595:
+                return (w & 0x0010F800) != 0 ? null : Op("mfsr", R(d), Imm(a & 15));
+            case 210:
+                return (w & 0x0010F800) != 0 ? null : Op("mtsr", Imm(a & 15), R(d));
+            case 659:
+                return a != 0 ? null : Op("mfsrin", R(d), R(b));
+            case 242:
+                return a != 0 ? null : Op("mtsrin", R(d), R(b));
+            case 306:
+                return (w & 0x03FF0000) != 0 ? null : Op("tlbie", R(b));
             // The 603's software table walk [Doc: PEM, "tlbld", "tlbli" (603e)]: rD and rA reserved.
-            case 978: return (w & 0x03FF0000) != 0 ? null : Op("tlbld", R(b));
-            case 1010: return (w & 0x03FF0000) != 0 ? null : Op("tlbli", R(b));
-            case 370: return w == 0x7C0002E4 ? Op("tlbia") : null;
-            case 566: return w == 0x7C00046C ? Op("tlbsync") : null;
-            case 598: return w == 0x7C0004AC ? Op("sync") : null;
-            case 854: return w == 0x7C0006AC ? Op("eieio") : null;
+            case 978:
+                return (w & 0x03FF0000) != 0 ? null : Op("tlbld", R(b));
+            case 1010:
+                return (w & 0x03FF0000) != 0 ? null : Op("tlbli", R(b));
+            case 370:
+                return w == 0x7C0002E4 ? Op("tlbia") : null;
+            case 566:
+                return w == 0x7C00046C ? Op("tlbsync") : null;
+            case 598:
+                return w == 0x7C0004AC ? Op("sync") : null;
+            case 854:
+                return w == 0x7C0006AC ? Op("eieio") : null;
             case 597:
-            {
-                // rA in the range of registers to be loaded (ceil(NB/4) from rD, wrapping from r31 to r0), including
-                // the case in which rA = 0, is invalid [Doc: PEM, "lswi"].
-                int n = b == 0 ? 32 : b;
-                if (((a - d) & 31) < (n + 3) / 4) return null;
-                return Op("lswi", R(d), RA0(a), Imm(n));
-            }
-            case 725: return Op("stswi", R(d), RA0(a), Imm(b == 0 ? 32 : b));
+                {
+                    // rA in the range of registers to be loaded (ceil(NB/4) from rD, wrapping from r31 to r0), including
+                    // the case in which rA = 0, is invalid [Doc: PEM, "lswi"].
+                    int n = b == 0 ? 32 : b;
+                    if (((a - d) & 31) < (n + 3) / 4)
+                    {
+                        return null;
+                    }
+
+                    return Op("lswi", R(d), RA0(a), Imm(n));
+                }
+            case 725:
+                return Op("stswi", R(d), RA0(a), Imm(b == 0 ? 32 : b));
             case 342 or 374:
-            {
-                // dst/dstst rA,rB,STRM: T in the rD field's top bit, STRM in its low two, the two between reserved.
-                if ((d & 0x0C) != 0) return null;
-                string name = (xo == 342 ? "dst" : "dstst") + ((d & 0x10) != 0 ? "t" : "");
-                return Op(name, R(a), R(b), Imm(d & 3));
-            }
+                {
+                    // dst/dstst rA,rB,STRM: T in the rD field's top bit, STRM in its low two, the two between reserved.
+                    if ((d & 0x0C) != 0)
+                    {
+                        return null;
+                    }
+
+                    string name = (xo == 342 ? "dst" : "dstst") + ((d & 0x10) != 0 ? "t" : "");
+                    return Op(name, R(a), R(b), Imm(d & 3));
+                }
             case 822:
                 // dss STRM / dssall (A = 1): the rA and rB fields and bits 7-8 reserved.
-                if ((d & 0x0C) != 0 || a != 0 || b != 0) return null;
+                if ((d & 0x0C) != 0 || a != 0 || b != 0)
+                {
+                    return null;
+                }
+
                 return (d & 0x10) != 0 ? Op("dssall") : Op("dss", Imm(d & 3));
         }
         return null;
@@ -466,8 +750,17 @@ public static class PpcDisassembler
     {
         string? name = Xo5(w) switch
         {
-            18 => "fdivs", 20 => "fsubs", 21 => "fadds", 22 => "fsqrts", 24 => "fres", 25 => "fmuls", 28 => "fmsubs",
-            29 => "fmadds", 30 => "fnmsubs", 31 => "fnmadds", _ => null,
+            18 => "fdivs",
+            20 => "fsubs",
+            21 => "fadds",
+            22 => "fsqrts",
+            24 => "fres",
+            25 => "fmuls",
+            28 => "fmsubs",
+            29 => "fmadds",
+            30 => "fnmsubs",
+            31 => "fnmadds",
+            _ => null,
         };
         return name is null ? null : FloatArithmetic(w, name);
     }
@@ -478,8 +771,18 @@ public static class PpcDisassembler
         {
             string? name = Xo5(w) switch
             {
-                18 => "fdiv", 20 => "fsub", 21 => "fadd", 22 => "fsqrt", 23 => "fsel", 25 => "fmul", 26 => "frsqrte",
-                28 => "fmsub", 29 => "fmadd", 30 => "fnmsub", 31 => "fnmadd", _ => null,
+                18 => "fdiv",
+                20 => "fsub",
+                21 => "fadd",
+                22 => "fsqrt",
+                23 => "fsel",
+                25 => "fmul",
+                26 => "frsqrte",
+                28 => "fmsub",
+                29 => "fmadd",
+                30 => "fnmsub",
+                31 => "fnmadd",
+                _ => null,
             };
             return name is null ? null : FloatArithmetic(w, name);
         }
@@ -490,20 +793,30 @@ public static class PpcDisassembler
             case 0 or 32:
                 return (w & 0x00600001) != 0 ? null : Op(xo == 0 ? "fcmpu" : "fcmpo", Cr(CrfD(w)), F(a), F(b));
             case 12 or 14 or 15 or 40 or 72 or 136 or 264:
-            {
-                string name = xo switch
                 {
-                    12 => "frsp", 14 => "fctiw", 15 => "fctiwz", 40 => "fneg", 72 => "fmr", 136 => "fnabs", _ => "fabs",
-                };
-                return a != 0 ? null : Op(name + dot, F(d), F(b));
-            }
+                    string name = xo switch
+                    {
+                        12 => "frsp",
+                        14 => "fctiw",
+                        15 => "fctiwz",
+                        40 => "fneg",
+                        72 => "fmr",
+                        136 => "fnabs",
+                        _ => "fabs",
+                    };
+                    return a != 0 ? null : Op(name + dot, F(d), F(b));
+                }
             case 38 or 70:
                 return (w & 0x001FF800) != 0 ? null : Op((xo == 38 ? "mtfsb1" : "mtfsb0") + dot, Imm(d));
-            case 64: return (w & 0x0063F801) != 0 ? null : Op("mcrfs", Cr(CrfD(w)), Cr(a >> 2));
+            case 64:
+                return (w & 0x0063F801) != 0 ? null : Op("mcrfs", Cr(CrfD(w)), Cr(a >> 2));
             // crfD here numbers an FPSCR field, so it prints as a number, not cr7 [Doc: PEM, "mtfsfi"].
-            case 134: return (w & 0x007F0800) != 0 ? null : Op("mtfsfi" + dot, Imm(CrfD(w)), Hex((w >> 12) & 15));
-            case 583: return (w & 0x001FF800) != 0 ? null : Op("mffs" + dot, F(d));
-            case 711: return (w & 0x02010000) != 0 ? null : Op("mtfsf" + dot, Hex((w >> 17) & 0xFF), F(b));
+            case 134:
+                return (w & 0x007F0800) != 0 ? null : Op("mtfsfi" + dot, Imm(CrfD(w)), Hex((w >> 12) & 15));
+            case 583:
+                return (w & 0x001FF800) != 0 ? null : Op("mffs" + dot, F(d));
+            case 711:
+                return (w & 0x02010000) != 0 ? null : Op("mtfsf" + dot, Hex((w >> 17) & 0xFF), F(b));
         }
         return null;   // fctid, fctidz, fcfid (64-bit) and undefined
     }
@@ -519,7 +832,10 @@ public static class PpcDisassembler
         var t = new Dictionary<int, (string, VectorForm)>();
         void Add(VectorForm form, params (int Xo, string Name)[] ops)
         {
-            foreach (var (xo, name) in ops) t.Add(xo, (name, form));
+            foreach (var (xo, name) in ops)
+            {
+                t.Add(xo, (name, form));
+            }
         }
         Add(VectorForm.DAB,
             (0, "vaddubm"), (2, "vmaxub"), (4, "vrlb"), (8, "vmuloub"), (10, "vaddfp"), (12, "vmrghb"), (14, "vpkuhum"),
@@ -558,9 +874,19 @@ public static class PpcDisassembler
     // VXR-form compares, by the 10-bit extended opcode; bit 21 is Rc.
     private static readonly Dictionary<int, string> VectorCompares = new()
     {
-        [6] = "vcmpequb", [70] = "vcmpequh", [134] = "vcmpequw", [198] = "vcmpeqfp", [454] = "vcmpgefp",
-        [518] = "vcmpgtub", [582] = "vcmpgtuh", [646] = "vcmpgtuw", [710] = "vcmpgtfp", [774] = "vcmpgtsb",
-        [838] = "vcmpgtsh", [902] = "vcmpgtsw", [966] = "vcmpbfp",
+        [6] = "vcmpequb",
+        [70] = "vcmpequh",
+        [134] = "vcmpequw",
+        [198] = "vcmpeqfp",
+        [454] = "vcmpgefp",
+        [518] = "vcmpgtub",
+        [582] = "vcmpgtuh",
+        [646] = "vcmpgtuw",
+        [710] = "vcmpgtfp",
+        [774] = "vcmpgtsb",
+        [838] = "vcmpgtsh",
+        [902] = "vcmpgtsw",
+        [966] = "vcmpbfp",
     };
 
     private static int SplatReserved(string name) =>
@@ -571,25 +897,47 @@ public static class PpcDisassembler
         int d = D(w), a = A(w), b = B(w), c = C(w);
         switch ((int)(w & 0x3F))
         {
-            case 32: return Op("vmhaddshs", V(d), V(a), V(b), V(c));
-            case 33: return Op("vmhraddshs", V(d), V(a), V(b), V(c));
-            case 34: return Op("vmladduhm", V(d), V(a), V(b), V(c));
-            case 36: return Op("vmsumubm", V(d), V(a), V(b), V(c));
-            case 37: return Op("vmsummbm", V(d), V(a), V(b), V(c));
-            case 38: return Op("vmsumuhm", V(d), V(a), V(b), V(c));
-            case 39: return Op("vmsumuhs", V(d), V(a), V(b), V(c));
-            case 40: return Op("vmsumshm", V(d), V(a), V(b), V(c));
-            case 41: return Op("vmsumshs", V(d), V(a), V(b), V(c));
-            case 42: return Op("vsel", V(d), V(a), V(b), V(c));
-            case 43: return Op("vperm", V(d), V(a), V(b), V(c));
-            case 44: return (c & 0x10) != 0 ? null : Op("vsldoi", V(d), V(a), V(b), Imm(c & 15));
-            case 46: return Op("vmaddfp", V(d), V(a), V(c), V(b));
-            case 47: return Op("vnmsubfp", V(d), V(a), V(c), V(b));
-            case 35 or 45: return null;
+            case 32:
+                return Op("vmhaddshs", V(d), V(a), V(b), V(c));
+            case 33:
+                return Op("vmhraddshs", V(d), V(a), V(b), V(c));
+            case 34:
+                return Op("vmladduhm", V(d), V(a), V(b), V(c));
+            case 36:
+                return Op("vmsumubm", V(d), V(a), V(b), V(c));
+            case 37:
+                return Op("vmsummbm", V(d), V(a), V(b), V(c));
+            case 38:
+                return Op("vmsumuhm", V(d), V(a), V(b), V(c));
+            case 39:
+                return Op("vmsumuhs", V(d), V(a), V(b), V(c));
+            case 40:
+                return Op("vmsumshm", V(d), V(a), V(b), V(c));
+            case 41:
+                return Op("vmsumshs", V(d), V(a), V(b), V(c));
+            case 42:
+                return Op("vsel", V(d), V(a), V(b), V(c));
+            case 43:
+                return Op("vperm", V(d), V(a), V(b), V(c));
+            case 44:
+                return (c & 0x10) != 0 ? null : Op("vsldoi", V(d), V(a), V(b), Imm(c & 15));
+            case 46:
+                return Op("vmaddfp", V(d), V(a), V(c), V(b));
+            case 47:
+                return Op("vnmsubfp", V(d), V(a), V(c), V(b));
+            case 35 or 45:
+                return null;
         }
         if (VectorCompares.TryGetValue((int)(w & 0x3FF), out var compare))
+        {
             return Op(compare + ((w & 0x400) != 0 ? "." : ""), V(d), V(a), V(b));
-        if (!VectorVx.TryGetValue((int)(w & 0x7FF), out var vx)) return null;
+        }
+
+        if (!VectorVx.TryGetValue((int)(w & 0x7FF), out var vx))
+        {
+            return null;
+        }
+
         return vx.Form switch
         {
             VectorForm.DAB => Op(vx.Name, V(d), V(a), V(b)),

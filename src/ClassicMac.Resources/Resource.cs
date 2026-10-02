@@ -41,7 +41,11 @@ namespace ClassicMac.Resources
             get => name;
             set
             {
-                if (value == name) return;
+                if (value == name)
+                {
+                    return;
+                }
+
                 name = value;
                 NamePlacement = NextPlacement();
             }
@@ -78,7 +82,11 @@ namespace ClassicMac.Resources
         /// </summary>
         public void SetData(ReadOnlyMemory<byte> data)
         {
-            if (data.Length > this.data.Length) DataPlacement = NextPlacement();
+            if (data.Length > this.data.Length)
+            {
+                DataPlacement = NextPlacement();
+            }
+
             this.data = data;
             DataModified = true;
         }

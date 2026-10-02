@@ -1,14 +1,14 @@
 using System.Text;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.PixelFormats;
-using SkiaSharp;
-using Xunit;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.ImageSharp;
 using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.PixelFormats;
+using SkiaSharp;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -63,8 +63,13 @@ public class StreamDecodingTests
     {
         var bitmap = new RgbaBitmap(width, height);
         for (int y = 0; y < height; y++)
+        {
             for (int x = 0; x < width; x++)
+            {
                 bitmap[x, y] = new RgbaColor((byte)(x * 40), (byte)(y * 60), (byte)((x + y) * 20));
+            }
+        }
+
         return bitmap;
     }
 
@@ -85,7 +90,7 @@ public class StreamDecodingTests
         "v2 without HeaderOp" => new PictBuilder().U16(0).Rect(0, 0, 4, 6).U16(0x0011).U16(0x02FF)
             .U16(0x0031).Rect(1, 1, 3, 5).U16(0x00FF).ToArray(),
         "file rgb888 144 dpi icc" => Written(new PictWriteOptions
-            { HorizontalResolution = 144, VerticalResolution = 144, IccProfile = [1, 2, 3, 4, 5] }),
+        { HorizontalResolution = 144, VerticalResolution = 144, IccProfile = [1, 2, 3, 4, 5] }),
         "bare indexed" => Written(new PictWriteOptions { FileHeader = false, Format = PictPixelFormat.Indexed8 }),
         "bare rgb555" => Written(new PictWriteOptions { FileHeader = false, Format = PictPixelFormat.Rgb555 }),
         _ => throw new ArgumentException(name),
@@ -139,7 +144,8 @@ public class StreamDecodingTests
         // Cut anywhere, a picture gives the same pixels or the same exception either way.
         static string Outcome(Func<RgbaBitmap> decode)
         {
-            try { return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(decode().Pixels)); }
+            try
+            { return Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(decode().Pixels)); }
             catch (Exception ex) { return ex.GetType().Name; }
         }
         var picture = Picture("bare indexed");
@@ -232,7 +238,11 @@ public class StreamDecodingTests
         var b = new List<byte>(new byte[512]);
         b[3] = 2;
         b.AddRange(new byte[] { 0xF9, 0xFF, 0xC1, 0x00 });
-        for (int row = 1; row < rows; row++) b.AddRange(new byte[] { 0xB9, 0x00 });
+        for (int row = 1; row < rows; row++)
+        {
+            b.AddRange(new byte[] { 0xB9, 0x00 });
+        }
+
         return b.ToArray();
     }
 
@@ -242,8 +252,10 @@ public class StreamDecodingTests
         header[1] = 5;
         Encoding.ASCII.GetBytes("Paint").CopyTo(header, 2);
         Encoding.ASCII.GetBytes("PNTGMPNT").CopyTo(header, 65);
-        header[83] = (byte)(fork.Length >> 24); header[84] = (byte)(fork.Length >> 16);
-        header[85] = (byte)(fork.Length >> 8); header[86] = (byte)fork.Length;
+        header[83] = (byte)(fork.Length >> 24);
+        header[84] = (byte)(fork.Length >> 16);
+        header[85] = (byte)(fork.Length >> 8);
+        header[86] = (byte)fork.Length;
         return [.. header, .. fork, .. after];
     }
 

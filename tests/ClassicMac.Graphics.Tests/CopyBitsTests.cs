@@ -1,11 +1,11 @@
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -32,12 +32,36 @@ public class CopyBitsTests
         Enumerable.Range(0, bmp.Height).Select(y => new string(Enumerable.Range(0, bmp.Width).Select(x =>
         {
             var c = bmp[x, y];
-            if (c.A == 0) return '.';
-            if (c == Black) return '#';
-            if (c == White) return 'w';
-            if (c == Red) return 'r';
-            if (c == Green) return 'g';
-            if (c == Blue) return 'b';
+            if (c.A == 0)
+            {
+                return '.';
+            }
+
+            if (c == Black)
+            {
+                return '#';
+            }
+
+            if (c == White)
+            {
+                return 'w';
+            }
+
+            if (c == Red)
+            {
+                return 'r';
+            }
+
+            if (c == Green)
+            {
+                return 'g';
+            }
+
+            if (c == Blue)
+            {
+                return 'b';
+            }
+
             return '?';
         }).ToArray())).ToArray();
 
@@ -47,7 +71,11 @@ public class CopyBitsTests
     {
         b.Align().U16(0x0090).U16(rowBytes).Rect(bounds.t, bounds.l, bounds.b, bounds.r)
             .Rect(src.t, src.l, src.b, src.r).Rect(dst.t, dst.l, dst.b, dst.r).U16(mode);
-        foreach (var x in rows) b.U8(x);
+        foreach (var x in rows)
+        {
+            b.U8(x);
+        }
+
         return b;
     }
 
@@ -59,7 +87,11 @@ public class CopyBitsTests
             .U16(0).U16(1).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0)
             .U16(16).U16(32).U16(cmpCount).U16(8).U16(0).U16(0).U16(0).U16(0).U16(0).U16(0)
             .Rect(0, 0, h, w).Rect(dst.t, dst.l, dst.b, dst.r).U16(mode);
-        foreach (var p in pixels) b.U8(p.a).U8(p.r).U8(p.g).U8(p.b);
+        foreach (var p in pixels)
+        {
+            b.U8(p.a).U8(p.r).U8(p.g).U8(p.b);
+        }
+
         return b;
     }
 
@@ -341,7 +373,11 @@ public class CopyBitsTests
             .U16(0).U16(0).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0).U16(0).U16(8).U16(1).U16(8).U16(0).U16(0).U16(0).U16(0).U16(0).U16(0)
             .U16(0).U16(0).U16(0x8000).U16(255);
         var palette = StandardColorTables.ForId(8)!;
-        for (int i = 0; i < 256; i++) pict.U16(i).Rgb(palette[i].R * 257, palette[i].G * 257, palette[i].B * 257);
+        for (int i = 0; i < 256; i++)
+        {
+            pict.U16(i).Rgb(palette[i].R * 257, palette[i].G * 257, palette[i].B * 257);
+        }
+
         pict.Rect(0, 0, 1, 2).Rect(0, 0, 1, 1).U16(0).U8(5).U8(200).U16(0x00FF);
         Assert.Equal(palette[200], PictReader.Decode(pict.ToArray())[0, 0]);
     }

@@ -43,8 +43,15 @@ namespace ClassicMac.Resources.Cli
                 ?? Path.Combine(input.DirectoryName ?? ".", Path.GetFileNameWithoutExtension(input.Name) + " resources");
             var exported = new List<(string Source, Diagnostic Diagnostic)>();
             var result = Unpacker.Extract(opened.Root, forks.Select(f => new ForkToExtract(f.Node, f.Chain, f.Fork!)).ToList(), root, options, exported);
-            foreach (var (source, diagnostic) in exported) reporter.Write(source == input.Name ? input.Name : $"{input.Name} > {source}", [diagnostic]);
-            foreach (var failure in result.Failed) error.WriteLine(failure);
+            foreach (var (source, diagnostic) in exported)
+            {
+                reporter.Write(source == input.Name ? input.Name : $"{input.Name} > {source}", [diagnostic]);
+            }
+
+            foreach (var failure in result.Failed)
+            {
+                error.WriteLine(failure);
+            }
 
             output.WriteLine($"{result.Resources} resources from {result.Files} files, to {root}");
             return result.Failed.Count > 0 ? ExitCodes.IoError : reporter.ExitCode;

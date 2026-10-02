@@ -58,7 +58,10 @@ namespace ClassicMac.Files
             var full = Path.GetFullPath(path);
             foreach (var file in OpenFiles.Keys)
             {
-                if (string.Equals(file.FilePath, full, StringComparison.OrdinalIgnoreCase)) file.Close();
+                if (string.Equals(file.FilePath, full, StringComparison.OrdinalIgnoreCase))
+                {
+                    file.Close();
+                }
             }
         }
 
@@ -66,7 +69,10 @@ namespace ClassicMac.Files
         public virtual ForkData Slice(long offset, long length)
         {
             if (offset < 0 || length < 0 || offset > Length - length)
+            {
                 throw new ArgumentOutOfRangeException(nameof(offset), $"{offset}+{length} lies outside the {Length}-byte fork.");
+            }
+
             return new SliceForkData(this, offset, length);
         }
 
@@ -87,8 +93,16 @@ namespace ClassicMac.Files
         public int ReadAt(long offset, Span<byte> buffer)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(offset);
-            if (offset >= Length || buffer.IsEmpty) return 0;
-            if (buffer.Length > Length - offset) buffer = buffer[..(int)(Length - offset)];
+            if (offset >= Length || buffer.IsEmpty)
+            {
+                return 0;
+            }
+
+            if (buffer.Length > Length - offset)
+            {
+                buffer = buffer[..(int)(Length - offset)];
+            }
+
             ReadAtCore(offset, buffer);
             return buffer.Length;
         }
@@ -107,7 +121,10 @@ namespace ClassicMac.Files
             else
             {
                 var skip = new byte[Math.Min(offset, 81920)];
-                for (var left = offset; left > 0;) left -= stream.Read(skip, 0, (int)Math.Min(left, skip.Length)) is > 0 and var n ? n : throw new EndOfStreamException();
+                for (var left = offset; left > 0;)
+                {
+                    left -= stream.Read(skip, 0, (int)Math.Min(left, skip.Length)) is > 0 and var n ? n : throw new EndOfStreamException();
+                }
             }
             stream.ReadExactly(buffer);
         }
@@ -116,7 +133,10 @@ namespace ClassicMac.Files
         public byte[] ToArray(long maxLength = int.MaxValue)
         {
             if (Length > maxLength || Length > int.MaxValue)
+            {
                 throw new InvalidDataException($"The {Length}-byte fork exceeds the {maxLength}-byte limit.");
+            }
+
             var buffer = new byte[Length];
             ReadAt(0, buffer);
             return buffer;
@@ -141,7 +161,11 @@ namespace ClassicMac.Files
                 {
                     if (end <= Math.Min(Length, HeadLimit))
                     {
-                        if (end > head.Length) GrowHead(end);
+                        if (end > head.Length)
+                        {
+                            GrowHead(end);
+                        }
+
                         head.AsSpan((int)offset, buffer.Length).CopyTo(buffer);
                     }
                     else if (offset >= tailStart)
@@ -186,7 +210,10 @@ namespace ClassicMac.Files
             public override ForkData Slice(long offset, long length)
             {
                 if (offset < 0 || length < 0 || offset > Length - length)
+                {
                     throw new ArgumentOutOfRangeException(nameof(offset), $"{offset}+{length} lies outside the {Length}-byte fork.");
+                }
+
                 return new BytesForkData(bytes.Slice((int)offset, (int)length));
             }
         }
@@ -206,7 +233,13 @@ namespace ClassicMac.Files
 
             public bool IsOpen
             {
-                get { lock (gate) return handle is not null; }
+                get
+                {
+                    lock (gate)
+                    {
+                        return handle is not null;
+                    }
+                }
             }
 
             // Read even while another program (an emulator with the image mounted) has the file open for writing.
@@ -218,7 +251,11 @@ namespace ClassicMac.Files
                 while (!buffer.IsEmpty)
                 {
                     var read = RandomAccess.Read(file, buffer, offset);
-                    if (read == 0) throw new EndOfStreamException($"{path} is shorter than when it was opened.");
+                    if (read == 0)
+                    {
+                        throw new EndOfStreamException($"{path} is shorter than when it was opened.");
+                    }
+
                     buffer = buffer[read..];
                     offset += read;
                 }
@@ -245,7 +282,10 @@ namespace ClassicMac.Files
             {
                 lock (gate)
                 {
-                    if (Environment.TickCount64 - lastUse >= (long)idle.TotalMilliseconds) Close();
+                    if (Environment.TickCount64 - lastUse >= (long)idle.TotalMilliseconds)
+                    {
+                        Close();
+                    }
                 }
             }
 
@@ -253,7 +293,11 @@ namespace ClassicMac.Files
             {
                 lock (gate)
                 {
-                    if (handle is null) return;
+                    if (handle is null)
+                    {
+                        return;
+                    }
+
                     handle.Dispose();
                     handle = null;
                     closer?.Change(Timeout.Infinite, Timeout.Infinite);
@@ -274,7 +318,10 @@ namespace ClassicMac.Files
             public override ForkData Slice(long start, long count)
             {
                 if (start < 0 || count < 0 || start > Length - count)
+                {
                     throw new ArgumentOutOfRangeException(nameof(start), $"{start}+{count} lies outside the {Length}-byte fork.");
+                }
+
                 return new SliceForkData(parent, offset + start, count);
             }
         }

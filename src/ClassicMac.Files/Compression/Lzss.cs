@@ -27,22 +27,37 @@ namespace ClassicMac.Files.Compression
                 flags >>= 1;
                 if ((flags & 0x100) == 0)
                 {
-                    if (i >= input.Length) break;
+                    if (i >= input.Length)
+                    {
+                        break;
+                    }
+
                     flags = input[i++] | 0xFF00u;
                 }
                 if ((flags & 1) != 0)
                 {
-                    if (i >= input.Length) break;
+                    if (i >= input.Length)
+                    {
+                        break;
+                    }
+
                     var c = input[i++];
                     Put(c);
                 }
                 else
                 {
-                    if (i > input.Length - 2) break;
+                    if (i > input.Length - 2)
+                    {
+                        break;
+                    }
+
                     var position = input[i] | ((input[i + 1] & 0xF0) << 4);
                     var count = (input[i + 1] & 0x0F) + Threshold + 1;
                     i += 2;
-                    for (var k = 0; k < count; k++) Put(window[(position + k) & (WindowSize - 1)]);
+                    for (var k = 0; k < count; k++)
+                    {
+                        Put(window[(position + k) & (WindowSize - 1)]);
+                    }
                 }
             }
             return output.ToArray();
@@ -50,7 +65,10 @@ namespace ClassicMac.Files.Compression
             void Put(byte c)
             {
                 if (output.Length >= maxLength)
+                {
                     throw new InvalidDataException("LZSS expansion exceeds the configured expanded-size limit.");
+                }
+
                 output.WriteByte(c);
                 window[r] = c;
                 r = (r + 1) & (WindowSize - 1);

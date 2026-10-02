@@ -1,16 +1,16 @@
 using ClassicMac.Core;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.SkiaSharp;
+using ClassicMac.Resources.Decoders.Images;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Metadata.Profiles.Icc;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
-using ClassicMac.Graphics.ImageSharp;
-using ClassicMac.Graphics.SkiaSharp;
-using ClassicMac.Resources.Decoders.Images;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -22,7 +22,13 @@ public class WriterTests
     {
         var bmp = new RgbaBitmap(w, h);
         for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++) bmp[x, y] = color(x, y);
+        {
+            for (int x = 0; x < w; x++)
+            {
+                bmp[x, y] = color(x, y);
+            }
+        }
+
         return bmp;
     }
 
@@ -37,24 +43,34 @@ public class WriterTests
     {
         Assert.Equal((expected.Width, expected.Height), (actual.Width, actual.Height));
         for (int y = 0; y < expected.Height; y++)
+        {
             for (int x = 0; x < expected.Width; x++)
             {
                 var e = expect == null ? expected[x, y] : expect(expected[x, y]);
                 Assert.True(e == actual[x, y], $"({x},{y}): expected {e}, got {actual[x, y]}");
             }
+        }
     }
 
     private static readonly RgbaColor[] Four = { new(255, 255, 255), new(255, 0, 0), new(0, 0, 255), new(0, 0, 0) };
 
     // Widths cover unpacked rows (rowBytes < 8), byte counts and word counts (rowBytes > 250).
     [Theory]
-    [InlineData(PictPixelFormat.Indexed1, 3)] [InlineData(PictPixelFormat.Indexed1, 70)] [InlineData(PictPixelFormat.Indexed1, 2100)]
-    [InlineData(PictPixelFormat.Indexed2, 5)] [InlineData(PictPixelFormat.Indexed2, 1100)]
-    [InlineData(PictPixelFormat.Indexed4, 9)] [InlineData(PictPixelFormat.Indexed4, 600)]
-    [InlineData(PictPixelFormat.Indexed8, 5)] [InlineData(PictPixelFormat.Indexed8, 300)]
-    [InlineData(PictPixelFormat.Rgb555, 3)] [InlineData(PictPixelFormat.Rgb555, 130)]
-    [InlineData(PictPixelFormat.Rgb888, 1)] [InlineData(PictPixelFormat.Rgb888, 100)]
-    [InlineData(PictPixelFormat.Argb8888, 1)] [InlineData(PictPixelFormat.Argb8888, 100)]
+    [InlineData(PictPixelFormat.Indexed1, 3)]
+    [InlineData(PictPixelFormat.Indexed1, 70)]
+    [InlineData(PictPixelFormat.Indexed1, 2100)]
+    [InlineData(PictPixelFormat.Indexed2, 5)]
+    [InlineData(PictPixelFormat.Indexed2, 1100)]
+    [InlineData(PictPixelFormat.Indexed4, 9)]
+    [InlineData(PictPixelFormat.Indexed4, 600)]
+    [InlineData(PictPixelFormat.Indexed8, 5)]
+    [InlineData(PictPixelFormat.Indexed8, 300)]
+    [InlineData(PictPixelFormat.Rgb555, 3)]
+    [InlineData(PictPixelFormat.Rgb555, 130)]
+    [InlineData(PictPixelFormat.Rgb888, 1)]
+    [InlineData(PictPixelFormat.Rgb888, 100)]
+    [InlineData(PictPixelFormat.Argb8888, 1)]
+    [InlineData(PictPixelFormat.Argb8888, 100)]
     public void Formats_RoundTrip(PictPixelFormat format, int width)
     {
         bool indexed = format <= PictPixelFormat.Indexed8;
@@ -87,13 +103,17 @@ public class WriterTests
         var bmp = new RgbaBitmap(32, 2);
         for (int i = 0; i < 64; i++)
         {
-            bmp.Pixels[4 * i] = (byte)(i * 7); bmp.Pixels[4 * i + 1] = (byte)(i * 13 + 1);
-            bmp.Pixels[4 * i + 2] = (byte)(i * 29 + 2); bmp.Pixels[4 * i + 3] = 255;
+            bmp.Pixels[4 * i] = (byte)(i * 7);
+            bmp.Pixels[4 * i + 1] = (byte)(i * 13 + 1);
+            bmp.Pixels[4 * i + 2] = (byte)(i * 29 + 2);
+            bmp.Pixels[4 * i + 3] = 255;
         }
         using var ms = new MemoryStream();
         PictWriter.Write(ms, bmp, new PictWriteOptions { FileHeader = false });
         foreach (var quickDraw in new[] { QuickDrawVersion.MacOS9, QuickDrawVersion.MacRom })
+        {
             Assert.Equal(bmp.Pixels, PictReader.Decode(ms.ToArray(), new PictDecodeOptions { QuickDraw = quickDraw }).Pixels);
+        }
     }
 
     [Fact]
@@ -166,7 +186,13 @@ public class WriterTests
     private static int FindOpcode(byte[] data, int op)
     {
         for (int i = 0; i + 1 < data.Length; i += 2)
-            if (((data[i] << 8) | data[i + 1]) == op) return i;
+        {
+            if (((data[i] << 8) | data[i + 1]) == op)
+            {
+                return i;
+            }
+        }
+
         throw new Xunit.Sdk.XunitException("opcode not found");
     }
 
@@ -188,22 +214,37 @@ public class WriterTests
         ms.Position = 0;
         return PictDecoder.Instance.Decode<Rgba32>(new PictDecoderOptions
         {
-            GeneralOptions = new DecoderOptions { Configuration = Config }, PreserveAlpha = preserveAlpha,
+            GeneralOptions = new DecoderOptions { Configuration = Config },
+            PreserveAlpha = preserveAlpha,
         }, ms);
     }
 
     [Theory]
-    [InlineData(1)] [InlineData(2)] [InlineData(4)] [InlineData(8)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
     public void Encoder_IndexedDepths_KeepImagesWithFewEnoughColors(int bits)
     {
         using var src = new Image<Rgba32>(Config, 17, 3);
         var palette = new[] { new Rgba32(255, 255, 255), new Rgba32(0, 0, 0), new Rgba32(200, 30, 30), new Rgba32(20, 20, 220) };
         int n = Math.Min(4, 1 << bits);
         for (int y = 0; y < 3; y++)
-            for (int x = 0; x < 17; x++) src[x, y] = palette[(x + y) % n];
+        {
+            for (int x = 0; x < 17; x++)
+            {
+                src[x, y] = palette[(x + y) % n];
+            }
+        }
+
         using var back = Encoded(src, new PictEncoder { BitsPerPixel = bits });
         for (int y = 0; y < 3; y++)
-            for (int x = 0; x < 17; x++) Assert.Equal(src[x, y], back[x, y]);
+        {
+            for (int x = 0; x < 17; x++)
+            {
+                Assert.Equal(src[x, y], back[x, y]);
+            }
+        }
     }
 
     [Fact]
@@ -218,7 +259,10 @@ public class WriterTests
         // A minimal ICC profile: 128-byte header (size, 'acsp' signature) and an empty tag table.
         var icc = new byte[132];
         icc[3] = 132;
-        icc[36] = (byte)'a'; icc[37] = (byte)'c'; icc[38] = (byte)'s'; icc[39] = (byte)'p';
+        icc[36] = (byte)'a';
+        icc[37] = (byte)'c';
+        icc[38] = (byte)'s';
+        icc[39] = (byte)'p';
         src.Metadata.IccProfile = new IccProfile(icc);
         using var back = Encoded(src, new PictEncoder { BitsPerPixel = 32 }, preserveAlpha: true);
         Assert.Equal(src[0, 0], back[0, 0]);

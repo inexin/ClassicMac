@@ -43,17 +43,44 @@ namespace ClassicMac.Files.Containers
         // header gives (forks padded to 128, the last one possibly not).
         internal static int Detect(ReadOnlyMemory<byte> header, long totalLength)
         {
-            if (header.Length < HeaderLength) return 0;
-            if (header.Span[0] != 0 || header.Span[74] != 0 || header.Span[82] != 0) return 0;
-            if (header.Span[1] is < 1 or > 63) return 0;
-            if (header.Span.Slice(2, header.Span[1]).IndexOfAny((byte)':', (byte)0) >= 0) return 0;
+            if (header.Length < HeaderLength)
+            {
+                return 0;
+            }
+
+            if (header.Span[0] != 0 || header.Span[74] != 0 || header.Span[82] != 0)
+            {
+                return 0;
+            }
+
+            if (header.Span[1] is < 1 or > 63)
+            {
+                return 0;
+            }
+
+            if (header.Span.Slice(2, header.Span[1]).IndexOfAny((byte)':', (byte)0) >= 0)
+            {
+                return 0;
+            }
+
             var reader = new BigEndianReader(header);
             long dataLength = reader.ReadUInt32At(83);
             long resourceLength = reader.ReadUInt32At(87);
-            if (dataLength > MaxForkLength || resourceLength > MaxForkLength) return 0;
+            if (dataLength > MaxForkLength || resourceLength > MaxForkLength)
+            {
+                return 0;
+            }
+
             if (Crc16.Compute(header.Span[..124]) == reader.ReadUInt16At(124))
+            {
                 return reader.ReadUInt32At(102) == MBin ? 3 : 2;
-            if (header.Span[99..126].IndexOfAnyExcept((byte)0) >= 0) return 0;
+            }
+
+            if (header.Span[99..126].IndexOfAnyExcept((byte)0) >= 0)
+            {
+                return 0;
+            }
+
             var padded = HeaderLength + Padded(dataLength) + Padded(resourceLength);
             var lastUnpadded = resourceLength > 0
                 ? HeaderLength + Padded(dataLength) + resourceLength
@@ -65,7 +92,10 @@ namespace ClassicMac.Files.Containers
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             var header = input.ReadPrefix(HeaderLength);
-            if (Detect(header, input.Length) != version) throw new InvalidDataException($"Not a {FormatName} file.");
+            if (Detect(header, input.Length) != version)
+            {
+                throw new InvalidDataException($"Not a {FormatName} file.");
+            }
 
             var name = new MacString(header.AsSpan(2, header[1]));
             // Finder flags: the high byte at 73 in every version, the low byte at 101 from MacBinary II on.
@@ -113,7 +143,11 @@ namespace ClassicMac.Files.Containers
 
         private static ForkData Fork(ForkData input, long offset, long length, string which, ContainerContext context)
         {
-            if (length == 0) return ForkData.Empty;
+            if (length == 0)
+            {
+                return ForkData.Empty;
+            }
+
             var available = Math.Max(0, input.Length - offset);
             if (length > available)
             {

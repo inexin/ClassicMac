@@ -43,14 +43,32 @@ namespace ClassicMac.App.Views
             Row(1, "ID", id);
             Row(2, "Name", name);
             var flags = new WrapPanel();
-            foreach (var box in boxes) flags.Children.Add(new Border { Child = box, Margin = new Thickness(0, 0, 12, 0) });
-            if (compressed) flags.Children.Add(new TextBlock { Text = "Compressed", Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center });
+            foreach (var box in boxes)
+            {
+                flags.Children.Add(new Border { Child = box, Margin = new Thickness(0, 0, 12, 0) });
+            }
+
+            if (compressed)
+            {
+                flags.Children.Add(new TextBlock { Text = "Compressed", Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center });
+            }
+
             Row(3, "Attributes", flags);
             var ok = await Show(title, grid, "OK");
-            if (!ok) return null;
+            if (!ok)
+            {
+                return null;
+            }
+
             var attributes = compressed ? ResourceAttributes.Compressed : ResourceAttributes.None;
             for (var i = 0; i < Flags.Length; i++)
-                if (boxes[i].IsChecked == true) attributes |= Flags[i].Flag;
+            {
+                if (boxes[i].IsChecked == true)
+                {
+                    attributes |= Flags[i].Flag;
+                }
+            }
+
             return new ResourceInfo(type.Text ?? "", (short)Math.Clamp(id.Value ?? 0, short.MinValue, short.MaxValue), name.Text ?? "", attributes);
         }
 
@@ -71,7 +89,11 @@ namespace ClassicMac.App.Views
                 grid.Children.Add(rows[row].Control);
             }
             var note = new TextBlock { Classes = { "muted" }, Text = "A resource of that type and ID has its data replaced.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
-            if (!await Show($"Import “{fileName}”", new StackPanel { Spacing = 10, Children = { grid, note } }, "Import")) return null;
+            if (!await Show($"Import “{fileName}”", new StackPanel { Spacing = 10, Children = { grid, note } }, "Import"))
+            {
+                return null;
+            }
+
             return new ImportChoice(type.SelectedItem as string ?? initial.Type, (short)Math.Clamp(id.Value ?? 0, short.MinValue, short.MaxValue), name.Text ?? "");
         }
 
@@ -92,7 +114,11 @@ namespace ClassicMac.App.Views
                 grid.Children.Add(rows[row].Control);
             }
             var note = new TextBlock { Classes = { "muted" }, Text = "Written to the image with File ▸ Save As ▸ HFS Volume Image.", TextWrapping = TextWrapping.Wrap, MaxWidth = 400 };
-            if (!await Show(title, new StackPanel { Spacing = 10, Children = { grid, note } }, "Create")) return null;
+            if (!await Show(title, new StackPanel { Spacing = 10, Children = { grid, note } }, "Create"))
+            {
+                return null;
+            }
+
             return new NewFileChoice(name.Text ?? "", type.Text ?? "", creator.Text ?? "");
         }
 
@@ -148,7 +174,8 @@ namespace ClassicMac.App.Views
                 : $"You edited this resource but the changes can't be applied: {error}";
             dialog.Content = Layout(new StackPanel
             {
-                Spacing = 6, MaxWidth = 420,
+                Spacing = 6,
+                MaxWidth = 420,
                 Children =
                 {
                     new TextBlock { Text = $"Apply your changes to {what}?", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap },
@@ -166,13 +193,21 @@ namespace ClassicMac.App.Views
         {
             var box = new TextBox
             {
-                Text = Format(data), AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap, FontFamily = AppFonts.Mono,
-                Width = 560, Height = 360,
+                Text = Format(data),
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.NoWrap,
+                FontFamily = AppFonts.Mono,
+                Width = 560,
+                Height = 360,
             };
             var note = new TextBlock { Classes = { "muted" }, Text = "Hex bytes; spaces and line breaks are ignored." };
             while (await Show(title, new StackPanel { Spacing = 6, Children = { note, box } }, "OK"))
             {
-                if (Parse(box.Text ?? "") is { } bytes) return bytes;
+                if (Parse(box.Text ?? "") is { } bytes)
+                {
+                    return bytes;
+                }
+
                 note.Text = "That is not whole hex bytes (0-9, A-F, two digits a byte).";
             }
             return null;
@@ -192,10 +227,20 @@ namespace ClassicMac.App.Views
         private static byte[]? Parse(string text)
         {
             var digits = new string(text.Where(c => !char.IsWhiteSpace(c)).ToArray());
-            if (digits.Length % 2 != 0) return null;
+            if (digits.Length % 2 != 0)
+            {
+                return null;
+            }
+
             var bytes = new byte[digits.Length / 2];
             for (var i = 0; i < bytes.Length; i++)
-                if (!byte.TryParse(digits.AsSpan(2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out bytes[i])) return null;
+            {
+                if (!byte.TryParse(digits.AsSpan(2 * i, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out bytes[i]))
+                {
+                    return null;
+                }
+            }
+
             return bytes;
         }
 
@@ -209,7 +254,10 @@ namespace ClassicMac.App.Views
             cancelButton.Click += (_, _) => dialog.Close();
             dialog.Content = Layout(body, new StackPanel
             {
-                Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Children = { okButton, cancelButton },
+                Orientation = Orientation.Horizontal,
+                Spacing = 8,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Children = { okButton, cancelButton },
             });
             await dialog.ShowDialog(owner);
             return result;
@@ -217,7 +265,10 @@ namespace ClassicMac.App.Views
 
         private static Window MakeWindow(string title) => new()
         {
-            Title = title, SizeToContent = SizeToContent.WidthAndHeight, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Title = title,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
             MinWidth = 320,
         };
 

@@ -113,7 +113,10 @@ internal sealed class M68kCodeMap
     {
         var map = new M68kCodeMap(code, start);
         if (codeRelocations is not null)
+        {
             map.codeRelocations = codeRelocations;
+        }
+
         map.Run(entries, data);
         return map;
     }
@@ -125,15 +128,23 @@ internal sealed class M68kCodeMap
             int from = Math.Clamp(region.Offset, 0, kinds.Length);
             int to = (int)Math.Clamp((long)region.Offset + region.Length, from, kinds.Length);
             if (to > from && IsFree(from, to - from))
+            {
                 MarkData(new M68kDataRegion(from, to - from, region.Kind, region.Note));
+            }
         }
         MarkFreeAsData(0, start, M68kDataKind.Header);
         foreach (var entry in entries)
+        {
             Register(entry.Offset, entry.Name, entry.Source);
+        }
+
         FindMacsBugNames();
 
         foreach (int offset in registered.Keys.Order().Reverse())
+        {
             work.Push(offset);
+        }
+
         Descend();
         AssignMacsBugNames();
         Descend();
@@ -143,7 +154,10 @@ internal sealed class M68kCodeMap
         foreach (var (offset, (name, source)) in registered)
         {
             if (!Instructions.ContainsKey(offset) && !macsBugAt.ContainsKey(offset))
+            {
                 continue;
+            }
+
             string label = macsBugAt.TryGetValue(offset, out var m) ? m
                 : name ?? "sub_" + offset.ToString("X4", CultureInfo.InvariantCulture);
             Functions[offset] = new CodeFunction(0, (uint)offset, label, source);
@@ -159,11 +173,17 @@ internal sealed class M68kCodeMap
         {
             int end = Math.Min(name.End, kinds.Length);
             if (name.ReturnOffset < previousEnd || !IsFree(name.ReturnOffset, end - name.ReturnOffset))
+            {
                 continue;
+            }
+
             accepted.Add(name);
             MarkData(new M68kDataRegion(name.Offset, name.Length, M68kDataKind.MacsBugName, name.Name));
             if (end > name.Offset + name.Length)
+            {
                 MarkData(new M68kDataRegion(name.Offset + name.Length, end - name.Offset - name.Length, M68kDataKind.Literals));
+            }
+
             previousEnd = end;
         }
         MacsBugNames = accepted;
@@ -179,8 +199,13 @@ internal sealed class M68kCodeMap
         {
             int functionStart = previousEnd;
             foreach (int known in registered.Keys)
+            {
                 if (known >= previousEnd && known <= name.ReturnOffset && known > functionStart)
+                {
                     functionStart = known;
+                }
+            }
+
             if (macsBugAt.TryAdd(functionStart, name.Name))
             {
                 Register(functionStart, null, CodeFunctionSource.MacsBug);
@@ -194,28 +219,43 @@ internal sealed class M68kCodeMap
     private void MarkStrings()
     {
         foreach (var ins in Instructions.Values.ToList())
+        {
             MarkStrings(ins);
+        }
     }
 
     private void MarkStrings(M68kInstruction ins)
     {
         if (ins.Mnemonic is "jsr" or "jmp")
+        {
             return;
+        }
+
         foreach (var operand in ins.Operands)
+        {
             if (operand is M68kEffectiveAddress { Mode: M68kAddressingMode.PcDisplacement, Address: uint target }
                 && target < (uint)kinds.Length && M68kStrings.At(code.Span, (int)target) is { } s
                 && IsFree((int)target, s.Length))
+            {
                 MarkData(new M68kDataRegion((int)target, s.Length, M68kDataKind.String));
+            }
+        }
     }
 
     private void Register(int offset, string? name, CodeFunctionSource source)
     {
         if ((offset & 1) != 0 || offset < start || offset >= kinds.Length)
+        {
             return;
+        }
+
         if (registered.TryGetValue(offset, out var known))
         {
             if (known.Name is null && name is not null)
+            {
                 registered[offset] = (name, known.Source);
+            }
+
             return;
         }
         registered[offset] = (name, source);
@@ -229,35 +269,59 @@ internal sealed class M68kCodeMap
             while (CanStart(p))
             {
                 if (IsMixedModeMagic(p))
+                {
                     break;
+                }
+
                 var ins = Decode(p);
                 if (ins.IsInvalid || !IsFree(p, ins.Length))
+                {
                     break;
+                }
+
                 Record(ins, swept: false);
                 if (RelocatedTarget(ins) is int relocated)
                 {
                     BranchTargets.Add(relocated);
                     if (ins.Mnemonic == "jsr")
+                    {
                         Register(relocated, null, CodeFunctionSource.Call);
+                    }
+
                     work.Push(relocated);
                 }
                 else if (FollowsReferences(ins))
+                {
                     foreach (var reference in ins.References)
                     {
                         if (reference.Kind == M68kReferenceKind.Data || reference.Address >= (uint)kinds.Length)
+                        {
                             continue;
+                        }
+
                         int target = (int)reference.Address;
                         BranchTargets.Add(target);
                         if (reference.Kind == M68kReferenceKind.Call)
+                        {
                             Register(target, null, CodeFunctionSource.Call);
+                        }
+
                         work.Push(target);
                     }
+                }
+
                 if ((ins.Flags & M68kFlags.Return) != 0 || EndsFlow(ins))
+                {
                     break;
+                }
+
                 if ((ins.Flags & (M68kFlags.Branch | M68kFlags.Conditional | M68kFlags.Call)) == M68kFlags.Branch)
                 {
                     if (ins is { Mnemonic: "jmp", Operands: [M68kEffectiveAddress { Mode: M68kAddressingMode.PcIndexed } ea] })
+                    {
                         IndexedJump(ins, ea);
+                    }
+
                     break;
                 }
                 p += ins.Length;
@@ -270,7 +334,10 @@ internal sealed class M68kCodeMap
     {
         if (ins is not { Mnemonic: "jsr" or "jmp", Operands: [M68kEffectiveAddress { Mode: M68kAddressingMode.AbsoluteLong, Address: uint target }] }
             || !codeRelocations.Contains((int)ins.Address + 2) || target >= (uint)kinds.Length)
+        {
             return null;
+        }
+
         return (int)target;
     }
 
@@ -278,8 +345,13 @@ internal sealed class M68kCodeMap
     private static bool FollowsReferences(M68kInstruction ins)
     {
         foreach (var operand in ins.Operands)
+        {
             if (operand is M68kEffectiveAddress { Mode: M68kAddressingMode.AbsoluteShort or M68kAddressingMode.AbsoluteLong })
+            {
                 return false;
+            }
+        }
+
         return true;
     }
 
@@ -308,7 +380,10 @@ internal sealed class M68kCodeMap
             work.Push(q);
             var next = Decode(q);
             if (next.Mnemonic != "bra")
+            {
                 break;
+            }
+
             q += next.Length;
         }
     }
@@ -322,7 +397,9 @@ internal sealed class M68kCodeMap
             ins = previous;
             if (ins is { Mnemonic: "cmpi" or "cmp", Size: M68kSize.Word or M68kSize.Long, Operands: [M68kImmediate imm, M68kRegisterOperand r] }
                 && r == register)
+            {
                 return imm.Value is >= 0 and < MaxTableEntries ? (int)imm.Value + 1 : null;
+            }
         }
         return null;
     }
@@ -331,8 +408,13 @@ internal sealed class M68kCodeMap
     public M68kInstruction? Previous(M68kInstruction ins)
     {
         for (int back = 2; back <= 22 && back <= ins.Address; back += 2)
+        {
             if (Instructions.TryGetValue((int)ins.Address - back, out var p))
+            {
                 return p.Address + (uint)p.Length == ins.Address ? p : null;
+            }
+        }
+
         return null;
     }
 
@@ -343,12 +425,21 @@ internal sealed class M68kCodeMap
         {
             int pos = table + 2 * i;
             if (pos < start || pos > kinds.Length - 2 || !IsFree(pos, 2) || (count is null && pos >= lowest))
+            {
                 break;
+            }
+
             int target = jumpBase + reader.ReadInt16At(pos);
             if ((target & 1) != 0 || target < start || target >= kinds.Length)
+            {
                 break;
+            }
+
             if (target > table)
+            {
                 lowest = Math.Min(lowest, target);
+            }
+
             MarkData(new M68kDataRegion(pos, 2, M68kDataKind.SwitchTable));
             BranchTargets.Add(target);
             work.Push(target);
@@ -366,7 +457,10 @@ internal sealed class M68kCodeMap
             }
             int e = g;
             while (e < kinds.Length && kinds[e] == Free)
+            {
                 e++;
+            }
+
             SweepGap(g, e);
             g = e;
         }
@@ -402,7 +496,10 @@ internal sealed class M68kCodeMap
             {
                 Record(ins, swept: true);
                 if (first)
+                {
                     Register(p, null, CodeFunctionSource.Gap);
+                }
+
                 MarkStrings(ins);
                 p += ins.Length;
                 first = (ins.Flags & M68kFlags.Return) != 0
@@ -411,7 +508,10 @@ internal sealed class M68kCodeMap
             }
             int n = Math.Min(2, e - p);
             if (n == 2 && kinds[p + 1] != Free)
+            {
                 n = 1;
+            }
+
             MarkData(new M68kDataRegion(p, n, M68kDataKind.Unknown));
             p += n;
             first = false;
@@ -425,9 +525,13 @@ internal sealed class M68kCodeMap
         {
             if (Data.Count > 0 && Data[^1] is var last && last.End == region.Offset && last.Kind == region.Kind
                 && last.Note is null && region.Note is null && region.Kind is not (M68kDataKind.Header or M68kDataKind.String))
+            {
                 Data[^1] = last with { Length = last.Length + region.Length };
+            }
             else
+            {
                 Data.Add(region);
+            }
         }
     }
 
@@ -440,10 +544,18 @@ internal sealed class M68kCodeMap
     private bool IsFree(int p, int length)
     {
         if (p < 0 || length > kinds.Length - p)
+        {
             return false;
+        }
+
         for (int i = p; i < p + length; i++)
+        {
             if (kinds[i] != Free)
+            {
                 return false;
+            }
+        }
+
         return true;
     }
 
@@ -452,16 +564,24 @@ internal sealed class M68kCodeMap
         int p = (int)ins.Address;
         Instructions[p] = ins;
         if (swept)
+        {
             Swept.Add(p);
+        }
+
         kinds[p] = InstructionStart;
         for (int i = p + 1; i < p + ins.Length; i++)
+        {
             kinds[i] = InstructionByte;
+        }
     }
 
     private void MarkData(M68kDataRegion region)
     {
         for (int i = region.Offset; i < region.End; i++)
+        {
             kinds[i] = DataByte;
+        }
+
         regions.Add(region);
     }
 
@@ -476,7 +596,10 @@ internal sealed class M68kCodeMap
             }
             int e = p;
             while (e < to && kinds[e] == Free)
+            {
                 e++;
+            }
+
             MarkData(new M68kDataRegion(p, e - p, kind));
             p = e;
         }

@@ -43,7 +43,10 @@ namespace ClassicMac.Code.M68k
 
                 void Add(uint first, uint count)
                 {
-                    for (long i = 0; i < count && i < MaxEntries; i++) indices.Add((int)(first / 8 + i));
+                    for (long i = 0; i < count && i < MaxEntries; i++)
+                    {
+                        indices.Add((int)(first / 8 + i));
+                    }
                 }
             }
         }
@@ -69,7 +72,9 @@ namespace ClassicMac.Code.M68k
             }
             SegmentHeader header;
             if (!far)
+            {
                 header = new SegmentHeader(false, reader.ReadUInt16At(0), reader.ReadUInt16At(2), 0, 0, 0, 0, 0, 0);
+            }
             else
             {
                 reader.Position = 4;
@@ -77,8 +82,11 @@ namespace ClassicMac.Code.M68k
                     reader.ReadUInt32(), reader.ReadUInt32(), reader.ReadUInt32(), reader.ReadUInt32());
             }
             if ((header.NearCount != 0 && header.FirstNearOffset % 8 != 0) || (header.FarCount != 0 && header.FirstFarOffset % 8 != 0))
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.segment-entry-offset",
                     "The segment's first jump-table entry offset is not a multiple of 8.", 0));
+            }
+
             return header;
         }
     }

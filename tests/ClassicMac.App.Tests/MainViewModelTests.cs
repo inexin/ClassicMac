@@ -17,7 +17,11 @@ public class MainViewModelTests : IDisposable
         foreach (var (type, id, name, data) in resources)
         {
             var r = new Resource(FourCC.FromString(type), id, data);
-            if (name is not null) r.Name = MacString.FromMacRoman(name);
+            if (name is not null)
+            {
+                r.Name = MacString.FromMacRoman(name);
+            }
+
             fork.Add(r);
         }
         return fork.ToArray();
@@ -76,7 +80,8 @@ public class MainViewModelTests : IDisposable
         };
         var text = ClassicMac.Files.Containers.BinHexWriter.ToText(new ClassicMac.Files.MacFile
         {
-            Name = MacString.FromMacRoman("Note"), DataFork = ClassicMac.Files.ForkData.FromBytes(new byte[300]),
+            Name = MacString.FromMacRoman("Note"),
+            DataFork = ClassicMac.Files.ForkData.FromBytes(new byte[300]),
         }).ToCharArray();
         var data = Array.LastIndexOf(text, ':') - 20;
         text[data] = text[data] == 'A' ? 'B' : 'A';
@@ -131,7 +136,8 @@ public class MainViewModelTests : IDisposable
         var bad = File.ReadAllBytes(ContainerDisk()); // the disk, MacBinary-wrapped: its files are one level further in
         File.WriteAllBytes(path, ClassicMac.Files.Containers.MacBinaryWriter.ToArray(new ClassicMac.Files.MacFile
         {
-            Name = MacString.FromMacRoman("Disk"), DataFork = ClassicMac.Files.ForkData.FromBytes(bad),
+            Name = MacString.FromMacRoman("Disk"),
+            DataFork = ClassicMac.Files.ForkData.FromBytes(bad),
         }));
         var input = (await model.OpenAsync(path))!;
         var disk = Child<ContainerFileNode>(input, "Disk (HFS volume)");

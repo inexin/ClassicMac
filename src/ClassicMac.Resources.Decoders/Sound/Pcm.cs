@@ -17,11 +17,31 @@ namespace ClassicMac.Resources.Decoders.Sound
         {
             // The Sound Manager reads 'raw ' and 'twos' as 8-bit when the header says 8 and as 16-bit otherwise, and 'sowt'
             // always as 16-bit (disassembly of Sound Manager 3.5.1); the headers refuse sizes other than 8 and 16.
-            if (format == Sowt) return 2;
-            if (format == Raw || format == Twos) return sampleSize == 8 ? 1 : 2;
-            if (format == In24) return 3;
-            if (format == In32 || format == Fl32) return 4;
-            if (format == Fl64) return 8;
+            if (format == Sowt)
+            {
+                return 2;
+            }
+
+            if (format == Raw || format == Twos)
+            {
+                return sampleSize == 8 ? 1 : 2;
+            }
+
+            if (format == In24)
+            {
+                return 3;
+            }
+
+            if (format == In32 || format == Fl32)
+            {
+                return 4;
+            }
+
+            if (format == Fl64)
+            {
+                return 8;
+            }
+
             return 0;
         }
 
@@ -32,7 +52,11 @@ namespace ClassicMac.Resources.Decoders.Sound
         public static byte[]? ToWav(SampledSound sound)
         {
             var width = BytesPerSample(sound.Format, sound.SampleSize);
-            if (width == 0) return null;
+            if (width == 0)
+            {
+                return null;
+            }
+
             var data = sound.Data.Span;
             var whole = data.Length / (width * sound.Channels) * width * sound.Channels;
             var output = data[..whole].ToArray();
@@ -40,11 +64,20 @@ namespace ClassicMac.Resources.Decoders.Sound
             if (width == 1)
             {
                 // WAV's 8-bit samples are unsigned, as 'raw ' (offset binary) is; 'twos' and 'sowt' are signed.
-                if (f != Raw) for (var i = 0; i < output.Length; i++) output[i] ^= 0x80;
+                if (f != Raw)
+                {
+                    for (var i = 0; i < output.Length; i++)
+                    {
+                        output[i] ^= 0x80;
+                    }
+                }
             }
             else if (f != Sowt)
             {
-                for (var i = 0; i < output.Length; i += width) output.AsSpan(i, width).Reverse();
+                for (var i = 0; i < output.Length; i += width)
+                {
+                    output.AsSpan(i, width).Reverse();
+                }
             }
             return output;
         }

@@ -1,6 +1,6 @@
 using System;
-using System.IO;
 using System.Buffers.Binary;
+using System.IO;
 namespace ClassicMac.Core
 {
     /// <summary>
@@ -17,7 +17,11 @@ namespace ClassicMac.Core
         /// <summary>Reads a point from the first four bytes of <paramref name="source"/>.</summary>
         public static MacPoint Read(ReadOnlySpan<byte> source)
         {
-            if (source.Length < Length) throw new EndOfStreamException();
+            if (source.Length < Length)
+            {
+                throw new EndOfStreamException();
+            }
+
             return new(BinaryPrimitives.ReadInt16BigEndian(source), BinaryPrimitives.ReadInt16BigEndian(source[2..]));
         }
 
@@ -75,7 +79,11 @@ namespace ClassicMac.Core
         /// <summary>Reads a rectangle from the first eight bytes of <paramref name="source"/>.</summary>
         public static MacRect Read(ReadOnlySpan<byte> source)
         {
-            if (source.Length < Length) throw new EndOfStreamException();
+            if (source.Length < Length)
+            {
+                throw new EndOfStreamException();
+            }
+
             return new(BinaryPrimitives.ReadInt16BigEndian(source), BinaryPrimitives.ReadInt16BigEndian(source[2..]),
                 BinaryPrimitives.ReadInt16BigEndian(source[4..]), BinaryPrimitives.ReadInt16BigEndian(source[6..]));
         }

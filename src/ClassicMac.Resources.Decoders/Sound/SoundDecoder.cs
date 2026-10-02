@@ -21,13 +21,39 @@ namespace ClassicMac.Resources.Decoders.Sound
         // Sound.h's command numbers, for the JSON.
         private static readonly Dictionary<int, string> CommandNames = new()
         {
-            [0] = "nullCmd", [3] = "quietCmd", [4] = "flushCmd", [5] = "reInitCmd", [10] = "waitCmd", [11] = "pauseCmd",
-            [12] = "resumeCmd", [13] = "callBackCmd", [14] = "syncCmd", [24] = "availableCmd", [25] = "versionCmd",
-            [26] = "totalLoadCmd", [27] = "loadCmd", [40] = "freqDurationCmd", [41] = "restCmd", [42] = "freqCmd",
-            [43] = "ampCmd", [44] = "timbreCmd", [45] = "getAmpCmd", [46] = "volumeCmd", [47] = "getVolumeCmd",
-            [60] = "waveTableCmd", [61] = "phaseCmd", [80] = "soundCmd", [81] = "bufferCmd", [82] = "rateCmd",
-            [83] = "continueCmd", [84] = "doubleBufferCmd", [85] = "getRateCmd", [86] = "rateMultiplierCmd",
-            [87] = "getRateMultiplierCmd", [90] = "sizeCmd", [91] = "convertCmd",
+            [0] = "nullCmd",
+            [3] = "quietCmd",
+            [4] = "flushCmd",
+            [5] = "reInitCmd",
+            [10] = "waitCmd",
+            [11] = "pauseCmd",
+            [12] = "resumeCmd",
+            [13] = "callBackCmd",
+            [14] = "syncCmd",
+            [24] = "availableCmd",
+            [25] = "versionCmd",
+            [26] = "totalLoadCmd",
+            [27] = "loadCmd",
+            [40] = "freqDurationCmd",
+            [41] = "restCmd",
+            [42] = "freqCmd",
+            [43] = "ampCmd",
+            [44] = "timbreCmd",
+            [45] = "getAmpCmd",
+            [46] = "volumeCmd",
+            [47] = "getVolumeCmd",
+            [60] = "waveTableCmd",
+            [61] = "phaseCmd",
+            [80] = "soundCmd",
+            [81] = "bufferCmd",
+            [82] = "rateCmd",
+            [83] = "continueCmd",
+            [84] = "doubleBufferCmd",
+            [85] = "getRateCmd",
+            [86] = "rateMultiplierCmd",
+            [87] = "getRateMultiplierCmd",
+            [90] = "sizeCmd",
+            [91] = "convertCmd",
         };
 
         public string Name => "sound.snd";
@@ -41,8 +67,15 @@ namespace ClassicMac.Resources.Decoders.Sound
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
             var resource = SoundResource.Read(input.Data, input.Diagnostics, input.Resource.ToString());
-            if (resource is null) return [];
-            if (resource.Sound is not { } sound) return [new DecodedFile(".json", Json(resource))];
+            if (resource is null)
+            {
+                return [];
+            }
+
+            if (resource.Sound is not { } sound)
+            {
+                return [new DecodedFile(".json", Json(resource))];
+            }
 
             if (SoundCodecs.ToWav(sound) is not { } samples)
             {
@@ -60,7 +93,11 @@ namespace ClassicMac.Resources.Decoders.Sound
         {
             var note = sound.BaseNote; // 0 is note 0: the Sound Manager has no special case
             var loop = sound.LoopEnd > sound.LoopStart && sound.LoopEnd - sound.LoopStart > 2 && sound.LoopEnd <= frames;
-            if (!loop && note == 60) return null;
+            if (!loop && note == 60)
+            {
+                return null;
+            }
+
             return new SamplerInfo(note, loop ? sound.LoopStart : null, loop ? sound.LoopEnd - 1 : 0);
         }
 
@@ -89,8 +126,16 @@ namespace ClassicMac.Resources.Decoders.Sound
             {
                 w.WriteStartObject();
                 w.WriteNumber("command", c.Code);
-                if (CommandNames.TryGetValue(c.Code, out var name)) w.WriteString("name", name);
-                if (c.DataOffset) w.WriteBoolean("dataOffset", true);
+                if (CommandNames.TryGetValue(c.Code, out var name))
+                {
+                    w.WriteString("name", name);
+                }
+
+                if (c.DataOffset)
+                {
+                    w.WriteBoolean("dataOffset", true);
+                }
+
                 w.WriteNumber("param1", c.Param1);
                 w.WriteNumber("param2", c.Param2);
                 w.WriteEndObject();

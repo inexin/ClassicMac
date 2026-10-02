@@ -14,7 +14,11 @@ namespace ClassicMac.Graphics.QuickTime
         public static PictImageDescription? Read(ReadOnlyMemory<byte> block, int p, out int idSize)
         {
             idSize = 0;
-            if (p < 0 || p + 86 > block.Length) return null;
+            if (p < 0 || p + 86 > block.Length)
+            {
+                return null;
+            }
+
             int idStart = p;
             var reader = new ClassicMac.Core.BigEndianReader(block) { Position = p };
             idSize = reader.ReadInt32();
@@ -30,7 +34,10 @@ namespace ClassicMac.Graphics.QuickTime
             int depth = reader.ReadInt16(), clutId = reader.ReadInt16();
             RgbaColor[]? table = StandardColorTables.ForId(clutId);
             if (clutId == 0 && idSize > 86 && reader.Position + 8 <= block.Length)
+            {
                 table = ReadColorTable(block, reader.Position, idStart + idSize);
+            }
+
             table ??= StandardColorTables.ForDepth(depth);
             return new PictImageDescription(codec, width, height, depth, clutId, hRes, vRes, name) { ColorTable = table };
         }
@@ -40,15 +47,22 @@ namespace ClassicMac.Graphics.QuickTime
         {
             var reader = new ClassicMac.Core.BigEndianReader(block);
             int size = reader.ReadUInt16At(p + 6) + 1;
-            if (size <= 0 || size > 256) return null;
+            if (size <= 0 || size > 256)
+            {
+                return null;
+            }
+
             var table = new RgbaColor[size];
             reader.Position = p + 8;
             for (int i = 0; i < size && reader.Position + 8 <= Math.Min(end, block.Length); i++)
             {
                 reader.ReadUInt16();
-                byte red = reader.ReadByte(); reader.ReadByte();
-                byte green = reader.ReadByte(); reader.ReadByte();
-                byte blue = reader.ReadByte(); reader.ReadByte();
+                byte red = reader.ReadByte();
+                reader.ReadByte();
+                byte green = reader.ReadByte();
+                reader.ReadByte();
+                byte blue = reader.ReadByte();
+                reader.ReadByte();
                 table[i] = new RgbaColor(red, green, blue);
             }
             return table;

@@ -5,11 +5,11 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using ClassicMac.Core;
-using ClassicMac.Resources.Decoders.Text;
-using ClassicMac.Resources.Export;
 using ClassicMac.Graphics;
 using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Resources.Decoders.Text;
+using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Decoders.Images
 {
@@ -138,10 +138,17 @@ namespace ClassicMac.Resources.Decoders.Images
             var files = new List<DecodedFile>();
             foreach (var type in Order)
             {
-                if (family.Masked(type) is not { } image) continue;
+                if (family.Masked(type) is not { } image)
+                {
+                    continue;
+                }
+
                 if (family.MaskFor(image.Height) is null && files.Count == 0)
+                {
                     input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Info, "image.no-mask",
                         $"{input.Resource}: the family has no mask; its images are drawn opaque."));
+                }
+
                 files.Add(Image(image, "." + type.TrimEnd('#')));
             }
             return files;
@@ -172,7 +179,11 @@ namespace ClassicMac.Resources.Decoders.Images
                 for (var y = 0; y < height; y++)
                 {
                     var row = new StringBuilder(width);
-                    for (var x = 0; x < width; x++) row.Append(y * width + x < cursor.Inverted.Length && cursor.Inverted[y * width + x] ? '1' : '0');
+                    for (var x = 0; x < width; x++)
+                    {
+                        row.Append(y * width + x < cursor.Inverted.Length && cursor.Inverted[y * width + x] ? '1' : '0');
+                    }
+
                     w.WriteStringValue(row.ToString());
                 }
                 w.WriteEndArray();
@@ -180,7 +191,10 @@ namespace ClassicMac.Resources.Decoders.Images
                 {
                     w.WriteStartArray("xor");
                     for (var y = 0; y < height; y++)
+                    {
                         w.WriteStringValue(string.Join(" ", cursor.Xor.Skip(y * width).Take(width).Select(v => v.ToString("X6", CultureInfo.InvariantCulture))));
+                    }
+
                     w.WriteEndArray();
                 }
                 w.WriteEndObject();

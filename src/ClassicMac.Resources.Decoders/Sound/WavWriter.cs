@@ -83,7 +83,11 @@ namespace ClassicMac.Resources.Decoders.Sound
             w.Write("data"u8);
             w.Write((uint)samples.Length);
             w.Write(samples);
-            if (samples.Length % 2 != 0) w.Write((byte)0);
+            if (samples.Length % 2 != 0)
+            {
+                w.Write((byte)0);
+            }
+
             w.Flush();
 
             var bytes = stream.ToArray();

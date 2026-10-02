@@ -234,7 +234,10 @@ namespace ClassicMac.Core
         private Span<byte> Append(int count)
         {
             if (buffer.Length - length < count)
+            {
                 Array.Resize(ref buffer, (int)Math.Min(Array.MaxLength, Math.Max((long)length + count, Math.Max(256, 2L * buffer.Length))));
+            }
+
             var span = buffer.AsSpan(length, count);
             length += count;
             return span;
@@ -243,7 +246,11 @@ namespace ClassicMac.Core
         private Span<byte> At(int offset, int count)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(offset);
-            if (offset > length - count) throw new ArgumentOutOfRangeException(nameof(offset), "Only bytes already written can be overwritten.");
+            if (offset > length - count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset), "Only bytes already written can be overwritten.");
+            }
+
             return buffer.AsSpan(offset, count);
         }
     }

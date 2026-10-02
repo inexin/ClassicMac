@@ -56,8 +56,15 @@ namespace ClassicMac.Resources.Compression
         public void WriteByte(byte value)
         {
             if (Written >= memory.Length)
+            {
                 throw new DecompressionOverrunException("The decompressor wrote past the memory after its block.");
-            if (Written >= blockLength && context is not null) context.WrotePastBlock = true;
+            }
+
+            if (Written >= blockLength && context is not null)
+            {
+                context.WrotePastBlock = true;
+            }
+
             memory[Written++] = value;
         }
 
@@ -76,22 +83,39 @@ namespace ClassicMac.Resources.Compression
         // Copies bytes from the source, one at a time, as the Mac's loops do.
         public void CopyLiteral(int count)
         {
-            for (var i = 0; i < count; i++) WriteByte(ReadByte());
+            for (var i = 0; i < count; i++)
+            {
+                WriteByte(ReadByte());
+            }
         }
 
         // Copies from earlier output, forward and a byte at a time, so an offset shorter than the length repeats the
         // pattern. An offset beyond the output would read the memory before the block on the Mac; we stop.
         public void CopyBack(int offset, int count)
         {
-            if (offset <= 0 || offset > Written) throw new DecompressionOverrunException("A back-reference points before the output.");
-            for (var i = 0; i < count; i++) WriteByte(memory[Written - offset]);
+            if (offset <= 0 || offset > Written)
+            {
+                throw new DecompressionOverrunException("A back-reference points before the output.");
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                WriteByte(memory[Written - offset]);
+            }
         }
 
         private byte Peek(long at)
         {
             if (at >= memory.Length)
+            {
                 throw new DecompressionOverrunException("The decompressor read past the memory after its input.");
-            if (at >= blockLength && context is not null) context.ReadPastInput = true;
+            }
+
+            if (at >= blockLength && context is not null)
+            {
+                context.ReadPastInput = true;
+            }
+
             return memory[at];
         }
     }

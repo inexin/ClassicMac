@@ -71,13 +71,29 @@ namespace ClassicMac.Code.M68k
             int nameLength = reader.ReadByte();
             bool standard = true;
             string name = "";
-            if (nameLength > reader.Remaining) standard = false;
-            else name = MacRoman.Decode(reader.ReadBytes(nameLength));
+            if (nameLength > reader.Remaining)
+            {
+                standard = false;
+            }
+            else
+            {
+                name = MacRoman.Decode(reader.ReadBytes(nameLength));
+            }
+
             foreach (var offset in (ReadOnlySpan<ushort>)[open, prime, control, status, close])
-                if (offset >= reader.Length) standard = false;
+            {
+                if (offset >= reader.Length)
+                {
+                    standard = false;
+                }
+            }
+
             if (!standard)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.drvr-nonstandard",
                     "The 'DRVR' is not a standard driver: its routine offsets or name fall outside the resource."));
+            }
+
             return new DriverHeader(flags, delay, eventMask, menu, open, prime, control, status, close, name, standard);
         }
     }

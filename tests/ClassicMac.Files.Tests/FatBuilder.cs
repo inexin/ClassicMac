@@ -30,7 +30,10 @@ internal sealed class FatBuilder
         var clusters = totalSectors; // an upper bound, enough to size the FAT
         fatSectors = (int)Math.Ceiling((clusters + 2) * (bits == 12 ? 1.5 : bits / 8.0) / Sector);
         next = 2;
-        if (bits == 32) directoryClusters[""] = Allocate(new byte[Sector * 4], fragmented: false); // the root folder
+        if (bits == 32)
+        {
+            directoryClusters[""] = Allocate(new byte[Sector * 4], fragmented: false); // the root folder
+        }
     }
 
     public static readonly DateTime DefaultTime = new(2020, 1, 2, 3, 4, 6);
@@ -63,7 +66,10 @@ internal sealed class FatBuilder
         {
             for (var i = 0; i < entries.Count; i++)
             {
-                if (pending.TryGetValue(entries[i], out var folder)) SetCluster(entries[i], directoryClusters[folder]);
+                if (pending.TryGetValue(entries[i], out var folder))
+                {
+                    SetCluster(entries[i], directoryClusters[folder]);
+                }
             }
             if (path.Length > 0)
             {
@@ -83,15 +89,26 @@ internal sealed class FatBuilder
         BinaryPrimitives.WriteUInt16LittleEndian(boot[14..], (ushort)reserved);
         boot[16] = 2;
         BinaryPrimitives.WriteUInt16LittleEndian(boot[17..], (ushort)rootEntries);
-        if (totalSectors < 0x10000) BinaryPrimitives.WriteUInt16LittleEndian(boot[19..], (ushort)totalSectors);
-        else BinaryPrimitives.WriteUInt32LittleEndian(boot[32..], (uint)totalSectors);
+        if (totalSectors < 0x10000)
+        {
+            BinaryPrimitives.WriteUInt16LittleEndian(boot[19..], (ushort)totalSectors);
+        }
+        else
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(boot[32..], (uint)totalSectors);
+        }
+
         boot[21] = 0xF0;
         if (bits == 32)
         {
             BinaryPrimitives.WriteUInt32LittleEndian(boot[36..], (uint)fatSectors);
             BinaryPrimitives.WriteUInt32LittleEndian(boot[44..], directoryClusters[""]);
         }
-        else BinaryPrimitives.WriteUInt16LittleEndian(boot[22..], (ushort)fatSectors);
+        else
+        {
+            BinaryPrimitives.WriteUInt16LittleEndian(boot[22..], (ushort)fatSectors);
+        }
+
         boot[510] = 0x55;
         boot[511] = 0xAA;
 
@@ -124,19 +141,35 @@ internal sealed class FatBuilder
         }
         Set(0, bits == 12 ? 0xFF0u : bits == 16 ? 0xFFF0u : 0x0FFFFFF0u);
         Set(1, bits == 12 ? 0xFFFu : bits == 16 ? 0xFFFFu : 0x0FFFFFFFu);
-        foreach (var (cluster, value) in fat) Set(cluster, value == uint.MaxValue ? (bits == 12 ? 0xFFFu : bits == 16 ? 0xFFFFu : 0x0FFFFFFFu) : value);
-        for (var copy = 0; copy < 2; copy++) table.CopyTo(image, (reserved + copy * fatSectors) * Sector);
+        foreach (var (cluster, value) in fat)
+        {
+            Set(cluster, value == uint.MaxValue ? (bits == 12 ? 0xFFFu : bits == 16 ? 0xFFFFu : 0x0FFFFFFFu) : value);
+        }
+
+        for (var copy = 0; copy < 2; copy++)
+        {
+            table.CopyTo(image, (reserved + copy * fatSectors) * Sector);
+        }
 
         var rootOffset = (reserved + 2 * fatSectors) * Sector;
         var dataOffset = rootOffset + rootEntries * 32;
-        foreach (var (cluster, data) in clusterData) data.CopyTo(image, dataOffset + (cluster - 2) * Sector);
+        foreach (var (cluster, data) in clusterData)
+        {
+            data.CopyTo(image, dataOffset + (cluster - 2) * Sector);
+        }
 
         // Directory contents.
         foreach (var (path, entries) in directories)
         {
             var bytes = entries.SelectMany(e => e).ToArray();
-            if (path.Length == 0 && bits != 32) bytes.CopyTo(image, rootOffset);
-            else bytes.CopyTo(image, dataOffset + (directoryClusters[path] - 2) * Sector);
+            if (path.Length == 0 && bits != 32)
+            {
+                bytes.CopyTo(image, rootOffset);
+            }
+            else
+            {
+                bytes.CopyTo(image, dataOffset + (directoryClusters[path] - 2) * Sector);
+            }
         }
         return image;
     }
@@ -172,9 +205,17 @@ internal sealed class FatBuilder
         if (longName is not null)
         {
             byte sum = 0;
-            foreach (var b in name) sum = (byte)(((sum & 1) << 7) + (sum >> 1) + b);
+            foreach (var b in name)
+            {
+                sum = (byte)(((sum & 1) << 7) + (sum >> 1) + b);
+            }
+
             var chars = longName.ToCharArray().Append('\0').ToList();
-            while (chars.Count % 13 != 0) chars.Add('￿');
+            while (chars.Count % 13 != 0)
+            {
+                chars.Add('￿');
+            }
+
             var parts = chars.Count / 13;
             for (var p = parts; p >= 1; p--)
             {
@@ -183,12 +224,20 @@ internal sealed class FatBuilder
                 e[11] = 0x0F;
                 e[13] = sum;
                 var slots = new[] { 1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30 };
-                for (var i = 0; i < 13; i++) BinaryPrimitives.WriteUInt16LittleEndian(e.AsSpan(slots[i]), chars[(p - 1) * 13 + i]);
+                for (var i = 0; i < 13; i++)
+                {
+                    BinaryPrimitives.WriteUInt16LittleEndian(e.AsSpan(slots[i]), chars[(p - 1) * 13 + i]);
+                }
+
                 entries.Add(e);
             }
         }
         var entry = Entry(name, attributes, cluster, size, created, modified);
-        if (pendingFolder is not null) pending[entry] = pendingFolder;
+        if (pendingFolder is not null)
+        {
+            pending[entry] = pendingFolder;
+        }
+
         entries.Add(entry);
         return entries;
     }
@@ -212,7 +261,10 @@ internal sealed class FatBuilder
     private void SetCluster(byte[] e, uint cluster)
     {
         BinaryPrimitives.WriteUInt16LittleEndian(e.AsSpan(26), (ushort)cluster);
-        if (bits == 32) BinaryPrimitives.WriteUInt16LittleEndian(e.AsSpan(20), (ushort)(cluster >> 16));
+        if (bits == 32)
+        {
+            BinaryPrimitives.WriteUInt16LittleEndian(e.AsSpan(20), (ushort)(cluster >> 16));
+        }
     }
 
     private static (ushort Time, ushort Date) Dos(DateTime t) =>

@@ -42,7 +42,11 @@ namespace ClassicMac.Files.Hfs
         public bool CanRead(MacFile file)
         {
             ArgumentNullException.ThrowIfNull(file);
-            if (!Header.TryRead(file.DataFork, out var header)) return false;
+            if (!Header.TryRead(file.DataFork, out var header))
+            {
+                return false;
+            }
+
             var typed = file.FinderInfo.Creator == Creator || file.FinderInfo.Type.ToString().StartsWith("DMd", StringComparison.Ordinal);
             return header.Total == file.DataFork.Length || (typed && header.Total <= file.DataFork.Length);
         }
@@ -56,7 +60,11 @@ namespace ClassicMac.Files.Hfs
         {
             ArgumentNullException.ThrowIfNull(file);
             ArgumentNullException.ThrowIfNull(context);
-            if (!Header.TryRead(file.DataFork, out var header)) throw new InvalidDataException("Not a DART image.");
+            if (!Header.TryRead(file.DataFork, out var header))
+            {
+                throw new InvalidDataException("Not a DART image.");
+            }
+
             var raw = file.DataFork.ToArray(context.Options.MaxExpandedBytesPerInput);
 
             var blocks = header.Kilobytes * 2 / BlockSectors;
@@ -73,18 +81,25 @@ namespace ClassicMac.Files.Hfs
                 var source = raw.AsMemory(at, bytes);
                 at += bytes;
                 Array.Clear(block);
-                if (stored) source.Span.CopyTo(block);
+                if (stored)
+                {
+                    source.Span.CopyTo(block);
+                }
                 else if (header.Compression == Rle)
                 {
                     if (!DartRle.Decompress(source, block, out var written))
+                    {
                         Report(context, $"RLE block {i} decodes to {written} of its {BlockLength} bytes; the rest reads as zeros.");
+                    }
                 }
                 else
                 {
                     // DART's own files can end a block a byte short (a tag byte): zeros, as Disk Copy leaves them.
                     var written = lzh.Decode(source.Span, block);
                     if (written < DataPerBlock)
+                    {
                         Report(context, $"LZH block {i} decodes to {written} of its {BlockLength} bytes; the rest reads as zeros.");
+                    }
                 }
                 block.AsSpan(0, DataPerBlock).CopyTo(data.AsSpan(i * DataPerBlock));
                 block.AsSpan(DataPerBlock, TagsPerBlock).CopyTo(tags.AsSpan(i * TagsPerBlock));
@@ -102,7 +117,11 @@ namespace ClassicMac.Files.Hfs
         // which skips the first 12 bytes).
         private static void CheckSums(MacFile file, byte[] data, byte[] tags, ContainerContext context)
         {
-            if (file.ResourceFork.Length == 0) return;
+            if (file.ResourceFork.Length == 0)
+            {
+                return;
+            }
+
             ResourceFork fork;
             try
             {
@@ -114,7 +133,11 @@ namespace ClassicMac.Files.Hfs
             }
             foreach (var (id, bytes, what) in new[] { ((short)2, data, "data"), ((short)1, tags, "tag") })
             {
-                if (fork.Find(Cksm, id)?.GetData() is not { Length: >= 4 } stored) continue;
+                if (fork.Find(Cksm, id)?.GetData() is not { Length: >= 4 } stored)
+                {
+                    continue;
+                }
+
                 var expected = new BigEndianReader(stored).ReadUInt32At(0);
                 var sum = DiskCopy42Reader.Sum(bytes);
                 if (sum != expected)
@@ -132,27 +155,56 @@ namespace ClassicMac.Files.Hfs
             {
                 header = null!;
                 var start = input.ReadPrefix(4 + 72 * 2);
-                if (start.Length < 4) return false;
+                if (start.Length < 4)
+                {
+                    return false;
+                }
+
                 var reader = new BigEndianReader(start);
                 var compression = start[0];
                 int kilobytes = reader.ReadUInt16At(2);
-                if (compression > Stored || kilobytes is not (400 or 720 or 800 or 1440)) return false;
+                if (compression > Stored || kilobytes is not (400 or 720 or 800 or 1440))
+                {
+                    return false;
+                }
+
                 var count = kilobytes == 1440 ? 72 : 40;
                 var length = 4 + count * 2;
-                if (start.Length < length) return false;
+                if (start.Length < length)
+                {
+                    return false;
+                }
+
                 var blocks = kilobytes * 2 / BlockSectors;
                 var lengths = new short[count];
                 long total = length;
                 for (var i = 0; i < count; i++)
                 {
                     lengths[i] = reader.ReadInt16At(4 + i * 2);
-                    if (i >= blocks) continue;
+                    if (i >= blocks)
+                    {
+                        continue;
+                    }
+
                     var l = lengths[i];
-                    if (compression == Stored || l == -1) total += BlockLength;
-                    else if (l <= 0 || l > BlockLength) return false; // Disk Copy's limit, on the value as stored
-                    else total += compression == Rle ? l * 2 : l;
+                    if (compression == Stored || l == -1)
+                    {
+                        total += BlockLength;
+                    }
+                    else if (l <= 0 || l > BlockLength)
+                    {
+                        return false; // Disk Copy's limit, on the value as stored
+                    }
+                    else
+                    {
+                        total += compression == Rle ? l * 2 : l;
+                    }
                 }
-                if (total > input.Length) return false;
+                if (total > input.Length)
+                {
+                    return false;
+                }
+
                 header = new Header(compression, start[1], kilobytes, lengths, length, total);
                 return true;
             }

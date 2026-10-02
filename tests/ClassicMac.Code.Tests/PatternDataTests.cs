@@ -25,7 +25,10 @@ public class PatternDataTests
         var d = Assert.Single(diagnostics);
         Assert.Equal(code, d.Code);
         Assert.Equal(DiagnosticSeverity.Error, d.Severity);
-        if (partial is not null) Assert.Equal(partial, image);
+        if (partial is not null)
+        {
+            Assert.Equal(partial, image);
+        }
     }
 
     [Fact]

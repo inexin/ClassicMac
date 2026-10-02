@@ -46,7 +46,10 @@ namespace ClassicMac.Resources.Cli
                 var diagnostics = new List<Diagnostic>();
                 var files = CodeExport.Disassemble(entry.Fork!, () => file.DataFork.ToArray(readOptions.MaxResourceSize), cpu, readOptions, diagnostics);
                 reporter.Write(Input.Source(input, file), diagnostics);
-                if (files.Count > 0) listed.Add((entry, files));
+                if (files.Count > 0)
+                {
+                    listed.Add((entry, files));
+                }
             }
             if (listed.Count == 0)
             {
@@ -63,7 +66,11 @@ namespace ClassicMac.Resources.Cli
             }
             var layout = new OutputLayout(name => HostNames.ToHostName(name));
             var folders = new Dictionary<ContainerNode, List<string>>(ReferenceEqualityComparer.Instance);
-            foreach (var (leaf, place) in layout.Place(opened.Root)) folders[leaf] = place;
+            foreach (var (leaf, place) in layout.Place(opened.Root))
+            {
+                folders[leaf] = place;
+            }
+
             int listings = 0;
             try
             {
@@ -78,7 +85,10 @@ namespace ClassicMac.Resources.Cli
                     var target = Path.Combine([root, .. parts]);
                     Directory.CreateDirectory(target);
                     foreach (var file in files)
+                    {
                         File.WriteAllBytes(Path.Combine(target, file.Name), file.Content.ToArray());
+                    }
+
                     listings += files.Count(f => f.Name.EndsWith(".s", StringComparison.Ordinal));
                 }
             }

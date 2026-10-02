@@ -62,7 +62,10 @@ public sealed class CodeListing
     {
         ArgumentNullException.ThrowIfNull(application);
         if (segmentId is < short.MinValue or > short.MaxValue || application.FindSegment((short)segmentId) is not { } segment)
+        {
             throw new ArgumentException($"The application has no 'CODE' {segmentId}.", nameof(segmentId));
+        }
+
         short id = segment.Id;
         var w = new ListingWriter(24);
         string title = $"'CODE' {id}" + (segment.Name is { } n ? $" \"{n}\"" : "") + ": 68k segment, "
@@ -72,38 +75,70 @@ public sealed class CodeListing
         w.Header(title);
         w.Header("Model: " + ModelText(application.Model));
         if (application.Entry is { } entry)
+        {
             w.Header($"Entry: CODE {entry.Segment}:+${entry.ResourceOffset:X}");
+        }
+
         if (application.OriginalEntry is { } original)
+        {
             w.Header($"Original entry: CODE {original.Segment}:+${original.ResourceOffset:X}");
+        }
+
         if (application.HasPowerPCFragment)
+        {
             w.Header("Also PowerPC code: 'cfrg' 0");
+        }
+
         var own = application.JumpTable.Where(e => e.ResourceOffset is not null && e.Segment == id).ToList();
         if (own.Count > 0)
+        {
             w.Header($"Jump-table entries: {own.Count}");
+        }
+
         var context = M68kContext.ForApplication(application, id);
         if (context.Relocations.Count > 0)
+        {
             w.Header($"Relocations: {context.Relocations.Count}");
+        }
+
         w.EndHeader();
         if (!segment.IsReadable)
+        {
             return w.Finish([], [], [], []);
+        }
 
         var data = segment.Data;
         int start = segment.Header?.Length ?? data.Length;
         var entries = new List<M68kEntry>();
         if (application.Entry is { } e0 && e0.Segment == id)
+        {
             entries.Add(new M68kEntry(Offset(e0.ResourceOffset), "entry", CodeFunctionSource.Entry));
+        }
+
         if (application.OriginalEntry is { } e1 && e1.Segment == id)
+        {
             entries.Add(new M68kEntry(Offset(e1.ResourceOffset), "original_entry", CodeFunctionSource.Entry));
+        }
+
         foreach (var jt in own)
+        {
             entries.Add(new M68kEntry(Offset(jt.ResourceOffset!.Value), "JT" + jt.Index.ToString(CultureInfo.InvariantCulture),
                 CodeFunctionSource.JumpTable));
+        }
+
         entries.Add(new M68kEntry(start, null, CodeFunctionSource.Entry));
 
         var regions = new List<M68kDataRegion> { new(0, start, M68kDataKind.Header, "segment header") };
         if (segment.Header is { IsFar: true } far)
+        {
             regions.AddRange(FarLists(data, far));
+        }
+
         if (application.A5InitSegment == id && application.A5Init is { } init && init.HeaderOffset < data.Length)
+        {
             regions.Add(new M68kDataRegion(init.HeaderOffset, data.Length - init.HeaderOffset, M68kDataKind.Initializer));
+        }
+
         var selfRelocated = context.Relocations.Where(r => r.Value.Base == M68kRelocationBase.Segment && r.Value.Segment == id)
             .Select(r => (int)r.Key).ToHashSet();
         var map = M68kCodeMap.Build(data, start, entries, regions, selfRelocated);
@@ -122,7 +157,9 @@ public sealed class CodeListing
         var diagnostics = new List<Diagnostic>();
         string title = $"'{type}' {id}";
         if (fork?.Find(type, id)?.Name is { } resourceName)
+        {
             title += $" \"{resourceName.ToMacRoman()}\"";
+        }
 
         if (type == CodeType && id == 0)
         {
@@ -179,8 +216,11 @@ public sealed class CodeListing
         int count = pef.Sections.Count;
         w.Header((title is null ? "" : title + ": ") + $"{kind} ('{arch}'), {count} section{(count == 1 ? "" : "s")}");
         foreach (var section in pef.Sections)
+        {
             w.Header($"Section {section.Index}: {section.Kind}, 0x{(section.IsInstantiable ? section.TotalLength : section.ContainerLength):X} bytes"
                 + (section.Name is { } sn ? $" \"{sn}\"" : ""));
+        }
+
         if (arch != PowerPC)
         {
             w.Header("Not PowerPC code: not disassembled");
@@ -194,19 +234,34 @@ public sealed class CodeListing
             foreach (var (label, point) in new[] { ("Main", loader.Main), ("Init", loader.Init), ("Term", loader.Term) })
             {
                 if (point is not { } p)
+                {
                     continue;
+                }
+
                 string text = $"{label}: {p}";
                 if (pef.GetTransitionVector(p, diagnostics) is { CodeSection: >= 0 } tv)
+                {
                     text += $" -> {tv.CodeSection}:0x{tv.CodeOffset:X}";
+                }
+
                 w.Header(text);
             }
         }
         if (map.TocSection is int toc)
+        {
             w.Header($"TOC base: {toc}:0x{map.TocBase:X}");
+        }
+
         if (pef.Loader is { } l && (l.ImportedSymbols.Count > 0 || l.ImportedLibraries.Count > 0))
+        {
             w.Header($"Imports: {l.ImportedSymbols.Count} from {l.ImportedLibraries.Count} librar{(l.ImportedLibraries.Count == 1 ? "y" : "ies")}");
+        }
+
         if (pef.Loader is { Exports.Count: > 0 } x)
+        {
             w.Header($"Exports: {x.Exports.Count}");
+        }
+
         w.EndHeader();
 
         var references = new List<CodeReference>();
@@ -218,7 +273,10 @@ public sealed class CodeListing
             for (int at = 0; at < image.Length;)
             {
                 if (map.Functions.TryGetValue((section, (uint)at), out var function))
+                {
                     w.Label(function.Name);
+                }
+
                 if (tables.TryGetValue(at, out var table))
                 {
                     int end = (int)Math.Min(image.Length, (table.Offset + (long)table.Length + 3) & ~3L);
@@ -244,8 +302,10 @@ public sealed class CodeListing
             w.Blank();
             w.Comment("Transition vectors");
             foreach (var t in map.TransitionVectors)
+            {
                 w.Line($"{t.Section}:{t.Offset:X8}", $"{t.CodeOffset:X8} {t.TocOffset:X8}", $"dc.l ${t.CodeOffset:X8},${t.TocOffset:X8}",
                     (t.Label is null ? "" : t.Label + ": ") + $"code {t.CodeSection}:0x{t.CodeOffset:X}, TOC {t.TocSection}:0x{t.TocOffset:X}");
+            }
         }
         return w.Finish(map.Functions.Values.ToList(), references, diagnostics, []);
     }
@@ -264,8 +324,12 @@ public sealed class CodeListing
         {
             regions.AddRange(FarLists(data, far));
             if (far.A5RelocationOffset != 0)
+            {
                 foreach (long at in FarRelocations.Read(data, far.A5RelocationOffset, diagnostics))
+                {
                     relocations[at] = new M68kRelocation(M68kRelocationBase.A5, 0);
+                }
+            }
         }
         var map = M68kCodeMap.Build(data, start, [new M68kEntry(start, "entry", CodeFunctionSource.Entry)], regions);
         var references = WriteBody(w, map, new M68kContext { Relocations = relocations });
@@ -292,8 +356,13 @@ public sealed class CodeListing
                 (driver.Open, "Open"), (driver.Prime, "Prime"), (driver.Control, "Control"), (driver.Status, "Status"),
                 (driver.Close, "Close"),
             })
+            {
                 if (offset >= end)
+                {
                     entries.Add(new M68kEntry(offset, name, CodeFunctionSource.DriverRoutine));
+                }
+            }
+
             entersAtStart = false;
         }
         else if (PackageHeader.Read(data, diagnostics) is { } package)
@@ -302,10 +371,15 @@ public sealed class CodeListing
             int end = Math.Min(data.Length, PackageHeader.TableOffset + 2 * package.Entries.Count);
             regions.Add(new M68kDataRegion(0, end, M68kDataKind.Header, "package header"));
             foreach (var entry in package.Entries)
+            {
                 if (entry.TargetOffset is { } target && target >= end && target < data.Length)
+                {
                     entries.Add(new M68kEntry((int)target,
                         "selector_" + (entry.Selector < 0 ? "m" : "") + Math.Abs(entry.Selector).ToString(CultureInfo.InvariantCulture),
                         CodeFunctionSource.PackageRoutine));
+                }
+            }
+
             entersAtStart = false;
         }
         else if (CodeResourceHeader.Read(data, type, diagnostics) is { } header)
@@ -318,7 +392,9 @@ public sealed class CodeListing
             entersAtStart = false;
         }
         if (entersAtStart)
+        {
             entries.Add(new M68kEntry(0, "entry", CodeFunctionSource.Entry));
+        }
 
         if (RoutineDescriptor.Find(data) is int at && RoutineDescriptor.Read(data, diagnostics) is { } descriptor)
         {
@@ -329,7 +405,10 @@ public sealed class CodeListing
             {
                 var routine = descriptor.Routines[i];
                 if (routine is not { TargetOffset: long target, Pef: { } pef } || target < 0 || target >= data.Length)
+                {
                     continue;
+                }
+
                 int length = (int)Math.Min(data.Length - target, pef.Data.Length);
                 regions.Add(new M68kDataRegion((int)target, length, M68kDataKind.Fragment, $"routine {i}"));
                 fragments.Add(ForFragment(pef, $"{title} routine {i}", diagnostics));
@@ -339,15 +418,22 @@ public sealed class CodeListing
         var map = M68kCodeMap.Build(data, 0, entries, regions);
         var references = WriteBody(w, map, new M68kContext());
         foreach (var fragment in fragments)
+        {
             w.Append("\n" + fragment.Text);
+        }
+
         return w.Finish(map.Functions.Values.ToList(), references, diagnostics, fragments);
     }
 
     private static IEnumerable<M68kDataRegion> FarLists(ReadOnlyMemory<byte> data, SegmentHeader far)
     {
         foreach (uint list in new[] { far.A5RelocationOffset, far.PcRelocationOffset })
+        {
             if (list != 0 && FarRelocations.ListLength(data, list) is int length and > 0)
+            {
                 yield return new M68kDataRegion((int)list, length, M68kDataKind.Relocations);
+            }
+        }
     }
 
     private static int Offset(long resourceOffset) => (int)Math.Clamp(resourceOffset, -1, int.MaxValue);
@@ -370,14 +456,23 @@ public sealed class CodeListing
         foreach (var (offset, ins) in map.Instructions)
         {
             for (; d < map.Data.Count && map.Data[d].Offset < offset; d++)
+            {
                 w.M68kData(span, map.Data[d]);
+            }
+
             if (map.Functions.TryGetValue(offset, out var function))
+            {
                 w.Label(function.Name);
+            }
+
             var refs = M68kAnnotator.Annotate(ins, map, context);
             references.AddRange(refs);
             var notes = new List<string>();
             if (ins.Comment is { } comment)
+            {
                 notes.Add(comment);
+            }
+
             notes.AddRange(refs.Where(r => r.Kind != CodeReferenceKind.Trap).Select(r => r.Text));
             string text = ins.Comment is null ? ins.Text : ins.Text[..^(ins.Comment.Length + 4)];
             w.Line(offset.ToString("X8", CultureInfo.InvariantCulture),
@@ -385,7 +480,10 @@ public sealed class CodeListing
                 notes.Count == 0 ? null : string.Join("; ", notes));
         }
         for (; d < map.Data.Count; d++)
+        {
             w.M68kData(span, map.Data[d]);
+        }
+
         return references;
     }
 
@@ -413,7 +511,10 @@ public sealed class CodeListing
         public void Label(string name)
         {
             if (body)
+            {
                 sb.Append('\n');
+            }
+
             sb.Append(name).Append(":\n");
             body = true;
         }
@@ -422,7 +523,10 @@ public sealed class CodeListing
         {
             sb.Append(address).Append("  ").Append(hex.PadRight(hexWidth)).Append("  ").Append(text);
             if (note is not null)
+            {
                 sb.Append("  ; ").Append(note);
+            }
+
             sb.Append('\n');
             body = true;
         }
@@ -451,7 +555,10 @@ public sealed class CodeListing
             {
                 int n = (at & 1) != 0 ? 1 : Math.Min(BytesPerLine, region.End - at);
                 if (n > 1)
+                {
                     n &= ~1;
+                }
+
                 var bytes = code.Slice(at, n);
                 string hex, text;
                 if (n == 1)
@@ -463,7 +570,10 @@ public sealed class CodeListing
                 {
                     var words = new List<string>();
                     for (int i = 0; i < n; i += 2)
+                    {
                         words.Add(((bytes[i] << 8) | bytes[i + 1]).ToString("X4", CultureInfo.InvariantCulture));
+                    }
+
                     hex = string.Join(" ", words);
                     text = "dc.w $" + string.Join(",$", words);
                 }
@@ -483,7 +593,10 @@ public sealed class CodeListing
                 {
                     var words = new List<string>();
                     for (; words.Count < WordsPerLine && bytes.Length - i >= 4; i += 4)
+                    {
                         words.Add(((uint)(bytes[i] << 24 | bytes[i + 1] << 16 | bytes[i + 2] << 8 | bytes[i + 3])).ToString("X8", CultureInfo.InvariantCulture));
+                    }
+
                     Line(address, string.Join(" ", words), "dc.l $" + string.Join(",$", words), note);
                 }
                 else
@@ -504,7 +617,10 @@ public sealed class CodeListing
         {
             var chars = new char[bytes.Length];
             for (int i = 0; i < bytes.Length; i++)
+            {
                 chars[i] = bytes[i] is >= 0x20 and <= 0x7E ? (char)bytes[i] : '.';
+            }
+
             return new string(chars);
         }
     }

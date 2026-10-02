@@ -1,7 +1,7 @@
 using System;
-using System.Threading.Tasks;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
@@ -40,10 +40,18 @@ namespace ClassicMac.App.ViewModels
         // A list whose items' and own changes count as edits.
         protected void Watch<T>(ObservableCollection<T> list) where T : System.ComponentModel.INotifyPropertyChanged
         {
-            foreach (var item in list) item.PropertyChanged += (_, _) => RaiseEdited();
+            foreach (var item in list)
+            {
+                item.PropertyChanged += (_, _) => RaiseEdited();
+            }
+
             list.CollectionChanged += (_, e) =>
             {
-                foreach (var item in e.NewItems?.OfType<T>() ?? []) item.PropertyChanged += (_, _) => RaiseEdited();
+                foreach (var item in e.NewItems?.OfType<T>() ?? [])
+                {
+                    item.PropertyChanged += (_, _) => RaiseEdited();
+                }
+
                 RaiseEdited();
             };
         }
@@ -126,7 +134,11 @@ namespace ClassicMac.App.ViewModels
     {
         public StringListForm(Resource resource, System.Collections.Generic.IReadOnlyList<string> strings) : base(resource)
         {
-            foreach (var s in strings) Strings.Add(new StringItem(s));
+            foreach (var s in strings)
+            {
+                Strings.Add(new StringItem(s));
+            }
+
             Watch(Strings);
         }
 
@@ -142,7 +154,10 @@ namespace ClassicMac.App.ViewModels
         private void MoveUp(StringItem item)
         {
             var i = Strings.IndexOf(item);
-            if (i > 0) Strings.Move(i, i - 1);
+            if (i > 0)
+            {
+                Strings.Move(i, i - 1);
+            }
         }
 
         public override byte[] BuildData() => TextResources.WriteStringList(Strings.Select(s => s.Text).ToList());
@@ -220,7 +235,11 @@ namespace ClassicMac.App.ViewModels
             var form = UseTemplate ? template ?? typed : typed ?? template;
             form?.MarkClean();
             // A draft can be saved (Save applies it first): Save's state follows the form's values.
-            if (form is not null) form.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
+            if (form is not null)
+            {
+                form.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
+            }
+
             Form = form;
             WatchForm(Form, node as ResourceNode);
         }
@@ -236,12 +255,23 @@ namespace ClassicMac.App.ViewModels
             get => useTemplate;
             set
             {
-                if (useTemplate == value) return;
+                if (useTemplate == value)
+                {
+                    return;
+                }
+
                 if (askingDraft || HasDraft)
                 {
-                    if (!askingDraft) DraftTask = UseTemplateAfterDraftAsync(value);
+                    if (!askingDraft)
+                    {
+                        DraftTask = UseTemplateAfterDraftAsync(value);
+                    }
                     // The check box (bound two-way) already shows the new value: told again, it shows the kept one.
-                    if (useTemplate != value) Refuse(nameof(UseTemplate));
+                    if (useTemplate != value)
+                    {
+                        Refuse(nameof(UseTemplate));
+                    }
+
                     return;
                 }
                 SetProperty(ref useTemplate, value);
@@ -251,7 +281,10 @@ namespace ClassicMac.App.ViewModels
 
         private async Task UseTemplateAfterDraftAsync(bool value)
         {
-            if (await ResolveDraftAsync()) UseTemplate = value;
+            if (await ResolveDraftAsync())
+            {
+                UseTemplate = value;
+            }
         }
 
         /// <summary>Whether the selection has both a form of its own and a template to choose between.</summary>
@@ -264,7 +297,11 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanApplyForm))]
         private void ApplyForm()
         {
-            if (Form is not { } form || Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
+            if (Form is not { } form || Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+            {
+                return;
+            }
+
             IResourceEdit edit;
             try
             {

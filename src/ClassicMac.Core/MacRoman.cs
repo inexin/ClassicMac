@@ -34,7 +34,11 @@ namespace ClassicMac.Core
         public static string Decode(ReadOnlySpan<byte> bytes)
         {
             var text = new StringBuilder(bytes.Length);
-            foreach (var b in bytes) text.Append(ToChar(b));
+            foreach (var b in bytes)
+            {
+                text.Append(ToChar(b));
+            }
+
             return text.ToString();
         }
 
@@ -74,7 +78,10 @@ namespace ClassicMac.Core
         private static Dictionary<char, byte> BuildReverse()
         {
             var reverse = new Dictionary<char, byte>(High.Length + 2);
-            for (var i = 0; i < High.Length; i++) reverse[High[i]] = (byte)(0x80 + i);
+            for (var i = 0; i < High.Length; i++)
+            {
+                reverse[High[i]] = (byte)(0x80 + i);
+            }
             // Older mappings, accepted when encoding: ¤ (currency sign, $DB before Mac OS 8.5) and Ω (ohm sign, $BD).
             reverse.TryAdd('¤', 0xDB);
             reverse.TryAdd('Ω', 0xBD);

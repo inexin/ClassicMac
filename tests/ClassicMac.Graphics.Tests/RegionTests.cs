@@ -1,12 +1,12 @@
-using Xunit;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 

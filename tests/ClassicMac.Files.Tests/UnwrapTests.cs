@@ -1,8 +1,8 @@
 using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Files.Containers;
-using static ClassicMac.Files.Tests.Fixtures;
 using ClassicMac.Tests;
+using static ClassicMac.Files.Tests.Fixtures;
 
 namespace ClassicMac.Files.Tests;
 
@@ -29,7 +29,10 @@ public class UnwrapTests
         for (var node = root; ; node = Assert.Single(node.Children))
         {
             formats.Add(node.Format);
-            if (node.Children.Count == 0) break;
+            if (node.Children.Count == 0)
+            {
+                break;
+            }
         }
         Assert.Equal(["host file", "AppleSingle", "BinHex 4.0", "MacBinary II"], formats);
         var leaf = Assert.Single(root.Leaves());
@@ -51,7 +54,11 @@ public class UnwrapTests
     public void Nesting_stops_at_the_limit()
     {
         var bytes = MacBinary(2, "Deep", "x"u8.ToArray(), []);
-        for (var i = 0; i < 3; i++) bytes = MacBinary(2, $"Level{i}", bytes, []);
+        for (var i = 0; i < 3; i++)
+        {
+            bytes = MacBinary(2, $"Level{i}", bytes, []);
+        }
+
         var diagnostics = new List<Diagnostic>();
 
         Unwrap(bytes, diagnostics, ContainerReadOptions.Default with { MaxNestingDepth = 2 });
@@ -394,15 +401,24 @@ public class HostFilesTests : IDisposable
     public void Corpus_host_files_unwrap()
     {
         if (!CorpusFolders.Any)
+        {
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of Mac files to run this.");
+        }
 
         int files = 0, basilisk = 0, withFinderInfo = 0;
         foreach (var path in CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories))
         {
             var folderName = Path.GetFileName(Path.GetDirectoryName(path));
-            if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._")) continue;
+            if (folderName is ".rsrc" or ".finf" || Path.GetFileName(path).StartsWith("._"))
+            {
+                continue;
+            }
             // The harness's deliberately damaged images (checked by their own tests).
-            if (CorpusFolders.IsDamageTest(path)) continue;
+            if (CorpusFolders.IsDamageTest(path))
+            {
+                continue;
+            }
+
             var diagnostics = new List<Diagnostic>();
             ContainerNode root;
             try
@@ -415,8 +431,15 @@ public class HostFilesTests : IDisposable
             }
             Assert.False(diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error), $"{path}: {string.Join("; ", diagnostics.Select(d => d.Message))}");
             files++;
-            if (root.Format == "Basilisk II folder") basilisk++;
-            if (root.File.FinderInfo.Type != default) withFinderInfo++;
+            if (root.Format == "Basilisk II folder")
+            {
+                basilisk++;
+            }
+
+            if (root.File.FinderInfo.Type != default)
+            {
+                withFinderInfo++;
+            }
         }
         TestContext.Current.SendDiagnosticMessage(
             $"{files} host files; {basilisk} in Basilisk II folders; {withFinderInfo} with a file type.");

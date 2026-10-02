@@ -24,7 +24,11 @@ public class SoundPreviewTests : IDisposable
 
         public void Play(DecodedSound sound, Action ended)
         {
-            if (Unavailable is not null) return;
+            if (Unavailable is not null)
+            {
+                return;
+            }
+
             Played.Add(sound);
             this.ended = ended;
         }

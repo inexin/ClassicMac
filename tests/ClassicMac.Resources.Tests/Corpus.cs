@@ -9,7 +9,9 @@ internal static class Corpus
     public static IReadOnlyList<string> ForkFiles()
     {
         if (!CorpusFolders.Any)
+        {
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of resource forks to run this.");
+        }
 
         return CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
             .Where(f => Path.GetFileName(Path.GetDirectoryName(f)) switch

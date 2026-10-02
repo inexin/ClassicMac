@@ -57,7 +57,11 @@ namespace ClassicMac.Resources
         public static bool TryRead(ReadOnlyMemory<byte> data, out CompressedResourceHeader header)
         {
             header = default;
-            if (data.Length < Length || !HasSignature(data)) return false;
+            if (data.Length < Length || !HasSignature(data))
+            {
+                return false;
+            }
+
             var reader = new BigEndianReader(data);
             var version = data.Span[6];
             header = version == 8

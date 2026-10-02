@@ -32,7 +32,9 @@ public sealed class HfsCatalogWriterFeatureTests
         Assert.Equal(U16(source, 0x0C) + 1, U16(output, 0x0C));
         Assert.Equal(2, FolderValence(output, HfsBuilder.Root));
         if (Environment.GetEnvironmentVariable("CLASSICMAC_HFS_SYNTHETIC_OUTPUT") is { Length: > 0 } path)
+        {
             System.IO.File.WriteAllBytes(path, output);
+        }
     }
 
     [Fact]
@@ -225,13 +227,17 @@ public sealed class HfsCatalogWriterFeatureTests
             : System.IO.File.ReadAllBytes(external);
         string[] names = ["Á", "F", "Éa", "á", "Ez", "ª", "º"];
         foreach (string name in names)
+        {
             image = HfsWriter.CreateFile(ForkData.FromBytes(image), name,
                 Array.Empty<byte>(), Array.Empty<byte>(), FinderInfo.Empty);
+        }
 
         Assert.Equal(new[] { "á", "ª", "Ez", "Éa", "F", "º", "Á" },
             Read(image).Select(file => file.Name.ToString()).Where(names.Contains));
         if (Environment.GetEnvironmentVariable("CLASSICMAC_HFS_NAMES_OUTPUT") is { Length: > 0 } path)
+        {
             System.IO.File.WriteAllBytes(path, image);
+        }
     }
 
     [Theory]
@@ -362,7 +368,10 @@ public sealed class HfsCatalogWriterFeatureTests
     {
         string? sourcePath = Environment.GetEnvironmentVariable("CLASSICMAC_HFS_INTEROP_INPUT");
         string? outputPath = Environment.GetEnvironmentVariable("CLASSICMAC_HFS_CATALOG_INTEROP_OUTPUT");
-        if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(outputPath)) return;
+        if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(outputPath))
+        {
+            return;
+        }
 
         byte[] source = System.IO.File.ReadAllBytes(sourcePath);
         byte[] withFolder = HfsWriter.CreateFolder(ForkData.FromBytes(source), "Created");
@@ -390,17 +399,28 @@ public sealed class HfsCatalogWriterFeatureTests
         byte[] image = source;
 
         for (int index = 0; index < fileCount; index++)
+        {
             image = HfsWriter.CreateFile(ForkData.FromBytes(image), $"File{index:D2}",
                 new byte[] { checked((byte)index) }, Array.Empty<byte>(), FinderInfo.Empty);
+        }
 
         Assert.Equal(original, source);
         Assert.Equal(filesBefore + fileCount, Read(image).Count);
         for (int index = 0; index < fileCount; index++)
+        {
             Assert.Equal(new byte[] { checked((byte)index) }, File(image, $"File{index:D2}").DataFork.ToArray());
-        if (string.IsNullOrEmpty(external)) Assert.True(U32(image, 0x92) > catalogLengthBefore);
+        }
+
+        if (string.IsNullOrEmpty(external))
+        {
+            Assert.True(U32(image, 0x92) > catalogLengthBefore);
+        }
+
         Assert.Equal(U32(source, 0x54) + fileCount, U32(image, 0x54));
         if (Environment.GetEnvironmentVariable("CLASSICMAC_HFS_CATALOG_STRESS_OUTPUT") is { Length: > 0 } path)
+        {
             System.IO.File.WriteAllBytes(path, image);
+        }
     }
 
     [Fact]
@@ -417,8 +437,10 @@ public sealed class HfsCatalogWriterFeatureTests
         byte[] image = source;
 
         for (int index = 0; index < 128; index++)
+        {
             image = HfsWriter.CreateFile(ForkData.FromBytes(image), $"Entry{index:D2}",
                 Array.Empty<byte>(), Array.Empty<byte>(), FinderInfo.Empty);
+        }
 
         Assert.Equal(original, source);
         Assert.Equal(filesBefore + 128, Read(image).Count);
@@ -443,7 +465,11 @@ public sealed class HfsCatalogWriterFeatureTests
         for (int block = 5; block < U16(source, 0x12); block += 2)
         {
             byte mask = (byte)(0x80 >> (block % 8));
-            if ((source[bitmap + block / 8] & mask) != 0) continue;
+            if ((source[bitmap + block / 8] & mask) != 0)
+            {
+                continue;
+            }
+
             source[bitmap + block / 8] |= mask;
             reserved++;
         }
@@ -453,8 +479,10 @@ public sealed class HfsCatalogWriterFeatureTests
         byte[] image = source;
 
         for (int index = 0; index < 128; index++)
+        {
             image = HfsWriter.CreateFile(ForkData.FromBytes(image), $"Entry{index:D2}",
                 Array.Empty<byte>(), Array.Empty<byte>(), FinderInfo.Empty);
+        }
 
         Assert.Equal(original, source);
         Assert.Equal(filesBefore + 128, Read(image).Count);
@@ -467,7 +495,9 @@ public sealed class HfsCatalogWriterFeatureTests
         Assert.Equal("Overflow catalog"u8.ToArray(), File(edited, "Entry127").DataFork.ToArray());
         Assert.Equal(filesBefore + 128, Read(edited).Count);
         if (Environment.GetEnvironmentVariable("CLASSICMAC_HFS_OVERFLOW_OUTPUT") is { Length: > 0 } path)
+        {
             System.IO.File.WriteAllBytes(path, edited);
+        }
     }
 
     [Fact]
@@ -589,7 +619,10 @@ public sealed class HfsCatalogWriterFeatureTests
         }
 
         foreach (string path in expected.Keys.ToArray())
+        {
             image = HfsWriter.DeleteFile(ForkData.FromBytes(image), path);
+        }
+
         image = HfsWriter.DeleteFolder(ForkData.FromBytes(image), "Documents");
         image = HfsWriter.DeleteFolder(ForkData.FromBytes(image), "Archive");
         Assert.Empty(Read(image));
@@ -635,9 +668,11 @@ public sealed class HfsCatalogWriterFeatureTests
                 int keyEnd = at + start + 1 + tree[at + start];
                 int record = (keyEnd + 1) & ~1;
                 if (tree[record] == 1 && BinaryPrimitives.ReadUInt32BigEndian(tree.AsSpan(record + 6)) == folderId)
+                {
                     return fieldLength == 2
                         ? BinaryPrimitives.ReadUInt16BigEndian(tree.AsSpan(record + fieldOffset))
                         : BinaryPrimitives.ReadUInt32BigEndian(tree.AsSpan(record + fieldOffset));
+                }
             }
             leaf = BinaryPrimitives.ReadUInt32BigEndian(tree.AsSpan(at));
         }

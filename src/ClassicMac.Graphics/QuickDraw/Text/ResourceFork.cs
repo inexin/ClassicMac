@@ -13,17 +13,28 @@ namespace ClassicMac.Graphics.QuickDraw
     {
         public static IEnumerable<(string type, int id, string? name, byte[] data)> Read(byte[] fork)
         {
-            if (fork.Length < 16) throw new ArgumentException("Not a resource fork.", nameof(fork));
+            if (fork.Length < 16)
+            {
+                throw new ArgumentException("Not a resource fork.", nameof(fork));
+            }
+
             var s = fork.AsMemory();
             var reader = new BigEndianReader(s);
             int dataOffset = (int)reader.ReadUInt32();
             int mapOffset = (int)reader.ReadUInt32();
             if (dataOffset < 16 || mapOffset < 16 || mapOffset + 30 > fork.Length || dataOffset > fork.Length)
+            {
                 throw new ArgumentException("Not a resource fork.", nameof(fork));
+            }
+
             var map = new BigEndianReader(s.Slice(mapOffset));
             int typeList = mapOffset + map.ReadUInt16At(24);
             int nameList = mapOffset + map.ReadUInt16At(26);
-            if (typeList + 2 > fork.Length) throw new ArgumentException("Not a resource fork.", nameof(fork));
+            if (typeList + 2 > fork.Length)
+            {
+                throw new ArgumentException("Not a resource fork.", nameof(fork));
+            }
+
             int types = reader.ReadUInt16At(typeList) + 1;
             var result = new List<(string, int, string?, byte[])>();
             for (int t = 0; t < types && typeList + 2 + 8 * (t + 1) <= fork.Length; t++)
@@ -38,9 +49,17 @@ namespace ClassicMac.Graphics.QuickDraw
                     int id = reader.ReadInt16At(re);
                     int nameOffset = reader.ReadUInt16At(re + 2);
                     int dataAt = dataOffset + ((s.Span[re + 5] << 16) | (s.Span[re + 6] << 8) | s.Span[re + 7]);
-                    if (dataAt + 4 > fork.Length) continue;
+                    if (dataAt + 4 > fork.Length)
+                    {
+                        continue;
+                    }
+
                     int length = (int)reader.ReadUInt32At(dataAt);
-                    if (length < 0 || dataAt + 4 + length > fork.Length) continue;
+                    if (length < 0 || dataAt + 4 + length > fork.Length)
+                    {
+                        continue;
+                    }
+
                     string? name = null;
                     if (nameOffset != 0xFFFF && nameList + nameOffset < fork.Length)
                     {

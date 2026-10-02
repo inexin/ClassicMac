@@ -27,9 +27,14 @@ public class M68kCorpusTests
             instructions++;
             bytes += ins.Length;
             if (ins.IsInvalid)
+            {
                 invalid++;
+            }
+
             if (ins is { Mnemonic: "jsr", Operands: [M68kEffectiveAddress { Mode: M68kAddressingMode.Displacement, Register: 5 }] })
+            {
                 jumpTableCalls++;
+            }
         }
         Assert.Equal(segment.Length - headerLength, bytes);
         return new Sweep(instructions, invalid, bytes, jumpTableCalls);
@@ -73,7 +78,10 @@ public class M68kCorpusTests
         {
             var data = CodeResource(fork, resource.Id);
             if (data.Length < 0x28 || data.Span[0] != 0xFF || data.Span[1] != 0xFF)
+            {
                 continue;
+            }
+
             var sweep = Disassemble(data, 0x28);
             segments++;
             instructions += sweep.Instructions;

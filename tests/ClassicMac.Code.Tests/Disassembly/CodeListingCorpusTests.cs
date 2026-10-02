@@ -70,7 +70,9 @@ public class CodeListingCorpusTests
         All(App("QDHarness.APPL", 117059, out _));
         var current = CodeCorpus.Find("QDHarness.APPL", 121903);
         if (current is not null)
+        {
             All(CodeApplication.Read(ResourceFork.Read(File.ReadAllBytes(current)), new List<Diagnostic>()));
+        }
     }
 
     [Fact]
@@ -130,7 +132,10 @@ public class CodeListingCorpusTests
         {
             var data = ResourceDecompression.Default.GetData(resource, fork, null, new List<Diagnostic>());
             if (CompressedResourceHeader.HasSignature(data))
+            {
                 continue;
+            }
+
             var listing = CodeListing.ForCodeResource(resource.Type, resource.Id, data, fork);
             Assert.False(string.IsNullOrEmpty(listing.Text));
             listed++;

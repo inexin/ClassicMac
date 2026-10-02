@@ -69,9 +69,17 @@ namespace ClassicMac.Core
             int read = 0, written = 0;
             while (read < source.Length)
             {
-                if (written == destination.Length) return new(read, written, PackBitsEnd.OutputFull);
+                if (written == destination.Length)
+                {
+                    return new(read, written, PackBitsEnd.OutputFull);
+                }
+
                 int flag = unchecked((sbyte)source[read++]);
-                if (flag == -128 && !o.Flag80IsRun) continue;
+                if (flag == -128 && !o.Flag80IsRun)
+                {
+                    continue;
+                }
+
                 if (flag >= 0)
                 {
                     int length = (flag + 1) * unit;
@@ -81,18 +89,34 @@ namespace ClassicMac.Core
                     source.Slice(read, copy).CopyTo(destination[written..]);
                     read += copy;
                     written += copy;
-                    if (available < length && copy == available) return new(source.Length, written, PackBitsEnd.LiteralPastInput);
-                    if (copy < length) return new(read, written, PackBitsEnd.LiteralPastOutput);
+                    if (available < length && copy == available)
+                    {
+                        return new(source.Length, written, PackBitsEnd.LiteralPastInput);
+                    }
+
+                    if (copy < length)
+                    {
+                        return new(read, written, PackBitsEnd.LiteralPastOutput);
+                    }
+
                     continue;
                 }
-                if (source.Length - read < unit) return new(source.Length, written, PackBitsEnd.RepeatPastInput);
+                if (source.Length - read < unit)
+                {
+                    return new(source.Length, written, PackBitsEnd.RepeatPastInput);
+                }
+
                 var value = source.Slice(read, unit);
                 read += unit;
                 int count = 1 - flag;
                 for (int i = 0; i < count; i++)
                 {
                     // Only whole units are repeated: a word that does not fit is left out, as QuickDraw's scan-line reader does.
-                    if (destination.Length - written < unit) return new(read, written, PackBitsEnd.RepeatPastOutput);
+                    if (destination.Length - written < unit)
+                    {
+                        return new(read, written, PackBitsEnd.RepeatPastOutput);
+                    }
+
                     value.CopyTo(destination[written..]);
                     written += unit;
                 }
@@ -115,7 +139,11 @@ namespace ClassicMac.Core
             while (i < n)
             {
                 int run = 1;
-                while (i + run < n && run < 128 && Same(data, unit, i, i + run)) run++;
+                while (i + run < n && run < 128 && Same(data, unit, i, i + run))
+                {
+                    run++;
+                }
+
                 if (run >= 3 || (run == 2 && unit == 2))
                 {
                     output.Add((byte)(1 - run));
@@ -124,7 +152,11 @@ namespace ClassicMac.Core
                     continue;
                 }
                 int start = i++;
-                while (i < n && i - start < 128 && !(i + 2 < n && Same(data, unit, i, i + 1) && Same(data, unit, i, i + 2))) i++;
+                while (i < n && i - start < 128 && !(i + 2 < n && Same(data, unit, i, i + 1) && Same(data, unit, i, i + 2)))
+                {
+                    i++;
+                }
+
                 output.Add((byte)(i - start - 1));
                 output.AddRange(data.Slice(start * unit, (i - start) * unit));
             }

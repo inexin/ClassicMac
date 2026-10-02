@@ -1,15 +1,15 @@
 using System.Text;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.SkiaSharp;
+using ClassicMac.Resources.Decoders.Images;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
-using ClassicMac.Graphics.ImageSharp;
-using ClassicMac.Graphics.SkiaSharp;
-using ClassicMac.Resources.Decoders.Images;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -46,7 +46,11 @@ public class MacImageFileTests
         var pixels = new byte[] { 0, 255, 0, 0, 0, 0, 0, 255 };                         // 2 x 1 ARGB: red, blue
         var file = new List<byte>(Atom("idsc", Description("raw ", 2, 1, 32, pixels.Length)));
         file.AddRange(Atom("idat", pixels));
-        if (icc != null) file.AddRange(Atom("iicc", icc));
+        if (icc != null)
+        {
+            file.AddRange(Atom("iicc", icc));
+        }
+
         return file.ToArray();
     }
 
@@ -91,7 +95,11 @@ public class MacImageFileTests
         var b = new List<byte>(new byte[512]);
         b[3] = 2;
         b.AddRange(new byte[] { 0xF9, 0xFF, 0xC1, 0x00 });                              // 8 x $FF, 64 x $00
-        for (int row = 1; row < 720; row++) b.AddRange(new byte[] { 0xB9, 0x00 });      // 72 x $00
+        for (int row = 1; row < 720; row++)
+        {
+            b.AddRange(new byte[] { 0xB9, 0x00 });      // 72 x $00
+        }
+
         return b.ToArray();
     }
 
@@ -115,8 +123,10 @@ public class MacImageFileTests
         header[1] = 5;
         Encoding.ASCII.GetBytes("Paint").CopyTo(header, 2);
         Encoding.ASCII.GetBytes("PNTGMPNT").CopyTo(header, 65);
-        header[83] = (byte)(paint.Length >> 24); header[84] = (byte)(paint.Length >> 16);
-        header[85] = (byte)(paint.Length >> 8); header[86] = (byte)paint.Length;
+        header[83] = (byte)(paint.Length >> 24);
+        header[84] = (byte)(paint.Length >> 16);
+        header[85] = (byte)(paint.Length >> 8);
+        header[86] = (byte)paint.Length;
         var data = header.Concat(paint).ToArray();
         Assert.True(MacPaintFile.IsMacPaintFile(data));
         Assert.Equal(new RgbaColor(0, 0, 0), MacPaintFile.Decode(data)[0, 0]);

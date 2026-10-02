@@ -1,9 +1,9 @@
 using System;
-using SkiaSharp;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using SkiaSharp;
 
 namespace ClassicMac.Graphics.SkiaSharp
 {
@@ -26,7 +26,11 @@ namespace ClassicMac.Graphics.SkiaSharp
         {
             ArgumentNullException.ThrowIfNull(text);
             var typeface = Resolve(style.FontId, style.Face);
-            if (typeface == null) return null;
+            if (typeface == null)
+            {
+                return null;
+            }
+
             using var font = new SKFont(typeface, style.Size <= 0 ? 12 : style.Size) { Edging = SKFontEdging.Alias, Subpixel = false };
             using var paint = new SKPaint { Color = SKColors.White, IsAntialias = false };
 
@@ -36,7 +40,10 @@ namespace ClassicMac.Graphics.SkiaSharp
             int descent = (int)Math.Ceiling(metrics.Descent);
             int pad = (int)Math.Ceiling(font.Size / 2);               // room for overhangs (italic, bold)
             int width = (int)Math.Ceiling(advance) + 2 * pad, height = ascent + descent + 2;
-            if (width <= 0 || height <= 0) return null;
+            if (width <= 0 || height <= 0)
+            {
+                return null;
+            }
 
             using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Gray8, SKAlphaType.Opaque));
             using (var canvas = new SKCanvas(bitmap))
@@ -47,21 +54,33 @@ namespace ClassicMac.Graphics.SkiaSharp
             var pixels = bitmap.GetPixelSpan();
             var bits = new byte[width * height];
             for (int y = 0; y < height; y++)
+            {
                 for (int x = 0; x < width; x++)
+                {
                     bits[y * width + x] = pixels[y * bitmap.RowBytes + x] >= 128 ? (byte)1 : (byte)0;
+                }
+            }
+
             return new TextFallbackMask(width, height, pad, ascent, bits, advance);
         }
 
         private SKTypeface? Resolve(int fontId, int face)
         {
-            if (typefaceResolver?.Invoke(fontId) is { } resolved) return resolved;
+            if (typefaceResolver?.Invoke(fontId) is { } resolved)
+            {
+                return resolved;
+            }
+
             bool bold = (face & 0x01) != 0, italic = (face & 0x02) != 0;
             var style = new SKFontStyle(bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal,
                 italic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright);
             foreach (var name in MacFontNames(fontId))
             {
                 var typeface = SKFontManager.Default.MatchFamily(name, style);
-                if (typeface != null) return typeface;
+                if (typeface != null)
+                {
+                    return typeface;
+                }
             }
             return SKTypeface.Default;
         }

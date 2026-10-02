@@ -1,11 +1,11 @@
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -38,7 +38,9 @@ public class QuickDrawResourceTests
         // icl8: pixel 0 = index 215 (the red ramp's $EE), pixel 1 = 255 (black), pixel 2 = 0 (white); ICN# mask row 0
         // keeps pixels 0-2 only.
         var data = new byte[1024];
-        data[0] = 215; data[1] = 255; data[2] = 0;
+        data[0] = 215;
+        data[1] = 255;
+        data[2] = 0;
         var list = new byte[256];
         list[128] = 0xE0;
         var icon = QuickDrawResources.DecodeColorIcon("icl8", data, list);
@@ -56,7 +58,10 @@ public class QuickDrawResourceTests
         var data = new byte[68];
         data[0] = 0xC0;
         data[32] = 0x80;
-        data[64] = 0; data[65] = 3; data[66] = 0; data[67] = 5;
+        data[64] = 0;
+        data[65] = 3;
+        data[66] = 0;
+        data[67] = 5;
         var cursor = QuickDrawResources.DecodeCursor(data);
         Assert.Equal(Black, cursor.Image[0, 0]);
         Assert.True(cursor.Inverted[1]);
@@ -137,7 +142,11 @@ public class QuickDrawResourceTests
         // ppat type 2: PixMap at 28, pixels at 78 (8 bytes), table at 86 with 5 entries; entry 4 = $12xx $34xx $56xx.
         var b = new PictBuilder().U16(2).U16(0).U16(28).U16(0).U16(78).Zeros(4).U16(0).Zeros(4).Zeros(8);
         PixMap8x1(b, 86).Bytes(1, 1, 1, 1, 1, 1, 1, 1).U16(0).U16(0).U16(0).U16(4);
-        for (int i = 0; i < 4; i++) b.U16(i).Rgb(0, 0, 0);
+        for (int i = 0; i < 4; i++)
+        {
+            b.U16(i).Rgb(0, 0, 0);
+        }
+
         b.U16(4).Rgb(0x1299, 0x3499, 0x5699);
         var pattern = QuickDrawResources.DecodePixelPattern(b.ToArray());
         Assert.Equal((8, 8), (pattern.Width, pattern.Height));
@@ -149,7 +158,10 @@ public class QuickDrawResourceTests
     {
         // ics# with only the icon: a 4 x 4 black ring at (0..3, 0..3) encloses a white hole, which CalcMask keeps.
         var data = new byte[32];
-        data[0] = 0xF0; data[2] = 0x90; data[4] = 0x90; data[6] = 0xF0;
+        data[0] = 0xF0;
+        data[2] = 0x90;
+        data[4] = 0x90;
+        data[6] = 0xF0;
         var icon = QuickDrawResources.DecodeIconList("ics#", data);
         Assert.Equal(White, icon[1, 1]);                       // enclosed: opaque white
         Assert.Equal(255, A(icon, 1, 1));
@@ -162,8 +174,17 @@ public class QuickDrawResourceTests
         // crsr: 2-bit 16 x 16 PixMap, table 0 white 1 black 2 red; row 0 pixels 1 (black), 0 (white), 2 (red), 1.
         // Mask row 0 = $80 (pixel 0 only); the 1-bit data ($FF..) is never read.
         var b = new PictBuilder().U16(0x8001).U16(0).U16(96).U16(0).U16(146).Zeros(10);
-        for (int i = 0; i < 16; i++) b.U16(0xFFFF);                                            // 1-bit data (unused)
-        b.U16(0x8000); for (int i = 1; i < 16; i++) b.U16(0);                                  // mask
+        for (int i = 0; i < 16; i++)
+        {
+            b.U16(0xFFFF);                                            // 1-bit data (unused)
+        }
+
+        b.U16(0x8000);
+        for (int i = 1; i < 16; i++)
+        {
+            b.U16(0);                                  // mask
+        }
+
         b.U16(20).U16(40).Zeros(8);                                                            // hotspot v 20 h 40
         b.U16(0).U16(0).U16(0x8004).Rect(0, 0, 16, 16).U16(0).U16(0).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0)
             .U16(0).U16(2).U16(1).U16(2).U16(0).U16(0).U16(0).U16(210).U16(0).U16(0);           // PixMap, pmTable 210

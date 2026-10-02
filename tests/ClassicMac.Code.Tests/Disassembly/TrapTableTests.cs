@@ -341,7 +341,10 @@ public class LowMemoryGlobalsTests
         var all = LowMemoryGlobals.All;
         Assert.True(all.Count > 200);
         for (int i = 1; i < all.Count; i++)
+        {
             Assert.True(all[i - 1].Address < all[i].Address);
+        }
+
         Assert.All(all, g => Assert.True(g.Size > 0 && char.IsUpper(g.Name[0])));
     }
 }

@@ -39,7 +39,10 @@ namespace ClassicMac.Resources.Decoders.Documents
             for (var i = 0; i < pictures.Count;)
             {
                 var row = new List<DocumentPicture> { pictures[i++] };
-                while (i < pictures.Count && Blank(text, row[^1].Anchor + 1, pictures[i].Anchor)) row.Add(pictures[i++]);
+                while (i < pictures.Count && Blank(text, row[^1].Anchor + 1, pictures[i].Anchor))
+                {
+                    row.Add(pictures[i++]);
+                }
 
                 Lines(blocks, text, position, row[0].Anchor, beforeAnchor: true);
                 blocks.Add(new PictureRow(row, ParagraphOf(text, row[0].Anchor)));
@@ -52,7 +55,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                     var stop = lineEnd < 0 ? next : lineEnd;
                     if (!Blank(text, position, stop))
                     {
-                        while (first && IsSpace(text[position])) position++;
+                        while (first && IsSpace(text[position]))
+                        {
+                            position++;
+                        }
+
                         break;
                     }
                     position = lineEnd < 0 ? next : lineEnd + 1;
@@ -76,7 +83,10 @@ namespace ClassicMac.Resources.Decoders.Documents
         {
             for (var i = start; i < end; i++)
             {
-                if (!IsSpace(text[i])) return false;
+                if (!IsSpace(text[i]))
+                {
+                    return false;
+                }
             }
             return true;
         }
@@ -92,8 +102,16 @@ namespace ClassicMac.Resources.Decoders.Documents
                 if (lineEnd < 0)
                 {
                     var contentEnd = end;
-                    while (beforeAnchor && contentEnd > line && IsSpace(text[contentEnd - 1])) contentEnd--;
-                    if (contentEnd > line) blocks.Add(new DocumentLine(line, contentEnd, number));
+                    while (beforeAnchor && contentEnd > line && IsSpace(text[contentEnd - 1]))
+                    {
+                        contentEnd--;
+                    }
+
+                    if (contentEnd > line)
+                    {
+                        blocks.Add(new DocumentLine(line, contentEnd, number));
+                    }
+
                     break;
                 }
                 blocks.Add(new DocumentLine(line, lineEnd, number));

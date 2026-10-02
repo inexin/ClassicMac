@@ -1,11 +1,11 @@
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -17,10 +17,15 @@ public class PictReaderTests
     {
         var bmp = new RgbaBitmap(width, height);
         for (int y = 0; y < height; y++)
+        {
             for (int x = 0; x < width; x++)
+            {
                 bmp[x, y] = x < width / 2
                     ? new RgbaColor(10, 200, 30)
                     : new RgbaColor((byte)(x * 37 + y), (byte)(x * 11 + y * 7), (byte)(x ^ y));
+            }
+        }
+
         return bmp;
     }
 

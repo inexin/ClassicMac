@@ -15,9 +15,17 @@ namespace ClassicMac.Files
         // zeroIsNull (a creation date, where File Exchange shows "now" when the date word is 0), a zero date is null.
         public static MacDate? FromFields(ushort date, ushort time, bool zeroIsNull = false)
         {
-            if (zeroIsNull && date == 0) return null;
+            if (zeroIsNull && date == 0)
+            {
+                return null;
+            }
+
             var year = (date >> 9) + 1980;
-            if (year > 2031) year = (date >> 9) + 1852;
+            if (year > 2031)
+            {
+                year = (date >> 9) + 1852;
+            }
+
             return new MacDate(Date2Secs(year, (date >> 5) & 15, date & 31, time >> 11, (time >> 5) & 63, (time & 31) * 2));
         }
 
@@ -32,7 +40,10 @@ namespace ClassicMac.Files
             {
                 m = (short)(month - 3);
                 days = (days + 59) & 0xFFFF;
-                if (year % 4 == 0) days = (days + 1) & 0xFFFF;
+                if (year % 4 == 0)
+                {
+                    days = (days + 1) & 0xFFFF;
+                }
             }
             days = ((m * 3917 + 52) / 128 + days) & 0xFFFF;
             return unchecked((uint)days * 86400 + seconds);
@@ -42,7 +53,11 @@ namespace ClassicMac.Files
         public static MacDate? FromLocal(DateTime local)
         {
             local = local.AddTicks(-(local.Ticks % (2 * TimeSpan.TicksPerSecond)));
-            if (local.Year >= 2032) local = local.AddYears(-128);
+            if (local.Year >= 2032)
+            {
+                local = local.AddYears(-128);
+            }
+
             try
             {
                 return MacDate.FromDateTime(local);

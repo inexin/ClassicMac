@@ -118,7 +118,11 @@ namespace ClassicMac.Code.Ppc
             var result = new List<PefRelocationInstruction>(words.Count);
             for (int k = 0; k < words.Count;)
             {
-                if (DecodeAt(words, k, diagnostics) is not { } instruction) break;
+                if (DecodeAt(words, k, diagnostics) is not { } instruction)
+                {
+                    break;
+                }
+
                 result.Add(instruction);
                 k += WordCount(instruction.Opcode);
             }
@@ -132,21 +136,37 @@ namespace ClassicMac.Code.Ppc
         private static PefRelocationInstruction? DecodeAt(IReadOnlyList<ushort> words, int k, ICollection<Diagnostic> diagnostics)
         {
             int w = words[k];
-            if (w >> 14 == 0) return new(PefRelocationOpcode.BySectDWithSkip, k, (uint)(w >> 6) & 0xFF, (uint)w & 0x3F);
+            if (w >> 14 == 0)
+            {
+                return new(PefRelocationOpcode.BySectDWithSkip, k, (uint)(w >> 6) & 0xFF, (uint)w & 0x3F);
+            }
+
             if (w >> 13 == 2)
             {
                 int sub = (w >> 9) & 0xF;
                 uint run = (uint)(w & 0x1FF) + 1;
-                if (sub <= 5) return new((PefRelocationOpcode)((int)PefRelocationOpcode.BySectC + sub), k, 0, run);
+                if (sub <= 5)
+                {
+                    return new((PefRelocationOpcode)((int)PefRelocationOpcode.BySectC + sub), k, 0, run);
+                }
             }
             else if (w >> 13 == 3)
             {
                 int sub = (w >> 9) & 0xF;
                 uint index = (uint)w & 0x1FF;
-                if (sub <= 3) return new((PefRelocationOpcode)((int)PefRelocationOpcode.ByImport + sub), k, index, 0);
+                if (sub <= 3)
+                {
+                    return new((PefRelocationOpcode)((int)PefRelocationOpcode.ByImport + sub), k, index, 0);
+                }
             }
-            else if (w >> 12 == 8) return new(PefRelocationOpcode.IncrPosition, k, 0, (uint)(w & 0xFFF) + 1);
-            else if (w >> 12 == 9) return new(PefRelocationOpcode.Repeat, k, (uint)((w >> 8) & 0xF) + 1, (uint)(w & 0xFF) + 1);
+            else if (w >> 12 == 8)
+            {
+                return new(PefRelocationOpcode.IncrPosition, k, 0, (uint)(w & 0xFFF) + 1);
+            }
+            else if (w >> 12 == 9)
+            {
+                return new(PefRelocationOpcode.Repeat, k, (uint)((w >> 8) & 0xF) + 1, (uint)(w & 0xFF) + 1);
+            }
 
             int top = w >> 10;
             PefRelocationOpcode? opcode = top switch
@@ -223,7 +243,11 @@ namespace ClassicMac.Code.Ppc
             long left = 0;
             for (int k = 0; k < words.Count && !machine.Stopped;)
             {
-                if (DecodeAt(words, k, diagnostics) is not { } instruction) break;
+                if (DecodeAt(words, k, diagnostics) is not { } instruction)
+                {
+                    break;
+                }
+
                 int next = k + WordCount(instruction.Opcode);
                 if (instruction.Opcode is not (PefRelocationOpcode.Repeat or PefRelocationOpcode.LgRepeat))
                 {
@@ -321,7 +345,11 @@ namespace ClassicMac.Code.Ppc
 
             private bool ValidSection(int index, PefRelocationInstruction instruction)
             {
-                if ((uint)index < (uint)container.Sections.Count) return true;
+                if ((uint)index < (uint)container.Sections.Count)
+                {
+                    return true;
+                }
+
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-bad-section",
                     $"Relocation word {instruction.Position} names section {index}; the container has {container.Sections.Count}."));
                 return false;
@@ -329,16 +357,30 @@ namespace ClassicMac.Code.Ppc
 
             private void Add(PefRelocationOpcode opcode, PefFixupTarget target, int index, uint amount)
             {
-                if (Stopped) return;
+                if (Stopped)
+                {
+                    return;
+                }
+
                 if (position < 0 || position > length - 4)
                 {
-                    if (outOfRange < 0) outOfRange = position;
-                    if (++outOfRangeCount > maxFixups) Stopped = true;
+                    if (outOfRange < 0)
+                    {
+                        outOfRange = position;
+                    }
+
+                    if (++outOfRangeCount > maxFixups)
+                    {
+                        Stopped = true;
+                    }
                 }
                 else
                 {
                     if (writer is not null && reader is not null)
+                    {
                         writer.WriteUInt32At((int)position, unchecked(reader.ReadUInt32At((int)position) + amount));
+                    }
+
                     Fixups.Add(new PefFixup(section, position, opcode, target, index, amount));
                     if (Fixups.Count > maxFixups)
                     {
@@ -372,13 +414,25 @@ namespace ClassicMac.Code.Ppc
                 {
                     case PefRelocationOpcode.BySectDWithSkip:
                         position += 4L * instruction.Operand;
-                        for (uint n = 0; n < instruction.Count; n++) AddSection(op, sectionD);
+                        for (uint n = 0; n < instruction.Count; n++)
+                        {
+                            AddSection(op, sectionD);
+                        }
+
                         break;
                     case PefRelocationOpcode.BySectC:
-                        for (uint n = 0; n < instruction.Count; n++) AddSection(op, sectionC);
+                        for (uint n = 0; n < instruction.Count; n++)
+                        {
+                            AddSection(op, sectionC);
+                        }
+
                         break;
                     case PefRelocationOpcode.BySectD:
-                        for (uint n = 0; n < instruction.Count; n++) AddSection(op, sectionD);
+                        for (uint n = 0; n < instruction.Count; n++)
+                        {
+                            AddSection(op, sectionD);
+                        }
+
                         break;
                     case PefRelocationOpcode.TVector12:
                         for (uint n = 0; n < instruction.Count; n++)
@@ -403,7 +457,11 @@ namespace ClassicMac.Code.Ppc
                         }
                         break;
                     case PefRelocationOpcode.ImportRun:
-                        for (uint n = 0; n < instruction.Count; n++) AddImport(op, importIndex++, instruction);
+                        for (uint n = 0; n < instruction.Count; n++)
+                        {
+                            AddImport(op, importIndex++, instruction);
+                        }
+
                         break;
                     case PefRelocationOpcode.ByImport:
                     case PefRelocationOpcode.LgByImport:
@@ -412,16 +470,31 @@ namespace ClassicMac.Code.Ppc
                         break;
                     case PefRelocationOpcode.SetSectC:
                     case PefRelocationOpcode.LgSetSectC:
-                        if (ValidSection((int)instruction.Operand, instruction)) sectionC = (int)instruction.Operand;
+                        if (ValidSection((int)instruction.Operand, instruction))
+                        {
+                            sectionC = (int)instruction.Operand;
+                        }
+
                         break;
                     case PefRelocationOpcode.SetSectD:
                     case PefRelocationOpcode.LgSetSectD:
-                        if (ValidSection((int)instruction.Operand, instruction)) sectionD = (int)instruction.Operand;
+                        if (ValidSection((int)instruction.Operand, instruction))
+                        {
+                            sectionD = (int)instruction.Operand;
+                        }
+
                         break;
                     case PefRelocationOpcode.BySection:
                     case PefRelocationOpcode.LgBySection:
-                        if (ValidSection((int)instruction.Operand, instruction)) AddSection(op, (int)instruction.Operand);
-                        else position += 4;
+                        if (ValidSection((int)instruction.Operand, instruction))
+                        {
+                            AddSection(op, (int)instruction.Operand);
+                        }
+                        else
+                        {
+                            position += 4;
+                        }
+
                         break;
                     case PefRelocationOpcode.IncrPosition:
                         position += instruction.Count;
@@ -435,8 +508,10 @@ namespace ClassicMac.Code.Ppc
             public void Finish()
             {
                 if (outOfRangeCount > 0)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.relocation-out-of-range",
                         $"{outOfRangeCount} relocation(s) of section {section} fall outside its 0x{length:X} bytes (the first at 0x{outOfRange:X}); they were skipped."));
+                }
             }
         }
     }

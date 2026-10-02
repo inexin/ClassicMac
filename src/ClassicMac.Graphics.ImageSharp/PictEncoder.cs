@@ -2,16 +2,16 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing.Processors.Quantization;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.Graphics.ImageSharp
 {
@@ -54,7 +54,11 @@ namespace ClassicMac.Graphics.ImageSharp
             {
                 var writer = new PictWriter(stream, image.Width, image.Height, new PictWriteOptions
                 {
-                    Format = format, HorizontalResolution = hRes, VerticalResolution = vRes, IccProfile = icc, FileHeader = FileHeader,
+                    Format = format,
+                    HorizontalResolution = hRes,
+                    VerticalResolution = vRes,
+                    IccProfile = icc,
+                    FileHeader = FileHeader,
                 });
                 var row = new Rgba32[image.Width];
                 frame.ProcessPixelRows(accessor =>
@@ -84,12 +88,20 @@ namespace ClassicMac.Graphics.ImageSharp
             var rgba = new Rgba32[source.Length];
             PixelOperations<TPixel>.Instance.ToRgba32(configuration, source, rgba);
             var palette = new RgbaColor[rgba.Length];
-            for (int i = 0; i < rgba.Length; i++) palette[i] = new RgbaColor(rgba[i].R, rgba[i].G, rgba[i].B);
+            for (int i = 0; i < rgba.Length; i++)
+            {
+                palette[i] = new RgbaColor(rgba[i].R, rgba[i].G, rgba[i].B);
+            }
+
             var (ordered, remap) = WhiteBlackOrder(palette, format);
 
             var indexedWriter = new PictWriter(stream, image.Width, image.Height, new PictWriteOptions
             {
-                Format = format, Palette = ordered, HorizontalResolution = hRes, VerticalResolution = vRes, IccProfile = icc,
+                Format = format,
+                Palette = ordered,
+                HorizontalResolution = hRes,
+                VerticalResolution = vRes,
+                IccProfile = icc,
                 FileHeader = FileHeader,
             });
             var line = new byte[image.Width];
@@ -97,7 +109,11 @@ namespace ClassicMac.Graphics.ImageSharp
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var src = indexed.DangerousGetRowSpan(y);
-                for (int x = 0; x < line.Length; x++) line[x] = remap[src[x]];
+                for (int x = 0; x < line.Length; x++)
+                {
+                    line[x] = remap[src[x]];
+                }
+
                 indexedWriter.WriteRow(line);
             }
             indexedWriter.Finish();
@@ -107,11 +123,18 @@ namespace ClassicMac.Graphics.ImageSharp
         private static (RgbaColor[] palette, byte[] remap) WhiteBlackOrder(RgbaColor[] palette, PictPixelFormat format)
         {
             var remap = new byte[Math.Max(palette.Length, 1)];
-            for (int i = 0; i < remap.Length; i++) remap[i] = (byte)i;
+            for (int i = 0; i < remap.Length; i++)
+            {
+                remap[i] = (byte)i;
+            }
+
             var white = new RgbaColor(255, 255, 255);
             var black = new RgbaColor(0, 0, 0);
             if (format == PictPixelFormat.Indexed1 && palette.Length == 2 && palette[0] == black && palette[1] == white)
+            {
                 return (new[] { white, black }, new byte[] { 1, 0 });
+            }
+
             return (palette, remap);
         }
 
@@ -120,9 +143,17 @@ namespace ClassicMac.Graphics.ImageSharp
             double h = m.HorizontalResolution, v = m.VerticalResolution;
             switch (m.ResolutionUnits)
             {
-                case PixelResolutionUnit.PixelsPerCentimeter: h *= 2.54; v *= 2.54; break;
-                case PixelResolutionUnit.PixelsPerMeter: h *= 0.0254; v *= 0.0254; break;
-                case PixelResolutionUnit.AspectRatio: h = v = 72; break;
+                case PixelResolutionUnit.PixelsPerCentimeter:
+                    h *= 2.54;
+                    v *= 2.54;
+                    break;
+                case PixelResolutionUnit.PixelsPerMeter:
+                    h *= 0.0254;
+                    v *= 0.0254;
+                    break;
+                case PixelResolutionUnit.AspectRatio:
+                    h = v = 72;
+                    break;
             }
             return (h > 0 ? h : 72, v > 0 ? v : 72);
         }

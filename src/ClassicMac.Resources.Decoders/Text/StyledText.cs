@@ -59,7 +59,10 @@ namespace ClassicMac.Resources.Decoders.Text
             var decoded = MacText.Decode(text, options ?? DecodeOptions.Default);
             var complete = true;
             var styles = styl.IsEmpty ? [] : StyleRuns.Read(styl, out complete);
-            if (styles.Count == 0) styles = [new StyleRun(0, 0, 0, 3, 0, 12, 0, 0, 0)];
+            if (styles.Count == 0)
+            {
+                styles = [new StyleRun(0, 0, 0, 3, 0, 12, 0, 0, 0)];
+            }
 
             // As TEUseStyleScrap applies a style scrap (disassembly; SimpleText, the Help Manager and DOCMaker all use
             // it): in stored order from the start of the text, each run up to where the next run's start says (a run's
@@ -81,7 +84,11 @@ namespace ClassicMac.Resources.Decoders.Text
             for (var start = 0; start < decoded.Length;)
             {
                 var end = start + 1;
-                while (end < decoded.Length && styleOf[end] == styleOf[start]) end++;
+                while (end < decoded.Length && styleOf[end] == styleOf[start])
+                {
+                    end++;
+                }
+
                 var s = styles[styleOf[start]];
                 runs.Add(new TextRun(start, end - start, s.Font, StyleRuns.FontName(s.Font), s.Size > 0 ? s.Size : 12, s.Face,
                     (byte)(s.Red >> 8), (byte)(s.Green >> 8), (byte)(s.Blue >> 8), s.Height, s.Ascent));

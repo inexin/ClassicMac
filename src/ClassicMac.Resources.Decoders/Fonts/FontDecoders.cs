@@ -62,7 +62,11 @@ namespace ClassicMac.Resources.Decoders.Fonts
             var id = input.Resource.Id;
             foreach (var (fondId, fondName) in input.Ids(Fond))
             {
-                if (input.Find(Fond, fondId) is not { } data) continue;
+                if (input.Find(Fond, fondId) is not { } data)
+                {
+                    continue;
+                }
+
                 FontFamily family;
                 try
                 {
@@ -72,7 +76,10 @@ namespace ClassicMac.Resources.Decoders.Fonts
                 {
                     continue;
                 }
-                if (family.Fonts.FirstOrDefault(f => f.FontId == id && f.Size > 0) is { Size: > 0 } font) return (fondName, font.Size, font.Style);
+                if (family.Fonts.FirstOrDefault(f => f.FontId == id && f.Size > 0) is { Size: > 0 } font)
+                {
+                    return (fondName, font.Size, font.Style);
+                }
             }
             if (input.Resource.Type.ToString() == "FONT")
             {
@@ -121,11 +128,19 @@ namespace ClassicMac.Resources.Decoders.Fonts
                 {
                     w.WriteStartObject();
                     w.WriteNumber("character", g.Character);
-                    if (g.Character >= 0) w.WriteString("text", MacRoman.Decode([(byte)g.Character]));
+                    if (g.Character >= 0)
+                    {
+                        w.WriteString("text", MacRoman.Decode([(byte)g.Character]));
+                    }
+
                     w.WriteNumber("advance", g.Advance);
                     w.WriteNumber("left", font.MaxKern + g.Offset);
                     w.WriteNumber("width", g.ImageWidth);
-                    if (g.FractionalAdvance is { } f) w.WriteNumber("fractionalAdvance", f);
+                    if (g.FractionalAdvance is { } f)
+                    {
+                        w.WriteNumber("fractionalAdvance", f);
+                    }
+
                     if (font.HasHeightTable)
                     {
                         w.WriteNumber("top", g.Top);
@@ -147,13 +162,21 @@ namespace ClassicMac.Resources.Decoders.Fonts
         // Pixel values to colours: a 1-bit font black; a deeper one through its fctb, else greys from white to black.
         private static Func<int, (byte R, byte G, byte B)> Palette(DecodeInput input, BitmapFont font)
         {
-            if (font.Depth == 1) return _ => (0, 0, 0);
+            if (font.Depth == 1)
+            {
+                return _ => (0, 0, 0);
+            }
+
             var table = input.Find(FourCC.FromString("fctb"), input.Resource.Id) is { } fctb ? FontColorTable.Read(fctb) : [];
             var colours = table.GroupBy(e => e.Value).ToDictionary(g => g.Key, g => ((byte)(g.First().Red >> 8), (byte)(g.First().Green >> 8), (byte)(g.First().Blue >> 8)));
             var max = (1 << font.Depth) - 1;
             return value =>
             {
-                if (colours.TryGetValue(value, out var colour)) return colour;
+                if (colours.TryGetValue(value, out var colour))
+                {
+                    return colour;
+                }
+
                 var grey = (byte)(255 - value * 255 / max);
                 return (grey, grey, grey);
             };
@@ -183,7 +206,11 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     for (var x = 0; x < g.ImageWidth; x++)
                     {
                         var value = pixels[y * g.ImageWidth + x];
-                        if (value == 0) continue;
+                        if (value == 0)
+                        {
+                            continue;
+                        }
+
                         var (r, gr, b) = colour(value);
                         var at = ((y0 + y) * width + x0 + x) * 4;
                         rgba[at] = r;
@@ -239,7 +266,10 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     var row = new byte[rowBytes];
                     for (var x = 0; x < g.ImageWidth; x++)
                     {
-                        if (pixels[y * g.ImageWidth + x] != 0) row[x >> 3] |= (byte)(0x80 >> (x & 7));
+                        if (pixels[y * g.ImageWidth + x] != 0)
+                        {
+                            row[x >> 3] |= (byte)(0x80 >> (x & 7));
+                        }
                     }
                     text.Append(Convert.ToHexString(row)).Append('\n');
                 }
@@ -259,16 +289,14 @@ namespace ClassicMac.Resources.Decoders.Fonts
                 w.WriteNumber("familyId", family.FamilyId);
                 w.WriteNumber("flags", family.Flags);
                 w.WriteNumber("version", family.Version);
-                if (family.Language is { } language) w.WriteNumber("language", language);
-                w.WriteNumber("firstChar", family.FirstChar);
+                if (family.Language is { } language) { w.WriteNumber("language", language); } w.WriteNumber("firstChar", family.FirstChar);
                 w.WriteNumber("lastChar", family.LastChar);
                 w.WriteNumber("ascent", family.Ascent);
                 w.WriteNumber("descent", family.Descent);
                 w.WriteNumber("leading", family.Leading);
                 w.WriteNumber("maxWidth", family.MaxWidth);
                 w.WriteStartArray("styleExtras");
-                foreach (var extra in family.StyleExtras) w.WriteNumberValue(extra);
-                w.WriteEndArray();
+                foreach (var extra in family.StyleExtras) { w.WriteNumberValue(extra); } w.WriteEndArray();
                 w.WriteStartArray("fonts");
                 foreach (var font in family.Fonts)
                 {
@@ -281,9 +309,7 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     var type = font.Size <= 0 ? (input.Find(FourCC.FromString(font.Kind), font.FontId) is not null ? font.Kind : null)
                         : input.Find(FourCC.FromString("NFNT"), font.FontId) is not null ? "NFNT"
                         : input.Find(FourCC.FromString("FONT"), font.FontId) is not null ? "FONT" : null;
-                    if (type is null) w.WriteNull("resource");
-                    else w.WriteString("resource", type);
-                    w.WriteEndObject();
+                    if (type is null) { w.WriteNull("resource"); } else { w.WriteString("resource", type); } w.WriteEndObject();
                 }
                 w.WriteEndArray();
                 w.WriteStartArray("bounds");
@@ -304,8 +330,7 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     w.WriteStartObject();
                     w.WriteNumber("style", table.Style);
                     w.WriteStartArray("widths");
-                    foreach (var width in table.Widths) w.WriteNumberValue(width);
-                    w.WriteEndArray();
+                    foreach (var width in table.Widths) { w.WriteNumberValue(width); } w.WriteEndArray();
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -333,11 +358,9 @@ namespace ClassicMac.Resources.Decoders.Fonts
                     w.WriteNumber("fontClass", mapping.FontClass);
                     w.WriteNumber("encodingOffset", mapping.EncodingOffset);
                     w.WriteStartArray("indexes");
-                    foreach (var index in mapping.Indexes) w.WriteNumberValue(index);
-                    w.WriteEndArray();
+                    foreach (var index in mapping.Indexes) { w.WriteNumberValue(index); } w.WriteEndArray();
                     w.WriteStartArray("names");
-                    foreach (var n in mapping.Names) w.WriteStringValue(n);
-                    w.WriteEndArray();
+                    foreach (var n in mapping.Names) { w.WriteStringValue(n); } w.WriteEndArray();
                     w.WriteStartArray("glyphEncoding");
                     foreach (var (code, glyph) in mapping.Encoding)
                     {

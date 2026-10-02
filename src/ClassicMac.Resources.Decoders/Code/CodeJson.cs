@@ -25,9 +25,20 @@ namespace ClassicMac.Resources.Decoders.Code
             w.WriteString("model", Name(app.Model));
             w.WriteBoolean("farModel", app.IsFarModel);
             w.WriteBoolean("powerPC", app.HasPowerPCFragment);
-            if (app.Entry is { } entry) Entry(w, "entry", entry);
-            else w.WriteNull("entry");
-            if (app.OriginalEntry is { } original) Entry(w, "originalEntry", original);
+            if (app.Entry is { } entry)
+            {
+                Entry(w, "entry", entry);
+            }
+            else
+            {
+                w.WriteNull("entry");
+            }
+
+            if (app.OriginalEntry is { } original)
+            {
+                Entry(w, "originalEntry", original);
+            }
+
             if (app.A5Init is { } init)
             {
                 w.WriteStartObject("a5Init");
@@ -51,7 +62,11 @@ namespace ClassicMac.Resources.Decoders.Code
                 w.WriteEndArray();
                 w.WriteEndObject();
             }
-            if (app.DataRelocations.Count > 0) w.WriteNumber("dataRelocations", app.DataRelocations.Count);
+            if (app.DataRelocations.Count > 0)
+            {
+                w.WriteNumber("dataRelocations", app.DataRelocations.Count);
+            }
+
             w.WriteStartArray("entries");
             foreach (var e in app.JumpTable)
             {
@@ -59,11 +74,31 @@ namespace ClassicMac.Resources.Decoders.Code
                 w.WriteNumber("index", e.Index);
                 w.WriteNumber("a5Offset", e.A5Offset);
                 w.WriteString("kind", Name(e.Kind));
-                if (e.Kind is not (JumpTableEntryKind.FarMarker or JumpTableEntryKind.Unrecognized)) w.WriteNumber("segment", e.Segment);
-                if (e.Kind is JumpTableEntryKind.NearUnloaded or JumpTableEntryKind.FarUnloaded) w.WriteNumber("offset", e.Offset);
-                if (e.ResourceOffset is { } at) w.WriteNumber("resourceOffset", at);
-                if (e.Kind is JumpTableEntryKind.NearLoaded or JumpTableEntryKind.FarLoaded) w.WriteNumber("address", e.Address);
-                if (e.Kind == JumpTableEntryKind.Unrecognized) w.WriteString("raw", e.Raw.ToString("X16", System.Globalization.CultureInfo.InvariantCulture));
+                if (e.Kind is not (JumpTableEntryKind.FarMarker or JumpTableEntryKind.Unrecognized))
+                {
+                    w.WriteNumber("segment", e.Segment);
+                }
+
+                if (e.Kind is JumpTableEntryKind.NearUnloaded or JumpTableEntryKind.FarUnloaded)
+                {
+                    w.WriteNumber("offset", e.Offset);
+                }
+
+                if (e.ResourceOffset is { } at)
+                {
+                    w.WriteNumber("resourceOffset", at);
+                }
+
+                if (e.Kind is JumpTableEntryKind.NearLoaded or JumpTableEntryKind.FarLoaded)
+                {
+                    w.WriteNumber("address", e.Address);
+                }
+
+                if (e.Kind == JumpTableEntryKind.Unrecognized)
+                {
+                    w.WriteString("raw", e.Raw.ToString("X16", System.Globalization.CultureInfo.InvariantCulture));
+                }
+
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -118,7 +153,11 @@ namespace ClassicMac.Resources.Decoders.Code
             foreach (var f in functions)
             {
                 w.WriteStartObject();
-                if (withSection) w.WriteNumber("section", f.Section);
+                if (withSection)
+                {
+                    w.WriteNumber("section", f.Section);
+                }
+
                 w.WriteNumber("offset", f.Offset);
                 w.WriteString("name", f.Name);
                 w.WriteString("source", Name(f.Source));
@@ -133,7 +172,11 @@ namespace ClassicMac.Resources.Decoders.Code
             foreach (var r in references)
             {
                 w.WriteStartObject();
-                if (withSection) w.WriteNumber("section", r.Section);
+                if (withSection)
+                {
+                    w.WriteNumber("section", r.Section);
+                }
+
                 w.WriteNumber("offset", r.Offset);
                 w.WriteString("kind", Name(r.Kind));
                 w.WriteString("text", r.Text);
@@ -155,7 +198,11 @@ namespace ClassicMac.Resources.Decoders.Code
             {
                 w.WriteStartObject();
                 w.WriteNumber("index", s.Index);
-                if (s.Name is { } name) w.WriteString("name", name);
+                if (s.Name is { } name)
+                {
+                    w.WriteString("name", name);
+                }
+
                 w.WriteString("kind", Name(s.Kind));
                 w.WriteString("share", Name(s.ShareKind));
                 w.WriteNumber("totalLength", s.TotalLength);
@@ -166,7 +213,11 @@ namespace ClassicMac.Resources.Decoders.Code
                 w.WriteEndObject();
             }
             w.WriteEndArray();
-            if (pef.Loader is not { } loader) return;
+            if (pef.Loader is not { } loader)
+            {
+                return;
+            }
+
             EntryPoint(w, "main", loader.Main);
             EntryPoint(w, "init", loader.Init);
             EntryPoint(w, "term", loader.Term);
@@ -197,7 +248,11 @@ namespace ClassicMac.Resources.Decoders.Code
 
         private static void EntryPoint(Utf8JsonWriter w, string name, PefEntryPoint? point)
         {
-            if (point is not { } p) return;
+            if (point is not { } p)
+            {
+                return;
+            }
+
             w.WriteStartObject(name);
             w.WriteNumber("section", p.Section);
             w.WriteNumber("offset", p.Offset);
@@ -229,7 +284,11 @@ namespace ClassicMac.Resources.Decoders.Code
                 w.WriteStartObject("search");
                 w.WriteString("libraryKind", search.LibraryKind.ToString());
                 w.WriteStartArray("qualifiers");
-                foreach (var q in search.Qualifiers) w.WriteStringValue(q);
+                foreach (var q in search.Qualifiers)
+                {
+                    w.WriteStringValue(q);
+                }
+
                 w.WriteEndArray();
                 w.WriteEndObject();
             }

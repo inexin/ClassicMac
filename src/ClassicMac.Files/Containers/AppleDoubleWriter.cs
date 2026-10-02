@@ -65,7 +65,10 @@ namespace ClassicMac.Files.Containers
             Entry(FinderInfoEntry, FinderInfo.Length);
             var data = single ? file.DataFork.Length : 0;
             if (data + file.ResourceFork.Length > uint.MaxValue - (long)offset)
+            {
                 throw new ArgumentException("The forks are too large for AppleSingle or AppleDouble.", nameof(file));
+            }
+
             if (single)
             {
                 writer.WriteUInt32At(entry, DataForkEntry);
@@ -99,7 +102,11 @@ namespace ClassicMac.Files.Containers
         // Signed seconds from 2000 UTC; int.MinValue when unknown.
         private static int Seconds(MacDate? date, TimeZoneInfo zone)
         {
-            if (date is not { } d) return int.MinValue;
+            if (date is not { } d)
+            {
+                return int.MinValue;
+            }
+
             var local = DateTime.SpecifyKind(d.ToDateTime(), DateTimeKind.Unspecified);
             var utc = zone.IsInvalidTime(local) ? local - zone.GetUtcOffset(local.AddHours(-1)) : TimeZoneInfo.ConvertTimeToUtc(local, zone);
             return (int)Math.Clamp((long)(utc - DateEpoch).TotalSeconds, int.MinValue + 1, int.MaxValue);

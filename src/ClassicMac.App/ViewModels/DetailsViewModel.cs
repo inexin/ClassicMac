@@ -47,9 +47,17 @@ namespace ClassicMac.App.ViewModels
                 new("Read as", HostFiles.FormatName(input.Host.Layout)),
             };
             rows.AddRange(input.Host.Companions.Select(c => new DetailRow("With", c)));
-            if (input.Root.Children.Count > 0) rows.Add(new("Holds", input.Root.Children[0].Format));
+            if (input.Root.Children.Count > 0)
+            {
+                rows.Add(new("Holds", input.Root.Children[0].Format));
+            }
+
             rows.AddRange(FileRows(input.Root.File));
-            if (input.RawResources is { Fork: { } fork }) rows.Add(new("Resources", $"{fork.Resources.Count} in {fork.Types.Count} types (the file is a resource fork)"));
+            if (input.RawResources is { Fork: { } fork })
+            {
+                rows.Add(new("Resources", $"{fork.Resources.Count} in {fork.Types.Count} types (the file is a resource fork)"));
+            }
+
             return new DetailsViewModel(input.Title, rows);
         }
 
@@ -60,7 +68,11 @@ namespace ClassicMac.App.ViewModels
                 new("Mac path", file.MacPath),
                 new("Found in", foundIn),
             };
-            if (holds is not null) rows.Add(new("Holds", holds));
+            if (holds is not null)
+            {
+                rows.Add(new("Holds", holds));
+            }
+
             rows.AddRange(FileRows(file));
             if (resources is { } found)
             {

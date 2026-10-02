@@ -1,11 +1,11 @@
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -24,7 +24,11 @@ public class ScreenDepthTests
             .U16(0).U16(1).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0)
             .U16(16).U16(32).U16(3).U16(8).U16(0).U16(0).U16(0).U16(0).U16(0).U16(0)
             .Rect(0, 0, h, w).Rect(0, 0, h, w).U16(mode);
-        foreach (var p in pixels) b.U8(0).U8(p.r).U8(p.g).U8(p.b);
+        foreach (var p in pixels)
+        {
+            b.U8(0).U8(p.r).U8(p.g).U8(p.b);
+        }
+
         return b.Align().U16(0x00FF);
     }
 

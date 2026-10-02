@@ -51,7 +51,11 @@ namespace ClassicMac.Code.M68k
         {
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(data);
-            if (reader.Length < 2 || reader.ReadUInt16At(0) != Signature) return null;
+            if (reader.Length < 2 || reader.ReadUInt16At(0) != Signature)
+            {
+                return null;
+            }
+
             if (reader.Length < TableOffset)
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.package-truncated",
@@ -68,8 +72,11 @@ namespace ClassicMac.Code.M68k
             var entries = new List<PackageEntry>();
             int step = (flags & 1) != 0 ? 2 : 1;
             if (last < first)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.package-range",
                     $"The $A9FF header's last selector {last} is before its first {first}.", 12));
+            }
+
             for (int selector = first; selector <= last; selector += step)
             {
                 if (!reader.TryReadUInt16(out var offset))

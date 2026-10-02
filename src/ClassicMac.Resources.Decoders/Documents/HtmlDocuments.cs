@@ -52,8 +52,16 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 CollectTargets();
                 var pages = new List<DocumentFile>();
-                if (document.Kind == DocumentKind.DocMaker) pages.Add(Page("index.html", Contents()));
-                for (var i = 0; i < document.Chapters.Count; i++) pages.Add(Page(PageName(document, document.Chapters[i].Number), Chapter(i)));
+                if (document.Kind == DocumentKind.DocMaker)
+                {
+                    pages.Add(Page("index.html", Contents()));
+                }
+
+                for (var i = 0; i < document.Chapters.Count; i++)
+                {
+                    pages.Add(Page(PageName(document, document.Chapters[i].Number), Chapter(i)));
+                }
+
                 pages.Add(Page("style.css", Css()));
                 pages.AddRange(imageFiles.OrderBy(f => f.Path, StringComparer.Ordinal));
                 return pages;
@@ -68,13 +76,18 @@ namespace ClassicMac.Resources.Decoders.Documents
                 {
                     foreach (var picture in chapter.Pictures)
                     {
-                        if (picture.Action is { Code: 1, Paragraph: >= 0 } a) targets.Add((a.Chapter, a.Paragraph));
+                        if (picture.Action is { Code: 1, Paragraph: >= 0 } a)
+                        {
+                            targets.Add((a.Chapter, a.Paragraph));
+                        }
                     }
                 }
                 foreach (var entry in document.Contents)
                 {
                     if (document.Chapters.FirstOrDefault(c => c.Number == entry.Chapter) is { } chapter)
+                    {
                         targets.Add((entry.Chapter, DocumentFlow.ParagraphOf(chapter.Text.Text, entry.SelectionStart)));
+                    }
                 }
             }
 
@@ -111,7 +124,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                 var navigation = docMaker ? Navigation(index) : "";
                 html.Append(navigation);
                 html.Append("<main class=\"column\" style=\"");
-                if (chapter.ColumnWidth > 0) html.Append(CultureInfo.InvariantCulture, $"width:{chapter.ColumnWidth}px;");
+                if (chapter.ColumnWidth > 0)
+                {
+                    html.Append(CultureInfo.InvariantCulture, $"width:{chapter.ColumnWidth}px;");
+                }
+
                 html.Append("text-align:").Append(chapter.Justification switch
                 {
                     Justification.Center => "center",
@@ -150,8 +167,14 @@ namespace ClassicMac.Resources.Decoders.Documents
                 foreach (var block in DocumentFlow.Blocks(chapter))
                 {
                     Targets(html, chapter, block.Paragraph);
-                    if (block is DocumentLine line) Paragraph(html, chapter, line.Start, line.End);
-                    else if (block is PictureRow row) Row(html, chapter, row.Pictures);
+                    if (block is DocumentLine line)
+                    {
+                        Paragraph(html, chapter, line.Start, line.End);
+                    }
+                    else if (block is PictureRow row)
+                    {
+                        Row(html, chapter, row.Pictures);
+                    }
                 }
                 Targets(html, chapter, int.MaxValue);
             }
@@ -160,7 +183,11 @@ namespace ClassicMac.Resources.Decoders.Documents
             private void Targets(StringBuilder html, DocumentChapter chapter, int upTo)
             {
                 var due = targets.Where(t => t.Chapter == chapter.Number && t.Paragraph >= nextTarget && t.Paragraph <= upTo).Select(t => t.Paragraph);
-                foreach (var paragraph in due.Order()) html.Append(CultureInfo.InvariantCulture, $"<a id=\"p{paragraph}\"></a>\n");
+                foreach (var paragraph in due.Order())
+                {
+                    html.Append(CultureInfo.InvariantCulture, $"<a id=\"p{paragraph}\"></a>\n");
+                }
+
                 nextTarget = upTo == int.MaxValue ? upTo : Math.Max(nextTarget, upTo + 1);
             }
 
@@ -182,7 +209,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                     {
                         var from = Math.Max(start, run.Start);
                         var to = Math.Min(end, run.Start + run.Length);
-                        if (from >= to) continue;
+                        if (from >= to)
+                        {
+                            continue;
+                        }
+
                         var style = Style(run);
                         var content = Escape(chapter.Text.Text[from..to]);
                         html.Append(run == first ? content : $"<span class=\"{style}\">{content}</span>");
@@ -198,9 +229,17 @@ namespace ClassicMac.Resources.Decoders.Documents
                 foreach (var (alignment, name) in new[] { (PictureAlignment.Left, "l"), (PictureAlignment.Center, "c"), (PictureAlignment.Right, "r") })
                 {
                     var placed = row.Where(p => p.Alignment == alignment).ToList();
-                    if (placed.Count == 0) continue;
+                    if (placed.Count == 0)
+                    {
+                        continue;
+                    }
+
                     html.Append("<div class=\"").Append(name).Append("\">");
-                    foreach (var picture in placed) html.Append(Picture(chapter, picture));
+                    foreach (var picture in placed)
+                    {
+                        html.Append(Picture(chapter, picture));
+                    }
+
                     html.Append("</div>");
                 }
                 html.Append("</div>\n");
@@ -222,7 +261,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                     ? $"<span class=\"missing\" style=\"width:{width}px;height:{height}px\" title=\"{alt} (not drawn)\"></span>"
                     : $"<img src=\"{file}\" {size} alt=\"{alt}\">";
                 var (href, title) = Link(chapter, picture.Action);
-                if (href is not null) return $"<a href=\"{Escape(href)}\"{(title is null ? "" : $" title=\"{Escape(title)}\"")}>{element}</a>";
+                if (href is not null)
+                {
+                    return $"<a href=\"{Escape(href)}\"{(title is null ? "" : $" title=\"{Escape(title)}\"")}>{element}</a>";
+                }
+
                 return title is null ? element : $"<span title=\"{Escape(title)}\">{element}</span>";
             }
 
@@ -251,7 +294,11 @@ namespace ClassicMac.Resources.Decoders.Documents
             // The picture's file, drawn once per PICT ID; null when it is missing or cannot be drawn.
             private string? Image(DocumentChapter chapter, DocumentPicture picture)
             {
-                if (images.TryGetValue(picture.PictureId, out var known)) return known;
+                if (images.TryGetValue(picture.PictureId, out var known))
+                {
+                    return known;
+                }
+
                 string? file = null;
                 if (DocumentPictures.Draw(chapter, picture, options, diagnostics) is { } image)
                 {
@@ -267,15 +314,51 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 var css = new StringBuilder("font-family:").Append(FontFamily(run.FontName));
                 css.Append(CultureInfo.InvariantCulture, $";font-size:{run.Size}px");
-                if (run.LineHeight > 0) css.Append(CultureInfo.InvariantCulture, $";line-height:{run.LineHeight}px");
-                if (run.Bold) css.Append(";font-weight:bold");
-                if (run.Italic) css.Append(";font-style:italic");
-                if (run.Underline) css.Append(";text-decoration:underline");
-                if (run.Outline || run.Shadow) css.Append(";-webkit-text-stroke:1px currentColor;-webkit-text-fill-color:transparent");
-                if (run.Shadow) css.Append(";text-shadow:1px 1px 0 currentColor");
-                if (run.Condense) css.Append(";letter-spacing:-1px");
-                if (run.Extend) css.Append(";letter-spacing:1px");
-                if ((run.Red, run.Green, run.Blue) != (0, 0, 0)) css.Append(";color:").Append(Colour(run.Red, run.Green, run.Blue));
+                if (run.LineHeight > 0)
+                {
+                    css.Append(CultureInfo.InvariantCulture, $";line-height:{run.LineHeight}px");
+                }
+
+                if (run.Bold)
+                {
+                    css.Append(";font-weight:bold");
+                }
+
+                if (run.Italic)
+                {
+                    css.Append(";font-style:italic");
+                }
+
+                if (run.Underline)
+                {
+                    css.Append(";text-decoration:underline");
+                }
+
+                if (run.Outline || run.Shadow)
+                {
+                    css.Append(";-webkit-text-stroke:1px currentColor;-webkit-text-fill-color:transparent");
+                }
+
+                if (run.Shadow)
+                {
+                    css.Append(";text-shadow:1px 1px 0 currentColor");
+                }
+
+                if (run.Condense)
+                {
+                    css.Append(";letter-spacing:-1px");
+                }
+
+                if (run.Extend)
+                {
+                    css.Append(";letter-spacing:1px");
+                }
+
+                if ((run.Red, run.Green, run.Blue) != (0, 0, 0))
+                {
+                    css.Append(";color:").Append(Colour(run.Red, run.Green, run.Blue));
+                }
+
                 var declaration = css.ToString();
                 var index = styles.IndexOf(declaration);
                 if (index < 0)
@@ -299,7 +382,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                 css.Append(".row .l{grid-column:1;justify-self:start}\n.row .c{grid-column:2}\n.row .r{grid-column:3;justify-self:end}\n");
                 css.Append(".row img,.row .missing{display:inline-block;vertical-align:top}\n");
                 css.Append(".missing{box-sizing:border-box;border:1px dashed #888}\n");
-                for (var i = 0; i < styles.Count; i++) css.Append(CultureInfo.InvariantCulture, $".s{i}{{{styles[i]}}}\n");
+                for (var i = 0; i < styles.Count; i++)
+                {
+                    css.Append(CultureInfo.InvariantCulture, $".s{i}{{{styles[i]}}}\n");
+                }
+
                 return css.ToString();
             }
         }
@@ -358,10 +445,18 @@ namespace ClassicMac.Resources.Decoders.Documents
             ArgumentNullException.ThrowIfNull(picture);
             ArgumentNullException.ThrowIfNull(options);
             ArgumentNullException.ThrowIfNull(diagnostics);
-            if (picture.Picture is not { } data) return null;
+            if (picture.Picture is not { } data)
+            {
+                return null;
+            }
+
             try
             {
-                if ((long)picture.Width * picture.Height > options.MaxImagePixels) throw new InvalidDataException("Its frame is over the pixel limit.");
+                if ((long)picture.Width * picture.Height > options.MaxImagePixels)
+                {
+                    throw new InvalidDataException("Its frame is over the pixel limit.");
+                }
+
                 var bitmap = PictureDecoder.Draw(data.ToArray(), options);
                 return options.ImageEncoder.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels);
             }

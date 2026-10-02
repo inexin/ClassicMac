@@ -40,7 +40,10 @@ namespace ClassicMac.Files.Containers
             {
                 // Only text may precede the first begin line, as for BinHex (docs/formats/containers/binhex.md §5).
                 // [ClassicMac]
-                if (ParseBegin(text.AsSpan(start, end - start), out _, out _)) return PlainText.IsText(text.AsSpan(0, start));
+                if (ParseBegin(text.AsSpan(start, end - start), out _, out _))
+                {
+                    return PlainText.IsText(text.AsSpan(0, start));
+                }
             }
             return false;
         }
@@ -58,13 +61,20 @@ namespace ClassicMac.Files.Containers
                 {
                     // Outside a block only begin lines matter: anything else is mail or news text. [Doc]
                     if (ParseBegin(line, out var base64, out var name))
+                    {
                         block = new Block(base64, name);
+                    }
+
                     continue;
                 }
                 if (block.Ended)
                 {
                     // After the zero-count line the next line should be "end". [Doc]
-                    if (IsBlank(line)) continue;
+                    if (IsBlank(line))
+                    {
+                        continue;
+                    }
+
                     if (!line.TrimEnd(" \t"u8).SequenceEqual("end"u8))
                     {
                         context.Report(DiagnosticSeverity.Warning, "uuencode.missing-end",
@@ -72,11 +82,22 @@ namespace ClassicMac.Files.Containers
                     }
                     files.Add(block.ToFile());
                     block = null;
-                    if (ParseBegin(line, out var base64, out var name)) block = new Block(base64, name);
+                    if (ParseBegin(line, out var base64, out var name))
+                    {
+                        block = new Block(base64, name);
+                    }
+
                     continue;
                 }
-                if (block.Base64) DecodeBase64Line(line, start, block, context);
-                else DecodeUuLine(line, start, block, context);
+                if (block.Base64)
+                {
+                    DecodeBase64Line(line, start, block, context);
+                }
+                else
+                {
+                    DecodeUuLine(line, start, block, context);
+                }
+
                 if (block.Ended && block.Base64)
                 {
                     files.Add(block.ToFile());
@@ -97,7 +118,11 @@ namespace ClassicMac.Files.Containers
                 }
                 files.Add(block.ToFile());
             }
-            if (files.Count == 0) throw new InvalidDataException("No uuencode begin line found.");
+            if (files.Count == 0)
+            {
+                throw new InvalidDataException("No uuencode begin line found.");
+            }
+
             return files;
         }
 
@@ -134,7 +159,10 @@ namespace ClassicMac.Files.Containers
                 var at = 1 + g * 4;
                 int a = Char(line, at), b = Char(line, at + 1), c = Char(line, at + 2), d = Char(line, at + 3);
                 var bytes = a << 18 | b << 12 | c << 6 | d;
-                for (var k = 0; k < 3 && g * 3 + k < count; k++) block.Data.WriteByte((byte)(bytes >> (16 - 8 * k)));
+                for (var k = 0; k < 3 && g * 3 + k < count; k++)
+                {
+                    block.Data.WriteByte((byte)(bytes >> (16 - 8 * k)));
+                }
             }
         }
 
@@ -185,16 +213,35 @@ namespace ClassicMac.Files.Containers
         {
             name = [];
             base64 = line.StartsWith("begin-base64 "u8);
-            if (!base64 && !line.StartsWith("begin "u8)) return false;
+            if (!base64 && !line.StartsWith("begin "u8))
+            {
+                return false;
+            }
+
             var rest = line[(base64 ? 13 : 6)..];
             var digits = 0;
-            while (digits < rest.Length && rest[digits] is >= (byte)'0' and <= (byte)'7') digits++;
-            if (digits is 0 or > 6 || digits >= rest.Length || rest[digits] != ' ') return false;
+            while (digits < rest.Length && rest[digits] is >= (byte)'0' and <= (byte)'7')
+            {
+                digits++;
+            }
+
+            if (digits is 0 or > 6 || digits >= rest.Length || rest[digits] != ' ')
+            {
+                return false;
+            }
+
             var path = rest[(digits + 1)..].TrimEnd(" \t"u8);
-            if (path.IsEmpty) return false;
+            if (path.IsEmpty)
+            {
+                return false;
+            }
             // The name is a host path; ClassicMac keeps its last component, cut to 255 bytes.
             var slash = path.LastIndexOf((byte)'/');
-            if (slash >= 0 && slash < path.Length - 1) path = path[(slash + 1)..];
+            if (slash >= 0 && slash < path.Length - 1)
+            {
+                path = path[(slash + 1)..];
+            }
+
             name = path[..Math.Min(path.Length, 255)].ToArray();
             return true;
         }
@@ -224,7 +271,11 @@ namespace ClassicMac.Files.Containers
         {
             var values = new sbyte[128];
             Array.Fill(values, (sbyte)-1);
-            for (var i = 0; i < Base64Alphabet.Length; i++) values[Base64Alphabet[i]] = (sbyte)i;
+            for (var i = 0; i < Base64Alphabet.Length; i++)
+            {
+                values[Base64Alphabet[i]] = (sbyte)i;
+            }
+
             return values;
         }
 

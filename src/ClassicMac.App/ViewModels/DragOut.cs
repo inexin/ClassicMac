@@ -51,7 +51,11 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         public async Task<IReadOnlyList<string>> PrepareDragOutAsync(NodeViewModel node)
         {
-            if (!CanDragOut(node)) return [];
+            if (!CanDragOut(node))
+            {
+                return [];
+            }
+
             var folder = Path.Combine(DragFolder, Guid.NewGuid().ToString("N"));
             var diagnostics = new List<Diagnostic>();
             // The status bar says what is written while the drag waits for it (boards/browse-tree.md, drag source).
@@ -68,7 +72,11 @@ namespace ClassicMac.App.ViewModels
                     ContainerFileNode container => await Task.Run(() => WriteFile(container.File, folder)),
                     _ => [],
                 };
-                foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
+                foreach (var d in diagnostics)
+                {
+                    Report(new DiagnosticEntry(d, node.Source, node));
+                }
+
                 Status = before;
                 return paths;
             }
@@ -85,7 +93,10 @@ namespace ClassicMac.App.ViewModels
         {
             try
             {
-                if (Directory.Exists(DragFolder)) Directory.Delete(DragFolder, recursive: true);
+                if (Directory.Exists(DragFolder))
+                {
+                    Directory.Delete(DragFolder, recursive: true);
+                }
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -95,7 +106,11 @@ namespace ClassicMac.App.ViewModels
         // The file with its resource edits, saved or not.
         private static MacFile WithEdits(FileNode node)
         {
-            if (node.Editing is not { } state) return node.File;
+            if (node.Editing is not { } state)
+            {
+                return node.File;
+            }
+
             var fork = ForkData.FromBytes(state.Session.Fork.ToArray());
             return state.ForkInDataFork ? node.File with { DataFork = fork } : node.File with { ResourceFork = fork };
         }
@@ -108,7 +123,10 @@ namespace ClassicMac.App.ViewModels
                 var path = Path.Combine(folder, HostNames.ToHostName(file.Name, 200) + (hasResources ? ".bin" : ""));
                 using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
                 {
-                    if (hasResources) MacBinaryWriter.Write(file, output);
+                    if (hasResources)
+                    {
+                        MacBinaryWriter.Write(file, output);
+                    }
                     else
                     {
                         using var data = file.DataFork.Open();

@@ -13,7 +13,10 @@ public class M68kDisassemblerTests
         var digits = hex.Replace(" ", "", StringComparison.Ordinal);
         var bytes = new byte[digits.Length / 2];
         for (int i = 0; i < bytes.Length; i++)
+        {
             bytes[i] = byte.Parse(digits.AsSpan(i * 2, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+        }
+
         return bytes;
     }
 
@@ -57,7 +60,10 @@ public class M68kDisassemblerTests
     public void Return_instructions_are_flagged()
     {
         foreach (var hex in new[] { "4E75", "4E74 0008", "4E73", "4E77", "06C8" })
+        {
             Assert.Equal(M68kFlags.Return, D(hex).Flags);
+        }
+
         Assert.Equal(8, ((M68kImmediate)D("4E74 0008").Operands[0]).Value);
     }
 

@@ -3,8 +3,8 @@ using System.Text;
 using System.Text.RegularExpressions;
 using ClassicMac.Core;
 using ClassicMac.Files.Iso;
-using static ClassicMac.Files.Tests.IsoBuilder;
 using ClassicMac.Tests;
+using static ClassicMac.Files.Tests.IsoBuilder;
 
 namespace ClassicMac.Files.Tests;
 
@@ -42,7 +42,10 @@ public class IsoTests
     {
         var builder = new IsoBuilder();
         foreach (var name in new[] { "README.TXT;1", "NOEXT.;1", "LONGNAME12.;1", "mixed.Case;1", "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456;1" })
+        {
             builder.Add("", new Rec(name, Text("x")));
+        }
+
         builder.Folder("SUB");
         builder.Add("SUB", new Rec("INSIDE.TXT;1", Text("inside")));
 
@@ -78,7 +81,11 @@ public class IsoTests
 
         var (files, _) = Read(builder.Build());
 
-        string Info(string name) { var f = Named(files, name).FinderInfo; return $"{f.Type}/{f.Creator} {(ushort)f.Flags:X4}"; }
+        string Info(string name)
+        {
+            var f = Named(files, name).FinderInfo;
+            return $"{f.Type}/{f.Creator} {(ushort)f.Flags:X4}";
+        }
         Assert.Equal("TEXT/hscd 0100", Info("PLAIN.TXT"));
         Assert.Equal("APPL/ttxt 2100", Info("AA.BIN"));
         Assert.Equal("APPL/abcd 2100", Info("BA3.BIN"));
@@ -205,13 +212,20 @@ public class IsoTests
                 .Select(Path.GetDirectoryName)
                 .FirstOrDefault(d => !Path.GetFileName(d!).StartsWith('.') && File.Exists(Path.Combine(d!, "log.txt"))
                     && File.ReadAllText(Path.Combine(d!, "log.txt")).Contains(":#1 FILE", StringComparison.Ordinal));
-        if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's iso_tests.iso and its log.txt to run this.");
+        if (folder is null)
+        {
+            Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's iso_tests.iso and its log.txt to run this.");
+        }
 
         var log = MacRoman.Decode(File.ReadAllBytes(Path.Combine(folder, "log.txt"))).Split('\r', '\n');
         // The emulator may still hold the disc open; any copy of it will do.
         var disc = CorpusFolders.EnumerateFiles("iso_tests.iso", SearchOption.AllDirectories)
             .OrderBy(f => Path.GetDirectoryName(f) == folder ? 0 : 1).Select(TryRead).FirstOrDefault(b => b is not null);
-        if (disc is null) Assert.Skip("The harness's iso_tests.iso is in use.");
+        if (disc is null)
+        {
+            Assert.Skip("The harness's iso_tests.iso is in use.");
+        }
+
         var (files, diagnostics) = Read(disc);
         Assert.Empty(diagnostics);
 

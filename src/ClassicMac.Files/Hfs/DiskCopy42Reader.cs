@@ -29,10 +29,22 @@ namespace ClassicMac.Files.Hfs
         public bool CanRead(ForkData input)
         {
             var header = input.ReadPrefix(HeaderLength);
-            if (header.Length < HeaderLength) return false;
+            if (header.Length < HeaderLength)
+            {
+                return false;
+            }
+
             var reader = new BigEndianReader(header);
-            if (reader.ReadUInt16At(82) != Private) return false;
-            if (header[0] > 63) return false;
+            if (reader.ReadUInt16At(82) != Private)
+            {
+                return false;
+            }
+
+            if (header[0] > 63)
+            {
+                return false;
+            }
+
             long dataSize = reader.ReadUInt32At(64);
             long tagSize = reader.ReadUInt32At(68);
             // Fitted checks on top of the note's $0100: whole blocks, 12 tag bytes per block or none.
@@ -42,7 +54,11 @@ namespace ClassicMac.Files.Hfs
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
-            if (!CanRead(input)) throw new InvalidDataException("Not a Disk Copy 4.2 image.");
+            if (!CanRead(input))
+            {
+                throw new InvalidDataException("Not a Disk Copy 4.2 image.");
+            }
+
             var header = input.ReadPrefix(HeaderLength);
             var reader = new BigEndianReader(header);
             long dataSize = reader.ReadUInt32At(64);
@@ -65,7 +81,9 @@ namespace ClassicMac.Files.Hfs
             {
                 CheckSum(disk, 0, reader.ReadUInt32At(72), "data", context);
                 if (tagSize > 0)
+                {
                     CheckSum(input.Slice(HeaderLength + dataSize, tagSize), 12, reader.ReadUInt32At(76), "tag", context);
+                }
             }
             return [new MacFile { Name = new MacString(header.AsSpan(1, header[0])), DataFork = disk }];
         }

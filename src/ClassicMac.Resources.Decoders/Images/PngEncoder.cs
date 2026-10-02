@@ -47,7 +47,10 @@ namespace ClassicMac.Resources.Decoders.Images
             ArgumentOutOfRangeException.ThrowIfLessThan(width, 1);
             ArgumentOutOfRangeException.ThrowIfLessThan(height, 1);
             var stride = checked(width * 4);
-            if (rgba.Length < (long)stride * height) throw new ArgumentException("Fewer pixels than the size says.", nameof(rgba));
+            if (rgba.Length < (long)stride * height)
+            {
+                throw new ArgumentException("Fewer pixels than the size says.", nameof(rgba));
+            }
 
             var output = new BigEndianWriter();
             output.WriteBytes(Signature);
@@ -87,7 +90,11 @@ namespace ClassicMac.Resources.Decoders.Images
         // CRC-32 (ISO 3309, reflected, polynomial $EDB88320) as the PNG specification defines it.
         private static uint Crc(uint crc, ReadOnlySpan<byte> data)
         {
-            foreach (var b in data) crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+            foreach (var b in data)
+            {
+                crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+            }
+
             return crc;
         }
 
@@ -97,7 +104,11 @@ namespace ClassicMac.Resources.Decoders.Images
             for (uint n = 0; n < 256; n++)
             {
                 var c = n;
-                for (var k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+                for (var k = 0; k < 8; k++)
+                {
+                    c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+                }
+
                 table[n] = c;
             }
             return table;

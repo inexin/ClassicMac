@@ -104,7 +104,11 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A size for people: bytes below 1 KB, else KB, MB or GB to one decimal.</summary>
         public static string FormatSize(long bytes)
         {
-            if (bytes < 1024) return string.Create(CultureInfo.InvariantCulture, $"{bytes:N0} {(bytes == 1 ? "byte" : "bytes")}");
+            if (bytes < 1024)
+            {
+                return string.Create(CultureInfo.InvariantCulture, $"{bytes:N0} {(bytes == 1 ? "byte" : "bytes")}");
+            }
+
             string[] units = ["KB", "MB", "GB", "TB"];
             double value = bytes;
             var unit = -1;
@@ -147,8 +151,15 @@ namespace ClassicMac.App.ViewModels
                 ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => () => ResourceIcon(resource),
                 _ => null,
             };
-            if (load is null) return;
-            if (await Task.Run(load) is { } png) IconPng = png;
+            if (load is null)
+            {
+                return;
+            }
+
+            if (await Task.Run(load) is { } png)
+            {
+                IconPng = png;
+            }
         }
 
         /// <summary>How many file icons the volume holding <paramref name="node"/> has resolved (for tests).</summary>
@@ -195,13 +206,22 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A bitmap fitted into 16 × 16 by nearest neighbour (never smoothed), as PNG; one that fits as it is.</summary>
         internal static byte[] Shrink16(RgbaBitmap bitmap)
         {
-            if (bitmap.Width <= 16 && bitmap.Height <= 16) return Png(bitmap);
+            if (bitmap.Width <= 16 && bitmap.Height <= 16)
+            {
+                return Png(bitmap);
+            }
+
             var size = Math.Max(bitmap.Width, bitmap.Height);
             int w = Math.Max(1, bitmap.Width * 16 / size), h = Math.Max(1, bitmap.Height * 16 / size);
             var small = new RgbaBitmap(w, h);
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
+                {
                     small[x, y] = bitmap[x * bitmap.Width / w, y * bitmap.Height / h];
+                }
+            }
+
             return Png(small);
         }
 

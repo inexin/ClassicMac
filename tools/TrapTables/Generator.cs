@@ -15,7 +15,9 @@ public static class TrapTablesGenerator
 
         var items = new List<Item>();
         foreach (string file in Directory.GetFiles(defs, "*.yaml").OrderBy(f => f, StringComparer.Ordinal))
+        {
             items.AddRange(Yaml.Read(file));
+        }
 
         // ---- Traps ----
         // word -> (name, modifier kind). The first definition of a word wins (files in name order, items in file order).
@@ -29,23 +31,35 @@ public static class TrapTablesGenerator
             AddTrap(trap, d["name"], d.File);
         }
         foreach (var f in items.Where(i => i.Kind == "function" && i.Has("trap") && !i.Has("dispatcher")))
+        {
             AddTrap(ParseWord(f["trap"]), f["name"], f.File, f);
+        }
         // Calls selected by the trap word's own bits (Gestalt's $200 and $400): the word is the dispatcher's plus the selector.
         foreach (var f in items.Where(i => i.Kind == "function" && !i.Has("trap") && i.Has("dispatcher") && i.Has("selector")))
         {
             var (trap, location) = dispatchers[f["dispatcher"]];
             if (location == "TrapBits")
+            {
                 AddTrap(checked((ushort)(trap | ParseLong(f["selector"]))), f["name"], f.File, f);
+            }
         }
         foreach (var (word, name, kind) in Supplements.Traps)
+        {
             traps[word] = (name, kind ?? (traps.TryGetValue(word, out var old) ? old.Kind : "None"));
+        }
+
         foreach (ushort word in Supplements.Removed)
+        {
             traps.Remove(word);
+        }
 
         void AddTrap(ushort word, string name, string file, Item? f = null)
         {
             if (IsExecutorOwn(name) || traps.ContainsKey(word))
+            {
                 return;
+            }
+
             traps[word] = (name, ModifierKind(word, file, f));
         }
 
@@ -59,12 +73,21 @@ public static class TrapTablesGenerator
         static string ModifierKind(ushort word, string file, Item? f)
         {
             if ((word & 0x0800) != 0)
+            {
                 return "None";
+            }
+
             string stem = Path.GetFileNameWithoutExtension(file);
             if (stem == "MemoryMgr")
+            {
                 return "Memory";
+            }
+
             if (f != null && (f.Has("file_trap") || f.Args.Any(a => a.GetValueOrDefault("register") == "TrapBit<0x400>")))
+            {
                 return "File";
+            }
+
             return "None";
         }
 
@@ -75,7 +98,10 @@ public static class TrapTablesGenerator
         foreach (var (name, (trap, location)) in dispatchers)
         {
             if (location == "TrapBits")
+            {
                 continue;
+            }
+
             var c = Convention(location);
             conventions[trap] = (name, c.Location, c.Width, c.Mask);
         }
@@ -83,7 +109,10 @@ public static class TrapTablesGenerator
         {
             var (dtrap, location) = dispatchers[f["dispatcher"]];
             if (location == "TrapBits" || IsExecutorOwn(f["name"]))
+            {
                 continue;
+            }
+
             ushort trap = f.Has("trap") ? ParseWord(f["trap"]) : dtrap;
             if (!conventions.ContainsKey(trap))
             {
@@ -94,34 +123,69 @@ public static class TrapTablesGenerator
             table.TryAdd(ParseLong(f["selector"]), f["name"]);
         }
         foreach (var (trap, name, location, width, mask) in Supplements.Conventions)
+        {
             conventions[trap] = (name, location, width, mask);
+        }
+
         foreach (var (trap, selector, name) in Supplements.Selectors)
+        {
             (selectors.TryGetValue(trap, out var s) ? s : selectors[trap] = new())[selector] = name;
+        }
 
         // Gestalt: D0 holds an OSType selector; its names are the gestalt* constants.
         const ushort GestaltTrap = 0xA1AD;
         var gestalt = new SortedDictionary<uint, string>();
         foreach (var e in items.Where(i => i.Kind == "enum" && Path.GetFileNameWithoutExtension(i.File) == "Gestalt"))
+        {
             foreach (var v in e.Values)
+            {
                 if (v.Name.StartsWith("gestalt", StringComparison.Ordinal) && TryParseOSType(v.Value, out uint code))
+                {
                     gestalt.TryAdd(code, v.Name);
+                }
+            }
+        }
+
         conventions[GestaltTrap] = ("Gestalt", "D0", "OSType", 0xFFFFFFFF);
         selectors[GestaltTrap] = gestalt;
 
         // Multiversal's selector-location: StackW, StackL, D0W, D0L, D0<mask>, StackWLookahead<mask>, StackWMasked<mask>.
         static (string Location, string Width, uint Mask) Convention(string location)
         {
-            if (location == "StackW") return ("Stack", "Word", 0xFFFF);
-            if (location == "StackL") return ("Stack", "Long", 0xFFFFFFFF);
-            if (location == "D0W") return ("D0", "Word", 0xFFFF);
-            if (location == "D0L") return ("D0", "Long", 0xFFFFFFFF);
+            if (location == "StackW")
+            {
+                return ("Stack", "Word", 0xFFFF);
+            }
+
+            if (location == "StackL")
+            {
+                return ("Stack", "Long", 0xFFFFFFFF);
+            }
+
+            if (location == "D0W")
+            {
+                return ("D0", "Word", 0xFFFF);
+            }
+
+            if (location == "D0L")
+            {
+                return ("D0", "Long", 0xFFFFFFFF);
+            }
+
             int lt = location.IndexOf('<');
             if (lt > 0 && location.EndsWith('>'))
             {
                 uint mask = ParseLong(location[(lt + 1)..^1]);
                 string head = location[..lt];
-                if (head == "D0") return ("D0", mask > 0xFFFF ? "Long" : "Word", mask);
-                if (head is "StackWLookahead" or "StackWMasked") return ("Stack", "Word", mask);
+                if (head == "D0")
+                {
+                    return ("D0", mask > 0xFFFF ? "Long" : "Word", mask);
+                }
+
+                if (head is "StackWLookahead" or "StackWMasked")
+                {
+                    return ("Stack", "Word", mask);
+                }
             }
             throw new InvalidDataException("Unknown selector-location " + location);
         }
@@ -139,11 +203,17 @@ public static class TrapTablesGenerator
         {
             int bracket = type.IndexOf('[');
             if (bracket > 0)
+            {
                 return LowMemSize(type[..bracket]) * int.Parse(type[(bracket + 1)..^1], CultureInfo.InvariantCulture);
+            }
+
             if (type.EndsWith('*') || type.EndsWith("Ptr", StringComparison.Ordinal) || type.EndsWith("Handle", StringComparison.Ordinal)
                 || type.EndsWith("UPP", StringComparison.Ordinal) || type.EndsWith("_ptr", StringComparison.Ordinal)
                 || type is "WindowPeek" or "THz")
+            {
                 return 4;
+            }
+
             return type switch
             {
                 "Byte" or "Boolean" or "uint8_t" or "SignedByte" or "Char" => 1,
@@ -177,7 +247,10 @@ public static class TrapTablesGenerator
         sb.AppendLine("    private static readonly (ushort Word, string Name, TrapModifierKind Kind)[] Table =");
         sb.AppendLine("    [");
         foreach (var (word, (name, kind)) in traps)
+        {
             sb.AppendLine(CultureInfo.InvariantCulture, $"        (0x{word:X4}, \"{name}\", TrapModifierKind.{kind}),");
+        }
+
         sb.AppendLine("    ];");
         sb.AppendLine("}");
         Write("TrapNames.g.cs", sb);
@@ -189,15 +262,23 @@ public static class TrapTablesGenerator
         sb.AppendLine("    private static readonly (ushort Trap, string Name, SelectorLocation Location, SelectorWidth Width, uint Mask)[] Dispatchers =");
         sb.AppendLine("    [");
         foreach (var (trap, (name, location, width, mask)) in conventions)
+        {
             sb.AppendLine(CultureInfo.InvariantCulture, $"        (0x{trap:X4}, \"{name}\", SelectorLocation.{location}, SelectorWidth.{width}, 0x{mask:X}),");
+        }
+
         sb.AppendLine("    ];");
         sb.AppendLine();
         sb.AppendLine("    // Dispatcher trap -> selector -> routine name.");
         sb.AppendLine("    private static readonly (ushort Trap, uint Selector, string Name)[] Table =");
         sb.AppendLine("    [");
         foreach (var (trap, table) in selectors)
+        {
             foreach (var (selector, name) in table)
+            {
                 sb.AppendLine(CultureInfo.InvariantCulture, $"        (0x{trap:X4}, 0x{selector:X}, \"{name}\"),");
+            }
+        }
+
         sb.AppendLine("    ];");
         sb.AppendLine("}");
         Write("SelectorNames.g.cs", sb);
@@ -209,7 +290,10 @@ public static class TrapTablesGenerator
         sb.AppendLine("    private static readonly (uint Address, string Name, int Size, string Type)[] Table =");
         sb.AppendLine("    [");
         foreach (var (address, (name, size, type)) in lowmem)
+        {
             sb.AppendLine(CultureInfo.InvariantCulture, $"        (0x{address:X4}, \"{name}\", {size}, \"{type}\"),");
+        }
+
         sb.AppendLine("    ];");
         sb.AppendLine("}");
         Write("LowMemoryGlobals.g.cs", sb);
@@ -234,11 +318,17 @@ public static class TrapTablesGenerator
             code = 0;
             s = s.Trim().Trim('"');
             if (s.Length != 6 || s[0] != '\'' || s[5] != '\'')
+            {
                 return false;
+            }
+
             for (int i = 1; i <= 4; i++)
             {
                 if (s[i] > 0xFF)
+                {
                     return false;
+                }
+
                 code = (code << 8) | s[i];
             }
             return true;

@@ -21,8 +21,15 @@ namespace ClassicMac.Files.Export
         {
             ArgumentNullException.ThrowIfNull(root);
             var placed = new List<(ContainerNode, List<string>)>();
-            if (root.Children.Count == 0) placed.Add((root, []));
-            else Walk(root, [], null, placed);
+            if (root.Children.Count == 0)
+            {
+                placed.Add((root, []));
+            }
+            else
+            {
+                Walk(root, [], null, placed);
+            }
+
             return placed;
         }
 
@@ -42,10 +49,23 @@ namespace ClassicMac.Files.Export
             foreach (var child in node.Children)
             {
                 var here = new List<string>(folder);
-                foreach (var part in child.File.FolderPath) here.Add(FolderName(here, part));
-                if (child.Children.Count == 0) placed.Add((child, here));
-                else if (!HoldsSeveral(child)) Walk(child, here, null, placed);
-                else if (child.Children.Count == 1) Walk(child, here, pending ?? child.File.Name, placed);
+                foreach (var part in child.File.FolderPath)
+                {
+                    here.Add(FolderName(here, part));
+                }
+
+                if (child.Children.Count == 0)
+                {
+                    placed.Add((child, here));
+                }
+                else if (!HoldsSeveral(child))
+                {
+                    Walk(child, here, null, placed);
+                }
+                else if (child.Children.Count == 1)
+                {
+                    Walk(child, here, pending ?? child.File.Name, placed);
+                }
                 else
                 {
                     here.Add(FolderName(here, pending ?? child.File.Name));
@@ -65,14 +85,22 @@ namespace ClassicMac.Files.Export
         {
             var host = hostName(name);
             var key = string.Join('/', parents) + "/" + host;
-            if (!folders.TryGetValue(key, out var chosen)) folders[key] = chosen = HostNames.MakeUnique(host, Taken(parents));
+            if (!folders.TryGetValue(key, out var chosen))
+            {
+                folders[key] = chosen = HostNames.MakeUnique(host, Taken(parents));
+            }
+
             return chosen;
         }
 
         private HashSet<string> Taken(List<string> folder)
         {
             var key = string.Join('/', folder);
-            if (!taken.TryGetValue(key, out var set)) taken[key] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (!taken.TryGetValue(key, out var set))
+            {
+                taken[key] = set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            }
+
             return set;
         }
     }

@@ -35,7 +35,11 @@ namespace ClassicMac.Files.Iso
         /// <inheritdoc/>
         public bool CanRead(ForkData input)
         {
-            if (input.Length is 0 or > MaxLength) return false;
+            if (input.Length is 0 or > MaxLength)
+            {
+                return false;
+            }
+
             var text = Text(input);
             return text is not null && FileLine().IsMatch(text) && TrackLine().IsMatch(text);
         }
@@ -66,11 +70,19 @@ namespace ClassicMac.Files.Iso
             var key = placed.FirstOrDefault(p => p.Track.Session == first.Track.Session && p.Track.Mode != "AUDIO" && p.Lba >= first.Lba)
                 ?? placed.First(p => p.Track.Mode != "AUDIO");
             if (SectorSize(key.Track.Mode) is null)
+            {
                 throw new InvalidDataException($"Track {key.Track.Number} has mode {key.Track.Mode}, which is not read.");
+            }
+
             if (key.File is null)
+            {
                 throw new InvalidDataException($"\"{key.Track.File}\", which holds track {key.Track.Number}, is not beside the cue sheet.");
+            }
+
             if (key.Blocks <= 0)
+            {
                 throw new InvalidDataException($"Track {key.Track.Number} starts past the end of \"{key.Track.File}\".");
+            }
 
             var segments = new List<CdDisc.Segment>();
             foreach (var p in placed.Where(p => p.Track.Mode != "AUDIO"))
@@ -91,14 +103,21 @@ namespace ClassicMac.Files.Iso
             // volume is read the same way (ClassicMac's choice; the driver's handling of one was not traced).
             ForkData data = disc;
             if (session > 0 && SessionHoldsHfs(disc, session))
+            {
                 data = disc.Slice(session * 2048, disc.Length - session * 2048);
+            }
+
             return [new MacFile { Name = RawCdReader.DiscName(context), DataFork = data }];
         }
 
         private static bool SessionHoldsHfs(CdDisc disc, long session)
         {
             var start = session * 2048;
-            if (start > disc.Length - 2 * 2048) return false;
+            if (start > disc.Length - 2 * 2048)
+            {
+                return false;
+            }
+
             var b = disc.Slice(start, 2 * 2048).ToArray();
             var map = (b.AsSpan(0, 2).SequenceEqual("ER"u8) || (b[0] == 0 && b[1] == 0))
                 && (b.AsSpan(512, 2).SequenceEqual("PM"u8) || b.AsSpan(2048, 2).SequenceEqual("PM"u8));
@@ -162,9 +181,14 @@ namespace ClassicMac.Files.Iso
             foreach (var raw in text.Split('\n'))
             {
                 var line = raw.Trim();
-                if (FileLine().Match(line) is { Success: true } f) file = f.Groups["name"].Value;
+                if (FileLine().Match(line) is { Success: true } f)
+                {
+                    file = f.Groups["name"].Value;
+                }
                 else if (SessionLine().Match(line) is { Success: true } s)
+                {
                     session = int.Parse(s.Groups["number"].Value, CultureInfo.InvariantCulture);
+                }
                 else if (TrackLine().Match(line) is { Success: true } t)
                 {
                     pending = (int.Parse(t.Groups["number"].Value, CultureInfo.InvariantCulture), t.Groups["mode"].Value.ToUpperInvariant(), session);
@@ -206,7 +230,11 @@ namespace ClassicMac.Files.Iso
         private static string? Text(ForkData input)
         {
             var bytes = input.ToArray(MaxLength);
-            if (bytes.Any(b => b == 0)) return null;
+            if (bytes.Any(b => b == 0))
+            {
+                return null;
+            }
+
             var text = Encoding.Latin1.GetString(bytes).TrimStart('﻿', 'ï', '»', '¿');
             return text.Replace("\r", "\n", StringComparison.Ordinal);
         }

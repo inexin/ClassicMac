@@ -55,7 +55,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read one byte.</summary>
         public bool TryReadByte(out byte value)
         {
-            if (Remaining < 1) { value = default; return false; }
+            if (Remaining < 1)
+            {
+                value = default;
+                return false;
+            }
             value = source.Span[position++];
             return true;
         }
@@ -66,7 +70,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a byte at an absolute offset without changing <see cref="Position"/>.</summary>
         public bool TryReadByteAt(int offset, out byte value)
         {
-            if (!TryReadBytesAt(offset, 1, out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, 1, out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = bytes[0];
             return true;
         }
@@ -77,7 +85,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 16-bit integer.</summary>
         public bool TryReadInt16(out short value)
         {
-            if (Remaining < sizeof(short)) { value = default; return false; }
+            if (Remaining < sizeof(short))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadInt16BigEndian(source.Span[position..]);
             position += sizeof(short);
             return true;
@@ -89,7 +101,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 16-bit integer at an absolute offset.</summary>
         public bool TryReadInt16At(int offset, out short value)
         {
-            if (!TryReadBytesAt(offset, sizeof(short), out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, sizeof(short), out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadInt16BigEndian(bytes);
             return true;
         }
@@ -100,7 +116,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 16-bit integer.</summary>
         public bool TryReadUInt16(out ushort value)
         {
-            if (Remaining < sizeof(ushort)) { value = default; return false; }
+            if (Remaining < sizeof(ushort))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadUInt16BigEndian(source.Span[position..]);
             position += sizeof(ushort);
             return true;
@@ -112,7 +132,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 16-bit integer at an absolute offset.</summary>
         public bool TryReadUInt16At(int offset, out ushort value)
         {
-            if (!TryReadBytesAt(offset, sizeof(ushort), out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, sizeof(ushort), out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadUInt16BigEndian(bytes);
             return true;
         }
@@ -123,7 +147,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 32-bit integer.</summary>
         public bool TryReadInt32(out int value)
         {
-            if (Remaining < sizeof(int)) { value = default; return false; }
+            if (Remaining < sizeof(int))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadInt32BigEndian(source.Span[position..]);
             position += sizeof(int);
             return true;
@@ -135,7 +163,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 32-bit integer at an absolute offset.</summary>
         public bool TryReadInt32At(int offset, out int value)
         {
-            if (!TryReadBytesAt(offset, sizeof(int), out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, sizeof(int), out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadInt32BigEndian(bytes);
             return true;
         }
@@ -146,7 +178,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 32-bit integer.</summary>
         public bool TryReadUInt32(out uint value)
         {
-            if (Remaining < sizeof(uint)) { value = default; return false; }
+            if (Remaining < sizeof(uint))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadUInt32BigEndian(source.Span[position..]);
             position += sizeof(uint);
             return true;
@@ -158,7 +194,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 32-bit integer at an absolute offset.</summary>
         public bool TryReadUInt32At(int offset, out uint value)
         {
-            if (!TryReadBytesAt(offset, sizeof(uint), out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, sizeof(uint), out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadUInt32BigEndian(bytes);
             return true;
         }
@@ -169,7 +209,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 64-bit integer.</summary>
         public bool TryReadInt64(out long value)
         {
-            if (Remaining < sizeof(long)) { value = default; return false; }
+            if (Remaining < sizeof(long))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadInt64BigEndian(source.Span[position..]);
             position += sizeof(long);
             return true;
@@ -181,7 +225,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 64-bit integer at an absolute offset.</summary>
         public bool TryReadInt64At(int offset, out long value)
         {
-            if (!TryReadBytesAt(offset, sizeof(long), out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, sizeof(long), out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadInt64BigEndian(bytes);
             return true;
         }
@@ -192,7 +240,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 64-bit integer.</summary>
         public bool TryReadUInt64(out ulong value)
         {
-            if (Remaining < sizeof(ulong)) { value = default; return false; }
+            if (Remaining < sizeof(ulong))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadUInt64BigEndian(source.Span[position..]);
             position += sizeof(ulong);
             return true;
@@ -204,7 +256,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 64-bit integer at an absolute offset.</summary>
         public bool TryReadUInt64At(int offset, out ulong value)
         {
-            if (!TryReadBytesAt(offset, sizeof(ulong), out var bytes)) { value = default; return false; }
+            if (!TryReadBytesAt(offset, sizeof(ulong), out var bytes))
+            {
+                value = default;
+                return false;
+            }
             value = BinaryPrimitives.ReadUInt64BigEndian(bytes);
             return true;
         }
@@ -215,7 +271,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a four-character code.</summary>
         public bool TryReadFourCC(out FourCC value)
         {
-            if (!TryReadUInt32(out uint raw)) { value = default; return false; }
+            if (!TryReadUInt32(out uint raw))
+            {
+                value = default;
+                return false;
+            }
             value = new FourCC(raw);
             return true;
         }
@@ -226,7 +286,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a four-character code at an absolute offset.</summary>
         public bool TryReadFourCCAt(int offset, out FourCC value)
         {
-            if (!TryReadUInt32At(offset, out uint raw)) { value = default; return false; }
+            if (!TryReadUInt32At(offset, out uint raw))
+            {
+                value = default;
+                return false;
+            }
             value = new FourCC(raw);
             return true;
         }
@@ -234,14 +298,22 @@ namespace ClassicMac.Core
         /// <summary>Reads a QuickDraw point.</summary>
         public MacPoint ReadMacPoint()
         {
-            if (Remaining < MacPoint.Length) throw new EndOfStreamException();
+            if (Remaining < MacPoint.Length)
+            {
+                throw new EndOfStreamException();
+            }
+
             return new(ReadInt16(), ReadInt16());
         }
 
         /// <summary>Attempts to read a QuickDraw point.</summary>
         public bool TryReadMacPoint(out MacPoint value)
         {
-            if (Remaining < MacPoint.Length) { value = default; return false; }
+            if (Remaining < MacPoint.Length)
+            {
+                value = default;
+                return false;
+            }
             value = new MacPoint(ReadInt16(), ReadInt16());
             return true;
         }
@@ -252,7 +324,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a QuickDraw point at an absolute offset.</summary>
         public bool TryReadMacPointAt(int offset, out MacPoint value)
         {
-            if (!TryReadInt16At(offset, out var v) || !TryReadInt16At(offset + sizeof(short), out var h)) { value = default; return false; }
+            if (!TryReadInt16At(offset, out var v) || !TryReadInt16At(offset + sizeof(short), out var h))
+            {
+                value = default;
+                return false;
+            }
             value = new MacPoint(v, h);
             return true;
         }
@@ -260,14 +336,22 @@ namespace ClassicMac.Core
         /// <summary>Reads a QuickDraw rectangle.</summary>
         public MacRect ReadMacRect()
         {
-            if (Remaining < MacRect.Length) throw new EndOfStreamException();
+            if (Remaining < MacRect.Length)
+            {
+                throw new EndOfStreamException();
+            }
+
             return new(ReadInt16(), ReadInt16(), ReadInt16(), ReadInt16());
         }
 
         /// <summary>Attempts to read a QuickDraw rectangle.</summary>
         public bool TryReadMacRect(out MacRect value)
         {
-            if (Remaining < MacRect.Length) { value = default; return false; }
+            if (Remaining < MacRect.Length)
+            {
+                value = default;
+                return false;
+            }
             value = new MacRect(ReadInt16(), ReadInt16(), ReadInt16(), ReadInt16());
             return true;
         }
@@ -281,7 +365,10 @@ namespace ClassicMac.Core
         {
             if (!TryReadInt16At(offset, out var top) || !TryReadInt16At(offset + 2, out var left)
                 || !TryReadInt16At(offset + 4, out var bottom) || !TryReadInt16At(offset + 6, out var right))
-            { value = default; return false; }
+            {
+                value = default;
+                return false;
+            }
             value = new MacRect(top, left, bottom, right);
             return true;
         }
@@ -292,7 +379,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 16.16 fixed-point value.</summary>
         public bool TryReadFixed(out Fixed value)
         {
-            if (!TryReadInt32(out int raw)) { value = default; return false; }
+            if (!TryReadInt32(out int raw))
+            {
+                value = default;
+                return false;
+            }
             value = new Fixed(raw);
             return true;
         }
@@ -303,7 +394,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read a signed 16.16 fixed-point value at an absolute offset.</summary>
         public bool TryReadFixedAt(int offset, out Fixed value)
         {
-            if (!TryReadInt32At(offset, out int raw)) { value = default; return false; }
+            if (!TryReadInt32At(offset, out int raw))
+            {
+                value = default;
+                return false;
+            }
             value = new Fixed(raw);
             return true;
         }
@@ -314,7 +409,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 16.16 fixed-point value.</summary>
         public bool TryReadUnsignedFixed(out UnsignedFixed value)
         {
-            if (!TryReadUInt32(out uint raw)) { value = default; return false; }
+            if (!TryReadUInt32(out uint raw))
+            {
+                value = default;
+                return false;
+            }
             value = new UnsignedFixed(raw);
             return true;
         }
@@ -325,7 +424,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to read an unsigned 16.16 fixed-point value at an absolute offset.</summary>
         public bool TryReadUnsignedFixedAt(int offset, out UnsignedFixed value)
         {
-            if (!TryReadUInt32At(offset, out uint raw)) { value = default; return false; }
+            if (!TryReadUInt32At(offset, out uint raw))
+            {
+                value = default;
+                return false;
+            }
             value = new UnsignedFixed(raw);
             return true;
         }
@@ -336,7 +439,11 @@ namespace ClassicMac.Core
         public ReadOnlySpan<byte> ReadBytes(int length)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(length);
-            if (length > Remaining) throw new EndOfStreamException();
+            if (length > Remaining)
+            {
+                throw new EndOfStreamException();
+            }
+
             var result = source.Span.Slice(position, length);
             position += length;
             return result;
@@ -349,7 +456,11 @@ namespace ClassicMac.Core
         public BigEndianReader ReadSubReader(int length)
         {
             ArgumentOutOfRangeException.ThrowIfNegative(length);
-            if (length > Remaining) throw new EndOfStreamException();
+            if (length > Remaining)
+            {
+                throw new EndOfStreamException();
+            }
+
             var sub = new BigEndianReader(source.Slice(position, length));
             position += length;
             return sub;
@@ -359,7 +470,11 @@ namespace ClassicMac.Core
         /// <remarks>A failed attempt returns an empty slice and leaves <see cref="Position"/> unchanged.</remarks>
         public bool TryReadBytes(int length, out ReadOnlySpan<byte> value)
         {
-            if (length < 0 || length > Remaining) { value = default; return false; }
+            if (length < 0 || length > Remaining)
+            {
+                value = default;
+                return false;
+            }
             value = source.Span.Slice(position, length);
             position += length;
             return true;
@@ -375,7 +490,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to return a borrowed byte slice at an absolute offset.</summary>
         public bool TryReadBytesAt(int offset, int length, out ReadOnlySpan<byte> value)
         {
-            if (!IsRangeValid(offset, length)) { value = default; return false; }
+            if (!IsRangeValid(offset, length))
+            {
+                value = default;
+                return false;
+            }
             value = source.Span.Slice(offset, length);
             return true;
         }
@@ -386,7 +505,11 @@ namespace ClassicMac.Core
         /// <summary>Attempts to advance past <paramref name="length"/> bytes.</summary>
         public bool TrySkip(int length)
         {
-            if (length < 0 || length > Remaining) return false;
+            if (length < 0 || length > Remaining)
+            {
+                return false;
+            }
+
             position += length;
             return true;
         }
@@ -398,7 +521,10 @@ namespace ClassicMac.Core
         {
             ArgumentOutOfRangeException.ThrowIfNegative(offset);
             ArgumentOutOfRangeException.ThrowIfNegative(length);
-            if (!IsRangeValid(offset, length)) throw new EndOfStreamException();
+            if (!IsRangeValid(offset, length))
+            {
+                throw new EndOfStreamException();
+            }
         }
 
         private static byte[] ReadToEnd(Stream stream)

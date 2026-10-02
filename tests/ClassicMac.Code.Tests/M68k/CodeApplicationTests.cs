@@ -26,7 +26,11 @@ public class CodeApplicationTests
     {
         var w = new BigEndianWriter();
         w.WriteBytes(segment);
-        if (w.Length % 2 != 0) w.WriteByte(0);
+        if (w.Length % 2 != 0)
+        {
+            w.WriteByte(0);
+        }
+
         int header = w.Length;
         w.WriteUInt32(below);
         w.WriteUInt16(1);
@@ -638,8 +642,16 @@ public class CodeApplicationTests
             "ANSI Libraries");
         var data = new BigEndianWriter();
         data.WriteUInt32(4 + 15 + 12);
-        for (int i = 0; i < 3; i++) data.WriteBytes(new byte[] { 0, 0, 0, 0, 0 });
-        for (int i = 0; i < 6; i++) data.WriteUInt32(0);
+        for (int i = 0; i < 3; i++)
+        {
+            data.WriteBytes(new byte[] { 0, 0, 0, 0, 0 });
+        }
+
+        for (int i = 0; i < 6; i++)
+        {
+            data.WriteUInt32(0);
+        }
+
         fork.Add("DATA", 0, data.ToArray());
         var diagnostics = new List<Diagnostic>();
         var app = Read(fork, diagnostics);

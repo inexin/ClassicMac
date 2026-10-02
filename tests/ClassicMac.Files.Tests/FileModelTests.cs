@@ -34,7 +34,11 @@ public class ForkSliceTests
 
     private static ForkData Source(string kind)
     {
-        if (kind == "memory") return ForkData.FromBytes(Bytes);
+        if (kind == "memory")
+        {
+            return ForkData.FromBytes(Bytes);
+        }
+
         var path = Path.GetTempFileName();
         File.WriteAllBytes(path, Bytes);
         return ForkData.FromFile(path);
@@ -144,7 +148,11 @@ public class ForkSliceTests
         Assert.Equal(Bytes[12..16], buffer);
         Assert.True(ForkData.IsHostFileOpen(fork));
 
-        for (var waited = 0; ForkData.IsHostFileOpen(fork) && waited < 5000; waited += 50) await Task.Delay(50, TestContext.Current.CancellationToken);
+        for (var waited = 0; ForkData.IsHostFileOpen(fork) && waited < 5000; waited += 50)
+        {
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
         Assert.False(ForkData.IsHostFileOpen(fork));
         fork.ReadAt(96, buffer);
         Assert.Equal(Bytes[96..100], buffer);

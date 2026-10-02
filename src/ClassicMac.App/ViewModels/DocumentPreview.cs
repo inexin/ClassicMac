@@ -92,7 +92,10 @@ namespace ClassicMac.App.ViewModels
             {
                 foreach (var picture in chapter.Pictures)
                 {
-                    if (!drawn.ContainsKey(picture.PictureId)) drawn[picture.PictureId] = DocumentPictures.Draw(chapter, picture, options, diagnostics);
+                    if (!drawn.ContainsKey(picture.PictureId))
+                    {
+                        drawn[picture.PictureId] = DocumentPictures.Draw(chapter, picture, options, diagnostics);
+                    }
                 }
             }
             return new DocumentPreview(document, drawn);
@@ -114,7 +117,11 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanGoBack))]
         private void Back()
         {
-            if (history.Count == 0) return;
+            if (history.Count == 0)
+            {
+                return;
+            }
+
             navigating = true;
             ChapterIndex = history.Pop();
             navigating = false;
@@ -129,7 +136,11 @@ namespace ClassicMac.App.ViewModels
             var lines = new List<DocumentLine>();
             void Flush()
             {
-                if (lines.Count == 0) return;
+                if (lines.Count == 0)
+                {
+                    return;
+                }
+
                 items.Add(new DocumentTextItem(Join(chapter.Text, lines), chapter.Justification));
                 lines.Clear();
             }
@@ -163,9 +174,15 @@ namespace ClassicMac.App.ViewModels
                 {
                     // The line break belongs to the run before it (runs cover every character), or after empty lines
                     // at the start, to one in the style of the previous line's first character.
-                    if (runs.Count > 0) runs[^1] = runs[^1] with { Length = joined.Length + 1 - runs[^1].Start };
+                    if (runs.Count > 0)
+                    {
+                        runs[^1] = runs[^1] with { Length = joined.Length + 1 - runs[^1].Start };
+                    }
                     else if (text.Runs.FirstOrDefault(r => r.Start <= lines[i - 1].Start && lines[i - 1].Start < r.Start + r.Length) is { } style)
+                    {
                         runs.Add(style with { Start = joined.Length, Length = 1 });
+                    }
+
                     joined.Append('\r');
                 }
                 var offset = joined.Length - line.Start;
@@ -174,7 +191,10 @@ namespace ClassicMac.App.ViewModels
                 {
                     var from = Math.Max(line.Start, run.Start);
                     var to = Math.Min(line.End, run.Start + run.Length);
-                    if (from < to) runs.Add(run with { Start = from + offset, Length = to - from });
+                    if (from < to)
+                    {
+                        runs.Add(run with { Start = from + offset, Length = to - from });
+                    }
                 }
             }
             return new StyledText(joined.ToString(), runs, text.Complete);

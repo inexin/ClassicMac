@@ -35,13 +35,24 @@ namespace ClassicMac.Files.Rom
         public bool CanRead(ForkData input)
         {
             var length = input.Length;
-            if (length is < MinLength or > MaxLength || !BitOperations.IsPow2(length)) return false;
+            if (length is < MinLength or > MaxLength || !BitOperations.IsPow2(length))
+            {
+                return false;
+            }
+
             var prefix = input.ReadPrefix(RomResourceTable.TablePointerOffset + 4);
             long table = new BigEndianReader(prefix).ReadUInt32At(RomResourceTable.TablePointerOffset);
-            if (table > length - 10) return false;
+            if (table > length - 10)
+            {
+                return false;
+            }
             // The header alone first, so most files are turned away without reading the whole image.
             var header = new BigEndianReader(input.Slice(table, 10).ReadPrefix(10));
-            if (header.ReadUInt16At(6) != 1 || header.ReadUInt16At(8) != 12 || header.ReadByteAt(5) is < 1 or > 8) return false;
+            if (header.ReadUInt16At(6) != 1 || header.ReadUInt16At(8) != 12 || header.ReadByteAt(5) is < 1 or > 8)
+            {
+                return false;
+            }
+
             return RomResourceTable.Read(input.ToArray()) is not null;
         }
 
@@ -50,7 +61,11 @@ namespace ClassicMac.Files.Rom
         {
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(context);
-            if (input.Length is < MinLength or > MaxLength) throw new InvalidDataException("Not a Mac ROM image.");
+            if (input.Length is < MinLength or > MaxLength)
+            {
+                throw new InvalidDataException("Not a Mac ROM image.");
+            }
+
             var table = RomResourceTable.Read(input.ToArray(), context.Diagnostics)
                 ?? throw new InvalidDataException("Not a Mac ROM image with a resource table.");
             var fork = ToResourceFork(table, context);

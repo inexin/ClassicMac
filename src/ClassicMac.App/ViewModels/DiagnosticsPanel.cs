@@ -117,9 +117,17 @@ namespace ClassicMac.App.ViewModels
             get => IsExpanded ? expandedHeight : HeaderHeight;
             set
             {
-                if (!IsExpanded) return;
+                if (!IsExpanded)
+                {
+                    return;
+                }
+
                 var height = Math.Max(HeaderHeight, value);
-                if (height == expandedHeight) return;
+                if (height == expandedHeight)
+                {
+                    return;
+                }
+
                 expandedHeight = height;
                 OnPropertyChanged();
             }
@@ -141,8 +149,15 @@ namespace ClassicMac.App.ViewModels
                     OnPropertyChanged();
                     return;
                 }
-                if (!SetProperty(ref selectedRow, value)) return;
-                if (value is DiagnosticEntry entry) select?.Invoke(entry);
+                if (!SetProperty(ref selectedRow, value))
+                {
+                    return;
+                }
+
+                if (value is DiagnosticEntry entry)
+                {
+                    select?.Invoke(entry);
+                }
             }
         }
 
@@ -192,14 +207,29 @@ namespace ClassicMac.App.ViewModels
         {
             all.Add(entry);
             counts[(int)entry.Diagnostic.Severity]++;
-            if (entry.Diagnostic.Severity != DiagnosticSeverity.Info) Latest = entry;
+            if (entry.Diagnostic.Severity != DiagnosticSeverity.Info)
+            {
+                Latest = entry;
+            }
+
             CountsChanged(entry.Diagnostic.Severity);
-            if (!Shows(entry)) return;
+            if (!Shows(entry))
+            {
+                return;
+            }
+
             Entries.Add(entry);
             if (!ByFile)
             {
-                if (Sort == SeveritySort.None) Rows.Add(entry);
-                else Rows.Insert(SortedIndex(Rows.Cast<DiagnosticEntry>().ToList(), entry), entry);
+                if (Sort == SeveritySort.None)
+                {
+                    Rows.Add(entry);
+                }
+                else
+                {
+                    Rows.Insert(SortedIndex(Rows.Cast<DiagnosticEntry>().ToList(), entry), entry);
+                }
+
                 return;
             }
             var group = GroupFor(entry);
@@ -213,8 +243,16 @@ namespace ClassicMac.App.ViewModels
                 // A new header goes after the groups that come before it.
                 var header = RowIndexAfterGroupsBefore(group);
                 Rows.Insert(header, group);
-                if (!group.Toggled) group.IsExpanded = !group.IsInfoOnly;
-                if (group.IsExpanded) Rows.Insert(header + 1, entry);
+                if (!group.Toggled)
+                {
+                    group.IsExpanded = !group.IsInfoOnly;
+                }
+
+                if (group.IsExpanded)
+                {
+                    Rows.Insert(header + 1, entry);
+                }
+
                 return;
             }
             if (!group.Toggled && group.IsExpanded != !group.IsInfoOnly)
@@ -222,14 +260,25 @@ namespace ClassicMac.App.ViewModels
                 SetExpanded(group, !group.IsInfoOnly);
                 return;
             }
-            if (wasExpanded) Rows.Insert(Rows.IndexOf(group) + 1 + at, entry);
+            if (wasExpanded)
+            {
+                Rows.Insert(Rows.IndexOf(group) + 1 + at, entry);
+            }
         }
 
         public void RemoveAll(Predicate<DiagnosticEntry> match)
         {
-            if (all.RemoveAll(match) == 0) return;
+            if (all.RemoveAll(match) == 0)
+            {
+                return;
+            }
+
             Array.Clear(counts);
-            foreach (var e in all) counts[(int)e.Diagnostic.Severity]++;
+            foreach (var e in all)
+            {
+                counts[(int)e.Diagnostic.Severity]++;
+            }
+
             Latest = all.LastOrDefault(e => e.Diagnostic.Severity != DiagnosticSeverity.Info);
             CountsChanged(null);
             Refresh();
@@ -239,7 +288,11 @@ namespace ClassicMac.App.ViewModels
         public static (string Path, NodeKind Kind) GroupOf(DiagnosticEntry entry)
         {
             var at = entry.Node;
-            while (at is ResourceNode or ResourceTypeNode or LoadingNode) at = at.Parent;
+            while (at is ResourceNode or ResourceTypeNode or LoadingNode)
+            {
+                at = at.Parent;
+            }
+
             return at is null ? (entry.Source, NodeKind.Input) : GroupOf(entry.Source, entry.Node!.Kind, at.Source, at.Kind);
         }
 
@@ -283,10 +336,18 @@ namespace ClassicMac.App.ViewModels
         // After the last entry that ranks with or before it (arrival order among equals).
         private int SortedIndex(IReadOnlyList<DiagnosticEntry> list, DiagnosticEntry entry)
         {
-            if (Sort == SeveritySort.None) return list.Count;
+            if (Sort == SeveritySort.None)
+            {
+                return list.Count;
+            }
+
             var rank = Rank(entry);
             var at = list.Count;
-            while (at > 0 && Rank(list[at - 1]) > rank) at--;
+            while (at > 0 && Rank(list[at - 1]) > rank)
+            {
+                at--;
+            }
+
             return at;
         }
 
@@ -306,8 +367,16 @@ namespace ClassicMac.App.ViewModels
             var index = 0;
             foreach (var g in groups)
             {
-                if (g == group) break;
-                if (g.Items.Count == 0) continue;
+                if (g == group)
+                {
+                    break;
+                }
+
+                if (g.Items.Count == 0)
+                {
+                    continue;
+                }
+
                 index += 1 + (g.IsExpanded ? g.Items.Count : 0);
             }
             return index;
@@ -315,14 +384,32 @@ namespace ClassicMac.App.ViewModels
 
         private void SetExpanded(DiagnosticGroup group, bool expanded)
         {
-            if (group.IsExpanded == expanded) return;
+            if (group.IsExpanded == expanded)
+            {
+                return;
+            }
+
             group.IsExpanded = expanded;
             var header = Rows.IndexOf(group);
-            if (header < 0) return;
+            if (header < 0)
+            {
+                return;
+            }
+
             if (expanded)
-                for (var i = 0; i < group.Items.Count; i++) Rows.Insert(header + 1 + i, group.Items[i]);
+            {
+                for (var i = 0; i < group.Items.Count; i++)
+                {
+                    Rows.Insert(header + 1 + i, group.Items[i]);
+                }
+            }
             else
-                while (header + 1 < Rows.Count && Rows[header + 1] is DiagnosticEntry) Rows.RemoveAt(header + 1);
+            {
+                while (header + 1 < Rows.Count && Rows[header + 1] is DiagnosticEntry)
+                {
+                    Rows.RemoveAt(header + 1);
+                }
+            }
         }
 
         // Rebuilds the entries, groups and rows from every diagnostic (a filter, the grouping or the sort changed).
@@ -330,16 +417,31 @@ namespace ClassicMac.App.ViewModels
         {
             var shown = all.Where(Shows).ToList();
             Entries.Clear();
-            foreach (var e in shown) Entries.Add(e);
-            foreach (var g in groups) g.Items.Clear();
+            foreach (var e in shown)
+            {
+                Entries.Add(e);
+            }
+
+            foreach (var g in groups)
+            {
+                g.Items.Clear();
+            }
+
             Rows.Clear();
             var sorted = Sort == SeveritySort.None ? shown : shown.OrderBy(Rank).ToList(); // stable
             if (!ByFile)
             {
-                foreach (var e in sorted) Rows.Add(e);
+                foreach (var e in sorted)
+                {
+                    Rows.Add(e);
+                }
+
                 return;
             }
-            foreach (var e in sorted) GroupFor(e).Items.Add(e);
+            foreach (var e in sorted)
+            {
+                GroupFor(e).Items.Add(e);
+            }
             // Groups whose diagnostics were all removed (their input closed) go.
             var paths = all.Select(e => GroupOf(e).Path).ToHashSet(StringComparer.Ordinal);
             foreach (var gone in groups.Where(g => !paths.Contains(g.Path)).ToList())
@@ -350,22 +452,55 @@ namespace ClassicMac.App.ViewModels
             foreach (var g in groups.Where(g => g.Items.Count > 0))
             {
                 g.Changed();
-                if (!g.Toggled) g.IsExpanded = !g.IsInfoOnly;
+                if (!g.Toggled)
+                {
+                    g.IsExpanded = !g.IsInfoOnly;
+                }
+
                 Rows.Add(g);
-                if (g.IsExpanded) foreach (var e in g.Items) Rows.Add(e);
+                if (g.IsExpanded)
+                {
+                    foreach (var e in g.Items)
+                    {
+                        Rows.Add(e);
+                    }
+                }
             }
         }
 
         private void CountsChanged(DiagnosticSeverity? severity)
         {
             if (severity is null or DiagnosticSeverity.Error)
-                foreach (var name in new[] { nameof(ErrorCount), nameof(ErrorText), nameof(HasErrors) }) OnPropertyChanged(name);
+            {
+                foreach (var name in new[] { nameof(ErrorCount), nameof(ErrorText), nameof(HasErrors) })
+                {
+                    OnPropertyChanged(name);
+                }
+            }
+
             if (severity is null or DiagnosticSeverity.Warning)
-                foreach (var name in new[] { nameof(WarningCount), nameof(WarningText), nameof(HasWarnings) }) OnPropertyChanged(name);
+            {
+                foreach (var name in new[] { nameof(WarningCount), nameof(WarningText), nameof(HasWarnings) })
+                {
+                    OnPropertyChanged(name);
+                }
+            }
+
             if (severity is null or DiagnosticSeverity.Info)
-                foreach (var name in new[] { nameof(InfoCount), nameof(InfoText), nameof(HasInfos) }) OnPropertyChanged(name);
+            {
+                foreach (var name in new[] { nameof(InfoCount), nameof(InfoText), nameof(HasInfos) })
+                {
+                    OnPropertyChanged(name);
+                }
+            }
+
             if (severity != DiagnosticSeverity.Info)
-                foreach (var name in new[] { nameof(Latest), nameof(HasLatest), nameof(LatestPlace) }) OnPropertyChanged(name);
+            {
+                foreach (var name in new[] { nameof(Latest), nameof(HasLatest), nameof(LatestPlace) })
+                {
+                    OnPropertyChanged(name);
+                }
+            }
         }
     }
 }

@@ -25,9 +25,18 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             this.rows = rows;
             (Left, Top, Right, Bottom) = (left, top, right, bottom);
-            if (rows.Length != top + 1 + bottom) throw new ArgumentException("The rows do not match the zones.", nameof(rows));
+            if (rows.Length != top + 1 + bottom)
+            {
+                throw new ArgumentException("The rows do not match the zones.", nameof(rows));
+            }
+
             foreach (var row in rows)
-                if (row.Length != left + 1 + right) throw new ArgumentException($"Row '{row}' does not match the zones.", nameof(rows));
+            {
+                if (row.Length != left + 1 + right)
+                {
+                    throw new ArgumentException($"Row '{row}' does not match the zones.", nameof(rows));
+                }
+            }
         }
 
         public int Left { get; }
@@ -52,21 +61,33 @@ namespace ClassicMac.Resources.Decoders.Interface
         /// </summary>
         public void Paint(QuickDrawPort port, int h, int v, int width, int height, RgbColor content)
         {
-            if (width <= 0 || height <= 0) return;
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
+
             var saved = port.ForeColor;
             int y = 0;
             while (y < height)
             {
                 // Target rows that map to the same source row are painted as one band.
                 int sy = Source(y, height, Top, Bottom), end = y + 1;
-                while (end < height && Source(end, height, Top, Bottom) == sy) end++;
+                while (end < height && Source(end, height, Top, Bottom) == sy)
+                {
+                    end++;
+                }
+
                 var row = rows[sy];
                 int x = 0;
                 while (x < width)
                 {
                     char c = row[Source(x, width, Left, Right)];
                     int run = x + 1;
-                    while (run < width && row[Source(run, width, Left, Right)] == c) run++;
+                    while (run < width && row[Source(run, width, Left, Right)] == c)
+                    {
+                        run++;
+                    }
+
                     if (c != ' ')
                     {
                         port.ForeColor = c == '~' ? content : Color(c);
@@ -89,7 +110,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             for (int x = 0; x < Width; x++)
             {
                 var chars = new char[Height];
-                for (int y = 0; y < Height; y++) chars[y] = rows[y][x];
+                for (int y = 0; y < Height; y++)
+                {
+                    chars[y] = rows[y][x];
+                }
+
                 turned[x] = new string(chars);
             }
             return new PlatinumArt(Top, Left, Bottom, Right, turned);

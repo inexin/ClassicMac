@@ -33,8 +33,13 @@ namespace ClassicMac.Graphics.Pict
             var drawing = port.Options;
             var options = new PictDecodeOptions
             {
-                QuickDraw = drawing.Version, ScreenDepth = drawing.ScreenDepth, Fonts = drawing.Fonts, TextFallback = drawing.TextFallback,
-                HiliteColor = drawing.HiliteColor?.ToRgba(), PreserveAlpha = drawing.PreserveAlpha, ImageCodec = imageCodec,
+                QuickDraw = drawing.Version,
+                ScreenDepth = drawing.ScreenDepth,
+                Fonts = drawing.Fonts,
+                TextFallback = drawing.TextFallback,
+                HiliteColor = drawing.HiliteColor?.ToRgba(),
+                PreserveAlpha = drawing.PreserveAlpha,
+                ImageCodec = imageCodec,
             };
             var reader = new ClassicMac.Core.BigEndianReader(picture);
             var info = PictHeader.Parse(reader, out bool v1);

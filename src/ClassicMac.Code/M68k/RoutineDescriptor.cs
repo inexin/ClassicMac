@@ -60,7 +60,11 @@ namespace ClassicMac.Code.M68k
         /// <summary>Where the descriptor is: 0, or a standard header's branch target; null when there is none.</summary>
         public static int? Find(ReadOnlyMemory<byte> data)
         {
-            if (IsMagic(data.Span, 0)) return 0;
+            if (IsMagic(data.Span, 0))
+            {
+                return 0;
+            }
+
             var header = CodeResourceHeader.Read(data, null, []);
             return header is not null && IsMagic(data.Span, header.BranchTarget) ? header.BranchTarget : null;
         }
@@ -75,7 +79,11 @@ namespace ClassicMac.Code.M68k
         public static RoutineDescriptor? Read(ReadOnlyMemory<byte> data, ICollection<Diagnostic> diagnostics)
         {
             ArgumentNullException.ThrowIfNull(diagnostics);
-            if (Find(data) is not { } at) return null;
+            if (Find(data) is not { } at)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(data);
             var routines = new List<RoutineRecord>();
             if (at > reader.Length - HeaderLength)
@@ -91,8 +99,11 @@ namespace ClassicMac.Code.M68k
             var selectorInfo = reader.ReadByte();
             int count = reader.ReadUInt16() + 1;
             if (version != CurrentVersion)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.routine-descriptor-version",
                     $"The routine descriptor's version is {version}, not {CurrentVersion}.", at));
+            }
+
             for (int i = 0; i < count; i++)
             {
                 if (reader.Remaining < RecordLength)
@@ -114,8 +125,10 @@ namespace ClassicMac.Code.M68k
                 {
                     target = at + (long)proc;
                     if (target >= reader.Length)
+                    {
                         diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.routine-target",
                             $"Routine {i}'s procedure at {target:X} lies outside the {reader.Length}-byte resource.", at));
+                    }
                     else if (PefContainer.IsPef(data.Span[(int)target.Value..]))
                     {
                         try

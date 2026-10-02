@@ -9,8 +9,16 @@ public class MacsBugNamesTests
     private static byte[] Code(string hex, string? text = null, string? tail = null)
     {
         var bytes = new List<byte>(Bytes(hex));
-        if (text is not null) bytes.AddRange(System.Text.Encoding.ASCII.GetBytes(text));
-        if (tail is not null) bytes.AddRange(Bytes(tail));
+        if (text is not null)
+        {
+            bytes.AddRange(System.Text.Encoding.ASCII.GetBytes(text));
+        }
+
+        if (tail is not null)
+        {
+            bytes.AddRange(Bytes(tail));
+        }
+
         return [.. bytes];
     }
 

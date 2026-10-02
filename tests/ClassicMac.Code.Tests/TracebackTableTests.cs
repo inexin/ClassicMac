@@ -12,7 +12,11 @@ public class TracebackTableTests
     private static byte[] Words(params uint[] words)
     {
         var w = new BigEndianWriter();
-        foreach (var word in words) w.WriteUInt32(word);
+        foreach (var word in words)
+        {
+            w.WriteUInt32(word);
+        }
+
         return w.ToArray();
     }
 

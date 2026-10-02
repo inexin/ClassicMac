@@ -14,7 +14,11 @@ public class TextDecoderTests
     {
         var fork = new ResourceFork();
         fork.Add(resource);
-        foreach (var other in others) fork.Add(other);
+        foreach (var other in others)
+        {
+            fork.Add(other);
+        }
+
         var diagnostics = new List<Diagnostic>();
         var decoder = Decoders.Single(d => d.CanDecode(resource.Type));
         return (decoder.Decode(new DecodeInput(resource, resource.GetData(), fork, diagnostics: diagnostics)), diagnostics);

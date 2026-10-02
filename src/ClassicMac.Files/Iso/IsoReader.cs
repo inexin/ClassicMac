@@ -54,7 +54,10 @@ namespace ClassicMac.Files.Iso
                 // session first (D + 16), then sector 16. Once an anchor passes, its scan decides.
                 if (input is CdDisc { LastSession: > 0 } disc && IsAnchor(input, disc.LastSession + FirstDescriptor))
                 {
-                    if (Primary(input, disc.LastSession + FirstDescriptor) is not { } p) return null;
+                    if (Primary(input, disc.LastSession + FirstDescriptor) is not { } p)
+                    {
+                        return null;
+                    }
                     // The driver maps the whole disc from offset 0 when the root's extent is at or after the session's
                     // start, so extents are absolute; otherwise they count from the session's start.
                     var reader = new BigEndianReader(p.Bytes);
@@ -72,7 +75,11 @@ namespace ClassicMac.Files.Iso
             // An anchor holds a descriptor of either standard, version 1 (its type byte is not checked).
             private static bool IsAnchor(ForkData input, long sector)
             {
-                if ((sector + 1) * Sector > input.Length) return false;
+                if ((sector + 1) * Sector > input.Length)
+                {
+                    return false;
+                }
+
                 var v = input.Slice(sector * Sector, 16).ToArray();
                 return (v[6] == 1 && (v.AsSpan(1, 5).SequenceEqual("CD001"u8) || v.AsSpan(1, 5).SequenceEqual("CD-I "u8)))
                     || (v[14] == 1 && v.AsSpan(9, 5).SequenceEqual("CDROM"u8));
@@ -83,26 +90,46 @@ namespace ClassicMac.Files.Iso
             {
                 for (var sector = first; sector < first + DescriptorsTried; sector++)
                 {
-                    if ((sector + 1) * Sector > input.Length) return null;
+                    if ((sector + 1) * Sector > input.Length)
+                    {
+                        return null;
+                    }
+
                     var v = input.Slice(sector * Sector, Sector).ToArray();
                     var id = System.Text.Encoding.ASCII.GetString(v, 1, 5).ToUpperInvariant();
                     var highSierra = System.Text.Encoding.ASCII.GetString(v, 9, 5).ToUpperInvariant() == "CDROM";
                     // A terminator ends the search: ISO's at byte 0, High Sierra's at byte 8.
-                    if ((v[0] == 0xFF && id == "CD001") || (v[8] == 0xFF && highSierra)) return null;
+                    if ((v[0] == 0xFF && id == "CD001") || (v[8] == 0xFF && highSierra))
+                    {
+                        return null;
+                    }
+
                     if (v[0] == 1 && v[6] == 1 && id is "CD001" or "CD-I ")
+                    {
                         return (v, false, id == "CD-I ");
+                    }
+
                     if (v[8] == 1 && v[14] == 1 && highSierra)
+                    {
                         return (v, true, false);
+                    }
                 }
                 return null;
             }
 
             private static Descriptor? Iso(ForkData input, byte[] v, bool cdI)
             {
-                if (v[0x371] is not (0 or 1)) return null;
+                if (v[0x371] is not (0 or 1))
+                {
+                    return null;
+                }
+
                 var reader = new BigEndianReader(v);
                 if (!cdI && BinaryPrimitives.ReadUInt32LittleEndian(v.AsSpan(0x84)) != reader.ReadUInt32At(0x88))
+                {
                     return null;
+                }
+
                 var xa = v.AsSpan(0x400, 8).SequenceEqual("CD-XA001"u8);
                 int blockSize = reader.ReadUInt16At(130);
                 // The root comes from the first entry of the big-endian path table.
@@ -120,9 +147,17 @@ namespace ClassicMac.Files.Iso
 
             private static long? PathTableRoot(ForkData input, uint table, int blockSize, int at)
             {
-                if (blockSize is < 512 or > Sector || (blockSize & (blockSize - 1)) != 0) return null;
+                if (blockSize is < 512 or > Sector || (blockSize & (blockSize - 1)) != 0)
+                {
+                    return null;
+                }
+
                 var offset = (long)table * blockSize;
-                if (offset + 8 > input.Length) return null;
+                if (offset + 8 > input.Length)
+                {
+                    return null;
+                }
+
                 var extent = new BigEndianReader(input.Slice(offset, 8).ToArray()).ReadUInt32At(at);
                 var root = (long)extent * blockSize;
                 return root > 0 && root < input.Length ? root : null;
@@ -169,10 +204,22 @@ namespace ClassicMac.Files.Iso
                 get
                 {
                     int year = b[18] + 1900, month = b[19], day = b[20], hour = b[21], minute = b[22], second = b[23];
-                    if (!HighSierra && year >= 2040) (year, month, day, hour, minute, second) = (2040, 2, 6, 0, 0, 0);
+                    if (!HighSierra && year >= 2040)
+                    {
+                        (year, month, day, hour, minute, second) = (2040, 2, 6, 0, 0, 0);
+                    }
+
                     year = Math.Max(year, 1904);
-                    if (month is < 1 or > 12) month = 1;
-                    if (day is < 1 or > 31) day = 1;
+                    if (month is < 1 or > 12)
+                    {
+                        month = 1;
+                    }
+
+                    if (day is < 1 or > 31)
+                    {
+                        day = 1;
+                    }
+
                     var date = new DateTime(year, month, 1).AddDays(day - 1).AddHours(hour).AddMinutes(minute).AddSeconds(second);
                     return date > Latest.ToDateTime() ? Latest : MacDate.FromDateTime(date);
                 }
@@ -197,7 +244,10 @@ namespace ClassicMac.Files.Iso
             {
                 var bytes = new byte[0x10C];
                 if (position >= 0 && position < image.Length)
+                {
                     image.Slice(position, Math.Min(recordBuffer, image.Length - position)).ToArray().CopyTo(bytes, 0);
+                }
+
                 return new Record(bytes, descriptor.HighSierra);
             }
 
@@ -242,14 +292,20 @@ namespace ClassicMac.Files.Iso
             // puts the data record first and an associated one after it.
             private (Record Record, long Id)? NextEntry(ref long position, long end)
             {
-                if (ReadRecord(ref position, end) is not { } first) return null;
+                if (ReadRecord(ref position, end) is not { } first)
+                {
+                    return null;
+                }
+
                 var id = position - first.Length;
                 if (descriptor.HighSierra || first.IsAssociated)
                 {
                     var after = position;
                     if (ReadRecord(ref after, end) is { } second && (!descriptor.HighSierra || second.IsAssociated)
                         && SameName(first, second))
+                    {
                         position = after;
+                    }
                 }
                 return (first, id);
             }
@@ -258,15 +314,26 @@ namespace ClassicMac.Files.Iso
             // sector start, ends the directory.
             private Record? ReadRecord(ref long position, long end)
             {
-                if (position >= end) return null; // a record starts inside its directory's extent
+                if (position >= end)
+                {
+                    return null; // a record starts inside its directory's extent
+                }
+
                 var record = RecordAt(position);
                 if (!record.IsValid)
                 {
                     var next = (position + Sector - 1) & ~(long)(Sector - 1);
-                    if (next >= end) return null;
+                    if (next >= end)
+                    {
+                        return null;
+                    }
+
                     position = next;
                     record = RecordAt(position);
-                    if (!record.IsValid) return null;
+                    if (!record.IsValid)
+                    {
+                        return null;
+                    }
                 }
                 position += record.Length;
                 return record;
@@ -274,7 +341,10 @@ namespace ClassicMac.Files.Iso
 
             private bool IsDirectory(Record record)
             {
-                if (!descriptor.CdI) return (record.Flags & FlagDirectory) != 0;
+                if (!descriptor.CdI)
+                {
+                    return (record.Flags & FlagDirectory) != 0;
+                }
                 // CD-i keeps the directory bit in its system-use field.
                 var su = 33 + record.NameLength + ((record.NameLength & 1) != 0 ? 0 : 1);
                 return (record.Bytes.Span[su + 4] & 0x80) != 0;
@@ -286,11 +356,27 @@ namespace ClassicMac.Files.Iso
             {
                 var raw = record.RawName[..Math.Min(record.NameLength, 31)];
                 var n = raw.Length;
-                while (n > 0 && raw[n - 1] == 0x20) n--;
+                while (n > 0 && raw[n - 1] == 0x20)
+                {
+                    n--;
+                }
+
                 var j = n;
-                while (j > 0 && raw[j - 1] != (byte)';' && raw[j - 1] is >= (byte)'0' and <= (byte)'9') j--;
-                if (j > 0 && raw[j - 1] == (byte)';') n = j - 1;
-                if (n is > 0 and <= 9 && raw[n - 1] == (byte)'.') n--;
+                while (j > 0 && raw[j - 1] != (byte)';' && raw[j - 1] is >= (byte)'0' and <= (byte)'9')
+                {
+                    j--;
+                }
+
+                if (j > 0 && raw[j - 1] == (byte)';')
+                {
+                    n = j - 1;
+                }
+
+                if (n is > 0 and <= 9 && raw[n - 1] == (byte)'.')
+                {
+                    n--;
+                }
+
                 return new MacString(raw[..n]);
             }
 
@@ -326,12 +412,19 @@ namespace ClassicMac.Files.Iso
                 MacDate? date = null;
                 foreach (var fork in new[] { data, resource })
                 {
-                    if (fork is null) continue;
+                    if (fork is null)
+                    {
+                        continue;
+                    }
+
                     date = fork.Date;
                     var (type, creator, apply) = FinderInfoOf(fork);
                     info = info with { Type = type, Creator = creator };
                     flags = apply(flags);
-                    if (fork.IsHidden) flags |= (ushort)FinderFlags.IsInvisible;
+                    if (fork.IsHidden)
+                    {
+                        flags |= (ushort)FinderFlags.IsInvisible;
+                    }
                 }
                 return new MacFile
                 {
@@ -362,8 +455,10 @@ namespace ClassicMac.Files.Iso
                         var creator = reader.ReadFourCCAt(p + 7);
                         switch (b[p + 2])
                         {
-                            case 2 or 4: return (type, creator, f => (ushort)(f | 0x0100));
-                            case 3 or 5: return (type, creator, f => (ushort)(f | 0x2100));
+                            case 2 or 4:
+                                return (type, creator, f => (ushort)(f | 0x0100));
+                            case 3 or 5:
+                                return (type, creator, f => (ushort)(f | 0x2100));
                             case 6:
                                 var stored = reader.ReadUInt16At(p + 11);
                                 return (type, creator, f => (ushort)(f | (stored & 0xB020) | 0x0100));
@@ -371,7 +466,11 @@ namespace ClassicMac.Files.Iso
                     }
                     else
                     {
-                        if (descriptor.Xa) p += 14;
+                        if (descriptor.Xa)
+                        {
+                            p += 14;
+                        }
+
                         while (p + 14 <= b.Length && p < record.Length)
                         {
                             if (b[p] == (byte)'A' && b[p + 1] == (byte)'A' && b[p + 3] == 2)
@@ -381,7 +480,11 @@ namespace ClassicMac.Files.Iso
                                     reader.ReadFourCCAt(p + 8),
                                     _ => (ushort)((stored & 0xB020) | 0x0100));
                             }
-                            if (b[p + 2] < 4) break;
+                            if (b[p + 2] < 4)
+                            {
+                                break;
+                            }
+
                             p += b[p + 2];
                         }
                     }
@@ -398,13 +501,17 @@ namespace ClassicMac.Files.Iso
                 long wanted = record.Size;
                 var ranges = new List<(long Offset, long Length)>();
                 if (record.UnitBlocks == 0)
+                {
                     ranges.Add((offset, wanted));
+                }
                 else
                 {
                     var unit = (long)record.UnitBlocks * blockSize;
                     var step = unit + (long)record.GapBlocks * blockSize;
                     for (long covered = 0; covered < wanted; covered += unit, offset += step)
+                    {
                         ranges.Add((offset, Math.Min(unit, wanted - covered)));
+                    }
                 }
 
                 var inImage = new List<(long, long)>();
@@ -412,9 +519,16 @@ namespace ClassicMac.Files.Iso
                 foreach (var (at, count) in ranges)
                 {
                     var take = Math.Clamp(image.Length - at, 0, count);
-                    if (take > 0) inImage.Add((at, take));
+                    if (take > 0)
+                    {
+                        inImage.Add((at, take));
+                    }
+
                     available += take;
-                    if (take < count) break;
+                    if (take < count)
+                    {
+                        break;
+                    }
                 }
                 if (available < wanted)
                 {

@@ -36,14 +36,26 @@ namespace ClassicMac.Files.Compression
             var i = 0;
             while (written < output.Length)
             {
-                if (i >= input.Length) return Result.Truncated;
+                if (i >= input.Length)
+                {
+                    return Result.Truncated;
+                }
+
                 var op = input[i++];
                 int length, distance;
                 if ((op & 0x80) != 0)
                 {
                     length = (op & 0x7F) + 1;
-                    if (written + length > output.Length) return Result.Overrun;
-                    if (i + length > input.Length) return Result.Truncated;
+                    if (written + length > output.Length)
+                    {
+                        return Result.Overrun;
+                    }
+
+                    if (i + length > input.Length)
+                    {
+                        return Result.Truncated;
+                    }
+
                     input.Slice(i, length).CopyTo(output[written..]);
                     written += length;
                     i += length;
@@ -52,20 +64,39 @@ namespace ClassicMac.Files.Compression
                 if ((op & 0x40) != 0)
                 {
                     length = (op & 0x3F) + 4;
-                    if (i + 2 > input.Length) return Result.Truncated;
+                    if (i + 2 > input.Length)
+                    {
+                        return Result.Truncated;
+                    }
+
                     distance = (input[i] << 8 | input[i + 1]) + 1;
                     i += 2;
                 }
                 else
                 {
                     length = (op >> 2) + 3;
-                    if (i + 1 > input.Length) return Result.Truncated;
+                    if (i + 1 > input.Length)
+                    {
+                        return Result.Truncated;
+                    }
+
                     distance = ((op & 0x03) << 8 | input[i]) + 1;
                     i += 1;
                 }
-                if (written + length > output.Length) return Result.Overrun;
-                if (distance > written) return Result.BadDistance;
-                for (var n = 0; n < length; n++, written++) output[written] = output[written - distance];
+                if (written + length > output.Length)
+                {
+                    return Result.Overrun;
+                }
+
+                if (distance > written)
+                {
+                    return Result.BadDistance;
+                }
+
+                for (var n = 0; n < length; n++, written++)
+                {
+                    output[written] = output[written - distance];
+                }
             }
             return Result.Done;
         }

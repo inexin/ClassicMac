@@ -15,9 +15,21 @@ public class UdifTests
     private static byte[] Device()
     {
         var device = new byte[20 * 512];
-        for (var i = 0; i < 6 * 512; i++) device[i] = (byte)"The quick brown fox jumps over the lazy dog. "[i % 45];
-        for (var i = 0; i < 1024; i++) device[10 * 512 + i] = (byte)((i * 7 + i / 256) & 0xFF);
-        for (var i = 12 * 512; i < device.Length; i++) device[i] = (byte)(i % 251);
+        for (var i = 0; i < 6 * 512; i++)
+        {
+            device[i] = (byte)"The quick brown fox jumps over the lazy dog. "[i % 45];
+        }
+
+        for (var i = 0; i < 1024; i++)
+        {
+            device[10 * 512 + i] = (byte)((i * 7 + i / 256) & 0xFF);
+        }
+
+        for (var i = 12 * 512; i < device.Length; i++)
+        {
+            device[i] = (byte)(i % 251);
+        }
+
         return device;
     }
 
@@ -111,7 +123,11 @@ public class UdifTests
     {
         var reference = !CorpusFolders.Any ? null
             : CorpusFolders.EnumerateFiles("dev800_ref.bin", SearchOption.AllDirectories).FirstOrDefault();
-        if (reference is null) Assert.Skip("Set CLASSICMAC_CORPUS to folders holding the harness's early UDIF samples to run this.");
+        if (reference is null)
+        {
+            Assert.Skip("Set CLASSICMAC_CORPUS to folders holding the harness's early UDIF samples to run this.");
+        }
+
         var device = File.ReadAllBytes(reference);
         var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
             .Where(f => Path.GetFileName(f) is "uco" or "uro" or "ued" && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.'))

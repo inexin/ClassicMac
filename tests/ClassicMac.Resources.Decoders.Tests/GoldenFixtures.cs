@@ -13,7 +13,11 @@ internal static class GoldenFixtures
     public static ResourceFork Fork()
     {
         var fork = new ResourceFork();
-        foreach (var r in Resources()) fork.Add(r);
+        foreach (var r in Resources())
+        {
+            fork.Add(r);
+        }
+
         return fork;
     }
 
@@ -27,7 +31,9 @@ internal static class GoldenFixtures
             if (r.Type.ToString() == "PICT" && r.Id == 129)
             {
                 foreach (var depth in new[] { 1, 8 })
+                {
                     fixtures.Add(new Fixture($"{key}-d{depth}", r, DecodeOptions.Default with { ScreenDepth = depth }));
+                }
             }
         }
         return fixtures;
@@ -49,7 +55,11 @@ internal static class GoldenFixtures
     private static Resource Res(string type, short id, byte[] data, string? name = null)
     {
         var r = new Resource(FourCC.FromString(type), id, data);
-        if (name is not null) r.Name = MacString.FromMacRoman(name);
+        if (name is not null)
+        {
+            r.Name = MacString.FromMacRoman(name);
+        }
+
         return r;
     }
 
@@ -177,9 +187,14 @@ internal static class GoldenFixtures
         yield return Res("DRVR", 12, CodeFixtures.Driver, ".D");
         yield return Res("PACK", 3, CodeFixtures.Package);
         foreach (var type in Code.CodeResourceDecoder.NativeTypes.Where(t => t != "ncod"))
+        {
             yield return Res(type, 128, SmallFragment());
+        }
+
         foreach (var type in Code.CodeResourceDecoder.M68kTypes.Where(t => t is not ("CDEF" or "DRVR" or "PACK")))
+        {
             yield return Res(type, (short)(type == "ptch" ? 129 : 128), [0x70, 0x00, 0x4E, 0x75]); // 'ptch' and 'PTCH' apart on any disk
+        }
 
         // A type no decoder handles: exported raw.
         yield return Res("DATA", 0, [0x4E, 0x75]);
@@ -237,8 +252,16 @@ internal static class GoldenFixtures
         var rowBytes = (width + 15) / 16 * 2;
         var data = new byte[rowBytes * height];
         for (var y = 0; y < height; y++)
-        for (var x = 0; x < width; x++)
-            if (set(x, y)) data[y * rowBytes + x / 8] |= (byte)(0x80 >> (x % 8));
+        {
+            for (var x = 0; x < width; x++)
+            {
+                if (set(x, y))
+                {
+                    data[y * rowBytes + x / 8] |= (byte)(0x80 >> (x % 8));
+                }
+            }
+        }
+
         return data;
     }
 
@@ -263,7 +286,11 @@ internal static class GoldenFixtures
     private static byte[] ColorTable(params (ushort R, ushort G, ushort B)[] colours)
     {
         var table = new List<byte>([0, 0, 0, 0, 0, 0, .. BE16(colours.Length - 1)]);
-        for (var i = 0; i < colours.Length; i++) table.AddRange([.. BE16(i), .. BE16(colours[i].R), .. BE16(colours[i].G), .. BE16(colours[i].B)]);
+        for (var i = 0; i < colours.Length; i++)
+        {
+            table.AddRange([.. BE16(i), .. BE16(colours[i].R), .. BE16(colours[i].G), .. BE16(colours[i].B)]);
+        }
+
         return [.. table];
     }
 
@@ -275,8 +302,13 @@ internal static class GoldenFixtures
         var rowBytes = (width * 2 + 15) / 16 * 2;
         var data = new byte[rowBytes * height];
         for (var y = 0; y < height; y++)
-        for (var x = 0; x < width; x++)
-            data[y * rowBytes + x / 4] |= (byte)(((x + y) / 4 % 4) << (6 - x % 4 * 2));
+        {
+            for (var x = 0; x < width; x++)
+            {
+                data[y * rowBytes + x / 4] |= (byte)(((x + y) / 4 % 4) << (6 - x % 4 * 2));
+            }
+        }
+
         return data;
     }
 
@@ -353,8 +385,14 @@ internal static class GoldenFixtures
         for (var i = 0; i < samples; i++)
         {
             var v = Math.Sin(i * Math.PI / 8);
-            if (bits == 8) data.Add((byte)(128 + (int)Math.Round(100 * v)));
-            else data.AddRange(BE16((short)Math.Round(20000 * v)));
+            if (bits == 8)
+            {
+                data.Add((byte)(128 + (int)Math.Round(100 * v)));
+            }
+            else
+            {
+                data.AddRange(BE16((short)Math.Round(20000 * v)));
+            }
         }
         return [.. data];
     }
@@ -362,7 +400,11 @@ internal static class GoldenFixtures
     private static byte[] Swap16(byte[] data)
     {
         var swapped = (byte[])data.Clone();
-        for (var i = 0; i + 1 < swapped.Length; i += 2) (swapped[i], swapped[i + 1]) = (swapped[i + 1], swapped[i]);
+        for (var i = 0; i + 1 < swapped.Length; i += 2)
+        {
+            (swapped[i], swapped[i + 1]) = (swapped[i + 1], swapped[i]);
+        }
+
         return swapped;
     }
 

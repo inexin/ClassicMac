@@ -35,7 +35,11 @@ namespace ClassicMac.Files.Hfs
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
-            if (!CanRead(input)) throw new InvalidDataException("Not an MFS volume.");
+            if (!CanRead(input))
+            {
+                throw new InvalidDataException("Not an MFS volume.");
+            }
+
             var info = new BigEndianReader(input.Slice(InfoOffset, 64).ToArray());
             int directoryStart = info.ReadUInt16At(0x0E);
             int directoryBlocks = info.ReadUInt16At(0x10);
@@ -44,10 +48,16 @@ namespace ClassicMac.Files.Hfs
             long firstBlock = info.ReadUInt16At(0x1C) * (long)BlockSize;
             int fileCount = info.ReadUInt16At(0x0C);
             if (blockSize == 0 || blockSize % 512 != 0)
+            {
                 throw new InvalidDataException($"The allocation block size {blockSize} is not a multiple of 512.");
+            }
 
             var mapLength = (blocks * 3 + 1) / 2;
-            if (MapOffset + mapLength > input.Length) throw new InvalidDataException("The allocation block map lies outside the volume.");
+            if (MapOffset + mapLength > input.Length)
+            {
+                throw new InvalidDataException("The allocation block map lies outside the volume.");
+            }
+
             var map = input.Slice(MapOffset, mapLength).ToArray();
 
             var directoryEnd = (long)(directoryStart + directoryBlocks) * BlockSize;
@@ -105,7 +115,11 @@ namespace ClassicMac.Files.Hfs
             // A fork: its chain of allocation blocks through the map, merged into ranges, cut to its logical length.
             ForkData Fork(int start, long length, string what)
             {
-                if (length == 0) return ForkData.Empty;
+                if (length == 0)
+                {
+                    return ForkData.Empty;
+                }
+
                 var ranges = new List<(long Offset, long Length)>();
                 var seen = new HashSet<int>();
                 long covered = 0;
@@ -119,12 +133,21 @@ namespace ClassicMac.Files.Hfs
                     }
                     var offset = firstBlock + (b - 2) * blockSize;
                     if (ranges.Count > 0 && ranges[^1].Offset + ranges[^1].Length == offset)
+                    {
                         ranges[^1] = (ranges[^1].Offset, ranges[^1].Length + blockSize);
+                    }
                     else
+                    {
                         ranges.Add((offset, blockSize));
+                    }
+
                     covered += blockSize;
                     var next = Entry(b);
-                    if (next == 1) break;
+                    if (next == 1)
+                    {
+                        break;
+                    }
+
                     if (next == 0)
                     {
                         context.Report(DiagnosticSeverity.Error, "mfs.bad-chain", $"The block chain of {what} runs into a free block.");
@@ -137,9 +160,16 @@ namespace ClassicMac.Files.Hfs
                 foreach (var (offset, count) in ranges)
                 {
                     var take = Math.Clamp(input.Length - offset, 0, count);
-                    if (take > 0) inImage.Add((offset, take));
+                    if (take > 0)
+                    {
+                        inImage.Add((offset, take));
+                    }
+
                     available += take;
-                    if (take < count) break;
+                    if (take < count)
+                    {
+                        break;
+                    }
                 }
                 if (available < length)
                 {

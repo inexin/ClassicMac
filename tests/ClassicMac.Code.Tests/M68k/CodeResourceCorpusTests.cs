@@ -124,12 +124,22 @@ public class CodeResourceCorpusTests
             var r = new BigEndianReader(data);
             foreach (var entry in header!.Entries)
             {
-                if (entry.TargetOffset is not { } target) continue;
+                if (entry.TargetOffset is not { } target)
+                {
+                    continue;
+                }
+
                 targets++;
                 Assert.True(target % 2 == 0 && target < data.Length, $"{resource}: selector {entry.Selector} at {target:X}");
                 Assert.False(M68kDisassembler.Decode(data, (int)target).IsInvalid, $"{resource}: selector {entry.Selector} at {target:X}");
-                if (r.ReadUInt16At((int)target) == 0x4E56) links++;
-                else if (r.ReadUInt16At((int)target - 2) is 0x4E75 or 0x4ED0 || r.ReadUInt16At((int)target - 4) == 0x4E74) afterReturn++;
+                if (r.ReadUInt16At((int)target) == 0x4E56)
+                {
+                    links++;
+                }
+                else if (r.ReadUInt16At((int)target - 2) is 0x4E75 or 0x4ED0 || r.ReadUInt16At((int)target - 4) == 0x4E74)
+                {
+                    afterReturn++;
+                }
             }
         }
         Assert.Equal((277, 196, 22), (targets, links, afterReturn));

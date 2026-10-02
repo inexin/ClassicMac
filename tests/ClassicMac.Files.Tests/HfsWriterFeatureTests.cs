@@ -171,7 +171,10 @@ public sealed class HfsWriterFeatureTests
         Assert.Equal(Bytes(150, 37), File(output, "Fragmented").ResourceFork.ToArray());
         Assert.Equal(freeBefore + 72 - remainingBlocks, FreeBlocks(output));
         AssertBitmapMatchesFreeCount(output);
-        if (remainingBlocks == 3) AssertEmptyExtentsTree(output);
+        if (remainingBlocks == 3)
+        {
+            AssertEmptyExtentsTree(output);
+        }
     }
 
     [Fact]
@@ -295,9 +298,14 @@ public sealed class HfsWriterFeatureTests
         builder.File(HfsBuilder.Root, "Target", Bytes(40, 31), Array.Empty<byte>());
         byte[] source = builder.Build("Volume");
         if (hfsPlusWrapper)
+        {
             BinaryPrimitives.WriteUInt16BigEndian(source.AsSpan(2 * HfsBuilder.Block + 0x7C), 0x482B);
+        }
         else
+        {
             BinaryPrimitives.WriteUInt16BigEndian(source.AsSpan(2 * HfsBuilder.Block), 0x0000);
+        }
+
         byte[] original = (byte[])source.Clone();
 
         Assert.Throws<InvalidDataException>(() =>

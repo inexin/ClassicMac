@@ -1,14 +1,14 @@
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.SkiaSharp;
+using ClassicMac.Resources.Decoders.Images;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
-using ClassicMac.Graphics.ImageSharp;
-using ClassicMac.Graphics.SkiaSharp;
-using ClassicMac.Resources.Decoders.Images;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -42,8 +42,12 @@ public class ImageSharpPluginTests
     {
         Assert.Equal(expected.Size, actual.Size);
         for (int y = 0; y < expected.Height; y++)
+        {
             for (int x = 0; x < expected.Width; x++)
+            {
                 Assert.Equal(expected[x, y], actual[x, y]);
+            }
+        }
     }
 
     [Theory]

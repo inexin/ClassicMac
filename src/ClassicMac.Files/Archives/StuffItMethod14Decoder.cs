@@ -22,9 +22,14 @@ internal static class StuffItMethod14Decoder
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
         if (outputLength < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(outputLength));
+        }
+
         if (input.Length < 2)
+        {
             throw new InvalidDataException("A StuffIt method 14 fork has no block count.");
+        }
 
         int blockCount = input[0] | input[1] << 8;
         int inputOffset = 2;
@@ -36,14 +41,22 @@ internal static class StuffItMethod14Decoder
         for (int blockIndex = 0; blockIndex < blockCount; blockIndex++)
         {
             if (input.Length - inputOffset < 8)
+            {
                 throw new InvalidDataException("A StuffIt method 14 block header is truncated.");
+            }
+
             uint compressedSize = ReadUInt32LittleEndian(input, inputOffset);
             uint expandedSize = ReadUInt32LittleEndian(input, inputOffset + 4);
             inputOffset += 8;
             if (compressedSize > input.Length - inputOffset)
+            {
                 throw new InvalidDataException("A StuffIt method 14 block exceeds its compressed fork.");
+            }
+
             if (expandedSize > (uint)(output.Length - outputOffset))
+            {
                 throw new InvalidDataException("StuffIt method 14 output exceeds its declared fork length.");
+            }
 
             var bits = new BitReader(input.Slice(inputOffset, checked((int)compressedSize)));
             HuffmanTree literalsAndLengths = ReadTree(ref bits, LiteralCount + LengthCount, 0);
@@ -60,18 +73,29 @@ internal static class StuffItMethod14Decoder
 
                 int lengthIndex = symbol - LiteralCount;
                 if ((uint)lengthIndex >= LengthCount)
+                {
                     throw new InvalidDataException("A StuffIt method 14 block contains an invalid length symbol.");
+                }
+
                 int lengthExtraBits = LengthExtraBits(lengthIndex);
                 int length = checked(LengthBase(lengthIndex) + 4 + (int)bits.ReadBits(lengthExtraBits));
                 int distanceSymbol = distances.ReadSymbol(ref bits);
                 if ((uint)distanceSymbol >= DistanceCount)
+                {
                     throw new InvalidDataException("A StuffIt method 14 block contains an invalid distance symbol.");
+                }
+
                 int distanceExtraBits = DistanceExtraBits(distanceSymbol);
                 int distance = checked(DistanceBase(distanceSymbol) + (int)bits.ReadBits(distanceExtraBits));
                 if (distance > WindowSize)
+                {
                     throw new InvalidDataException("A StuffIt method 14 back-reference exceeds its history window.");
+                }
+
                 if (length > blockEnd - outputOffset)
+                {
                     throw new InvalidDataException("A StuffIt method 14 match exceeds its declared block length.");
+                }
 
                 for (int copied = 0; copied < length; copied++)
                 {
@@ -85,8 +109,11 @@ internal static class StuffItMethod14Decoder
         }
 
         if (outputOffset != output.Length)
+        {
             throw new InvalidDataException(
                 $"StuffIt method 14 produced {outputOffset} of {output.Length} declared bytes.");
+        }
+
         return output;
     }
 
@@ -94,7 +121,10 @@ internal static class StuffItMethod14Decoder
         ref int windowPosition)
     {
         if (outputOffset >= output.Length)
+        {
             throw new InvalidDataException("StuffIt method 14 output exceeds its declared fork length.");
+        }
+
         output[outputOffset++] = value;
         window[windowPosition] = value;
         windowPosition = (windowPosition + 1) & WindowMask;
@@ -103,7 +133,9 @@ internal static class StuffItMethod14Decoder
     private static HuffmanTree ReadTree(ref BitReader bits, int symbolCount, int depth)
     {
         if (depth > MaximumTreeDepth)
+        {
             throw new InvalidDataException("A StuffIt method 14 code tree is nested too deeply.");
+        }
 
         bool hasZeroLengthCode = bits.ReadBits(1) != 0;
         int width = checked((int)bits.ReadBits(2) + 2);
@@ -121,7 +153,8 @@ internal static class StuffItMethod14Decoder
             while (position < lengths.Length)
             {
                 int symbol;
-                try { symbol = lengthTree.ReadSymbol(ref bits); }
+                try
+                { symbol = lengthTree.ReadSymbol(ref bits); }
                 catch (InvalidDataException e)
                 {
                     throw new InvalidDataException(
@@ -170,7 +203,10 @@ internal static class StuffItMethod14Decoder
     private static void RepeatPrevious(Span<byte> lengths, ref int position, int repeatCount)
     {
         if (position == 0 || repeatCount > lengths.Length - position)
+        {
             throw new InvalidDataException("A StuffIt method 14 code-length repeat is invalid.");
+        }
+
         byte previous = lengths[position - 1];
         lengths.Slice(position, repeatCount).Fill(previous);
         position += repeatCount;
@@ -182,7 +218,10 @@ internal static class StuffItMethod14Decoder
     {
         int result = 0;
         for (int index = 0; index < symbol; index++)
+        {
             result = checked(result + (1 << LengthExtraBits(index)));
+        }
+
         return result;
     }
 
@@ -192,7 +231,10 @@ internal static class StuffItMethod14Decoder
     {
         int result = 1;
         for (int index = 0; index < symbol; index++)
+        {
             result = checked(result + (1 << DistanceExtraBits(index)));
+        }
+
         return result;
     }
 
@@ -212,13 +254,22 @@ internal static class StuffItMethod14Decoder
             foreach (byte length in lengths)
             {
                 if (length > MaximumCodeLength)
+                {
                     throw new InvalidDataException("A StuffIt method 14 Huffman code is too long.");
-                if (length == 0) continue;
+                }
+
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 counts[length]++;
                 maxLength = Math.Max(maxLength, length);
             }
             if (maxLength == 0)
+            {
                 throw new InvalidDataException("A StuffIt method 14 Huffman tree has no symbols.");
+            }
 
             var nextCodes = new ulong[MaximumCodeLength + 1];
             ulong code = 0;
@@ -226,7 +277,10 @@ internal static class StuffItMethod14Decoder
             {
                 code = checked((code + (uint)counts[length - 1]) << 1);
                 if (code + (uint)counts[length] > 1UL << length)
+                {
                     throw new InvalidDataException("A StuffIt method 14 Huffman tree is oversubscribed.");
+                }
+
                 nextCodes[length] = code;
             }
 
@@ -234,7 +288,11 @@ internal static class StuffItMethod14Decoder
             for (int symbol = 0; symbol < lengths.Length; symbol++)
             {
                 int length = lengths[symbol];
-                if (length == 0) continue;
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 tree.Insert(ReverseBits(nextCodes[length]++, length), length, symbol);
             }
             return tree;
@@ -248,8 +306,10 @@ internal static class StuffItMethod14Decoder
                 int branch = (int)bits.ReadBits(1);
                 node = _nodes[node].Children[branch];
                 if (node < 0)
-            throw new InvalidDataException(
+                {
+                    throw new InvalidDataException(
                 $"A StuffIt method 14 Huffman code is invalid at compressed bit {bits.Position}.");
+                }
             }
             return _nodes[node].Symbol;
         }
@@ -260,7 +320,10 @@ internal static class StuffItMethod14Decoder
             for (int bit = 0; bit < length; bit++)
             {
                 if (_nodes[node].Symbol >= 0)
+                {
                     throw new InvalidDataException("A StuffIt method 14 Huffman tree is not prefix-free.");
+                }
+
                 int branch = (int)((code >> bit) & 1);
                 int child = _nodes[node].Children[branch];
                 if (child < 0)
@@ -272,7 +335,10 @@ internal static class StuffItMethod14Decoder
                 node = child;
             }
             if (_nodes[node].Symbol >= 0 || _nodes[node].Children[0] >= 0 || _nodes[node].Children[1] >= 0)
+            {
                 throw new InvalidDataException("A StuffIt method 14 Huffman tree contains a code collision.");
+            }
+
             _nodes[node].Symbol = symbol;
         }
 
@@ -280,7 +346,10 @@ internal static class StuffItMethod14Decoder
         {
             ulong result = 0;
             for (int bit = 0; bit < count; bit++)
+            {
                 result |= ((value >> bit) & 1) << (count - bit - 1);
+            }
+
             return result;
         }
 
@@ -301,10 +370,16 @@ internal static class StuffItMethod14Decoder
         public uint ReadBits(int count)
         {
             if (count is < 0 or > 32 || count > _input.Length * 8 - _position)
+            {
                 throw new InvalidDataException("A StuffIt method 14 block ends inside its compressed bitstream.");
+            }
+
             uint value = 0;
             for (int bit = 0; bit < count; bit++, _position++)
+            {
                 value |= (uint)((_input[_position >> 3] >> (_position & 7)) & 1) << bit;
+            }
+
             return value;
         }
 

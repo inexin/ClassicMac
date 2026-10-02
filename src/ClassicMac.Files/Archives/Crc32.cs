@@ -10,7 +10,11 @@ internal static class Crc32
     public static uint Compute(ReadOnlySpan<byte> bytes)
     {
         var crc = uint.MaxValue;
-        foreach (var b in bytes) crc = Table[(crc ^ b) & 0xFF] ^ (crc >> 8);
+        foreach (var b in bytes)
+        {
+            crc = Table[(crc ^ b) & 0xFF] ^ (crc >> 8);
+        }
+
         return ~crc;
     }
 
@@ -20,7 +24,11 @@ internal static class Crc32
         for (uint n = 0; n < 256; n++)
         {
             var c = n;
-            for (var k = 0; k < 8; k++) c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+            for (var k = 0; k < 8; k++)
+            {
+                c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+            }
+
             table[n] = c;
         }
         return table;

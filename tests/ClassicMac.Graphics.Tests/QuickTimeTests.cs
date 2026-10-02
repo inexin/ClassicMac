@@ -1,14 +1,14 @@
 using System.Text;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.SkiaSharp;
+using ClassicMac.Resources.Decoders.Images;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
-using ClassicMac.Graphics.ImageSharp;
-using ClassicMac.Graphics.SkiaSharp;
-using ClassicMac.Resources.Decoders.Images;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -25,14 +25,27 @@ public class QuickTimeTests
         var b = new PictBuilder();
         void L(int v) => b.U16(v >> 16).U16(v & 0xFFFF);
         b.U16(0);
-        L(sx << 16); L(0); L(0);
-        L(0); L(sy << 16); L(0);
-        L(tx << 16); L(ty << 16); L(1 << 30);
-        L(0); b.Rect(0, 0, 0, 0);                                        // matte size, matte rect
+        L(sx << 16);
+        L(0);
+        L(0);
+        L(0);
+        L(sy << 16);
+        L(0);
+        L(tx << 16);
+        L(ty << 16);
+        L(1 << 30);
+        L(0);
+        b.Rect(0, 0, 0, 0);                                        // matte size, matte rect
         b.U16(mode).Rect(0, 0, height, width);                          // mode, srcRect
-        L(0); L(0);                                                     // accuracy, mask size
-        L(86); b.Bytes(Encoding.ASCII.GetBytes(codec)).Zeros(8).U16(0).U16(0).Zeros(4).Zeros(8);
-        b.U16(width).U16(height); L(72 << 16); L(72 << 16); L(data.Length); b.U16(1).Zeros(32).U16(depth).U16(clutId);
+        L(0);
+        L(0);                                                     // accuracy, mask size
+        L(86);
+        b.Bytes(Encoding.ASCII.GetBytes(codec)).Zeros(8).U16(0).U16(0).Zeros(4).Zeros(8);
+        b.U16(width).U16(height);
+        L(72 << 16);
+        L(72 << 16);
+        L(data.Length);
+        b.U16(1).Zeros(32).U16(depth).U16(clutId);
         b.Bytes(data);
         var block = b.ToArray();
         return new PictBuilder().U16(0x8200).U16(block.Length >> 16).U16(block.Length & 0xFFFF).Bytes(block).ToArray();
@@ -215,7 +228,10 @@ public class QuickTimeTests
     public void Targa_BottomUpTrueColor()
     {
         var header = new byte[18];
-        header[2] = 2; header[12] = 1; header[14] = 2; header[16] = 24;   // uncompressed true-color 1x2, bottom-up
+        header[2] = 2;
+        header[12] = 1;
+        header[14] = 2;
+        header[16] = 24;   // uncompressed true-color 1x2, bottom-up
         var data = header.Concat(new byte[] { 255, 0, 0, 0, 0, 255 }).ToArray();   // BGR: bottom blue, top red
         var img = Decode("tga ", 1, 2, 24, data);
         Assert.Equal(Red, img[0, 0]);

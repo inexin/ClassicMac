@@ -49,25 +49,50 @@ namespace ClassicMac.App.ViewModels
             {
                 if (node is ResourceTypeNode type)
                 {
-                    if (!forks.Any(f => ReferenceEquals(f, type.Fork))) forks.Add(type.Fork);
+                    if (!forks.Any(f => ReferenceEquals(f, type.Fork)))
+                    {
+                        forks.Add(type.Fork);
+                    }
+
                     return;
                 }
-                foreach (var child in Tree.Contents(node)) Walk(child);
+                foreach (var child in Tree.Contents(node))
+                {
+                    Walk(child);
+                }
             }
-            foreach (var root in roots) Walk(root);
+            foreach (var root in roots)
+            {
+                Walk(root);
+            }
+
             var system = forks.Where(f => Enumerable.Range(0, 3).Any(id => f.Find(Cicn, (short)id) is not null || f.Find(Icon, (short)id) is not null)).ToList();
             var generic = forks.Where(f => f.Find(IconList, FinderIconResolver.GenericDocumentId) is not null
                 || f.Find(Icns, FinderIconResolver.GenericDocumentId) is not null || f.Find(Isrv, 128) is not null).ToList();
             var withFonts = forks.Where(f => f.OfType(Fond).Any() || f.OfType(Font).Any()).ToList();
-            if (withFonts.Count == 0) return new(system, null) { GenericIconForks = generic };
+            if (withFonts.Count == 0)
+            {
+                return new(system, null) { GenericIconForks = generic };
+            }
             // Mac OS 9's system font is Charcoal; without it, Chicago (family 0) as earlier systems.
             var charcoal = withFonts.SelectMany(f => f.OfType(Fond)).FirstOrDefault(r => r.Name?.ToMacRoman() == "Charcoal");
             var library = new FontLibrary { SystemFontId = charcoal?.Id ?? 0 };
             foreach (var fork in withFonts)
             {
-                foreach (var r in fork.OfType(Fond)) library.AddFamily(r.Id, r.Name?.ToMacRoman(), Data(r, fork));
-                foreach (var r in fork.OfType(Nfnt)) library.AddNfnt(r.Id, Data(r, fork));
-                foreach (var r in fork.OfType(Font)) library.AddFont(r.Id, Data(r, fork), r.Name?.ToMacRoman());
+                foreach (var r in fork.OfType(Fond))
+                {
+                    library.AddFamily(r.Id, r.Name?.ToMacRoman(), Data(r, fork));
+                }
+
+                foreach (var r in fork.OfType(Nfnt))
+                {
+                    library.AddNfnt(r.Id, Data(r, fork));
+                }
+
+                foreach (var r in fork.OfType(Font))
+                {
+                    library.AddFont(r.Id, Data(r, fork), r.Name?.ToMacRoman());
+                }
             }
             return new(system, library) { GenericIconForks = generic };
         }
@@ -87,10 +112,15 @@ namespace ClassicMac.App.ViewModels
         {
             sources ??= DialogSources.None;
             if (DialogDrawings.Read(resource, data, fork, options, readOptions, diagnostics, DialogKind.Alert, sources.SystemForks) is not { } drawing)
+            {
                 return null;
+            }
+
             var rendering = DialogRenderer.Render(drawing, new DialogRenderOptions
             {
-                ScreenDepth = options.ScreenDepth, Fonts = sources.Fonts, TextFallback = SystemTextFallback.Instance,
+                ScreenDepth = options.ScreenDepth,
+                Fonts = sources.Fonts,
+                TextFallback = SystemTextFallback.Instance,
             });
             var bitmap = rendering.Bitmap;
             return new DialogPreview(drawing, PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height);

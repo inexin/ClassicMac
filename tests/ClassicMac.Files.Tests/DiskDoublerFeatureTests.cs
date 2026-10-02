@@ -323,13 +323,24 @@ public sealed class DiskDoublerFeatureTests
         while (offset <= archive.Length - 46 && archive.AsSpan(offset, 4).SequenceEqual("DDA2"u8))
         {
             ushort currentType = BinaryPrimitives.ReadUInt16BigEndian(archive.AsSpan(offset + 4));
-            if (currentType == 0xBBBB) break;
+            if (currentType == 0xBBBB)
+            {
+                break;
+            }
+
             int nameLength = archive[offset + 6];
             int recordLength = checked((int)BinaryPrimitives.ReadUInt32BigEndian(archive.AsSpan(offset + 42)));
             if (currentType == entryType &&
                 System.Text.Encoding.ASCII.GetString(archive, offset + 7, nameLength) == name)
+            {
                 return offset;
-            if (recordLength < 46 || recordLength > archive.Length - offset) break;
+            }
+
+            if (recordLength < 46 || recordLength > archive.Length - offset)
+            {
+                break;
+            }
+
             offset += recordLength;
         }
         return -1;
@@ -1607,7 +1618,11 @@ public sealed class DiskDoublerFeatureTests
             byte[] data, byte[] resource)
         {
             byte[] nameBytes = MacString.FromMacRoman(name).Bytes.ToArray();
-            if (nameBytes.Length > 63) throw new ArgumentOutOfRangeException(nameof(name));
+            if (nameBytes.Length > 63)
+            {
+                throw new ArgumentOutOfRangeException(nameof(name));
+            }
+
             byte[] bytes = new byte[LegacyRecordHeaderLength + data.Length + resource.Length];
             "DDAR"u8.CopyTo(bytes);
             bytes[8] = checked((byte)nameBytes.Length);
@@ -1662,29 +1677,73 @@ public sealed class DiskDoublerFeatureTests
             U16(archive, 40, 0x4000);
             U16(archive, 54, dataDelta);
             U16(archive, 56, resourceDelta);
-            if (dataMethod == 1) U16(archive, 48, MacCompressChecksum(data, encodedData, 0, 0));
-            if (dataMethod is 2 or 4 or 5) U16(archive, 48, ByteSum(data));
-            if (dataMethod == 7) U16(archive, 48, StacLzsChecksum(data));
-            if (dataMethod == 8) U16(archive, 48, Crc16Ibm(data));
-            if (resourceMethod == 1) U16(archive, 50, MacCompressChecksum(resource, encodedResource, 0, 0));
-            if (resourceMethod is 2 or 4 or 5) U16(archive, 50, ByteSum(resource));
-            if (resourceMethod == 7) U16(archive, 50, StacLzsChecksum(resource));
-            if (resourceMethod == 8) U16(archive, 50, Crc16Ibm(resource));
+            if (dataMethod == 1)
+            {
+                U16(archive, 48, MacCompressChecksum(data, encodedData, 0, 0));
+            }
+
+            if (dataMethod is 2 or 4 or 5)
+            {
+                U16(archive, 48, ByteSum(data));
+            }
+
+            if (dataMethod == 7)
+            {
+                U16(archive, 48, StacLzsChecksum(data));
+            }
+
+            if (dataMethod == 8)
+            {
+                U16(archive, 48, Crc16Ibm(data));
+            }
+
+            if (resourceMethod == 1)
+            {
+                U16(archive, 50, MacCompressChecksum(resource, encodedResource, 0, 0));
+            }
+
+            if (resourceMethod is 2 or 4 or 5)
+            {
+                U16(archive, 50, ByteSum(resource));
+            }
+
+            if (resourceMethod == 7)
+            {
+                U16(archive, 50, StacLzsChecksum(resource));
+            }
+
+            if (resourceMethod == 8)
+            {
+                U16(archive, 50, Crc16Ibm(resource));
+            }
+
             encodedData.CopyTo(archive, 84);
             encodedResource.CopyTo(archive, 84 + encodedData.Length);
-            if (headerChecksum) U16(archive, 82, Crc16Xmodem(archive.AsSpan(0, 82)));
+            if (headerChecksum)
+            {
+                U16(archive, 82, Crc16Xmodem(archive.AsSpan(0, 82)));
+            }
+
             return archive;
         }
 
         public static byte[] BuildAdnStoredBlock(byte[] data)
         {
-            if (data.Length > 0x2000) throw new ArgumentOutOfRangeException(nameof(data));
+            if (data.Length > 0x2000)
+            {
+                throw new ArgumentOutOfRangeException(nameof(data));
+            }
+
             byte[] block = new byte[12 + data.Length];
             U16(block, 0, checked((ushort)data.Length));
             U16(block, 2, checked((ushort)data.Length));
             block[9] = 1;
             byte headerXor = 0;
-            for (int index = 0; index < 11; index++) headerXor ^= block[index];
+            for (int index = 0; index < 11; index++)
+            {
+                headerXor ^= block[index];
+            }
+
             block[11] = headerXor;
             data.CopyTo(block, 12);
             return block;
@@ -1725,18 +1784,58 @@ public sealed class DiskDoublerFeatureTests
             U32(bytes, header + 24, 2_500_000_000);
             "TEXTttxt"u8.CopyTo(bytes.AsSpan(header + 28));
             U16(bytes, header + 36, 0x4000);
-            if (dataMethod == 8) U16(bytes, header + 44, Crc16Ibm(data));
-            if (resourceMethod == 8) U16(bytes, header + 46, Crc16Ibm(resource));
-            if (dataMethod == 1 && encodedData.Length >= 3) U16(bytes, header + 44,
+            if (dataMethod == 8)
+            {
+                U16(bytes, header + 44, Crc16Ibm(data));
+            }
+
+            if (resourceMethod == 8)
+            {
+                U16(bytes, header + 46, Crc16Ibm(resource));
+            }
+
+            if (dataMethod == 1 && encodedData.Length >= 3)
+            {
+                U16(bytes, header + 44,
                 MacCompressChecksum(data, encodedData, info1, info2));
-            if (dataMethod is 2 or 5) U16(bytes, header + 44, ByteSum(data));
-            if (dataMethod == 7) U16(bytes, header + 44, StacLzsChecksum(data));
-            if (resourceMethod == 1 && encodedResource.Length >= 3) U16(bytes, header + 46,
+            }
+
+            if (dataMethod is 2 or 5)
+            {
+                U16(bytes, header + 44, ByteSum(data));
+            }
+
+            if (dataMethod == 7)
+            {
+                U16(bytes, header + 44, StacLzsChecksum(data));
+            }
+
+            if (resourceMethod == 1 && encodedResource.Length >= 3)
+            {
+                U16(bytes, header + 46,
                 MacCompressChecksum(resource, encodedResource, info1, info2));
-            if (resourceMethod is 2 or 5) U16(bytes, header + 46, ByteSum(resource));
-            if (resourceMethod == 7) U16(bytes, header + 46, StacLzsChecksum(resource));
-            if (dataMethod == 4) U16(bytes, header + 44, ByteSum(data));
-            if (resourceMethod == 4) U16(bytes, header + 46, ByteSum(resource));
+            }
+
+            if (resourceMethod is 2 or 5)
+            {
+                U16(bytes, header + 46, ByteSum(resource));
+            }
+
+            if (resourceMethod == 7)
+            {
+                U16(bytes, header + 46, StacLzsChecksum(resource));
+            }
+
+            if (dataMethod == 4)
+            {
+                U16(bytes, header + 44, ByteSum(data));
+            }
+
+            if (resourceMethod == 4)
+            {
+                U16(bytes, header + 46, ByteSum(resource));
+            }
+
             encodedData.CopyTo(bytes, RecordHeaderLength + 14 + FileHeaderLength);
             encodedResource.CopyTo(bytes, RecordHeaderLength + 14 + FileHeaderLength + encodedData.Length);
             return bytes;
@@ -1749,7 +1848,9 @@ public sealed class DiskDoublerFeatureTests
             {
                 crc ^= value;
                 for (int bit = 0; bit < 8; bit++)
+                {
                     crc = (ushort)((crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xA001));
+                }
             }
             return crc;
         }
@@ -1761,7 +1862,9 @@ public sealed class DiskDoublerFeatureTests
             {
                 crc ^= (ushort)(value << 8);
                 for (int bit = 0; bit < 8; bit++)
+                {
                     crc = (ushort)((crc & 0x8000) == 0 ? crc << 1 : (crc << 1) ^ 0x1021);
+                }
             }
             return crc;
         }
@@ -1771,22 +1874,38 @@ public sealed class DiskDoublerFeatureTests
         {
             byte xor = info1 >= 0x2A && (info2 & 0x80) == 0 ? (byte)0x5A : (byte)0;
             uint sum = (uint)(encoded[0] ^ xor) + (uint)(encoded[1] ^ xor) + (uint)(encoded[2] ^ xor);
-            foreach (byte value in data) sum += value;
+            foreach (byte value in data)
+            {
+                sum += value;
+            }
+
             return (ushort)sum;
         }
 
         private static ushort ByteSum(ReadOnlySpan<byte> data)
         {
             uint sum = 0;
-            foreach (byte value in data) sum += value;
+            foreach (byte value in data)
+            {
+                sum += value;
+            }
+
             return (ushort)sum;
         }
 
         private static ushort StacLzsChecksum(ReadOnlySpan<byte> data)
         {
             byte xor = 0;
-            foreach (byte value in data) xor ^= value;
-            if ((data.Length & 1) == 0) xor ^= 0xFF;
+            foreach (byte value in data)
+            {
+                xor ^= value;
+            }
+
+            if ((data.Length & 1) == 0)
+            {
+                xor ^= 0xFF;
+            }
+
             return xor;
         }
 
@@ -1800,10 +1919,19 @@ public sealed class DiskDoublerFeatureTests
             bits.Add(true);
             WriteBits(bits, symbolB, 8);
             foreach (byte value in plain)
+            {
                 bits.Add(value == symbolB);
+            }
+
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1812,14 +1940,24 @@ public sealed class DiskDoublerFeatureTests
             var bits = new List<bool>();
             int symbolCount = ((value + 2) / 2) * 2;
             WriteBits(bits, symbolCount / 2, 8);
-            for (int symbol = 0; symbol < symbolCount; symbol++) WriteBits(bits, symbol == value ? 1 : 0, 4);
+            for (int symbol = 0; symbol < symbolCount; symbol++)
+            {
+                WriteBits(bits, symbol == value ? 1 : 0, 4);
+            }
+
             WriteBits(bits, 0, 8);
             WriteBits(bits, 0, 8);
             WriteBits(bits, 1, 1);
             WriteBits(bits, 0, 1);
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1829,7 +1967,10 @@ public sealed class DiskDoublerFeatureTests
             byte[] payload = new byte[checked(streamOffset + compressedStream.Length)];
             U32(payload, 6, entryCount);
             for (int index = 0; index < compressedStream.Length; index++)
+            {
                 payload[streamOffset + index] = (byte)(compressedStream[index] ^ 0xFF);
+            }
+
             return payload;
         }
 
@@ -1847,8 +1988,16 @@ public sealed class DiskDoublerFeatureTests
 
         public static byte[] BuildStacLzsRepeat(ReadOnlySpan<byte> literals, int offset, int length)
         {
-            if (offset is <= 0 or > 2047) throw new ArgumentOutOfRangeException(nameof(offset));
-            if (length < 2) throw new ArgumentOutOfRangeException(nameof(length));
+            if (offset is <= 0 or > 2047)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            }
+
+            if (length < 2)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
+
             var bits = new List<bool>();
             foreach (byte value in literals)
             {
@@ -1907,7 +2056,13 @@ public sealed class DiskDoublerFeatureTests
         {
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1915,10 +2070,22 @@ public sealed class DiskDoublerFeatureTests
         {
             var bits = new List<bool>();
             foreach (int code in codes)
-                for (int bit = 0; bit < 9; bit++) bits.Add((code & (1 << bit)) != 0);
+            {
+                for (int bit = 0; bit < 9; bit++)
+                {
+                    bits.Add((code & (1 << bit)) != 0);
+                }
+            }
+
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(1 << (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(1 << (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1929,11 +2096,20 @@ public sealed class DiskDoublerFeatureTests
             {
                 int width = index < 257 ? 9 : 10;
                 int code = literals[index];
-                for (int bit = 0; bit < width; bit++) bits.Add((code & (1 << bit)) != 0);
+                for (int bit = 0; bit < width; bit++)
+                {
+                    bits.Add((code & (1 << bit)) != 0);
+                }
             }
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(1 << (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(1 << (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -1942,28 +2118,48 @@ public sealed class DiskDoublerFeatureTests
             var bits = new List<bool>();
             AppendCode(bits, first, 9);
             AppendCode(bits, 256, 9);
-            while (bits.Count % (9 * 8) != 0) bits.Add(false);
+            while (bits.Count % (9 * 8) != 0)
+            {
+                bits.Add(false);
+            }
+
             AppendCode(bits, afterClear, 9);
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(1 << (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(1 << (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
         private static void AppendCode(List<bool> bits, int code, int width)
         {
-            for (int bit = 0; bit < width; bit++) bits.Add((code & (1 << bit)) != 0);
+            for (int bit = 0; bit < width; bit++)
+            {
+                bits.Add((code & (1 << bit)) != 0);
+            }
         }
 
         private static void WriteBits(List<bool> bits, int value, int count)
         {
-            for (int bit = count - 1; bit >= 0; bit--) bits.Add((value & (1 << bit)) != 0);
+            for (int bit = count - 1; bit >= 0; bit--)
+            {
+                bits.Add((value & (1 << bit)) != 0);
+            }
         }
 
         private static byte[] NewRecord(string name, uint depth, int totalSize, ushort type = 0)
         {
             byte[] nameBytes = MacString.FromMacRoman(name).Bytes.ToArray();
-            if (nameBytes.Length is 0 or > 31) throw new ArgumentOutOfRangeException(nameof(name));
+            if (nameBytes.Length is 0 or > 31)
+            {
+                throw new ArgumentOutOfRangeException(nameof(name));
+            }
+
             byte[] bytes = new byte[totalSize];
             "DDA2"u8.CopyTo(bytes);
             U16(bytes, 4, type);

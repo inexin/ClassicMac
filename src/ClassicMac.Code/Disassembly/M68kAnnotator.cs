@@ -49,16 +49,25 @@ internal sealed class M68kContext
         if (app.FindSegment(segment) is { } s)
         {
             foreach (long offset in s.A5Relocations)
+            {
                 relocations[offset] = new M68kRelocation(M68kRelocationBase.A5, 0);
+            }
+
             foreach (long offset in s.PcRelocations)
+            {
                 relocations[offset] = new M68kRelocation(M68kRelocationBase.Segment, segment);
+            }
             // Retro68: kind 0 adds the segment's address, kinds 1 to 3 the A5 displacement (docs/formats/code/code-data.md
             // §1.3). A relative relocation's long names the same target, as a distance once patched.
             foreach (var r in s.Retro68Relocations)
+            {
                 relocations[r.Offset] = r.Base == Retro68RelocationBase.Segment
                     ? new M68kRelocation(M68kRelocationBase.Segment, segment)
                     : new M68kRelocation(M68kRelocationBase.A5, 0);
+            }
+
             if (segment == 1 && app.CodeWarriorData is { } cw)
+            {
                 foreach (var list in cw.Relocations)
                 {
                     var relocation = list.Kind switch
@@ -69,9 +78,14 @@ internal sealed class M68kContext
                         _ => (M68kRelocation?)null,
                     };
                     if (relocation is { } r)
+                    {
                         foreach (int offset in list.Offsets)
+                        {
                             relocations[offset] = r;
+                        }
+                    }
                 }
+            }
         }
         var names = NameCache.GetValue(app, BuildNames);
         return new M68kContext
@@ -90,13 +104,19 @@ internal sealed class M68kContext
         foreach (var segment in app.Segments)
         {
             if (!segment.IsReadable)
+            {
                 continue;
+            }
+
             var names = new Dictionary<long, string>();
             int functionStart = segment.Header?.Length ?? 0;
             foreach (var name in MacsBugNames.Find(segment.Data))
             {
                 if (name.ReturnOffset < functionStart)
+                {
                     continue;
+                }
+
                 names.TryAdd(functionStart, name.Name);
                 functionStart = name.End;
             }
@@ -128,24 +148,40 @@ internal static class M68kAnnotator
             {
                 case M68kEffectiveAddress { Mode: M68kAddressingMode.Displacement, Register: 5 } a5:
                     if (ins.Mnemonic is "jsr" or "jmp" or "pea" or "lea" && context.Application?.ResolveA5(a5.BaseDisplacement) is { } entry)
+                    {
                         Add(CodeReferenceKind.JumpTable, JumpTable(entry, context));
+                    }
                     else
+                    {
                         Add(CodeReferenceKind.A5Global, Signed("A5", a5.BaseDisplacement));
+                    }
+
                     break;
                 case M68kEffectiveAddress { Mode: M68kAddressingMode.AbsoluteLong or M68kAddressingMode.AbsoluteShort, Address: uint address } abs:
                     if (abs.Mode == M68kAddressingMode.AbsoluteLong && FindRelocation(ins, address, reader, context, usedRelocations) is { } r)
+                    {
                         Add(CodeReferenceKind.Relocation, Relocated(r, address, map, context));
+                    }
                     else if (LowMemoryGlobals.TryFind(address, out var global, out int offset))
+                    {
                         Add(CodeReferenceKind.LowMemory, offset == 0 ? global.Name : $"{global.Name}+{offset}");
+                    }
+
                     break;
                 case M68kImmediate { Size: M68kSize.Long } imm:
                     if (FindRelocation(ins, (uint)imm.Value, reader, context, usedRelocations) is { } ri)
+                    {
                         Add(CodeReferenceKind.Relocation, Relocated(ri, (uint)imm.Value, map, context));
+                    }
+
                     break;
                 case M68kEffectiveAddress { Mode: M68kAddressingMode.PcDisplacement, Address: uint target }
                     when ins.Mnemonic is not ("jsr" or "jmp"):
                     if (target < (uint)map.Code.Length && M68kStrings.At(map.Code.Span, (int)target) is { } s)
+                    {
                         Add(CodeReferenceKind.String, s.Preview);
+                    }
+
                     break;
             }
         }
@@ -154,7 +190,9 @@ internal static class M68kAnnotator
         {
             Add(CodeReferenceKind.Trap, TrapNames.Describe(trap));
             if (SelectorNames.TryGetConvention(trap, out var convention) && FindSelector(ins, map, convention) is uint selector)
+            {
                 Add(CodeReferenceKind.Selector, SelectorText(trap, selector, convention));
+            }
         }
 
         foreach (var reference in ins.References)
@@ -163,7 +201,9 @@ internal static class M68kAnnotator
             bool jump = reference.Kind == M68kReferenceKind.Branch && (ins.Flags & M68kFlags.Conditional) == 0;
             if ((call || jump) && reference.Address < (uint)map.Code.Length && map.NameAt((int)reference.Address) is { } name
                 && !refs.Exists(r => r.Kind == CodeReferenceKind.Relocation))
+            {
                 Add(CodeReferenceKind.Call, name);
+            }
         }
         return refs;
     }
@@ -171,7 +211,10 @@ internal static class M68kAnnotator
     private static string JumpTable(JumpTableEntry entry, M68kContext context)
     {
         if (entry.ResourceOffset is not { } offset)
+        {
             return "JT " + entry.Index.ToString(CultureInfo.InvariantCulture);
+        }
+
         string text = $"CODE {entry.Segment}:+${offset:X}";
         return context.FunctionName(entry.Segment, offset) is { } name ? text + " " + name : text;
     }
@@ -184,13 +227,19 @@ internal static class M68kAnnotator
         HashSet<long> used)
     {
         if (context.Relocations.Count == 0)
+        {
             return null;
+        }
+
         for (long at = ins.Address + 2L; at <= ins.Address + (long)ins.Length - 4; at += 2)
+        {
             if (!used.Contains(at) && context.Relocations.TryGetValue(at, out var r) && reader.ReadUInt32At((int)at) == value)
             {
                 used.Add(at);
                 return r;
             }
+        }
+
         return null;
     }
 
@@ -215,18 +264,30 @@ internal static class M68kAnnotator
     private static uint? FindSelector(M68kInstruction trap, M68kCodeMap map, SelectorConvention convention)
     {
         if (IsBlockStart(trap, map))
+        {
             return null;
+        }
+
         var current = trap;
         for (int i = 0; i < Lookback; i++)
         {
             if (map.Previous(current) is not { } previous
                 || (previous.Flags & (M68kFlags.Branch | M68kFlags.Return | M68kFlags.Call | M68kFlags.ALine)) != 0)
+            {
                 return null;
+            }
+
             var (decided, value) = convention.Location == SelectorLocation.Stack ? StackSelector(previous) : D0Selector(previous);
             if (decided)
+            {
                 return value;
+            }
+
             if (IsBlockStart(previous, map))
+            {
                 return null;
+            }
+
             current = previous;
         }
         return null;
@@ -239,7 +300,10 @@ internal static class M68kAnnotator
     private static (bool, uint?) StackSelector(M68kInstruction ins)
     {
         if (ins.Operands.Count == 0 || ins.Operands[^1] is not M68kEffectiveAddress { Mode: M68kAddressingMode.PreDecrement, Register: 7 })
+        {
             return (false, null);
+        }
+
         return ins switch
         {
             { Mnemonic: "move", Size: M68kSize.Word, Operands: [M68kImmediate imm, _] } => (true, (uint)(ushort)imm.Value),
@@ -253,7 +317,10 @@ internal static class M68kAnnotator
     private static (bool, uint?) D0Selector(M68kInstruction ins)
     {
         if (ins.Operands.Count == 0 || ins.Operands[^1] is not M68kRegisterOperand { Kind: M68kRegisterKind.Data, Number: 0 })
+        {
             return (false, null);
+        }
+
         return ins switch
         {
             { Mnemonic: "moveq", Operands: [M68kImmediate imm, _] } => (true, unchecked((uint)(sbyte)(byte)imm.Value)),
@@ -298,15 +365,27 @@ internal static class M68kStrings
     public static (string Preview, int Length)? At(ReadOnlySpan<byte> code, int at)
     {
         if (at < 0 || at >= code.Length)
+        {
             return null;
+        }
+
         int n = code[at];
         if (n >= 1 && n <= code.Length - at - 1 && IsPrintable(code.Slice(at + 1, n)))
+        {
             return ("P'" + Preview(code.Slice(at + 1, n)) + "'", n + 1);
+        }
+
         int end = at;
         while (end < code.Length && end - at <= 255 && code[end] is >= 0x20 and <= 0x7E)
+        {
             end++;
+        }
+
         if (end - at >= MinCString && end < code.Length && code[end] == 0)
+        {
             return ("C'" + Preview(code[at..end]) + "'", end - at + 1);
+        }
+
         return null;
     }
 
@@ -314,8 +393,13 @@ internal static class M68kStrings
     public static bool IsPrintable(ReadOnlySpan<byte> chars)
     {
         foreach (byte c in chars)
+        {
             if (c is < 0x20 or > 0x7E)
+            {
                 return false;
+            }
+        }
+
         return true;
     }
 

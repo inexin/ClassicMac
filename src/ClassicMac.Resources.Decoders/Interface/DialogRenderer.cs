@@ -55,13 +55,19 @@ namespace ClassicMac.Resources.Decoders.Interface
             var canvas = new RgbaBitmap(width, height);
             var port = new QuickDrawPort(canvas, new QuickDrawOptions
             {
-                ScreenDepth = options.ScreenDepth, Version = QuickDrawVersion.MacOS9, Fonts = options.Fonts, TextFallback = options.TextFallback,
+                ScreenDepth = options.ScreenDepth,
+                Version = QuickDrawVersion.MacOS9,
+                Fonts = options.Fonts,
+                TextFallback = options.TextFallback,
             });
             var content = drawing.IsAlert || drawing.ThemeBackground ? PlatinumArt.Background : drawing.Content ?? RgbColor.White;
             var text = new TextTools(port, options);
 
             // The structure: the frame with the content colour inside.
-            if (art is not null) art.Paint(port, 0, 0, width, height, content);
+            if (art is not null)
+            {
+                art.Paint(port, 0, 0, width, height, content);
+            }
             else
             {
                 port.ForeColor = content;
@@ -75,15 +81,25 @@ namespace ClassicMac.Resources.Decoders.Interface
                     port.PaintRect(PlatinumArt.Rect(height - 2, 2, height, width));
                 }
             }
-            if (art == PlatinumArt.DocumentFrame || art == PlatinumArt.MovableFrame) TitleBar(port, text, drawing, art, width);
+            if (art == PlatinumArt.DocumentFrame || art == PlatinumArt.MovableFrame)
+            {
+                TitleBar(port, text, drawing, art, width);
+            }
 
             // The content, in local coordinates, clipped to the window's port.
             port.SetOrigin(-left, -top);
             var portRect = PlatinumArt.Rect(0, 0, drawing.Height, drawing.Width);
             port.Clip = Region.FromRect(portRect);
-            if (drawing.IsAlert && drawing.Kind != DialogKind.Alert) AlertIcon(port, drawing.AlertIcon, options);
+            if (drawing.IsAlert && drawing.Kind != DialogKind.Alert)
+            {
+                AlertIcon(port, drawing.AlertIcon, options);
+            }
+
             for (var i = 0; i < drawing.Items.Count; i++)
+            {
                 Item(port, text, drawing.Items[i], drawing.IsAlert && i + 1 == drawing.DefaultItem, content, portRect, options);
+            }
+
             return new DialogRendering(canvas, left, top);
         }
 
@@ -93,8 +109,16 @@ namespace ClassicMac.Resources.Decoders.Interface
         /// </summary>
         private static (PlatinumArt? Art, int Left, int Top, int Right, int Bottom) Frame(DialogDrawing drawing)
         {
-            if (drawing.IsAlert) return (PlatinumArt.AlertFrame, 6, 6, 7, 7);
-            if (drawing.Kind == DialogKind.ItemList) return (null, 1, 1, 1, 1);
+            if (drawing.IsAlert)
+            {
+                return (PlatinumArt.AlertFrame, 6, 6, 7, 7);
+            }
+
+            if (drawing.Kind == DialogKind.ItemList)
+            {
+                return (null, 1, 1, 1, 1);
+            }
+
             return drawing.Definition switch
             {
                 1 => (PlatinumArt.DialogFrame, 6, 6, 7, 7),
@@ -120,7 +144,10 @@ namespace ClassicMac.Resources.Decoders.Interface
                 port.PaintRect(PlatinumArt.Rect(4, 5, 16, 24));
                 PlatinumArt.CloseBox.Paint(port, 6, 4, PlatinumArt.TitleBar);
             }
-            if (drawing.Title.Length == 0) return;
+            if (drawing.Title.Length == 0)
+            {
+                return;
+            }
             // The gap: 5 pixels before the text's pen position to 3 after its width; the pen at half the structure's width
             // less the text's [Verified: three titles].
             int textWidth = text.Width(drawing.Title);
@@ -136,7 +163,10 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             // The icon goes at (10, 20, 42, 52) in the alert [Verified].
             var rect = new MacRect(10, 20, 42, 52);
-            if (icon is not null && Image(port, icon, rect, isIcon: true)) return;
+            if (icon is not null && Image(port, icon, rect, isIcon: true))
+            {
+                return;
+            }
             // Without the System's icon, a neutral placeholder [ClassicMac].
             port.ForeColor = new RgbColor(0x8888, 0x8888, 0x8888);
             port.FrameRect(rect);
@@ -172,7 +202,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                     text.Box(item.Text ?? "", r, portRect);
                     break;
                 case 32 or 64:
-                    if (entry.Image is { } image) Image(port, image, r, item.Type == 32);
+                    if (entry.Image is { } image)
+                    {
+                        Image(port, image, r, item.Type == 32);
+                    }
+
                     break;
                     // User items (0) and help items (1) draw nothing [Verified: a user item].
             }
@@ -180,8 +214,14 @@ namespace ClassicMac.Resources.Decoders.Interface
 
         private static void PushButton(QuickDrawPort port, TextTools text, MacRect r, string title, bool isDefault)
         {
-            if (isDefault) PlatinumArt.DefaultButton.Paint(port, r.Left - 3, r.Top - 3, r.Width + 6, r.Height + 6, PlatinumArt.Background);
-            else PlatinumArt.Button.Paint(port, r.Left, r.Top, r.Width, r.Height, PlatinumArt.Background);
+            if (isDefault)
+            {
+                PlatinumArt.DefaultButton.Paint(port, r.Left - 3, r.Top - 3, r.Width + 6, r.Height + 6, PlatinumArt.Background);
+            }
+            else
+            {
+                PlatinumArt.Button.Paint(port, r.Left, r.Top, r.Width, r.Height, PlatinumArt.Background);
+            }
             // The title centred, its baseline where a line of the system font is centred [Verified].
             int width = text.Width(title);
             text.Draw(title, r.Left + (r.Width - width) / 2, Baseline(r), r);
@@ -207,7 +247,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             if (control is null || !control.Visible)
             {
-                if (control is null) Placeholder(port, r);
+                if (control is null)
+                {
+                    Placeholder(port, r);
+                }
+
                 return;
             }
             // The Dialog Manager puts the control in the item's rectangle. Classic IDs and their Appearance equivalents.
@@ -217,8 +261,15 @@ namespace ClassicMac.Resources.Decoders.Interface
                     PushButton(port, text, r, control.Title, false);
                     break;
                 case 1 or 9 or 369 or 377:
-                    if (control.Value != 0) CheckBoxOn(port, text, r, control.Title);
-                    else CheckBox(port, text, r, control.Title, PlatinumArt.CheckBox, false);
+                    if (control.Value != 0)
+                    {
+                        CheckBoxOn(port, text, r, control.Title);
+                    }
+                    else
+                    {
+                        CheckBox(port, text, r, control.Title, PlatinumArt.CheckBox, false);
+                    }
+
                     break;
                 case 2 or 10 or 370 or 378:
                     CheckBox(port, text, r, control.Title, PlatinumArt.RadioButton, control.Value != 0);
@@ -264,9 +315,19 @@ namespace ClassicMac.Resources.Decoders.Interface
                 : (Turned.Track, Turned.Thumb, Turned.UpArrow, Turned.DownArrow);
             void Paint(PlatinumArt art, int at, int length)
             {
-                if (length <= 0) return;
-                if (vertical) art.Paint(port, origin, at, across, length, PlatinumArt.Background);
-                else art.Paint(port, at, origin, length, across, PlatinumArt.Background);
+                if (length <= 0)
+                {
+                    return;
+                }
+
+                if (vertical)
+                {
+                    art.Paint(port, origin, at, across, length, PlatinumArt.Background);
+                }
+                else
+                {
+                    art.Paint(port, at, origin, length, across, PlatinumArt.Background);
+                }
             }
             int arrows = end - 31;                                  // the up arrow's top line
             if (arrows < start)
@@ -285,7 +346,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 Paint(track, at + 16, arrows - at - 15);
                 Paint(thumb, at, 17);
             }
-            else Paint(track, start, arrows - start + 1);
+            else
+            {
+                Paint(track, start, arrows - start + 1);
+            }
+
             Paint(up, arrows, 16);
             Paint(down, end - 16, 16);
         }
@@ -302,13 +367,24 @@ namespace ClassicMac.Resources.Decoders.Interface
         private static void Popup(QuickDrawPort port, TextTools text, MacRect r, ControlTemplate control)
         {
             int titleWidth = Math.Clamp((int)control.Maximum, 0, r.Width);
-            if (titleWidth > 0 && control.Title.Length > 0) text.Draw(control.Title, r.Left, Baseline(r), PlatinumArt.Rect(r.Top, r.Left, r.Bottom, r.Left + titleWidth));
+            if (titleWidth > 0 && control.Title.Length > 0)
+            {
+                text.Draw(control.Title, r.Left, Baseline(r), PlatinumArt.Rect(r.Top, r.Left, r.Bottom, r.Left + titleWidth));
+            }
+
             int left = r.Left + titleWidth;
-            if (r.Right - left < 24) return;
+            if (r.Right - left < 24)
+            {
+                return;
+            }
+
             PlatinumArt.Button.Paint(port, left, r.Top, r.Right - left, r.Height, PlatinumArt.Background);
             port.ForeColor = RgbColor.Black;
             int cx = r.Right - 12, cy = r.Top + r.Height / 2 - 2;
-            for (int i = 0; i < 4; i++) port.PaintRect(PlatinumArt.Rect(cy + i, cx - 4 + i, cy + i + 1, cx + 3 - i));
+            for (int i = 0; i < 4; i++)
+            {
+                port.PaintRect(PlatinumArt.Rect(cy + i, cx - 4 + i, cy + i + 1, cx + 3 - i));
+            }
         }
 
         // An icon or a picture item.
@@ -325,13 +401,13 @@ namespace ClassicMac.Resources.Decoders.Interface
                         IconSuite.PlotIcon(port, new MacRect(r.Top, r.Left, (short)(r.Top + 32), (short)(r.Left + 32)), image.Data);
                         return true;
                     case "cicn":
-                    {
-                        var bitmap = QuickDrawResources.DecodeCicn(image.Data);
-                        var bounds = new MacRect(0, 0, (short)bitmap.Height, (short)bitmap.Width);
-                        var at = new MacRect(r.Top, r.Left, (short)(r.Top + bitmap.Height), (short)(r.Left + bitmap.Width));
-                        port.CopyBits(PixMap.FromBitmap(bitmap), bounds, at, TransferMode.SrcCopy, Mask(bitmap).Offset(r.Left, r.Top));
-                        return true;
-                    }
+                        {
+                            var bitmap = QuickDrawResources.DecodeCicn(image.Data);
+                            var bounds = new MacRect(0, 0, (short)bitmap.Height, (short)bitmap.Width);
+                            var at = new MacRect(r.Top, r.Left, (short)(r.Top + bitmap.Height), (short)(r.Left + bitmap.Width));
+                            port.CopyBits(PixMap.FromBitmap(bitmap), bounds, at, TransferMode.SrcCopy, Mask(bitmap).Offset(r.Left, r.Top));
+                            return true;
+                        }
                     case "PICT" when !isIcon:
                         port.DrawPicture(image.Data, r);
                         return true;
@@ -350,8 +426,16 @@ namespace ClassicMac.Resources.Decoders.Interface
             int rowBytes = (bitmap.Width + 15) / 16 * 2;
             var bits = new byte[rowBytes * bitmap.Height];
             for (int y = 0; y < bitmap.Height; y++)
+            {
                 for (int x = 0; x < bitmap.Width; x++)
-                    if (bitmap.Pixels[(y * bitmap.Width + x) * 4 + 3] >= 128) bits[y * rowBytes + x / 8] |= (byte)(0x80 >> (x % 8));
+                {
+                    if (bitmap.Pixels[(y * bitmap.Width + x) * 4 + 3] >= 128)
+                    {
+                        bits[y * rowBytes + x / 8] |= (byte)(0x80 >> (x % 8));
+                    }
+                }
+            }
+
             return Region.FromBitMap(PixMap.FromBitMap(bits, rowBytes, new MacRect(0, 0, (short)bitmap.Height, (short)bitmap.Width)));
         }
 
@@ -360,10 +444,22 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             public int Width(string text)
             {
-                if (text.Length == 0) return 0;
+                if (text.Length == 0)
+                {
+                    return 0;
+                }
+
                 Setup();
-                if (port.StringWidth(text) is > 0 and var width) return width;
-                if (options.TextFallback?.Render(text, new TextFallbackStyle(0, 0, 12)) is { } mask) return (int)Math.Round(mask.Advance);
+                if (port.StringWidth(text) is > 0 and var width)
+                {
+                    return width;
+                }
+
+                if (options.TextFallback?.Render(text, new TextFallbackStyle(0, 0, 12)) is { } mask)
+                {
+                    return (int)Math.Round(mask.Advance);
+                }
+
                 return text.Length * 7;                             // [ClassicMac: Charcoal 12's average width, for layout without fonts]
             }
 
@@ -379,9 +475,17 @@ namespace ClassicMac.Resources.Decoders.Interface
             // One line at a pen position, clipped to a rectangle within the port's clip.
             public void Draw(string text, int h, int v, MacRect? clip = null)
             {
-                if (text.Length == 0) return;
+                if (text.Length == 0)
+                {
+                    return;
+                }
+
                 var saved = port.Clip;
-                if (clip is { } c) port.Clip = saved is null ? Region.FromRect(c) : saved.Intersect(Region.FromRect(c));
+                if (clip is { } c)
+                {
+                    port.Clip = saved is null ? Region.FromRect(c) : saved.Intersect(Region.FromRect(c));
+                }
+
                 Setup();
                 port.MoveTo(h, v);
                 port.DrawString(text);
@@ -397,7 +501,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 int v = r.Top + Ascent;
                 foreach (var line in Lines(text, r.Width))
                 {
-                    if (v - Ascent >= Math.Min(r.Bottom, portRect.Bottom)) break;
+                    if (v - Ascent >= Math.Min(r.Bottom, portRect.Bottom))
+                    {
+                        break;
+                    }
+
                     Draw(line, r.Left, v, r);
                     v += LineHeight;
                 }
@@ -413,8 +521,16 @@ namespace ClassicMac.Resources.Decoders.Interface
                     {
                         // The next word with the spaces after it.
                         int end = i;
-                        while (end < paragraph.Length && paragraph[end] != ' ') end++;
-                        while (end < paragraph.Length && paragraph[end] == ' ') end++;
+                        while (end < paragraph.Length && paragraph[end] != ' ')
+                        {
+                            end++;
+                        }
+
+                        while (end < paragraph.Length && paragraph[end] == ' ')
+                        {
+                            end++;
+                        }
+
                         var word = paragraph[i..end];
                         if (line.Length > 0 && Width((line + word).TrimEnd()) > width)
                         {

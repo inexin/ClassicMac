@@ -87,14 +87,20 @@ namespace ClassicMac.Resources
         {
             ArgumentNullException.ThrowIfNull(input);
             if (input.CanSeek && input.Length - input.Position > MaxForkLength)
+            {
                 throw new InvalidDataException($"A resource fork is at most {MaxForkLength} bytes.");
+            }
+
             using var buffer = new MemoryStream();
             var chunk = new byte[81920];
             int read;
             while ((read = input.Read(chunk)) > 0)
             {
                 if (buffer.Length + read > MaxForkLength)
+                {
                     throw new InvalidDataException($"A resource fork is at most {MaxForkLength} bytes.");
+                }
+
                 buffer.Write(chunk, 0, read);
             }
             return Read(buffer.ToArray(), options);
@@ -131,9 +137,15 @@ namespace ClassicMac.Resources
         {
             ArgumentNullException.ThrowIfNull(resource);
             if (resource.Owner is not null)
+            {
                 throw new InvalidOperationException($"{resource} already belongs to a resource fork.");
+            }
+
             if (!index.TryAdd((resource.Type, resource.Id), resource))
+            {
                 throw new InvalidOperationException($"The fork already has a resource '{resource.Type}' {resource.Id}.");
+            }
+
             resources.Add(resource);
             resource.Owner = this;
         }
@@ -150,7 +162,11 @@ namespace ClassicMac.Resources
         public bool Remove(Resource resource)
         {
             ArgumentNullException.ThrowIfNull(resource);
-            if (resource.Owner != this) return false;
+            if (resource.Owner != this)
+            {
+                return false;
+            }
+
             index.Remove((resource.Type, resource.Id));
             resources.Remove(resource);
             resource.Owner = null;
@@ -161,10 +177,21 @@ namespace ClassicMac.Resources
         public void Renumber(Resource resource, short newId)
         {
             ArgumentNullException.ThrowIfNull(resource);
-            if (resource.Owner != this) throw new InvalidOperationException($"{resource} is not in this fork.");
-            if (newId == resource.Id) return;
+            if (resource.Owner != this)
+            {
+                throw new InvalidOperationException($"{resource} is not in this fork.");
+            }
+
+            if (newId == resource.Id)
+            {
+                return;
+            }
+
             if (!index.TryAdd((resource.Type, newId), resource))
+            {
                 throw new InvalidOperationException($"The fork already has a resource '{resource.Type}' {newId}.");
+            }
+
             index.Remove((resource.Type, resource.Id));
             resource.Id = newId;
         }

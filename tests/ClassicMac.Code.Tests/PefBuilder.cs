@@ -50,7 +50,11 @@ internal sealed class PefBuilder
         var nameOffsets = new Dictionary<string, int>();
         int CString(string s)
         {
-            if (nameOffsets.TryGetValue(s, out var o)) return o;
+            if (nameOffsets.TryGetValue(s, out var o))
+            {
+                return o;
+            }
+
             o = strings.Length;
             strings.WriteBytes(MacRoman.Encode(s));
             strings.WriteByte(0);
@@ -60,7 +64,10 @@ internal sealed class PefBuilder
         foreach (var lib in Libraries)
         {
             CString(lib.Name);
-            foreach (var sym in lib.Symbols) CString(sym.Name);
+            foreach (var sym in lib.Symbols)
+            {
+                CString(sym.Name);
+            }
         }
 
         // Exports go in hash-chain order; their names are packed with no NUL between them. The slot is the "Hash Word"
@@ -84,9 +91,12 @@ internal sealed class PefBuilder
         w.WriteInt32(Libraries.Count);
         w.WriteInt32(symbolCount);
         w.WriteInt32(Relocations.Count);
-        int relocInstrAt = w.Length; w.WriteUInt32(0);
-        int stringsAt = w.Length; w.WriteUInt32(0);
-        int hashAt = w.Length; w.WriteUInt32(0);
+        int relocInstrAt = w.Length;
+        w.WriteUInt32(0);
+        int stringsAt = w.Length;
+        w.WriteUInt32(0);
+        int hashAt = w.Length;
+        w.WriteUInt32(0);
         w.WriteInt32(power);
         w.WriteInt32(Exports.Count);
 
@@ -104,7 +114,9 @@ internal sealed class PefBuilder
             first += lib.Symbols.Count;
         }
         foreach (var sym in Libraries.SelectMany(l => l.Symbols))
+        {
             w.WriteUInt32(((uint)sym.Flags << 28) | ((uint)sym.Class << 24) | (uint)CString(sym.Name));
+        }
 
         int relocFirst = 0;
         foreach (var (section, words) in Relocations)
@@ -118,12 +130,20 @@ internal sealed class PefBuilder
         LoaderRelocOffset = w.Length;
         w.WriteInt32At(relocInstrAt, w.Length);
         foreach (var (_, words) in Relocations)
-            foreach (var word in words) w.WriteUInt16(word);
+        {
+            foreach (var word in words)
+            {
+                w.WriteUInt16(word);
+            }
+        }
 
         LoaderStringsOffset = w.Length;
         w.WriteInt32At(stringsAt, w.Length);
         w.WriteBytes(strings.WrittenSpan);
-        while (w.Length % 4 != 0) w.WriteByte(0);
+        while (w.Length % 4 != 0)
+        {
+            w.WriteByte(0);
+        }
 
         LoaderHashOffset = w.Length;
         w.WriteInt32At(hashAt, w.Length);
@@ -133,7 +153,11 @@ internal sealed class PefBuilder
             int firstIndex = count == 0 ? 0 : ordered.FindIndex(x => x.Slot == slot);
             w.WriteUInt32(((uint)count << 18) | (uint)firstIndex);
         }
-        foreach (var x in ordered) w.WriteUInt32(x.Key);
+        foreach (var x in ordered)
+        {
+            w.WriteUInt32(x.Key);
+        }
+
         for (int i = 0; i < ordered.Count; i++)
         {
             var e = ordered[i].Export;
@@ -161,7 +185,11 @@ internal sealed class PefBuilder
         var names = new BigEndianWriter();
         var nameOffsets = all.Select(s =>
         {
-            if (s.Name is null) return -1;
+            if (s.Name is null)
+            {
+                return -1;
+            }
+
             int o = names.Length;
             names.WriteBytes(MacRoman.Encode(s.Name));
             names.WriteByte(0);
@@ -184,9 +212,17 @@ internal sealed class PefBuilder
         w.WriteBytes(names.WrittenSpan);
         for (int i = 0; i < all.Count; i++)
         {
-            while (w.Length % 16 != 0) w.WriteByte(0);
+            while (w.Length % 16 != 0)
+            {
+                w.WriteByte(0);
+            }
+
             int at = w.Length;
-            if (all[i].Kind == PefSectionKind.Loader) LoaderOffset = at;
+            if (all[i].Kind == PefSectionKind.Loader)
+            {
+                LoaderOffset = at;
+            }
+
             w.WriteBytes(all[i].Contents);
             int h = headers + 28 * i;
             w.WriteInt32At(h, nameOffsets[i]);
@@ -206,7 +242,11 @@ internal sealed class PefBuilder
     public static byte[] Words(params uint[] words)
     {
         var w = new BigEndianWriter();
-        foreach (var word in words) w.WriteUInt32(word);
+        foreach (var word in words)
+        {
+            w.WriteUInt32(word);
+        }
+
         return w.ToArray();
     }
 }

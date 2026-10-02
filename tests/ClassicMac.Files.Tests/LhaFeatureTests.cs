@@ -747,10 +747,17 @@ public sealed class LhaFeatureTests
         public static byte[] BuildNewStyleLiteralBlock(string method, ReadOnlySpan<byte> literals)
         {
             if (literals.IsEmpty || literals.Length > 65)
+            {
                 throw new ArgumentOutOfRangeException(nameof(literals));
+            }
+
             foreach (byte literal in literals)
+            {
                 if (literal is not (byte)'A' and not (byte)'B')
+                {
                     throw new ArgumentOutOfRangeException(nameof(literals));
+                }
+            }
 
             var bits = new LhaBitWriter();
             WriteNewStyleLiteralBlock(bits, method, literals);
@@ -812,7 +819,10 @@ public sealed class LhaFeatureTests
             {
                 bool hasCode = symbol is (byte)'A' or 256;
                 bits.Write(hasCode ? 1 : 0, 1);
-                if (hasCode) bits.Write(0, 4); // A one-bit canonical code.
+                if (hasCode)
+                {
+                    bits.Write(0, 4); // A one-bit canonical code.
+                }
             }
 
             bits.Write(positionTreeMode == 0 ? 0 : 1, 1);
@@ -826,15 +836,22 @@ public sealed class LhaFeatureTests
             else if (positionTreeMode == 2)
             {
                 for (int symbol = 0; symbol < 128; symbol++)
+                {
                     bits.Write(symbol < 2 ? 1 : 0, 4); // Position codes zero and one have one-bit codes.
+                }
             }
 
             bits.Write(0, 1); // Literal A.
             bits.Write(1, 1); // Length-three match.
             if (positionTreeMode == 0)
+            {
                 bits.Write(0, 2); // Ready-made table's code for position symbol zero.
+            }
             else if (positionTreeMode == 2)
+            {
                 bits.Write(0, 1); // Canonical code for position symbol zero.
+            }
+
             bits.Write(0, 6); // Low bits make the absolute ring position zero.
             return bits.ToArray();
         }
@@ -855,7 +872,10 @@ public sealed class LhaFeatureTests
             {
                 bool hasCode = symbol is 0 or 1 or 2 or 3;
                 bits.Write(hasCode ? 1 : 0, 1);
-                if (hasCode) bits.Write(symbol == 2 ? 1 : 0, 4);
+                if (hasCode)
+                {
+                    bits.Write(symbol == 2 ? 1 : 0, 4);
+                }
             }
             return bits.ToArray();
         }
@@ -868,7 +888,10 @@ public sealed class LhaFeatureTests
             {
                 bool hasCode = symbol is (byte)'A' or 285;
                 bits.Write(hasCode ? 1 : 0, 1);
-                if (hasCode) bits.Write(0, 4);
+                if (hasCode)
+                {
+                    bits.Write(0, 4);
+                }
             }
             bits.Write(1, 1); // Transmit the position tree.
             for (int index = 0; index < 3; index++)
@@ -910,7 +933,10 @@ public sealed class LhaFeatureTests
         private static void WriteLzsMatch(LhaBitWriter bits, int position, int length)
         {
             if ((uint)position >= 2048 || length is < 2 or > 17)
+            {
                 throw new ArgumentOutOfRangeException(nameof(length));
+            }
+
             bits.Write(0, 1); // A zero bit introduces a sliding-window match.
             bits.Write(position, 11);
             bits.Write(length - 2, 4);
@@ -921,13 +947,20 @@ public sealed class LhaFeatureTests
             bits.Write(literals.Length, 16);
             WriteTempTreeWithSkipAndLengthOne(bits);
             bits.Write(67, 9);
-            for (int index = 0; index < 65; index++) bits.Write(0, 1); // Skip codes 0 through 64.
+            for (int index = 0; index < 65; index++)
+            {
+                bits.Write(0, 1); // Skip codes 0 through 64.
+            }
+
             bits.Write(1, 1); // Code 65 has length 1.
             bits.Write(1, 1); // Code 66 has length 1.
             int offsetCodeBits = method[3] >= '6' ? 5 : 4;
             bits.Write(0, offsetCodeBits); // One offset code.
             bits.Write(0, offsetCodeBits); // Its value is zero.
-            foreach (byte literal in literals) bits.Write(literal == 65 ? 0 : 1, 1);
+            foreach (byte literal in literals)
+            {
+                bits.Write(literal == 65 ? 0 : 1, 1);
+            }
         }
 
         public static byte[] BuildNewStyleBackReferenceBlock(string method)
@@ -943,11 +976,19 @@ public sealed class LhaFeatureTests
             bits.Write(1, 3);
 
             bits.Write(257, 9);
-            for (int index = 0; index < 65; index++) bits.Write(0, 1);
+            for (int index = 0; index < 65; index++)
+            {
+                bits.Write(0, 1);
+            }
+
             bits.Write(1, 1); // Code 65: length 2.
             bits.Write(1, 1); // Code 66: length 2.
             bits.Write(1, 1); // Code 67: length 2.
-            for (int index = 68; index < 256; index++) bits.Write(0, 1);
+            for (int index = 68; index < 256; index++)
+            {
+                bits.Write(0, 1);
+            }
+
             bits.Write(1, 1); // Code 256: length 2.
 
             int offsetCodeBits = method[3] >= '6' ? 5 : 4;
@@ -977,8 +1018,16 @@ public sealed class LhaFeatureTests
         public static byte[] BuildLevelOneStoredFile(string baseName, string? directory, string? filename, byte[] data)
         {
             var extensions = new List<byte[]>();
-            if (filename is not null) extensions.Add(BuildExtension(0x01, MacString.FromMacRoman(filename).Bytes));
-            if (directory is not null) extensions.Add(BuildExtension(0x02, MacString.FromMacRoman(directory).Bytes));
+            if (filename is not null)
+            {
+                extensions.Add(BuildExtension(0x01, MacString.FromMacRoman(filename).Bytes));
+            }
+
+            if (directory is not null)
+            {
+                extensions.Add(BuildExtension(0x02, MacString.FromMacRoman(directory).Bytes));
+            }
+
             for (int index = 0; index < extensions.Count; index++)
             {
                 ushort nextSize = index + 1 == extensions.Count ? (ushort)0 : checked((ushort)extensions[index + 1].Length);
@@ -1017,7 +1066,11 @@ public sealed class LhaFeatureTests
             byte[] directoryBytes = MacString.FromMacRoman(directory).Bytes.ToArray();
             byte[] crcExtension = new byte[5 + (includeHeaderCrcInfo ? 1 : 0)];
             crcExtension[0] = 0;
-            if (includeHeaderCrcInfo) crcExtension[3] = 0xA5;
+            if (includeHeaderCrcInfo)
+            {
+                crcExtension[3] = 0xA5;
+            }
+
             byte[] nameExtension = BuildExtension(0x01, nameBytes);
             byte[] directoryExtension = BuildExtension(0x02, directoryBytes);
             BinaryPrimitives.WriteUInt16LittleEndian(crcExtension.AsSpan(crcExtension.Length - 2),
@@ -1052,7 +1105,11 @@ public sealed class LhaFeatureTests
             byte[] directoryBytes = MacString.FromMacRoman(directory).Bytes.ToArray();
             byte[] crcExtension = new byte[7 + (includeHeaderCrcInfo ? 1 : 0)];
             crcExtension[0] = 0;
-            if (includeHeaderCrcInfo) crcExtension[3] = 0xA5;
+            if (includeHeaderCrcInfo)
+            {
+                crcExtension[3] = 0xA5;
+            }
+
             byte[] nameExtension = BuildExtension32(0x01, nameBytes);
             byte[] directoryExtension = BuildExtension32(0x02, directoryBytes);
             BinaryPrimitives.WriteUInt32LittleEndian(crcExtension.AsSpan(crcExtension.Length - 4),
@@ -1088,7 +1145,10 @@ public sealed class LhaFeatureTests
             byte[] entry = BuildLevelOneStoredFile("name", null, null, data);
             int headerLength = entry[0] + 2;
             int oldExtensionLength = BinaryPrimitives.ReadUInt16LittleEndian(entry.AsSpan(headerLength - 2));
-            if (oldExtensionLength != 0) throw new InvalidOperationException("Expected an empty extension chain.");
+            if (oldExtensionLength != 0)
+            {
+                throw new InvalidOperationException("Expected an empty extension chain.");
+            }
 
             byte[] result = new byte[entry.Length + extension.Length];
             entry.AsSpan(0, headerLength).CopyTo(result);
@@ -1123,7 +1183,9 @@ public sealed class LhaFeatureTests
         {
             byte[] nameBytes = MacString.FromMacRoman(name).Bytes.ToArray();
             if (nameBytes.Length > byte.MaxValue || Encoding.ASCII.GetByteCount(method) != 5)
+            {
                 throw new ArgumentOutOfRangeException(nameof(name));
+            }
 
             int headerLength = checked(25 + nameBytes.Length);
             byte[] archive = new byte[headerLength + packedData.Length + 1];
@@ -1147,7 +1209,11 @@ public sealed class LhaFeatureTests
         public static byte HeaderChecksum(ReadOnlySpan<byte> header)
         {
             byte checksum = 0;
-            foreach (byte value in header) checksum = unchecked((byte)(checksum + value));
+            foreach (byte value in header)
+            {
+                checksum = unchecked((byte)(checksum + value));
+            }
+
             return checksum;
         }
 
@@ -1158,7 +1224,9 @@ public sealed class LhaFeatureTests
             {
                 crc ^= value;
                 for (int bit = 0; bit < 8; bit++)
+                {
                     crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+                }
             }
             return crc;
         }
@@ -1173,7 +1241,11 @@ public sealed class LhaFeatureTests
         {
             for (int bit = count - 1; bit >= 0; bit--)
             {
-                if (_bitCount == 0) _bytes.Add(0);
+                if (_bitCount == 0)
+                {
+                    _bytes.Add(0);
+                }
+
                 _bytes[^1] |= (byte)(((value >> bit) & 1) << (7 - _bitCount));
                 _bitCount = (_bitCount + 1) & 7;
             }

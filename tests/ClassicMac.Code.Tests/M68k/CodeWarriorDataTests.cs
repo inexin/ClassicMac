@@ -49,9 +49,17 @@ public class CodeWarriorDataTests
         w.WriteBytes(Block1);
         w.WriteBytes(Block2);
         w.WriteBytes(block3 ?? Block3);
-        foreach (var list in GlobalLists) w.WriteBytes(list);
+        foreach (var list in GlobalLists)
+        {
+            w.WriteBytes(list);
+        }
+
         int codeAt = w.Length;
-        foreach (var list in CodeLists) w.WriteBytes(list);
+        foreach (var list in CodeLists)
+        {
+            w.WriteBytes(list);
+        }
+
         w.WriteUInt32At(0, codeRelocOffset ?? (uint)codeAt);
         var bytes = w.ToArray();
         return truncate ? bytes[..^3] : bytes;
@@ -167,10 +175,18 @@ public class CodeWarriorDataTests
     {
         var w = new BigEndianWriter();
         w.WriteUInt32(0);
-        foreach (var block in blocks) w.WriteBytes(block);
+        foreach (var block in blocks)
+        {
+            w.WriteBytes(block);
+        }
+
         for (int i = 0; i < lists.Length; i++)
         {
-            if (i == 3) w.WriteUInt32At(0, w.Length);
+            if (i == 3)
+            {
+                w.WriteUInt32At(0, w.Length);
+            }
+
             w.WriteBytes(lists[i]);
         }
         return w.ToArray();

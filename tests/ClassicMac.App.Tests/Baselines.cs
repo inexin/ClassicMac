@@ -54,7 +54,11 @@ internal static class Baselines
     /// </summary>
     public static void Check(TopLevel window, string name, ICollection<string> failures, params Variant[] variants)
     {
-        if (!Compared) return;
+        if (!Compared)
+        {
+            return;
+        }
+
         var app = Application.Current!;
         var theme = app.RequestedThemeVariant;
         try
@@ -69,7 +73,10 @@ internal static class Baselines
 #pragma warning disable CS0618 // the simple overload is enough for a test snapshot
                 frame.Save(png);
 #pragma warning restore CS0618
-                if (Compare($"{name}-{Suffix(variant)}", png.ToArray()) is { } failure) failures.Add(failure);
+                if (Compare($"{name}-{Suffix(variant)}", png.ToArray()) is { } failure)
+                {
+                    failures.Add(failure);
+                }
             }
         }
         finally
@@ -83,7 +90,11 @@ internal static class Baselines
     /// <summary>Fails with every mismatch, or skips on systems where frames are not compared.</summary>
     public static void Verify(ICollection<string> failures)
     {
-        if (!Compared) Assert.Skip("Screenshot baselines are compared on Windows only.");
+        if (!Compared)
+        {
+            Assert.Skip("Screenshot baselines are compared on Windows only.");
+        }
+
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
@@ -112,7 +123,11 @@ internal static class Baselines
             return $"{name}: frame {actual.Size.Width} × {actual.Size.Height}, baseline {expected.Size.Width} × {expected.Size.Height} ({path}); actual frame: {actualPath}";
         }
         var diff = Differences(expected.Pixels, actual.Pixels, Tolerance);
-        if (diff.Count == 0) return null;
+        if (diff.Count == 0)
+        {
+            return null;
+        }
+
         File.WriteAllBytes(actualPath, actualPng);
         var diffPath = Path.Combine(FailureFolder, name + "-diff.png");
         WriteDiff(diffPath, actual, diff.Mask);
@@ -130,12 +145,14 @@ internal static class Baselines
         {
             uint e = expected[i], a = actual[i];
             for (var shift = 0; shift < 32; shift += 8)
+            {
                 if (Math.Abs((int)(e >> shift & 0xFF) - (int)(a >> shift & 0xFF)) > tolerance)
                 {
                     mask[i] = true;
                     count++;
                     break;
                 }
+            }
         }
         return (count, mask);
     }
@@ -170,8 +187,12 @@ internal static class Baselines
             pixels[i] = mask[i] ? 0xFFFF00FF : 0xFF000000 | grey << 16 | grey << 8 | grey;
         }
         using (var locked = bitmap.Lock())
+        {
             for (var y = 0; y < actual.Size.Height; y++)
+            {
                 Marshal.Copy((int[])(object)pixels, y * actual.Size.Width, locked.Address + y * locked.RowBytes, actual.Size.Width);
+            }
+        }
 #pragma warning disable CS0618
         bitmap.Save(path);
 #pragma warning restore CS0618

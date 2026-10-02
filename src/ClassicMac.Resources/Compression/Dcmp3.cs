@@ -18,7 +18,9 @@ namespace ClassicMac.Resources.Compression
         {
             var header = context.Header;
             if (header.IsVersion8)
+            {
                 throw new DecompressionFormException("'dcmp' 3 has the version-9 entry points but the resource uses a version-8 header.");
+            }
 
             var cursor = new BlockCursor(context);
             var bits = new BitReader(cursor);
@@ -32,7 +34,10 @@ namespace ClassicMac.Resources.Compression
                     // A literal run; only a full 63-byte run may be followed by another.
                     var literal = ReadLength1To63(bits);
                     literalAllowed = literal >= 63;
-                    for (var i = 0; i < literal; i++) cursor.WriteByte((byte)bits.Read(8));
+                    for (var i = 0; i < literal; i++)
+                    {
+                        cursor.WriteByte((byte)bits.Read(8));
+                    }
                 }
                 else
                 {
@@ -51,16 +56,31 @@ namespace ClassicMac.Resources.Compression
         // else 32 + 8(x−12) + 3 bits.
         private static int ReadLength1To63(BitReader bits)
         {
-            if (bits.Read(1) == 0) return 1;
+            if (bits.Read(1) == 0)
+            {
+                return 1;
+            }
+
             switch (bits.Read(2))
             {
-                case 0: return 2;
-                case 1: return 3;
-                case 2: return bits.Read(2) + 4;
+                case 0:
+                    return 2;
+                case 1:
+                    return 3;
+                case 2:
+                    return bits.Read(2) + 4;
                 default:
                     var which = bits.Read(4);
-                    if (which < 8) return which + 8;
-                    if (which < 12) return bits.Read(2) + ((which - 8) << 2) + 0x10;
+                    if (which < 8)
+                    {
+                        return which + 8;
+                    }
+
+                    if (which < 12)
+                    {
+                        return bits.Read(2) + ((which - 8) << 2) + 0x10;
+                    }
+
                     return bits.Read(3) + ((which - 12) << 3) + 0x20;
             }
         }
@@ -70,7 +90,11 @@ namespace ClassicMac.Resources.Compression
         private static int ReadLength0To2042(BitReader bits)
         {
             var ones = 0;
-            while (ones < 10 && bits.Read(1) == 1) ones++;
+            while (ones < 10 && bits.Read(1) == 1)
+            {
+                ones++;
+            }
+
             return ones switch
             {
                 0 => bits.Read(1),
@@ -92,17 +116,30 @@ namespace ClassicMac.Resources.Compression
         {
             var max = (uint)written;
             var family = 0;
-            while (max > FamilyLimits[family]) family++;
+            while (max > FamilyLimits[family])
+            {
+                family++;
+            }
 
-            if (bits.Read(1) == 0) return bits.Read(family) + 1;
-            if (bits.Read(1) == 0) return bits.Read(family + 2) + (1 << family) + 1;
+            if (bits.Read(1) == 0)
+            {
+                return bits.Read(family) + 1;
+            }
+
+            if (bits.Read(1) == 0)
+            {
+                return bits.Read(family + 2) + (1 << family) + 1;
+            }
 
             // Widths 1 … family+3 by threshold; the widest is the code's unconditional else.
             var @base = 1 + (1 << family) + (1 << (family + 2));
             for (var k = 1; k < family + 4; k++)
             {
                 var (threshold, width) = Threshold(family, k, @base);
-                if (max <= threshold) return bits.Read(width) + @base;
+                if (max <= threshold)
+                {
+                    return bits.Read(width) + @base;
+                }
             }
             return bits.Read(family + 4) + @base;
         }

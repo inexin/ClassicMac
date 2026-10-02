@@ -145,13 +145,19 @@ namespace ClassicMac.Resources.Editing
         /// <inheritdoc/>
         public void Apply(ResourceFork fork)
         {
-            foreach (var edit in edits) edit.Apply(fork);
+            foreach (var edit in edits)
+            {
+                edit.Apply(fork);
+            }
         }
 
         /// <inheritdoc/>
         public void Undo(ResourceFork fork)
         {
-            for (var i = edits.Length - 1; i >= 0; i--) edits[i].Undo(fork);
+            for (var i = edits.Length - 1; i >= 0; i--)
+            {
+                edits[i].Undo(fork);
+            }
         }
     }
 

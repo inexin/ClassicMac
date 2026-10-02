@@ -144,9 +144,15 @@ namespace ClassicMac.App.ViewModels
                 return StyledPreview(StyledText.Read(data.Span, styl, options));
             }
             if (type == "snd " && SoundResource.Read(data, diagnostics, resource.ToString()) is { Sound: { } sampled })
+            {
                 return SoundPreview(sampled);
+            }
+
             if (InterfacePreviews.Dialog(resource, data, fork, options, readOptions, diagnostics, dialogSources) is { } dialog)
+            {
                 return new PreviewViewModel(PreviewKind.Dialog, "") { Dialog = dialog };
+            }
+
             if (type is "clut" or "pltt")
             {
                 var entries = type == "clut" ? Resources.Decoders.Colors.Palettes.ReadColorTable(data, out _, out _, out _)
@@ -154,14 +160,24 @@ namespace ClassicMac.App.ViewModels
                 return entries.Count == 0 ? Nothing($"'{type}'") : Swatches(entries);
             }
             if (type == "MENU")
+            {
                 return new PreviewViewModel(PreviewKind.Menu, "") { Menu = InterfaceResources.ReadMenu(data, options, diagnostics, resource.ToString()) };
+            }
+
             var decoder = ResourceDecoders.Create(options).FirstOrDefault(d => d.CanDecode(resource.Type));
-            if (decoder is null) return Nothing($"'{type}'");
+            if (decoder is null)
+            {
+                return Nothing($"'{type}'");
+            }
+
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));
             var preview = FromFiles(files, $"'{type}'");
             // Icons: the suite of their ID as the Finder draws it, after the member itself.
             if (preview.Kind == PreviewKind.Image && FinderIcons.Applies(resource))
+            {
                 preview = new PreviewViewModel(PreviewKind.Image, "") { Images = [.. preview.Images, .. FinderIcons.Draw(resource, fork, options, readOptions, diagnostics)] };
+            }
+
             return preview;
         }
 
@@ -171,7 +187,10 @@ namespace ClassicMac.App.ViewModels
         {
             var type = file.FinderInfo.Type.ToString();
             if (DocumentOf(file, options, readOptions, diagnostics) is { } document)
+            {
                 return new PreviewViewModel(PreviewKind.Document, "") { Document = DocumentPreview.Create(document, options, diagnostics) };
+            }
+
             if (type == "PICT" && file.DataFork.Length is > 512 + 10 and <= MaxPictureFile)
             {
                 var picture = new Resource(FourCC.FromString("PICT"), 0, file.DataFork.Slice(512, file.DataFork.Length - 512).ToArray());
@@ -184,7 +203,10 @@ namespace ClassicMac.App.ViewModels
             {
                 var styl = ReadOnlyMemory<byte>.Empty;
                 if (MacFileResources.Read(file, readOptions).Fork is { } fork && fork.Find(FourCC.FromString("styl"), 128) is { } s)
+                {
                     styl = ResourceDecompression.Default.GetData(s, fork, readOptions, diagnostics);
+                }
+
                 return StyledPreview(StyledText.Read(file.DataFork.ToArray(), styl, options));
             }
             return None;
@@ -193,9 +215,17 @@ namespace ClassicMac.App.ViewModels
         // A DOCMaker document, or a SimpleText document that has pictures (one without is shown as styled text).
         private static StyledDocument? DocumentOf(MacFile file, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
         {
-            if (MacFileResources.Read(file, readOptions).Fork is not { } fork) return null;
+            if (MacFileResources.Read(file, readOptions).Fork is not { } fork)
+            {
+                return null;
+            }
+
             var isText = file.FinderInfo.Type == FourCC.FromString("TEXT") || file.FinderInfo.Type == FourCC.FromString("ttro");
-            if (isText && file.DataFork.Length > MaxTextFile) return null;
+            if (isText && file.DataFork.Length > MaxTextFile)
+            {
+                return null;
+            }
+
             var text = isText ? file.DataFork.ToArray() : ReadOnlyMemory<byte>.Empty;
             var document = StyledDocuments.Read(text, fork, file.FinderInfo.Type, file.Name.ToString(), options, readOptions, diagnostics);
             return document is { Kind: DocumentKind.DocMaker } || document?.Chapters.Any(c => c.Pictures.Count > 0) == true ? document : null;
@@ -232,7 +262,10 @@ namespace ClassicMac.App.ViewModels
         {
             var bits = sampled.Kind == SoundHeaderKind.Compressed ? $"'{sampled.Format}'" : $"{sampled.SampleSize}-bit";
             if (SoundSamples.Decode(sampled) is not { } sound)
+            {
                 return new PreviewViewModel(PreviewKind.None, $"A {bits} sound, a format ClassicMac does not read; see Hex.");
+            }
+
             var channels = sound.Channels == 1 ? "mono" : sound.Channels == 2 ? "stereo" : $"{sound.Channels} channels";
             var loop = sampled.LoopEnd > sampled.LoopStart && sampled.LoopEnd - sampled.LoopStart > 2 ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
             var note = sampled.BaseNote is not (0 or 60) ? $", base note {sampled.BaseNote}" : "";
@@ -265,9 +298,15 @@ namespace ClassicMac.App.ViewModels
             }
             // Code: its listing.
             if (files.FirstOrDefault(f => f.Extension == ".s") is { } listing)
+            {
                 return new PreviewViewModel(PreviewKind.Text, "") { Text = Encoding.UTF8.GetString(listing.Content.Span).TrimEnd('\n') };
+            }
+
             if (files.FirstOrDefault(f => f.Extension == ".txt") is { } text)
+            {
                 return new PreviewViewModel(PreviewKind.Text, "") { Text = Encoding.UTF8.GetString(text.Content.Span) };
+            }
+
             if (files.FirstOrDefault(f => f.Extension == ".json") is { } other)
             {
                 using var document = JsonDocument.Parse(other.Content);
@@ -293,7 +332,11 @@ namespace ClassicMac.App.ViewModels
         // Width and height from the PNG's IHDR (which directly follows the signature).
         private static (int Width, int Height) PngSize(ReadOnlyMemory<byte> png)
         {
-            if (png.Length < 24) return (0, 0);
+            if (png.Length < 24)
+            {
+                return (0, 0);
+            }
+
             var reader = new BigEndianReader(png);
             return (reader.ReadInt32At(16), reader.ReadInt32At(20));
         }

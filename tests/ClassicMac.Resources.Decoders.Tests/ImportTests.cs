@@ -14,14 +14,21 @@ public class ImportTests
     {
         var image = new RgbaBitmap(w, h);
         for (int y = 0; y < h; y++)
+        {
             for (int x = 0; x < w; x++)
             {
                 double dx = x + 0.5 - w / 2.0, dy = y + 0.5 - h / 2.0, r = Math.Sqrt(dx * dx + dy * dy) / (Math.Min(w, h) / 2.0);
-                if (r > 1) continue;
+                if (r > 1)
+                {
+                    continue;
+                }
+
                 var c = r > 0.8 ? new RgbaColor(0, 0, 0) : r < 0.3 ? new RgbaColor(255, 255, 255) : new RgbaColor(221, 8, 6);
                 int i = (y * w + x) * 4;
                 (image.Pixels[i], image.Pixels[i + 1], image.Pixels[i + 2], image.Pixels[i + 3]) = (c.R, c.G, c.B, 255);
             }
+        }
+
         return image;
     }
 
@@ -29,11 +36,13 @@ public class ImportTests
     {
         Assert.Equal((expected.Width, expected.Height), (actual.Width, actual.Height));
         for (int y = 0; y < expected.Height; y++)
+        {
             for (int x = 0; x < expected.Width; x++)
             {
                 var (e, a) = (expected[x, y], actual[x, y]);
                 Assert.True(e.A < 128 ? a.A == 0 : a == e with { A = 255 }, $"({x}, {y}): {e} became {a}");
             }
+        }
     }
 
     [Fact]
@@ -101,7 +110,13 @@ public class ImportTests
     private static int FindOpcode(byte[] data)
     {
         for (int i = 40; i + 1 < data.Length; i += 2)
-            if (data[i] == 0 && data[i + 1] is 0x90 or 0x98) return i;
+        {
+            if (data[i] == 0 && data[i + 1] is 0x90 or 0x98)
+            {
+                return i;
+            }
+        }
+
         return -1;
     }
 
@@ -110,7 +125,11 @@ public class ImportTests
     {
         // 16-bit stereo with a loop and a base note.
         var pcm = new byte[400 * 4];
-        for (int i = 0; i < 800; i++) BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), (short)(i * 40 - 16000));
+        for (int i = 0; i < 800; i++)
+        {
+            BinaryPrimitives.WriteInt16LittleEndian(pcm.AsSpan(i * 2), (short)(i * 40 - 16000));
+        }
+
         var wav = WavWriter.Write(pcm, 2, 2, false, 22050, new SamplerInfo(72, 10, 99));
         var diagnostics = new List<ClassicMac.Core.Diagnostic>();
         var resource = SoundResource.Read(SoundImport.FromWav(wav), diagnostics)!;

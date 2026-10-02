@@ -24,9 +24,16 @@ internal static class CodeCorpus
     public static byte[] Require(string name, long? length = null)
     {
         if (Roots.Count == 0)
+        {
             Assert.Skip("Set CLASSICMAC_CODE_CORPUS to the folders holding the code samples to run this.");
+        }
+
         var path = Find(name, length);
-        if (path is null) Assert.Skip($"{name} is not in the code corpus.");
+        if (path is null)
+        {
+            Assert.Skip($"{name} is not in the code corpus.");
+        }
+
         return File.ReadAllBytes(path!);
     }
 }

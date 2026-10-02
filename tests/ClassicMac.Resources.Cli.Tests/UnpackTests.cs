@@ -84,7 +84,9 @@ public class UnpackTests : IDisposable
     public void Corpus_images_unpack_and_read_back()
     {
         if (!CorpusFolders.Any)
+        {
             Assert.Skip("Set CLASSICMAC_CORPUS to a folder of disk images to run this.");
+        }
 
         string[] extensions = [".img", ".dsk", ".iso", ".hfv", ".image", ".smi"];
         var images = CorpusFolders.EnumerateFiles("*", SearchOption.AllDirectories)
@@ -103,7 +105,10 @@ public class UnpackTests : IDisposable
             {
                 continue; // in use
             }
-            if (input.Root.Children.Count == 0) continue;
+            if (input.Root.Children.Count == 0)
+            {
+                continue;
+            }
 
             var target = Path.Combine(folder, $"corpus{checkedImages++}");
             var (code, _, error) = Run("unpack", image, "-o", target, "--layout", "basilisk", "-q");

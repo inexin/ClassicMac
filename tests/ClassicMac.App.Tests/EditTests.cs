@@ -242,7 +242,11 @@ public sealed partial class EditTests : IDisposable
     {
         var (model, file, dialogs, picker, _) = await Open();
         var image = new RgbaBitmap(32, 32);
-        for (int i = 0; i < 32 * 16 * 4; i += 4) (image.Pixels[i], image.Pixels[i + 3]) = (200, 255);   // red top half
+        for (int i = 0; i < 32 * 16 * 4; i += 4)
+        {
+            (image.Pixels[i], image.Pixels[i + 3]) = (200, 255);   // red top half
+        }
+
         model.LoadImage = _ => image;
         picker.Open = Path.Combine(folder, "art.png");
 
@@ -296,7 +300,7 @@ public sealed partial class EditTests : IDisposable
         File.WriteAllBytes(data, fork.ToArray());
         var tmpl = new ResourceFork();
         tmpl.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("ID", "DWRD"), ("Count", "ZCNT"), ("*****", "LSTC"), ("Value", "HWRD"), ("*****", "LSTE")))
-            { Name = MacString.FromMacRoman("Rsrc") });
+        { Name = MacString.FromMacRoman("Rsrc") });
         File.WriteAllBytes(templates, tmpl.ToArray());
 
         var model = new MainViewModel { EditDialogs = new Dialogs() };
@@ -489,7 +493,8 @@ public sealed partial class EditTests : IDisposable
         fork.Add(new Resource(Str, 200, "\u0003new"u8.ToArray()));
         var host = new MacFile
         {
-            Name = MacString.FromMacRoman("Imported"), DataFork = ForkData.FromBytes("imported data"u8.ToArray()),
+            Name = MacString.FromMacRoman("Imported"),
+            DataFork = ForkData.FromBytes("imported data"u8.ToArray()),
             ResourceFork = ForkData.FromBytes(fork.ToArray()),
             FinderInfo = FinderInfo.Empty with { Type = FourCC.FromString("APPL"), Creator = FourCC.FromString("abcd") },
         };

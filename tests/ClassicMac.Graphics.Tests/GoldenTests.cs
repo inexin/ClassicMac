@@ -1,13 +1,13 @@
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using ClassicMac.Graphics.SkiaSharp;
+using ClassicMac.Resources.Decoders.Images;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Xunit;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
-using ClassicMac.Graphics.ImageSharp;
-using ClassicMac.Graphics.SkiaSharp;
-using ClassicMac.Resources.Decoders.Images;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -22,7 +22,13 @@ public class GoldenTests
     private static string FindRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
-            if (File.Exists(Path.Combine(dir.FullName, "ClassicMac.slnx"))) return Path.Combine(dir.FullName, "tests", "golden");
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "ClassicMac.slnx")))
+            {
+                return Path.Combine(dir.FullName, "tests", "golden");
+            }
+        }
+
         return Path.Combine(AppContext.BaseDirectory, "golden");
     }
 
@@ -31,8 +37,18 @@ public class GoldenTests
         var data = new TheoryData<string>();
         var dir = Path.Combine(Root, "screens");
         if (Directory.Exists(dir))
-            foreach (var png in Directory.GetFiles(dir, "*.png").OrderBy(p => p)) data.Add(Path.GetFileNameWithoutExtension(png));
-        if (!data.Any()) data.Add("");                                   // no screenshots captured yet
+        {
+            foreach (var png in Directory.GetFiles(dir, "*.png").OrderBy(p => p))
+            {
+                data.Add(Path.GetFileNameWithoutExtension(png));
+            }
+        }
+
+        if (!data.Any())
+        {
+            data.Add("");                                   // no screenshots captured yet
+        }
+
         return data;
     }
 
@@ -40,7 +56,11 @@ public class GoldenTests
     [MemberData(nameof(Screens))]
     public void Screenshot_MatchesTheDecodedPicture(string name)
     {
-        if (name.Length == 0) return;
+        if (name.Length == 0)
+        {
+            return;
+        }
+
         var picture = File.ReadAllBytes(Path.Combine(Root, "pict", name + ".pict"));
         var expected = PictReader.Decode(picture, new PictDecodeOptions { Resolution = PictResolution.PictureFrame, Fonts = Fonts() });
         using var screen = Image.Load<Rgb24>(Path.Combine(Root, "screens", name + ".png"));
@@ -52,16 +72,27 @@ public class GoldenTests
         int wrong = 0;
         using var diff = new Image<Rgb24>(expected.Width, expected.Height);
         for (int y = 0; y < expected.Height; y++)
+        {
             for (int x = 0; x < expected.Width; x++)
             {
                 var e = expected[x, y];
                 var ours = e.A == 0 ? new Rgb24(255, 255, 255) : new Rgb24(e.R, e.G, e.B);
                 var mac = screen[ox + x, oy + y];
                 bool same = ours == mac;
-                if (!same) wrong++;
+                if (!same)
+                {
+                    wrong++;
+                }
+
                 diff[x, y] = same ? new Rgb24((byte)(ours.R / 4 + 190), (byte)(ours.G / 4 + 190), (byte)(ours.B / 4 + 190)) : new Rgb24(255, 0, 255);
             }
-        if (wrong > 0) diff.SaveAsPng(Path.Combine(AppContext.BaseDirectory, $"golden-diff-{name}.png"));
+        }
+
+        if (wrong > 0)
+        {
+            diff.SaveAsPng(Path.Combine(AppContext.BaseDirectory, $"golden-diff-{name}.png"));
+        }
+
         Assert.True(wrong == 0, $"{name}: {wrong} pixels differ from the Macintosh (diff: golden-diff-{name}.png in the test output).");
     }
 
@@ -70,25 +101,48 @@ public class GoldenTests
     {
         var black = new Rgb24(0, 0, 0);
         for (int y = 0; y + height <= screen.Height; y++)
+        {
             for (int x = 0; x + width <= screen.Width; x++)
             {
-                if (screen[x, y] != black || screen[x + width - 1, y] != black || screen[x, y + height - 1] != black) continue;
+                if (screen[x, y] != black || screen[x + width - 1, y] != black || screen[x, y + height - 1] != black)
+                {
+                    continue;
+                }
+
                 bool frame = true;
-                for (int i = 0; i < width && frame; i++) frame = screen[x + i, y] == black && screen[x + i, y + height - 1] == black;
-                for (int i = 0; i < height && frame; i++) frame = screen[x, y + i] == black && screen[x + width - 1, y + i] == black;
-                if (frame) return (x, y);
+                for (int i = 0; i < width && frame; i++)
+                {
+                    frame = screen[x + i, y] == black && screen[x + i, y + height - 1] == black;
+                }
+
+                for (int i = 0; i < height && frame; i++)
+                {
+                    frame = screen[x, y + i] == black && screen[x + width - 1, y + i] == black;
+                }
+
+                if (frame)
+                {
+                    return (x, y);
+                }
             }
+        }
+
         return null;
     }
 
     private static FontLibrary? Fonts()
     {
         var dir = Path.Combine(Root, "fonts");
-        if (!Directory.Exists(dir)) return null;
+        if (!Directory.Exists(dir))
+        {
+            return null;
+        }
+
         var library = new FontLibrary();
         foreach (var file in Directory.GetFiles(dir))
         {
-            try { library.AddResourceFork(File.ReadAllBytes(file)); }
+            try
+            { library.AddResourceFork(File.ReadAllBytes(file)); }
             catch (ArgumentException) { }
         }
         return library;
@@ -98,8 +152,16 @@ public class GoldenTests
     public void Locate_FindsTheFrameInsideALargerScreenshot()
     {
         using var screen = new Image<Rgb24>(40, 30, new Rgb24(200, 200, 200));
-        for (int i = 0; i < 12; i++) { screen[7 + i, 5] = default; screen[7 + i, 14] = default; }
-        for (int i = 0; i < 10; i++) { screen[7, 5 + i] = default; screen[18, 5 + i] = default; }
+        for (int i = 0; i < 12; i++)
+        {
+            screen[7 + i, 5] = default;
+            screen[7 + i, 14] = default;
+        }
+        for (int i = 0; i < 10; i++)
+        {
+            screen[7, 5 + i] = default;
+            screen[18, 5 + i] = default;
+        }
         Assert.Equal((7, 5), Locate(screen, 12, 10));
         Assert.Null(Locate(screen, 13, 10));
     }

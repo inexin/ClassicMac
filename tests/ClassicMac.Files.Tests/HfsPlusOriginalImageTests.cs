@@ -11,11 +11,15 @@ public sealed class HfsPlusOriginalImageTests
     {
         string? imagePath = Environment.GetEnvironmentVariable("CLASSICMAC_HFSPLUS_REFERENCE_IMAGE");
         if (string.IsNullOrWhiteSpace(imagePath) || !File.Exists(imagePath))
+        {
             Assert.Skip("Set CLASSICMAC_HFSPLUS_REFERENCE_IMAGE to Digital Corpora's nps-2009-hfsjtest1/image.gen1.dmg.");
+        }
 
         using (FileStream image = File.OpenRead(imagePath))
+        {
             Assert.Equal("BEB7795DD6D1A5319F9C20101855FFFF9665FCC11C6B23DE822D50C0D1E388EE",
                 Convert.ToHexString(SHA256.HashData(image)));
+        }
 
         var diagnostics = new List<Diagnostic>();
         ContainerNode root = ContainerUnwrapper.Default.Unwrap(imagePath, diagnostics: diagnostics);

@@ -66,7 +66,10 @@ namespace ClassicMac.Files
         {
             ArgumentNullException.ThrowIfNull(data);
             if (!LooksLikeFork(data))
+            {
                 throw new InvalidDataException("its first 16 bytes do not describe a resource fork's data and map.");
+            }
+
             return Found(ReadFork(data, options ?? ReadOptions.Default), ResourceForkSource.DataFork, diagnostics);
         }
 
@@ -77,7 +80,11 @@ namespace ClassicMac.Files
         public static bool LooksLikeFork(ForkData data)
         {
             ArgumentNullException.ThrowIfNull(data);
-            if (data.Length is < 256 or > ResourceFork.MaxForkLength) return false;
+            if (data.Length is < 256 or > ResourceFork.MaxForkLength)
+            {
+                return false;
+            }
+
             var header = data.ReadPrefix(16);
             var headerReader = new ClassicMac.Core.BigEndianReader(header);
             long dataOffset = headerReader.ReadUInt32At(0);
@@ -92,7 +99,10 @@ namespace ClassicMac.Files
         {
             if (diagnostics is not null)
             {
-                foreach (var d in fork.Diagnostics) diagnostics.Add(d);
+                foreach (var d in fork.Diagnostics)
+                {
+                    diagnostics.Add(d);
+                }
             }
             return new FileResources(fork, source);
         }
@@ -106,7 +116,11 @@ namespace ClassicMac.Files
         // A data fork that reads as a resource fork with at least one resource and no errors, or null.
         private static ResourceFork? TryDataForkAsFork(ForkData data, ReadOptions options)
         {
-            if (!LooksLikeFork(data)) return null;
+            if (!LooksLikeFork(data))
+            {
+                return null;
+            }
+
             try
             {
                 var fork = ReadFork(data, options);

@@ -64,7 +64,10 @@ namespace ClassicMac.Resources.Export
             {
                 try
                 {
-                    if (converter.Convert(input) is { Count: > 0 } files) return (converter, files);
+                    if (converter.Convert(input) is { Count: > 0 } files)
+                    {
+                        return (converter, files);
+                    }
                 }
                 catch (Exception e) when (e is InvalidDataException or EndOfStreamException or ArgumentException or IndexOutOfRangeException
                     or FormatException or OverflowException or NotSupportedException)

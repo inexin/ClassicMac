@@ -47,10 +47,17 @@ namespace ClassicMac.Files.Iso
         /// </summary>
         internal static long? HeaderLba(ReadOnlySpan<byte> sector)
         {
-            if (sector.Length < 16 || !IsRawSector(sector)) return null;
+            if (sector.Length < 16 || !IsRawSector(sector))
+            {
+                return null;
+            }
+
             static int? Bcd(byte b) => (b >> 4) <= 9 && (b & 15) <= 9 ? (b >> 4) * 10 + (b & 15) : null;
             if (Bcd(sector[12]) is not { } m || Bcd(sector[13]) is not { } s || Bcd(sector[14]) is not { } f || s >= 60 || f >= 75)
+            {
                 return null;
+            }
+
             var lba = ((long)m * 60 + s) * 75 + f - 150;
             return lba >= 0 ? lba : null;
         }
@@ -79,12 +86,19 @@ namespace ClassicMac.Files.Iso
             {
                 for (var i = 0; i < 300 && index >= 0 && index < count; i++, index += step)
                 {
-                    if (Offset(index) is { } o) return o;
+                    if (Offset(index) is { } o)
+                    {
+                        return o;
+                    }
                 }
                 return null;
             }
 
-            if (Nearest(count - 1, -1) is not { } offset || offset <= 0 || Nearest(0, 1) == offset) return null;
+            if (Nearest(count - 1, -1) is not { } offset || offset <= 0 || Nearest(0, 1) == offset)
+            {
+                return null;
+            }
+
             var runs = new List<CdDisc.Segment>();
             var end = count;
             while (offset > 0 && end > 0 && runs.Count < 99)
@@ -94,23 +108,38 @@ namespace ClassicMac.Files.Iso
                 while (lo < hi)
                 {
                     var mid = lo + (hi - lo) / 2;
-                    if (Offset(mid) is { } o && o >= offset) hi = mid;
-                    else lo = mid + 1;
+                    if (Offset(mid) is { } o && o >= offset)
+                    {
+                        hi = mid;
+                    }
+                    else
+                    {
+                        lo = mid + 1;
+                    }
                 }
                 runs.Add(new CdDisc.Segment(lo + offset, end - lo, Cooked(input.Slice(lo * 2352, (end - lo) * 2352), 2352)));
                 end = lo;
                 offset = end > 0 && Nearest(end - 1, -1) is { } before && before < offset ? before : 0;
             }
-            if (end > 0) runs.Add(new CdDisc.Segment(0, end, Cooked(input.Slice(0, end * 2352), 2352)));
+            if (end > 0)
+            {
+                runs.Add(new CdDisc.Segment(0, end, Cooked(input.Slice(0, end * 2352), 2352)));
+            }
 
             var session = runs[0].Lba;
             var disc = new CdDisc(runs, session);
             foreach (var start in new[] { session, session + 150 })
             {
-                if ((start + 17) * 2048 > disc.Length) continue;
+                if ((start + 17) * 2048 > disc.Length)
+                {
+                    continue;
+                }
+
                 var v = disc.Slice((start + 16) * 2048, 16).ToArray();
                 if (v.AsSpan(1, 5).SequenceEqual("CD001"u8) || v.AsSpan(1, 5).SequenceEqual("CD-I "u8) || v.AsSpan(9, 5).SequenceEqual("CDROM"u8))
+                {
                     return new CdDisc(runs, start);
+                }
             }
             return disc;
         }
@@ -134,7 +163,10 @@ namespace ClassicMac.Files.Iso
             {
                 var sector16 = input.Slice(16 * 2352L, 2352).ToArray();
                 var sector0 = input.ReadPrefix(2352);
-                if (IsRawSector(sector16) || IsRawSector(sector0)) return 2352;
+                if (IsRawSector(sector16) || IsRawSector(sector0))
+                {
+                    return 2352;
+                }
             }
             if (input.Length >= 2336 * 17 && input.Length % 2336 == 0)
             {
@@ -145,7 +177,9 @@ namespace ClassicMac.Files.Iso
                 if (subheader.AsSpan(0, 4).SequenceEqual(subheader.AsSpan(4, 4))
                     && (descriptor.AsSpan(1, 5).SequenceEqual("CD001"u8) || descriptor.AsSpan(9, 5).SequenceEqual("CDROM"u8)
                         || start.AsSpan(0, 2).SequenceEqual("ER"u8) || start.AsSpan(1024, 2).SequenceEqual("BD"u8)))
+                {
                     return 2336;
+                }
             }
             return null;
         }
@@ -204,7 +238,10 @@ namespace ClassicMac.Files.Iso
                         cachedSector = index;
                     }
                     if (sectorSize == 2336)
+                    {
                         return (sector[2] & 0x20) != 0 ? Zeros : sector.AsSpan(8, Block); // form 2: no 2048-byte block
+                    }
+
                     return sector[15] switch
                     {
                         1 => sector.AsSpan(16, Block),
@@ -237,7 +274,11 @@ namespace ClassicMac.Files.Iso
 
                 protected override void Dispose(bool disposing)
                 {
-                    if (disposing) inner.Dispose();
+                    if (disposing)
+                    {
+                        inner.Dispose();
+                    }
+
                     base.Dispose(disposing);
                 }
             }

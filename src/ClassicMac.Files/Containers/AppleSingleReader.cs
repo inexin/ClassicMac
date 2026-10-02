@@ -55,7 +55,11 @@ namespace ClassicMac.Files.Containers
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
-            if (!CanRead(input)) throw new InvalidDataException($"Not an {FormatName} file.");
+            if (!CanRead(input))
+            {
+                throw new InvalidDataException($"Not an {FormatName} file.");
+            }
+
             var header = input.ReadPrefix(HeaderLength);
             var reader = new BigEndianReader(header);
             var version = reader.ReadUInt32At(4);
@@ -90,8 +94,11 @@ namespace ClassicMac.Files.Containers
                 {
                     case DataFork:
                         if (magic == DoubleMagic)
+                        {
                             context.Report(DiagnosticSeverity.Warning, "applesingle.double-data-fork",
                                 "An AppleDouble header file contains a data fork; it is used.", at);
+                        }
+
                         file = file with { DataFork = entry };
                         break;
                     case ResourceFork:
@@ -154,7 +161,11 @@ namespace ClassicMac.Files.Containers
 
         private static MacDate? ToMacDate(int seconds, ContainerContext context, long offset)
         {
-            if (seconds == UnknownDate) return null;
+            if (seconds == UnknownDate)
+            {
+                return null;
+            }
+
             var local = TimeZoneInfo.ConvertTimeFromUtc(DateEpoch.AddSeconds(seconds), context.Options.TimeZone);
             try
             {

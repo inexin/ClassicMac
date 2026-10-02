@@ -38,27 +38,53 @@ namespace ClassicMac.Files.Compression
             var afterRun = false; // a literal run shorter than 63 must be followed by a match
             while (total < output.Length)
             {
-                if (!LengthCode(ref bits, out var value)) return Result.Overread;
+                if (!LengthCode(ref bits, out var value))
+                {
+                    return Result.Overread;
+                }
+
                 if (value > 0 || afterRun)
                 {
                     var length = value + 2 + (afterRun ? 1 : 0);
                     afterRun = false;
-                    if (!Distance(ref bits, total, DistanceClass(total), out var distance)) return Result.Overread;
+                    if (!Distance(ref bits, total, DistanceClass(total), out var distance))
+                    {
+                        return Result.Overread;
+                    }
+
                     var from = total - distance;
-                    if (from < 0) return Result.BadDistance;
+                    if (from < 0)
+                    {
+                        return Result.BadDistance;
+                    }
+
                     for (var i = 0; i < length; i++, total++)
                     {
-                        if (total < output.Length) output[total] = output[from + i];
+                        if (total < output.Length)
+                        {
+                            output[total] = output[from + i];
+                        }
                     }
                 }
                 else
                 {
-                    if (!LiteralCount(ref bits, out var count)) return Result.Overread;
+                    if (!LiteralCount(ref bits, out var count))
+                    {
+                        return Result.Overread;
+                    }
+
                     afterRun = count < 63;
                     for (var i = 0; i < count; i++, total++)
                     {
-                        if (!bits.Get(8, out var b)) return Result.Overread;
-                        if (total < output.Length) output[total] = (byte)b;
+                        if (!bits.Get(8, out var b))
+                        {
+                            return Result.Overread;
+                        }
+
+                        if (total < output.Length)
+                        {
+                            output[total] = (byte)b;
+                        }
                     }
                 }
                 written = Math.Min(total, output.Length);
@@ -78,24 +104,44 @@ namespace ClassicMac.Files.Compression
                 case 0:
                     return bits.Get(1, out value);
                 case 1:
-                    if (!bits.Get(1, out a)) return false;
+                    if (!bits.Get(1, out a))
+                    {
+                        return false;
+                    }
+
                     if (a == 0)
                     {
                         value = 2;
                         return true;
                     }
-                    if (!bits.Get(1, out b)) return false;
+                    if (!bits.Get(1, out b))
+                    {
+                        return false;
+                    }
+
                     value = b + 3;
                     return true;
                 case 2:
-                    if (!bits.Get(1, out a)) return false;
+                    if (!bits.Get(1, out a))
+                    {
+                        return false;
+                    }
+
                     if (a != 0)
                     {
-                        if (!bits.Get(2, out b)) return false;
+                        if (!bits.Get(2, out b))
+                        {
+                            return false;
+                        }
+
                         value = b + 7;
                         return true;
                     }
-                    if (!bits.Get(1, out b)) return false;
+                    if (!bits.Get(1, out b))
+                    {
+                        return false;
+                    }
+
                     value = b + 5;
                     return true;
             }
@@ -110,7 +156,11 @@ namespace ClassicMac.Files.Compression
                 9 => (507, 9),
                 _ => (1019, 10),
             };
-            if (!bits.Get(width, out b)) return false;
+            if (!bits.Get(width, out b))
+            {
+                return false;
+            }
+
             value = b + @base;
             return true;
         }
@@ -119,13 +169,21 @@ namespace ClassicMac.Files.Compression
         private static bool LiteralCount(ref BitReader bits, out int count)
         {
             count = 0;
-            if (!bits.Get(1, out var first)) return false;
+            if (!bits.Get(1, out var first))
+            {
+                return false;
+            }
+
             if (first == 0)
             {
                 count = 1;
                 return true;
             }
-            if (!bits.Get(2, out var x)) return false;
+            if (!bits.Get(2, out var x))
+            {
+                return false;
+            }
+
             switch (x)
             {
                 case 0:
@@ -135,11 +193,19 @@ namespace ClassicMac.Files.Compression
                     count = 3;
                     return true;
                 case 2:
-                    if (!bits.Get(2, out var z)) return false;
+                    if (!bits.Get(2, out var z))
+                    {
+                        return false;
+                    }
+
                     count = z + 4;
                     return true;
             }
-            if (!bits.Get(4, out var y)) return false;
+            if (!bits.Get(4, out var y))
+            {
+                return false;
+            }
+
             if (y <= 7)
             {
                 count = y + 8;
@@ -147,11 +213,19 @@ namespace ClassicMac.Files.Compression
             }
             if (y <= 11)
             {
-                if (!bits.Get(2, out var low)) return false;
+                if (!bits.Get(2, out var low))
+                {
+                    return false;
+                }
+
                 count = 4 * y + low - 16;
                 return true;
             }
-            if (!bits.Get(3, out var low3)) return false;
+            if (!bits.Get(3, out var low3))
+            {
+                return false;
+            }
+
             count = 8 * y + low3 - 64;
             return true;
         }
@@ -162,13 +236,19 @@ namespace ClassicMac.Files.Compression
             ReadOnlySpan<(int Limit, int Class)> small = [(0xB, 0), (0x15, 1), (0x29, 2), (0x51, 3), (0xA1, 4), (0x2A1, 5), (0x3E9, 6)];
             foreach (var (limit, k) in small)
             {
-                if (position < limit) return k;
+                if (position < limit)
+                {
+                    return k;
+                }
             }
             ReadOnlySpan<(int Limit, int Window, int Class)> large =
                 [(0xA81, 0x801, 7), (0x1501, 0x1001, 8), (0x2A01, 0x2001, 9), (0x5401, 0x4001, 10), (0xA801, 0x8001, 11), (0x11171, 0x10001, 12), (0x2A001, 0x20001, 13)];
             foreach (var (limit, window, k) in large)
             {
-                if (position < limit || WindowLimit < window) return k;
+                if (position < limit || WindowLimit < window)
+                {
+                    return k;
+                }
             }
             return 14;
         }
@@ -176,26 +256,48 @@ namespace ClassicMac.Files.Compression
         private static bool Distance(ref BitReader bits, int position, int k, out int distance)
         {
             distance = 0;
-            if (!bits.Get(1, out var first)) return false;
+            if (!bits.Get(1, out var first))
+            {
+                return false;
+            }
+
             int value;
             if (first == 0)
             {
-                if (!bits.Get(k, out value)) return false;
+                if (!bits.Get(k, out value))
+                {
+                    return false;
+                }
+
                 distance = value + 1;
                 return true;
             }
             var @base = 1 << k;
-            if (!bits.Get(1, out var second)) return false;
+            if (!bits.Get(1, out var second))
+            {
+                return false;
+            }
+
             if (second == 0)
             {
-                if (!bits.Get(k + 2, out value)) return false;
+                if (!bits.Get(k + 2, out value))
+                {
+                    return false;
+                }
+
                 distance = @base + value + 1;
                 return true;
             }
             @base *= 5;
             int width;
-            if (position <= @base + 2) width = 1;
-            else if (position <= @base + 4) width = 2;
+            if (position <= @base + 2)
+            {
+                width = 1;
+            }
+            else if (position <= @base + 4)
+            {
+                width = 2;
+            }
             else
             {
                 var threshold = @base + 4;
@@ -206,12 +308,20 @@ namespace ClassicMac.Files.Compression
                     threshold += step;
                     // $680 is compared as $66C: a quirk of Disk Copy's code, kept.
                     var compare = threshold == 0x680 ? 0x66C : threshold;
-                    if (position <= compare || width == k + 4) break;
+                    if (position <= compare || width == k + 4)
+                    {
+                        break;
+                    }
+
                     step <<= 1;
                     width++;
                 }
             }
-            if (!bits.Get(width, out value)) return false;
+            if (!bits.Get(width, out value))
+            {
+                return false;
+            }
+
             distance = @base + value + 1;
             return true;
         }
@@ -231,8 +341,16 @@ namespace ClassicMac.Files.Compression
             public bool Get(int count, out int value)
             {
                 value = 0;
-                if (position + count > limit) return false;
-                for (var i = 0; i < count; i++) value = (value << 1) | BitAt(position + i);
+                if (position + count > limit)
+                {
+                    return false;
+                }
+
+                for (var i = 0; i < count; i++)
+                {
+                    value = (value << 1) | BitAt(position + i);
+                }
+
                 position += count;
                 return true;
             }
@@ -244,7 +362,11 @@ namespace ClassicMac.Files.Compression
                 while (count < max)
                 {
                     var bit = BitAt(position++);
-                    if (bit == 0) return count;
+                    if (bit == 0)
+                    {
+                        return count;
+                    }
+
                     count++;
                 }
                 return count;

@@ -5,8 +5,8 @@ using System.Text.RegularExpressions;
 using ClassicMac.Core;
 using ClassicMac.Files.Containers;
 using ClassicMac.Files.Fat;
-using static ClassicMac.Files.Tests.Fixtures;
 using ClassicMac.Tests;
+using static ClassicMac.Files.Tests.Fixtures;
 
 namespace ClassicMac.Files.Tests;
 
@@ -179,7 +179,11 @@ public class FatTests
     public void Too_many_entries_stop_the_walk()
     {
         var builder = new FatBuilder(12);
-        for (var i = 0; i < 10; i++) builder.File($"F{i}", $"F{i}", Bytes(3, i + 1));
+        for (var i = 0; i < 10; i++)
+        {
+            builder.File($"F{i}", $"F{i}", Bytes(3, i + 1));
+        }
+
         var diagnostics = new List<Diagnostic>();
 
         var files = FatReader.Instance.Read(ForkData.FromBytes(builder.Build()),
@@ -377,7 +381,10 @@ public class FatTests
                     && !Path.GetFileName(Path.GetDirectoryName(f)!).StartsWith('.') // Basilisk II .rsrc/.finf companions
                     && File.Exists(Path.Combine(Path.GetDirectoryName(f)!, "log.txt")))
                 .ToList();
-        if (images.Count == 0) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's fxtest*.img and log.txt to run this.");
+        if (images.Count == 0)
+        {
+            Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's fxtest*.img and log.txt to run this.");
+        }
 
         var pattern = new Regex(@"^F list [^:]+:(?<folder>[^#]*)#\d+ FILE '(?<name>.*)' num \d+ attrib \S+ type '(?<type>.{4})' creator '(?<creator>.{4})' flags (?<flags>[0-9A-F]{4}) .* cr (?<cr>[0-9A-F]{8}) md (?<md>[0-9A-F]{8}) .* data (?<data>\d+) rsrc (?<rsrc>\d+)");
         var compared = 0;
@@ -389,7 +396,9 @@ public class FatTests
             foreach (var line in log.Split('\r', '\n'))
             {
                 if (pattern.Match(line) is { Success: true } m)
+                {
                     listed[(m.Groups["folder"].Value.Length > 0 ? m.Groups["folder"].Value + ":" : "") + m.Groups["name"].Value] = m;
+                }
             }
 
             var diagnostics = new List<Diagnostic>();
@@ -404,7 +413,11 @@ public class FatTests
                 var what = $"{Path.GetFileName(image)}: \"{path}\"";
                 Assert.True(ulong.Parse(m.Groups["data"].Value) == (ulong)file.DataFork.Length, what);
                 compared++;
-                if (path == "Desktop") continue; // changed by the Finder after the listing
+                if (path == "Desktop")
+                {
+                    continue; // changed by the Finder after the listing
+                }
+
                 Assert.True(ulong.Parse(m.Groups["rsrc"].Value) == (ulong)file.ResourceFork.Length, what);
                 Assert.Equal((m.Groups["type"].Value, m.Groups["creator"].Value), (file.FinderInfo.Type.ToString(), file.FinderInfo.Creator.ToString()));
                 Assert.Equal(Convert.ToUInt16(m.Groups["flags"].Value, 16), (ushort)file.FinderInfo.Flags);

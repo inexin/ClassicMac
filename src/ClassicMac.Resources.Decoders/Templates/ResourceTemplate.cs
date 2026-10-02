@@ -105,7 +105,11 @@ namespace ClassicMac.Resources.Decoders.Templates
             for (int at = 0; at < data.Length;)
             {
                 int length = data[at];
-                if (at + 1 + length + 4 > data.Length) throw new InvalidDataException($"The template ends inside the field at offset {at}.");
+                if (at + 1 + length + 4 > data.Length)
+                {
+                    throw new InvalidDataException($"The template ends inside the field at offset {at}.");
+                }
+
                 fields.Add(new TemplateField(MacRoman.Decode(data.Slice(at + 1, length)), MacRoman.Decode(data.Slice(at + 1 + length, 4))));
                 at += 5 + length;
             }
@@ -136,22 +140,47 @@ namespace ClassicMac.Resources.Decoders.Templates
             for (int i = 0; i < fields.Count; i++)
             {
                 var type = fields[i].Type;
-                if (type == "HEXD" && i < fields.Count - 1) problems.Add($"HEXD (“{fields[i].Label}”) is not the last field.");
-                if (type == "BBIT") bits++;
+                if (type == "HEXD" && i < fields.Count - 1)
+                {
+                    problems.Add($"HEXD (“{fields[i].Label}”) is not the last field.");
+                }
+
+                if (type == "BBIT")
+                {
+                    bits++;
+                }
                 else
                 {
-                    if (bits % 8 != 0) problems.Add($"A run of {bits} BBIT fields before “{fields[i].Label}” is not a multiple of 8.");
+                    if (bits % 8 != 0)
+                    {
+                        problems.Add($"A run of {bits} BBIT fields before “{fields[i].Label}” is not a multiple of 8.");
+                    }
+
                     bits = 0;
                 }
-                if (type != "LSTC" && previous is "OCNT" or "ZCNT") problems.Add($"The count before “{fields[i].Label}” is not followed by LSTC.");
+                if (type != "LSTC" && previous is "OCNT" or "ZCNT")
+                {
+                    problems.Add($"The count before “{fields[i].Label}” is not followed by LSTC.");
+                }
+
                 if (type is "LSTB" or "LSTC" or "LSTZ")
                 {
                     depth++;
-                    if (type == "LSTC" && previous is not ("OCNT" or "ZCNT")) problems.Add($"LSTC (“{fields[i].Label}”) does not follow an OCNT or ZCNT.");
+                    if (type == "LSTC" && previous is not ("OCNT" or "ZCNT"))
+                    {
+                        problems.Add($"LSTC (“{fields[i].Label}”) does not follow an OCNT or ZCNT.");
+                    }
+
                     if (type == "LSTB")
                     {
-                        if (lstbDepth > 0) problems.Add($"LSTB (“{fields[i].Label}”) follows another LSTB.");
-                        else lstbDepth = depth;
+                        if (lstbDepth > 0)
+                        {
+                            problems.Add($"LSTB (“{fields[i].Label}”) follows another LSTB.");
+                        }
+                        else
+                        {
+                            lstbDepth = depth;
+                        }
                     }
                 }
                 else if (type == "LSTE")
@@ -159,14 +188,32 @@ namespace ClassicMac.Resources.Decoders.Templates
                     depth--;
                     // ResEdit clears its LSTB mark only when depth returns to the LSTB's own depth (a list nested in it
                     // closing), so a second LSTB after one without a nested list is refused too.
-                    if (depth == lstbDepth) lstbDepth = 0;
+                    if (depth == lstbDepth)
+                    {
+                        lstbDepth = 0;
+                    }
                 }
-                if (!Known.Contains(type) && !IsSized(type)) problems.Add($"“{fields[i].Label}” has the unknown field type '{type}'.");
+                if (!Known.Contains(type) && !IsSized(type))
+                {
+                    problems.Add($"“{fields[i].Label}” has the unknown field type '{type}'.");
+                }
+
                 previous = type;
             }
-            if (depth > 0) problems.Add("A list has no LSTE.");
-            else if (depth < 0) problems.Add("An LSTE has no list begin.");
-            if (bits % 8 != 0) problems.Add($"A run of {bits} BBIT fields at the end is not a multiple of 8.");
+            if (depth > 0)
+            {
+                problems.Add("A list has no LSTE.");
+            }
+            else if (depth < 0)
+            {
+                problems.Add("An LSTE has no list begin.");
+            }
+
+            if (bits % 8 != 0)
+            {
+                problems.Add($"A run of {bits} BBIT fields at the end is not a multiple of 8.");
+            }
+
             return problems;
         }
 
@@ -184,7 +231,11 @@ namespace ClassicMac.Resources.Decoders.Templates
                 }
                 else if (field.Type == "LSTE")
                 {
-                    if (stack.Count == 0) continue;
+                    if (stack.Count == 0)
+                    {
+                        continue;
+                    }
+
                     var (list, parent) = stack.Pop();
                     parent.Add(new TemplateNode(list, current));
                     current = parent;
@@ -213,10 +264,18 @@ namespace ClassicMac.Resources.Decoders.Templates
         /// <exception cref="InvalidOperationException">The template has <see cref="Problems"/>.</exception>
         public TemplateReadResult Read(ReadOnlySpan<byte> data)
         {
-            if (Problems.Count > 0) throw new InvalidOperationException(Problems[0]);
+            if (Problems.Count > 0)
+            {
+                throw new InvalidOperationException(Problems[0]);
+            }
+
             var reader = new Reader(data.ToArray());
             var values = reader.Items(Nodes);
-            if (reader.Bit != 7) reader.Position++;
+            if (reader.Bit != 7)
+            {
+                reader.Position++;
+            }
+
             int end = Math.Min(reader.Position, data.Length);
             return new TemplateReadResult(values, reader.Missing, data[end..].ToArray());
         }
@@ -252,15 +311,27 @@ namespace ClassicMac.Resources.Decoders.Templates
                         switch (node.Type)
                         {
                             case "LSTC":
-                                for (int i = 0; i < count; i++) items.Add(Items(node.Children));
+                                for (int i = 0; i < count; i++)
+                                {
+                                    items.Add(Items(node.Children));
+                                }
+
                                 break;
                             case "LSTB":
-                                while (Position < End) items.Add(Items(node.Children));
+                                while (Position < End)
+                                {
+                                    items.Add(Items(node.Children));
+                                }
+
                                 break;
                             default:   // LSTZ: to a 0 byte at the start of an item, which is consumed
                                 while (Position < End)
                                 {
-                                    if (data[Position] == 0) { Position++; break; }
+                                    if (data[Position] == 0)
+                                    {
+                                        Position++;
+                                        break;
+                                    }
                                     items.Add(Items(node.Children));
                                 }
                                 break;
@@ -274,7 +345,10 @@ namespace ClassicMac.Resources.Decoders.Templates
                         int value = int.Parse(text, CultureInfo.InvariantCulture);
                         count = node.Type == "ZCNT" ? (value + 1) & 0xFFFF : value;
                     }
-                    if (!node.IsHidden) values.Add(new TemplateScalar(node, text));
+                    if (!node.IsHidden)
+                    {
+                        values.Add(new TemplateScalar(node, text));
+                    }
                 }
                 return values;
             }
@@ -283,73 +357,107 @@ namespace ClassicMac.Resources.Decoders.Templates
             {
                 switch (type)
                 {
-                    case "DBYT": return ((sbyte)Take(1)[0]).ToString(CultureInfo.InvariantCulture);
-                    case "DWRD": return new BigEndianReader(Take(2)).ReadInt16().ToString(CultureInfo.InvariantCulture);
-                    case "DLNG": return new BigEndianReader(Take(4)).ReadInt32().ToString(CultureInfo.InvariantCulture);
-                    case "HBYT": return "$" + Convert.ToHexString(Take(1));
-                    case "HWRD": return "$" + Convert.ToHexString(Take(2));
-                    case "HLNG": return "$" + Convert.ToHexString(Take(4));
-                    case "OCNT" or "ZCNT": return new BigEndianReader(Take(2)).ReadUInt16().ToString(CultureInfo.InvariantCulture);
-                    case "CHAR": { var b = Take(1); return b[0] == 0 ? "" : MacRoman.Decode(b); }
-                    case "TNAM": return MacRoman.Decode(Take(4));
-                    case "BOOL": return Take(2)[0] != 0 ? "1" : "0";   // only the first byte counts
+                    case "DBYT":
+                        return ((sbyte)Take(1)[0]).ToString(CultureInfo.InvariantCulture);
+                    case "DWRD":
+                        return new BigEndianReader(Take(2)).ReadInt16().ToString(CultureInfo.InvariantCulture);
+                    case "DLNG":
+                        return new BigEndianReader(Take(4)).ReadInt32().ToString(CultureInfo.InvariantCulture);
+                    case "HBYT":
+                        return "$" + Convert.ToHexString(Take(1));
+                    case "HWRD":
+                        return "$" + Convert.ToHexString(Take(2));
+                    case "HLNG":
+                        return "$" + Convert.ToHexString(Take(4));
+                    case "OCNT" or "ZCNT":
+                        return new BigEndianReader(Take(2)).ReadUInt16().ToString(CultureInfo.InvariantCulture);
+                    case "CHAR":
+                        {
+                            var b = Take(1);
+                            return b[0] == 0 ? "" : MacRoman.Decode(b);
+                        }
+                    case "TNAM":
+                        return MacRoman.Decode(Take(4));
+                    case "BOOL":
+                        return Take(2)[0] != 0 ? "1" : "0";   // only the first byte counts
                     case "RECT":
-                    {
-                        var rect = new BigEndianReader(Take(8)).ReadMacRect();
-                        return string.Join(", ", rect.Top, rect.Left, rect.Bottom, rect.Right);
-                    }
+                        {
+                            var rect = new BigEndianReader(Take(8)).ReadMacRect();
+                            return string.Join(", ", rect.Top, rect.Left, rect.Bottom, rect.Right);
+                        }
                     case "BBIT":
-                    {
-                        int bit = Position < End ? (data[Position] >> Bit) & 1 : 0;
-                        if (Position >= End) Missing = Math.Max(Missing, Position + 1 - End);
-                        if (--Bit < 0) { Bit = 7; Position++; }
-                        return bit.ToString(CultureInfo.InvariantCulture);
-                    }
+                        {
+                            int bit = Position < End ? (data[Position] >> Bit) & 1 : 0;
+                            if (Position >= End)
+                            {
+                                Missing = Math.Max(Missing, Position + 1 - End);
+                            }
+
+                            if (--Bit < 0)
+                            {
+                                Bit = 7;
+                                Position++;
+                            }
+                            return bit.ToString(CultureInfo.InvariantCulture);
+                        }
                     case "PSTR" or "ESTR" or "OSTR":
-                    {
-                        int n = Take(1)[0];
-                        int pad = type == "ESTR" && n % 2 == 0 || type == "OSTR" && n % 2 == 1 ? 1 : 0;
-                        return Text(n, pad);
-                    }
-                    case "WSTR": return Text(new BigEndianReader(Take(2)).ReadUInt16(), 0);
-                    case "LSTR": return Text((int)Math.Min(new BigEndianReader(Take(4)).ReadUInt32(), int.MaxValue), 0);
+                        {
+                            int n = Take(1)[0];
+                            int pad = type == "ESTR" && n % 2 == 0 || type == "OSTR" && n % 2 == 1 ? 1 : 0;
+                            return Text(n, pad);
+                        }
+                    case "WSTR":
+                        return Text(new BigEndianReader(Take(2)).ReadUInt16(), 0);
+                    case "LSTR":
+                        return Text((int)Math.Min(new BigEndianReader(Take(4)).ReadUInt32(), int.MaxValue), 0);
                     case "CSTR" or "ECST" or "OCST":
-                    {
-                        int start = Math.Min(Position, End);
-                        int nul = Array.IndexOf(data, (byte)0, start);
-                        int n = (nul < 0 ? End : nul) - start;
-                        int extra = type == "ECST" && n % 2 == 0 || type == "OCST" && n % 2 == 1 ? 2 : 1;
-                        var text = MacRoman.Decode(data.AsSpan(start, n));
-                        Position = Math.Min(start + n + extra, End);
-                        return text;
-                    }
+                        {
+                            int start = Math.Min(Position, End);
+                            int nul = Array.IndexOf(data, (byte)0, start);
+                            int n = (nul < 0 ? End : nul) - start;
+                            int extra = type == "ECST" && n % 2 == 0 || type == "OCST" && n % 2 == 1 ? 2 : 1;
+                            var text = MacRoman.Decode(data.AsSpan(start, n));
+                            Position = Math.Min(start + n + extra, End);
+                            return text;
+                        }
                     case "HEXD":
-                    {
-                        var text = Convert.ToHexString(data.AsSpan(Math.Min(Position, End)));
-                        Position = End;
-                        return text;
-                    }
-                    case "FBYT": Take(1); return "";
-                    case "FWRD": Take(2); return "";
-                    case "FLNG": Take(4); return "";
-                    case "AWRD": Position += Position & 1; return "";
-                    case "ALNG": Position += -Position & 3; return "";
+                        {
+                            var text = Convert.ToHexString(data.AsSpan(Math.Min(Position, End)));
+                            Position = End;
+                            return text;
+                        }
+                    case "FBYT":
+                        Take(1);
+                        return "";
+                    case "FWRD":
+                        Take(2);
+                        return "";
+                    case "FLNG":
+                        Take(4);
+                        return "";
+                    case "AWRD":
+                        Position += Position & 1;
+                        return "";
+                    case "ALNG":
+                        Position += -Position & 3;
+                        return "";
                 }
                 int size = SizeOf(type);
                 switch (type[0])
                 {
-                    case 'H': return Convert.ToHexString(Take(size));
+                    case 'H':
+                        return Convert.ToHexString(Take(size));
                     case 'C':
-                    {
-                        var b = Take(size);
-                        int nul = Array.IndexOf(b, (byte)0);
-                        return MacRoman.Decode(b.AsSpan(0, nul < 0 || nul > size - 1 ? Math.Max(0, size - 1) : nul));
-                    }
+                        {
+                            var b = Take(size);
+                            int nul = Array.IndexOf(b, (byte)0);
+                            return MacRoman.Decode(b.AsSpan(0, nul < 0 || nul > size - 1 ? Math.Max(0, size - 1) : nul));
+                        }
                     default:
-                    {
-                        var b = Take(size + 1);
-                        return MacRoman.Decode(b.AsSpan(1, Math.Min(b[0], size)));
-                    }
+                        {
+                            var b = Take(size + 1);
+                            return MacRoman.Decode(b.AsSpan(1, Math.Min(b[0], size)));
+                        }
                 }
             }
 
@@ -381,8 +489,14 @@ namespace ClassicMac.Resources.Decoders.Templates
             var values = new List<TemplateValue>();
             foreach (var node in nodes)
             {
-                if (node.IsList) values.Add(new TemplateList(node, []));
-                else if (!node.IsHidden) values.Add(new TemplateScalar(node, DefaultText(node.Type)));
+                if (node.IsList)
+                {
+                    values.Add(new TemplateList(node, []));
+                }
+                else if (!node.IsHidden)
+                {
+                    values.Add(new TemplateScalar(node, DefaultText(node.Type)));
+                }
             }
             return values;
         }
@@ -407,7 +521,11 @@ namespace ClassicMac.Resources.Decoders.Templates
         public byte[] Write(IReadOnlyList<TemplateValue> values, ReadOnlySpan<byte> extra = default)
         {
             ArgumentNullException.ThrowIfNull(values);
-            if (Problems.Count > 0) throw new InvalidOperationException(Problems[0]);
+            if (Problems.Count > 0)
+            {
+                throw new InvalidOperationException(Problems[0]);
+            }
+
             var writer = new Writer();
             writer.Items(Nodes, values);
             writer.Flush();
@@ -422,7 +540,11 @@ namespace ClassicMac.Resources.Decoders.Templates
 
             public void Flush()
             {
-                if (bitCount == 0) return;
+                if (bitCount == 0)
+                {
+                    return;
+                }
+
                 Output.WriteByte((byte)(bits << (8 - bitCount)));
                 bits = bitCount = 0;
             }
@@ -433,12 +555,18 @@ namespace ClassicMac.Resources.Decoders.Templates
                 for (int i = 0; i < nodes.Count; i++)
                 {
                     var node = nodes[i];
-                    if (node.Type != "BBIT") Flush();
+                    if (node.Type != "BBIT")
+                    {
+                        Flush();
+                    }
+
                     if (node.IsHidden)
                     {
                         int pad = node.Type switch
                         {
-                            "FBYT" => 1, "FWRD" => 2, "FLNG" => 4,
+                            "FBYT" => 1,
+                            "FWRD" => 2,
+                            "FLNG" => 4,
                             "AWRD" => Output.Length & 1,
                             _ => -Output.Length & 3,
                         };
@@ -446,7 +574,10 @@ namespace ClassicMac.Resources.Decoders.Templates
                         continue;
                     }
                     if (v >= values.Count || !ReferenceEquals(values[v].Node, node))
+                    {
                         throw new ArgumentException($"No value for “{node.Label}”.", nameof(values));
+                    }
+
                     var value = values[v++];
                     if (node.IsList)
                     {
@@ -456,7 +587,11 @@ namespace ClassicMac.Resources.Decoders.Templates
                             Items(node.Children, item);
                             Flush();
                         }
-                        if (node.Type == "LSTZ") Output.WriteByte(0);
+                        if (node.Type == "LSTZ")
+                        {
+                            Output.WriteByte(0);
+                        }
+
                         continue;
                     }
                     var text = ((TemplateScalar)value).Text;
@@ -464,7 +599,11 @@ namespace ClassicMac.Resources.Decoders.Templates
                     {
                         // The count of the LSTC that follows (ResEdit keeps it in step as items are added and removed).
                         int count = i + 1 < nodes.Count && nodes[i + 1].IsList && v < values.Count && values[v] is TemplateList next ? next.Items.Count : 0;
-                        if (count > 0xFFFF) throw new ArgumentException($"“{node.Label}”: too many items.");
+                        if (count > 0xFFFF)
+                        {
+                            throw new ArgumentException($"“{node.Label}”: too many items.");
+                        }
+
                         Output.WriteUInt16((ushort)(node.Type == "ZCNT" ? (count - 1) & 0xFFFF : count));
                         continue;
                     }
@@ -476,8 +615,15 @@ namespace ClassicMac.Resources.Decoders.Templates
             {
                 long value = ParseNumber(node, text);
                 long min = -(1L << (bytes * 8 - 1)), max = (1L << (bytes * 8)) - 1;
-                if (value < min || value > max) throw new ArgumentException($"“{node.Label}”: {text.Trim()} does not fit in {bytes} byte{(bytes == 1 ? "" : "s")}.");
-                for (int b = bytes - 1; b >= 0; b--) Output.WriteByte((byte)(value >> (8 * b)));
+                if (value < min || value > max)
+                {
+                    throw new ArgumentException($"“{node.Label}”: {text.Trim()} does not fit in {bytes} byte{(bytes == 1 ? "" : "s")}.");
+                }
+
+                for (int b = bytes - 1; b >= 0; b--)
+                {
+                    Output.WriteByte((byte)(value >> (8 * b)));
+                }
             }
 
             private static long ParseNumber(TemplateNode node, string text)
@@ -486,24 +632,44 @@ namespace ClassicMac.Resources.Decoders.Templates
                 bool ok = t.StartsWith('$')
                     ? long.TryParse(t.AsSpan(1), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out long value)
                     : long.TryParse(t, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
-                if (!ok) throw new ArgumentException($"“{node.Label}”: “{text}” is not a number (decimal, or hex after $).");
+                if (!ok)
+                {
+                    throw new ArgumentException($"“{node.Label}”: “{text}” is not a number (decimal, or hex after $).");
+                }
+
                 return value;
             }
 
             private static byte[] Encode(TemplateNode node, string text, int max)
             {
-                if (!MacRoman.TryEncode(text, out var bytes)) throw new ArgumentException($"“{node.Label}”: the text is not all Mac OS Roman.");
-                if (bytes.Length > max) throw new ArgumentException($"“{node.Label}”: the text is longer than {max} characters.");
+                if (!MacRoman.TryEncode(text, out var bytes))
+                {
+                    throw new ArgumentException($"“{node.Label}”: the text is not all Mac OS Roman.");
+                }
+
+                if (bytes.Length > max)
+                {
+                    throw new ArgumentException($"“{node.Label}”: the text is longer than {max} characters.");
+                }
+
                 return bytes;
             }
 
             private static byte[] Hex(TemplateNode node, string text)
             {
                 var digits = new string(text.Where(c => !char.IsWhiteSpace(c)).ToArray());
-                if (digits.StartsWith('$')) digits = digits[1..];
+                if (digits.StartsWith('$'))
+                {
+                    digits = digits[1..];
+                }
+
                 try
                 {
-                    if (digits.Length % 2 != 0) throw new FormatException();
+                    if (digits.Length % 2 != 0)
+                    {
+                        throw new FormatException();
+                    }
+
                     return Convert.FromHexString(digits);
                 }
                 catch (FormatException)
@@ -517,93 +683,135 @@ namespace ClassicMac.Resources.Decoders.Templates
                 var type = node.Type;
                 switch (type)
                 {
-                    case "DBYT" or "HBYT": Number(node, text, 1); return;
-                    case "DWRD" or "HWRD": Number(node, text, 2); return;
-                    case "DLNG" or "HLNG": Number(node, text, 4); return;
+                    case "DBYT" or "HBYT":
+                        Number(node, text, 1);
+                        return;
+                    case "DWRD" or "HWRD":
+                        Number(node, text, 2);
+                        return;
+                    case "DLNG" or "HLNG":
+                        Number(node, text, 4);
+                        return;
                     case "CHAR":
-                    {
-                        var b = Encode(node, text, 1);
-                        Output.WriteByte(b.Length == 0 ? (byte)0 : b[0]);
-                        return;
-                    }
+                        {
+                            var b = Encode(node, text, 1);
+                            Output.WriteByte(b.Length == 0 ? (byte)0 : b[0]);
+                            return;
+                        }
                     case "TNAM":
-                    {
-                        var b = Encode(node, text, 4);
-                        Output.WriteBytes(b);
-                        for (int i = b.Length; i < 4; i++) Output.WriteByte((byte)' ');
+                        {
+                            var b = Encode(node, text, 4);
+                            Output.WriteBytes(b);
+                            for (int i = b.Length; i < 4; i++)
+                            {
+                                Output.WriteByte((byte)' ');
+                            }
+
+                            return;
+                        }
+                    case "BOOL":
+                        Output.WriteBytes(Flag(node, text) ? new byte[] { 1, 0 } : new byte[2]);
                         return;
-                    }
-                    case "BOOL": Output.WriteBytes(Flag(node, text) ? new byte[] { 1, 0 } : new byte[2]); return;
                     case "BBIT":
                         bits = (bits << 1) | (Flag(node, text) ? 1 : 0);
-                        if (++bitCount == 8) Flush();
+                        if (++bitCount == 8)
+                        {
+                            Flush();
+                        }
+
                         return;
                     case "RECT":
-                    {
-                        var parts = text.Split(',');
-                        if (parts.Length != 4) throw new ArgumentException($"“{node.Label}”: a rectangle is four numbers: top, left, bottom, right.");
-                        foreach (var part in parts) Number(node, part, 2);
-                        return;
-                    }
+                        {
+                            var parts = text.Split(',');
+                            if (parts.Length != 4)
+                            {
+                                throw new ArgumentException($"“{node.Label}”: a rectangle is four numbers: top, left, bottom, right.");
+                            }
+
+                            foreach (var part in parts)
+                            {
+                                Number(node, part, 2);
+                            }
+
+                            return;
+                        }
                     case "PSTR" or "ESTR" or "OSTR":
-                    {
-                        var b = Encode(node, text, 255);
-                        Output.WriteByte(b.Length);
-                        Output.WriteBytes(b);
-                        if (type == "ESTR" && b.Length % 2 == 0 || type == "OSTR" && b.Length % 2 == 1) Output.WriteByte(0);
-                        return;
-                    }
+                        {
+                            var b = Encode(node, text, 255);
+                            Output.WriteByte(b.Length);
+                            Output.WriteBytes(b);
+                            if (type == "ESTR" && b.Length % 2 == 0 || type == "OSTR" && b.Length % 2 == 1)
+                            {
+                                Output.WriteByte(0);
+                            }
+
+                            return;
+                        }
                     case "WSTR":
-                    {
-                        var b = Encode(node, text, 0xFFFF);
-                        Output.WriteUInt16(b.Length);
-                        Output.WriteBytes(b);
-                        return;
-                    }
+                        {
+                            var b = Encode(node, text, 0xFFFF);
+                            Output.WriteUInt16(b.Length);
+                            Output.WriteBytes(b);
+                            return;
+                        }
                     case "LSTR":
-                    {
-                        var b = Encode(node, text, int.MaxValue);
-                        Output.WriteUInt32(b.Length);
-                        Output.WriteBytes(b);
-                        return;
-                    }
+                        {
+                            var b = Encode(node, text, int.MaxValue);
+                            Output.WriteUInt32(b.Length);
+                            Output.WriteBytes(b);
+                            return;
+                        }
                     case "CSTR" or "ECST" or "OCST":
-                    {
-                        var b = Encode(node, text, int.MaxValue);
-                        if (Array.IndexOf(b, (byte)0) >= 0) throw new ArgumentException($"“{node.Label}”: a C string cannot hold a NUL.");
-                        Output.WriteBytes(b);
-                        Output.WriteByte(0);
-                        if (type == "ECST" && b.Length % 2 == 0 || type == "OCST" && b.Length % 2 == 1) Output.WriteByte(0);
+                        {
+                            var b = Encode(node, text, int.MaxValue);
+                            if (Array.IndexOf(b, (byte)0) >= 0)
+                            {
+                                throw new ArgumentException($"“{node.Label}”: a C string cannot hold a NUL.");
+                            }
+
+                            Output.WriteBytes(b);
+                            Output.WriteByte(0);
+                            if (type == "ECST" && b.Length % 2 == 0 || type == "OCST" && b.Length % 2 == 1)
+                            {
+                                Output.WriteByte(0);
+                            }
+
+                            return;
+                        }
+                    case "HEXD":
+                        Output.WriteBytes(Hex(node, text));
                         return;
-                    }
-                    case "HEXD": Output.WriteBytes(Hex(node, text)); return;
                 }
                 int size = SizeOf(type);
                 switch (type[0])
                 {
                     case 'H':
-                    {
-                        var b = Hex(node, text);
-                        if (b.Length > size) throw new ArgumentException($"“{node.Label}”: more than {size} bytes.");
-                        Output.WriteBytes(b);
-                        Output.WriteZeros(size - b.Length);
-                        return;
-                    }
+                        {
+                            var b = Hex(node, text);
+                            if (b.Length > size)
+                            {
+                                throw new ArgumentException($"“{node.Label}”: more than {size} bytes.");
+                            }
+
+                            Output.WriteBytes(b);
+                            Output.WriteZeros(size - b.Length);
+                            return;
+                        }
                     case 'C':
-                    {
-                        var b = Encode(node, text, Math.Max(0, size - 1));
-                        Output.WriteBytes(b);
-                        Output.WriteZeros(size - b.Length);
-                        return;
-                    }
+                        {
+                            var b = Encode(node, text, Math.Max(0, size - 1));
+                            Output.WriteBytes(b);
+                            Output.WriteZeros(size - b.Length);
+                            return;
+                        }
                     default:
-                    {
-                        var b = Encode(node, text, Math.Min(size, 255));
-                        Output.WriteByte(b.Length);
-                        Output.WriteBytes(b);
-                        Output.WriteZeros(size - b.Length);
-                        return;
-                    }
+                        {
+                            var b = Encode(node, text, Math.Min(size, 255));
+                            Output.WriteByte(b.Length);
+                            Output.WriteBytes(b);
+                            Output.WriteZeros(size - b.Length);
+                            return;
+                        }
                 }
             }
 

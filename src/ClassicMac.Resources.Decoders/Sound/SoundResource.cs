@@ -132,7 +132,11 @@ namespace ClassicMac.Resources.Decoders.Sound
             ArgumentNullException.ThrowIfNull(diagnostics);
             var data = resource.Span;
             void Report(DiagnosticSeverity severity, string code, string message) => diagnostics.Add(new Diagnostic(severity, code, $"{source}: {message}"));
-            if (data.Length < 4) return null;
+            if (data.Length < 4)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(resource);
             int format = reader.ReadUInt16At(0);
             var synths = new List<SoundSynth>();
@@ -148,7 +152,9 @@ namespace ClassicMac.Resources.Decoders.Sound
                     return null;
                 }
                 for (var i = 0; i < count; i++, at += 6)
+                {
                     synths.Add(new SoundSynth(reader.ReadUInt16At(at), reader.ReadUInt32At(at + 2)));
+                }
             }
             else if (format == 2)
             {
@@ -184,7 +190,10 @@ namespace ClassicMac.Resources.Decoders.Sound
             // disassembly); Realmz's format 2 sounds point to 20 but play from there.
             var players = commands.FindAll(c => c.DataOffset && c.Code is SoundCommand.BufferCmd or SoundCommand.SoundCmd);
             if (players.Count > 1)
+            {
                 Report(DiagnosticSeverity.Info, "sound.several-sounds", $"{players.Count} commands point to sound headers; the first is decoded.");
+            }
+
             var offset = players.Count > 0 ? players[0].Param2 : -1;
             if (format == 2)
             {
@@ -217,8 +226,14 @@ namespace ClassicMac.Resources.Decoders.Sound
             var encode = h.ReadByte();
             var baseNote = h.ReadByte();
             if (samplePtr != 0)
+            {
                 report(DiagnosticSeverity.Warning, "sound.sample-pointer", $"the header's samplePtr is ${samplePtr:X8}, not 0; the samples after the header are read.");
-            if (rate == 0) report(DiagnosticSeverity.Warning, "sound.no-rate", "the sample rate is 0.");
+            }
+
+            if (rate == 0)
+            {
+                report(DiagnosticSeverity.Warning, "sound.no-rate", "the sample rate is 0.");
+            }
 
             var sound = new SampledSound
             {
@@ -231,93 +246,100 @@ namespace ClassicMac.Resources.Decoders.Sound
             switch (encode)
             {
                 case (byte)SoundHeaderKind.Standard:
-                {
-                    var start = offset + HeaderLength;
-                    return sound with
                     {
-                        Kind = SoundHeaderKind.Standard,
-                        Frames = (int)Math.Min(lengthOrChannels, int.MaxValue),
-                        Format = Raw,
-                        Data = Samples(resource, start, lengthOrChannels, report),
-                    };
-                }
-                case (byte)SoundHeaderKind.Extended or (byte)SoundHeaderKind.Compressed:
-                {
-                    if (offset + LongHeaderLength > data.Length)
-                    {
-                        report(DiagnosticSeverity.Error, "sound.short", "the resource ends inside the sound header.");
-                        return null;
-                    }
-                    // The Sound Manager reads numChannels as the word at +6.
-                    int channels = h.ReadUInt16At(6);
-                    if (channels is 0 or > 64)
-                    {
-                        report(DiagnosticSeverity.Error, "sound.bad-header", $"the header gives {channels} channels.");
-                        return null;
-                    }
-                    var frames = (int)Math.Min(h.ReadUInt32At(22), int.MaxValue);
-                    var start = offset + LongHeaderLength;
-                    // sampleSize: at +48 in an extended header (after the AIFF fields), at +62 in a compressed one.
-                    int sampleSize = h.ReadUInt16At(encode == (byte)SoundHeaderKind.Extended ? 48 : 62);
-                    if (encode == (byte)SoundHeaderKind.Extended)
-                    {
-                        // Extended header: 8-bit samples offset binary as in a standard header, 16-bit two's complement
-                        // big-endian, channels interleaved. The Sound Manager reads every other size as 16-bit, so it
-                        // misreads 24- and 32-bit samples: they are refused here.
-                        if (sampleSize is not (8 or 16))
-                        {
-                            report(DiagnosticSeverity.Error, "sound.bad-header",
-                                $"the header gives {sampleSize}-bit samples, which the Sound Manager reads as 16-bit.");
-                            return null;
-                        }
+                        var start = offset + HeaderLength;
                         return sound with
                         {
-                            Kind = SoundHeaderKind.Extended,
-                            Channels = channels,
-                            Frames = frames,
-                            SampleSize = sampleSize,
-                            Format = sampleSize == 8 ? Raw : Twos,
-                            Data = Samples(resource, start, (long)frames * channels * (sampleSize / 8), report),
+                            Kind = SoundHeaderKind.Standard,
+                            Frames = (int)Math.Min(lengthOrChannels, int.MaxValue),
+                            Format = Raw,
+                            Data = Samples(resource, start, lengthOrChannels, report),
                         };
                     }
-
-                    // Compressed header (Sound Manager 3.5.1): compressionID 0 is PCM whatever format says, 3 and 4 are
-                    // MACE, -1 and -2 leave it to format; it refuses any other (-223). A codec's numFrames counts packets.
-                    var format = h.ReadFourCCAt(40);
-                    var compressionId = h.ReadInt16At(56);
-                    var packetSize = h.ReadUInt16At(58);
-                    switch (compressionId)
+                case (byte)SoundHeaderKind.Extended or (byte)SoundHeaderKind.Compressed:
                     {
-                        case 0: format = sampleSize == 8 ? Raw : Twos; break;
-                        case 3: format = SoundCodecs.Mace3; break;
-                        case 4: format = SoundCodecs.Mace6; break;
-                        case -1 or -2: break;
-                        default:
-                            report(DiagnosticSeverity.Error, "sound.bad-header", $"compressionID {compressionId} is one the Sound Manager refuses.");
+                        if (offset + LongHeaderLength > data.Length)
+                        {
+                            report(DiagnosticSeverity.Error, "sound.short", "the resource ends inside the sound header.");
                             return null;
+                        }
+                        // The Sound Manager reads numChannels as the word at +6.
+                        int channels = h.ReadUInt16At(6);
+                        if (channels is 0 or > 64)
+                        {
+                            report(DiagnosticSeverity.Error, "sound.bad-header", $"the header gives {channels} channels.");
+                            return null;
+                        }
+                        var frames = (int)Math.Min(h.ReadUInt32At(22), int.MaxValue);
+                        var start = offset + LongHeaderLength;
+                        // sampleSize: at +48 in an extended header (after the AIFF fields), at +62 in a compressed one.
+                        int sampleSize = h.ReadUInt16At(encode == (byte)SoundHeaderKind.Extended ? 48 : 62);
+                        if (encode == (byte)SoundHeaderKind.Extended)
+                        {
+                            // Extended header: 8-bit samples offset binary as in a standard header, 16-bit two's complement
+                            // big-endian, channels interleaved. The Sound Manager reads every other size as 16-bit, so it
+                            // misreads 24- and 32-bit samples: they are refused here.
+                            if (sampleSize is not (8 or 16))
+                            {
+                                report(DiagnosticSeverity.Error, "sound.bad-header",
+                                    $"the header gives {sampleSize}-bit samples, which the Sound Manager reads as 16-bit.");
+                                return null;
+                            }
+                            return sound with
+                            {
+                                Kind = SoundHeaderKind.Extended,
+                                Channels = channels,
+                                Frames = frames,
+                                SampleSize = sampleSize,
+                                Format = sampleSize == 8 ? Raw : Twos,
+                                Data = Samples(resource, start, (long)frames * channels * (sampleSize / 8), report),
+                            };
+                        }
+
+                        // Compressed header (Sound Manager 3.5.1): compressionID 0 is PCM whatever format says, 3 and 4 are
+                        // MACE, -1 and -2 leave it to format; it refuses any other (-223). A codec's numFrames counts packets.
+                        var format = h.ReadFourCCAt(40);
+                        var compressionId = h.ReadInt16At(56);
+                        var packetSize = h.ReadUInt16At(58);
+                        switch (compressionId)
+                        {
+                            case 0:
+                                format = sampleSize == 8 ? Raw : Twos;
+                                break;
+                            case 3:
+                                format = SoundCodecs.Mace3;
+                                break;
+                            case 4:
+                                format = SoundCodecs.Mace6;
+                                break;
+                            case -1 or -2:
+                                break;
+                            default:
+                                report(DiagnosticSeverity.Error, "sound.bad-header", $"compressionID {compressionId} is one the Sound Manager refuses.");
+                                return null;
+                        }
+                        if ((format == Raw || format == Twos) && sampleSize is not (8 or 16))
+                        {
+                            report(DiagnosticSeverity.Error, "sound.bad-header",
+                                $"the header gives {sampleSize}-bit '{format}' samples, which the Sound Manager reads as 16-bit.");
+                            return null;
+                        }
+                        var pcm = Pcm.BytesPerSample(format, sampleSize);
+                        var packet = SoundCodecs.Packet(format);
+                        return sound with
+                        {
+                            Kind = SoundHeaderKind.Compressed,
+                            Channels = channels,
+                            Frames = frames,
+                            SampleSize = pcm > 0 ? pcm * 8 : SoundCodecs.OutputSize(format),
+                            Format = format,
+                            CompressionId = compressionId,
+                            PacketSize = packetSize,
+                            Data = pcm > 0 ? Samples(resource, start, (long)frames * channels * pcm, report)
+                                : packet is { } p ? Samples(resource, start, (long)frames * channels * p.Bytes, report)
+                                : resource[Math.Min(start, resource.Length)..],
+                        };
                     }
-                    if ((format == Raw || format == Twos) && sampleSize is not (8 or 16))
-                    {
-                        report(DiagnosticSeverity.Error, "sound.bad-header",
-                            $"the header gives {sampleSize}-bit '{format}' samples, which the Sound Manager reads as 16-bit.");
-                        return null;
-                    }
-                    var pcm = Pcm.BytesPerSample(format, sampleSize);
-                    var packet = SoundCodecs.Packet(format);
-                    return sound with
-                    {
-                        Kind = SoundHeaderKind.Compressed,
-                        Channels = channels,
-                        Frames = frames,
-                        SampleSize = pcm > 0 ? pcm * 8 : SoundCodecs.OutputSize(format),
-                        Format = format,
-                        CompressionId = compressionId,
-                        PacketSize = packetSize,
-                        Data = pcm > 0 ? Samples(resource, start, (long)frames * channels * pcm, report)
-                            : packet is { } p ? Samples(resource, start, (long)frames * channels * p.Bytes, report)
-                            : resource[Math.Min(start, resource.Length)..],
-                    };
-                }
                 default:
                     report(DiagnosticSeverity.Error, "sound.bad-header", $"the header's encode byte is ${encode:X2}, not a sampled sound header.");
                     return null;

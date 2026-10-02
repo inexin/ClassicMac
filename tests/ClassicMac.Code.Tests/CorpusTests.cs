@@ -17,16 +17,29 @@ public class CorpusTests
         var diagnostics = new List<Diagnostic>();
         var pef = PefContainer.Read(data, diagnostics);
         for (int i = 0; i < pef.Sections.Count; i++)
+        {
             if (pef.Sections[i].IsInstantiable)
+            {
                 Assert.Equal(pef.Sections[i].TotalLength, (uint)pef.GetImage(i, diagnostics).Length);
+            }
+        }
+
         var addresses = pef.Sections.Select((_, i) => 0x10000000u * (uint)(i + 1)).ToList();
         var instance = pef.Instantiate(addresses, i => 0xF0000000u + 4u * (uint)i, diagnostics);
         Assert.True(diagnostics.Count == 0, $"{what}: {string.Join("; ", diagnostics.Select(d => d.Code + " " + d.Message))}");
         foreach (var fixup in instance.Fixups)
+        {
             Assert.InRange(fixup.Offset, 0, pef.Sections[fixup.Section].TotalLength - 4);
+        }
+
         if (pef.Loader is { } loader)
+        {
             foreach (var export in loader.Exports)
+            {
                 Assert.Same(export, loader.FindExport(export.Name));
+            }
+        }
+
         return pef;
     }
 
@@ -52,7 +65,10 @@ public class CorpusTests
         Assert.Equal(4, loader.Exports.Count(e => !e.IsReexport && e.Class == PefSymbolClass.Data));
         Assert.Equal(26, loader.Exports.Count(e => e.IsReexport));
         foreach (var reexport in loader.Exports.Where(e => e.IsReexport))
+        {
             Assert.Equal(reexport.Name, loader.ReexportedImport(reexport)!.Name);
+        }
+
         Assert.Equal(5, loader.ExportHashTablePower);
         Assert.Null(loader.Main);
         Assert.Equal(new PefEntryPoint(1, 0x1470), loader.Init);
@@ -62,7 +78,9 @@ public class CorpusTests
         var init = pef.GetTransitionVector(loader.Init, [])!.Value;
         Assert.Equal((0, 1), (init.CodeSection, init.TocSection));
         foreach (var export in loader.Exports.Where(e => e.Class == PefSymbolClass.TVector && !e.IsReexport))
+        {
             Assert.Equal(0, pef.GetTransitionVector(export.SectionIndex, export.Value, [])!.Value.CodeSection);
+        }
     }
 
     [Fact]
@@ -119,12 +137,20 @@ public class CorpusTests
     [Fact]
     public void Every_Mac_OS_9_2_2_fragment_verifies_and_matches_its_facts()
     {
-        if (CodeCorpus.Roots.Count == 0) Assert.Skip("Set CLASSICMAC_CODE_CORPUS to run this.");
+        if (CodeCorpus.Roots.Count == 0)
+        {
+            Assert.Skip("Set CLASSICMAC_CODE_CORPUS to run this.");
+        }
+
         int checkedCount = 0;
         foreach (var facts in FragmentFacts.MacOS922)
         {
             var path = CodeCorpus.Find(facts.Name, facts.Length);
-            if (path is null) continue;
+            if (path is null)
+            {
+                continue;
+            }
+
             var pef = Verify(File.ReadAllBytes(path), facts.Name);
             var loader = pef.Loader!;
             Assert.Equal(facts.Imports, loader.ImportedSymbols.Count);
@@ -139,18 +165,32 @@ public class CorpusTests
             Assert.Equal(facts.RelocationOps, OpString(pef));
             checkedCount++;
         }
-        if (checkedCount == 0) Assert.Skip("No Mac OS 9.2.2 fragment is in the code corpus.");
+        if (checkedCount == 0)
+        {
+            Assert.Skip("No Mac OS 9.2.2 fragment is in the code corpus.");
+        }
+
         Assert.Equal(FragmentFacts.MacOS922.Length, checkedCount);
     }
 
     [Fact]
     public void Every_corpus_PEF_verifies()
     {
-        if (CodeCorpus.Roots.Count == 0) Assert.Skip("Set CLASSICMAC_CODE_CORPUS to run this.");
+        if (CodeCorpus.Roots.Count == 0)
+        {
+            Assert.Skip("Set CLASSICMAC_CODE_CORPUS to run this.");
+        }
+
         var files = CodeCorpus.Files("*.pef").ToList();
-        if (files.Count == 0) Assert.Skip("No .pef file is in the code corpus.");
+        if (files.Count == 0)
+        {
+            Assert.Skip("No .pef file is in the code corpus.");
+        }
+
         foreach (var file in files)
+        {
             Verify(File.ReadAllBytes(file), file);
+        }
     }
 
     // The 'cfrg' resources of the Mac OS 9 System file: resource ID, members, extensions.
@@ -181,7 +221,10 @@ public class CorpusTests
                 Assert.Equal(CfrgUsage.ImportLibrary, member.Usage);
                 Assert.Equal(FourCC.FromString("pwpc"), member.Architecture);
                 foreach (var extension in member.Extensions.Where(e => e.Kind == CfrgExtension.SearchKind))
+                {
                     Assert.NotNull(member.Search);
+                }
+
                 Assert.True(PefContainer.IsPef(dataFork.AsSpan((int)member.Offset)), $"{member.Name} at 0x{member.Offset:X}");
                 int length = member.Length == 0 ? dataFork.Length - (int)member.Offset : (int)member.Length;
                 var pef = Verify(dataFork.AsMemory((int)member.Offset, length), member.Name);
@@ -196,28 +239,120 @@ public class CorpusTests
     // 'fovr', 'vdig', 'cdek', 'sfvr', …): ID, and fixups counted by an independent reader.
     private static readonly Dictionary<string, int> SystemNativeResources = new()
     {
-        ["cdek -19131"] = 241, ["cdek -20565"] = 88, ["cdek -20676"] = 61, ["cdek -21003"] = 78, ["dcod -20221"] = 26,
-        ["fovr -16400"] = 187, ["fovr -16404"] = 106, ["fovr -20157"] = 664, ["fovr -20186"] = 125, ["fovr 10"] = 33,
-        ["fovr 35"] = 172, ["fovr 50"] = 996, ["fovr 51"] = 84, ["fovr 6"] = 1797, ["hqda 1"] = 68, ["ncmp 0"] = 11,
-        ["ncmp 2"] = 4, ["ncod 2"] = 5, ["ncod 3"] = 494, ["ndmc -20034"] = 18, ["ndrv -16511"] = 88, ["ndrv -16800"] = 52,
-        ["ndrv -20156"] = 468, ["ndrv -20164"] = 312, ["ndrv -20192"] = 3, ["ndrv -20193"] = 3, ["ndrv -20194"] = 3,
-        ["ndrv -20195"] = 3, ["ndrv -20413"] = 244, ["ndrv -20535"] = 43, ["ndrv -20921"] = 42, ["ndrv -20963"] = 50,
-        ["ndrv 100"] = 372, ["ndrv 101"] = 407, ["ndrv 103"] = 251, ["ndrv 505"] = 58, ["ndrv 99"] = 283,
-        ["nift -16557"] = 32, ["nift -16558"] = 32, ["nift -16559"] = 31, ["nift -16561"] = 45, ["nift -16566"] = 32,
-        ["nift -16589"] = 31, ["nift -16593"] = 31, ["nift -16594"] = 32, ["nift -16595"] = 33, ["nift -16597"] = 32,
-        ["nift -20027"] = 30, ["nift -20489"] = 121, ["nift -20490"] = 131, ["nift -20493"] = 1862, ["nitt 43"] = 743,
-        ["nitt 44"] = 145, ["nlib -16399"] = 54, ["nlib -16402"] = 176, ["nlib -16403"] = 39, ["nlib -16410"] = 23,
-        ["nlib -16412"] = 55, ["nlib -16415"] = 157, ["nlib -16417"] = 206, ["nlib -16420"] = 94, ["nlib -20216"] = 62,
-        ["nlib -20264"] = 33, ["nlib -20536"] = 174, ["nlib -20537"] = 279, ["nlib -20673"] = 493, ["nlib -20696"] = 211,
-        ["nlib -20878"] = 88, ["nlib -20918"] = 171, ["nlib -20919"] = 137, ["nlib -20920"] = 95, ["nlib -20933"] = 215,
-        ["nlib -20960"] = 18, ["nlib -20987"] = 469, ["nlib -20989"] = 109, ["nlib -20990"] = 194, ["nlib -21145"] = 148,
-        ["nlib 11"] = 171, ["nlib 198"] = 175, ["nlib 666"] = 140, ["nlib 8"] = 0, ["nsnd -16500"] = 67,
-        ["ntrb -16389"] = 20, ["ntrb -16391"] = 137, ["ntrb -16398"] = 72, ["ntrb -16400"] = 37, ["ntrb -20414"] = 56,
-        ["ntrb -20931"] = 10, ["ntrb -20987"] = 24, ["ntrb 11"] = 214, ["ntrb 12"] = 37, ["ntrb 15"] = 92, ["ntrb 17"] = 64,
-        ["ntrb 18"] = 32, ["ntrb 19"] = 85, ["ntrb 198"] = 19, ["ntrb 33"] = 80, ["ntrb 42"] = 55, ["ppct 1"] = 47,
-        ["pthg -16501"] = 9, ["qtcm -19071"] = 47, ["scal -20223"] = 108, ["sfvr -16401"] = 319, ["sfvr 0"] = 433,
-        ["sfvr 1"] = 619, ["sfvr 8"] = 66, ["vdig -16732"] = 109, ["vdig -20152"] = 119, ["vdig -20153"] = 184,
-        ["vdig -20219"] = 538, ["vdig -20445"] = 544, ["vdig -20549"] = 575, ["vdig -20754"] = 930, ["vdig -20929"] = 547,
+        ["cdek -19131"] = 241,
+        ["cdek -20565"] = 88,
+        ["cdek -20676"] = 61,
+        ["cdek -21003"] = 78,
+        ["dcod -20221"] = 26,
+        ["fovr -16400"] = 187,
+        ["fovr -16404"] = 106,
+        ["fovr -20157"] = 664,
+        ["fovr -20186"] = 125,
+        ["fovr 10"] = 33,
+        ["fovr 35"] = 172,
+        ["fovr 50"] = 996,
+        ["fovr 51"] = 84,
+        ["fovr 6"] = 1797,
+        ["hqda 1"] = 68,
+        ["ncmp 0"] = 11,
+        ["ncmp 2"] = 4,
+        ["ncod 2"] = 5,
+        ["ncod 3"] = 494,
+        ["ndmc -20034"] = 18,
+        ["ndrv -16511"] = 88,
+        ["ndrv -16800"] = 52,
+        ["ndrv -20156"] = 468,
+        ["ndrv -20164"] = 312,
+        ["ndrv -20192"] = 3,
+        ["ndrv -20193"] = 3,
+        ["ndrv -20194"] = 3,
+        ["ndrv -20195"] = 3,
+        ["ndrv -20413"] = 244,
+        ["ndrv -20535"] = 43,
+        ["ndrv -20921"] = 42,
+        ["ndrv -20963"] = 50,
+        ["ndrv 100"] = 372,
+        ["ndrv 101"] = 407,
+        ["ndrv 103"] = 251,
+        ["ndrv 505"] = 58,
+        ["ndrv 99"] = 283,
+        ["nift -16557"] = 32,
+        ["nift -16558"] = 32,
+        ["nift -16559"] = 31,
+        ["nift -16561"] = 45,
+        ["nift -16566"] = 32,
+        ["nift -16589"] = 31,
+        ["nift -16593"] = 31,
+        ["nift -16594"] = 32,
+        ["nift -16595"] = 33,
+        ["nift -16597"] = 32,
+        ["nift -20027"] = 30,
+        ["nift -20489"] = 121,
+        ["nift -20490"] = 131,
+        ["nift -20493"] = 1862,
+        ["nitt 43"] = 743,
+        ["nitt 44"] = 145,
+        ["nlib -16399"] = 54,
+        ["nlib -16402"] = 176,
+        ["nlib -16403"] = 39,
+        ["nlib -16410"] = 23,
+        ["nlib -16412"] = 55,
+        ["nlib -16415"] = 157,
+        ["nlib -16417"] = 206,
+        ["nlib -16420"] = 94,
+        ["nlib -20216"] = 62,
+        ["nlib -20264"] = 33,
+        ["nlib -20536"] = 174,
+        ["nlib -20537"] = 279,
+        ["nlib -20673"] = 493,
+        ["nlib -20696"] = 211,
+        ["nlib -20878"] = 88,
+        ["nlib -20918"] = 171,
+        ["nlib -20919"] = 137,
+        ["nlib -20920"] = 95,
+        ["nlib -20933"] = 215,
+        ["nlib -20960"] = 18,
+        ["nlib -20987"] = 469,
+        ["nlib -20989"] = 109,
+        ["nlib -20990"] = 194,
+        ["nlib -21145"] = 148,
+        ["nlib 11"] = 171,
+        ["nlib 198"] = 175,
+        ["nlib 666"] = 140,
+        ["nlib 8"] = 0,
+        ["nsnd -16500"] = 67,
+        ["ntrb -16389"] = 20,
+        ["ntrb -16391"] = 137,
+        ["ntrb -16398"] = 72,
+        ["ntrb -16400"] = 37,
+        ["ntrb -20414"] = 56,
+        ["ntrb -20931"] = 10,
+        ["ntrb -20987"] = 24,
+        ["ntrb 11"] = 214,
+        ["ntrb 12"] = 37,
+        ["ntrb 15"] = 92,
+        ["ntrb 17"] = 64,
+        ["ntrb 18"] = 32,
+        ["ntrb 19"] = 85,
+        ["ntrb 198"] = 19,
+        ["ntrb 33"] = 80,
+        ["ntrb 42"] = 55,
+        ["ppct 1"] = 47,
+        ["pthg -16501"] = 9,
+        ["qtcm -19071"] = 47,
+        ["scal -20223"] = 108,
+        ["sfvr -16401"] = 319,
+        ["sfvr 0"] = 433,
+        ["sfvr 1"] = 619,
+        ["sfvr 8"] = 66,
+        ["vdig -16732"] = 109,
+        ["vdig -20152"] = 119,
+        ["vdig -20153"] = 184,
+        ["vdig -20219"] = 538,
+        ["vdig -20445"] = 544,
+        ["vdig -20549"] = 575,
+        ["vdig -20754"] = 930,
+        ["vdig -20929"] = 547,
     };
 
     private static IEnumerable<(string Name, ReadOnlyMemory<byte> Data)> SystemNativePefs(ResourceFork fork) =>
@@ -229,7 +364,10 @@ public class CorpusTests
         var fork = ResourceFork.Read(CodeCorpus.Require("MacOS9_System.rsrc", 8021864));
         var found = new Dictionary<string, int>();
         foreach (var (name, data) in SystemNativePefs(fork))
+        {
             found[name] = Verify(data, name).GetFixups([]).Count;
+        }
+
         Assert.Equal(SystemNativeResources.OrderBy(kv => kv.Key, StringComparer.Ordinal), found.OrderBy(kv => kv.Key, StringComparer.Ordinal));
         Assert.Equal(114, found.Count);
         Assert.Equal(21784, found.Values.Sum());
@@ -271,19 +409,36 @@ public class CorpusTests
     [Fact]
     public void All_288_sample_containers_make_117236_fixups()
     {
-        if (CodeCorpus.Roots.Count == 0) Assert.Skip("Set CLASSICMAC_CODE_CORPUS to run this.");
+        if (CodeCorpus.Roots.Count == 0)
+        {
+            Assert.Skip("Set CLASSICMAC_CODE_CORPUS to run this.");
+        }
+
         var containers = new List<ReadOnlyMemory<byte>>();
         foreach (var facts in FragmentFacts.MacOS922)
+        {
             containers.Add(CodeCorpus.Require(facts.Name, facts.Length));
+        }
+
         foreach (var (name, length) in new[] { ("NQD.pef", 272110L), ("NQD_altbuild.pef", 275574L), ("FontManager.pef", 196388L), ("DC612.pef", 288984L), ("DC65.pef", 907621L) })
+        {
             containers.Add(CodeCorpus.Require(name, length));
+        }
+
         var fork = ResourceFork.Read(CodeCorpus.Require("MacOS9_System.rsrc", 8021864));
         var dataFork = CodeCorpus.Require("MacOS9_System_datafork.bin", 6284692);
         var offsets = new HashSet<uint>();
         foreach (var resource in fork.Resources.Where(r => r.Type == CfrgType))
+        {
             foreach (var member in Cfrg.Read(resource.GetData(), []).Members)
+            {
                 if (offsets.Add(member.Offset))
+                {
                     containers.Add(dataFork.AsMemory((int)member.Offset, member.Length == 0 ? dataFork.Length - (int)member.Offset : (int)member.Length));
+                }
+            }
+        }
+
         containers.AddRange(SystemNativePefs(fork).Select(p => p.Data));
         Assert.Equal(288, containers.Count);
         Assert.Equal(117236, containers.Sum(c => Verify(c, "sample").GetFixups([]).Count));

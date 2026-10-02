@@ -14,9 +14,16 @@ internal static class CompactProLzhDecoder
 
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
-        if (outputLength < 0) throw new ArgumentOutOfRangeException(nameof(outputLength));
+        if (outputLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(outputLength));
+        }
+
         var output = new RleOutput(outputLength);
-        if (outputLength == 0) return output.Result;
+        if (outputLength == 0)
+        {
+            return output.Result;
+        }
 
         var bits = new MsbBitReader(input);
         var window = new byte[WindowSize];
@@ -47,7 +54,11 @@ internal static class CompactProLzhDecoder
                 int upperDisplacement = displacements.ReadSymbol(ref bits);
                 int lowerDisplacement = bits.ReadBits(6);
                 int distance = (upperDisplacement << 6) | lowerDisplacement;
-                if (distance == 0) distance = WindowSize;
+                if (distance == 0)
+                {
+                    distance = WindowSize;
+                }
+
                 blockSize = checked(blockSize + 3);
                 for (int index = 0; index < length && !output.IsComplete; index++)
                 {
@@ -60,7 +71,9 @@ internal static class CompactProLzhDecoder
             }
 
             if (!output.IsComplete)
+            {
                 bits.SkipBlockPadding();
+            }
         }
 
         return output.Result;
@@ -70,14 +83,19 @@ internal static class CompactProLzhDecoder
     {
         int symbolCount = bits.ReadBits(8) * 2;
         if (symbolCount > maximumSymbols)
+        {
             throw new InvalidDataException("A Compact Pro LZH code tree describes too many symbols.");
+        }
 
         var codeLengths = new byte[maximumSymbols];
         for (int symbol = 0; symbol < symbolCount; symbol++)
         {
             int length = bits.ReadBits(4);
             if (length > 15)
+            {
                 throw new InvalidDataException("A Compact Pro LZH code length is invalid.");
+            }
+
             codeLengths[symbol] = (byte)length;
         }
         return HuffmanTree.Create(codeLengths);
@@ -110,9 +128,15 @@ internal static class CompactProLzhDecoder
                 {
                     int repeatCount = value - 1;
                     if (repeatCount > 0 && !hasPrevious)
+                    {
                         throw new InvalidDataException("A Compact Pro RLE run has no preceding byte.");
+                    }
+
                     if (repeatCount > result.Length - written)
+                    {
                         throw new InvalidDataException("Compact Pro RLE output exceeds its declared fork length.");
+                    }
+
                     result.AsSpan(written, repeatCount).Fill(previous);
                     written += repeatCount;
                 }
@@ -129,20 +153,31 @@ internal static class CompactProLzhDecoder
                 }
 
                 Emit(0x81);
-                if (!IsComplete) Write(value);
+                if (!IsComplete)
+                {
+                    Write(value);
+                }
+
                 return;
             }
 
             if (value == 0x81)
+            {
                 escapePending = true;
+            }
             else
+            {
                 Emit(value);
+            }
         }
 
         private void Emit(byte value)
         {
             if (written == result.Length)
+            {
                 throw new InvalidDataException("Compact Pro RLE output exceeds its declared fork length.");
+            }
+
             result[written++] = previous = value;
             hasPrevious = true;
         }
@@ -159,14 +194,21 @@ internal static class CompactProLzhDecoder
             Span<int> counts = stackalloc int[16];
             counts.Clear();
             foreach (byte length in codeLengths)
-                if (length != 0) counts[length]++;
+            {
+                if (length != 0)
+                {
+                    counts[length]++;
+                }
+            }
 
             int remaining = 1;
             for (int length = 1; length <= 15; length++)
             {
                 remaining = (remaining << 1) - counts[length];
                 if (remaining < 0)
+                {
                     throw new InvalidDataException("A Compact Pro LZH code tree is oversubscribed.");
+                }
             }
 
             var nextCode = new int[16];
@@ -181,25 +223,43 @@ internal static class CompactProLzhDecoder
             for (int symbol = 0; symbol < codeLengths.Length; symbol++)
             {
                 int length = codeLengths[symbol];
-                if (length == 0) continue;
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 int symbolCode = nextCode[length]++;
                 if (symbolCode >= 1 << length)
+                {
                     throw new InvalidDataException("A Compact Pro LZH code tree has an invalid canonical code.");
+                }
+
                 root ??= new Node();
                 Node node = root;
                 for (int bit = length - 1; bit >= 0; bit--)
                 {
                     if (node.Symbol >= 0)
+                    {
                         throw new InvalidDataException("A Compact Pro LZH code is a prefix of another code.");
+                    }
+
                     bool one = ((symbolCode >> bit) & 1) != 0;
                     if (one)
+                    {
                         node.One ??= new Node();
+                    }
                     else
+                    {
                         node.Zero ??= new Node();
+                    }
+
                     node = (one ? node.One : node.Zero)!;
                 }
                 if (node.Symbol >= 0 || node.Zero is not null || node.One is not null)
+                {
                     throw new InvalidDataException("A Compact Pro LZH code tree contains duplicate or prefix codes.");
+                }
+
                 node.Symbol = symbol;
             }
             return new HuffmanTree(root);
@@ -208,13 +268,19 @@ internal static class CompactProLzhDecoder
         public int ReadSymbol(ref MsbBitReader bits)
         {
             Node? node = root;
-            if (node is null) throw new InvalidDataException("A Compact Pro LZH stream uses an empty code tree.");
+            if (node is null)
+            {
+                throw new InvalidDataException("A Compact Pro LZH stream uses an empty code tree.");
+            }
+
             while (node.Symbol < 0)
             {
                 bool one = bits.ReadBit();
                 node = one ? node.One : node.Zero;
                 if (node is null)
+                {
                     throw new InvalidDataException("A Compact Pro LZH stream follows an undefined Huffman code.");
+                }
             }
             return node.Symbol;
         }
@@ -235,7 +301,10 @@ internal static class CompactProLzhDecoder
         public bool ReadBit()
         {
             if (bitPosition >= input.Length * 8)
+            {
                 throw new InvalidDataException("A Compact Pro LZH stream ends inside a code tree or token.");
+            }
+
             bool value = (input[bitPosition >> 3] & (0x80 >> (bitPosition & 7))) != 0;
             bitPosition++;
             return value;
@@ -244,7 +313,11 @@ internal static class CompactProLzhDecoder
         public int ReadBits(int count)
         {
             int value = 0;
-            for (int bit = 0; bit < count; bit++) value = (value << 1) | (ReadBit() ? 1 : 0);
+            for (int bit = 0; bit < count; bit++)
+            {
+                value = (value << 1) | (ReadBit() ? 1 : 0);
+            }
+
             return value;
         }
 
@@ -253,7 +326,10 @@ internal static class CompactProLzhDecoder
             int bytePosition = (bitPosition + 7) >> 3;
             bytePosition = checked(bytePosition + 2 + ((bytePosition & 1) == 0 ? 0 : 1));
             if (bytePosition > input.Length)
+            {
                 throw new InvalidDataException("A Compact Pro LZH block ends before its alignment padding.");
+            }
+
             bitPosition = bytePosition << 3;
         }
     }

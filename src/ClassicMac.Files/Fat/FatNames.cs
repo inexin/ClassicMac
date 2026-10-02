@@ -20,8 +20,15 @@ namespace ClassicMac.Files.Fat
         {
             var units = longName;
             var roman = MacRoman.TryEncode(units, out var encoded);
-            if (roman && encoded.Length <= MaxName) return new MacString(encoded);
-            if (!roman && units.Length <= MaxName) return new MacString(LowBytes(units));
+            if (roman && encoded.Length <= MaxName)
+            {
+                return new MacString(encoded);
+            }
+
+            if (!roman && units.Length <= MaxName)
+            {
+                return new MacString(LowBytes(units));
+            }
 
             var extension = Extension(units) is { } at ? units[at..] : "";
             var extensionBytes = roman ? MacRoman.Encode(extension) : LowBytes(extension);
@@ -30,7 +37,11 @@ namespace ClassicMac.Files.Fat
             name.AddRange(roman ? MacRoman.Encode(head) : LowBytes(head));
             var crc = Crc(units);
             name.Add((byte)'#');
-            foreach (var shift in new[] { 8, 4, 0 }) name.Add((byte)"0123456789ABCDEF"[crc >> shift & 0xF]);
+            foreach (var shift in new[] { 8, 4, 0 })
+            {
+                name.Add((byte)"0123456789ABCDEF"[crc >> shift & 0xF]);
+            }
+
             name.AddRange(extensionBytes);
             return new MacString(name.ToArray());
         }
@@ -38,7 +49,11 @@ namespace ClassicMac.Files.Fat
         private static byte[] LowBytes(string units)
         {
             var bytes = new byte[units.Length];
-            for (var i = 0; i < units.Length; i++) bytes[i] = units[i] == ':' ? (byte)'_' : (byte)units[i];
+            for (var i = 0; i < units.Length; i++)
+            {
+                bytes[i] = units[i] == ':' ? (byte)'_' : (byte)units[i];
+            }
+
             return bytes;
         }
 
@@ -48,7 +63,10 @@ namespace ClassicMac.Files.Fat
             var window = units.Length < 3 ? 0 : units.Length < 7 ? units.Length - 2 : 6;
             for (var i = units.Length - 1; i >= units.Length - window; i--)
             {
-                if (units[i] == '.') return i;
+                if (units[i] == '.')
+                {
+                    return i;
+                }
             }
             return null;
         }
@@ -63,7 +81,11 @@ namespace ClassicMac.Files.Fat
                 foreach (var b in new[] { (byte)(c >> 8), (byte)c })
                 {
                     crc ^= b << 8;
-                    for (var bit = 0; bit < 8; bit++) crc = (crc & 0x8000) != 0 ? (crc << 1) ^ 0x1021 : crc << 1;
+                    for (var bit = 0; bit < 8; bit++)
+                    {
+                        crc = (crc & 0x8000) != 0 ? (crc << 1) ^ 0x1021 : crc << 1;
+                    }
+
                     crc &= 0xFFFF;
                 }
             }

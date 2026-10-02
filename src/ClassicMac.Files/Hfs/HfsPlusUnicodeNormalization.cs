@@ -14,13 +14,25 @@ internal static partial class HfsPlusUnicodeNormalization
             int codePoint = (bigEndianName[offset] << 8) | bigEndianName[offset + 1];
             if (char.IsHighSurrogate((char)codePoint))
             {
-                if (offset + 3 >= bigEndianName.Length) return false;
+                if (offset + 3 >= bigEndianName.Length)
+                {
+                    return false;
+                }
+
                 int lowSurrogate = (bigEndianName[offset + 2] << 8) | bigEndianName[offset + 3];
-                if (!char.IsLowSurrogate((char)lowSurrogate)) return false;
+                if (!char.IsLowSurrogate((char)lowSurrogate))
+                {
+                    return false;
+                }
+
                 codePoint = char.ConvertToUtf32((char)codePoint, (char)lowSurrogate);
                 offset += 2;
             }
-            else if (char.IsLowSurrogate((char)codePoint)) return false;
+            else if (char.IsLowSurrogate((char)codePoint))
+            {
+                return false;
+            }
+
             if (!usePostJaguarFixups && (codePoint is 0x0FB2 or 0x0FB3) && offset + 5 < bigEndianName.Length &&
                 ((bigEndianName[offset + 2] << 8) | bigEndianName[offset + 3]) == 0x0F80 &&
                 ((bigEndianName[offset + 4] << 8) | bigEndianName[offset + 5]) == 0x0F71)
@@ -34,15 +46,23 @@ internal static partial class HfsPlusUnicodeNormalization
             }
             // TN1150 has no normalization-version field, so HFS+ must retain these Unicode 2.1 spellings.
             if (!usePostJaguarFixups && HasLegacyUnicode21Decomposition(codePoint))
+            {
                 decomposed.Add(codePoint);
+            }
             else
+            {
                 AppendDecomposition(codePoint, decomposed);
+            }
         }
 
         for (int index = 1; index < decomposed.Count; index++)
         {
             byte currentClass = CombiningClass(decomposed[index]);
-            if (currentClass == 0) continue;
+            if (currentClass == 0)
+            {
+                continue;
+            }
+
             int position = index;
             while (position > 0)
             {
@@ -50,16 +70,26 @@ internal static partial class HfsPlusUnicodeNormalization
                 if (!usePostJaguarFixups && position >= 2 &&
                     (decomposed[position - 2] is 0x0FB2 or 0x0FB3) &&
                     decomposed[position - 1] == 0x0F80 && decomposed[position] == 0x0F71)
+                {
                     break;
+                }
+
                 byte previousClass = CombiningClass(decomposed[position - 1]);
-                if (previousClass == 0 || previousClass <= currentClass) break;
+                if (previousClass == 0 || previousClass <= currentClass)
+                {
+                    break;
+                }
+
                 (decomposed[position - 1], decomposed[position]) =
                     (decomposed[position], decomposed[position - 1]);
                 position--;
             }
         }
 
-        if (usePostJaguarFixups && HasKnownPostJaguarCorrection(decomposed)) return false;
+        if (usePostJaguarFixups && HasKnownPostJaguarCorrection(decomposed))
+        {
+            return false;
+        }
 
         int inputOffset = 0;
         foreach (int codePoint in decomposed)
@@ -69,7 +99,10 @@ internal static partial class HfsPlusUnicodeNormalization
                 if (inputOffset + 1 >= bigEndianName.Length ||
                     bigEndianName[inputOffset] != (byte)(codePoint >> 8) ||
                     bigEndianName[inputOffset + 1] != (byte)codePoint)
+                {
                     return false;
+                }
+
                 inputOffset += 2;
                 continue;
             }
@@ -82,7 +115,10 @@ internal static partial class HfsPlusUnicodeNormalization
                 bigEndianName[inputOffset + 1] != (byte)highSurrogate ||
                 bigEndianName[inputOffset + 2] != (byte)(lowSurrogate >> 8) ||
                 bigEndianName[inputOffset + 3] != (byte)lowSurrogate)
+            {
                 return false;
+            }
+
             inputOffset += 4;
         }
 
@@ -95,28 +131,40 @@ internal static partial class HfsPlusUnicodeNormalization
         {
             // Apple fsck_hfs's FixDecomps corrects these legacy sequences before comparing names.
             if (codePoints[index] == 0x0306 && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0307)
+            {
                 return true;
+            }
 
             if ((codePoints[index] is 0x00A8 or 0x0308 || IsGreekTonosBase(codePoints[index])) &&
                 index + 1 < codePoints.Count && codePoints[index + 1] == 0x030D)
+            {
                 return true;
+            }
 
             if (codePoints[index] == 0x09AC && index + 1 < codePoints.Count && codePoints[index + 1] == 0x09BC)
+            {
                 return true;
+            }
 
             // Apple fsck_hfs replaces the obsolete Odia YA + NUKTA sequence with U+0B5F.
             if (codePoints[index] == 0x0B2F && index + 1 < codePoints.Count && codePoints[index + 1] == 0x0B3C)
+            {
                 return true;
+            }
 
             if (index + 1 < codePoints.Count &&
                 (codePoints[index] == 0x0A21 && codePoints[index + 1] == 0x0A3C ||
                  codePoints[index] == 0x0E4D && codePoints[index + 1] == 0x0E32 ||
                  codePoints[index] == 0x0ECD && codePoints[index + 1] == 0x0EB2))
+            {
                 return true;
+            }
 
             if (index + 2 < codePoints.Count && (codePoints[index] is 0x0FB2 or 0x0FB3) &&
                 codePoints[index + 1] == 0x0F80 && codePoints[index + 2] == 0x0F71)
+            {
                 return true;
+            }
         }
 
         return false;
@@ -155,7 +203,11 @@ internal static partial class HfsPlusUnicodeNormalization
             output.Add(hangulLBase + hangulIndex / hangulNCount);
             output.Add(hangulVBase + hangulIndex % hangulNCount / hangulTCount);
             int trailingIndex = hangulIndex % hangulTCount;
-            if (trailingIndex != 0) output.Add(hangulTBase + trailingIndex);
+            if (trailingIndex != 0)
+            {
+                output.Add(hangulTBase + trailingIndex);
+            }
+
             return;
         }
 
@@ -164,12 +216,21 @@ internal static partial class HfsPlusUnicodeNormalization
         while (low < high)
         {
             int middle = low + (high - low) / 2;
-            if (DecompositionSources[middle] < codePoint) low = middle + 1;
-            else if (DecompositionSources[middle] > codePoint) high = middle;
+            if (DecompositionSources[middle] < codePoint)
+            {
+                low = middle + 1;
+            }
+            else if (DecompositionSources[middle] > codePoint)
+            {
+                high = middle;
+            }
             else
             {
                 for (int index = DecompositionOffsets[middle]; index < DecompositionOffsets[middle + 1]; index++)
+                {
                     output.Add(DecomposedCodePoints[index]);
+                }
+
                 return;
             }
         }
@@ -186,9 +247,18 @@ internal static partial class HfsPlusUnicodeNormalization
             int middle = low + (high - low) / 2;
             int entry = (int)CombiningClasses[middle];
             int source = entry >> 8;
-            if (source < codePoint) low = middle + 1;
-            else if (source > codePoint) high = middle;
-            else return (byte)entry;
+            if (source < codePoint)
+            {
+                low = middle + 1;
+            }
+            else if (source > codePoint)
+            {
+                high = middle;
+            }
+            else
+            {
+                return (byte)entry;
+            }
         }
 
         return 0;

@@ -56,11 +56,18 @@ namespace ClassicMac.Files.Containers
         public static IReadOnlyList<PcExchangeRecord> ReadFinderData(byte[] data, int clusterSize)
         {
             ArgumentNullException.ThrowIfNull(data);
-            if (clusterSize < RecordLength) throw new ArgumentOutOfRangeException(nameof(clusterSize));
+            if (clusterSize < RecordLength)
+            {
+                throw new ArgumentOutOfRangeException(nameof(clusterSize));
+            }
+
             var records = new List<PcExchangeRecord>();
             foreach (var offset in Offsets(data.Length, clusterSize))
             {
-                if (Used(data, offset)) records.Add(Parse(data.AsMemory(offset, RecordLength)));
+                if (Used(data, offset))
+                {
+                    records.Add(Parse(data.AsMemory(offset, RecordLength)));
+                }
             }
             return records;
         }
@@ -83,7 +90,10 @@ namespace ClassicMac.Files.Containers
         internal static MacFile Apply(MacFile file, PcExchangeRecord? record, MacDate? dosCreated, MacDate? dosModified)
         {
             if (record is null)
+            {
                 return file with { FinderInfo = Placeholder, Created = dosCreated, Modified = dosModified };
+            }
+
             var modified = record.Modified is { } m && (dosModified is null || m.Seconds >= dosModified.Value.Seconds)
                 ? record.Modified
                 : dosModified;
@@ -112,7 +122,11 @@ namespace ClassicMac.Files.Containers
                 }
             }
             var records = new List<PcExchangeRecord>(best.Count);
-            foreach (var offset in best) records.Add(Parse(data.AsMemory(offset, RecordLength)));
+            foreach (var offset in best)
+            {
+                records.Add(Parse(data.AsMemory(offset, RecordLength)));
+            }
+
             return records;
         }
 
@@ -125,8 +139,16 @@ namespace ClassicMac.Files.Containers
             var dot = hostName.LastIndexOf('.');
             var stem = dot < 0 ? hostName : hostName[..dot];
             var extension = dot < 0 ? "" : hostName[(dot + 1)..];
-            if (stem.Length is < 1 or > 8 || extension.Length > 3 || stem.Contains('.')) return null;
-            if (!(stem + extension).All(c => c is > ' ' and < (char)0x7F)) return null;
+            if (stem.Length is < 1 or > 8 || extension.Length > 3 || stem.Contains('.'))
+            {
+                return null;
+            }
+
+            if (!(stem + extension).All(c => c is > ' ' and < (char)0x7F))
+            {
+                return null;
+            }
+
             return (stem.PadRight(8) + extension.PadRight(3)).ToUpperInvariant();
         }
 
@@ -134,7 +156,11 @@ namespace ClassicMac.Files.Containers
         {
             if (cluster == 0)
             {
-                for (var o = 0; o + RecordLength <= length; o += RecordLength) yield return o;
+                for (var o = 0; o + RecordLength <= length; o += RecordLength)
+                {
+                    yield return o;
+                }
+
                 yield break;
             }
             for (var c = 0; c < length; c += cluster)
@@ -142,7 +168,10 @@ namespace ClassicMac.Files.Containers
                 for (var i = 0; i < cluster / RecordLength; i++)
                 {
                     var o = c + i * RecordLength;
-                    if (o + RecordLength <= length) yield return o;
+                    if (o + RecordLength <= length)
+                    {
+                        yield return o;
+                    }
                 }
             }
         }

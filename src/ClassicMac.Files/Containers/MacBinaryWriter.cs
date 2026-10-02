@@ -23,13 +23,23 @@ namespace ClassicMac.Files.Containers
             ArgumentNullException.ThrowIfNull(file);
             ArgumentNullException.ThrowIfNull(output);
             if (file.DataFork.Length > 0x7FFFFF || file.ResourceFork.Length > 0x7FFFFF)
+            {
                 throw new ArgumentException("A fork is over MacBinary's 8 MiB limit.", nameof(file));
+            }
+
             var header = new byte[Block];
             var name = file.Name.Bytes;
             var length = Math.Clamp(name.Length, 1, 63);
             header[1] = (byte)length;
-            if (name.Length > 0) name[..Math.Min(63, name.Length)].CopyTo(header.AsSpan(2));
-            else header[2] = (byte)'?';
+            if (name.Length > 0)
+            {
+                name[..Math.Min(63, name.Length)].CopyTo(header.AsSpan(2));
+            }
+            else
+            {
+                header[2] = (byte)'?';
+            }
+
             var info = file.FinderInfo;
             var writer = new BigEndianWriter(header);
             writer.WriteFourCCAt(65, info.Type);
@@ -63,7 +73,11 @@ namespace ClassicMac.Files.Containers
 
         private static void Fork(ForkData fork, Stream output)
         {
-            using (var stream = fork.Open()) stream.CopyTo(output);
+            using (var stream = fork.Open())
+            {
+                stream.CopyTo(output);
+            }
+
             var pad = (int)((Block - fork.Length % Block) % Block);
             output.Write(new byte[pad]);
         }
@@ -97,8 +111,15 @@ namespace ClassicMac.Files.Containers
             var length = Math.Clamp(name.Length, 1, 63);
             var header = new BigEndianWriter(22 + length);
             header.WriteByte(length);
-            if (name.Length > 0) header.WriteBytes(name[..length]);
-            else header.WriteByte((byte)'?');
+            if (name.Length > 0)
+            {
+                header.WriteBytes(name[..length]);
+            }
+            else
+            {
+                header.WriteByte((byte)'?');
+            }
+
             header.WriteByte(0);
             header.WriteFourCC(file.FinderInfo.Type);
             header.WriteFourCC(file.FinderInfo.Creator);
@@ -144,7 +165,11 @@ namespace ClassicMac.Files.Containers
             {
                 var b = data[i];
                 var run = 1;
-                while (i + run < data.Length && data[i + run] == b && run < 255) run++;
+                while (i + run < data.Length && data[i + run] == b && run < 255)
+                {
+                    run++;
+                }
+
                 if (b == 0x90)
                 {
                     output.WriteByte(0x90);
@@ -183,7 +208,11 @@ namespace ClassicMac.Files.Containers
                     text.Append(Alphabet[(bits >> count) & 0x3F]);
                 }
             }
-            if (count > 0) text.Append(Alphabet[(bits << (6 - count)) & 0x3F]);
+            if (count > 0)
+            {
+                text.Append(Alphabet[(bits << (6 - count)) & 0x3F]);
+            }
+
             return text.ToString();
         }
     }

@@ -18,7 +18,10 @@ public class MacsBugCorpusTests
         foreach (var resource in fork.Resources.Where(r => r.Type == Code))
         {
             if (uncompressedOnly && (resource.Attributes & ResourceAttributes.Compressed) != 0)
+            {
                 continue;
+            }
+
             var data = ResourceDecompression.Default.GetData(resource, fork, null, new List<Diagnostic>());
             names.AddRange(MacsBugNames.Find(data));
         }

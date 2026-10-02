@@ -76,16 +76,26 @@ namespace ClassicMac.Graphics.Fonts
             out ushort[] rawWidthWords)
         {
             rawWidthWords = [];
-            if (offset <= 0 || lastChar == 0 || offset + 2 > reader.Length) return [];
+            if (offset <= 0 || lastChar == 0 || offset + 2 > reader.Length)
+            {
+                return [];
+            }
+
             var count = reader.ReadInt16At(offset) + 1;
             var entries = lastChar - firstChar + 3;
-            if (count <= 0 || entries <= 0) return [];
+            if (count <= 0 || entries <= 0)
+            {
+                return [];
+            }
+
             int firstWidth = offset + 4;
             if (firstWidth < reader.Length)
             {
                 rawWidthWords = new ushort[(reader.Length - firstWidth) / 2];
                 for (int i = 0; i < rawWidthWords.Length; i++)
+                {
                     rawWidthWords[i] = reader.ReadUInt16At(firstWidth + 2 * i);
+                }
             }
             var tables = new List<RawWidthTable>();
             var at = offset + 2;
@@ -168,7 +178,11 @@ namespace ClassicMac.Graphics.Fonts
         public static FontFamily Read(BigEndianReader input, string name, ICollection<Diagnostic>? diagnostics = null)
         {
             var fields = input.ReadSubReader(input.Remaining);
-            if (fields.Length < 54) throw new InvalidDataException($"A font family record needs 54 bytes; this is {fields.Length}.");
+            if (fields.Length < 54)
+            {
+                throw new InvalidDataException($"A font family record needs 54 bytes; this is {fields.Length}.");
+            }
+
             var shortData = false;
             static double Fixed412(int value) => value / 4096.0;
             // Mac OS 9 reads a 4.12 kern below −$2000 as sign and magnitude.
@@ -203,7 +217,10 @@ namespace ClassicMac.Graphics.Fonts
             var entries = lastChar - firstChar + 3;
             if (widthOffset > 0 && lastChar != 0 && entries > 0)
             {
-                if (widthOffset + 2 > fields.Length) shortData = true;
+                if (widthOffset + 2 > fields.Length)
+                {
+                    shortData = true;
+                }
                 else
                 {
                     var tables = fields.ReadInt16At(widthOffset) + 1;
@@ -216,7 +233,11 @@ namespace ClassicMac.Graphics.Fonts
                             break;
                         }
                         var widths = new double[entries];
-                        for (var c = 0; c < entries; c++) widths[c] = Fixed412((ushort)fields.ReadInt16At(at + 2 + 2 * c));
+                        for (var c = 0; c < entries; c++)
+                        {
+                            widths[c] = Fixed412((ushort)fields.ReadInt16At(at + 2 + 2 * c));
+                        }
+
                         widthTables.Add(new FamilyWidthTable((ushort)fields.ReadInt16At(at), widths));
                         at += 2 + 2 * entries;
                     }
@@ -229,7 +250,10 @@ namespace ClassicMac.Graphics.Fonts
             var kernOffset = fields.ReadInt32At(20);
             if (kernOffset > 0)
             {
-                if (kernOffset + 2 > fields.Length) shortData = true;
+                if (kernOffset + 2 > fields.Length)
+                {
+                    shortData = true;
+                }
                 else
                 {
                     var tables = fields.ReadInt16At(kernOffset) + 1;
@@ -255,7 +279,10 @@ namespace ClassicMac.Graphics.Fonts
                             list.Add(new KerningPair(fields.ReadByteAt(at), fields.ReadByteAt(at + 1), Fixed412(SignMagnitude(fields.ReadInt16At(at + 2)))));
                         }
                         kerningTables.Add(new KerningTable(style, list));
-                        if (shortData) break;
+                        if (shortData)
+                        {
+                            break;
+                        }
                     }
                 }
             }
@@ -265,7 +292,10 @@ namespace ClassicMac.Graphics.Fonts
             var styleOffset = fields.ReadInt32At(24);
             if (styleOffset > 0)
             {
-                if (styleOffset + 58 > fields.Length) shortData = true;
+                if (styleOffset + 58 > fields.Length)
+                {
+                    shortData = true;
+                }
                 else
                 {
                     var names = new List<string>();
@@ -337,9 +367,16 @@ namespace ClassicMac.Graphics.Fonts
             }
 
             if (shortData)
+            {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The family record's tables run past its data; read as far as they go."));
+            }
+
             var property = new int[9];
-            for (var i = 0; i < 9; i++) property[i] = (ushort)fields.ReadInt16At(28 + 2 * i);
+            for (var i = 0; i < 9; i++)
+            {
+                property[i] = (ushort)fields.ReadInt16At(28 + 2 * i);
+            }
+
             var rawWidthTables = ReadRawWidthTables(fields, widthOffset, firstChar, lastChar, out var rawWidthWords);
             return new FontFamily
             {
@@ -375,10 +412,17 @@ namespace ClassicMac.Graphics.Fonts
         public static BitmapFont? Strike(FontAssociation font, FontLookup lookup, ICollection<Diagnostic>? diagnostics = null)
         {
             ArgumentNullException.ThrowIfNull(lookup);
-            if (font.Size <= 0) return null;
+            if (font.Size <= 0)
+            {
+                return null;
+            }
             // An empty result counts as none (a null array converts to empty memory, not null).
             var data = lookup(FourCC.FromString("NFNT"), font.FontId) is { Length: > 0 } nfnt ? nfnt : lookup(FourCC.FromString("FONT"), font.FontId);
-            if (data is not { Length: > 0 } bytes) return null;
+            if (data is not { Length: > 0 } bytes)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(bytes);
             return BitmapFont.Read(reader, diagnostics, rom: false);
         }

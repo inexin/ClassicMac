@@ -79,7 +79,11 @@ namespace ClassicMac.Graphics.QuickDraw
             // Mac OS 9's inner shape of zero width: constant edges over its rows.
             public static EllipseEdges Fixed(int top, int left, int bottom, int right) => new EllipseEdges
             {
-                Top = top, Bottom = bottom, left = left << 16, right = right << 16, fixedEdges = true,
+                Top = top,
+                Bottom = bottom,
+                left = left << 16,
+                right = right << 16,
+                fixedEdges = true,
             };
 
             private EllipseEdges() { }
@@ -102,7 +106,11 @@ namespace ClassicMac.Graphics.QuickDraw
 
             public void Step(int row)
             {
-                if (fixedEdges || row < Top || row >= Bottom) return;
+                if (fixedEdges || row < Top || row >= Bottom)
+                {
+                    return;
+                }
+
                 int y = oddY;
                 oddY = (short)(oddY + 2);
                 while ((int)(sum >> 32) < target)
@@ -142,7 +150,11 @@ namespace ClassicMac.Graphics.QuickDraw
         private static Region[] CurveParts(PictRect r, int ovalWidth, int ovalHeight, bool hollow, int penH, int penV,
             int startAngle, int arcAngle, bool macOS9)
         {
-            if (r.IsEmpty || arcAngle == 0) return new[] { Region.Empty };
+            if (r.IsEmpty || arcAngle == 0)
+            {
+                return new[] { Region.Empty };
+            }
+
             var rows = new Scanlines(r.Left, r.Right);
             Scanlines? rightSlabs = null;
             int top = r.Top, left = r.Left, bottom = r.Bottom, right = r.Right;
@@ -160,9 +172,17 @@ namespace ClassicMac.Graphics.QuickDraw
             if (isArc)
             {
                 startAngle = (short)startAngle % 360;
-                if (startAngle < 0) startAngle += 360;
+                if (startAngle < 0)
+                {
+                    startAngle += 360;
+                }
+
                 int stopAngle = startAngle + arcAngle;
-                if (stopAngle >= 360) stopAngle -= 360;
+                if (stopAngle >= 360)
+                {
+                    stopAngle -= 360;
+                }
+
                 midRow = (short)(top + bottom) >> 1;
                 int midColumn = (short)(left + right) >> 1;
                 int aspect = FixedMath.FixRatio((short)(right - left), (short)(bottom - top));
@@ -175,8 +195,14 @@ namespace ClassicMac.Graphics.QuickDraw
                 flag1 = startAngle < 180 ? startAngle - 90 : 270 - startAngle;
                 flag2 = stopAngle < 180 ? stopAngle - 90 : 270 - stopAngle;
                 // An arc of under 180 degrees whose rays both point down has nothing in the top half.
-                if (arcAngle < 180) hidden = (short)(flag1 | flag2) >= 0;
-                else if (arcAngle == 180) hidden = startAngle == 90;
+                if (arcAngle < 180)
+                {
+                    hidden = (short)(flag1 | flag2) >= 0;
+                }
+                else if (arcAngle == 180)
+                {
+                    hidden = startAngle == 90;
+                }
             }
 
             var outer = new EllipseEdges(top, left, bottom, right, ovalWidth, ovalHeight);
@@ -189,15 +215,23 @@ namespace ClassicMac.Graphics.QuickDraw
                     if (iLeft >= iRight || ovalWidth - 2 * penH <= 0)
                     {
                         inner = EllipseEdges.Fixed(iTop, iLeft, iBottom, iRight);
-                        if (iLeft > iRight) rightSlabs = new Scanlines(r.Left, r.Right);
+                        if (iLeft > iRight)
+                        {
+                            rightSlabs = new Scanlines(r.Left, r.Right);
+                        }
                     }
                     else
+                    {
                         inner = new EllipseEdges(iTop, iLeft, iBottom, iRight, ovalWidth - 2 * penH, Math.Max(0, ovalHeight - 2 * penV));
+                    }
                 }
             }
             else if (hollow && left + penH < right - penH && top + penV < bottom - penV)
+            {
                 inner = new EllipseEdges(top + penV, left + penH, bottom - penV, right - penH,
                     ovalWidth - 2 * penH, ovalHeight - 2 * penV);
+            }
+
             var second = rightSlabs ?? rows;
 
             // Round rects hold their edges still between the corner ovals' halves.
@@ -218,8 +252,16 @@ namespace ClassicMac.Graphics.QuickDraw
                     flag2 = -flag2;
                     hidden = false;
                     // Arcs of 180 degrees or less that fit in the top half end here.
-                    if (arcAngle < 180 && (short)(flag1 | flag2) >= 0) break;
-                    if (arcAngle == 180 && startAngle == 270) break;
+                    if (arcAngle < 180 && (short)(flag1 | flag2) >= 0)
+                    {
+                        break;
+                    }
+
+                    if (arcAngle == 180 && startAngle == 270)
+                    {
+                        break;
+                    }
+
                     (flag1, flag2) = (flag2, flag1);
                     (ray1, ray2) = (ray2, ray1);
                     (slope1, slope2) = (slope2, slope1);
@@ -236,11 +278,15 @@ namespace ClassicMac.Graphics.QuickDraw
                             second.Add(row, inner.Right, outer.Right);
                         }
                         else
+                        {
                             rows.Add(row, outer.Left, outer.Right);
+                        }
                     }
                     else
+                    {
                         ArcRow(rows, second, row, outer, inner, innerRow, (short)(ray1 >> 16), (short)(ray2 >> 16),
                             flag1 < 0, flag2 < 0, (short)(flag1 & flag2) < 0 && arcAngle > 180);
+                    }
                 }
 
                 ray1 += slope1;
@@ -268,14 +314,23 @@ namespace ClassicMac.Graphics.QuickDraw
                 }
                 else if (reflex)
                 {
-                    if (innerLeft == cutRight) rows.Add(row, cutLeft, inner.Left);
-                    else if (cutLeft == innerRight) rows.Add(row, inner.Right, cutRight);
+                    if (innerLeft == cutRight)
+                    {
+                        rows.Add(row, cutLeft, inner.Left);
+                    }
+                    else if (cutLeft == innerRight)
+                    {
+                        rows.Add(row, inner.Right, cutRight);
+                    }
+
                     rows.Add(row, outerLeft, innerLeft);
                     rows.Add(row, innerRight, outerRight);
                 }
             }
             else if (cutLeft < cutRight)
+            {
                 rows.Add(row, cutLeft, cutRight);
+            }
             else if (reflex)
             {
                 rows.Add(row, outerLeft, cutRight);
@@ -303,9 +358,20 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int top = Math.Min(v1, v2), bottom = Math.Max(v1, v2) + penV;
             int left = Math.Min(h1, h2), right = Math.Max(h1, h2) + penH;
-            if (top >= bottom || left >= right) return Region.Empty;
-            if (h1 == h2 || v1 == v2) return Region.FromRect(new PictRect(top, left, bottom, right));
-            if (penH <= 0 || penV <= 0) return Region.Empty;
+            if (top >= bottom || left >= right)
+            {
+                return Region.Empty;
+            }
+
+            if (h1 == h2 || v1 == v2)
+            {
+                return Region.FromRect(new PictRect(top, left, bottom, right));
+            }
+
+            if (penH <= 0 || penV <= 0)
+            {
+                return Region.Empty;
+            }
 
             if (v2 < v1)
             {
@@ -319,14 +385,26 @@ namespace ClassicMac.Graphics.QuickDraw
             if (slope >= 0)
             {
                 runLeft -= penRise;
-                if (slope < 0x10000) runLeft += slope;
-                else runRight -= 0x10000;
+                if (slope < 0x10000)
+                {
+                    runLeft += slope;
+                }
+                else
+                {
+                    runRight -= 0x10000;
+                }
             }
             else
             {
                 runRight -= penRise;
-                if (slope < -0x10000) runLeft += 0x10000;
-                else runRight += slope;
+                if (slope < -0x10000)
+                {
+                    runLeft += 0x10000;
+                }
+                else
+                {
+                    runRight += slope;
+                }
             }
 
             var rows = new Scanlines(left, right);
@@ -344,13 +422,24 @@ namespace ClassicMac.Graphics.QuickDraw
         // The region an open region records for the polygon's edges, closed from the last point to the first.
         public static Region Polygon(IReadOnlyList<(int h, int v)> points)
         {
-            if (points.Count < 2) return Region.Empty;
+            if (points.Count < 2)
+            {
+                return Region.Empty;
+            }
+
             var inversions = new Dictionary<int, List<int>>();
             for (int i = 1; i < points.Count; i++)
+            {
                 EdgeInversions(inversions, points[i - 1].h, points[i - 1].v, points[i].h, points[i].v);
+            }
+
             EdgeInversions(inversions, points[^1].h, points[^1].v, points[0].h, points[0].v);
             var rows = new List<(int y, List<int> xs)>();
-            foreach (var (y, xs) in inversions) rows.Add((y, xs));
+            foreach (var (y, xs) in inversions)
+            {
+                rows.Add((y, xs));
+            }
+
             return Region.FromInversionRows(rows);
         }
 
@@ -360,12 +449,20 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             void Toggle(int v, int a, int b)
             {
-                if (!points.TryGetValue(v, out var xs)) points[v] = xs = new List<int>();
+                if (!points.TryGetValue(v, out var xs))
+                {
+                    points[v] = xs = new List<int>();
+                }
+
                 xs.Add(a);
                 xs.Add(b);
             }
 
-            if (h1 == h2) return;
+            if (h1 == h2)
+            {
+                return;
+            }
+
             if (v1 == v2)
             {
                 Toggle(v1, h1, h2);
@@ -380,10 +477,15 @@ namespace ClassicMac.Graphics.QuickDraw
             int h = (h1 << 16) + 0x8000 + (slope >> 1);
             if (slope >= 0)
             {
-                if (slope < 0x10000) h += slope;
+                if (slope < 0x10000)
+                {
+                    h += slope;
+                }
             }
             else if (slope < -0x10000)
+            {
                 h += 0x10000;
+            }
 
             int previous = h1, v = v1;
             do
@@ -397,7 +499,10 @@ namespace ClassicMac.Graphics.QuickDraw
                 v++;
                 h += slope;
             } while (v != v2);
-            if (previous != h2) Toggle(v, previous, h2);
+            if (previous != h2)
+            {
+                Toggle(v, previous, h2);
+            }
         }
 
         // ---- scan-line accumulation ----
@@ -418,8 +523,16 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 x0 = Math.Max(x0, clipLeft);
                 x1 = Math.Min(x1, clipRight);
-                if (x0 >= x1) return;
-                if (!rows.TryGetValue(row, out var runs)) rows[row] = runs = new List<int>();
+                if (x0 >= x1)
+                {
+                    return;
+                }
+
+                if (!rows.TryGetValue(row, out var runs))
+                {
+                    rows[row] = runs = new List<int>();
+                }
+
                 runs.Add(x0);
                 runs.Add(x1);
             }

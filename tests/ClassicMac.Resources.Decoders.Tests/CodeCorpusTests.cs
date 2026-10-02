@@ -33,12 +33,19 @@ public class CodeCorpusTests
         foreach (var resource in fork.Resources)
         {
             if (decoders.FirstOrDefault(d => d.CanDecode(resource.Type)) is not { } decoder)
+            {
                 continue;
+            }
+
             var diagnostics = new List<Diagnostic>();
             var files = decoder.Decode(new DecodeInput(resource, ResourceDecompression.Default.GetData(resource, fork, null, diagnostics), fork,
                 diagnostics: diagnostics));
             int expected = resource.Type.ToString() == "cfrg" || (resource.Type.ToString() == "CODE" && resource.Id == 0) ? 2 : 3;
-            if (files.Count != expected) errors.Add($"{resource}: {files.Count} files");
+            if (files.Count != expected)
+            {
+                errors.Add($"{resource}: {files.Count} files");
+            }
+
             errors.AddRange(diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => $"{resource}: {d.Message} [{d.Code}]"));
             count++;
         }

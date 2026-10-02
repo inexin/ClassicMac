@@ -317,7 +317,11 @@ namespace ClassicMac.Graphics.QuickDraw
             // [ClassicMac: the mask is stretched by its own StretchBits, as the ROM's fallback stretches it; CopyMask's
             // single pass is taken to sample both alike.]
             var region = StretchedMask(mask, PictRect.From(maskRect), destination);
-            if (ClipRegion != null) region = region.Intersect(ClipRegion);
+            if (ClipRegion != null)
+            {
+                region = region.Intersect(ClipRegion);
+            }
+
             var source1 = PictRect.From(sourceRect);
             var colors = Colors;
             // Mac OS 9's general stretch path (a scaled 1-bit source onto a 1-bit screen, with a 1-bit mask) applies its
@@ -341,27 +345,45 @@ namespace ClassicMac.Graphics.QuickDraw
         private Region StretchedMask(PixMap mask, PictRect maskRect, PictRect destination)
         {
             int w = destination.Width, h = destination.Height;
-            if (w <= 0 || h <= 0) return Region.Empty;
+            if (w <= 0 || h <= 0)
+            {
+                return Region.Empty;
+            }
+
             var scratch = new RgbaBitmap(w, h);
             var colors = new PortColors(new RgbaColor(0, 0, 0), new RgbaColor(255, 255, 255), (0, 0, 0), new RgbaColor(0, 0, 0), macOS9);
             Bits.CopyBits(scratch, mask, maskRect, new PictRect(0, 0, h, w), TransferModes.SrcCopy, null, false, colors, false);
             var set = new bool[w * h];
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
                     var c = scratch[x, y];
                     set[y * w + x] = c.A != 0 && c.R == 0 && c.G == 0 && c.B == 0;
                 }
+            }
+
             var region = Region.Empty;
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
-                    if (!set[y * w + x]) continue;
+                    if (!set[y * w + x])
+                    {
+                        continue;
+                    }
+
                     int end = x;
-                    while (end < w && set[y * w + end]) end++;
+                    while (end < w && set[y * w + end])
+                    {
+                        end++;
+                    }
+
                     region = region.Union(Region.FromRect(new PictRect(destination.Top + y, destination.Left + x, destination.Top + y + 1, destination.Left + end)));
                     x = end;
                 }
+            }
+
             return region;
         }
 
@@ -375,7 +397,11 @@ namespace ClassicMac.Graphics.QuickDraw
                 : device.Index2Color16(device.Color2Index(c.r, c.g, c.b));
             var bk = Realize((back.Red, back.Green, back.Blue));
             var fg = Realize((fore.Red, fore.Green, fore.Blue));
-            int Mid(int a, int b) { int m = (a + b) >> 1; return m < 0x8000 ? m + 2 : m; }
+            int Mid(int a, int b)
+            {
+                int m = (a + b) >> 1;
+                return m < 0x8000 ? m + 2 : m;
+            }
             (int r, int g, int b) mid = (Mid(fg.r, bk.r), Mid(fg.g, bk.g), Mid(fg.b, bk.b));
             var real = Realize(mid);
             int Distance((int r, int g, int b) a, (int r, int g, int b) b) =>
@@ -406,7 +432,11 @@ namespace ClassicMac.Graphics.QuickDraw
             get => Size;
             set
             {
-                if (!macOS9 || value != Size) ChExtra = 0;
+                if (!macOS9 || value != Size)
+                {
+                    ChExtra = 0;
+                }
+
                 Size = value;
             }
         }
@@ -424,10 +454,17 @@ namespace ClassicMac.Graphics.QuickDraw
             if (!macOS9)
             {
                 long remainder = ((long)extra.Raw << 16) % size;
-                if (Math.Abs(remainder) * 2 >= size) quotient += Math.Sign(remainder);   // [ClassicMac: FixDiv's tie rule not checked]
+                if (Math.Abs(remainder) * 2 >= size)
+                {
+                    quotient += Math.Sign(remainder);   // [ClassicMac: FixDiv's tie rule not checked]
+                }
+
                 ChExtra = (short)(quotient >> 4);
             }
-            else ChExtra = (int)Math.Clamp(quotient >> 4, -0x7FFF, 0x7FFF);
+            else
+            {
+                ChExtra = (int)Math.Clamp(quotient >> 4, -0x7FFF, 0x7FFF);
+            }
         }
 
         /// <summary>The text's transfer mode (<c>TextMode</c>).</summary>
@@ -462,9 +499,16 @@ namespace ClassicMac.Graphics.QuickDraw
         /// </summary>
         public int TextWidth(ReadOnlySpan<byte> text)
         {
-            if (Select((1, 1), (1, 1)) is not { } font) return 0;
+            if (Select((1, 1), (1, 1)) is not { } font)
+            {
+                return 0;
+            }
+
             int width = TextDrawer.Measure(font, text, unchecked(((short)ChExtra << 4) + InterCharSpacing)) >> 16;
-            if (font.Numer == font.Denom) return width;
+            if (font.Numer == font.Denom)
+            {
+                return width;
+            }
             // The ROM multiplies and divides unsigned (MULU, DIVU); Mac OS 9 signed.
             return macOS9
                 ? (int)((long)width * font.Numer.h / font.Denom.h)
@@ -488,9 +532,17 @@ namespace ClassicMac.Graphics.QuickDraw
         /// </summary>
         public FontInfo GetFontInfo()
         {
-            if (Select((1, 1), (1, 1)) is not { } font) return default;
+            if (Select((1, 1), (1, 1)) is not { } font)
+            {
+                return default;
+            }
+
             int ascent = font.Ascent, descent = font.Descent, widMax = font.WidMax + (sbyte)font.Extra, leading = font.Leading;
-            if (font.Shadow != 0) (ascent, descent) = (ascent + 1, descent + (byte)font.Shadow);
+            if (font.Shadow != 0)
+            {
+                (ascent, descent) = (ascent + 1, descent + (byte)font.Shadow);
+            }
+
             if (font.Numer != font.Denom)
             {
                 int Scale(int value, int numer, int denom) =>
@@ -530,7 +582,10 @@ namespace ClassicMac.Graphics.QuickDraw
             (FontId, Face, Size, TxMode, SpaceExtraFixed, ChExtra, InterCharSpacing) =
                 (s.FontId, s.Face, s.Size, s.TxMode, s.SpaceExtra, s.ChExtra, s.InterCharSpacing);
             (FractEnable, FScaleDisable, TextNumer, TextDenom) = (s.FractEnable, s.FScaleDisable, s.TextNumer, s.TextDenom);
-            if (hilite) (Hilite, hilite16) = (s.Hilite, s.Hilite16);
+            if (hilite)
+            {
+                (Hilite, hilite16) = (s.Hilite, s.Hilite16);
+            }
         }
 
         // DrawPicture's starting state (the pen visibility and the Font Manager's settings are kept).
@@ -551,13 +606,21 @@ namespace ClassicMac.Graphics.QuickDraw
 
         internal void RectShape(PictRect r, int verb)
         {
-            if (r.IsEmpty) { Done(); return; }
+            if (r.IsEmpty)
+            {
+                Done();
+                return;
+            }
             Shape(verb, () => RegionShapes.Rect(r), () => new[] { RegionShapes.FrameRect(r, PenWidth, PenHeight) }, true);
         }
 
         internal void RoundRectShape(PictRect r, int ovalWidth, int ovalHeight, int verb)
         {
-            if (r.IsEmpty) { Done(); return; }
+            if (r.IsEmpty)
+            {
+                Done();
+                return;
+            }
             int ow = ovalWidth, oh = ovalHeight;
             if (macOS9)
             {
@@ -576,13 +639,21 @@ namespace ClassicMac.Graphics.QuickDraw
 
         internal void OvalShape(PictRect r, int verb)
         {
-            if (r.IsEmpty) { Done(); return; }
+            if (r.IsEmpty)
+            {
+                Done();
+                return;
+            }
             Shape(verb, () => RegionShapes.Oval(r), () => RegionShapes.FrameOvalParts(r, PenWidth, PenHeight, macOS9), false);
         }
 
         internal void ArcShape(PictRect r, int startAngle, int arcAngle, int verb)
         {
-            if (r.IsEmpty) { Done(); return; }
+            if (r.IsEmpty)
+            {
+                Done();
+                return;
+            }
             Shape(verb, () => RegionShapes.Arc(r, startAngle, arcAngle, macOS9),
                 () => RegionShapes.FrameArcParts(r, startAngle, arcAngle, PenWidth, PenHeight, macOS9), false);
         }
@@ -590,11 +661,18 @@ namespace ClassicMac.Graphics.QuickDraw
         // Framing draws each edge as a line and does not close the polygon.
         internal void PolyShape((int h, int v)[] points, int verb)
         {
-            if (points.Length < 2) { Done(); return; }
+            if (points.Length < 2)
+            {
+                Done();
+                return;
+            }
             if (verb == 0)
             {
                 for (int i = 1; i < points.Length; i++)
+                {
                     PaintLine(points[i - 1].h, points[i - 1].v, points[i].h, points[i].v);
+                }
+
                 Done();
                 return;
             }
@@ -609,7 +687,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // viaStretchBits: rects, regions and polygons (not ovals, round rects and arcs, which DrawArc draws itself).
         private void Shape(int verb, Func<Region> interior, Func<Region[]> frame, bool viaStretchBits)
         {
-            if (PenVis < 0) { Done(); return; }
+            if (PenVis < 0)
+            {
+                Done();
+                return;
+            }
             var colors = Colors;
             // DrawArc (ovals, round rects, arcs) takes the pen mode with bit 3 forced and draws only pattern modes
             // 8-15, arithmetic modes 40-47 and hilite 58; any other mode (16-31, 49, 64 and up, ...) draws nothing
@@ -617,19 +699,34 @@ namespace ClassicMac.Graphics.QuickDraw
             if (!viaStretchBits && verb <= 1)
             {
                 int m = (macOS9 ? Mode & ~TransferModes.DitherCopy : Mode) | 8;
-                if (!(m <= 15 || (m >= 40 && m <= 47) || m == 58)) { Done(); return; }
+                if (!(m <= 15 || (m >= 40 && m <= 47) || m == 58))
+                {
+                    Done();
+                    return;
+                }
             }
             switch (verb)
             {
                 case 0:
                     // (Mac OS 9 paints a crossed frame's two slabs one after the other.)
                     foreach (var part in frame())
+                    {
                         Painter.FillRegion(canvas, part, ClipRegion, PnPat, Align, Mode, HilitePending, colors, viaStretchBits, OriginV);
+                    }
+
                     break;
-                case 1: Painter.FillRegion(canvas, interior(), ClipRegion, PnPat, Align, Mode, HilitePending, colors, viaStretchBits, OriginV); break;
-                case 2: Painter.FillRegion(canvas, interior(), ClipRegion, BkPat, Align, TransferModes.PatCopy, false, colors, viaStretchBits, OriginV); break;
-                case 3: Painter.FillRegion(canvas, interior(), ClipRegion, QuickDrawPattern.Black, Align, TransferModes.PatXor, HilitePending, colors, viaStretchBits, OriginV); break;
-                case 4: Painter.FillRegion(canvas, interior(), ClipRegion, FillPat, Align, TransferModes.PatCopy, false, colors, viaStretchBits, OriginV); break;
+                case 1:
+                    Painter.FillRegion(canvas, interior(), ClipRegion, PnPat, Align, Mode, HilitePending, colors, viaStretchBits, OriginV);
+                    break;
+                case 2:
+                    Painter.FillRegion(canvas, interior(), ClipRegion, BkPat, Align, TransferModes.PatCopy, false, colors, viaStretchBits, OriginV);
+                    break;
+                case 3:
+                    Painter.FillRegion(canvas, interior(), ClipRegion, QuickDrawPattern.Black, Align, TransferModes.PatXor, HilitePending, colors, viaStretchBits, OriginV);
+                    break;
+                case 4:
+                    Painter.FillRegion(canvas, interior(), ClipRegion, FillPat, Align, TransferModes.PatCopy, false, colors, viaStretchBits, OriginV);
+                    break;
             }
             Done();
         }
@@ -640,7 +737,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // StdLine paints the pen-swept region with the pen pattern; Boolean pen modes act as pattern modes.
         internal void PaintLine(int x1, int y1, int x2, int y2)
         {
-            if (PenVis < 0) return;
+            if (PenVis < 0)
+            {
+                return;
+            }
+
             var region = RegionShapes.Line(x1, y1, x2, y2, PenWidth, PenHeight);
             int mode = Mode < TransferModes.Blend ? (Mode % 0x40) | 8 : Mode;
             Painter.FillRegion(canvas, region, ClipRegion, PnPat, Align, mode, HilitePending, Colors, x1 == x2 || y1 == y2, OriginV);
@@ -649,8 +750,16 @@ namespace ClassicMac.Graphics.QuickDraw
         // The mask and the clip together limit the copy.
         internal void CopyBits(PixMap source, PictRect sourceRect, PictRect destinationRect, int mode, Region? mask)
         {
-            if (PenVis < 0) { Done(); return; }
-            if (ClipRegion != null) mask = mask == null ? ClipRegion : mask.Intersect(ClipRegion);
+            if (PenVis < 0)
+            {
+                Done();
+                return;
+            }
+            if (ClipRegion != null)
+            {
+                mask = mask == null ? ClipRegion : mask.Intersect(ClipRegion);
+            }
+
             Bits.CopyBits(canvas, source, sourceRect, destinationRect, mode, mask, HilitePending, Colors, Options.PreserveAlpha);
             Done();
         }
@@ -660,11 +769,18 @@ namespace ClassicMac.Graphics.QuickDraw
         // movePen, the pen ends past the text.
         internal void DrawTextAt(ReadOnlySpan<byte> text, int x, int y, int fontId, int fallbackFontId, string? fallbackName, bool movePen)
         {
-            if (text.Length == 0) { Done(); return; }
+            if (text.Length == 0)
+            {
+                Done();
+                return;
+            }
             int mode = TxMode;
             // Mac OS 9 draws transparent and ditherCopy text as srcOr (grayishTextOr stays the gray srcOr below).
             if (macOS9 && (mode == TransferModes.Transparent || mode == TransferModes.DitherCopy))
+            {
                 mode = TransferModes.SrcOr;
+            }
+
             int advance = 0, startFrac = PenFrac & 0xFFFF;
             if (Options.Fonts is { } library)
             {
@@ -695,21 +811,39 @@ namespace ClassicMac.Graphics.QuickDraw
             {
                 var mask = fallback.Render(MacRoman.Decode(text), new TextFallbackStyle(fallbackFontId, Face, Size, fallbackName));
                 if (mask != null && mask.Width > 0 && mask.Height > 0 && PenVis >= 0)
+                {
                     Painter.FillMask(canvas, x - mask.OriginX, y - mask.OriginY, mask.Width, mask.Height, mask.Bits,
                         ClipRegion, mode, HilitePending, Colors);
-                if (mask != null) advance = (int)Math.Round(mask.Advance * 65536.0);
+                }
+
+                if (mask != null)
+                {
+                    advance = (int)Math.Round(mask.Advance * 65536.0);
+                }
             }
             // (The picture player keeps its fraction across fallback text; a port's pen moves by the fallback's advance.)
-            if (movePen) PenFrac = (startFrac + advance) & 0xFFFF;
+            if (movePen)
+            {
+                PenFrac = (startFrac + advance) & 0xFFFF;
+            }
+
             Moved();
             Done();
 
             void Moved()
             {
-                if (!movePen) return;
+                if (!movePen)
+                {
+                    return;
+                }
+
                 long pen = ((long)(x + OriginH) << 16) + startFrac + advance;
                 // Mac OS 9 stops the pen at 32752.0.
-                if (macOS9 && pen > 32752L << 16) (pen, PenFrac) = (32752L << 16, 0);
+                if (macOS9 && pen > 32752L << 16)
+                {
+                    (pen, PenFrac) = (32752L << 16, 0);
+                }
+
                 (PenH, PenV) = ((int)(pen >> 16), y + OriginV);
             }
         }
@@ -724,18 +858,29 @@ namespace ClassicMac.Graphics.QuickDraw
             (int r, int g, int b) Wide(RgbaColor c) => (c.R * 257, c.G * 257, c.B * 257);
             var fg = Wide(Fore);
             var bk = Wide(Back);
-            int Mid(int a, int b) { int m = (a + b) >> 1; return m < 0x8000 ? m + 2 : m; }
+            int Mid(int a, int b)
+            {
+                int m = (a + b) >> 1;
+                return m < 0x8000 ? m + 2 : m;
+            }
             (int r, int g, int b) mid = (Mid(fg.r, bk.r), Mid(fg.g, bk.g), Mid(fg.b, bk.b));
             var gray = new RgbaColor((byte)(mid.r >> 8), (byte)(mid.g >> 8), (byte)(mid.b >> 8));
             var grayWide = Wide(gray);
             int Distance((int r, int g, int b) a, (int r, int g, int b) b) =>
                 Math.Max(Math.Abs(a.r - b.r), Math.Max(Math.Abs(a.g - b.g), Math.Abs(a.b - b.b)));
             if (Distance(grayWide, mid) < Distance(grayWide, bk) / 2 && Distance(grayWide, mid) < Distance(grayWide, fg) / 2)
+            {
                 return TextDrawer.Draw(canvas, font, text, x, y, PenFrac, charExtra, TransferModes.SrcOr, ClipRegion,
                     HilitePending, new PortColors(gray, Back, Op, Hilite, macOS9, device), out advance);
+            }
+
             int width = (short)(TextDrawer.Measure(font, text, charExtra) >> 16);
             int ascent = font.Ascent, descent = font.Descent;
-            if (font.Shadow != 0) (ascent, descent) = (ascent + 1, descent + (byte)font.Shadow);
+            if (font.Shadow != 0)
+            {
+                (ascent, descent) = (ascent + 1, descent + (byte)font.Shadow);
+            }
+
             if (font.Numer != font.Denom)
             {
                 uint n = (ushort)font.Numer.v, d = (ushort)font.Denom.v;

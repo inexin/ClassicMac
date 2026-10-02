@@ -55,14 +55,22 @@ namespace ClassicMac.App.Views
         {
             base.OnAttachedToVisualTree(e);
             topLevel = TopLevel.GetTopLevel(this);
-            if (topLevel is not null) topLevel.ScalingChanged += OnScalingChanged;
+            if (topLevel is not null)
+            {
+                topLevel.ScalingChanged += OnScalingChanged;
+            }
+
             InvalidateMeasure();
         }
 
         protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
         {
             base.OnDetachedFromVisualTree(e);
-            if (topLevel is not null) topLevel.ScalingChanged -= OnScalingChanged;
+            if (topLevel is not null)
+            {
+                topLevel.ScalingChanged -= OnScalingChanged;
+            }
+
             topLevel = null;
         }
 
@@ -116,7 +124,11 @@ namespace ClassicMac.App.Views
 
         public override void Render(DrawingContext context)
         {
-            if (Source is not { } source) return;
+            if (Source is not { } source)
+            {
+                return;
+            }
+
             using var snap = PushSnap(context);
             context.DrawImage(source, new Rect(PixelScaling.Size(new Size(source.PixelSize.Width, source.PixelSize.Height), Zoom, RenderScaling)));
         }

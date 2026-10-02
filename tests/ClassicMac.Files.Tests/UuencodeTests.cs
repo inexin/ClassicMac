@@ -134,7 +134,9 @@ public class UuencodeTests
         byte[] text = [.. "Subject: caf\t\f\v\r\n"u8, 0xE9, 0x8E, (byte)'\n'];
         Assert.True(UuencodeReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, .. uu])));
         foreach (var control in new byte[] { 0x00, 0x01, 0x08, 0x0E, 0x1B, 0x1F })
+        {
             Assert.False(UuencodeReader.Instance.CanRead(ForkData.FromBytes((byte[])[.. text, control, (byte)'\n', .. uu])));
+        }
     }
 
     [Fact]

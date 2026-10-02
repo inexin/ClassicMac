@@ -52,7 +52,11 @@ namespace ClassicMac.Resources.Decoders.Text
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
         {
             var reader = new BigEndianReader(input.Data);
-            if (!reader.TryReadUInt16(out ushort count)) return [];
+            if (!reader.TryReadUInt16(out ushort count))
+            {
+                return [];
+            }
+
             var strings = new List<string>(count);
             for (var i = 0; i < count; i++)
             {
@@ -76,7 +80,11 @@ namespace ClassicMac.Resources.Decoders.Text
             {
                 w.WriteStartObject();
                 w.WriteStartArray("strings");
-                foreach (var s in strings) w.WriteStringValue(MacText.Lines(s, options));
+                foreach (var s in strings)
+                {
+                    w.WriteStringValue(MacText.Lines(s, options));
+                }
+
                 w.WriteEndArray();
                 w.WriteEndObject();
             });

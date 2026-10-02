@@ -28,7 +28,11 @@ public class GoldenTests
         foreach (var fixture in GoldenFixtures.All())
         {
             var decoder = ResourceDecoders.Create(fixture.Options).FirstOrDefault(d => d.CanDecode(fixture.Resource.Type));
-            if (decoder is null) continue;
+            if (decoder is null)
+            {
+                continue;
+            }
+
             var diagnostics = new List<Diagnostic>();
             var files = decoder.Decode(new DecodeInput(fixture.Resource, fixture.Resource.GetData(), fork, diagnostics: diagnostics));
             var outputs = new List<object>();
@@ -93,15 +97,25 @@ public class GoldenTests
         {
             Directory.CreateDirectory(folder);
             File.WriteAllBytes(Path.Combine(folder, mainName), main);
-            foreach (var (name, bytes) in texts) File.WriteAllBytes(Path.Combine(folder, name), bytes);
+            foreach (var (name, bytes) in texts)
+            {
+                File.WriteAllBytes(Path.Combine(folder, name), bytes);
+            }
+
             return;
         }
         var problems = new List<string>();
         foreach (var (name, bytes) in texts.Append(new(mainName, main)))
         {
             var path = Path.Combine(folder, name);
-            if (!File.Exists(path)) problems.Add($"{name}: no golden file");
-            else if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(bytes)) problems.Add($"{name}: differs from its golden");
+            if (!File.Exists(path))
+            {
+                problems.Add($"{name}: no golden file");
+            }
+            else if (!File.ReadAllBytes(path).AsSpan().SequenceEqual(bytes))
+            {
+                problems.Add($"{name}: differs from its golden");
+            }
         }
         Assert.True(problems.Count == 0,
             string.Join("\n", problems) + "\nIf the change is intended, run with CLASSICMAC_UPDATE_GOLDEN=1 and review Golden/ in git.");

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 
 namespace ClassicMac.Graphics.Pict
 {
@@ -111,8 +111,15 @@ namespace ClassicMac.Graphics.Pict
         public void Origin(int dh, int dv)
         {
             fromRect = new PictRect(fromRect.Top + dv, fromRect.Left + dh, fromRect.Bottom + dv, fromRect.Right + dh);
-            if (!macOS9) port.PatternAlign = (port.PatternAlign.h + dh, port.PatternAlign.v + dv);
-            if (pictureClip != null) port.ClipRegion = Clipped(pictureClip);
+            if (!macOS9)
+            {
+                port.PatternAlign = (port.PatternAlign.h + dh, port.PatternAlign.v + dv);
+            }
+
+            if (pictureClip != null)
+            {
+                port.ClipRegion = Clipped(pictureClip);
+            }
         }
 
         // ---- state ----
@@ -167,14 +174,19 @@ namespace ClassicMac.Graphics.Pict
             fontNames[fontId] = name;
             if (options.Fonts is { } library && library.TryGetFamilyByName(name, out int family) && family != 0
                 && family != fontId)
+            {
                 fontMap.TryAdd(fontId, family);
+            }
         }
 
         public void PnLocHFrac(int fraction) => pendingFrac = fraction & 0xFFFF;
         // (Mac OS 9 skips LineJustify: its character extra stays 0.)
         public void LineJustify(int interCharacterSpacing)
         {
-            if (!macOS9) port.InterCharSpacing = interCharacterSpacing;
+            if (!macOS9)
+            {
+                port.InterCharSpacing = interCharacterSpacing;
+            }
         }
         public void GlyphState(bool fractionalWidths, bool scalingDisabled) =>
             (port.FractEnable, port.FScaleDisable) = (fractionalWidths, scalingDisabled);
@@ -183,41 +195,73 @@ namespace ClassicMac.Graphics.Pict
 
         public void Rect(PictRect? pictureRect, int verb)
         {
-            if (pictureRect is { } pr) lastRect = pr;
+            if (pictureRect is { } pr)
+            {
+                lastRect = pr;
+            }
+
             port.RectShape(MapRect(lastRect), verb);
         }
 
         public void RoundRect(PictRect? pictureRect, int verb)
         {
-            if (pictureRect is { } pr) lastRect = pr;
+            if (pictureRect is { } pr)
+            {
+                lastRect = pr;
+            }
+
             port.RoundRectShape(MapRect(lastRect), ovalWidth, ovalHeight, verb);
         }
 
         public void Oval(PictRect? pictureRect, int verb)
         {
-            if (pictureRect is { } pr) lastRect = pr;
+            if (pictureRect is { } pr)
+            {
+                lastRect = pr;
+            }
+
             port.OvalShape(MapRect(lastRect), verb);
         }
 
         public void Arc(PictRect? pictureRect, int startAngle, int arcAngle, int verb)
         {
-            if (pictureRect is { } pr) lastRect = pr;
+            if (pictureRect is { } pr)
+            {
+                lastRect = pr;
+            }
+
             port.ArcShape(MapRect(lastRect), startAngle, arcAngle, verb);
         }
 
         // Polygons (picture-space points).
         public void Polygon((int h, int v)[]? picturePoints, int verb)
         {
-            if (picturePoints != null) lastPoly = picturePoints;
-            if (lastPoly == null || lastPoly.Length < 2) { port.Done(); return; }
+            if (picturePoints != null)
+            {
+                lastPoly = picturePoints;
+            }
+
+            if (lastPoly == null || lastPoly.Length < 2)
+            {
+                port.Done();
+                return;
+            }
             var pts = new (int h, int v)[lastPoly.Length];
-            for (int i = 0; i < pts.Length; i++) pts[i] = MapPoint(lastPoly[i].h, lastPoly[i].v);
+            for (int i = 0; i < pts.Length; i++)
+            {
+                pts[i] = MapPoint(lastPoly[i].h, lastPoly[i].v);
+            }
+
             port.PolyShape(pts, verb);
         }
 
         public void Rgn(Region? pictureRegion, int verb)
         {
-            if (pictureRegion != null) lastRegion = pictureRegion;
+            if (pictureRegion != null)
+            {
+                lastRegion = pictureRegion;
+            }
+
             port.RgnShape(MapRegion(lastRegion), verb);
         }
 
@@ -257,9 +301,17 @@ namespace ClassicMac.Graphics.Pict
         public PictRect? QuickTime(byte[] block)
         {
             var q = QuickTimeImage.Parse(block);
-            if (q == null) return null;
+            if (q == null)
+            {
+                return null;
+            }
+
             var image = QuickTimeCodecs.Decode(q.Description, q.Data) ?? options.ImageCodec?.Decode(q.Description, q.Data);
-            if (image == null) return null;
+            if (image == null)
+            {
+                return null;
+            }
+
             var source = q.SourceRect.IsEmpty ? new PictRect(0, 0, image.Height, image.Width) : q.SourceRect;
             var destination = q.DestinationRect();
             port.CopyBits(QuickTimeImage.ToPixMap(image), source, MapRect(destination), q.Mode, q.Mask == null ? null : MapRegion(q.Mask));
@@ -305,7 +357,10 @@ namespace ClassicMac.Graphics.Pict
             int fraction = pendingFrac;
             pendingFrac = 0x8000;
             int x, y;
-            if (Version1) (x, y) = MapPoint(textH, textV);
+            if (Version1)
+            {
+                (x, y) = MapPoint(textH, textV);
+            }
             else
             {
                 int fh = MapFixed(unchecked((textH << 16) | fraction), fromRect.Left, fromRect.Right, toRect.Left, toRect.Right, macOS9);
@@ -331,7 +386,10 @@ namespace ClassicMac.Graphics.Pict
                     long ratio = ((long)(short)(toHi - toLo) << 16) / (short)(fromHi - fromLo);
                     d = FixedMath.FixMulHalfUp(d, (int)Math.Clamp(ratio, int.MinValue, int.MaxValue));
                 }
-                else d = unchecked((int)((long)d * toSize / fromSize));
+                else
+                {
+                    d = unchecked((int)((long)d * toSize / fromSize));
+                }
             }
             return unchecked(d + ((short)toLo << 16));
         }

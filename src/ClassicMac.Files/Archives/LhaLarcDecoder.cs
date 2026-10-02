@@ -12,7 +12,10 @@ internal static class LhaLarcDecoder
 
     public static byte[] DecodeLzs(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0) throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        if (expandedSize < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        }
 
         byte[] window = new byte[LzsWindowSize];
         window.AsSpan().Fill((byte)' ');
@@ -35,7 +38,9 @@ internal static class LhaLarcDecoder
             int sourceOffset = bits.Read(11);
             int length = bits.Read(4) + 2;
             if (length > output.Length - outputOffset)
+            {
                 throw new InvalidDataException("An LZS match exceeds the declared expanded size.");
+            }
 
             for (int i = 0; i < length; i++)
             {
@@ -51,7 +56,10 @@ internal static class LhaLarcDecoder
 
     public static byte[] DecodeLz5(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0) throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        if (expandedSize < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        }
 
         byte[] window = CreateInitialWindow();
         byte[] output = new byte[expandedSize];
@@ -78,7 +86,9 @@ internal static class LhaLarcDecoder
                 int sourceOffset = ((highAndLength & 0xF0) << 4) | low;
                 int length = (highAndLength & 0x0F) + 3;
                 if (length > output.Length - outputOffset)
+                {
                     throw new InvalidDataException("An LZ5 match exceeds the declared expanded size.");
+                }
 
                 for (int i = 0; i < length; i++)
                 {
@@ -102,8 +112,16 @@ internal static class LhaLarcDecoder
             window.AsSpan(offset, 13).Fill((byte)value);
             offset += 13;
         }
-        for (int value = 0; value < 256; value++) window[offset++] = (byte)value;
-        for (int value = 255; value >= 0; value--) window[offset++] = (byte)value;
+        for (int value = 0; value < 256; value++)
+        {
+            window[offset++] = (byte)value;
+        }
+
+        for (int value = 255; value >= 0; value--)
+        {
+            window[offset++] = (byte)value;
+        }
+
         window.AsSpan(offset, 128).Clear();
         offset += 128;
         window.AsSpan(offset, 110).Fill((byte)' ');
@@ -115,7 +133,10 @@ internal static class LhaLarcDecoder
     private static byte ReadByte(ReadOnlySpan<byte> packed, ref int offset)
     {
         if ((uint)offset >= (uint)packed.Length)
+        {
             throw new InvalidDataException("An LZ5 payload is truncated.");
+        }
+
         return packed[offset++];
     }
 
@@ -133,7 +154,10 @@ internal static class LhaLarcDecoder
             for (int bit = 0; bit < count; bit++)
             {
                 if (_byteOffset >= _packed.Length)
+                {
                     throw new InvalidDataException("An LZS payload is truncated.");
+                }
+
                 value = (value << 1) | ((_packed[_byteOffset] >> (7 - _bitOffset)) & 1);
                 if (++_bitOffset == 8)
                 {

@@ -94,11 +94,31 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// </summary>
         public static IReadOnlyDictionary<FourCC, short> DefaultIconIds { get; } = new Dictionary<FourCC, short>
         {
-            [F("docu")] = -4000, [F("sdoc")] = -3985, [F("APPL")] = -3996, [F("APPC")] = -3824, [F("APPD")] = -3991,
-            [F("fldr")] = -3999, [F("ofld")] = -3997, [F("shfl")] = -3978, [F("dbox")] = -3979, [F("mntd")] = -3977,
-            [F("ownd")] = -3980, [F("prvf")] = -3994, [F("hdsk")] = -3995, [F("flpy")] = -3998, [F("cddr")] = -3987,
-            [F("srvr")] = -3972, [F("desk")] = -3992, [F("trsh")] = -3993, [F("ftrh")] = -3984, [F("macs")] = -3983,
-            [F("pref")] = -3971, [F("abdg")] = -20789, [F("lbdg")] = -20786, [F("mbdg")] = -20787, [F("sbdg")] = -20788,
+            [F("docu")] = -4000,
+            [F("sdoc")] = -3985,
+            [F("APPL")] = -3996,
+            [F("APPC")] = -3824,
+            [F("APPD")] = -3991,
+            [F("fldr")] = -3999,
+            [F("ofld")] = -3997,
+            [F("shfl")] = -3978,
+            [F("dbox")] = -3979,
+            [F("mntd")] = -3977,
+            [F("ownd")] = -3980,
+            [F("prvf")] = -3994,
+            [F("hdsk")] = -3995,
+            [F("flpy")] = -3998,
+            [F("cddr")] = -3987,
+            [F("srvr")] = -3972,
+            [F("desk")] = -3992,
+            [F("trsh")] = -3993,
+            [F("ftrh")] = -3984,
+            [F("macs")] = -3983,
+            [F("pref")] = -3971,
+            [F("abdg")] = -20789,
+            [F("lbdg")] = -20786,
+            [F("mbdg")] = -20787,
+            [F("sbdg")] = -20788,
         };
 
         private static FourCC F(string s) => FourCC.FromString(s);
@@ -120,7 +140,15 @@ namespace ClassicMac.Resources.Decoders.Finder
         // An icon suite member's exact size, by type.
         private static readonly Dictionary<string, int> MemberSizes = new(StringComparer.Ordinal)
         {
-            ["ICN#"] = 256, ["icl4"] = 512, ["icl8"] = 1024, ["ics#"] = 64, ["ics4"] = 128, ["ics8"] = 256, ["icm#"] = 48, ["icm4"] = 96, ["icm8"] = 192,
+            ["ICN#"] = 256,
+            ["icl4"] = 512,
+            ["icl8"] = 1024,
+            ["ics#"] = 64,
+            ["ics4"] = 128,
+            ["ics8"] = 256,
+            ["icm#"] = 48,
+            ["icm4"] = 96,
+            ["icm8"] = 192,
         };
 
         private readonly ILookup<FourCC, FinderBundleSource> bundles;
@@ -168,7 +196,11 @@ namespace ClassicMac.Resources.Decoders.Finder
             bool read = false;
             ResourceFork? Own()
             {
-                if (!read && ownFork is not null) own = Read(ownFork);
+                if (!read && ownFork is not null)
+                {
+                    own = Read(ownFork);
+                }
+
                 read = true;
                 return own;
             }
@@ -176,28 +208,57 @@ namespace ClassicMac.Resources.Decoders.Finder
                 ? CustomBadge(badged)
                 : null;
             var badges = new List<IconSuite>();
-            if ((flags & IsAliasFlag) != 0 && SystemIcon(AliasBadge) is { } alias) badges.Add(alias);
-            if (isLocked && SystemIcon(LockedBadge) is { } locked) badges.Add(locked);
-            if (badge?.Icon is { } custom) badges.Add(custom);
+            if ((flags & IsAliasFlag) != 0 && SystemIcon(AliasBadge) is { } alias)
+            {
+                badges.Add(alias);
+            }
+
+            if (isLocked && SystemIcon(LockedBadge) is { } locked)
+            {
+                badges.Add(locked);
+            }
+
+            if (badge?.Icon is { } custom)
+            {
+                badges.Add(custom);
+            }
+
             return Icon(kind, type, creator, flags, Own, badge) with { Badges = badges };
         }
 
         private FinderIcon Icon(FinderItemKind kind, FourCC type, FourCC creator, ushort flags, Func<ResourceFork?> own, (IconSuite? Icon, FourCC Type, FourCC Creator)? badge)
         {
             if ((flags & HasCustomIconFlag) != 0 && own() is { } fork && CustomIcon(fork, readOptions) is { } customIcon)
+            {
                 return new FinderIcon(customIcon, FinderIconSource.Custom);
+            }
             // A folder: its package icon with kHasBundle (not drawn here), else the folder icon [Code: Finder 9.2.2].
-            if (kind == FinderItemKind.Folder) return System(Fldr);
+            if (kind == FinderItemKind.Folder)
+            {
+                return System(Fldr);
+            }
             // A custom badge's override type and creator replace the item's when it has no custom icon.
             if (badge is { Type: var overrideType, Creator: var overrideCreator } && overrideType != default)
+            {
                 (type, creator) = (overrideType, overrideCreator);
+            }
+
             bool system = false;
             if ((flags & IsStationeryFlag) != 0 && type != default)
+            {
                 type = new FourCC((type.Value & 0x00FFFFFF) | ((uint)'s' << 24));
+            }
+
             if ((flags & IsAliasFlag) != 0)
             {
-                if (FolderAliasTypes.Contains(type)) (type, system) = (Fldr, true);
-                else if (type == F("fasy")) (type, system) = (Macs, true);
+                if (FolderAliasTypes.Contains(type))
+                {
+                    (type, system) = (Fldr, true);
+                }
+                else if (type == F("fasy"))
+                {
+                    (type, system) = (Macs, true);
+                }
             }
             return IconRef(creator, type, system);
         }
@@ -206,15 +267,27 @@ namespace ClassicMac.Resources.Decoders.Finder
         // database (here the applications' bundles), the system's table by type, the generic icons [Code: Icon Services 9.2.2].
         private FinderIcon IconRef(FourCC creator, FourCC type, bool system)
         {
-            if (creator == default || creator == Unknown || type == default || type == Unknown) (creator, type) = (Macs, Docu);
+            if (creator == default || creator == Unknown || type == default || type == Unknown)
+            {
+                (creator, type) = (Macs, Docu);
+            }
+
             var mapped = Mapped(type);
             if (system || SystemCreators.Contains(creator) || type == Pref)
             {
                 var icon = System(mapped);
                 return icon.Suite is not null ? icon : Generic(mapped);
             }
-            if (ApplicationIcon(creator, type) is { } suite) return new FinderIcon(suite, FinderIconSource.Application);
-            if (!UnmappedTypes.Contains(type) && System(type) is { Suite: not null } byType) return byType;
+            if (ApplicationIcon(creator, type) is { } suite)
+            {
+                return new FinderIcon(suite, FinderIconSource.Application);
+            }
+
+            if (!UnmappedTypes.Contains(type) && System(type) is { Suite: not null } byType)
+            {
+                return byType;
+            }
+
             return Generic(mapped);
         }
 
@@ -248,15 +321,23 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             lock (systemIcons)
             {
-                if (systemIcons.TryGetValue(id, out var cached)) return cached;
+                if (systemIcons.TryGetValue(id, out var cached))
+                {
+                    return cached;
+                }
+
                 IconSuite? suite = null;
                 foreach (var fork in systemForks)
+                {
                     if (FamilyAt(fork, id) is { } family)
                     {
                         suite = family;
                         break;
                     }
+                }
+
                 if (suite is null)
+                {
                     foreach (var fork in systemForks)
                     {
                         var members = IconSuite.FromResources((t, i) => fork.Find(t, i) is { } r && Data(r, fork) is var d
@@ -267,6 +348,8 @@ namespace ClassicMac.Resources.Decoders.Finder
                             break;
                         }
                     }
+                }
+
                 return systemIcons[id] = suite;
             }
         }
@@ -274,7 +357,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         // The 'icns' of an ID as a suite; null when absent, empty or damaged.
         private IconSuite? FamilyAt(ResourceFork fork, short id)
         {
-            if (fork.Find(Icns, id) is not { } resource) return null;
+            if (fork.Find(Icns, id) is not { } resource)
+            {
+                return null;
+            }
+
             try
             {
                 var family = IconSuite.FromFamily(IconFamily.ReadIcns(Data(resource, fork)));
@@ -291,18 +378,35 @@ namespace ClassicMac.Resources.Decoders.Finder
         // badge is the icon family of its ID in the same fork, else the system's icon for its type.
         private (IconSuite? Icon, FourCC Type, FourCC Creator)? CustomBadge(ResourceFork fork)
         {
-            if (fork.Find(Badg, CustomIconId) is not { } resource) return null;
+            if (fork.Find(Badg, CustomIconId) is not { } resource)
+            {
+                return null;
+            }
+
             var data = Data(resource, fork);
-            if (data.Length < 0x1C) return null;
+            if (data.Length < 0x1C)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(data);
-            if (reader.ReadInt16At(0) > 0) return null;
+            if (reader.ReadInt16At(0) > 0)
+            {
+                return null;
+            }
+
             short id = reader.ReadInt16At(2);
             var type = reader.ReadFourCCAt(4);
             IconSuite? icon = null;
             if (id != 0)
+            {
                 icon = FamilyAt(fork, id) ?? (IconSuite.FromResources((t, i) => fork.Find(t, i) is { } r ? Data(r, fork) : null, id) is { Members.Count: > 0 } s ? s : null);
+            }
             else if (type != default)
+            {
                 icon = SystemIcon(type);
+            }
+
             return (icon, reader.ReadFourCCAt(0x14), reader.ReadFourCCAt(0x18));
         }
 
@@ -316,8 +420,16 @@ namespace ClassicMac.Resources.Decoders.Finder
             ReadOnlyMemory<byte>? Lookup(FourCC type, short id) =>
                 fork.Find(type, id) is { } r ? ResourceDecompression.Default.GetData(r, fork, readOptions) : null;
             var suite = IconSuite.FromResources(Lookup, CustomIconId);
-            if (suite.Members.ContainsKey("ICN#")) return suite;
-            if (Lookup(Icns, CustomIconId) is not { } icns) return null;
+            if (suite.Members.ContainsKey("ICN#"))
+            {
+                return suite;
+            }
+
+            if (Lookup(Icns, CustomIconId) is not { } icns)
+            {
+                return null;
+            }
+
             try
             {
                 var family = IconSuite.FromFamily(IconFamily.ReadIcns(icns));
@@ -338,14 +450,29 @@ namespace ClassicMac.Resources.Decoders.Finder
                 var map = (FourCC t) => bundle.Maps.Where(m => m.Type == t).SelectMany(m => m.Ids);
                 foreach (var (_, frefId) in map(Fref))
                 {
-                    if (fork.Find(Fref, frefId) is not { } r) continue;
+                    if (fork.Find(Fref, frefId) is not { } r)
+                    {
+                        continue;
+                    }
+
                     var reference = FinderResources.ReadFileReference(Data(r, fork), DecodeOptions.Default, out var complete);
-                    if (!complete || reference.FileType != type) continue;
+                    if (!complete || reference.FileType != type)
+                    {
+                        continue;
+                    }
+
                     foreach (var (local, iconId) in map(IconList))
                     {
-                        if (local != reference.LocalIconId) continue;
+                        if (local != reference.LocalIconId)
+                        {
+                            continue;
+                        }
+
                         var suite = IconSuite.FromResources((t, id) => fork.Find(t, id) is { } m ? Data(m, fork) : null, iconId);
-                        if (suite.Members.ContainsKey("ICN#") || suite.Members.ContainsKey("ics#")) return suite;
+                        if (suite.Members.ContainsKey("ICN#") || suite.Members.ContainsKey("ics#"))
+                        {
+                            return suite;
+                        }
                     }
                 }
             }
@@ -357,15 +484,26 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             lock (applications)
             {
-                if (applications.TryGetValue(creator, out var found)) return found;
+                if (applications.TryGetValue(creator, out var found))
+                {
+                    return found;
+                }
+
                 var list = new List<(ResourceFork, Bundle)>();
                 foreach (var source in bundles[creator])
                 {
-                    if (Read(source.Fork) is not { } fork) continue;
+                    if (Read(source.Fork) is not { } fork)
+                    {
+                        continue;
+                    }
+
                     foreach (var r in fork.OfType(Bndl))
                     {
                         var bundle = FinderResources.ReadBundle(Data(r, fork), out var complete);
-                        if (complete && bundle.Signature == creator) list.Add((fork, bundle));
+                        if (complete && bundle.Signature == creator)
+                        {
+                            list.Add((fork, bundle));
+                        }
                     }
                 }
                 return applications[creator] = list;
@@ -378,12 +516,19 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             foreach (var fork in systemForks)
             {
-                if (fork.Find(Isrv, 128) is not { } resource) continue;
+                if (fork.Find(Isrv, 128) is not { } resource)
+                {
+                    continue;
+                }
+
                 var data = Data(resource, fork);
                 var reader = new BigEndianReader(data);
                 var table = new Dictionary<FourCC, short>();
                 for (int offset = 0; offset <= data.Length - 6; offset += 6)
+                {
                     table.TryAdd(reader.ReadFourCCAt(offset), reader.ReadInt16At(offset + 4));
+                }
+
                 return table;
             }
             return DefaultIconIds;
@@ -393,9 +538,14 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             var colours = IconSuite.DefaultLabelColors.ToArray();
             for (int label = 1; label < colours.Length; label++)
+            {
                 foreach (var fork in systemForks)
                 {
-                    if (fork.Find(Rgb, (short)(-16392 + label)) is not { } resource) continue;
+                    if (fork.Find(Rgb, (short)(-16392 + label)) is not { } resource)
+                    {
+                        continue;
+                    }
+
                     var data = Data(resource, fork);
                     if (data.Length >= 6)
                     {
@@ -404,6 +554,8 @@ namespace ClassicMac.Resources.Decoders.Finder
                     }
                     break;
                 }
+            }
+
             return colours;
         }
 

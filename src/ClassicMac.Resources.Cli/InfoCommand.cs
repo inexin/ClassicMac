@@ -26,7 +26,11 @@ namespace ClassicMac.Resources.Cli
             }
 
             output.WriteLine($"{input.FullName}");
-            foreach (var companion in opened.Host.Companions) output.WriteLine($"  with {companion}");
+            foreach (var companion in opened.Host.Companions)
+            {
+                output.WriteLine($"  with {companion}");
+            }
+
             Write(opened.Root, 0);
             return reporter.ExitCode;
         }
@@ -39,9 +43,15 @@ namespace ClassicMac.Resources.Cli
             output.WriteLine($"{indent}{node.Format}: \"{file.MacPath}\"");
             output.WriteLine($"{indent}  type '{info.Type}'  creator '{info.Creator}'  flags {Flags(info.Flags)}");
             if (file.Created is not null || file.Modified is not null)
+            {
                 output.WriteLine($"{indent}  created {Date(file.Created)}  modified {Date(file.Modified)}");
+            }
+
             output.WriteLine($"{indent}  data fork {file.DataFork.Length} bytes  resource fork {file.ResourceFork.Length} bytes");
-            foreach (var child in node.Children) Write(child, depth + 1);
+            foreach (var child in node.Children)
+            {
+                Write(child, depth + 1);
+            }
         }
 
         private static string Flags(FinderFlags flags) =>

@@ -2,12 +2,12 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
-using SkiaSharp;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using SkiaSharp;
 
 namespace ClassicMac.Graphics.SkiaSharp
 {
@@ -87,10 +87,20 @@ namespace ClassicMac.Graphics.SkiaSharp
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (QuickTimeImageFile.IsQuickTimeImageFile(data))
+            {
                 return ToSKBitmap(QuickTimeImageFile.Decode(data, new SkiaImageCodec()));
+            }
+
             if (PictHeader.IsPicture(data) || PictHeader.IsPictFile(data))
+            {
                 return ToSKBitmap(PictReader.Decode(data, CoreOptions(options), cancellationToken));
-            if (MacPaintFile.IsMacPaintFile(data)) return ToSKBitmap(MacPaintFile.Decode(data));
+            }
+
+            if (MacPaintFile.IsMacPaintFile(data))
+            {
+                return ToSKBitmap(MacPaintFile.Decode(data));
+            }
+
             return null;
         }
 
@@ -130,7 +140,10 @@ namespace ClassicMac.Graphics.SkiaSharp
             var destination = result.GetPixels();
             int rowBytes = bitmap.Width * 4;
             for (int y = 0; y < bitmap.Height; y++)
+            {
                 Marshal.Copy(bitmap.Pixels, y * rowBytes, destination + y * result.RowBytes, rowBytes);
+            }
+
             return result;
         }
 
@@ -145,7 +158,9 @@ namespace ClassicMac.Graphics.SkiaSharp
             {
                 using var source = bitmap.PeekPixels();
                 if (source == null || !source.ReadPixels(info, handle.AddrOfPinnedObject(), info.Width * 4, 0, 0))
+                {
                     throw new NotSupportedException($"Cannot read pixels of colour type {bitmap.ColorType}.");
+                }
             }
             finally
             {

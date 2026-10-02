@@ -257,26 +257,52 @@ public sealed class CompactProFeatureTests
             var bits = new List<bool>();
             int symbolCount = ((value + 2) / 2) * 2;
             WriteBits(bits, symbolCount / 2, 8);
-            for (int symbol = 0; symbol < symbolCount; symbol++) WriteBits(bits, symbol == value ? 1 : 0, 4);
+            for (int symbol = 0; symbol < symbolCount; symbol++)
+            {
+                WriteBits(bits, symbol == value ? 1 : 0, 4);
+            }
+
             WriteBits(bits, 0, 8); // No match-length symbols are needed for a literal-only stream.
             WriteBits(bits, 0, 8); // No displacement symbols are needed for a literal-only stream.
             WriteBits(bits, 1, 1); // Literal token.
             WriteBits(bits, 0, 1); // The only defined symbol has the canonical one-bit code 0.
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
         public static byte[] BuildLzhLiteralThenMatch(byte value, int length, int distance)
         {
-            if (length is < 0 or >= 4) throw new ArgumentOutOfRangeException(nameof(length));
-            if (distance != 1) throw new ArgumentOutOfRangeException(nameof(distance));
+            if (length is < 0 or >= 4)
+            {
+                throw new ArgumentOutOfRangeException(nameof(length));
+            }
+
+            if (distance != 1)
+            {
+                throw new ArgumentOutOfRangeException(nameof(distance));
+            }
+
             var bits = new List<bool>();
             WriteBits(bits, 33, 8);
-            for (int symbol = 0; symbol < 66; symbol++) WriteBits(bits, symbol == value ? 1 : 0, 4);
+            for (int symbol = 0; symbol < 66; symbol++)
+            {
+                WriteBits(bits, symbol == value ? 1 : 0, 4);
+            }
+
             WriteBits(bits, 2, 8); // Four length symbols, with the requested length represented by one code.
-            for (int symbol = 0; symbol < 4; symbol++) WriteBits(bits, symbol == length ? 1 : 0, 4);
+            for (int symbol = 0; symbol < 4; symbol++)
+            {
+                WriteBits(bits, symbol == length ? 1 : 0, 4);
+            }
+
             WriteBits(bits, 1, 8); // Two displacement symbols, with the upper displacement 0 defined.
             WriteBits(bits, 1, 4);
             WriteBits(bits, 0, 4);
@@ -288,7 +314,13 @@ public sealed class CompactProFeatureTests
             WriteBits(bits, distance, 6); // Lower six displacement bits.
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
@@ -296,28 +328,57 @@ public sealed class CompactProFeatureTests
         {
             var bits = new List<bool>();
             WriteLzhLiteralTree(bits, value);
-            for (int index = 0; index < firstBlockLiterals; index++) WriteBits(bits, 2, 2);
-            while ((bits.Count & 15) != 0) bits.Add(false);
-            for (int index = 0; index < 16; index++) bits.Add(false); // A block boundary discards 16..31 bits.
+            for (int index = 0; index < firstBlockLiterals; index++)
+            {
+                WriteBits(bits, 2, 2);
+            }
+
+            while ((bits.Count & 15) != 0)
+            {
+                bits.Add(false);
+            }
+
+            for (int index = 0; index < 16; index++)
+            {
+                bits.Add(false); // A block boundary discards 16..31 bits.
+            }
+
             WriteLzhLiteralTree(bits, value);
-            for (int index = 0; index < secondBlockLiterals; index++) WriteBits(bits, 2, 2);
+            for (int index = 0; index < secondBlockLiterals; index++)
+            {
+                WriteBits(bits, 2, 2);
+            }
+
             byte[] encoded = new byte[(bits.Count + 7) / 8];
             for (int bit = 0; bit < bits.Count; bit++)
-                if (bits[bit]) encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+            {
+                if (bits[bit])
+                {
+                    encoded[bit / 8] |= (byte)(0x80 >> (bit & 7));
+                }
+            }
+
             return encoded;
         }
 
         private static void WriteLzhLiteralTree(List<bool> bits, byte value)
         {
             WriteBits(bits, 33, 8);
-            for (int symbol = 0; symbol < 66; symbol++) WriteBits(bits, symbol == value ? 1 : 0, 4);
+            for (int symbol = 0; symbol < 66; symbol++)
+            {
+                WriteBits(bits, symbol == value ? 1 : 0, 4);
+            }
+
             WriteBits(bits, 0, 8);
             WriteBits(bits, 0, 8);
         }
 
         private static void WriteBits(List<bool> bits, int value, int count)
         {
-            for (int bit = count - 1; bit >= 0; bit--) bits.Add((value & (1 << bit)) != 0);
+            for (int bit = count - 1; bit >= 0; bit--)
+            {
+                bits.Add((value & (1 << bit)) != 0);
+            }
         }
 
         public static byte[] BuildNestedFile()
@@ -362,7 +423,9 @@ public sealed class CompactProFeatureTests
             {
                 crc ^= value;
                 for (int bit = 0; bit < 8; bit++)
+                {
                     crc = (crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xEDB88320u);
+                }
             }
             return crc;
         }

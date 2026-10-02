@@ -42,12 +42,21 @@ namespace ClassicMac.Resources.Compression
         {
             var header = context.Header;
             if (!header.IsVersion8)
+            {
                 throw new DecompressionFormException($"'dcmp' {id} has the version-8 entry point but the resource uses a version-9 header.");
+            }
 
             var cursor = new BlockCursor(context);
             var memo = new MemoTable(WorkSize(header, context.Options.ResourceManager), cursor, context);
-            if (id == 0) Run0(cursor, memo);
-            else Run1(cursor, memo);
+            if (id == 0)
+            {
+                Run0(cursor, memo);
+            }
+            else
+            {
+                Run1(cursor, memo);
+            }
+
             return cursor.Written;
         }
 
@@ -58,50 +67,95 @@ namespace ClassicMac.Resources.Compression
             var block = (uint)(header.DecompressedSize + header.ExpansionBytes);
             var frac = header.WorkingBufferFraction;
             if (model == ResourceManagerModel.Rom68k)
+            {
                 return (frac == 0 ? 0 : unchecked(block * (uint)(frac + 1)) >> 8) + 4;
+            }
+
             return (frac == 0 ? 0 : unchecked((int)(block * (uint)(frac + 1))) >> 8) + 2;
         }
 
         private static void Run0(BlockCursor cursor, MemoTable memo)
         {
-            for (;;)
+            for (; ; )
             {
                 var op = cursor.ReadByte();
                 switch (op)
                 {
-                    case 0x00: cursor.CopyLiteral((2 * ReadVarint(cursor)) & 0xFFFF); break;
-                    case < 0x10: cursor.CopyLiteral(op * 2); break;
-                    case 0x10: RememberAndCopy(cursor, memo, (2 * ReadVarint(cursor)) & 0xFFFF); break;
-                    case < 0x20: RememberAndCopy(cursor, memo, (op - 0x10) * 2); break;
-                    case 0x20: memo.Recall(cursor.ReadByte() + 0x28); break;
-                    case 0x21: memo.Recall(cursor.ReadByte() + 0x128); break;
-                    case 0x22: memo.Recall((cursor.ReadU16() + 0x28) & 0xFFFF); break;
-                    case < 0x4B: memo.Recall(op - 0x23); break;
-                    case < 0xFE: cursor.WriteU16(Table0[op - 0x4B]); break;
-                    case 0xFE: Extension(cursor); break;
-                    default: return;
+                    case 0x00:
+                        cursor.CopyLiteral((2 * ReadVarint(cursor)) & 0xFFFF);
+                        break;
+                    case < 0x10:
+                        cursor.CopyLiteral(op * 2);
+                        break;
+                    case 0x10:
+                        RememberAndCopy(cursor, memo, (2 * ReadVarint(cursor)) & 0xFFFF);
+                        break;
+                    case < 0x20:
+                        RememberAndCopy(cursor, memo, (op - 0x10) * 2);
+                        break;
+                    case 0x20:
+                        memo.Recall(cursor.ReadByte() + 0x28);
+                        break;
+                    case 0x21:
+                        memo.Recall(cursor.ReadByte() + 0x128);
+                        break;
+                    case 0x22:
+                        memo.Recall((cursor.ReadU16() + 0x28) & 0xFFFF);
+                        break;
+                    case < 0x4B:
+                        memo.Recall(op - 0x23);
+                        break;
+                    case < 0xFE:
+                        cursor.WriteU16(Table0[op - 0x4B]);
+                        break;
+                    case 0xFE:
+                        Extension(cursor);
+                        break;
+                    default:
+                        return;
                 }
             }
         }
 
         private static void Run1(BlockCursor cursor, MemoTable memo)
         {
-            for (;;)
+            for (; ; )
             {
                 var op = cursor.ReadByte();
                 switch (op)
                 {
-                    case < 0x10: cursor.CopyLiteral(op + 1); break;
-                    case < 0x20: RememberAndCopy(cursor, memo, op - 0x0F); break;
-                    case < 0xD0: memo.Recall(op - 0x20); break;
-                    case 0xD0: cursor.CopyLiteral(ReadVarint(cursor) & 0xFFFF); break;
-                    case 0xD1: RememberAndCopy(cursor, memo, ReadVarint(cursor) & 0xFFFF); break;
-                    case 0xD2: memo.Recall(cursor.ReadByte() + 0xB0); break;
-                    case 0xD3: memo.Recall(cursor.ReadByte() + 0x1B0); break;
-                    case 0xD4: memo.Recall((cursor.ReadU16() + 0xB0) & 0xFFFF); break;
-                    case < 0xFE: cursor.WriteU16(Table1[op - 0xD5]); break;
-                    case 0xFE: Extension(cursor); break;
-                    default: return;
+                    case < 0x10:
+                        cursor.CopyLiteral(op + 1);
+                        break;
+                    case < 0x20:
+                        RememberAndCopy(cursor, memo, op - 0x0F);
+                        break;
+                    case < 0xD0:
+                        memo.Recall(op - 0x20);
+                        break;
+                    case 0xD0:
+                        cursor.CopyLiteral(ReadVarint(cursor) & 0xFFFF);
+                        break;
+                    case 0xD1:
+                        RememberAndCopy(cursor, memo, ReadVarint(cursor) & 0xFFFF);
+                        break;
+                    case 0xD2:
+                        memo.Recall(cursor.ReadByte() + 0xB0);
+                        break;
+                    case 0xD3:
+                        memo.Recall(cursor.ReadByte() + 0x1B0);
+                        break;
+                    case 0xD4:
+                        memo.Recall((cursor.ReadU16() + 0xB0) & 0xFFFF);
+                        break;
+                    case < 0xFE:
+                        cursor.WriteU16(Table1[op - 0xD5]);
+                        break;
+                    case 0xFE:
+                        Extension(cursor);
+                        break;
+                    default:
+                        return;
                 }
             }
         }
@@ -117,8 +171,16 @@ namespace ClassicMac.Resources.Compression
         internal static int ReadVarint(BlockCursor cursor)
         {
             var b = cursor.ReadByte();
-            if (b < 0x80) return b;
-            if (b == 0xFF) return (int)cursor.ReadU32();
+            if (b < 0x80)
+            {
+                return b;
+            }
+
+            if (b == 0xFF)
+            {
+                return (int)cursor.ReadU32();
+            }
+
             return (b - 0xC0) * 256 + cursor.ReadByte();
         }
 
@@ -128,91 +190,117 @@ namespace ClassicMac.Resources.Compression
             switch (cursor.ReadByte())
             {
                 case 0: // export table: seg, cnt, cnt × delta; exactly cnt entries, then a trailing 3F3C seg A9F0
-                {
-                    var segment = ReadVarint(cursor);
-                    var count = ReadVarint(cursor) & 0xFFFF;
-                    var index = 6;
-                    for (var i = 0; i < count; i++)
                     {
-                        index = (index + ReadVarint(cursor) - 6) & 0xFFFF;
+                        var segment = ReadVarint(cursor);
+                        var count = ReadVarint(cursor) & 0xFFFF;
+                        var index = 6;
+                        for (var i = 0; i < count; i++)
+                        {
+                            index = (index + ReadVarint(cursor) - 6) & 0xFFFF;
+                            cursor.WriteU16(0x3F3C);
+                            cursor.WriteU16(segment);
+                            cursor.WriteU16(0xA9F0);
+                            cursor.WriteU16(index);
+                        }
                         cursor.WriteU16(0x3F3C);
                         cursor.WriteU16(segment);
                         cursor.WriteU16(0xA9F0);
-                        cursor.WriteU16(index);
+                        break;
                     }
-                    cursor.WriteU16(0x3F3C);
-                    cursor.WriteU16(segment);
-                    cursor.WriteU16(0xA9F0);
-                    break;
-                }
                 case 1: // jump table: target, a5 delta, cnt, a5 offset; (cnt & $FFFF) + 1 entries of 6100 target 4EED a5
-                {
-                    var target = ReadVarint(cursor);
-                    var a5Delta = ReadVarint(cursor);
-                    var count = (ReadVarint(cursor) & 0xFFFF) + 1;
-                    var a5 = ReadVarint(cursor);
-                    for (var i = 0; i < count; i++)
                     {
-                        if (i > 0)
+                        var target = ReadVarint(cursor);
+                        var a5Delta = ReadVarint(cursor);
+                        var count = (ReadVarint(cursor) & 0xFFFF) + 1;
+                        var a5 = ReadVarint(cursor);
+                        for (var i = 0; i < count; i++)
                         {
-                            target -= 8;
-                            if ((a5Delta & 0xFFFF) == 0) a5 = ReadVarint(cursor);
-                            else a5 += a5Delta;
+                            if (i > 0)
+                            {
+                                target -= 8;
+                                if ((a5Delta & 0xFFFF) == 0)
+                                {
+                                    a5 = ReadVarint(cursor);
+                                }
+                                else
+                                {
+                                    a5 += a5Delta;
+                                }
+                            }
+                            cursor.WriteU16(0x6100);
+                            cursor.WriteU16(target);
+                            cursor.WriteU16(0x4EED);
+                            cursor.WriteU16(a5);
                         }
-                        cursor.WriteU16(0x6100);
-                        cursor.WriteU16(target);
-                        cursor.WriteU16(0x4EED);
-                        cursor.WriteU16(a5);
+                        break;
                     }
-                    break;
-                }
                 case 2: // byte run
-                {
-                    var value = (byte)ReadVarint(cursor);
-                    var count = (ReadVarint(cursor) & 0xFFFF) + 1;
-                    for (var i = 0; i < count; i++) cursor.WriteByte(value);
-                    break;
-                }
+                    {
+                        var value = (byte)ReadVarint(cursor);
+                        var count = (ReadVarint(cursor) & 0xFFFF) + 1;
+                        for (var i = 0; i < count; i++)
+                        {
+                            cursor.WriteByte(value);
+                        }
+
+                        break;
+                    }
                 case 3: // word run
-                {
-                    var value = ReadVarint(cursor);
-                    var count = (ReadVarint(cursor) & 0xFFFF) + 1;
-                    for (var i = 0; i < count; i++) cursor.WriteU16(value);
-                    break;
-                }
+                    {
+                        var value = ReadVarint(cursor);
+                        var count = (ReadVarint(cursor) & 0xFFFF) + 1;
+                        for (var i = 0; i < count; i++)
+                        {
+                            cursor.WriteU16(value);
+                        }
+
+                        break;
+                    }
                 case 4: // words, signed-byte deltas
-                {
-                    var value = ReadVarint(cursor);
-                    var count = (ReadVarint(cursor) & 0xFFFF) + 1;
-                    for (var i = 0; i < count; i++)
                     {
-                        if (i > 0) value += (sbyte)cursor.ReadByte();
-                        cursor.WriteU16(value);
+                        var value = ReadVarint(cursor);
+                        var count = (ReadVarint(cursor) & 0xFFFF) + 1;
+                        for (var i = 0; i < count; i++)
+                        {
+                            if (i > 0)
+                            {
+                                value += (sbyte)cursor.ReadByte();
+                            }
+
+                            cursor.WriteU16(value);
+                        }
+                        break;
                     }
-                    break;
-                }
                 case 5: // words, varint deltas
-                {
-                    var value = ReadVarint(cursor);
-                    var count = (ReadVarint(cursor) & 0xFFFF) + 1;
-                    for (var i = 0; i < count; i++)
                     {
-                        if (i > 0) value += ReadVarint(cursor);
-                        cursor.WriteU16(value);
+                        var value = ReadVarint(cursor);
+                        var count = (ReadVarint(cursor) & 0xFFFF) + 1;
+                        for (var i = 0; i < count; i++)
+                        {
+                            if (i > 0)
+                            {
+                                value += ReadVarint(cursor);
+                            }
+
+                            cursor.WriteU16(value);
+                        }
+                        break;
                     }
-                    break;
-                }
                 case 6: // longs, varint deltas
-                {
-                    var value = (uint)ReadVarint(cursor);
-                    var count = (ReadVarint(cursor) & 0xFFFF) + 1;
-                    for (var i = 0; i < count; i++)
                     {
-                        if (i > 0) value += (uint)ReadVarint(cursor);
-                        cursor.WriteU32(value);
+                        var value = (uint)ReadVarint(cursor);
+                        var count = (ReadVarint(cursor) & 0xFFFF) + 1;
+                        for (var i = 0; i < count; i++)
+                        {
+                            if (i > 0)
+                            {
+                                value += (uint)ReadVarint(cursor);
+                            }
+
+                            cursor.WriteU32(value);
+                        }
+                        break;
                     }
-                    break;
-                }
                 default: // 7 and above: only the sub-op byte is consumed
                     break;
             }
@@ -246,7 +334,11 @@ namespace ClassicMac.Resources.Compression
                 var start = (ushort)(Word((ushort)(slot - 2)) - length);
                 SetWord(slot, start);
                 SetWord(0, (ushort)(slot + 2));
-                for (var i = 0; i < length; i++) Set(start + i, cursor.PeekByte(i));
+                for (var i = 0; i < length; i++)
+                {
+                    Set(start + i, cursor.PeekByte(i));
+                }
+
                 count++;
             }
 
@@ -261,7 +353,10 @@ namespace ClassicMac.Resources.Compression
                 var at = (ushort)(4 + 2 * index);
                 var start = Word(at);
                 var length = (ushort)(Word((ushort)(at - 2)) - start);
-                for (var i = 0; i < length; i++) cursor.WriteByte(Get(start + i));
+                for (var i = 0; i < length; i++)
+                {
+                    cursor.WriteByte(Get(start + i));
+                }
             }
 
             private ushort Word(int at) => (ushort)(Get(at) << 8 | Get(at + 1));
@@ -274,13 +369,21 @@ namespace ClassicMac.Resources.Compression
 
             private byte Get(int at)
             {
-                if (at >= work.Length) throw new DecompressionOverrunException("A memo string lies outside the working buffer.");
+                if (at >= work.Length)
+                {
+                    throw new DecompressionOverrunException("A memo string lies outside the working buffer.");
+                }
+
                 return work[at];
             }
 
             private void Set(int at, byte value)
             {
-                if (at >= work.Length) throw new DecompressionOverrunException("A memo string lies outside the working buffer.");
+                if (at >= work.Length)
+                {
+                    throw new DecompressionOverrunException("A memo string lies outside the working buffer.");
+                }
+
                 work[at] = value;
             }
         }

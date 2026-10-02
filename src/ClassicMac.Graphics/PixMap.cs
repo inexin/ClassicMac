@@ -26,7 +26,11 @@ namespace ClassicMac.Graphics
         // A palette entry's 16-bit components.
         internal (int r, int g, int b) Exact(int index)
         {
-            if (index < Palette16.Length) return Palette16[index];
+            if (index < Palette16.Length)
+            {
+                return Palette16[index];
+            }
+
             var c = index < Palette.Length ? Palette[index] : new RgbaColor(0, 0, 0);
             return (c.R * 257, c.G * 257, c.B * 257);
         }
@@ -43,27 +47,27 @@ namespace ClassicMac.Graphics
             switch (PixelSize)
             {
                 case 16:
-                {
-                    int p = (Data[row + 2 * x] << 8) | Data[row + 2 * x + 1];
-                    int r5 = (p >> 10) & 0x1F, g5 = (p >> 5) & 0x1F, b5 = p & 0x1F;
-                    return new RgbaColor((byte)((r5 << 3) | (r5 >> 2)), (byte)((g5 << 3) | (g5 >> 2)), (byte)((b5 << 3) | (b5 >> 2)));
-                }
-                case 32:
-                {
-                    int i = row + 4 * x;
-                    return new RgbaColor(Data[i + 1], Data[i + 2], Data[i + 3]);
-                }
-                default:
-                {
-                    int bitPos = x * PixelSize;
-                    int value = 0;
-                    for (int i = 0; i < PixelSize; i++)
                     {
-                        int bit = bitPos + i;
-                        value = (value << 1) | ((Data[row + (bit >> 3)] >> (7 - (bit & 7))) & 1);
+                        int p = (Data[row + 2 * x] << 8) | Data[row + 2 * x + 1];
+                        int r5 = (p >> 10) & 0x1F, g5 = (p >> 5) & 0x1F, b5 = p & 0x1F;
+                        return new RgbaColor((byte)((r5 << 3) | (r5 >> 2)), (byte)((g5 << 3) | (g5 >> 2)), (byte)((b5 << 3) | (b5 >> 2)));
                     }
-                    return value < Palette.Length ? Palette[value] : new RgbaColor(0, 0, 0);
-                }
+                case 32:
+                    {
+                        int i = row + 4 * x;
+                        return new RgbaColor(Data[i + 1], Data[i + 2], Data[i + 3]);
+                    }
+                default:
+                    {
+                        int bitPos = x * PixelSize;
+                        int value = 0;
+                        for (int i = 0; i < PixelSize; i++)
+                        {
+                            int bit = bitPos + i;
+                            value = (value << 1) | ((Data[row + (bit >> 3)] >> (7 - (bit & 7))) & 1);
+                        }
+                        return value < Palette.Length ? Palette[value] : new RgbaColor(0, 0, 0);
+                    }
             }
         }
 
@@ -72,7 +76,10 @@ namespace ClassicMac.Graphics
         {
             int bit = x * PixelSize, value = 0, row = y * RowBytes;
             for (int i = 0; i < PixelSize; i++, bit++)
+            {
                 value = (value << 1) | ((Data[row + (bit >> 3)] >> (7 - (bit & 7))) & 1);
+            }
+
             return value;
         }
 
@@ -103,7 +110,10 @@ namespace ClassicMac.Graphics
             if (pm.IsPixMap)
             {
                 pm.ReadPixMapFields(b);
-                if (!macOS9 || pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+                if (!macOS9 || pm.PixelSize < 9)
+                {
+                    (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+                }
             }
             else
             {
@@ -120,7 +130,11 @@ namespace ClassicMac.Graphics
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = true, MacOS9 = macOS9 };
             pm.Bounds = PictRect.Read(b);
             pm.ReadPixMapFields(b);
-            if (macOS9 && pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+            if (macOS9 && pm.PixelSize < 9)
+            {
+                (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+            }
+
             return pm;
         }
 
@@ -131,7 +145,11 @@ namespace ClassicMac.Graphics
             var pm = new PixMap { RowBytes = rawRowBytes & RowBytesMask, IsPixMap = true, MacOS9 = macOS9 };
             pm.Bounds = PictRect.Read(b);
             pm.ReadPixMapFields(b);
-            if (!macOS9 || pm.PixelSize < 9) (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+            if (!macOS9 || pm.PixelSize < 9)
+            {
+                (pm.Palette, pm.Palette16) = ReadColorTableExact(b, pm.PixelSize);
+            }
+
             pm.ReadPixData(b);
             return pm;
         }
@@ -153,7 +171,9 @@ namespace ClassicMac.Graphics
             b.ReadUInt32();                  // pmTable
             b.ReadUInt32();                  // pmReserved
             if (PixelSize != 1 && PixelSize != 2 && PixelSize != 4 && PixelSize != 8 && PixelSize != 16 && PixelSize != 32)
+            {
                 throw new NotSupportedException($"PixMap pixelSize {PixelSize} is not a QuickDraw depth");
+            }
         }
 
         // ColorTable: ctSeed, ctFlags, ctSize (entries - 1, signed, so -1 is no entries), then (value, RGB) entries. A device table (ctFlags bit 15)
@@ -168,7 +188,11 @@ namespace ClassicMac.Graphics
             bool positional = (ctFlags & 0x8000) != 0;
             var palette = new RgbaColor[1 << Math.Min(pixelSize, 8)];
             var exact = new (ushort r, ushort g, ushort b)[palette.Length];
-            for (int i = 0; i < palette.Length; i++) palette[i] = new RgbaColor(0, 0, 0);
+            for (int i = 0; i < palette.Length; i++)
+            {
+                palette[i] = new RgbaColor(0, 0, 0);
+            }
+
             for (int i = 0; i <= ctSize; i++)
             {
                 int value = b.ReadUInt16();
@@ -230,43 +254,52 @@ namespace ClassicMac.Graphics
             switch (packType)
             {
                 case 3:
-                {
-                    var line = new byte[RowBytes];
-                    for (int y = 0; y < height; y++)
                     {
-                        UnpackRow(b, line, sizesAreWords, wordChunks: true, MacOS9);
-                        Buffer.BlockCopy(line, 0, Data, y * RowBytes, RowBytes);
+                        var line = new byte[RowBytes];
+                        for (int y = 0; y < height; y++)
+                        {
+                            UnpackRow(b, line, sizesAreWords, wordChunks: true, MacOS9);
+                            Buffer.BlockCopy(line, 0, Data, y * RowBytes, RowBytes);
+                        }
+                        return;
                     }
-                    return;
-                }
                 case 4 when MacOS9:
                     ReadPlanesMacOS9(b, height, sizesAreWords, pixels);
                     return;
                 case 4:
-                {
-                    int planes = Math.Clamp(CmpCount, 1, 4), first = 4 - planes;
-                    var packed = new byte[pixels * planes];
-                    for (int y = 0; y < height; y++)
                     {
-                        UnpackRow(b, packed, sizesAreWords, wordChunks: false, MacOS9);
-                        int row = y * RowBytes;
-                        for (int k = 0; k < planes; k++)
-                            for (int x = 0; x < pixels; x++)
-                                Data[row + 4 * x + first + k] = packed[k * pixels + x];
+                        int planes = Math.Clamp(CmpCount, 1, 4), first = 4 - planes;
+                        var packed = new byte[pixels * planes];
+                        for (int y = 0; y < height; y++)
+                        {
+                            UnpackRow(b, packed, sizesAreWords, wordChunks: false, MacOS9);
+                            int row = y * RowBytes;
+                            for (int k = 0; k < planes; k++)
+                            {
+                                for (int x = 0; x < pixels; x++)
+                                {
+                                    Data[row + 4 * x + first + k] = packed[k * pixels + x];
+                                }
+                            }
+                        }
+                        return;
                     }
-                    return;
-                }
                 default:
                     if (packType >= 5)
                     {
                         for (int y = 0; y < height; y++)
+                        {
                             b.Skip(sizesAreWords ? b.ReadUInt16() : b.ReadByte());
+                        }
+
                         return;
                     }
                     var raw = b.ReadBytes(pixels * height * 3).ToArray();
                     for (int i = 0, s = 0; i < pixels * height; i++, s += 3)
                     {
-                        Data[4 * i + 1] = raw[s]; Data[4 * i + 2] = raw[s + 1]; Data[4 * i + 3] = raw[s + 2];
+                        Data[4 * i + 1] = raw[s];
+                        Data[4 * i + 2] = raw[s + 1];
+                        Data[4 * i + 3] = raw[s + 2];
                     }
                     return;
             }
@@ -294,22 +327,37 @@ namespace ClassicMac.Graphics
                     sbyte flag = (sbyte)memory[src++];
                     if (flag >= 0)
                     {
-                        for (int i = 0; i <= flag && dst < n && src < memory.Length; i++) memory[packSize + dst++] = memory[src++];
+                        for (int i = 0; i <= flag && dst < n && src < memory.Length; i++)
+                        {
+                            memory[packSize + dst++] = memory[src++];
+                        }
                     }
                     else
                     {
-                        if (src >= memory.Length) break;
+                        if (src >= memory.Length)
+                        {
+                            break;
+                        }
+
                         byte v = memory[src++];
-                        for (int i = 0; i < 1 - flag && dst < n; i++) memory[packSize + dst++] = v;
+                        for (int i = 0; i < 1 - flag && dst < n; i++)
+                        {
+                            memory[packSize + dst++] = v;
+                        }
                     }
                 }
                 int row = y * RowBytes;
                 for (int k = 0; k < planes; k++)
+                {
                     for (int x = 0; x < pixels; x++)
                     {
                         int at = k * pixels + x;
-                        if (at < n) Data[row + 4 * x + first + k] = memory[packSize + at];
+                        if (at < n)
+                        {
+                            Data[row + 4 * x + first + k] = memory[packSize + at];
+                        }
                     }
+                }
             }
         }
 

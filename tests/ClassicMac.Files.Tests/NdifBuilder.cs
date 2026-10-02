@@ -48,7 +48,11 @@ internal static class NdifBuilder
     public static byte[] Fork(params (string Type, short Id, byte[] Data)[] resources)
     {
         var fork = new ResourceFork();
-        foreach (var (type, id, bytes) in resources) fork.Add(new Resource(FourCC.FromString(type), id, bytes));
+        foreach (var (type, id, bytes) in resources)
+        {
+            fork.Add(new Resource(FourCC.FromString(type), id, bytes));
+        }
+
         return fork.ToArray();
     }
 
@@ -70,7 +74,11 @@ internal static class NdifBuilder
         {
             // A run of one repeated byte: the byte as a literal, then a long match one back.
             var run = 1;
-            while (i + run < input.Length && input[i + run] == input[i] && run < 68) run++;
+            while (i + run < input.Length && input[i + run] == input[i] && run < 68)
+            {
+                run++;
+            }
+
             if (run >= 5)
             {
                 output.AddRange([0x80, input[i], (byte)(0x40 | (run - 1 - 4)), 0, 0]);

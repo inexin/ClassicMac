@@ -42,14 +42,24 @@ namespace ClassicMac.App.ViewModels
         public static bool HasNoName(MacString name)
         {
             foreach (var b in name.Bytes)
-                if (b is > 0x20 and not 0x7F and not 0xCA) return false;
+            {
+                if (b is > 0x20 and not 0x7F and not 0xCA)
+                {
+                    return false;
+                }
+            }
+
             return true;
         }
 
         /// <summary>A name with its whitespace made visible: ␣ space, ⍽ option-space, ↵ return, control pictures for the other control characters.</summary>
         public static string VisibleName(MacString name)
         {
-            if (name.Bytes.Length == 0) return "(empty)";
+            if (name.Bytes.Length == 0)
+            {
+                return "(empty)";
+            }
+
             var text = new StringBuilder();
             foreach (var b in name.Bytes)
             {
@@ -88,7 +98,11 @@ namespace ClassicMac.App.ViewModels
         // or titled "(no name)"; the nodes are kept, so their expansion and the selection stay.
         private static void Layout(NodeViewModel node)
         {
-            if (node.Items is not { } items) return;
+            if (node.Items is not { } items)
+            {
+                return;
+            }
+
             var display = node.Input.Display;
             var shown = items.Where(i => !(display.HideInvisible && IsInvisibleFile(i))).ToList();
             var noName = shown.Where(IsNoNameFile).ToList();
@@ -117,11 +131,18 @@ namespace ClassicMac.App.ViewModels
             else
             {
                 group?.Children.Clear();
-                foreach (var file in noName) (file.Alias, file.IsItalic) = ("(no name)", true);
+                foreach (var file in noName)
+                {
+                    (file.Alias, file.IsItalic) = ("(no name)", true);
+                }
+
                 desired = shown;
             }
             Sync(node.Children, desired);
-            foreach (var item in items) Layout(item);
+            foreach (var item in items)
+            {
+                Layout(item);
+            }
         }
 
         // Makes a collection hold the nodes wanted, in order, moving the ones it has rather than re-adding them.
@@ -129,20 +150,43 @@ namespace ClassicMac.App.ViewModels
         {
             for (var i = 0; i < wanted.Count; i++)
             {
-                if (i < target.Count && ReferenceEquals(target[i], wanted[i])) continue;
+                if (i < target.Count && ReferenceEquals(target[i], wanted[i]))
+                {
+                    continue;
+                }
+
                 var at = -1;
                 for (var j = i + 1; j < target.Count && at < 0; j++)
-                    if (ReferenceEquals(target[j], wanted[i])) at = j;
-                if (at >= 0) target.Move(at, i);
-                else target.Insert(i, wanted[i]);
+                {
+                    if (ReferenceEquals(target[j], wanted[i]))
+                    {
+                        at = j;
+                    }
+                }
+
+                if (at >= 0)
+                {
+                    target.Move(at, i);
+                }
+                else
+                {
+                    target.Insert(i, wanted[i]);
+                }
             }
-            while (target.Count > wanted.Count) target.RemoveAt(target.Count - 1);
+            while (target.Count > wanted.Count)
+            {
+                target.RemoveAt(target.Count - 1);
+            }
         }
 
         /// <summary>How many files below a node the tree hides.</summary>
         public static int HiddenCount(NodeViewModel node)
         {
-            if (node.Items is not { } items) return 0;
+            if (node.Items is not { } items)
+            {
+                return 0;
+            }
+
             var own = node.Input.Display.HideInvisible ? items.Count(IsInvisibleFile) : 0;
             return own + items.Sum(HiddenCount);
         }
@@ -152,7 +196,13 @@ namespace ClassicMac.App.ViewModels
         {
             var at = node;
             for (; at.Parent is { } parent; at = parent)
-                if (!parent.Children.Contains(at)) return false;
+            {
+                if (!parent.Children.Contains(at))
+                {
+                    return false;
+                }
+            }
+
             return roots.Contains(at);
         }
     }
@@ -204,12 +254,27 @@ namespace ClassicMac.App.ViewModels
         {
             settings.Save(new AppSettings(TreeDisplay.GroupNoName, TreeDisplay.HideInvisible));
             var kept = Selected;
-            foreach (var root in Roots) Tree.Relayout(root);
+            foreach (var root in Roots)
+            {
+                Tree.Relayout(root);
+            }
+
             UpdateHiddenCount();
-            if (kept is null) return;
+            if (kept is null)
+            {
+                return;
+            }
+
             var shown = kept;
-            while (shown is not null && !Tree.IsShown(shown, Roots)) shown = shown.Parent;
-            if (!ReferenceEquals(Selected, shown)) Selected = shown;
+            while (shown is not null && !Tree.IsShown(shown, Roots))
+            {
+                shown = shown.Parent;
+            }
+
+            if (!ReferenceEquals(Selected, shown))
+            {
+                Selected = shown;
+            }
         }
     }
 }

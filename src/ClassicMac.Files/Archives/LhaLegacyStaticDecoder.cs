@@ -16,7 +16,10 @@ internal static class LhaLegacyStaticDecoder
 
     public static byte[] DecodeLh3(ReadOnlySpan<byte> packed, int expandedSize)
     {
-        if (expandedSize < 0) throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        if (expandedSize < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(expandedSize));
+        }
 
         var bits = new BitReader(packed);
         byte[] window = new byte[WindowSize];
@@ -33,7 +36,10 @@ internal static class LhaLegacyStaticDecoder
             {
                 blockCommands = bits.Read(16);
                 if (blockCommands == 0)
+                {
                     throw new InvalidDataException("An LH3 block has no commands.");
+                }
+
                 literalLengthTree = ReadLiteralLengthTree(ref bits);
                 positionTree = bits.Read(1) != 0
                     ? ReadPositionTree(ref bits)
@@ -51,15 +57,26 @@ internal static class LhaLegacyStaticDecoder
             }
 
             if (symbol >= LiteralLengthSymbolCount)
+            {
                 throw new InvalidDataException("An LH3 literal/length symbol is invalid.");
+            }
+
             int lengthCode = symbol;
             if (symbol == LiteralLengthSymbolCount - 1)
+            {
                 lengthCode += bits.Read(8);
+            }
+
             int matchLength = lengthCode - MatchLengthBias;
             if (matchLength is < MinimumMatchLength or > MaximumMatchLength)
+            {
                 throw new InvalidDataException("An LH3 match length is outside the method's range.");
+            }
+
             if (matchLength > output.Length - outputOffset)
+            {
                 throw new InvalidDataException("An LH3 match exceeds the declared expanded size.");
+            }
 
             int positionSymbol = positionTree.ReadSymbol(ref bits);
             int sourceOffset = (positionSymbol << 6) | bits.Read(6);
@@ -84,7 +101,10 @@ internal static class LhaLegacyStaticDecoder
             {
                 int onlySymbol = bits.Read(9);
                 if (onlySymbol >= LiteralLengthSymbolCount)
+                {
                     throw new InvalidDataException("An LH3 single-symbol tree names an invalid symbol.");
+                }
+
                 return HuffmanTable.SingleSymbol(onlySymbol);
             }
         }
@@ -101,7 +121,10 @@ internal static class LhaLegacyStaticDecoder
             {
                 int onlySymbol = bits.Read(7);
                 if (onlySymbol >= PositionSymbolCount)
+                {
                     throw new InvalidDataException("An LH3 single-symbol position tree is invalid.");
+                }
+
                 return HuffmanTable.SingleSymbol(onlySymbol);
             }
         }
@@ -140,7 +163,10 @@ internal static class LhaLegacyStaticDecoder
             for (int bit = 0; bit < count; bit++)
             {
                 if (_byteOffset >= _data.Length)
+                {
                     throw new InvalidDataException("An LH3 bitstream is truncated.");
+                }
+
                 value = (value << 1) | ((_data[_byteOffset] >> (7 - _bitOffset)) & 1);
                 if (++_bitOffset == 8)
                 {
@@ -176,20 +202,31 @@ internal static class LhaLegacyStaticDecoder
             foreach (byte length in lengths)
             {
                 if (length > 16)
+                {
                     throw new InvalidDataException("An LH3 Huffman code is too long.");
-                if (length == 0) continue;
+                }
+
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 counts[length]++;
                 maximumLength = Math.Max(maximumLength, length);
             }
             if (maximumLength == 0)
+            {
                 throw new InvalidDataException("An LH3 Huffman tree has no symbols.");
+            }
 
             int remainingCodes = 1;
             for (int length = 1; length <= maximumLength; length++)
             {
                 remainingCodes = (remainingCodes << 1) - counts[length];
                 if (remainingCodes < 0)
+                {
                     throw new InvalidDataException("An LH3 Huffman tree is oversubscribed.");
+                }
             }
 
             Span<int> nextCode = stackalloc int[17];
@@ -205,7 +242,11 @@ internal static class LhaLegacyStaticDecoder
             for (int symbol = 0; symbol < lengths.Length; symbol++)
             {
                 int length = lengths[symbol];
-                if (length == 0) continue;
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 int symbolCode = nextCode[length]++;
                 symbolsByCode.Add((length << 16) | symbolCode, symbol);
             }
@@ -214,13 +255,19 @@ internal static class LhaLegacyStaticDecoder
 
         public int ReadSymbol(ref BitReader bits)
         {
-            if (_singleSymbol >= 0) return _singleSymbol;
+            if (_singleSymbol >= 0)
+            {
+                return _singleSymbol;
+            }
+
             int code = 0;
             for (int length = 1; length <= MaximumCodeLength; length++)
             {
                 code = (code << 1) | bits.Read(1);
                 if (_symbolsByCode.TryGetValue((length << 16) | code, out int symbol))
+                {
                     return symbol;
+                }
             }
             throw new InvalidDataException("An LH3 Huffman code does not match its tree.");
         }

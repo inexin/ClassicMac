@@ -125,9 +125,14 @@ namespace ClassicMac.Code.Ppc
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(data);
             if (reader.Length < HeaderSize)
+            {
                 throw new InvalidDataException($"A PEF container header is {HeaderSize} bytes; there are {reader.Length}.");
+            }
+
             if (!IsPef(data.Span))
+            {
                 throw new InvalidDataException("Not a PEF container: it does not start with 'Joy!peff'.");
+            }
 
             reader.Position = 8;
             var architecture = reader.ReadFourCC();
@@ -139,13 +144,18 @@ namespace ClassicMac.Code.Ppc
             int sectionCount = reader.ReadUInt16();
             int instantiatedCount = reader.ReadUInt16();
             if (formatVersion != 1)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "pef.format-version",
                     $"PEF format version {formatVersion}; only version 1 is defined.", 12));
+            }
 
             int fitting = Math.Min(sectionCount, (reader.Length - HeaderSize) / SectionHeaderSize);
             if (fitting < sectionCount)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.sections-truncated",
                     $"The container has room for {fitting} of its {sectionCount} section headers.", HeaderSize));
+            }
+
             long nameTable = HeaderSize + (long)sectionCount * SectionHeaderSize;
 
             var sections = new PefSection[fitting];
@@ -163,9 +173,12 @@ namespace ClassicMac.Code.Ppc
                 var alignment = reader.ReadByte();
                 string? name = nameOffset == -1 ? null : SectionName(reader, nameTable, nameOffset, i, diagnostics);
                 if (containerOffset > reader.Length || containerLength > reader.Length - (long)containerOffset)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.section-out-of-range",
                         $"Section {i}'s contents (0x{containerOffset:X} + 0x{containerLength:X}) run past the container's end (0x{reader.Length:X}).",
                         HeaderSize + i * SectionHeaderSize));
+                }
+
                 sections[i] = new PefSection(i, name, defaultAddress, totalLength, unpackedLength, containerLength,
                     containerOffset, kind, shareKind, alignment);
             }
@@ -182,7 +195,11 @@ namespace ClassicMac.Code.Ppc
             };
             foreach (var section in sections)
             {
-                if (section.Kind != PefSectionKind.Loader) continue;
+                if (section.Kind != PefSectionKind.Loader)
+                {
+                    continue;
+                }
+
                 container.Loader = PefLoader.Read(container.GetContents(section.Index), section.Index, diagnostics);
                 break;
             }
@@ -241,9 +258,12 @@ namespace ClassicMac.Code.Ppc
             {
                 var unpacked = PatternData.Unpack(contents, diagnostics, (int)Math.Min(cap, PatternData.DefaultMaxLength));
                 if (unpacked.Length != section.UnpackedLength)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.pidata-length",
                         $"Section {section.Index}'s pattern data unpacks to 0x{unpacked.Length:X} bytes; its header says 0x{section.UnpackedLength:X}.",
                         section.ContainerOffset));
+                }
+
                 initialized = unpacked;
             }
             else
@@ -263,10 +283,17 @@ namespace ClassicMac.Code.Ppc
         public IReadOnlyList<PefFixup> GetFixups(ICollection<Diagnostic> diagnostics)
         {
             ArgumentNullException.ThrowIfNull(diagnostics);
-            if (fixups is not null) return fixups;
+            if (fixups is not null)
+            {
+                return fixups;
+            }
+
             var all = new List<PefFixup>();
             foreach (var header in HeadersRun(diagnostics))
+            {
                 all.AddRange(PefRelocator.Run(this, header, null, null, null, diagnostics));
+            }
+
             return fixups = all;
         }
 
@@ -276,15 +303,23 @@ namespace ClassicMac.Code.Ppc
         private List<PefRelocationHeader> HeadersRun(ICollection<Diagnostic> diagnostics)
         {
             var run = new List<PefRelocationHeader>();
-            if (Loader is null) return run;
+            if (Loader is null)
+            {
+                return run;
+            }
+
             var seen = new HashSet<int>();
             foreach (var header in Loader.RelocationHeaders)
             {
                 if (seen.Add(header.SectionIndex))
+                {
                     run.Add(header);
+                }
                 else
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "pef.relocation-duplicate-header",
                         $"Section {header.SectionIndex} has more than one relocation header; only the first runs."));
+                }
             }
             return run;
         }
@@ -303,11 +338,18 @@ namespace ClassicMac.Code.Ppc
             ArgumentNullException.ThrowIfNull(diagnostics);
             var relocated = new byte[Sections.Count][];
             for (int i = 0; i < relocated.Length; i++)
+            {
                 relocated[i] = Sections[i].IsInstantiable ? GetImage(i, diagnostics).ToArray() : [];
+            }
+
             var made = new List<PefFixup>();
             foreach (var header in HeadersRun(diagnostics))
             {
-                if ((uint)header.SectionIndex >= (uint)relocated.Length) continue;
+                if ((uint)header.SectionIndex >= (uint)relocated.Length)
+                {
+                    continue;
+                }
+
                 made.AddRange(PefRelocator.Run(this, header, relocated[header.SectionIndex], sectionAddresses,
                     importAddress, diagnostics));
             }
@@ -324,9 +366,17 @@ namespace ClassicMac.Code.Ppc
         public PefTransitionVector? GetTransitionVector(int sectionIndex, uint offset, ICollection<Diagnostic> diagnostics)
         {
             ArgumentNullException.ThrowIfNull(diagnostics);
-            if ((uint)sectionIndex >= (uint)Sections.Count || !Sections[sectionIndex].IsInstantiable) return null;
+            if ((uint)sectionIndex >= (uint)Sections.Count || !Sections[sectionIndex].IsInstantiable)
+            {
+                return null;
+            }
+
             var image = GetImage(sectionIndex, diagnostics);
-            if (offset > (uint)image.Length || image.Length - offset < 8) return null;
+            if (offset > (uint)image.Length || image.Length - offset < 8)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(image);
             var code = reader.ReadUInt32At((int)offset);
             var toc = reader.ReadUInt32At((int)offset + 4);
@@ -335,7 +385,9 @@ namespace ClassicMac.Code.Ppc
             {
                 fixupsAt = [];
                 foreach (var fixup in GetFixups(diagnostics))
+                {
                     fixupsAt[(fixup.Section, fixup.Offset)] = fixup;
+                }
             }
             int SectionAdded(long at) =>
                 fixupsAt.TryGetValue((sectionIndex, at), out var f) && f.Target == PefFixupTarget.Section ? f.TargetIndex : -1;

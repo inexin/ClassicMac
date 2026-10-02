@@ -25,8 +25,15 @@ internal static class CorpusFolders
     {
         for (var dir = Path.GetDirectoryName(path); !string.IsNullOrEmpty(dir); dir = Path.GetDirectoryName(dir))
         {
-            if (Path.GetFileName(dir) == "ndiftest" || File.Exists(Path.Combine(dir, ".classicmac-damage-test"))) return true;
-            if (Roots.Any(r => string.Equals(Path.GetFullPath(r).TrimEnd(Path.DirectorySeparatorChar), dir, StringComparison.OrdinalIgnoreCase))) break;
+            if (Path.GetFileName(dir) == "ndiftest" || File.Exists(Path.Combine(dir, ".classicmac-damage-test")))
+            {
+                return true;
+            }
+
+            if (Roots.Any(r => string.Equals(Path.GetFullPath(r).TrimEnd(Path.DirectorySeparatorChar), dir, StringComparison.OrdinalIgnoreCase)))
+            {
+                break;
+            }
         }
         return false;
     }

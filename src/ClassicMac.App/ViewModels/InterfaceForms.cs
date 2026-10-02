@@ -23,7 +23,10 @@ namespace ClassicMac.App.ViewModels
         protected static void Move<T>(ObservableCollection<T> list, T item, int by)
         {
             var i = list.IndexOf(item);
-            if (i >= 0 && i + by >= 0 && i + by < list.Count) list.Move(i, i + by);
+            if (i >= 0 && i + by >= 0 && i + by < list.Count)
+            {
+                list.Move(i, i + by);
+            }
         }
     }
 
@@ -95,7 +98,10 @@ namespace ClassicMac.App.ViewModels
         {
             var stages = 0;
             foreach (var s in Stages)
+            {
                 stages |= ((s.BoldItem == 2 ? 8 : 0) | (s.Drawn ? 4 : 0) | ((int)s.Sound & 3)) << ((s.Number - 1) * 4);
+            }
+
             return InterfaceWriter.WriteAlert(new AlertTemplate(Rect(Top, Left, Bottom, Right), (short)ItemsId, (ushort)stages, HasPosition ? (ushort)Position : null));
         }
     }
@@ -146,7 +152,11 @@ namespace ClassicMac.App.ViewModels
     {
         public DialogItemsForm(Resource resource, IReadOnlyList<DialogItem> items) : base(resource)
         {
-            foreach (var item in items) Items.Add(new DialogItemRow(item));
+            foreach (var item in items)
+            {
+                Items.Add(new DialogItemRow(item));
+            }
+
             Watch(Items);
         }
 
@@ -219,7 +229,11 @@ namespace ClassicMac.App.ViewModels
         {
             this.menu = menu;
             (id, definition, title, enabled) = (menu.Id, menu.Definition, menu.Title, menu.Enabled);
-            foreach (var item in menu.Items) Items.Add(new MenuItemRow(item));
+            foreach (var item in menu.Items)
+            {
+                Items.Add(new MenuItemRow(item));
+            }
+
             Watch(Items);
         }
 
@@ -241,7 +255,10 @@ namespace ClassicMac.App.ViewModels
 
         public MenuResource ToMenu() => menu with
         {
-            Id = (short)Id, Definition = (short)Definition, Title = Title, EnableFlags = Enabled ? menu.EnableFlags | 1 : menu.EnableFlags & ~1u,
+            Id = (short)Id,
+            Definition = (short)Definition,
+            Title = Title,
+            EnableFlags = Enabled ? menu.EnableFlags | 1 : menu.EnableFlags & ~1u,
             Items = Items.Select(i => i.ToItem()).ToList(),
         };
 
@@ -293,7 +310,11 @@ namespace ClassicMac.App.ViewModels
             FormDialog = null;
             FormMenu = null;
             FormError = null;
-            if (form is not DataForm data || node is null) return;
+            if (form is not DataForm data || node is null)
+            {
+                return;
+            }
+
             DialogSources? sources = null;
             void Update()
             {
@@ -301,10 +322,15 @@ namespace ClassicMac.App.ViewModels
                 {
                     var bytes = data.BuildData();
                     FormError = null;
-                    if (data is MenuForm menu) FormMenu = menu.ToMenu();
+                    if (data is MenuForm menu)
+                    {
+                        FormMenu = menu.ToMenu();
+                    }
                     else
+                    {
                         FormDialog = InterfacePreviews.Dialog(node.Resource, bytes, node.Fork, DecodeOptions.Default with { ScreenDepth = ScreenDepth }, ReadOptions, [],
                             sources ??= DialogSources.From(Roots));
+                    }
                 }
                 catch (ArgumentException e)
                 {

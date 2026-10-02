@@ -35,19 +35,29 @@ public sealed class GzipReader : IContainerReader
     /// <inheritdoc/>
     public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
     {
-        if (!CanRead(input)) throw new InvalidDataException("Not a gzip file.");
+        if (!CanRead(input))
+        {
+            throw new InvalidDataException("Not a gzip file.");
+        }
+
         var header = input.ReadPrefix(10 + 2 + 1024);
         var flags = header[3];
         var mtime = BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4));
         string? storedName = null;
         var at = 10;
         if ((flags & FlagExtra) != 0 && at <= header.Length - 2)
+        {
             at += 2 + BinaryPrimitives.ReadUInt16LittleEndian(header.AsSpan(at));
+        }
+
         if ((flags & FlagName) != 0 && at < header.Length)
         {
             var end = header.AsSpan(at).IndexOf((byte)0);
             // FNAME is ISO 8859-1 (RFC 1952 §2.3.1); only its last path component is the name.
-            if (end > 0) storedName = Encoding.Latin1.GetString(header, at, end).Split('/', '\\')[^1];
+            if (end > 0)
+            {
+                storedName = Encoding.Latin1.GetString(header, at, end).Split('/', '\\')[^1];
+            }
         }
 
         var limit = context.Options.MaxExpandedBytesPerInput;
@@ -59,7 +69,10 @@ public sealed class GzipReader : IContainerReader
             while ((read = stream.Read(buffer)) > 0)
             {
                 if (output.Length > limit - read)
+                {
                     throw new InvalidDataException("gzip expansion exceeds the configured expanded-size limit.");
+                }
+
                 output.Write(buffer, 0, read);
             }
         }
@@ -81,11 +94,24 @@ public sealed class GzipReader : IContainerReader
     private static string NameFromHost(MacString? host)
     {
         var name = host?.ToMacRoman() ?? "";
-        if (name.Length == 0) return "gzip data";
-        if (name.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase)) return name[..^4] + ".tar";
+        if (name.Length == 0)
+        {
+            return "gzip data";
+        }
+
+        if (name.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase))
+        {
+            return name[..^4] + ".tar";
+        }
+
         foreach (var suffix in new[] { ".gz", "-gz", "_gz", ".z" })
+        {
             if (name.Length > suffix.Length && name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+            {
                 return name[..^suffix.Length];
+            }
+        }
+
         return name;
     }
 }

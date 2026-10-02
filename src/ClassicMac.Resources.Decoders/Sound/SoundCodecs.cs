@@ -32,14 +32,30 @@ namespace ClassicMac.Resources.Decoders.Sound
         public static WavSamples? ToWav(SampledSound sound)
         {
             var f = sound.Format;
-            if (Pcm.ToWav(sound) is { } pcm) return new WavSamples(pcm, Pcm.BytesPerSample(f, sound.SampleSize), Pcm.IsFloat(f));
-            if (f == Mace3 || f == Mace6) return new WavSamples(Mace.Decode(sound.Data.Span, sound.Channels, f == Mace6), 1, false);
-            if (f == Ima4) return new WavSamples(Little(Sound.Ima4.Decode(sound.Data, sound.Channels)), 2, false);
+            if (Pcm.ToWav(sound) is { } pcm)
+            {
+                return new WavSamples(pcm, Pcm.BytesPerSample(f, sound.SampleSize), Pcm.IsFloat(f));
+            }
+
+            if (f == Mace3 || f == Mace6)
+            {
+                return new WavSamples(Mace.Decode(sound.Data.Span, sound.Channels, f == Mace6), 1, false);
+            }
+
+            if (f == Ima4)
+            {
+                return new WavSamples(Little(Sound.Ima4.Decode(sound.Data, sound.Channels)), 2, false);
+            }
+
             if (f == MuLaw)
             {
                 var data = sound.Data.Span;
                 var samples = new short[data.Length / sound.Channels * sound.Channels];
-                for (var i = 0; i < samples.Length; i++) samples[i] = MuLawSample(data[i]);
+                for (var i = 0; i < samples.Length; i++)
+                {
+                    samples[i] = MuLawSample(data[i]);
+                }
+
                 return new WavSamples(Little(samples), 2, false);
             }
             return null;

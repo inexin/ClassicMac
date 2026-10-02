@@ -97,7 +97,13 @@ namespace ClassicMac.Resources.Decoders.Images
             ArgumentNullException.ThrowIfNull(lookup);
             var suite = new IconSuite();
             foreach (var type in SuiteTypes)
-                if (lookup(FourCC.FromString(type), id) is { Length: > 0 } data) suite.members[type] = data.ToArray();
+            {
+                if (lookup(FourCC.FromString(type), id) is { Length: > 0 } data)
+                {
+                    suite.members[type] = data.ToArray();
+                }
+            }
+
             return suite;
         }
 
@@ -107,7 +113,13 @@ namespace ClassicMac.Resources.Decoders.Images
             ArgumentNullException.ThrowIfNull(family);
             var suite = new IconSuite();
             foreach (var (type, data) in family.Members)
-                if (type is not ("it32" or "t8mk")) suite.members[type] = data;
+            {
+                if (type is not ("it32" or "t8mk"))
+                {
+                    suite.members[type] = data;
+                }
+            }
+
             return suite;
         }
 
@@ -125,13 +137,28 @@ namespace ClassicMac.Resources.Decoders.Images
             bool native = port.Options.Version == QuickDrawVersion.MacOS9;
             int depth = port.Options.ScreenDepth;
             int t = (int)transform;
-            if ((t & 0xF00) == 0) t |= (Label & 7) << 8;
+            if ((t & 0xF00) == 0)
+            {
+                t |= (Label & 7) << 8;
+            }
+
             int tf = t & 3, label = (t >> 8) & 15;
             bool selected = (t & 0x4000) != 0;
-            if (label >= 8) label = 0;                            // GetLabel fails for 8-15 [ClassicMac: the colour is undefined there]
+            if (label >= 8)
+            {
+                label = 0;                            // GetLabel fails for 8-15 [ClassicMac: the colour is undefined there]
+            }
 
-            if (Prepare(rect, alignment, native) is not { } p) return false;
-            if (p.Empty) return true;
+            if (Prepare(rect, alignment, native) is not { } p)
+            {
+                return false;
+            }
+
+            if (p.Empty)
+            {
+                return true;
+            }
+
             var (group, gw, gh, image, mask, place) = (p.Group, p.Width, p.Height, p.Image, p.Mask, p.Place);
             int rowBytes = gw / 8;
 
@@ -147,7 +174,10 @@ namespace ClassicMac.Resources.Decoders.Images
                     : null;
                 // Mac OS 9 draws colour data through an 8-bit mask of the suite instead, when the screen has 8 bits or more.
                 var deepMask = data != null && native && depth >= 8 ? DeepMask(rect, data) : null;
-                if (data != null) PlotDeep(port, data, maskMap, deepMask, place, tf, label, selected, labelColors, native, gw, gh, m32);
+                if (data != null)
+                {
+                    PlotDeep(port, data, maskMap, deepMask, place, tf, label, selected, labelColors, native, gw, gh, m32);
+                }
                 else
                 {
                     var imageMap = PixMap.FromBitMap(image, rowBytes, new MacRect(0, 0, (short)gh, (short)gw));
@@ -168,8 +198,16 @@ namespace ClassicMac.Resources.Decoders.Images
         /// </summary>
         public Region? ToRegion(MacRect rect, IconAlignment alignment = IconAlignment.None, QuickDrawVersion version = QuickDrawVersion.MacOS9)
         {
-            if (Prepare(rect, alignment, version == QuickDrawVersion.MacOS9) is not { } p) return null;
-            if (p.Empty) return Region.Empty;
+            if (Prepare(rect, alignment, version == QuickDrawVersion.MacOS9) is not { } p)
+            {
+                return null;
+            }
+
+            if (p.Empty)
+            {
+                return Region.Empty;
+            }
+
             var region = Region.FromBitMap(PixMap.FromBitMap(p.Mask, p.Width / 8, new MacRect(0, 0, (short)p.Height, (short)p.Width)));
             return MapRegion(region, p.Width, p.Height, p.Place);
         }
@@ -228,7 +266,11 @@ namespace ClassicMac.Resources.Decoders.Images
                 : w >= 32 || h >= 32 ? ["ICN#", "ics#", "icm#"]
                   : h > 12 ? ["ics#", "icm#", "ICN#"]
                   : ["icm#", "ics#", "ICN#"];
-            if (groups.FirstOrDefault(members.ContainsKey) is not { } group) return null;
+            if (groups.FirstOrDefault(members.ContainsKey) is not { } group)
+            {
+                return null;
+            }
+
             var (gw, gh) = group switch { "ICN#" => (32, 32), "ics#" => (16, 16), "icm#" => (16, 12), _ => (48, 48) };
             var list = members[group];
             int rowBytes = gw / 8;
@@ -243,7 +285,11 @@ namespace ClassicMac.Resources.Decoders.Images
                 gh = 16;
             }
             int bytes = rowBytes * gh;
-            if (group == "ich#" && native && size < 2 * bytes) return null;   // a short ich# fails the call
+            if (group == "ich#" && native && size < 2 * bytes)
+            {
+                return null;   // a short ich# fails the call
+            }
+
             var image = Pad(list, 0, bytes);
             // The mask is the member's second half (at half its size, so a list of SICNs gives the rows from there), or
             // CalcMask of the image when the member is too short for one.
@@ -251,8 +297,16 @@ namespace ClassicMac.Resources.Decoders.Images
 
             // MakeBoundary: nothing is drawn for an empty mask.
             var boundary = Boundary(mask, gw, gh);
-            if (boundary.IsEmpty) return new Prepared(group, gw, gh, image, mask, place, Empty: true);
-            if (alignment != IconAlignment.None) place = Align(place, boundary, gw, gh, (int)alignment);
+            if (boundary.IsEmpty)
+            {
+                return new Prepared(group, gw, gh, image, mask, place, Empty: true);
+            }
+
+            if (alignment != IconAlignment.None)
+            {
+                place = Align(place, boundary, gw, gh, (int)alignment);
+            }
+
             return new Prepared(group, gw, gh, image, mask, place, Empty: false);
         }
 
@@ -272,7 +326,13 @@ namespace ClassicMac.Resources.Decoders.Images
                 : depth == 8 ? [x8, x32, x4]
                 : depth == 4 ? [x4] : [];
             foreach (var type in order)
-                if (type != null && members.TryGetValue(type, out var bytes) && bytes.Length >= IconFamily.MemberType(type)!.RawSize) return type;
+            {
+                if (type != null && members.TryGetValue(type, out var bytes) && bytes.Length >= IconFamily.MemberType(type)!.RawSize)
+                {
+                    return type;
+                }
+            }
+
             return null;
         }
 
@@ -287,10 +347,18 @@ namespace ClassicMac.Resources.Decoders.Images
             string[] list = w >= 48 || h >= 48 ? ["h8mk", "l8mk", "s8mk"]
                 : w < 32 && h < 32 ? ["s8mk", "l8mk", "h8mk"]
                 : ["l8mk", "h8mk", "s8mk"];
-            if (list.FirstOrDefault(members.ContainsKey) is not { } type) return null;
+            if (list.FirstOrDefault(members.ContainsKey) is not { } type)
+            {
+                return null;
+            }
+
             var mask = IconFamily.MemberType(type)!;
             var member = IconFamily.MemberType(data)!;
-            if (mask.Width != member.Width || mask.Height != member.Height || members[type].Length < mask.RawSize) return null;
+            if (mask.Width != member.Width || mask.Height != member.Height || members[type].Length < mask.RawSize)
+            {
+                return null;
+            }
+
             return members[type];
         }
 
@@ -308,9 +376,19 @@ namespace ClassicMac.Resources.Decoders.Images
                 : PixMap.Indexed(members[type], gw * member.Depth / 8, new MacRect(0, 0, (short)gh, (short)gw), member.Depth,
                     Clut(member.Depth, label, selected, disabled, labelColors, native));
             var bounds = new MacRect(0, 0, (short)gh, (short)gw);
-            if (deepMask != null) RenderDeep(port, dataMap, deepMask, bounds, place);
-            else Render(port, dataMap, maskMap, bounds, place, m32);
-            if (tf == 2) Transform(port, null, maskMap, place, tf, native, gw, gh, onePass: false, m32);
+            if (deepMask != null)
+            {
+                RenderDeep(port, dataMap, deepMask, bounds, place);
+            }
+            else
+            {
+                Render(port, dataMap, maskMap, bounds, place, m32);
+            }
+
+            if (tf == 2)
+            {
+                Transform(port, null, maskMap, place, tf, native, gw, gh, onePass: false, m32);
+            }
         }
 
         // 32-bit data transformed on a copy: label c * Brighten(L) >> 16 per channel, selected halves every channel,
@@ -320,6 +398,7 @@ namespace ClassicMac.Resources.Decoders.Images
             var copy = argb.ToArray();
             var bright = label != 0 ? Brighten(labelColors[label]) : default;
             for (int i = 0; i < gw * gh; i++)
+            {
                 for (int c = 1; c <= 3; c++)
                 {
                     int v = copy[4 * i + c];
@@ -328,10 +407,20 @@ namespace ClassicMac.Resources.Decoders.Images
                         int l = c == 1 ? bright.Red : c == 2 ? bright.Green : bright.Blue;
                         v = (int)(((long)(v << 8) * l) >> 24);
                     }
-                    if (selected) v >>= 1;
-                    if (disabled) v = (v + 255) >> 1;
+                    if (selected)
+                    {
+                        v >>= 1;
+                    }
+
+                    if (disabled)
+                    {
+                        v = (v + 255) >> 1;
+                    }
+
                     copy[4 * i + c] = (byte)v;
                 }
+            }
+
             return PixMap.Direct(copy, gw * 4, new MacRect(0, 0, (short)gh, (short)gw), 32);
         }
 
@@ -341,7 +430,11 @@ namespace ClassicMac.Resources.Decoders.Images
         private static RgbColor[] Clut(int depth, int label, bool selected, bool disabled, IReadOnlyList<RgbColor> labelColors, bool native)
         {
             var table = StandardColorTables.Exact(depth)!.Select(c => new RgbColor(c.r, c.g, c.b)).ToArray();
-            if (label == 0 && !selected && !disabled) return table;
+            if (label == 0 && !selected && !disabled)
+            {
+                return table;
+            }
+
             var romEntries = depth == 8 ? Indl8 : Indl4;
             var bright = Brighten(labelColors[label]);
             for (int i = 0; i < table.Length; i++)
@@ -351,13 +444,26 @@ namespace ClassicMac.Resources.Decoders.Images
                 if (label != 0 && listed)
                 {
                     if (depth == 8)
+                    {
                         c = i == 0
                             ? new((ushort)((c.Red + bright.Red) >> 1), (ushort)((c.Green + bright.Green) >> 1), (ushort)((c.Blue + bright.Blue) >> 1))
                             : new((ushort)((c.Red * bright.Red) >> 16), (ushort)((c.Green * bright.Green) >> 16), (ushort)((c.Blue * bright.Blue) >> 16));
-                    else if (i == 15) c = labelColors[label];
+                    }
+                    else if (i == 15)
+                    {
+                        c = labelColors[label];
+                    }
                 }
-                if (selected && listed) c = Darken(c);
-                if (disabled) c = new((ushort)((c.Red + 0xFFFF) >> 1), (ushort)((c.Green + 0xFFFF) >> 1), (ushort)((c.Blue + 0xFFFF) >> 1));
+                if (selected && listed)
+                {
+                    c = Darken(c);
+                }
+
+                if (disabled)
+                {
+                    c = new((ushort)((c.Red + 0xFFFF) >> 1), (ushort)((c.Green + 0xFFFF) >> 1), (ushort)((c.Blue + 0xFFFF) >> 1));
+                }
+
                 table[i] = c;
             }
             return table;
@@ -378,15 +484,26 @@ namespace ClassicMac.Resources.Decoders.Images
                 // Label (raw), then the disabled grey, then Darken for selection.
                 var fg = depth > 2 && label != 0 ? labelColors[label] : port.ForeColor;
                 var bk = tf == 3 ? new RgbColor(0xCC2A, 0xCC2A, 0xFF2A) : port.BackColor;
-                if (tf == 1 && (depth > 4 || label == 0) && port.GetGray(bk, fg, out var gray)) (fg, tf) = (gray, 0);
+                if (tf == 1 && (depth > 4 || label == 0) && port.GetGray(bk, fg, out var gray))
+                {
+                    (fg, tf) = (gray, 0);
+                }
+
                 if (selected)
                 {
-                    if (depth > 4) fg = Darken(fg);
+                    if (depth > 4)
+                    {
+                        fg = Darken(fg);
+                    }
+
                     bk = Darken(bk);
                 }
                 (port.ForeColor, port.BackColor) = (fg, bk);
             }
-            else if (selected) (port.ForeColor, port.BackColor) = (port.BackColor, port.ForeColor);
+            else if (selected)
+            {
+                (port.ForeColor, port.BackColor) = (port.BackColor, port.ForeColor);
+            }
 
             var bounds = new MacRect(0, 0, (short)gh, (short)gw);
             if (tf == 0)
@@ -418,7 +535,11 @@ namespace ClassicMac.Resources.Decoders.Images
         private static void RenderDeep(QuickDrawPort port, PixMap dataMap, byte[] deepMask, MacRect bounds, PictRect place)
         {
             int w = place.Width, h = place.Height;
-            if (w <= 0 || h <= 0) return;
+            if (w <= 0 || h <= 0)
+            {
+                return;
+            }
+
             var options = new QuickDrawOptions { ScreenDepth = 32, Version = QuickDrawVersion.MacOS9 };
             var target = new MacRect(0, 0, (short)h, (short)w);
             var source = new RgbaBitmap(w, h);
@@ -431,10 +552,15 @@ namespace ClassicMac.Resources.Decoders.Images
             var blended = new byte[4 * w * h];
             var covered = new bool[w * h];
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
                     int i = y * w + x, m = alpha.Pixels[4 * i];
-                    if (m == 0) continue;
+                    if (m == 0)
+                    {
+                        continue;
+                    }
+
                     covered[i] = true;
                     int cx = place.Left + x - port.OriginH, cy = place.Top + y - port.OriginV;
                     bool inside = cx >= 0 && cy >= 0 && cx < canvas.Width && cy < canvas.Height;
@@ -445,6 +571,7 @@ namespace ClassicMac.Resources.Decoders.Images
                         blended[4 * i + 1 + c] = (byte)(m == 255 ? s : d + (((s - d) * m) >> 8));
                     }
                 }
+            }
             // The blended pixels go through the port 1:1, so its clip and screen depth apply.
             port.CopyMask(PixMap.Direct(blended, 4 * w, target, 32), ToBitMap(covered, w, h), target, target, place.ToMacRect());
         }
@@ -462,7 +589,11 @@ namespace ClassicMac.Resources.Decoders.Images
                 return toBlack <= toWhite ? 1 : 0;              // [I: the tie rule, for greys near 50%]
             }
             int f = Index1(fore), b = Index1(back);
-            if (f == b && fore != back) f = Index1(new RgbColor((ushort)~fore.Red, (ushort)~fore.Green, (ushort)~fore.Blue));
+            if (f == b && fore != back)
+            {
+                f = Index1(new RgbColor((ushort)~fore.Red, (ushort)~fore.Green, (ushort)~fore.Blue));
+            }
+
             var stretched = Stretch(maskMap, gw, gh, 32, 32);
             return stretched.Select(m => (m ? f : b) == 1).ToArray();
         }
@@ -482,11 +613,23 @@ namespace ClassicMac.Resources.Decoders.Images
             {
                 var region = MapRegion(Region.FromBitMap(maskMap), gw, gh, place);
                 var bounds = new MacRect(0, 0, (short)gh, (short)gw);
-                if (onePass && tf != 3) port.CopyMask(imageMap!, maskMap, bounds, bounds, rect);
+                if (onePass && tf != 3)
+                {
+                    port.CopyMask(imageMap!, maskMap, bounds, bounds, rect);
+                }
+
                 switch (tf)
                 {
-                    case 1: port.PenPattern = QuickDrawPattern.Gray; port.PenMode = TransferMode.PatBic; port.PaintRgn(region); break;
-                    case 2: port.PenPattern = QuickDrawPattern.LightGray; port.PenMode = TransferMode.PatOr; port.PaintRgn(region); break;
+                    case 1:
+                        port.PenPattern = QuickDrawPattern.Gray;
+                        port.PenMode = TransferMode.PatBic;
+                        port.PaintRgn(region);
+                        break;
+                    case 2:
+                        port.PenPattern = QuickDrawPattern.LightGray;
+                        port.PenMode = TransferMode.PatOr;
+                        port.PaintRgn(region);
+                        break;
                     case 3:
                         port.FillRgn(region, QuickDrawPattern.Black);
                         port.FillRgn(region.Inset(1, 1), QuickDrawPattern.LightGray);
@@ -502,6 +645,7 @@ namespace ClassicMac.Resources.Decoders.Images
             var imageBits = imageMap == null ? new bool[tw * th] : prescale ? Stretch(imageMap, gw, gh, tw, th) : Bits(imageMap, gw, gh);
             var t = new bool[tw * th];
             for (int y = 0; y < th; y++)
+            {
                 for (int x = 0; x < tw; x++)
                 {
                     int i = y * tw + x;
@@ -513,10 +657,19 @@ namespace ClassicMac.Resources.Decoders.Images
                         bool Inside(int xx, int yy) => xx >= 0 && yy >= 0 && xx < tw && yy < th && maskBits[yy * tw + xx];
                         v = !(Inside(x - 1, y) && Inside(x + 1, y) && Inside(x, y - 1) && Inside(x, y + 1));
                     }
-                    if (tf == 1) v &= (y & 1) == 0 ? (x & 1) == 0 : (x & 1) == 1;            // $AAAAAAAA / $55555555
-                    else if (tf is 2 or 3) v |= m && ((y & 1) == 0 ? (x & 3) == 0 : (x & 3) == 2);   // $88888888 / $22222222
+                    if (tf == 1)
+                    {
+                        v &= (y & 1) == 0 ? (x & 1) == 0 : (x & 1) == 1;            // $AAAAAAAA / $55555555
+                    }
+                    else if (tf is 2 or 3)
+                    {
+                        v |= m && ((y & 1) == 0 ? (x & 3) == 0 : (x & 3) == 2);   // $88888888 / $22222222
+                    }
+
                     t[i] = v;
                 }
+            }
+
             var tMap = ToBitMap(t, tw, th);
             var tBounds = new MacRect(0, 0, (short)th, (short)tw);
             if (!onePass)
@@ -534,7 +687,10 @@ namespace ClassicMac.Resources.Decoders.Images
             }
             // The prescaled mask no longer matches the data: the ROM paints the mask srcBic then T srcOr; Mac OS 9 copies
             // T srcCopy through the mask as a region.
-            if (native) port.CopyBits(tMap, tBounds, rect, TransferMode.SrcCopy, Region.FromBitMap(maskOut).Offset(rect.Left, rect.Top));
+            if (native)
+            {
+                port.CopyBits(tMap, tBounds, rect, TransferMode.SrcCopy, Region.FromBitMap(maskOut).Offset(rect.Left, rect.Top));
+            }
             else
             {
                 port.CopyBits(maskOut, tBounds, rect, TransferMode.SrcBic);
@@ -551,7 +707,13 @@ namespace ClassicMac.Resources.Decoders.Images
         {
             var bits = new bool[w * h];
             for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++) bits[y * w + x] = map.GetIndex(x, y) != 0;
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    bits[y * w + x] = map.GetIndex(x, y) != 0;
+                }
+            }
+
             return bits;
         }
 
@@ -562,7 +724,11 @@ namespace ClassicMac.Resources.Decoders.Images
             var port = new QuickDrawPort(scratch);
             port.CopyBits(map, new MacRect(0, 0, (short)gh, (short)gw), new MacRect(0, 0, (short)h, (short)w), TransferMode.SrcCopy);
             var bits = new bool[w * h];
-            for (int i = 0; i < w * h; i++) bits[i] = scratch.Pixels[4 * i] == 0 && scratch.Pixels[4 * i + 3] != 0;
+            for (int i = 0; i < w * h; i++)
+            {
+                bits[i] = scratch.Pixels[4 * i] == 0 && scratch.Pixels[4 * i + 3] != 0;
+            }
+
             return bits;
         }
 
@@ -571,8 +737,16 @@ namespace ClassicMac.Resources.Decoders.Images
             int rowBytes = (w + 15) / 16 * 2;
             var data = new byte[rowBytes * h];
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
-                    if (bits[y * w + x]) data[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                {
+                    if (bits[y * w + x])
+                    {
+                        data[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                    }
+                }
+            }
+
             return PixMap.FromBitMap(data, rowBytes, new MacRect(0, 0, (short)h, (short)w));
         }
 
@@ -581,7 +755,11 @@ namespace ClassicMac.Resources.Decoders.Images
         private static byte[] Pad(byte[] data, int at, int length)
         {
             var result = new byte[length];
-            if (at < data.Length) data.AsSpan(at, Math.Min(length, data.Length - at)).CopyTo(result);
+            if (at < data.Length)
+            {
+                data.AsSpan(at, Math.Min(length, data.Length - at)).CopyTo(result);
+            }
+
             return result;
         }
 
@@ -590,9 +768,16 @@ namespace ClassicMac.Resources.Decoders.Images
             int top = int.MaxValue, left = int.MaxValue, bottom = int.MinValue, right = int.MinValue;
             int rowBytes = w / 8;
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
+                {
                     if (((mask[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1) != 0)
+                    {
                         (top, left, bottom, right) = (Math.Min(top, y), Math.Min(left, x), Math.Max(bottom, y + 1), Math.Max(right, x + 1));
+                    }
+                }
+            }
+
             return top == int.MaxValue ? default : new PictRect(top, left, bottom, right);
         }
 
@@ -602,7 +787,11 @@ namespace ClassicMac.Resources.Decoders.Images
         {
             static int Map(int v, int fromLo, int fromSize, int toLo, int toSize)
             {
-                if (fromSize == toSize) return v - fromLo + toLo;
+                if (fromSize == toSize)
+                {
+                    return v - fromLo + toLo;
+                }
+
                 int d = v - fromLo;
                 int scaled = (int)(((uint)Math.Abs(d) * (uint)toSize + (uint)(fromSize >> 1)) / (uint)fromSize);
                 return (d < 0 ? -scaled : scaled) + toLo;
@@ -639,7 +828,10 @@ namespace ClassicMac.Resources.Decoders.Images
                 int min = v[0] <= v[1] && v[0] <= v[2] ? 0 : v[1] <= v[2] ? 1 : 2;
                 v[min] >>= 1;
                 int a = (min + 1) % 3, b = (min + 2) % 3;
-                if (!Equal(v[a], v[b])) v[v[a] < v[b] ? a : b] >>= 1;
+                if (!Equal(v[a], v[b]))
+                {
+                    v[v[a] < v[b] ? a : b] >>= 1;
+                }
             }
             return new((ushort)v[0], (ushort)v[1], (ushort)v[2]);
         }
@@ -649,7 +841,11 @@ namespace ClassicMac.Resources.Decoders.Images
         internal static RgbColor Brighten(RgbColor c)
         {
             int max = Math.Max(c.Red, Math.Max(c.Green, c.Blue));
-            if (max == 0) return RgbColor.White;
+            if (max == 0)
+            {
+                return RgbColor.White;
+            }
+
             int lum = (5 * c.Red + 9 * c.Green + 2 * c.Blue) >> 4;
             long target = (lum >> 1) + (lum >> 3) + 0x6000;
             ushort One(int v)

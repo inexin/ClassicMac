@@ -1,4 +1,3 @@
-using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,6 +8,7 @@ using ClassicMac.Files;
 using ClassicMac.Files.Editing;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Editing;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels
@@ -97,9 +97,20 @@ namespace ClassicMac.App.ViewModels
         {
             for (var at = node; at is not null; at = at.Parent)
             {
-                if (at is FileNode { Resources: not null }) return at;
-                if (at is InputNode { RawResources: not null }) return at;
-                if (at is FileNode or InputNode or ContainerFileNode or FolderNode) return null;
+                if (at is FileNode { Resources: not null })
+                {
+                    return at;
+                }
+
+                if (at is InputNode { RawResources: not null })
+                {
+                    return at;
+                }
+
+                if (at is FileNode or InputNode or ContainerFileNode or FolderNode)
+                {
+                    return null;
+                }
             }
             return null;
         }
@@ -113,15 +124,28 @@ namespace ClassicMac.App.ViewModels
 
         private static IEnumerable<(NodeViewModel Node, EditState State)> EditedFiles(NodeViewModel root)
         {
-            if (EditingOf(root) is { } state) yield return (root, state);
+            if (EditingOf(root) is { } state)
+            {
+                yield return (root, state);
+            }
+
             foreach (var child in Tree.Contents(root))
-                foreach (var found in EditedFiles(child)) yield return found;
+            {
+                foreach (var found in EditedFiles(child))
+                {
+                    yield return found;
+                }
+            }
         }
 
         // The file's edit state, made on its first edit.
         private EditState StateFor(NodeViewModel owner)
         {
-            if (EditingOf(owner) is { } existing) return existing;
+            if (EditingOf(owner) is { } existing)
+            {
+                return existing;
+            }
+
             var input = owner.Input;
             var (resources, container) = owner switch
             {
@@ -135,7 +159,10 @@ namespace ClassicMac.App.ViewModels
             if (owner is FileNode file)
             {
                 file.Editing = state;
-                if (resources.Fork is null) file.Resources = resources with { Fork = fork, Source = ResourceForkSource.ResourceFork };
+                if (resources.Fork is null)
+                {
+                    file.Resources = resources with { Fork = fork, Source = ResourceForkSource.ResourceFork };
+                }
             }
             else
             {
@@ -158,7 +185,10 @@ namespace ClassicMac.App.ViewModels
             foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
                 ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
                 NewFileCommand, ImportFileCommand, NewFolderCommand, DeleteItemCommand })
+            {
                 command.NotifyCanExecuteChanged();
+            }
+
             OnPropertyChanged(nameof(UndoTitle));
             OnPropertyChanged(nameof(RedoTitle));
         }
@@ -186,7 +216,11 @@ namespace ClassicMac.App.ViewModels
                 return;
             }
             var typeNode = owner.Children.OfType<ResourceTypeNode>().FirstOrDefault(t => t.Type == resource.Type);
-            if (typeNode is null) return;
+            if (typeNode is null)
+            {
+                return;
+            }
+
             owner.IsExpanded = true;
             typeNode.IsExpanded = true;
             Selected = typeNode.Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource == resource) ?? (NodeViewModel)typeNode;
@@ -218,7 +252,13 @@ namespace ClassicMac.App.ViewModels
                 return null;
             }
             foreach (var warning in problems)
-                if (EditDialogs is null || !await EditDialogs.ConfirmAsync("Resource ID", warning.Message + " Use it anyway?")) return null;
+            {
+                if (EditDialogs is null || !await EditDialogs.ConfirmAsync("Resource ID", warning.Message + " Use it anyway?"))
+                {
+                    return null;
+                }
+            }
+
             return (type, name);
         }
 
@@ -229,13 +269,29 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanNewResource))]
         private async Task NewResource()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (FileOwner(Selected) is not { } owner || EditDialogs is null) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (FileOwner(Selected) is not { } owner || EditDialogs is null)
+            {
+                return;
+            }
+
             var fork = StateFor(owner).Session.Fork;
             var type = Selected switch { ResourceNode r => r.Resource.Type, ResourceTypeNode t => t.Type, _ => FourCC.FromString("STR ") };
             var initial = new ResourceInfo(type.ToString(), ResourceEditRules.NextFreeId(fork, type), "", ResourceAttributes.None);
-            if (await EditDialogs.ResourceInfoAsync("New Resource", initial, isNew: true) is not { } info) return;
-            if (await Validate(fork, info, null) is not { } valid) return;
+            if (await EditDialogs.ResourceInfoAsync("New Resource", initial, isNew: true) is not { } info)
+            {
+                return;
+            }
+
+            if (await Validate(fork, info, null) is not { } valid)
+            {
+                return;
+            }
+
             var add = new AddResource(valid.Type, info.Id, valid.Name, ReadOnlyMemory<byte>.Empty, info.Attributes);
             Execute(owner, add, () => add.Added);
         }
@@ -243,8 +299,16 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task DuplicateResource()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+            {
+                return;
+            }
+
             var duplicate = new DuplicateResource(node.Resource);
             Execute(owner, duplicate, () => duplicate.Copy);
         }
@@ -252,29 +316,65 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task DeleteResource()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+            {
+                return;
+            }
+
             Execute(owner, new DeleteResource(node.Resource), () => null);
         }
 
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task GetInfo()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null)
+            {
+                return;
+            }
+
             var resource = node.Resource;
             var initial = new ResourceInfo(resource.Type.ToString(), resource.Id, resource.Name?.ToMacRoman() ?? "", resource.Attributes);
-            if (await EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false) is not { } info || info == initial) return;
-            if (await Validate(StateFor(owner).Session.Fork, info with { Type = initial.Type }, resource) is not { } valid) return;
+            if (await EditDialogs.ResourceInfoAsync($"Info for {resource}", initial, isNew: false) is not { } info || info == initial)
+            {
+                return;
+            }
+
+            if (await Validate(StateFor(owner).Session.Fork, info with { Type = initial.Type }, resource) is not { } valid)
+            {
+                return;
+            }
+
             Execute(owner, new SetResourceInfo(resource, info.Id, valid.Name, info.Attributes), () => resource);
         }
 
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task ReplaceData()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || FilePicker is null) return;
-            if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || FilePicker is null)
+            {
+                return;
+            }
+
+            if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+            {
+                return;
+            }
+
             var data = await File.ReadAllBytesAsync(path);
             Execute(owner, new SetResourceData(node.Resource, data, $"Replace data of {node.Resource}"), () => node.Resource);
         }
@@ -282,11 +382,27 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanEditResource))]
         private async Task EditHex()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner || EditDialogs is null)
+            {
+                return;
+            }
+
             var resource = node.Resource;
-            if (await EditDialogs.EditHexAsync($"Edit {resource}", resource.GetData().ToArray()) is not { } data) return;
-            if (data.AsSpan().SequenceEqual(resource.GetData().Span)) return;
+            if (await EditDialogs.EditHexAsync($"Edit {resource}", resource.GetData().ToArray()) is not { } data)
+            {
+                return;
+            }
+
+            if (data.AsSpan().SequenceEqual(resource.GetData().Span))
+            {
+                return;
+            }
+
             Execute(owner, new SetResourceData(resource, data, $"Edit {resource}"), () => resource);
         }
 
@@ -304,7 +420,11 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanBeginHexEdit))]
         private void BeginHexEdit()
         {
-            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner) return;
+            if (Selected is not ResourceNode node || FileOwner(node) is not { } owner)
+            {
+                return;
+            }
+
             hexEditTarget = (node.Resource, owner);
             HexEdit = new HexEditor(node.Resource.GetData());
             HexEdit.Edited += (_, _) => SaveCommand.NotifyCanExecuteChanged();
@@ -317,7 +437,11 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand]
         private void ApplyHexEdit()
         {
-            if (TakeHexEdit() is not var (resource, owner, data)) return;
+            if (TakeHexEdit() is not var (resource, owner, data))
+            {
+                return;
+            }
+
             Execute(owner, new SetResourceData(resource, data, $"Edit {resource}"), () => resource);
         }
 
@@ -331,7 +455,11 @@ namespace ClassicMac.App.ViewModels
         // Ends hex editing; the edited bytes when they differ from the resource's.
         private (Resource Resource, NodeViewModel Owner, byte[] Data)? TakeHexEdit()
         {
-            if (HexEdit is not { } editor || hexEditTarget is not { } target) return null;
+            if (HexEdit is not { } editor || hexEditTarget is not { } target)
+            {
+                return null;
+            }
+
             HexEdit = null;
             hexEditTarget = null;
             return editor.IsModified ? (target.Resource, target.Owner, editor.ToArray()) : null;
@@ -350,7 +478,11 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanUndo))]
         private async Task Undo()
         {
-            if (!await ResolveDraftAsync()) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
             if (SelectedState is { } state && FileOwner(Selected) is { } owner && state.Session.NextUndo is { } edit)
             {
                 state.Session.Undo();
@@ -362,7 +494,11 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanRedo))]
         private async Task Redo()
         {
-            if (!await ResolveDraftAsync()) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
             if (SelectedState is { } state && FileOwner(Selected) is { } owner && state.Session.NextRedo is { } edit)
             {
                 state.Session.Redo();
@@ -379,14 +515,25 @@ namespace ClassicMac.App.ViewModels
         // Unapplied edits are applied (or discarded) first; cancelled, nothing is saved.
         private async Task SaveSelectedAsync()
         {
-            if (!await ResolveDraftAsync()) return;
-            if (FileOwner(Selected) is { } owner) await SaveAsync(owner);
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
+            if (FileOwner(Selected) is { } owner)
+            {
+                await SaveAsync(owner);
+            }
         }
 
         // Saves one file's edits back where they came from; true when saved (or nothing to save).
         private async Task<bool> SaveAsync(NodeViewModel owner)
         {
-            if (EditingOf(owner) is not { Session.IsDirty: true } state) return true;
+            if (EditingOf(owner) is not { Session.IsDirty: true } state)
+            {
+                return true;
+            }
+
             if (state.Location is not { } location)
             {
                 Status = $"{owner.BaseTitle} is inside a disk image or archive; use Save As.";
@@ -402,7 +549,10 @@ namespace ClassicMac.App.ViewModels
                 catch (FileChangedException e)
                 {
                     if (EditDialogs is null || !await EditDialogs.ConfirmAsync("File changed", $"{e.FilePath} has changed on disk since it was opened. Overwrite it?"))
+                    {
                         return false;
+                    }
+
                     saved = await Task.Run(() => ForkSaver.Save(location, state.Session.Fork, overwriteChanged: true));
                 }
                 state.Location = saved;
@@ -430,7 +580,11 @@ namespace ClassicMac.App.ViewModels
                 await SaveHfsImageAs();
                 return;
             }
-            if (FileOwner(Selected) is not { } owner || FilePicker is null) return;
+            if (FileOwner(Selected) is not { } owner || FilePicker is null)
+            {
+                return;
+            }
+
             var state = StateFor(owner);
             var extension = format switch
             {
@@ -442,7 +596,11 @@ namespace ClassicMac.App.ViewModels
             };
             var name = HostNames.ToHostName(state.File.Name, 200);
             var path = await FilePicker.PickSaveFileAsync($"Save {owner.BaseTitle} As", name + extension, extension.Length > 0 ? [extension] : []);
-            if (path is null) return;
+            if (path is null)
+            {
+                return;
+            }
+
             try
             {
                 var file = state.File;
@@ -460,16 +618,28 @@ namespace ClassicMac.App.ViewModels
         // edited fork in it (the selected file's always), written and verified; the image itself is not changed.
         private async Task SaveHfsImageAs()
         {
-            if (Selected?.Input is not { IsWritableHfs: true } input || FilePicker is null) return;
+            if (Selected?.Input is not { IsWritableHfs: true } input || FilePicker is null)
+            {
+                return;
+            }
+
             var selectedOwner = FileOwner(Selected);
-            if (selectedOwner is not null) StateFor(selectedOwner);
+            if (selectedOwner is not null)
+            {
+                StateFor(selectedOwner);
+            }
+
             var forks = EditedFiles(input)
                 .Where(e => e.Node is FileNode && VolumeItem(e.Node) is not null && (e.State.Session.IsDirty || ReferenceEquals(e.Node, selectedOwner)))
                 .Select(e => new HfsForkReplacement(e.State.File.MacPath, e.State.Session.Fork, e.State.ForkInDataFork))
                 .ToList();
             var extension = Path.GetExtension(input.Path) is { Length: > 0 } imageExtension ? imageExtension : ".img";
             var path = await FilePicker.PickSaveFileAsync($"Save {input.BaseTitle} As", Path.GetFileNameWithoutExtension(input.Path) + "-edited" + extension, [extension]);
-            if (path is null) return;
+            if (path is null)
+            {
+                return;
+            }
+
             try
             {
                 var volume = input.EditedVolume;
@@ -489,14 +659,23 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanRevert))]
         private async Task Revert()
         {
-            if (Selected?.Input is not { } input) return;
-            if (EditDialogs is not null && !await EditDialogs.ConfirmAsync("Revert", $"Discard the edits to {input.BaseTitle} and read it again from disk?"))
+            if (Selected?.Input is not { } input)
+            {
                 return;
+            }
+
+            if (EditDialogs is not null && !await EditDialogs.ConfirmAsync("Revert", $"Discard the edits to {input.BaseTitle} and read it again from disk?"))
+            {
+                return;
+            }
+
             DiscardDraft();
             var index = Roots.IndexOf(input);
             RemoveInput(input);
             if (await OpenAsync(input.Path) is { } reopened && index >= 0 && index < Roots.Count - 1)
+            {
                 Roots.Move(Roots.IndexOf(reopened), index);
+            }
         }
 
         /// <summary>
@@ -507,11 +686,19 @@ namespace ClassicMac.App.ViewModels
         {
             inputs = inputs.ToList();
             // Unapplied edits in a closing file are applied or discarded first, then its saving is asked.
-            if (Selected?.Input is { } selectedInput && inputs.Contains(selectedInput) && !await ResolveDraftAsync()) return false;
+            if (Selected?.Input is { } selectedInput && inputs.Contains(selectedInput) && !await ResolveDraftAsync())
+            {
+                return false;
+            }
+
             foreach (var input in inputs.Where(i => i.EditedVolume is not null))
             {
                 var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle);
-                if (choice == SaveChanges.Cancel) return false;
+                if (choice == SaveChanges.Cancel)
+                {
+                    return false;
+                }
+
                 if (choice == SaveChanges.Save)
                 {
                     Status = $"The files and folders created or deleted in {input.BaseTitle} are saved with Save As ▸ HFS Volume Image.";
@@ -520,10 +707,21 @@ namespace ClassicMac.App.ViewModels
             }
             foreach (var (node, state) in inputs.SelectMany(EditedFiles).ToList())
             {
-                if (!state.Session.IsDirty) continue;
+                if (!state.Session.IsDirty)
+                {
+                    continue;
+                }
+
                 var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(node.BaseTitle);
-                if (choice == SaveChanges.Cancel) return false;
-                if (choice == SaveChanges.Save && !await SaveAsync(node)) return false;
+                if (choice == SaveChanges.Cancel)
+                {
+                    return false;
+                }
+
+                if (choice == SaveChanges.Save && !await SaveAsync(node))
+                {
+                    return false;
+                }
             }
             return true;
         }

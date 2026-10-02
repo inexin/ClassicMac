@@ -22,14 +22,20 @@ namespace ClassicMac.App.ViewModels
             int key = (bold ? 1 : 0) | (italic ? 2 : 0);
             lock (typefaces)
             {
-                if (typefaces[key] is { } cached) return cached;
+                if (typefaces[key] is { } cached)
+                {
+                    return cached;
+                }
+
                 var style = new SKFontStyle(bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal, SKFontStyleWidth.Normal,
                     italic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright);
                 foreach (var family in Families)
                 {
                     var typeface = SKTypeface.FromFamilyName(family, style);
                     if (typeface is not null && string.Equals(typeface.FamilyName, family, StringComparison.OrdinalIgnoreCase))
+                    {
                         return typefaces[key] = typeface;
+                    }
                 }
                 return typefaces[key] = SKTypeface.FromFamilyName(null, style);
             }
@@ -40,7 +46,11 @@ namespace ClassicMac.App.ViewModels
             ArgumentNullException.ThrowIfNull(text);
             // The system font (0) is Charcoal, a heavy face: drawn bold. Its 12 points are narrower than most fonts'.
             bool bold = (style.Face & 1) != 0 || style.FontId == 0;
-            if (Typeface(bold, (style.Face & 2) != 0) is not { } typeface) return null;
+            if (Typeface(bold, (style.Face & 2) != 0) is not { } typeface)
+            {
+                return null;
+            }
+
             float size = style.Size <= 0 ? 12 : style.Size;
             using var font = new SKFont(typeface, style.FontId == 0 ? size * 0.92f : size) { Edging = SKFontEdging.Alias, Subpixel = false };
             using var paint = new SKPaint { Color = SKColors.White, IsAntialias = false };
@@ -49,7 +59,11 @@ namespace ClassicMac.App.ViewModels
             int ascent = (int)Math.Ceiling(-metrics.Ascent), descent = (int)Math.Ceiling(metrics.Descent);
             int pad = (int)Math.Ceiling(font.Size / 2);
             int width = (int)Math.Ceiling(advance) + 2 * pad, height = ascent + descent + 2;
-            if (width <= 0 || height <= 0) return null;
+            if (width <= 0 || height <= 0)
+            {
+                return null;
+            }
+
             using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Gray8, SKAlphaType.Opaque));
             using (var canvas = new SKCanvas(bitmap))
             {
@@ -59,8 +73,13 @@ namespace ClassicMac.App.ViewModels
             var pixels = bitmap.GetPixelSpan();
             var bits = new byte[width * height];
             for (int y = 0; y < height; y++)
+            {
                 for (int x = 0; x < width; x++)
+                {
                     bits[y * width + x] = pixels[y * bitmap.RowBytes + x] >= 128 ? (byte)1 : (byte)0;
+                }
+            }
+
             return new TextFallbackMask(width, height, pad, ascent, bits, (float)Math.Round(advance));
         }
     }

@@ -97,11 +97,17 @@ namespace ClassicMac.Resources.Decoders.Code
                 {
                     CodeListing listing;
                     var segment = app?.FindSegment(resource.Id);
-                    if (app is not null && segment is not null) listing = CodeListing.ForSegment(app, resource.Id);
+                    if (app is not null && segment is not null)
+                    {
+                        listing = CodeListing.ForSegment(app, resource.Id);
+                    }
                     else
                     {
                         listing = CodeListing.ForCodeResource(CodeType, resource.Id, Data(resource), Named(resource, Data(resource)));
-                        foreach (var d in listing.Diagnostics) diagnostics.Add(d);
+                        foreach (var d in listing.Diagnostics)
+                        {
+                            diagnostics.Add(d);
+                        }
                     }
                     segments.Add((segment, resource, Add(resource, listing.Text), listing));
                 }
@@ -114,9 +120,15 @@ namespace ClassicMac.Resources.Decoders.Code
             {
                 var data = Data(resource);
                 bool pef = PefContainer.IsPef(data.Span);
-                if (pef ? !ppc : !m68k) continue;
+                if (pef ? !ppc : !m68k)
+                {
+                    continue;
+                }
+
                 if (List(resource, data, diagnostics) is { } listing)
+                {
                     resources.Add((resource, Add(resource, listing.Text), pef ? "pef" : "68k", listing));
+                }
             }
 
             // The fragments the 'cfrg' resources name ('cfrg' 0 an application's or library's; the System file has more).
@@ -141,64 +153,69 @@ namespace ClassicMac.Resources.Decoders.Code
                     switch (member.Where)
                     {
                         case CfrgWhere.DataFork:
-                        {
-                            var bytes = dataForkBytes ??= dataFork();
-                            long length = member.Length == 0 ? bytes.Length - (long)member.Offset : member.Length;
-                            if (member.Offset > bytes.Length || length < 0 || length > bytes.Length - (long)member.Offset)
                             {
-                                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-range",
-                                    $"Fragment \"{member.Name}\" is at {member.Offset} for {length} bytes, past the data fork's {bytes.Length} bytes; not listed."));
-                                fragments.Add((cfrgId, i, member, null, null, null));
-                                break;
-                            }
-                            var slice = bytes.Slice((int)member.Offset, (int)length);
-                            PefContainer pef;
-                            try
-                            {
-                                pef = PefContainer.Read(slice, diagnostics);
-                            }
-                            catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
-                            {
-                                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-unreadable",
-                                    $"Fragment \"{member.Name}\" in the data fork is not a PEF container ({e.Message}); not listed."));
-                                fragments.Add((cfrgId, i, member, null, null, null));
-                                break;
-                            }
-                            var listing = CodeListing.ForFragment(pef, member.Name);
-                            foreach (var d in listing.Diagnostics) diagnostics.Add(d);
-                            var stem = "fragment-" + (cfrgId == 0 ? "" : cfrgId.ToString(CultureInfo.InvariantCulture) + ".")
+                                var bytes = dataForkBytes ??= dataFork();
+                                long length = member.Length == 0 ? bytes.Length - (long)member.Offset : member.Length;
+                                if (member.Offset > bytes.Length || length < 0 || length > bytes.Length - (long)member.Offset)
+                                {
+                                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-range",
+                                        $"Fragment \"{member.Name}\" is at {member.Offset} for {length} bytes, past the data fork's {bytes.Length} bytes; not listed."));
+                                    fragments.Add((cfrgId, i, member, null, null, null));
+                                    break;
+                                }
+                                var slice = bytes.Slice((int)member.Offset, (int)length);
+                                PefContainer pef;
+                                try
+                                {
+                                    pef = PefContainer.Read(slice, diagnostics);
+                                }
+                                catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+                                {
+                                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-unreadable",
+                                        $"Fragment \"{member.Name}\" in the data fork is not a PEF container ({e.Message}); not listed."));
+                                    fragments.Add((cfrgId, i, member, null, null, null));
+                                    break;
+                                }
+                                var listing = CodeListing.ForFragment(pef, member.Name);
+                                foreach (var d in listing.Diagnostics)
+                                {
+                                    diagnostics.Add(d);
+                                }
+
+                                var stem = "fragment-" + (cfrgId == 0 ? "" : cfrgId.ToString(CultureInfo.InvariantCulture) + ".")
                                 + i.ToString(CultureInfo.InvariantCulture) + (member.Name.Length > 0 ? " " + member.Name : "");
-                            var file = HostNames.MakeUnique(HostNames.ToHostName(MacString.FromMacRoman(stem), 120) + ".s", taken);
-                            files.Add(new CodeFile(file, Encoding.UTF8.GetBytes(listing.Text)));
-                            fragments.Add((cfrgId, i, member, file, pef, listing));
-                            break;
-                        }
-                        case CfrgWhere.Resource:
-                        {
-                            var key = (new FourCC(member.Where1), (short)member.Where2);
-                            if (fork.Find(key.Item1, key.Item2) is not { } resource)
-                            {
-                                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-missing",
-                                    $"Fragment \"{member.Name}\" is in '{key.Item1}' {key.Item2}, which the file does not have."));
-                                fragments.Add((cfrgId, i, member, null, null, null));
+                                var file = HostNames.MakeUnique(HostNames.ToHostName(MacString.FromMacRoman(stem), 120) + ".s", taken);
+                                files.Add(new CodeFile(file, Encoding.UTF8.GetBytes(listing.Text)));
+                                fragments.Add((cfrgId, i, member, file, pef, listing));
                                 break;
                             }
-                            var data = Data(resource);
-                            if (!listed.TryGetValue(key, out var file) && List(resource, data, diagnostics) is { } listing)
+                        case CfrgWhere.Resource:
                             {
-                                file = Add(resource, listing.Text);
-                                resources.Add((resource, file, "pef", listing));
+                                var key = (new FourCC(member.Where1), (short)member.Where2);
+                                if (fork.Find(key.Item1, key.Item2) is not { } resource)
+                                {
+                                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-missing",
+                                        $"Fragment \"{member.Name}\" is in '{key.Item1}' {key.Item2}, which the file does not have."));
+                                    fragments.Add((cfrgId, i, member, null, null, null));
+                                    break;
+                                }
+                                var data = Data(resource);
+                                if (!listed.TryGetValue(key, out var file) && List(resource, data, diagnostics) is { } listing)
+                                {
+                                    file = Add(resource, listing.Text);
+                                    resources.Add((resource, file, "pef", listing));
+                                }
+                                PefContainer? pef = null;
+                                if (PefContainer.IsPef(data.Span))
+                                {
+                                    try
+                                    { pef = PefContainer.Read(data, new List<Diagnostic>()); }
+                                    catch (Exception e) when (e is InvalidDataException or EndOfStreamException) { }
+                                }
+                                var known = resources.FirstOrDefault(r => r.Resource == resource);
+                                fragments.Add((cfrgId, i, member, file, pef, known.Listing));
+                                break;
                             }
-                            PefContainer? pef = null;
-                            if (PefContainer.IsPef(data.Span))
-                            {
-                                try { pef = PefContainer.Read(data, new List<Diagnostic>()); }
-                                catch (Exception e) when (e is InvalidDataException or EndOfStreamException) { }
-                            }
-                            var known = resources.FirstOrDefault(r => r.Resource == resource);
-                            fragments.Add((cfrgId, i, member, file, pef, known.Listing));
-                            break;
-                        }
                         default:
                             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Info, "code.fragment-elsewhere",
                                 $"Fragment \"{member.Name}\" is not in this file ({CodeJson.Name(member.Where)}); not listed."));
@@ -208,11 +225,18 @@ namespace ClassicMac.Resources.Decoders.Code
                 }
             }
 
-            if (files.Count == 0 && fragments.Count == 0 && segments.Count == 0) return [];
+            if (files.Count == 0 && fragments.Count == 0 && segments.Count == 0)
+            {
+                return [];
+            }
+
             files.Add(new CodeFile("code.json", MacText.Json(w =>
             {
                 w.WriteStartObject();
-                if (app is null) w.WriteNull("application");
+                if (app is null)
+                {
+                    w.WriteNull("application");
+                }
                 else
                 {
                     w.WriteStartObject("application");
@@ -260,8 +284,16 @@ namespace ClassicMac.Resources.Decoders.Code
                         w.WriteNumber("resourceId", (short)member.Where2);
                     }
                     w.WriteString("file", file);
-                    if (pef is not null) CodeJson.Fragment(w, pef);
-                    if (listing is not null) CodeJson.Functions(w, listing.Functions, withSection: true);
+                    if (pef is not null)
+                    {
+                        CodeJson.Fragment(w, pef);
+                    }
+
+                    if (listing is not null)
+                    {
+                        CodeJson.Functions(w, listing.Functions, withSection: true);
+                    }
+
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -276,7 +308,11 @@ namespace ClassicMac.Resources.Decoders.Code
             try
             {
                 var listing = CodeListing.ForCodeResource(resource.Type, resource.Id, data, Named(resource, data));
-                foreach (var d in listing.Diagnostics) diagnostics.Add(d);
+                foreach (var d in listing.Diagnostics)
+                {
+                    diagnostics.Add(d);
+                }
+
                 return listing;
             }
             catch (Exception e) when (e is InvalidDataException or EndOfStreamException)

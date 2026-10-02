@@ -82,7 +82,11 @@ namespace ClassicMac.Code.M68k
             {
                 int at = reader.Position;
                 // The runtime ends a list on a 0 byte, not on a value of 0: 80 00 is a step of 0.
-                if (at < reader.Length && reader.ReadByteAt(at) == 0) return true;
+                if (at < reader.Length && reader.ReadByteAt(at) == 0)
+                {
+                    return true;
+                }
+
                 if (!TryReadUleb(reader, out var value, out var overflow))
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.rela-truncated",
@@ -106,8 +110,11 @@ namespace ClassicMac.Code.M68k
                     continue;
                 }
                 if ((offset & 1) != 0)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.rela-odd",
                         $"A relocation at odd offset {offset:X} would fault on a 68000.", at));
+                }
+
                 relocations.Add(new Retro68Relocation(offset, kind, relative));
             }
         }
@@ -120,10 +127,25 @@ namespace ClassicMac.Code.M68k
             ulong v = 0;
             for (int shift = 0; ; shift += 7)
             {
-                if (!reader.TryReadByte(out var b)) return false;
-                if (shift < 64) v |= (ulong)(b & 0x7F) << shift;
-                if (shift >= 35 || v > uint.MaxValue) overflow = true;
-                if ((b & 0x80) == 0) break;
+                if (!reader.TryReadByte(out var b))
+                {
+                    return false;
+                }
+
+                if (shift < 64)
+                {
+                    v |= (ulong)(b & 0x7F) << shift;
+                }
+
+                if (shift >= 35 || v > uint.MaxValue)
+                {
+                    overflow = true;
+                }
+
+                if ((b & 0x80) == 0)
+                {
+                    break;
+                }
             }
             value = (uint)v;
             return true;

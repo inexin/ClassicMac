@@ -18,7 +18,11 @@ namespace ClassicMac.Graphics.QuickDraw
             int mode, bool hilitePending, in PortColors colors, bool viaStretchBits, int pixPatRomV = 0)
         {
             var area = Visible(canvas, region, clip);
-            if (area.IsEmpty) return;
+            if (area.IsEmpty)
+            {
+                return;
+            }
+
             int m = TransferModes.Normalize(mode, hilitePending);
             bool colorPattern = pattern.Pixels != null || pattern.Rgb != null;
             if (colors.Device != null)
@@ -32,10 +36,14 @@ namespace ClassicMac.Graphics.QuickDraw
             // (ROM only: Mac OS 9 hilites through the pattern everywhere.)
             if (m == TransferModes.Hilite && !colors.MacOS9 && !colorPattern && viaStretchBits && !IsRectangle(area) &&
                 Array.TrueForAll(pattern.Mono, row => row == 0 || row == 0xFF) && Array.IndexOf(pattern.Mono, (byte)0xFF) >= 0)
+            {
                 pattern = QuickDrawPattern.Black;
+            }
 
             foreach (var r in area.Rectangles())
+            {
                 for (int y = r.Top; y < r.Bottom; y++)
+                {
                     for (int x = r.Left; x < r.Right; x++)
                     {
                         var dst = ReadPixel(canvas, x, y);
@@ -47,10 +55,16 @@ namespace ClassicMac.Graphics.QuickDraw
                             // copy P, or d | P, xor d ^ P, bic d & ~P (P inverted first for the not modes).
                             var src = pattern.Rgb ?? PatternPixel(pattern.Pixels!, x + align.h, y + (colors.MacOS9 ? align.v : pixPatRomV));
                             if (TransferModes.IsArithmetic(m) || m == TransferModes.Hilite)
+                            {
                                 write = TransferModes.ApplyColor(m, src, dst, colors, out result);
+                            }
                             else
                             {
-                                if ((m & 4) != 0) src = TransferModes.Invert(src);
+                                if ((m & 4) != 0)
+                                {
+                                    src = TransferModes.Invert(src);
+                                }
+
                                 result = (m & 3) switch
                                 {
                                     0 => src,
@@ -66,8 +80,13 @@ namespace ClassicMac.Graphics.QuickDraw
                             bool bit = ((pattern.Mono[(y + align.v) & 7] >> (7 - ((x + align.h) & 7))) & 1) != 0;
                             write = TransferModes.ApplyBit(m, bit, dst, colors, out result);
                         }
-                        if (write) WritePixel(canvas, x, y, result);
+                        if (write)
+                        {
+                            WritePixel(canvas, x, y, result);
+                        }
                     }
+                }
+            }
         }
 
         // A 1-bit mask (text) placed with its top-left at (left, top), transferred with a source mode.
@@ -75,21 +94,33 @@ namespace ClassicMac.Graphics.QuickDraw
             Region? clip, int mode, bool hilitePending, in PortColors colors)
         {
             var area = Visible(canvas, Region.FromRect(new PictRect(top, left, top + height, left + width)), clip);
-            if (area.IsEmpty) return;
+            if (area.IsEmpty)
+            {
+                return;
+            }
+
             int m = TransferModes.Normalize(mode, hilitePending);
             foreach (var r in area.Rectangles())
+            {
                 for (int y = r.Top; y < r.Bottom; y++)
+                {
                     for (int x = r.Left; x < r.Right; x++)
                     {
                         bool bit = bits[(y - top) * width + (x - left)] != 0;
                         if (colors.Device is { } device)
                         {
                             if (DeviceModes.Bit(m, bit, device.Read(canvas, x, y), colors, out int value))
+                            {
                                 device.Write(canvas, x, y, value);
+                            }
                         }
                         else if (TransferModes.ApplyBit(m, bit, ReadPixel(canvas, x, y), colors, out var result))
+                        {
                             WritePixel(canvas, x, y, result);
+                        }
                     }
+                }
+            }
         }
 
         // On an indexed or 16-bit screen: 1-bit patterns draw fg / bk indices; a pixel pattern's colors become device
@@ -102,7 +133,9 @@ namespace ClassicMac.Graphics.QuickDraw
             int[]? cell = pattern.Rgb != null ? device.PatDither(pattern.Rgb16) : null;
             var pixels = pattern.Rgb == null ? pattern.Pixels : null;
             foreach (var r in area.Rectangles())
+            {
                 for (int y = r.Top; y < r.Bottom; y++)
+                {
                     for (int x = r.Left; x < r.Right; x++)
                     {
                         int dst = device.Read(canvas, x, y), value;
@@ -123,8 +156,13 @@ namespace ClassicMac.Graphics.QuickDraw
                             bool bit = ((pattern.Mono[(y + align.v) & 7] >> (7 - ((x + align.h) & 7))) & 1) != 0;
                             write = DeviceModes.Bit(m, bit, dst, colors, out value);
                         }
-                        if (write) device.Write(canvas, x, y, value);
+                        if (write)
+                        {
+                            device.Write(canvas, x, y, value);
+                        }
                     }
+                }
+            }
         }
 
         private static bool IsRectangle(Region r)
@@ -156,7 +194,10 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int i = (y * canvas.Width + x) * 4;
             var p = canvas.Pixels;
-            p[i] = c.R; p[i + 1] = c.G; p[i + 2] = c.B; p[i + 3] = alpha;
+            p[i] = c.R;
+            p[i + 1] = c.G;
+            p[i + 2] = c.B;
+            p[i + 3] = alpha;
         }
     }
 }

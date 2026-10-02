@@ -51,9 +51,21 @@ namespace ClassicMac.Resources.Decoders.Finder
         public static FinderView Read(short view, sbyte script, int openChain)
         {
             int v = (view >> 8) & 0xF, arrange = view & 7;
-            if (v == 2) return new(FinderViewKind.List, (openChain >> 18) & 0xF, arrange);
-            if (v > 8) return new(FinderViewKind.List, 2, arrange);
-            if (v >= 3) return new(FinderViewKind.List, v, arrange);
+            if (v == 2)
+            {
+                return new(FinderViewKind.List, (openChain >> 18) & 0xF, arrange);
+            }
+
+            if (v > 8)
+            {
+                return new(FinderViewKind.List, 2, arrange);
+            }
+
+            if (v >= 3)
+            {
+                return new(FinderViewKind.List, v, arrange);
+            }
+
             bool buttons = script >= 0 && (script & 0x20) != 0, own = (script & 0x40) != 0;
             var kind = buttons
                 ? own && (script & 0x08) != 0 ? FinderViewKind.SmallButton : FinderViewKind.Button

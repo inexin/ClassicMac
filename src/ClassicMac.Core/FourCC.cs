@@ -18,7 +18,11 @@ namespace ClassicMac.Core
         /// <summary>Creates a code from its four bytes.</summary>
         public FourCC(ReadOnlySpan<byte> bytes)
         {
-            if (bytes.Length != 4) throw new ArgumentException("A four-character code is four bytes.", nameof(bytes));
+            if (bytes.Length != 4)
+            {
+                throw new ArgumentException("A four-character code is four bytes.", nameof(bytes));
+            }
+
             Value = BinaryPrimitives.ReadUInt32BigEndian(bytes);
         }
 
@@ -36,22 +40,40 @@ namespace ClassicMac.Core
         public static bool TryParse(string? code, out FourCC result)
         {
             result = default;
-            if (code is null) return false;
+            if (code is null)
+            {
+                return false;
+            }
+
             Span<byte> bytes = stackalloc byte[4];
             var count = 0;
             for (var i = 0; i < code.Length; i++)
             {
-                if (count == 4) return false;
+                if (count == 4)
+                {
+                    return false;
+                }
+
                 if (code[i] == '\\' && i + 3 < code.Length && code[i + 1] == 'x'
                     && byte.TryParse(code.AsSpan(i + 2, 2), System.Globalization.NumberStyles.HexNumber, null, out var escaped))
                 {
                     bytes[count++] = escaped;
                     i += 3;
                 }
-                else if (MacRoman.TryGetByte(code[i], out var b)) bytes[count++] = b;
-                else return false;
+                else if (MacRoman.TryGetByte(code[i], out var b))
+                {
+                    bytes[count++] = b;
+                }
+                else
+                {
+                    return false;
+                }
             }
-            if (count != 4) return false;
+            if (count != 4)
+            {
+                return false;
+            }
+
             result = new FourCC(bytes);
             return true;
         }
@@ -101,8 +123,14 @@ namespace ClassicMac.Core
             var text = new StringBuilder(bytes.Length);
             foreach (var b in bytes)
             {
-                if (b < 0x20 || b == 0x7F || b == '\\') text.Append("\\x").Append(b.ToString("X2"));
-                else text.Append(MacRoman.ToChar(b));
+                if (b < 0x20 || b == 0x7F || b == '\\')
+                {
+                    text.Append("\\x").Append(b.ToString("X2"));
+                }
+                else
+                {
+                    text.Append(MacRoman.ToChar(b));
+                }
             }
             return text.ToString();
         }

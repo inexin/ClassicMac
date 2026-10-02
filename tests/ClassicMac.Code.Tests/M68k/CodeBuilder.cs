@@ -20,7 +20,11 @@ internal static class CodeBuilder
     public static byte[] Words(params ushort[] words)
     {
         var w = new BigEndianWriter();
-        foreach (var word in words) w.WriteUInt16(word);
+        foreach (var word in words)
+        {
+            w.WriteUInt16(word);
+        }
+
         return w.ToArray();
     }
 
@@ -33,7 +37,11 @@ internal static class CodeBuilder
         w.WriteUInt32(below);
         w.WriteUInt32(size);
         w.WriteUInt32(jtOffset);
-        foreach (var e in entries) w.WriteBytes(e);
+        foreach (var e in entries)
+        {
+            w.WriteBytes(e);
+        }
+
         return w.ToArray();
     }
 
@@ -70,7 +78,11 @@ internal static class CodeBuilder
         ResourceAttributes attributes = ResourceAttributes.None)
     {
         var resource = new Resource(FourCC.FromString(type), id, data) { Attributes = attributes };
-        if (name is not null) resource.Name = MacString.FromMacRoman(name);
+        if (name is not null)
+        {
+            resource.Name = MacString.FromMacRoman(name);
+        }
+
         fork.Add(resource);
         return resource;
     }

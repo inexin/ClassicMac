@@ -28,8 +28,12 @@ namespace ClassicMac.Graphics
             Check(bits, rowBytes, bounds, 1);
             return new PixMap
             {
-                Bounds = PictRect.From(bounds), RowBytes = rowBytes, PixelSize = 1, IsPixMap = false,
-                Palette = [new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0)], Data = bits.ToArray(),
+                Bounds = PictRect.From(bounds),
+                RowBytes = rowBytes,
+                PixelSize = 1,
+                IsPixMap = false,
+                Palette = [new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0)],
+                Data = bits.ToArray(),
             };
         }
 
@@ -38,12 +42,20 @@ namespace ClassicMac.Graphics
         public static PixMap Indexed(ReadOnlySpan<byte> pixels, int rowBytes, MacRect bounds, int depth, IReadOnlyList<RgbColor> colors)
         {
             ArgumentNullException.ThrowIfNull(colors);
-            if (depth is not (1 or 2 or 4 or 8)) throw new ArgumentException("An indexed pixel map has 1, 2, 4 or 8 bits per pixel.", nameof(depth));
+            if (depth is not (1 or 2 or 4 or 8))
+            {
+                throw new ArgumentException("An indexed pixel map has 1, 2, 4 or 8 bits per pixel.", nameof(depth));
+            }
+
             Check(pixels, rowBytes, bounds, depth);
             return new PixMap
             {
-                Bounds = PictRect.From(bounds), RowBytes = rowBytes, PixelSize = depth, IsPixMap = true,
-                Palette = colors.Select(c => c.ToRgba()).ToArray(), Palette16 = colors.Select(c => c.Tuple).ToArray(),
+                Bounds = PictRect.From(bounds),
+                RowBytes = rowBytes,
+                PixelSize = depth,
+                IsPixMap = true,
+                Palette = colors.Select(c => c.ToRgba()).ToArray(),
+                Palette16 = colors.Select(c => c.Tuple).ToArray(),
                 Data = pixels.ToArray(),
             };
         }
@@ -52,12 +64,21 @@ namespace ClassicMac.Graphics
         /// <exception cref="ArgumentException">A bad depth, or data shorter than <paramref name="rowBytes"/> × the height.</exception>
         public static PixMap Direct(ReadOnlySpan<byte> pixels, int rowBytes, MacRect bounds, int depth)
         {
-            if (depth is not (16 or 32)) throw new ArgumentException("A direct pixel map has 16 or 32 bits per pixel.", nameof(depth));
+            if (depth is not (16 or 32))
+            {
+                throw new ArgumentException("A direct pixel map has 16 or 32 bits per pixel.", nameof(depth));
+            }
+
             Check(pixels, rowBytes, bounds, depth);
             return new PixMap
             {
-                Bounds = PictRect.From(bounds), RowBytes = rowBytes, PixelSize = depth, CmpCount = 3, PixelType = 16,
-                IsPixMap = true, Data = pixels.ToArray(),
+                Bounds = PictRect.From(bounds),
+                RowBytes = rowBytes,
+                PixelSize = depth,
+                CmpCount = 3,
+                PixelType = 16,
+                IsPixMap = true,
+                Data = pixels.ToArray(),
             };
         }
 
@@ -76,17 +97,26 @@ namespace ClassicMac.Graphics
             }
             return new PixMap
             {
-                Bounds = new PictRect(0, 0, bitmap.Height, bitmap.Width), RowBytes = bitmap.Width * 4, PixelSize = 32,
-                CmpCount = 4, IsPixMap = true, Data = data,
+                Bounds = new PictRect(0, 0, bitmap.Height, bitmap.Width),
+                RowBytes = bitmap.Width * 4,
+                PixelSize = 32,
+                CmpCount = 4,
+                IsPixMap = true,
+                Data = data,
             };
         }
 
         private static void Check(ReadOnlySpan<byte> data, int rowBytes, MacRect bounds, int depth)
         {
             if (rowBytes < 0 || (long)rowBytes * 8 < (long)Math.Max(0, bounds.Width) * depth)
+            {
                 throw new ArgumentException($"{rowBytes} bytes per row cannot hold {bounds.Width} pixels of {depth} bits.", nameof(rowBytes));
+            }
+
             if ((long)rowBytes * Math.Max(0, bounds.Height) > data.Length)
+            {
                 throw new ArgumentException($"{bounds.Height} rows of {rowBytes} bytes need {rowBytes * bounds.Height} bytes; there are {data.Length}.", nameof(data));
+            }
         }
     }
 }

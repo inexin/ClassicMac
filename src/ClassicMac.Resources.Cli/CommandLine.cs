@@ -2,8 +2,8 @@ using System;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Globalization;
-using System.Linq;
 using System.IO;
+using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files;
 
@@ -67,7 +67,11 @@ namespace ClassicMac.Resources.Cli
             var result = BuildRoot().Parse(args);
             if (result.Errors.Count > 0)
             {
-                foreach (var parseError in result.Errors) error.WriteLine(parseError.Message);
+                foreach (var parseError in result.Errors)
+                {
+                    error.WriteLine(parseError.Message);
+                }
+
                 return ExitCodes.Usage;
             }
             return result.Invoke(new InvocationConfiguration { Output = output, Error = error });
@@ -193,7 +197,12 @@ namespace ClassicMac.Resources.Cli
             types.Validators.Add(r =>
             {
                 foreach (var type in r.GetValueOrDefault<string[]>() ?? [])
-                    if (!FourCC.TryParse(type, out _)) r.AddError($"'{type}' is not a four-character type.");
+                {
+                    if (!FourCC.TryParse(type, out _))
+                    {
+                        r.AddError($"'{type}' is not a four-character type.");
+                    }
+                }
             });
             var overwrite = new Option<bool>("--overwrite") { Description = "Write into output folders that already hold files" };
             var command = new Command("extract", "Extract resources into a folder with a manifest")
@@ -321,7 +330,11 @@ namespace ClassicMac.Resources.Cli
         internal static long ParseSize(ArgumentResult result)
         {
             var text = result.Tokens.Count == 1 ? result.Tokens[0].Value : string.Empty;
-            if (TryParseSize(text, out var size)) return size;
+            if (TryParseSize(text, out var size))
+            {
+                return size;
+            }
+
             result.AddError($"'{text}' is not a size: use bytes, or a number with KiB, MiB or GiB.");
             return 0;
         }
@@ -343,8 +356,16 @@ namespace ClassicMac.Resources.Cli
                     break;
                 }
             }
-            if (!long.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out var number)) return false;
-            if (number > long.MaxValue / unit) return false;
+            if (!long.TryParse(s, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+            {
+                return false;
+            }
+
+            if (number > long.MaxValue / unit)
+            {
+                return false;
+            }
+
             size = number * unit;
             return size > 0;
         }

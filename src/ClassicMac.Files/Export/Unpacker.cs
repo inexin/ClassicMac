@@ -99,7 +99,11 @@ namespace ClassicMac.Files.Export
             options ??= ExportOptions.Default;
             var layout = new OutputLayout(name => HostNames.ToHostName(name));
             var folders = new Dictionary<ContainerNode, List<string>>(ReferenceEqualityComparer.Instance);
-            foreach (var (leaf, folder) in layout.Place(root)) folders[leaf] = folder;
+            foreach (var (leaf, folder) in layout.Place(root))
+            {
+                folders[leaf] = folder;
+            }
+
             var failed = new List<string>();
             int resources = 0, files = 0;
             foreach (var entry in forks)
@@ -121,7 +125,10 @@ namespace ClassicMac.Files.Export
                         () => file.DataFork.ToArray(options.ReadOptions.MaxResourceSize));
                     // The fork's own diagnostics were reported when it was read.
                     for (var i = entry.Fork.Diagnostics.Count; i < result.Diagnostics.Count; i++)
+                    {
                         diagnostics?.Add((file.MacPath, result.Diagnostics[i]));
+                    }
+
                     resources += result.Manifest.Resources.Count;
                     files++;
                     progress?.Report(files);
@@ -155,7 +162,9 @@ namespace ClassicMac.Files.Export
             ArgumentNullException.ThrowIfNull(converters);
             readOptions ??= ReadOptions.Default;
             if (!overwrite && Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any())
+            {
                 throw new IOException($"{directory} is not empty.");
+            }
 
             // Converted first, to know whether there are several.
             var converted = new List<(ForkToExtract Entry, IDocumentConverter Converter, IReadOnlyList<DocumentFile> Files)>();
@@ -165,13 +174,24 @@ namespace ClassicMac.Files.Export
                 var found = new List<Diagnostic>();
                 var input = new DocumentInput(entry.Fork, () => file.DataFork.ToArray(readOptions.MaxResourceSize), file.FinderInfo.Type,
                     file.FinderInfo.Creator, file.Name.ToString(), readOptions, found);
-                if (DocumentExport.Convert(converters, input) is var (converter, files)) converted.Add((entry, converter, files));
-                foreach (var d in found) diagnostics?.Add((file.MacPath, d));
+                if (DocumentExport.Convert(converters, input) is var (converter, files))
+                {
+                    converted.Add((entry, converter, files));
+                }
+
+                foreach (var d in found)
+                {
+                    diagnostics?.Add((file.MacPath, d));
+                }
             }
 
             var layout = new OutputLayout(name => HostNames.ToHostName(name));
             var folders = new Dictionary<ContainerNode, List<string>>(ReferenceEqualityComparer.Instance);
-            foreach (var (leaf, place) in layout.Place(root)) folders[leaf] = place;
+            foreach (var (leaf, place) in layout.Place(root))
+            {
+                folders[leaf] = place;
+            }
+
             var documents = new List<(string, ManifestDocument)>();
             var failed = new List<string>();
             foreach (var (entry, converter, files) in converted)
@@ -208,7 +228,11 @@ namespace ClassicMac.Files.Export
             for (var n = 1; ; n++)
             {
                 var path = Path.Combine(parent, n == 1 ? name : $"{name} {n}");
-                if (Directory.Exists(path) || File.Exists(path)) continue;
+                if (Directory.Exists(path) || File.Exists(path))
+                {
+                    continue;
+                }
+
                 Directory.CreateDirectory(path);
                 return path;
             }

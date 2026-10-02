@@ -27,7 +27,11 @@ public class FinderIconResolverTests
     private static ResourceFork Fork(params (string Type, short Id, byte[] Data)[] resources)
     {
         var fork = new ResourceFork();
-        foreach (var (type, id, data) in resources) fork.Add(new Resource(FourCC.FromString(type), id, data));
+        foreach (var (type, id, data) in resources)
+        {
+            fork.Add(new Resource(FourCC.FromString(type), id, data));
+        }
+
         return fork;
     }
 

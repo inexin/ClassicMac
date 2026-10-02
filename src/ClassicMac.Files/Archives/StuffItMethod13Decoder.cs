@@ -33,11 +33,19 @@ internal static class StuffItMethod13Decoder
     public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
     {
         if (outputLength < 0)
+        {
             throw new ArgumentOutOfRangeException(nameof(outputLength));
+        }
+
         if (outputLength == 0)
+        {
             return [];
+        }
+
         if (input.IsEmpty)
+        {
             throw new InvalidDataException("A nonempty StuffIt method 13 fork has no compressed data.");
+        }
 
         byte control = input[0];
         int tableSet = control >> 4;
@@ -62,7 +70,9 @@ internal static class StuffItMethod13Decoder
                 continue;
             }
             if (symbol == EndOfStreamSymbol)
+            {
                 throw new InvalidDataException("A StuffIt method 13 fork ended before its declared output length.");
+            }
 
             int length = symbol switch
             {
@@ -81,12 +91,20 @@ internal static class StuffItMethod13Decoder
                 _ => throw new InvalidDataException("A StuffIt method 13 fork contains an invalid back-reference."),
             };
             if (distance > written)
+            {
                 throw new InvalidDataException("A StuffIt method 13 back-reference precedes the start of the fork.");
+            }
+
             if (length > output.Length - written)
+            {
                 throw new InvalidDataException("StuffIt method 13 output exceeds its declared fork length.");
+            }
 
             for (int index = 0; index < length; index++)
+            {
                 output[written + index] = output[written + index - distance];
+            }
+
             written += length;
             useCodeA = false;
         }
@@ -153,10 +171,15 @@ internal static class StuffItMethod13Decoder
             }
 
             if (accumulator > MaximumCodeLength)
+            {
                 throw new InvalidDataException("A StuffIt method 13 dynamic Huffman code length is too large.");
+            }
+
             byte value = accumulator > 0 ? (byte)accumulator : (byte)0;
             for (int emitted = 0; emitted <= repeat && position < lengths.Length; emitted++)
+            {
                 lengths[position++] = value;
+            }
         }
         return lengths;
     }
@@ -174,14 +197,22 @@ internal static class StuffItMethod13Decoder
             foreach (byte length in lengths)
             {
                 if (length > MaximumCodeLength)
+                {
                     throw new InvalidDataException("A StuffIt method 13 Huffman code is too long.");
+                }
+
                 if (length == 0)
+                {
                     continue;
+                }
+
                 counts[length]++;
                 maximumLength = Math.Max(maximumLength, length);
             }
             if (maximumLength == 0)
+            {
                 throw new InvalidDataException("A StuffIt method 13 Huffman tree has no symbols.");
+            }
 
             var nextCode = BuildCanonicalCodes(counts, maximumLength);
             var tree = new HuffmanTree([new Node()]);
@@ -189,7 +220,10 @@ internal static class StuffItMethod13Decoder
             {
                 int length = lengths[symbol];
                 if (length == 0)
+                {
                     continue;
+                }
+
                 uint code = ReverseBits(nextCode[length]++, length);
                 tree.Insert(code, length, symbol);
             }
@@ -199,12 +233,18 @@ internal static class StuffItMethod13Decoder
         public static HuffmanTree FromExplicitCodes(ReadOnlySpan<uint> codes, ReadOnlySpan<byte> lengths)
         {
             if (codes.Length != lengths.Length)
+            {
                 throw new InvalidDataException("A StuffIt method 13 meta-code has mismatched tables.");
+            }
+
             var tree = new HuffmanTree([new Node()]);
             for (int symbol = 0; symbol < codes.Length; symbol++)
             {
                 if (lengths[symbol] == 0 || lengths[symbol] > MaximumCodeLength)
+                {
                     throw new InvalidDataException("A StuffIt method 13 meta-code length is invalid.");
+                }
+
                 tree.Insert(codes[symbol], lengths[symbol], symbol);
             }
             return tree;
@@ -218,7 +258,9 @@ internal static class StuffItMethod13Decoder
                 int branch = (int)bits.ReadBits(1);
                 nodeIndex = _nodes[nodeIndex].Children[branch];
                 if (nodeIndex < 0)
+                {
                     throw new InvalidDataException("A StuffIt method 13 Huffman code is invalid.");
+                }
             }
             return _nodes[nodeIndex].Symbol;
         }
@@ -229,7 +271,10 @@ internal static class StuffItMethod13Decoder
             for (int bitIndex = 0; bitIndex < length; bitIndex++)
             {
                 if (_nodes[nodeIndex].Symbol >= 0)
+                {
                     throw new InvalidDataException("A StuffIt method 13 Huffman table is not prefix-free.");
+                }
+
                 int branch = (int)((code >> bitIndex) & 1);
                 int childIndex = _nodes[nodeIndex].Children[branch];
                 if (childIndex < 0)
@@ -242,7 +287,10 @@ internal static class StuffItMethod13Decoder
             }
             if (_nodes[nodeIndex].Symbol >= 0 || _nodes[nodeIndex].Children[0] >= 0 ||
                 _nodes[nodeIndex].Children[1] >= 0)
+            {
                 throw new InvalidDataException("A StuffIt method 13 Huffman table has a code collision.");
+            }
+
             _nodes[nodeIndex].Symbol = symbol;
         }
 
@@ -254,7 +302,10 @@ internal static class StuffItMethod13Decoder
             {
                 code = checked((code + (uint)counts[bits - 1]) << 1);
                 if (code + (uint)counts[bits] > 1UL << bits)
+                {
                     throw new InvalidDataException("A StuffIt method 13 Huffman table is oversubscribed.");
+                }
+
                 nextCode[bits] = checked((uint)code);
             }
             return nextCode;
@@ -264,7 +315,10 @@ internal static class StuffItMethod13Decoder
         {
             uint reversed = 0;
             for (int bit = 0; bit < count; bit++)
+            {
                 reversed |= ((value >> bit) & 1) << (count - bit - 1);
+            }
+
             return reversed;
         }
 
@@ -283,10 +337,16 @@ internal static class StuffItMethod13Decoder
         public uint ReadBits(int count)
         {
             if (count is < 0 or > 32 || count > _input.Length * 8 - _position)
+            {
                 throw new InvalidDataException("A StuffIt method 13 fork ends inside its compressed bitstream.");
+            }
+
             uint value = 0;
             for (int bit = 0; bit < count; bit++, _position++)
+            {
                 value |= (uint)((_input[_position >> 3] >> (_position & 7)) & 1) << bit;
+            }
+
             return value;
         }
     }

@@ -75,18 +75,28 @@ namespace ClassicMac.Files.Hfs
                     $"The disk is {diskLength} bytes, over the {context.Options.MaxExpandedBytesPerInput}-byte limit.");
             }
             if (header.DataStart > data.Length)
+            {
                 context.Report(DiagnosticSeverity.Error, "ndif.bad-map", $"The data starts at {header.DataStart}, past the {data.Length}-byte data fork.");
+            }
 
             var chunks = Chunks(map, header, data.Length, context);
             var disk = new ChunkedForkData(data, chunks, diskLength, Decode, (chunk, problem) => context.Report(DiagnosticSeverity.Error,
                 "ndif.bad-chunk", $"The compressed chunk at block {chunk.Start / SectorSize} {problem}; Disk Copy calls it damaged. The rest reads as zeros."));
-            if (context.Options.VerifyChecksums) VerifyChecksum(disk, header.Crc, context);
+            if (context.Options.VerifyChecksums)
+            {
+                VerifyChecksum(disk, header.Crc, context);
+            }
+
             return [new MacFile { Name = header.Name.Bytes.Length > 0 ? header.Name : file.Name, DataFork = disk }];
         }
 
         private static ResourceFork? Resources(MacFile file)
         {
-            if (file.ResourceFork.Length is < 256 or > ResourceFork.MaxForkLength) return null;
+            if (file.ResourceFork.Length is < 256 or > ResourceFork.MaxForkLength)
+            {
+                return null;
+            }
+
             try
             {
                 return ResourceFork.Read(file.ResourceFork.ToArray());
@@ -106,16 +116,30 @@ namespace ClassicMac.Files.Hfs
             public static Header Read(byte[] map, MacFile file, ContainerContext context)
             {
                 // A map too short for its version word throws as a span read past its end does.
-                if (map.Length < 2) throw new ArgumentOutOfRangeException(nameof(map));
+                if (map.Length < 2)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(map));
+                }
+
                 var reader = new BigEndianReader(map);
                 int version = reader.ReadUInt16At(0);
                 if (version > 12)
+                {
                     throw new InvalidDataException($"The image is NDIF version {version}, newer than Disk Copy 6.5 writes.");
+                }
+
                 if (version is not (2 or 10 or 11 or 12))
+                {
                     throw new InvalidDataException($"The image's map has version {version}; Disk Copy calls it damaged.");
+                }
+
                 var old = version == 2;
                 var (entriesAt, entrySize) = old ? (OldHeaderLength, OldEntryLength) : (HeaderLength, EntryLength);
-                if (map.Length < entriesAt) throw new InvalidDataException("The map is shorter than its header.");
+                if (map.Length < entriesAt)
+                {
+                    throw new InvalidDataException("The map is shorter than its header.");
+                }
+
                 if (old)
                 {
                     // No real image has been seen: the fields that would show another layout are reported with a request.
@@ -125,31 +149,54 @@ namespace ClassicMac.Files.Hfs
                         + $"map {map.Length} bytes. No real image of this kind has been seen yet: please send it to the ClassicMac project.");
                 }
                 var count = (int)reader.ReadUInt32At(old ? 0x54 : 0x7C);
-                if (count < 2) throw new InvalidDataException($"The map lists {count} chunks; Disk Copy calls it damaged.");
+                if (count < 2)
+                {
+                    throw new InvalidDataException($"The map lists {count} chunks; Disk Copy calls it damaged.");
+                }
+
                 var room = (map.Length - entriesAt) / entrySize;
                 if (map.Length != entriesAt + count * entrySize)
                 {
                     // Disk Copy 6.0 wrote version 10 maps one entry longer or shorter than their count.
                     if (version == 10 && Math.Abs(room - count) == 1)
+                    {
                         context.Report(DiagnosticSeverity.Warning, "ndif.map-size", "The map's length is one entry off its count (Disk Copy 6.0).");
+                    }
                     else
+                    {
                         context.Report(DiagnosticSeverity.Error, "ndif.map-size", $"The map holds {room} entries but counts {count}.");
+                    }
                 }
                 count = Math.Min(count, room);
-                if (count < 2) throw new InvalidDataException("The map holds fewer than two chunks.");
+                if (count < 2)
+                {
+                    throw new InvalidDataException("The map holds fewer than two chunks.");
+                }
 
                 var nameLength = map[4];
                 if (nameLength > 63)
+                {
                     context.Report(DiagnosticSeverity.Error, "ndif.bad-name", "The volume name is longer than 63 bytes; cut.");
+                }
+
                 var blocks = reader.ReadUInt32At(0x44);
                 if (blocks == 0 || blocks >= MaxBlocks)
+                {
                     throw new InvalidDataException($"The disk is {blocks} blocks; Disk Copy calls it damaged.");
+                }
+
                 var segmented = !old && reader.ReadUInt32At(0x54) != 0;
                 if (segmented && version < 12)
+                {
                     throw new InvalidDataException("The map says segmented but its version is below 12; Disk Copy calls it damaged.");
+                }
+
                 var crc = reader.ReadUInt32At(0x50);
                 if (crc == 0xFFFFFFFF)
+                {
                     context.Report(DiagnosticSeverity.Warning, "ndif.crc-uninitialized", "The image's checksum was never set.");
+                }
+
                 return new Header(version, new MacString(map.AsSpan(5, Math.Min(nameLength, (byte)63))), blocks,
                     reader.ReadUInt32At(0x48), reader.ReadUInt32At(0x4C),
                     crc, segmented, count, entriesAt, entrySize);
@@ -173,7 +220,10 @@ namespace ClassicMac.Files.Hfs
             if (header.EntrySize == OldEntryLength)
             {
                 // Version 2: a chunk's length runs to the next entry's offset (the end entry's offset is the data's end).
-                for (var k = 0; k + 1 < entries.Count; k++) entries[k] = entries[k] with { Stored = entries[k + 1].Offset - entries[k].Offset };
+                for (var k = 0; k + 1 < entries.Count; k++)
+                {
+                    entries[k] = entries[k] with { Stored = entries[k + 1].Offset - entries[k].Offset };
+                }
             }
 
             var end = entries.FindIndex(e => e.Type == ChunkEnd);
@@ -209,14 +259,24 @@ namespace ClassicMac.Files.Hfs
                 switch (type)
                 {
                     case ChunkZero:
-                        if (stored != 0) context.Report(DiagnosticSeverity.Warning, "ndif.zero-length", $"{where} is zero-filled but stores {stored} bytes.");
+                        if (stored != 0)
+                        {
+                            context.Report(DiagnosticSeverity.Warning, "ndif.zero-length", $"{where} is zero-filled but stores {stored} bytes.");
+                        }
+
                         break;
                     case ChunkRaw:
-                        if (stored < size) context.Report(DiagnosticSeverity.Error, "ndif.short", $"{where} stores {stored} of its {size} bytes; the rest reads as zeros.");
+                        if (stored < size)
+                        {
+                            context.Report(DiagnosticSeverity.Error, "ndif.short", $"{where} stores {stored} of its {size} bytes; the rest reads as zeros.");
+                        }
+
                         break;
                     case ChunkAdc or ChunkDartRle or ChunkDartLzh or ChunkKenCode:
                         if (type == ChunkAdc && header.Version < 11)
+                        {
                             context.Report(DiagnosticSeverity.Error, "ndif.bad-map", $"{where} is ADC-compressed, which needs map version 11.");
+                        }
                         // Disk Copy 6.1.2 refuses a chunk over +$48 blocks; 6.3.3 and 6.5b13 clear that validator error at
                         // the next entry and fail only when the chunk overflows the decode buffer, +$48 blocks (doubled
                         // for version 10) (disassembly; checked in SheepShaver). The chunk still decodes here.
@@ -273,13 +333,23 @@ namespace ClassicMac.Files.Hfs
             parts[reader.ReadUInt16At(0)] = file.DataFork;
             foreach (var sibling in context.Siblings?.Invoke() ?? [])
             {
-                if (sibling.FinderInfo.Type != Dseg || Resources(sibling)?.Find(Bcm, 128)?.GetData().ToArray() is not { Length: >= 20 } part) continue;
+                if (sibling.FinderInfo.Type != Dseg || Resources(sibling)?.Find(Bcm, 128)?.GetData().ToArray() is not { Length: >= 20 } part)
+                {
+                    continue;
+                }
+
                 var partReader = new BigEndianReader(part);
                 int number = partReader.ReadUInt16At(0);
                 if (partReader.ReadUInt16At(2) == count && part.AsSpan(4, 16).SequenceEqual(id)
                     && number is >= 1 && number <= count && parts[number] is null)
+                {
                     parts[number] = sibling.DataFork;
-                if (parts.Skip(1).All(p => p is not null)) break;
+                }
+
+                if (parts.Skip(1).All(p => p is not null))
+                {
+                    break;
+                }
             }
 
             var found = new List<ForkData>();
@@ -292,7 +362,10 @@ namespace ClassicMac.Files.Hfs
                     break;
                 }
                 if (n < count && p.Length % SectorSize != 0)
+                {
                     context.Report(DiagnosticSeverity.Error, "ndif.bad-segment", $"Part {n} of {count} is not a whole number of blocks.");
+                }
+
                 found.Add(p);
             }
             return new ConcatForkData(found);
@@ -303,16 +376,26 @@ namespace ClassicMac.Files.Hfs
         // Only Disk Copy's "Verify checksum" setting checks it; its driver never does.
         private static void VerifyChecksum(ForkData disk, uint stored, ContainerContext context)
         {
-            if (stored == 0) return;
+            if (stored == 0)
+            {
+                return;
+            }
+
             var computed = Crc(disk);
             if (computed != stored)
+            {
                 context.Report(DiagnosticSeverity.Error, "ndif.bad-checksum", $"The disk's checksum is ${computed:X8}, not the ${stored:X8} the image records.");
+            }
         }
 
         private static readonly uint[] CrcTable = Enumerable.Range(0, 256).Select(i =>
         {
             var c = (uint)i;
-            for (var k = 0; k < 8; k++) c = (c & 1) != 0 ? (c >> 1) ^ 0x04C11DB7 : c >> 1;
+            for (var k = 0; k < 8; k++)
+            {
+                c = (c & 1) != 0 ? (c >> 1) ^ 0x04C11DB7 : c >> 1;
+            }
+
             return c;
         }).ToArray();
 
@@ -324,7 +407,10 @@ namespace ClassicMac.Files.Hfs
             int read;
             while ((read = stream.Read(buffer)) > 0)
             {
-                foreach (var b in buffer.AsSpan(0, read)) crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+                foreach (var b in buffer.AsSpan(0, read))
+                {
+                    crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+                }
             }
             return crc;
         }
@@ -352,7 +438,11 @@ namespace ClassicMac.Files.Hfs
                 long start = 0;
                 foreach (var part in parts)
                 {
-                    if (offset >= start && offset + length <= start + part.Length) return part.Slice(offset - start, length);
+                    if (offset >= start && offset + length <= start + part.Length)
+                    {
+                        return part.Slice(offset - start, length);
+                    }
+
                     start += part.Length;
                 }
                 return base.Slice(offset, length);

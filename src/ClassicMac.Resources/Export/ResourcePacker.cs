@@ -64,7 +64,9 @@ namespace ClassicMac.Resources.Export
                 throw new InvalidDataException($"manifest.json is not a manifest: {e.Message}", e);
             }
             if (!manifest.FormatVersion.StartsWith("1.", StringComparison.Ordinal))
+            {
                 throw new InvalidDataException($"manifest.json is format {manifest.FormatVersion}; this version reads format 1.");
+            }
 
             var diagnostics = new List<Diagnostic>();
             var fork = new ResourceFork
@@ -81,8 +83,15 @@ namespace ClassicMac.Resources.Export
                 var main = Local(directory, entry.Path);
                 if (!File.Exists(main))
                 {
-                    if (options.AllowDeletes) Report(DiagnosticSeverity.Info, "pack.deleted", $"{entry.Path} is gone; the resource is left out.");
-                    else Report(DiagnosticSeverity.Error, "pack.missing-file", $"{entry.Path} is gone (allow deletes to leave the resource out).");
+                    if (options.AllowDeletes)
+                    {
+                        Report(DiagnosticSeverity.Info, "pack.deleted", $"{entry.Path} is gone; the resource is left out.");
+                    }
+                    else
+                    {
+                        Report(DiagnosticSeverity.Error, "pack.missing-file", $"{entry.Path} is gone (allow deletes to leave the resource out).");
+                    }
+
                     continue;
                 }
                 var file = File.ReadAllBytes(main);
@@ -95,7 +104,9 @@ namespace ClassicMac.Resources.Export
                     {
                         var path = Local(directory, other.Path);
                         if (File.Exists(path) && Hash(File.ReadAllBytes(path)) != other.Sha256)
+                        {
                             Report(DiagnosticSeverity.Warning, "pack.other-changed", $"{other.Path} changed, but only the main file is packed; the change is ignored.");
+                        }
                     }
                 }
                 else if (!IsData(entry))
@@ -120,7 +131,11 @@ namespace ClassicMac.Resources.Export
                     }
                 }
                 var resource = new Resource(type, entry.Id, stored) { Attributes = attributes };
-                if (entry.Name is { } name) resource.Name = MacString.Parse(name);
+                if (entry.Name is { } name)
+                {
+                    resource.Name = MacString.Parse(name);
+                }
+
                 fork.Add(resource);
             }
             return new PackResult(fork, manifest.Source, diagnostics);
@@ -135,13 +150,20 @@ namespace ClassicMac.Resources.Export
             {
                 var raw = File.ReadAllBytes(Local(directory, rawPath));
                 if (Hash(raw) != entry.StoredSha256)
+                {
                     report(DiagnosticSeverity.Warning, "pack.raw-changed", $"{rawPath} differs from what was exported; it is packed as it is.");
+                }
+
                 return raw;
             }
             if (baseFork?.Find(type, entry.Id) is { } original)
             {
                 var data = original.GetData().ToArray();
-                if (Hash(data) == entry.StoredSha256) return data;
+                if (Hash(data) == entry.StoredSha256)
+                {
+                    return data;
+                }
+
                 report(DiagnosticSeverity.Warning, "pack.base-differs", "the base fork's resource is not the one exported; not used.");
             }
             return null;

@@ -21,7 +21,7 @@ public class PackBitsTests
     [Fact]
     public void Flag_80_is_a_no_op_or_a_run_of_129()
     {
-        var packed = Hex("80 7F") ;
+        var packed = Hex("80 7F");
         var noOp = new byte[200];
         var run = new byte[200];
 
@@ -133,7 +133,11 @@ public class PackBitsTests
         for (int trial = 0; trial < 50; trial++)
         {
             var data = new byte[random.Next(0, 400) / unit * unit];
-            for (int i = 0; i < data.Length; i++) data[i] = (byte)(random.Next(3) == 0 ? random.Next(256) : i / 20);
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] = (byte)(random.Next(3) == 0 ? random.Next(256) : i / 20);
+            }
+
             var packed = PackBits.Pack(data, unit);
             Assert.DoesNotContain((byte)0x80, Flags(packed, unit));
             var output = new byte[data.Length];

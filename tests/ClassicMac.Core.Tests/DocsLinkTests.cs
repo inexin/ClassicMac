@@ -21,8 +21,15 @@ public partial class DocsLinkTests
             {
                 string target = link.Groups[1].Value.Trim();
                 if (target.Length == 0 || target.Contains("://") || target.StartsWith("mailto:", StringComparison.Ordinal))
+                {
                     continue;
-                if (target.Contains(' ')) target = target[..target.IndexOf(' ')]; // a link title
+                }
+
+                if (target.Contains(' '))
+                {
+                    target = target[..target.IndexOf(' ')]; // a link title
+                }
+
                 int hash = target.IndexOf('#');
                 string path = hash < 0 ? target : target[..hash];
                 string anchor = hash < 0 ? "" : target[(hash + 1)..];
@@ -34,15 +41,26 @@ public partial class DocsLinkTests
                     broken.Add($"{where} → missing file");
                     continue;
                 }
-                if (anchor.Length == 0 || !resolved.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) continue;
+                if (anchor.Length == 0 || !resolved.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
                 if (!slugCache.TryGetValue(resolved, out var slugs))
+                {
                     slugCache[resolved] = slugs = Slugs(File.ReadAllText(resolved));
+                }
+
                 if (!slugs.Contains(Uri.UnescapeDataString(anchor)))
+                {
                     broken.Add($"{where} → no heading #{anchor}");
+                }
                 // A link whose text names a section (§6.2) points at that section's heading (#62-…).
                 Match section = SectionPattern().Match(link.Groups[0].Value);
                 if (section.Success && !anchor.StartsWith(section.Groups[1].Value.Replace(".", "") + "-", StringComparison.Ordinal))
+                {
                     broken.Add($"{where} → text says §{section.Groups[1].Value}");
+                }
             }
         }
         Assert.True(broken.Count == 0, "Broken links:\n" + string.Join("\n", broken));
@@ -63,7 +81,9 @@ public partial class DocsLinkTests
                 .Select(m => m.Groups[1].Value.TrimEnd()).ToArray();
             string[] expected = sections.Select((s, i) => $"{i + 1}. {s}").ToArray();
             if (!found.SequenceEqual(expected))
+            {
                 wrong.Add($"{Path.GetRelativePath(formats, file)}: {string.Join(" | ", found)}");
+            }
         }
         Assert.True(wrong.Count == 0, "Not following TEMPLATE.md:\n" + string.Join("\n", wrong));
     }
@@ -88,8 +108,14 @@ public partial class DocsLinkTests
             var slug = new StringBuilder();
             foreach (char c in title.ToLowerInvariant())
             {
-                if (char.IsLetterOrDigit(c) || c is '-' or '_') slug.Append(c);
-                else if (c == ' ') slug.Append('-');
+                if (char.IsLetterOrDigit(c) || c is '-' or '_')
+                {
+                    slug.Append(c);
+                }
+                else if (c == ' ')
+                {
+                    slug.Append('-');
+                }
             }
             string s = slug.ToString();
             int n = counts.GetValueOrDefault(s);

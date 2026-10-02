@@ -56,14 +56,32 @@ namespace ClassicMac.Resources.Decoders.Interface
                 w.WriteStartObject();
                 w.WriteString("text", item.Text);
                 w.WriteBoolean("enabled", item.Enabled);
-                if (item.IsDivider) w.WriteBoolean("divider", true);
+                if (item.IsDivider)
+                {
+                    w.WriteBoolean("divider", true);
+                }
+
                 w.WriteNumber("icon", item.Icon);
                 w.WriteNumber("keyEquivalent", item.KeyEquivalent);
-                if (item.KeyKind is { } keyKind) w.WriteString("keyKind", keyKind);
-                else if (item.KeyEquivalent is > 0x20 and < 0x7F) w.WriteString("key", ((char)item.KeyEquivalent).ToString());
+                if (item.KeyKind is { } keyKind)
+                {
+                    w.WriteString("keyKind", keyKind);
+                }
+                else if (item.KeyEquivalent is > 0x20 and < 0x7F)
+                {
+                    w.WriteString("key", ((char)item.KeyEquivalent).ToString());
+                }
+
                 w.WriteNumber("mark", item.Mark);
-                if (item.Submenu is { } submenu) w.WriteNumber("submenu", submenu);
-                else if (item.Mark != 0) w.WriteString("markCharacter", InterfaceNames.Chicago(MacRoman.Decode([item.Mark])));
+                if (item.Submenu is { } submenu)
+                {
+                    w.WriteNumber("submenu", submenu);
+                }
+                else if (item.Mark != 0)
+                {
+                    w.WriteString("markCharacter", InterfaceNames.Chicago(MacRoman.Decode([item.Mark])));
+                }
+
                 w.WriteNumber("face", item.Face);
                 Face(w, item.Face);
                 w.WriteEndObject();
@@ -76,7 +94,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             w.WriteStartObject();
             w.WriteStartArray("menus");
-            foreach (var id in ids) w.WriteNumberValue(id);
+            foreach (var id in ids)
+            {
+                w.WriteNumberValue(id);
+            }
+
             w.WriteEndArray();
             w.WriteEndObject();
         });
@@ -87,11 +109,19 @@ namespace ClassicMac.Resources.Decoders.Interface
             w.WriteString("title", window.Title);
             Rect(w, "bounds", window.Bounds);
             w.WriteNumber("definition", window.Definition);
-            if (InterfaceNames.Window(window.Definition) is { } kind) w.WriteString("definitionName", kind);
+            if (InterfaceNames.Window(window.Definition) is { } kind)
+            {
+                w.WriteString("definitionName", kind);
+            }
+
             w.WriteBoolean("visible", window.Visible);
             w.WriteBoolean("goAway", window.GoAway);
             w.WriteNumber("refCon", window.RefCon);
-            if (window.ItemsId is { } items) w.WriteNumber("items", items);
+            if (window.ItemsId is { } items)
+            {
+                w.WriteNumber("items", items);
+            }
+
             Position(w, window.Position);
             w.WriteEndObject();
         });
@@ -131,18 +161,35 @@ namespace ClassicMac.Resources.Decoders.Interface
                 w.WriteNumber("typeCode", item.Type);
                 w.WriteBoolean("enabled", item.Enabled);
                 Rect(w, "bounds", item.Bounds);
-                if (item.Text is { } text) w.WriteString("text", text);
+                if (item.Text is { } text)
+                {
+                    w.WriteString("text", text);
+                }
                 else if (item.Type == 1 && item.Data.Length >= 4)
                 {
                     var help = item.Data.Span;
                     var helpKind = (help[0] << 8) | help[1];
                     w.WriteNumber("helpKind", helpKind);
-                    if (helpKind switch { 1 => "hdlg", 2 => "hrct", 8 => "appendHdlg", _ => null } is { } helpName) w.WriteString("helpKindName", helpName);
+                    if (helpKind switch { 1 => "hdlg", 2 => "hrct", 8 => "appendHdlg", _ => null } is { } helpName)
+                    {
+                        w.WriteString("helpKindName", helpName);
+                    }
+
                     w.WriteNumber("resourceId", item.ResourceId ?? 0);
-                    if (help.Length >= 6) w.WriteNumber("offset", (short)((help[4] << 8) | help[5]));
+                    if (help.Length >= 6)
+                    {
+                        w.WriteNumber("offset", (short)((help[4] << 8) | help[5]));
+                    }
                 }
-                else if (item.ResourceId is { } id) w.WriteNumber("resourceId", id);
-                else if (item.Data.Length > 0) w.WriteString("data", Convert.ToHexString(item.Data.Span));
+                else if (item.ResourceId is { } id)
+                {
+                    w.WriteNumber("resourceId", id);
+                }
+                else if (item.Data.Length > 0)
+                {
+                    w.WriteString("data", Convert.ToHexString(item.Data.Span));
+                }
+
                 w.WriteEndObject();
             }
             w.WriteEndArray();
@@ -155,7 +202,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             w.WriteString("title", control.Title);
             Rect(w, "bounds", control.Bounds);
             w.WriteNumber("definition", control.Definition);
-            if (InterfaceNames.Control(control.Definition) is { } kind) w.WriteString("definitionName", kind);
+            if (InterfaceNames.Control(control.Definition) is { } kind)
+            {
+                w.WriteString("definitionName", kind);
+            }
+
             w.WriteNumber("value", control.Value);
             w.WriteNumber("minimum", control.Minimum);
             w.WriteNumber("maximum", control.Maximum);
@@ -170,7 +221,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 w.WriteNumber("titleJustification", (sbyte)(control.Value & 0xFF));
                 w.WriteBoolean("titleNoStyle", (control.Value & 0x8000) != 0);
                 Face(w, (byte)((control.Value >> 8) & 0x7F), "titleStyle");
-                if ((control.Definition & 4) != 0) w.WriteString("addResMenu", FourCCText(control.RefCon));
+                if ((control.Definition & 4) != 0)
+                {
+                    w.WriteString("addResMenu", FourCCText(control.RefCon));
+                }
+
                 w.WriteEndObject();
             }
             w.WriteEndObject();
@@ -196,7 +251,11 @@ namespace ClassicMac.Resources.Decoders.Interface
             }
             w.WriteStartObject("position");
             w.WriteNumber("code", code);
-            if (InterfaceNames.Position(code) is { } name) w.WriteString("name", name);
+            if (InterfaceNames.Position(code) is { } name)
+            {
+                w.WriteString("name", name);
+            }
+
             var used = (code & 0x7FF) == 0x00A;
             w.WriteBoolean("used", used);
             if (used)
@@ -216,7 +275,10 @@ namespace ClassicMac.Resources.Decoders.Interface
             string[] names = ["bold", "italic", "underline", "outline", "shadow", "condense", "extend"];
             for (var bit = 0; bit < names.Length; bit++)
             {
-                if ((face & (1 << bit)) != 0) w.WriteStringValue(names[bit]);
+                if ((face & (1 << bit)) != 0)
+                {
+                    w.WriteStringValue(names[bit]);
+                }
             }
             w.WriteEndArray();
         }
@@ -278,7 +340,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         /// </summary>
         public static string? Control(short definition)
         {
-            if (definition == 16) return "scrollBarProc";
+            if (definition == 16)
+            {
+                return "scrollBarProc";
+            }
+
             if (definition is >= 1008 and <= 1023)
             {
                 var variation = definition - 1008;

@@ -40,7 +40,9 @@ namespace ClassicMac.Resources.Compression
         {
             var header = context.Header;
             if (header.IsVersion8)
+            {
                 throw new DecompressionFormException("'dcmp' 2 has the version-9 entry points but the resource uses a version-8 header.");
+            }
 
             var cursor = new BlockCursor(context);
             var table = DefaultTable;
@@ -49,7 +51,10 @@ namespace ClassicMac.Resources.Compression
             {
                 table = new ushort[256];
                 customCount = header.Param1 + 1;
-                for (var i = 0; i < customCount; i++) table[i] = cursor.ReadU16();
+                for (var i = 0; i < customCount; i++)
+                {
+                    table[i] = cursor.ReadU16();
+                }
             }
 
             var staleReported = false;
@@ -71,15 +76,29 @@ namespace ClassicMac.Resources.Compression
             {
                 // do { … } while (--words > 0): at least one word.
                 var count = words == 0 ? 1 : words;
-                for (uint i = 0; i < count; i++) Word();
+                for (uint i = 0; i < count; i++)
+                {
+                    Word();
+                }
             }
             else
             {
-                for (uint group = 0; group < words >> 3; group++) Mixed(cursor, 8, Word);
-                if ((words & 7) != 0) Mixed(cursor, (int)(words & 7), Word);
+                for (uint group = 0; group < words >> 3; group++)
+                {
+                    Mixed(cursor, 8, Word);
+                }
+
+                if ((words & 7) != 0)
+                {
+                    Mixed(cursor, (int)(words & 7), Word);
+                }
             }
 
-            if ((header.DecompressedSize & 1) != 0) cursor.WriteByte(cursor.ReadByte());
+            if ((header.DecompressedSize & 1) != 0)
+            {
+                cursor.WriteByte(cursor.ReadByte());
+            }
+
             return cursor.Written;
         }
 
@@ -88,8 +107,14 @@ namespace ClassicMac.Resources.Compression
             var flags = cursor.ReadByte();
             for (var i = 0; i < count; i++, flags <<= 1)
             {
-                if ((flags & 0x80) != 0) word();
-                else cursor.CopyLiteral(2);
+                if ((flags & 0x80) != 0)
+                {
+                    word();
+                }
+                else
+                {
+                    cursor.CopyLiteral(2);
+                }
             }
         }
     }

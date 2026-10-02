@@ -46,7 +46,10 @@ public static partial class LowMemoryGlobals
     {
         int i = Array.BinarySearch(Index.All, new LowMemoryGlobal(address, "", 0, ""), ByAddress.Instance);
         if (i < 0)
+        {
             i = ~i - 1;
+        }
+
         if (i >= 0 && address - Index.All[i].Address < (uint)Index.All[i].Size)
         {
             global = Index.All[i];
@@ -62,7 +65,10 @@ public static partial class LowMemoryGlobals
     {
         var all = new LowMemoryGlobal[Table.Length];
         for (int i = 0; i < all.Length; i++)
+        {
             all[i] = new LowMemoryGlobal(Table[i].Address, Table[i].Name, Table[i].Size, Table[i].Type);
+        }
+
         return all;
     }
 

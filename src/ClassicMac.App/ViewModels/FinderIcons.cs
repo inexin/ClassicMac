@@ -46,7 +46,10 @@ namespace ClassicMac.App.ViewModels
                     return [];
                 }
             }
-            else suite = IconSuite.FromResources(Lookup, resource.Id);
+            else
+            {
+                suite = IconSuite.FromResources(Lookup, resource.Id);
+            }
 
             var quickDraw = new QuickDrawOptions
             {
@@ -59,10 +62,15 @@ namespace ClassicMac.App.ViewModels
             foreach (var (w, h, _) in sizes)
             {
                 if (Strip(suite, quickDraw, w, h, States.Select(s => s.Transform).ToList()) is { } strip)
+                {
                     images.Add(Image(strip, string.Create(CultureInfo.InvariantCulture, $"Finder {w} × {h}: {string.Join(", ", States.Select(s => s.Name))}")));
+                }
             }
             if (sizes.Any(s => s.W == 32) && Strip(suite, quickDraw, 32, 32, Enumerable.Range(1, 7).Select(l => (IconTransform)(l << 8)).ToList()) is { } labels)
+            {
                 images.Add(Image(labels, "Finder labels 1–7"));
+            }
+
             return images;
         }
 
@@ -76,7 +84,10 @@ namespace ClassicMac.App.ViewModels
             for (var i = 0; i < transforms.Count; i++)
             {
                 var left = Gap + i * (w + Gap);
-                if (!suite.Plot(port, new MacRect(Gap, (short)left, (short)(Gap + h), (short)(left + w)), IconAlignment.None, transforms[i])) return null;
+                if (!suite.Plot(port, new MacRect(Gap, (short)left, (short)(Gap + h), (short)(left + w)), IconAlignment.None, transforms[i]))
+                {
+                    return null;
+                }
             }
             return canvas;
         }

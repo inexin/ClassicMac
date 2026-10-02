@@ -84,7 +84,10 @@ internal sealed class PpcFragmentMap
     public string ImportName(int index)
     {
         if (Pef.Loader is not { } loader || (uint)index >= (uint)loader.ImportedSymbols.Count)
+        {
             return "?import " + index.ToString(CultureInfo.InvariantCulture);
+        }
+
         var symbol = loader.ImportedSymbols[index];
         return (uint)symbol.LibraryIndex < (uint)loader.ImportedLibraries.Count
             ? loader.ImportedLibraries[symbol.LibraryIndex].Name + "::" + symbol.Name
@@ -99,12 +102,21 @@ internal sealed class PpcFragmentMap
     public string? SlotText(int section, long slot)
     {
         if (FixupAt(section, slot) is not { } fixup)
+        {
             return null;
+        }
+
         if (fixup.Target == PefFixupTarget.Import)
+        {
             return ImportName(fixup.TargetIndex);
+        }
+
         var image = Image(section);
         if (slot < 0 || slot > image.Length - 4L)
+        {
             return null;
+        }
+
         uint value = new BigEndianReader(image).ReadUInt32At((int)slot);
         string text = $"{fixup.TargetIndex}:0x{value:X}";
         string? label = Functions.TryGetValue((fixup.TargetIndex, value), out var f) ? f.Name
@@ -115,22 +127,38 @@ internal sealed class PpcFragmentMap
     private void Run()
     {
         foreach (var fixup in Pef.GetFixups(diagnostics))
+        {
             fixupsAt[(fixup.Section, fixup.Offset)] = fixup;
+        }
+
         FindTransitionVectors();
         var entryLabels = EntryLabels();
         foreach (int section in CodeSections)
+        {
             FindFunctions(section);
+        }
+
         foreach (var (section, offset, label, source, _, _) in entryLabels)
+        {
             Candidate(section, offset, label, source);
+        }
+
         foreach (var t in TransitionVectors.ToList())
         {
             string? label = entryLabels.Find(e => e.VectorSection == t.Section && e.VectorOffset == t.Offset).Label;
             if (label is not null)
+            {
                 TransitionVectors[TransitionVectors.IndexOf(t)] = t with { Label = label };
+            }
         }
         foreach (int section in CodeSections)
+        {
             if (!candidates.ContainsKey((section, 0)) && Image(section).Length > 0)
+            {
                 Candidate(section, 0, null, CodeFunctionSource.Entry);
+            }
+        }
+
         foreach (var (key, list) in candidates)
         {
             var best = list.MinBy(c => Priority(c.Source));
@@ -153,9 +181,15 @@ internal sealed class PpcFragmentMap
     private void Candidate(int section, uint offset, string? name, CodeFunctionSource source)
     {
         if (!CodeSections.Contains(section) || offset >= (uint)Image(section).Length)
+        {
             return;
+        }
+
         if (!candidates.TryGetValue((section, offset), out var list))
+        {
             candidates[(section, offset)] = list = [];
+        }
+
         list.Add((name, source));
     }
 
@@ -167,10 +201,16 @@ internal sealed class PpcFragmentMap
             if (fixup.Target != PefFixupTarget.Section || !CodeSections.Contains(fixup.TargetIndex)
                 || FixupAt(fixup.Section, fixup.Offset + 4) is not { Target: PefFixupTarget.Section } toc
                 || CodeSections.Contains(toc.TargetIndex))
+            {
                 continue;
+            }
+
             var image = Image(fixup.Section);
             if (fixup.Offset < 0 || fixup.Offset > image.Length - 8L)
+            {
                 continue;
+            }
+
             var reader = new BigEndianReader(image);
             TransitionVectors.Add(new PpcTransitionVectorEntry(fixup.Section, (uint)fixup.Offset, fixup.TargetIndex,
                 reader.ReadUInt32At((int)fixup.Offset), toc.TargetIndex, reader.ReadUInt32At((int)fixup.Offset + 4), null));
@@ -189,24 +229,39 @@ internal sealed class PpcFragmentMap
     {
         var labels = new List<(int, uint, string, CodeFunctionSource, int, uint)>();
         if (Pef.Loader is not { } loader)
+        {
             return labels;
+        }
+
         foreach (var export in loader.Exports)
         {
             if (export.SectionIndex < 0)
+            {
                 continue;
+            }
+
             if (export.Class == PefSymbolClass.TVector
                 && Pef.GetTransitionVector(export.SectionIndex, export.Value, diagnostics) is { CodeSection: >= 0 } tv)
+            {
                 labels.Add((tv.CodeSection, tv.CodeOffset, export.Name, CodeFunctionSource.Export, export.SectionIndex, export.Value));
+            }
             else if (export.Class == PefSymbolClass.Code)
+            {
                 labels.Add((export.SectionIndex, export.Value, export.Name, CodeFunctionSource.Export, -1, 0));
+            }
         }
         foreach (var (entry, name, source) in new[]
         {
             (loader.Main, "main", CodeFunctionSource.Main), (loader.Init, "init", CodeFunctionSource.Init),
             (loader.Term, "term", CodeFunctionSource.Term),
         })
+        {
             if (entry is { } e && Pef.GetTransitionVector(e, diagnostics) is { CodeSection: >= 0 } tv)
+            {
                 labels.Add((tv.CodeSection, tv.CodeOffset, name, source, e.Section, e.Offset));
+            }
+        }
+
         return labels;
     }
 
@@ -220,15 +275,23 @@ internal sealed class PpcFragmentMap
         foreach (var table in tables)
         {
             for (int i = table.Offset; i < table.Offset + table.Length; i += 4)
+            {
                 inTable.Add(i & ~3);
+            }
+
             if (table.FunctionStart is int start)
+            {
                 Candidate(section, (uint)start, table.Name, CodeFunctionSource.Traceback);
+            }
         }
         var reader = new BigEndianReader(image);
         for (int at = 0; at <= image.Length - 4; at += 4)
         {
             if (inTable.Contains(at))
+            {
                 continue;
+            }
+
             uint word = reader.ReadUInt32At(at);
             if ((word & GlueFirstMask) == GlueFirst && IsGlue(reader, at))
             {
@@ -241,7 +304,9 @@ internal sealed class PpcFragmentMap
             {
                 var ins = PpcDisassembler.Decode(word, (uint)at);
                 if (ins.Target is uint target)
+                {
                     Candidate(section, target, null, CodeFunctionSource.Call);
+                }
             }
         }
     }
@@ -249,17 +314,28 @@ internal sealed class PpcFragmentMap
     private static bool IsGlue(BigEndianReader reader, int at)
     {
         if (at > reader.Length - 24)
+        {
             return false;
+        }
+
         for (int i = 0; i < GlueRest.Length; i++)
+        {
             if (reader.ReadUInt32At(at + 4 + 4 * i) != GlueRest[i])
+            {
                 return false;
+            }
+        }
+
         return true;
     }
 
     private string GlueImport(short displacement)
     {
         if (TocSection is not int toc)
+        {
             return $"?slot r2+0x{displacement:X}";
+        }
+
         long slot = TocBase + (long)displacement;
         return FixupAt(toc, slot) is { Target: PefFixupTarget.Import } fixup ? ImportName(fixup.TargetIndex) : $"?slot {toc}:0x{slot:X}";
     }
@@ -275,13 +351,20 @@ internal static class PpcAnnotator
         if (ins.Target is uint target && (ins.IsCall || !ins.IsConditional))
         {
             if (map.Glue.TryGetValue((section, target), out var import))
+            {
                 refs.Add(new CodeReference(section, ins.Address, CodeReferenceKind.Glue, import));
+            }
             else if (map.Functions.TryGetValue((section, target), out var f))
+            {
                 refs.Add(new CodeReference(section, ins.Address, CodeReferenceKind.Call, f.Name));
+            }
         }
         if (ins is { Mnemonic: "lwz", Operands: [_, { Kind: PpcOperandKind.Displacement, Base: 2 } d] } && map.TocSection is int toc
             && map.SlotText(toc, map.TocBase + d.Value) is { } slot)
+        {
             refs.Add(new CodeReference(section, ins.Address, CodeReferenceKind.TocSlot, slot));
+        }
+
         return refs;
     }
 }

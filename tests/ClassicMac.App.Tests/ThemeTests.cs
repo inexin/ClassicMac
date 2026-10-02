@@ -9,9 +9,9 @@ using Avalonia.Headless;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using Avalonia.Themes.Fluent;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Resources.Decoders.Sound;
@@ -392,7 +392,10 @@ public class ThemeTests
     {
         var text = File.ReadAllText(SourceFile(file));
         if (file.EndsWith(".axaml", StringComparison.Ordinal))
+        {
             Assert.DoesNotMatch(new Regex("#[0-9A-Fa-f]{3,8}\\b"), text);
+        }
+
         Assert.DoesNotMatch(new Regex("Opacity\\s*=\\s*\"?0\\."), text);
         Assert.DoesNotContain("SystemControlForegroundBaseLowBrush", text);
     }

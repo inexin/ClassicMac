@@ -91,7 +91,8 @@ public class BigEndianReaderWriterTests
         Assert.Equal(6, parent.Position);
 
         bool childThrew = false;
-        try { section.ReadByte(); }
+        try
+        { section.ReadByte(); }
         catch (EndOfStreamException) { childThrew = true; }
         Assert.True(childThrew);
         Assert.Equal(4, section.Position);
@@ -103,7 +104,8 @@ public class BigEndianReaderWriterTests
         var reader = new BigEndianReader(new byte[] { 0x12, 0x34 }) { Position = 1 };
 
         bool threw = false;
-        try { reader.ReadSubReader(2); }
+        try
+        { reader.ReadSubReader(2); }
         catch (EndOfStreamException) { threw = true; }
 
         Assert.True(threw);
@@ -149,7 +151,8 @@ public class BigEndianReaderWriterTests
     {
         var reader = new BigEndianReader(new byte[] { 0x12 });
         bool readThrew = false;
-        try { reader.ReadUInt16(); }
+        try
+        { reader.ReadUInt16(); }
         catch (EndOfStreamException) { readThrew = true; }
         Assert.True(readThrew);
         Assert.Equal(0, reader.Position);
@@ -163,7 +166,8 @@ public class BigEndianReaderWriterTests
         Assert.Equal(0, reader.Remaining);
 
         bool threw = false;
-        try { reader.Position = 3; }
+        try
+        { reader.Position = 3; }
         catch (ArgumentOutOfRangeException) { threw = true; }
         Assert.True(threw);
         Assert.Equal(2, reader.Position);
@@ -205,7 +209,10 @@ public class BigEndianReaderWriterTests
     {
         static IEnumerable<ushort> Words(BigEndianReader reader)
         {
-            while (reader.Remaining >= 2) yield return reader.ReadUInt16();
+            while (reader.Remaining >= 2)
+            {
+                yield return reader.ReadUInt16();
+            }
         }
         Assert.Equal(new ushort[] { 1, 2 }, Words(new BigEndianReader(new byte[] { 0, 1, 0, 2, 9 })));
         var sub = new BigEndianReader(new byte[] { 1, 2, 3, 4 }).ReadSubReader(2);
@@ -217,7 +224,11 @@ public class BigEndianReaderWriterTests
     {
         var writer = new BigEndianWriter(capacity: 2);
         writer.WriteUInt32(0);                                       // placeholder for a length
-        for (int i = 0; i < 1000; i++) writer.WriteUInt16((ushort)i);
+        for (int i = 0; i < 1000; i++)
+        {
+            writer.WriteUInt16((ushort)i);
+        }
+
         writer.WriteZeros(3);
         writer.WriteUInt32At(0, (uint)(writer.Length - 4));
         Assert.Equal(4 + 2000 + 3, writer.Length);

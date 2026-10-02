@@ -162,5 +162,7 @@ checks subtract-first (`offset > length - size`), as the Mac OS code does.
 ## Conventions
 
 - Work on `main` (no feature branches).
+- Every `if`/`else`/loop body has braces, one statement per line (`.editorconfig`); the build enforces the style
+  (`EnforceCodeStyleInBuild`, warnings are errors). `dotnet format style --diagnostics IDE0011` fixes braces.
 - A change to how a format is read or written updates its document in `docs/formats/<category>/` in the same commit;
   the authoring rules are in `docs/formats/CLAUDE.md`.

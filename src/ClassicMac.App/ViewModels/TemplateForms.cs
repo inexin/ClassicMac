@@ -34,8 +34,16 @@ namespace ClassicMac.App.ViewModels
             Fields = TemplateRows.Make(read.Values, 0);
             WatchRows(Fields);
             var notes = new List<string>();
-            if (read.MissingBytes > 0) notes.Add($"The data is {read.MissingBytes} byte{(read.MissingBytes == 1 ? "" : "s")} shorter than the template; Apply adds them as zeros.");
-            if (read.Extra.Length > 0) notes.Add($"{read.Extra.Length} byte{(read.Extra.Length == 1 ? "" : "s")} after the template's last field are kept.");
+            if (read.MissingBytes > 0)
+            {
+                notes.Add($"The data is {read.MissingBytes} byte{(read.MissingBytes == 1 ? "" : "s")} shorter than the template; Apply adds them as zeros.");
+            }
+
+            if (read.Extra.Length > 0)
+            {
+                notes.Add($"{read.Extra.Length} byte{(read.Extra.Length == 1 ? "" : "s")} after the template's last field are kept.");
+            }
+
             Note = notes.Count > 0 ? string.Join(" ", notes) : null;
         }
 
@@ -45,11 +53,23 @@ namespace ClassicMac.App.ViewModels
             foreach (var row in rows)
             {
                 row.PropertyChanged += (_, _) => RaiseEdited();
-                if (row is not TemplateListRow list) continue;
-                foreach (var item in list.Items) WatchRows(item.Fields);
+                if (row is not TemplateListRow list)
+                {
+                    continue;
+                }
+
+                foreach (var item in list.Items)
+                {
+                    WatchRows(item.Fields);
+                }
+
                 list.Items.CollectionChanged += (_, e) =>
                 {
-                    foreach (var item in e.NewItems?.OfType<TemplateItemRow>() ?? []) WatchRows(item.Fields);
+                    foreach (var item in e.NewItems?.OfType<TemplateItemRow>() ?? [])
+                    {
+                        WatchRows(item.Fields);
+                    }
+
                     RaiseEdited();
                 };
             }
@@ -69,7 +89,11 @@ namespace ClassicMac.App.ViewModels
 
         public override byte[] BuildData()
         {
-            if (!IsUsable) throw new ArgumentException(Note);
+            if (!IsUsable)
+            {
+                throw new ArgumentException(Note);
+            }
+
             return template.Write(TemplateRows.Values(Fields), extra.Span);
         }
     }
@@ -119,7 +143,11 @@ namespace ClassicMac.App.ViewModels
         {
             this.count = count;
             this.depth = depth;
-            foreach (var item in items) Items.Add(new TemplateItemRow(this, TemplateRows.Make(item, depth + 1)));
+            foreach (var item in items)
+            {
+                Items.Add(new TemplateItemRow(this, TemplateRows.Make(item, depth + 1)));
+            }
+
             Items.CollectionChanged += (_, _) => Renumber();
             Renumber();
         }
@@ -140,9 +168,16 @@ namespace ClassicMac.App.ViewModels
 
         private void Renumber()
         {
-            for (int i = 0; i < Items.Count; i++) Items[i].Number = i + 1;
+            for (int i = 0; i < Items.Count; i++)
+            {
+                Items[i].Number = i + 1;
+            }
+
             if (count is not null)
+            {
                 count.Text = (count.Node.Type == "ZCNT" ? (Items.Count - 1) & 0xFFFF : Items.Count).ToString(CultureInfo.InvariantCulture);
+            }
+
             OnPropertyChanged(nameof(Summary));
         }
 
@@ -198,11 +233,23 @@ namespace ClassicMac.App.ViewModels
         {
             var forks = new List<(ResourceFork Fork, string Name)> { (own, ownFile?.BaseTitle ?? "this file") };
             foreach (var root in Roots)
+            {
                 foreach (var node in Loaded(root))
-                    if (!forks.Any(f => ReferenceEquals(f.Fork, node.Fork))) forks.Add(node);
+                {
+                    if (!forks.Any(f => ReferenceEquals(f.Fork, node.Fork)))
+                    {
+                        forks.Add(node);
+                    }
+                }
+            }
+
             foreach (var (fork, name) in forks)
             {
-                if (ResourceTemplate.Find(fork, type) is not { } tmpl) continue;
+                if (ResourceTemplate.Find(fork, type) is not { } tmpl)
+                {
+                    continue;
+                }
+
                 try
                 {
                     var data = ResourceDecompression.Default.GetData(tmpl, fork, ReadOptions, []);
@@ -219,7 +266,11 @@ namespace ClassicMac.App.ViewModels
         // A template form for a resource without a typed form, when a TMPL for its type is at hand.
         private TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)
         {
-            if (FindTemplate(node.Resource.Type, node.Fork, owner) is not { } found) return null;
+            if (FindTemplate(node.Resource.Type, node.Fork, owner) is not { } found)
+            {
+                return null;
+            }
+
             var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, ReadOptions, []);
             return new TemplateForm(node.Resource, found.Template, found.Source, data.Span);
         }
@@ -228,13 +279,30 @@ namespace ClassicMac.App.ViewModels
         {
             if (node is FileNode file)
             {
-                if (file.Resources?.Fork is { } fork) yield return (fork, node.BaseTitle);
+                if (file.Resources?.Fork is { } fork)
+                {
+                    yield return (fork, node.BaseTitle);
+                }
+
                 yield break;
             }
-            if (node is ResourceTypeNode or ResourceNode) yield break;
-            if (node is InputNode { RawResources.Fork: { } raw }) yield return (raw, node.BaseTitle);
+            if (node is ResourceTypeNode or ResourceNode)
+            {
+                yield break;
+            }
+
+            if (node is InputNode { RawResources.Fork: { } raw })
+            {
+                yield return (raw, node.BaseTitle);
+            }
+
             foreach (var child in Tree.Contents(node))
-                foreach (var found in Loaded(child)) yield return found;
+            {
+                foreach (var found in Loaded(child))
+                {
+                    yield return found;
+                }
+            }
         }
     }
 }

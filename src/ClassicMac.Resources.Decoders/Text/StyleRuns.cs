@@ -28,7 +28,11 @@ namespace ClassicMac.Resources.Decoders.Text
         {
             var runs = new List<StyleRun>();
             complete = data.Length >= 2;
-            if (!complete) return runs;
+            if (!complete)
+            {
+                return runs;
+            }
+
             var reader = new BigEndianReader(data);
             var count = reader.ReadUInt16();
             for (var i = 0; i < count; i++)

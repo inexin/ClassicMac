@@ -94,7 +94,9 @@ public class PixelScalingTests
         var image = new PixelImage { Source = Checkerboard(n), Zoom = zoom, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top };
         var window = new Window
         {
-            Width = 200, Height = 120, Background = Brushes.Red,
+            Width = 200,
+            Height = 120,
+            Background = Brushes.Red,
             Content = new Border { Padding = new Thickness(10.3, 7.7, 0, 0), Child = image },
         };
         window.Show();
@@ -106,12 +108,15 @@ public class PixelScalingTests
         var origin = Array.FindIndex(pixels, p => p != Red);
         var (x0, y0) = (origin % width, origin / width);
         for (var y = 0; y < n * k + 1; y++)
+        {
             for (var x = 0; x < n * k + 1; x++)
             {
                 var expected = x == n * k || y == n * k ? Red : ((x / k + y / k) % 2 == 0 ? Black : White);
                 Assert.True(pixels[(y0 + y) * width + x0 + x] == expected,
                     $"device pixel ({x}, {y}) of the checkerboard at {scaling:P0}: {pixels[(y0 + y) * width + x0 + x]:X8}, expected {expected:X8}");
             }
+        }
+
         window.Close();
     });
 

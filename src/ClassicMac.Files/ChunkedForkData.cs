@@ -47,13 +47,20 @@ namespace ClassicMac.Files
         {
             lock (reported)
             {
-                if (index == cachedIndex) return cached;
+                if (index == cachedIndex)
+                {
+                    return cached;
+                }
+
                 var chunk = chunks[index];
                 var bytes = new byte[chunk.End - chunk.Start];
                 if (chunk.Stored > 0)
                 {
                     var stored = data.Slice(chunk.Offset, chunk.Stored).ToArray();
-                    if (decode(chunk, stored, bytes) is { } problem && reported.Add(index)) report(chunk, problem);
+                    if (decode(chunk, stored, bytes) is { } problem && reported.Add(index))
+                    {
+                        report(chunk, problem);
+                    }
                 }
                 cachedIndex = index;
                 cached = bytes;

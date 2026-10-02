@@ -1,9 +1,9 @@
 using System;
-using ClassicMac.Core;
 using System.Collections.Generic;
+using ClassicMac.Core;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 
 namespace ClassicMac.Graphics.Pict
 {
@@ -66,7 +66,11 @@ namespace ClassicMac.Graphics.Pict
         internal void AddComment(int kind, byte[] data)
         {
             CommentList.Add(new PictComment(kind, data));
-            if (kind != 224 || data.Length < 4) return;
+            if (kind != 224 || data.Length < 4)
+            {
+                return;
+            }
+
             uint selector = (uint)(data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]);
             var payload = data.AsSpan(4);
             switch (selector)
@@ -78,7 +82,11 @@ namespace ClassicMac.Graphics.Pict
                     iccAccumulator?.AddRange(payload.ToArray());
                     break;
                 case 2:
-                    if (iccAccumulator != null) IccProfile = iccAccumulator.ToArray();
+                    if (iccAccumulator != null)
+                    {
+                        IccProfile = iccAccumulator.ToArray();
+                    }
+
                     iccAccumulator = null;
                     break;
             }

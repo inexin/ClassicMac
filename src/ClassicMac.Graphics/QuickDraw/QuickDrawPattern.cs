@@ -56,7 +56,10 @@ namespace ClassicMac.Graphics.QuickDraw
                 pattern.Rgb16 = ((ushort)r, (ushort)g, (ushort)bl);
             }
             else
+            {
                 pattern.Pixels = PixMap.ReadPatternPixMap(b, macOS9);
+            }
+
             return pattern;
         }
     }

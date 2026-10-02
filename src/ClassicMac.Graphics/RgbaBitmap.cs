@@ -17,11 +17,22 @@ namespace ClassicMac.Graphics
         /// <summary>Wraps an existing RGBA buffer of exactly <paramref name="width"/> × <paramref name="height"/> × 4 bytes.</summary>
         public RgbaBitmap(int width, int height, byte[] pixels)
         {
-            if (width <= 0) throw new ArgumentOutOfRangeException(nameof(width));
-            if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
+            if (width <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(width));
+            }
+
+            if (height <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(height));
+            }
+
             ArgumentNullException.ThrowIfNull(pixels);
             if (pixels.Length != width * height * 4)
+            {
                 throw new ArgumentException($"Expected {width * height * 4} bytes of RGBA data, got {pixels.Length}.", nameof(pixels));
+            }
+
             Width = width;
             Height = height;
             Pixels = pixels;
@@ -56,8 +67,16 @@ namespace ClassicMac.Graphics
 
         private int Offset(int x, int y)
         {
-            if ((uint)x >= (uint)Width) throw new ArgumentOutOfRangeException(nameof(x));
-            if ((uint)y >= (uint)Height) throw new ArgumentOutOfRangeException(nameof(y));
+            if ((uint)x >= (uint)Width)
+            {
+                throw new ArgumentOutOfRangeException(nameof(x));
+            }
+
+            if ((uint)y >= (uint)Height)
+            {
+                throw new ArgumentOutOfRangeException(nameof(y));
+            }
+
             return (y * Width + x) * 4;
         }
     }

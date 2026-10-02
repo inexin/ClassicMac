@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.Metadata.Profiles.Icc;
 using SixLabors.ImageSharp.PixelFormats;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.Graphics.ImageSharp
 {
@@ -110,7 +110,11 @@ namespace ClassicMac.Graphics.ImageSharp
         {
             var (description, profile) = MacImages.Guard(() => QuickTimeImageFile.ReadMetadata(stream));
             var metadata = new ImageMetadata();
-            if (!options.SkipMetadata) ApplyMetadata(metadata, description, profile);
+            if (!options.SkipMetadata)
+            {
+                ApplyMetadata(metadata, description, profile);
+            }
+
             return new ImageInfo(new PixelTypeInfo(32), new Size(Math.Max(1, description.Width), Math.Max(1, description.Height)), metadata);
         }
 
@@ -119,7 +123,11 @@ namespace ClassicMac.Graphics.ImageSharp
         {
             var result = MacImages.Guard(() => QuickTimeImageFile.Read(stream, new ImageSharpImageCodec(options.Configuration), cancellationToken));
             var image = MacImages.ToImage<TPixel>(options, result.Bitmap);
-            if (!options.SkipMetadata) ApplyMetadata(image.Metadata, result.Description, result.IccProfile);
+            if (!options.SkipMetadata)
+            {
+                ApplyMetadata(image.Metadata, result.Description, result.IccProfile);
+            }
+
             ScaleToTargetSize(options, image);
             return image;
         }
@@ -134,7 +142,9 @@ namespace ClassicMac.Graphics.ImageSharp
             metadata.HorizontalResolution = description.HorizontalResolution > 0 ? description.HorizontalResolution : 72;
             metadata.VerticalResolution = description.VerticalResolution > 0 ? description.VerticalResolution : 72;
             if (profile is { Length: > 0 } icc)
+            {
                 metadata.IccProfile = new IccProfile(icc);
+            }
         }
     }
 
@@ -152,7 +162,11 @@ namespace ClassicMac.Graphics.ImageSharp
         protected override ImageInfo Identify(DecoderOptions options, Stream stream, CancellationToken cancellationToken)
         {
             var metadata = new ImageMetadata();
-            if (!options.SkipMetadata) ApplyMetadata(metadata);
+            if (!options.SkipMetadata)
+            {
+                ApplyMetadata(metadata);
+            }
+
             return new ImageInfo(new PixelTypeInfo(1), new Size(MacPaintFile.Width, MacPaintFile.Height), metadata);
         }
 
@@ -160,7 +174,11 @@ namespace ClassicMac.Graphics.ImageSharp
         protected override Image<TPixel> Decode<TPixel>(DecoderOptions options, Stream stream, CancellationToken cancellationToken)
         {
             var image = MacImages.ToImage<TPixel>(options, MacImages.Guard(() => MacPaintFile.Decode(stream, cancellationToken)));
-            if (!options.SkipMetadata) ApplyMetadata(image.Metadata);
+            if (!options.SkipMetadata)
+            {
+                ApplyMetadata(image.Metadata);
+            }
+
             ScaleToTargetSize(options, image);
             return image;
         }
@@ -183,8 +201,15 @@ namespace ClassicMac.Graphics.ImageSharp
             where TPixel : unmanaged, IPixel<TPixel>
         {
             var rgba = Image.LoadPixelData<Rgba32>(options.Configuration, bitmap.Pixels, bitmap.Width, bitmap.Height);
-            if (rgba is Image<TPixel> same) return same;
-            using (rgba) return rgba.CloneAs<TPixel>(options.Configuration);
+            if (rgba is Image<TPixel> same)
+            {
+                return same;
+            }
+
+            using (rgba)
+            {
+                return rgba.CloneAs<TPixel>(options.Configuration);
+            }
         }
 
         // ImageSharp reports unsupported or corrupt input as InvalidImageContentException.

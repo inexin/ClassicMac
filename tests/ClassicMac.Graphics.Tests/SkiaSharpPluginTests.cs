@@ -1,12 +1,12 @@
-using SkiaSharp;
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using SkiaSharp;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -43,7 +43,11 @@ public class SkiaSharpPluginTests
         using var source = new SKBitmap(new SKImageInfo(2, 1, SKColorType.Rgba8888, SKAlphaType.Unpremul));
         source.SetPixel(1, 0, new SKColor(1, 2, 3));
         byte[] png;
-        using (var data = source.Encode(SKEncodedImageFormat.Png, 100)) png = data.ToArray();
+        using (var data = source.Encode(SKEncodedImageFormat.Png, 100))
+        {
+            png = data.ToArray();
+        }
+
         var codec = new SkiaImageCodec();
         var decoded = codec.Decode(new PictImageDescription("png ", 2, 1, 32, -1, 72, 72, "PNG"), png);
         Assert.NotNull(decoded);

@@ -19,11 +19,16 @@ namespace ClassicMac.Files
             this.ranges = ranges.ToArray();
             var available = this.ranges.Sum(r => r.Length);
             if (length > available)
+            {
                 throw new ArgumentOutOfRangeException(nameof(length), $"{length} bytes do not fit the {available} the extents hold.");
+            }
+
             foreach (var (offset, count) in this.ranges)
             {
                 if (offset < 0 || count < 0 || offset > parent.Length - count)
+                {
                     throw new ArgumentOutOfRangeException(nameof(ranges), $"{offset}+{count} lies outside the {parent.Length}-byte image.");
+                }
             }
             this.length = length;
         }
@@ -37,12 +42,20 @@ namespace ClassicMac.Files
             long start = 0;
             foreach (var (rangeOffset, rangeLength) in ranges)
             {
-                if (buffer.IsEmpty) return;
+                if (buffer.IsEmpty)
+                {
+                    return;
+                }
+
                 if (offset < start + rangeLength)
                 {
                     var within = offset - start;
                     var take = (int)Math.Min(rangeLength - within, buffer.Length);
-                    if (parent.ReadAt(rangeOffset + within, buffer[..take]) != take) throw new EndOfStreamException();
+                    if (parent.ReadAt(rangeOffset + within, buffer[..take]) != take)
+                    {
+                        throw new EndOfStreamException();
+                    }
+
                     buffer = buffer[take..];
                     offset += take;
                 }
@@ -117,7 +130,11 @@ namespace ClassicMac.Files
 
             protected override void Dispose(bool disposing)
             {
-                if (disposing) inner.Dispose();
+                if (disposing)
+                {
+                    inner.Dispose();
+                }
+
                 base.Dispose(disposing);
             }
         }

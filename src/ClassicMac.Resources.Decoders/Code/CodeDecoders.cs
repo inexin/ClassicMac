@@ -44,7 +44,11 @@ namespace ClassicMac.Resources.Decoders.Code
                         $"{input.Resource}: the jump table could not be read ({failure}); written as its data only."));
                     return [bin];
                 }
-                foreach (var d in appDiagnostics) input.Diagnostics.Add(d);
+                foreach (var d in appDiagnostics)
+                {
+                    input.Diagnostics.Add(d);
+                }
+
                 return [bin, new DecodedFile(".json", MacText.Json(w =>
                 {
                     w.WriteStartObject();
@@ -82,10 +86,17 @@ namespace ClassicMac.Resources.Decoders.Code
 
             // No application (or one that does not read): the segment on its own.
             if (failure is not null && input.Ids(CodeType).Any(r => r.Id == 0))
+            {
                 input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.listing-application",
                     $"The fork's 'CODE' 0 could not be read ({failure}); 'CODE' {id} is listed on its own."));
+            }
+
             var lone = CodeListing.ForCodeResource(CodeType, id, input.Data, NamedFork(input));
-            foreach (var d in lone.Diagnostics) input.Diagnostics.Add(d);
+            foreach (var d in lone.Diagnostics)
+            {
+                input.Diagnostics.Add(d);
+            }
+
             var header = ClassicMac.Code.M68k.SegmentHeader.Read(input.Data, new List<Diagnostic>());
             return [bin, Listing(lone), new DecodedFile(".json", MacText.Json(w =>
             {
@@ -109,11 +120,23 @@ namespace ClassicMac.Resources.Decoders.Code
         // What the loader patches in the segment: the far lists, Retro68's 'RELA', CodeWarrior's lists for CODE 1.
         private static IEnumerable<(long Offset, string Base)> Relocations(CodeApplication app, CodeSegment segment)
         {
-            foreach (long at in segment.A5Relocations) yield return (at, "a5");
-            foreach (long at in segment.PcRelocations) yield return (at, "segment");
+            foreach (long at in segment.A5Relocations)
+            {
+                yield return (at, "a5");
+            }
+
+            foreach (long at in segment.PcRelocations)
+            {
+                yield return (at, "segment");
+            }
+
             foreach (var r in segment.Retro68Relocations)
+            {
                 yield return (r.Offset, r.Base == Retro68RelocationBase.Segment ? "segment" : "a5");
+            }
+
             if (segment.Id == 1 && app.CodeWarriorData is { } cw)
+            {
                 foreach (var list in cw.Relocations)
                 {
                     string? name = list.Kind switch
@@ -123,8 +146,14 @@ namespace ClassicMac.Resources.Decoders.Code
                         _ => null,
                     };
                     if (name is not null)
-                        foreach (int at in list.Offsets) yield return (at, name);
+                    {
+                        foreach (int at in list.Offsets)
+                        {
+                            yield return (at, name);
+                        }
+                    }
                 }
+            }
         }
 
         internal static DecodedFile Listing(CodeListing listing) => new(".s", Encoding.UTF8.GetBytes(listing.Text));
@@ -228,7 +257,11 @@ namespace ClassicMac.Resources.Decoders.Code
                     $"{input.Resource}: its PEF container could not be read ({e.Message}); written as its data only."));
                 return [bin];
             }
-            foreach (var d in listing.Diagnostics) input.Diagnostics.Add(d);
+            foreach (var d in listing.Diagnostics)
+            {
+                input.Diagnostics.Add(d);
+            }
+
             return [bin, CodeSegmentDecoder.Listing(listing), new DecodedFile(".json", MacText.Json(w =>
             {
                 w.WriteStartObject();
@@ -284,8 +317,15 @@ namespace ClassicMac.Resources.Decoders.Code
                     w.WriteStartObject();
                     w.WriteNumber("selector", e.Selector);
                     w.WriteNumber("offset", e.Offset);
-                    if (e.TargetOffset is { } target) w.WriteNumber("target", target);
-                    else w.WriteNull("target");
+                    if (e.TargetOffset is { } target)
+                    {
+                        w.WriteNumber("target", target);
+                    }
+                    else
+                    {
+                        w.WriteNull("target");
+                    }
+
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -313,8 +353,15 @@ namespace ClassicMac.Resources.Decoders.Code
                     w.WriteNumber("procInfo", r.ProcInfo);
                     w.WriteBoolean("powerPC", r.IsPowerPC);
                     w.WriteNumber("flags", r.Flags);
-                    if (r.TargetOffset is { } target) w.WriteNumber("targetOffset", target);
-                    else w.WriteNumber("procDescriptor", r.ProcDescriptor);
+                    if (r.TargetOffset is { } target)
+                    {
+                        w.WriteNumber("targetOffset", target);
+                    }
+                    else
+                    {
+                        w.WriteNumber("procDescriptor", r.ProcDescriptor);
+                    }
+
                     w.WriteBoolean("pef", r.Pef is not null);
                     w.WriteEndObject();
                 }
@@ -330,7 +377,11 @@ namespace ClassicMac.Resources.Decoders.Code
             for (int i = 0; i < listing.Fragments.Count; i++)
             {
                 w.WriteStartObject();
-                if (i < pefs.Count) CodeJson.Fragment(w, pefs[i]);
+                if (i < pefs.Count)
+                {
+                    CodeJson.Fragment(w, pefs[i]);
+                }
+
                 CodeJson.Functions(w, listing.Fragments[i].Functions, withSection: true);
                 CodeJson.References(w, listing.Fragments[i].References, withSection: true);
                 w.WriteEndObject();
@@ -362,9 +413,16 @@ namespace ClassicMac.Resources.Decoders.Code
                 {
                     var data = type == input.Resource.Type && id == input.Resource.Id ? input.Data : input.Find(type, id) ?? ReadOnlyMemory<byte>.Empty;
                     var resource = new Resource(type, id, data.ToArray());
-                    if (name is not null) resource.Name = MacString.FromMacRoman(name);
+                    if (name is not null)
+                    {
+                        resource.Name = MacString.FromMacRoman(name);
+                    }
                     // Data the decompressor could not expand keeps its signature: the application reports it (code.compressed).
-                    if (CompressedResourceHeader.HasSignature(data)) resource.Attributes = ResourceAttributes.Compressed;
+                    if (CompressedResourceHeader.HasSignature(data))
+                    {
+                        resource.Attributes = ResourceAttributes.Compressed;
+                    }
+
                     fork.Add(resource);
                     var entry = new BigEndianWriter();
                     entry.WriteFourCC(type);
@@ -376,12 +434,22 @@ namespace ClassicMac.Resources.Decoders.Code
                 }
             }
             foreach (var d in input.Diagnostics.ToList())
-                if (!before.Contains(d)) input.Diagnostics.Remove(d);
+            {
+                if (!before.Contains(d))
+                {
+                    input.Diagnostics.Remove(d);
+                }
+            }
+
             var digest = hash.GetHashAndReset();
 
             lock (gate)
             {
-                if (key is not null && key.AsSpan().SequenceEqual(digest)) return cached;
+                if (key is not null && key.AsSpan().SequenceEqual(digest))
+                {
+                    return cached;
+                }
+
                 var diagnostics = new List<Diagnostic>();
                 try
                 {

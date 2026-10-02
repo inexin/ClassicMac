@@ -30,20 +30,44 @@ public sealed class TarArchiveReader : IContainerReader
     /// </summary>
     public bool CanRead(ForkData input)
     {
-        if (input.Length < BlockLength) return false;
+        if (input.Length < BlockLength)
+        {
+            return false;
+        }
+
         var block = input.ReadPrefix(BlockLength);
-        if (block[0] == 0) return false;
-        if (!TryParseOctal(block.AsSpan(148, 8), out var stored)) return false;
+        if (block[0] == 0)
+        {
+            return false;
+        }
+
+        if (!TryParseOctal(block.AsSpan(148, 8), out var stored))
+        {
+            return false;
+        }
+
         long sum = 0;
-        for (var i = 0; i < BlockLength; i++) sum += i is >= 148 and < 156 ? (byte)' ' : block[i];
-        if (sum != stored) return false;
+        for (var i = 0; i < BlockLength; i++)
+        {
+            sum += i is >= 148 and < 156 ? (byte)' ' : block[i];
+        }
+
+        if (sum != stored)
+        {
+            return false;
+        }
+
         return block.AsSpan(257, 5).SequenceEqual("ustar"u8) || block[156] is 0 or (byte)'0' or (byte)'1' or (byte)'2' or (byte)'5';
     }
 
     /// <inheritdoc/>
     public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
     {
-        if (!CanRead(input)) throw new InvalidDataException("Not a tar archive.");
+        if (!CanRead(input))
+        {
+            throw new InvalidDataException("Not a tar archive.");
+        }
+
         var entries = new List<UnixArchiveEntry>();
         var seen = new Dictionary<string, UnixArchiveEntry>(StringComparer.Ordinal);
         long expanded = 0;
@@ -55,7 +79,10 @@ public sealed class TarArchiveReader : IContainerReader
             while (reader.GetNextEntry() is { } entry)
             {
                 if (++count > context.Options.MaxVolumeEntries)
+                {
                     throw new InvalidDataException("The tar archive exceeds the configured entry limit.");
+                }
+
                 var path = UnixArchive.SplitPath(entry.Name, context, FormatName, 0);
                 var modified = UnixArchive.FromUtc(entry.ModificationTime.UtcDateTime, context);
                 switch (entry.EntryType)
@@ -64,24 +91,27 @@ public sealed class TarArchiveReader : IContainerReader
                         entries.Add(new UnixArchiveEntry { Path = path, IsDirectory = true });
                         break;
                     case Tar.TarEntryType.RegularFile or Tar.TarEntryType.V7RegularFile or Tar.TarEntryType.ContiguousFile:
-                    {
-                        var length = entry.Length;
-                        if (expanded > context.Options.MaxExpandedBytesPerInput - length || length > int.MaxValue)
-                            throw new InvalidDataException("tar extraction exceeds the configured expanded-size limit.");
-                        expanded += length;
-                        var data = new byte[length];
-                        var read = entry.DataStream?.ReadAtLeast(data, data.Length, throwOnEndOfStream: false) ?? 0;
-                        if (read < data.Length)
                         {
-                            context.Report(DiagnosticSeverity.Error, "archive.truncated",
-                                $"The tar entry \"{entry.Name}\" ends after {read} of its {length} bytes; they are kept.");
-                            data = data[..read];
+                            var length = entry.Length;
+                            if (expanded > context.Options.MaxExpandedBytesPerInput - length || length > int.MaxValue)
+                            {
+                                throw new InvalidDataException("tar extraction exceeds the configured expanded-size limit.");
+                            }
+
+                            expanded += length;
+                            var data = new byte[length];
+                            var read = entry.DataStream?.ReadAtLeast(data, data.Length, throwOnEndOfStream: false) ?? 0;
+                            if (read < data.Length)
+                            {
+                                context.Report(DiagnosticSeverity.Error, "archive.truncated",
+                                    $"The tar entry \"{entry.Name}\" ends after {read} of its {length} bytes; they are kept.");
+                                data = data[..read];
+                            }
+                            var file = new UnixArchiveEntry { Path = path, Data = ForkData.FromBytes(data), Modified = modified };
+                            seen[string.Join('/', path)] = file;
+                            entries.Add(file);
+                            break;
                         }
-                        var file = new UnixArchiveEntry { Path = path, Data = ForkData.FromBytes(data), Modified = modified };
-                        seen[string.Join('/', path)] = file;
-                        entries.Add(file);
-                        break;
-                    }
                     case Tar.TarEntryType.SymbolicLink:
                         entries.Add(new UnixArchiveEntry { Path = path, SymbolicLinkTarget = entry.LinkName, Modified = modified });
                         break;
@@ -122,10 +152,18 @@ public sealed class TarArchiveReader : IContainerReader
     {
         value = 0;
         var text = Encoding.ASCII.GetString(field).Trim(' ', '\0');
-        if (text.Length == 0) return false;
+        if (text.Length == 0)
+        {
+            return false;
+        }
+
         foreach (var c in text)
         {
-            if (c is < '0' or > '7') return false;
+            if (c is < '0' or > '7')
+            {
+                return false;
+            }
+
             value = value * 8 + (c - '0');
         }
         return true;

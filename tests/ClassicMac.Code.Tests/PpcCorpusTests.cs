@@ -26,7 +26,10 @@ public class PpcCorpusTests
         var instructions = PpcDisassembler.Disassemble(code, 0).ToList();
         Assert.Equal(code.Length / 4, instructions.Count);
         foreach (var table in tables.Where(t => t.FunctionStart is not null))
+        {
             Assert.True(instructions[table.FunctionStart!.Value / 4].IsValid, $"function at 0x{table.FunctionStart:X}");
+        }
+
         return instructions;
     }
 

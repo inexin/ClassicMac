@@ -49,7 +49,11 @@ namespace ClassicMac.Graphics.Fonts
         {
             int start = reader.Position;
             int length = reader.Remaining;
-            if (length < 12) throw new InvalidDataException($"An sfnt needs a 12-byte offset table; this is {length} bytes.");
+            if (length < 12)
+            {
+                throw new InvalidDataException($"An sfnt needs a 12-byte offset table; this is {length} bytes.");
+            }
+
             var count = reader.ReadUInt16At(start + 4);
             var tables = new List<OutlineTable>();
             var shortData = false;
@@ -63,7 +67,11 @@ namespace ClassicMac.Graphics.Fonts
                 }
                 var table = new OutlineTable(new FourCC(reader.ReadUInt32At(start + at)), reader.ReadUInt32At(start + at + 4),
                     reader.ReadUInt32At(start + at + 8), reader.ReadUInt32At(start + at + 12));
-                if (table.Offset + (long)table.Length > length) shortData = true;
+                if (table.Offset + (long)table.Length > length)
+                {
+                    shortData = true;
+                }
+
                 tables.Add(table);
             }
             string? family = null, subfamily = null, full = null;
@@ -78,7 +86,10 @@ namespace ClassicMac.Graphics.Fonts
                 full = Name(tableReader, 4);
             }
             if (shortData)
+            {
                 diagnostics?.Add(new Diagnostic(DiagnosticSeverity.Warning, "font.short", "The sfnt's table directory points past its data."));
+            }
+
             var result = new OutlineFont
             {
                 Version = new FourCC(reader.ReadUInt32At(start)),
@@ -101,14 +112,29 @@ namespace ClassicMac.Graphics.Fonts
             for (var i = 0; i < count; i++)
             {
                 var at = 6 + 12 * i;
-                if (at + 12 > table.Length) break;
+                if (at + 12 > table.Length)
+                {
+                    break;
+                }
+
                 int platform = table.ReadUInt16At(at), encoding = table.ReadUInt16At(at + 2),
                     id = table.ReadUInt16At(at + 6), length = table.ReadUInt16At(at + 8),
                     offset = table.ReadUInt16At(at + 10);
-                if (id != nameId || strings + offset + length > table.Length) continue;
+                if (id != nameId || strings + offset + length > table.Length)
+                {
+                    continue;
+                }
+
                 var bytes = table.ReadBytesAt(strings + offset, length);
-                if (platform == 1 && encoding == 0) return MacRoman.Decode(bytes);
-                if (unicode is null && (platform == 0 || (platform == 3 && encoding == 1))) unicode = Encoding.BigEndianUnicode.GetString(bytes);
+                if (platform == 1 && encoding == 0)
+                {
+                    return MacRoman.Decode(bytes);
+                }
+
+                if (unicode is null && (platform == 0 || (platform == 3 && encoding == 1)))
+                {
+                    unicode = Encoding.BigEndianUnicode.GetString(bytes);
+                }
             }
             return unicode;
         }
@@ -135,7 +161,11 @@ namespace ClassicMac.Graphics.Fonts
         public static IReadOnlyList<FontColorEntry> Read(BigEndianReader reader)
         {
             var entries = new List<FontColorEntry>();
-            if (reader.Remaining < 8) return entries;
+            if (reader.Remaining < 8)
+            {
+                return entries;
+            }
+
             reader.Skip(6);
             var count = reader.ReadInt16() + 1;
             for (var i = 0; i < count && reader.Remaining >= 8; i++)

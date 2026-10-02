@@ -29,13 +29,26 @@ public class SoundDecoderTests
         {
             switch (f)
             {
-                case byte b: bytes.Add(b); break;
-                case ushort s: bytes.AddRange([(byte)(s >> 8), (byte)s]); break;
-                case short s: bytes.AddRange([(byte)(s >> 8), (byte)s]); break;
-                case uint u: bytes.AddRange([(byte)(u >> 24), (byte)(u >> 16), (byte)(u >> 8), (byte)u]); break;
-                case string t: bytes.AddRange(FourCC.FromString(t).ToString().Select(c => (byte)c)); break;
-                case byte[] a: bytes.AddRange(a); break;
-                default: throw new ArgumentException(f.GetType().Name);
+                case byte b:
+                    bytes.Add(b);
+                    break;
+                case ushort s:
+                    bytes.AddRange([(byte)(s >> 8), (byte)s]);
+                    break;
+                case short s:
+                    bytes.AddRange([(byte)(s >> 8), (byte)s]);
+                    break;
+                case uint u:
+                    bytes.AddRange([(byte)(u >> 24), (byte)(u >> 16), (byte)(u >> 8), (byte)u]);
+                    break;
+                case string t:
+                    bytes.AddRange(FourCC.FromString(t).ToString().Select(c => (byte)c));
+                    break;
+                case byte[] a:
+                    bytes.AddRange(a);
+                    break;
+                default:
+                    throw new ArgumentException(f.GetType().Name);
             }
         }
         return [.. bytes];
@@ -87,13 +100,21 @@ public class SoundDecoderTests
             {
                 case "fmt ":
                     format = BinaryPrimitives.ReadUInt16LittleEndian(body);
-                    if (format == 0xFFFE) format = BinaryPrimitives.ReadUInt16LittleEndian(body[24..]);
+                    if (format == 0xFFFE)
+                    {
+                        format = BinaryPrimitives.ReadUInt16LittleEndian(body[24..]);
+                    }
+
                     channels = BinaryPrimitives.ReadUInt16LittleEndian(body[2..]);
                     rate = BinaryPrimitives.ReadInt32LittleEndian(body[4..]);
                     bits = BinaryPrimitives.ReadUInt16LittleEndian(body[14..]);
                     break;
-                case "data": data = body.ToArray(); break;
-                case "smpl": smpl = body.ToArray(); break;
+                case "data":
+                    data = body.ToArray();
+                    break;
+                case "smpl":
+                    smpl = body.ToArray();
+                    break;
             }
             at += 8 + size + (size & 1);
         }
@@ -262,7 +283,10 @@ public class SoundDecoderTests
     {
         var folder = !CorpusFolders.Any ? null
             : CorpusFolders.EnumerateFiles("mac3m8.p8", SearchOption.AllDirectories).Select(Path.GetDirectoryName).FirstOrDefault();
-        if (folder is null) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run22/out samples to run this.");
+        if (folder is null)
+        {
+            Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the harness's run22/out samples to run this.");
+        }
 
         foreach (var name in new[] { "mac3m8", "mac3s8", "mac6m8", "mac6s8", "mac3m16", "mac6m16", "ima4m", "ima4s", "ulawm" })
         {
@@ -280,7 +304,10 @@ public class SoundDecoderTests
             else
             {
                 expected = File.ReadAllBytes(Path.Combine(folder!, name + ".p16"));
-                for (var i = 0; i + 1 < expected.Length; i += 2) (expected[i], expected[i + 1]) = (expected[i + 1], expected[i]);
+                for (var i = 0; i + 1 < expected.Length; i += 2)
+                {
+                    (expected[i], expected[i + 1]) = (expected[i + 1], expected[i]);
+                }
             }
             Assert.True(expected.AsSpan().SequenceEqual(wav.Data), name);
         }

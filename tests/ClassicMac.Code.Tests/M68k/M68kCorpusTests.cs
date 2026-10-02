@@ -56,7 +56,10 @@ public class M68kCorpusTests
         {
             var data = new TheoryData<string, short, int, uint, int, int, long, long, int>();
             foreach (var i in Initializers)
+            {
                 data.Add(i.Type, i.Id, i.Header, i.Below, i.Runs, i.Relocations, i.DataEnd, i.RelocationEnd, i.FirstRelocation);
+            }
+
             return data;
         }
     }

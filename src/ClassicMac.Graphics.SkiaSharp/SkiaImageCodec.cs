@@ -1,10 +1,10 @@
 using System;
 using System.Buffers.Binary;
-using SkiaSharp;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
+using SkiaSharp;
 
 namespace ClassicMac.Graphics.SkiaSharp
 {

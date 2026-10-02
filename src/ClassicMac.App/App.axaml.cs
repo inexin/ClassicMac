@@ -1,10 +1,10 @@
 using System.Linq;
 using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
-using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Markup.Xaml;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 
@@ -20,7 +20,9 @@ namespace ClassicMac.App
             foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
             {
                 if (Resources.TryGetResource("CmAccentColor", variant, out var accent) && accent is Color color)
+                {
                     fluent.Palettes[variant] = new ColorPaletteResources { Accent = color };
+                }
             }
         }
 
@@ -30,7 +32,10 @@ namespace ClassicMac.App
             {
                 var model = new MainViewModel(new JsonSettingsStore(JsonSettingsStore.DefaultPath));
                 desktop.MainWindow = new MainWindow { DataContext = model };
-                foreach (var path in desktop.Args ?? []) _ = model.OpenAsync(path);
+                foreach (var path in desktop.Args ?? [])
+                {
+                    _ = model.OpenAsync(path);
+                }
             }
             base.OnFrameworkInitializationCompleted();
         }

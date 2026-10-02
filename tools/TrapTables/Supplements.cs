@@ -161,11 +161,13 @@ static class Supplements
 
         // Two-operand arithmetic and comparisons: every format, each also in 96-bit form.
         foreach (var (op, code) in new[] { ("ADD", 0x00u), ("SUB", 0x02u), ("MUL", 0x04u), ("DIV", 0x06u), ("CMP", 0x08u), ("CPX", 0x0Au), ("REM", 0x0Cu) })
+        {
             foreach (var (f, bits) in all)
             {
                 yield return (Trap, bits | code, $"F{op}{f}");
                 yield return (Trap, bits | Ext96 | code, $"F{op}{f}96");
             }
+        }
         // FOZ2X ($000E): the format is the source's.
         foreach (var (f, bits) in all)
         {
@@ -188,9 +190,15 @@ static class Supplements
         yield return (Trap, Ext96 | 0x09, "FDEC2X96");
         // FOCLASS ($001C) and FONEXT ($0013): the floating formats only (FCLASS also comp).
         foreach (var (f, bits) in Pick("X", "D", "S", "C"))
+        {
             yield return (Trap, bits | 0x1C, $"FCLASS{f}");
+        }
+
         foreach (var (f, bits) in Pick("X", "D", "S"))
+        {
             yield return (Trap, bits | 0x13, $"FNEXT{f}");
+        }
+
         yield return (Trap, Ext96 | 0x1C, "FCLASSX96");
         yield return (Trap, Ext96 | 0x13, "FNEXTX96");
         // One-operand operations on extended (FORTI is FRINTX, FOTTI FTINTX).
@@ -204,7 +212,9 @@ static class Supplements
         yield return (Trap, 0x2000 | Ext96 | 0x18, "FSCALBX96");
         // The environment calls, with no operand format.
         foreach (var (name, code) in new[] { ("FSETENV", 0x01u), ("FGETENV", 0x03u), ("FSETHV", 0x05u), ("FGETHV", 0x07u), ("FSETXCP", 0x15u), ("FPROCENTRY", 0x17u), ("FPROCEXIT", 0x19u), ("FTESTXCP", 0x1Bu) })
+        {
             yield return (Trap, code, name);
+        }
     }
 
     // _Elems68K (_Pack5) opwords and their macros [Doc: Apple Numerics Manual, second edition, the elementary

@@ -4,9 +4,9 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Data.Converters;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Input;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
@@ -54,7 +54,11 @@ namespace ClassicMac.App.Views
         {
             Inlines ??= [];
             Inlines.Clear();
-            if (Styled is not { } styled) return;
+            if (Styled is not { } styled)
+            {
+                return;
+            }
+
             foreach (var run in styled.Runs)
             {
                 Inlines.Add(new Run(styled.Text.Substring(run.Start, run.Length).Replace('\r', '\n'))
@@ -120,8 +124,16 @@ namespace ClassicMac.App.Views
         // device pixel per Mac pixel, at the size the layout gave it.
         protected override Size MeasureOverride(Size availableSize)
         {
-            if (Item is not { } item) return default;
-            if (bitmap is null || bitmap.PixelSize.Width == 0) return new Size(item.Width, item.Height);
+            if (Item is not { } item)
+            {
+                return default;
+            }
+
+            if (bitmap is null || bitmap.PixelSize.Width == 0)
+            {
+                return new Size(item.Width, item.Height);
+            }
+
             var zoom = (double)item.Width / bitmap.PixelSize.Width;
             var scale = PixelScaling.Scale(zoom, RenderScaling);
             return scale == zoom ? new Size(item.Width, item.Height) : new Size(bitmap.PixelSize.Width * scale, bitmap.PixelSize.Height * scale);
@@ -131,14 +143,23 @@ namespace ClassicMac.App.Views
         {
             var rect = new Rect(Bounds.Size);
             using var snap = PushSnap(context);
-            if (bitmap is not null) context.DrawImage(bitmap, rect);
-            else if (rect.Width > 0 && rect.Height > 0) context.DrawRectangle(null, Missing, rect.Deflate(0.5));
+            if (bitmap is not null)
+            {
+                context.DrawImage(bitmap, rect);
+            }
+            else if (rect.Width > 0 && rect.Height > 0)
+            {
+                context.DrawRectangle(null, Missing, rect.Deflate(0.5));
+            }
         }
 
         protected override void OnPointerReleased(PointerReleasedEventArgs e)
         {
             base.OnPointerReleased(e);
-            if (e.InitialPressMouseButton == MouseButton.Left && Item?.Open is { } open && open.CanExecute(null)) open.Execute(null);
+            if (e.InitialPressMouseButton == MouseButton.Left && Item?.Open is { } open && open.CanExecute(null))
+            {
+                open.Execute(null);
+            }
         }
     }
 
@@ -167,8 +188,16 @@ namespace ClassicMac.App.Views
         public override void Render(DrawingContext context)
         {
             var size = Bounds.Size;
-            if (Token("CmPaneBackground") is { } background) context.FillRectangle(background, new Rect(size));
-            if (Sound is not { Frames: > 0 } sound || size.Width < 1) return;
+            if (Token("CmPaneBackground") is { } background)
+            {
+                context.FillRectangle(background, new Rect(size));
+            }
+
+            if (Sound is not { Frames: > 0 } sound || size.Width < 1)
+            {
+                return;
+            }
+
             var wave = Token("CmAccent") ?? Brushes.Gray;
             var axis = Token("CmDivider");
             var lane = size.Height / sound.Channels;
@@ -177,7 +206,11 @@ namespace ClassicMac.App.Views
             {
                 var middle = lane * c + lane / 2;
                 var half = Math.Max(1, lane / 2 - 2);
-                if (axis is not null) context.FillRectangle(axis, new Rect(0, Math.Floor(middle), size.Width, 1)); // on whole pixels
+                if (axis is not null)
+                {
+                    context.FillRectangle(axis, new Rect(0, Math.Floor(middle), size.Width, 1)); // on whole pixels
+                }
+
                 for (var x = 0; x < columns; x++)
                 {
                     var first = (int)((long)x * sound.Frames / columns);

@@ -19,7 +19,10 @@ namespace ClassicMac.Core
         {
             var seconds = (date.Ticks - Epoch.Ticks) / TimeSpan.TicksPerSecond;
             if (date.Ticks < Epoch.Ticks || seconds > uint.MaxValue)
+            {
                 throw new ArgumentOutOfRangeException(nameof(date), "A Mac date covers 1904 to 2040.");
+            }
+
             return new MacDate((uint)seconds);
         }
 

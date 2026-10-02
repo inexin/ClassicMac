@@ -27,11 +27,18 @@ namespace ClassicMac.Graphics.QuickDraw
             if (fromSize != toSize)
             {
                 bool negative = c < 0;
-                if (negative) c = (short)-c;
+                if (negative)
+                {
+                    c = (short)-c;
+                }
+
                 uint product = (uint)(ushort)c * (ushort)toSize + ((uint)(ushort)fromSize >> 1);
                 uint quotient = product / (ushort)fromSize;
                 c = quotient > 0xFFFF ? (short)product : (short)quotient;   // an overflowing divide leaves the product
-                if (negative) c = (short)-c;
+                if (negative)
+                {
+                    c = (short)-c;
+                }
             }
             return (short)(c + toLo);
         }
@@ -42,8 +49,16 @@ namespace ClassicMac.Graphics.QuickDraw
 
         private static int ScaleOne(int size, int fromSize, int toSize)
         {
-            if ((short)fromSize == (short)toSize) return size;
-            if ((short)size <= 0) return 0;
+            if ((short)fromSize == (short)toSize)
+            {
+                return size;
+            }
+
+            if ((short)size <= 0)
+            {
+                return 0;
+            }
+
             uint scaled = ((uint)(ushort)size * (ushort)toSize + ((uint)(ushort)fromSize >> 1)) / (ushort)fromSize;
             int result = (short)scaled;
             return result == 0 ? 1 : result;
@@ -55,18 +70,32 @@ namespace ClassicMac.Graphics.QuickDraw
         public static Region MapRegion(Region region, PictRect from, PictRect to)
         {
             if (region.Bounds == WideOpen && region.Bands.Count == 1 && region.Bands[0].Spans.Length == 2)
+            {
                 return region;
+            }
+
             if (from.Width == to.Width && from.Height == to.Height)
+            {
                 return region.Offset(to.Left - from.Left, to.Top - from.Top);
+            }
+
             var rows = new Dictionary<int, List<int>>();
             foreach (var (x, y) in region.InversionPoints())
             {
                 var (h, v) = MapPoint(x, y, from, to);
-                if (!rows.TryGetValue(v, out var xs)) rows[v] = xs = new List<int>();
+                if (!rows.TryGetValue(v, out var xs))
+                {
+                    rows[v] = xs = new List<int>();
+                }
+
                 xs.Add(h);
             }
             var list = new List<(int y, List<int> xs)>();
-            foreach (var (y, xs) in rows) list.Add((y, xs));
+            foreach (var (y, xs) in rows)
+            {
+                list.Add((y, xs));
+            }
+
             return Region.FromInversionRows(list);
         }
     }

@@ -28,7 +28,11 @@ public class BaselineTests
     [Fact]
     public void A_mismatch_names_the_actual_frame_and_a_diff() => Headless.OnUiThread(() =>
     {
-        if (Baselines.Updating) return; // would write the baseline
+        if (Baselines.Updating)
+        {
+            return; // would write the baseline
+        }
+
         var name = $"cm-test-{Guid.NewGuid():N}";
         var path = Path.Combine(Baselines.Folder, name + ".png");
         var red = Png(4, 3, 255, 0, 0);
@@ -52,7 +56,10 @@ public class BaselineTests
         finally
         {
             File.Delete(path);
-            foreach (var file in Directory.EnumerateFiles(Baselines.FailureFolder, name + "*")) File.Delete(file);
+            foreach (var file in Directory.EnumerateFiles(Baselines.FailureFolder, name + "*"))
+            {
+                File.Delete(file);
+            }
         }
     });
 

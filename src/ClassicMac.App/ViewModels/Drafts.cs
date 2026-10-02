@@ -30,8 +30,16 @@ namespace ClassicMac.App.ViewModels
         {
             get
             {
-                if (HexEdit is { IsModified: true } && hexEditTarget is { } target) return (Name(target.Resource), null);
-                if (Form is { } form && form.Draft is (true, var error)) return (Name(form.Resource), error);
+                if (HexEdit is { IsModified: true } && hexEditTarget is { } target)
+                {
+                    return (Name(target.Resource), null);
+                }
+
+                if (Form is { } form && form.Draft is (true, var error))
+                {
+                    return (Name(form.Resource), error);
+                }
+
                 return null;
             }
         }
@@ -45,8 +53,16 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         internal async Task<bool> ResolveDraftAsync()
         {
-            if (askingDraft) return false;
-            if (CurrentDraft is not { } draft) return true;
+            if (askingDraft)
+            {
+                return false;
+            }
+
+            if (CurrentDraft is not { } draft)
+            {
+                return true;
+            }
+
             var choice = DraftChoice.Discard;
             if (EditDialogs is not null)
             {
@@ -63,8 +79,15 @@ namespace ClassicMac.App.ViewModels
             switch (choice)
             {
                 case DraftChoice.Apply when draft.Error is null:
-                    if (HexEdit is { IsModified: true }) ApplyHexEdit();
-                    else ApplyForm();
+                    if (HexEdit is { IsModified: true })
+                    {
+                        ApplyHexEdit();
+                    }
+                    else
+                    {
+                        ApplyForm();
+                    }
+
                     return !HasDraft;
                 case DraftChoice.Discard:
                     DiscardDraft();
@@ -77,14 +100,24 @@ namespace ClassicMac.App.ViewModels
         // Drops unapplied edits: the hex view's bytes, the form's values read again from the resource.
         private void DiscardDraft()
         {
-            if (HexEdit is { IsModified: true }) DiscardHexEdit();
-            else if (Form is { Draft.IsDraft: true }) UpdateForm(Selected);
+            if (HexEdit is { IsModified: true })
+            {
+                DiscardHexEdit();
+            }
+            else if (Form is { Draft.IsDraft: true })
+            {
+                UpdateForm(Selected);
+            }
         }
 
         // A selection refused while a draft was pending: made once the draft is applied or discarded.
         private async Task SelectAfterDraftAsync(NodeViewModel? target)
         {
-            if (!await ResolveDraftAsync()) return;
+            if (!await ResolveDraftAsync())
+            {
+                return;
+            }
+
             Selected = Current(target);
         }
 
@@ -97,10 +130,17 @@ namespace ClassicMac.App.ViewModels
                 ResourceTypeNode t => t,
                 _ => null,
             };
-            if (typeNode?.Parent is not { } owner || owner.Children.Contains(typeNode)) return node;
+            if (typeNode?.Parent is not { } owner || owner.Children.Contains(typeNode))
+            {
+                return node;
+            }
+
             var now = owner.Children.OfType<ResourceTypeNode>().FirstOrDefault(t => t.Type == typeNode.Type);
             if (node is ResourceNode resource && now is not null)
+            {
                 return (NodeViewModel?)now.Children.OfType<ResourceNode>().FirstOrDefault(n => n.Resource == resource.Resource) ?? now;
+            }
+
             return now ?? owner;
         }
     }

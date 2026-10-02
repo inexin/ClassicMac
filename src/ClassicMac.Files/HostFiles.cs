@@ -71,7 +71,10 @@ namespace ClassicMac.Files
                 {
                     companions.Add(rsrc);
                     var fork = ForkData.FromFile(rsrc);
-                    if (fork.Length > 0) file = file with { ResourceFork = fork };
+                    if (fork.Length > 0)
+                    {
+                        file = file with { ResourceFork = fork };
+                    }
                 }
                 if (File.Exists(finf))
                 {
@@ -113,14 +116,19 @@ namespace ClassicMac.Files
                 return new HostFile(file, HostLayout.AppleDouble, [visible]);
             }
 
-            if (ReadPcExchange(full, directory, hostName, file, context) is { } pcExchange) return pcExchange;
+            if (ReadPcExchange(full, directory, hostName, file, context) is { } pcExchange)
+            {
+                return pcExchange;
+            }
 
             // macOS keeps the resource fork as a named fork of the file itself.
             if (OperatingSystem.IsMacOS())
             {
                 var named = Path.Combine(full, "..namedfork", "rsrc");
                 if (File.Exists(named) && new FileInfo(named).Length > 0)
+                {
                     return new HostFile(file with { ResourceFork = ForkData.FromFile(named) }, HostLayout.MacOSNamedFork, [named]);
+                }
             }
 
             return new HostFile(file, HostLayout.Plain, []);
@@ -156,19 +164,31 @@ namespace ClassicMac.Files
             ArgumentNullException.ThrowIfNull(directory);
             options ??= HostWriteOptions.Default;
             if (options.Layout is not (HostLayout.AppleDouble or HostLayout.BasiliskII))
+            {
                 throw new ArgumentException($"Files cannot be written as {options.Layout}.", nameof(options));
+            }
+
             var name = hostName ?? ToHostName(file.Name, options.Layout);
 
             var data = Path.Combine(directory, name);
             var paths = new List<string> { data };
-            if (options.Layout == HostLayout.AppleDouble) paths.Add(Path.Combine(directory, "._" + name));
+            if (options.Layout == HostLayout.AppleDouble)
+            {
+                paths.Add(Path.Combine(directory, "._" + name));
+            }
             else
             {
-                if (file.ResourceFork.Length > 0) paths.Add(Path.Combine(directory, ".rsrc", name));
+                if (file.ResourceFork.Length > 0)
+                {
+                    paths.Add(Path.Combine(directory, ".rsrc", name));
+                }
+
                 paths.Add(Path.Combine(directory, ".finf", name));
             }
             if (!options.Overwrite && paths.FirstOrDefault(File.Exists) is { } existing)
+            {
                 throw new IOException($"{existing} exists.");
+            }
 
             Directory.CreateDirectory(directory);
             CopyTo(file.DataFork, data);
@@ -189,8 +209,16 @@ namespace ClassicMac.Files
             }
 
             // Mac dates are local times.
-            if (file.Created is { } created) File.SetCreationTime(data, created.ToDateTime());
-            if (file.Modified is { } modified) File.SetLastWriteTime(data, modified.ToDateTime());
+            if (file.Created is { } created)
+            {
+                File.SetCreationTime(data, created.ToDateTime());
+            }
+
+            if (file.Modified is { } modified)
+            {
+                File.SetLastWriteTime(data, modified.ToDateTime());
+            }
+
             return paths;
         }
 
@@ -225,15 +253,25 @@ namespace ClassicMac.Files
         {
             var rsrcFolder = FindEntry(directory, PcExchange.ResourceFolder, directories: true);
             var finderData = FindEntry(directory, PcExchange.FinderData, directories: false);
-            if (rsrcFolder is null && finderData is null) return null;
-            if (string.Equals(hostName, PcExchange.FinderData, StringComparison.OrdinalIgnoreCase)) return null;
+            if (rsrcFolder is null && finderData is null)
+            {
+                return null;
+            }
+
+            if (string.Equals(hostName, PcExchange.FinderData, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
 
             var companions = new List<string>();
             if (rsrcFolder is not null && FindEntry(rsrcFolder, hostName, directories: false) is { } rsrc)
             {
                 companions.Add(rsrc);
                 var fork = ForkData.FromFile(rsrc);
-                if (fork.Length > 0) file = file with { ResourceFork = fork };
+                if (fork.Length > 0)
+                {
+                    file = file with { ResourceFork = fork };
+                }
             }
 
             PcExchangeRecord? record = null;
@@ -251,7 +289,9 @@ namespace ClassicMac.Files
                 file = PcExchange.Apply(file, record,
                     DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
                 if (context.Options.ExtensionMap is { } map)
+                {
                     file = file with { FinderInfo = map.Apply(file.FinderInfo, hostName) };
+                }
             }
             else if (companions.Count > 0)
             {
@@ -260,12 +300,16 @@ namespace ClassicMac.Files
                 file = PcExchange.Apply(file, null,
                     DosTime.FromLocal(File.GetCreationTime(full)), DosTime.FromLocal(File.GetLastWriteTime(full)));
                 if (context.Options.ExtensionMap is { } map)
+                {
                     file = file with { FinderInfo = map.Apply(file.FinderInfo, hostName) };
+                }
             }
 
             // DOS hidden or system makes the file invisible.
             if ((File.GetAttributes(full) & (FileAttributes.Hidden | FileAttributes.System)) != 0)
+            {
                 file = file with { FinderInfo = file.FinderInfo with { Flags = file.FinderInfo.Flags | FinderFlags.IsInvisible } };
+            }
 
             return companions.Count == 0 ? null : new HostFile(file, HostLayout.PcExchange, companions);
         }
@@ -273,8 +317,16 @@ namespace ClassicMac.Files
         private static string? FindEntry(string directory, string name, bool directories)
         {
             var exact = Path.Combine(directory, name);
-            if (directories ? Directory.Exists(exact) : File.Exists(exact)) return exact;
-            if (!Directory.Exists(directory)) return null;
+            if (directories ? Directory.Exists(exact) : File.Exists(exact))
+            {
+                return exact;
+            }
+
+            if (!Directory.Exists(directory))
+            {
+                return null;
+            }
+
             var entries = directories ? Directory.EnumerateDirectories(directory) : Directory.EnumerateFiles(directory);
             return entries.FirstOrDefault(e => string.Equals(Path.GetFileName(e), name, StringComparison.OrdinalIgnoreCase));
         }
@@ -301,7 +353,10 @@ namespace ClassicMac.Files
                     bytes.Add(escaped);
                     i += 2;
                 }
-                else if (basilisk ? HostNames.TryGetBasiliskByte(hostName[i], out var b) : MacRoman.TryGetByte(hostName[i], out b)) bytes.Add(b);
+                else if (basilisk ? HostNames.TryGetBasiliskByte(hostName[i], out var b) : MacRoman.TryGetByte(hostName[i], out b))
+                {
+                    bytes.Add(b);
+                }
                 else
                 {
                     bytes.Add((byte)'?');

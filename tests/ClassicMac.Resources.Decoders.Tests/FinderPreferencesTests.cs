@@ -9,8 +9,14 @@ public class FinderPreferencesTests
     private static byte[] Fvl8(int font = 4, int size = 9, int length = 0x2C)
     {
         var data = new byte[Math.Max(length, 0x2C)];
-        data[0x18] = (byte)(font >> 24); data[0x19] = (byte)(font >> 16); data[0x1A] = (byte)(font >> 8); data[0x1B] = (byte)font;
-        data[0x1C] = (byte)(size >> 24); data[0x1D] = (byte)(size >> 16); data[0x1E] = (byte)(size >> 8); data[0x1F] = (byte)size;
+        data[0x18] = (byte)(font >> 24);
+        data[0x19] = (byte)(font >> 16);
+        data[0x1A] = (byte)(font >> 8);
+        data[0x1B] = (byte)font;
+        data[0x1C] = (byte)(size >> 24);
+        data[0x1D] = (byte)(size >> 16);
+        data[0x1E] = (byte)(size >> 8);
+        data[0x1F] = (byte)size;
         byte[] grid = [0, 150, 0, 100, 0, 200, 0, 120];
         grid.CopyTo(data, 0x24);
         return data[..length];

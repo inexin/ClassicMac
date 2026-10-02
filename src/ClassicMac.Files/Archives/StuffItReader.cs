@@ -43,10 +43,17 @@ public sealed class StuffItReader : IContainerReader
     /// <inheritdoc/>
     public bool CanRead(ForkData input)
     {
-        if (input.Length < 22) return false;
+        if (input.Length < 22)
+        {
+            return false;
+        }
+
         byte[] prefix = input.ReadPrefix(checked((int)Math.Min(input.Length, 83)));
         if (prefix.Length >= 83 && prefix.AsSpan(0, 8).SequenceEqual("StuffIt "u8) && prefix[82] == 5)
+        {
             return true;
+        }
+
         return IsLegacyV1OrV2(prefix);
     }
 
@@ -55,18 +62,34 @@ public sealed class StuffItReader : IContainerReader
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(context);
-        if (!CanRead(input)) throw new InvalidDataException("Not a supported StuffIt archive.");
+        if (!CanRead(input))
+        {
+            throw new InvalidDataException("Not a supported StuffIt archive.");
+        }
 
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
-        if (IsLegacyV1(archive)) return ReadLegacyV1(archive, context);
-        if (IsLegacyV2(archive)) return ReadLegacyV2(archive, context);
+        if (IsLegacyV1(archive))
+        {
+            return ReadLegacyV1(archive, context);
+        }
+
+        if (IsLegacyV2(archive))
+        {
+            return ReadLegacyV2(archive, context);
+        }
+
         if (archive.Length < ArchiveHeaderLength)
+        {
             throw new InvalidDataException("The StuffIt archive header is truncated.");
+        }
+
         var reader = new BigEndianReader(archive);
 
         uint reportedLength = reader.ReadUInt32At(84);
         if (reportedLength != 0 && reportedLength > archive.Length)
+        {
             throw new InvalidDataException("The StuffIt archive's reported size extends past the input.");
+        }
 
         int rootCount = reader.ReadUInt16At(92);
         // The root list starts at +88. +94 holds the same offset until StuffIt Deluxe 7.0 prepends a member (its return
@@ -74,9 +97,14 @@ public sealed class StuffItReader : IContainerReader
         // docs/formats/archives/stuffit5.md).
         int firstMember = ReadPosition(reader.ReadUInt32At(88), "first member");
         if (rootCount > context.Options.MaxVolumeEntries)
+        {
             throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
+        }
+
         if (rootCount != 0 && (firstMember < ArchiveHeaderLength || firstMember >= archive.Length))
+        {
             throw new InvalidDataException("The first StuffIt archive member lies outside the archive.");
+        }
 
         var work = new List<(Member Member, MemberList List)>();
         var visited = new HashSet<int>();
@@ -88,7 +116,11 @@ public sealed class StuffItReader : IContainerReader
         while (pending.Count > 0)
         {
             MemberList list = pending.Pop();
-            if (list.Remaining == 0) continue;
+            if (list.Remaining == 0)
+            {
+                continue;
+            }
+
             if (list.Position == 0)
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
@@ -96,25 +128,37 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
             if (!visited.Add(list.Position))
+            {
                 throw new InvalidDataException("A StuffIt member link refers to an entry already visited.");
+            }
+
             if (++entriesRead > context.Options.MaxVolumeEntries)
+            {
                 throw new InvalidDataException("The StuffIt archive exceeds the configured entry limit.");
+            }
 
             Member member = ParseMember(archive, reader, list.Position, context);
             int remaining = list.Remaining - 1;
             if (remaining > 0)
             {
                 if (member.Next == 0)
+                {
                     context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
                         $"A StuffIt member list has {remaining} more declared entries but no next-member link.");
+                }
                 else
+                {
                     pending.Push(new MemberList(member.Next, remaining, list.LegacyPath, list.UnicodePath));
+                }
             }
 
             if (member.IsFolder)
             {
                 if (member.ChildCount > context.Options.MaxVolumeEntries)
+                {
                     throw new InvalidDataException("A StuffIt folder exceeds the configured entry limit.");
+                }
+
                 if (member.ChildCount > 0)
                 {
                     var legacyPath = new MacString[list.LegacyPath.Length + 1];
@@ -146,7 +190,9 @@ public sealed class StuffItReader : IContainerReader
 
             expandedBytes = checked(expandedBytes + member.DataLength + member.ResourceLength);
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+            {
                 throw new InvalidDataException("StuffIt extraction exceeds the configured expanded-size limit.");
+            }
 
             work.Add((member, list));
         }
@@ -181,9 +227,14 @@ public sealed class StuffItReader : IContainerReader
             var (data, resource, error) = decoded[index];
             error?.Throw();
             if (member.DataMethod != 15)
+            {
                 CheckForkCrc(data, member.DataCrc, "data", member.Name, list.Position, context);
+            }
+
             if (member.ResourceMethod is not null and not 15)
+            {
                 CheckForkCrc(resource, member.ResourceCrc, "resource", member.Name, list.Position, context);
+            }
 
             files.Add(new MacFile
             {
@@ -209,7 +260,10 @@ public sealed class StuffItReader : IContainerReader
 
         bool isLegacyArchive = IsLegacyV1OrV2(file.DataFork.ReadPrefix(22));
         IReadOnlyList<MacFile> files = Read(file.DataFork, context);
-        if (!isLegacyArchive || file.ResourceFork.Length == 0) return files;
+        if (!isLegacyArchive || file.ResourceFork.Length == 0)
+        {
+            return files;
+        }
 
         FileResources resources = MacFileResources.Read(file, diagnostics: context.Diagnostics);
         Resource? comment = resources.Fork?.Find(FourCC.FromString("SitC"), 0);
@@ -217,7 +271,9 @@ public sealed class StuffItReader : IContainerReader
         {
             string text = MacRoman.Decode(comment.GetData().Span);
             if (text.Length > 0)
+            {
                 context.Report(DiagnosticSeverity.Info, "archive.comment", $"StuffIt comment: {text}");
+            }
         }
         return files;
     }
@@ -226,19 +282,29 @@ public sealed class StuffItReader : IContainerReader
     {
         const int headerLength = 22;
         if (archive.Length < headerLength)
+        {
             throw new InvalidDataException("The legacy StuffIt archive header is truncated.");
+        }
+
         var reader = new BigEndianReader(archive);
 
         uint reportedLength = reader.ReadUInt32At(6);
         if (reportedLength != 0 && reportedLength > archive.Length)
+        {
             throw new InvalidDataException("The legacy StuffIt archive's reported size extends past the input.");
+        }
 
         int rootCount = reader.ReadUInt16At(4);
         int firstMember = ReadPosition(reader.ReadUInt32At(16), "first legacy member");
         if (rootCount > context.Options.MaxVolumeEntries)
+        {
             throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
+        }
+
         if (rootCount != 0 && (firstMember < headerLength || firstMember >= archive.Length))
+        {
             throw new InvalidDataException("The first legacy StuffIt member lies outside the archive.");
+        }
 
         var files = new List<MacFile>();
         var visited = new HashSet<int>();
@@ -250,7 +316,11 @@ public sealed class StuffItReader : IContainerReader
         while (pending.Count > 0)
         {
             LegacyMemberList list = pending.Pop();
-            if (list.Remaining == 0) continue;
+            if (list.Remaining == 0)
+            {
+                continue;
+            }
+
             if (list.Position == 0)
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
@@ -258,34 +328,52 @@ public sealed class StuffItReader : IContainerReader
                 continue;
             }
             if (!visited.Add(list.Position))
+            {
                 throw new InvalidDataException("A legacy StuffIt member link refers to an entry already visited.");
+            }
+
             if (++entriesRead > context.Options.MaxVolumeEntries)
+            {
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
+            }
 
             LegacyMember member = ParseLegacyMember(archive, list.Position, context);
             // StuffIt Deluxe 4.5 links a folder's first member back to the folder ([Verified],
             // docs/formats/archives/stuffit.md).
             if (member.Previous != list.Previous && !(list.Previous == 0 && member.Previous == list.Parent))
+            {
                 context.Report(DiagnosticSeverity.Warning, "archive.previous-link-mismatch",
                     $"The legacy StuffIt member at offset {list.Position} has a previous-member link that does not match its list position.", list.Position);
+            }
+
             if (member.Parent != list.Parent)
+            {
                 context.Report(DiagnosticSeverity.Warning, "archive.parent-link-mismatch",
                     $"The legacy StuffIt member at offset {list.Position} has a parent link that does not match its containing folder.", list.Position);
+            }
+
             int remaining = list.Remaining - 1;
             if (remaining > 0)
             {
                 if (member.Next == 0)
+                {
                     context.Report(DiagnosticSeverity.Warning, "archive.count-mismatch",
                         $"A legacy StuffIt member list has {remaining} more declared entries but no next-member link.");
+                }
                 else
+                {
                     pending.Push(new LegacyMemberList(member.Next, remaining, list.Path, list.Parent,
                         checked((uint)list.Position)));
+                }
             }
 
             if (member.IsFolder)
             {
                 if (member.ChildCount > context.Options.MaxVolumeEntries)
+                {
                     throw new InvalidDataException("A legacy StuffIt folder exceeds the configured entry limit.");
+                }
+
                 if (member.ChildCount > 0)
                 {
                     var path = new MacString[list.Path.Length + 1];
@@ -312,16 +400,23 @@ public sealed class StuffItReader : IContainerReader
 
             expandedBytes = checked(expandedBytes + member.DataLength + member.ResourceLength);
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+            {
                 throw new InvalidDataException("Legacy StuffIt extraction exceeds the configured expanded-size limit.");
+            }
 
             byte[] resource = DecodeFork(archive, member.ResourceOffset, member.ResourceCompressedLength,
                 member.ResourceLength, member.ResourceMethod);
             byte[] data = DecodeFork(archive, member.DataOffset, member.DataCompressedLength,
                 member.DataLength, member.DataMethod);
             if (member.ResourceMethod != 15)
+            {
                 CheckForkCrc(resource, member.ResourceCrc, "resource", member.Name.ToString(), list.Position, context);
+            }
+
             if (member.DataMethod != 15)
+            {
                 CheckForkCrc(data, member.DataCrc, "data", member.Name.ToString(), list.Position, context);
+            }
 
             files.Add(new MacFile
             {
@@ -343,7 +438,10 @@ public sealed class StuffItReader : IContainerReader
         const int memberHeaderLength = 112;
         uint reportedLength = new BigEndianReader(archive).ReadUInt32At(6);
         if (reportedLength != 0 && (reportedLength < archiveHeaderLength || reportedLength > archive.Length))
+        {
             throw new InvalidDataException("The legacy StuffIt archive's reported size is invalid.");
+        }
+
         int archiveEnd = reportedLength == 0 ? archive.Length : (int)reportedLength;
 
         var files = new List<MacFile>();
@@ -354,14 +452,18 @@ public sealed class StuffItReader : IContainerReader
         while (position <= archiveEnd - memberHeaderLength)
         {
             if (++entriesRead > context.Options.MaxVolumeEntries)
+            {
                 throw new InvalidDataException("The legacy StuffIt archive exceeds the configured entry limit.");
+            }
 
             ReadOnlyMemory<byte> header = archive.AsMemory(position, memberHeaderLength);
             var headerReader = new BigEndianReader(header);
             ushort expectedHeaderCrc = headerReader.ReadUInt16At(110);
             if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
+            {
                 context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                     $"The legacy StuffIt member header checksum is incorrect at offset {position}.", position);
+            }
 
             byte resourceMethod = header.Span[0];
             byte dataMethod = header.Span[1];
@@ -369,7 +471,10 @@ public sealed class StuffItReader : IContainerReader
             bool startsFolder = resourceMethod == 32 || dataMethod == 32;
             bool endsFolder = resourceMethod == 33 || dataMethod == 33;
             if (nameLength > 63 || (nameLength == 0 && !endsFolder))
+            {
                 throw new InvalidDataException("A legacy StuffIt member name length is invalid.");
+            }
+
             MacString name = nameLength == 0 ? MacString.FromMacRoman("") : new MacString(header.Span.Slice(3, nameLength));
             int resourceLength = ReadLength(headerReader.ReadUInt32At(84), "resource fork length");
             int dataLength = ReadLength(headerReader.ReadUInt32At(88), "data fork length");
@@ -380,18 +485,26 @@ public sealed class StuffItReader : IContainerReader
                 checked(resourceCompressedLength + dataCompressedLength);
             Require(archive, payloadOffset, payloadLength, "legacy StuffIt fork data");
             if (payloadOffset > archiveEnd - payloadLength)
+            {
                 throw new InvalidDataException("Legacy StuffIt fork data extends past the declared archive size.");
+            }
 
             if (startsFolder)
             {
                 if (nameLength == 0)
+                {
                     throw new InvalidDataException("A legacy StuffIt folder has an empty name.");
+                }
+
                 folderPath.Add(name);
             }
             else if (endsFolder)
             {
                 if (folderPath.Count == 0)
+                {
                     throw new InvalidDataException("A legacy StuffIt folder end marker has no matching folder.");
+                }
+
                 folderPath.RemoveAt(folderPath.Count - 1);
             }
             else
@@ -412,7 +525,9 @@ public sealed class StuffItReader : IContainerReader
                 {
                     expandedBytes = checked(expandedBytes + resourceLength + dataLength);
                     if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+                    {
                         throw new InvalidDataException("Legacy StuffIt extraction exceeds the configured expanded-size limit.");
+                    }
 
                     byte resourceCompression = (byte)(resourceMethod & 0x0F);
                     byte dataCompression = (byte)(dataMethod & 0x0F);
@@ -421,10 +536,15 @@ public sealed class StuffItReader : IContainerReader
                     int dataOffset = checked(payloadOffset + resourceCompressedLength);
                     byte[] data = DecodeFork(archive, dataOffset, dataCompressedLength, dataLength, dataCompression);
                     if (resourceCompression != 15)
+                    {
                         CheckForkCrc(resource, headerReader.ReadUInt16At(100), "resource", name.ToString(), position,
                             context);
+                    }
+
                     if (dataCompression != 15)
+                    {
                         CheckForkCrc(data, headerReader.ReadUInt16At(102), "data", name.ToString(), position, context);
+                    }
 
                     files.Add(new MacFile
                     {
@@ -447,12 +567,21 @@ public sealed class StuffItReader : IContainerReader
         }
 
         if (position < archiveEnd && archive.AsSpan(position, archiveEnd - position).StartsWith("PEnd"u8))
+        {
             position += 4;
+        }
+
         if (folderPath.Count != 0)
+        {
             context.Report(DiagnosticSeverity.Warning, "archive.folder-unclosed",
                 "The legacy StuffIt archive ends before all folders are closed.", position);
+        }
+
         if (position < archiveEnd && archiveEnd - position >= memberHeaderLength)
+        {
             throw new InvalidDataException("The legacy StuffIt archive contains an incomplete member record.");
+        }
+
         return files;
     }
 
@@ -464,12 +593,16 @@ public sealed class StuffItReader : IContainerReader
         var headerReader = new BigEndianReader(header);
         int nameLength = header.Span[2];
         if (nameLength is < 1 or > 31)
+        {
             throw new InvalidDataException("A legacy StuffIt member name length is invalid.");
+        }
 
         ushort expectedHeaderCrc = headerReader.ReadUInt16At(110);
         if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
+        {
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The legacy StuffIt member header checksum is incorrect at offset {offset}.", offset);
+        }
 
         int resourceLength = ReadLength(headerReader.ReadUInt32At(84), "resource fork length");
         int dataLength = ReadLength(headerReader.ReadUInt32At(88), "data fork length");
@@ -489,9 +622,14 @@ public sealed class StuffItReader : IContainerReader
         int next = ReadPosition(headerReader.ReadUInt32At(54), "next member");
         uint parent = headerReader.ReadUInt32At(58);
         if (next != 0 && (next < headerLength || next >= archive.Length))
+        {
             throw new InvalidDataException("A legacy StuffIt next-member link lies outside the archive.");
+        }
+
         if (firstChild != 0 && (firstChild < headerLength || firstChild >= archive.Length))
+        {
             throw new InvalidDataException("A legacy StuffIt first-child link lies outside the archive.");
+        }
 
         var finderInfo = new FinderInfo
         {
@@ -540,16 +678,24 @@ public sealed class StuffItReader : IContainerReader
     {
         Require(archive, offset, 48, "StuffIt member header");
         if (reader.ReadUInt32At(offset) != MemberSignature)
+        {
             throw new InvalidDataException($"No StuffIt member header is present at offset {offset}.");
+        }
+
         int headerLength = reader.ReadUInt16At(offset + 6);
         if (headerLength is < 48 or > 2000)
+        {
             throw new InvalidDataException($"The StuffIt member header length {headerLength} is invalid.");
+        }
+
         Require(archive, offset, headerLength, "StuffIt member name and header");
 
         ushort expectedHeaderCrc = reader.ReadUInt16At(offset + 32);
         if (HeaderCrc(archive.AsSpan(offset, headerLength)) != expectedHeaderCrc)
+        {
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The StuffIt member header checksum is incorrect at offset {offset}.", offset);
+        }
 
         byte flags = archive[offset + 9];
         bool isFolder = (flags & FolderFlag) != 0;
@@ -578,17 +724,24 @@ public sealed class StuffItReader : IContainerReader
             nameOffset = checked(offset + 48 + dataPasswordLength);
         }
         if (nameOffset > offset + headerLength - nameLength)
+        {
             throw new InvalidDataException("A StuffIt member name extends past its header.");
+        }
 
         string name;
-        try { name = StrictUtf8.GetString(archive.AsSpan(nameOffset, nameLength)); }
+        try
+        { name = StrictUtf8.GetString(archive.AsSpan(nameOffset, nameLength)); }
         catch (DecoderFallbackException e) { throw new InvalidDataException("A StuffIt member name is not valid UTF-8.", e); }
         if (name.Length == 0 || name.Contains(':'))
+        {
             throw new InvalidDataException("A StuffIt member name is empty or contains a path separator.");
+        }
 
         uint nextRaw = reader.ReadUInt32At(offset + 22);
         if (nextRaw > int.MaxValue || (nextRaw != 0 && nextRaw >= archive.Length))
+        {
             throw new InvalidDataException("A StuffIt next-member link lies outside the archive.");
+        }
 
         var member = new Member
         {
@@ -608,7 +761,10 @@ public sealed class StuffItReader : IContainerReader
         if (isFolder)
         {
             if (firstChild != 0 && (firstChild < ArchiveHeaderLength || firstChild >= archive.Length))
+            {
                 throw new InvalidDataException("A StuffIt folder's first member lies outside the archive.");
+            }
+
             return member;
         }
 
@@ -648,7 +804,10 @@ public sealed class StuffItReader : IContainerReader
         // docs/formats/archives/stuffit5.md).
         int archiveEnd = member.Next > offset ? member.Next : archive.Length;
         if (resourceOffsetLong > archiveEnd || forksEnd > archiveEnd)
+        {
             throw new InvalidDataException("A StuffIt member's fork data overlaps its next entry or exceeds the archive.");
+        }
+
         int resourceOffset = (int)resourceOffsetLong;
         int dataOffset = (int)dataOffsetLong;
 
@@ -675,8 +834,10 @@ public sealed class StuffItReader : IContainerReader
         ContainerContext context)
     {
         if (Crc16Arc(bytes) != expected)
+        {
             context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                 $"The StuffIt {fork} fork checksum is incorrect for '{name}'.", offset);
+        }
     }
 
     private static byte[] DecodeFork(byte[] archive, int offset, int compressedLength, int outputLength, byte method)
@@ -685,18 +846,52 @@ public sealed class StuffItReader : IContainerReader
         if (method == 0)
         {
             if (compressedLength != outputLength)
+            {
                 throw new InvalidDataException("A stored StuffIt fork has different stored and logical lengths.");
+            }
+
             return archive.AsSpan(offset, outputLength).ToArray();
         }
         ReadOnlySpan<byte> input = archive.AsSpan(offset, compressedLength);
-        if (method == 2) return DecodeCompress(input, outputLength);
-        if (method == 3) return DecodeHuffman(input, outputLength);
-        if (method == 5) return DecodeLzah(input, outputLength);
-        if (method == 6) return DecodeMethod6Blocks(archive.AsMemory(offset, compressedLength), outputLength);
-        if (method == 8) return DecodeMw(input, outputLength);
-        if (method == 13) return StuffItMethod13Decoder.Decode(input, outputLength);
-        if (method == 14) return StuffItMethod14Decoder.Decode(input, outputLength);
-        if (method == 15) return StuffItMethod15Decoder.Decode(input, outputLength);
+        if (method == 2)
+        {
+            return DecodeCompress(input, outputLength);
+        }
+
+        if (method == 3)
+        {
+            return DecodeHuffman(input, outputLength);
+        }
+
+        if (method == 5)
+        {
+            return DecodeLzah(input, outputLength);
+        }
+
+        if (method == 6)
+        {
+            return DecodeMethod6Blocks(archive.AsMemory(offset, compressedLength), outputLength);
+        }
+
+        if (method == 8)
+        {
+            return DecodeMw(input, outputLength);
+        }
+
+        if (method == 13)
+        {
+            return StuffItMethod13Decoder.Decode(input, outputLength);
+        }
+
+        if (method == 14)
+        {
+            return StuffItMethod14Decoder.Decode(input, outputLength);
+        }
+
+        if (method == 15)
+        {
+            return StuffItMethod15Decoder.Decode(input, outputLength);
+        }
 
         var output = new byte[outputLength];
         int written = 0;
@@ -705,29 +900,50 @@ public sealed class StuffItReader : IContainerReader
             byte value = input[index];
             if (value != 0x90)
             {
-                if (written == output.Length) throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+                if (written == output.Length)
+                {
+                    throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+                }
+
                 output[written++] = value;
                 continue;
             }
 
             if (++index == input.Length)
+            {
                 throw new InvalidDataException("A StuffIt RLE90 fork ends with an incomplete run marker.");
+            }
+
             byte count = input[index];
             if (count == 0)
             {
-                if (written == output.Length) throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+                if (written == output.Length)
+                {
+                    throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+                }
+
                 output[written++] = 0x90;
                 continue;
             }
-            if (written == 0) throw new InvalidDataException("A StuffIt RLE90 run has no preceding byte to repeat.");
+            if (written == 0)
+            {
+                throw new InvalidDataException("A StuffIt RLE90 run has no preceding byte to repeat.");
+            }
+
             int additional = count - 1;
             if (additional > output.Length - written)
+            {
                 throw new InvalidDataException("StuffIt RLE90 output exceeds its declared size.");
+            }
+
             output.AsSpan(written, additional).Fill(output[written - 1]);
             written += additional;
         }
         if (written != outputLength)
+        {
             throw new InvalidDataException($"StuffIt RLE90 produced {written} of {outputLength} declared bytes.");
+        }
+
         return output;
     }
 
@@ -740,12 +956,16 @@ public sealed class StuffItReader : IContainerReader
         while (inputOffset < input.Length)
         {
             if (input.Length - inputOffset < sizeof(int))
+            {
                 throw new InvalidDataException("A StuffIt method 6 block has a truncated length.");
+            }
 
             int signedBlockLength = reader.ReadInt32At(inputOffset);
             long blockLength = signedBlockLength < 0 ? -(long)signedBlockLength : signedBlockLength;
             if (blockLength < sizeof(int) || blockLength > input.Length - inputOffset)
+            {
                 throw new InvalidDataException("A StuffIt method 6 block length is outside its compressed fork.");
+            }
 
             ReadOnlyMemory<byte> block = input.Slice(inputOffset + sizeof(int), checked((int)blockLength - sizeof(int)));
             if (signedBlockLength < 0)
@@ -760,24 +980,34 @@ public sealed class StuffItReader : IContainerReader
         }
 
         if (outputOffset != output.Length)
+        {
             throw new InvalidDataException(
                 $"StuffIt method 6 produced {outputOffset} of {output.Length} declared bytes.");
+        }
+
         return output;
     }
 
     private static void DecodeMethod6HuffmanBlock(ReadOnlyMemory<byte> block, byte[] output, ref int outputOffset)
     {
         if (block.Length < 6)
+        {
             throw new InvalidDataException("A StuffIt method 6 Huffman block has a truncated header.");
+        }
 
         var header = new BigEndianReader(block);
         uint packBitsLengthValue = header.ReadUInt32At(0);
         if (packBitsLengthValue > Method6MaximumPackBitsLength)
+        {
             throw new InvalidDataException("A StuffIt method 6 Huffman block exceeds its PackBits buffer limit.");
+        }
+
         int packBitsLength = checked((int)packBitsLengthValue);
         int symbolCount = header.ReadUInt16At(4);
         if (symbolCount > 256 || symbolCount > block.Length - 6)
+        {
             throw new InvalidDataException("A StuffIt method 6 Huffman block has an invalid translation table.");
+        }
 
         ReadOnlySpan<byte> translationTable = block.Span.Slice(6, symbolCount);
         ReadOnlySpan<byte> encoded = block.Span[(6 + symbolCount)..];
@@ -788,20 +1018,29 @@ public sealed class StuffItReader : IContainerReader
         {
             int node = 0;
             while (node > 258 || node == 0)
+            {
                 node = reader.ReadBit() ? Method6Tree.One[node] : Method6Tree.Zero[node];
+            }
 
             if (node >= 257)
+            {
                 break;
+            }
 
             int symbolIndex = node - 1;
             if (symbolIndex >= translationTable.Length || packedOffset == packed.Length)
+            {
                 throw new InvalidDataException("A StuffIt method 6 Huffman block contains too many or unmapped symbols.");
+            }
+
             packed[packedOffset++] = translationTable[symbolIndex];
         }
 
         if (packedOffset != packed.Length)
+        {
             throw new InvalidDataException(
                 $"A StuffIt method 6 Huffman block produced {packedOffset} of {packed.Length} PackBits bytes.");
+        }
 
         DecodePackBits(packed, output, ref outputOffset);
     }
@@ -824,7 +1063,10 @@ public sealed class StuffItReader : IContainerReader
         }
 
         if (offset != weights.Length)
+        {
             throw new InvalidOperationException("The StuffIt method 6 fixed-Huffman table has an invalid length.");
+        }
+
         return weights;
     }
 
@@ -834,7 +1076,11 @@ public sealed class StuffItReader : IContainerReader
         var tree = new Method6HuffmanTree(new int[515], new int[515]);
         int nextNode = FirstInternalNode;
         int totalWeight = 0;
-        foreach (int weight in Method6Weights) totalWeight += weight;
+        foreach (int weight in Method6Weights)
+        {
+            totalWeight += weight;
+        }
+
         Split(0, totalWeight, 1, Method6Weights.Length);
         return tree;
 
@@ -844,7 +1090,9 @@ public sealed class StuffItReader : IContainerReader
             int cumulativeWeight = 0;
             int splitSymbol = lowerSymbol;
             while (cumulativeWeight < sum)
+            {
                 cumulativeWeight += Method6Weights[splitSymbol++ - 1];
+            }
 
             if (lowerSymbol == splitSymbol - 1)
             {
@@ -881,8 +1129,16 @@ public sealed class StuffItReader : IContainerReader
         {
             // Input is left with the fork full: only no-op flags may follow.
             int next = result.Read;
-            while (next < input.Length && input[next] == 0x80) next++;
-            if (next == input.Length) return;
+            while (next < input.Length && input[next] == 0x80)
+            {
+                next++;
+            }
+
+            if (next == input.Length)
+            {
+                return;
+            }
+
             end = input[next] < 0x80 ? PackBitsEnd.LiteralPastOutput
                 : next + 1 == input.Length ? PackBitsEnd.RepeatPastInput : PackBitsEnd.RepeatPastOutput;
         }
@@ -906,7 +1162,11 @@ public sealed class StuffItReader : IContainerReader
         var prefix = new int[maximumCodes];
         Array.Fill(prefix, -1);
         var suffix = new byte[maximumCodes];
-        for (int code = 0; code < 256; code++) suffix[code] = (byte)code;
+        for (int code = 0; code < 256; code++)
+        {
+            suffix[code] = (byte)code;
+        }
+
         var phrase = new byte[maximumCodes];
         var output = new byte[outputLength];
         var reader = new LsbBitReader(input);
@@ -932,50 +1192,79 @@ public sealed class StuffItReader : IContainerReader
             if (previousCode < 0)
             {
                 if (code >= FirstDictionaryCode)
+                {
                     throw new InvalidDataException("A StuffIt Compress fork starts with an invalid LZW code.");
+                }
+
                 if (written == output.Length)
+                {
                     throw new InvalidDataException("StuffIt Compress output exceeds its declared fork length.");
+                }
+
                 output[written++] = (byte)code;
                 previousCode = code;
                 continue;
             }
 
             if (code > nextCode)
+            {
                 throw new InvalidDataException("A StuffIt Compress fork contains an invalid LZW code.");
+            }
 
             bool nextCodeCase = code == nextCode;
             int currentCode = nextCodeCase ? previousCode : code;
             int phraseLength = 0;
-            if (nextCodeCase) phrase[phraseLength++] = FirstByte(previousCode, prefix);
+            if (nextCodeCase)
+            {
+                phrase[phraseLength++] = FirstByte(previousCode, prefix);
+            }
 
             while (currentCode >= 256)
             {
                 if (currentCode >= nextCode || prefix[currentCode] < 0 || phraseLength == phrase.Length)
+                {
                     throw new InvalidDataException("A StuffIt Compress fork contains an invalid LZW dictionary chain.");
+                }
+
                 phrase[phraseLength++] = suffix[currentCode];
                 currentCode = prefix[currentCode];
             }
             if (phraseLength == phrase.Length)
+            {
                 throw new InvalidDataException("A StuffIt Compress LZW phrase is too long.");
+            }
+
             phrase[phraseLength++] = (byte)currentCode;
             byte firstByte = (byte)currentCode;
             if (phraseLength > output.Length - written)
+            {
                 throw new InvalidDataException("StuffIt Compress output exceeds its declared fork length.");
-            while (phraseLength > 0) output[written++] = phrase[--phraseLength];
+            }
+
+            while (phraseLength > 0)
+            {
+                output[written++] = phrase[--phraseLength];
+            }
 
             if (nextCode < maximumCodes)
             {
                 prefix[nextCode] = previousCode;
                 suffix[nextCode] = firstByte;
                 nextCode++;
-                if (codeBits < MaximumCodeBits && nextCode == 1 << codeBits) codeBits++;
+                if (codeBits < MaximumCodeBits && nextCode == 1 << codeBits)
+                {
+                    codeBits++;
+                }
             }
             previousCode = code;
         }
 
         if (written != output.Length)
+        {
             throw new InvalidDataException(
                 $"StuffIt Compress produced {written} of {output.Length} declared bytes.");
+        }
+
         return output;
     }
 
@@ -984,7 +1273,10 @@ public sealed class StuffItReader : IContainerReader
         while (code >= 256)
         {
             if (prefix[code] < 0)
+            {
                 throw new InvalidDataException("A StuffIt Compress fork contains an invalid LZW dictionary chain.");
+            }
+
             code = prefix[code];
         }
         return (byte)code;
@@ -1001,7 +1293,10 @@ public sealed class StuffItReader : IContainerReader
         {
             HuffmanNode node = root;
             while (!node.IsLeaf)
+            {
                 node = reader.ReadBit() ? node.One! : node.Zero!;
+            }
+
             output[index] = node.Symbol;
         }
         return output;
@@ -1010,7 +1305,10 @@ public sealed class StuffItReader : IContainerReader
     private static byte[] DecodeLzah(ReadOnlySpan<byte> input, int outputLength)
     {
         var output = new byte[outputLength];
-        if (outputLength == 0) return output;
+        if (outputLength == 0)
+        {
+            return output;
+        }
 
         var reader = new MsbBitReader(input);
         var tree = new LzahTree();
@@ -1030,7 +1328,11 @@ public sealed class StuffItReader : IContainerReader
             int length = symbol - 253;
             int offsetHigh = ReadLzahOffset(ref reader);
             int offsetLow = 0;
-            for (int bit = 0; bit < 6; bit++) offsetLow = (offsetLow << 1) | (reader.ReadBit() ? 1 : 0);
+            for (int bit = 0; bit < 6; bit++)
+            {
+                offsetLow = (offsetLow << 1) | (reader.ReadBit() ? 1 : 0);
+            }
+
             int distance = (offsetHigh << 6) | offsetLow;
             int source = (windowPosition - distance - 1) & 0xFFF;
             for (int index = 0; index < length && written < output.Length; index++)
@@ -1059,7 +1361,9 @@ public sealed class StuffItReader : IContainerReader
             int nextWidthBoundary = nextCode * 2;
             int codeWidth = 9;
             if (!reader.TryRead(codeWidth, out int code))
+            {
                 throw new InvalidDataException("A StuffIt MW fork ends before its declared output length.");
+            }
 
             if (code < nextCode)
             {
@@ -1079,7 +1383,10 @@ public sealed class StuffItReader : IContainerReader
             while (written < output.Length && reader.TryRead(codeWidth, out code) && code < nextCode)
             {
                 if (nextCode < MaximumDictionarySize)
+                {
                     dictionary[nextCode++] = (ushort)code;
+                }
+
                 WriteMwPhrase(code, nextCode, dictionary, stack, output, ref written);
                 if (nextCode == nextWidthBoundary)
                 {
@@ -1088,15 +1395,25 @@ public sealed class StuffItReader : IContainerReader
                 }
             }
 
-            if (written == output.Length) break;
+            if (written == output.Length)
+            {
+                break;
+            }
+
             if (code > nextCode)
+            {
                 throw new InvalidDataException("A StuffIt MW fork contains an invalid dictionary code.");
+            }
             // A code equal to the next free dictionary slot ends this code group. The next
             // group starts with a fresh 9-bit dictionary, as in the original MW decoder.
             if (code == nextCode)
+            {
                 continue;
+            }
             else
+            {
                 throw new InvalidDataException("A StuffIt MW fork ends before its declared output length.");
+            }
         }
 
         return output;
@@ -1112,15 +1429,25 @@ public sealed class StuffItReader : IContainerReader
             while (pendingCode >= 256)
             {
                 if (pendingCode >= nextCode || pendingCode >= dictionary.Length || stackLength == stack.Length)
+                {
                     throw new InvalidDataException("A StuffIt MW fork contains an invalid dictionary chain.");
+                }
+
                 stack[stackLength++] = dictionary[pendingCode];
                 pendingCode = dictionary[pendingCode - 1];
             }
 
             if (written == output.Length)
+            {
                 throw new InvalidDataException("StuffIt MW output exceeds its declared fork length.");
+            }
+
             output[written++] = (byte)pendingCode;
-            if (stackLength == 0) return;
+            if (stackLength == 0)
+            {
+                return;
+            }
+
             pendingCode = stack[--stackLength];
         }
     }
@@ -1130,9 +1457,23 @@ public sealed class StuffItReader : IContainerReader
         var window = new byte[4096];
         int position = 18;
         for (int value = 0; value <= byte.MaxValue; value++)
-            for (int repeat = 0; repeat < 13; repeat++) window[position++] = (byte)value;
-        for (int value = 0; value <= byte.MaxValue; value++) window[position++] = (byte)value;
-        for (int value = byte.MaxValue; value >= 0; value--) window[position++] = (byte)value;
+        {
+            for (int repeat = 0; repeat < 13; repeat++)
+            {
+                window[position++] = (byte)value;
+            }
+        }
+
+        for (int value = 0; value <= byte.MaxValue; value++)
+        {
+            window[position++] = (byte)value;
+        }
+
+        for (int value = byte.MaxValue; value >= 0; value--)
+        {
+            window[position++] = (byte)value;
+        }
+
         position += 128; // The volume-format seed leaves this region zero-filled.
         window.AsSpan(position, 110).Fill(0x20);
         return window;
@@ -1153,8 +1494,12 @@ public sealed class StuffItReader : IContainerReader
         {
             code = (code << 1) | (reader.ReadBit() ? 1 : 0);
             for (int value = 0; value < 64; value++)
+            {
                 if (LzahOffsetCodeLengths[value] == length && LzahOffsetCodes[value] == code)
+                {
                     return value;
+                }
+            }
         }
         throw new InvalidDataException("A StuffIt LZAH offset code is invalid.");
     }
@@ -1166,6 +1511,7 @@ public sealed class StuffItReader : IContainerReader
     {
         var lengths = new byte[64];
         for (int value = 0; value < lengths.Length; value++)
+        {
             lengths[value] = value switch
             {
                 0 => 3,
@@ -1175,6 +1521,8 @@ public sealed class StuffItReader : IContainerReader
                 <= 47 => 7,
                 _ => 8,
             };
+        }
+
         return lengths;
     }
 
@@ -1223,7 +1571,11 @@ public sealed class StuffItReader : IContainerReader
             int node = forward[TreeSize - 1];
             while (node < TreeSize)
             {
-                if (reader.ReadBit()) node++;
+                if (reader.ReadBit())
+                {
+                    node++;
+                }
+
                 node = forward[node];
             }
             return node - TreeSize;
@@ -1231,7 +1583,10 @@ public sealed class StuffItReader : IContainerReader
 
         public void Update(int symbol)
         {
-            if (frequency[TreeSize - 1] >= 0x8000) Reorder();
+            if (frequency[TreeSize - 1] >= 0x8000)
+            {
+                Reorder();
+            }
 
             int node = backward[symbol + TreeSize];
             while (node != 0)
@@ -1240,19 +1595,28 @@ public sealed class StuffItReader : IContainerReader
                 int swap = node + 1;
                 if (frequency[swap] < weight)
                 {
-                    do { swap++; } while (frequency[swap] < weight);
+                    do
+                    { swap++; } while (frequency[swap] < weight);
                     swap--;
                     frequency[node] = frequency[swap];
                     frequency[swap] = weight;
 
                     int child = forward[node];
                     backward[child] = swap;
-                    if (child < TreeSize) backward[child + 1] = swap;
+                    if (child < TreeSize)
+                    {
+                        backward[child + 1] = swap;
+                    }
+
                     forward[node] = forward[swap];
                     forward[swap] = child;
                     child = forward[node];
                     backward[child] = node;
-                    if (child < TreeSize) backward[child + 1] = node;
+                    if (child < TreeSize)
+                    {
+                        backward[child + 1] = node;
+                    }
+
                     node = swap;
                 }
                 node = backward[node];
@@ -1264,7 +1628,11 @@ public sealed class StuffItReader : IContainerReader
             int leaf = 0;
             for (int node = 0; node < TreeSize; node++)
             {
-                if (forward[node] < TreeSize) continue;
+                if (forward[node] < TreeSize)
+                {
+                    continue;
+                }
+
                 frequency[leaf] = (frequency[node] + 1) >> 1;
                 forward[leaf++] = forward[node];
             }
@@ -1274,7 +1642,11 @@ public sealed class StuffItReader : IContainerReader
             {
                 int combinedFrequency = frequency[child] + frequency[child + 1];
                 int insertAt = nextNode - 1;
-                while (insertAt >= 0 && combinedFrequency < frequency[insertAt]) insertAt--;
+                while (insertAt >= 0 && combinedFrequency < frequency[insertAt])
+                {
+                    insertAt--;
+                }
+
                 insertAt++;
                 Array.Copy(frequency, insertAt, frequency, insertAt + 1, nextNode - insertAt);
                 Array.Copy(forward, insertAt, forward, insertAt + 1, nextNode - insertAt);
@@ -1286,7 +1658,10 @@ public sealed class StuffItReader : IContainerReader
             {
                 int child = forward[node];
                 backward[child] = node;
-                if (child < TreeSize) backward[child + 1] = node;
+                if (child < TreeSize)
+                {
+                    backward[child + 1] = node;
+                }
             }
         }
     }
@@ -1295,11 +1670,17 @@ public sealed class StuffItReader : IContainerReader
         ref int leafCount)
     {
         if (depth > 255 || ++nodeCount > 511)
+        {
             throw new InvalidDataException("A StuffIt Huffman code tree is too large.");
+        }
+
         if (reader.ReadBit())
         {
             if (++leafCount > 256)
+            {
                 throw new InvalidDataException("A StuffIt Huffman code tree has too many symbols.");
+            }
+
             return new HuffmanNode(reader.ReadByte());
         }
         HuffmanNode zero = ReadHuffmanNode(ref reader, depth + 1, ref nodeCount, ref leafCount);
@@ -1349,7 +1730,10 @@ public sealed class StuffItReader : IContainerReader
         public bool ReadBit()
         {
             if (bitOffset >= (long)input.Length * 8)
+            {
                 throw new InvalidDataException("A StuffIt Huffman fork ends inside its code tree or data.");
+            }
+
             bool value = (input[checked((int)(bitOffset >> 3))] & (0x80 >> (int)(bitOffset & 7))) != 0;
             bitOffset++;
             return value;
@@ -1358,7 +1742,11 @@ public sealed class StuffItReader : IContainerReader
         public byte ReadByte()
         {
             byte value = 0;
-            for (int bit = 0; bit < 8; bit++) value = (byte)((value << 1) | (ReadBit() ? 1 : 0));
+            for (int bit = 0; bit < 8; bit++)
+            {
+                value = (byte)((value << 1) | (ReadBit() ? 1 : 0));
+            }
+
             return value;
         }
     }
@@ -1380,7 +1768,10 @@ public sealed class StuffItReader : IContainerReader
 
             value = 0;
             for (int bit = 0; bit < bitCount; bit++, bitOffset++)
+            {
                 value |= ((input[(int)(bitOffset >> 3)] >> (int)(bitOffset & 7)) & 1) << bit;
+            }
+
             return true;
         }
 
@@ -1393,14 +1784,21 @@ public sealed class StuffItReader : IContainerReader
     {
         ushort crc = 0;
         for (int index = 0; index < header.Length; index++)
+        {
             crc = CrcByte(crc, index is 32 or 33 ? (byte)0 : header[index]);
+        }
+
         return crc;
     }
 
     private static ushort Crc16Arc(ReadOnlySpan<byte> bytes)
     {
         ushort crc = 0;
-        foreach (byte value in bytes) crc = CrcByte(crc, value);
+        foreach (byte value in bytes)
+        {
+            crc = CrcByte(crc, value);
+        }
+
         return crc;
     }
 
@@ -1415,7 +1813,11 @@ public sealed class StuffItReader : IContainerReader
         for (int index = 0; index < 256; index++)
         {
             var crc = (ushort)index;
-            for (int bit = 0; bit < 8; bit++) crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+            for (int bit = 0; bit < 8; bit++)
+            {
+                crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+            }
+
             table[index] = crc;
         }
         return table;
@@ -1423,7 +1825,8 @@ public sealed class StuffItReader : IContainerReader
 
     private static MacString LegacyName(string name)
     {
-        try { return MacString.FromMacRoman(name); }
+        try
+        { return MacString.FromMacRoman(name); }
         catch (ArgumentException) { return MacString.FromMacRoman("?"); }
     }
 
@@ -1432,18 +1835,28 @@ public sealed class StuffItReader : IContainerReader
     private static void Require(byte[] archive, int offset, int length, string what)
     {
         if (offset < 0 || length < 0 || offset > archive.Length - length)
+        {
             throw new InvalidDataException($"The {what} lies outside the StuffIt archive.");
+        }
     }
 
     private static int ReadPosition(uint value, string what)
     {
-        if (value > int.MaxValue) throw new InvalidDataException($"The StuffIt {what} offset is too large.");
+        if (value > int.MaxValue)
+        {
+            throw new InvalidDataException($"The StuffIt {what} offset is too large.");
+        }
+
         return (int)value;
     }
 
     private static int ReadLength(uint value, string what)
     {
-        if (value > int.MaxValue) throw new InvalidDataException($"The StuffIt {what} exceeds the supported size.");
+        if (value > int.MaxValue)
+        {
+            throw new InvalidDataException($"The StuffIt {what} exceeds the supported size.");
+        }
+
         return (int)value;
     }
 

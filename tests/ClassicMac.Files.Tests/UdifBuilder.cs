@@ -36,8 +36,14 @@ internal static class UdifBuilder
             data.AddRange(stored);
             if (type is not (Run.Zero or Run.Free))
             {
-                if (hash is not null) hash.AppendData(bytes);
-                else crc = Crc(crc, bytes);
+                if (hash is not null)
+                {
+                    hash.AppendData(bytes);
+                }
+                else
+                {
+                    crc = Crc(crc, bytes);
+                }
             }
             sector += count;
         }
@@ -117,7 +123,11 @@ internal static class UdifBuilder
     private static byte[] Zlib(byte[] bytes)
     {
         using var output = new MemoryStream();
-        using (var zlib = new ZLibStream(output, CompressionLevel.Optimal)) zlib.Write(bytes);
+        using (var zlib = new ZLibStream(output, CompressionLevel.Optimal))
+        {
+            zlib.Write(bytes);
+        }
+
         return output.ToArray();
     }
 
@@ -133,7 +143,10 @@ internal static class UdifBuilder
         foreach (var b in bytes)
         {
             crc ^= b;
-            for (var k = 0; k < 8; k++) crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
+            for (var k = 0; k < 8; k++)
+            {
+                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320 : crc >> 1;
+            }
         }
         return crc;
     }

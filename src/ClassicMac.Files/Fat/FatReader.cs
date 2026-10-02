@@ -38,7 +38,10 @@ namespace ClassicMac.Files.Fat
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
             if (!Geometry.TryRead(input.ReadPrefix(512), input.Length, out var geometry))
+            {
                 throw new InvalidDataException("Not a FAT volume.");
+            }
+
             return new Volume(input, geometry, context).Files();
         }
 
@@ -53,28 +56,63 @@ namespace ClassicMac.Files.Fat
             public static bool TryRead(ReadOnlySpan<byte> boot, long length, out Geometry geometry)
             {
                 geometry = null!;
-                if (boot.Length < 512 || boot[510] != 0x55 || boot[511] != 0xAA) return false;
-                if (boot[0] is not (0xEB or 0xE9)) return false;
+                if (boot.Length < 512 || boot[510] != 0x55 || boot[511] != 0xAA)
+                {
+                    return false;
+                }
+
+                if (boot[0] is not (0xEB or 0xE9))
+                {
+                    return false;
+                }
+
                 int bytesPerSector = BinaryPrimitives.ReadUInt16LittleEndian(boot[11..]);
                 int sectorsPerCluster = boot[13];
                 int reserved = BinaryPrimitives.ReadUInt16LittleEndian(boot[14..]);
                 int fats = boot[16];
                 int rootEntries = BinaryPrimitives.ReadUInt16LittleEndian(boot[17..]);
                 long totalSectors = BinaryPrimitives.ReadUInt16LittleEndian(boot[19..]);
-                if (totalSectors == 0) totalSectors = BinaryPrimitives.ReadUInt32LittleEndian(boot[32..]);
+                if (totalSectors == 0)
+                {
+                    totalSectors = BinaryPrimitives.ReadUInt32LittleEndian(boot[32..]);
+                }
+
                 long fatSectors = BinaryPrimitives.ReadUInt16LittleEndian(boot[22..]);
-                if (fatSectors == 0) fatSectors = BinaryPrimitives.ReadUInt32LittleEndian(boot[36..]);
-                if (bytesPerSector is not (512 or 1024 or 2048 or 4096)) return false;
-                if (sectorsPerCluster == 0 || (sectorsPerCluster & (sectorsPerCluster - 1)) != 0) return false;
-                if (reserved == 0 || fats is < 1 or > 2 || fatSectors == 0 || totalSectors == 0) return false;
+                if (fatSectors == 0)
+                {
+                    fatSectors = BinaryPrimitives.ReadUInt32LittleEndian(boot[36..]);
+                }
+
+                if (bytesPerSector is not (512 or 1024 or 2048 or 4096))
+                {
+                    return false;
+                }
+
+                if (sectorsPerCluster == 0 || (sectorsPerCluster & (sectorsPerCluster - 1)) != 0)
+                {
+                    return false;
+                }
+
+                if (reserved == 0 || fats is < 1 or > 2 || fatSectors == 0 || totalSectors == 0)
+                {
+                    return false;
+                }
 
                 var rootSectors = (rootEntries * EntryLength + bytesPerSector - 1) / bytesPerSector;
                 var firstData = reserved + fats * fatSectors + rootSectors;
-                if (firstData >= totalSectors) return false;
+                if (firstData >= totalSectors)
+                {
+                    return false;
+                }
+
                 var clusters = (totalSectors - firstData) / sectorsPerCluster;
                 var bits = clusters < 4085 ? 12 : clusters < 65525 ? 16 : 32;
                 var rootCluster = bits == 32 ? BinaryPrimitives.ReadUInt32LittleEndian(boot[44..]) & 0x0FFFFFFF : 0;
-                if (bits == 32 && rootEntries != 0) return false;
+                if (bits == 32 && rootEntries != 0)
+                {
+                    return false;
+                }
+
                 geometry = new Geometry(
                     bytesPerSector, sectorsPerCluster, (long)reserved * bytesPerSector, fatSectors * bytesPerSector,
                     (reserved + fats * fatSectors) * bytesPerSector, rootEntries, firstData * bytesPerSector, clusters,
@@ -103,10 +141,22 @@ namespace ClassicMac.Files.Fat
                 get
                 {
                     var stem = ShortName.AsSpan(0, 8).ToArray();
-                    if (stem[0] == 0x05) stem[0] = 0xE5;
-                    if (stem.AsSpan().IndexOfAnyInRange((byte)0, (byte)0x20) is var stemEnd and >= 0) stem = stem[..stemEnd];
+                    if (stem[0] == 0x05)
+                    {
+                        stem[0] = 0xE5;
+                    }
+
+                    if (stem.AsSpan().IndexOfAnyInRange((byte)0, (byte)0x20) is var stemEnd and >= 0)
+                    {
+                        stem = stem[..stemEnd];
+                    }
+
                     ReadOnlySpan<byte> extension = ShortName.AsSpan(8, 3);
-                    if (extension.IndexOfAnyInRange((byte)0, (byte)0x1F) is var cut and >= 0) extension = extension[..cut];
+                    if (extension.IndexOfAnyInRange((byte)0, (byte)0x1F) is var cut and >= 0)
+                    {
+                        extension = extension[..cut];
+                    }
+
                     extension = extension.TrimEnd((byte)' ');
                     return new MacString(extension.Length > 0 ? [.. stem, (byte)'.', .. extension] : stem);
                 }
@@ -145,7 +195,11 @@ namespace ClassicMac.Files.Fat
                 foreach (var entry in list)
                 {
                     // File Exchange hides its own files by name.
-                    if (entry.Key is "FINDER  DAT" or "FILEID  DAT" or "RESOURCEFRK") continue;
+                    if (entry.Key is "FINDER  DAT" or "FILEID  DAT" or "RESOURCEFRK")
+                    {
+                        continue;
+                    }
+
                     if (++entries > context.Options.MaxVolumeEntries)
                     {
                         context.Report(DiagnosticSeverity.Error, "fat.too-many-entries",
@@ -172,7 +226,10 @@ namespace ClassicMac.Files.Fat
                             continue;
                         }
                         if (ReadChain(entry.FirstCluster, $"folder \"{name}\"") is { } folder)
+                        {
                             ReadDirectory(folder.ToArray(context.Options.MaxExpandedBytesPerInput), [.. path, name]);
+                        }
+
                         continue;
                     }
 
@@ -188,10 +245,15 @@ namespace ClassicMac.Files.Fat
                     file = PcExchange.Apply(file, record,
                         DosTime.FromFields(entry.CreatedDate, entry.CreatedTime, zeroIsNull: true), DosTime.FromFields(entry.ModifiedDate, entry.ModifiedTime));
                     if (context.Options.ExtensionMap is { } map)
+                    {
                         file = file with { FinderInfo = map.Apply(file.FinderInfo, file.Name.ToMacRoman()) };
+                    }
                     // DOS hidden or system makes the file invisible.
                     if ((entry.Attributes & (AttrHidden | AttrSystem)) != 0)
+                    {
                         file = file with { FinderInfo = file.FinderInfo with { Flags = file.FinderInfo.Flags | FinderFlags.IsInvisible } };
+                    }
+
                     files.Add(file);
                 }
             }
@@ -205,7 +267,11 @@ namespace ClassicMac.Files.Fat
                 for (var at = 0; at + EntryLength <= directory.Length; at += EntryLength)
                 {
                     var e = directory.AsSpan(at, EntryLength);
-                    if (e[0] == 0x00) break;
+                    if (e[0] == 0x00)
+                    {
+                        break;
+                    }
+
                     if (e[0] == 0xE5)
                     {
                         longParts.Clear();
@@ -213,7 +279,11 @@ namespace ClassicMac.Files.Fat
                     }
                     if (e[11] == AttrLongName)
                     {
-                        if ((e[0] & 0x40) != 0) longParts.Clear();
+                        if ((e[0] & 0x40) != 0)
+                        {
+                            longParts.Clear();
+                        }
+
                         longChecksum = e[13];
                         longParts.Add((e[0] & 0x1F, LongPart(e)));
                         continue;
@@ -221,12 +291,27 @@ namespace ClassicMac.Files.Fat
                     var shortName = e[..11].ToArray(); // as stored: FINDER.DAT keys compare these bytes
                     string? longName = null;
                     if (longParts.Count > 0 && Checksum(e[..11]) == longChecksum)
+                    {
                         longName = string.Concat(longParts.OrderBy(p => p.Order).Select(p => p.Part));
+                    }
+
                     longParts.Clear();
-                    if ((e[11] & AttrVolume) != 0 && (e[11] & AttrDirectory) == 0) continue; // volume label
-                    if (shortName[0] == (byte)'.') continue; // "." and ".."
+                    if ((e[11] & AttrVolume) != 0 && (e[11] & AttrDirectory) == 0)
+                    {
+                        continue; // volume label
+                    }
+
+                    if (shortName[0] == (byte)'.')
+                    {
+                        continue; // "." and ".."
+                    }
+
                     uint cluster = BinaryPrimitives.ReadUInt16LittleEndian(e[26..]);
-                    if (geometry.Bits == 32) cluster |= (uint)BinaryPrimitives.ReadUInt16LittleEndian(e[20..]) << 16;
+                    if (geometry.Bits == 32)
+                    {
+                        cluster |= (uint)BinaryPrimitives.ReadUInt16LittleEndian(e[20..]) << 16;
+                    }
+
                     result.Add(new Entry(shortName, longName, e[11], cluster, BinaryPrimitives.ReadUInt32LittleEndian(e[28..]),
                         BinaryPrimitives.ReadUInt16LittleEndian(e[16..]), BinaryPrimitives.ReadUInt16LittleEndian(e[14..]),
                         BinaryPrimitives.ReadUInt16LittleEndian(e[24..]), BinaryPrimitives.ReadUInt16LittleEndian(e[22..])));
@@ -242,7 +327,11 @@ namespace ClassicMac.Files.Fat
                     for (var i = 0; i < count; i++)
                     {
                         var c = (char)BinaryPrimitives.ReadUInt16LittleEndian(e[(from + 2 * i)..]);
-                        if (c is '\0' or '￿') return new string([.. chars]);
+                        if (c is '\0' or '￿')
+                        {
+                            return new string([.. chars]);
+                        }
+
                         chars.Add(c);
                     }
                 }
@@ -252,7 +341,11 @@ namespace ClassicMac.Files.Fat
             private static byte Checksum(ReadOnlySpan<byte> shortName)
             {
                 byte sum = 0;
-                foreach (var b in shortName) sum = (byte)(((sum & 1) << 7) + (sum >> 1) + b);
+                foreach (var b in shortName)
+                {
+                    sum = (byte)(((sum & 1) << 7) + (sum >> 1) + b);
+                }
+
                 return sum;
             }
 
@@ -274,11 +367,20 @@ namespace ClassicMac.Files.Fat
                     }
                     var offset = geometry.DataOffset + (long)(cluster - 2) * geometry.ClusterSize;
                     if (ranges.Count > 0 && ranges[^1].Offset + ranges[^1].Length == offset)
+                    {
                         ranges[^1] = (ranges[^1].Offset, ranges[^1].Length + geometry.ClusterSize);
+                    }
                     else
+                    {
                         ranges.Add((offset, geometry.ClusterSize));
+                    }
+
                     covered += geometry.ClusterSize;
-                    if (length is { } l && covered >= l) break;
+                    if (length is { } l && covered >= l)
+                    {
+                        break;
+                    }
+
                     cluster = Next(cluster);
                 }
 
@@ -287,9 +389,16 @@ namespace ClassicMac.Files.Fat
                 foreach (var (offset, count) in ranges)
                 {
                     var take = Math.Clamp(image.Length - offset, 0, count);
-                    if (take > 0) inImage.Add((offset, take));
+                    if (take > 0)
+                    {
+                        inImage.Add((offset, take));
+                    }
+
                     available += take;
-                    if (take < count) break;
+                    if (take < count)
+                    {
+                        break;
+                    }
                 }
                 var wanted = length ?? available;
                 if (available < wanted)
@@ -307,22 +416,26 @@ namespace ClassicMac.Files.Fat
                 switch (geometry.Bits)
                 {
                     case 12:
-                    {
-                        var at = (int)(cluster * 3 / 2);
-                        if (at + 1 >= fat.Length) return 0;
-                        var pair = (uint)(fat[at] | fat[at + 1] << 8);
-                        return (cluster & 1) == 0 ? pair & 0xFFF : pair >> 4;
-                    }
+                        {
+                            var at = (int)(cluster * 3 / 2);
+                            if (at + 1 >= fat.Length)
+                            {
+                                return 0;
+                            }
+
+                            var pair = (uint)(fat[at] | fat[at + 1] << 8);
+                            return (cluster & 1) == 0 ? pair & 0xFFF : pair >> 4;
+                        }
                     case 16:
-                    {
-                        var at = (int)(cluster * 2);
-                        return at + 1 >= fat.Length ? 0u : BinaryPrimitives.ReadUInt16LittleEndian(fat.AsSpan(at));
-                    }
+                        {
+                            var at = (int)(cluster * 2);
+                            return at + 1 >= fat.Length ? 0u : BinaryPrimitives.ReadUInt16LittleEndian(fat.AsSpan(at));
+                        }
                     default:
-                    {
-                        var at = (long)cluster * 4;
-                        return at + 3 >= fat.Length ? 0 : BinaryPrimitives.ReadUInt32LittleEndian(fat.AsSpan((int)at)) & 0x0FFFFFFF;
-                    }
+                        {
+                            var at = (long)cluster * 4;
+                            return at + 3 >= fat.Length ? 0 : BinaryPrimitives.ReadUInt32LittleEndian(fat.AsSpan((int)at)) & 0x0FFFFFFF;
+                        }
                 }
             }
         }

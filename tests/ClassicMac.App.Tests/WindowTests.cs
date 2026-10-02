@@ -1,6 +1,6 @@
-using Avalonia.Headless;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ClassicMac.App.ViewModels;
@@ -8,8 +8,8 @@ using ClassicMac.App.Views;
 using ClassicMac.Core;
 using ClassicMac.Files.Tests;
 using ClassicMac.Resources.Decoders.Interface;
-using MenuItem = Avalonia.Controls.MenuItem;
 using MacMenuItem = ClassicMac.Resources.Decoders.Interface.MenuItem;
+using MenuItem = Avalonia.Controls.MenuItem;
 
 namespace ClassicMac.App.Tests;
 
@@ -36,7 +36,10 @@ public class WindowTests
             frame.Save(Path.Combine(Path.GetDirectoryName(shot)!, $"{Path.GetFileNameWithoutExtension(shot)}-{name}.png"));
 #pragma warning restore CS0618
         }
-        if (baselines is not null) Baselines.Check(window, name, baselines);
+        if (baselines is not null)
+        {
+            Baselines.Check(window, name, baselines);
+        }
     }
 
     [Fact]
@@ -504,7 +507,11 @@ public class WindowTests
                 var row = tree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(i => i.DataContext == last);
                 var header = row?.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_Header");
                 var viewer = tree.GetVisualDescendants().OfType<ScrollViewer>().First();
-                if (header?.TranslatePoint(default, viewer) is not { } at) return false;
+                if (header?.TranslatePoint(default, viewer) is not { } at)
+                {
+                    return false;
+                }
+
                 return at.Y >= 0 && at.Y + header.Bounds.Height <= viewer.Viewport.Height + 0.5;
             }
             // The tree scrolled back to its top, away from the node.

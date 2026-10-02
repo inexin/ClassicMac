@@ -23,11 +23,22 @@ namespace ClassicMac.App.ViewModels
         // file), when it is in a plain HFS image and not inside a container held in it.
         private static NodeViewModel? VolumeFolder(NodeViewModel? node)
         {
-            if (node is ResourceTypeNode or ResourceNode or LoadingNode) return null;
+            if (node is ResourceTypeNode or ResourceNode or LoadingNode)
+            {
+                return null;
+            }
+
             for (var at = node is ContainerFileNode ? node.Parent : node; at is not null; at = at.Parent)
             {
-                if (at is FolderNode or InputNode) return at.Input.IsWritableHfs ? at : null;
-                if (at is ContainerFileNode) return null;
+                if (at is FolderNode or InputNode)
+                {
+                    return at.Input.IsWritableHfs ? at : null;
+                }
+
+                if (at is ContainerFileNode)
+                {
+                    return null;
+                }
             }
             return null;
         }
@@ -40,7 +51,11 @@ namespace ClassicMac.App.ViewModels
         private static List<string> FolderNames(NodeViewModel folder)
         {
             var names = new List<string>();
-            for (var at = folder; at is FolderNode; at = at.Parent!) names.Insert(0, at.BaseTitle);
+            for (var at = folder; at is FolderNode; at = at.Parent!)
+            {
+                names.Insert(0, at.BaseTitle);
+            }
+
             return names;
         }
 
@@ -60,9 +75,21 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
         private async Task NewFile()
         {
-            if (VolumeFolder(Selected) is not { } folder || EditDialogs is null) return;
-            if (await EditDialogs.NewFileAsync("New File", new NewFileChoice("untitled", "TEXT", "ttxt")) is not { } choice) return;
-            if (FinderInfoFor(choice, FinderInfo.Empty) is not { } finder) return;
+            if (VolumeFolder(Selected) is not { } folder || EditDialogs is null)
+            {
+                return;
+            }
+
+            if (await EditDialogs.NewFileAsync("New File", new NewFileChoice("untitled", "TEXT", "ttxt")) is not { } choice)
+            {
+                return;
+            }
+
+            if (FinderInfoFor(choice, FinderInfo.Empty) is not { } finder)
+            {
+                return;
+            }
+
             AddFile(folder, new MacFile { Name = MacString.FromMacRoman(choice.Name), FinderInfo = finder });
         }
 
@@ -73,8 +100,16 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
         private async Task ImportFile()
         {
-            if (VolumeFolder(Selected) is not { } folder || EditDialogs is null || FilePicker is null) return;
-            if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path) return;
+            if (VolumeFolder(Selected) is not { } folder || EditDialogs is null || FilePicker is null)
+            {
+                return;
+            }
+
+            if ((await FilePicker.PickFilesAsync()).FirstOrDefault() is not { } path)
+            {
+                return;
+            }
+
             MacFile imported;
             try
             {
@@ -86,10 +121,22 @@ namespace ClassicMac.App.ViewModels
                 return;
             }
             var name = imported.Name.ToMacRoman();
-            if (name.Length > 31) name = name[..31];
+            if (name.Length > 31)
+            {
+                name = name[..31];
+            }
+
             var initial = new NewFileChoice(name, imported.FinderInfo.Type.ToString(), imported.FinderInfo.Creator.ToString());
-            if (await EditDialogs.NewFileAsync($"Import “{Path.GetFileName(path)}”", initial) is not { } choice) return;
-            if (FinderInfoFor(choice, imported.FinderInfo) is not { } finder) return;
+            if (await EditDialogs.NewFileAsync($"Import “{Path.GetFileName(path)}”", initial) is not { } choice)
+            {
+                return;
+            }
+
+            if (FinderInfoFor(choice, imported.FinderInfo) is not { } finder)
+            {
+                return;
+            }
+
             AddFile(folder, imported with { Name = MacString.FromMacRoman(choice.Name), FinderInfo = finder });
         }
 
@@ -97,10 +144,17 @@ namespace ClassicMac.App.ViewModels
         private MacFile ReadHostFile(string path)
         {
             var host = HostFiles.Read(path, ContainerOptions);
-            if (host.Layout != HostLayout.Plain) return host.File;
+            if (host.Layout != HostLayout.Plain)
+            {
+                return host.File;
+            }
+
             IContainerReader[] wrappers = [MacBinaryReader.III, MacBinaryReader.II, MacBinaryReader.I, AppleSingleReader.AppleSingle];
             if (wrappers.FirstOrDefault(r => r.CanRead(host.File)) is { } reader && reader.Read(host.File, new ContainerContext(ContainerOptions)) is [var inner])
+            {
                 return inner;
+            }
+
             return host.File;
         }
 
@@ -117,10 +171,22 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
         private async Task NewFolder()
         {
-            if (VolumeFolder(Selected) is not { } folder || EditDialogs is null) return;
-            if (await EditDialogs.NewFolderAsync("untitled folder") is not { } name) return;
+            if (VolumeFolder(Selected) is not { } folder || EditDialogs is null)
+            {
+                return;
+            }
+
+            if (await EditDialogs.NewFolderAsync("untitled folder") is not { } name)
+            {
+                return;
+            }
+
             var path = string.Join(":", FolderNames(folder).Append(name));
-            if (!ChangeVolume(folder.Input, image => HfsWriter.CreateFolder(ForkData.FromBytes(image), path), $"create folder {name}")) return;
+            if (!ChangeVolume(folder.Input, image => HfsWriter.CreateFolder(ForkData.FromBytes(image), path), $"create folder {name}"))
+            {
+                return;
+            }
+
             var node = new FolderNode(folder, name);
             Insert(folder, node);
             Status = $"Created folder {name}; Save As ▸ HFS Volume Image writes it.";
@@ -130,17 +196,27 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanDeleteFromVolume))]
         private async Task DeleteItem()
         {
-            if (VolumeItem(Selected) is not { } item) return;
+            if (VolumeItem(Selected) is not { } item)
+            {
+                return;
+            }
+
             var name = ItemName(item);
             var inside = item is FolderNode ? Descendants(item).Count(n => n is FileNode or ContainerFileNode or FolderNode) : 0;
             var question = inside > 0
                 ? $"Delete the folder {name} and the {inside} item{(inside == 1 ? "" : "s")} in it from the volume?"
                 : $"Delete {name} from the volume?";
-            if (EditDialogs is not null && !await EditDialogs.ConfirmAsync("Delete", question)) return;
+            if (EditDialogs is not null && !await EditDialogs.ConfirmAsync("Delete", question))
+            {
+                return;
+            }
             // Contents first, deepest first; one failure leaves the volume as it was.
             var steps = new List<Func<byte[], byte[]>>();
             AddDeletes(item, steps);
-            if (!ChangeVolume(item.Input, image => steps.Aggregate(image, (at, step) => step(at)), $"delete {name}")) return;
+            if (!ChangeVolume(item.Input, image => steps.Aggregate(image, (at, step) => step(at)), $"delete {name}"))
+            {
+                return;
+            }
             // Shown or not (hidden, grouped), the item leaves its folder's items; the folder is laid out again.
             var parent = Tree.FolderOf(item)!;
             parent.Items!.Remove(item);
@@ -155,7 +231,11 @@ namespace ClassicMac.App.ViewModels
             var path = MacPathOf(item);
             if (item is FolderNode)
             {
-                foreach (var child in Tree.Contents(item).Where(c => c is FileNode or ContainerFileNode or FolderNode)) AddDeletes(child, steps);
+                foreach (var child in Tree.Contents(item).Where(c => c is FileNode or ContainerFileNode or FolderNode))
+                {
+                    AddDeletes(child, steps);
+                }
+
                 steps.Add(image => HfsWriter.DeleteFolder(ForkData.FromBytes(image), path));
             }
             else
@@ -174,7 +254,11 @@ namespace ClassicMac.App.ViewModels
             var data = file.DataFork.ToArray();
             var resource = file.ResourceFork.ToArray();
             if (!ChangeVolume(folder.Input, image => HfsWriter.CreateFile(ForkData.FromBytes(image), path, data, resource, file.FinderInfo, file.Created, file.Modified),
-                    $"create {file.Name.ToMacRoman()}")) return;
+                    $"create {file.Name.ToMacRoman()}"))
+            {
+                return;
+            }
+
             var created = file with
             {
                 FolderPath = folderPath.Select(MacString.FromMacRoman).ToList(),
@@ -186,7 +270,11 @@ namespace ClassicMac.App.ViewModels
             var node = ContainerUnwrapper.Default.Unwrap(created, HfsReader.Instance.FormatName, new ContainerContext(ContainerOptions));
             NodeViewModel item = node.Children.Count > 0 ? new ContainerFileNode(folder, node) : new FileNode(folder, node);
             // A file made without resources can be given some at once: its edits start from an empty fork.
-            if (item is FileNode { Children.Count: 0 } empty) empty.Resources = new FileResources(null, ResourceForkSource.None);
+            if (item is FileNode { Children.Count: 0 } empty)
+            {
+                empty.Resources = new FileResources(null, ResourceForkSource.None);
+            }
+
             Insert(folder, item);
             Status = $"Created {file.Name.ToMacRoman()}; Save As ▸ HFS Volume Image writes it.";
         }
@@ -217,11 +305,19 @@ namespace ClassicMac.App.ViewModels
         {
             var items = folder.Items!;
             var index = 0;
-            while (index < items.Count && string.Compare(items[index].BaseTitle, item.BaseTitle, StringComparison.OrdinalIgnoreCase) < 0) index++;
+            while (index < items.Count && string.Compare(items[index].BaseTitle, item.BaseTitle, StringComparison.OrdinalIgnoreCase) < 0)
+            {
+                index++;
+            }
+
             items.Insert(index, item);
             Tree.Relayout(folder);
             folder.IsExpanded = true;
-            if (item.Parent is NoNameGroupNode group) group.IsExpanded = true;
+            if (item.Parent is NoNameGroupNode group)
+            {
+                group.IsExpanded = true;
+            }
+
             Selected = Tree.IsShown(item, Roots) ? item : folder;
         }
     }

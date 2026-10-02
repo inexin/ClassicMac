@@ -43,7 +43,11 @@ internal static class Fixtures
             offset += entries[i].Data.Length;
         }
         output.Write(buffer);
-        foreach (var entry in entries) output.Write(entry.Data);
+        foreach (var entry in entries)
+        {
+            output.Write(entry.Data);
+        }
+
         return output.ToArray();
     }
 
@@ -190,11 +194,18 @@ internal static class Fixtures
                 text.Append(alphabet[buffer >> bits & 0x3F]);
             }
         }
-        if (bits > 0) text.Append(alphabet[buffer << (6 - bits) & 0x3F]);
+        if (bits > 0)
+        {
+            text.Append(alphabet[buffer << (6 - bits) & 0x3F]);
+        }
 
         var lines = new StringBuilder("From: someone\r\nSubject: a file\r\n\r\n(This file must be converted with BinHex 4.0)\r\n:");
         var encoded = text.ToString();
-        for (var i = 0; i < encoded.Length; i += 63) lines.Append(encoded, i, Math.Min(63, encoded.Length - i)).Append("\r\n");
+        for (var i = 0; i < encoded.Length; i += 63)
+        {
+            lines.Append(encoded, i, Math.Min(63, encoded.Length - i)).Append("\r\n");
+        }
+
         return lines.Append(":\r\n").ToString();
     }
 
@@ -213,15 +224,29 @@ internal static class Fixtures
         {
             var b = data[i];
             var run = 1;
-            while (i + run < data.Length && data[i + run] == b && run < 255) run++;
-            if (b == 0x90) output.Write([0x90, 0x00]);
-            else output.WriteByte(b);
+            while (i + run < data.Length && data[i + run] == b && run < 255)
+            {
+                run++;
+            }
+
+            if (b == 0x90)
+            {
+                output.Write([0x90, 0x00]);
+            }
+            else
+            {
+                output.WriteByte(b);
+            }
+
             if (run >= 3)
             {
                 output.Write([0x90, (byte)run]);
                 i += run;
             }
-            else i++;
+            else
+            {
+                i++;
+            }
         }
         return output.ToArray();
     }
@@ -229,14 +254,22 @@ internal static class Fixtures
     public static byte[] Int32s(params int[] values)
     {
         var bytes = new byte[values.Length * 4];
-        for (var i = 0; i < values.Length; i++) BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(i * 4), values[i]);
+        for (var i = 0; i < values.Length; i++)
+        {
+            BinaryPrimitives.WriteInt32BigEndian(bytes.AsSpan(i * 4), values[i]);
+        }
+
         return bytes;
     }
 
     public static byte[] UInt32s(params uint[] values)
     {
         var bytes = new byte[values.Length * 4];
-        for (var i = 0; i < values.Length; i++) BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(i * 4), values[i]);
+        for (var i = 0; i < values.Length; i++)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(bytes.AsSpan(i * 4), values[i]);
+        }
+
         return bytes;
     }
 }

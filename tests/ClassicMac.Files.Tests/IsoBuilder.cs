@@ -30,7 +30,11 @@ internal sealed class IsoBuilder(bool highSierra = false)
     {
         // Layout: 16 system sectors, descriptor, terminator, path table, directories, then data.
         var sectors = new List<byte[]>();
-        for (var i = 0; i < 16; i++) sectors.Add(new byte[Sector]);
+        for (var i = 0; i < 16; i++)
+        {
+            sectors.Add(new byte[Sector]);
+        }
+
         var descriptor = new byte[Sector];
         var terminator = new byte[Sector];
         var pathTable = new byte[Sector];
@@ -52,7 +56,11 @@ internal sealed class IsoBuilder(bool highSierra = false)
                 continue;
             }
             dataSectors[record] = sectors.Count;
-            for (var i = 0; i < record.AttributeBlocks; i++) sectors.Add(new byte[Sector]);
+            for (var i = 0; i < record.AttributeBlocks; i++)
+            {
+                sectors.Add(new byte[Sector]);
+            }
+
             var at = 0;
             do
             {
@@ -60,11 +68,18 @@ internal sealed class IsoBuilder(bool highSierra = false)
                 for (var u = 0; u < units; u++)
                 {
                     var sector = new byte[Sector];
-                    if (at < record.Data.Length) record.Data.AsSpan(at, Math.Min(Sector, record.Data.Length - at)).CopyTo(sector);
+                    if (at < record.Data.Length)
+                    {
+                        record.Data.AsSpan(at, Math.Min(Sector, record.Data.Length - at)).CopyTo(sector);
+                    }
+
                     at += Sector;
                     sectors.Add(sector);
                 }
-                for (var g = 0; g < record.Gap && at < record.Data.Length; g++) sectors.Add(new byte[Sector]);
+                for (var g = 0; g < record.Gap && at < record.Data.Length; g++)
+                {
+                    sectors.Add(new byte[Sector]);
+                }
             }
             while (record.Unit != 0 && at < record.Data.Length);
         }
@@ -93,7 +108,7 @@ internal sealed class IsoBuilder(bool highSierra = false)
 
         // Descriptor and path table (root entry only; the plug-ins read nothing else from it).
         BinaryPrimitives.WriteUInt32BigEndian(pathTable.AsSpan(highSierra ? 0 : 2), (uint)(directorySectors[""] + Origin));
-        Record("\0",directorySectors[""], Sector, 2, null, DefaultDate, 0, 0, 0).CopyTo(descriptor, highSierra ? 180 : 156);
+        Record("\0", directorySectors[""], Sector, 2, null, DefaultDate, 0, 0, 0).CopyTo(descriptor, highSierra ? 180 : 156);
         if (highSierra)
         {
             descriptor[8] = 1;

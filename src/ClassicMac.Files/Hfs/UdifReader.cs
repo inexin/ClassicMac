@@ -45,7 +45,11 @@ namespace ClassicMac.Files.Hfs
         public bool CanRead(ForkData input)
         {
             ArgumentNullException.ThrowIfNull(input);
-            if (input.Length < TrailerLength) return false;
+            if (input.Length < TrailerLength)
+            {
+                return false;
+            }
+
             return Trailer(input).AsSpan(0, 4).SequenceEqual("koly"u8) || Encrypted(input);
         }
 
@@ -55,10 +59,15 @@ namespace ClassicMac.Files.Hfs
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(context);
             if (Encrypted(input))
+            {
                 throw new InvalidDataException("The image is an encrypted UDIF image, which ClassicMac does not read.");
+            }
+
             var koly = Koly.Read(Trailer(input));
             if (koly.SegmentCount > 1)
+            {
                 throw new InvalidDataException($"The image is part {koly.SegmentNumber} of a {koly.SegmentCount}-part UDIF image, which ClassicMac does not read yet.");
+            }
 
             var tables = Tables(input, koly, context);
             var chunks = new List<DiskChunk>();
@@ -83,10 +92,16 @@ namespace ClassicMac.Files.Hfs
 
             var length = koly.SectorCount > 0 ? (long)koly.SectorCount * Sector : end;
             if (length > context.Options.MaxExpandedBytesPerInput)
+            {
                 throw new InvalidDataException($"The disk is {length} bytes, over the {context.Options.MaxExpandedBytesPerInput}-byte limit.");
+            }
+
             var disk = new ChunkedForkData(input, chunks, length, Decode, (chunk, problem) => context.Report(DiagnosticSeverity.Error,
                 "udif.bad-run", $"The run at sector {chunk.Start / Sector} {problem}; the rest of it reads as zeros."));
-            if (context.Options.VerifyChecksums) VerifyChecksums(input, koly, runsOf, disk, context);
+            if (context.Options.VerifyChecksums)
+            {
+                VerifyChecksums(input, koly, runsOf, disk, context);
+            }
 
             var name = context.HostName?.ToMacRoman() is { } host ? Path.GetFileNameWithoutExtension(host) : "Disk image";
             return [new MacFile { Name = MacString.FromMacRoman(name.Length > 0 ? name : "Disk image"), DataFork = disk }];
@@ -136,17 +151,26 @@ namespace ClassicMac.Files.Hfs
             if (koly.XmlLength > 0)
             {
                 if (koly.XmlLength > MaxXml || koly.XmlOffset + koly.XmlLength > (ulong)input.Length)
+                {
                     throw new InvalidDataException("The image's property list lies outside it.");
+                }
+
                 blocks = PropertyListTables(input.Slice((long)koly.XmlOffset, (long)koly.XmlLength).ToArray());
             }
             else if (koly.ResourceLength > 0)
             {
                 if (koly.ResourceOffset + koly.ResourceLength > (ulong)input.Length || koly.ResourceLength > ResourceFork.MaxForkLength)
+                {
                     throw new InvalidDataException("The image's embedded resource fork lies outside it.");
+                }
+
                 var fork = ResourceFork.Read(input.Slice((long)koly.ResourceOffset, (long)koly.ResourceLength).ToArray());
                 blocks = [.. fork.OfType(Blkx).Select(r => ((int)r.Id, r.GetData().ToArray()))];
             }
-            if (blocks.Count == 0) throw new InvalidDataException("The image has no block tables (blkx).");
+            if (blocks.Count == 0)
+            {
+                throw new InvalidDataException("The image has no block tables (blkx).");
+            }
 
             var tables = new List<Table>();
             foreach (var (id, data) in blocks.OrderBy(b => b.Id))
@@ -178,13 +202,21 @@ namespace ClassicMac.Files.Hfs
             }
             var root = document.Root?.Element("dict");
             var blkx = Value(Value(root, "resource-fork"), "blkx");
-            if (blkx is null || blkx.Name != "array") return [];
+            if (blkx is null || blkx.Name != "array")
+            {
+                return [];
+            }
+
             var tables = new List<(int, byte[])>();
             foreach (var entry in blkx.Elements("dict"))
             {
                 var data = Value(entry, "Data")?.Value;
                 var id = Value(entry, "ID")?.Value;
-                if (data is null) continue;
+                if (data is null)
+                {
+                    continue;
+                }
+
                 try
                 {
                     tables.Add((int.TryParse(id, out var n) ? n : tables.Count, Convert.FromBase64String(new string(data.Where(c => !char.IsWhiteSpace(c)).ToArray()))));
@@ -227,7 +259,11 @@ namespace ClassicMac.Files.Hfs
                     ended = true;
                     break;
                 }
-                if (type == RunComment || sectors == 0) continue;
+                if (type == RunComment || sectors == 0)
+                {
+                    continue;
+                }
+
                 var start = (long)(table.FirstSector + first) * Sector;
                 var end = start + (long)sectors * Sector;
                 var where = (long)(koly.DataForkOffset + table.DataOffset + offset);
@@ -262,7 +298,11 @@ namespace ClassicMac.Files.Hfs
                 }
                 chunks.Add(new DiskChunk(start, end, type, storage, where, (long)stored));
             }
-            if (!ended) context.Report(DiagnosticSeverity.Warning, "udif.bad-table", $"Block table {table.Id} has no end run.");
+            if (!ended)
+            {
+                context.Report(DiagnosticSeverity.Warning, "udif.bad-table", $"Block table {table.Id} has no end run.");
+            }
+
             return chunks;
         }
 
@@ -301,7 +341,11 @@ namespace ClassicMac.Files.Hfs
             foreach (var (table, chunks) in tables)
             {
                 var hash = Hasher.For(table.ChecksumType);
-                if (hash is null) return;
+                if (hash is null)
+                {
+                    return;
+                }
+
                 using var stream = disk.Open();
                 var buffer = new byte[65536];
                 foreach (var chunk in chunks.Where(c => c.Storage != ChunkStorage.Zeros))
@@ -310,7 +354,11 @@ namespace ClassicMac.Files.Hfs
                     for (var left = chunk.End - chunk.Start; left > 0;)
                     {
                         var read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, left));
-                        if (read == 0) break;
+                        if (read == 0)
+                        {
+                            break;
+                        }
+
                         hash.Add(buffer.AsSpan(0, read));
                         left -= read;
                     }
@@ -321,7 +369,11 @@ namespace ClassicMac.Files.Hfs
             }
             if (Hasher.For(koly.MasterChecksumType) is { } master)
             {
-                foreach (var value in computed) master.Add(value);
+                foreach (var value in computed)
+                {
+                    master.Add(value);
+                }
+
                 Compare(master.Finish(), koly.MasterChecksum, "The master", context);
             }
             if (Hasher.For(koly.DataChecksumType) is { } data && koly.DataForkLength > 0)
@@ -329,7 +381,11 @@ namespace ClassicMac.Files.Hfs
                 using var stream = input.Slice((long)koly.DataForkOffset, (long)Math.Min(koly.DataForkLength, (ulong)input.Length)).Open();
                 var buffer = new byte[65536];
                 int read;
-                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0) data.Add(buffer.AsSpan(0, read));
+                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    data.Add(buffer.AsSpan(0, read));
+                }
+
                 Compare(data.Finish(), koly.DataChecksum, "The data", context);
             }
         }
@@ -349,7 +405,11 @@ namespace ClassicMac.Files.Hfs
             private static readonly uint[] CrcTable = Enumerable.Range(0, 256).Select(i =>
             {
                 var c = (uint)i;
-                for (var k = 0; k < 8; k++) c = (c & 1) != 0 ? (c >> 1) ^ 0xEDB88320 : c >> 1;
+                for (var k = 0; k < 8; k++)
+                {
+                    c = (c & 1) != 0 ? (c >> 1) ^ 0xEDB88320 : c >> 1;
+                }
+
                 return c;
             }).ToArray();
 
@@ -372,12 +432,19 @@ namespace ClassicMac.Files.Hfs
                     md5.AppendData(bytes);
                     return;
                 }
-                foreach (var b in bytes) crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+                foreach (var b in bytes)
+                {
+                    crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+                }
             }
 
             public byte[] Finish()
             {
-                if (md5 is not null) return md5.GetHashAndReset();
+                if (md5 is not null)
+                {
+                    return md5.GetHashAndReset();
+                }
+
                 var writer = new BigEndianWriter(4);
                 writer.WriteUInt32(~crc);
                 return writer.ToArray();

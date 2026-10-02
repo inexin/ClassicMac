@@ -30,9 +30,21 @@ namespace ClassicMac.Resources.Decoders.Sound
         public static byte[] Write(ReadOnlySpan<byte> samples, int channels, int sampleSize, double sampleRate,
             uint loopStart = 0, uint loopEnd = 0, byte baseNote = 60)
         {
-            if (channels is < 1 or > 64) throw new ArgumentOutOfRangeException(nameof(channels), "A sound has 1 to 64 channels.");
-            if (sampleSize is not (8 or 16)) throw new ArgumentOutOfRangeException(nameof(sampleSize), "The Sound Manager plays 8- and 16-bit samples.");
-            if (!(sampleRate > 0 && sampleRate < 65536)) throw new ArgumentOutOfRangeException(nameof(sampleRate), "The sample rate must be below 65536 Hz.");
+            if (channels is < 1 or > 64)
+            {
+                throw new ArgumentOutOfRangeException(nameof(channels), "A sound has 1 to 64 channels.");
+            }
+
+            if (sampleSize is not (8 or 16))
+            {
+                throw new ArgumentOutOfRangeException(nameof(sampleSize), "The Sound Manager plays 8- and 16-bit samples.");
+            }
+
+            if (!(sampleRate > 0 && sampleRate < 65536))
+            {
+                throw new ArgumentOutOfRangeException(nameof(sampleRate), "The sample rate must be below 65536 Hz.");
+            }
+
             int frameBytes = channels * sampleSize / 8;
             uint frames = (uint)(samples.Length / frameBytes);
             samples = samples[..(int)(frames * frameBytes)];
@@ -64,7 +76,10 @@ namespace ClassicMac.Resources.Decoders.Sound
                 w.WriteUInt32(0);                                    // instrumentChunks
                 w.WriteUInt32(0);                                    // AESRecording
                 w.WriteUInt16(sampleSize);
-                w.WriteUInt16(0); w.WriteUInt32(0); w.WriteUInt32(0); w.WriteUInt32(0); // futureUse1-4
+                w.WriteUInt16(0);
+                w.WriteUInt32(0);
+                w.WriteUInt32(0);
+                w.WriteUInt32(0); // futureUse1-4
             }
             w.WriteBytes(samples);
             return w.ToArray();
@@ -78,7 +93,10 @@ namespace ClassicMac.Resources.Decoders.Sound
         public static byte[] FromWav(ReadOnlySpan<byte> wav)
         {
             if (wav.Length < 12 || !wav[..4].SequenceEqual("RIFF"u8) || !wav[8..12].SequenceEqual("WAVE"u8))
+            {
                 throw new InvalidDataException("Not a RIFF WAVE file.");
+            }
+
             int format = 0, channels = 0, bits = 0;
             uint rate = 0;
             ReadOnlySpan<byte> data = default;
@@ -98,7 +116,10 @@ namespace ClassicMac.Resources.Decoders.Sound
                     channels = BinaryPrimitives.ReadUInt16LittleEndian(chunk[2..]);
                     rate = BinaryPrimitives.ReadUInt32LittleEndian(chunk[4..]);
                     bits = BinaryPrimitives.ReadUInt16LittleEndian(chunk[14..]);
-                    if (format == 0xFFFE && length >= 26) format = BinaryPrimitives.ReadUInt16LittleEndian(chunk[24..]);
+                    if (format == 0xFFFE && length >= 26)
+                    {
+                        format = BinaryPrimitives.ReadUInt16LittleEndian(chunk[24..]);
+                    }
                 }
                 else if (id.SequenceEqual("data"u8))
                 {
@@ -116,10 +137,16 @@ namespace ClassicMac.Resources.Decoders.Sound
                 }
                 at = body + (int)Math.Min(size + (size & 1), int.MaxValue - body);
             }
-            if (!hasData || channels == 0) throw new InvalidDataException("The WAV file has no 'fmt ' or 'data' chunk.");
+            if (!hasData || channels == 0)
+            {
+                throw new InvalidDataException("The WAV file has no 'fmt ' or 'data' chunk.");
+            }
+
             bool isFloat = format == 3;
             if (!(format == 1 && bits is 8 or 16 or 24 or 32) && !(isFloat && bits is 32 or 64))
+            {
                 throw new InvalidDataException($"WAV format {format} with {bits}-bit samples is not PCM or float.");
+            }
 
             int width = bits / 8, count = data.Length / width;
             byte[] samples;
@@ -145,7 +172,11 @@ namespace ClassicMac.Resources.Decoders.Sound
                 }
                 samples = output.ToArray();
             }
-            if (loopEnd <= loopStart) (loopStart, loopEnd) = (0, 0);
+            if (loopEnd <= loopStart)
+            {
+                (loopStart, loopEnd) = (0, 0);
+            }
+
             return Write(samples, channels, bits == 8 ? 8 : 16, rate, loopStart, loopEnd, note);
         }
 

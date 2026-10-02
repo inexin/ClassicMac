@@ -15,11 +15,21 @@ public class IconSuiteTests
     {
         var list = new byte[256];
         for (int y = 0; y < 32; y++)
+        {
             for (int x = 0; x < 32; x++)
             {
-                if (x >= 8 && x < 24 && y >= 8 && y < 24) list[y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
-                if (x >= maskLeft && x < 28 && y >= 4 && y < 28) list[128 + y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
+                if (x >= 8 && x < 24 && y >= 8 && y < 24)
+                {
+                    list[y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
+                }
+
+                if (x >= maskLeft && x < 28 && y >= 4 && y < 28)
+                {
+                    list[128 + y * 4 + x / 8] |= (byte)(0x80 >> (x & 7));
+                }
             }
+        }
+
         return list;
     }
 
@@ -130,7 +140,11 @@ public class IconSuiteTests
     private static byte[] Il32(byte r, byte g, byte b, int pixels = 1024)
     {
         var data = new byte[4 * pixels];
-        for (int i = 0; i < pixels; i++) (data[4 * i + 1], data[4 * i + 2], data[4 * i + 3]) = (r, g, b);
+        for (int i = 0; i < pixels; i++)
+        {
+            (data[4 * i + 1], data[4 * i + 2], data[4 * i + 3]) = (r, g, b);
+        }
+
         return data;
     }
 
@@ -199,7 +213,11 @@ public class IconSuiteTests
     {
         // A 16 x 16 rect picks s8mk; with only l8mk present it is the first of the list, and its size does not match ics8.
         var ics = new byte[64];
-        for (int i = 0; i < 32; i++) ics[32 + i] = (byte)(i >= 8 && i < 24 ? 0xFF : 0);   // mask rows 4..12
+        for (int i = 0; i < 32; i++)
+        {
+            ics[32 + i] = (byte)(i >= 8 && i < 24 ? 0xFF : 0);   // mask rows 4..12
+        }
+
         var port = Background(32, Blue);
         Family(("ics#", ics), ("is32", Il32(255, 0, 0, 256)), ("s8mk", Fill(256, 0xFF))).Plot(port, R(0, 0, 16, 16));
         Assert.Equal(new RgbaColor(255, 0, 0), port.Canvas[1, 1]);
@@ -249,7 +267,13 @@ public class IconSuiteTests
         // l8mk: left half $FF, right half 0; in a 48 x 48 rect (no h8mk, ich#) ICN# is the group, so l8mk matches icl8.
         var mask = new byte[1024];
         for (int y = 0; y < 32; y++)
-            for (int x = 0; x < 16; x++) mask[y * 32 + x] = 0xFF;
+        {
+            for (int x = 0; x < 16; x++)
+            {
+                mask[y * 32 + x] = 0xFF;
+            }
+        }
+
         var port = Background(32, Blue);
         Family(("ICN#", IconList()), ("il32", Il32(255, 0, 0)), ("l8mk", mask)).Plot(port, R(0, 0, 48, 48));
         Assert.Equal(new RgbaColor(255, 0, 0), port.Canvas[23, 1]);

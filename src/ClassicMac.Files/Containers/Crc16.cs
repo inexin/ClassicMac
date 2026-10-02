@@ -10,7 +10,11 @@ namespace ClassicMac.Files.Containers
 
         public static ushort Compute(ReadOnlySpan<byte> bytes, ushort crc = 0)
         {
-            foreach (var b in bytes) crc = (ushort)(crc << 8 ^ Table[(crc >> 8 ^ b) & 0xFF]);
+            foreach (var b in bytes)
+            {
+                crc = (ushort)(crc << 8 ^ Table[(crc >> 8 ^ b) & 0xFF]);
+            }
+
             return crc;
         }
 
@@ -20,7 +24,11 @@ namespace ClassicMac.Files.Containers
             for (var i = 0; i < 256; i++)
             {
                 var crc = (ushort)(i << 8);
-                for (var bit = 0; bit < 8; bit++) crc = (ushort)((crc & 0x8000) != 0 ? crc << 1 ^ 0x1021 : crc << 1);
+                for (var bit = 0; bit < 8; bit++)
+                {
+                    crc = (ushort)((crc & 0x8000) != 0 ? crc << 1 ^ 0x1021 : crc << 1);
+                }
+
                 table[i] = crc;
             }
             return table;

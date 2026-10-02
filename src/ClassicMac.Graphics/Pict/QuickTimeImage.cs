@@ -3,8 +3,8 @@ using System.IO;
 using System.Text;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 
 namespace ClassicMac.Graphics.Pict
 {
@@ -23,31 +23,52 @@ namespace ClassicMac.Graphics.Pict
 
         public static QuickTimeImage? Parse(byte[] block)
         {
-            if (block.Length < 2 + 36 + 4 + 8 + 2 + 8 + 4 + 4) return null;
+            if (block.Length < 2 + 36 + 4 + 8 + 2 + 8 + 4 + 4)
+            {
+                return null;
+            }
+
             var q = new QuickTimeImage();
             var reader = new ClassicMac.Core.BigEndianReader(block) { Position = 2 }; // version
-            for (int i = 0; i < 9; i++) q.Matrix[i] = reader.ReadInt32();
+            for (int i = 0; i < 9; i++)
+            {
+                q.Matrix[i] = reader.ReadInt32();
+            }
+
             int matteSize = reader.ReadInt32();
             ReadRect(reader);                                     // matte rect
             q.Mode = reader.ReadUInt16();
             q.SourceRect = ReadRect(reader);
             reader.ReadInt32();                                       // accuracy
             int maskSize = reader.ReadInt32();
-            if (matteSize < 0 || maskSize < 0 || reader.Position + (long)matteSize + maskSize > block.Length) return null;
+            if (matteSize < 0 || maskSize < 0 || reader.Position + (long)matteSize + maskSize > block.Length)
+            {
+                return null;
+            }
+
             reader.Skip(matteSize);                                   // the matte is not applied
             if (maskSize > 0)
             {
                 var mask = block.AsMemory(reader.Position, maskSize);
                 reader.Skip(maskSize);
-                try { q.Mask = Region.FromRgnData(mask); }
+                try
+                { q.Mask = Region.FromRgnData(mask); }
                 catch (InvalidDataException) { }
             }
             var p = reader.Position;
             var description = ImageDescriptionReader.Read(block, p, out int idSize);
-            if (description == null) return null;
+            if (description == null)
+            {
+                return null;
+            }
+
             q.Description = description;
             int dataStart = p + Math.Max(idSize, 86);
-            if (dataStart > block.Length) return null;
+            if (dataStart > block.Length)
+            {
+                return null;
+            }
+
             q.Data = block.AsSpan(dataStart).ToArray();
             return q;
         }

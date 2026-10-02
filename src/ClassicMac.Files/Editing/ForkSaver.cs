@@ -123,7 +123,11 @@ namespace ClassicMac.Files.Editing
             var full = System.IO.Path.GetFullPath(inputPath);
             if (file == root)
             {
-                if (forkInDataFork) return host.Layout == HostLayout.Plain ? Location(SaveTarget.RawFork, full, file.File, true) : null;
+                if (forkInDataFork)
+                {
+                    return host.Layout == HostLayout.Plain ? Location(SaveTarget.RawFork, full, file.File, true) : null;
+                }
+
                 return host.Layout switch
                 {
                     HostLayout.AppleDouble => Location(SaveTarget.AppleDoubleHeader, host.Companions[0], file.File, false),
@@ -132,7 +136,11 @@ namespace ClassicMac.Files.Editing
                     _ => null,
                 };
             }
-            if (host.Layout != HostLayout.Plain || root.Children.Count != 1 || root.Children[0] != file || file.Children.Count > 0) return null;
+            if (host.Layout != HostLayout.Plain || root.Children.Count != 1 || root.Children[0] != file || file.Children.Count > 0)
+            {
+                return null;
+            }
+
             SaveTarget? target = file.Format switch
             {
                 var f when f.StartsWith("MacBinary", StringComparison.Ordinal) => SaveTarget.MacBinary,
@@ -156,7 +164,11 @@ namespace ClassicMac.Files.Editing
         {
             ArgumentNullException.ThrowIfNull(location);
             ArgumentNullException.ThrowIfNull(fork);
-            if (!overwriteChanged && location.Stamp.HasChanged) throw new FileChangedException(location.Path);
+            if (!overwriteChanged && location.Stamp.HasChanged)
+            {
+                throw new FileChangedException(location.Path);
+            }
+
             var file = WithFork(location.File, fork, location.ForkInDataFork);
             var bytes = Serialize(location.Target, file, fork);
             var directory = System.IO.Path.GetDirectoryName(location.Path)!;
@@ -166,11 +178,19 @@ namespace ClassicMac.Files.Editing
             try
             {
                 var differences = Verify(location.Target, temp, file, fork, location.ForkInDataFork);
-                if (differences.Count > 0) throw new SaveVerificationException(differences);
+                if (differences.Count > 0)
+                {
+                    throw new SaveVerificationException(differences);
+                }
+
                 if (File.Exists(location.Path))
                 {
                     var backup = location.Path + ".orig";
-                    if (!File.Exists(backup)) File.Copy(location.Path, backup);
+                    if (!File.Exists(backup))
+                    {
+                        File.Copy(location.Path, backup);
+                    }
+
                     ForkData.CloseHostFile(temp);
                     ForkData.CloseHostFile(location.Path);
                     File.Replace(temp, location.Path, null);
@@ -184,7 +204,10 @@ namespace ClassicMac.Files.Editing
             finally
             {
                 ForkData.CloseHostFile(temp);
-                if (File.Exists(temp)) File.Delete(temp);
+                if (File.Exists(temp))
+                {
+                    File.Delete(temp);
+                }
             }
             return location with { File = file, Stamp = FileStamp.Of(location.Path) };
         }
@@ -208,7 +231,11 @@ namespace ClassicMac.Files.Editing
                     System.IO.Path.GetFileName(full));
                 var back = HostFiles.Read(full);
                 var differences = Compare(edited, back.File, fork, forkInDataFork, name: false);
-                if (differences.Count > 0) throw new SaveVerificationException(differences);
+                if (differences.Count > 0)
+                {
+                    throw new SaveVerificationException(differences);
+                }
+
                 return paths;
             }
             var target = format switch
@@ -223,7 +250,11 @@ namespace ClassicMac.Files.Editing
             Directory.CreateDirectory(directory);
             File.WriteAllBytes(full, Serialize(target, edited, fork));
             var found = Verify(target, full, edited, fork, format == SaveAsFormat.RawFork || forkInDataFork);
-            if (found.Count > 0) throw new SaveVerificationException(found);
+            if (found.Count > 0)
+            {
+                throw new SaveVerificationException(found);
+            }
+
             return [full];
         }
 
@@ -257,7 +288,9 @@ namespace ClassicMac.Files.Editing
             var destination = System.IO.Path.GetFullPath(destinationPath);
             var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
             if (string.Equals(source, destination, comparison))
+            {
                 throw new InvalidOperationException("Save As cannot overwrite the source HFS image.");
+            }
 
             var directory = System.IO.Path.GetDirectoryName(destination)!;
             var temporary = System.IO.Path.Combine(directory, $".classicmac-{Guid.NewGuid():N}.tmp");
@@ -280,24 +313,40 @@ namespace ClassicMac.Files.Editing
             }
             finally
             {
-                if (File.Exists(temporary)) File.Delete(temporary);
+                if (File.Exists(temporary))
+                {
+                    File.Delete(temporary);
+                }
             }
         }
 
         // Reads the written volume back and compares each replaced fork (HfsWriter checks the volume's own structures).
         private static void VerifyHfsForks(byte[] image, List<(string MacPath, HfsFork Kind, byte[] Data)> written)
         {
-            if (written.Count == 0) return;
+            if (written.Count == 0)
+            {
+                return;
+            }
+
             var files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
             var found = new List<string>();
             foreach (var (macPath, kind, data) in written)
             {
                 var file = files.FirstOrDefault(f => f.MacPath == macPath);
                 var fork = kind == HfsFork.Data ? file?.DataFork : file?.ResourceFork;
-                if (fork is null) found.Add($"{macPath} is missing");
-                else if (!fork.ToArray().AsSpan().SequenceEqual(data)) found.Add($"{macPath}'s {(kind == HfsFork.Data ? "data" : "resource")} fork differs");
+                if (fork is null)
+                {
+                    found.Add($"{macPath} is missing");
+                }
+                else if (!fork.ToArray().AsSpan().SequenceEqual(data))
+                {
+                    found.Add($"{macPath}'s {(kind == HfsFork.Data ? "data" : "resource")} fork differs");
+                }
             }
-            if (found.Count > 0) throw new SaveVerificationException(found);
+            if (found.Count > 0)
+            {
+                throw new SaveVerificationException(found);
+            }
         }
 
         private static MacFile WithFork(MacFile file, ResourceFork fork, bool inData)
@@ -311,12 +360,22 @@ namespace ClassicMac.Files.Editing
             using var output = new MemoryStream();
             switch (target)
             {
-                case SaveTarget.RawFork: return fork.ToArray();
-                case SaveTarget.BasiliskResourceFork: return file.ResourceFork.ToArray();
-                case SaveTarget.AppleDoubleHeader: AppleDoubleWriter.Write(file, output); break;
-                case SaveTarget.AppleSingle: AppleDoubleWriter.WriteAppleSingle(file, output); break;
-                case SaveTarget.MacBinary: MacBinaryWriter.Write(file, output); break;
-                case SaveTarget.BinHex: BinHexWriter.Write(file, output); break;
+                case SaveTarget.RawFork:
+                    return fork.ToArray();
+                case SaveTarget.BasiliskResourceFork:
+                    return file.ResourceFork.ToArray();
+                case SaveTarget.AppleDoubleHeader:
+                    AppleDoubleWriter.Write(file, output);
+                    break;
+                case SaveTarget.AppleSingle:
+                    AppleDoubleWriter.WriteAppleSingle(file, output);
+                    break;
+                case SaveTarget.MacBinary:
+                    MacBinaryWriter.Write(file, output);
+                    break;
+                case SaveTarget.BinHex:
+                    BinHexWriter.Write(file, output);
+                    break;
             }
             return output.ToArray();
         }
@@ -334,21 +393,25 @@ namespace ClassicMac.Files.Editing
                     case SaveTarget.BasiliskResourceFork:
                         return ResourceForkComparison.Differences(fork, ResourceFork.Read(input.ToArray()));
                     case SaveTarget.AppleDoubleHeader:
-                    {
-                        var back = AppleSingleReader.AppleDouble.Read(input, context)[0] with { DataFork = expected.DataFork };
-                        return Compare(expected, back, fork, inData, name: true);
-                    }
-                    default:
-                    {
-                        IContainerReader reader = target switch
                         {
-                            SaveTarget.MacBinary => MacBinaryReader.III,
-                            SaveTarget.BinHex => BinHexReader.Instance,
-                            _ => AppleSingleReader.AppleSingle,
-                        };
-                        if (!reader.CanRead(input)) return [$"the written file is not {reader.FormatName}"];
-                        return Compare(expected, reader.Read(input, context)[0], fork, inData, name: true);
-                    }
+                            var back = AppleSingleReader.AppleDouble.Read(input, context)[0] with { DataFork = expected.DataFork };
+                            return Compare(expected, back, fork, inData, name: true);
+                        }
+                    default:
+                        {
+                            IContainerReader reader = target switch
+                            {
+                                SaveTarget.MacBinary => MacBinaryReader.III,
+                                SaveTarget.BinHex => BinHexReader.Instance,
+                                _ => AppleSingleReader.AppleSingle,
+                            };
+                            if (!reader.CanRead(input))
+                            {
+                                return [$"the written file is not {reader.FormatName}"];
+                            }
+
+                            return Compare(expected, reader.Read(input, context)[0], fork, inData, name: true);
+                        }
                 }
             }
             catch (InvalidDataException e)
@@ -360,10 +423,22 @@ namespace ClassicMac.Files.Editing
         private static IReadOnlyList<string> Compare(MacFile expected, MacFile actual, ResourceFork fork, bool inData, bool name)
         {
             var differences = new List<string>();
-            if (name && expected.Name != actual.Name) differences.Add($"the name is {actual.Name}, not {expected.Name}");
-            if (!expected.FinderInfo.ToArray().AsSpan().SequenceEqual(actual.FinderInfo.ToArray())) differences.Add("the Finder info differs");
+            if (name && expected.Name != actual.Name)
+            {
+                differences.Add($"the name is {actual.Name}, not {expected.Name}");
+            }
+
+            if (!expected.FinderInfo.ToArray().AsSpan().SequenceEqual(actual.FinderInfo.ToArray()))
+            {
+                differences.Add("the Finder info differs");
+            }
+
             var other = inData ? (expected.ResourceFork, actual.ResourceFork) : (expected.DataFork, actual.DataFork);
-            if (!other.Item1.ToArray().AsSpan().SequenceEqual(other.Item2.ToArray())) differences.Add(inData ? "the resource fork differs" : "the data fork differs");
+            if (!other.Item1.ToArray().AsSpan().SequenceEqual(other.Item2.ToArray()))
+            {
+                differences.Add(inData ? "the resource fork differs" : "the data fork differs");
+            }
+
             var written = inData ? actual.DataFork : actual.ResourceFork;
             differences.AddRange(ResourceForkComparison.Differences(fork, ResourceFork.Read(written.ToArray())));
             return differences;

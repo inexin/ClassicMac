@@ -23,7 +23,11 @@ namespace ClassicMac.Resources.Decoders.Sound
         public static DecodedSound? Decode(SampledSound sound)
         {
             ArgumentNullException.ThrowIfNull(sound);
-            if (SoundCodecs.ToWav(sound) is not { } decoded) return null;
+            if (SoundCodecs.ToWav(sound) is not { } decoded)
+            {
+                return null;
+            }
+
             var (wav, width, isFloat) = decoded;
             var samples = new float[wav.Length / width];
             var span = wav.AsSpan();

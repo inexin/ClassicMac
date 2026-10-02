@@ -39,7 +39,10 @@ internal static class LhaNewDecoder
             {
                 commandsRemaining = reader.ReadBits(16);
                 if (commandsRemaining == 0)
+                {
                     throw new InvalidDataException("An LHA compressed block has no commands.");
+                }
+
                 HuffmanTree temporaryTree = ReadTemporaryTree(ref reader);
                 codeTree = ReadCodeTree(ref reader, temporaryTree);
                 offsetTree = ReadOffsetTree(ref reader, windowBits, offsetCodeBits);
@@ -55,11 +58,16 @@ internal static class LhaNewDecoder
 
             int matchLength = checked(code - 256 + CopyThreshold);
             if (matchLength > output.Length - outputPosition)
+            {
                 throw new InvalidDataException("An LHA match exceeds the declared expanded size.");
+            }
 
             int offsetCode = offsetTree.Decode(ref reader);
             if (offsetCode > windowBits)
+            {
                 throw new InvalidDataException("An LHA match uses an invalid history offset.");
+            }
+
             int offset = offsetCode == 0 ? 0 : checked((1 << (offsetCode - 1)) + reader.ReadBits(offsetCode - 1));
             int sourcePosition = (windowPosition - offset - 1 + windowSize) & (windowSize - 1);
             for (int index = 0; index < matchLength; index++)
@@ -88,21 +96,37 @@ internal static class LhaNewDecoder
         {
             int code = reader.ReadBits(5);
             if (code >= 31)
+            {
                 throw new InvalidDataException("An LHA temporary table selects a code outside its alphabet.");
+            }
+
             return HuffmanTree.Single(code);
         }
         if (count > 31)
+        {
             throw new InvalidDataException("An LHA temporary Huffman table is too large.");
+        }
 
         var lengths = new List<int>(count);
         for (int index = 0; index < count; index++)
         {
             lengths.Add(ReadLength(ref reader));
-            if (index != 2) continue;
+            if (index != 2)
+            {
+                continue;
+            }
+
             int skipped = reader.ReadBits(2);
             if (skipped > count - lengths.Count)
+            {
                 throw new InvalidDataException("An LHA temporary Huffman table has too many skipped codes.");
-            for (int item = 0; item < skipped; item++) lengths.Add(0);
+            }
+
+            for (int item = 0; item < skipped; item++)
+            {
+                lengths.Add(0);
+            }
+
             index += skipped;
         }
         return HuffmanTree.FromLengths(lengths);
@@ -115,11 +139,16 @@ internal static class LhaNewDecoder
         {
             int code = reader.ReadBits(9);
             if (code >= CodeCount)
+            {
                 throw new InvalidDataException("An LHA code table selects a code outside its alphabet.");
+            }
+
             return HuffmanTree.Single(code);
         }
         if (count > CodeCount)
+        {
             throw new InvalidDataException("An LHA code table has more entries than the method permits.");
+        }
 
         var lengths = new List<int>(count);
         while (lengths.Count < count)
@@ -138,11 +167,17 @@ internal static class LhaNewDecoder
                 2 => reader.ReadBits(9) + 20,
                 _ => throw new InvalidDataException("An LHA code table contains an invalid skip code.")
             };
-            for (int item = 0; item < skipped && lengths.Count < count; item++) lengths.Add(0);
+            for (int item = 0; item < skipped && lengths.Count < count; item++)
+            {
+                lengths.Add(0);
+            }
         }
 
         if (lengths.Count != count)
+        {
             throw new InvalidDataException("An LHA code table is malformed.");
+        }
+
         return HuffmanTree.FromLengths(lengths);
     }
 
@@ -153,13 +188,23 @@ internal static class LhaNewDecoder
         {
             int code = reader.ReadBits(offsetCodeBits);
             if (code > windowBits)
+            {
                 throw new InvalidDataException("An LHA offset table selects a code outside its alphabet.");
+            }
+
             return HuffmanTree.Single(code);
         }
         if (count > windowBits + 1)
+        {
             throw new InvalidDataException("An LHA offset table is too large.");
+        }
+
         var lengths = new int[count];
-        for (int index = 0; index < count; index++) lengths[index] = ReadLength(ref reader);
+        for (int index = 0; index < count; index++)
+        {
+            lengths[index] = ReadLength(ref reader);
+        }
+
         return HuffmanTree.FromLengths(lengths);
     }
 
@@ -171,7 +216,9 @@ internal static class LhaNewDecoder
             while (reader.ReadBit() != 0)
             {
                 if (++length > MaximumCodeLength)
+                {
                     throw new InvalidDataException("An LHA Huffman code is too long.");
+                }
             }
         }
         return length;
@@ -193,7 +240,9 @@ internal static class LhaNewDecoder
         public static HuffmanTree FromLengths(IReadOnlyList<int> lengths)
         {
             if (lengths.Count == 0)
+            {
                 throw new InvalidDataException("An LHA Huffman table is empty.");
+            }
 
             int maximumLength = 0;
             var counts = new int[MaximumCodeLength + 1];
@@ -201,13 +250,22 @@ internal static class LhaNewDecoder
             {
                 int length = lengths[index];
                 if (length < 0 || length > MaximumCodeLength)
+                {
                     throw new InvalidDataException("An LHA Huffman code has an invalid length.");
-                if (length == 0) continue;
+                }
+
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 counts[length]++;
                 maximumLength = Math.Max(maximumLength, length);
             }
             if (maximumLength == 0)
+            {
                 throw new InvalidDataException("An LHA Huffman table has no usable codes.");
+            }
 
             var nextCode = new int[MaximumCodeLength + 1];
             int code = 0;
@@ -215,7 +273,10 @@ internal static class LhaNewDecoder
             {
                 code = (code + counts[bits - 1]) << 1;
                 if (code + counts[bits] > (1 << bits))
+                {
                     throw new InvalidDataException("An LHA Huffman table is over-subscribed.");
+                }
+
                 nextCode[bits] = code;
             }
 
@@ -223,7 +284,11 @@ internal static class LhaNewDecoder
             for (int symbol = 0; symbol < lengths.Count; symbol++)
             {
                 int length = lengths[symbol];
-                if (length == 0) continue;
+                if (length == 0)
+                {
+                    continue;
+                }
+
                 symbols.Add((length << 16) | nextCode[length]++, symbol);
             }
             return new HuffmanTree(symbols, -1);
@@ -231,12 +296,19 @@ internal static class LhaNewDecoder
 
         public int Decode(ref BitReader reader)
         {
-            if (_singleCode >= 0) return _singleCode;
+            if (_singleCode >= 0)
+            {
+                return _singleCode;
+            }
+
             int code = 0;
             for (int length = 1; length <= MaximumCodeLength; length++)
             {
                 code = (code << 1) | reader.ReadBit();
-                if (_symbols.TryGetValue((length << 16) | code, out int symbol)) return symbol;
+                if (_symbols.TryGetValue((length << 16) | code, out int symbol))
+                {
+                    return symbol;
+                }
             }
             throw new InvalidDataException("An LHA Huffman code is not present in its table.");
         }
@@ -256,7 +328,10 @@ internal static class LhaNewDecoder
         public int ReadBit()
         {
             if (_bitOffset >= _data.Length * 8)
+            {
                 throw new InvalidDataException("An LHA compressed stream is truncated.");
+            }
+
             int value = (_data[_bitOffset >> 3] >> (7 - (_bitOffset & 7))) & 1;
             _bitOffset++;
             return value;
@@ -265,7 +340,11 @@ internal static class LhaNewDecoder
         public int ReadBits(int count)
         {
             int value = 0;
-            for (int bit = 0; bit < count; bit++) value = (value << 1) | ReadBit();
+            for (int bit = 0; bit < count; bit++)
+            {
+                value = (value << 1) | ReadBit();
+            }
+
             return value;
         }
     }

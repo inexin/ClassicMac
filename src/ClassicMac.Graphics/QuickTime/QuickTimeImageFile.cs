@@ -26,9 +26,17 @@ namespace ClassicMac.Graphics.QuickTime
         /// <summary>True if <paramref name="data"/> starts with a QuickTime image file's first atom.</summary>
         public static bool IsQuickTimeImageFile(ReadOnlyMemory<byte> data)
         {
-            if (data.Length < SignatureLength) return false;
+            if (data.Length < SignatureLength)
+            {
+                return false;
+            }
+
             uint size = new BigEndianReader(data).ReadUInt32At(0);
-            if (size != 1 && size < 8) return false;
+            if (size != 1 && size < 8)
+            {
+                return false;
+            }
+
             string type = Encoding.Latin1.GetString(data.Span.Slice(4, 4));
             return type is "idsc" or "idat" or "iicc";
         }
@@ -78,7 +86,11 @@ namespace ClassicMac.Graphics.QuickTime
         private static QuickTimeImageResult Read(ReadOnlyMemory<byte> data, IPictImageCodec? codec)
         {
             var description = ReadDescription(data);
-            if (!TryFindAtom(data, "idat", out var atom)) throw NoImage();
+            if (!TryFindAtom(data, "idat", out var atom))
+            {
+                throw NoImage();
+            }
+
             var image = atom.ToArray();
             var bitmap = QuickTimeCodecs.Decode(description, image) ?? codec?.Decode(description, image)
                 ?? throw new NotSupportedException($"QuickTime codec '{description.CodecType}' is not supported.");
@@ -108,12 +120,24 @@ namespace ClassicMac.Graphics.QuickTime
                 int header = 8;
                 if (size == 1)
                 {
-                    if (p + 16 > data.Length) break;
+                    if (p + 16 > data.Length)
+                    {
+                        break;
+                    }
+
                     size = (long)new BigEndianReader(data.Slice((int)p + 8, 8)).ReadUInt64();
                     header = 16;
                 }
-                else if (size == 0) size = data.Length - p;
-                if (size < header) break;
+                else if (size == 0)
+                {
+                    size = data.Length - p;
+                }
+
+                if (size < header)
+                {
+                    break;
+                }
+
                 long end = Math.Min(data.Length, p + size);
                 if (type == requestedType)
                 {

@@ -52,7 +52,10 @@ namespace ClassicMac.Resources
             ArgumentNullException.ThrowIfNull(resource);
             options ??= ReadOptions.Default;
             var stored = resource.GetData();
-            if ((resource.Attributes & ResourceAttributes.Compressed) == 0) return stored;
+            if ((resource.Attributes & ResourceAttributes.Compressed) == 0)
+            {
+                return stored;
+            }
 
             var label = resource.ToString();
             void Report(DiagnosticSeverity severity, string code, string message) =>
@@ -78,7 +81,11 @@ namespace ClassicMac.Resources
                 // "Extended, uncompressed": ROM strips the 12-byte extended header; OS 9 reads from the start instead,
                 // keeping the header and losing the last 12 bytes.
                 var length = Math.Max(0, stored.Length - 12);
-                if (rom) return stored[12..];
+                if (rom)
+                {
+                    return stored[12..];
+                }
+
                 Report(DiagnosticSeverity.Warning, "resource.extended-uncompressed",
                     "extended but not compressed; Mac OS 9 keeps the header and drops the last 12 bytes.");
                 return stored[..length];

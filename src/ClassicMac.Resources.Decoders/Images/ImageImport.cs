@@ -58,9 +58,16 @@ namespace ClassicMac.Resources.Decoders.Images
             for (int i = 0; i < image.Pixels.Length; i += 4)
             {
                 int a = image.Pixels[i + 3];
-                for (int c = 0; c < 3; c++) flat.Pixels[i + c] = (byte)((image.Pixels[i + c] * a + 255 * (255 - a) + 127) / 255);
+                for (int c = 0; c < 3; c++)
+                {
+                    flat.Pixels[i + c] = (byte)((image.Pixels[i + c] * a + 255 * (255 - a) + 127) / 255);
+                }
+
                 flat.Pixels[i + 3] = 255;
-                if (colors.Count <= 256) colors.Add((flat.Pixels[i] << 16) | (flat.Pixels[i + 1] << 8) | flat.Pixels[i + 2]);
+                if (colors.Count <= 256)
+                {
+                    colors.Add((flat.Pixels[i] << 16) | (flat.Pixels[i + 1] << 8) | flat.Pixels[i + 2]);
+                }
             }
             var format = colors.Count switch
             {
@@ -119,7 +126,11 @@ namespace ClassicMac.Resources.Decoders.Images
         public static byte[] WriteCicn(RgbaBitmap image)
         {
             ArgumentNullException.ThrowIfNull(image);
-            if (image.Width > 256 || image.Height > 256) image = Fit(image, Math.Min(256, image.Width), Math.Min(256, image.Height));
+            if (image.Width > 256 || image.Height > 256)
+            {
+                image = Fit(image, Math.Min(256, image.Width), Math.Min(256, image.Height));
+            }
+
             int w = image.Width, h = image.Height;
             var (table, depth) = TableFor(image, withWhite: false);
             int rowBytes = (w * depth + 15) / 16 * 2, bitRowBytes = (w + 15) / 16 * 2;
@@ -189,7 +200,11 @@ namespace ClassicMac.Resources.Decoders.Images
         public static RgbaBitmap Fit(RgbaBitmap image, int width, int height)
         {
             ArgumentNullException.ThrowIfNull(image);
-            if (image.Width == width && image.Height == height) return image;
+            if (image.Width == width && image.Height == height)
+            {
+                return image;
+            }
+
             double scale = Math.Min((double)width / image.Width, (double)height / image.Height);
             int w = Math.Max(1, (int)Math.Round(image.Width * scale)), h = Math.Max(1, (int)Math.Round(image.Height * scale));
             int left = (width - w) / 2, top = (height - h) / 2;
@@ -210,7 +225,11 @@ namespace ClassicMac.Resources.Decoders.Images
                             double f = fy * (Math.Min(x1, sx + 1) - Math.Max(x0, sx));
                             int i = (sy * image.Width + sx) * 4;
                             double pa = src[i + 3] * f;
-                            r += src[i] * pa; g += src[i + 1] * pa; bl += src[i + 2] * pa; a += pa; area += f;
+                            r += src[i] * pa;
+                            g += src[i + 1] * pa;
+                            bl += src[i + 2] * pa;
+                            a += pa;
+                            area += f;
                         }
                     }
                     int o = ((top + y) * width + left + x) * 4;
@@ -236,14 +255,24 @@ namespace ClassicMac.Resources.Decoders.Images
         private static byte[] Bits(RgbaBitmap image, bool dark, int rowBytes = 0)
         {
             int w = image.Width, h = image.Height;
-            if (rowBytes == 0) rowBytes = w / 8;
+            if (rowBytes == 0)
+            {
+                rowBytes = w / 8;
+            }
+
             var bits = new byte[rowBytes * h];
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
                     int i = (y * w + x) * 4;
-                    if (dark ? Dark(image.Pixels, i) : Opaque(image.Pixels, i)) bits[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                    if (dark ? Dark(image.Pixels, i) : Opaque(image.Pixels, i))
+                    {
+                        bits[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                    }
                 }
+            }
+
             return bits;
         }
 
@@ -255,6 +284,7 @@ namespace ClassicMac.Resources.Decoders.Images
             int white = Nearest(table, 255, 255, 255);
             var cache = new Dictionary<int, int>();
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
                     int i = (y * w + x) * 4;
@@ -263,11 +293,16 @@ namespace ClassicMac.Resources.Decoders.Images
                     if (Opaque(p, i))
                     {
                         int key = (p[i] << 16) | (p[i + 1] << 8) | p[i + 2];
-                        if (!cache.TryGetValue(key, out index)) cache[key] = index = Nearest(table, p[i], p[i + 1], p[i + 2]);
+                        if (!cache.TryGetValue(key, out index))
+                        {
+                            cache[key] = index = Nearest(table, p[i], p[i + 1], p[i + 2]);
+                        }
                     }
                     int bit = x * depth;
                     data[y * rowBytes + (bit >> 3)] |= (byte)(index << (8 - depth - (bit & 7)));
                 }
+            }
+
             return data;
         }
 
@@ -277,7 +312,10 @@ namespace ClassicMac.Resources.Decoders.Images
             for (int i = 0; i < table.Length; i++)
             {
                 int dr = table[i].R - r, dg = table[i].G - g, db = table[i].B - b, d = dr * dr + dg * dg + db * db;
-                if (d < bestDistance) (best, bestDistance) = (i, d);
+                if (d < bestDistance)
+                {
+                    (best, bestDistance) = (i, d);
+                }
             }
             return best;
         }
@@ -288,12 +326,30 @@ namespace ClassicMac.Resources.Decoders.Images
         {
             var colors = new List<RgbaColor>();
             var seen = new HashSet<int>();
-            if (withWhite) { colors.Add(new RgbaColor(255, 255, 255)); seen.Add(0xFFFFFF); }
+            if (withWhite)
+            {
+                colors.Add(new RgbaColor(255, 255, 255));
+                seen.Add(0xFFFFFF);
+            }
             var p = image.Pixels;
             for (int i = 0; i < p.Length && colors.Count <= 256; i += 4)
-                if (Opaque(p, i) && seen.Add((p[i] << 16) | (p[i + 1] << 8) | p[i + 2])) colors.Add(new RgbaColor(p[i], p[i + 1], p[i + 2]));
-            if (colors.Count == 0) colors.Add(new RgbaColor(255, 255, 255));
-            if (colors.Count > 256) return (StandardColorTables.ForId(8)!, 8);
+            {
+                if (Opaque(p, i) && seen.Add((p[i] << 16) | (p[i + 1] << 8) | p[i + 2]))
+                {
+                    colors.Add(new RgbaColor(p[i], p[i + 1], p[i + 2]));
+                }
+            }
+
+            if (colors.Count == 0)
+            {
+                colors.Add(new RgbaColor(255, 255, 255));
+            }
+
+            if (colors.Count > 256)
+            {
+                return (StandardColorTables.ForId(8)!, 8);
+            }
+
             int depth = colors.Count switch { <= 2 => 1, <= 4 => 2, <= 16 => 4, _ => 8 };
             return (colors.ToArray(), depth);
         }
@@ -303,11 +359,15 @@ namespace ClassicMac.Resources.Decoders.Images
         {
             b.WriteUInt32(0);                                             // baseAddr
             b.WriteUInt16(0x8000 | rowBytes);
-            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16(h); b.WriteUInt16(w); // bounds
+            b.WriteUInt16(0);
+            b.WriteUInt16(0);
+            b.WriteUInt16(h);
+            b.WriteUInt16(w); // bounds
             b.WriteUInt16(0);                                             // pmVersion
             b.WriteUInt16(0);                                             // packType
             b.WriteUInt32(0);                                             // packSize
-            b.WriteUInt32(0x00480000); b.WriteUInt32(0x00480000);         // hRes, vRes: 72 dpi
+            b.WriteUInt32(0x00480000);
+            b.WriteUInt32(0x00480000);         // hRes, vRes: 72 dpi
             b.WriteUInt16(0);                                             // pixelType: indexed
             b.WriteUInt16(depth);                                 // pixelSize
             b.WriteUInt16(1);                                             // cmpCount
@@ -321,7 +381,10 @@ namespace ClassicMac.Resources.Decoders.Images
         {
             b.WriteUInt32(0);
             b.WriteUInt16(rowBytes);
-            b.WriteUInt16(0); b.WriteUInt16(0); b.WriteUInt16(h); b.WriteUInt16(w);
+            b.WriteUInt16(0);
+            b.WriteUInt16(0);
+            b.WriteUInt16(h);
+            b.WriteUInt16(w);
         }
 
         // ctSeed 0, ctFlags 0 (a PixMap's table), ctSize, then value/r/g/b per entry (16-bit, each byte repeated).
@@ -333,7 +396,9 @@ namespace ClassicMac.Resources.Decoders.Images
             for (int i = 0; i < table.Length; i++)
             {
                 b.WriteUInt16(i);
-                b.WriteUInt16(table[i].R * 257); b.WriteUInt16(table[i].G * 257); b.WriteUInt16(table[i].B * 257);
+                b.WriteUInt16(table[i].R * 257);
+                b.WriteUInt16(table[i].G * 257);
+                b.WriteUInt16(table[i].B * 257);
             }
         }
 

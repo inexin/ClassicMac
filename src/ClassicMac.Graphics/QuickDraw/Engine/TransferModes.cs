@@ -10,19 +10,33 @@ namespace ClassicMac.Graphics.QuickDraw
         public PortColors(RgbaColor fore, RgbaColor back, (ushort r, ushort g, ushort b) op, RgbaColor hilite, bool macOS9,
             ScreenDevice? device = null, (ushort r, ushort g, ushort b)? fore16 = null, (ushort r, ushort g, ushort b)? back16 = null)
         {
-            Fore = fore; Back = back; Op = op; Hilite = hilite; MacOS9 = macOS9; Device = device;
+            Fore = fore;
+            Back = back;
+            Op = op;
+            Hilite = hilite;
+            MacOS9 = macOS9;
+            Device = device;
             Fore16 = fore16 ?? ((ushort)(fore.R * 257), (ushort)(fore.G * 257), (ushort)(fore.B * 257));
             Back16 = back16 ?? ((ushort)(back.R * 257), (ushort)(back.G * 257), (ushort)(back.B * 257));
             FgIndex = BkIndex = HiliteIndex = 0;
-            if (device == null) return;
+            if (device == null)
+            {
+                return;
+            }
             // The port's indices (Color2Index when the colors are set). On 1- and 2-bit screens a foreground that maps
             // to the background's index although the colors differ takes its inverse's index instead.
             FgIndex = device.Color2Index(Fore16.r, Fore16.g, Fore16.b);
             BkIndex = device.Color2Index(Back16.r, Back16.g, Back16.b);
             if (device.Depth <= 2 && FgIndex == BkIndex && Fore16 != Back16)
+            {
                 FgIndex = device.Color2Index(0xFFFF - Fore16.r, 0xFFFF - Fore16.g, 0xFFFF - Fore16.b);
+            }
+
             HiliteIndex = device.Color2Index(hilite);
-            if (HiliteIndex == BkIndex) HiliteIndex = device.Color2Index(TransferModes.Invert(hilite));
+            if (HiliteIndex == BkIndex)
+            {
+                HiliteIndex = device.Color2Index(TransferModes.Invert(hilite));
+            }
         }
         public readonly RgbaColor Fore, Back, Hilite;
         public readonly (ushort r, ushort g, ushort b) Op;
@@ -48,11 +62,27 @@ namespace ClassicMac.Graphics.QuickDraw
         public static int Normalize(int mode, bool hilitePending)
         {
             mode &= ~DitherCopy;
-            if (mode >= Hilite) return Hilite;
-            if (mode == GrayishTextOr) return SrcOr;
-            if (mode >= Blend && mode < Blend + 16) return mode & ~8;
+            if (mode >= Hilite)
+            {
+                return Hilite;
+            }
+
+            if (mode == GrayishTextOr)
+            {
+                return SrcOr;
+            }
+
+            if (mode >= Blend && mode < Blend + 16)
+            {
+                return mode & ~8;
+            }
+
             int boolean = mode & 7;
-            if (hilitePending && boolean == SrcXor) return Hilite;
+            if (hilitePending && boolean == SrcXor)
+            {
+                return Hilite;
+            }
+
             return boolean;
         }
 
@@ -63,7 +93,10 @@ namespace ClassicMac.Graphics.QuickDraw
         public static bool ApplyBit(int mode, bool bit, RgbaColor dst, in PortColors c, out RgbaColor result)
         {
             if (mode >= Blend)
+            {
                 return ApplyColor(mode, bit ? c.Fore : c.Back, dst, c, out result);
+            }
+
             bool on = (mode & 4) != 0 ? !bit : bit;
             switch (mode & 3)
             {
@@ -96,9 +129,21 @@ namespace ClassicMac.Graphics.QuickDraw
                     return !SameRgb(src, c.Back);
                 case Hilite:
                     result = dst;
-                    if (SameRgb(src, c.Back)) return false;
-                    if (SameRgb(dst, c.Back)) { result = c.Hilite; return true; }
-                    if (SameRgb(dst, c.Hilite)) { result = c.Back; return true; }
+                    if (SameRgb(src, c.Back))
+                    {
+                        return false;
+                    }
+
+                    if (SameRgb(dst, c.Back))
+                    {
+                        result = c.Hilite;
+                        return true;
+                    }
+                    if (SameRgb(dst, c.Hilite))
+                    {
+                        result = c.Back;
+                        return true;
+                    }
                     return false;
             }
             int wr = Math.Max(1, (int)c.Op.r), wg = Math.Max(1, (int)c.Op.g), wb = Math.Max(1, (int)c.Op.b);
@@ -120,15 +165,29 @@ namespace ClassicMac.Graphics.QuickDraw
             int pin = w >> 8;
             switch (mode)
             {
-                case Blend: return (byte)(average ? (s + d) >> 1
+                case Blend:
+                    return (byte)(average ? (s + d) >> 1
                     : (int)(((long)s * w + (long)d * (65536 - w) + (macOS9 ? 0x8000 : 0)) >> 16));
-                case AddPin: { int r = s + d; return (byte)(r > 255 || r > pin ? pin : r); }
-                case AddOver: return (byte)(s + d);
-                case SubPin: { int r = d - s; return (byte)(r < 0 || r < pin ? pin : r); }
-                case SubOver: return (byte)(d - s);
-                case AddMax: return (byte)Math.Max(s, d);
-                case AdMin: return (byte)Math.Min(s, d);
-                default: return (byte)s;
+                case AddPin:
+                    {
+                        int r = s + d;
+                        return (byte)(r > 255 || r > pin ? pin : r);
+                    }
+                case AddOver:
+                    return (byte)(s + d);
+                case SubPin:
+                    {
+                        int r = d - s;
+                        return (byte)(r < 0 || r < pin ? pin : r);
+                    }
+                case SubOver:
+                    return (byte)(d - s);
+                case AddMax:
+                    return (byte)Math.Max(s, d);
+                case AdMin:
+                    return (byte)Math.Min(s, d);
+                default:
+                    return (byte)s;
             }
         }
 
@@ -142,14 +201,30 @@ namespace ClassicMac.Graphics.QuickDraw
             int s = Rgb(src), d = Rgb(dst), f = Rgb(c.Fore), b = Rgb(c.Back), r;
             switch (mode & 7)
             {
-                case 0: r = (s & b) | (~s & f); break;
-                case 1: r = (~s & f) | (s & d); break;
-                case 2: r = d ^ ~s; break;
-                case 3: r = (~s & b) | (s & d); break;
-                case 4: r = (~s & b) | (s & f); break;
-                case 5: r = (s & f) | (~s & d); break;
-                case 6: r = d ^ s; break;
-                default: r = (s & b) | (~s & d); break;
+                case 0:
+                    r = (s & b) | (~s & f);
+                    break;
+                case 1:
+                    r = (~s & f) | (s & d);
+                    break;
+                case 2:
+                    r = d ^ ~s;
+                    break;
+                case 3:
+                    r = (~s & b) | (s & d);
+                    break;
+                case 4:
+                    r = (~s & b) | (s & f);
+                    break;
+                case 5:
+                    r = (s & f) | (~s & d);
+                    break;
+                case 6:
+                    r = d ^ s;
+                    break;
+                default:
+                    r = (s & b) | (~s & d);
+                    break;
             }
             return new RgbaColor((byte)(r >> 16), (byte)(r >> 8), (byte)r);
         }
@@ -166,14 +241,26 @@ namespace ClassicMac.Graphics.QuickDraw
             bool not = (mode & 4) != 0;
             bool foreBlack = SameRgb(c.Fore, new RgbaColor(0, 0, 0)), backWhite = SameRgb(c.Back, new RgbaColor(255, 255, 255));
             bool colorize = op switch { 0 => !foreBlack || !backWhite, 1 => !foreBlack, 3 => !backWhite, _ => false };
-            if (!colorize || (op == 0 && !directSource)) return null;
+            if (!colorize || (op == 0 && !directSource))
+            {
+                return null;
+            }
+
             var fore = c.Fore;
             var back = c.Back;
             byte Channel(int s, int f, int b, int d)
             {
-                if (op == 0) return (byte)(not ? ((256 - s) * b + (s + 1) * f) >> 8 : ((256 - s) * f + (s + 1) * b) >> 8);
+                if (op == 0)
+                {
+                    return (byte)(not ? ((256 - s) * b + (s + 1) * f) >> 8 : ((256 - s) * f + (s + 1) * b) >> 8);
+                }
+
                 int color = op == 1 ? f : b;
-                if (not) s = 255 - s;
+                if (not)
+                {
+                    s = 255 - s;
+                }
+
                 return (byte)(((256 - s) * color + (s + 1) * d) >> 8);
             }
             return new RgbaColor(Channel(src.R, fore.R, back.R, dst.R), Channel(src.G, fore.G, back.G, dst.G),

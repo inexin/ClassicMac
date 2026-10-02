@@ -85,9 +85,17 @@ namespace ClassicMac.Files.Rom
         {
             var reader = new BigEndianReader(rom);
             long length = rom.Length;
-            if (length < TablePointerOffset + 4) return null;
+            if (length < TablePointerOffset + 4)
+            {
+                return null;
+            }
+
             long tableOffset = reader.ReadUInt32At(TablePointerOffset);
-            if (tableOffset > length - TableHeaderLength) return null;
+            if (tableOffset > length - TableHeaderLength)
+            {
+                return null;
+            }
+
             var at = (int)tableOffset;
             long first = reader.ReadUInt32At(at);
             int maxIndex = reader.ReadByteAt(at + 4), fieldSize = reader.ReadByteAt(at + 5);
@@ -95,13 +103,19 @@ namespace ClassicMac.Files.Rom
             var headerSize = reader.ReadUInt16At(at + 8);
             if (version != 1 || fieldSize is < 1 or > 8 || maxIndex < 1 || maxIndex >= fieldSize * 8 ||
                 headerSize != BlockHeaderLength || first == 0)
+            {
                 return null;
+            }
 
             var entries = new List<RomResourceEntry>();
             var limit = length / (fieldSize + EntryFixedLength);
-            for (var offset = first; offset != 0; )
+            for (var offset = first; offset != 0;)
             {
-                if (entries.Count >= limit || offset > length - (fieldSize + EntryFixedLength)) return null;
+                if (entries.Count >= limit || offset > length - (fieldSize + EntryFixedLength))
+                {
+                    return null;
+                }
+
                 var e = (int)offset;
                 var mask = rom.Slice(e, fieldSize);
                 var fixedAt = e + fieldSize;
@@ -110,13 +124,20 @@ namespace ClassicMac.Files.Rom
                 var typeBytes = reader.ReadBytesAt(fixedAt + 8, 4);
                 foreach (var b in typeBytes)
                 {
-                    if (b < 0x20 || b == 0x7F) return null;
+                    if (b < 0x20 || b == 0x7F)
+                    {
+                        return null;
+                    }
                 }
                 var type = new FourCC(typeBytes);
                 var id = reader.ReadInt16At(fixedAt + 12);
                 var attributes = reader.ReadByteAt(fixedAt + 14);
                 int nameLength = reader.ReadByteAt(fixedAt + 15);
-                if (nameLength > length - (fixedAt + EntryFixedLength)) return null;
+                if (nameLength > length - (fixedAt + EntryFixedLength))
+                {
+                    return null;
+                }
+
                 MacString? name = nameLength == 0 ? null : new MacString(reader.ReadBytesAt(fixedAt + 16, nameLength));
 
                 var data = ReadOnlyMemory<byte>.Empty;
@@ -125,15 +146,28 @@ namespace ClassicMac.Files.Rom
                     // 32-bit block header: tag, flags, reserved, size correction; physical size; relative handle.
                     var header = (int)dataOffset - BlockHeaderLength;
                     long size = (long)reader.ReadUInt32At(header + 4) - BlockHeaderLength - reader.ReadByteAt(header + 3);
-                    if (size >= 0 && size <= length - dataOffset) data = rom.Slice((int)dataOffset, (int)size);
-                    else Report(diagnostics, type, id, offset, $"its block header gives {size} bytes, past the end of the image");
+                    if (size >= 0 && size <= length - dataOffset)
+                    {
+                        data = rom.Slice((int)dataOffset, (int)size);
+                    }
+                    else
+                    {
+                        Report(diagnostics, type, id, offset, $"its block header gives {size} bytes, past the end of the image");
+                    }
                 }
-                else Report(diagnostics, type, id, offset, $"its data offset ${dataOffset:X} is outside the image");
+                else
+                {
+                    Report(diagnostics, type, id, offset, $"its data offset ${dataOffset:X} is outside the image");
+                }
 
                 entries.Add(new RomResourceEntry(type, id, attributes, name, mask, offset, dataOffset, data));
                 offset = next;
             }
-            if (entries.Count == 0) return null;
+            if (entries.Count == 0)
+            {
+                return null;
+            }
+
             return new RomResourceTable(reader.ReadUInt16At(8), tableOffset, maxIndex, fieldSize, version, headerSize, entries);
         }
 

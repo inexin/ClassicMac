@@ -54,7 +54,11 @@ internal sealed class HfsBuilder
         var allocation = new List<byte[]>(); // allocation blocks from 0
         var allocated = new List<bool>();
         var overflow = new List<byte[]>(); // extents overflow leaf records
-        if (ExtentsTreeNodes < 2) throw new InvalidOperationException("The extents tree needs room for a header and leaf.");
+        if (ExtentsTreeNodes < 2)
+        {
+            throw new InvalidOperationException("The extents tree needs room for a header and leaf.");
+        }
+
         for (var i = 0; i < ExtentsTreeNodes; i++)
         {
             allocation.Add(new byte[Block]);
@@ -113,8 +117,16 @@ internal sealed class HfsBuilder
         {
             var r = new byte[102];
             r[0] = 2;
-            if (f.Thread) r[2] = 2;
-            if (f.Locked) r[2] |= 1;
+            if (f.Thread)
+            {
+                r[2] = 2;
+            }
+
+            if (f.Locked)
+            {
+                r[2] |= 1;
+            }
+
             Encoding.ASCII.GetBytes(f.Type).CopyTo(r, 4);
             Encoding.ASCII.GetBytes(f.Creator).CopyTo(r, 8);
             BinaryPrimitives.WriteUInt16BigEndian(r.AsSpan(12), 0x0100);
@@ -133,7 +145,10 @@ internal sealed class HfsBuilder
             ForkExtents(f.Data, f.Fragments, 0x00, f.Id).CopyTo(r, 74);
             ForkExtents(f.Resource, 1, 0xFF, f.Id).CopyTo(r, 86);
             records.Add((f.Parent, f.Name, r));
-            if (f.Thread) records.Add((f.Id, "", ThreadRecord(f.Parent, f.Name, kind: 4)));
+            if (f.Thread)
+            {
+                records.Add((f.Id, "", ThreadRecord(f.Parent, f.Name, kind: 4)));
+            }
         }
 
         // Catalog: records in the leaves, linked in order, under one index node.
@@ -146,7 +161,10 @@ internal sealed class HfsBuilder
         {
             var chunk = keyed.Skip((leaf - 1) * perLeaf).Take(perLeaf).ToList();
             allocation[catalogStart + leaf] = Leaf(chunk, forward: leaf == CatalogLeaves ? 0u : (uint)leaf + 1, backward: (uint)leaf - 1);
-            if (chunk.Count > 0) index.Add(IndexRecord(chunk[0], (uint)leaf));
+            if (chunk.Count > 0)
+            {
+                index.Add(IndexRecord(chunk[0], (uint)leaf));
+            }
         }
         var root = (uint)CatalogLeaves + 1;
         allocation[catalogStart + (int)root] = Leaf(index, forward: 0, backward: 0, kind: 0, height: 2);
@@ -156,14 +174,20 @@ internal sealed class HfsBuilder
         for (var leaf = 1; leaf <= CatalogLeaves && FirstFileRecordOffset < 0; leaf++)
         {
             var fileKeyOffset = FindFirstFileRecord(allocation[catalogStart + leaf]);
-            if (fileKeyOffset >= 0) FirstFileRecordOffset = (FirstAllocationBlock + catalogStart + leaf) * Block + fileKeyOffset;
+            if (fileKeyOffset >= 0)
+            {
+                FirstFileRecordOffset = (FirstAllocationBlock + catalogStart + leaf) * Block + fileKeyOffset;
+            }
         }
 
         // Build a one- or two-leaf extents tree, leaving any unused nodes mapped free.
         if (overflow.Count > 22)
         {
             if (ExtentsTreeNodes < 4 || overflow.Count > 44)
+            {
                 throw new InvalidOperationException("This fixture needs a larger extents tree.");
+            }
+
             var split = overflow.Count / 2;
             allocation[1] = Leaf(overflow.Take(split).ToList(), 2, 0);
             allocation[2] = Leaf(overflow.Skip(split).ToList(), 0, 1);
@@ -179,7 +203,10 @@ internal sealed class HfsBuilder
 
         // The allocation area is followed by two reserved sectors, with the alternate MDB in the first.
         var image = new byte[(FirstAllocationBlock + allocation.Count + 2) * Block];
-        for (var i = 0; i < allocation.Count; i++) allocation[i].CopyTo(image, (FirstAllocationBlock + i) * Block);
+        for (var i = 0; i < allocation.Count; i++)
+        {
+            allocation[i].CopyTo(image, (FirstAllocationBlock + i) * Block);
+        }
 
         var mdb = image.AsSpan(1024);
         BinaryPrimitives.WriteUInt16BigEndian(mdb, 0x4244);
@@ -202,7 +229,13 @@ internal sealed class HfsBuilder
         BinaryPrimitives.WriteUInt32BigEndian(mdb[0x92..], (uint)(catalogNodes * Block));
         ExtentRecord([(catalogStart, catalogNodes)]).CopyTo(mdb[0x96..]);
         for (var i = 0; i < allocated.Count; i++)
-            if (allocated[i]) image[3 * Block + (i >> 3)] |= (byte)(0x80 >> (i & 7));
+        {
+            if (allocated[i])
+            {
+                image[3 * Block + (i >> 3)] |= (byte)(0x80 >> (i & 7));
+            }
+        }
+
         image.AsSpan(1024, 162).CopyTo(image.AsSpan(image.Length - 1024, 162));
         return image;
     }
@@ -253,7 +286,11 @@ internal sealed class HfsBuilder
         key.AddRange(id);
         key.Add((byte)name.Length);
         key.AddRange(MacRoman.Encode(name));
-        if (key.Count % 2 != 0) key.Add(0);
+        if (key.Count % 2 != 0)
+        {
+            key.Add(0);
+        }
+
         key[0] = checked((byte)(uncountedPadding ? 6 + name.Length : key.Count - 1));
         return [.. key, .. record];
     }
@@ -283,7 +320,11 @@ internal sealed class HfsBuilder
             at += records[i].Length;
         }
         BinaryPrimitives.WriteUInt16BigEndian(node.AsSpan(Block - 2 * (records.Count + 1)), (ushort)at);
-        if (at > Block - 2 * (records.Count + 1)) throw new InvalidOperationException("Too many records for one leaf.");
+        if (at > Block - 2 * (records.Count + 1))
+        {
+            throw new InvalidOperationException("Too many records for one leaf.");
+        }
+
         return node;
     }
 
@@ -306,7 +347,10 @@ internal sealed class HfsBuilder
         const int mapStart = 14 + 106 + 128;
         const int mapLength = Block - mapStart - 8;
         for (var i = 0; i < usedNodes; i++)
+        {
             node[mapStart + (i >> 3)] |= (byte)(0x80 >> (i & 7));
+        }
+
         BinaryPrimitives.WriteUInt16BigEndian(node.AsSpan(Block - 2), 14);
         BinaryPrimitives.WriteUInt16BigEndian(node.AsSpan(Block - 4), 14 + 106);
         BinaryPrimitives.WriteUInt16BigEndian(node.AsSpan(Block - 6), mapStart);
@@ -321,8 +365,15 @@ internal sealed class HfsBuilder
         {
             int start = BinaryPrimitives.ReadUInt16BigEndian(leaf.AsSpan(Block - 2 * (i + 1)));
             var dataStart = start + 1 + leaf[start];
-            if ((dataStart & 1) != 0) dataStart++;
-            if (leaf[dataStart] == 2) return dataStart;
+            if ((dataStart & 1) != 0)
+            {
+                dataStart++;
+            }
+
+            if (leaf[dataStart] == 2)
+            {
+                return dataStart;
+            }
         }
         return -1;
     }

@@ -81,10 +81,17 @@ namespace ClassicMac.Code.Ppc
             value = 0;
             for (int i = 0; i < 5; i++)
             {
-                if (p >= packed.Length) return false;
+                if (p >= packed.Length)
+                {
+                    return false;
+                }
+
                 byte b = packed[p++];
                 value = (value << 7) | (uint)(b & 0x7F);
-                if ((b & 0x80) == 0) return value <= uint.MaxValue;
+                if ((b & 0x80) == 0)
+                {
+                    return value <= uint.MaxValue;
+                }
             }
             return false;
         }
@@ -96,15 +103,27 @@ namespace ClassicMac.Code.Ppc
 
         private static Step Zero(BigEndianWriter output, long count, int maxLength)
         {
-            if (!Fits(output, count, maxLength)) return Step.TooLong;
+            if (!Fits(output, count, maxLength))
+            {
+                return Step.TooLong;
+            }
+
             output.WriteZeros((int)count);
             return Step.Done;
         }
 
         private static Step Copy(BigEndianWriter output, ReadOnlySpan<byte> packed, ref int p, long count, int maxLength)
         {
-            if (count > packed.Length - p) return Step.Truncated;
-            if (!Fits(output, count, maxLength)) return Step.TooLong;
+            if (count > packed.Length - p)
+            {
+                return Step.Truncated;
+            }
+
+            if (!Fits(output, count, maxLength))
+            {
+                return Step.TooLong;
+            }
+
             output.WriteBytes(packed.Slice(p, (int)count));
             p += (int)count;
             return Step.Done;
@@ -112,12 +131,26 @@ namespace ClassicMac.Code.Ppc
 
         private static Step RepeatedBlock(BigEndianWriter output, ReadOnlySpan<byte> packed, ref int p, long blockSize, int maxLength)
         {
-            if (!TryArgument(packed, ref p, out long repeat) || blockSize > packed.Length - p) return Step.Truncated;
-            if (!Fits(output, Times(blockSize, repeat + 1), maxLength)) return Step.TooLong;
+            if (!TryArgument(packed, ref p, out long repeat) || blockSize > packed.Length - p)
+            {
+                return Step.Truncated;
+            }
+
+            if (!Fits(output, Times(blockSize, repeat + 1), maxLength))
+            {
+                return Step.TooLong;
+            }
+
             var block = packed.Slice(p, (int)blockSize);
             p += (int)blockSize;
             if (blockSize > 0)
-                for (long i = 0; i <= repeat; i++) output.WriteBytes(block);
+            {
+                for (long i = 0; i <= repeat; i++)
+                {
+                    output.WriteBytes(block);
+                }
+            }
+
             return Step.Done;
         }
 
@@ -126,23 +159,54 @@ namespace ClassicMac.Code.Ppc
             bool withCommonBlock, int maxLength)
         {
             if (!TryArgument(packed, ref p, out long customSize) || !TryArgument(packed, ref p, out long repeat))
+            {
                 return Step.Truncated;
+            }
+
             ReadOnlySpan<byte> common = default;
             if (withCommonBlock)
             {
-                if (commonSize > packed.Length - p) return Step.Truncated;
+                if (commonSize > packed.Length - p)
+                {
+                    return Step.Truncated;
+                }
+
                 common = packed.Slice(p, (int)commonSize);
                 p += (int)commonSize;
             }
-            if (Times(customSize, repeat) > packed.Length - p) return Step.Truncated;
-            if (!Fits(output, Times(commonSize, repeat + 1) + Times(customSize, repeat), maxLength)) return Step.TooLong;
+            if (Times(customSize, repeat) > packed.Length - p)
+            {
+                return Step.Truncated;
+            }
+
+            if (!Fits(output, Times(commonSize, repeat + 1) + Times(customSize, repeat), maxLength))
+            {
+                return Step.TooLong;
+            }
+
             for (long i = 0; i < repeat && commonSize + customSize > 0; i++)
             {
-                if (withCommonBlock) output.WriteBytes(common); else output.WriteZeros((int)commonSize);
+                if (withCommonBlock)
+                {
+                    output.WriteBytes(common);
+                }
+                else
+                {
+                    output.WriteZeros((int)commonSize);
+                }
+
                 output.WriteBytes(packed.Slice(p, (int)customSize));
                 p += (int)customSize;
             }
-            if (withCommonBlock) output.WriteBytes(common); else output.WriteZeros((int)commonSize);
+            if (withCommonBlock)
+            {
+                output.WriteBytes(common);
+            }
+            else
+            {
+                output.WriteZeros((int)commonSize);
+            }
+
             return Step.Done;
         }
     }

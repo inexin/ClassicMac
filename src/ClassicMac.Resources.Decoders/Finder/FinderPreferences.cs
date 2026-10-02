@@ -31,12 +31,24 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// </summary>
         public static FinderPreferences? Read(ReadOnlyMemory<byte> data)
         {
-            if (data.Length < 0x20) return null;
+            if (data.Length < 0x20)
+            {
+                return null;
+            }
+
             var reader = new BigEndianReader(data);
             int font = reader.ReadInt32At(0x18), size = reader.ReadInt32At(0x1C);
-            if (font is < 0 or > short.MaxValue || size is < 1 or > 127) return null;
+            if (font is < 0 or > short.MaxValue || size is < 1 or > 127)
+            {
+                return null;
+            }
+
             var preferences = new FinderPreferences(font, size);
-            if (data.Length < 0x2C) return preferences;
+            if (data.Length < 0x2C)
+            {
+                return preferences;
+            }
+
             return preferences with
             {
                 GridSpacing = [reader.ReadInt16At(0x24), reader.ReadInt16At(0x26), reader.ReadInt16At(0x28), reader.ReadInt16At(0x2A)],

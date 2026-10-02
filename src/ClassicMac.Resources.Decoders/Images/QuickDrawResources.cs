@@ -92,8 +92,12 @@ namespace ClassicMac.Resources.Decoders.Images
             var palette = StandardColorTables.ForId(depth)!;
             var pm = new PixMap
             {
-                Bounds = new PictRect(0, 0, h, w), RowBytes = w * depth / 8, PixelSize = depth, IsPixMap = true,
-                Palette = palette, Data = data,
+                Bounds = new PictRect(0, 0, h, w),
+                RowBytes = w * depth / 8,
+                PixelSize = depth,
+                IsPixMap = true,
+                Palette = palette,
+                Data = data,
             };
             var mask = iconList != null && iconList.Length >= w / 8 * h ? IconMask(iconList, w, h) : null;
             return Render(pm, mask, 0, w / 8);
@@ -104,7 +108,11 @@ namespace ClassicMac.Resources.Decoders.Images
         {
             ArgumentNullException.ThrowIfNull(data);
             var icons = new List<RgbaBitmap>();
-            for (int o = 0; o + 32 <= data.Length; o += 32) icons.Add(Mono(data, o, 16, 16, null, 0));
+            for (int o = 0; o + 32 <= data.Length; o += 32)
+            {
+                icons.Add(Mono(data, o, 16, 16, null, 0));
+            }
+
             return icons;
         }
 
@@ -121,7 +129,11 @@ namespace ClassicMac.Resources.Decoders.Images
             int p = 82;
             int maskAt = p;
             p += maskRowBytes * maskHeight + bitmapRowBytes * bitmapHeight;
-            if (p + 8 > data.Length) throw Truncated("cicn");
+            if (p + 8 > data.Length)
+            {
+                throw Truncated("cicn");
+            }
+
             var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(p));
             pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
             p += b.Position;
@@ -145,13 +157,21 @@ namespace ClassicMac.Resources.Decoders.Images
         public static MacCursor DecodeColorCursor(byte[] data)
         {
             Require(data, 96, "crsr");
-            if ((U16(data, 0) & 0xFFFE) != 0x8000) throw new NotSupportedException("Unknown crsr type.");
+            if ((U16(data, 0) & 0xFFFE) != 0x8000)
+            {
+                throw new NotSupportedException("Unknown crsr type.");
+            }
+
             int mapAt = (int)U32(data, 2), pixelsAt = (int)U32(data, 6);
             PixMap? color = null;
             if (U16(data, 0) == 0x8001 && mapAt > 0)
             {
                 color = ReadPixMap(data, mapAt, out int tableAt);
-                if (tableAt < 0 || tableAt + 8 > data.Length) throw Truncated("crsr");
+                if (tableAt < 0 || tableAt + 8 > data.Length)
+                {
+                    throw Truncated("crsr");
+                }
+
                 var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(tableAt));
                 color.Palette = PixMap.ReadColorTable(b, color.PixelSize);
                 color.Data = Slice(data, pixelsAt, color.RowBytes * color.Height, "crsr");
@@ -168,7 +188,11 @@ namespace ClassicMac.Resources.Decoders.Images
             Require(data, 2, "PAT#");
             var list = new List<RgbaBitmap>();
             int count = U16(data, 0);
-            for (int i = 0, o = 2; i < count && o + 8 <= data.Length; i++, o += 8) list.Add(Mono(data, o, 8, 8, null, 0));
+            for (int i = 0, o = 2; i < count && o + 8 <= data.Length; i++, o += 8)
+            {
+                list.Add(Mono(data, o, 8, 8, null, 0));
+            }
+
             return list;
         }
 
@@ -187,7 +211,11 @@ namespace ClassicMac.Resources.Decoders.Images
             Require(data, 2, "ppt#");
             int count = U16(data, 0);
             var offsets = new List<int>();
-            for (int i = 0; i < count && 2 + 4 * i + 4 <= data.Length; i++) offsets.Add((int)U32(data, 2 + 4 * i));
+            for (int i = 0; i < count && 2 + 4 * i + 4 <= data.Length; i++)
+            {
+                offsets.Add((int)U32(data, 2 + 4 * i));
+            }
+
             var list = new List<RgbaBitmap>();
             for (int i = 0; i < offsets.Count; i++)
             {
@@ -205,38 +233,73 @@ namespace ClassicMac.Resources.Decoders.Images
         // 32-bit screen. Other types fail to load (Mac OS 9).
         private static RgbaBitmap PixelPattern(byte[] data, int start, int end)
         {
-            if (start < 0 || end > data.Length || end - start < 28) throw Truncated("ppat");
+            if (start < 0 || end > data.Length || end - start < 28)
+            {
+                throw Truncated("ppat");
+            }
+
             int type = U16(data, start);
-            if (type > 3) throw new NotSupportedException($"ppat type {type} is not 0-3.");
+            if (type > 3)
+            {
+                throw new NotSupportedException($"ppat type {type} is not 0-3.");
+            }
+
             int mapAt = start + (int)U32(data, start + 2), pixelsAt = start + (int)U32(data, start + 6);
             if (type == 0)
             {
-                if (pixelsAt + 8 > data.Length) throw Truncated("ppat");
+                if (pixelsAt + 8 > data.Length)
+                {
+                    throw Truncated("ppat");
+                }
+
                 return Mono(data, pixelsAt, 8, 8, null, 0);
             }
             var pm = ReadPixMap(data, mapAt, out int tableAt, start);
-            if (tableAt < pixelsAt) throw new NotSupportedException("The ppat's color table does not follow its pixel data.");
+            if (tableAt < pixelsAt)
+            {
+                throw new NotSupportedException("The ppat's color table does not follow its pixel data.");
+            }
+
             if (type == 2)
             {
-                if (tableAt + 0x30 > data.Length) throw Truncated("ppat");
+                if (tableAt + 0x30 > data.Length)
+                {
+                    throw Truncated("ppat");
+                }
+
                 var solid = new RgbaBitmap(8, 8);
                 var rgb = new RgbaColor(data[tableAt + 0x2A], data[tableAt + 0x2C], data[tableAt + 0x2E]);
                 for (int y = 0; y < 8; y++)
-                    for (int x = 0; x < 8; x++) Set(solid, x, y, rgb);
+                {
+                    for (int x = 0; x < 8; x++)
+                    {
+                        Set(solid, x, y, rgb);
+                    }
+                }
+
                 return solid;
             }
             if (tableAt < pixelsAt + pm.RowBytes * pm.Height)
+            {
                 throw new NotSupportedException("The ppat's pixel data is shorter than its PixMap.");
+            }
+
             pm.Data = Slice(data, pixelsAt, pm.RowBytes * pm.Height, "ppat");
             if (pm.PixelType != 16)
             {
-                if (tableAt + 8 > data.Length) throw Truncated("ppat");
+                if (tableAt + 8 > data.Length)
+                {
+                    throw Truncated("ppat");
+                }
+
                 var b = new ClassicMac.Core.BigEndianReader(data.AsMemory(tableAt));
                 pm.Palette = PixMap.ReadColorTable(b, pm.PixelSize);
                 // An empty table (ctSize -1, ResEdit's ppats) draws a 1-bit pattern 0 white, 1 black, whatever the
                 // port's colours [Verified].
                 if (pm.PixelSize == 1 && (short)U16(data, tableAt + 6) < 0)
+                {
                     pm.Palette = [new RgbaColor(255, 255, 255), new RgbaColor(0, 0, 0)];
+                }
             }
             return Render(pm, null, 0, 0);
         }
@@ -244,7 +307,11 @@ namespace ClassicMac.Resources.Decoders.Images
         // A 50-byte PixMap record (baseAddr, rowBytes, bounds, ..., pmTable as an offset from `origin`).
         private static PixMap ReadPixMap(byte[] data, int at, out int tableAt, int origin = 0)
         {
-            if (at < 0 || at + 50 > data.Length) throw Truncated("PixMap");
+            if (at < 0 || at + 50 > data.Length)
+            {
+                throw Truncated("PixMap");
+            }
+
             var pm = new PixMap
             {
                 RowBytes = U16(data, at + 4) & 0x3FFF,
@@ -256,7 +323,10 @@ namespace ClassicMac.Resources.Decoders.Images
                 IsPixMap = true,
             };
             if (pm.PixelSize is not (1 or 2 or 4 or 8 or 16 or 32))
+            {
                 throw new NotSupportedException($"PixMap pixelSize {pm.PixelSize} is not a QuickDraw depth");
+            }
+
             tableAt = origin + (int)U32(data, at + 42);
             return pm;
         }
@@ -267,14 +337,20 @@ namespace ClassicMac.Resources.Decoders.Images
             int w = Math.Max(1, pm.Width), h = Math.Max(1, pm.Height);
             var bmp = new RgbaBitmap(w, h);
             for (int y = 0; y < pm.Height; y++)
+            {
                 for (int x = 0; x < pm.Width; x++)
                 {
                     // Rows or columns past the mask's data are unmasked.
                     int maskByte = maskAt + y * maskRowBytes + (x >> 3);
                     if (maskData != null && (x >> 3) < maskRowBytes && maskByte < maskData.Length && !Bit(maskData, maskAt + y * maskRowBytes, x))
+                    {
                         continue;
+                    }
+
                     Set(bmp, x, y, pm.GetPixel(x, y));
                 }
+            }
+
             return bmp;
         }
 
@@ -284,11 +360,18 @@ namespace ClassicMac.Resources.Decoders.Images
             Require(data, at + w / 8 * h, "icon");
             var bmp = new RgbaBitmap(w, h);
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
-                    if (maskData != null && !Bit(maskData, maskAt + y * (w / 8), x)) continue;
+                    if (maskData != null && !Bit(maskData, maskAt + y * (w / 8), x))
+                    {
+                        continue;
+                    }
+
                     Set(bmp, x, y, Bit(data, at + y * (w / 8), x) ? Black : White);
                 }
+            }
+
             return bmp;
         }
 
@@ -301,21 +384,32 @@ namespace ClassicMac.Resources.Decoders.Images
             var inverted = new bool[256];
             var xor = new int[256];
             for (int y = 0; y < 16; y++)
+            {
                 for (int x = 0; x < 16; x++)
                 {
                     bool mask = Bit(data, at + 32 + 2 * y, x);
                     RgbaColor c;
                     if (color != null)
+                    {
                         c = x < color.Width && y < color.Height ? color.GetPixel(x, y) : Black;
+                    }
                     else
+                    {
                         c = Bit(data, at + 2 * y, x) ? Black : White;
-                    if (mask) Set(bmp, x, y, c);
+                    }
+
+                    if (mask)
+                    {
+                        Set(bmp, x, y, c);
+                    }
                     else
                     {
                         xor[y * 16 + x] = ~((c.R << 16) | (c.G << 8) | c.B) & 0xFFFFFF;
                         inverted[y * 16 + x] = xor[y * 16 + x] == 0xFFFFFF;
                     }
                 }
+            }
+
             return new MacCursor(bmp, inverted, Math.Clamp(hotH, 0, 15), Math.Clamp(hotV, 0, 15)) { Xor = xor };
         }
 
@@ -334,21 +428,44 @@ namespace ClassicMac.Resources.Decoders.Images
             var stack = new Stack<int>();
             void Push(int x, int y)
             {
-                if (x < 0 || y < 0 || x >= w || y >= h || outside[y * w + x] || Bit(image, y * rowBytes, x)) return;
+                if (x < 0 || y < 0 || x >= w || y >= h || outside[y * w + x] || Bit(image, y * rowBytes, x))
+                {
+                    return;
+                }
+
                 outside[y * w + x] = true;
                 stack.Push(y * w + x);
             }
-            for (int x = 0; x < w; x++) { Push(x, 0); Push(x, h - 1); }
-            for (int y = 0; y < h; y++) { Push(0, y); Push(w - 1, y); }
+            for (int x = 0; x < w; x++)
+            {
+                Push(x, 0);
+                Push(x, h - 1);
+            }
+            for (int y = 0; y < h; y++)
+            {
+                Push(0, y);
+                Push(w - 1, y);
+            }
             while (stack.Count > 0)
             {
                 int p = stack.Pop(), x = p % w, y = p / w;
-                Push(x + 1, y); Push(x - 1, y); Push(x, y + 1); Push(x, y - 1);
+                Push(x + 1, y);
+                Push(x - 1, y);
+                Push(x, y + 1);
+                Push(x, y - 1);
             }
             var mask = new byte[rowBytes * h];
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
-                    if (!outside[y * w + x]) mask[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                {
+                    if (!outside[y * w + x])
+                    {
+                        mask[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                    }
+                }
+            }
+
             return mask;
         }
 
@@ -366,21 +483,32 @@ namespace ClassicMac.Resources.Decoders.Images
         private static void Set(RgbaBitmap bmp, int x, int y, RgbaColor c)
         {
             int i = (y * bmp.Width + x) * 4;
-            bmp.Pixels[i] = c.R; bmp.Pixels[i + 1] = c.G; bmp.Pixels[i + 2] = c.B; bmp.Pixels[i + 3] = 255;
+            bmp.Pixels[i] = c.R;
+            bmp.Pixels[i + 1] = c.G;
+            bmp.Pixels[i + 2] = c.B;
+            bmp.Pixels[i + 3] = 255;
         }
 
         private static int Height(byte[] data, int boundsAt) => Math.Max(0, I16(data, boundsAt + 4) - I16(data, boundsAt));
 
         private static byte[] Slice(byte[] data, int at, int length, string type)
         {
-            if (at < 0 || length < 0 || at + length > data.Length) throw Truncated(type);
+            if (at < 0 || length < 0 || at + length > data.Length)
+            {
+                throw Truncated(type);
+            }
+
             return data.AsSpan(at, length).ToArray();
         }
 
         private static byte[] Require(byte[] data, int length, string type)
         {
             ArgumentNullException.ThrowIfNull(data);
-            if (data.Length < length) throw Truncated(type);
+            if (data.Length < length)
+            {
+                throw Truncated(type);
+            }
+
             return data;
         }
 

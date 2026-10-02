@@ -26,7 +26,11 @@ namespace ClassicMac.Resources.Decoders.Documents
         {
             options ??= DecodeOptions.Default;
             diagnostics ??= new List<Diagnostic>();
-            if (fork is not null && ReadDocMaker(fork, title, options, readOptions, diagnostics) is { } docMaker) return docMaker;
+            if (fork is not null && ReadDocMaker(fork, title, options, readOptions, diagnostics) is { } docMaker)
+            {
+                return docMaker;
+            }
+
             return ReadSimpleText(dataFork, fork, type, title, options, readOptions, diagnostics);
         }
 
@@ -42,7 +46,11 @@ namespace ClassicMac.Resources.Decoders.Documents
             options ??= DecodeOptions.Default;
             diagnostics ??= new List<Diagnostic>();
             var count = fork.OfType(Wndo).Count();
-            if (count < 1 || fork.Find(Text, 128) is null) return null;
+            if (count < 1 || fork.Find(Text, 128) is null)
+            {
+                return null;
+            }
+
             byte[]? Data(FourCC type, int id) =>
                 fork.Find(type, (short)id) is { } r ? ResourceDecompression.Default.GetData(r, fork, readOptions, diagnostics).ToArray() : null;
             void Report(DiagnosticSeverity severity, string code, string message) => diagnostics.Add(new Diagnostic(severity, code, message));
@@ -53,8 +61,14 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 var reader = new BigEndianReader(window);
                 var mode = reader.ReadInt16At(0);
-                if (mode == 2) windowWidth = reader.ReadInt16At(6);
-                else if (mode == 1) windowWidth = reader.ReadInt16At(2);
+                if (mode == 2)
+                {
+                    windowWidth = reader.ReadInt16At(6);
+                }
+                else if (mode == 1)
+                {
+                    windowWidth = reader.ReadInt16At(2);
+                }
             }
             var backgrounds = Data(Clut, 128) is { } clut ? ColorTable(clut) : [];
             var word = StringListItem(Data(StrList, 128), 16, options) ?? "Chapter";
@@ -90,7 +104,10 @@ namespace ClassicMac.Resources.Decoders.Documents
                             $"Chapter {k}'s picture {j} (pInf {100 * k + 100 + j}) has no option-space to anchor it; not shown.");
                         continue;
                     }
-                    if (PictureInfo(info, anchors[j - 1], fork, readOptions, diagnostics, options, k, count) is { } picture) pictures.Add(picture);
+                    if (PictureInfo(info, anchors[j - 1], fork, readOptions, diagnostics, options, k, count) is { } picture)
+                    {
+                        pictures.Add(picture);
+                    }
                 }
                 chapters.Add(new DocumentChapter(k, chapterTitle, StyledText.Read(text, Data(Styl, id), options), justification, background,
                     pictures, windowWidth - ScrollBar - left - right));
@@ -107,10 +124,17 @@ namespace ClassicMac.Resources.Decoders.Documents
         {
             options ??= DecodeOptions.Default;
             diagnostics ??= new List<Diagnostic>();
-            if (type != Text && type != Ttro) return null;
+            if (type != Text && type != Ttro)
+            {
+                return null;
+            }
+
             var styl = fork?.Find(Styl, 128) is { } s ? ResourceDecompression.Default.GetData(s, fork, readOptions, diagnostics).ToArray() : null;
             var hasPictures = fork is not null && fork.OfType(Pict).Any();
-            if (styl is null && !(hasPictures && fork!.OfType(Pict).Any(p => p.Id >= 1000))) return null;
+            if (styl is null && !(hasPictures && fork!.OfType(Pict).Any(p => p.Id >= 1000)))
+            {
+                return null;
+            }
 
             var text = dataFork.ToArray();
             var pictures = new List<DocumentPicture>();
@@ -120,7 +144,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                 for (var k = 0; k < anchors.Count; k++)
                 {
                     // k advances even when the picture is missing, so a missing one leaves a gap.
-                    if (fork!.Find(Pict, (short)(1000 + k)) is not { } resource) continue;
+                    if (fork!.Find(Pict, (short)(1000 + k)) is not { } resource)
+                    {
+                        continue;
+                    }
+
                     var data = ResourceDecompression.Default.GetData(resource, fork, readOptions, diagnostics);
                     var (width, height) = PictureSize(data, scaleTo72Dpi: true);
                     pictures.Add(new DocumentPicture(anchors[k], (short)(1000 + k), data, width, height, PictureAlignment.Center, true, PictureAction.None));
@@ -136,7 +164,10 @@ namespace ClassicMac.Resources.Decoders.Documents
             var anchors = new List<int>();
             for (var i = 0; i < text.Length; i++)
             {
-                if (text[i] == Anchor) anchors.Add(i);
+                if (text[i] == Anchor)
+                {
+                    anchors.Add(i);
+                }
             }
             return anchors;
         }
@@ -174,11 +205,19 @@ namespace ClassicMac.Resources.Decoders.Documents
                     }
                     break;
                 case 5 or 7 or 8 or 16:
-                    if (MacText.TryReadPascal(span, ref at, out var text)) action = action with { Text = MacText.Decode(text, options) };
+                    if (MacText.TryReadPascal(span, ref at, out var text))
+                    {
+                        action = action with { Text = MacText.Decode(text, options) };
+                    }
+
                     break;
                 case 13 when span.Length >= at + 12:
                     at += 12;
-                    if (MacText.TryReadPascal(span, ref at, out var script)) action = action with { Text = MacText.Decode(script, options) };
+                    if (MacText.TryReadPascal(span, ref at, out var script))
+                    {
+                        action = action with { Text = MacText.Decode(script, options) };
+                    }
+
                     break;
                 case 0 or 2 or 3 or 4 or 6 or 9 or 10 or 11 or 12 or 14 or 15:
                     break;
@@ -204,7 +243,11 @@ namespace ClassicMac.Resources.Decoders.Documents
         // A picture's frame size; SimpleText scales an extended version 2 picture's frame to 72 dpi by its resolution.
         internal static (int Width, int Height) PictureSize(ReadOnlyMemory<byte> pict, bool scaleTo72Dpi)
         {
-            if (pict.Length < 10) return (0, 0);
+            if (pict.Length < 10)
+            {
+                return (0, 0);
+            }
+
             var reader = new BigEndianReader(pict);
             var frame = reader.ReadMacRectAt(2);
             int width = frame.Right - frame.Left;
@@ -213,8 +256,15 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 var hRes = reader.ReadInt32At(0x14) / 65536.0;
                 var vRes = reader.ReadInt32At(0x18) / 65536.0;
-                if (hRes > 0) width = (int)(width * 72 / hRes);
-                if (vRes > 0) height = (int)(height * 72 / vRes);
+                if (hRes > 0)
+                {
+                    width = (int)(width * 72 / hRes);
+                }
+
+                if (vRes > 0)
+                {
+                    height = (int)(height * 72 / vRes);
+                }
             }
             return (Math.Max(0, width), Math.Max(0, height));
         }
@@ -223,7 +273,11 @@ namespace ClassicMac.Resources.Decoders.Documents
         private static List<Rgb> ColorTable(byte[] clut)
         {
             var colours = new List<Rgb>();
-            if (clut.Length < 8) return colours;
+            if (clut.Length < 8)
+            {
+                return colours;
+            }
+
             var count = new BigEndianReader(clut).ReadInt16At(6) + 1;
             for (var i = 0; i < count && 16 + i * 8 <= clut.Length; i++)
             {
@@ -237,7 +291,11 @@ namespace ClassicMac.Resources.Decoders.Documents
         private static List<ContentsEntry> ContentsEntries(byte[]? data, DecodeOptions options)
         {
             var entries = new List<ContentsEntry>();
-            if (data is not { Length: >= 2 }) return entries;
+            if (data is not { Length: >= 2 })
+            {
+                return entries;
+            }
+
             var reader = new BigEndianReader(data);
             var count = reader.ReadInt16At(0);
             var at = 2;
@@ -246,7 +304,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                 var span = data.AsSpan();
                 int chapter = reader.ReadInt16At(at), start = reader.ReadInt16At(at + 2), end = reader.ReadInt16At(at + 4);
                 at += 6;
-                if (!MacText.TryReadPascal(span, ref at, out var title)) break;
+                if (!MacText.TryReadPascal(span, ref at, out var title))
+                {
+                    break;
+                }
+
                 entries.Add(new ContentsEntry(chapter, start, end, MacText.Decode(title, options)));
             }
             return entries;
@@ -261,12 +323,23 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         private static string? StringListItem(byte[]? list, int index, DecodeOptions options)
         {
-            if (list is not { Length: >= 2 } || index > new BigEndianReader(list).ReadUInt16At(0)) return null;
+            if (list is not { Length: >= 2 } || index > new BigEndianReader(list).ReadUInt16At(0))
+            {
+                return null;
+            }
+
             var at = 2;
             for (var i = 1; i <= index; i++)
             {
-                if (!MacText.TryReadPascal(list, ref at, out var item)) return null;
-                if (i == index) return MacText.Decode(item, options);
+                if (!MacText.TryReadPascal(list, ref at, out var item))
+                {
+                    return null;
+                }
+
+                if (i == index)
+                {
+                    return MacText.Decode(item, options);
+                }
             }
             return null;
         }

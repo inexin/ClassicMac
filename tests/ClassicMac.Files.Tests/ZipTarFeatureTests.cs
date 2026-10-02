@@ -19,8 +19,12 @@ public sealed class ZipTarFeatureTests
         w.WriteZeros(16);
         w.WriteUInt16((ushort)2);
         const int dataStart = 26 + 2 * 12;
-        w.WriteUInt32(9u); w.WriteUInt32((uint)dataStart); w.WriteUInt32(32u);
-        w.WriteUInt32(2u); w.WriteUInt32((uint)(dataStart + 32)); w.WriteUInt32((uint)resource.Length);
+        w.WriteUInt32(9u);
+        w.WriteUInt32((uint)dataStart);
+        w.WriteUInt32(32u);
+        w.WriteUInt32(2u);
+        w.WriteUInt32((uint)(dataStart + 32));
+        w.WriteUInt32((uint)resource.Length);
         w.WriteBytes(Encoding.Latin1.GetBytes(type));
         w.WriteBytes(Encoding.Latin1.GetBytes(creator));
         w.WriteUInt16(flags);
@@ -113,7 +117,11 @@ public sealed class ZipTarFeatureTests
         byte[] packed;
         using (var ms = new MemoryStream())
         {
-            using (var d = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true)) d.Write(attributes);
+            using (var d = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+            {
+                d.Write(attributes);
+            }
+
             packed = ms.ToArray();
         }
         byte[] Mac3(bool dataFork, bool local)
@@ -251,7 +259,11 @@ public sealed class ZipTarFeatureTests
                 w.WriteEntry(Dir(format, "Folder/"));
                 w.WriteEntry(File(format, "Folder/._Read Me", AppleDouble("TEXT", "ttxt", Resource)));
                 w.WriteEntry(File(format, "Folder/Read Me", "hello"u8.ToArray()));
-                if (format != TarEntryFormat.Ustar) w.WriteEntry(File(format, longName, "long"u8.ToArray()));
+                if (format != TarEntryFormat.Ustar)
+                {
+                    w.WriteEntry(File(format, longName, "long"u8.ToArray()));
+                }
+
                 var link = Entry(format, TarEntryType.SymbolicLink, "Folder/Link");
                 link.LinkName = "Read Me";
                 w.WriteEntry(link);
@@ -269,7 +281,10 @@ public sealed class ZipTarFeatureTests
             Assert.Equal(MacDate.FromDateTime(new DateTime(2020, 1, 1)), readMe.Modified);
             Assert.Equal("Read Me", files.Single(f => f.UnicodeName == "Link").SymbolicLinkTarget);
             if (format != TarEntryFormat.Ustar)
+            {
                 Assert.Contains(files, f => f.UnicodeName == new string('n', 120));
+            }
+
             Assert.DoesNotContain(files, f => f.UnicodeName!.StartsWith("._", StringComparison.Ordinal));
         }
     }
@@ -340,7 +355,10 @@ public sealed class ZipTarFeatureTests
         foreach (var b in data)
         {
             crc ^= b;
-            for (var k = 0; k < 8; k++) crc = (crc & 1) != 0 ? 0xEDB88320 ^ (crc >> 1) : crc >> 1;
+            for (var k = 0; k < 8; k++)
+            {
+                crc = (crc & 1) != 0 ? 0xEDB88320 ^ (crc >> 1) : crc >> 1;
+            }
         }
         return ~crc;
     }
@@ -371,16 +389,27 @@ public sealed class ZipTarFeatureTests
     private static byte[] Tar(TarEntryFormat format, Action<TarWriter> write)
     {
         using var stream = new MemoryStream();
-        using (var writer = new TarWriter(stream, format, leaveOpen: true)) write(writer);
+        using (var writer = new TarWriter(stream, format, leaveOpen: true))
+        {
+            write(writer);
+        }
+
         return stream.ToArray();
     }
 
     private static byte[] Gzip(byte[] data, string? name)
     {
         using var ms = new MemoryStream();
-        using (var gz = new GZipStream(ms, CompressionLevel.Optimal, leaveOpen: true)) gz.Write(data);
+        using (var gz = new GZipStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+        {
+            gz.Write(data);
+        }
+
         var bytes = ms.ToArray();
-        if (name is null) return bytes;
+        if (name is null)
+        {
+            return bytes;
+        }
         // Insert an FNAME field after the 10-byte header.
         var nameBytes = Encoding.Latin1.GetBytes(name + "\0");
         var result = new byte[bytes.Length + nameBytes.Length];

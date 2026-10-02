@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 
 namespace ClassicMac.Graphics.Pict
 {
@@ -28,11 +28,23 @@ namespace ClassicMac.Graphics.Pict
         public static bool IsPicture(BigEndianReader reader)
         {
             int start = reader.Position;
-            if (reader.Remaining < 12) return false;
+            if (reader.Remaining < 12)
+            {
+                return false;
+            }
+
             short top = reader.ReadInt16At(start + 2), left = reader.ReadInt16At(start + 4),
                 bottom = reader.ReadInt16At(start + 6), right = reader.ReadInt16At(start + 8);
-            if (bottom <= top || right <= left) return false;
-            if (IsVersion1(reader, start)) return true;
+            if (bottom <= top || right <= left)
+            {
+                return false;
+            }
+
+            if (IsVersion1(reader, start))
+            {
+                return true;
+            }
+
             return reader.Remaining >= SignatureLength
                 && reader.ReadUInt16At(start + 10) == 0x0011 && reader.ReadUInt16At(start + 12) == 0x02FF
                 && reader.ReadUInt16At(start + 14) == 0x0C00;
@@ -41,9 +53,16 @@ namespace ClassicMac.Graphics.Pict
         /// <summary>True if <paramref name="data"/> starts with a <c>.pict</c> file: a 512-byte header, then a picture.</summary>
         public static bool IsPictFile(ReadOnlyMemory<byte> data)
         {
-            if (data.Length < FileHeaderSize + 12) return false;
+            if (data.Length < FileHeaderSize + 12)
+            {
+                return false;
+            }
+
             var picture = data.Slice(FileHeaderSize);
-            if (!IsPicture(picture)) return false;
+            if (!IsPicture(picture))
+            {
+                return false;
+            }
             // v1's two-byte version opcode is a weak signature at an arbitrary offset, so for v1 also require the
             // conventional all-zero application header.
             var reader = new BigEndianReader(data);
@@ -72,7 +91,10 @@ namespace ClassicMac.Graphics.Pict
             // MacDraft: "pictDF...") fill it; skip it whenever the picture's version opcode is found after it
             // rather than at the start.
             if (b.Length >= FileHeaderSize + 12 && !HasVersionOpcode(b, start) && HasVersionOpcode(b, start + FileHeaderSize))
+            {
                 start += FileHeaderSize;
+            }
+
             b.Position = start;
             b.ReadUInt16();                                            // picSize: unreliable in v2
             var frame = PictRect.Read(b);
@@ -84,7 +106,9 @@ namespace ClassicMac.Graphics.Pict
                 return new PictInfo(1, false, frame, frame, 72, 72);
             }
             if (versionOp != 0x0011)
+            {
                 throw new NotSupportedException($"Unexpected PICT version opcode 0x{versionOp:X4}");
+            }
 
             version1 = false;
             b.ReadUInt16();                                            // Version (0x02FF)
@@ -101,7 +125,10 @@ namespace ClassicMac.Graphics.Pict
             var srcRect = PictRect.Read(b);
             b.ReadUInt32();                                            // reserved
             if (headerVersion != -2)
+            {
                 return new PictInfo(2, false, frame, frame, 72, 72);
+            }
+
             return new PictInfo(2, true, frame, srcRect.IsEmpty ? frame : srcRect,
                 hRes > 0 ? hRes / 65536.0 : 72, vRes > 0 ? vRes / 65536.0 : 72);
         }
@@ -110,7 +137,11 @@ namespace ClassicMac.Graphics.Pict
         // and picFrame. Leaves the stream position unspecified.
         private static bool HasVersionOpcode(BigEndianReader b, int offset)
         {
-            if (b.Length - offset < 14) return false;
+            if (b.Length - offset < 14)
+            {
+                return false;
+            }
+
             ushort op = b.ReadUInt16At(offset + 10);
             return op == 0x1101 || (op == 0x0011 && b.ReadUInt16At(offset + 12) == 0x02FF);
         }

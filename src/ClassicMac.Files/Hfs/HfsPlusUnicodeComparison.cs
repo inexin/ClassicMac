@@ -750,7 +750,10 @@ internal static class HfsPlusUnicodeComparison
             ushort leftValue = Next(left, ref leftIndex);
             ushort rightValue = Next(right, ref rightIndex);
             int comparison = leftValue.CompareTo(rightValue);
-            if (comparison != 0 || leftValue == 0) return comparison;
+            if (comparison != 0 || leftValue == 0)
+            {
+                return comparison;
+            }
         }
     }
 
@@ -765,7 +768,10 @@ internal static class HfsPlusUnicodeComparison
             ushort leftValue = NextBigEndian(leftReader, ref leftIndex);
             ushort rightValue = NextBigEndian(rightReader, ref rightIndex);
             int comparison = leftValue.CompareTo(rightValue);
-            if (comparison != 0 || leftValue == 0) return comparison;
+            if (comparison != 0 || leftValue == 0)
+            {
+                return comparison;
+            }
         }
     }
 
@@ -774,8 +780,16 @@ internal static class HfsPlusUnicodeComparison
         while (index < value.Length)
         {
             ushort character = value[index++];
-            if (character == 0) return ushort.MaxValue;
-            if (IsIgnorable(character)) continue;
+            if (character == 0)
+            {
+                return ushort.MaxValue;
+            }
+
+            if (IsIgnorable(character))
+            {
+                continue;
+            }
+
             int low = 0;
             int high = LowercaseMappings.Length;
             while (low < high)
@@ -783,9 +797,18 @@ internal static class HfsPlusUnicodeComparison
                 int middle = low + (high - low) / 2;
                 uint entry = LowercaseMappings[middle];
                 ushort source = (ushort)(entry >> 16);
-                if (source < character) low = middle + 1;
-                else if (source > character) high = middle;
-                else return (ushort)entry;
+                if (source < character)
+                {
+                    low = middle + 1;
+                }
+                else if (source > character)
+                {
+                    high = middle;
+                }
+                else
+                {
+                    return (ushort)entry;
+                }
             }
             return character;
         }
@@ -798,8 +821,16 @@ internal static class HfsPlusUnicodeComparison
         {
             ushort character = reader.ReadUInt16At(index);
             index += 2;
-            if (character == 0) return ushort.MaxValue;
-            if (IsIgnorable(character)) continue;
+            if (character == 0)
+            {
+                return ushort.MaxValue;
+            }
+
+            if (IsIgnorable(character))
+            {
+                continue;
+            }
+
             int low = 0;
             int high = LowercaseMappings.Length;
             while (low < high)
@@ -807,9 +838,18 @@ internal static class HfsPlusUnicodeComparison
                 int middle = low + (high - low) / 2;
                 uint entry = LowercaseMappings[middle];
                 ushort source = (ushort)(entry >> 16);
-                if (source < character) low = middle + 1;
-                else if (source > character) high = middle;
-                else return (ushort)entry;
+                if (source < character)
+                {
+                    low = middle + 1;
+                }
+                else if (source > character)
+                {
+                    high = middle;
+                }
+                else
+                {
+                    return (ushort)entry;
+                }
             }
             return character;
         }
@@ -826,9 +866,18 @@ internal static class HfsPlusUnicodeComparison
             uint range = IgnorableRanges[middle];
             ushort start = (ushort)(range >> 16);
             ushort end = (ushort)range;
-            if (character < start) high = middle;
-            else if (character > end) low = middle + 1;
-            else return true;
+            if (character < start)
+            {
+                high = middle;
+            }
+            else if (character > end)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                return true;
+            }
         }
         return false;
     }

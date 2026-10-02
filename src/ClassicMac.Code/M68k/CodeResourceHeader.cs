@@ -40,36 +40,66 @@ namespace ClassicMac.Code.M68k
         {
             ArgumentNullException.ThrowIfNull(diagnostics);
             var reader = new BigEndianReader(data);
-            if (reader.Length < Length) return null;
+            if (reader.Length < Length)
+            {
+                return null;
+            }
+
             ushort w0 = reader.ReadUInt16At(0);
             CodeResourceBranch branch;
             int target;
             ushort flags = 0;
-            if (w0 == 0x6000) { branch = CodeResourceBranch.BraWord; target = 2 + reader.ReadInt16At(2); }
-            else if (w0 == 0x4EFA) { branch = CodeResourceBranch.JmpPcRelative; target = 2 + reader.ReadInt16At(2); }
+            if (w0 == 0x6000)
+            {
+                branch = CodeResourceBranch.BraWord;
+                target = 2 + reader.ReadInt16At(2);
+            }
+            else if (w0 == 0x4EFA)
+            {
+                branch = CodeResourceBranch.JmpPcRelative;
+                target = 2 + reader.ReadInt16At(2);
+            }
             else if ((w0 & 0xFF00) == 0x6000 && (w0 & 0xFF) != 0xFF)
             {
                 branch = CodeResourceBranch.BraShort;
                 target = 2 + (sbyte)(w0 & 0xFF);
                 flags = reader.ReadUInt16At(2);
             }
-            else return null;
+            else
+            {
+                return null;
+            }
 
             var named = reader.ReadFourCCAt(4);
-            if (type is { } expected ? named != expected : !IsPrintable(reader.ReadBytesAt(4, 4))) return null;
+            if (type is { } expected ? named != expected : !IsPrintable(reader.ReadBytesAt(4, 4)))
+            {
+                return null;
+            }
+
             if (target < 0 || target >= reader.Length)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.code-header-branch",
                     $"The standard header's branch lands at {target:X}, outside the {reader.Length}-byte resource.", 0));
+            }
             else if (target < Length)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.code-header-branch",
                     $"The standard header's branch lands at {target:X}, inside the header.", 0));
+            }
+
             return new CodeResourceHeader(branch, target, flags, named, reader.ReadInt16At(8), reader.ReadUInt16At(10));
         }
 
         private static bool IsPrintable(ReadOnlySpan<byte> bytes)
         {
             foreach (var b in bytes)
-                if (b is < 0x20 or > 0x7E) return false;
+            {
+                if (b is < 0x20 or > 0x7E)
+                {
+                    return false;
+                }
+            }
+
             return true;
         }
     }

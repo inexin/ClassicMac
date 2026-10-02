@@ -91,14 +91,21 @@ namespace ClassicMac.App.ViewModels
                 var text = new StringBuilder(BytesPerLine);
                 for (var i = 0; i < BytesPerLine; i++)
                 {
-                    if (i == 8) hex.Append(' ');
+                    if (i == 8)
+                    {
+                        hex.Append(' ');
+                    }
+
                     if (i < line.Length)
                     {
                         hex.Append(line[i].ToString("X2", CultureInfo.InvariantCulture)).Append(' ');
                         var c = MacRoman.ToChar(line[i]);
                         text.Append(c < ' ' || c == '\u007F' ? '·' : c);
                     }
-                    else hex.Append("   ");
+                    else
+                    {
+                        hex.Append("   ");
+                    }
                 }
                 var column = cursor >= offset && cursor < offset + BytesPerLine ? (int)(cursor - offset) * 3 + (cursor - offset >= 8 ? 1 : 0) : -1;
                 return new HexLine(offset.ToString("X8", CultureInfo.InvariantCulture), hex.ToString().TrimEnd(), text.ToString(), editing ? column : -1);
@@ -107,7 +114,10 @@ namespace ClassicMac.App.ViewModels
 
         public IEnumerator<HexLine> GetEnumerator()
         {
-            for (var i = 0; i < Count; i++) yield return this[i];
+            for (var i = 0; i < Count; i++)
+            {
+                yield return this[i];
+            }
         }
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -144,7 +154,10 @@ namespace ClassicMac.App.ViewModels
 
         void ICollection.CopyTo(Array array, int index)
         {
-            for (var i = 0; i < Count; i++) array.SetValue(this[i], index + i);
+            for (var i = 0; i < Count; i++)
+            {
+                array.SetValue(this[i], index + i);
+            }
         }
     }
 

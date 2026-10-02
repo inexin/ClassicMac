@@ -186,7 +186,11 @@ public class CommandLineTests
             U32((uint)data.Length);
             offset += (uint)data.Length;
         }
-        foreach (var (_, data) in entries) bytes.AddRange(data);
+        foreach (var (_, data) in entries)
+        {
+            bytes.AddRange(data);
+        }
+
         var path = Path.GetTempFileName();
         File.WriteAllBytes(path, bytes.ToArray());
         return path;

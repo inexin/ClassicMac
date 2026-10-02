@@ -121,7 +121,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 var item = new MenuItem(text, icon, key, mark, face, n > 31 || (flags & (1u << n)) != 0);
                 items.Add(item.IsDivider ? item with { Enabled = false } : item); // a divider is never enabled
             }
-            if (!r.Short && r.Remaining == 0) r.Short = true; // no terminating 0
+            if (!r.Short && r.Remaining == 0)
+            {
+                r.Short = true; // no terminating 0
+            }
+
             Report(r, diagnostics, what);
             return new MenuResource(id, width, height, definition, flags, title, items);
         }
@@ -135,7 +139,10 @@ namespace ClassicMac.Resources.Decoders.Interface
             for (var i = 0; i < count && !r.Short; i++)
             {
                 var menu = r.I16();
-                if (!r.Short) ids.Add(menu);
+                if (!r.Short)
+                {
+                    ids.Add(menu);
+                }
             }
             Report(r, diagnostics, what);
             return ids;
@@ -191,8 +198,16 @@ namespace ClassicMac.Resources.Decoders.Interface
                 var type = r.U8();
                 var length = r.U8();
                 var itemData = r.Bytes(length);
-                if (r.Short) break;
-                if ((length & 1) != 0 && r.Remaining > 0) r.Skip(1);
+                if (r.Short)
+                {
+                    break;
+                }
+
+                if ((length & 1) != 0 && r.Remaining > 0)
+                {
+                    r.Skip(1);
+                }
+
                 var kind = type & 0x7F;
                 string? text = kind is 4 or 5 or 6 or 8 or 16 ? MacText.Decode(itemData.Span, options) : null;
                 var itemReader = new BigEndianReader(itemData);
@@ -223,7 +238,10 @@ namespace ClassicMac.Resources.Decoders.Interface
 
         private static void Report(Reader r, ICollection<Diagnostic> diagnostics, string what)
         {
-            if (r.Short) diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "ui.short", $"{what}: the data ends early; read as far as it goes."));
+            if (r.Short)
+            {
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "ui.short", $"{what}: the data ends early; read as far as it goes."));
+            }
         }
 
         // Big-endian fields in order; reading past the end gives zeros and sets Short.
@@ -241,7 +259,11 @@ namespace ClassicMac.Resources.Decoders.Interface
 
             private bool Take(int n)
             {
-                if (at + n <= data.Length) return true;
+                if (at + n <= data.Length)
+                {
+                    return true;
+                }
+
                 Short = true;
                 at = data.Length;
                 return false;
@@ -249,14 +271,21 @@ namespace ClassicMac.Resources.Decoders.Interface
 
             public void Skip(int n)
             {
-                if (Take(n)) at += n;
+                if (Take(n))
+                {
+                    at += n;
+                }
             }
 
             public byte U8() => Take(1) ? data.Span[at++] : (byte)0;
 
             public short I16()
             {
-                if (!Take(2)) return 0;
+                if (!Take(2))
+                {
+                    return 0;
+                }
+
                 var value = reader.ReadInt16At(at);
                 at += 2;
                 return value;
@@ -264,7 +293,11 @@ namespace ClassicMac.Resources.Decoders.Interface
 
             public int I32()
             {
-                if (!Take(4)) return 0;
+                if (!Take(4))
+                {
+                    return 0;
+                }
+
                 var value = reader.ReadInt32At(at);
                 at += 4;
                 return value;
@@ -277,13 +310,21 @@ namespace ClassicMac.Resources.Decoders.Interface
                 var available = Math.Min(n, Remaining);
                 var bytes = data.Slice(at, available);
                 at += available;
-                if (available < n) Short = true;
+                if (available < n)
+                {
+                    Short = true;
+                }
+
                 return bytes;
             }
 
             public string Pascal(DecodeOptions options)
             {
-                if (!Take(1)) return "";
+                if (!Take(1))
+                {
+                    return "";
+                }
+
                 var length = data.Span[at++];
                 return MacText.Decode(Bytes(length).Span, options);
             }
@@ -291,9 +332,17 @@ namespace ClassicMac.Resources.Decoders.Interface
             // A trailing word, at an even offset when aligned; null when the data ends first.
             public ushort? OptionalWord(bool align)
             {
-                if (Short) return null;
+                if (Short)
+                {
+                    return null;
+                }
+
                 var offset = align ? (at + 1) & ~1 : at;
-                if (!reader.TryReadUInt16At(offset, out var word)) return null;
+                if (!reader.TryReadUInt16At(offset, out var word))
+                {
+                    return null;
+                }
+
                 at = offset + 2;
                 return word;
             }

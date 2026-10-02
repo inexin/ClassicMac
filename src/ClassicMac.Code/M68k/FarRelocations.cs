@@ -37,13 +37,28 @@ namespace ClassicMac.Code.M68k
             while (true)
             {
                 int at = reader.Position;
-                if (!reader.TryReadByte(out var b)) { Truncated(at); break; }
-                if (b == 0) break;
+                if (!reader.TryReadByte(out var b))
+                {
+                    Truncated(at);
+                    break;
+                }
+                if (b == 0)
+                {
+                    break;
+                }
+
                 long delta;
-                if (b < 0x80) delta = 2L * b;
+                if (b < 0x80)
+                {
+                    delta = 2L * b;
+                }
                 else
                 {
-                    if (!reader.TryReadByte(out var next)) { Truncated(at); break; }
+                    if (!reader.TryReadByte(out var next))
+                    {
+                        Truncated(at);
+                        break;
+                    }
                     if (b == 0x80 && next == 0)
                     {
                         diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-escape",
@@ -56,14 +71,21 @@ namespace ClassicMac.Code.M68k
                 if (offset > reader.Length - 4L)
                 {
                     // Offsets only grow, so every later one is outside too: reported once, with the count.
-                    if (outside++ == 0) (firstOutside, firstOutsideAt) = (offset, at);
+                    if (outside++ == 0)
+                    {
+                        (firstOutside, firstOutsideAt) = (offset, at);
+                    }
+
                     continue;
                 }
                 offsets.Add(offset);
             }
             if (outside > 0)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-range",
                     $"{outside} relocations, the first at {firstOutside:X}, lie outside the {reader.Length}-byte segment; left out.", firstOutsideAt));
+            }
+
             return offsets;
 
             void Truncated(int at) => diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-truncated",
@@ -77,12 +99,23 @@ namespace ClassicMac.Code.M68k
         public static int ListLength(ReadOnlyMemory<byte> segment, long listOffset)
         {
             var reader = new BigEndianReader(segment);
-            if (listOffset < 0 || listOffset >= reader.Length) return 0;
+            if (listOffset < 0 || listOffset >= reader.Length)
+            {
+                return 0;
+            }
+
             reader.Position = (int)listOffset;
             while (reader.TryReadByte(out var b) && b != 0)
             {
-                if (b < 0x80) continue;
-                if (!reader.TryReadByte(out var next) || (b == 0x80 && next == 0)) break;
+                if (b < 0x80)
+                {
+                    continue;
+                }
+
+                if (!reader.TryReadByte(out var next) || (b == 0x80 && next == 0))
+                {
+                    break;
+                }
             }
             return reader.Position - (int)listOffset;
         }

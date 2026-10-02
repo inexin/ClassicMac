@@ -48,7 +48,10 @@ public static partial class TrapNames
     public static TrapInfo Lookup(ushort word)
     {
         if (!IsTrap(word))
+        {
             return new TrapInfo(word, null, false, false, [], false);
+        }
+
         if ((word & 0x0800) != 0)
         {
             bool autoPop = (word & 0x0400) != 0;
@@ -59,9 +62,14 @@ public static partial class TrapNames
 
         bool noA0 = (word & 0x0100) != 0;
         if (Index.Exact.TryGetValue(word, out var exact))
+        {
             return new TrapInfo(word, exact.Name, false, false, [], noA0);
+        }
+
         if (!Index.OsByKey.TryGetValue((ushort)(word & 0xF8FF), out var candidates))
+        {
             return new TrapInfo(word, null, false, false, [], noA0);
+        }
 
         // The most specific entry whose own modifier bits are all present in the word; else the plainest.
         int bits = word & 0x0700;
@@ -70,12 +78,20 @@ public static partial class TrapNames
         {
             int cb = c.Word & 0x0700;
             if ((cb & ~bits) == 0 && (best is null || PopCount(cb) > PopCount(best.Value.Word & 0x0700)))
+            {
                 best = c;
+            }
         }
         if (best is null)
+        {
             foreach (var c in candidates)
+            {
                 if (best is null || PopCount(c.Word & 0x0700) < PopCount(best.Value.Word & 0x0700))
+                {
                     best = c;
+                }
+            }
+        }
 
         var b = best!.Value;
         int extra = bits & ~(b.Word & 0x0700) & 0x0600;
@@ -93,14 +109,23 @@ public static partial class TrapNames
     public static string Describe(ushort word)
     {
         if (!IsTrap(word))
+        {
             throw new ArgumentOutOfRangeException(nameof(word), word, "Not an A-line trap word.");
+        }
+
         var info = Lookup(word);
         if (info.Name is null)
+        {
             return "_" + word.ToString("X4", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         var sb = new StringBuilder("_").Append(info.Name);
         string sep = " ,";
         if (info.AutoPop)
+        {
             sb.Append(sep).Append("AUTOPOP");
+        }
+
         foreach (string m in info.Modifiers)
         {
             sb.Append(sep).Append(m);
@@ -133,13 +158,27 @@ public static partial class TrapNames
         // Inside Macintosh writes _CmpString ,MARKS,CASE and _NewPtr ,SYS,CLEAR.
         if (kind == TrapModifierKind.String)
         {
-            if ((bits & 0x200) != 0) names.Add(Low);
-            if ((bits & 0x400) != 0) names.Add(High);
+            if ((bits & 0x200) != 0)
+            {
+                names.Add(Low);
+            }
+
+            if ((bits & 0x400) != 0)
+            {
+                names.Add(High);
+            }
         }
         else
         {
-            if ((bits & 0x400) != 0) names.Add(High);
-            if ((bits & 0x200) != 0) names.Add(Low);
+            if ((bits & 0x400) != 0)
+            {
+                names.Add(High);
+            }
+
+            if ((bits & 0x200) != 0)
+            {
+                names.Add(Low);
+            }
         }
         return names;
     }
@@ -150,7 +189,10 @@ public static partial class TrapNames
     {
         var d = new Dictionary<ushort, (string, TrapModifierKind)>(Table.Length);
         foreach (var (word, name, kind) in Table)
+        {
             d[word] = (name, kind);
+        }
+
         return d;
     }
 
@@ -160,10 +202,16 @@ public static partial class TrapNames
         foreach (var entry in Table)
         {
             if ((entry.Word & 0x0800) != 0)
+            {
                 continue;
+            }
+
             ushort key = (ushort)(entry.Word & 0xF8FF);
             if (!d.TryGetValue(key, out var list))
+            {
                 d[key] = list = [];
+            }
+
             list.Add(entry);
         }
         return d;

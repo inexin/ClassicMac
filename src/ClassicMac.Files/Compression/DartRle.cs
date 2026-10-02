@@ -16,19 +16,38 @@ namespace ClassicMac.Files.Compression
             var reader = new BigEndianReader(input);
             while (written < output.Length)
             {
-                if (!reader.TryReadInt16(out var count)) return false;
+                if (!reader.TryReadInt16(out var count))
+                {
+                    return false;
+                }
+
                 var words = Math.Abs((int)count);
-                if (written + words * 2 > output.Length) return false;
+                if (written + words * 2 > output.Length)
+                {
+                    return false;
+                }
+
                 if (count >= 0)
                 {
-                    if (!reader.TryReadBytes(words * 2, out var literal)) return false;
+                    if (!reader.TryReadBytes(words * 2, out var literal))
+                    {
+                        return false;
+                    }
+
                     literal.CopyTo(output[written..]);
                     written += words * 2;
                 }
                 else
                 {
-                    if (!reader.TryReadBytes(2, out var word)) return false;
-                    for (var n = 0; n < words; n++, written += 2) word.CopyTo(output[written..]);
+                    if (!reader.TryReadBytes(2, out var word))
+                    {
+                        return false;
+                    }
+
+                    for (var n = 0; n < words; n++, written += 2)
+                    {
+                        word.CopyTo(output[written..]);
+                    }
                 }
             }
             return true;

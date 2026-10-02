@@ -19,7 +19,11 @@ public class PefRelocatorTests
     private static PefBuilder Builder(ushort[] program, int imports, int dataLength)
     {
         var data = new BigEndianWriter();
-        for (uint o = 0; o < dataLength; o += 4) data.WriteUInt32(o);
+        for (uint o = 0; o < dataLength; o += 4)
+        {
+            data.WriteUInt32(o);
+        }
+
         var b = new PefBuilder();
         b.AddSection(PefSectionKind.Code, new byte[0x40]);
         b.AddSection(PefSectionKind.UnpackedData, data.ToArray());
@@ -134,7 +138,11 @@ public class PefRelocatorTests
     {
         // LABS 0x10; DATA; RPT 2 words once: the block is 0010 (DDAT count 16) and DATA, not LABS and DATA.
         var expected = new List<(int, PefRelocationOpcode, PefFixupTarget, int)> { (0x10, BySectD, Section, 1) };
-        for (int o = 0x14; o <= 0x50; o += 4) expected.Add((o, BySectDWithSkip, Section, 1));
+        for (int o = 0x14; o <= 0x50; o += 4)
+        {
+            expected.Add((o, BySectDWithSkip, Section, 1));
+        }
+
         expected.Add((0x54, BySectD, Section, 1));
         Expect([0xA000, 0x0010, 0x4200, 0x9100], [.. expected]);
     }

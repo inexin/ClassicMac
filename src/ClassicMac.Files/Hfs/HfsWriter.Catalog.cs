@@ -19,7 +19,10 @@ public static partial class HfsWriter
         var (parent, name) = ResolveParent(state.Records, macPath);
         EnsureAbsent(state.Records, parent, name);
         uint id = U32(new BigEndianReader(state.Result), MdbOffset + 0x1E);
-        if (id < 16 || id == uint.MaxValue) throw new InvalidDataException("The HFS volume has no available catalog ID.");
+        if (id < 16 || id == uint.MaxValue)
+        {
+            throw new InvalidDataException("The HFS volume has no available catalog ID.");
+        }
 
         var record = new byte[102];
         record[0] = 2;
@@ -35,10 +38,22 @@ public static partial class HfsWriter
         AdjustParentValence(state.Records, parent, 1);
         AddCount(state.Result, 0x1E, 1);
         AddCount(state.Result, 0x54, 1);
-        if (parent == 2) AddShortCount(state.Result, 0x0C, 1);
+        if (parent == 2)
+        {
+            AddShortCount(state.Result, 0x0C, 1);
+        }
+
         byte[] result = CommitCatalog(state);
-        if (!data.IsEmpty) result = ReplaceFork(ForkData.FromBytes(result), macPath, HfsFork.Data, data);
-        if (!resource.IsEmpty) result = ReplaceFork(ForkData.FromBytes(result), macPath, HfsFork.Resource, resource);
+        if (!data.IsEmpty)
+        {
+            result = ReplaceFork(ForkData.FromBytes(result), macPath, HfsFork.Data, data);
+        }
+
+        if (!resource.IsEmpty)
+        {
+            result = ReplaceFork(ForkData.FromBytes(result), macPath, HfsFork.Resource, resource);
+        }
+
         if (modified is not null && (!data.IsEmpty || !resource.IsEmpty))
         {
             // Fork replacement stamps its edit time. Restore the caller's file date after both forks are written.
@@ -57,26 +72,47 @@ public static partial class HfsWriter
         var (parent, name) = ResolveParent(initial.Records, macPath);
         var existing = FindCatalogRecord(initial.Records, parent, name);
         if (existing.Data is null || existing.Data.Length < 102 || existing.Data[0] != 2)
+        {
             throw new InvalidDataException("The HFS file to delete was not found.");
-        if ((existing.Data[2] & 1) != 0) throw new InvalidDataException("The HFS file is locked.");
+        }
+
+        if ((existing.Data[2] & 1) != 0)
+        {
+            throw new InvalidDataException("The HFS file is locked.");
+        }
 
         byte[] cleared = ReplaceFork(ForkData.FromBytes(initial.Source), macPath, HfsFork.Data, Array.Empty<byte>());
         cleared = ReplaceFork(ForkData.FromBytes(cleared), macPath, HfsFork.Resource, Array.Empty<byte>());
         var state = OpenCatalog(ForkData.FromBytes(cleared));
         var target = FindCatalogRecord(state.Records, parent, name);
-        if (!state.Records.Remove(target)) throw new InvalidDataException("The HFS file record disappeared during deletion.");
+        if (!state.Records.Remove(target))
+        {
+            throw new InvalidDataException("The HFS file record disappeared during deletion.");
+        }
+
         uint fileId = U32(new BigEndianReader(target.Data), 20);
         var thread = FindCatalogRecord(state.Records, fileId, "");
         if ((target.Data[2] & 2) != 0 && (thread.Data is null || thread.Data[0] != 4))
+        {
             throw new InvalidDataException("The HFS file thread is missing.");
+        }
+
         if (thread.Data is not null)
         {
-            if (thread.Data[0] != 4) throw new InvalidDataException("The HFS file has an invalid thread record.");
+            if (thread.Data[0] != 4)
+            {
+                throw new InvalidDataException("The HFS file has an invalid thread record.");
+            }
+
             state.Records.Remove(thread);
         }
         AdjustParentValence(state.Records, parent, -1);
         AddCount(state.Result, 0x54, -1);
-        if (parent == 2) AddShortCount(state.Result, 0x0C, -1);
+        if (parent == 2)
+        {
+            AddShortCount(state.Result, 0x0C, -1);
+        }
+
         return CommitCatalog(state);
     }
 
@@ -87,7 +123,11 @@ public static partial class HfsWriter
         var (parent, name) = ResolveParent(state.Records, macPath);
         EnsureAbsent(state.Records, parent, name);
         uint id = U32(new BigEndianReader(state.Result), MdbOffset + 0x1E);
-        if (id < 16 || id == uint.MaxValue) throw new InvalidDataException("The HFS volume has no available catalog ID.");
+        if (id < 16 || id == uint.MaxValue)
+        {
+            throw new InvalidDataException("The HFS volume has no available catalog ID.");
+        }
+
         uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
 
         var folder = new byte[70];
@@ -107,7 +147,11 @@ public static partial class HfsWriter
         AdjustParentValence(state.Records, parent, 1);
         AddCount(state.Result, 0x1E, 1);
         AddCount(state.Result, 0x58, 1);
-        if (parent == 2) AddShortCount(state.Result, 0x52, 1);
+        if (parent == 2)
+        {
+            AddShortCount(state.Result, 0x52, 1);
+        }
+
         return CommitCatalog(state);
     }
 
@@ -118,19 +162,32 @@ public static partial class HfsWriter
         var (parent, name) = ResolveParent(state.Records, macPath);
         var folder = FindCatalogRecord(state.Records, parent, name);
         if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
+        {
             throw new InvalidDataException("The HFS folder to delete was not found.");
+        }
+
         uint id = U32(new BigEndianReader(folder.Data), 6);
         if (state.Records.Any(record =>
                 U32(new BigEndianReader(record.Key), 2) == id && DecodeName(record.Key).Length != 0))
+        {
             throw new InvalidDataException("A nonempty HFS folder cannot be deleted.");
+        }
+
         var thread = FindCatalogRecord(state.Records, id, "");
         if (thread.Data is null || thread.Data[0] != 3)
+        {
             throw new InvalidDataException("The HFS folder thread is missing.");
+        }
+
         state.Records.Remove(folder);
         state.Records.Remove(thread);
         AdjustParentValence(state.Records, parent, -1);
         AddCount(state.Result, 0x58, -1);
-        if (parent == 2) AddShortCount(state.Result, 0x52, -1);
+        if (parent == 2)
+        {
+            AddShortCount(state.Result, 0x52, -1);
+        }
+
         return CommitCatalog(state);
     }
 
@@ -161,16 +218,24 @@ public static partial class HfsWriter
         ArgumentNullException.ThrowIfNull(image);
         byte[] source = image.ToArray();
         if (source.Length < MdbOffset + MdbSize || U16(new BigEndianReader(source), MdbOffset) != 0x4244)
+        {
             throw new InvalidDataException("The input is not a plain HFS volume.");
+        }
+
         var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
         if (U16(mdb, 0x7C) == 0x482B || (U16(mdb, 0x0A) & 0x8000) != 0)
+        {
             throw new InvalidDataException("The HFS volume is wrapped or software-locked.");
+        }
+
         uint blockSize = U32(mdb, 0x14);
         uint blockCount = U16(mdb, 0x12);
         uint firstBlock = (uint)U16(mdb, 0x1C) * BlockSize;
         if (blockSize < BlockSize || blockSize % BlockSize != 0 ||
             firstBlock + (ulong)blockCount * blockSize > (ulong)source.Length)
+        {
             throw new InvalidDataException("The HFS allocation area is invalid.");
+        }
 
         var overflow = new Dictionary<(byte Fork, uint File), List<(ushort Start, byte[] Extents)>>();
         var extentsTreeExtents = ParseExtents(mdb, 0x86);
@@ -183,7 +248,11 @@ public static partial class HfsWriter
             var key = new BigEndianReader(record.Key);
             uint id = U32(key, 2);
             ushort start = U16(key, 6);
-            if (!overflow.TryGetValue((kind, id), out var list)) overflow[(kind, id)] = list = [];
+            if (!overflow.TryGetValue((kind, id), out var list))
+            {
+                overflow[(kind, id)] = list = [];
+            }
+
             list.Add((start, record.Data));
         }
         var catalogExtents = ParseExtents(mdb, 0x96);
@@ -196,7 +265,10 @@ public static partial class HfsWriter
         int bitmapOffset = checked(U16(mdb, 0x0E) * BlockSize);
         int bitmapLength = checked(((int)blockCount + 7) / 8);
         if (bitmapOffset + bitmapLength > source.Length)
+        {
             throw new InvalidDataException("The HFS volume bitmap lies outside the image.");
+        }
+
         byte[] workingBitmap = source.AsSpan(bitmapOffset, bitmapLength).ToArray();
         ValidateBitmapFreeCount(blockCount, workingBitmap, U16(mdb, 0x22));
         ValidateExtentOwnership(blockCount, workingBitmap, extentsTreeExtents,
@@ -228,8 +300,11 @@ public static partial class HfsWriter
         }
         WriteFork(state.Result, state.FirstBlock, state.BlockSize, state.CatalogExtents, state.Catalog);
         if (state.ExtentsTreeChanged)
+        {
             WriteFork(state.Result, state.FirstBlock, state.BlockSize,
                 state.ExtentsTreeExtents, state.ExtentsTree);
+        }
+
         uint allocatedSystemBlocks = checked(state.AllocatedCatalogBlocks + state.AllocatedExtentsTreeBlocks);
         var volume = new BigEndianWriter(state.Result);
         var volumeReader = new BigEndianReader(state.Result);
@@ -237,21 +312,29 @@ public static partial class HfsWriter
         {
             ushort oldFree = U16(volumeReader, MdbOffset + 0x22);
             if (oldFree < allocatedSystemBlocks)
+            {
                 throw new InvalidDataException("The HFS free-block count cannot cover catalog growth.");
+            }
+
             volume.WriteUInt16At(MdbOffset + 0x22, oldFree - allocatedSystemBlocks);
             state.Bitmap.CopyTo(state.Result, state.BitmapOffset);
             volume.WriteUInt32At(MdbOffset + 0x92, state.Catalog.Length);
             state.Result.AsSpan(MdbOffset + 0x96, 12).Clear();
             for (int index = 0; index < Math.Min(3, state.CatalogExtents.Count); index++)
+            {
                 WriteExtent(state.Result.AsSpan(MdbOffset + 0x96, 12), index,
                     state.CatalogExtents[index].Start, state.CatalogExtents[index].Count);
+            }
+
             if (state.AllocatedExtentsTreeBlocks != 0)
             {
                 volume.WriteUInt32At(MdbOffset + 0x82, state.ExtentsTree.Length);
                 state.Result.AsSpan(MdbOffset + 0x86, 12).Clear();
                 for (int index = 0; index < state.ExtentsTreeExtents.Count; index++)
+                {
                     WriteExtent(state.Result.AsSpan(MdbOffset + 0x86, 12), index,
                         state.ExtentsTreeExtents[index].Start, state.ExtentsTreeExtents[index].Count);
+                }
             }
         }
         uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
@@ -261,18 +344,27 @@ public static partial class HfsWriter
         if (allocatedSystemBlocks != 0 && alternateMdbOffset >= 0 &&
             (ulong)alternateMdbOffset >= state.FirstBlock + (ulong)state.BlockCount * state.BlockSize &&
             U16(new BigEndianReader(state.Source), alternateMdbOffset) == 0x4244)
+        {
             state.Result.AsSpan(MdbOffset, BlockSize).CopyTo(state.Result.AsSpan(alternateMdbOffset, BlockSize));
+        }
+
         var diagnostics = new List<Diagnostic>();
         HfsReader.Instance.Read(ForkData.FromBytes(state.Result), new ContainerContext(diagnostics: diagnostics));
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
+        {
             throw new InvalidDataException("The edited HFS catalog did not reopen cleanly.");
+        }
+
         return state.Result;
     }
 
     private static void GrowCatalogTree(CatalogEditState state)
     {
         if (state.Catalog.Length > int.MaxValue - state.BlockSize)
+        {
             throw new InvalidDataException("The HFS catalog B-tree cannot grow further.");
+        }
+
         uint oldNodeCount = (uint)(state.Catalog.Length / NodeSize);
         uint nodesPerBlock = state.BlockSize / NodeSize;
         uint maxBlocks = 8;
@@ -284,17 +376,30 @@ public static partial class HfsWriter
             : AllocateRuns(state.Bitmap, checked((ushort)state.BlockCount), 1, 1)[0].Start;
         uint chosenBlocks = 0;
         while (chosenBlocks < maxBlocks && (uint)newBlock + chosenBlocks < state.BlockCount &&
-            !IsAllocated(state.Bitmap, checked((ushort)(newBlock + chosenBlocks)))) chosenBlocks++;
-        if (chosenBlocks == 0) throw new InvalidDataException("No free HFS blocks are available for catalog growth.");
+            !IsAllocated(state.Bitmap, checked((ushort)(newBlock + chosenBlocks))))
+        {
+            chosenBlocks++;
+        }
+
+        if (chosenBlocks == 0)
+        {
+            throw new InvalidDataException("No free HFS blocks are available for catalog growth.");
+        }
+
         bool extendLast = adjacent == newBlock && last.Count <= ushort.MaxValue - chosenBlocks;
         if (extendLast)
+        {
             extents[^1] = (last.Start, checked((ushort)(last.Count + chosenBlocks)));
+        }
         else
         {
             extents.Add((newBlock, checked((ushort)chosenBlocks)));
         }
         for (uint block = newBlock; block < (uint)newBlock + chosenBlocks; block++)
+        {
             SetBitmap(state.Bitmap, checked((ushort)block), allocated: true);
+        }
+
         uint addedNodes = checked(chosenBlocks * nodesPerBlock);
         uint newNodeCount = checked(oldNodeCount + addedNodes);
         byte[] grown = new byte[checked(state.Catalog.Length + (int)(chosenBlocks * state.BlockSize))];
@@ -306,8 +411,10 @@ public static partial class HfsWriter
         state.Catalog = grown;
         state.AllocatedCatalogBlocks += chosenBlocks;
         if (extents.Count > 3)
+        {
             UpdateCatalogOverflowExtents(state, newBlock, checked((ushort)chosenBlocks), extendLast,
                 checked((ushort)(extents.Take(extents.Count - (extendLast ? 0 : 1)).Sum(extent => extent.Count))));
+        }
     }
 
     private static void UpdateCatalogOverflowExtents(CatalogEditState state, ushort start,
@@ -321,16 +428,26 @@ public static partial class HfsWriter
         if (extendLast || (lastData is not null && LastExtentSlot(lastData) < 2))
         {
             if (lastRecord is null || lastData is null)
+            {
                 throw new InvalidDataException("The catalog overflow extent record is missing.");
+            }
+
             int slot = LastExtentSlot(lastData);
             if (extendLast)
             {
                 if (slot < 0 || U16(lastData, slot * 4) != state.CatalogExtents[^1].Start)
+                {
                     throw new InvalidDataException("The catalog's terminal overflow extent is inconsistent.");
+                }
+
                 WriteExtent(lastRecord.Data, slot, start: state.CatalogExtents[^1].Start,
                     count: state.CatalogExtents[^1].Count);
             }
-            else WriteExtent(lastRecord.Data, slot + 1, start, count);
+            else
+            {
+                WriteExtent(lastRecord.Data, slot + 1, start, count);
+            }
+
             UpdateTreeRecord(state.ExtentsTree, lastRecord.Key, lastRecord.Data);
         }
         else
@@ -368,7 +485,10 @@ public static partial class HfsWriter
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         if (path.StartsWith(':') || path.EndsWith(':') || path.Contains("::", StringComparison.Ordinal))
+        {
             throw new ArgumentException("Use a colon-separated HFS path without empty components.", nameof(path));
+        }
+
         string[] parts = path.Split(':');
         uint parent = 2;
         foreach (string component in parts[..^1])
@@ -376,7 +496,10 @@ public static partial class HfsWriter
             ValidateCatalogName(component);
             var folder = FindCatalogRecord(records, parent, component);
             if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
+            {
                 throw new InvalidDataException($"The HFS parent folder '{component}' was not found.");
+            }
+
             parent = U32(new BigEndianReader(folder.Data), 6);
         }
         ValidateCatalogName(parts[^1]);
@@ -392,42 +515,62 @@ public static partial class HfsWriter
         foreach (var folder in folders)
         {
             uint id = U32(new BigEndianReader(folder.Data), 6);
-            if (!folderIds.Add(id)) throw new InvalidDataException("The HFS catalog has duplicate folder IDs.");
+            if (!folderIds.Add(id))
+            {
+                throw new InvalidDataException("The HFS catalog has duplicate folder IDs.");
+            }
         }
         if (!folderIds.Contains(2) || folders.Count(folder =>
                 U32(new BigEndianReader(folder.Data), 6) == 2 && U32(new BigEndianReader(folder.Key), 2) == 1) != 1)
+        {
             throw new InvalidDataException("The HFS root folder is missing or duplicated.");
+        }
+
         foreach (var folder in folders)
         {
             var data = new BigEndianReader(folder.Data);
             uint id = U32(data, 6);
             uint parent = U32(new BigEndianReader(folder.Key), 2);
             if (id != 2 && !folderIds.Contains(parent))
+            {
                 throw new InvalidDataException("An HFS folder has no parent folder.");
+            }
+
             int children = records.Count(record => record.Data.Length > 0 && record.Data[0] is 1 or 2 &&
                 U32(new BigEndianReader(record.Key), 2) == id);
             if (U16(data, 4) != children)
+            {
                 throw new InvalidDataException("An HFS folder valence disagrees with its catalog children.");
+            }
         }
         var catalogIds = new HashSet<uint>(folderIds);
         foreach (var file in files)
         {
             if (!catalogIds.Add(U32(new BigEndianReader(file.Data), 20)))
+            {
                 throw new InvalidDataException("The HFS catalog has duplicate file or folder IDs.");
+            }
+
             if (!folderIds.Contains(U32(new BigEndianReader(file.Key), 2)))
+            {
                 throw new InvalidDataException("An HFS file has no parent folder.");
+            }
         }
         if (U32(mdb, 0x54) != files.Length || U32(mdb, 0x58) != folders.Length - 1 ||
             U16(mdb, 0x0C) != files.Count(file => U32(new BigEndianReader(file.Key), 2) == 2) ||
             U16(mdb, 0x52) != folders.Count(folder => U32(new BigEndianReader(folder.Key), 2) == 2))
+        {
             throw new InvalidDataException("The HFS volume counts disagree with its catalog records.");
+        }
     }
 
     private static void ValidateCatalogName(string name)
     {
         byte[] encoded = MacRoman.Encode(name);
         if (encoded.Length is < 1 or > 31 || name.Contains(':') || name.Contains('\0'))
+        {
             throw new ArgumentException("An HFS name must contain 1 to 31 Mac Roman bytes and no colon or null.", nameof(name));
+        }
     }
 
     private static (byte[] Key, byte[] Data) FindCatalogRecord(List<(byte[] Key, byte[] Data)> records,
@@ -440,7 +583,9 @@ public static partial class HfsWriter
     private static void EnsureAbsent(List<(byte[] Key, byte[] Data)> records, uint parent, string name)
     {
         if (FindCatalogRecord(records, parent, name).Data is not null)
+        {
             throw new InvalidDataException("An HFS catalog item with that name already exists.");
+        }
     }
 
     private static byte[] CatalogKey(uint parent, string name)
@@ -460,14 +605,24 @@ public static partial class HfsWriter
     internal static int CompareCatalogKeys(byte[] left, byte[] right)
     {
         int byParent = U32(new BigEndianReader(left), 2).CompareTo(U32(new BigEndianReader(right), 2));
-        if (byParent != 0) return byParent;
+        if (byParent != 0)
+        {
+            return byParent;
+        }
+
         int leftLength = left[6], rightLength = right[6];
         if (left.Length < 7 + leftLength || right.Length < 7 + rightLength)
+        {
             throw new InvalidDataException("An HFS catalog key has an invalid name length.");
+        }
+
         for (int index = 0; index < Math.Min(leftLength, rightLength); index++)
         {
             int comparison = CatalogNameWeights[left[7 + index]].CompareTo(CatalogNameWeights[right[7 + index]]);
-            if (comparison != 0) return comparison;
+            if (comparison != 0)
+            {
+                return comparison;
+            }
         }
         return leftLength.CompareTo(rightLength);
     }
@@ -477,32 +632,69 @@ public static partial class HfsWriter
         // Inside Macintosh: Text, RelString; the exceptions here follow the Mac OS 9 ROM rules
         // recorded in docs/formats/file-systems/hfs.md §1.11. Unlisted Mac Roman bytes keep their code order.
         var weights = new ushort[256];
-        for (int value = 0; value < weights.Length; value++) weights[value] = (ushort)(value << 8);
-        for (char value = 'a'; value <= 'z'; value++) Set(value.ToString(), (ushort)((value - 32) << 8));
+        for (int value = 0; value < weights.Length; value++)
+        {
+            weights[value] = (ushort)(value << 8);
+        }
+
+        for (char value = 'a'; value <= 'z'; value++)
+        {
+            Set(value.ToString(), (ushort)((value - 32) << 8));
+        }
+
         void Set(string chars, ushort weight)
         {
             foreach (char value in chars)
             {
                 if (!MacRoman.TryGetByte(value, out byte encoded))
+                {
                     throw new InvalidOperationException($"The HFS comparison table contains an unencodable character: {value}.");
+                }
+
                 weights[encoded] = weight;
             }
         }
 
         Set("`", 0x4180);
         Set("\u00A0", 0x2000);
-        Set("äÄ", 0x4108); Set("åÅ", 0x410C); Set("àÀ", 0x4104); Set("ãÃ", 0x410A);
-        Set("æÆ", 0x4114); Set("çÇ", 0x4310); Set("éÉ", 0x4502); Set("ñÑ", 0x4E0A);
-        Set("öÖ", 0x4F08); Set("õÕ", 0x4F0A); Set("øØ", 0x4F0E); Set("œŒ", 0x4F14);
+        Set("äÄ", 0x4108);
+        Set("åÅ", 0x410C);
+        Set("àÀ", 0x4104);
+        Set("ãÃ", 0x410A);
+        Set("æÆ", 0x4114);
+        Set("çÇ", 0x4310);
+        Set("éÉ", 0x4502);
+        Set("ñÑ", 0x4E0A);
+        Set("öÖ", 0x4F08);
+        Set("õÕ", 0x4F0A);
+        Set("øØ", 0x4F0E);
+        Set("œŒ", 0x4F14);
         Set("üÜ", 0x5508);
-        Set("á", 0x4182); Set("â", 0x4186); Set("è", 0x4584); Set("ê", 0x4586);
-        Set("ë", 0x4588); Set("í", 0x4982); Set("ì", 0x4984); Set("î", 0x4986);
-        Set("ï", 0x4988); Set("ó", 0x4F82); Set("ò", 0x4F84); Set("ô", 0x4F86);
-        Set("ú", 0x5582); Set("ù", 0x5584); Set("û", 0x5586);
-        Set("ß", 0x5382); Set("ÿ", 0x5988);
-        Set("ª", 0x4192); Set("º", 0x4F92);
-        Set("“", 0x2202); Set("”", 0x2204); Set("«", 0x2206); Set("»", 0x2208);
-        Set("‘", 0x2702); Set("’", 0x2704);
+        Set("á", 0x4182);
+        Set("â", 0x4186);
+        Set("è", 0x4584);
+        Set("ê", 0x4586);
+        Set("ë", 0x4588);
+        Set("í", 0x4982);
+        Set("ì", 0x4984);
+        Set("î", 0x4986);
+        Set("ï", 0x4988);
+        Set("ó", 0x4F82);
+        Set("ò", 0x4F84);
+        Set("ô", 0x4F86);
+        Set("ú", 0x5582);
+        Set("ù", 0x5584);
+        Set("û", 0x5586);
+        Set("ß", 0x5382);
+        Set("ÿ", 0x5988);
+        Set("ª", 0x4192);
+        Set("º", 0x4F92);
+        Set("“", 0x2202);
+        Set("”", 0x2204);
+        Set("«", 0x2206);
+        Set("»", 0x2208);
+        Set("‘", 0x2702);
+        Set("’", 0x2704);
         return weights;
     }
 
@@ -510,11 +702,18 @@ public static partial class HfsWriter
     {
         var folder = records.FirstOrDefault(record => record.Data.Length >= 70 && record.Data[0] == 1 &&
             U32(new BigEndianReader(record.Data), 6) == parent);
-        if (folder.Data is null) throw new InvalidDataException("The HFS parent folder record is missing.");
+        if (folder.Data is null)
+        {
+            throw new InvalidDataException("The HFS parent folder record is missing.");
+        }
+
         ushort value = U16(new BigEndianReader(folder.Data), 4);
         int updated = value + adjustment;
         if (updated is < 0 or > ushort.MaxValue)
+        {
             throw new InvalidDataException("The HFS parent folder valence cannot represent this change.");
+        }
+
         new BigEndianWriter(folder.Data).WriteUInt16At(4, updated);
     }
 

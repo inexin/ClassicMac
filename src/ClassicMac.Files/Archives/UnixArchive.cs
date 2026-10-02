@@ -41,7 +41,11 @@ internal static class UnixArchive
         var parts = new List<string>();
         foreach (var part in path.Split('/'))
         {
-            if (part.Length == 0 || part == ".") continue;
+            if (part.Length == 0 || part == ".")
+            {
+                continue;
+            }
+
             if (part == "..")
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.path-unsafe",
@@ -77,7 +81,10 @@ internal static class UnixArchive
         int year = (date >> 9) + 1980, month = (date >> 5) & 15, day = date & 31;
         int hour = time >> 11, minute = (time >> 5) & 63, second = (time & 31) * 2;
         if (month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(year, month) || hour > 23 || minute > 59 || second > 59)
+        {
             return null;
+        }
+
         try
         {
             return MacDate.FromDateTime(new DateTime(year, month, day, hour, minute, second));
@@ -91,10 +98,17 @@ internal static class UnixArchive
     /// <summary>A Unicode name in Mac Roman, characters Mac Roman lacks becoming '?'.</summary>
     public static MacString ToMacString(string name)
     {
-        if (MacRoman.TryEncode(name, out var bytes)) return new MacString(bytes);
+        if (MacRoman.TryEncode(name, out var bytes))
+        {
+            return new MacString(bytes);
+        }
+
         var result = new List<byte>(name.Length);
         foreach (var c in name.Normalize(System.Text.NormalizationForm.FormC))
+        {
             result.Add(MacRoman.TryGetByte(c, out var b) ? b : (byte)'?');
+        }
+
         return new MacString(result.ToArray());
     }
 
@@ -114,8 +128,16 @@ internal static class UnixArchive
 
         foreach (var entry in entries)
         {
-            if (entry.Path.Length == 0) continue;
-            for (var i = 1; i < entry.Path.Length; i++) folders.Add(Key(entry.Path[..i]));
+            if (entry.Path.Length == 0)
+            {
+                continue;
+            }
+
+            for (var i = 1; i < entry.Path.Length; i++)
+            {
+                folders.Add(Key(entry.Path[..i]));
+            }
+
             if (entry.IsDirectory)
             {
                 folders.Add(Key(entry.Path));
@@ -130,7 +152,11 @@ internal static class UnixArchive
             if (name.Length > 2 && name.StartsWith("._", StringComparison.Ordinal) && entry.SymbolicLinkTarget is null)
             {
                 var folder = entry.Path[..^1];
-                if (folder.Length > 0 && folder[0] == MacOsXFolder) folder = folder[1..];
+                if (folder.Length > 0 && folder[0] == MacOsXFolder)
+                {
+                    folder = folder[1..];
+                }
+
                 doubles.Add(([.. folder, name[2..]], entry));
                 continue;
             }
@@ -155,7 +181,11 @@ internal static class UnixArchive
                 Add(entry);
                 continue;
             }
-            if (Find(target) is null && folders.Contains(Key(target))) continue; // A folder's Finder info: not kept.
+            if (Find(target) is null && folders.Contains(Key(target)))
+            {
+                continue; // A folder's Finder info: not kept.
+            }
+
             MacFile parts;
             try
             {

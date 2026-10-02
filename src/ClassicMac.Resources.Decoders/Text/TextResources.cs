@@ -31,10 +31,18 @@ namespace ClassicMac.Resources.Decoders.Text
         {
             var strings = new List<string>();
             var reader = new BigEndianReader(data);
-            if (!reader.TryReadUInt16(out ushort count)) return strings;
+            if (!reader.TryReadUInt16(out ushort count))
+            {
+                return strings;
+            }
+
             for (var i = 0; i < count && reader.TryReadByte(out byte length); i++)
             {
-                if (!reader.TryReadBytes(length, out var text)) break;
+                if (!reader.TryReadBytes(length, out var text))
+                {
+                    break;
+                }
+
                 strings.Add(FromMac(text));
             }
             return strings;
@@ -45,10 +53,18 @@ namespace ClassicMac.Resources.Decoders.Text
         public static byte[] WriteStringList(IReadOnlyList<string> strings)
         {
             ArgumentNullException.ThrowIfNull(strings);
-            if (strings.Count > ushort.MaxValue) throw new ArgumentException("A string list holds at most 65535 strings.", nameof(strings));
+            if (strings.Count > ushort.MaxValue)
+            {
+                throw new ArgumentException("A string list holds at most 65535 strings.", nameof(strings));
+            }
+
             var writer = new BigEndianWriter();
             writer.WriteUInt16(strings.Count);
-            foreach (var s in strings) writer.WriteBytes(Pascal(s));
+            foreach (var s in strings)
+            {
+                writer.WriteBytes(Pascal(s));
+            }
+
             return writer.ToArray();
         }
 
@@ -64,18 +80,34 @@ namespace ClassicMac.Resources.Decoders.Text
         public static (byte[] Text, byte[]? Styl) WriteText(ReadOnlySpan<byte> oldText, ReadOnlyMemory<byte> styl, string newText, bool hasStyl)
         {
             var text = ToMac(newText);
-            if (!hasStyl) return (text, null);
+            if (!hasStyl)
+            {
+                return (text, null);
+            }
+
             int prefix = 0, suffix = 0;
-            while (prefix < oldText.Length && prefix < text.Length && oldText[prefix] == text[prefix]) prefix++;
+            while (prefix < oldText.Length && prefix < text.Length && oldText[prefix] == text[prefix])
+            {
+                prefix++;
+            }
+
             while (suffix < oldText.Length - prefix && suffix < text.Length - prefix
-                   && oldText[oldText.Length - 1 - suffix] == text[text.Length - 1 - suffix]) suffix++;
+                   && oldText[oldText.Length - 1 - suffix] == text[text.Length - 1 - suffix])
+            {
+                suffix++;
+            }
+
             int oldEnd = oldText.Length - suffix, newEnd = text.Length - suffix;
             var runs = StyleRuns.Read(styl, out _);
             StyleRun? Covering(int at) => runs.LastOrDefault(r => r.Start <= at) ?? runs.FirstOrDefault();
             // Before the change: as it was (the run the change starts in also styles the new text). After it: the text that
             // was there keeps its style, whether its run began before the change or after.
             var kept = runs.Where(r => r.Start <= prefix).ToList();
-            if (suffix > 0 && Covering(oldEnd) is { } tail && tail.Start > prefix && tail.Start < oldEnd) kept.Add(tail with { Start = newEnd });
+            if (suffix > 0 && Covering(oldEnd) is { } tail && tail.Start > prefix && tail.Start < oldEnd)
+            {
+                kept.Add(tail with { Start = newEnd });
+            }
+
             kept.AddRange(runs.Where(r => r.Start >= oldEnd && r.Start > prefix).Select(r => r with { Start = r.Start - oldEnd + newEnd }));
             // One run per start (the later wins); none past the end but the first.
             kept = kept.GroupBy(r => r.Start).Select(g => g.Last()).OrderBy(r => r.Start).ToList();
@@ -86,7 +118,11 @@ namespace ClassicMac.Resources.Decoders.Text
         private static byte[] Pascal(string text)
         {
             var bytes = ToMac(text);
-            if (bytes.Length > 255) throw new ArgumentException($"A Pascal string holds at most 255 bytes; this is {bytes.Length}.", nameof(text));
+            if (bytes.Length > 255)
+            {
+                throw new ArgumentException($"A Pascal string holds at most 255 bytes; this is {bytes.Length}.", nameof(text));
+            }
+
             return [(byte)bytes.Length, .. bytes];
         }
 
@@ -113,14 +149,22 @@ namespace ClassicMac.Resources.Decoders.Text
         public static VersionResource? Read(ReadOnlyMemory<byte> data)
         {
             var bytes = data.Span;
-            if (bytes.Length < 7) return null;
+            if (bytes.Length < 7)
+            {
+                return null;
+            }
+
             static int Bcd(byte b) => (b >> 4) * 10 + (b & 0x0F);
             var nonRelease = (bytes[3] >> 4) <= 9 && (bytes[3] & 0x0F) <= 9 ? Bcd(bytes[3]) : bytes[3];
             var offset = 6;
             MacText.TryReadPascal(bytes, ref offset, out var shortText);
             var shortVersion = MacRoman.Decode(shortText);
             var longVersion = "";
-            if (offset < bytes.Length && MacText.TryReadPascal(bytes, ref offset, out var longText)) longVersion = MacRoman.Decode(longText).Replace('\r', '\n');
+            if (offset < bytes.Length && MacText.TryReadPascal(bytes, ref offset, out var longText))
+            {
+                longVersion = MacRoman.Decode(longText).Replace('\r', '\n');
+            }
+
             var reader = new BigEndianReader(data);
             return new VersionResource(Bcd(bytes[0]), bytes[1] >> 4, bytes[1] & 0x0F, bytes[2], nonRelease, reader.ReadInt16At(4),
                 shortVersion, longVersion);
@@ -131,7 +175,10 @@ namespace ClassicMac.Resources.Decoders.Text
         public byte[] Write()
         {
             if (Major is < 0 or > 99 || Minor is < 0 or > 15 || BugFix is < 0 or > 15 || NonRelease is < 0 or > 99)
+            {
                 throw new ArgumentException("The version is major 0–99, minor and bug fix 0–15, non-release 0–99.");
+            }
+
             static byte Bcd(int v) => (byte)((v / 10 << 4) | (v % 10));
             var writer = new BigEndianWriter();
             writer.WriteByte(Bcd(Major));

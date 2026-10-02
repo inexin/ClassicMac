@@ -35,7 +35,10 @@ public class CorpusExportTests : IDisposable
     [Fact]
     public void Corpus_exports_without_decoder_errors()
     {
-        if (!CorpusFolders.Any) Assert.Skip("Set CLASSICMAC_CORPUS to one or more corpus folders (separated by ';') to run this.");
+        if (!CorpusFolders.Any)
+        {
+            Assert.Skip("Set CLASSICMAC_CORPUS to one or more corpus folders (separated by ';') to run this.");
+        }
 
         var decoders = ResourceDecoders.Create();
         var converters = ResourceDecoders.CreateDocumentConverters();
@@ -66,21 +69,41 @@ public class CorpusExportTests : IDisposable
                 continue;
             }
             foreach (var d in inputDiagnostics)
+            {
                 Count(d.Severity == DiagnosticSeverity.Error ? damaged : warnings, d.Code);
-            if (forks.Count == 0) continue;
+            }
+
+            if (forks.Count == 0)
+            {
+                continue;
+            }
 
             var sha = Sha256([path, .. companions.Order(StringComparer.Ordinal)]); // a fork may be in a companion file
-            if (summaries.ContainsKey(sha)) continue;
+            if (summaries.ContainsKey(sha))
+            {
+                continue;
+            }
+
             var output = Path.Combine(folder, (target++).ToString(System.Globalization.CultureInfo.InvariantCulture));
             var exported = new List<(string Source, Diagnostic Diagnostic)>();
             var result = Unpacker.Extract(root, forks, output, ExportOptions.Default with { Decoders = decoders, Documents = converters, KeepRaw = true }, exported);
             var name = Path.GetFileName(path);
             var damageTest = CorpusFolders.IsDamageTest(path);
-            foreach (var failure in result.Failed) failures.Add($"{name}: {failure}");
+            foreach (var failure in result.Failed)
+            {
+                failures.Add($"{name}: {failure}");
+            }
+
             foreach (var (source, d) in exported)
             {
-                if (d.Severity == DiagnosticSeverity.Error && damageTest) Count(damaged, d.Code);
-                else if (d.Severity == DiagnosticSeverity.Error || d.Code == "export.decoder-failed") failures.Add($"{name} > {source}: {d.Message} [{d.Code}]");
+                if (d.Severity == DiagnosticSeverity.Error && damageTest)
+                {
+                    Count(damaged, d.Code);
+                }
+                else if (d.Severity == DiagnosticSeverity.Error || d.Code == "export.decoder-failed")
+                {
+                    failures.Add($"{name} > {source}: {d.Message} [{d.Code}]");
+                }
                 else
                 {
                     Count(warnings, d.Code);
@@ -100,14 +123,19 @@ public class CorpusExportTests : IDisposable
                 // Phase 5's exit check: the export packs back into a fork with every resource's stored bytes unchanged.
                 var packed = ResourcePacker.Pack(directory);
                 foreach (var d in packed.Diagnostics.Where(d => d.Severity != DiagnosticSeverity.Info))
+                {
                     failures.Add($"{name} > {relative}: pack: {d.Message} [{d.Code}]");
+                }
+
                 var entries = manifest.RootElement.GetProperty("resources").EnumerateArray().ToList();
                 for (var i = 0; i < Math.Min(entries.Count, packed.Fork.Resources.Count); i++)
                 {
                     var r = packed.Fork.Resources[i];
                     if (Convert.ToHexStringLower(SHA256.HashData(r.GetData().Span)) != entries[i].GetProperty("storedSha256").GetString()
                         || (int)r.Attributes != entries[i].GetProperty("attributes").GetInt32())
+                    {
                         failures.Add($"{name} > {relative}: '{r.Type}' {r.Id} does not pack back as it was stored");
+                    }
                 }
                 foreach (var r in manifest.RootElement.GetProperty("resources").EnumerateArray())
                 {
@@ -116,7 +144,11 @@ public class CorpusExportTests : IDisposable
                     var id = r.GetProperty("id").GetInt32();
                     var filePath = r.GetProperty("path").GetString()!;
                     var fileSha = r.GetProperty("sha256").GetString()!;
-                    if (Sha256(Path.Combine(directory, filePath)) != fileSha) failures.Add($"{name} > {relative}/{filePath}: hash differs from its manifest");
+                    if (Sha256(Path.Combine(directory, filePath)) != fileSha)
+                    {
+                        failures.Add($"{name} > {relative}/{filePath}: hash differs from its manifest");
+                    }
+
                     outputs.Add($"{relative}/{filePath} {fileSha}");
                     if (r.GetProperty("decoder").GetString() != "raw")
                     {
@@ -126,7 +158,9 @@ public class CorpusExportTests : IDisposable
                     {
                         raw++;
                         if (decoders.Any(d => d.CanDecode(type)) && !allowlist.Any(a => a.Sha256 == sha && a.Type == type.ToString() && a.Id == id))
+                        {
                             failures.Add($"{name} > {relative}: '{type}' {id} was left raw although a decoder handles its type");
+                        }
                     }
                 }
                 if (manifest.RootElement.GetProperty("document") is { ValueKind: JsonValueKind.Object } document)
@@ -135,7 +169,11 @@ public class CorpusExportTests : IDisposable
                     foreach (var f in document.GetProperty("files").EnumerateArray())
                     {
                         var (filePath, fileSha) = (f.GetProperty("path").GetString()!, f.GetProperty("sha256").GetString()!);
-                        if (Sha256(Path.Combine(directory, filePath)) != fileSha) failures.Add($"{name} > {relative}/{filePath}: hash differs from its manifest");
+                        if (Sha256(Path.Combine(directory, filePath)) != fileSha)
+                        {
+                            failures.Add($"{name} > {relative}/{filePath}: hash differs from its manifest");
+                        }
+
                         outputs.Add($"{relative}/{filePath} {fileSha}");
                     }
                 }
@@ -152,7 +190,10 @@ public class CorpusExportTests : IDisposable
         TestContext.Current.SendDiagnosticMessage(summary);
         // CLASSICMAC_CORPUS_REPORT names a file for the summary and every export warning, for a look.
         if (Environment.GetEnvironmentVariable("CLASSICMAC_CORPUS_REPORT") is { Length: > 0 } report)
+        {
             File.WriteAllLines(report, [summary, .. failures, .. details]);
+        }
+
         Assert.True(failures.Count == 0, $"{failures.Count} decoder failures:\n" + string.Join('\n', failures.Take(50)));
         Assert.True(changes.Count == 0, "Outputs changed from the baseline (if intended, run with CLASSICMAC_UPDATE_BASELINE=1):\n"
             + string.Join('\n', changes.Take(50)));
@@ -171,15 +212,26 @@ public class CorpusExportTests : IDisposable
         var forks = new List<ForkToExtract>();
         if (input.IsPlain && input.Root.File.ResourceFork.Length == 0)
         {
-            if (!MacFileResources.LooksLikeFork(input.Root.File.DataFork)) return forks;
+            if (!MacFileResources.LooksLikeFork(input.Root.File.DataFork))
+            {
+                return forks;
+            }
+
             var raw = MacFileResources.ReadRaw(input.Root.File.DataFork, ReadOptions.Default, diagnostics);
-            if (raw.Fork is { Resources.Count: > 0 } fork) forks.Add(new ForkToExtract(input.Root, ["raw resource fork"], fork));
+            if (raw.Fork is { Resources.Count: > 0 } fork)
+            {
+                forks.Add(new ForkToExtract(input.Root, ["raw resource fork"], fork));
+            }
+
             return forks;
         }
         foreach (var (node, chain) in input.Leaves)
         {
             var found = MacFileResources.Read(node.File, ReadOptions.Default, diagnostics);
-            if (found.Fork is { Resources.Count: > 0 } fork) forks.Add(new ForkToExtract(node, chain, fork));
+            if (found.Fork is { Resources.Count: > 0 } fork)
+            {
+                forks.Add(new ForkToExtract(node, chain, fork));
+            }
         }
         return forks;
     }
@@ -193,7 +245,11 @@ public class CorpusExportTests : IDisposable
         var known = baseline.ToDictionary(s => s.Sha256, StringComparer.Ordinal);
         if (Environment.GetEnvironmentVariable("CLASSICMAC_UPDATE_BASELINE") == "1")
         {
-            foreach (var s in current) known[s.Sha256] = s;
+            foreach (var s in current)
+            {
+                known[s.Sha256] = s;
+            }
+
             var sorted = known.Values.OrderBy(s => s.Name, StringComparer.Ordinal).ThenBy(s => s.Sha256, StringComparer.Ordinal).ToList();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, JsonSerializer.Serialize(sorted, JsonOptions).ReplaceLineEndings("\n") + "\n");
@@ -203,10 +259,20 @@ public class CorpusExportTests : IDisposable
         var added = 0;
         foreach (var s in current)
         {
-            if (!known.TryGetValue(s.Sha256, out var before)) added++;
-            else if (before with { Name = s.Name } != s) changes.Add($"{s.Name}: {Describe(before)} → {Describe(s)}");
+            if (!known.TryGetValue(s.Sha256, out var before))
+            {
+                added++;
+            }
+            else if (before with { Name = s.Name } != s)
+            {
+                changes.Add($"{s.Name}: {Describe(before)} → {Describe(s)}");
+            }
         }
-        if (added > 0) TestContext.Current.SendDiagnosticMessage($"{added} inputs are not in the baseline yet.");
+        if (added > 0)
+        {
+            TestContext.Current.SendDiagnosticMessage($"{added} inputs are not in the baseline yet.");
+        }
+
         return changes;
     }
 
@@ -231,7 +297,11 @@ public class CorpusExportTests : IDisposable
     private static string Sha256(IEnumerable<string> paths)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        foreach (var path in paths) hash.AppendData(File.ReadAllBytes(path));
+        foreach (var path in paths)
+        {
+            hash.AppendData(File.ReadAllBytes(path));
+        }
+
         return Convert.ToHexStringLower(hash.GetHashAndReset());
     }
 

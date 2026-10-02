@@ -37,7 +37,11 @@ public class ContainerWriterTests
             (actual.FinderInfo.Type, actual.FinderInfo.Creator, actual.FinderInfo.Flags));
         Assert.Equal(expected.DataFork.ToArray(), actual.DataFork.ToArray());
         Assert.Equal(expected.ResourceFork.ToArray(), actual.ResourceFork.ToArray());
-        if (dates) Assert.Equal((expected.Created, expected.Modified), (actual.Created, actual.Modified));
+        if (dates)
+        {
+            Assert.Equal((expected.Created, expected.Modified), (actual.Created, actual.Modified));
+        }
+
         if (extended)
         {
             Assert.Equal((expected.FinderInfo.Location, expected.FinderInfo.Folder), (actual.FinderInfo.Location, actual.FinderInfo.Folder));

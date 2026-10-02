@@ -33,8 +33,13 @@ public class PortTests
     {
         var data = new TheoryData<string, QuickDrawVersion>();
         foreach (var name in Drawings.Keys)
+        {
             foreach (var version in new[] { QuickDrawVersion.MacOS9, QuickDrawVersion.MacRom })
+            {
                 data.Add(name, version);
+            }
+        }
+
         return data;
     }
 
@@ -101,7 +106,8 @@ public class PortTests
             var region = Region.FromRect(R(3, 3, 12, 12)).Union(Region.FromRect(R(8, 8, 20, 22)));
             b.U16(0x0080).Bytes(region.ToRgnData()).Align();
             b.U16(0x000A).Bytes(QuickDrawPattern.LightGray.Bits.ToArray()).U16(0x0084).Bytes(region.Offset(15, 5).ToRgnData()).Align();
-        }),
+        }
+        ),
 
         ["clip, hilite"] = (p =>
         {
@@ -128,7 +134,8 @@ public class PortTests
                 .U16(0x0090).U16(1).Rect(0, 0, 8, 8).Rect(0, 0, 8, 8).Rect(2, 3, 26, 35).U16(0).Bytes(bits).Align()
                 .U16(0x0091).U16(1).Rect(0, 0, 8, 8).Rect(2, 2, 6, 8).Rect(20, 20, 28, 39).U16(2)
                 .Bytes(Region.Oval(R(18, 18, 30, 40)).ToRgnData()).Bytes(bits).Align();
-        }),
+        }
+        ),
 
         ["text"] = (p =>
         {
@@ -152,7 +159,10 @@ public class PortTests
     {
         int top = points.Min(p => p.v), left = points.Min(p => p.h), bottom = points.Max(p => p.v), right = points.Max(p => p.h);
         b.U16(opcode).U16(10 + 4 * points.Length).Rect(top, left, bottom, right);
-        foreach (var (v, h) in points) b.Point(v, h);
+        foreach (var (v, h) in points)
+        {
+            b.Point(v, h);
+        }
     }
 
     [Theory]
@@ -260,9 +270,17 @@ public class PortTests
     private static byte[] Picture(bool clip, params (int top, int left, int bottom, int right)[] paints)
     {
         var b = PictBuilder.V2(0, 0, Height, Width);
-        if (clip) b.Align().U16(0x0001).U16(10).Rect(0, 0, Height, Width);
+        if (clip)
+        {
+            b.Align().U16(0x0001).U16(10).Rect(0, 0, Height, Width);
+        }
+
         b.U16(0x001A).Rgb(0, 0, 0xFFFF);
-        foreach (var (top, left, bottom, right) in paints) b.U16(0x0031).Rect(top, left, bottom, right);
+        foreach (var (top, left, bottom, right) in paints)
+        {
+            b.U16(0x0031).Rect(top, left, bottom, right);
+        }
+
         return b.Align().U16(0x00FF).ToArray();
     }
 
@@ -330,7 +348,10 @@ public class PortTests
             R(0, 0, size, size));
         var colours = Enumerable.Range(0, size).Select(x => port.Canvas[x, 0]).Distinct().ToList();
         Assert.Equal(imageKept ? 2 : 1, colours.Count);
-        if (!imageKept) Assert.Equal(new RgbaColor(0, 0, 0), colours[0]);
+        if (!imageKept)
+        {
+            Assert.Equal(new RgbaColor(0, 0, 0), colours[0]);
+        }
     }
 
     [Fact]

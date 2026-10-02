@@ -51,12 +51,22 @@ namespace ClassicMac.Resources.Cli
                 error.WriteLine(e.Message);
                 return ExitCodes.IoError;
             }
-            foreach (var (source, diagnostic) in found) reporter.Write(source == input.Name ? input.Name : $"{input.Name} > {source}", [diagnostic]);
-            foreach (var failure in result.Failed) error.WriteLine(failure);
+            foreach (var (source, diagnostic) in found)
+            {
+                reporter.Write(source == input.Name ? input.Name : $"{input.Name} > {source}", [diagnostic]);
+            }
+
+            foreach (var failure in result.Failed)
+            {
+                error.WriteLine(failure);
+            }
 
             if (!quiet)
             {
-                foreach (var (macPath, document) in result.Documents) output.WriteLine($"{macPath}: {document.Path}");
+                foreach (var (macPath, document) in result.Documents)
+                {
+                    output.WriteLine($"{macPath}: {document.Path}");
+                }
             }
             output.WriteLine(result.Documents.Count == 0 ? $"No documents in {input.Name}." : $"{result.Documents.Count} document{(result.Documents.Count == 1 ? "" : "s")}, to {root}");
             return result.Failed.Count > 0 ? ExitCodes.IoError : reporter.ExitCode;

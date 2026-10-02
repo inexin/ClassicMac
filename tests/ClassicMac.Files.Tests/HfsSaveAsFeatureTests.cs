@@ -20,7 +20,10 @@ public sealed class HfsSaveAsFeatureTests
         builder.File(HfsBuilder.Root, "Other", otherData, otherResource);
         byte[] sourceImage = PadToInteropVolume(builder.Build("Volume"));
         if (Environment.GetEnvironmentVariable("CLASSICMAC_HFS_INTEROP_SOURCE") is { Length: > 0 } sourceArtifact)
+        {
             System.IO.File.WriteAllBytes(sourceArtifact, sourceImage);
+        }
+
         string directory = Path.Combine(Path.GetTempPath(), "cm-hfs-save-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         try
@@ -36,7 +39,10 @@ public sealed class HfsSaveAsFeatureTests
             Assert.Equal(sourceImage, System.IO.File.ReadAllBytes(sourcePath));
             byte[] savedImage = System.IO.File.ReadAllBytes(outputPath);
             if (Environment.GetEnvironmentVariable("CLASSICMAC_HFS_INTEROP_IMAGE") is { Length: > 0 } interopPath)
+            {
                 System.IO.File.WriteAllBytes(interopPath, savedImage);
+            }
+
             MacFile savedTarget = Assert.Single(Read(savedImage), file => file.MacPath == "Target");
             MacFile savedOther = Assert.Single(Read(savedImage), file => file.MacPath == "Other");
             Assert.Equal("Target data"u8.ToArray(), savedTarget.DataFork.ToArray());
@@ -113,7 +119,10 @@ public sealed class HfsSaveAsFeatureTests
     {
         string? sourcePath = Environment.GetEnvironmentVariable("CLASSICMAC_HFS_INTEROP_INPUT");
         string? outputPath = Environment.GetEnvironmentVariable("CLASSICMAC_HFS_INTEROP_OUTPUT");
-        if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(outputPath)) return;
+        if (string.IsNullOrEmpty(sourcePath) || string.IsNullOrEmpty(outputPath))
+        {
+            return;
+        }
 
         byte[] original = System.IO.File.ReadAllBytes(sourcePath);
         MacFile target = Assert.Single(Read(original), file => file.MacPath == "Target");

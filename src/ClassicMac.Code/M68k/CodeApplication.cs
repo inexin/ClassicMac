@@ -149,7 +149,13 @@ namespace ClassicMac.Code.M68k
         public CodeSegment? FindSegment(short id)
         {
             foreach (var segment in Segments)
-                if (segment.Id == id) return segment;
+            {
+                if (segment.Id == id)
+                {
+                    return segment;
+                }
+            }
+
             return null;
         }
 
@@ -161,7 +167,11 @@ namespace ClassicMac.Code.M68k
         public JumpTableEntry? ResolveA5(int displacement)
         {
             long d = (long)displacement - 2 - JumpTableOffset;
-            if (d < 0 || d % EntryLength != 0) return null;
+            if (d < 0 || d % EntryLength != 0)
+            {
+                return null;
+            }
+
             long index = d / EntryLength;
             return index < JumpTable.Count
                 && JumpTable[(int)index] is { Kind: not (JumpTableEntryKind.FarMarker or JumpTableEntryKind.Unrecognized) } entry
@@ -184,7 +194,10 @@ namespace ClassicMac.Code.M68k
             var code0Resource = fork.Find(CodeType, 0)
                 ?? throw new InvalidDataException("Not a 68k application: there is no 'CODE' 0.");
             if (!TryGetData(code0Resource, out var code0))
+            {
                 throw new InvalidDataException("'CODE' 0 is compressed and could not be decompressed.");
+            }
+
             var app = new CodeApplication();
             app.ReadJumpTable(code0, diagnostics);
 
@@ -193,13 +206,22 @@ namespace ClassicMac.Code.M68k
             {
                 bool readable = TryGetData(resource, out var data);
                 var segment = new CodeSegment(resource, data, readable);
-                if (readable) segment.Header = SegmentHeader.Read(data, diagnostics);
+                if (readable)
+                {
+                    segment.Header = SegmentHeader.Read(data, diagnostics);
+                }
+
                 if (segment.Header is { IsFar: true } far)
                 {
                     if (far.A5RelocationOffset != 0)
+                    {
                         segment.A5Relocations = FarRelocations.Read(data, far.A5RelocationOffset, diagnostics);
+                    }
+
                     if (far.PcRelocationOffset != 0)
+                    {
                         segment.PcRelocations = FarRelocations.Read(data, far.PcRelocationOffset, diagnostics);
+                    }
                 }
                 segments.Add(segment);
             }
@@ -232,21 +254,33 @@ namespace ClassicMac.Code.M68k
                 }
                 foreach (var rela in relas)
                 {
-                    if (!TryGetData(rela, out var relaData)) continue;
+                    if (!TryGetData(rela, out var relaData))
+                    {
+                        continue;
+                    }
+
                     if (rela.Id == 0)
                     {
                         if (data0 is null)
+                        {
                             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.rela-target",
                                 "'RELA' 0 has no 'DATA' 0 to relocate; not read."));
+                        }
                         else if (data0Image is { } readable)
+                        {
                             app.DataRelocations = Retro68Relocations.Read(relaData, 0, readable.Length, diagnostics);
+                        }
                     }
                     else if (app.FindSegment(rela.Id) is not { } target)
+                    {
                         diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.rela-target",
                             $"'RELA' {rela.Id} has no 'CODE' {rela.Id} to relocate; not read."));
+                    }
                     else if (target.IsReadable)
+                    {
                         target.Retro68Relocations = Retro68Relocations.Read(relaData,
                             Retro68Relocations.CodeStart(target.Data.Span), target.Data.Length, diagnostics);
+                    }
                 }
             }
             else if (data0 is not null && app.FindSegment(1) is { IsReadable: true } code1 && StartsWithCodeWarriorStartup(code1.Data.Span))
@@ -265,16 +299,24 @@ namespace ClassicMac.Code.M68k
                 }
             }
             else if (app.IsFarModel && segments.Any(s => s.Header is { IsFar: true, NearCount: > 0 }))
+            {
                 app.Model = CodeModel.MpwFar;
+            }
             else if (!segments.Any(s => s.Header is { IsFar: true }) && app.A5Init is not null)
+            {
                 app.Model = CodeModel.MpwNear;
+            }
+
             return app;
 
             bool TryGetData(Resource resource, out ReadOnlyMemory<byte> data)
             {
                 data = decompression.GetData(resource, fork, null, diagnostics);
                 if ((resource.Attributes & ResourceAttributes.Compressed) == 0 || !CompressedResourceHeader.HasSignature(data))
+                {
                     return true;
+                }
+
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "code.compressed",
                     $"{resource}: compressed and could not be decompressed; its code is not read."));
                 return false;
@@ -290,14 +332,20 @@ namespace ClassicMac.Code.M68k
         {
             var reader = new BigEndianReader(code0);
             if (reader.Length < Code0HeaderLength)
+            {
                 throw new InvalidDataException($"'CODE' 0 is {reader.Length} bytes, shorter than its {Code0HeaderLength}-byte header.");
+            }
+
             AboveA5 = reader.ReadUInt32();
             BelowA5 = reader.ReadUInt32();
             JumpTableSize = reader.ReadUInt32();
             JumpTableOffset = reader.ReadUInt32();
             if (JumpTableSize % EntryLength != 0)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.jt-size",
                     $"The jump table's size {JumpTableSize} is not a multiple of 8; the last {JumpTableSize % EntryLength} bytes are ignored.", 8));
+            }
+
             long count = JumpTableSize / EntryLength;
             if (count > reader.Remaining / EntryLength)
             {
@@ -306,8 +354,10 @@ namespace ClassicMac.Code.M68k
                 count = reader.Remaining / EntryLength;
             }
             if (AboveA5 < (long)JumpTableOffset + JumpTableSize)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.above-a5",
                     $"The {AboveA5} bytes above A5 do not hold the jump table (offset {JumpTableOffset}, {JumpTableSize} bytes).", 0));
+            }
 
             var entries = new List<JumpTableEntry>((int)count);
             for (int i = 0; i < count; i++)
@@ -323,12 +373,18 @@ namespace ClassicMac.Code.M68k
                     entry = new JumpTableEntry(i, a5, JumpTableEntryKind.FarMarker, 0, 0, 0, raw);
                 }
                 else if (w1 == MoveWToStack && w3 == LoadSeg)
+                {
                     entry = new JumpTableEntry(i, a5, JumpTableEntryKind.NearUnloaded, (short)w2, w0, 0, raw);
+                }
                 else if (w1 == LoadSeg)
+                {
                     entry = new JumpTableEntry(i, a5, JumpTableEntryKind.FarUnloaded, (short)w0, (uint)raw, 0, raw);
+                }
                 else if (w1 == JmpAbsoluteLong)
+                {
                     entry = new JumpTableEntry(i, a5, IsFarModel && i >= 2 ? JumpTableEntryKind.FarLoaded : JumpTableEntryKind.NearLoaded,
                         (short)w0, 0, (uint)raw, raw);
+                }
                 else
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.jt-entry",
@@ -345,17 +401,27 @@ namespace ClassicMac.Code.M68k
         {
             foreach (var entry in JumpTable)
             {
-                if (entry.ResourceOffset is not { } offset) continue;
+                if (entry.ResourceOffset is not { } offset)
+                {
+                    continue;
+                }
+
                 var segment = FindSegment(entry.Segment);
                 if (segment is null)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.segment-missing",
                         $"Jump-table entry {entry.Index} names 'CODE' {entry.Segment}, which does not exist."));
+                }
                 else if (segment.IsReadable && offset >= segment.Data.Length)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.entry-range",
                         $"Jump-table entry {entry.Index} points at {offset:X} in 'CODE' {entry.Segment}, past its {segment.Data.Length} bytes."));
+                }
                 else if (segment.Header is { } header && offset < header.Length)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.entry-header",
                         $"Jump-table entry {entry.Index} points at {offset:X} in 'CODE' {entry.Segment}, inside its {header.Length}-byte header."));
+                }
             }
         }
 
@@ -363,8 +429,10 @@ namespace ClassicMac.Code.M68k
         private void CheckBelowA5(uint size, string what, ICollection<Diagnostic> diagnostics)
         {
             if (size > BelowA5)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "m68k.below-a5",
                     $"{what} take {size} bytes; 'CODE' 0 has {BelowA5} below A5."));
+            }
         }
 
         // Entry 0; and the bootstrap shape: a near segment entered at +$10 that holds the table's A5 offset at +4 and the
@@ -377,14 +445,30 @@ namespace ClassicMac.Code.M68k
                 return;
             }
             var first = JumpTable[0];
-            if (first.ResourceOffset is not { } offset) return;
+            if (first.ResourceOffset is not { } offset)
+            {
+                return;
+            }
+
             Entry = new CodeEntryPoint(first.Segment, first.Offset, offset);
-            if (first.Kind != JumpTableEntryKind.NearUnloaded || offset != BootstrapEntry) return;
+            if (first.Kind != JumpTableEntryKind.NearUnloaded || offset != BootstrapEntry)
+            {
+                return;
+            }
+
             if (FindSegment(first.Segment) is not { IsReadable: true, Header.IsFar: false } segment
-                || segment.Data.Length < BootstrapEntry) return;
+                || segment.Data.Length < BootstrapEntry)
+            {
+                return;
+            }
+
             var reader = new BigEndianReader(segment.Data);
             if (reader.ReadUInt32At(4) != JumpTableOffset
-                || reader.ReadUInt16At(10) != MoveWToStack || reader.ReadUInt16At(14) != LoadSeg) return;
+                || reader.ReadUInt16At(10) != MoveWToStack || reader.ReadUInt16At(14) != LoadSeg)
+            {
+                return;
+            }
+
             ushort savedOffset = reader.ReadUInt16At(8);
             OriginalEntry = new CodeEntryPoint(reader.ReadInt16At(12), savedOffset, savedOffset + 4L);
         }

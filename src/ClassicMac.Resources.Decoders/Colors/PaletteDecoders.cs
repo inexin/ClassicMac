@@ -29,7 +29,11 @@ namespace ClassicMac.Resources.Decoders.Colors
             flags = 0;
             complete = data.Length >= 8;
             var entries = new List<PaletteEntry>();
-            if (!complete) return entries;
+            if (!complete)
+            {
+                return entries;
+            }
+
             var reader = new BigEndianReader(data);
             seed = reader.ReadInt32();
             flags = reader.ReadUInt16();
@@ -58,7 +62,11 @@ namespace ClassicMac.Resources.Decoders.Colors
         {
             complete = data.Length >= 16;
             var entries = new List<PaletteEntry>();
-            if (!complete) return entries;
+            if (!complete)
+            {
+                return entries;
+            }
+
             var reader = new BigEndianReader(data);
             var count = reader.ReadInt16();
             for (var i = 0; i < count; i++)
@@ -86,7 +94,11 @@ namespace ClassicMac.Resources.Decoders.Colors
             var highest = -1;
             foreach (var e in entries)
             {
-                if (e.Index is < 0 or > 255) continue;
+                if (e.Index is < 0 or > 255)
+                {
+                    continue;
+                }
+
                 act[e.Index * 3] = (byte)(e.Red >> 8);
                 act[e.Index * 3 + 1] = (byte)(e.Green >> 8);
                 act[e.Index * 3 + 2] = (byte)(e.Blue >> 8);
@@ -141,7 +153,11 @@ namespace ClassicMac.Resources.Decoders.Colors
                 {
                     w.WriteStartObject();
                     w.WriteNumber("index", e.Index);
-                    if (isTable) w.WriteNumber("value", e.Value);
+                    if (isTable)
+                    {
+                        w.WriteNumber("value", e.Value);
+                    }
+
                     w.WriteNumber("red", e.Red);
                     w.WriteNumber("green", e.Green);
                     w.WriteNumber("blue", e.Blue);
@@ -152,7 +168,10 @@ namespace ClassicMac.Resources.Decoders.Colors
                         w.WriteStartArray("usageNames");
                         foreach (var (bit, flag) in UsageNames)
                         {
-                            if ((e.Usage & bit) != 0) w.WriteStringValue(flag);
+                            if ((e.Usage & bit) != 0)
+                            {
+                                w.WriteStringValue(flag);
+                            }
                         }
                         w.WriteEndArray();
                         w.WriteNumber("tolerance", e.Tolerance);

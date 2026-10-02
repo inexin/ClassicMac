@@ -1,6 +1,6 @@
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 namespace ClassicMac.Graphics.Pict
 {
     /// <summary>Options for <see cref="PictReader"/>.</summary>
@@ -70,8 +70,12 @@ namespace ClassicMac.Graphics.Pict
         // The drawing half of these options, for the port a picture is played into.
         internal QuickDrawOptions ToQuickDrawOptions() => new()
         {
-            Version = QuickDraw, ScreenDepth = ScreenDepth, Fonts = Fonts, TextFallback = TextFallback,
-            HiliteColor = HiliteColor is { } hilite ? RgbColor.FromRgba(hilite) : null, PreserveAlpha = PreserveAlpha,
+            Version = QuickDraw,
+            ScreenDepth = ScreenDepth,
+            Fonts = Fonts,
+            TextFallback = TextFallback,
+            HiliteColor = HiliteColor is { } hilite ? RgbColor.FromRgba(hilite) : null,
+            PreserveAlpha = PreserveAlpha,
         };
     }
 

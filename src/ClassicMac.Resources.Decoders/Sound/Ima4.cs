@@ -65,9 +65,21 @@ namespace ClassicMac.Resources.Decoders.Sound
         {
             int step = Steps[Math.Min(index, 88)];
             var d = step >> 3;
-            if ((n & 4) != 0) d += step;
-            if ((n & 2) != 0) d += step >> 1;
-            if ((n & 1) != 0) d += step >> 2;
+            if ((n & 4) != 0)
+            {
+                d += step;
+            }
+
+            if ((n & 2) != 0)
+            {
+                d += step >> 1;
+            }
+
+            if ((n & 1) != 0)
+            {
+                d += step >> 2;
+            }
+
             predictor = Math.Clamp(predictor + ((n & 8) != 0 ? -d : d), -32768, 32767);
             index = Math.Clamp(index + IndexChange[n], 0, 88);
             output[at] = (short)predictor;

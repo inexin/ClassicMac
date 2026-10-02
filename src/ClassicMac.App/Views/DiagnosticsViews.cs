@@ -99,11 +99,17 @@ namespace ClassicMac.App.Views
             Apply();
             panel.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(DiagnosticsPanel.PanelHeight) or nameof(DiagnosticsPanel.IsExpanded)) Apply();
+                if (e.PropertyName is nameof(DiagnosticsPanel.PanelHeight) or nameof(DiagnosticsPanel.IsExpanded))
+                {
+                    Apply();
+                }
             };
             row.PropertyChanged += (_, e) =>
             {
-                if (e.Property == RowDefinition.HeightProperty && row.Height.IsAbsolute && panel.IsExpanded) panel.PanelHeight = row.Height.Value;
+                if (e.Property == RowDefinition.HeightProperty && row.Height.IsAbsolute && panel.IsExpanded)
+                {
+                    panel.PanelHeight = row.Height.Value;
+                }
             };
         }
     }

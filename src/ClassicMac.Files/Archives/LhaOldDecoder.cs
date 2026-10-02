@@ -32,7 +32,10 @@ internal static class LhaOldDecoder
 
             int count = code - 0x100 + MatchThreshold;
             if (count > output.Length - outputPosition)
+            {
                 throw new InvalidDataException("An LHA match exceeds the declared expanded size.");
+            }
+
             int offset = ReadOffset(ref bits);
             int sourcePosition = (windowPosition - offset - 1 + WindowSize) & (WindowSize - 1);
             for (int index = 0; index < count; index++)
@@ -58,7 +61,10 @@ internal static class LhaOldDecoder
             code = (code << 1) | bits.ReadBit();
             int count = OffsetCodeCounts[length - 3];
             if (code >= firstCode && code - firstCode < count)
+            {
                 return ((symbol + code - firstCode) << 6) | bits.ReadBits(6);
+            }
+
             symbol += count;
             firstCode = (firstCode + count) << 1;
         }
@@ -88,7 +94,11 @@ internal sealed class LhaAdaptiveHuffmanTree
 
     public LhaAdaptiveHuffmanTree(int symbolCount)
     {
-        if (symbolCount < 2) throw new ArgumentOutOfRangeException(nameof(symbolCount));
+        if (symbolCount < 2)
+        {
+            throw new ArgumentOutOfRangeException(nameof(symbolCount));
+        }
+
         _symbolCount = symbolCount;
         _nodeCount = symbolCount * 2 - 1;
         _nodes = new Node[_nodeCount];
@@ -103,7 +113,9 @@ internal sealed class LhaAdaptiveHuffmanTree
     {
         int nodeIndex = 0;
         while (!_nodes[nodeIndex].IsLeaf)
+        {
             nodeIndex = _nodes[nodeIndex].ChildIndex - bits.ReadBit();
+        }
 
         int code = _nodes[nodeIndex].ChildIndex;
         IncrementForCode(code);
@@ -131,16 +143,25 @@ internal sealed class LhaAdaptiveHuffmanTree
             _nodes[child].Parent = nodeIndex;
             _nodes[child - 1].Parent = nodeIndex;
             if (node.Frequency == _nodes[nodeIndex + 1].Frequency)
+            {
                 _nodes[nodeIndex].Group = _nodes[nodeIndex + 1].Group;
+            }
             else
+            {
                 _nodes[nodeIndex].Group = AllocateGroup();
+            }
+
             _groupLeaders[_nodes[nodeIndex].Group] = nodeIndex;
         }
     }
 
     private void InitializeGroups()
     {
-        for (int index = 0; index < _nodeCount; index++) _groups[index] = index;
+        for (int index = 0; index < _nodeCount; index++)
+        {
+            _groups[index] = index;
+        }
+
         _groupCount = 0;
     }
 
@@ -154,7 +175,11 @@ internal sealed class LhaAdaptiveHuffmanTree
 
     private void IncrementForCode(int code)
     {
-        if (_nodes[0].Frequency >= ReorderLimit) ReconstructTree();
+        if (_nodes[0].Frequency >= ReorderLimit)
+        {
+            ReconstructTree();
+        }
+
         _nodes[0].Frequency++;
         int nodeIndex = _leafNodes[code];
         while (nodeIndex != 0)
@@ -168,7 +193,10 @@ internal sealed class LhaAdaptiveHuffmanTree
     private int MakeGroupLeader(int nodeIndex)
     {
         int leaderIndex = _groupLeaders[_nodes[nodeIndex].Group];
-        if (leaderIndex == nodeIndex) return nodeIndex;
+        if (leaderIndex == nodeIndex)
+        {
+            return nodeIndex;
+        }
 
         (_nodes[nodeIndex].IsLeaf, _nodes[leaderIndex].IsLeaf) =
             (_nodes[leaderIndex].IsLeaf, _nodes[nodeIndex].IsLeaf);
@@ -182,7 +210,9 @@ internal sealed class LhaAdaptiveHuffmanTree
     private void UpdateMovedNode(int nodeIndex)
     {
         if (_nodes[nodeIndex].IsLeaf)
+        {
             _leafNodes[_nodes[nodeIndex].ChildIndex] = nodeIndex;
+        }
         else
         {
             _nodes[_nodes[nodeIndex].ChildIndex].Parent = nodeIndex;
@@ -197,7 +227,9 @@ internal sealed class LhaAdaptiveHuffmanTree
         {
             _groupLeaders[_nodes[nodeIndex].Group]++;
             if (_nodes[nodeIndex].Frequency == _nodes[nodeIndex - 1].Frequency)
+            {
                 _nodes[nodeIndex].Group = _nodes[nodeIndex - 1].Group;
+            }
             else
             {
                 _nodes[nodeIndex].Group = AllocateGroup();
@@ -215,7 +247,11 @@ internal sealed class LhaAdaptiveHuffmanTree
     {
         for (int index = 0, leafCount = 0; index < _nodeCount; index++)
         {
-            if (!_nodes[index].IsLeaf) continue;
+            if (!_nodes[index].IsLeaf)
+            {
+                continue;
+            }
+
             Node leaf = _nodes[index];
             leaf.Frequency = (leaf.Frequency + 1) / 2;
             _nodes[leafCount++] = leaf;
@@ -283,7 +319,10 @@ internal ref struct LhaBitReader
     public int ReadBit()
     {
         if (_position >= _data.Length * 8)
+        {
             throw new InvalidDataException("An LHA compressed stream is truncated.");
+        }
+
         int bit = (_data[_position >> 3] >> (7 - (_position & 7))) & 1;
         _position++;
         return bit;
@@ -292,7 +331,11 @@ internal ref struct LhaBitReader
     public int ReadBits(int count)
     {
         int value = 0;
-        for (int index = 0; index < count; index++) value = (value << 1) | ReadBit();
+        for (int index = 0; index < count; index++)
+        {
+            value = (value << 1) | ReadBit();
+        }
+
         return value;
     }
 }

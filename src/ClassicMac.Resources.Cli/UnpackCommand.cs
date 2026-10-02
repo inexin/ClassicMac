@@ -33,7 +33,10 @@ namespace ClassicMac.Resources.Cli
             var written = new List<Diagnostic>();
             var result = Unpacker.Unpack(opened.Root, root, options, written);
             reporter.Write(input.Name, written);
-            foreach (var failure in result.Failed) error.WriteLine(failure);
+            foreach (var failure in result.Failed)
+            {
+                error.WriteLine(failure);
+            }
 
             output.WriteLine($"{result.Files} files, {result.Bytes} bytes, to {root}");
             return result.Failed.Count > 0 ? ExitCodes.IoError : reporter.ExitCode;

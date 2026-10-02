@@ -23,7 +23,11 @@ namespace ClassicMac.App.Views
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             DataContextChanged += (_, _) =>
             {
-                if (DataContext is not MainViewModel model) return;
+                if (DataContext is not MainViewModel model)
+                {
+                    return;
+                }
+
                 model.ChangeRefused -= OnChangeRefused;
                 model.ChangeRefused += OnChangeRefused;
                 model.FilePicker = this;
@@ -54,7 +58,11 @@ namespace ClassicMac.App.Views
         private void ShowInTree(NodeViewModel node) => Dispatcher.UIThread.Post(() =>
         {
             Tree.UpdateLayout();
-            if (ContainerOf(node) is not { } row) return;
+            if (ContainerOf(node) is not { } row)
+            {
+                return;
+            }
+
             row.BringIntoView();
             row.Focus();
         }, DispatcherPriority.Background);
@@ -62,8 +70,16 @@ namespace ClassicMac.App.Views
         // The tree row of a node: each ancestor's container holds the next one.
         private TreeViewItem? ContainerOf(NodeViewModel node)
         {
-            if (node.Parent is null) return Tree.ContainerFromItem(node) as TreeViewItem;
-            if (ContainerOf(node.Parent) is not { } parent) return null;
+            if (node.Parent is null)
+            {
+                return Tree.ContainerFromItem(node) as TreeViewItem;
+            }
+
+            if (ContainerOf(node.Parent) is not { } parent)
+            {
+                return null;
+            }
+
             parent.UpdateLayout();
             return parent.ContainerFromItem(node) as TreeViewItem;
         }
@@ -82,9 +98,17 @@ namespace ClassicMac.App.Views
 
         private async void OnTreePointerMoved(object? sender, PointerEventArgs e)
         {
-            if (dragPress is not { } press || draggingOut) return;
+            if (dragPress is not { } press || draggingOut)
+            {
+                return;
+            }
+
             var moved = e.GetPosition(Tree) - dragOrigin;
-            if (Math.Abs(moved.X) < 6 && Math.Abs(moved.Y) < 6) return;
+            if (Math.Abs(moved.X) < 6 && Math.Abs(moved.Y) < 6)
+            {
+                return;
+            }
+
             var node = (press.Source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext as NodeViewModel;
             if (DataContext is not MainViewModel model || !MainViewModel.CanDragOut(node))
             {
@@ -97,10 +121,20 @@ namespace ClassicMac.App.Views
             {
                 var paths = await model.PrepareDragOutAsync(node!);
                 // Released while the files were written: no drag (it would drop wherever the pointer is).
-                if (paths.Count == 0 || dragPress != press) return;
+                if (paths.Count == 0 || dragPress != press)
+                {
+                    return;
+                }
+
                 var data = new DataTransfer();
                 foreach (var path in paths)
-                    if (await StorageProvider.TryGetFileFromPathAsync(new Uri(path)) is { } file) data.Add(DataTransferItem.CreateFile(file));
+                {
+                    if (await StorageProvider.TryGetFileFromPathAsync(new Uri(path)) is { } file)
+                    {
+                        data.Add(DataTransferItem.CreateFile(file));
+                    }
+                }
+
                 await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Copy);
             }
             finally
@@ -114,7 +148,11 @@ namespace ClassicMac.App.Views
         // Keys of the hex view go to the byte editor while it is on; the cursor's line is kept in view.
         private void OnHexKeyDown(object? sender, KeyEventArgs e)
         {
-            if (DataContext is not MainViewModel { HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers)) return;
+            if (DataContext is not MainViewModel { HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers))
+            {
+                return;
+            }
+
             e.Handled = true;
             HexList.ScrollIntoView(editor.CursorLine);
         }
@@ -124,11 +162,22 @@ namespace ClassicMac.App.Views
         // afterwards does not push a value it thinks the control has.
         private void OnChangeRefused(object? sender, string property)
         {
-            if (sender is not MainViewModel model) return;
+            if (sender is not MainViewModel model)
+            {
+                return;
+            }
+
             Dispatcher.UIThread.Post(() =>
             {
-                if (property == nameof(MainViewModel.Selected) && !ReferenceEquals(Tree.SelectedItem, model.Selected)) Tree.SelectedItem = model.Selected;
-                if (property == nameof(MainViewModel.UseTemplate) && TemplateBox.IsChecked != model.UseTemplate) TemplateBox.IsChecked = model.UseTemplate;
+                if (property == nameof(MainViewModel.Selected) && !ReferenceEquals(Tree.SelectedItem, model.Selected))
+                {
+                    Tree.SelectedItem = model.Selected;
+                }
+
+                if (property == nameof(MainViewModel.UseTemplate) && TemplateBox.IsChecked != model.UseTemplate)
+                {
+                    TemplateBox.IsChecked = model.UseTemplate;
+                }
             });
         }
 
@@ -138,9 +187,17 @@ namespace ClassicMac.App.Views
         // discarded, and saved or discarded.
         private async void OnClosing(object? sender, WindowClosingEventArgs e)
         {
-            if (quitting || DataContext is not MainViewModel model || !model.HasDraft && !model.HasUnsavedChanges) return;
+            if (quitting || DataContext is not MainViewModel model || !model.HasDraft && !model.HasUnsavedChanges)
+            {
+                return;
+            }
+
             e.Cancel = true;
-            if (!await model.ConfirmQuitAsync()) return;
+            if (!await model.ConfirmQuitAsync())
+            {
+                return;
+            }
+
             quitting = true;
             Close();
         }
@@ -181,10 +238,17 @@ namespace ClassicMac.App.Views
 
         private async void OnDrop(object? sender, DragEventArgs e)
         {
-            if (draggingOut || DataContext is not MainViewModel model) return;
+            if (draggingOut || DataContext is not MainViewModel model)
+            {
+                return;
+            }
+
             foreach (var item in e.DataTransfer.TryGetFiles() ?? [])
             {
-                if (item.TryGetLocalPath() is { } path) await model.OpenAsync(path);
+                if (item.TryGetLocalPath() is { } path)
+                {
+                    await model.OpenAsync(path);
+                }
             }
         }
 

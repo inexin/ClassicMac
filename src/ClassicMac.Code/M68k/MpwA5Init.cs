@@ -62,7 +62,10 @@ namespace ClassicMac.Code.M68k
         {
             ArgumentNullException.ThrowIfNull(diagnostics);
             if (!HasTrailer(segment.Span))
+            {
                 throw new InvalidDataException("Not an MPW %A5Init segment: it does not end with the 'mpwd' trailer.");
+            }
+
             var reader = new BigEndianReader(segment);
             int trailer = reader.Length - TrailerLength;
             uint headerOffset = reader.ReadUInt32At(trailer);
@@ -86,7 +89,10 @@ namespace ClassicMac.Code.M68k
                     $"The %A5Init header's version is {version}; only 1 is read (the initializer fails on others).", h));
                 return new MpwA5Init
                 {
-                    HeaderOffset = h, BelowA5Size = below, Version = version, DataOffset = dataOffset,
+                    HeaderOffset = h,
+                    BelowA5Size = below,
+                    Version = version,
+                    DataOffset = dataOffset,
                     RelocationOffset = relocationOffset,
                 };
             }
@@ -94,8 +100,14 @@ namespace ClassicMac.Code.M68k
             var (relocations, relocationEnd) = ReadRelocations(reader, relocationOffset, below, diagnostics);
             return new MpwA5Init
             {
-                HeaderOffset = h, BelowA5Size = below, Version = version, DataOffset = dataOffset,
-                RelocationOffset = relocationOffset, DataEnd = dataEnd, RelocationEnd = relocationEnd, Runs = runs,
+                HeaderOffset = h,
+                BelowA5Size = below,
+                Version = version,
+                DataOffset = dataOffset,
+                RelocationOffset = relocationOffset,
+                DataEnd = dataEnd,
+                RelocationEnd = relocationEnd,
+                Runs = runs,
                 Relocations = relocations,
             };
         }
@@ -126,17 +138,35 @@ namespace ClassicMac.Code.M68k
                     if (n == 0)
                     {
                         n = ReadVarint(reader, out var r);
-                        if (r is { } rn) repeat = rn;
-                        if (n == 0) break;
+                        if (r is { } rn)
+                        {
+                            repeat = rn;
+                        }
+
+                        if (n == 0)
+                        {
+                            break;
+                        }
                     }
-                    else n *= 2;
+                    else
+                    {
+                        n *= 2;
+                    }
+
                     long skip = b & 0xF0;
                     if (skip == 0)
                     {
                         skip = ReadVarint(reader, out var r);
-                        if (r is { } rs) repeat = rs;
+                        if (r is { } rs)
+                        {
+                            repeat = rs;
+                        }
                     }
-                    else skip = (b >> 4) * 2;
+                    else
+                    {
+                        skip = (b >> 4) * 2;
+                    }
+
                     for (uint i = 0; i < Math.Max(repeat, 1u); i++)
                     {
                         q += skip;
@@ -146,7 +176,11 @@ namespace ClassicMac.Code.M68k
                                 $"A data run at {q:X} from the globals' start runs past the {below}-byte globals; the data stopped.", at));
                             return (runs, reader.Position);
                         }
-                        if (n > reader.Remaining) throw new EndOfStreamException();
+                        if (n > reader.Remaining)
+                        {
+                            throw new EndOfStreamException();
+                        }
+
                         runs.Add(new MpwDataRun((int)(q - below), reader.Source.Slice(reader.Position, (int)n)));
                         reader.Skip((int)n);
                         q += n;
@@ -194,7 +228,11 @@ namespace ClassicMac.Code.M68k
                     if (b == 0)
                     {
                         b = reader.ReadByte();
-                        if (b == 0) break;
+                        if (b == 0)
+                        {
+                            break;
+                        }
+
                         if ((b & 0x80) != 0)
                         {
                             reader.Position--;
@@ -206,8 +244,14 @@ namespace ClassicMac.Code.M68k
                             count = ReadVarint(reader, out _);
                         }
                     }
-                    else if ((b & 0x80) != 0) delta = (uint)((b & 0x7F) << 8) | reader.ReadByte();
-                    else delta = b;
+                    else if ((b & 0x80) != 0)
+                    {
+                        delta = (uint)((b & 0x7F) << 8) | reader.ReadByte();
+                    }
+                    else
+                    {
+                        delta = b;
+                    }
                     // More positions than the globals have words (a delta of 0 repeated, say) cannot be real: reported, and
                     // reading stops.
                     if (count > below / 2)
@@ -221,7 +265,11 @@ namespace ClassicMac.Code.M68k
                         position = unchecked(position + 2 * delta);
                         if (position > below - 4L)
                         {
-                            if (outside++ == 0) (firstOutside, firstOutsideAt) = (position, at);
+                            if (outside++ == 0)
+                            {
+                                (firstOutside, firstOutsideAt) = (position, at);
+                            }
+
                             continue;
                         }
                         relocations.Add((int)(position - (long)below));
@@ -238,9 +286,12 @@ namespace ClassicMac.Code.M68k
                 Truncated(diagnostics, "relocations", reader.Position);
             }
             if (outside > 0)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.a5init-reloc-range",
                     $"{outside} relocations, the first at {firstOutside:X} from the globals' start, lie outside the {below}-byte globals; left out.",
                     firstOutsideAt));
+            }
+
             return (relocations, reader.Position);
         }
 
@@ -258,10 +309,26 @@ namespace ClassicMac.Code.M68k
         {
             repeat = null;
             byte b = reader.ReadByte();
-            if (b < 0x80) return b;
-            if ((b & 0xC0) == 0x80) return (uint)((b & 0x3F) << 8) | reader.ReadByte();
-            if ((b & 0xE0) == 0xC0) return (uint)((b & 0x1F) << 16) | reader.ReadUInt16();
-            if ((b & 0xF0) == 0xE0) return reader.ReadUInt32();
+            if (b < 0x80)
+            {
+                return b;
+            }
+
+            if ((b & 0xC0) == 0x80)
+            {
+                return (uint)((b & 0x3F) << 8) | reader.ReadByte();
+            }
+
+            if ((b & 0xE0) == 0xC0)
+            {
+                return (uint)((b & 0x1F) << 16) | reader.ReadUInt16();
+            }
+
+            if ((b & 0xF0) == 0xE0)
+            {
+                return reader.ReadUInt32();
+            }
+
             uint value = ReadVarint(reader, out _);
             repeat = ReadVarint(reader, out _);
             return value;

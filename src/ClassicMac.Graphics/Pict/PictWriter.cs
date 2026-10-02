@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 
 namespace ClassicMac.Graphics.Pict
 {
@@ -81,8 +81,16 @@ namespace ClassicMac.Graphics.Pict
         public PictWriter(Stream stream, int width, int height, PictWriteOptions? options = null)
         {
             ArgumentNullException.ThrowIfNull(stream);
-            if (width <= 0 || width > short.MaxValue) throw new ArgumentOutOfRangeException(nameof(width));
-            if (height <= 0 || height > short.MaxValue) throw new ArgumentOutOfRangeException(nameof(height));
+            if (width <= 0 || width > short.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(nameof(width));
+            }
+
+            if (height <= 0 || height > short.MaxValue)
+            {
+                throw new ArgumentOutOfRangeException(nameof(height));
+            }
+
             this.stream = stream;
             this.width = width;
             this.height = height;
@@ -100,14 +108,26 @@ namespace ClassicMac.Graphics.Pict
             if (bits <= 8)
             {
                 var p = this.options.Palette ?? throw new ArgumentException("An indexed format needs a palette.", nameof(options));
-                if (p.Count == 0 || p.Count > 1 << bits) throw new ArgumentException($"The palette must have 1..{1 << bits} colors.", nameof(options));
+                if (p.Count == 0 || p.Count > 1 << bits)
+                {
+                    throw new ArgumentException($"The palette must have 1..{1 << bits} colors.", nameof(options));
+                }
+
                 palette = new RgbaColor[p.Count];
-                for (int i = 0; i < p.Count; i++) palette[i] = p[i];
+                for (int i = 0; i < p.Count; i++)
+                {
+                    palette[i] = p[i];
+                }
+
                 bitMap = bits == 1 && palette.Length == 2 && TransferModes.SameRgb(palette[0], new RgbaColor(255, 255, 255)) &&
                     TransferModes.SameRgb(palette[1], new RgbaColor(0, 0, 0));
             }
             // 32-bit strips are buffered to choose between packed and unpacked rows (see StripFitsMacOS9).
-            if (width > StripWidth || bits == 32) buffered = new List<byte[]>(height);
+            if (width > StripWidth || bits == 32)
+            {
+                buffered = new List<byte[]>(height);
+            }
+
             WriteHeader();
             Flush();
         }
@@ -137,18 +157,32 @@ namespace ClassicMac.Graphics.Pict
                     for (int i = 0; i < bitmap.Width * bitmap.Height; i++)
                     {
                         int key = Key(bitmap.Pixels, i);
-                        if (lookup.ContainsKey(key)) continue;
+                        if (lookup.ContainsKey(key))
+                        {
+                            continue;
+                        }
+
                         if (colors.Count == max)
+                        {
                             throw new ArgumentException($"The bitmap has more than {max} colors; supply a palette.", nameof(bitmap));
+                        }
+
                         lookup[key] = colors.Count;
                         colors.Add(new RgbaColor(bitmap.Pixels[4 * i], bitmap.Pixels[4 * i + 1], bitmap.Pixels[4 * i + 2]));
                     }
                     if (options.Format == PictPixelFormat.Indexed1 && colors.Count <= 2)
+                    {
                         colors = OrderAsWhiteBlack(colors, lookup);
+                    }
+
                     options = new PictWriteOptions
                     {
-                        Format = options.Format, Palette = colors, FileHeader = options.FileHeader, IccProfile = options.IccProfile,
-                        HorizontalResolution = options.HorizontalResolution, VerticalResolution = options.VerticalResolution,
+                        Format = options.Format,
+                        Palette = colors,
+                        FileHeader = options.FileHeader,
+                        IccProfile = options.IccProfile,
+                        HorizontalResolution = options.HorizontalResolution,
+                        VerticalResolution = options.VerticalResolution,
                     };
                 }
             }
@@ -169,7 +203,9 @@ namespace ClassicMac.Graphics.Pict
                     if (lookup == null || !lookup.TryGetValue(key, out int index))
                     {
                         if (!nearest.TryGetValue(key, out index))
+                        {
                             nearest[key] = index = Nearest(writer.palette, bitmap.Pixels[4 * i], bitmap.Pixels[4 * i + 1], bitmap.Pixels[4 * i + 2]);
+                        }
                     }
                     row[x] = (byte)index;
                 }
@@ -186,7 +222,11 @@ namespace ClassicMac.Graphics.Pict
             var white = new RgbaColor(255, 255, 255);
             var black = new RgbaColor(0, 0, 0);
             bool onlyWhiteBlack = colors.TrueForAll(c => TransferModes.SameRgb(c, white) || TransferModes.SameRgb(c, black));
-            if (!onlyWhiteBlack) return colors;
+            if (!onlyWhiteBlack)
+            {
+                return colors;
+            }
+
             lookup.Clear();
             lookup[0xFFFFFF] = 0;
             lookup[0] = 1;
@@ -200,7 +240,11 @@ namespace ClassicMac.Graphics.Pict
             {
                 int dr = palette[k].R - r, dg = palette[k].G - g, db = palette[k].B - b;
                 int d = dr * dr + dg * dg + db * db;
-                if (d < bestDistance) { best = k; bestDistance = d; }
+                if (d < bestDistance)
+                {
+                    best = k;
+                    bestDistance = d;
+                }
             }
             return best;
         }
@@ -209,13 +253,36 @@ namespace ClassicMac.Graphics.Pict
         /// R, G, B, A per pixel (alpha is stored only by <see cref="PictPixelFormat.Argb8888"/>).</summary>
         public void WriteRow(ReadOnlySpan<byte> row)
         {
-            if (row.Length != RowLength) throw new ArgumentException($"Expected {RowLength} bytes per row.", nameof(row));
-            if (rows == height) throw new InvalidOperationException("All rows have already been written.");
+            if (row.Length != RowLength)
+            {
+                throw new ArgumentException($"Expected {RowLength} bytes per row.", nameof(row));
+            }
+
+            if (rows == height)
+            {
+                throw new InvalidOperationException("All rows have already been written.");
+            }
+
             if (bits <= 8)
+            {
                 foreach (byte index in row)
-                    if (index >= palette.Length) throw new ArgumentException($"Palette index {index} out of range.", nameof(row));
-            if (buffered != null) buffered.Add(row.ToArray());
-            else WriteStripRow(row, 0, width);
+                {
+                    if (index >= palette.Length)
+                    {
+                        throw new ArgumentException($"Palette index {index} out of range.", nameof(row));
+                    }
+                }
+            }
+
+            if (buffered != null)
+            {
+                buffered.Add(row.ToArray());
+            }
+            else
+            {
+                WriteStripRow(row, 0, width);
+            }
+
             rows++;
             Flush();
         }
@@ -223,18 +290,33 @@ namespace ClassicMac.Graphics.Pict
         /// <summary>Ends the picture. Every row must have been written.</summary>
         public void Finish()
         {
-            if (rows != height) throw new InvalidOperationException($"Wrote {rows} of {height} rows.");
+            if (rows != height)
+            {
+                throw new InvalidOperationException($"Wrote {rows} of {height} rows.");
+            }
+
             if (buffered != null)
             {
                 for (int left = 0; left < width; left += StripWidth)
                 {
                     int w = Math.Min(StripWidth, width - left);
                     bool unpacked = bits == 32 && !StripFitsMacOS9(left, w);
-                    if (left > 0 || bits == 32) BitmapHeader(left, w, unpacked);
-                    foreach (var row in buffered) WriteStripRow(row, left, w, unpacked);
+                    if (left > 0 || bits == 32)
+                    {
+                        BitmapHeader(left, w, unpacked);
+                    }
+
+                    foreach (var row in buffered)
+                    {
+                        WriteStripRow(row, left, w, unpacked);
+                    }
                 }
             }
-            if ((Written & 1) == 1) output.WriteByte(0); // word-align before OpEndPic
+            if ((Written & 1) == 1)
+            {
+                output.WriteByte(0); // word-align before OpEndPic
+            }
+
             output.WriteUInt16(0x00FF);
             Flush();
         }
@@ -262,17 +344,37 @@ namespace ClassicMac.Graphics.Pict
             int frameHeight = Math.Max(1, (int)Math.Round(height * 72 / vRes));
 
             output.WriteUInt16(0);                          // picSize (unused for version 2)
-            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16(frameHeight); output.WriteInt16(frameWidth); // picFrame, 72 dpi
-            output.WriteUInt16(0x0011); output.WriteUInt16(0x02FF); // version 2
+            output.WriteInt16(0);
+            output.WriteInt16(0);
+            output.WriteInt16(frameHeight);
+            output.WriteInt16(frameWidth); // picFrame, 72 dpi
+            output.WriteUInt16(0x0011);
+            output.WriteUInt16(0x02FF); // version 2
             output.WriteUInt16(0x0C00);                     // extended version 2 header
-            output.WriteUInt16(0xFFFE); output.WriteUInt16(0);
-            output.WriteUInt32(Fixed(hRes)); output.WriteUInt32(Fixed(vRes));
-            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16(height); output.WriteInt16(width); // source rect: image at its resolution
+            output.WriteUInt16(0xFFFE);
+            output.WriteUInt16(0);
+            output.WriteUInt32(Fixed(hRes));
+            output.WriteUInt32(Fixed(vRes));
+            output.WriteInt16(0);
+            output.WriteInt16(0);
+            output.WriteInt16(height);
+            output.WriteInt16(width); // source rect: image at its resolution
             output.WriteUInt32(0);
-            output.WriteUInt16(0x0001); output.WriteUInt16(10);
-            output.WriteInt16(0); output.WriteInt16(0); output.WriteInt16(height); output.WriteInt16(width); // clip
-            if (options.IccProfile is { Length: > 0 } icc) WriteIccProfile(icc);
-            if (bits != 32) BitmapHeader(0, Math.Min(width, StripWidth), unpacked: false);
+            output.WriteUInt16(0x0001);
+            output.WriteUInt16(10);
+            output.WriteInt16(0);
+            output.WriteInt16(0);
+            output.WriteInt16(height);
+            output.WriteInt16(width); // clip
+            if (options.IccProfile is { Length: > 0 } icc)
+            {
+                WriteIccProfile(icc);
+            }
+
+            if (bits != 32)
+            {
+                BitmapHeader(0, Math.Min(width, StripWidth), unpacked: false);
+            }
         }
 
         // Mac OS 9 unpacks component-plane rows through a buffer of (n + (n >> 7) + 3) & ~3 bytes for n unpacked bytes,
@@ -282,9 +384,19 @@ namespace ClassicMac.Graphics.Pict
         {
             int n = w * (options.Format == PictPixelFormat.Argb8888 ? 4 : 3);
             int buffer = (n + (n >> 7) + 3) & ~3;
-            if (RowBytes(w) < 8) return true;
+            if (RowBytes(w) < 8)
+            {
+                return true;
+            }
+
             foreach (var row in buffered!)
-                if (PackBits(PlaneLine(row, left, w)).Length > buffer) return false;
+            {
+                if (PackBits(PlaneLine(row, left, w)).Length > buffer)
+                {
+                    return false;
+                }
+            }
+
             return true;
         }
 
@@ -295,13 +407,22 @@ namespace ClassicMac.Graphics.Pict
         {
             const int Chunk = 32000;
             for (int offset = 0; offset < icc.Length; offset += Chunk)
+            {
                 Comment(offset == 0 ? 0u : 1u, icc.AsSpan(offset, Math.Min(Chunk, icc.Length - offset)));
+            }
+
             Comment(2, ReadOnlySpan<byte>.Empty);
 
             void Comment(uint selector, ReadOnlySpan<byte> data)
             {
-                if ((Written & 1) == 1) output.WriteByte(0);
-                output.WriteUInt16(0x00A1); output.WriteUInt16(224); output.WriteUInt16((4 + data.Length));
+                if ((Written & 1) == 1)
+                {
+                    output.WriteByte(0);
+                }
+
+                output.WriteUInt16(0x00A1);
+                output.WriteUInt16(224);
+                output.WriteUInt16((4 + data.Length));
                 output.WriteUInt32(selector);
                 output.WriteBytes(data);
             }
@@ -310,7 +431,11 @@ namespace ClassicMac.Graphics.Pict
         // The opcode and pixel map fields up to the pixel data, for the strip [left, left + w).
         private void BitmapHeader(int left, int w, bool unpacked)
         {
-            if ((Written & 1) == 1) output.WriteByte(0);
+            if ((Written & 1) == 1)
+            {
+                output.WriteByte(0);
+            }
+
             int rowBytes = RowBytes(w);
             var bounds = (0, left, height, left + w);
             if (bits > 8)
@@ -318,8 +443,10 @@ namespace ClassicMac.Graphics.Pict
                 output.WriteUInt16(0x009A);                  // DirectBitsRect
                 output.WriteUInt32(0x000000FF);              // baseAddr
                 output.WriteUInt16((rowBytes | 0x8000));
-                output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
-                output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4);
+                output.WriteInt16(bounds.Item1);
+                output.WriteInt16(bounds.Item2);
+                output.WriteInt16(bounds.Item3);
+                output.WriteInt16(bounds.Item4);
                 PixMapFields(packType: bits == 16 ? 3 : unpacked ? 1 : 4, pixelType: 16, cmpCount: bits == 16 || options.Format == PictPixelFormat.Rgb888 ? 3 : 4,
                     cmpSize: bits == 16 ? 5 : 8);
             }
@@ -327,8 +454,10 @@ namespace ClassicMac.Graphics.Pict
             {
                 output.WriteUInt16((rowBytes < 8 ? 0x0090 : 0x0098)); // BitsRect (unpacked) / PackBitsRect
                 output.WriteUInt16((bitMap ? rowBytes : rowBytes | 0x8000));
-                output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
-                output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4);
+                output.WriteInt16(bounds.Item1);
+                output.WriteInt16(bounds.Item2);
+                output.WriteInt16(bounds.Item3);
+                output.WriteInt16(bounds.Item4);
                 if (!bitMap)
                 {
                     PixMapFields(packType: 0, pixelType: 0, cmpCount: 1, cmpSize: bits);
@@ -344,10 +473,14 @@ namespace ClassicMac.Graphics.Pict
                     }
                 }
             }
-            output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
-            output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4); // srcRect
-            output.WriteInt16(bounds.Item1); output.WriteInt16(bounds.Item2);
-            output.WriteInt16(bounds.Item3); output.WriteInt16(bounds.Item4); // dstRect
+            output.WriteInt16(bounds.Item1);
+            output.WriteInt16(bounds.Item2);
+            output.WriteInt16(bounds.Item3);
+            output.WriteInt16(bounds.Item4); // srcRect
+            output.WriteInt16(bounds.Item1);
+            output.WriteInt16(bounds.Item2);
+            output.WriteInt16(bounds.Item3);
+            output.WriteInt16(bounds.Item4); // dstRect
             output.WriteUInt16(0);                           // srcCopy
         }
 
@@ -362,7 +495,9 @@ namespace ClassicMac.Graphics.Pict
             output.WriteUInt16(bits);
             output.WriteUInt16(cmpCount);
             output.WriteUInt16(cmpSize);
-            output.WriteUInt32(0); output.WriteUInt32(0); output.WriteUInt32(0); // planeBytes, pmTable, reserved
+            output.WriteUInt32(0);
+            output.WriteUInt32(0);
+            output.WriteUInt32(0); // planeBytes, pmTable, reserved
         }
 
         // Even row bytes for the strip's pixels.
@@ -398,10 +533,15 @@ namespace ClassicMac.Graphics.Pict
                 {
                     var p = row.Slice(4 * (left + x), 4);
                     line[4 * x] = options.Format == PictPixelFormat.Argb8888 ? p[3] : (byte)0;
-                    line[4 * x + 1] = p[0]; line[4 * x + 2] = p[1]; line[4 * x + 3] = p[2];
+                    line[4 * x + 1] = p[0];
+                    line[4 * x + 2] = p[1];
+                    line[4 * x + 3] = p[2];
                 }
             }
-            else line = PlaneLine(row, left, w);
+            else
+            {
+                line = PlaneLine(row, left, w);
+            }
 
             if (rowBytes < 8 || unpacked)
             {
@@ -409,8 +549,15 @@ namespace ClassicMac.Graphics.Pict
                 return;
             }
             var packed = bits == 16 ? PackWords(line) : PackBits(line);
-            if (rowBytes > 250) output.WriteUInt16(packed.Length);
-            else output.WriteByte(packed.Length);
+            if (rowBytes > 250)
+            {
+                output.WriteUInt16(packed.Length);
+            }
+            else
+            {
+                output.WriteByte(packed.Length);
+            }
+
             output.WriteBytes(packed);
         }
 
@@ -424,7 +571,9 @@ namespace ClassicMac.Graphics.Pict
             {
                 var p = row.Slice(4 * (left + x), 4);
                 for (int k = 0; k < planes; k++)
+                {
                     line[k * w + x] = (k + first) switch { 0 => p[3], 1 => p[0], 2 => p[1], _ => p[2] };
+                }
             }
             return line;
         }

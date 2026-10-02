@@ -1,11 +1,11 @@
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -35,11 +35,31 @@ public class DrawingTests
         Enumerable.Range(0, bmp.Height).Select(y => new string(Enumerable.Range(0, bmp.Width).Select(x =>
         {
             var c = bmp[x, y];
-            if (c.A == 0) return '.';
-            if (c == Black) return '#';
-            if (c == White) return 'w';
-            if (c == Red) return 'r';
-            if (c == Blue) return 'b';
+            if (c.A == 0)
+            {
+                return '.';
+            }
+
+            if (c == Black)
+            {
+                return '#';
+            }
+
+            if (c == White)
+            {
+                return 'w';
+            }
+
+            if (c == Red)
+            {
+                return 'r';
+            }
+
+            if (c == Blue)
+            {
+                return 'b';
+            }
+
             return '?';
         }).ToArray())).ToArray();
 
@@ -237,8 +257,14 @@ public class DrawingTests
             b.U16(0x0008).U16(mode);
             b.U16(0x0031).Rect(0, 0, 1, 2);
         });
-        if (mode == 11) Assert.Equal(new RgbaColor(255, 255, 0), bmp[0, 0]);
-        else Assert.Equal(new[] { expected }, Picture(bmp));
+        if (mode == 11)
+        {
+            Assert.Equal(new RgbaColor(255, 255, 0), bmp[0, 0]);
+        }
+        else
+        {
+            Assert.Equal(new[] { expected }, Picture(bmp));
+        }
     }
 
     [Fact]

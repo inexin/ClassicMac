@@ -48,9 +48,17 @@ namespace ClassicMac.Files.Containers
         private static int FindStart(ReadOnlySpan<byte> text, out int marker)
         {
             marker = text.IndexOf(Encoding.ASCII.GetBytes(Marker));
-            if (marker < 0) return -1;
+            if (marker < 0)
+            {
+                return -1;
+            }
+
             var lineEnd = text[marker..].IndexOfAny((byte)'\r', (byte)'\n');
-            if (lineEnd < 0) return -1;
+            if (lineEnd < 0)
+            {
+                return -1;
+            }
+
             var colon = text[(marker + lineEnd)..].IndexOf((byte)':');
             return colon < 0 ? -1 : marker + lineEnd + colon + 1;
         }
@@ -61,14 +69,20 @@ namespace ClassicMac.Files.Containers
             var limit = context.Options.MaxExpandedBytesPerInput;
             var text = input.ToArray(limit);
             var start = FindStart(text.AsSpan(0, Math.Min(text.Length, SearchLength)), out _);
-            if (start < 0) throw new InvalidDataException("No BinHex 4.0 data found.");
+            if (start < 0)
+            {
+                throw new InvalidDataException("No BinHex 4.0 data found.");
+            }
 
             var decoded = Expand(Decode(text, start, context), limit, context);
             var d = decoded.AsSpan();
 
             // Header: name length, name, version (0), type, creator, flags, data length, resource length, CRC.
             if (d.Length < 1 || d[0] is < 1 or > 63 || d.Length < 1 + d[0] + 1 + 20)
+            {
                 throw new InvalidDataException("The BinHex header is missing or has no valid name.");
+            }
+
             var nameLength = d[0];
             var header = 1 + nameLength + 1;
             if (d[1 + nameLength] != 0)
@@ -120,8 +134,16 @@ namespace ClassicMac.Files.Containers
                     break;
                 }
                 var c = text[i];
-                if (c == ':') break;
-                if (c is (byte)'\r' or (byte)'\n' or (byte)' ' or (byte)'\t') continue;
+                if (c == ':')
+                {
+                    break;
+                }
+
+                if (c is (byte)'\r' or (byte)'\n' or (byte)' ' or (byte)'\t')
+                {
+                    continue;
+                }
+
                 var value = c < Values.Length ? Values[c] : -1;
                 if (value < 0)
                 {
@@ -167,10 +189,15 @@ namespace ClassicMac.Files.Containers
                 }
                 else
                 {
-                    for (var n = 1; n < count; n++) output.WriteByte(last);
+                    for (var n = 1; n < count; n++)
+                    {
+                        output.WriteByte(last);
+                    }
                 }
                 if (output.Length > limit)
+                {
                     throw new InvalidDataException($"BinHex data expands past the {limit}-byte limit.");
+                }
             }
             return output.ToArray();
         }
@@ -208,7 +235,11 @@ namespace ClassicMac.Files.Containers
         {
             var values = new sbyte[128];
             Array.Fill(values, (sbyte)-1);
-            for (var i = 0; i < Alphabet.Length; i++) values[Alphabet[i]] = (sbyte)i;
+            for (var i = 0; i < Alphabet.Length; i++)
+            {
+                values[Alphabet[i]] = (sbyte)i;
+            }
+
             return values;
         }
     }

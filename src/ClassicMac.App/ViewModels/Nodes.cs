@@ -92,7 +92,8 @@ namespace ClassicMac.App.ViewModels
 
         partial void OnIsExpandedChanged(bool value)
         {
-            if (value) _ = EnsureLoadedAsync();
+            if (value)
+                _ = EnsureLoadedAsync();
         }
 
         public override string ToString() => Title;
@@ -115,8 +116,14 @@ namespace ClassicMac.App.ViewModels
             ContainerOptions = containerOptions;
             Options = options;
             Report = report;
-            if (root.Children.Count > 0) Tree.AddContents(this, root.Children);
-            else FileNode.AddResourcesPlaceholder(this, root.File, raw: host.Layout == HostLayout.Plain);
+            if (root.Children.Count > 0)
+            {
+                Tree.AddContents(this, root.Children);
+            }
+            else
+            {
+                FileNode.AddResourcesPlaceholder(this, root.File, raw: host.Layout == HostLayout.Plain);
+            }
         }
 
         public string Path { get; }
@@ -165,8 +172,14 @@ namespace ClassicMac.App.ViewModels
             : base($"{node.File.Name.ToMacRoman()} ({ContentFormatOf(node)})", NodeKind.Container, parent)
         {
             Node = node;
-            if (node.UnreadFormat is not null) Children.Add(new LoadingNode(this));
-            else Tree.AddContents(this, node.Children);
+            if (node.UnreadFormat is not null)
+            {
+                Children.Add(new LoadingNode(this));
+            }
+            else
+            {
+                Tree.AddContents(this, node.Children);
+            }
         }
 
         /// <summary>The container as read so far (its contents once it has been expanded).</summary>
@@ -184,7 +197,11 @@ namespace ClassicMac.App.ViewModels
         // Reads the container one level down, off the UI thread, then shows what it holds.
         protected override async Task LoadAsync()
         {
-            if (Node.UnreadFormat is null) return;
+            if (Node.UnreadFormat is null)
+            {
+                return;
+            }
+
             var diagnostics = new List<Diagnostic>();
             var options = Input.ContainerOptions;
             var siblings = Tree.Siblings(this);
@@ -193,7 +210,10 @@ namespace ClassicMac.App.ViewModels
             Children.Clear();
             Tree.AddContents(this, Node.Children);
             OnRead();
-            foreach (var d in diagnostics) Input.Report(new DiagnosticEntry(d, Tree.SourceOf(this, d), this));
+            foreach (var d in diagnostics)
+            {
+                Input.Report(new DiagnosticEntry(d, Tree.SourceOf(this, d), this));
+            }
         }
     }
 
@@ -239,13 +259,19 @@ namespace ClassicMac.App.ViewModels
         internal static void AddResourcesPlaceholder(NodeViewModel node, MacFile file, bool raw)
         {
             if (file.ResourceFork.Length > 0 || (file.DataFork.Length > 0 && MacFileResources.LooksLikeFork(file.DataFork)))
+            {
                 node.Children.Add(new LoadingNode(node));
+            }
         }
 
         // Reads the file's resources off the UI thread, then shows its types.
         internal static async Task LoadResourcesAsync(NodeViewModel node, MacFile file, bool raw)
         {
-            if (node.Children.Count == 0) return;
+            if (node.Children.Count == 0)
+            {
+                return;
+            }
+
             var diagnostics = new List<Diagnostic>();
             var options = node.Input.Options;
             FileResources found;
@@ -260,11 +286,25 @@ namespace ClassicMac.App.ViewModels
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "fork.unreadable", e.Message));
                 found = new FileResources(null, ResourceForkSource.None);
             }
-            if (node is FileNode fileNode) fileNode.Resources = found;
-            else if (node is InputNode input) input.RawResources = found;
+            if (node is FileNode fileNode)
+            {
+                fileNode.Resources = found;
+            }
+            else if (node is InputNode input)
+            {
+                input.RawResources = found;
+            }
+
             node.Children.Clear();
-            if (found.Fork is { } fork) ShowTypes(node, fork);
-            foreach (var d in diagnostics) node.Input.Report(new DiagnosticEntry(d, node.Source, node));
+            if (found.Fork is { } fork)
+            {
+                ShowTypes(node, fork);
+            }
+
+            foreach (var d in diagnostics)
+            {
+                node.Input.Report(new DiagnosticEntry(d, node.Source, node));
+            }
         }
 
         // (Re)builds a file node's type nodes from its fork, keeping which types were open.
@@ -273,7 +313,9 @@ namespace ClassicMac.App.ViewModels
             var open = node.Children.OfType<ResourceTypeNode>().Where(t => t.IsExpanded).Select(t => t.Type).ToHashSet();
             node.Children.Clear();
             foreach (var type in fork.Types.OrderBy(t => t.ToString(), StringComparer.Ordinal))
+            {
                 node.Children.Add(new ResourceTypeNode(node, fork, type) { IsExpanded = open.Contains(type) });
+            }
         }
     }
 
@@ -285,7 +327,10 @@ namespace ClassicMac.App.ViewModels
         {
             Fork = fork;
             Type = type;
-            foreach (var resource in fork.OfType(type).OrderBy(r => r.Id)) Children.Add(new ResourceNode(this, fork, resource));
+            foreach (var resource in fork.OfType(type).OrderBy(r => r.Id))
+            {
+                Children.Add(new ResourceNode(this, fork, resource));
+            }
         }
 
         public ResourceFork Fork { get; }
@@ -346,7 +391,11 @@ namespace ClassicMac.App.ViewModels
         public static Func<IEnumerable<MacFile>> Siblings(ContainerFileNode node)
         {
             NodeViewModel? at = node.Parent;
-            while (at is FolderNode or NoNameGroupNode) at = at.Parent;
+            while (at is FolderNode or NoNameGroupNode)
+            {
+                at = at.Parent;
+            }
+
             var holder = at switch { InputNode input => input.Root, ContainerFileNode container => container.Node, _ => null };
             var file = node.File;
             return () => holder is null ? []

@@ -67,8 +67,16 @@ namespace ClassicMac.Graphics.QuickDraw
         public static FontSelection? Swap(FontLibrary library, int family, int size, int face,
             (int h, int v) numer, (int h, int v) denom, int spaceExtra, bool fractEnable, bool fScaleDisable, bool macOS9)
         {
-            if (size == 0) size = 12;
-            if (size < 0) return null;
+            if (size == 0)
+            {
+                size = 12;
+            }
+
+            if (size < 0)
+            {
+                return null;
+            }
+
             face &= 0xFF;
             // The ROM searches for the size scaled by the horizontal ratio; Mac OS 9 folds the ratio into the size first.
             int searchSize;
@@ -79,7 +87,9 @@ namespace ClassicMac.Graphics.QuickDraw
                 searchSize = fold.size;
             }
             else
+            {
                 searchSize = FixedMath.FixRound(FixedMath.FixMul(FixedMath.FixRatio((short)numer.h, (short)denom.h), size << 16));
+            }
 
             foreach (int candidate in Families(library, family, macOS9))
             {
@@ -91,13 +101,21 @@ namespace ClassicMac.Graphics.QuickDraw
                     {
                         var selection = Build(found.Value, size, face, numer, denom, spaceExtra, fractEnable, fScaleDisable, macOS9, fold);
                         if (found.Value.Font.Depth > 1)
+                        {
                             selection.Palette = library.ColorFontPalette(found.Value.FontId, found.Value.Font.Depth);
+                        }
+
                         return selection;
                     }
-                    if (trueType) return null;
+                    if (trueType)
+                    {
+                        return null;
+                    }
                 }
                 if (candidate < 0x200 && FromOldFonts(library, candidate, searchSize, face, fScaleDisable, !macOS9) is { } old)
+                {
                     return Build(old, size, face, numer, denom, spaceExtra, fractEnable, fScaleDisable, macOS9, fold);
+                }
             }
             return null;
         }
@@ -114,7 +132,12 @@ namespace ClassicMac.Graphics.QuickDraw
                 ? new[] { mapped, library.SystemFontId, library.ApplicationFontId }
                 : new[] { mapped, library.ApplicationFontId, Geneva, library.SystemFontId };
             foreach (int f in list)
-                if (seen.Add(f)) yield return f;
+            {
+                if (seen.Add(f))
+                {
+                    yield return f;
+                }
+            }
         }
 
         private static Found? FromFamily(FontLibrary library, FontFamily fond, int searchSize, int face,
@@ -134,40 +157,90 @@ namespace ClassicMac.Graphics.QuickDraw
                 int bestScore = int.MinValue;
                 foreach (var a in entries)
                 {
-                    if (a.Size != size) continue;
+                    if (a.Size != size)
+                    {
+                        continue;
+                    }
+
                     int style = a.Style & 0xFF;
-                    if (style == match) { chosen = a; break; }
+                    if (style == match)
+                    {
+                        chosen = a;
+                        break;
+                    }
                     int score = (style & ~match) != 0 ? -1 : Score(style, VariantScore);
-                    if (score > bestScore) (bestScore, chosen) = (score, a);
+                    if (score > bestScore)
+                    {
+                        (bestScore, chosen) = (score, a);
+                    }
                 }
-                if (chosen is not { } entry) return null;
+                if (chosen is not { } entry)
+                {
+                    return null;
+                }
+
                 foreach (var a in entries)
+                {
                     if (a.Size == size && (a.Style & 0xFF) == (entry.Style & 0xFF) && (a.Style >> 8) is >= 1 and <= 4)
+                    {
                         entry = a;
-                if (library.Strike(entry.FontId, !macOS9) is not { } strike) return null;
+                    }
+                }
+
+                if (library.Strike(entry.FontId, !macOS9) is not { } strike)
+                {
+                    return null;
+                }
+
                 return new Found(strike, entry.Size, face & ~(entry.Style & 0xFF), fond) { FontId = entry.FontId };
             }
 
-            if (Has(searchSize) && Load(searchSize) is { } exact) return exact;
-            if (entries.Exists(a => a.Size == 0)) { trueType = true; return null; }
+            if (Has(searchSize) && Load(searchSize) is { } exact)
+            {
+                return exact;
+            }
+
+            if (entries.Exists(a => a.Size == 0))
+            {
+                trueType = true;
+                return null;
+            }
             if (!fScaleDisable)
             {
-                if (Has(searchSize * 2) && Load(searchSize * 2) is { } doubled) return doubled;
-                if ((searchSize & 1) == 0 && Has(searchSize / 2) && Load(searchSize / 2) is { } half) return half;
+                if (Has(searchSize * 2) && Load(searchSize * 2) is { } doubled)
+                {
+                    return doubled;
+                }
+
+                if ((searchSize & 1) == 0 && Has(searchSize / 2) && Load(searchSize / 2) is { } half)
+                {
+                    return half;
+                }
             }
             // The nearest size in table order (a leading size-0 entry skipped): the closest, later entries winning
             // ties; with FScaleDisable a larger size ends the scan once a smaller one was found ($FFCBF57A).
             int nearest = 0, best = 0x7FFF;
             for (int i = 0; i < entries.Count; i++)
             {
-                if (i == 0 && entries[0].Size == 0) continue;
+                if (i == 0 && entries[0].Size == 0)
+                {
+                    continue;
+                }
+
                 int d = (short)(searchSize - entries[i].Size);
                 if (d < 0)
                 {
-                    if (fScaleDisable && nearest != 0) break;
+                    if (fScaleDisable && nearest != 0)
+                    {
+                        break;
+                    }
+
                     d = -d;
                 }
-                if (d <= best) (best, nearest) = (d, entries[i].Size);
+                if (d <= best)
+                {
+                    (best, nearest) = (d, entries[i].Size);
+                }
             }
             return nearest == 0 ? null : Load(nearest);
         }
@@ -177,17 +250,38 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int size = (searchSize == 0 ? 1 : searchSize) & 0x7F;
             var order = new List<int> { size };
-            if (size < 64) order.Add(size * 2);
-            if ((size & 1) == 0) order.Add(size / 2);
+            if (size < 64)
+            {
+                order.Add(size * 2);
+            }
+
+            if ((size & 1) == 0)
+            {
+                order.Add(size / 2);
+            }
+
             var up = new List<int>();
             var down = new List<int>();
-            for (int s = size + 1; s <= 127; s++) up.Add(s);
-            for (int s = size - 1; s >= 1; s--) down.Add(s);
+            for (int s = size + 1; s <= 127; s++)
+            {
+                up.Add(s);
+            }
+
+            for (int s = size - 1; s >= 1; s--)
+            {
+                down.Add(s);
+            }
+
             order.AddRange(fScaleDisable ? down : up);
             order.AddRange(fScaleDisable ? up : down);
             foreach (int s in order)
+            {
                 if (library.OldStyleStrike(family, s, rom) is { } strike)
+                {
                     return new Found(strike, s, face, null);
+                }
+            }
+
             return null;
         }
 
@@ -201,13 +295,40 @@ namespace ClassicMac.Graphics.QuickDraw
 
             // The style table's byte additions.
             int extra = 0;
-            if ((remaining & Bold) != 0) { s.Bold += 1; extra += 1; }
-            if ((remaining & Italic) != 0) s.Italic += 8;
-            if ((remaining & Outline) != 0) { s.Shadow += 1; extra += 1; }
-            if ((remaining & Shadow) != 0) { s.Shadow += 2; extra += 2; }
-            if ((remaining & Condense) != 0) extra -= 1;
-            if ((remaining & Extend) != 0) extra += 1;
-            if ((remaining & Underline) != 0) (s.UlOffset, s.UlShadow, s.UlThick) = (1, 1, 1);
+            if ((remaining & Bold) != 0)
+            {
+                s.Bold += 1;
+                extra += 1;
+            }
+            if ((remaining & Italic) != 0)
+            {
+                s.Italic += 8;
+            }
+
+            if ((remaining & Outline) != 0)
+            {
+                s.Shadow += 1;
+                extra += 1;
+            }
+            if ((remaining & Shadow) != 0)
+            {
+                s.Shadow += 2;
+                extra += 2;
+            }
+            if ((remaining & Condense) != 0)
+            {
+                extra -= 1;
+            }
+
+            if ((remaining & Extend) != 0)
+            {
+                extra += 1;
+            }
+
+            if ((remaining & Underline) != 0)
+            {
+                (s.UlOffset, s.UlShadow, s.UlThick) = (1, 1, 1);
+            }
 
             // The remaining stretch: text scale x requested / actual size, as 8.8 rounded.
             int actual = found.ActualSize & 0x7F;
@@ -246,7 +367,9 @@ namespace ClassicMac.Graphics.QuickDraw
             FontFamily.RawWidthTable? fondWidths = null;
             bool nfntWidths = fractEnable && f.FractionalWidths != null;
             if (fractEnable && !nfntWidths && fond != null && (fond.Flags & 0x4000) == 0)
+            {
                 fondWidths = MatchWidthTable(fond, face);
+            }
 
             // Style extra: the style table's, or the family's own style-extra table.
             int widthExtra = (sbyte)extra << 16;
@@ -256,9 +379,18 @@ namespace ClassicMac.Graphics.QuickDraw
                 int covered = fondWidths?.Style ?? 0;
                 int sum = SignMagnitude(fond.Property[0]);
                 for (int bit = 0; bit < 7; bit++)
-                    if ((remaining & ~covered & (1 << bit)) != 0) sum += SignMagnitude(fond.Property[bit + 1]);
+                {
+                    if ((remaining & ~covered & (1 << bit)) != 0)
+                    {
+                        sum += SignMagnitude(fond.Property[bit + 1]);
+                    }
+                }
+
                 int fixedExtra = FixedMath.FixMul(sum << 4, actual << 16);
-                if (fractEnable) widthExtra = fixedExtra;
+                if (fractEnable)
+                {
+                    widthExtra = fixedExtra;
+                }
                 else
                 {
                     s.Extra = FixedMath.FixRound(fixedExtra);
@@ -278,13 +410,21 @@ namespace ClassicMac.Graphics.QuickDraw
                     int fondMissing = macOS9 ? fond!.LastChar - fond.FirstChar + 1 : missing;
                     int i = !macOS9 ? index : index == missing ? fondMissing : index + f.FirstChar - fond!.FirstChar;
                     int word = fond!.WidthWord(fondWidths.Value, i);
-                    if (word == 0xFFFF && i != fondMissing) word = fond.WidthWord(fondWidths.Value, fondMissing);
+                    if (word == 0xFFFF && i != fondMissing)
+                    {
+                        word = fond.WidthWord(fondWidths.Value, fondMissing);
+                    }
+
                     return unchecked((int)((uint)word * (uint)actual << 4));
                 }
                 if (nfntWidths)
                 {
                     int word = f.FractionalWidths![index];
-                    if (word == 0xFFFF && index != missing) word = f.FractionalWidths[missing];
+                    if (word == 0xFFFF && index != missing)
+                    {
+                        word = f.FractionalWidths[missing];
+                    }
+
                     return word << 8;
                 }
                 return (f.OffsetWidths[index] & 0xFF) << 16;
@@ -299,13 +439,19 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (w != 0)
                 {
                     w = unchecked(w + widthExtra);
-                    if (scaleWidths) w = FixedMath.FixMul(w, hFactor);
+                    if (scaleWidths)
+                    {
+                        w = FixedMath.FixMul(w, hFactor);
+                    }
                 }
                 s.Widths[c] = w;
             }
             if (spaceExtra != 0)
+            {
                 s.Widths[' '] += FixedMath.FixMul(FixedMath.FixMul(FixedMath.FixRatio((short)numer.h, (short)denom.h),
                     FixedMath.FixRatio((short)s.Denom.h, (short)s.Numer.h)), spaceExtra);
+            }
+
             s.Widths['\r'] = 0;
             return s;
         }
@@ -316,10 +462,22 @@ namespace ClassicMac.Graphics.QuickDraw
         // stretch of 0 or of $8000 and up; those are left uncut here.
         private static (int numer, int factor) ReduceStretch(int stretch)
         {
-            if (stretch <= 0 || stretch >= 0x8000) return (stretch, 0x10000);
+            if (stretch <= 0 || stretch >= 0x8000)
+            {
+                return (stretch, 0x10000);
+            }
+
             int n = stretch, numer = 0x100;
-            while (n >= 0x200) { numer = (short)(numer << 1); n >>= 1; }
-            while (n < 0xC0) { numer >>= 1; n <<= 1; }
+            while (n >= 0x200)
+            {
+                numer = (short)(numer << 1);
+                n >>= 1;
+            }
+            while (n < 0xC0)
+            {
+                numer >>= 1;
+                n <<= 1;
+            }
             if (n < 0x100)
             {
                 numer = (short)(numer * 3) >> 2;
@@ -334,14 +492,30 @@ namespace ClassicMac.Graphics.QuickDraw
         // the ratio to 1.
         internal static (int size, (int h, int v) numer, (int h, int v) denom) Fold(int size, (int h, int v) numer, (int h, int v) denom)
         {
-            if (numer.h == 0 || numer.v == 0 || denom.h == 0 || denom.v == 0) return (size, (1, 1), (1, 1));
+            if (numer.h == 0 || numer.v == 0 || denom.h == 0 || denom.v == 0)
+            {
+                return (size, (1, 1), (1, 1));
+            }
+
             numer = (Math.Abs(numer.h), Math.Abs(numer.v));
             denom = (Math.Abs(denom.h), Math.Abs(denom.v));
-            if (numer.v == denom.v) (numer.v, denom.v) = (1, 1);
-            if (numer.h == denom.h) return (size, (1, numer.v), (1, denom.v));
+            if (numer.v == denom.v)
+            {
+                (numer.v, denom.v) = (1, 1);
+            }
+
+            if (numer.h == denom.h)
+            {
+                return (size, (1, numer.v), (1, denom.v));
+            }
+
             int r = (int)(((long)numer.h << 16) / denom.h);
             int p = unchecked(r * size);
-            if (p >> 16 < 4) return (size, numer, denom);
+            if (p >> 16 < 4)
+            {
+                return (size, numer, denom);
+            }
+
             int newSize = (p + 0x8000) >> 16;
             int f = FixedMath.FixRatio((short)size, (short)newSize);
             int hF = FixedMath.FixMul(f, r), vF = FixedMath.FixMul(f, (int)(((long)numer.v << 16) / denom.v));
@@ -356,10 +530,21 @@ namespace ClassicMac.Graphics.QuickDraw
             foreach (var t in fond.RawWidthTables)
             {
                 int style = t.Style & 0xFF;
-                if (style == face) return t;
-                if ((style & ~face) != 0) continue;
+                if (style == face)
+                {
+                    return t;
+                }
+
+                if ((style & ~face) != 0)
+                {
+                    continue;
+                }
+
                 int score = Score(style, WidthTableScore);
-                if (score > bestScore) (bestScore, best) = (score, t);
+                if (score > bestScore)
+                {
+                    (bestScore, best) = (score, t);
+                }
             }
             return best;
         }
@@ -368,7 +553,13 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int score = 0;
             for (int bit = 0; bit < 8; bit++)
-                if ((style & (1 << bit)) != 0) score += weights[bit];
+            {
+                if ((style & (1 << bit)) != 0)
+                {
+                    score += weights[bit];
+                }
+            }
+
             return score;
         }
 

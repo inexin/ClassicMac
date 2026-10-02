@@ -19,7 +19,11 @@ namespace ClassicMac.Graphics.QuickTime
 
         public static RgbaBitmap? Decode(PictImageDescription d, byte[] data)
         {
-            if (data.Length < 10) return null;
+            if (data.Length < 10)
+            {
+                return null;
+            }
+
             int strips = (data[8] << 8) | data[9];
             var v4 = new Entry[256];
             var v1 = new Entry[256];
@@ -33,20 +37,33 @@ namespace ClassicMac.Graphics.QuickTime
                 int y1 = (data[p + 4] << 8) | data[p + 5], y2 = (data[p + 8] << 8) | data[p + 9];
                 int x2 = (data[p + 10] << 8) | data[p + 11];
                 int stripHeight = y2 - y1;
-                if (stripHeight <= 0) stripHeight = d.Height - top;
+                if (stripHeight <= 0)
+                {
+                    stripHeight = d.Height - top;
+                }
+
                 int end = Math.Min(data.Length, p + size);
                 int c = p + 12;
                 while (c + 4 <= end)
                 {
                     int id = (data[c] << 8) | data[c + 1];
                     int chunkSize = (data[c + 2] << 8) | data[c + 3];
-                    if (chunkSize < 4) break;
+                    if (chunkSize < 4)
+                    {
+                        break;
+                    }
+
                     int chunkEnd = Math.Min(end, c + chunkSize);
                     var chunk = data.AsSpan(c + 4, chunkEnd - c - 4);
                     if ((id & 0xF000) == 0x2000)
+                    {
                         ReadCodebook((id & 0x0200) != 0 ? v1 : v4, chunk.ToArray(), (id & 0x0400) != 0, (id & 0x0100) != 0);
+                    }
                     else if ((id & 0xF000) == 0x3000)
+                    {
                         Vectors(img, chunk, id, v4, v1, top, stripHeight, Math.Min(x2 > 0 ? x2 : d.Width, d.Width), colors, gray);
+                    }
+
                     c = chunkEnd;
                 }
                 top += stripHeight;
@@ -61,13 +78,21 @@ namespace ClassicMac.Graphics.QuickTime
             Entry Read()
             {
                 var e = new Entry { Y0 = chunk[p], Y1 = chunk[p + 1], Y2 = chunk[p + 2], Y3 = chunk[p + 3] };
-                if (!fourBytes) { e.U = (sbyte)chunk[p + 4]; e.V = (sbyte)chunk[p + 5]; }
+                if (!fourBytes)
+                {
+                    e.U = (sbyte)chunk[p + 4];
+                    e.V = (sbyte)chunk[p + 5];
+                }
                 p += entrySize;
                 return e;
             }
             if (!partial)
             {
-                while (p + entrySize <= chunk.Length && index < 256) book[index++] = Read();
+                while (p + entrySize <= chunk.Length && index < 256)
+                {
+                    book[index++] = Read();
+                }
+
                 return;
             }
             while (p + 4 <= chunk.Length && index < 256)
@@ -75,11 +100,17 @@ namespace ClassicMac.Graphics.QuickTime
                 uint mask = (uint)((chunk[p] << 24) | (chunk[p + 1] << 16) | (chunk[p + 2] << 8) | chunk[p + 3]);
                 p += 4;
                 for (int bit = 31; bit >= 0 && index < 256; bit--, index++)
+                {
                     if ((mask >> bit & 1) != 0)
                     {
-                        if (p + entrySize > chunk.Length) return;
+                        if (p + entrySize > chunk.Length)
+                        {
+                            return;
+                        }
+
                         book[index] = Read();
                     }
+                }
             }
         }
 
@@ -94,7 +125,11 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 if (bits == 0)
                 {
-                    if (p + 4 > c.Length) { bits = -1; return false; }
+                    if (p + 4 > c.Length)
+                    {
+                        bits = -1;
+                        return false;
+                    }
                     mask = (uint)((c[p] << 24) | (c[p + 1] << 16) | (c[p + 2] << 8) | c[p + 3]);
                     p += 4;
                     bits = 32;
@@ -107,26 +142,56 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 int bx = block % blocksWide * 4, by = top + block / blocksWide * 4;
                 bool useV4;
-                if (id == 0x3200) useV4 = false;
+                if (id == 0x3200)
+                {
+                    useV4 = false;
+                }
                 else if (id == 0x3100)
                 {
                     bool changed = NextBit(chunk);
-                    if (bits < 0) return;
-                    if (!changed) continue;
+                    if (bits < 0)
+                    {
+                        return;
+                    }
+
+                    if (!changed)
+                    {
+                        continue;
+                    }
+
                     useV4 = NextBit(chunk);
                 }
-                else useV4 = NextBit(chunk);
-                if (bits < 0) return;
+                else
+                {
+                    useV4 = NextBit(chunk);
+                }
+
+                if (bits < 0)
+                {
+                    return;
+                }
+
                 if (useV4)
                 {
-                    if (p + 4 > chunk.Length) return;
+                    if (p + 4 > chunk.Length)
+                    {
+                        return;
+                    }
+
                     for (int q = 0; q < 4; q++)
+                    {
                         Put2x2(img, bx + (q & 1) * 2, by + (q >> 1) * 2, v4[chunk[p + q]], palette, gray);
+                    }
+
                     p += 4;
                 }
                 else
                 {
-                    if (p + 1 > chunk.Length) return;
+                    if (p + 1 > chunk.Length)
+                    {
+                        return;
+                    }
+
                     var e = v1[chunk[p++]];
                     for (int q = 0; q < 4; q++)
                     {
@@ -144,10 +209,19 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 int lum = k switch { 0 => e.Y0, 1 => e.Y1, 2 => e.Y2, _ => e.Y3 };
                 RgbaColor c;
-                if (palette != null) c = palette[lum % palette.Length];
-                else if (gray) c = new RgbaColor((byte)lum, (byte)lum, (byte)lum);
+                if (palette != null)
+                {
+                    c = palette[lum % palette.Length];
+                }
+                else if (gray)
+                {
+                    c = new RgbaColor((byte)lum, (byte)lum, (byte)lum);
+                }
                 else
+                {
                     c = new RgbaColor(Clamp(lum + 2 * e.V), Clamp(lum - e.U / 2 - e.V), Clamp(lum + 2 * e.U));
+                }
+
                 QuickTimeCodecs.Set(img, x + (k & 1), y + (k >> 1), c);
             }
         }
@@ -161,11 +235,19 @@ namespace ClassicMac.Graphics.QuickTime
     {
         public static RgbaBitmap? Decode(byte[] data)
         {
-            if (data.Length < 18) return null;
+            if (data.Length < 18)
+            {
+                return null;
+            }
+
             int idLength = data[0], mapType = data[1], type = data[2];
             int mapFirst = data[3] | (data[4] << 8), mapLength = data[5] | (data[6] << 8), mapBits = data[7];
             int width = data[12] | (data[13] << 8), height = data[14] | (data[15] << 8), bits = data[16], descriptor = data[17];
-            if (width == 0 || height == 0) return null;
+            if (width == 0 || height == 0)
+            {
+                return null;
+            }
+
             int p = 18 + idLength;
             var map = new RgbaColor[mapType == 1 ? mapFirst + mapLength : 0];
             for (int i = 0; i < mapLength && mapType == 1; i++)
@@ -204,16 +286,28 @@ namespace ClassicMac.Graphics.QuickTime
 
             while (pixel < count && p < data.Length)
             {
-                if (!rle) { Put(Next()); continue; }
+                if (!rle)
+                {
+                    Put(Next());
+                    continue;
+                }
                 int packet = data[p++];
                 int n = (packet & 0x7F) + 1;
                 if ((packet & 0x80) != 0)
                 {
                     var c = Next();
-                    for (int i = 0; i < n && pixel < count; i++) Put(c);
+                    for (int i = 0; i < n && pixel < count; i++)
+                    {
+                        Put(c);
+                    }
                 }
                 else
-                    for (int i = 0; i < n && pixel < count; i++) Put(Next());
+                {
+                    for (int i = 0; i < n && pixel < count; i++)
+                    {
+                        Put(Next());
+                    }
+                }
             }
             return img;
         }
@@ -224,11 +318,11 @@ namespace ClassicMac.Graphics.QuickTime
             {
                 case 15:
                 case 16:
-                {
-                    int v = data[p] | (data[p + 1] << 8);
-                    p += 2;
-                    return QuickTimeCodecs.Rgb555(v);
-                }
+                    {
+                        int v = data[p] | (data[p + 1] << 8);
+                        p += 2;
+                        return QuickTimeCodecs.Rgb555(v);
+                    }
                 case 24:
                     p += 3;
                     return new RgbaColor(data[p - 1], data[p - 2], data[p - 3]);

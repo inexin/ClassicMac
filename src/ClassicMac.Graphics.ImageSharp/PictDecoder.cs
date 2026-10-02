@@ -1,14 +1,14 @@
 using System.IO;
 using System.Threading;
+using ClassicMac.Graphics;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Metadata;
 using SixLabors.ImageSharp.Metadata.Profiles.Icc;
 using SixLabors.ImageSharp.PixelFormats;
-using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 
 namespace ClassicMac.Graphics.ImageSharp
 {
@@ -33,7 +33,10 @@ namespace ClassicMac.Graphics.ImageSharp
             var size = new Size(System.Math.Max(1, info.Bounds.Width), System.Math.Max(1, info.Bounds.Height));
             var metadata = new ImageMetadata();
             if (!options.SkipMetadata)
+            {
                 ApplyMetadata(metadata, info, PictResolution.Native);
+            }
+
             return new ImageInfo(new PixelTypeInfo(32), size, metadata);
         }
 
@@ -64,11 +67,16 @@ namespace ClassicMac.Graphics.ImageSharp
             else
             {
                 using (rgba)
+                {
                     image = rgba.CloneAs<TPixel>(configuration);
+                }
             }
 
             if (!general.SkipMetadata)
+            {
                 ApplyMetadata(image.Metadata, picture.Info, options.Resolution);
+            }
+
             ScaleToTargetSize(general, image);
             return image;
         }
@@ -90,7 +98,9 @@ namespace ClassicMac.Graphics.ImageSharp
             metadata.HorizontalResolution = frame ? 72 : info.HorizontalResolution;
             metadata.VerticalResolution = frame ? 72 : info.VerticalResolution;
             if (info.IccProfile is { Length: > 0 } icc)
+            {
                 metadata.IccProfile = new IccProfile(icc);
+            }
         }
 
         // ImageSharp reports corrupt/truncated input as InvalidImageContentException.

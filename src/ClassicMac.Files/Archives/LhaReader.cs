@@ -27,12 +27,20 @@ public sealed class LhaReader : IContainerReader
     /// <inheritdoc />
     public bool CanRead(ForkData input)
     {
-        if (input.Length < LevelZeroHeaderMinimumLength) return false;
+        if (input.Length < LevelZeroHeaderMinimumLength)
+        {
+            return false;
+        }
+
         ReadOnlySpan<byte> header = input.ReadPrefix((int)Math.Min(input.Length, ushort.MaxValue));
         byte level = header[20];
         if (level == 3)
         {
-            if (header.Length < LevelThreeHeaderMinimumLength) return false;
+            if (header.Length < LevelThreeHeaderMinimumLength)
+            {
+                return false;
+            }
+
             uint levelThreeHeaderLength = U32(header, 24);
             return U16(header, 0) == 4 && levelThreeHeaderLength >= LevelThreeHeaderMinimumLength &&
                 levelThreeHeaderLength <= input.Length && IsLhaMethod(header.Slice(2, 5));
@@ -44,14 +52,24 @@ public sealed class LhaReader : IContainerReader
                 IsLhaMethod(header.Slice(2, 5));
         }
 
-        if (level is not 0 and not 1) return false;
+        if (level is not 0 and not 1)
+        {
+            return false;
+        }
+
         int headerLength = header[0] + 2;
         if (headerLength < LevelZeroHeaderMinimumLength || headerLength > header.Length)
+        {
             return false;
+        }
+
         int nameLength = header[21];
         if (level == 0 && headerLength < LevelZeroHeaderMinimumLength + nameLength ||
             level == 1 && headerLength < 27 + nameLength)
+        {
             return false;
+        }
+
         return IsLhaMethod(header.Slice(2, 5));
     }
 
@@ -59,7 +77,10 @@ public sealed class LhaReader : IContainerReader
     public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
     {
         if (input.Length > context.Options.MaxExpandedBytesPerInput)
+        {
             throw new InvalidDataException("The LHA archive exceeds the configured input-size limit.");
+        }
+
         byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
         var files = new List<MacFile>();
         long expandedBytes = 0;
@@ -76,7 +97,10 @@ public sealed class LhaReader : IContainerReader
             }
 
             if (archive.Length - offset < 21)
+            {
                 throw new InvalidDataException("An LHA header is truncated.");
+            }
+
             byte headerLevel = archive[offset + 20];
             int fixedHeaderLength = headerLevel switch
             {
@@ -85,10 +109,16 @@ public sealed class LhaReader : IContainerReader
                 _ => LevelZeroHeaderMinimumLength
             };
             if (archive.Length - offset < fixedHeaderLength)
+            {
                 throw new InvalidDataException("An LHA header is truncated.");
+            }
+
             uint levelThreeLength = headerLevel == 3 ? U32(archive.AsSpan(offset), 24) : 0;
             if (levelThreeLength > int.MaxValue)
+            {
                 throw new InvalidDataException("An LHA level-3 header exceeds the supported in-memory size.");
+            }
+
             int headerLength = headerLevel switch
             {
                 2 => U16(archive.AsSpan(offset), 0),
@@ -104,22 +134,35 @@ public sealed class LhaReader : IContainerReader
             if (headerLength < minimumHeaderLength ||
                 headerLevel is not 2 and not 3 && headerLength > MaximumHeaderLength ||
                 headerLength > archive.Length - offset)
+            {
                 throw new InvalidDataException("An LHA header is truncated or has an invalid size.");
+            }
+
             if (++entryCount > context.Options.MaxVolumeEntries)
+            {
                 throw new InvalidDataException("The LHA archive exceeds the configured entry limit.");
+            }
 
             ReadOnlySpan<byte> header = archive.AsSpan(offset, headerLength);
             if (headerLevel > 3)
+            {
                 throw new InvalidDataException("Only LHA level-0 through level-3 headers are supported.");
+            }
+
             if (headerLevel < 2 && HeaderChecksum(header.Slice(2, headerLength - 2)) != header[1])
+            {
                 throw new InvalidDataException("An LHA header checksum is invalid.");
+            }
 
             ReadOnlySpan<byte> method = header.Slice(2, 5);
             int nameLength = header[21];
             uint packedSizeValue = U32(header, 7);
             uint expandedSizeValue = U32(header, 11);
             if (packedSizeValue > int.MaxValue || expandedSizeValue > int.MaxValue)
+            {
                 throw new InvalidDataException("An LHA file exceeds the supported in-memory size.");
+            }
+
             int declaredPackedSize = (int)packedSizeValue;
             int packedSize = declaredPackedSize;
             int expandedSize = (int)expandedSizeValue;
@@ -129,7 +172,10 @@ public sealed class LhaReader : IContainerReader
             if (headerLevel == 0)
             {
                 if (headerLength < LevelZeroHeaderMinimumLength + nameLength)
+                {
                     throw new InvalidDataException("An LHA level-0 header has an invalid filename length.");
+                }
+
                 pathData = header.Slice(22, nameLength).ToArray();
                 // The OS identifier is an optional extension after the CRC. MacLHA 2.24 writes level-0 headers
                 // without one; such a name is read as MacRoman like an 'm' one ([Verified],
@@ -142,13 +188,19 @@ public sealed class LhaReader : IContainerReader
             else if (headerLevel == 1)
             {
                 if (headerLength < 27 + nameLength)
+                {
                     throw new InvalidDataException("An LHA level-1 header has an invalid filename length.");
+                }
+
                 osIdentifier = header[24 + nameLength];
                 ushort firstExtensionSize = U16(header, headerLength - 2);
                 LhaExtendedHeaders extensions = ReadLevelOneExtensions(archive,
                     checked(offset + headerLength), firstExtensionSize, declaredPackedSize);
                 if (extensions.Length > declaredPackedSize)
+                {
                     throw new InvalidDataException("An LHA level-1 header's extended headers exceed its skip size.");
+                }
+
                 packedSize = declaredPackedSize - extensions.Length;
                 pathData = CombinePath(extensions.DirectoryName, extensions.FileName ?? header.Slice(22, nameLength));
                 payloadOffset = checked(offset + headerLength + extensions.Length);
@@ -161,15 +213,23 @@ public sealed class LhaReader : IContainerReader
                     : ReadLevelThreeExtensions(header);
                 ValidateExtendedHeaderCrc(header, extensions.HeaderCrcOffset);
                 if (extensions.FileName is not { Length: > 0 })
+                {
                     throw new InvalidDataException($"An LHA level-{headerLevel} file has an empty filename.");
+                }
+
                 pathData = CombinePath(extensions.DirectoryName, extensions.FileName);
                 payloadOffset = checked(offset + headerLength);
             }
 
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput - expandedSize)
+            {
                 throw new InvalidDataException("LHA extraction exceeds the configured expanded-size limit.");
+            }
+
             if (packedSize > archive.Length - payloadOffset)
+            {
                 throw new InvalidDataException("An LHA file payload is truncated.");
+            }
 
             if (method.SequenceEqual("-lh0-"u8) || method.SequenceEqual("-lh1-"u8) ||
                 method.SequenceEqual("-lzs-"u8) || method.SequenceEqual("-lz5-"u8) ||
@@ -189,7 +249,10 @@ public sealed class LhaReader : IContainerReader
                 if (method.SequenceEqual("-lh0-"u8))
                 {
                     if (packedSize != expandedSize)
+                    {
                         throw new InvalidDataException("An uncompressed LHA file has different packed and expanded sizes.");
+                    }
+
                     decodedData = packedData.ToArray();
                 }
                 else if (IsNewStyleMethod(method))
@@ -226,19 +289,30 @@ public sealed class LhaReader : IContainerReader
                 }
 
                 if (Crc16Ibm(decodedData) != expectedCrc)
+                {
                     context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                         "An LHA file has a CRC-16 mismatch; its decoded data is retained.", payloadOffset);
+                }
 
                 if (pathData.Length == 0)
+                {
                     throw new InvalidDataException("An LHA file has an empty filename.");
+                }
+
                 MacFile? file = MakeFile(pathData, decodedData);
-                if (file is not null) files.Add(file);
+                if (file is not null)
+                {
+                    files.Add(file);
+                }
+
                 expandedBytes += expandedSize;
             }
             else if (method.SequenceEqual("-lhd-"u8))
             {
                 if (packedSize != 0 || expandedSize != 0)
+                {
                     throw new InvalidDataException("An LHA directory record has a nonempty payload.");
+                }
             }
             else
             {
@@ -251,8 +325,11 @@ public sealed class LhaReader : IContainerReader
         }
 
         if (!foundEndMarker)
+        {
             context.Report(DiagnosticSeverity.Warning, "archive.end-marker-missing",
                 "The LHA archive has no end marker.", offset);
+        }
+
         return files;
     }
 
@@ -262,11 +339,23 @@ public sealed class LhaReader : IContainerReader
         int start = 0;
         for (int index = 0; index <= path.Length; index++)
         {
-            if (index != path.Length && path[index] is not ((byte)'\\') and not ((byte)'/')) continue;
-            if (index > start) components.Add(new MacString(path[start..index]));
+            if (index != path.Length && path[index] is not ((byte)'\\') and not ((byte)'/'))
+            {
+                continue;
+            }
+
+            if (index > start)
+            {
+                components.Add(new MacString(path[start..index]));
+            }
+
             start = index + 1;
         }
-        if (components.Count == 0) return null;
+        if (components.Count == 0)
+        {
+            return null;
+        }
+
         var folders = components.GetRange(0, components.Count - 1).ToArray();
         return new MacFile
         {
@@ -285,10 +374,15 @@ public sealed class LhaReader : IContainerReader
         while (nextHeaderSize != 0)
         {
             if (nextHeaderSize < 3 || nextHeaderSize > packedSize - totalLength)
+            {
                 throw new InvalidDataException("An LHA level-1 extended header has an invalid size.");
+            }
+
             int extensionOffset = checked(offset + totalLength);
             if (extensionOffset > archive.Length || nextHeaderSize > archive.Length - extensionOffset)
+            {
                 throw new InvalidDataException("An LHA level-1 extended header is truncated.");
+            }
 
             ReadOnlySpan<byte> extension = archive.Slice(extensionOffset, nextHeaderSize);
             int dataLength = nextHeaderSize - 3;
@@ -321,7 +415,9 @@ public sealed class LhaReader : IContainerReader
         while (nextHeaderSize != 0)
         {
             if (nextHeaderSize < 3 || nextHeaderSize > extensionBytesRemaining - totalLength)
+            {
                 throw new InvalidDataException("An LHA level-2 extended header has an invalid size.");
+            }
 
             int extensionOffset = LevelTwoHeaderMinimumLength + totalLength;
             ReadOnlySpan<byte> extension = header.Slice(extensionOffset, nextHeaderSize);
@@ -330,7 +426,10 @@ public sealed class LhaReader : IContainerReader
             {
                 case 0x00:
                     if (dataLength < 2 || headerCrcOffset >= 0)
+                    {
                         throw new InvalidDataException("An LHA level-2 header has an invalid header-CRC extension.");
+                    }
+
                     headerCrcOffset = extensionOffset + 1;
                     break;
                 case 0x01:
@@ -347,9 +446,14 @@ public sealed class LhaReader : IContainerReader
 
         int padding = extensionBytesRemaining - totalLength;
         if (padding is not 0 and not 1)
+        {
             throw new InvalidDataException("An LHA level-2 header has an invalid padding length.");
+        }
+
         if (headerCrcOffset < 0)
+        {
             throw new InvalidDataException("An LHA level-2 header has no header-CRC extension.");
+        }
 
         return new LhaExtendedHeaders(totalLength, directoryName, fileName, headerCrcOffset);
     }
@@ -359,7 +463,10 @@ public sealed class LhaReader : IContainerReader
         int totalLength = 0;
         uint nextHeaderSizeValue = U32(header, 28);
         if (nextHeaderSizeValue > int.MaxValue)
+        {
             throw new InvalidDataException("An LHA level-3 extended header exceeds the supported size.");
+        }
+
         int nextHeaderSize = (int)nextHeaderSizeValue;
         int headerCrcOffset = -1;
         byte[]? directoryName = null;
@@ -368,7 +475,9 @@ public sealed class LhaReader : IContainerReader
         while (nextHeaderSize != 0)
         {
             if (nextHeaderSize < 5 || nextHeaderSize > header.Length - LevelThreeHeaderMinimumLength - totalLength)
+            {
                 throw new InvalidDataException("An LHA level-3 extended header has an invalid size.");
+            }
 
             int extensionOffset = LevelThreeHeaderMinimumLength + totalLength;
             ReadOnlySpan<byte> extension = header.Slice(extensionOffset, nextHeaderSize);
@@ -377,7 +486,10 @@ public sealed class LhaReader : IContainerReader
             {
                 case 0x00:
                     if (dataLength < 2 || headerCrcOffset >= 0)
+                    {
                         throw new InvalidDataException("An LHA level-3 header has an invalid header-CRC extension.");
+                    }
+
                     headerCrcOffset = extensionOffset + 1;
                     break;
                 case 0x01:
@@ -390,15 +502,23 @@ public sealed class LhaReader : IContainerReader
 
             uint nextSizeValue = U32(extension, nextHeaderSize - 4);
             if (nextSizeValue > int.MaxValue)
+            {
                 throw new InvalidDataException("An LHA level-3 extended header exceeds the supported size.");
+            }
+
             nextHeaderSize = (int)nextSizeValue;
             totalLength = checked(totalLength + extension.Length);
         }
 
         if (header.Length - LevelThreeHeaderMinimumLength - totalLength != 0)
+        {
             throw new InvalidDataException("An LHA level-3 header has an invalid padding length.");
+        }
+
         if (headerCrcOffset < 0)
+        {
             throw new InvalidDataException("An LHA level-3 header has no header-CRC extension.");
+        }
 
         return new LhaExtendedHeaders(totalLength, directoryName, fileName, headerCrcOffset);
     }
@@ -408,12 +528,17 @@ public sealed class LhaReader : IContainerReader
         ushort expectedCrc = U16(header, crcOffset);
         ushort actualCrc = Crc16IbmWithZeroedRange(header, crcOffset, 2);
         if (actualCrc != expectedCrc)
+        {
             throw new InvalidDataException("An LHA level-2 header CRC is invalid.");
+        }
     }
 
     private static byte[] CombinePath(byte[]? directoryName, ReadOnlySpan<byte> fileName)
     {
-        if (directoryName is null || directoryName.Length == 0) return fileName.ToArray();
+        if (directoryName is null || directoryName.Length == 0)
+        {
+            return fileName.ToArray();
+        }
         // The directory extension separates its names with $FF (LHa's header.doc; MacLHA 2.24 writes them so, with a
         // leading $FF before a volume name, [Verified], docs/formats/archives/lha.md).
         directoryName = [.. directoryName.Select(value => value == 0xFF ? (byte)'/' : value)];
@@ -421,7 +546,11 @@ public sealed class LhaReader : IContainerReader
         byte[] path = new byte[directoryName.Length + (hasSeparator ? 0 : 1) + fileName.Length];
         directoryName.CopyTo(path, 0);
         int filenameOffset = directoryName.Length;
-        if (!hasSeparator) path[filenameOffset++] = (byte)'/';
+        if (!hasSeparator)
+        {
+            path[filenameOffset++] = (byte)'/';
+        }
+
         fileName.CopyTo(path.AsSpan(filenameOffset));
         return path;
     }
@@ -438,7 +567,11 @@ public sealed class LhaReader : IContainerReader
     private static byte HeaderChecksum(ReadOnlySpan<byte> bytes)
     {
         byte checksum = 0;
-        foreach (byte value in bytes) checksum = unchecked((byte)(checksum + value));
+        foreach (byte value in bytes)
+        {
+            checksum = unchecked((byte)(checksum + value));
+        }
+
         return checksum;
     }
 
@@ -449,7 +582,9 @@ public sealed class LhaReader : IContainerReader
         {
             crc ^= value;
             for (int bit = 0; bit < 8; bit++)
+            {
                 crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+            }
         }
         return crc;
     }
@@ -462,7 +597,9 @@ public sealed class LhaReader : IContainerReader
             byte value = index >= zeroOffset && index - zeroOffset < zeroLength ? (byte)0 : bytes[index];
             crc ^= value;
             for (int bit = 0; bit < 8; bit++)
+            {
                 crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+            }
         }
         return crc;
     }

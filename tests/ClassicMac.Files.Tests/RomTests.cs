@@ -171,11 +171,26 @@ public class RomTests
         };
         var w = new BigEndianWriter(rom);
         var table = damage is "loop" or "type" or "pointer" ? RomResourceTable.Read(rom) : null;
-        if (damage == "pointer") w.WriteUInt32At(0x1A, (uint)rom.Length - 4);
-        if (damage == "loop") w.WriteUInt32At((int)table!.Entries[2].EntryOffset + 8, (uint)table.Entries[0].EntryOffset);
-        if (damage == "type") w.WriteByteAt((int)table!.Entries[1].EntryOffset + 8 + 8, 0x01);
+        if (damage == "pointer")
+        {
+            w.WriteUInt32At(0x1A, (uint)rom.Length - 4);
+        }
+
+        if (damage == "loop")
+        {
+            w.WriteUInt32At((int)table!.Entries[2].EntryOffset + 8, (uint)table.Entries[0].EntryOffset);
+        }
+
+        if (damage == "type")
+        {
+            w.WriteByteAt((int)table!.Entries[1].EntryOffset + 8 + 8, 0x01);
+        }
+
         Assert.False(MacRomReader.Instance.CanRead(ForkData.FromBytes(rom)));
-        if (damage != "length") Assert.Null(RomResourceTable.Read(rom));
+        if (damage != "length")
+        {
+            Assert.Null(RomResourceTable.Read(rom));
+        }
     }
 
     // Okumura's LZSS with literals only (flag $FF before every 8 bytes), plus one hand-made match.
@@ -254,7 +269,9 @@ public class RomTests
     {
         var path = Environment.GetEnvironmentVariable("CLASSICMAC_ROM_IMAGE");
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
             Assert.Skip("Set CLASSICMAC_ROM_IMAGE to a $077D ROM image or a NewWorld Mac OS ROM file.");
+        }
 
         var diagnostics = new List<Diagnostic>();
         var root = ContainerUnwrapper.Default.Unwrap(path, diagnostics: diagnostics);
@@ -277,17 +294,29 @@ public class RomTests
         foreach (var resource in fork.Resources)
         {
             var data = resource.GetData();
-            if (data.Length < 40 || !data.Span[..8].SequenceEqual("Joy!peff"u8)) continue;
+            if (data.Length < 40 || !data.Span[..8].SequenceEqual("Joy!peff"u8))
+            {
+                continue;
+            }
             // A PEF container ends with its last section (header 40 bytes, 28 per section header).
             var reader = new BigEndianReader(data);
             int sections = reader.ReadUInt16At(32);
             long end = 40 + 28 * sections;
             for (var i = 0; i < sections; i++)
+            {
                 end = Math.Max(end, (long)reader.ReadUInt32At(40 + 28 * i + 20) + reader.ReadUInt32At(40 + 28 * i + 16));
+            }
             // Most end exactly at the resource's end; the rest are padded to a multiple of 16 bytes.
             Assert.InRange(data.Length - end, 0, 15);
-            if (data.Length == end) exact++;
-            else Assert.Equal(0, data.Length % 16);
+            if (data.Length == end)
+            {
+                exact++;
+            }
+            else
+            {
+                Assert.Equal(0, data.Length % 16);
+            }
+
             pefs++;
         }
         Assert.Equal((51, 45), (pefs, exact));

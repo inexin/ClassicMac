@@ -32,11 +32,17 @@ namespace ClassicMac.Files.Containers
         {
             ArgumentNullException.ThrowIfNull(stored);
             ArgumentNullException.ThrowIfNull(name);
-            if (stored.Type != PcExchange.Placeholder.Type || stored.Creator != PcExchange.Placeholder.Creator) return stored;
+            if (stored.Type != PcExchange.Placeholder.Type || stored.Creator != PcExchange.Placeholder.Creator)
+            {
+                return stored;
+            }
+
             foreach (var (suffix, type, creator) in suffixes)
             {
                 if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                {
                     return stored with { Type = type, Creator = creator };
+                }
             }
             return stored;
         }

@@ -72,7 +72,11 @@ namespace ClassicMac.Files
         /// <summary>Writes <c>DInfo</c> and <c>DXInfo</c>, 32 bytes, as <see cref="Read"/> reads them.</summary>
         public void Write(Span<byte> destination)
         {
-            if (destination.Length < Length) throw new ArgumentException($"Folder Finder info needs {Length} bytes.", nameof(destination));
+            if (destination.Length < Length)
+            {
+                throw new ArgumentException($"Folder Finder info needs {Length} bytes.", nameof(destination));
+            }
+
             var writer = new BigEndianWriter(Length);
             writer.WriteMacRect(WindowBounds);
             writer.WriteUInt16((ushort)Flags);

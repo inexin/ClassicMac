@@ -40,7 +40,10 @@ namespace ClassicMac.Files.Rom
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(context);
             if (!TryLocate(input, out var offset, out var size))
+            {
                 throw new InvalidDataException("Not a NewWorld Mac OS ROM file with an LZSS image.");
+            }
+
             var image = Lzss.Decompress(input.Slice(offset, size).ToArray(), context.Options.MaxExpandedBytesPerInput);
             var name = image.Length >= 10
                 ? $"ROM ${new BigEndianReader(image).ReadUInt16At(8):X4}"
@@ -52,17 +55,32 @@ namespace ClassicMac.Files.Rom
         private static bool TryLocate(ForkData input, out long offset, out long size)
         {
             offset = size = 0;
-            if (!input.ReadPrefix(Signature.Length).AsSpan().SequenceEqual(Signature)) return false;
+            if (!input.ReadPrefix(Signature.Length).AsSpan().SequenceEqual(Signature))
+            {
+                return false;
+            }
+
             var prefix = input.ReadPrefix((int)Math.Min(input.Length, ScriptSearchLength));
             var script = Encoding.Latin1.GetString(prefix);
             var end = script.IndexOf("</CHRP-BOOT>", StringComparison.Ordinal);
-            if (end >= 0) script = script[..end];
+            if (end >= 0)
+            {
+                script = script[..end];
+            }
+
             var offsetMatch = OffsetConstant().Match(script);
             var sizeMatch = SizeConstant().Match(script);
-            if (!offsetMatch.Success || !sizeMatch.Success) return false;
+            if (!offsetMatch.Success || !sizeMatch.Success)
+            {
+                return false;
+            }
+
             if (!long.TryParse(offsetMatch.Groups[1].ValueSpan, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out offset) ||
                 !long.TryParse(sizeMatch.Groups[1].ValueSpan, NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out size))
+            {
                 return false;
+            }
+
             return size > 0 && offset >= 0 && offset <= input.Length - size;
         }
 

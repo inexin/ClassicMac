@@ -41,8 +41,15 @@ namespace ClassicMac.Resources.Cli
                 return ExitCodes.IoError;
             }
 
-            if (format == CommandLine.ListFormat.Json) WriteJson(input, entries);
-            else WriteText(entries);
+            if (format == CommandLine.ListFormat.Json)
+            {
+                WriteJson(input, entries);
+            }
+            else
+            {
+                WriteText(entries);
+            }
+
             return reporter.ExitCode;
         }
 
@@ -52,7 +59,10 @@ namespace ClassicMac.Resources.Cli
             {
                 // A lone raw fork prints its table only, as before containers existed.
                 if (entries.Count > 1 || entry.Chain[0] != "raw resource fork")
+                {
                     output.WriteLine($"\"{entry.Path}\" ({string.Join(" > ", entry.Chain)})");
+                }
+
                 if (entry.Fork is not { } fork)
                 {
                     output.WriteLine("  no resource fork");

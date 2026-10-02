@@ -44,7 +44,9 @@ namespace ClassicMac.Resources.Export
             ArgumentNullException.ThrowIfNull(source);
             options ??= ExportOptions.Default;
             if (!options.Overwrite && Directory.Exists(directory) && Directory.EnumerateFileSystemEntries(directory).Any())
+            {
                 throw new IOException($"{directory} is not empty.");
+            }
 
             var diagnostics = new List<Diagnostic>(fork.Diagnostics);
             var resources = fork.Resources.Where(r => options.Types is null || options.Types.Contains(r.Type)).ToList();
@@ -96,7 +98,11 @@ namespace ClassicMac.Resources.Export
                 var longest = outputs.Max(o => o.Extension.Length);
                 var budget = Math.Max(8, options.MaxPathLength - folder.Length - 1 - longest);
                 var stem = HostNames.ToHostName(FileStem(resource), budget);
-                if (!taken.TryGetValue(folder, out var names)) taken[folder] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (!taken.TryGetValue(folder, out var names))
+                {
+                    taken[folder] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                }
+
                 Directory.CreateDirectory(Path.Combine(directory, folder));
                 var written = new List<ManifestFile>();
                 foreach (var output in outputs)
@@ -133,7 +139,10 @@ namespace ClassicMac.Resources.Export
                 var input = new DocumentInput(fork, dataFork ?? (() => ReadOnlyMemory<byte>.Empty), source.Type, source.Creator,
                     source.Name.ToString(), options.ReadOptions, diagnostics);
                 document = DocumentExport.Write(options.Documents, input, Path.Combine(directory, DocumentFolder), DocumentFolder + "/");
-                if (document is not null) files.AddRange(document.Files.Select(f => Path.Combine([directory, .. f.Path.Split('/')])));
+                if (document is not null)
+                {
+                    files.AddRange(document.Files.Select(f => Path.Combine([directory, .. f.Path.Split('/')])));
+                }
             }
 
             var manifest = new ExportManifest(
@@ -160,7 +169,11 @@ namespace ClassicMac.Resources.Export
 
         private static short? Dcmp(Resource resource)
         {
-            if ((resource.Attributes & ResourceAttributes.Compressed) == 0) return null;
+            if ((resource.Attributes & ResourceAttributes.Compressed) == 0)
+            {
+                return null;
+            }
+
             return CompressedResourceHeader.TryRead(resource.GetData(), out var header) && header.IsCompressed
                 ? header.DecompressorId
                 : null;

@@ -54,7 +54,11 @@ namespace ClassicMac.Resources.Decoders.Finder
                 if ((Flags & HasBeenInitedFlag) == 0)
                 {
                     short h = unchecked((short)(Location.H + 20000)), v = unchecked((short)(Location.V + 20000));
-                    if (h is <= -4000 or >= 4000 || v <= -4000) return null;
+                    if (h is <= -4000 or >= 4000 || v <= -4000)
+                    {
+                        return null;
+                    }
+
                     point = new MacPoint(v, h);
                 }
                 return point == default || point == new MacPoint(-1, -1) ? null : point;
@@ -219,8 +223,12 @@ namespace ClassicMac.Resources.Decoders.Finder
             port.PenNormal();
             PlatinumArt.FinderFrame.Paint(port, 0, 0, canvas.Width, canvas.Height, RgbColor.White);
             for (int y = 0; y < content.Height; y++)
+            {
                 for (int x = 0; x < content.Width; x++)
+                {
                     canvas[x + FrameLeft, y + FrameTop] = content[x, y];
+                }
+            }
             // The grow box reaches over the content's right line into the frame [Verified: Mac OS 9.0 Finder].
             PlatinumArt.GrowBox.Paint(port, FrameLeft + content.Width - ScrollBarSize, FrameTop + content.Height - ScrollBarSize, RgbColor.White);
             port.ForeColor = PlatinumArt.TitleBar;
@@ -242,7 +250,11 @@ namespace ClassicMac.Resources.Decoders.Finder
             int textWidth = TitleWidth(port, name, options);
             int iconWidth = window.TitleIcon is null ? 0 : 20;
             int total = iconWidth + textWidth;
-            if (total == 0) return;
+            if (total == 0)
+            {
+                return;
+            }
+
             int start = (width - total) / 2;
             port.PenNormal();
             port.ForeColor = PlatinumArt.TitleBar;
@@ -252,12 +264,23 @@ namespace ClassicMac.Resources.Decoders.Finder
                 (port.ForeColor, port.BackColor) = (RgbColor.Black, RgbColor.White);
                 icon.Plot(port, new MacRect(3, (short)start, 19, (short)(start + 16)), IconAlignment.None, IconTransform.None, null);
             }
-            if (name.Length == 0) return;
+            if (name.Length == 0)
+            {
+                return;
+            }
+
             port.Clip = Region.FromRect(PlatinumArt.Rect(1, 22, 20, width - 39));
             TitleStyle(port);
             port.MoveTo(start + iconWidth, 15);
-            if (port.StringWidth(name) > 0) port.DrawString(name);
-            else if (options.TextFallback is not null) port.DrawString(name);
+            if (port.StringWidth(name) > 0)
+            {
+                port.DrawString(name);
+            }
+            else if (options.TextFallback is not null)
+            {
+                port.DrawString(name);
+            }
+
             port.Clip = null;
         }
 
@@ -273,10 +296,22 @@ namespace ClassicMac.Resources.Decoders.Finder
         // The title's width in the system font, measured by what draws it.
         private static int TitleWidth(QuickDrawPort port, string name, FinderWindowOptions options)
         {
-            if (name.Length == 0) return 0;
+            if (name.Length == 0)
+            {
+                return 0;
+            }
+
             TitleStyle(port);
-            if (port.StringWidth(name) is > 0 and var width) return width;
-            if (options.TextFallback?.Render(name, new TextFallbackStyle(0, 0, 12)) is { } mask) return (int)Math.Round(mask.Advance);
+            if (port.StringWidth(name) is > 0 and var width)
+            {
+                return width;
+            }
+
+            if (options.TextFallback?.Render(name, new TextFallbackStyle(0, 0, 12)) is { } mask)
+            {
+                return (int)Math.Round(mask.Advance);
+            }
+
             return name.Length * 7;                             // [ClassicMac: Charcoal 12's average width, for layout without fonts]
         }
 
@@ -289,7 +324,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         public static string HeaderText(int count, long? freeBytes)
         {
             var items = string.Create(CultureInfo.InvariantCulture, $"{count} item{(count == 1 ? "" : "s")}");
-            if (freeBytes is not { } free) return items;
+            if (freeBytes is not { } free)
+            {
+                return items;
+            }
+
             static string Tenths(long bytes, long unit, string name)
             {
                 long tenths = bytes * 10 / unit;
@@ -317,7 +356,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// </summary>
         public static (int At, int Length)? Thumb(int track, int visible, int range, int value)
         {
-            if (range <= 0 || track <= 0) return null;
+            if (range <= 0 || track <= 0)
+            {
+                return null;
+            }
+
             int length = (int)Math.Max(16, (long)track * visible / ((long)visible + range));
             length = Math.Min(length, track);
             int at = (int)((long)(track - length) * Math.Clamp(value, 0, range) / range);
@@ -368,8 +411,11 @@ namespace ClassicMac.Resources.Decoders.Finder
             var placed = Place(window, Port(new RgbaBitmap(1, 1), options), options);
             int width = Width(window), height = Height(window);
             if (!window.HasBounds && placed.Any(p => p.Placement.Arranged))
+            {
                 height = Math.Max(height, HeaderHeight + placed.Where(p => p.Placement.Arranged).Max(p => p.Placement.Location.V) - Scroll(window).V
                     + layout.CellHeight + ScrollBarSize);
+            }
+
             var canvas = new RgbaBitmap(width, height);
             var port = Port(canvas, options);
             port.EraseRect(port.PortRect);
@@ -379,13 +425,29 @@ namespace ClassicMac.Resources.Decoders.Finder
             {
                 var item = placement.Item;
                 int v = HeaderHeight + placement.Location.V - scroll.V, h = placement.Location.H - scroll.H;
-                if (layout.Frame(v, h) is { } frame) BevelButton(port, frame);
+                if (layout.Frame(v, h) is { } frame)
+                {
+                    BevelButton(port, frame);
+                }
+
                 (port.ForeColor, port.BackColor) = (RgbColor.Black, RgbColor.White);
                 // PlotIconRef with the label in the transform's bits 8-11 [Code: Finder 9.2.2]; badges composited on it.
                 var transform = (IconTransform)(item.Label << 8);
-                if (item.Icon?.Plot(port, placement.IconRect, layout.Alignment, transform, colours) != true) Placeholder(port, placement.IconRect, item.Kind);
-                foreach (var badge in item.Badges) badge.Plot(port, placement.IconRect, IconAlignment.None, transform, colours);
-                if (name.Text.Length == 0) continue;
+                if (item.Icon?.Plot(port, placement.IconRect, layout.Alignment, transform, colours) != true)
+                {
+                    Placeholder(port, placement.IconRect, item.Kind);
+                }
+
+                foreach (var badge in item.Badges)
+                {
+                    badge.Plot(port, placement.IconRect, IconAlignment.None, transform, colours);
+                }
+
+                if (name.Text.Length == 0)
+                {
+                    continue;
+                }
+
                 TextStyle(port, options, name.Face);
                 var (penH, baseline) = layout.Pen(v, h, name.Width);
                 port.MoveTo(penH, baseline);
@@ -399,7 +461,10 @@ namespace ClassicMac.Resources.Decoders.Finder
 
         private static QuickDrawPort Port(RgbaBitmap canvas, FinderWindowOptions options) => new(canvas, new QuickDrawOptions
         {
-            ScreenDepth = options.ScreenDepth, Version = options.QuickDraw, Fonts = options.Fonts, TextFallback = options.TextFallback,
+            ScreenDepth = options.ScreenDepth,
+            Version = options.QuickDraw,
+            Fonts = options.Fonts,
+            TextFallback = options.TextFallback,
         });
 
         private static int Width(FinderWindow window) => window.HasBounds ? window.Bounds.Width : DefaultWidth;
@@ -412,8 +477,16 @@ namespace ClassicMac.Resources.Decoders.Finder
         // Shown: not invisible, and at a volume's root not one of the volume's own files or folders [Code: Finder 9.2.2].
         private static bool Shown(FinderWindowItem item, bool root)
         {
-            if (item.IsInvisible) return false;
-            if (!root) return true;
+            if (item.IsInvisible)
+            {
+                return false;
+            }
+
+            if (!root)
+            {
+                return true;
+            }
+
             var name = item.Name.ToMacRoman();
             return !(item.Kind == FinderItemKind.Folder ? RootFolders : RootFiles).Contains(name);
         }
@@ -430,10 +503,20 @@ namespace ClassicMac.Resources.Decoders.Finder
             var names = items.Select(i => FitName(port, i, layout, options)).ToList();
             var occupied = new List<Box>();
             for (int i = 0; i < items.Count; i++)
-                if (items[i].Position is { } position) Occupy(occupied, layout, position, names[i].Width, options.LabelFontSize);
+            {
+                if (items[i].Position is { } position)
+                {
+                    Occupy(occupied, layout, position, names[i].Width, options.LabelFontSize);
+                }
+            }
+
             bool placed = occupied.Count > 0;
             // Small icons keep clear of all the placed items together [Fitted: Mac OS 9.0 Finder].
-            if (placed && layout.Columns) occupied.Add(occupied.Aggregate((a, b) => a.Union(b)));
+            if (placed && layout.Columns)
+            {
+                occupied.Add(occupied.Aggregate((a, b) => a.Union(b)));
+            }
+
             var start = layout.Start(placed, scroll);
             int visibleRight = scroll.H + Width(window) - ScrollBarSize;
             int visibleBottom = scroll.V + Height(window) - HeaderHeight - ScrollBarSize;
@@ -443,7 +526,11 @@ namespace ClassicMac.Resources.Decoders.Finder
                 var item = items[i];
                 bool arranged = item.Position is null;
                 var location = item.Position ?? Arrange(occupied, layout, start, visibleRight, visibleBottom, names[i].Width);
-                if (arranged) Occupy(occupied, layout, location, names[i].Width, options.LabelFontSize);
+                if (arranged)
+                {
+                    Occupy(occupied, layout, location, names[i].Width, options.LabelFontSize);
+                }
+
                 var icon = layout.Icon(HeaderHeight + location.V - scroll.V, location.H - scroll.H);
                 var rect = new MacRect((short)icon.Top, (short)icon.Left, (short)icon.Bottom, (short)icon.Right);
                 result.Add((new FinderWindowPlacement(item, location, rect, arranged), names[i]));
@@ -508,7 +595,11 @@ namespace ClassicMac.Resources.Decoders.Finder
             // 3 below it, 2 either side of the text [ClassicMac], a small icon's from h + 17 [Verified: Mac OS 9.0 Finder].
             public Box LabelBox(int v, int h, int width)
             {
-                if (Kind == FinderViewKind.LargeIcon) return Box.Label(v, h, width);
+                if (Kind == FinderViewKind.LargeIcon)
+                {
+                    return Box.Label(v, h, width);
+                }
+
                 var (penH, baseline) = Pen(v, h, width);
                 int left = Kind == FinderViewKind.SmallIcon ? h + 17 : penH - 2;
                 return new Box(baseline - 10, left, baseline + 3, left + width + (Kind == FinderViewKind.SmallIcon ? 2 : 4));
@@ -548,9 +639,19 @@ namespace ClassicMac.Resources.Decoders.Finder
                     continue;
                 }
                 Box body = layout.Body(v, h), label = layout.LabelBox(v, h, nameWidth);
-                if (!occupied.Any(o => o.Intersects(body) || o.Intersects(label))) return new MacPoint(unchecked((short)v), unchecked((short)h));
-                if (layout.Columns) v += layout.CellHeight;
-                else h += layout.CellWidth;
+                if (!occupied.Any(o => o.Intersects(body) || o.Intersects(label)))
+                {
+                    return new MacPoint(unchecked((short)v), unchecked((short)h));
+                }
+
+                if (layout.Columns)
+                {
+                    v += layout.CellHeight;
+                }
+                else
+                {
+                    h += layout.CellWidth;
+                }
             }
         }
 
@@ -585,10 +686,18 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             var face = Face(item);
             int width = TextWidth(port, item.Name, face, options);
-            if (layout.Kind != FinderViewKind.SmallIcon || width + 2 <= SmallNameWidth) return new Name(item.Name, face, width);
+            if (layout.Kind != FinderViewKind.SmallIcon || width + 2 <= SmallNameWidth)
+            {
+                return new Name(item.Name, face, width);
+            }
+
             face |= QuickDrawStyle.Condense;
             width = TextWidth(port, item.Name, face, options);
-            if (width + 2 <= SmallNameWidth) return new Name(item.Name, face, width);
+            if (width + 2 <= SmallNameWidth)
+            {
+                return new Name(item.Name, face, width);
+            }
+
             var text = TruncateMiddle(port, item.Name, face, options, SmallNameWidth - 2);
             return new Name(text, face, TextWidth(port, text, face, options));
         }
@@ -602,7 +711,10 @@ namespace ClassicMac.Resources.Decoders.Finder
             {
                 int head = (keep + 1) / 2, tail = keep / 2;
                 var candidate = new MacString([.. bytes[..head], 0xC9, .. bytes[^tail..]]);
-                if (TextWidth(port, candidate, face, options) <= width) return candidate;
+                if (TextWidth(port, candidate, face, options) <= width)
+                {
+                    return candidate;
+                }
             }
             return new MacString([0xC9]);
         }
@@ -612,10 +724,17 @@ namespace ClassicMac.Resources.Decoders.Finder
         private static int TextWidth(QuickDrawPort port, MacString text, QuickDrawStyle face, FinderWindowOptions options)
         {
             TextStyle(port, options, face);
-            if (text.Length == 0) return 0;
+            if (text.Length == 0)
+            {
+                return 0;
+            }
+
             int width = port.TextWidth(text.Bytes);
             if (width == 0 && options.TextFallback?.Render(text.ToMacRoman(), new TextFallbackStyle(options.LabelFontId, (int)face, options.LabelFontSize)) is { } mask)
+            {
                 width = (int)Math.Round(mask.Advance);
+            }
+
             return width;
         }
 
@@ -686,9 +805,19 @@ namespace ClassicMac.Resources.Decoders.Finder
         {
             void Paint(PlatinumArt art, int at, int length)
             {
-                if (length <= 0) return;
-                if (vertical) art.Paint(port, across, at, 16, length, RgbColor.White);
-                else art.Paint(port, at, across, length, 16, RgbColor.White);
+                if (length <= 0)
+                {
+                    return;
+                }
+
+                if (vertical)
+                {
+                    art.Paint(port, across, at, 16, length, RgbColor.White);
+                }
+                else
+                {
+                    art.Paint(port, at, across, length, 16, RgbColor.White);
+                }
             }
             int arrows = end - 30;
             var pieces = vertical ? Pieces.Vertical : Pieces.Horizontal;

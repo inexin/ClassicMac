@@ -99,12 +99,23 @@ namespace ClassicMac.App.ViewModels
             get => selected;
             set
             {
-                if (ReferenceEquals(selected, value)) return;
+                if (ReferenceEquals(selected, value))
+                {
+                    return;
+                }
+
                 if (askingDraft || HasDraft)
                 {
-                    if (!askingDraft) DraftTask = SelectAfterDraftAsync(value);
+                    if (!askingDraft)
+                    {
+                        DraftTask = SelectAfterDraftAsync(value);
+                    }
                     // The tree (bound two-way) already shows the new node: told again, it shows the kept one.
-                    if (!ReferenceEquals(selected, value)) Refuse(nameof(Selected));
+                    if (!ReferenceEquals(selected, value))
+                    {
+                        Refuse(nameof(Selected));
+                    }
+
                     return;
                 }
                 var old = selected;
@@ -113,7 +124,10 @@ namespace ClassicMac.App.ViewModels
                 OnPropertyChanged(nameof(Selected));
                 foreach (var command in new IRelayCommand[] { CloseCommand, SaveResourceAsCommand, ExportResourcesCommand, ExtractAllCommand, UnpackAppleDoubleCommand,
                     UnpackBasiliskCommand })
+                {
                     command.NotifyCanExecuteChanged();
+                }
+
                 OnSelectedChanged(value);
                 OnSelectedChanged(old, value);
             }
@@ -191,7 +205,11 @@ namespace ClassicMac.App.ViewModels
                 var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report, TreeDisplay);
                 Roots.Add(input);
                 UpdateHiddenCount();
-                foreach (var d in diagnostics) Report(new DiagnosticEntry(d, Tree.SourceOf(input, d), input));
+                foreach (var d in diagnostics)
+                {
+                    Report(new DiagnosticEntry(d, Tree.SourceOf(input, d), input));
+                }
+
                 Selected = input;
                 input.IsExpanded = true;
                 var files = root.Leaves().Count();
@@ -209,15 +227,30 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand]
         private async Task Open()
         {
-            if (FilePicker is null) return;
-            foreach (var path in await FilePicker.PickFilesAsync()) await OpenAsync(path);
+            if (FilePicker is null)
+            {
+                return;
+            }
+
+            foreach (var path in await FilePicker.PickFilesAsync())
+            {
+                await OpenAsync(path);
+            }
         }
 
         [RelayCommand(CanExecute = nameof(CanClose))]
         private async Task Close()
         {
-            if (Selected?.Input is not { } input) return;
-            if (!await ConfirmCloseAsync([input])) return;
+            if (Selected?.Input is not { } input)
+            {
+                return;
+            }
+
+            if (!await ConfirmCloseAsync([input]))
+            {
+                return;
+            }
+
             RemoveInput(input);
         }
 
@@ -270,8 +303,16 @@ namespace ClassicMac.App.ViewModels
             try
             {
                 // An unread container is read first, as expanding it does, so its contents show.
-                if (node is ContainerFileNode { Node.UnreadFormat: not null } unread) await unread.EnsureLoadedAsync();
-                if (cancellation.IsCancellationRequested) return;
+                if (node is ContainerFileNode { Node.UnreadFormat: not null } unread)
+                {
+                    await unread.EnsureLoadedAsync();
+                }
+
+                if (cancellation.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
                     ReadOptions, diagnostics, cancellation.Token,
                     node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL"
@@ -286,12 +327,29 @@ namespace ClassicMac.App.ViewModels
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "preview.failed", e.Message));
                 result = PreviewViewModel.None;
             }
-            if (cancellation.IsCancellationRequested) return;
-            foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
+            if (cancellation.IsCancellationRequested)
+            {
+                return;
+            }
+
+            foreach (var d in diagnostics)
+            {
+                Report(new DiagnosticEntry(d, node.Source, node));
+            }
             // Small images (icons, patterns) open enlarged.
-            if (result.Kind == PreviewKind.Image) Zoom = result.Images[0] is { Width: <= 64, Height: <= 64 } ? (result.Images.Any(i => i.Width > 256) ? 2 : 4) : 1;
-            else if (result.Kind is PreviewKind.Dialog or PreviewKind.Menu) Zoom = 2;
-            else if (result.Kind == PreviewKind.Folder) Zoom = 1;
+            if (result.Kind == PreviewKind.Image)
+            {
+                Zoom = result.Images[0] is { Width: <= 64, Height: <= 64 } ? (result.Images.Any(i => i.Width > 256) ? 2 : 4) : 1;
+            }
+            else if (result.Kind is PreviewKind.Dialog or PreviewKind.Menu)
+            {
+                Zoom = 2;
+            }
+            else if (result.Kind == PreviewKind.Folder)
+            {
+                Zoom = 1;
+            }
+
             Preview = result;
             if (result.HasPreview)
             {
@@ -312,8 +370,10 @@ namespace ClassicMac.App.ViewModels
         // Selecting a diagnostic shows its node: its ancestors open and it becomes the selection.
         partial void OnSelectedDiagnosticChanged(DiagnosticEntry? value)
         {
-            if (value?.Node is not { } node) return;
-            for (var at = node.Parent; at is not null; at = at.Parent) at.IsExpanded = true;
+            if (value?.Node is not { } node)
+                return;
+            for (var at = node.Parent; at is not null; at = at.Parent)
+                at.IsExpanded = true;
             Selected = node;
         }
 
@@ -327,12 +387,24 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand(CanExecute = nameof(CanShowItem))]
         private async Task ShowItem(DiagnosticEntry? entry)
         {
-            if (entry?.Node is not { } node) return;
+            if (entry?.Node is not { } node)
+            {
+                return;
+            }
+
             var before = Selected;
-            for (var at = node.Parent; at is not null; at = at.Parent) at.IsExpanded = true;
+            for (var at = node.Parent; at is not null; at = at.Parent)
+            {
+                at.IsExpanded = true;
+            }
+
             Selected = node;
             await DraftTask;
-            if (Selected is not { } shown || ReferenceEquals(shown, before) && !ReferenceEquals(before, node)) return;
+            if (Selected is not { } shown || ReferenceEquals(shown, before) && !ReferenceEquals(before, node))
+            {
+                return;
+            }
+
             ItemShown?.Invoke(shown);
         }
 

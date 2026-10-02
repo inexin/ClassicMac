@@ -108,8 +108,14 @@ public sealed record TracebackTable
         for (int offset = 4; offset <= code.Length - 12; offset += 4)
         {
             if (reader.ReadUInt32At(offset) != 0 || reader.ReadUInt32At(offset - 4) != Blr || reader.ReadByteAt(offset + 4) != 0)
+            {
                 continue;
-            if (Read(reader, offset, diagnostics) is { } table) tables.Add(table);
+            }
+
+            if (Read(reader, offset, diagnostics) is { } table)
+            {
+                tables.Add(table);
+            }
         }
         return tables;
     }
@@ -117,63 +123,112 @@ public sealed record TracebackTable
     private static TracebackTable? Read(BigEndianReader reader, int offset, ICollection<Diagnostic> diagnostics)
     {
         reader.Position = offset;
-        if (!reader.TryReadUInt32(out uint zero)) return Truncated();
-        if (zero != 0) return null;
-        if (!reader.TryReadUInt64(out ulong flags)) return Truncated();
+        if (!reader.TryReadUInt32(out uint zero))
+        {
+            return Truncated();
+        }
+
+        if (zero != 0)
+        {
+            return null;
+        }
+
+        if (!reader.TryReadUInt64(out ulong flags))
+        {
+            return Truncated();
+        }
+
         var table = new TracebackTable { Offset = offset, Flags = flags };
 
         uint? parameterInfo = null, tbOffset = null, handlerMask = null;
         if (table.FixedParameterCount != 0 || table.FloatParameterCount != 0)
         {
-            if (!reader.TryReadUInt32(out uint p)) return Truncated();
+            if (!reader.TryReadUInt32(out uint p))
+            {
+                return Truncated();
+            }
+
             parameterInfo = p;
         }
         if (table.HasTbOffset)
         {
-            if (!reader.TryReadUInt32(out uint t)) return Truncated();
+            if (!reader.TryReadUInt32(out uint t))
+            {
+                return Truncated();
+            }
+
             tbOffset = t;
         }
         if (table.IsInterruptHandler)
         {
-            if (!reader.TryReadUInt32(out uint h)) return Truncated();
+            if (!reader.TryReadUInt32(out uint h))
+            {
+                return Truncated();
+            }
+
             handlerMask = h;
         }
         uint[] controlled = [];
         if (table.HasControlledStorage)
         {
-            if (!reader.TryReadUInt32(out uint count)) return Truncated();
-            if (count > (uint)reader.Remaining / 4) return Truncated();
+            if (!reader.TryReadUInt32(out uint count))
+            {
+                return Truncated();
+            }
+
+            if (count > (uint)reader.Remaining / 4)
+            {
+                return Truncated();
+            }
+
             controlled = new uint[count];
-            for (int i = 0; i < controlled.Length; i++) controlled[i] = reader.ReadUInt32();
+            for (int i = 0; i < controlled.Length; i++)
+            {
+                controlled[i] = reader.ReadUInt32();
+            }
         }
         string? name = null;
         if (table.HasName)
         {
-            if (!reader.TryReadUInt16(out ushort length) || length > reader.Remaining) return Truncated();
+            if (!reader.TryReadUInt16(out ushort length) || length > reader.Remaining)
+            {
+                return Truncated();
+            }
+
             name = MacRoman.Decode(reader.ReadBytes(length));
         }
         byte? allocaRegister = null;
         if (table.UsesAlloca)
         {
-            if (!reader.TryReadByte(out byte r)) return Truncated();
+            if (!reader.TryReadByte(out byte r))
+            {
+                return Truncated();
+            }
+
             allocaRegister = r;
         }
 
         // has_vec and has_ext_table add the vector extension and an extension byte after alloca_reg [Doc: AIX
         // sys/debug.h]. Whether a Mac OS compiler sets them is not known, so they are reported, not read.
         if (table.HasVectorInfo || table.HasExtensionTable)
+        {
             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "traceback.extension-unread",
                 $"The traceback table at 0x{offset:X} has vector or extension fields after alloca_reg, not read.",
                 offset));
+        }
 
         int? functionStart = null;
         if (tbOffset is { } tb)
         {
             if (tb > (uint)offset)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "traceback.bad-offset",
                     $"The traceback table at 0x{offset:X} gives tb_offset 0x{tb:X}, before the start of the code.", offset));
+            }
             else
+            {
                 functionStart = offset - (int)tb;
+            }
         }
         return table with
         {

@@ -27,7 +27,11 @@ public class TreeRowTests : IDisposable
     {
         using var stream = new MemoryStream();
         using (var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true))
-            using (var entry = new StreamWriter(zip.CreateEntry("a.txt").Open())) entry.Write("a");
+        using (var entry = new StreamWriter(zip.CreateEntry("a.txt").Open()))
+        {
+            entry.Write("a");
+        }
+
         return stream.ToArray();
     }
 
@@ -150,11 +154,14 @@ public class TreeRowTests : IDisposable
         using var decoded = SkiaSharp.SKBitmap.Decode(png);
         var bitmap = new RgbaBitmap(decoded.Width, decoded.Height);
         for (int y = 0; y < decoded.Height; y++)
+        {
             for (int x = 0; x < decoded.Width; x++)
             {
                 var c = decoded.GetPixel(x, y);
                 bitmap[x, y] = new RgbaColor(c.Red, c.Green, c.Blue, c.Alpha);
             }
+        }
+
         return bitmap;
     }
 
@@ -200,13 +207,23 @@ public class TreeRowTests : IDisposable
     {
         var bitmap = new RgbaBitmap(32, 32);
         for (int y = 0; y < 32; y++)
+        {
             for (int x = 0; x < 32; x++)
+            {
                 bitmap[x, y] = (x / 2 + y / 2) % 2 == 0 ? Black : White;
+            }
+        }
+
         var small = Decode(NodeViewModel.Shrink16(bitmap));
         Assert.Equal((16, 16), (small.Width, small.Height));
         for (int y = 0; y < 16; y++)
+        {
             for (int x = 0; x < 16; x++)
+            {
                 Assert.Equal((x + y) % 2 == 0 ? Black : White, small[x, y]);
+            }
+        }
+
         await Task.CompletedTask;
     }
 

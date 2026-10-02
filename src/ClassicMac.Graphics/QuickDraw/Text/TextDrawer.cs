@@ -35,9 +35,21 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             penFrac &= 0xFFFF;
             advance = 0;
-            if (text.Length == 0) return penFrac;
-            if (s.MacOS9 && text.Length == 1 && text[0] == '\r') return penFrac;   // Mac OS 9: a lone CR draws nothing
-            if (s.Palette != null) return DrawColorFont(canvas, s, text, penH, penV, penFrac, charExtra, clip, hilitePending, colors, out advance);
+            if (text.Length == 0)
+            {
+                return penFrac;
+            }
+
+            if (s.MacOS9 && text.Length == 1 && text[0] == '\r')
+            {
+                return penFrac;   // Mac OS 9: a lone CR draws nothing
+            }
+
+            if (s.Palette != null)
+            {
+                return DrawColorFont(canvas, s, text, penH, penV, penFrac, charExtra, clip, hilitePending, colors, out advance);
+            }
+
             var f = s.Font;
 
             int cx = CharExtra(s, charExtra);
@@ -59,15 +71,26 @@ namespace ClassicMac.Graphics.QuickDraw
                 int rounded = (width + 0x8000) >> 16, it = (sbyte)s.Italic;
                 int right = inkRight;
                 bool extended = mode == 0 || mode > 3 || s.UlThick != 0;
-                if (extended) right = Math.Max(right, rounded);
+                if (extended)
+                {
+                    right = Math.Max(right, rounded);
+                }
+
                 right += s.Bold + (it != 0 ? it * (f.Ascent - 1) / 16 - s.Extra : 0) + (s.Shadow != 0 ? Math.Min(s.Shadow + 1, 4) : 0);
-                if (s.Extra > 0) right = Math.Max(right - s.Extra, rounded);
+                if (s.Extra > 0)
+                {
+                    right = Math.Max(right - s.Extra, rounded);
+                }
+
                 int left = Math.Min(inkLeft - (it != 0 ? it * (f.Descent - 1) / 16 : 0), 0);
                 // Vertically the ink rows, from the baseline up at least, for srcOr / srcXor / srcBic; the whole font
                 // rect for the other modes, underline and shadow.
                 int rectTop = top, rectBottom = top + f.RectHeight;
                 if (!extended && s.Shadow == 0)
+                {
                     (rectTop, rectBottom) = (penV + Math.Min(inkTop, 0), penV + Math.Max(inkBottom, Math.Min(inkTop, 0)));
+                }
+
                 textRect = new PictRect((short)rectTop, (short)(penH + left), (short)rectBottom, (short)(penH + right));
             }
             else
@@ -76,9 +99,16 @@ namespace ClassicMac.Graphics.QuickDraw
                 if (f.MaxKern < 0)
                 {
                     int ow = f.RawOffsetWidth(text[0]);
-                    if (ow == -1) ow = f.RawOffsetWidth(0);
+                    if (ow == -1)
+                    {
+                        ow = f.RawOffsetWidth(0);
+                    }
+
                     int offset = ((ow >> 8) & 0xFF) + f.MaxKern;
-                    if (offset <= 0) kern = offset;
+                    if (offset <= 0)
+                    {
+                        kern = offset;
+                    }
                 }
                 int penFixed = unchecked((penH << 16) | penFrac);
                 int right = (short)((uint)unchecked(penFixed + width) >> 16);
@@ -113,7 +143,11 @@ namespace ClassicMac.Graphics.QuickDraw
             int bufLeft = (short)(textRect.Left & ~31);
             int rowLongs = ((ushort)(textRect.Right - bufLeft) >> 5) + 2;
             int bufWidth = rowLongs * 32, height = f.RectHeight;
-            if (height <= 0) return newFrac;
+            if (height <= 0)
+            {
+                return newFrac;
+            }
+
             int length = bufWidth * height;
             var buffer = new bool[length + 32];
 
@@ -134,12 +168,19 @@ namespace ClassicMac.Graphics.QuickDraw
                 {
                     index = f.MissingIndex;
                     ow = f.OffsetWidths[index];
-                    if (ow == -1) continue;                    // no missing symbol: skipped without advancing
+                    if (ow == -1)
+                    {
+                        continue;                    // no missing symbol: skipped without advancing
+                    }
                 }
                 int dstLeft = (short)(((ow >> 8) & 0xFF) + (short)(charLoc >> 16));
                 charLoc = unchecked(charLoc + step);
                 int srcLeft = f.Locations[index], bits = (short)(f.Locations[index + 1] - srcLeft);
-                if (bits <= 0) continue;
+                if (bits <= 0)
+                {
+                    continue;
+                }
+
                 int rowTop = 0, rows = height & 0xFF;
                 if (f.Heights != null)
                 {
@@ -147,18 +188,39 @@ namespace ClassicMac.Graphics.QuickDraw
                     rows = f.Heights[index] & 0xFF;
                 }
                 for (int y = rowTop; y < rowTop + rows && y < height; y++)
+                {
                     for (int x = 0; x < bits; x++)
+                    {
                         if (f.StrikeBit(y, srcLeft + x))
                         {
                             long at = (long)y * bufWidth + dstLeft + x;
-                            if (at >= 0 && at < buffer.Length) buffer[at] = true;
+                            if (at >= 0 && at < buffer.Length)
+                            {
+                                buffer[at] = true;
+                            }
                         }
+                    }
+                }
             }
 
-            for (int i = 0; i < (s.Bold & 0xFF); i++) SmearRight(buffer, buffer.Length);
-            if (s.MacOS9 && (sbyte)s.Italic != 0) SlantMacOS9(buffer, bufWidth, height, f.Ascent, (sbyte)s.Italic);
-            else if (!s.MacOS9 && (s.Italic & 0xFF) != 0) Slant(buffer, bufWidth, height, s.Italic & 0xFF);
-            if (s.UlThick != 0) Underline(buffer, bufWidth, height, f.Ascent, f.Descent);
+            for (int i = 0; i < (s.Bold & 0xFF); i++)
+            {
+                SmearRight(buffer, buffer.Length);
+            }
+
+            if (s.MacOS9 && (sbyte)s.Italic != 0)
+            {
+                SlantMacOS9(buffer, bufWidth, height, f.Ascent, (sbyte)s.Italic);
+            }
+            else if (!s.MacOS9 && (s.Italic & 0xFF) != 0)
+            {
+                Slant(buffer, bufWidth, height, s.Italic & 0xFF);
+            }
+
+            if (s.UlThick != 0)
+            {
+                Underline(buffer, bufWidth, height, f.Ascent, f.Descent);
+            }
 
             if (s.Shadow != 0)
             {
@@ -166,13 +228,31 @@ namespace ClassicMac.Graphics.QuickDraw
                 int shadowHeight = height + 4;
                 var shadow = new bool[bufWidth * shadowHeight];
                 Array.Copy(buffer, shadow, length);
-                for (int i = 0; i < passes; i++) SmearRight(shadow, length + 32);
-                for (int i = 0; i < passes; i++) SmearDown(shadow, bufWidth, shadowHeight);
+                for (int i = 0; i < passes; i++)
+                {
+                    SmearRight(shadow, length + 32);
+                }
+
+                for (int i = 0; i < passes; i++)
+                {
+                    SmearDown(shadow, bufWidth, shadowHeight);
+                }
+
                 for (int j = length + 31; j >= 1; j--)       // XOR the glyphs out, one pixel right and down
-                    if (buffer[j - 1]) shadow[bufWidth + j] = !shadow[bufWidth + j];
+                {
+                    if (buffer[j - 1])
+                    {
+                        shadow[bufWidth + j] = !shadow[bufWidth + j];
+                    }
+                }
+
                 var srcRect = new PictRect(textRect.Top, textRect.Left, textRect.Bottom + 4, textRect.Right);
                 var shadowDst = new PictRect(srcRect.Top - 1, srcRect.Left - 1, srcRect.Bottom - 1, srcRect.Right - 1);
-                if (stretch) shadowDst = PictureMapping.MapRect(shadowDst, fromRect, toRect);
+                if (stretch)
+                {
+                    shadowDst = PictureMapping.MapRect(shadowDst, fromRect, toRect);
+                }
+
                 var pix = ToPixMap(shadow, bufWidth, shadowHeight, new PictRect(textRect.Top, bufLeft, textRect.Bottom + 4, textRect.Right));
                 Blit(canvas, pix, srcRect, shadowDst, mode, masked, clip, hilitePending, colors);
                 return newFrac;
@@ -219,8 +299,10 @@ namespace ClassicMac.Graphics.QuickDraw
                             box = new PictRect(v.Top, x, v.Bottom, x + w);
                         }
                         if (w > 0)
+                        {
                             Bits.CopyBits(canvas, strike, new PictRect(0, srcLeft, f.RectHeight, srcLeft + bits), box,
                                 TransferModes.SrcCopy, clip, hilitePending, colors, false);
+                        }
                     }
                 }
                 advanced = unchecked(advanced + step);
@@ -235,7 +317,11 @@ namespace ClassicMac.Graphics.QuickDraw
         // multiplies round half up).
         private static int CharExtra(FontSelection s, int charExtra)
         {
-            if (charExtra == 0) return 0;
+            if (charExtra == 0)
+            {
+                return 0;
+            }
+
             Func<int, int, int> mul = s.MacOS9 ? FixedMath.FixMulHalfUp : FixedMath.FixMul;
             return mul(mul(charExtra, s.Size << 16), mul(
                 FixedMath.FixRatio((short)s.InNumer.h, (short)s.InDenom.h), FixedMath.FixRatio((short)s.Denom.h, (short)s.Numer.h)));
@@ -244,9 +330,17 @@ namespace ClassicMac.Graphics.QuickDraw
         // How far drawing the text moves the pen (Fixed): the measured width, stretched as Draw stretches it.
         public static int Advance(FontSelection s, ReadOnlySpan<byte> text, int charExtra)
         {
-            if (text.Length == 0 || (s.MacOS9 && text.Length == 1 && text[0] == '\r')) return 0;
+            if (text.Length == 0 || (s.MacOS9 && text.Length == 1 && text[0] == '\r'))
+            {
+                return 0;
+            }
+
             int width = Measure(s, text, charExtra);
-            if (s.Numer == s.Denom) return width;
+            if (s.Numer == s.Denom)
+            {
+                return width;
+            }
+
             return s.MacOS9
                 ? FixedMath.FixMulHalfUp(width, FixedMath.FixRatio((short)s.Numer.h, (short)s.Denom.h))
                 : (int)((ulong)(uint)width * (ushort)s.Numer.h / (ushort)s.Denom.h);
@@ -258,7 +352,10 @@ namespace ClassicMac.Graphics.QuickDraw
         {
             int cx = CharExtra(s, charExtra), width = 0;
             foreach (byte c in text)
+            {
                 width = unchecked(width + s.Widths[c] + (c == ' ' || (s.MacOS9 && s.Widths[c] <= 0) ? 0 : cx));
+            }
+
             return width;
         }
 
@@ -285,23 +382,38 @@ namespace ClassicMac.Graphics.QuickDraw
                 {
                     index = f.MissingIndex;
                     ow = f.OffsetWidths[index];
-                    if (ow == -1) continue;
+                    if (ow == -1)
+                    {
+                        continue;
+                    }
                 }
                 advance = unchecked(advance + s.Widths[c] + (s.Widths[c] <= 0 ? 0 : cx));
                 int bits = (short)(f.Locations[index + 1] - f.Locations[index]);
-                if (bits <= 0) continue;
+                if (bits <= 0)
+                {
+                    continue;
+                }
+
                 int x = origin + ((ow >> 8) & 0xFF) + f.MaxKern;
                 (left, right) = (Math.Min(left, x), Math.Max(right, x + bits));
                 int srcLeft = f.Locations[index];
                 for (int y = 0; y < f.RectHeight; y++)
+                {
                     for (int b = 0; b < bits; b++)
+                    {
                         if (f.StrikeBit(y, srcLeft + b))
                         {
                             (top, bottom) = (Math.Min(top, y - f.Ascent), Math.Max(bottom, y - f.Ascent + 1));
                             break;
                         }
+                    }
+                }
             }
-            if (top > bottom) (top, bottom) = (0, 0);
+            if (top > bottom)
+            {
+                (top, bottom) = (0, 0);
+            }
+
             return left > right ? (0, 0, top, bottom) : (left, right, top, bottom);
         }
 
@@ -314,7 +426,11 @@ namespace ClassicMac.Graphics.QuickDraw
             for (int y = 0; y < height; y++)
             {
                 int shift = y < ascent ? (ascent - y) * italic / 16 : -((y - ascent + 1) * italic / 16);
-                if (shift == 0) continue;
+                if (shift == 0)
+                {
+                    continue;
+                }
+
                 int start = y * width;
                 Array.Copy(b, start, row, 0, width);
                 for (int x = 0; x < width; x++)
@@ -340,20 +456,33 @@ namespace ClassicMac.Graphics.QuickDraw
 
         private static Region MaskRegion(PixMap bits, PictRect srcRect, PictRect dstRect, bool macOS9)
         {
-            if (dstRect.IsEmpty) return Region.Empty;
+            if (dstRect.IsEmpty)
+            {
+                return Region.Empty;
+            }
+
             var scratch = new RgbaBitmap(dstRect.Width, dstRect.Height);
             var black = new RgbaColor(0, 0, 0);
             Bits.CopyBits(scratch, bits, srcRect, new PictRect(0, 0, dstRect.Height, dstRect.Width), TransferModes.SrcCopy,
                 null, false, new PortColors(black, new RgbaColor(255, 255, 255), default, default, macOS9), false);
             var rows = new SortedDictionary<int, List<int>>();
             for (int y = 0; y < scratch.Height; y++)
+            {
                 for (int x = 0; x < scratch.Width; x++)
+                {
                     if (scratch[x, y] == black)
                     {
-                        if (!rows.TryGetValue(y + dstRect.Top, out var runs)) rows[y + dstRect.Top] = runs = new List<int>();
+                        if (!rows.TryGetValue(y + dstRect.Top, out var runs))
+                        {
+                            rows[y + dstRect.Top] = runs = new List<int>();
+                        }
+
                         runs.Add(x + dstRect.Left);
                         runs.Add(x + dstRect.Left + 1);
                     }
+                }
+            }
+
             return Region.FromScanlines(rows);
         }
 
@@ -361,14 +490,26 @@ namespace ClassicMac.Graphics.QuickDraw
         private static void SmearRight(bool[] b, int bits)
         {
             for (int i = Math.Min(bits, b.Length) - 1; i > 0; i--)
-                if (b[i - 1]) b[i] = true;
+            {
+                if (b[i - 1])
+                {
+                    b[i] = true;
+                }
+            }
         }
 
         private static void SmearDown(bool[] b, int width, int height)
         {
             for (int y = height - 1; y > 0; y--)
+            {
                 for (int x = 0; x < width; x++)
-                    if (b[(y - 1) * width + x]) b[y * width + x] = true;
+                {
+                    if (b[(y - 1) * width + x])
+                    {
+                        b[y * width + x] = true;
+                    }
+                }
+            }
         }
 
         // Italic: working up from the second-to-last row, row k (0 = bottom) takes the stream bits (k * italic) / 16
@@ -392,14 +533,31 @@ namespace ClassicMac.Graphics.QuickDraw
         // Underline the row below the baseline row, except one pixel around ink in the baseline row and the two below.
         private static void Underline(bool[] b, int width, int height, int ascent, int descent)
         {
-            if (descent < 2) return;
+            if (descent < 2)
+            {
+                return;
+            }
+
             int r0 = ascent, r1 = ascent + 1, r2 = descent == 2 ? ascent : ascent + 2;
-            if (r0 < 0 || r1 >= height) return;
+            if (r0 < 0 || r1 >= height)
+            {
+                return;
+            }
+
             bool Ink(int row, int x) => row < height && b[row * width + x];
             var ink = new bool[width];
-            for (int x = 0; x < width; x++) ink[x] = Ink(r0, x) || Ink(r1, x) || Ink(r2, x);
             for (int x = 0; x < width; x++)
-                if (!(ink[x] || (x > 0 && ink[x - 1]) || (x + 1 < width && ink[x + 1]))) b[r1 * width + x] = true;
+            {
+                ink[x] = Ink(r0, x) || Ink(r1, x) || Ink(r2, x);
+            }
+
+            for (int x = 0; x < width; x++)
+            {
+                if (!(ink[x] || (x > 0 && ink[x - 1]) || (x + 1 < width && ink[x + 1])))
+                {
+                    b[r1 * width + x] = true;
+                }
+            }
         }
 
         private static PixMap ToPixMap(bool[] bits, int width, int height, PictRect bounds)
@@ -407,8 +565,16 @@ namespace ClassicMac.Graphics.QuickDraw
             int rowBytes = width / 8;
             var data = new byte[rowBytes * height];
             for (int y = 0; y < height; y++)
+            {
                 for (int x = 0; x < width; x++)
-                    if (bits[y * width + x]) data[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                {
+                    if (bits[y * width + x])
+                    {
+                        data[y * rowBytes + (x >> 3)] |= (byte)(0x80 >> (x & 7));
+                    }
+                }
+            }
+
             return new PixMap
             {
                 Bounds = bounds,

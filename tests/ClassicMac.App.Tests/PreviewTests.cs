@@ -19,7 +19,11 @@ public class PreviewTests : IDisposable
         foreach (var (type, id, name, data) in resources)
         {
             var r = new Resource(FourCC.FromString(type), id, data);
-            if (name is not null) r.Name = MacString.FromMacRoman(name);
+            if (name is not null)
+            {
+                r.Name = MacString.FromMacRoman(name);
+            }
+
             fork.Add(r);
         }
         return fork.ToArray();

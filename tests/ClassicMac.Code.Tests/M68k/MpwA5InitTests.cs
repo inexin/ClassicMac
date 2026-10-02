@@ -21,7 +21,11 @@ public class MpwA5InitTests
         w.WriteUInt32(relocOffset ?? (uint)(16 + data.Length));
         w.WriteBytes(data);
         w.WriteBytes(relocs);
-        if (w.Length % 2 != 0) w.WriteByte(0);
+        if (w.Length % 2 != 0)
+        {
+            w.WriteByte(0);
+        }
+
         w.WriteUInt32(headerOffset ?? Prefix);
         w.WriteFourCC(FourCC.FromString("mpwd"));
         return w.ToArray();

@@ -35,7 +35,11 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         public static PreviewImage? Build(NodeViewModel node, DecodeOptions options, ReadOptions readOptions, DialogSources? sources)
         {
-            if (Locate(node) is not var (holder, path)) return null;
+            if (Locate(node) is not var (holder, path))
+            {
+                return null;
+            }
+
             sources ??= DialogSources.None;
             var volume = Volumes.GetValue(holder, h => new Volume(h, readOptions));
             var (window, resolver) = volume.Window(path, sources);
@@ -75,7 +79,11 @@ namespace ClassicMac.App.ViewModels
         private static ContainerNode? Holder(NodeViewModel node)
         {
             var at = node.Parent;
-            while (at is not null and not InputNode and not ContainerFileNode) at = at.Parent;
+            while (at is not null and not InputNode and not ContainerFileNode)
+            {
+                at = at.Parent;
+            }
+
             return at switch
             {
                 InputNode input => input.Root,
@@ -102,7 +110,11 @@ namespace ClassicMac.App.ViewModels
             };
             // A container holding one file that holds others (MacBinary or a disk image around a disk) shows that file's
             // contents: the window the Finder would open for it [ClassicMac].
-            while (path.Count == 0 && holder is { Children: [{ Children.Count: > 0 } only] }) holder = only;
+            while (path.Count == 0 && holder is { Children: [{ Children.Count: > 0 } only] })
+            {
+                holder = only;
+            }
+
             return holder is { Children.Count: > 0 } ? (holder, path) : null;
         }
 
@@ -132,7 +144,9 @@ namespace ClassicMac.App.ViewModels
                     try
                     {
                         foreach (var folder in HfsReader.Instance.ReadFolders(holder.File.DataFork, new ContainerContext()))
+                        {
                             folders.TryAdd(Key(folder.Path), folder);
+                        }
                     }
                     catch (Exception e) when (e is InvalidDataException or IOException or EndOfStreamException)
                     {
@@ -142,9 +156,21 @@ namespace ClassicMac.App.ViewModels
                 // The System and System Resources files on the volume: system icons, badges, label colours and the views
                 // font; the Finder Preferences file: the views font's family and size. [ClassicMac: Mac OS keeps them there]
                 foreach (var system in files.Where(f => (f.FinderInfo.Type == Zsys || f.FinderInfo.Type == Zsyr) && f.FinderInfo.Creator == Macs))
-                    if (Fork(system) is { } fork) systemForks.Add(fork);
+                {
+                    if (Fork(system) is { } fork)
+                    {
+                        systemForks.Add(fork);
+                    }
+                }
+
                 foreach (var file in files.Where(f => f.FinderInfo.Type == Pref && f.FinderInfo.Creator == Macs && f.Name.ToMacRoman() == "Finder Preferences"))
-                    if (Preferences is null && Fork(file) is { } fork) Preferences = FinderPreferences.FromFork(fork, readOptions);
+                {
+                    if (Preferences is null && Fork(file) is { } fork)
+                    {
+                        Preferences = FinderPreferences.FromFork(fork, readOptions);
+                    }
+                }
+
                 fonts = new(LoadFonts);
             }
 
@@ -156,7 +182,10 @@ namespace ClassicMac.App.ViewModels
             // The window of the folder at `path`: its record's rectangle, scroll and view, and its items.
             public (FinderWindow Window, FinderIconResolver Resolver) Window(IReadOnlyList<string> path, DialogSources sources)
             {
-                lock (systemForks) return WindowLocked(path, sources);
+                lock (systemForks)
+                {
+                    return WindowLocked(path, sources);
+                }
             }
 
             private readonly Dictionary<MacFile, byte[]?> treeIcons = new(ReferenceEqualityComparer.Instance);
@@ -169,7 +198,11 @@ namespace ClassicMac.App.ViewModels
             {
                 lock (systemForks)
                 {
-                    if (treeIcons.TryGetValue(file, out var cached)) return cached;
+                    if (treeIcons.TryGetValue(file, out var cached))
+                    {
+                        return cached;
+                    }
+
                     ResolvedTreeIcons++;
                     var suite = FileIcon(resolver ?? Resolver(DialogSources.None), file, () => Fork(file)).Suite;
                     return treeIcons[file] = suite is null ? null : NodeViewModel.Plot16(suite);
@@ -205,7 +238,9 @@ namespace ClassicMac.App.ViewModels
                 {
                     var name = file.FolderPath[path.Count];
                     if (seen.Add(name.ToMacRoman()))
+                    {
                         items.Add(new FinderWindowItem(name, default, 0, resolver.Find(FinderItemKind.Folder, default, default, 0, null).Suite, FinderItemKind.Folder));
+                    }
                 }
                 foreach (var file in files.Where(f => Key(f.FolderPath) == key))
                 {
@@ -263,7 +298,11 @@ namespace ClassicMac.App.ViewModels
 
             private ResourceFork? Fork(MacFile file)
             {
-                if (file.ResourceFork.Length == 0) return null;
+                if (file.ResourceFork.Length == 0)
+                {
+                    return null;
+                }
+
                 try
                 {
                     return MacFileResources.Read(file, readOptions).Fork;
@@ -285,7 +324,10 @@ namespace ClassicMac.App.ViewModels
                 {
                     try
                     {
-                        if (file.ResourceFork.Length > 0) added += library.AddResourceFork(file.ResourceFork.ToArray());
+                        if (file.ResourceFork.Length > 0)
+                        {
+                            added += library.AddResourceFork(file.ResourceFork.ToArray());
+                        }
                     }
                     catch (Exception e) when (e is ArgumentException or InvalidDataException or IOException or EndOfStreamException)
                     {

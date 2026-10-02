@@ -88,7 +88,10 @@ public class DartTests
             : CorpusFolders.EnumerateFiles("*-best.data", SearchOption.AllDirectories)
                 .Concat(CorpusFolders.EnumerateFiles("*-fast.data", SearchOption.AllDirectories))
                 .Where(f => !f.Contains("__MACOSX", StringComparison.Ordinal)).ToList();
-        if (samples.Count == 0) Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the dart_samples to run this.");
+        if (samples.Count == 0)
+        {
+            Assert.Skip("Set CLASSICMAC_CORPUS to a folder holding the dart_samples to run this.");
+        }
 
         foreach (var sample in samples)
         {

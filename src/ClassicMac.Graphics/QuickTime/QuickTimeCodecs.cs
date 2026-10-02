@@ -12,7 +12,11 @@ namespace ClassicMac.Graphics.QuickTime
     {
         public static RgbaBitmap? Decode(PictImageDescription d, byte[] data)
         {
-            if (d.Width <= 0 || d.Height <= 0) return null;
+            if (d.Width <= 0 || d.Height <= 0)
+            {
+                return null;
+            }
+
             try
             {
                 return d.CodecType switch
@@ -49,9 +53,16 @@ namespace ClassicMac.Graphics.QuickTime
 
         internal static void Set(RgbaBitmap img, int x, int y, RgbaColor c)
         {
-            if ((uint)x >= (uint)img.Width || (uint)y >= (uint)img.Height) return;
+            if ((uint)x >= (uint)img.Width || (uint)y >= (uint)img.Height)
+            {
+                return;
+            }
+
             int i = (y * img.Width + x) * 4;
-            img.Pixels[i] = c.R; img.Pixels[i + 1] = c.G; img.Pixels[i + 2] = c.B; img.Pixels[i + 3] = c.A;
+            img.Pixels[i] = c.R;
+            img.Pixels[i + 1] = c.G;
+            img.Pixels[i + 2] = c.B;
+            img.Pixels[i + 3] = c.A;
         }
 
         internal static RgbaColor Rgb555(int v) =>
@@ -70,9 +81,12 @@ namespace ClassicMac.Graphics.QuickTime
         {
             switch (depth)
             {
-                case 16: return Rgb555((row[2 * x] << 8) | row[2 * x + 1]);
-                case 24: return new RgbaColor(row[3 * x], row[3 * x + 1], row[3 * x + 2]);
-                case 32: return new RgbaColor(row[4 * x + 1], row[4 * x + 2], row[4 * x + 3]);
+                case 16:
+                    return Rgb555((row[2 * x] << 8) | row[2 * x + 1]);
+                case 24:
+                    return new RgbaColor(row[3 * x], row[3 * x + 1], row[3 * x + 2]);
+                case 32:
+                    return new RgbaColor(row[4 * x + 1], row[4 * x + 2], row[4 * x + 3]);
             }
             int bits = depth > 32 ? depth - 32 : depth;
             int bit = x * bits;
@@ -96,7 +110,10 @@ namespace ClassicMac.Graphics.QuickTime
             for (int y = 0; y < d.Height && (long)y * rowBytes + minRow <= data.Length; y++)
             {
                 var row = data.AsSpan(y * rowBytes, minRow);
-                for (int x = 0; x < d.Width; x++) Set(img, x, y, Pixel(row, x, depth, palette));
+                for (int x = 0; x < d.Width; x++)
+                {
+                    Set(img, x, y, Pixel(row, x, depth, palette));
+                }
             }
             return img;
         }
@@ -106,15 +123,27 @@ namespace ClassicMac.Graphics.QuickTime
         private static RgbaBitmap? Planar(PictImageDescription d, byte[] data)
         {
             int channels = d.Depth switch { 8 => 1, 24 => 3, 32 => 4, _ => 0 };
-            if (channels == 0) return null;
+            if (channels == 0)
+            {
+                return null;
+            }
+
             int lines = d.Height * channels;
-            if (data.Length < 2 * lines) return null;
+            if (data.Length < 2 * lines)
+            {
+                return null;
+            }
+
             var planes = new byte[channels * d.Width * d.Height];
             int p = 2 * lines;
             for (int l = 0; l < lines; l++)
             {
                 int count = (data[2 * l] << 8) | data[2 * l + 1];
-                if (p + count > data.Length) return null;
+                if (p + count > data.Length)
+                {
+                    return null;
+                }
+
                 PackBits.Unpack(data.AsSpan(p, count), planes.AsSpan(l * d.Width, d.Width));
                 p += count;
             }
@@ -122,6 +151,7 @@ namespace ClassicMac.Graphics.QuickTime
             var img = new RgbaBitmap(d.Width, d.Height);
             int plane = d.Width * d.Height;
             for (int y = 0; y < d.Height; y++)
+            {
                 for (int x = 0; x < d.Width; x++)
                 {
                     int i = y * d.Width + x;
@@ -129,6 +159,8 @@ namespace ClassicMac.Graphics.QuickTime
                         : new RgbaColor(planes[i], planes[plane + i], planes[2 * plane + i], channels == 4 ? planes[3 * plane + i] : (byte)255);
                     Set(img, x, y, channels == 4 ? new RgbaColor(c.R, c.G, c.B) : c);
                 }
+            }
+
             return img;
         }
 
@@ -138,14 +170,21 @@ namespace ClassicMac.Graphics.QuickTime
             int pairs = (d.Width + 1) / 2;
             var img = new RgbaBitmap(d.Width, d.Height);
             for (int y = 0; y < d.Height; y++)
+            {
                 for (int k = 0; k < pairs; k++)
                 {
                     int o = (y * pairs + k) * 4;
-                    if (o + 3 >= data.Length) return img;
+                    if (o + 3 >= data.Length)
+                    {
+                        return img;
+                    }
+
                     int u = (sbyte)data[o + 1], v = (sbyte)data[o + 3];
                     Set(img, 2 * k, y, YuvToRgb(data[o], u, v));
                     Set(img, 2 * k + 1, y, YuvToRgb(data[o + 2], u, v));
                 }
+            }
+
             return img;
         }
 
@@ -153,15 +192,22 @@ namespace ClassicMac.Graphics.QuickTime
         private static RgbaBitmap? Yvu9(PictImageDescription d, byte[] data)
         {
             int w = d.Width, h = d.Height, cw = (w + 3) / 4, ch = (h + 3) / 4;
-            if (data.Length < w * h + 2 * cw * ch) return null;
+            if (data.Length < w * h + 2 * cw * ch)
+            {
+                return null;
+            }
+
             var img = new RgbaBitmap(w, h);
             for (int y = 0; y < h; y++)
+            {
                 for (int x = 0; x < w; x++)
                 {
                     int c = (y / 4) * cw + x / 4;
                     int v = data[w * h + c] - 128, u = data[w * h + cw * ch + c] - 128;
                     Set(img, x, y, YuvToRgb(data[y * w + x], u, v));
                 }
+            }
+
             return img;
         }
 

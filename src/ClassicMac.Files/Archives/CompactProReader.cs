@@ -30,16 +30,28 @@ public sealed class CompactProReader : IContainerReader
     public bool CanRead(ForkData input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        if (input.Length < ArchiveHeaderLength + 7) return false;
+        if (input.Length < ArchiveHeaderLength + 7)
+        {
+            return false;
+        }
+
         try
         {
             using Stream stream = input.Open();
             var header = new byte[8];
             stream.ReadExactly(header);
             var reader = new BigEndianReader(header);
-            if (reader.ReadByte() != 1) return false;
+            if (reader.ReadByte() != 1)
+            {
+                return false;
+            }
+
             uint offset = reader.ReadUInt32At(4);
-            if (offset < ArchiveHeaderLength || offset > input.Length - 7 || offset > int.MaxValue) return false;
+            if (offset < ArchiveHeaderLength || offset > input.Length - 7 || offset > int.MaxValue)
+            {
+                return false;
+            }
+
             stream.Seek(offset, SeekOrigin.Begin);
             CompactProDirectory directory = ReadDirectory(new BigEndianReader(stream), (int)offset);
             return directory.StoredCrc == directory.ComputedCrc;
@@ -57,29 +69,49 @@ public sealed class CompactProReader : IContainerReader
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(context);
         if (input.Length > context.Options.MaxExpandedBytesPerInput)
+        {
             throw new InvalidDataException("The Compact Pro archive exceeds the configured input-size limit.");
+        }
+
         byte[] lastSegment = input.ToArray(context.Options.MaxExpandedBytesPerInput);
         var reader = new BigEndianReader(lastSegment);
         if (reader.Length < ArchiveHeaderLength || reader.ReadByteAt(0) != 1)
+        {
             throw new InvalidDataException("Not a Compact Pro archive.");
+        }
+
         byte segmentNumber = reader.ReadByteAt(1);
         ushort setId = reader.ReadUInt16At(2);
         uint directoryOffsetRaw = reader.ReadUInt32At(4);
         if (directoryOffsetRaw > int.MaxValue)
+        {
             throw new InvalidDataException("The Compact Pro directory offset is too large.");
+        }
+
         int directoryOffset = (int)directoryOffsetRaw;
         if (directoryOffset < ArchiveHeaderLength || directoryOffset > reader.Length - 7)
+        {
             throw new InvalidDataException("The Compact Pro directory lies outside the archive.");
+        }
+
         reader.Position = directoryOffset;
         CompactProDirectory directory = ReadDirectory(reader, 0);
         if (directory.StoredCrc != directory.ComputedCrc)
+        {
             context.Report(DiagnosticSeverity.Error, "archive.header-crc",
                 "The Compact Pro directory checksum is incorrect.", directoryOffset);
+        }
+
         if (directory.Comment.Length > 0)
+        {
             context.Report(DiagnosticSeverity.Info, "archive.comment",
                 $"Compact Pro comment: {directory.Comment}", directoryOffset);
+        }
+
         if (directory.Entries.Count > context.Options.MaxVolumeEntries)
+        {
             throw new InvalidDataException("The Compact Pro archive exceeds the configured entry limit.");
+        }
 
         // [Verified against Compact Pro 1.52] Segment n of a set is the archive's next bytes behind an 8-byte header
         // of its own (1, n, the set's id, a directory offset that is 0 except in the last segment, where it counts
@@ -98,15 +130,25 @@ public sealed class CompactProReader : IContainerReader
         long expandedBytes = 0;
         for (int index = 0; index < directory.Entries.Count; index++)
         {
-            while (folders.Count > 0 && folders[^1].LastEntry < index) folders.RemoveAt(folders.Count - 1);
+            while (folders.Count > 0 && folders[^1].LastEntry < index)
+            {
+                folders.RemoveAt(folders.Count - 1);
+            }
+
             CompactProEntry entry = directory.Entries[index];
             if (entry.IsDirectory)
             {
                 int lastChildEntry = checked(index + entry.ChildEntryCount);
                 if (entry.ChildEntryCount > 0 && lastChildEntry >= directory.Entries.Count)
+                {
                     throw new InvalidDataException("A Compact Pro directory's child count extends past the entry table.");
+                }
+
                 if (entry.ChildEntryCount > 0)
+                {
                     folders.Add(new FolderScope(lastChildEntry, entry.Name));
+                }
+
                 continue;
             }
 
@@ -129,9 +171,14 @@ public sealed class CompactProReader : IContainerReader
                 continue;
             }
             if (fileOffset < ArchiveHeaderLength || fileOffset < joinedTableEnd && forksEnd > joinedDirectory)
+            {
                 throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
+            }
+
             if (forksEnd > archive.Length)
+            {
                 throw new InvalidDataException("The Compact Pro fork data lies outside the Compact Pro archive.");
+            }
 
             if ((flags & 1) != 0)
             {
@@ -140,11 +187,16 @@ public sealed class CompactProReader : IContainerReader
                 continue;
             }
             if ((flags & ~7) != 0)
+            {
                 context.Report(DiagnosticSeverity.Warning, "archive.flags-unknown",
                     $"The Compact Pro entry '{entry.Name}' has unknown flags 0x{flags:X4}.", entry.Offset);
+            }
+
             expandedBytes = checked(expandedBytes + resourceLength + dataLength);
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
+            {
                 throw new InvalidDataException("Compact Pro extraction exceeds the configured expanded-size limit.");
+            }
 
             ReadOnlySpan<byte> resourceInput = archive.AsSpan((int)fileOffset, resourceCompressedLength);
             byte[] resource = (flags & 2) != 0
@@ -155,8 +207,10 @@ public sealed class CompactProReader : IContainerReader
                 ? CompactProLzhDecoder.Decode(dataInput, dataLength)
                 : DecodeRle8182(dataInput, dataLength);
             if (~Crc32(resource, data) != file.Crc)
+            {
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                     $"The Compact Pro data/resource checksum is incorrect for '{entry.Name}'.", entry.Offset);
+            }
 
             files.Add(new MacFile
             {
@@ -176,22 +230,40 @@ public sealed class CompactProReader : IContainerReader
     // directory offset. Without all of them, the archive is the segments up to the first missing one.
     private static SegmentSet JoinSegments(byte[] lastSegment, byte segmentCount, ushort setId, ContainerContext context)
     {
-        if (segmentCount <= 1) return new SegmentSet(lastSegment, true);
+        if (segmentCount <= 1)
+        {
+            return new SegmentSet(lastSegment, true);
+        }
+
         var segments = new byte[]?[segmentCount];
         segments[segmentCount - 1] = lastSegment;
         long totalBytes = lastSegment.Length;
         foreach (MacFile sibling in context.Siblings?.Invoke() ?? [])
         {
             ForkData fork = sibling.DataFork;
-            if (fork.Length < ArchiveHeaderLength) continue;
+            if (fork.Length < ArchiveHeaderLength)
+            {
+                continue;
+            }
+
             var header = new BigEndianReader(fork.Slice(0, ArchiveHeaderLength).ToArray(ArchiveHeaderLength));
             byte number = header.ReadByteAt(1);
             if (header.ReadByteAt(0) != 1 || number == 0 || number >= segmentCount ||
-                header.ReadUInt16At(2) != setId || header.ReadUInt32At(4) != 0) continue;
+                header.ReadUInt16At(2) != setId || header.ReadUInt32At(4) != 0)
+            {
+                continue;
+            }
+
             if (segments[number - 1] is not null)
+            {
                 throw new InvalidDataException($"More than one Compact Pro sibling is segment {number} of the set.");
+            }
+
             if (fork.Length > context.Options.MaxExpandedBytesPerInput - totalBytes)
+            {
                 throw new InvalidDataException("The Compact Pro segment set exceeds the configured input-size limit.");
+            }
+
             segments[number - 1] = fork.ToArray(context.Options.MaxExpandedBytesPerInput);
             totalBytes += fork.Length;
         }
@@ -204,7 +276,10 @@ public sealed class CompactProReader : IContainerReader
             context.Report(DiagnosticSeverity.Error, "archive.missing-volume",
                 $"Compact Pro segment(s) {missing} of {segmentCount} are missing; open the last segment with the others " +
                 "beside it.");
-            if (present == 0) return new SegmentSet([], false);
+            if (present == 0)
+            {
+                return new SegmentSet([], false);
+            }
         }
         int count = complete ? segmentCount : present;
         IEnumerable<byte[]> parts = segments.Take(count).Select(segment => segment!);
@@ -233,7 +308,11 @@ public sealed class CompactProReader : IContainerReader
         {
             int nameType = ReadByte(directory, ref crc);
             int nameLength = nameType & 0x7F;
-            if (nameLength == 0) throw new InvalidDataException("A Compact Pro entry has an empty name.");
+            if (nameLength == 0)
+            {
+                throw new InvalidDataException("A Compact Pro entry has an empty name.");
+            }
+
             var name = new MacString(ReadBlock(directory, nameLength, ref crc).Source.Span);
             if ((nameType & 0x80) != 0)
             {
@@ -262,11 +341,18 @@ public sealed class CompactProReader : IContainerReader
         var output = new CompactProLzhDecoder.RleOutput(outputLength);
         foreach (byte value in input)
         {
-            if (output.IsComplete) break;
+            if (output.IsComplete)
+            {
+                break;
+            }
+
             output.Write(value);
         }
         if (!output.IsComplete)
+        {
             throw new InvalidDataException($"Compact Pro RLE produced {output.Written} of {outputLength} declared bytes.");
+        }
+
         return output.Result;
     }
 
@@ -279,7 +365,11 @@ public sealed class CompactProReader : IContainerReader
 
     private static int ReadByte(BigEndianReader directory, ref uint crc)
     {
-        if (!directory.TryReadByte(out byte value)) throw new InvalidDataException("The Compact Pro directory is truncated.");
+        if (!directory.TryReadByte(out byte value))
+        {
+            throw new InvalidDataException("The Compact Pro directory is truncated.");
+        }
+
         crc = UpdateCrcByte(crc, value);
         return value;
     }
@@ -288,7 +378,10 @@ public sealed class CompactProReader : IContainerReader
     private static BigEndianReader ReadBlock(BigEndianReader directory, int length, ref uint crc)
     {
         if (length < 0 || length > directory.Remaining)
+        {
             throw new InvalidDataException("A Compact Pro directory entry extends past the archive.");
+        }
+
         var block = directory.ReadSubReader(length);
         crc = UpdateCrc(crc, block.Source.Span);
         return block;
@@ -296,7 +389,11 @@ public sealed class CompactProReader : IContainerReader
 
     private static uint UpdateCrc(uint crc, ReadOnlySpan<byte> bytes)
     {
-        foreach (byte value in bytes) crc = UpdateCrcByte(crc, value);
+        foreach (byte value in bytes)
+        {
+            crc = UpdateCrcByte(crc, value);
+        }
+
         return crc;
     }
 
@@ -304,7 +401,10 @@ public sealed class CompactProReader : IContainerReader
     {
         crc ^= value;
         for (int bit = 0; bit < 8; bit++)
+        {
             crc = (crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xEDB88320u);
+        }
+
         return crc;
     }
 
@@ -313,7 +413,11 @@ public sealed class CompactProReader : IContainerReader
 
     private static int ReadLength(uint value, string what)
     {
-        if (value > int.MaxValue) throw new InvalidDataException($"A Compact Pro {what} exceeds the supported size.");
+        if (value > int.MaxValue)
+        {
+            throw new InvalidDataException($"A Compact Pro {what} exceeds the supported size.");
+        }
+
         return (int)value;
     }
 

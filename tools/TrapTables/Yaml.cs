@@ -33,11 +33,17 @@ static class Yaml
             if (blockIndent >= 0)
             {
                 if (line.Length == 0 || indent >= blockIndent)
+                {
                     continue;
+                }
+
                 blockIndent = -1;
             }
             if (line.Length == 0 || line.TrimStart().StartsWith('#'))
+            {
                 continue;
+            }
+
             if (indent == 0)
             {
                 item = null;
@@ -50,33 +56,54 @@ static class Yaml
                 continue;
             }
             if (item == null)
+            {
                 continue;
+            }
+
             string text = line.TrimStart();
             if (indent == 4 && !text.StartsWith("- ", StringComparison.Ordinal))
             {
                 list = null;
                 var (key, value) = Split(text);
                 if (value == "|" || value == ">")
+                {
                     blockIndent = indent + 1;
+                }
                 else if (value.Length == 0)
+                {
                     list = key;
+                }
                 else
+                {
                     item.Fields[key] = Unquote(value);
+                }
+
                 continue;
             }
             if (list == null)
+            {
                 continue;
+            }
+
             if (text.StartsWith("- ", StringComparison.Ordinal))
             {
                 entry = new Dictionary<string, string>(StringComparer.Ordinal);
                 if (list == "args")
+                {
                     item.Args.Add(entry);
+                }
+
                 text = text[2..];
                 if (!text.Contains(':'))
+                {
                     continue;   // a scalar list item (variants)
+                }
             }
             if (entry == null)
+            {
                 continue;
+            }
+
             var (k, v) = Split(text);
             if (v == "|" || v == ">")
             {
@@ -85,7 +112,9 @@ static class Yaml
             }
             entry[k] = Unquote(v);
             if (list == "values" && entry.TryGetValue("name", out var n) && entry.TryGetValue("value", out var val) && (k == "name" || k == "value"))
+            {
                 item.Values.Add((n, val));
+            }
         }
         return result;
     }

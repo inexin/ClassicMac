@@ -17,20 +17,32 @@ internal static class FontBuilder
         var all = glyphs.Append(missing).ToList();
         var height = ascent + descent;
         var locations = new List<int> { 0 };
-        foreach (var g in all) locations.Add(locations[^1] + (g?.Rows[0].Length ?? 0));
+        foreach (var g in all)
+        {
+            locations.Add(locations[^1] + (g?.Rows[0].Length ?? 0));
+        }
+
         var width = locations[^1];
         var rowWords = (width + 15) / 16;
         var strike = new byte[rowWords * 2 * height];
         for (var i = 0; i < all.Count; i++)
         {
-            if (all[i] is not { } g) continue;
+            if (all[i] is not { } g)
+            {
+                continue;
+            }
+
             for (var y = 0; y < height; y++)
+            {
                 for (var x = 0; x < g.Rows[y].Length; x++)
+                {
                     if (g.Rows[y][x] == '#')
                     {
                         var column = locations[i] + x;
                         strike[y * rowWords * 2 + column / 8] |= (byte)(0x80 >> (column % 8));
                     }
+                }
+            }
         }
         var entries = all.Count + 1;
         var fontType = (ushort)(0x9000 | (widthTable ? 2 : 0) | (heightTable ? 1 : 0));
@@ -53,10 +65,21 @@ internal static class FontBuilder
         W(16, (owTable - 16) / 2);
         var body = new List<byte>(header);
         body.AddRange(strike);
-        foreach (var l in locations) body.AddRange(BE16(l));
+        foreach (var l in locations)
+        {
+            body.AddRange(BE16(l));
+        }
+
         body.AddRange(all.SelectMany(g => g is null ? BE16(-1) : BE16(g.Offset << 8 | g.Advance)));
         body.AddRange(BE16(-1));
-        if (widthTable) foreach (var g in all.Append(null)) body.AddRange(BE16((g?.Advance ?? 0) * 256 + 128)); // advance + 0.5
+        if (widthTable)
+        {
+            foreach (var g in all.Append(null))
+            {
+                body.AddRange(BE16((g?.Advance ?? 0) * 256 + 128)); // advance + 0.5
+            }
+        }
+
         if (heightTable)
         {
             foreach (var g in all.Append(null))
@@ -111,17 +134,29 @@ internal static class FontBuilder
         var entries = 127 - 32 + 3;
         var widths = new List<byte>(BE16(0)); // one table
         widths.AddRange(BE16(0));             // plain
-        for (var i = 0; i < entries; i++) widths.AddRange(BE16(0x0800));
+        for (var i = 0; i < entries; i++)
+        {
+            widths.AddRange(BE16(0x0800));
+        }
+
         byte[] kerning = [.. BE16(0), .. BE16(0), .. BE16(2), (byte)'A', (byte)'V', .. BE16(-0x0100), (byte)'T', (byte)'o', 0x81, 0x2F];
         var style = new List<byte>(BE16(1));
         style.AddRange(BE32(0));
         style.AddRange(BE32(0));
         style.AddRange(Enumerable.Range(0, 48).Select(i => (byte)(i == 0 ? 1 : 0)));
         style.AddRange(BE16(2));
-        foreach (var name in new[] { "Example", "Bold" }) style.AddRange([(byte)name.Length, .. Encoding.ASCII.GetBytes(name)]);
+        foreach (var name in new[] { "Example", "Bold" })
+        {
+            style.AddRange([(byte)name.Length, .. Encoding.ASCII.GetBytes(name)]);
+        }
+
         var encodingAt = style.Count; // 73: odd
         style.AddRange(BE16(2));
-        foreach (var (code, glyph) in new[] { (0x80, "Adieresis"), (0x81, "Aring") }) style.AddRange([(byte)code, (byte)glyph.Length, .. Encoding.ASCII.GetBytes(glyph)]);
+        foreach (var (code, glyph) in new[] { (0x80, "Adieresis"), (0x81, "Aring") })
+        {
+            style.AddRange([(byte)code, (byte)glyph.Length, .. Encoding.ASCII.GetBytes(glyph)]);
+        }
+
         style[2] = (byte)(encodingAt >> 24);
         style[3] = (byte)(encodingAt >> 16);
         style[4] = (byte)(encodingAt >> 8);

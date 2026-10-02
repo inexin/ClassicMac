@@ -372,11 +372,18 @@ public class DecompressionTests
             foreach (var resource in fork.Resources.Where(r => (r.Attributes & ResourceAttributes.Compressed) != 0))
             {
                 if (!CompressedResourceHeader.TryRead(resource.GetData(), out var header) || !header.IsCompressed)
+                {
                     continue;
+                }
+
                 compressed++;
                 var diagnostics = new List<Diagnostic>();
                 var data = ResourceDecompression.Default.GetData(resource, fork, null, diagnostics);
-                if (diagnostics.Any(d => d.Severity != DiagnosticSeverity.Info)) continue;
+                if (diagnostics.Any(d => d.Severity != DiagnosticSeverity.Info))
+                {
+                    continue;
+                }
+
                 Assert.Equal((int)header.DecompressedSize, data.Length);
                 clean++;
             }
@@ -392,7 +399,13 @@ public class DecompressionTests
         bits = bits.Replace(" ", "");
         var bytes = new byte[(bits.Length + 7) / 8];
         for (var i = 0; i < bits.Length; i++)
-            if (bits[i] == '1') bytes[i / 8] |= (byte)(0x80 >> (i % 8));
+        {
+            if (bits[i] == '1')
+            {
+                bytes[i / 8] |= (byte)(0x80 >> (i % 8));
+            }
+        }
+
         return Convert.ToHexString(bytes);
     }
 }

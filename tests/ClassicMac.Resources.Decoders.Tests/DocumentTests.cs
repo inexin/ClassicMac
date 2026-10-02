@@ -114,7 +114,11 @@ public class DocumentTests
         if (Environment.GetEnvironmentVariable("CLASSICMAC_UPDATE_GOLDEN") == "1")
         {
             Directory.CreateDirectory(folder);
-            foreach (var (path, bytes) in expected) File.WriteAllBytes(Path.Combine(folder, path), bytes);
+            foreach (var (path, bytes) in expected)
+            {
+                File.WriteAllBytes(Path.Combine(folder, path), bytes);
+            }
+
             return;
         }
         var problems = expected.Where(e => !File.Exists(Path.Combine(folder, e.Path)) || !File.ReadAllBytes(Path.Combine(folder, e.Path)).AsSpan().SequenceEqual(e.Bytes))

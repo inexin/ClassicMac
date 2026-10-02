@@ -23,9 +23,18 @@ namespace ClassicMac.App.Views
 
         private static readonly Dictionary<char, uint> Palette = new()
         {
-            ['.'] = 0x00000000, ['K'] = 0xFF000000, ['W'] = 0xFFFFFFFF, ['G'] = 0xFFBBBBBB, ['D'] = 0xFF555555,
-            ['g'] = 0xFF22B14C, ['T'] = 0xFFD9B98C, ['S'] = 0xFF7A4A1E, ['L'] = 0xFFC9C0F2, ['P'] = 0xFF8A62C8,
-            ['B'] = 0xFF2E5CD6, ['b'] = 0xFF9DB6F2,
+            ['.'] = 0x00000000,
+            ['K'] = 0xFF000000,
+            ['W'] = 0xFFFFFFFF,
+            ['G'] = 0xFFBBBBBB,
+            ['D'] = 0xFF555555,
+            ['g'] = 0xFF22B14C,
+            ['T'] = 0xFFD9B98C,
+            ['S'] = 0xFF7A4A1E,
+            ['L'] = 0xFFC9C0F2,
+            ['P'] = 0xFF8A62C8,
+            ['B'] = 0xFF2E5CD6,
+            ['b'] = 0xFF9DB6F2,
         };
 
         /// <summary>The art of each kind, row by row; '.' is transparent (see <see cref="Palette"/>).</summary>
@@ -219,12 +228,23 @@ namespace ClassicMac.App.Views
         public static uint[] Pixels(TreeIconKind kind)
         {
             var art = Art[kind];
-            if (art.Length != Size) throw new InvalidOperationException($"{kind}: {art.Length} rows");
+            if (art.Length != Size)
+            {
+                throw new InvalidOperationException($"{kind}: {art.Length} rows");
+            }
+
             var pixels = new uint[Size * Size];
             for (int y = 0; y < Size; y++)
             {
-                if (art[y].Length != Size) throw new InvalidOperationException($"{kind}: row {y} has {art[y].Length} pixels");
-                for (int x = 0; x < Size; x++) pixels[y * Size + x] = Palette[art[y][x]];
+                if (art[y].Length != Size)
+                {
+                    throw new InvalidOperationException($"{kind}: row {y} has {art[y].Length} pixels");
+                }
+
+                for (int x = 0; x < Size; x++)
+                {
+                    pixels[y * Size + x] = Palette[art[y][x]];
+                }
             }
             return pixels;
         }
@@ -244,13 +264,26 @@ namespace ClassicMac.App.Views
         /// <summary>The kind's icon as a bitmap (made once, on the UI thread); none for the loading placeholder.</summary>
         public static Bitmap? For(TreeIconKind kind)
         {
-            if (!Art.ContainsKey(kind)) return null;
-            if (Bitmaps.TryGetValue(kind, out var bitmap)) return bitmap;
+            if (!Art.ContainsKey(kind))
+            {
+                return null;
+            }
+
+            if (Bitmaps.TryGetValue(kind, out var bitmap))
+            {
+                return bitmap;
+            }
+
             var writeable = new WriteableBitmap(new PixelSize(Size, Size), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
             var pixels = Pixels(kind);
             using (var locked = writeable.Lock())
+            {
                 for (int y = 0; y < Size; y++)
+                {
                     Marshal.Copy((int[])(object)pixels, y * Size, locked.Address + y * locked.RowBytes, Size);
+                }
+            }
+
             return Bitmaps[kind] = writeable;
         }
     }
@@ -279,17 +312,33 @@ namespace ClassicMac.App.Views
         protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
         {
             base.OnPropertyChanged(change);
-            if (change.Property != NodeProperty) return;
-            if (watched is not null) watched.PropertyChanged -= OnNodeChanged;
+            if (change.Property != NodeProperty)
+            {
+                return;
+            }
+
+            if (watched is not null)
+            {
+                watched.PropertyChanged -= OnNodeChanged;
+            }
+
             watched = Node;
-            if (watched is not null) watched.PropertyChanged += OnNodeChanged;
+            if (watched is not null)
+            {
+                watched.PropertyChanged += OnNodeChanged;
+            }
+
             LoadOwn();
             WatchViewport(watched is not null && watched.IconPng is null);
         }
 
         private void OnNodeChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(NodeViewModel.IconPng)) return;
+            if (e.PropertyName != nameof(NodeViewModel.IconPng))
+            {
+                return;
+            }
+
             LoadOwn();
             InvalidateVisual();
         }
@@ -302,17 +351,35 @@ namespace ClassicMac.App.Views
 
         private void WatchViewport(bool watch)
         {
-            if (watch == watchingViewport) return;
+            if (watch == watchingViewport)
+            {
+                return;
+            }
+
             watchingViewport = watch;
-            if (watch) EffectiveViewportChanged += OnViewportChanged;
-            else EffectiveViewportChanged -= OnViewportChanged;
+            if (watch)
+            {
+                EffectiveViewportChanged += OnViewportChanged;
+            }
+            else
+            {
+                EffectiveViewportChanged -= OnViewportChanged;
+            }
         }
 
         // On screen: resolve the node's own icon (once; the node keeps it).
         private void OnViewportChanged(object? sender, EffectiveViewportChangedEventArgs e)
         {
-            if (Node is not { } node || !IsEffectivelyVisible || Bounds.Width <= 0) return;
-            if (!e.EffectiveViewport.Intersects(new Rect(Bounds.Size))) return;
+            if (Node is not { } node || !IsEffectivelyVisible || Bounds.Width <= 0)
+            {
+                return;
+            }
+
+            if (!e.EffectiveViewport.Intersects(new Rect(Bounds.Size)))
+            {
+                return;
+            }
+
             WatchViewport(false);
             _ = node.RequestIconAsync();
         }
@@ -322,7 +389,11 @@ namespace ClassicMac.App.Views
         public override void Render(DrawingContext context)
         {
             var bitmap = own ?? (Node is { } node ? TreeIcons.For(node.IconKind) : null);
-            if (bitmap is null) return;
+            if (bitmap is null)
+            {
+                return;
+            }
+
             var scaling = RenderScaling;
             var k = PixelScaling.DevicePixels(1, scaling);
             var slot = (int)Math.Round(TreeIcons.Size * scaling);

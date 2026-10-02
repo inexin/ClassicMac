@@ -89,7 +89,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 var part = reader.ReadInt16At(at);
                 w.WriteStartObject();
                 w.WriteNumber("value", part);
-                if (part >= 0 && part < parts.Length) w.WriteString("part", parts[part]);
+                if (part >= 0 && part < parts.Length)
+                {
+                    w.WriteString("part", parts[part]);
+                }
+
                 Rgb(w, data[(at + 2)..]);
                 w.WriteEndObject();
             }
@@ -105,7 +109,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 w.WriteStartObject();
                 var reader = new BigEndianReader(data);
                 var count = reader.TryReadInt16At(0, out var entryCount) ? entryCount : 0;
-                if (data.Length < 2) Short(input);
+                if (data.Length < 2)
+                {
+                    Short(input);
+                }
+
                 w.WriteStartArray("entries");
                 for (var i = 0; i < count; i++)
                 {
@@ -221,7 +229,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 Rgb(w, style[12..]);
                 w.WriteEndObject();
             }
-            if ((flags & 0x4000) != 0) w.WriteNumber("mode", reader.ReadInt16At(18));
+            if ((flags & 0x4000) != 0)
+            {
+                w.WriteNumber("mode", reader.ReadInt16At(18));
+            }
+
             w.WriteEndObject();
         }
 
@@ -232,7 +244,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         {
             return Json(input, (w, data) =>
             {
-                if (data.Length < 6) Short(input);
+                if (data.Length < 6)
+                {
+                    Short(input);
+                }
+
                 w.WriteStartObject();
                 var reader = new BigEndianReader(data);
                 w.WriteNumber("version", reader.TryReadInt16At(0, out var version) ? version : 0);
@@ -246,7 +262,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         private static byte[] AlertExtension(DecodeInput input, DecodeOptions options)
         {
             var head = input.Data;
-            if (head.Length < 12) Short(input);
+            if (head.Length < 12)
+            {
+                Short(input);
+            }
+
             var version = new BigEndianReader(head).TryReadInt16At(0, out var word) ? word : (short)0;
             var titleAt = version == 0 && head.Length >= 0x1D && 0x1C + 1 + head.Span[0x1C] <= head.Length ? 0x1C : 12;
             var title = "";
@@ -280,7 +300,11 @@ namespace ClassicMac.Resources.Decoders.Interface
                 var reader = new BigEndianReader(data);
                 w.WriteNumber("version", reader.TryReadInt16At(0, out var version) ? version : 0);
                 var count = reader.TryReadInt16At(2, out var itemCount) ? itemCount : 0;
-                if (data.Length < 4) Short(input);
+                if (data.Length < 4)
+                {
+                    Short(input);
+                }
+
                 w.WriteStartArray("items");
                 var at = 4;
                 for (var i = 0; i < count; i++)
@@ -334,7 +358,10 @@ namespace ClassicMac.Resources.Decoders.Interface
             w.WriteStartArray(name + "Names");
             for (var bit = 0; bit < names.Length; bit++)
             {
-                if ((flags & (1u << bit)) != 0) w.WriteStringValue(names[bit]);
+                if ((flags & (1u << bit)) != 0)
+                {
+                    w.WriteStringValue(names[bit]);
+                }
             }
             w.WriteEndArray();
         }
@@ -342,7 +369,11 @@ namespace ClassicMac.Resources.Decoders.Interface
         // An RGBColor: three u16, and the colour as #rrggbb (high bytes).
         private static void Rgb(Utf8JsonWriter w, ReadOnlyMemory<byte> rgb)
         {
-            if (rgb.Length < 6) return;
+            if (rgb.Length < 6)
+            {
+                return;
+            }
+
             var reader = new BigEndianReader(rgb);
             ushort r = reader.ReadUInt16(), g = reader.ReadUInt16(), b = reader.ReadUInt16();
             w.WriteNumber("red", r);
@@ -356,7 +387,10 @@ namespace ClassicMac.Resources.Decoders.Interface
             var message = $"{input.Resource}: the data ends early; read as far as it goes.";
             foreach (var d in input.Diagnostics)
             {
-                if (d.Code == "ui.short" && d.Message == message) return;
+                if (d.Code == "ui.short" && d.Message == message)
+                {
+                    return;
+                }
             }
             input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "ui.short", message));
         }

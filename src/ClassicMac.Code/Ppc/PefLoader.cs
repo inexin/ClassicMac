@@ -183,20 +183,30 @@ namespace ClassicMac.Code.Ppc
                 RelocationsOffset = relocInstrOffset,
             };
             if (hashPower > 18)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.loader-hash-power",
                     $"The export hash table power {hashPower} is larger than an export index (18 bits) allows."));
+            }
 
             long at = HeaderSize;
             loader.ReadImports(reader, ref at, libraryCount, symbolCount, diagnostics);
             loader.ReadRelocationHeaders(reader, at, relocSectionCount, diagnostics);
-            if (hashPower <= 18) loader.ReadExports(reader, hashOffset, exportCount, diagnostics);
+            if (hashPower <= 18)
+            {
+                loader.ReadExports(reader, hashOffset, exportCount, diagnostics);
+            }
+
             return loader;
         }
 
         private static long Fit(BigEndianReader reader, long at, uint count, int size, string what, ICollection<Diagnostic> diagnostics)
         {
             long room = Math.Max(0, (reader.Length - at) / size);
-            if (count <= room) return count;
+            if (count <= room)
+            {
+                return count;
+            }
+
             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.loader-truncated",
                 $"The loader section has room for {room} of its {count} {what}.", at));
             return room;
@@ -238,8 +248,11 @@ namespace ClassicMac.Code.Ppc
                 var first = reader.ReadUInt32();
                 var options = (PefLibraryOptions)reader.ReadByte();
                 if (first > symbolCount || count > symbolCount - first)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.loader-library-symbols",
                         $"Imported library {i}'s symbols ({first} + {count}) run past the {symbolCount} imported symbols.", reader.Position - 9));
+                }
+
                 libs[i] = new PefImportedLibrary(CString(reader, nameOffset, diagnostics), oldImpVersion, currentVersion,
                     (int)Math.Min(first, int.MaxValue), (int)Math.Min(count, int.MaxValue), options);
             }
@@ -249,8 +262,13 @@ namespace ClassicMac.Code.Ppc
             var owner = new int[symbols];
             Array.Fill(owner, -1);
             for (int l = 0; l < libs.Length; l++)
+            {
                 for (long s = libs[l].FirstSymbol; s < (long)libs[l].FirstSymbol + libs[l].SymbolCount && s < symbols; s++)
+                {
                     owner[s] = l;
+                }
+            }
+
             var imports = new PefImportedSymbol[symbols];
             for (int i = 0; i < imports.Length; i++)
             {
@@ -277,11 +295,17 @@ namespace ClassicMac.Code.Ppc
                 long start = (long)RelocationsOffset + first;
                 long room = start > reader.Length ? 0 : (reader.Length - start) / 2;
                 if (words > room)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.loader-truncated",
                         $"Section {section}'s {words} relocation words run past the loader section; {room} read.", start));
+                }
+
                 var instructions = new ushort[Math.Min(words, room)];
                 for (int w = 0; w < instructions.Length; w++)
+                {
                     instructions[w] = reader.ReadUInt16At((int)(start + 2L * w));
+                }
+
                 headers[i] = new PefRelocationHeader(section, instructions, first);
             }
             RelocationHeaders = headers;
@@ -293,7 +317,9 @@ namespace ClassicMac.Code.Ppc
             long fitting = Fit(reader, hashOffset, (uint)hashCount, 4, "export hash entries", diagnostics);
             hashTable = new uint[fitting];
             for (int i = 0; i < hashTable.Length; i++)
+            {
                 hashTable[i] = reader.ReadUInt32At((int)(hashOffset + 4L * i));
+            }
 
             long keys = hashOffset + 4 * hashCount;
             long count = Fit(reader, keys, exportCount, 4, "export keys", diagnostics);
@@ -327,11 +353,17 @@ namespace ClassicMac.Code.Ppc
                     NameBytes = name,
                 };
                 if (name.Length == length && Hash(name.Span) != key)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "pef.export-hash-mismatch",
                         $"Export '{export.Name}' has key 0x{key:X8}; its name hashes to 0x{Hash(name.Span):X8}.", keys + 4L * i));
+                }
+
                 if (export.IsReexport && value >= (uint)ImportedSymbols.Count)
+                {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "pef.export-reexport-out-of-range",
                         $"Export '{export.Name}' re-exports import {value}; there are {ImportedSymbols.Count}.", symbols + 10L * i));
+                }
+
                 exports[i] = export;
             }
             Exports = exports;
@@ -341,7 +373,11 @@ namespace ClassicMac.Code.Ppc
             foreach (var entry in hashTable)
             {
                 long chain = entry >> 18, first = entry & 0x3FFFF;
-                if (chain == 0) continue;
+                if (chain == 0)
+                {
+                    continue;
+                }
+
                 if (first != next)
                 {
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "pef.export-hash-chains",
@@ -351,8 +387,10 @@ namespace ClassicMac.Code.Ppc
                 next += chain;
             }
             if (next != exportCount)
+            {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "pef.export-hash-chains",
                     $"The export hash chains cover {next} exports; there are {exportCount}.", hashOffset));
+            }
         }
 
         /// <summary>
@@ -365,10 +403,17 @@ namespace ClassicMac.Code.Ppc
         public static uint Hash(ReadOnlySpan<byte> name)
         {
             int nul = name.IndexOf((byte)0);
-            if (nul >= 0) name = name[..nul];
+            if (nul >= 0)
+            {
+                name = name[..nul];
+            }
+
             int hash = 0;
             foreach (var c in name)
+            {
                 hash = unchecked((hash << 1) - (hash >> 16)) ^ c;
+            }
+
             return unchecked((uint)(name.Length << 16)) | (uint)((hash ^ (hash >> 16)) & 0xFFFF);
         }
 
@@ -379,16 +424,27 @@ namespace ClassicMac.Code.Ppc
         /// <summary>Finds an export by name through the hash table, as the Code Fragment Manager does; null when there is none.</summary>
         public PefExport? FindExport(ReadOnlySpan<byte> name)
         {
-            if (hashTable.Length == 0) return null;
+            if (hashTable.Length == 0)
+            {
+                return null;
+            }
+
             var key = Hash(name);
             int index = HashIndex(key, ExportHashTablePower);
-            if (index >= hashTable.Length) return null;
+            if (index >= hashTable.Length)
+            {
+                return null;
+            }
+
             var entry = hashTable[index];
             long first = entry & 0x3FFFF, end = first + (entry >> 18);
             for (long i = first; i < end && i < Exports.Count; i++)
             {
                 var export = Exports[(int)i];
-                if (export.HashKey == key && export.NameBytes.Span.SequenceEqual(name)) return export;
+                if (export.HashKey == key && export.NameBytes.Span.SequenceEqual(name))
+                {
+                    return export;
+                }
             }
             return null;
         }

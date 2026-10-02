@@ -89,7 +89,11 @@ namespace ClassicMac.Files
         /// <summary>Writes <c>FInfo</c> and <c>FXInfo</c>, 32 bytes, as <see cref="Read"/> reads them.</summary>
         public void Write(Span<byte> destination)
         {
-            if (destination.Length < Length) throw new ArgumentException($"Finder info needs {Length} bytes.", nameof(destination));
+            if (destination.Length < Length)
+            {
+                throw new ArgumentException($"Finder info needs {Length} bytes.", nameof(destination));
+            }
+
             var writer = new BigEndianWriter(Length);
             writer.WriteFourCC(Type);
             writer.WriteFourCC(Creator);

@@ -13,10 +13,16 @@ namespace ClassicMac.Resources
         public static ResourceFork Read(ReadOnlyMemory<byte> input, ReadOptions options)
         {
             var fork = new ResourceFork();
-            if (input.IsEmpty) return fork; // a file without a resource fork
+            if (input.IsEmpty)
+            {
+                return fork; // a file without a resource fork
+            }
+
             var bytes = input;
             if (bytes.Length < HeaderLength)
+            {
                 throw new InvalidDataException($"A resource fork needs a {HeaderLength}-byte header; this is {bytes.Length}.");
+            }
 
             // Whether the Mac would open the fork; said in the diagnostics, and in the exception when we cannot read it.
             var verdict = "";
@@ -51,7 +57,9 @@ namespace ClassicMac.Resources
             }
 
             if (mapOffset + MapHeaderLength > bytes.Length)
+            {
                 throw new InvalidDataException($"The resource map at {mapOffset} lies outside the {bytes.Length}-byte fork. {verdict}".TrimEnd());
+            }
 
             var mapEnd = mapOffset + mapLength;
             if (mapLength < MapHeaderLength || mapEnd > bytes.Length)
@@ -89,7 +97,9 @@ namespace ClassicMac.Resources
             var typeList = mapOffset + reader.ReadUInt16At(map + MapTypeListOffsetOffset);
             var nameList = mapOffset + reader.ReadUInt16At(map + MapNameListOffsetOffset);
             if (typeList + TypeCountLength > mapEnd)
+            {
                 throw new InvalidDataException($"The type list at {typeList} lies outside the resource map. {verdict}".TrimEnd());
+            }
 
             var context = new Context(input, fork, options, dataOffset, dataEnd, mapEnd, nameList);
             var typeCount = (ushort)(reader.ReadUInt16At((int)typeList) + 1);
@@ -167,10 +177,16 @@ namespace ClassicMac.Resources
                 }
 
                 var data = ReadData(context, label, dataOffset, entry);
-                if (data is null) continue;
+                if (data is null)
+                {
+                    continue;
+                }
 
                 var resource = new Resource(type, id, data.Value) { Attributes = attributes };
-                if (nameOffset != NoName) resource.Name = ReadName(context, label, nameOffset, entry);
+                if (nameOffset != NoName)
+                {
+                    resource.Name = ReadName(context, label, nameOffset, entry);
+                }
                 // Where the data and name sat, and the handle field, so the writer can lay the fork out as the
                 // Resource Manager's compaction would and keep what real files carry.
                 resource.DataPlacement = dataOffset;
@@ -216,7 +232,9 @@ namespace ClassicMac.Resources
             {
                 var length = context.Input.Span[(int)start];
                 if (start + 1 + length <= context.MapEnd)
+                {
                     return new MacString(context.Input.Span.Slice((int)start + 1, length));
+                }
             }
             context.Report(DiagnosticSeverity.Warning, "resource.name-out-of-range",
                 $"The name of {label} at {start} lies outside the resource map; the resource is kept unnamed.", entry);
@@ -261,7 +279,10 @@ namespace ClassicMac.Resources
             public void Report(DiagnosticSeverity severity, string code, string message, long offset)
             {
                 if (severity == DiagnosticSeverity.Error && ++errors > MaxErrors)
+                {
                     throw new InvalidDataException($"The fork is too damaged to read: over {MaxErrors} errors in its map.");
+                }
+
                 Fork.Diagnostics.Add(new Diagnostic(severity, code, message, offset));
             }
         }

@@ -1,12 +1,12 @@
 using ClassicMac.Core;
-using Xunit;
 using ClassicMac.Graphics;
-using ClassicMac.Graphics.QuickTime;
-using ClassicMac.Graphics.QuickDraw;
-using ClassicMac.Graphics.Pict;
 using ClassicMac.Graphics.ImageSharp;
+using ClassicMac.Graphics.Pict;
+using ClassicMac.Graphics.QuickDraw;
+using ClassicMac.Graphics.QuickTime;
 using ClassicMac.Graphics.SkiaSharp;
 using ClassicMac.Resources.Decoders.Images;
+using Xunit;
 
 namespace ClassicMac.Graphics.Tests;
 
@@ -89,7 +89,7 @@ public class PictParserTests
     public void LegalOpcode_IsSkippedWithItsSpecOperandSize(string name, byte[] opcodeAndOperands)
     {
         _ = name;
-        var bmp = DecodeWith(b => { foreach (var x in opcodeAndOperands) b.U8(x); });
+        var bmp = DecodeWith(b => { foreach (var x in opcodeAndOperands) { b.U8(x); } });
         Assert.Equal(Black, bmp[0, 0]);
         Assert.Equal(White, bmp[1, 0]);
     }
@@ -172,13 +172,20 @@ public class PictParserTests
         var bmp = DecodeWith(b =>
         {
             b.U16(0x0014).U16(patType).Zeros(8);
-            if (patType == 2) { b.Rgb(0xFFFF, 0, 0); return; }
+            if (patType == 2)
+            {
+                b.Rgb(0xFFFF, 0, 0);
+                return;
+            }
             b.U16(0x8008).Rect(0, 0, 8, 8)                       // rowBytes (PixMap flag) + bounds
              .U16(0).U16(0).U16(0).U16(0).U16(0x48).U16(0).U16(0x48).U16(0)   // pmVersion, packType, packSize, hRes, vRes
              .U16(0).U16(8).U16(1).U16(8).U16(0).U16(0).U16(0).U16(0).U16(0).U16(0)  // pixelType, pixelSize, cmpCount, cmpSize, planeBytes, pmTable, reserved
              .U16(0).U16(0).U16(0).U16(1)                        // ctSeed, ctFlags, ctSize (2 entries)
              .U16(0).Rgb(0xFFFF, 0xFFFF, 0xFFFF).U16(1).Rgb(0, 0, 0);
-            for (int row = 0; row < 8; row++) b.U8(2).U8(0xF9).U8(row & 1);   // byteCount, repeat 8x
+            for (int row = 0; row < 8; row++)
+            {
+                b.U8(2).U8(0xF9).U8(row & 1);   // byteCount, repeat 8x
+            }
         });
         Assert.Equal(Black, bmp[0, 0]);
     }
@@ -251,7 +258,11 @@ public class PictParserTests
             .U16(16).U16(32).U16(3).U16(8).U16(0).U16(0).U16(0).U16(0).U16(0).U16(0)
             .Rect(0, 0, 1, 32).Rect(0, 0, 1, 32).U16(0)
             .U8(97).U8(95);
-        for (int i = 1; i <= 96; i++) b.U8(i);
+        for (int i = 1; i <= 96; i++)
+        {
+            b.U8(i);
+        }
+
         var pict = b.Align().U16(0x00FF).ToArray();
         Assert.Equal(new RgbaColor(32, 64, 1), PictReader.Decode(pict)[31, 0]);
         Assert.Equal(new RgbaColor(32, 64, 96), PictReader.Decode(pict, new PictDecodeOptions { QuickDraw = QuickDrawVersion.MacRom })[31, 0]);
@@ -420,7 +431,8 @@ public class PictParserTests
         // MacDraw fills the 512-byte .pict header with its own data ("DRWG..."); the picture still follows it.
         var header = new byte[PictHeader.FileHeaderSize];
         "DRWGMD"u8.CopyTo(header);
-        header[20] = 0x11; header[21] = 0x01;   // decoy: not at the picture's version-opcode offset
+        header[20] = 0x11;
+        header[21] = 0x01;   // decoy: not at the picture's version-opcode offset
         var picture = PictBuilder.V1(0, 0, 1, 8)
             .U8(0x90).U16(2).Rect(0, 0, 1, 8).Rect(0, 0, 1, 8).Rect(0, 0, 1, 8).U16(0).U8(0x80).U8(0)
             .U8(0xFF).ToArray();

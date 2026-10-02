@@ -144,7 +144,11 @@ public class CodeDecoderTests
         var far = new BigEndianWriter();
         far.WriteUInt16(0xFFFF);
         far.WriteUInt16(0);
-        foreach (uint v in new uint[] { 0, 1, 0, 0, 0x36, 0, 0x38, 0, 0 }) far.WriteUInt32(v);
+        foreach (uint v in new uint[] { 0, 1, 0, 0, 0x36, 0, 0x38, 0, 0 })
+        {
+            far.WriteUInt32(v);
+        }
+
         far.WriteBytes(code);
         var farEntry = Words(1, 0xA9F0, 0, 0x28);
         var fork = Fork(Res("CODE", 0, Code0(farEntry, Words(0, 0xFFFF, 0, 0))), Res("CODE", 1, far.ToArray()));
@@ -188,7 +192,11 @@ public class CodeDecoderTests
         var far = new BigEndianWriter();
         far.WriteUInt16(0xFFFF);
         far.WriteUInt16(0);
-        foreach (uint v in new uint[] { 0, 0, 0, 0, 0x30, 0, 0, 0, 0 }) far.WriteUInt32(v);
+        foreach (uint v in new uint[] { 0, 0, 0, 0, 0x30, 0, 0, 0, 0 })
+        {
+            far.WriteUInt32(v);
+        }
+
         far.WriteBytes(code);
 
         var json = Json(Decode(Fork(Res("CODE", 1, far.ToArray())), "CODE", 1).Files);

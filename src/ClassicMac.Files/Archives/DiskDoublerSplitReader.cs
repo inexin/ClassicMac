@@ -38,7 +38,11 @@ public sealed class DiskDoublerSplitReader : IContainerReader
     public bool CanRead(ForkData input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        if (input.Length < HeaderLength) return false;
+        if (input.Length < HeaderLength)
+        {
+            return false;
+        }
+
         try
         {
             return TryReadHeader(input.Slice(0, HeaderLength).ToArray(HeaderLength), input.Length, out _);
@@ -70,10 +74,15 @@ public sealed class DiskDoublerSplitReader : IContainerReader
     {
         long maximumBytes = context.Options.MaxExpandedBytesPerInput;
         if (input.Length > maximumBytes)
+        {
             throw new InvalidDataException("The DiskDoubler split file exceeds the configured input-size limit.");
+        }
+
         byte[] inputBytes = input.ToArray(maximumBytes);
         if (!TryReadHeader(inputBytes, inputBytes.Length, out PartHeader? first) || first is null)
+        {
             throw new InvalidDataException("Not a DiskDoubler split file.");
+        }
 
         // The parts carry no name: the set is named by its host files, "name.1", "name.2" …
         string? setName = hostName is { } name ? StripPartNumber(name.ToMacRoman()) : null;
@@ -84,24 +93,44 @@ public sealed class DiskDoublerSplitReader : IContainerReader
         {
             if (setName is { Length: > 0 } &&
                 !string.Equals(StripPartNumber(sibling.Name.ToMacRoman()), setName, StringComparison.OrdinalIgnoreCase))
+            {
                 continue;
+            }
+
             ForkData fork = sibling.DataFork;
-            if (fork.Length < HeaderLength) continue;
+            if (fork.Length < HeaderLength)
+            {
+                continue;
+            }
+
             if (!TryReadHeader(fork.Slice(0, HeaderLength).ToArray(HeaderLength), fork.Length,
                     out PartHeader? header) || header is null || !first.SharedBytes.AsSpan().SequenceEqual(header.SharedBytes))
+            {
                 continue;
+            }
+
             if (parts[header.PartIndex] is not null)
+            {
                 throw new InvalidDataException(
                     $"More than one DiskDoubler split part is part {header.PartIndex + 1}.");
+            }
+
             if (fork.Length > maximumBytes - totalBytes)
+            {
                 throw new InvalidDataException("The DiskDoubler split set exceeds the configured input-size limit.");
+            }
+
             parts[header.PartIndex] = fork.ToArray(maximumBytes);
             totalBytes += fork.Length;
         }
 
         for (int index = 0; index < parts.Length; index++)
         {
-            if (parts[index] is not null) continue;
+            if (parts[index] is not null)
+            {
+                continue;
+            }
+
             context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
                 $"The DiskDoubler split file is missing part {index + 1} of {parts.Length}.");
             return [];
@@ -109,7 +138,10 @@ public sealed class DiskDoublerSplitReader : IContainerReader
 
         long forkTotal = (long)first.DataLength + first.ResourceLength;
         if (forkTotal > maximumBytes || forkTotal > int.MaxValue)
+        {
             throw new InvalidDataException("The DiskDoubler split file exceeds the configured expanded-size limit.");
+        }
+
         byte[] forks = new byte[forkTotal];
         int written = 0;
         for (int index = 0; index < parts.Length; index++)
@@ -119,10 +151,16 @@ public sealed class DiskDoublerSplitReader : IContainerReader
             int payloadLength = checked((int)header.ReadUInt32At(44));
             ReadOnlySpan<byte> payload = part.AsSpan(HeaderLength, payloadLength);
             if (header.ReadUInt16At(48) != Crc16Xmodem(payload))
+            {
                 context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                     $"DiskDoubler split part {index + 1} has a CRC-16 mismatch; its data is retained.");
+            }
+
             if (payloadLength > forks.Length - written)
+            {
                 throw new InvalidDataException("The DiskDoubler split parts hold more than the declared forks.");
+            }
+
             payload.CopyTo(forks.AsSpan(written));
             written += payloadLength;
         }
@@ -152,13 +190,25 @@ public sealed class DiskDoublerSplitReader : IContainerReader
     private static bool TryReadHeader(byte[] bytes, long inputLength, out PartHeader? header)
     {
         header = null;
-        if (bytes.Length < HeaderLength) return false;
+        if (bytes.Length < HeaderLength)
+        {
+            return false;
+        }
+
         var reader = new BigEndianReader(bytes);
-        if (reader.ReadUInt32At(0) != Magic || reader.ReadUInt32At(90) != Magic) return false;
+        if (reader.ReadUInt32At(0) != Magic || reader.ReadUInt32At(90) != Magic)
+        {
+            return false;
+        }
+
         ushort partCount = reader.ReadUInt16At(40);
         ushort partIndex = reader.ReadUInt16At(42);
         uint payloadLength = reader.ReadUInt32At(44);
-        if (partCount == 0 || partIndex >= partCount || payloadLength > inputLength - HeaderLength) return false;
+        if (partCount == 0 || partIndex >= partCount || payloadLength > inputLength - HeaderLength)
+        {
+            return false;
+        }
+
         header = new PartHeader(bytes.AsSpan(SharedStart, SharedLength).ToArray(), partCount, partIndex,
             reader.ReadUInt32At(8), reader.ReadUInt32At(12));
         return true;
@@ -168,9 +218,19 @@ public sealed class DiskDoublerSplitReader : IContainerReader
     private static string StripPartNumber(string name)
     {
         int dot = name.LastIndexOf('.');
-        if (dot <= 0 || dot == name.Length - 1) return name;
+        if (dot <= 0 || dot == name.Length - 1)
+        {
+            return name;
+        }
+
         for (int index = dot + 1; index < name.Length; index++)
-            if (!char.IsAsciiDigit(name[index])) return name;
+        {
+            if (!char.IsAsciiDigit(name[index]))
+            {
+                return name;
+            }
+        }
+
         return name[..dot];
     }
 
@@ -181,7 +241,9 @@ public sealed class DiskDoublerSplitReader : IContainerReader
         {
             crc ^= (ushort)(value << 8);
             for (int bit = 0; bit < 8; bit++)
+            {
                 crc = (ushort)((crc & 0x8000) == 0 ? crc << 1 : (crc << 1) ^ 0x1021);
+            }
         }
         return crc;
     }

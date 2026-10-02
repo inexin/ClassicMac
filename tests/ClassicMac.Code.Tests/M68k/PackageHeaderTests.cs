@@ -18,7 +18,11 @@ public class PackageHeaderTests
         w.WriteUInt16(flags);
         w.WriteByte(unchecked((byte)first));
         w.WriteByte(unchecked((byte)last));
-        foreach (var o in offsets) w.WriteUInt16(o);
+        foreach (var o in offsets)
+        {
+            w.WriteUInt16(o);
+        }
+
         w.WriteBytes(Words(0x4E56, 0, 0x4E5E, 0x4E75));
         return w.ToArray();
     }
