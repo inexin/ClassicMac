@@ -265,7 +265,7 @@ The header carries no name.
 ### 2.9 Method 8: Compact Pro
 
 1. The fork starts with 16 bytes. If their sum is 0, the rest is Compact Pro LZH followed by its RLE; otherwise RLE
-   alone ([compact-pro.md §2.3](compact-pro.md#23-rle) and [§2.4](compact-pro.md#24-lzh)).
+   alone ([compact-pro-rle-lzh.md](../codecs/compact-pro-rle-lzh.md)).
 2. The checksum is CRC-16/ARC (CRC-16/IBM) of the output.
 
 [Reference: XADMaster] [Verified: DiskDoubler 3.7.7]

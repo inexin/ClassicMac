@@ -145,6 +145,7 @@ One file per format, in its category folder. A codec used by more than one forma
 | [lzhuf.md](codecs/lzhuf.md) | DART LZH, Okumura and Yoshizaki's LZHUF (DART, NDIF) | `ClassicMac.Files.Compression` |
 | [bzip2.md](codecs/bzip2.md) | bzip2 (UDIF) | `ClassicMac.Files.Compression` |
 | [packbits.md](codecs/packbits.md) | PackBits scan lines (PICT) | `ClassicMac.Graphics` |
+| [compact-pro-rle-lzh.md](codecs/compact-pro-rle-lzh.md) | Compact Pro's RLE and LZH (Compact Pro, DiskDoubler method 8) | `ClassicMac.Files.Archives` |
 | [stuffit-methods.md](codecs/stuffit-methods.md) | The compression methods StuffIt 1.x–4.x and StuffIt 5 share | `ClassicMac.Files.Archives` |
 | [mace.md](codecs/mace.md) | MACE 3:1 and 6:1 | `ClassicMac.Resources.Decoders.Sound` |
 | [ima4.md](codecs/ima4.md) | IMA 4:1 | `ClassicMac.Resources.Decoders.Sound` |

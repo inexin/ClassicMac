@@ -1,7 +1,7 @@
 # Compact Pro
 
 The archive format of Bill Goodman's Compact Pro, extension `.cpt`. An 8-byte header points to a directory at the end
-of the archive; each file's forks are coded with RLE or with LZH followed by RLE. Compact Pro can cut an archive into
+of the archive; each file's forks are coded with RLE or with LZH followed by RLE ([compact-pro-rle-lzh.md](../codecs/compact-pro-rle-lzh.md)). Compact Pro can cut an archive into
 segments and save it as a self-extracting application. ClassicMac reads archives, folders, both fork codings, comments
 and segment sets.
 
@@ -10,7 +10,7 @@ and segment sets.
 | Identified by | `$01` at +$00 and a directory, at the offset in +$04, whose CRC matches. Files of type `PACT`, creator `CPCT`; extension `.cpt` |
 | ClassicMac | Reads; `ClassicMac.Files.Archives.CompactProReader` |
 | Verified against | Compact Pro 1.52 on Mac OS 9.0 (an archive, its `.sea` and a segment set) |
-| Sources | Compact Pro's *User's Guide*. Other readers (behaviour only): a Compact Pro format description (docs.rs `compact-pro`), XADMaster, psx-spx's notes, pmarreck/compact_pro, munbox |
+| Sources | Compact Pro's *User's Guide*. Other readers (behaviour only): a Compact Pro format description (docs.rs `compact-pro`), XADMaster, munbox. The fork codings' sources are in [compact-pro-rle-lzh.md](../codecs/compact-pro-rle-lzh.md) |
 
 Contents
 
@@ -107,31 +107,10 @@ every segment but the last, where it counts from the start of that segment file 
 
 [Verified: Compact Pro 1.52]
 
-### 2.3 RLE
+### 2.3 Fork codings
 
-The RLE stage, alone or after LZH, uses `$81` as the escape [Reference: pmarreck/compact_pro; munbox's sample]:
-
-1. A byte other than `$81` is output.
-2. `$81 $82 $00` outputs `$81 $82`.
-3. `$81 $82 n`, n ≥ 1, outputs n − 1 more copies of the last byte (`$81 $82 $01` adds none).
-4. `$81 x`, for any other x, outputs `$81` and then handles x as a new byte. So after `$81 $81` the second `$81` is
-   output and is itself an escape for the next byte ("half-escaped"): `81 81 82 05` gives five `$81`,
-   `81 81 81 82 05` six, and `81 81 41` is `81 81 41`.
-5. The output must reach the expanded length; a run with no byte before it is an error.
-
-### 2.4 LZH
-
-The LZH stage's output goes through the RLE stage (§2.3) [Reference: psx-spx, compact-pro description]
-[Verified: Compact Pro 1.52]:
-
-1. An 8 KiB history window. Bits are read most significant first.
-2. Each block starts with three code tables: literals (up to 256 symbols), lengths (up to 64) and the upper bits of
-   displacements (up to 128). Each table is an 8-bit count c, then 2c 4-bit code lengths; the codes are canonical.
-3. A 1 bit is followed by a literal code. A 0 bit is followed by a length code, a displacement code (the upper bits)
-   and 6 raw bits (the lower bits); a displacement of 0 means 8192. Copy `length` bytes from that far back in the
-   window; a copy may overlap the bytes it produces.
-4. Count 2 for each literal and 3 for each match. When the count reaches `$1FFF0`, the block ends: go to the next
-   byte boundary, skip 2 bytes, and 1 more if that leaves an odd byte offset; the next block's tables follow.
+Each fork is decoded with Compact Pro's RLE, or, when its flag bit is set, with LZH followed by RLE:
+[compact-pro-rle-lzh.md](../codecs/compact-pro-rle-lzh.md).
 
 ## 3. Writing
 
@@ -188,12 +167,12 @@ None.
     entries skipped; duplicate numbers are rejected; another set's siblings are ignored; the segments share the
     input-size limit.
 - `TestData/CompactProMunbox/testfile.compact_pro_152.cpt` (from munbox, MIT; said to be made by Compact Pro 1.52, not
-  confirmed; `CompactProSampleTests`): 27 files in two nested folders; every data fork matches munbox's MD5. Its LZH
-  + RLE forks use the half-escape chain (`81 81 81`, `81 81 82`), its RLE-only forks do not, and no fork has
-  `81 82 01`. Its directory ends the archive.
+  confirmed; `CompactProSampleTests`): 27 files in two nested folders; every data fork matches munbox's MD5. Its directory
+  ends the archive. What its forks prove about the codings is in
+  [compact-pro-rle-lzh.md §7](../codecs/compact-pro-rle-lzh.md#7-verification).
 - Hand-built archives in `CompactProFeatureTests`: RLE forks with Finder information, the comment, nested folders,
-  a `.sea`, a fork read from an earlier segment, forks overlapping the directory, malformed directory records, LZH
-  literals in either fork, overlapping matches, truncated tables, the block boundary.
+  a `.sea`, a fork read from an earlier segment, forks overlapping the directory, malformed directory records; the
+  LZH cases are in [compact-pro-rle-lzh.md §7](../codecs/compact-pro-rle-lzh.md#7-verification).
 
 ## 8. Not covered
 
@@ -207,8 +186,5 @@ None.
    documentation.
 2. Compact Pro format description, <https://docs.rs/crate/compact-pro/latest>. Licence not recorded; reference only.
 3. XADMaster (The Unarchiver), `XADCompactProParser.m`. LGPL-2.1; reference only.
-4. psx-spx, Compact Pro notes, <https://psx-spx.consoledev.net/ps1/cdr/cdromfileformats/compression/>.
-   Documentation; licence not recorded.
-5. pmarreck/compact_pro, its RLE rule as fixed against real archives. Licence not recorded; reference only.
-6. munbox, <https://github.com/dafo123/munbox>, its Compact Pro sample archive. MIT; the sample is committed with
+4. munbox, <https://github.com/dafo123/munbox>, its Compact Pro sample archive. MIT; the sample is committed with
    notice (`THIRD-PARTY-NOTICES.md`), no code used.
