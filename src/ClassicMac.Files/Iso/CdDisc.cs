@@ -8,7 +8,7 @@ namespace ClassicMac.Files.Iso
     /// <summary>
     /// A whole CD as a run of 2048-byte blocks numbered by absolute sector (logical block address), built from the
     /// data tracks of a cue sheet or the sessions of a raw image, with the start of the last session: what the Mac's
-    /// CD driver hands the file systems for a multisession disc (docs/formats/disk-images/cd-images.md §3). Blocks no
+    /// CD driver hands the file systems for a multisession disc (docs/formats/disk-images/cd-images.md §2.2). Blocks no
     /// data track covers (audio, the gap between sessions, tracks not read) read as zeros.
     /// </summary>
     internal sealed class CdDisc : ForkData

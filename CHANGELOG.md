@@ -13,7 +13,7 @@
 - Inputs: uuencode (`.uu`, `begin-base64`); zip (stored, DEFLATE, ZIP64) and tar/gzip with Mac data: AppleDouble `._`
   and `__MACOSX/` pairing, Info-ZIP and ZipIt Mac extra fields (archives/zip.md, archives/tar-gzip.md, containers/uuencode.md).
 - CD images: multisession discs are read by their last session's descriptors, as the Mac reads them, from cue sheets
-  and whole-disc raw images (disk-images/cd-images.md §2 and §3).
+  and whole-disc raw images (disk-images/cd-images.md §2.2 and §5.3).
 - HFS: catalog keys whose length leaves out the pad byte, as Mac OS writes them, are no longer rejected; most files on
   Mac-written volumes were missing from listings (file-systems/hfs.md §5.1).
 - Editor III: Volume ▸ New File, Import File, New Folder and Delete on plain HFS images, saved with Save As.

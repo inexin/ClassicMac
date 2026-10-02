@@ -15,7 +15,7 @@ namespace ClassicMac.Files.Iso
     /// <see cref="RawCdReader"/> for raw sectors), each at its absolute sector, for the volume readers to open next;
     /// audio tracks read as zeros. The start of the last session (<c>REM SESSION</c>, or the last data track) goes with
     /// the disc, as the Mac's CD driver reports it, so the ISO reader reads that session's descriptors
-    /// (docs/formats/disk-images/cd-images.md §3). The referenced files are found among the cue sheet's siblings by
+    /// (docs/formats/disk-images/cd-images.md §2.2). The referenced files are found among the cue sheet's siblings by
     /// name.
     /// </summary>
     public sealed partial class CueSheetReader : IContainerReader

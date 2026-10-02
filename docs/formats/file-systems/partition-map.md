@@ -180,4 +180,4 @@ Differences from the Mac that ClassicMac knowingly keeps (§4): a partition's vo
 ends (`pmPartBlkCnt − pmLgDataStart` blocks, where the CD-ROM driver takes `pmPartBlkCnt` from the data start);
 `Apple_MFS` partitions are read too; partition types must match exactly, where the driver compares the first nine
 bytes with `Apple_HFS`; an entry without `'PM'` is skipped rather than ending the map; and the multisession base is
-applied only to a cue sheet's last session ([cd-images.md §3](../disk-images/cd-images.md#3-multisession-discs)), without the driver's multiplication by the stride.
+applied only to a cue sheet's last session ([cd-images.md §5.3](../disk-images/cd-images.md#53-multisession-discs)), without the driver's multiplication by the stride.
