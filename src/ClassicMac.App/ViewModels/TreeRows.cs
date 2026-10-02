@@ -81,8 +81,8 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         public string? Meta => this switch
         {
-            FileNode file => $"{file.File.FinderInfo.Type} · {file.File.FinderInfo.Creator}",
-            ContainerFileNode container => $"{container.File.FinderInfo.Type} · {container.File.FinderInfo.Creator}",
+            FileNode file => FormatTypeCreator(file.File.FinderInfo.Type, file.File.FinderInfo.Creator),
+            ContainerFileNode container => FormatTypeCreator(container.File.FinderInfo.Type, container.File.FinderInfo.Creator),
             ResourceNode resource => FormatSize(resource.Resource.Length),
             NoNameGroupNode group => string.Create(CultureInfo.InvariantCulture, $"{group.Children.Count} files"),
             InputNode input => $"{(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "resource fork")} · {FormatSize(HostSize(input))}",
@@ -100,6 +100,14 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Tells the row its meta changed (a "No name" group's count).</summary>
         internal void OnMetaChanged() => OnPropertyChanged(nameof(Meta));
+
+        /// <summary>
+        /// "type · creator", a zero code (a file never given one, as from another system) a dash; null when both are zero.
+        /// </summary>
+        public static string? FormatTypeCreator(FourCC type, FourCC creator) =>
+            type.Value == 0 && creator.Value == 0
+                ? null
+                : $"{(type.Value == 0 ? "—" : type.ToString())} · {(creator.Value == 0 ? "—" : creator.ToString())}";
 
         /// <summary>A size for people: bytes below 1 KB, else KB, MB or GB to one decimal.</summary>
         public static string FormatSize(long bytes)

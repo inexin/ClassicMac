@@ -114,6 +114,16 @@ public class TreeRowTests : IDisposable
     [InlineData(3_221_225_472, "3 GB")]
     public void Sizes_read_as_bytes_KB_MB_or_GB(long bytes, string text) => Assert.Equal(text, NodeViewModel.FormatSize(bytes));
 
+    // A file never given a type or creator (copied from another system) has zeros there: no meta, or a dash for the one
+    // that is zero, not "\x00\x00\x00\x00".
+    [Theory]
+    [InlineData("TEXT", "ttxt", "TEXT · ttxt")]
+    [InlineData("\\x00\\x00\\x00\\x00", "\\x00\\x00\\x00\\x00", null)]
+    [InlineData("TEXT", "\\x00\\x00\\x00\\x00", "TEXT · —")]
+    [InlineData("\\x00\\x00\\x00\\x00", "ttxt", "— · ttxt")]
+    public void Zero_types_and_creators_are_left_out(string type, string creator, string? meta) =>
+        Assert.Equal(meta, NodeViewModel.FormatTypeCreator(FourCC.FromString(type), FourCC.FromString(creator)));
+
     [Fact]
     public async Task The_unsaved_mark_is_apart_from_the_name()
     {

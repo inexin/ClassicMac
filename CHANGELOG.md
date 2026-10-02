@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viewer: a file never given a type or creator (zeros) shows no type · creator in the tree, and a dash for the one
+  that is zero, not "\x00\x00\x00\x00".
 - Editor: Save and the unapplied-edits question follow every edit: typing in a `STR#` item, adding or removing one, a
   template field inside a list item, adding list items, and bytes typed in the hex view.
 - Viewer: the tree hides files with the invisible flag (`Icon
