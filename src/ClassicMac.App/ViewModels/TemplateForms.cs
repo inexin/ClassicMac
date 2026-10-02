@@ -280,7 +280,7 @@ namespace ClassicMac.App.ViewModels
             var data = node.Resource.GetData().Span;
             var type = node.Resource.Type;
             var template = type.ToString() is "STR " or "STR#" ? null : FindTemplate(type, node.Fork, FileOwner(node))?.Template;
-            return ByteMeanings.MeaningAt(type, data, offset, template);
+            return ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, data, offset, template);
         }
 
         private TemplateForm? TemplateFormFor(ResourceNode node, NodeViewModel owner)
