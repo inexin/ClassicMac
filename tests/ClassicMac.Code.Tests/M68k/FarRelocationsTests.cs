@@ -74,4 +74,15 @@ public class FarRelocationsTests
         Assert.Empty(FarRelocations.Read(new byte[0x20], 0x20, diagnostics));
         Assert.Equal("m68k.far-reloc-offset", Assert.Single(diagnostics).Code);
     }
+
+    [Fact]
+    public void List_length_includes_the_terminator()
+    {
+        Assert.Equal(5, FarRelocations.ListLength(Segment(0x300, 0x2F0, 0x05, 0x81, 0x00, 0x02, 0x00), 0x2F0));
+        Assert.Equal(1, FarRelocations.ListLength(Segment(0x40, 0x30, 0x00), 0x30));
+        Assert.Equal(2, FarRelocations.ListLength(Segment(0x10, 0x0E, 0x02, 0x02), 0x0E));     // to the end: no terminator
+        Assert.Equal(2, FarRelocations.ListLength(Segment(0x10, 0x0E, 0x02, 0x81), 0x0E));     // a cut two-byte delta
+        Assert.Equal(2, FarRelocations.ListLength(Segment(0x40, 0x30, 0x80, 0x00, 0x00), 0x30)); // the escape stops it
+        Assert.Equal(0, FarRelocations.ListLength(Segment(0x10, 0), 0x20));                      // outside
+    }
 }

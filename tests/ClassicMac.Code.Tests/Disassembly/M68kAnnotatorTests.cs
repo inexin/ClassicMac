@@ -186,8 +186,8 @@ public class M68kAnnotatorTests
         Assert.Contains((CodeReferenceKind.String, "C'Hi there'"), Of("487A 0004 4E75 4869 2074 6865 7265 00"));
         // Not a string: binary bytes.
         Assert.DoesNotContain(Of("41FA 0004 4E75 0301 0203"), r => r.Item1 == CodeReferenceKind.String);
-        // One character is not a C string.
-        Assert.DoesNotContain(Of("41FA 0004 4E75 4100"), r => r.Item1 == CodeReferenceKind.String);
+        // Three characters are not a C string.
+        Assert.DoesNotContain(Of("41FA 0004 4E75 4142 4300"), r => r.Item1 == CodeReferenceKind.String);
     }
 
     [Fact]

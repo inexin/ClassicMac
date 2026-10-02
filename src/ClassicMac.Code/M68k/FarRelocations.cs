@@ -63,5 +63,22 @@ namespace ClassicMac.Code.M68k
             void Truncated(int at) => diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "m68k.far-reloc-truncated",
                 $"A relocation list runs past the end of the segment; {offsets.Count} relocations read.", at));
         }
+
+        /// <summary>
+        /// The bytes the list at <paramref name="listOffset"/> takes, its 0 terminator included: as far as
+        /// <see cref="Read"/> reads it (to the end of the segment when it is cut short; 0 when it starts outside).
+        /// </summary>
+        public static int ListLength(ReadOnlyMemory<byte> segment, long listOffset)
+        {
+            var reader = new BigEndianReader(segment);
+            if (listOffset < 0 || listOffset >= reader.Length) return 0;
+            reader.Position = (int)listOffset;
+            while (reader.TryReadByte(out var b) && b != 0)
+            {
+                if (b < 0x80) continue;
+                if (!reader.TryReadByte(out var next) || (b == 0x80 && next == 0)) break;
+            }
+            return reader.Position - (int)listOffset;
+        }
     }
 }

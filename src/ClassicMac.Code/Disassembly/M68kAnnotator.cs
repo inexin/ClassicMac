@@ -118,7 +118,6 @@ internal sealed class M68kContext
 /// </summary>
 internal static class M68kAnnotator
 {
-    private const int MaxPreview = 40;
     private const int Lookback = 3;
 
     /// <summary>The annotations of <paramref name="ins"/>, in operand order then trap, selector and call.</summary>
@@ -151,8 +150,8 @@ internal static class M68kAnnotator
                     break;
                 case M68kEffectiveAddress { Mode: M68kAddressingMode.PcDisplacement, Address: uint target }
                     when ins.Mnemonic is not ("jsr" or "jmp"):
-                    if (StringAt(map.Code.Span, target) is { } preview)
-                        Add(CodeReferenceKind.String, preview);
+                    if (target < (uint)map.Code.Length && M68kStrings.At(map.Code.Span, (int)target) is { } s)
+                        Add(CodeReferenceKind.String, s.Preview);
                     break;
             }
         }
@@ -222,35 +221,6 @@ internal static class M68kAnnotator
         }
     }
 
-    // A Pascal string (a length byte, then that many printable characters) or a C string (at least 2 printable
-    // characters, then NUL).
-    private static string? StringAt(ReadOnlySpan<byte> code, uint target)
-    {
-        if (target >= (uint)code.Length)
-            return null;
-        int t = (int)target;
-        int n = code[t];
-        if (n >= 1 && n <= code.Length - t - 1 && IsPrintable(code.Slice(t + 1, n)))
-            return "P'" + Preview(code.Slice(t + 1, n)) + "'";
-        int end = t;
-        while (end < code.Length && end - t <= 255 && code[end] is >= 0x20 and <= 0x7E)
-            end++;
-        if (end - t >= 2 && end < code.Length && code[end] == 0)
-            return "C'" + Preview(code[t..end]) + "'";
-        return null;
-    }
-
-    private static bool IsPrintable(ReadOnlySpan<byte> chars)
-    {
-        foreach (byte c in chars)
-            if (c is < 0x20 or > 0x7E)
-                return false;
-        return true;
-    }
-
-    private static string Preview(ReadOnlySpan<byte> chars) =>
-        chars.Length > MaxPreview ? Encoding.ASCII.GetString(chars[..MaxPreview]) + "..." : Encoding.ASCII.GetString(chars);
-
     // Looks back up to 3 instructions in the trap's basic block for the instruction that sets the selector.
     private static uint? FindSelector(M68kInstruction trap, M68kCodeMap map, SelectorConvention convention)
     {
@@ -318,6 +288,47 @@ internal static class M68kAnnotator
     private static string FourCCText(uint value)
     {
         Span<byte> b = [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
-        return IsPrintable(b) ? "'" + Encoding.ASCII.GetString(b) + "'" : $"${value:X8}";
+        return M68kStrings.IsPrintable(b) ? "'" + Encoding.ASCII.GetString(b) + "'" : $"${value:X8}";
     }
+}
+
+/// <summary>Strings at the targets of PC-relative operands.</summary>
+internal static class M68kStrings
+{
+    private const int MaxPreview = 40;
+
+    // Shorter runs ending in NUL are too often code: link a6,#0 reads "NV ".
+    private const int MinCString = 4;
+
+    /// <summary>
+    /// A Pascal string (a length byte, then that many printable characters) or a C string (at least 4 printable
+    /// characters, then NUL) at <paramref name="at"/>: its preview (<c>P'text'</c>, <c>C'text'</c>, cut after 40
+    /// characters) and the bytes it takes (the length byte or the NUL included); null when there is neither.
+    /// </summary>
+    public static (string Preview, int Length)? At(ReadOnlySpan<byte> code, int at)
+    {
+        if (at < 0 || at >= code.Length)
+            return null;
+        int n = code[at];
+        if (n >= 1 && n <= code.Length - at - 1 && IsPrintable(code.Slice(at + 1, n)))
+            return ("P'" + Preview(code.Slice(at + 1, n)) + "'", n + 1);
+        int end = at;
+        while (end < code.Length && end - at <= 255 && code[end] is >= 0x20 and <= 0x7E)
+            end++;
+        if (end - at >= MinCString && end < code.Length && code[end] == 0)
+            return ("C'" + Preview(code[at..end]) + "'", end - at + 1);
+        return null;
+    }
+
+    /// <summary>Whether every byte is printable ASCII.</summary>
+    public static bool IsPrintable(ReadOnlySpan<byte> chars)
+    {
+        foreach (byte c in chars)
+            if (c is < 0x20 or > 0x7E)
+                return false;
+        return true;
+    }
+
+    private static string Preview(ReadOnlySpan<byte> chars) =>
+        chars.Length > MaxPreview ? Encoding.ASCII.GetString(chars[..MaxPreview]) + "..." : Encoding.ASCII.GetString(chars);
 }

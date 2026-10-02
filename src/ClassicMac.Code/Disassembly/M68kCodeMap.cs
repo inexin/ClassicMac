@@ -25,6 +25,10 @@ internal enum M68kDataKind
     Initializer,
     /// <summary>Bytes that do not decode, or that no entry reaches and that do not decode.</summary>
     Unknown,
+    /// <summary>An embedded PEF container (listed on its own).</summary>
+    Fragment,
+    /// <summary>A Pascal or C string a PC-relative operand points at.</summary>
+    String,
 }
 
 /// <summary>An entry point: where descent starts, and a function.</summary>
@@ -60,6 +64,7 @@ internal sealed class M68kCodeMap
     private readonly Dictionary<int, (string? Name, CodeFunctionSource Source)> registered = [];
     private readonly Dictionary<int, string> macsBugAt = [];
     private readonly Stack<int> work = new();
+    private IReadOnlySet<int> codeRelocations = new HashSet<int>();
 
     private M68kCodeMap(ReadOnlyMemory<byte> code, int start)
     {
@@ -101,10 +106,14 @@ internal sealed class M68kCodeMap
     /// <param name="start">Where the code starts; the bytes before it are a header.</param>
     /// <param name="entries">The entry points.</param>
     /// <param name="data">Runs known to be data (headers, relocation lists, initializer data).</param>
+    /// <param name="codeRelocations">The offsets of longs the loader relocates by this code's own address: a
+    /// <c>jsr</c>/<c>jmp</c> through one is followed.</param>
     public static M68kCodeMap Build(ReadOnlyMemory<byte> code, int start, IEnumerable<M68kEntry> entries,
-        IEnumerable<M68kDataRegion> data)
+        IEnumerable<M68kDataRegion> data, IReadOnlySet<int>? codeRelocations = null)
     {
         var map = new M68kCodeMap(code, start);
+        if (codeRelocations is not null)
+            map.codeRelocations = codeRelocations;
         map.Run(entries, data);
         return map;
     }
@@ -126,6 +135,9 @@ internal sealed class M68kCodeMap
         foreach (int offset in registered.Keys.Order().Reverse())
             work.Push(offset);
         Descend();
+        AssignMacsBugNames();
+        Descend();
+        MarkStrings();
         SweepGaps();
         BuildData();
         foreach (var (offset, (name, source)) in registered)
@@ -138,25 +150,62 @@ internal sealed class M68kCodeMap
         }
     }
 
-    // The function bounded by each name runs from the end of the previous name (or the start of the code).
+    // The names and their literals are data.
     private void FindMacsBugNames()
     {
         var accepted = new List<MacsBugName>();
-        int functionStart = start;
+        int previousEnd = start;
         foreach (var name in Disassembly.MacsBugNames.Find(code))
         {
             int end = Math.Min(name.End, kinds.Length);
-            if (name.ReturnOffset < functionStart || !IsFree(name.ReturnOffset, end - name.ReturnOffset))
+            if (name.ReturnOffset < previousEnd || !IsFree(name.ReturnOffset, end - name.ReturnOffset))
                 continue;
             accepted.Add(name);
-            macsBugAt[functionStart] = name.Name;
-            Register(functionStart, null, CodeFunctionSource.MacsBug);
             MarkData(new M68kDataRegion(name.Offset, name.Length, M68kDataKind.MacsBugName, name.Name));
             if (end > name.Offset + name.Length)
                 MarkData(new M68kDataRegion(name.Offset + name.Length, end - name.Offset - name.Length, M68kDataKind.Literals));
-            functionStart = end;
+            previousEnd = end;
         }
         MacsBugNames = accepted;
+    }
+
+    // A name labels the routine it ends: the last function known (an entry or a call target) between the end of the
+    // previous name (or the start of the code) and the name's return; else the routine that starts right after the
+    // previous name.
+    private void AssignMacsBugNames()
+    {
+        int previousEnd = start;
+        foreach (var name in MacsBugNames)
+        {
+            int functionStart = previousEnd;
+            foreach (int known in registered.Keys)
+                if (known >= previousEnd && known <= name.ReturnOffset && known > functionStart)
+                    functionStart = known;
+            if (macsBugAt.TryAdd(functionStart, name.Name))
+            {
+                Register(functionStart, null, CodeFunctionSource.MacsBug);
+                work.Push(functionStart);
+            }
+            previousEnd = Math.Min(name.End, kinds.Length);
+        }
+    }
+
+    // A Pascal or C string that a PC-relative operand of the code points at is data.
+    private void MarkStrings()
+    {
+        foreach (var ins in Instructions.Values.ToList())
+            MarkStrings(ins);
+    }
+
+    private void MarkStrings(M68kInstruction ins)
+    {
+        if (ins.Mnemonic is "jsr" or "jmp")
+            return;
+        foreach (var operand in ins.Operands)
+            if (operand is M68kEffectiveAddress { Mode: M68kAddressingMode.PcDisplacement, Address: uint target }
+                && target < (uint)kinds.Length && M68kStrings.At(code.Span, (int)target) is { } s
+                && IsFree((int)target, s.Length))
+                MarkData(new M68kDataRegion((int)target, s.Length, M68kDataKind.String));
     }
 
     private void Register(int offset, string? name, CodeFunctionSource source)
@@ -185,7 +234,14 @@ internal sealed class M68kCodeMap
                 if (ins.IsInvalid || !IsFree(p, ins.Length))
                     break;
                 Record(ins, swept: false);
-                if (FollowsReferences(ins))
+                if (RelocatedTarget(ins) is int relocated)
+                {
+                    BranchTargets.Add(relocated);
+                    if (ins.Mnemonic == "jsr")
+                        Register(relocated, null, CodeFunctionSource.Call);
+                    work.Push(relocated);
+                }
+                else if (FollowsReferences(ins))
                     foreach (var reference in ins.References)
                     {
                         if (reference.Kind == M68kReferenceKind.Data || reference.Address >= (uint)kinds.Length)
@@ -207,6 +263,15 @@ internal sealed class M68kCodeMap
                 p += ins.Length;
             }
         }
+    }
+
+    // jsr/jmp (xxx).l whose long the loader relocates by this code's address: the long is an offset in this code.
+    private int? RelocatedTarget(M68kInstruction ins)
+    {
+        if (ins is not { Mnemonic: "jsr" or "jmp", Operands: [M68kEffectiveAddress { Mode: M68kAddressingMode.AbsoluteLong, Address: uint target }] }
+            || !codeRelocations.Contains((int)ins.Address + 2) || target >= (uint)kinds.Length)
+            return null;
+        return (int)target;
     }
 
     // Branch targets and PC-relative jumps and calls are in this code; an absolute address is not.
@@ -307,11 +372,20 @@ internal sealed class M68kCodeMap
         }
     }
 
+    // Strings the swept code points at, ahead in the gap, become data before the sweep reaches them. A function starts
+    // at the gap's first instruction, and at the first after a return or jump, or after such data (an odd pad byte
+    // aside); not after bytes that do not decode.
     private void SweepGap(int g, int e)
     {
         bool first = true;
-        for (int p = g; p < e; first = false)
+        for (int p = g; p < e;)
         {
+            if (kinds[p] != Free)
+            {
+                p++;
+                first = true;
+                continue;
+            }
             if ((p & 1) != 0)
             {
                 MarkData(new M68kDataRegion(p, 1, M68kDataKind.Unknown));
@@ -320,21 +394,27 @@ internal sealed class M68kCodeMap
             }
             if (IsMixedModeMagic(p))
             {
-                MarkData(new M68kDataRegion(p, e - p, M68kDataKind.RoutineDescriptor));
+                MarkFreeAsData(p, e, M68kDataKind.RoutineDescriptor);
                 return;
             }
             var ins = Decode(p);
-            if (!ins.IsInvalid && ins.Length <= e - p)
+            if (!ins.IsInvalid && ins.Length <= e - p && IsFree(p, ins.Length))
             {
                 Record(ins, swept: true);
                 if (first)
                     Register(p, null, CodeFunctionSource.Gap);
+                MarkStrings(ins);
                 p += ins.Length;
+                first = (ins.Flags & M68kFlags.Return) != 0
+                    || (ins.Flags & (M68kFlags.Branch | M68kFlags.Conditional | M68kFlags.Call)) == M68kFlags.Branch;
                 continue;
             }
             int n = Math.Min(2, e - p);
+            if (n == 2 && kinds[p + 1] != Free)
+                n = 1;
             MarkData(new M68kDataRegion(p, n, M68kDataKind.Unknown));
             p += n;
+            first = false;
         }
     }
 
@@ -344,7 +424,7 @@ internal sealed class M68kCodeMap
         foreach (var region in regions.OrderBy(r => r.Offset))
         {
             if (Data.Count > 0 && Data[^1] is var last && last.End == region.Offset && last.Kind == region.Kind
-                && last.Note is null && region.Note is null && region.Kind != M68kDataKind.Header)
+                && last.Note is null && region.Note is null && region.Kind is not (M68kDataKind.Header or M68kDataKind.String))
                 Data[^1] = last with { Length = last.Length + region.Length };
             else
                 Data.Add(region);

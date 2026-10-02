@@ -57,6 +57,17 @@ public class M68kCodeMapTests
     }
 
     [Fact]
+    public void Swept_code_after_a_return_or_a_string_starts_a_function()
+    {
+        // 0 rts; 2 nop; 4 rts; 6 nop; 8 rts — then a string the swept code points at, then more code.
+        var map = Map("4E75 4E71 4E75 4E71 4E75", 0);
+        Assert.Equal([0, 2, 6], map.Functions.Keys);
+        // 0 rts; 2 lea 6(pc),a0 (-> $A); 6 nop; 8 nop; A "\x02ab" (data); E rts
+        var after = Map("4E75 41FA 0006 4E71 4E71 0261 6200 4E75", 0);
+        Assert.Equal([0, 2, 0xE], after.Functions.Keys);
+    }
+
+    [Fact]
     public void A_gap_starting_with_data_is_not_a_function()
     {
         var map = Map("4E75 FFFF 4E71 4E75", 0);
@@ -194,6 +205,21 @@ public class M68kCodeMapTests
     }
 
     [Fact]
+    public void Absolute_calls_relocated_to_this_code_are_followed()
+    {
+        // 0 jsr ($00000008).l, its long relocated by this code's address; 6 rts; 8 nop; A rts.
+        var map = M68kCodeMap.Build(Bytes("4EB9 0000 0008 4E75 4E71 4E75"), 0, [new M68kEntry(0, null, CodeFunctionSource.Entry)], [],
+            new HashSet<int> { 2 });
+        Assert.Empty(map.Swept);
+        Assert.Equal(CodeFunctionSource.Call, map.Functions[8].Source);
+        // jmp ($00000008).l likewise, without a fall-through.
+        var jump = M68kCodeMap.Build(Bytes("4EF9 0000 0008 4E75 4E71 4E75"), 0, [new M68kEntry(0, null, CodeFunctionSource.Entry)], [],
+            new HashSet<int> { 2 });
+        Assert.Equal([6], jump.Swept);
+        Assert.Contains(8, jump.BranchTargets);
+    }
+
+    [Fact]
     public void ExitToShell_and_auto_pop_traps_do_not_return()
     {
         Assert.Equal([2], Map("A9F4 4E75", 0).Swept);
@@ -222,6 +248,39 @@ public class M68kCodeMapTests
         Assert.Equal(new CodeFunction(0, 10, "JT2", CodeFunctionSource.JumpTable), map.Functions[10]);
         Assert.Equal("Fone", map.NameAt(0));
         Assert.Null(map.NameAt(2));
+    }
+
+    [Fact]
+    public void A_MacsBug_name_labels_the_last_known_function_before_it()
+    {
+        // 0 bsr.s 4; 2 rts; 4 nop; 6 rts; "Fone": the name belongs to the routine at 4 (a call target), not to 0.
+        byte[] code = With("6102 4E75 4E71 4E75 84", "Fone", "00 0000");
+        var map = M68kCodeMap.Build(code, 0, [new M68kEntry(0, null, CodeFunctionSource.Entry)], []);
+        Assert.Equal(new CodeFunction(0, 0, "sub_0000", CodeFunctionSource.Entry), map.Functions[0]);
+        Assert.Equal(new CodeFunction(0, 4, "Fone", CodeFunctionSource.Call), map.Functions[4]);
+    }
+
+    [Fact]
+    public void Strings_at_PC_relative_operands_are_data()
+    {
+        // lea 4(pc),a0; rts; "\x05Hello": data, not swept as code.
+        var map = Map("41FA 0004 4E75 0548 656C 6C6F", 0);
+        Assert.Equal([0, 4], map.Instructions.Keys);
+        Assert.Equal([new M68kDataRegion(6, 6, M68kDataKind.String)], map.Data);
+        // A C string with its NUL.
+        var c = Map("487A 0004 4E75 4869 2121 00", 0);
+        Assert.Equal([new M68kDataRegion(6, 5, M68kDataKind.String)], c.Data);
+        // Three characters and NUL is not taken for a C string: link a6,#0 reads "NV ".
+        Assert.Equal([0, 4, 6, 0xA], Map("487A 0004 4E75 4E56 0000 4E75", 0).Instructions.Keys);
+    }
+
+    [Fact]
+    public void Strings_ahead_of_swept_code_are_data()
+    {
+        // 0 rts; 2 (unreached) lea 4(pc),a0; 6 rts; 8 "abc"
+        var map = Map("4E75 41FA 0004 4E75 0361 6263", 0);
+        Assert.Equal([2, 6], map.Swept.Order());
+        Assert.Equal([new M68kDataRegion(8, 4, M68kDataKind.String)], map.Data);
     }
 
     [Fact]
