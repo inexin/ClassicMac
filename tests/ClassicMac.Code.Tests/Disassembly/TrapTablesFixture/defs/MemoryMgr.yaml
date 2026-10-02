@@ -1,0 +1,46 @@
+- function:
+    name: NewPtr
+    return: Ptr
+    args:
+      - name: size
+        type: Size
+        register: D0
+      - name: sys_p
+        type: bool
+        register: TrapBit<SYSBIT>
+    trap: 0xA11E
+    returnreg: A0
+    variants:
+      - NewPtr
+      - NewPtrSys
+
+# ####
+
+- lowmem:
+    name: CurrentA5
+    type: Ptr
+    address: 0x904
+    comment: |
+      Executor's comment: with a colon
+      address: 0x999
+
+# ####
+
+- lowmem:
+    name: executorlabel
+    type: Byte
+    address: 0x100
+
+# ####
+
+- lowmem:
+    name: Pats
+    type: Byte[8]
+    address: 0xA00
+
+# ####
+
+- lowmem:
+    name: EventQueue
+    type: QHdr
+    address: 0x14A

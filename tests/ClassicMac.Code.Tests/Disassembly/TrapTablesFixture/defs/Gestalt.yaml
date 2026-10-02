@@ -1,0 +1,30 @@
+# A hand-written fixture in the shape of Multiversal's defs/*.yaml.
+
+- dispatcher:
+    name: GestaltDispatch
+    trap: 0xA1AD
+    selector-location: TrapBits
+
+# ####
+
+- function:
+    name: NewGestalt
+    return: OSErr
+    args:
+      - name: selector
+        type: OSType
+        register: D0
+    dispatcher: GestaltDispatch
+    selector: 0x200
+    returnreg: D0
+
+# ####
+
+- enum:
+    values:
+      - name: gestaltSystemVersion
+        value: "'sysv'"
+      - name: notAGestaltName
+        value: "'abcd'"
+      - name: gestaltNumber
+        value: 42

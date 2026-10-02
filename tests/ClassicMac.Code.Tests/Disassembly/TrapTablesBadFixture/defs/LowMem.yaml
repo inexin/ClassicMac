@@ -1,0 +1,4 @@
+- lowmem:
+    name: Mystery
+    type: SomeUnknownStruct
+    address: 0x200

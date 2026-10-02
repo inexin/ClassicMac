@@ -1,0 +1,5 @@
+# A later file: its second definition of $A0F0 loses to Packages.yaml's.
+
+- function:
+    name: SecondDefinition
+    trap: 0xA0F0

@@ -1,0 +1,82 @@
+- dispatcher:
+    name: Pack7
+    trap: 0xA9EE
+    selector-location: StackW
+
+# ####
+
+- dispatcher:
+    name: ScriptUtil
+    trap: 0xA8B5
+    selector-location: StackL
+
+# ####
+
+- dispatcher:
+    name: ResourceDispatch
+    trap: 0xA822
+    selector-location: D0<0xF>
+
+# ####
+
+- function:
+    name: NumToString
+    args:
+      - name: n
+        type: LONGINT
+    comment: |
+      A block scalar
+      dispatcher: NotThis
+    dispatcher: Pack7
+    selector: 0x0000
+    executor: C_
+
+# ####
+
+- function:
+    name: StringToNum
+    dispatcher: Pack7
+    selector: 1
+
+# ####
+
+- function:
+    name: ROMlib_Hidden
+    dispatcher: Pack7
+    selector: 9
+
+# ####
+
+- function:
+    name: FinaleUnknown1
+    dispatcher: Pack7
+    selector: 0x0002
+
+# ####
+
+- function:
+    name: LongDateToSeconds
+    dispatcher: ScriptUtil
+    selector: 0x8008FFF2
+
+# ####
+
+- function:
+    name: PBFileCall
+    args:
+      - name: pb
+        type: ParmBlkPtr
+        register: A0
+      - name: async
+        type: Boolean
+        register: TrapBit<0x400>
+    file_trap: true
+    trap: 0xA0F0
+    returnreg: D0
+
+# ####
+
+- api: carbon
+  function:
+    name: CarbonOnly
+    trap: 0xA8F0
