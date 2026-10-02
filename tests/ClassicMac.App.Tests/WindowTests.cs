@@ -463,6 +463,56 @@ public class WindowTests
         owner.Close();
     });
 
+    // S1 on Windows: an extended client area makes Avalonia draw its own title bar (PlatformRequestedDrawnDecoration
+    // .TitleBar from the Win32 backend), whose overlay holds the window's Title and the caption buttons. The window's
+    // decorations theme hides that title, so only the app's own title bar text shows, and keeps the caption buttons.
+    // (The headless platform draws no decorations, so the theme is applied here to decorations made by hand.)
+    [Fact]
+    public void The_drawn_decorations_show_the_caption_buttons_but_not_a_second_title() => OnUiThread(() =>
+    {
+        var window = new MainWindow { DataContext = new MainViewModel() };
+        window.Show();
+        var theme = window.WindowDecorationsTheme;
+        Assert.NotNull(theme);
+        Assert.Equal(typeof(Avalonia.Controls.Chrome.WindowDrawnDecorations), theme!.TargetType);
+        Assert.NotNull(theme.BasedOn);                                       // Fluent's: its template and caption buttons
+
+        // Decorations as the Win32 backend has Window make them (a drawn title bar), hosted for styling in the window.
+        List<Control> Overlay(Avalonia.Styling.ControlTheme with)
+        {
+            var decorations = new Avalonia.Controls.Chrome.WindowDrawnDecorations { Theme = with, Title = "Shell.rsrc — ClassicMac" };
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(Avalonia.Controls.Chrome.WindowDrawnDecorations).GetProperty("EnabledParts", flags)!
+                .SetValue(decorations, Enum.ToObject(typeof(Avalonia.Controls.Chrome.WindowDrawnDecorations).Assembly.GetType("Avalonia.Controls.Chrome.DrawnWindowDecorationParts")!, 4)); // TitleBar
+            var host = new Panel();
+            ((Avalonia.Controls.ISetLogicalParent)decorations).SetParent(host);
+            window.Content = host;
+            decorations.ApplyStyling();
+            typeof(Avalonia.Controls.Chrome.WindowDrawnDecorations).GetMethod("ApplyTemplate", flags)!.Invoke(decorations, null);
+            host.Children.Add(decorations.Content!.Overlay!);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(decorations.HasTitleBar);
+            return decorations.Content.Overlay!.GetSelfAndVisualDescendants().OfType<Control>().ToList();
+        }
+
+        static bool ShowsTitle(List<Control> overlay) =>
+            overlay.OfType<TextBlock>().Any(t => t.Text == "Shell.rsrc — ClassicMac" && t.IsEffectivelyVisible);
+
+        Assert.True(ShowsTitle(Overlay(theme.BasedOn!)));                     // Fluent's draws the title over ours
+        var all = Overlay(theme);
+        Assert.False(ShowsTitle(all));                                         // ours does not
+        // The caption buttons are Fluent's: close always shows; minimize and maximize show by the window's allowed
+        // actions (pseudo-classes Window sets when it attaches the decorations, which these hand-made ones lack).
+        Assert.True(all.Single(c => c.Name == "PART_CloseButton").IsVisible);
+        Assert.Equal(Avalonia.Input.WindowDecorationsElementRole.CloseButton,
+            Avalonia.Controls.Chrome.WindowDecorationProperties.GetElementRole(all.Single(c => c.Name == "PART_CloseButton")));
+        Assert.Equal(Avalonia.Input.WindowDecorationsElementRole.MaximizeButton,
+            Avalonia.Controls.Chrome.WindowDecorationProperties.GetElementRole(all.Single(c => c.Name == "PART_MaximizeButton")));
+        Assert.Single(all, c => c.Name == "PART_MinimizeButton");
+
+        window.Close();
+    });
+
     // The shell (design/boards/main-window.md): the title bar (S1), the toolbar bound to the commands (S2), the View,
     // Window and Help menus and the About box (S7).
     [Fact]

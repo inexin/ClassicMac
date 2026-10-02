@@ -11,6 +11,21 @@
         Width="1200" Height="780" MinWidth="700" MinHeight="450"
         DragDrop.AllowDrop="True">
 
+  <Window.Resources>
+    <!-- With the client area extended, Avalonia 12 draws the title bar on Windows itself (the Win32 backend requests
+         PlatformRequestedDrawnDecoration.TitleBar): Fluent's WindowDrawnDecorations template puts the window's Title in
+         its overlay (Panel PART_TitleTextPanel), over the app's own title bar, beside its caption buttons. This theme is
+         Fluent's with that title hidden: the caption buttons (minimize, maximize with snap layouts, close in red on
+         hover) and the drag and resize areas stay. -->
+    <ControlTheme x:Key="CmWindowDecorations" TargetType="chrome:WindowDrawnDecorations"
+                  BasedOn="{StaticResource {x:Type chrome:WindowDrawnDecorations}}">
+      <!-- The text, not its panel: the panel's IsVisible is a template binding (HasTitleBar), which outranks a style. -->
+      <Style Selector="^ /template/ Panel#PART_TitleTextPanel > TextBlock">
+        <Setter Property="IsVisible" Value="False" />
+      </Style>
+    </ControlTheme>
+  </Window.Resources>
+
   <Window.Styles>
     <Style Selector="TreeViewItem" x:DataType="vm:NodeViewModel">
       <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -198,7 +213,7 @@
     </Style>
 
     <!-- Title bar (S1): CmBarTitle high on CmTitleBarBackground, the title in CmFontMeta and CmTextMuted, the unsaved
-         mark in CmAccent. The platform's caption buttons sit over its right end (Windows, 3 x 46) or left end (macOS). -->
+         mark in CmAccent. The caption buttons (Avalonia's drawn ones on Windows, the system's on macOS) sit over its right or left end. -->
     <Style Selector="Border.titlebar">
       <Setter Property="Height" Value="{DynamicResource CmBarTitle}" />
       <Setter Property="Background" Value="{DynamicResource CmTitleBarBackground}" />
@@ -300,7 +315,7 @@
 
   <DockPanel>
     <!-- The custom title bar (S1) on Windows and macOS, where the window extends into its decorations; a drag area for
-         the platform, which keeps its own caption buttons (right on Windows, left on macOS). Linux keeps the system's. -->
+         the platform; the caption buttons are drawn over it (see CmWindowDecorations). Linux keeps the system's. -->
     <Border x:Name="TitleBar" DockPanel.Dock="Top" Classes="titlebar" chrome:WindowDecorationProperties.ElementRole="TitleBar"
             IsVisible="{Binding $parent[Window].ExtendClientAreaToDecorationsHint}">
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

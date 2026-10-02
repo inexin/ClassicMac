@@ -28,6 +28,8 @@ namespace ClassicMac.App.Views
             }
 
             TitleBar.Classes.Set("mac", OperatingSystem.IsMacOS());
+            // Avalonia's own drawn title bar keeps its caption buttons but not its title text (see the theme).
+            WindowDecorationsTheme = (Avalonia.Styling.ControlTheme)Resources["CmWindowDecorations"]!;
             AddHandler(DragDrop.DropEvent, OnDrop);
             AddHandler(DragDrop.DragOverEvent, OnDragOver);
             AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);

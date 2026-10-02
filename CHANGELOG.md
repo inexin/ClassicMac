@@ -19,9 +19,10 @@
   colours; while a file is read or resources are extracted, exported, unpacked or converted, it shows what runs, how
   far ("1,240 of 3,906") and a progress bar. `ResourceExporter.Export` and `DocumentConverter.Convert` take an
   `IProgress<int>`.
-- Viewer: a custom title bar on Windows and macOS (the window extends into its decorations; the platform's caption
-  buttons stay, the bar drags the window), with the selected file's name, a " •" while it has unsaved edits, and the
-  app's name; Linux keeps the system title bar (S1).
+- Viewer: a custom title bar on Windows and macOS (the window extends into its decorations; the caption buttons stay,
+  Avalonia's own drawn title is hidden so the title shows once, the bar drags the window and a double-click maximizes
+  it), with the selected file's name, a " •" while it has unsaved edits, and the app's name; Linux keeps the system
+  title bar (S1).
 - Viewer: a toolbar with Open, Save, Get Info, Edit Hex, Export…, Extract All and Play, each following its command's
   enabled state, and the preview's Zoom (1× 2× 4× 8×) and screen Depth, moved there from the Preview tab (S2).
 - Viewer: View menu (Zoom In, Zoom Out, Actual Size, Screen Depth, Show Diagnostics, the tree's display options, Theme:
