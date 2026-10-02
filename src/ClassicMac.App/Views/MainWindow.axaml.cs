@@ -58,6 +58,8 @@ namespace ClassicMac.App.Views
                 model.PropertyChanged += OnPreviewChanged;
                 model.ChangeRefused -= OnChangeRefused;
                 model.ChangeRefused += OnChangeRefused;
+                model.HexLineShown -= OnHexLineShown;
+                model.HexLineShown += OnHexLineShown;
                 model.FilePicker = this;
                 model.EditDialogs ??= new EditDialogs(this);
                 model.AudioPlayer ??= audio;
@@ -371,9 +373,29 @@ namespace ClassicMac.App.Views
 
         private void OnQuit(object? sender, RoutedEventArgs e) => Close();
 
-        // Ctrl+F: the tree's filter field.
+        // Find's match: its line scrolls into view.
+        private void OnHexLineShown(int line) => HexList.ScrollIntoView(line);
+
+        // Ctrl+F: the hex view's Find box while the Hex tab has the focus, else the tree's filter field. F3 and Shift+F3
+        // in the Hex tab find the next and previous match.
         private void OnWindowKeyDown(object? sender, KeyEventArgs e)
         {
+            var inHex = HexPane.IsKeyboardFocusWithin && DataContext is MainViewModel;
+            if (inHex && e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
+            {
+                FindBox.Focus();
+                FindBox.SelectAll();
+                e.Handled = true;
+                return;
+            }
+
+            if (inHex && e.Key == Key.F3 && DataContext is MainViewModel hexModel)
+            {
+                (e.KeyModifiers == KeyModifiers.Shift ? hexModel.FindPreviousCommand : hexModel.FindNextCommand).Execute(null);
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
             {
                 TreeFilter.Focus();

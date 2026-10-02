@@ -490,6 +490,7 @@ namespace ClassicMac.App.ViewModels
                 {
                     Heading = string.Create(CultureInfo.InvariantCulture, $"At 0x{offset:X4}"),
                 };
+            hexSelectedOffset = offset;
             lines.Select(offset, readInspection.Meaning is { } field ? (field.Start, field.Length) : null);
             OnPropertyChanged(nameof(HexInspection));
         }
@@ -498,6 +499,9 @@ namespace ClassicMac.App.ViewModels
         partial void OnHexLinesChanged(HexLines? value)
         {
             readInspection = null;
+            hexSelectedOffset = -1;
+            FindStatus = null;
+            FindFailed = false;
             OnPropertyChanged(nameof(HexInspection));
         }
 

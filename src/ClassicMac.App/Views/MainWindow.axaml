@@ -198,6 +198,15 @@
     <Style Selector="Border.selected">
       <Setter Property="Background" Value="{DynamicResource CmSelectionInactive}" />
     </Style>
+    <Style Selector="Border.hex-find">
+      <Setter Property="Padding" Value="12,0,12,8" />
+    </Style>
+    <Style Selector="TextBox.find">
+      <Setter Property="Width" Value="180" />
+    </Style>
+    <Style Selector="Border.match">
+      <Setter Property="Background" Value="{DynamicResource CmMatch}" />
+    </Style>
     <Style Selector="Border.changed">
       <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
     </Style>
@@ -2384,6 +2393,24 @@
                   </Panel>
                 </DockPanel>
               </Border>
+              <!-- Find (the hex board's follow-up): hex bytes or Mac OS Roman text; Enter finds the next, Shift+Enter the
+                   previous; the match is selected or put under the cursor and highlighted. -->
+              <Border x:Name="HexFindBar" DockPanel.Dock="Top" Classes="hex-find">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="Find" Classes="muted" VerticalAlignment="Center" />
+                  <ListBox x:Name="FindModeChoice" Classes="segmented" ItemsSource="{x:Static vm:MainViewModel.FindModes}"
+                           SelectedIndex="{Binding FindModeIndex, Mode=TwoWay}" AutomationProperties.Name="Find hex or text" />
+                  <TextBox x:Name="FindBox" Classes="go-to find" PlaceholderText="Bytes or text" Text="{Binding FindText}" AutomationProperties.Name="Find">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding FindNextCommand}" />
+                      <KeyBinding Gesture="Shift+Enter" Command="{Binding FindPreviousCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Button Content="Previous" Command="{Binding FindPreviousCommand}" ToolTip.Tip="Shift+F3" />
+                  <Button Content="Next" Command="{Binding FindNextCommand}" ToolTip.Tip="F3" />
+                  <TextBlock x:Name="FindStatusText" Text="{Binding FindStatus}" Classes="muted" Classes.error="{Binding FindFailed}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Border>
               <Border x:Name="HexFooter" DockPanel.Dock="Bottom" Classes="host-footer" IsVisible="{Binding IsHexEditing}">
                 <DockPanel>
                   <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
@@ -2437,7 +2464,7 @@
                 </ItemsControl>
                 <TextBlock Classes="hex-text" Text="Mac OS Roman" />
               </StackPanel>
-              <ListBox x:Name="HexList" Classes="hex pane" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
+              <ListBox x:Name="HexList" Classes="hex pane" Focusable="True" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="{StaticResource CmFontMono}" FontSize="13">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="vm:HexLine">
                     <StackPanel Orientation="Horizontal">
@@ -2451,7 +2478,7 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="vm:HexCell">
                             <Border Classes="hex-cell" Classes.group-end="{Binding IsGroupEnd}" Classes.zero="{Binding IsZero}"
-                                    Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}"
+                                    Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}" Classes.match="{Binding IsMatch}"
                                     Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
                               <TextBlock Text="{Binding Hex}" />
                             </Border>
@@ -2466,7 +2493,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                           <DataTemplate DataType="vm:HexCell">
-                            <Border Classes="hex-char" Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}"
+                            <Border Classes="hex-char" Classes.in-field="{Binding IsInField}" Classes.selected="{Binding IsSelected}" Classes.match="{Binding IsMatch}"
                                     Classes.changed="{Binding IsChanged}" Classes.cursor="{Binding IsCursor}">
                               <TextBlock Text="{Binding Character}" Classes.muted="{Binding IsPlaceholder}" />
                             </Border>

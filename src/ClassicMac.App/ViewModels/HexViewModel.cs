@@ -39,8 +39,9 @@ namespace ClassicMac.App.ViewModels
     /// </summary>
     /// <param name="IsSelected">Selected in the read-only view (a click): the pair highlights in both columns.</param>
     /// <param name="IsInField">Part of the field the inspected byte belongs to (E8).</param>
+    /// <param name="IsMatch">Part of the match Find found.</param>
     public sealed record HexCell(long Offset, string Hex, string Character, bool IsZero, bool IsChanged, bool IsCursor, bool IsGroupEnd,
-        bool IsSelected = false, bool IsInField = false)
+        bool IsSelected = false, bool IsInField = false, bool IsMatch = false)
     {
         /// <summary>A non-printable byte, shown as a muted "·".</summary>
         public bool IsPlaceholder => Character == "·";
@@ -59,6 +60,7 @@ namespace ClassicMac.App.ViewModels
         private Func<int, bool>? changed;
         private long selected = -1;
         private (long Start, long Length)? field;
+        private (long Start, long Length)? match;
         private long cachedBlock = -1;
         private byte[] cache = [];
 
@@ -107,6 +109,13 @@ namespace ClassicMac.App.ViewModels
             CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
         }
 
+        /// <summary>Highlights the bytes Find found (until the next find; these lines are made anew for another selection).</summary>
+        public void ShowMatch(long start, int length)
+        {
+            match = (start, length);
+            CollectionChanged?.Invoke(this, new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
+        }
+
         /// <summary>How many bytes have been read so far (for tests).</summary>
         public long BytesRead { get; private set; }
 
@@ -138,7 +147,8 @@ namespace ClassicMac.App.ViewModels
                         var ch = MacRoman.ToChar(line[i]);
                         cells.Add(new HexCell(byteOffset, line[i].ToString("X2", CultureInfo.InvariantCulture), ch < ' ' || ch == '\u007F' ? "·" : ch.ToString(),
                             line[i] == 0, editing && byteOffset <= int.MaxValue && changed?.Invoke((int)byteOffset) == true, editing && byteOffset == cursor, i == 7,
-                            !editing && byteOffset == selected, field is var (start, length) && byteOffset >= start && byteOffset < start + length));
+                            !editing && byteOffset == selected, field is var (start, length) && byteOffset >= start && byteOffset < start + length,
+                            match is var (from, count) && byteOffset >= from && byteOffset < from + count));
                     }
                     else if (editing && byteOffset == cursor)
                     {

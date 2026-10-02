@@ -147,4 +147,53 @@ public sealed class HexViewTests
             Directory.Delete(folder, recursive: true);
         }
     });
+
+    // Find in the window: Ctrl+F in the Hex tab goes to the Find box; a match far down is scrolled to and highlighted.
+    [Fact]
+    public void Find_scrolls_to_and_highlights_the_match() => Headless.OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("cm-hexfindview").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Find.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("ZZZZ", 1, null, [.. new byte[4000], .. "needle"u8, 0, 0])));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
+            Pump(model.PreviewTask);
+            model.SelectedTab = 2;
+            Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame();
+
+            var at = Cell(window, 0).TranslatePoint(new Point(4, 4), window)!.Value;
+            window.MouseDown(at, MouseButton.Left);
+            window.MouseUp(at, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+            window.KeyPress(Key.F, RawInputModifiers.Control, PhysicalKey.F, "f");
+            Dispatcher.UIThread.RunJobs();
+            var box = window.FindControl<TextBox>("FindBox")!;
+            Assert.True(box.IsFocused);
+
+            model.FindModeIndex = 1;
+            box.Text = "needle";
+            window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+            Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Equal("1 of 1", model.FindStatus);
+            Assert.Contains("match", Cell(window, 4000).Classes);
+            Assert.Equal(Token("CmMatch"), ((ISolidColorBrush)Cell(window, 4001).Background!).Color);
+            Assert.True(window.FindControl<TextBlock>("FindStatusText")!.IsEffectivelyVisible);
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
 }

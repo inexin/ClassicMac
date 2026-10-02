@@ -7,6 +7,10 @@
   number raw ("Times `20`"), yes/no dots, rectangles as coordinates with their size, a card per nested object and per
   item of a list (100 at most); Properties | JSON switches to the JSON for the session; right-click a row to copy it as
   decimal, hex or JSON.
+- Editor: Find in the Hex tab: bytes as hex ("4E 75", "0x4E75") or text in Mac OS Roman (case-sensitive), Next and
+  Previous wrapping round (Enter/Shift+Enter in the box, F3/Shift+F3, Ctrl+F in the Hex tab focuses it); the match is
+  selected (or put under the cursor while editing, searching the edited bytes), highlighted and scrolled to, with "2 of 5",
+  "Not found" or why the pattern is bad; the hex grid now takes the keyboard focus when a byte is clicked.
 - Viewer: the image preview (P1) shows cards: each image on a checkerboard with its type and size under it
   ("'icl8'", "32×32 · 8-bit"); an icon shows every member of its family, its masks with "Show masks", and the Finder
   states strip (five states, seven labels, captioned; 2× from zoom 2) with "Finder states"; a summary line ("3 members ·
