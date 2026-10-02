@@ -144,7 +144,9 @@ namespace ClassicMac.Resources.Decoders.Images
                 var m32 = native && tf != 0 && place.Width == 32 && place.Height == 32 && (gw != 32 || gh != 32)
                     ? PrescaleNative(maskMap, gw, gh, port.ForeColor, port.BackColor)
                     : null;
-                if (data != null) PlotDeep(port, data, maskMap, place, tf, label, selected, labelColors, native, gw, gh, m32);
+                // Mac OS 9 draws colour data through an 8-bit mask of the suite instead, when the screen has 8 bits or more.
+                var deepMask = data != null && native && depth >= 8 ? DeepMask(rect, data) : null;
+                if (data != null) PlotDeep(port, data, maskMap, deepMask, place, tf, label, selected, labelColors, native, gw, gh, m32);
                 else
                 {
                     var imageMap = PixMap.FromBitMap(image, rowBytes, new MacRect(0, 0, (short)gh, (short)gw));
@@ -273,9 +275,27 @@ namespace ClassicMac.Resources.Decoders.Images
             return null;
         }
 
+        // The 8-bit mask Mac OS 9's Icon Utilities use with colour data at 8 bits or more (not when recording a picture
+        // or printing): h8mk for a rect 48 or more wide or tall, s8mk for one under 32 both ways, else l8mk, the first
+        // present of that list; used only when its bounds equal the data's, else the 1-bit mask [Code] [Verified] (the
+        // order after the first is ClassicMac's, as the 1-bit lists). It replaces the 1-bit mask. Only a colour member draws through it; the 1-bit path ignores it (undefined on the
+        // Mac) [ClassicMac].
+        private byte[]? DeepMask(MacRect rect, string data)
+        {
+            int w = rect.Width, h = rect.Height;
+            string[] list = w >= 48 || h >= 48 ? ["h8mk", "l8mk", "s8mk"]
+                : w < 32 && h < 32 ? ["s8mk", "l8mk", "h8mk"]
+                : ["l8mk", "h8mk", "s8mk"];
+            if (list.FirstOrDefault(members.ContainsKey) is not { } type) return null;
+            var mask = IconFamily.MemberType(type)!;
+            var member = IconFamily.MemberType(data)!;
+            if (mask.Width != member.Width || mask.Height != member.Height || members[type].Length < mask.RawSize) return null;
+            return members[type];
+        }
+
         // ---- colour data (PlotDeep) ----
 
-        private void PlotDeep(QuickDrawPort port, string type, PixMap maskMap, PictRect place, int tf, int label, bool selected,
+        private void PlotDeep(QuickDrawPort port, string type, PixMap maskMap, byte[]? deepMask, PictRect place, int tf, int label, bool selected,
             IReadOnlyList<RgbColor> labelColors, bool native, int gw, int gh, bool[]? m32)
         {
             var member = IconFamily.MemberType(type)!;
@@ -287,7 +307,8 @@ namespace ClassicMac.Resources.Decoders.Images
                 : PixMap.Indexed(members[type], gw * member.Depth / 8, new MacRect(0, 0, (short)gh, (short)gw), member.Depth,
                     Clut(member.Depth, label, selected, disabled, labelColors, native));
             var bounds = new MacRect(0, 0, (short)gh, (short)gw);
-            Render(port, dataMap, maskMap, bounds, place, m32);
+            if (deepMask != null) RenderDeep(port, dataMap, deepMask, bounds, place);
+            else Render(port, dataMap, maskMap, bounds, place, m32);
             if (tf == 2) Transform(port, null, maskMap, place, tf, native, gw, gh, onePass: false, m32);
         }
 
@@ -387,6 +408,44 @@ namespace ClassicMac.Resources.Decoders.Images
             }
             var region = Region.FromBitMap(ToBitMap(m32, 32, 32)).Offset(rect.Left, rect.Top);
             port.CopyBits(dataMap, bounds, rect, TransferMode.SrcCopy, region);
+        }
+
+        // Mac OS 9's CopyMask with an 8-bit mask (clut 40, a grey ramp; no CopyDeepMask): data and mask stretched alike to
+        // the rect (nearest pixel, no filtering), then per 8-bit component out = m == 255 ? s : d + (((s - d) * m) >> 8),
+        // a floor (not / 255). The screen takes the result as any 32-bit pixel: 16 bits truncate it to 5 bits a
+        // component, 8 bits take the nearest table entry, undithered [Code] [Verified].
+        private static void RenderDeep(QuickDrawPort port, PixMap dataMap, byte[] deepMask, MacRect bounds, PictRect place)
+        {
+            int w = place.Width, h = place.Height;
+            if (w <= 0 || h <= 0) return;
+            var options = new QuickDrawOptions { ScreenDepth = 32, Version = QuickDrawVersion.MacOS9 };
+            var target = new MacRect(0, 0, (short)h, (short)w);
+            var source = new RgbaBitmap(w, h);
+            new QuickDrawPort(source, options).CopyBits(dataMap, bounds, target, TransferMode.SrcCopy);
+            var alpha = new RgbaBitmap(w, h);
+            var ramp = Enumerable.Range(0, 256).Select(i => new RgbColor((ushort)(i * 257), (ushort)(i * 257), (ushort)(i * 257))).ToArray();
+            new QuickDrawPort(alpha, options).CopyBits(PixMap.Indexed(deepMask, bounds.Width, bounds, 8, ramp), bounds, target, TransferMode.SrcCopy);
+
+            var canvas = port.Canvas;
+            var blended = new byte[4 * w * h];
+            var covered = new bool[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x, m = alpha.Pixels[4 * i];
+                    if (m == 0) continue;
+                    covered[i] = true;
+                    int cx = place.Left + x - port.OriginH, cy = place.Top + y - port.OriginV;
+                    bool inside = cx >= 0 && cy >= 0 && cx < canvas.Width && cy < canvas.Height;
+                    for (int c = 0; c < 3; c++)
+                    {
+                        int s = source.Pixels[4 * i + c];
+                        int d = inside ? canvas.Pixels[4 * (cy * canvas.Width + cx) + c] : 0;
+                        blended[4 * i + 1 + c] = (byte)(m == 255 ? s : d + (((s - d) * m) >> 8));
+                    }
+                }
+            // The blended pixels go through the port 1:1, so its clip and screen depth apply.
+            port.CopyMask(PixMap.Direct(blended, 4 * w, target, 32), ToBitMap(covered, w, h), target, target, place.ToMacRect());
         }
 
         // PrescaleMask on Mac OS 9: CopyBits of the mask to a 32 x 32 1-bit buffer in the caller's colours, realised on a

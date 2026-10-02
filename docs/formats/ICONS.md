@@ -156,6 +156,23 @@ ROM's differ where noted [Code]. PlotIconID never reads `ICON` or `SICN`.
    - Brighten: white for black; else each component scaled up so the largest is $FFFF, then
      `c × lum′ / $FFFF + ($FFFF − lum′)`, with `lum = (5r + 9g + 2b) >> 4` and `lum′ = (lum >> 1) + (lum >> 3) + $6000`.
    - Offline then adds 25% black dots inside the mask (step 6).
+   - **Mac OS 9's 8-bit masks** (a suite from an icon family; there is no `t8mk` in a suite) [Code] [Verified]:
+     - used only when all hold: colour data is drawn (so never open, and never at depths 1–4, which take the 1-bit
+       mask), the screen has 8 bits or more, the port is not recording a picture or printing, and the mask's bounds
+       equal the data's. The ROM has none.
+     - The mask: width or height ≥ 48 → `h8mk` `l8mk` `s8mk`; both under 32 → `s8mk` `l8mk` `h8mk`; otherwise `l8mk`
+       `h8mk` `s8mk` [ClassicMac: the order after the first, as the 1-bit lists]; the first present is taken, and if its
+       size is not the data's the 1-bit mask is used.
+     - It **replaces** the 1-bit mask (an all-$00 `l8mk` draws nothing inside the `ICN#` mask; an all-$FF one draws the
+       whole square, outside it too). Alignment still uses the 1-bit mask's box.
+     - IconUtils calls CopyMask (not CopyDeepMask) with the data and an 8-bit mask PixMap using clut 40 (a grey ramp).
+       Both are stretched alike, nearest pixel (no filtering). Per 8-bit component, `out = m = $FF ? s : d + (((s − d)
+       × m) >> 8)` (s − d signed, an arithmetic shift: a floor, not ÷ 255). A 16-bit screen truncates the result to 5
+       bits a component; an 8-bit one takes the nearest table entry, undithered. Mac OS 9.2.2 blends the same.
+     - The label, selected and disabled recolouring above applies to the source first; offline's dots follow as
+       usual.
+     - An 8-bit mask without a colour member: undefined on the Mac; ClassicMac ignores it (the 1-bit path)
+       [ClassicMac].
 5. **1-bit data** (PlotShallow):
    - At depth 2 and more: the foreground is the raw label colour (depth > 2 and a label) or the port's; the
      background is `$CC2A $CC2A $FF2A` for open, else the port's; disabled, when depth > 4 or there is no label, takes
@@ -288,8 +305,7 @@ above. No Mac OS code imports an image, so the conversion rules are ClassicMac's
 ## Not covered
 
 - The export decoders take one resource at a time and do not draw suites; `IconSuite.Plot` does.
-- Not reproduced by `IconSuite`: the 8-bit masks of an extended suite (Mac OS 9's deep CopyMask), several screens
-  (DeviceLoop), a gray-scale device's label rule, and the ROM's endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac].
+- Not reproduced by `IconSuite`: several screens (DeviceLoop), a gray-scale device's label rule, and the ROM's endless pattern loop. CopyMask's single stretch of data and mask is taken to sample both alike [ClassicMac].
 - **Checked against Mac OS 9.0** ([README.md](README.md#reference-builds)) [Verified]: all 628 cases match pixel for
   pixel: every PlotIconID/PlotIconSuite case (alignments, rect sizes 16–52, every transform, labels, member choice,
   missing masks, colour pairs, depths 1/4/8/32, a moved origin), IconIDToRgn, PlotIconHandle, PlotSICNHandle and
