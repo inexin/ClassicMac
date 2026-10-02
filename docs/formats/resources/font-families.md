@@ -160,7 +160,9 @@ None.
   - finds old-style `'FONT'` resources only for families under $200;
   - prefers Chicago (16383) as the system font;
   - has no `'afnt'` associations.
-- **Mac OS 9.2.2** [Code: 9.2.2]: the language word is kept only when ffVersion ≥ 4
+- **The font-load request** [Code: Mac OS 9.0 Font Manager]: Mac OS 9.0 copies the language word into a font-load
+  request whenever ffVersion ≥ 1; the family's own language (§2.1) needs ffVersion ≥ 4.
+- **Mac OS 9.2.2** [Code: 9.2.2]: the font-load request copies the language word only when ffVersion ≥ 4
   ([README.md](../README.md#reference-builds)); the System's bitmap fonts were renumbered (Geneva 9 and 12 are `NFNT`
   1025 and 1026, Monaco 9 is 1027, the bitmaps unchanged).
 
@@ -204,8 +206,6 @@ None.
 ## 8. Not covered
 
 - Writing families.
-- The README's Mac OS 9.2.2 note (§4) implies Mac OS 9.0 keeps the language word in families before version 4, while
-  §2.1 gives version 4 and later for 9.0; which version test 9.0 makes is not settled.
 
 ## 9. References
 

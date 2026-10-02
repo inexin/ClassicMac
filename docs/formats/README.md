@@ -24,7 +24,7 @@ claimed for them. The native code is in the System file's data fork:
 | WindowsLib | 1 | 134885 | d0fb8648a2c6c7f46b5ad3cc4d00a6a6 |
 | AppearanceLib | 1 | 317505 | 3f0f0d3a8afb7676a3bffd130e1f73f8 |
 
-(Other components: Sound Manager 3.5.1, Appearance 1.1.4, File Exchange 3.0.3, Text Encoding Converter 1.5, Foreign File
+(Other components: Sound Manager 3.5.1, Appearance 1.1.4 (the control panel; the Appearance Manager's Gestalt `'apvr'` is $0111, 1.1.1), File Exchange 3.0.3, Text Encoding Converter 1.5, Foreign File
 Access 5.3.) "The ROM" or "the 68k ROM" means the 68k code in the Mac OS ROM image with ROM version `$077D`, the classic
 QuickDraw and Toolbox every Mac before Mac OS 9 used in some revision.
 
@@ -38,7 +38,8 @@ scaled CopyMask on a 1-bit screen. The differences found [Code: 9.2.2]:
 - QuickDraw: a hidden pen (pnVis < 0) also stops CopyMask and CopyDeepMask into the port's own pixels;
 - menus: a `MENU` item's icon byte is sign-extended into its text encoding; items of height 0, separators included, are
   not drawn; an item under 32 counts as enabled by its enableFlags bit alone;
-- fonts: a `FOND`'s language word is kept only when ffVersion ≥ 4; the System's bitmap fonts were renumbered (Geneva
+- fonts: the font-load request copies a `FOND`'s language word only when ffVersion ≥ 4 (9.0: ≥ 1; the family's own
+  language needs ffVersion ≥ 4 in both); the System's bitmap fonts were renumbered (Geneva
   9 and 12 are `NFNT` 1025 and 1026, Monaco 9 is 1027, the bitmaps unchanged);
 - Appearance: utility window titles use the application's script font.
 

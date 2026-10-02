@@ -42,7 +42,9 @@ The README's conventions hold ([README.md](../README.md#conventions)). In additi
 
 ### 1.2 The port
 
-A colour port (CGrafPort); the rules that use each field are in §2 [Doc: Imaging With QuickDraw]:
+A colour port (CGrafPort); the rules that use each field are in §2 [Doc: Imaging With QuickDraw] [Verified: every
+offset, against the field offsets of the published interfaces]. The ROM tells a colour port by the sign of portVersion and
+reads grafVars at +$08 [Code: 68k ROM]:
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
@@ -76,7 +78,8 @@ A colour port (CGrafPort); the rules that use each field are in §2 [Doc: Imagin
 | +$5C | 12 | picSave, rgnSave, polySave | Recording handles |
 | +$68 | 4 | grafProcs | Bottleneck procedures |
 
-GrafVars:
+GrafVars (rgbOpColor and rgbHiliteColor [Code: 68k ROM]: the OpColor and HiliteColor opcodes and DefHilite write
+them, only in a colour port; the Palette Manager fields [Doc: Imaging With QuickDraw]):
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
