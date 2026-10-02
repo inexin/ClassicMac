@@ -442,40 +442,40 @@
     <Style Selector="Grid.menu-columns">
       <Setter Property="Margin" Value="11,0,8,4" />
     </Style>
-    <Style Selector="Border.menu-row">
+    <Style Selector="Border.table-row">
       <Setter Property="MinHeight" Value="32" />
       <Setter Property="Padding" Value="11,2,8,2" />
       <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
       <Setter Property="BorderThickness" Value="0,0,0,1" />
       <Setter Property="Background" Value="Transparent" />
     </Style>
-    <Style Selector="Border.menu-row.selected">
+    <Style Selector="Border.table-row.selected">
       <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
     </Style>
-    <Style Selector="Border.menu-row Border.bar">
+    <Style Selector="Border.table-row Border.bar">
       <Setter Property="Width" Value="3" />
       <Setter Property="Margin" Value="-11,-2,0,-2" />
       <Setter Property="HorizontalAlignment" Value="Left" />
       <Setter Property="Background" Value="{DynamicResource CmAccent}" />
       <Setter Property="IsVisible" Value="False" />
     </Style>
-    <Style Selector="Border.menu-row.selected Border.bar">
+    <Style Selector="Border.table-row.selected Border.bar">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <Style Selector="Border.menu-row Grid.read-only > TextBlock">
+    <Style Selector="Border.table-row Grid.read-only > TextBlock">
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector="Border.menu-row.dimmed Grid.read-only TextBlock">
+    <Style Selector="Border.table-row.dimmed Grid.read-only TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
     </Style>
-    <Style Selector="Border.menu-row StackPanel.divider-mark">
+    <Style Selector="Border.table-row StackPanel.divider-mark">
       <Setter Property="IsVisible" Value="False" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector="Border.menu-row.divider StackPanel.divider-mark">
+    <Style Selector="Border.table-row.divider StackPanel.divider-mark">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <Style Selector="Border.menu-row.divider TextBlock.item-text">
+    <Style Selector="Border.table-row.divider TextBlock.item-text">
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <Style Selector="Border.rule">
@@ -484,7 +484,7 @@
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Background" Value="{DynamicResource CmBorder}" />
     </Style>
-    <Style Selector="Border.menu-row Grid.editing > :is(Control)">
+    <Style Selector="Border.table-row Grid.editing > :is(Control)">
       <Setter Property="Margin" Value="0,0,6,0" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -506,8 +506,43 @@
     <Style Selector="WrapPanel.menu-fields > StackPanel > TextBlock">
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
-    <Style Selector="TextBlock.strong">
-      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <!-- Table inputs (28 high, as boards/read-then-edit.md has them inside tables) fit their columns. -->
+    <Style Selector="Border.table-row Grid.editing TextBox, Border.table-row Grid.editing ComboBox">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.table-row Grid.editing NumericUpDown, WrapPanel.menu-fields NumericUpDown">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Border.table-row Grid.editing TextBox, Border.table-row Grid.editing ComboBox">
+      <Setter Property="Padding" Value="6,2" />
+    </Style>
+    <Style Selector="Border.table-row Grid.editing CheckBox">
+      <Setter Property="MinWidth" Value="0" />
+    </Style>
+    <Style Selector="WrapPanel.menu-fields TextBox">
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="6,2" />
+    </Style>
+    <Style Selector="StackPanel.menu-table.editing Border.table-row">
+      <Setter Property="Padding" Value="11,1,8,1" />
+      <Setter Property="MinHeight" Value="30" />
+    </Style>
+
+    <!-- E5's read-only views: a double-click anywhere on them edits; labelled rows 8 apart. -->
+    <Style Selector="Border.read-view">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Grid.labelled > TextBlock">
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector="TextBlock.strong-value">
+      <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
     </Style>
     <Style Selector="Button.row-tool.remove /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Foreground" Value="{DynamicResource CmError}" />
@@ -1050,59 +1085,116 @@
                 </ScrollViewer>
                 <ContentControl Classes="form-content" Content="{Binding Form}">
                   <ContentControl.DataTemplates>
+                    <!-- Strings, string lists, text and version (boards/read-then-edit.md, E5): read as text (a double-click
+                         anywhere on it edits), edited with the inputs. -->
                     <DataTemplate DataType="vm:StringForm">
-                      <StackPanel Spacing="6">
-                        <TextBlock Text="String (at most 255 Mac OS Roman characters)" Classes="muted" />
-                        <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
-                      </StackPanel>
+                      <Panel>
+                        <Border x:Name="StringRead" Classes="read-view form-row" IsVisible="{Binding !IsEditing}">
+                          <StackPanel Spacing="6">
+                            <TextBlock Classes="caption" Text="STRING" />
+                            <SelectableTextBlock Text="{Binding Text}" TextWrapping="Wrap" IsVisible="{Binding !IsEmpty}" />
+                            <TextBlock Classes="muted" Text="Empty" IsVisible="{Binding IsEmpty}" />
+                          </StackPanel>
+                        </Border>
+                        <StackPanel Spacing="6" IsVisible="{Binding IsEditing}">
+                          <TextBlock Text="String (at most 255 Mac OS Roman characters)" Classes="muted" />
+                          <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+                        </StackPanel>
+                      </Panel>
                     </DataTemplate>
                     <DataTemplate DataType="vm:StringListForm">
-                      <DockPanel>
-                        <Button DockPanel.Dock="Bottom" Content="Add String" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
-                        <ScrollViewer>
-                          <ItemsControl ItemsSource="{Binding Strings}">
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate DataType="vm:StringItem">
-                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,2">
-                                  <TextBox Text="{Binding Text}" />
-                                  <Button Grid.Column="1" Content="↑" Margin="4,0,0,0"
-                                          Command="{Binding $parent[ItemsControl].((vm:StringListForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
-                                  <Button Grid.Column="2" Content="Remove" Margin="4,0,0,0"
-                                          Command="{Binding $parent[ItemsControl].((vm:StringListForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
-                                </Grid>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
+                      <Panel>
+                        <ScrollViewer IsVisible="{Binding !IsEditing}">
+                          <StackPanel Spacing="6">
+                            <TextBlock Classes="caption" Text="{Binding Summary, StringFormat={}{0}}" />
+                            <ItemsControl x:Name="StringRows" ItemsSource="{Binding Strings}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:StringItem">
+                                  <Border Classes="table-row form-row" Classes.selected="{Binding IsSelected}">
+                                    <Panel>
+                                      <Border Classes="bar" />
+                                      <Grid ColumnDefinitions="36,*">
+                                        <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                      </Grid>
+                                    </Panel>
+                                  </Border>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </StackPanel>
                         </ScrollViewer>
-                      </DockPanel>
+                        <DockPanel IsVisible="{Binding IsEditing}">
+                          <Button DockPanel.Dock="Bottom" Content="Add String" Command="{Binding AddCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                          <ScrollViewer>
+                            <ItemsControl ItemsSource="{Binding Strings}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:StringItem">
+                                  <Grid ColumnDefinitions="36,*,Auto,Auto" Margin="0,2">
+                                    <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" Classes.selected="{Binding IsSelected}" Text="{Binding Text}" />
+                                    <Button Grid.Column="2" Content="↑" Margin="4,0,0,0"
+                                            Command="{Binding $parent[ItemsControl].((vm:StringListForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
+                                    <Button Grid.Column="3" Content="Remove" Margin="4,0,0,0"
+                                            Command="{Binding $parent[ItemsControl].((vm:StringListForm)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+                                  </Grid>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </ScrollViewer>
+                        </DockPanel>
+                      </Panel>
                     </DataTemplate>
                     <DataTemplate DataType="vm:TextForm">
-                      <DockPanel>
-                        <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Classes="muted"
-                                   Text="Text (Mac OS Roman). Its 'styl' runs follow your edits; new text takes the style where the change starts."
-                                   IsVisible="{Binding HasStyles}" TextWrapping="Wrap" />
-                        <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" />
-                      </DockPanel>
+                      <Panel>
+                        <ScrollViewer IsVisible="{Binding !IsEditing}">
+                          <Border x:Name="TextRead" Classes="read-view form-row">
+                            <views:StyledTextView Styled="{Binding Styled}" TextWrapping="Wrap" />
+                          </Border>
+                        </ScrollViewer>
+                        <DockPanel IsVisible="{Binding IsEditing}">
+                          <TextBlock DockPanel.Dock="Top" Margin="0,0,0,6" Classes="muted"
+                                     Text="Text (Mac OS Roman). Its 'styl' runs follow your edits; new text takes the style where the change starts."
+                                     IsVisible="{Binding HasStyles}" TextWrapping="Wrap" />
+                          <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" />
+                        </DockPanel>
+                      </Panel>
                     </DataTemplate>
                     <DataTemplate DataType="vm:VersionForm">
-                      <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
-                        <TextBlock Text="Major" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Column="1" Value="{Binding Major}" Minimum="0" Maximum="99" FormatString="0" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="1" Text="Minor" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Minor}" Minimum="0" Maximum="15" FormatString="0" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="2" Text="Bug fix" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding BugFix}" Minimum="0" Maximum="15" FormatString="0" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="3" Text="Stage" VerticalAlignment="Center" />
-                        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:VersionForm.Stages}" SelectedItem="{Binding Stage}" Width="140" />
-                        <TextBlock Grid.Row="4" Text="Non-release" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding NonRelease}" Minimum="0" Maximum="99" FormatString="0" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="5" Text="Region code" VerticalAlignment="Center" />
-                        <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Region}" Minimum="-32768" Maximum="32767" FormatString="0" Width="140" HorizontalAlignment="Left" />
-                        <TextBlock Grid.Row="6" Text="Short version" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding ShortVersion}" />
-                        <TextBlock Grid.Row="7" Text="Long version" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding LongVersion}" />
-                      </Grid>
+                      <Panel>
+                        <Border x:Name="VersionRead" Classes="read-view form-row" IsVisible="{Binding !IsEditing}">
+                          <Grid Classes="labelled" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                            <TextBlock Classes="muted" Text="Version" />
+                            <TextBlock Grid.Column="1" Classes="mono strong-value" Text="{Binding NumberText}" />
+                            <TextBlock Grid.Row="1" Classes="muted" Text="Stage" />
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StageText}" />
+                            <TextBlock Grid.Row="2" Classes="muted" Text="Region code" />
+                            <TextBlock Grid.Row="2" Grid.Column="1" Classes="mono" Text="{Binding RegionText}" />
+                            <TextBlock Grid.Row="3" Classes="muted" Text="Short version" />
+                            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding ShortVersion}" TextWrapping="Wrap" />
+                            <TextBlock Grid.Row="4" Classes="muted" Text="Long version" />
+                            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding LongVersion}" TextWrapping="Wrap" />
+                          </Grid>
+                        </Border>
+                        <Grid IsVisible="{Binding IsEditing}" ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+                          <TextBlock Text="Major" VerticalAlignment="Center" />
+                          <NumericUpDown Grid.Column="1" Value="{Binding Major}" Minimum="0" Maximum="99" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                          <TextBlock Grid.Row="1" Text="Minor" VerticalAlignment="Center" />
+                          <NumericUpDown Grid.Row="1" Grid.Column="1" Value="{Binding Minor}" Minimum="0" Maximum="15" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                          <TextBlock Grid.Row="2" Text="Bug fix" VerticalAlignment="Center" />
+                          <NumericUpDown Grid.Row="2" Grid.Column="1" Value="{Binding BugFix}" Minimum="0" Maximum="15" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                          <TextBlock Grid.Row="3" Text="Stage" VerticalAlignment="Center" />
+                          <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:VersionForm.Stages}" SelectedItem="{Binding Stage}" Width="140" />
+                          <TextBlock Grid.Row="4" Text="Non-release" VerticalAlignment="Center" />
+                          <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding NonRelease}" Minimum="0" Maximum="99" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                          <TextBlock Grid.Row="5" Text="Region code" VerticalAlignment="Center" />
+                          <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Region}" Minimum="-32768" Maximum="32767" FormatString="0" Width="140" HorizontalAlignment="Left" />
+                          <TextBlock Grid.Row="6" Text="Short version" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding ShortVersion}" />
+                          <TextBlock Grid.Row="7" Text="Long version" VerticalAlignment="Center" />
+                          <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding LongVersion}" />
+                        </Grid>
+                      </Panel>
                     </DataTemplate>
                     <DataTemplate DataType="vm:WindowForm">
                       <ScrollViewer>
@@ -1213,11 +1305,11 @@
                         <Border Grid.Column="1" Classes="preview-panel">
                           <DockPanel>
                             <Border DockPanel.Dock="Top" Classes="preview-header">
-                              <DockPanel>
-                                <TextBlock DockPanel.Dock="Right" Classes="muted" Text="2× · Mac OS 8/9" />
-                                <TextBlock x:Name="PreviewTitle" Classes="strong"
+                              <WrapPanel>
+                                <TextBlock x:Name="PreviewTitle" Classes="strong" Margin="0,0,10,0"
                                            Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormPreviewTitle, FallbackValue=Preview}" />
-                              </DockPanel>
+                                <TextBlock Classes="muted" Text="2× · Mac OS 8/9" />
+                              </WrapPanel>
                             </Border>
                             <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{DynamicResource CmCheckerboard}">
                               <views:MenuView x:Name="MenuPreview" Menu="{Binding Preview}" SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="2"
@@ -1240,17 +1332,17 @@
                             <WrapPanel Classes="menu-fields" IsVisible="{Binding IsEditing}">
                               <StackPanel>
                                 <TextBlock Classes="muted" Text="Title" />
-                                <TextBox Text="{Binding Title}" Width="180" AutomationProperties.Name="Menu title" />
+                                <TextBox Text="{Binding Title}" Width="130" AutomationProperties.Name="Menu title" />
                               </StackPanel>
                               <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
                               <StackPanel>
-                                <TextBlock Classes="muted" Text="Menu ID" />
-                                <NumericUpDown Classes="mono" Value="{Binding Id}" FormatString="0" Width="80" ShowButtonSpinner="False"
+                                <TextBlock Classes="muted" Text="ID" />
+                                <NumericUpDown Classes="mono" Value="{Binding Id}" FormatString="0" Width="68" ShowButtonSpinner="False"
                                                Minimum="-32768" Maximum="32767" AutomationProperties.Name="Menu ID" />
                               </StackPanel>
                               <StackPanel>
                                 <TextBlock Classes="muted" Text="MDEF" />
-                                <NumericUpDown Classes="mono" Value="{Binding Definition}" FormatString="0" Width="80" ShowButtonSpinner="False"
+                                <NumericUpDown Classes="mono" Value="{Binding Definition}" FormatString="0" Width="68" ShowButtonSpinner="False"
                                                Minimum="-32768" Maximum="32767" AutomationProperties.Name="MDEF" />
                               </StackPanel>
                             </WrapPanel>
@@ -1275,7 +1367,7 @@
                               <ItemsControl x:Name="MenuRows" ItemsSource="{Binding Items}">
                                 <ItemsControl.ItemTemplate>
                                   <DataTemplate DataType="vm:MenuItemRow">
-                                    <Border Classes="menu-row form-row" Classes.selected="{Binding IsSelected}" Classes.dimmed="{Binding IsDimmed}"
+                                    <Border Classes="table-row form-row" Classes.selected="{Binding IsSelected}" Classes.dimmed="{Binding IsDimmed}"
                                             Classes.divider="{Binding IsDivider}">
                                       <Panel>
                                         <Border Classes="bar" />

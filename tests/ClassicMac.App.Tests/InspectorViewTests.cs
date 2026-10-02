@@ -87,7 +87,8 @@ public sealed class InspectorViewTests
             var cancel = window.FindControl<DockPanel>("FormHost")!.GetVisualDescendants().OfType<Button>().Single(b => (string?)b.Content == "Cancel");
             cancel.Command!.Execute(null);
             Dispatcher.UIThread.RunJobs();
-            Assert.False(window.FindControl<DockPanel>("FormHost")!.IsEffectivelyVisible);
+            Assert.False(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);   // read only again
+            Assert.True(window.FindControl<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
 
             // A resource without a form has no Edit button.
             model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ZZZZ").Children[0];

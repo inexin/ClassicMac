@@ -17,7 +17,8 @@ public sealed class FormHostTests : IDisposable
     {
         var path = Path.Combine(folder, "Forms.rsrc");
         File.WriteAllBytes(path, PreviewTests.Fork(("MENU", 129, null, InterfaceWriter.WriteMenu(MenuFormTests.File())),
-            ("STR#", 128, null, [0, 1, 3, .. "one"u8])));
+            ("STR#", 128, null, [0, 1, 3, .. "one"u8]),
+            ("CNTL", 128, null, InterfaceWriter.WriteControl(new ControlTemplate(new MacRect(10, 10, 30, 90), 0, true, 1, 0, 0, 0, "OK")))));
         var model = new MainViewModel();
         var input = (await model.OpenAsync(path))!;
         await input.EnsureLoadedAsync();
@@ -43,7 +44,12 @@ public sealed class FormHostTests : IDisposable
         Assert.Equal("Read only. Press Edit or double-click a row to change it.", model.FormReadOnlyNote);
 
         await Select(model, input, "STR#");
-        Assert.False(model.ShowsForm);                                     // not moved yet: its preview until Edit
+        Assert.True(model.ShowsForm);                                      // moved (E5): its numbered list
+
+        // A form without a read-only view (the control form until E4 moves it): its preview until Edit.
+        await Select(model, input, "CNTL");
+        Assert.False(model.Form!.HasReadOnlyView);
+        Assert.False(model.ShowsForm);
         model.EditFormCommand.Execute(null);
         Assert.True(model.ShowsForm);
         Assert.True(model.Form!.IsEditing);

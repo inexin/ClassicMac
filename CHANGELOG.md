@@ -7,6 +7,11 @@
   edited, and the field's bytes are highlighted in the grid. Without editing, a click selects a byte (highlighted in
   both columns) and the inspector reads it. The grid and a 200-pixel inspector fit side by side at the default window
   size, the Mac OS Roman column in view.
+- Editor: strings, string lists, text and version open read only on the form host: a string as its text, a string
+  list as a numbered list (a double-click on a string edits with it selected), text with its styles applied, a
+  version as labelled rows ("1.2b3", stage, region, short and long version); editing shows the inputs as before (E5).
+- Editor: the menu form fits a 1200-pixel window while editing: table inputs 28 high in their columns, the fields on
+  one line, the preview's title wrapping above "2× · Mac OS 8/9".
 - Viewer: with nothing open, the status bar says "Ready" and the diagnostics panel is collapsed to its header, which
   says "Nothing opened yet"; it opens again when a file opens or something is reported, unless you opened or closed it
   yourself (S5).

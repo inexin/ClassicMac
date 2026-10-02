@@ -77,18 +77,27 @@ namespace ClassicMac.App.ViewModels
         protected virtual bool IsValue(string? propertyName) => true;
 
         // A list whose items' and own changes count as edits.
-        protected void Watch<T>(ObservableCollection<T> list) where T : System.ComponentModel.INotifyPropertyChanged
+        // With isValue, only the items' value properties count (not a row's number or selection).
+        protected void Watch<T>(ObservableCollection<T> list, Func<string?, bool>? isValue = null) where T : System.ComponentModel.INotifyPropertyChanged
         {
+            void OnItem(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+            {
+                if (isValue?.Invoke(e.PropertyName) != false)
+                {
+                    RaiseEdited();
+                }
+            }
+
             foreach (var item in list)
             {
-                item.PropertyChanged += (_, _) => RaiseEdited();
+                item.PropertyChanged += OnItem;
             }
 
             list.CollectionChanged += (_, e) =>
             {
                 foreach (var item in e.NewItems?.OfType<T>() ?? [])
                 {
-                    item.PropertyChanged += (_, _) => RaiseEdited();
+                    item.PropertyChanged += OnItem;
                 }
 
                 RaiseEdited();
@@ -152,104 +161,6 @@ namespace ClassicMac.App.ViewModels
         }
     }
 
-    /// <summary><c>'STR '</c>: one string.</summary>
-    public sealed partial class StringForm(Resource resource, string text) : ResourceForm(resource)
-    {
-        [ObservableProperty]
-        private string text = text;
-
-        public override byte[] BuildData() => TextResources.WriteString(Text);
-    }
-
-    /// <summary>One string of a <c>'STR#'</c>.</summary>
-    public sealed partial class StringItem(string text) : ObservableObject
-    {
-        [ObservableProperty]
-        private string text = text;
-    }
-
-    /// <summary><c>'STR#'</c>: a list of strings.</summary>
-    public sealed partial class StringListForm : ResourceForm
-    {
-        public StringListForm(Resource resource, System.Collections.Generic.IReadOnlyList<string> strings) : base(resource)
-        {
-            foreach (var s in strings)
-            {
-                Strings.Add(new StringItem(s));
-            }
-
-            Watch(Strings);
-        }
-
-        public ObservableCollection<StringItem> Strings { get; } = [];
-
-        [RelayCommand]
-        private void Add() => Strings.Add(new StringItem(""));
-
-        [RelayCommand]
-        private void Remove(StringItem item) => Strings.Remove(item);
-
-        [RelayCommand]
-        private void MoveUp(StringItem item)
-        {
-            var i = Strings.IndexOf(item);
-            if (i > 0)
-            {
-                Strings.Move(i, i - 1);
-            }
-        }
-
-        public override byte[] BuildData() => TextResources.WriteStringList(Strings.Select(s => s.Text).ToList());
-    }
-
-    /// <summary><c>'TEXT'</c>, with its <c>'styl'</c> kept in step when there is one.</summary>
-    public sealed partial class TextForm(Resource resource, byte[] data, (Resource Resource, byte[] Data)? styl) : ResourceForm(resource)
-    {
-        [ObservableProperty]
-        private string text = TextResources.ReadText(data);
-
-        public bool HasStyles => styl is not null;
-
-        // The 'styl' follows from the text, so the text's bytes are the draft's.
-        public override byte[] BuildData() => TextResources.WriteText(data, styl?.Data ?? [], Text, styl is not null).Text;
-
-        public override IResourceEdit BuildEdit(ResourceFork fork)
-        {
-            var (bytes, stylBytes) = TextResources.WriteText(data, styl?.Data ?? [], Text, styl is not null);
-            var edit = new SetResourceData(Resource, bytes, $"Edit {Resource}");
-            return styl is not { } s || stylBytes is null ? edit : new CompoundEdit($"Edit {Resource}", edit, new SetResourceData(s.Resource, stylBytes));
-        }
-    }
-
-    /// <summary><c>'vers'</c>: the version, stage, region and the two strings.</summary>
-    public sealed partial class VersionForm : ResourceForm
-    {
-        public VersionForm(Resource resource, VersionResource version) : base(resource)
-        {
-            (major, minor, bugFix, nonRelease, region, shortVersion, longVersion) =
-                (version.Major, version.Minor, version.BugFix, version.NonRelease, version.Region, version.ShortVersion, version.LongVersion);
-            stage = Stages.FirstOrDefault(s => s.Value == version.Stage) ?? Stages[^1];
-        }
-
-        public sealed record StageChoice(byte Value, string Name)
-        {
-            public override string ToString() => Name;
-        }
-
-        public static StageChoice[] Stages { get; } = [new(0x20, "development"), new(0x40, "alpha"), new(0x60, "beta"), new(0x80, "final")];
-
-        [ObservableProperty] private decimal major;
-        [ObservableProperty] private decimal minor;
-        [ObservableProperty] private decimal bugFix;
-        [ObservableProperty] private StageChoice stage;
-        [ObservableProperty] private decimal nonRelease;
-        [ObservableProperty] private decimal region;
-        [ObservableProperty] private string shortVersion;
-        [ObservableProperty] private string longVersion;
-
-        public override byte[] BuildData() =>
-            new VersionResource((int)Major, (int)Minor, (int)BugFix, Stage.Value, (int)NonRelease, (short)Region, ShortVersion, LongVersion).Write();
-    }
 
     public sealed partial class MainViewModel
     {

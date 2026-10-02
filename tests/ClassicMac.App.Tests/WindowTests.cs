@@ -675,7 +675,7 @@ public class WindowTests
             Assert.True(host.IsEffectivelyVisible);
             Assert.True(window.FindControl<StackPanel>("ReadOnlyFooter")!.IsEffectivelyVisible);
             Assert.False(window.FindControl<DockPanel>("EditingFooter")!.IsEffectivelyVisible);
-            var rows = host.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("menu-row")).ToList();
+            var rows = host.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("table-row")).ToList();
             Assert.Equal(5, rows.Count);
             Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);   // read only
             Assert.Contains(rows[0].GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Open…" && t.IsEffectivelyVisible);
@@ -732,6 +732,63 @@ public class WindowTests
             Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.LastApplied);
             Assert.Contains(window.FindControl<StackPanel>("ReadOnlyFooter")!.GetVisualDescendants().OfType<TextBlock>(),
                 t => t.Text == model.LastApplied && t.IsEffectivelyVisible);
+            window.Close();
+            Baselines.Verify(baselines);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
+    // Strings, string lists, text and version (E5) read as text on the host, and a double-click on a string edits with
+    // it selected.
+    [Fact]
+    public void Strings_text_and_version_read_first_on_the_host() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            byte[] vers = [0x01, 0x20, 0x60, 0x03, 0, 0, 5, .. "1.2b3"u8, 9, .. "1.2b3 (c)"u8];
+            var path = Path.Combine(folder, "Texts.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("STR ", 128, null, [5, .. "Hello"u8]), ("STR#", 128, null, [0, 2, 3, .. "one"u8, 3, .. "two"u8]),
+                ("TEXT", 128, null, "Some text"u8.ToArray()), ("vers", 1, null, vers)));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            var host = window.FindControl<DockPanel>("FormHost")!;
+            void Select(string type)
+            {
+                model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
+                Pump(model.PreviewTask);
+                Dispatcher.UIThread.RunJobs();
+                Assert.True(host.IsEffectivelyVisible, type);
+                Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
+            }
+
+            Select("STR ");
+            Assert.Contains(host.GetVisualDescendants().OfType<SelectableTextBlock>(), t => t.Text == "Hello" && t.IsEffectivelyVisible);
+            Select("TEXT");
+            Assert.Contains(host.GetVisualDescendants().OfType<StyledTextView>(), t => t.IsEffectivelyVisible);
+            Select("vers");
+            Assert.Contains(host.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "1.2b3" && t.IsEffectivelyVisible);
+            Capture(window, "vers-read", baselines);
+            Select("STR#");
+            var rows = host.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("table-row") && b.IsEffectivelyVisible).ToList();
+            Assert.Equal(2, rows.Count);
+            Capture(window, "strings-read", baselines);
+
+            rows[1].GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "two")
+                .RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.DoubleTappedEvent, null!));
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsEditingForm);
+            var list = Assert.IsType<StringListForm>(model.Form);
+            Assert.Same(list.Strings[1], list.SelectedItem);
+            Assert.Contains(host.GetVisualDescendants().OfType<TextBox>(), t => t.Text == "two" && t.IsEffectivelyVisible);
             window.Close();
             Baselines.Verify(baselines);
         }
