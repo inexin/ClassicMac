@@ -8,8 +8,9 @@ namespace ClassicMac.Files.Archives;
 
 /// <summary>Reads Compact Pro archives with RLE and LZH+RLE fork encodings.</summary>
 /// <remarks>
-/// The directory layout and both compression methods are fitted against independent published format descriptions.
-/// Fork payloads may reside in sibling files identified by their Compact Pro volume numbers.
+/// The layout, folders, both compression methods, self-extracting archives and segment sets are verified against
+/// archives made by Compact Pro 1.52. A segmented archive is opened from its last segment; the earlier segments are
+/// found among the context's siblings by their set id.
 /// </remarks>
 public sealed class CompactProReader : IContainerReader
 {
@@ -57,11 +58,12 @@ public sealed class CompactProReader : IContainerReader
         ArgumentNullException.ThrowIfNull(context);
         if (input.Length > context.Options.MaxExpandedBytesPerInput)
             throw new InvalidDataException("The Compact Pro archive exceeds the configured input-size limit.");
-        byte[] archive = input.ToArray(context.Options.MaxExpandedBytesPerInput);
-        var reader = new BigEndianReader(archive);
+        byte[] lastSegment = input.ToArray(context.Options.MaxExpandedBytesPerInput);
+        var reader = new BigEndianReader(lastSegment);
         if (reader.Length < ArchiveHeaderLength || reader.ReadByteAt(0) != 1)
             throw new InvalidDataException("Not a Compact Pro archive.");
-        byte volumeNumber = reader.ReadByteAt(1);
+        byte segmentNumber = reader.ReadByteAt(1);
+        ushort setId = reader.ReadUInt16At(2);
         uint directoryOffsetRaw = reader.ReadUInt32At(4);
         if (directoryOffsetRaw > int.MaxValue)
             throw new InvalidDataException("The Compact Pro directory offset is too large.");
@@ -79,11 +81,20 @@ public sealed class CompactProReader : IContainerReader
         if (directory.Entries.Count > context.Options.MaxVolumeEntries)
             throw new InvalidDataException("The Compact Pro archive exceeds the configured entry limit.");
 
+        // [Verified against Compact Pro 1.52] Segment n of a set is the archive's next bytes behind an 8-byte header
+        // of its own (1, n, the set's id, a directory offset that is 0 except in the last segment, where it counts
+        // from that segment's start). Segmenting leaves the directory untouched, so its fork offsets are into the
+        // whole archive: segment 1, then each later segment after its header. A fork may run across segments.
+        SegmentSet segments = JoinSegments(lastSegment, segmentNumber, setId, context);
+        byte[] archive = segments.Archive;
+        // The directory's place in the joined archive; past the end when a segment is missing.
+        long joinedDirectory = segments.Complete
+            ? archive.Length - ((long)lastSegment.Length - directoryOffset)
+            : long.MaxValue;
+        long joinedTableEnd = segments.Complete ? joinedDirectory + (directory.TableEnd - directoryOffset) : long.MaxValue;
+
         var files = new List<MacFile>();
         var folders = new List<FolderScope>();
-        var otherVolumes = new Dictionary<byte, byte[]>();
-        var unavailableVolumes = new HashSet<byte>();
-        long volumeBytes = archive.Length;
         long expandedBytes = 0;
         for (int index = 0; index < directory.Entries.Count; index++)
         {
@@ -99,54 +110,28 @@ public sealed class CompactProReader : IContainerReader
                 continue;
             }
 
+            // The entry's volume byte is 1 in a whole archive and in the segments made from it, so it does not
+            // locate the forks; the offset alone does.
             CompactProFile file = entry.File!;
-            int volume = file.Volume;
-            byte[] dataVolume = archive;
-            bool directoryInVolume = true;
-            if (volume != volumeNumber)
-            {
-                byte siblingVolumeNumber = checked((byte)volume);
-                if (otherVolumes.TryGetValue(siblingVolumeNumber, out byte[]? cachedVolume))
-                {
-                    dataVolume = cachedVolume;
-                }
-                else if (unavailableVolumes.Contains(siblingVolumeNumber))
-                {
-                    context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
-                        $"Compact Pro entry '{entry.Name}' refers to unavailable volume {volume}.", entry.Offset);
-                    continue;
-                }
-                else if (ReadSiblingVolume(siblingVolumeNumber, context, ref volumeBytes) is { } siblingVolume)
-                {
-                    dataVolume = siblingVolume;
-                    otherVolumes.Add(siblingVolumeNumber, siblingVolume);
-                }
-                else
-                {
-                    unavailableVolumes.Add(siblingVolumeNumber);
-                    context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
-                        $"Compact Pro entry '{entry.Name}' refers to unavailable volume {volume}.", entry.Offset);
-                    continue;
-                }
-                directoryInVolume = false;
-            }
-
-            if (file.Offset > int.MaxValue)
-                throw new InvalidDataException("A Compact Pro fork data offset is too large.");
-            int fileOffset = (int)file.Offset;
+            long fileOffset = file.Offset;
             ushort flags = file.Flags;
             int resourceLength = ReadLength(file.ResourceLength, "resource fork");
             int dataLength = ReadLength(file.DataLength, "data fork");
             int resourceCompressedLength = ReadLength(file.ResourceCompressedLength, "compressed resource fork");
             int dataCompressedLength = ReadLength(file.DataCompressedLength, "compressed data fork");
-            // Compact Pro writes the forks first and the directory after them ([Reference: munbox samples, said to
-            // be Compact Pro 1.33/1.52]); a fork may lie on either side of the directory but not across it.
-            long forksEnd = (long)fileOffset + resourceCompressedLength + dataCompressedLength;
-            if (fileOffset < ArchiveHeaderLength ||
-                directoryInVolume && fileOffset < directory.TableEnd && forksEnd > directoryOffset)
+            // Compact Pro writes the forks first and the directory after them [Verified against Compact Pro 1.52];
+            // a fork may lie on either side of the directory but not across it.
+            long forksEnd = fileOffset + resourceCompressedLength + dataCompressedLength;
+            if (!segments.Complete && forksEnd > archive.Length)
+            {
+                context.Report(DiagnosticSeverity.Warning, "archive.missing-volume",
+                    $"Compact Pro entry '{entry.Name}' lies in a missing segment.", entry.Offset);
+                continue;
+            }
+            if (fileOffset < ArchiveHeaderLength || fileOffset < joinedTableEnd && forksEnd > joinedDirectory)
                 throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
-            Require(dataVolume, fileOffset, checked(resourceCompressedLength + dataCompressedLength),
-                "Compact Pro fork data");
+            if (forksEnd > archive.Length)
+                throw new InvalidDataException("The Compact Pro fork data lies outside the Compact Pro archive.");
 
             if ((flags & 1) != 0)
             {
@@ -161,12 +146,11 @@ public sealed class CompactProReader : IContainerReader
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
                 throw new InvalidDataException("Compact Pro extraction exceeds the configured expanded-size limit.");
 
-            ReadOnlySpan<byte> resourceInput = dataVolume.AsSpan(fileOffset, resourceCompressedLength);
+            ReadOnlySpan<byte> resourceInput = archive.AsSpan((int)fileOffset, resourceCompressedLength);
             byte[] resource = (flags & 2) != 0
                 ? CompactProLzhDecoder.Decode(resourceInput, resourceLength)
                 : DecodeRle8182(resourceInput, resourceLength);
-            int dataOffset = checked(fileOffset + resourceCompressedLength);
-            ReadOnlySpan<byte> dataInput = dataVolume.AsSpan(dataOffset, dataCompressedLength);
+            ReadOnlySpan<byte> dataInput = archive.AsSpan((int)fileOffset + resourceCompressedLength, dataCompressedLength);
             byte[] data = (flags & 4) != 0
                 ? CompactProLzhDecoder.Decode(dataInput, dataLength)
                 : DecodeRle8182(dataInput, dataLength);
@@ -188,24 +172,51 @@ public sealed class CompactProReader : IContainerReader
         return files;
     }
 
-    private static byte[]? ReadSiblingVolume(byte volumeNumber, ContainerContext context, ref long totalVolumeBytes)
+    // The archive a last segment ends: the segments before it are the siblings with the same set id and a zero
+    // directory offset. Without all of them, the archive is the segments up to the first missing one.
+    private static SegmentSet JoinSegments(byte[] lastSegment, byte segmentCount, ushort setId, ContainerContext context)
     {
-        byte[]? foundVolume = null;
+        if (segmentCount <= 1) return new SegmentSet(lastSegment, true);
+        var segments = new byte[]?[segmentCount];
+        segments[segmentCount - 1] = lastSegment;
+        long totalBytes = lastSegment.Length;
         foreach (MacFile sibling in context.Siblings?.Invoke() ?? [])
         {
-            ForkData data = sibling.DataFork;
-            if (data.Length < ArchiveHeaderLength) continue;
-            byte[] header = data.Slice(0, ArchiveHeaderLength).ToArray(ArchiveHeaderLength);
-            if (header[0] != 1 || header[1] != volumeNumber) continue;
-            if (foundVolume is not null)
-                throw new InvalidDataException($"More than one Compact Pro sibling identifies volume {volumeNumber}.");
-            if (data.Length > context.Options.MaxExpandedBytesPerInput - totalVolumeBytes)
-                throw new InvalidDataException("The Compact Pro volume set exceeds the configured input-size limit.");
-            foundVolume = data.ToArray(context.Options.MaxExpandedBytesPerInput);
-            totalVolumeBytes = checked(totalVolumeBytes + data.Length);
+            ForkData fork = sibling.DataFork;
+            if (fork.Length < ArchiveHeaderLength) continue;
+            var header = new BigEndianReader(fork.Slice(0, ArchiveHeaderLength).ToArray(ArchiveHeaderLength));
+            byte number = header.ReadByteAt(1);
+            if (header.ReadByteAt(0) != 1 || number == 0 || number >= segmentCount ||
+                header.ReadUInt16At(2) != setId || header.ReadUInt32At(4) != 0) continue;
+            if (segments[number - 1] is not null)
+                throw new InvalidDataException($"More than one Compact Pro sibling is segment {number} of the set.");
+            if (fork.Length > context.Options.MaxExpandedBytesPerInput - totalBytes)
+                throw new InvalidDataException("The Compact Pro segment set exceeds the configured input-size limit.");
+            segments[number - 1] = fork.ToArray(context.Options.MaxExpandedBytesPerInput);
+            totalBytes += fork.Length;
         }
 
-        return foundVolume;
+        int present = Array.IndexOf(segments, null);
+        bool complete = present < 0;
+        if (!complete)
+        {
+            string missing = string.Join(", ", Enumerable.Range(1, segmentCount).Where(n => segments[n - 1] is null));
+            context.Report(DiagnosticSeverity.Error, "archive.missing-volume",
+                $"Compact Pro segment(s) {missing} of {segmentCount} are missing; open the last segment with the others " +
+                "beside it.");
+            if (present == 0) return new SegmentSet([], false);
+        }
+        int count = complete ? segmentCount : present;
+        IEnumerable<byte[]> parts = segments.Take(count).Select(segment => segment!);
+        byte[] joined = new byte[parts.Sum(segment => (long)segment.Length) - (count - 1L) * ArchiveHeaderLength];
+        int position = 0;
+        foreach (byte[] segment in parts)
+        {
+            ReadOnlySpan<byte> bytes = position == 0 ? segment : segment.AsSpan(ArchiveHeaderLength);
+            bytes.CopyTo(joined.AsSpan(position));
+            position += bytes.Length;
+        }
+        return new SegmentSet(joined, complete);
     }
 
     // The directory at the reader's position, to the end of the archive. baseOffset is where the reader's data starts
@@ -306,12 +317,8 @@ public sealed class CompactProReader : IContainerReader
         return (int)value;
     }
 
-    private static void Require(byte[] archive, int offset, int length, string what)
-    {
-        if (offset < 0 || length < 0 || offset > archive.Length - length)
-            throw new InvalidDataException($"The {what} lies outside the Compact Pro archive.");
-    }
-
+    // The whole archive, or the leading segments joined when a later one is missing (Complete false).
+    private sealed record SegmentSet(byte[] Archive, bool Complete);
     private sealed record CompactProDirectory(uint StoredCrc, uint ComputedCrc, int TableEnd, MacString Comment,
         List<CompactProEntry> Entries);
     private sealed record CompactProEntry(MacString Name, int ChildEntryCount, CompactProFile? File, int Offset)
