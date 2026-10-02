@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
@@ -297,7 +298,8 @@ namespace ClassicMac.App.Views
                     var first = (int)((long)x * sound.Frames / columns);
                     var last = Math.Min(sound.Frames, Math.Max(first + 1, (int)((long)(x + 1) * sound.Frames / columns)));
                     float low = 1, high = -1;
-                    for (var f = first; f < last; f++)
+                    // Up to the next column's first sample too, so a sound with fewer frames than columns is a line.
+                    for (var f = first; f <= Math.Min(last, sound.Frames - 1); f++)
                     {
                         var v = sound.Samples[f * sound.Channels + c];
                         low = Math.Min(low, v);
@@ -317,17 +319,30 @@ namespace ClassicMac.App.Views
             }
         }
 
+        /// <summary>
+        /// The ruler's labels from 0 to <paramref name="duration"/> in <paramref name="steps"/> steps, with two decimals,
+        /// or as many more as make the steps differ (a 0.02 s sound reads "0.005 s", not "0.00 s" twice).
+        /// </summary>
+        internal static string[] RulerLabels(double duration, int steps)
+        {
+            var step = duration / Math.Max(1, steps);
+            var decimals = step > 0 ? Math.Clamp((int)Math.Ceiling(-Math.Log10(step) - 1e-9), 2, 6) : 2;
+            var format = "{0:F" + decimals.ToString(System.Globalization.CultureInfo.InvariantCulture) + "} s";
+            return Enumerable.Range(0, steps + 1)
+                .Select(i => string.Format(System.Globalization.CultureInfo.InvariantCulture, format, duration * i / steps)).ToArray();
+        }
+
         // The time ruler: a tick and a label in mono 11 at about every 80 px, 0.00 s to the end.
         private void DrawRuler(DrawingContext context, DecodedSound sound, double top, double width)
         {
             var text = Token("CmTextMuted") ?? Brushes.Gray;
             var font = this.TryFindResource("CmFontMono", ActualThemeVariant, out var family) && family is FontFamily mono ? mono : FontFamily.Default;
             var steps = Math.Max(1, (int)(width / 80));
+            var labels = RulerLabels(sound.Duration, steps);
             for (var i = 0; i <= steps; i++)
             {
                 var x = Math.Round(width * i / steps);
-                var label = new FormattedText(string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0:0.00} s", sound.Duration * i / steps),
-                    System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface(font), 11, text);
+                var label = new FormattedText(labels[i], System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface(font), 11, text);
                 context.FillRectangle(text, new Rect(Math.Min(x, width - 1), top, 1, 4));
                 var at = Math.Clamp(x - label.Width / 2, 0, Math.Max(0, width - label.Width));
                 context.DrawText(label, new Point(at, top + 5));

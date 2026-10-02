@@ -527,6 +527,9 @@
       <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
       <Setter Property="Margin" Value="8,0,0,0" />
     </Style>
+    <Style Selector="Grid.template-field > TextBlock.label">
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
     <Style Selector="Grid.template-field TextBlock.value.code">
       <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
       <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
@@ -680,6 +683,18 @@
     <Style Selector="Border.table-row Grid.editing NumericUpDown, WrapPanel.menu-fields NumericUpDown">
       <Setter Property="MinWidth" Value="0" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <!-- The cards' coordinates, IDs and values: typed (or arrowed) in mono without the spinner buttons, which left too
+         little room for "-32768" (four bounds fit one row). -->
+    <Style Selector="NumericUpDown.coord">
+      <Setter Property="ShowButtonSpinner" Value="False" />
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="Width" Value="84" />
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="NumericUpDown.coord.wide">
+      <Setter Property="Width" Value="132" />
     </Style>
     <Style Selector="Border.table-row Grid.editing TextBox, Border.table-row Grid.editing ComboBox">
       <Setter Property="Padding" Value="6,2" />
@@ -1384,10 +1399,11 @@
                     </ItemsControl>
                   </ScrollViewer>
                 </DockPanel>
-                <ScrollViewer IsVisible="{Binding Preview.IsStyledText}" Padding="16,12">
+                <!-- 24 on the right: the overlay scroll bar never covers the text. -->
+                <ScrollViewer x:Name="StyledTextScroller" IsVisible="{Binding Preview.IsStyledText}" Padding="16,12,24,12">
                   <views:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
                 </ScrollViewer>
-                <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+                <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12,24,12" HorizontalScrollBarVisibility="Auto">
                   <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
                 </ScrollViewer>
                 <!-- The property view (boards/property-view.md, P2): Properties | JSON, then the values in cards (E4's card
@@ -1724,8 +1740,8 @@
                                     <TextBlock Classes="label" Text="Top, left" />
                                     <TextBlock Grid.Column="1" Classes="mono" Text="{Binding TopLeftText}" IsVisible="{Binding !IsEditing}" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
-                                      <NumericUpDown Value="{Binding Top}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
-                                      <NumericUpDown Value="{Binding Left}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
+                                      <NumericUpDown Value="{Binding Top}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
+                                      <NumericUpDown Value="{Binding Left}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
                                     </StackPanel>
                                   </Grid>
                                 </Border>
@@ -1734,8 +1750,8 @@
                                     <TextBlock Classes="label" Text="Bottom, right" />
                                     <TextBlock Grid.Column="1" Classes="mono" Text="{Binding BottomRightText}" IsVisible="{Binding !IsEditing}" />
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
-                                      <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
-                                      <NumericUpDown Value="{Binding Right}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
+                                      <NumericUpDown Value="{Binding Bottom}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
+                                      <NumericUpDown Value="{Binding Right}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
                                     </StackPanel>
                                   </Grid>
                                 </Border>
@@ -1772,7 +1788,7 @@
                                     <TextBlock Classes="label" Text="Item list" />
                                     <Button Grid.Column="1" Classes="link" Content="{Binding ItemsText}" IsVisible="{Binding !IsEditing}"
                                             Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
-                                    <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Width="110" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
+                                    <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
                                   </Grid>
                                 </Border>
                                 <Border Classes="card-line">
@@ -1799,7 +1815,7 @@
                                   <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
                                     <TextBlock Classes="label" Text="Reference constant" />
                                     <TextBlock Grid.Column="1" Classes="mono" Text="{Binding RefConText}" IsVisible="{Binding !IsEditing}" />
-                                    <NumericUpDown Grid.Column="1" Value="{Binding RefCon}" FormatString="0" Width="160" HorizontalAlignment="Left" Minimum="-2147483648" Maximum="2147483647" IsVisible="{Binding IsEditing}" />
+                                    <NumericUpDown Grid.Column="1" Value="{Binding RefCon}" FormatString="0" Classes="coord wide" HorizontalAlignment="Left" Minimum="-2147483648" Maximum="2147483647" IsVisible="{Binding IsEditing}" />
                                   </Grid>
                                 </Border>
                                 <Border Classes="card-line last">
@@ -1844,12 +1860,12 @@
                                     <TextBlock Classes="mono" Text="{Binding BoundsText}" />
                                     <TextBlock Classes="muted" Text="{Binding SizeText}" />
                                   </StackPanel>
-                                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
-                                    <NumericUpDown Value="{Binding Top}" FormatString="0" Width="96" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
-                                    <NumericUpDown Value="{Binding Left}" FormatString="0" Width="96" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
-                                    <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="96" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
-                                    <NumericUpDown Value="{Binding Right}" FormatString="0" Width="96" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
-                                  </StackPanel>
+                                  <WrapPanel Grid.Column="1" ItemSpacing="6" LineSpacing="6" Margin="0,6" IsVisible="{Binding IsEditing}">
+                                    <NumericUpDown Value="{Binding Top}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
+                                    <NumericUpDown Value="{Binding Left}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
+                                    <NumericUpDown Value="{Binding Bottom}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
+                                    <NumericUpDown Value="{Binding Right}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
+                                  </WrapPanel>
                                 </Grid>
                               </Border>
                               <Border Classes="card-line">
@@ -1860,7 +1876,7 @@
                                             Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
                                     <TextBlock Classes="muted" Text="{Binding ItemCountText}" VerticalAlignment="Center" />
                                   </StackPanel>
-                                  <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Width="110" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
+                                  <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
                                 </Grid>
                               </Border>
                               <Border Classes="card-line last">
@@ -1952,7 +1968,7 @@
                               <TextBlock Grid.Column="3" Classes="caption" Text="TOP, LEFT, BOTTOM, RIGHT" TextTrimming="CharacterEllipsis" />
                               <TextBlock Grid.Column="4" Classes="caption" Text="ENABLED" />
                             </Grid>
-                            <Grid Classes="menu-columns editing" ColumnDefinitions="24,104,*,172,24,24">
+                            <Grid Classes="menu-columns editing" ColumnDefinitions="24,136,*,172,24,24">
                               <TextBlock Classes="caption" Text="#" />
                               <TextBlock Grid.Column="1" Classes="caption" Text="KIND" />
                               <TextBlock Grid.Column="2" Classes="caption" Text="TEXT OR RESOURCE ID" TextTrimming="CharacterEllipsis" />
@@ -1972,7 +1988,7 @@
                                         <TextBlock Grid.Column="3" Classes="mono" Text="{Binding BoundsText}" />
                                         <TextBlock Grid.Column="4" Text="{Binding EnabledText}" Classes.muted="{Binding IsDimmed}" />
                                       </Grid>
-                                      <Grid Classes="editing" ColumnDefinitions="24,104,*,172,24,24">
+                                      <Grid Classes="editing" ColumnDefinitions="24,136,*,172,24,24">
                                         <TextBlock Classes="muted mono" Text="{Binding Number}" VerticalAlignment="Center" />
                                         <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:DialogItemRow.Kinds}" SelectedItem="{Binding Kind}" AutomationProperties.Name="Kind" />
                                         <TextBox x:Name="ItemText" Grid.Column="2" Text="{Binding Text}" IsVisible="{Binding HasText}" AutomationProperties.Name="Text" />
@@ -2148,8 +2164,8 @@
                                   <TextBlock Classes="label" Text="Top, left" />
                                   <TextBlock Grid.Column="1" Classes="mono" Text="{Binding TopLeftText}" IsVisible="{Binding !IsEditing}" />
                                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
-                                    <NumericUpDown Value="{Binding Top}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
-                                    <NumericUpDown Value="{Binding Left}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
+                                    <NumericUpDown Value="{Binding Top}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Top" />
+                                    <NumericUpDown Value="{Binding Left}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Left" />
                                   </StackPanel>
                                 </Grid>
                               </Border>
@@ -2158,8 +2174,8 @@
                                   <TextBlock Classes="label" Text="Bottom, right" />
                                   <TextBlock Grid.Column="1" Classes="mono" Text="{Binding BottomRightText}" IsVisible="{Binding !IsEditing}" />
                                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
-                                    <NumericUpDown Value="{Binding Bottom}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
-                                    <NumericUpDown Value="{Binding Right}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
+                                    <NumericUpDown Value="{Binding Bottom}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Bottom" />
+                                    <NumericUpDown Value="{Binding Right}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Right" />
                                   </StackPanel>
                                 </Grid>
                               </Border>
@@ -2195,7 +2211,7 @@
                                 <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
                                   <TextBlock Classes="label" Text="Value" />
                                   <TextBlock Grid.Column="1" Classes="mono" Text="{Binding ValueText}" IsVisible="{Binding !IsEditing}" />
-                                  <NumericUpDown Grid.Column="1" Value="{Binding Value}" FormatString="0" Width="110" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
+                                  <NumericUpDown Grid.Column="1" Value="{Binding Value}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
                                 </Grid>
                               </Border>
                               <Border Classes="card-line">
@@ -2207,8 +2223,8 @@
                                     <TextBlock Classes="mono" Text="{Binding MaximumText}" />
                                   </StackPanel>
                                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" IsVisible="{Binding IsEditing}">
-                                    <NumericUpDown Value="{Binding Minimum}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Minimum" />
-                                    <NumericUpDown Value="{Binding Maximum}" FormatString="0" Width="110" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Maximum" />
+                                    <NumericUpDown Value="{Binding Minimum}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Minimum" />
+                                    <NumericUpDown Value="{Binding Maximum}" FormatString="0" Classes="coord" Minimum="-32768" Maximum="32767" AutomationProperties.Name="Maximum" />
                                   </StackPanel>
                                 </Grid>
                               </Border>
@@ -2226,7 +2242,7 @@
                                 <Grid Classes="card-row form-row last" ColumnDefinitions="150,*">
                                   <TextBlock Classes="label" Text="Reference constant" />
                                   <TextBlock Grid.Column="1" Classes="mono" Text="{Binding RefConText}" IsVisible="{Binding !IsEditing}" />
-                                  <NumericUpDown Grid.Column="1" Value="{Binding RefCon}" FormatString="0" Width="160" HorizontalAlignment="Left" Minimum="-2147483648" Maximum="2147483647" IsVisible="{Binding IsEditing}" />
+                                  <NumericUpDown Grid.Column="1" Value="{Binding RefCon}" FormatString="0" Classes="coord wide" HorizontalAlignment="Left" Minimum="-2147483648" Maximum="2147483647" IsVisible="{Binding IsEditing}" />
                                 </Grid>
                               </Border>
                             </StackPanel>
@@ -2275,16 +2291,20 @@
                       <Border Classes="card-line">
                         <Grid Classes="card-row form-row template-field" ColumnDefinitions="180,*,Auto">
                           <TextBlock Classes="label" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
-                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
-                            <TextBlock Classes="value" Classes.code="{Binding IsCode}" Text="{Binding DisplayText}" TextWrapping="Wrap" />
-                            <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" />
-                          </StackPanel>
-                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsEditing}">
-                            <TextBox Text="{Binding Text}" IsVisible="{Binding IsEditableText}" MinWidth="160" TextWrapping="Wrap" AutomationProperties.Name="{Binding Label}" />
-                            <CheckBox IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" AutomationProperties.Name="{Binding Label}" />
-                            <TextBlock Classes="value" Text="{Binding DisplayText}" IsVisible="{Binding IsReadOnly}" />
-                            <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" />
-                          </StackPanel>
+                          <!-- Dock panels, not stack panels: a long value (a hex field) wraps within the column instead of
+                               running under the type code. -->
+                          <DockPanel Grid.Column="1" IsVisible="{Binding !IsEditing}">
+                            <TextBlock DockPanel.Dock="Left" Classes="value" Classes.code="{Binding IsCode}" Text="{Binding DisplayText}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" Margin="8,0,0,0" />
+                          </DockPanel>
+                          <DockPanel Grid.Column="1" IsVisible="{Binding IsEditing}">
+                            <Panel DockPanel.Dock="Left">
+                              <TextBox Text="{Binding Text}" IsVisible="{Binding IsEditableText}" MinWidth="160" HorizontalAlignment="Left" TextWrapping="Wrap" AutomationProperties.Name="{Binding Label}" />
+                              <CheckBox IsChecked="{Binding Flag}" IsVisible="{Binding IsFlag}" AutomationProperties.Name="{Binding Label}" />
+                              <TextBlock Classes="value" Text="{Binding DisplayText}" IsVisible="{Binding IsReadOnly}" VerticalAlignment="Center" />
+                            </Panel>
+                            <TextBlock Classes="muted count-note" Text="{Binding CountNote}" IsVisible="{Binding IsReadOnly}" Margin="8,0,0,0" />
+                          </DockPanel>
                           <TextBlock Grid.Column="2" Classes="type-code" Text="{Binding Type}" />
                         </Grid>
                       </Border>

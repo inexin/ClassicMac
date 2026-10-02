@@ -168,7 +168,12 @@ namespace ClassicMac.App.ViewModels
                     new("Holds", Holds(fork), Mono: true)]));
             }
 
-            groups.Add(Dates(input.Root.File, DateNote(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "")));
+            // A host file read as a volume or archive has no Mac dates of its own: no card of dashes.
+            if (input.Root.File.Created is not null || input.Root.File.Modified is not null)
+            {
+                groups.Add(Dates(input.Root.File, DateNote(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "")));
+            }
+
             groups.Add(new("How it was read", [], Wide: true) { Chain = Chain(input) });
             return new DetailsViewModel(input.Title, groups, problems: problems);
         }

@@ -177,6 +177,22 @@ public class DialogTests
     });
 
     [Fact]
+    public void Ids_of_six_characters_fit_their_fields() => OnUiThread(() =>
+    {
+        // Seen on Mac OS 9's System: "-32511" showed as "-325".
+        var info = Show(DialogViews.ResourceInfo("Get Info", new ResourceInfo("ICN#", -32511, "", ResourceAttributes.None), false, Trash));
+        var import = Show(DialogViews.Import("art.png", ["PICT"], new ImportChoice("PICT", -32511, ""), Art));
+        foreach (var window in new[] { info.Window, import.Window })
+        {
+            var id = window.GetVisualDescendants().OfType<NumericUpDown>().Single();
+            var text = id.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.TextPresenter>().Single();
+            var viewport = id.GetVisualDescendants().OfType<ScrollViewer>().Single().Viewport.Width;   // what the box shows
+            Assert.True(text.TextLayout.WidthIncludingTrailingWhitespace <= viewport + 0.5, $"{id.Value} is cut");
+            window.Close();
+        }
+    });
+
+    [Fact]
     public void Import_options_follow_the_types_offered()
     {
         var sound = new ImportOptions(["snd "], "snd ");

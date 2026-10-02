@@ -209,7 +209,7 @@ namespace ClassicMac.App.Views
                 Maximum = short.MaxValue,
                 Increment = 1,
                 FormatString = "0",
-                Width = 120,
+                Width = 156,                                  // "-32768" beside the two spinner buttons
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Classes = { "mono" },
             };

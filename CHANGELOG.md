@@ -15,6 +15,13 @@
   Previous wrapping round (Enter/Shift+Enter in the box, F3/Shift+F3, Ctrl+F in the Hex tab focuses it); the match is
   selected (or put under the cursor while editing, searching the edited bytes), highlighted and scrolled to, with "2 of 5",
   "Not found" or why the pattern is bad; the hex grid now takes the keyboard focus when a byte is clicked.
+- Viewer: fixes from a look at Mac OS 9's System and Finder: a sound shorter than the lanes is drawn as a line, not
+  dots, and the time ruler shows enough decimals to tell its ticks apart ("0.005 s", not "0.00 s" twice); text
+  previews keep clear of the scroll bar; a disk image's Details no longer shows a Dates card of dashes.
+- Editor: fixes from the same look: item kinds ("Radio button", "Static text") fit their select in the item list
+  form; the cards' bounds, IDs and values are mono fields without spinner buttons, so "-32768" fits and an alert's
+  four bounds stay in the card; template labels keep a gap before their values, and long values (a cursor's bits) wrap
+  before the type code instead of running under it; Get Info's and Import's ID fields fit "-32511".
 - Viewer: the image preview (P1) shows cards: each image on a checkerboard with its type and size under it
   ("'icl8'", "32×32 · 8-bit"); an icon shows every member of its family, its masks with "Show masks", and the Finder
   states strip (five states, seven labels, captioned; 2× from zoom 2) with "Finder states"; a summary line ("3 members ·

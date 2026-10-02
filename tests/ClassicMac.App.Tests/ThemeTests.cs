@@ -201,6 +201,25 @@ public class ThemeTests
         ((Window)TopLevel.GetTopLevel(view)!).Close();
     });
 
+    [Fact]
+    public void A_sound_shorter_than_the_lanes_is_drawn_as_a_line_not_dots() => OnUiThread(() =>
+    {
+        // Four frames over 300 px: each column joins its sample to the next, so between +0.5 (row 46) and -0.5 (row
+        // 134) the wave passes the rows in between.
+        var view = Show(new WaveformView { Sound = new DecodedSound([0.5f, -0.5f, 0.5f, -0.5f], 1, 22050) });
+        var frame = Frame(view);
+        Assert.Equal(Expected("CmAccent", ThemeVariant.Light), Pixel(frame, 30, 70));
+        Assert.Equal(Expected("CmAccent", ThemeVariant.Light), Pixel(frame, 30, 110));
+        ((Window)TopLevel.GetTopLevel(view)!).Close();
+    });
+
+    [Theory]
+    [InlineData(0.02, 4, "0.000 s|0.005 s|0.010 s|0.015 s|0.020 s")]
+    [InlineData(2.0, 4, "0.00 s|0.50 s|1.00 s|1.50 s|2.00 s")]
+    [InlineData(120.0, 2, "0.00 s|60.00 s|120.00 s")]
+    public void The_ruler_labels_are_precise_enough_to_differ(double duration, int steps, string expected) =>
+        Assert.Equal(expected, string.Join("|", WaveformView.RulerLabels(duration, steps)));
+
     // Muted text is a colour, not an opacity; inside a selected row of a focused list it reads in CmSelectionText.
     [Fact]
     public void Muted_text_uses_its_token_and_the_selection_text_in_a_selected_row() => OnUiThread(() =>

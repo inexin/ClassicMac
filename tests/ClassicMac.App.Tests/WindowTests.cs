@@ -179,6 +179,9 @@ public class WindowTests
             model.Selected = types.Single(t => t.Type.ToString() == "TEXT").Children[0];
             Pump(model.PreviewTask);
             Capture(window, "text", baselines);
+            // The text keeps clear of the overlay scroll bar on the right.
+            var styledScroller = window.FindControl<ScrollViewer>("StyledTextScroller")!;
+            Assert.True(styledScroller.Padding.Right >= 24);
 
             model.SelectedTab = 2;
             Dispatcher.UIThread.RunJobs();

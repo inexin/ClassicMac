@@ -222,6 +222,7 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal(["Path", "Read as", "Holds"], details.Groups[0].Rows.Select(r => r.Label));
         Assert.Equal("host file", Value(details.Groups[0], "Read as"));
         Assert.Equal("HFS volume", Value(details.Groups[0], "Holds"));
+        Assert.Equal(["Input", "How it was read"], details.Groups.Select(g => g.Title));   // a host file has no Mac dates: no Dates card
 
         var type = realmz.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ICN#");
         model.Selected = type.Children[0];
