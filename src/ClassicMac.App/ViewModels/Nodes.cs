@@ -163,6 +163,7 @@ namespace ClassicMac.App.ViewModels
             Node = await Task.Run(() => ContainerUnwrapper.Default.Expand(node, new ContainerContext(options, diagnostics, siblings: siblings), levels: 1));
             Children.Clear();
             Tree.AddContents(this, Node.Children);
+            OnRead();
             foreach (var d in diagnostics) Input.Report(new DiagnosticEntry(d, Tree.SourceOf(this, d), this));
         }
     }

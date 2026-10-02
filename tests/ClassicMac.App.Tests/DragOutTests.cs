@@ -45,6 +45,23 @@ public sealed class DragOutTests : IDisposable
         return (model, node, fork);
     }
 
+    // While the temporary file is written the status bar says so (boards/browse-tree.md, drag source), then goes back.
+    [Fact]
+    public async Task The_status_says_what_is_written_for_the_drag()
+    {
+        var (model, file, _) = await Open();
+        model.Status = "Before";
+        var statuses = new List<string?>();
+        model.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(MainViewModel.Status)) statuses.Add(model.Status); };
+
+        await model.PrepareDragOutAsync(file);
+        model.DragOutAsMacBinary = true;
+        await model.PrepareDragOutAsync(file);
+        await model.PrepareDragOutAsync(file.Children.OfType<ResourceTypeNode>().Single().Children[0]);
+
+        Assert.Equal(["Writing AppleDouble…", "Before", "Writing MacBinary…", "Before", "Writing 128…", "Before"], statuses);
+    }
+
     [Fact]
     public async Task A_file_drags_out_as_its_data_fork_and_an_AppleDouble_header()
     {

@@ -16,6 +16,14 @@
   collapsed, and a click on a header opens or closes it; "By file" off gives the flat list (D2).
 - Viewer: Ctrl+Shift+D or the header's chevron collapses the diagnostics panel to its header, which then shows the
   error and warning numbers and the latest problem; the splitter's height comes back when it opens (D3).
+- Viewer: the tree's rows are 22 high with 16-pixel pixel icons drawn 1:1 at any display scaling (hard disk, floppy,
+  parcel, folder, application, document, resource type, resource); icon resources show their own small icon and files
+  their Finder icon (custom icon, the application's bundle, the generic icon), resolved in the background only for rows
+  that come on screen and cached per volume; folders keep the folder icon. Each row shows its meta on the right in mono:
+  type · creator for files, the size for resources, format and size for the opened file.
+- Viewer: tree row states: the unsaved " •" in the accent colour, the loading placeholder as a spinner and "Loading…",
+  a "not read" chip on containers not read yet, a dashed outline on the row being dragged out while the status bar says
+  what is written; in the selected row of the focused tree the meta and the mark read in the selection's text colour.
 - Editor: unapplied edits (a form whose values differ from the resource's, or bytes changed in the hex view) are no
   longer applied or lost silently: selecting another node (in the tree, from a diagnostic, by opening a file), undo,
   redo, the Resource commands, closing a file and quitting first ask "Apply your changes to 'STR#' 128?" with Apply

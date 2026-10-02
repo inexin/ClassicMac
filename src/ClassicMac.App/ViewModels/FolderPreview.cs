@@ -59,6 +59,31 @@ namespace ClassicMac.App.ViewModels
             return new PreviewImage(PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height, caption);
         }
 
+        /// <summary>
+        /// A file's Finder icon at 16 × 16 for its tree row (design/boards/browse-tree.md, T4), as PNG: the same
+        /// resolution as the folder preview's (custom icon, the application's bundle, the generic icon), cached per
+        /// volume; null when nothing was found (the row keeps its kind icon).
+        /// </summary>
+        public static byte[]? TreeIcon(FileNode node) =>
+            Holder(node) is { } holder ? Volumes.GetValue(holder, h => new Volume(h, node.Input.Options)).TreeIcon(node.File) : null;
+
+        /// <summary>How many file icons the volume holding <paramref name="node"/> has resolved for the tree.</summary>
+        public static int ResolvedTreeIcons(NodeViewModel node) =>
+            Holder(node) is { } holder && Volumes.TryGetValue(holder, out var volume) ? volume.ResolvedTreeIcons : 0;
+
+        // The container whose contents hold a file node: its input's or its container file's.
+        private static ContainerNode? Holder(NodeViewModel node)
+        {
+            var at = node.Parent;
+            while (at is not null and not InputNode and not ContainerFileNode) at = at.Parent;
+            return at switch
+            {
+                InputNode input => input.Root,
+                ContainerFileNode container => container.Node,
+                _ => null,
+            };
+        }
+
         // The container holding the node's files, and the node's folder path in it.
         private static (ContainerNode Holder, IReadOnlyList<string> Path)? Locate(NodeViewModel node)
         {
@@ -131,6 +156,38 @@ namespace ClassicMac.App.ViewModels
             // The window of the folder at `path`: its record's rectangle, scroll and view, and its items.
             public (FinderWindow Window, FinderIconResolver Resolver) Window(IReadOnlyList<string> path, DialogSources sources)
             {
+                lock (systemForks) return WindowLocked(path, sources);
+            }
+
+            private readonly Dictionary<MacFile, byte[]?> treeIcons = new(ReferenceEqualityComparer.Instance);
+
+            public int ResolvedTreeIcons { get; private set; }
+
+            // A file's icon for the tree, once per file; with the resolver the folder preview last made, or one with
+            // the volume's own System files.
+            public byte[]? TreeIcon(MacFile file)
+            {
+                lock (systemForks)
+                {
+                    if (treeIcons.TryGetValue(file, out var cached)) return cached;
+                    ResolvedTreeIcons++;
+                    var suite = FileIcon(resolver ?? Resolver(DialogSources.None), file, () => Fork(file)).Suite;
+                    return treeIcons[file] = suite is null ? null : NodeViewModel.Plot16(suite);
+                }
+            }
+
+            // A file's icon as the Finder finds it.
+            private static FinderIcon FileIcon(FinderIconResolver resolver, MacFile file, Func<ResourceFork?> fork)
+            {
+                var finder = file.FinderInfo;
+                var kind = ApplicationTypes.Contains(finder.Type.ToString()) ? FinderItemKind.Application : FinderItemKind.Document;
+                // The extended Finder flags: FXInfo +8, a word over fdScript and fdXFlags (Finder.h, ExtendedFileInfo).
+                var extended = finder.Extended.Span is { Length: >= 10 } x ? (ushort)((x[8] << 8) | x[9]) : (ushort)0;
+                return resolver.Find(kind, finder.Type, finder.Creator, (ushort)finder.Flags, fork, extended, file.IsLocked);
+            }
+
+            private (FinderWindow Window, FinderIconResolver Resolver) WindowLocked(IReadOnlyList<string> path, DialogSources sources)
+            {
                 var key = Key(path);
                 var resolver = Resolver(sources);
                 var items = new List<FinderWindowItem>();
@@ -154,9 +211,7 @@ namespace ClassicMac.App.ViewModels
                 {
                     var finder = file.FinderInfo;
                     var kind = ApplicationTypes.Contains(finder.Type.ToString()) ? FinderItemKind.Application : FinderItemKind.Document;
-                    // The extended Finder flags: FXInfo +8, a word over fdScript and fdXFlags (Finder.h, ExtendedFileInfo).
-                    var extended = finder.Extended.Span is { Length: >= 10 } x ? (ushort)((x[8] << 8) | x[9]) : (ushort)0;
-                    var icon = resolver.Find(kind, finder.Type, finder.Creator, (ushort)finder.Flags, () => Fork(file), extended, file.IsLocked);
+                    var icon = FileIcon(resolver, file, () => Fork(file));
                     items.Add(new FinderWindowItem(file.Name, finder.Location, (ushort)finder.Flags, icon.Suite, kind) { Badges = icon.Badges });
                 }
                 var self = folders.GetValueOrDefault(key);

@@ -91,6 +91,7 @@ namespace ClassicMac.App.Views
                 return;
             }
             draggingOut = true;
+            node!.IsDragSource = true; // outlined while its files are written and dragged
             try
             {
                 var paths = await model.PrepareDragOutAsync(node!);
@@ -105,6 +106,7 @@ namespace ClassicMac.App.Views
             {
                 dragPress = null;
                 draggingOut = false;
+                node.IsDragSource = false;
             }
         }
 

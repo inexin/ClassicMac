@@ -154,16 +154,33 @@
 
     <Grid x:Name="Body" RowDefinitions="*,6,196">
       <Grid ColumnDefinitions="380,5,*">
-        <TreeView x:Name="Tree" Classes="sidebar" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
+        <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=TwoWay}">
           <TreeView.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
           </TreeView.KeyBindings>
           <TreeView.ItemTemplate>
             <TreeDataTemplate DataType="vm:NodeViewModel" ItemsSource="{Binding Children}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <PathIcon Width="14" Height="14" Data="{Binding Kind, Converter={x:Static views:NodeIcons.Converter}}" />
-                <TextBlock Text="{Binding Title}" />
-              </StackPanel>
+              <!-- A row (boards/browse-tree.md): icon or spinner, name, unsaved mark, "not read" chip; meta on the right. -->
+              <Panel Classes="tree-row">
+                <Rectangle Classes="drag-outline" IsVisible="{Binding IsDragSource}" />
+                <DockPanel>
+                  <TextBlock DockPanel.Dock="Right" Classes="meta" Text="{Binding Meta}"
+                             IsVisible="{Binding Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <views:TreeIcon Node="{Binding}" IsVisible="{Binding !IsLoading}" />
+                    <Panel Classes="spinner" IsVisible="{Binding IsLoading}">
+                      <Ellipse Classes="track" />
+                      <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
+                    </Panel>
+                    <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Text="{Binding Name}" />
+                    <TextBlock Classes="unsaved" Text=" •" IsVisible="{Binding IsUnsaved}" />
+                    <Panel Classes="not-read" IsVisible="{Binding IsUnread}">
+                      <Rectangle />
+                      <TextBlock Text="not read" />
+                    </Panel>
+                  </StackPanel>
+                </DockPanel>
+              </Panel>
             </TreeDataTemplate>
           </TreeView.ItemTemplate>
           <TreeView.ContextMenu>
@@ -722,7 +739,7 @@
               <Border Classes="sidebar diagnostic-group">
                 <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                   <PathIcon Classes="chevron" Classes.collapsed="{Binding !IsExpanded}" Width="10" Height="10" Data="M2,4 L5,7 L8,4" />
-                  <PathIcon Width="14" Height="14" Data="{Binding Kind, Converter={x:Static views:NodeIcons.Converter}}" />
+                  <Image Width="16" Height="16" RenderOptions.BitmapInterpolationMode="None" Source="{Binding Kind, Converter={x:Static views:TreeIcons.KindConverter}}" />
                   <TextBlock Text="{Binding Path}" FontWeight="{DynamicResource CmFontWeightStrong}" />
                   <TextBlock Text="{Binding Counts}" Classes="muted" />
                 </StackPanel>

@@ -54,6 +54,10 @@ namespace ClassicMac.App.ViewModels
             if (!CanDragOut(node)) return [];
             var folder = Path.Combine(DragFolder, Guid.NewGuid().ToString("N"));
             var diagnostics = new List<Diagnostic>();
+            // The status bar says what is written while the drag waits for it (boards/browse-tree.md, drag source).
+            var before = Status;
+            Status = node is ResourceNode ? $"Writing {node.BaseTitle}…"
+                : DragOutFormat == DragOutFormat.MacBinary ? "Writing MacBinary…" : "Writing AppleDouble…";
             try
             {
                 Directory.CreateDirectory(folder);
@@ -65,6 +69,7 @@ namespace ClassicMac.App.ViewModels
                     _ => [],
                 };
                 foreach (var d in diagnostics) Report(new DiagnosticEntry(d, node.Source, node));
+                Status = before;
                 return paths;
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)

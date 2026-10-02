@@ -242,8 +242,102 @@
   <Style Selector="TreeView:not(:focus-within) TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
     <Setter Property="Foreground" Value="{DynamicResource CmText}" />
   </Style>
-  <!-- No ".muted inside a selected tree row" rule yet: a descendant selector from TreeViewItem:selected would also reach
-       the rows nested under it. The tree's meta text (T5) needs its own rule on the row's template. -->
+  <!-- The browse tree's rows (boards/browse-tree.md): CmRowTree high, CmTreeIndent per level, the row's content stretched
+       so its meta sits on the right. -->
+  <Style Selector="TreeView.browse">
+    <Style.Resources>
+      <StaticResource x:Key="TreeViewItemMinHeight" ResourceKey="CmRowTree" />
+      <StaticResource x:Key="TreeViewItemIndent" ResourceKey="CmTreeIndent" />
+    </Style.Resources>
+  </Style>
+  <Style Selector="TreeView.browse TreeViewItem">
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
+  </Style>
+  <Style Selector="TreeView.browse TreeViewItem /template/ ContentPresenter#PART_HeaderPresenter">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="TreeView.browse :is(TextBlock).name.type">
+    <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
+    <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TreeView.browse :is(TextBlock).name.loading">
+    <Setter Property="FontStyle" Value="Italic" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+  </Style>
+  <Style Selector="TreeView.browse :is(TextBlock).meta">
+    <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="12,0,4,0" />
+  </Style>
+  <Style Selector="TreeView.browse :is(TextBlock).unsaved">
+    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
+    <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
+  </Style>
+  <!-- Inside the selected row of the focused tree, the meta and the unsaved mark read in CmSelectionText (muted text fails
+       contrast on the dark selection). The child combinator stops at the row's own header: the header's content is the
+       item's logical child, as are the rows nested under it, which are TreeViewItems, not .tree-row panels. -->
+  <Style Selector="TreeView.browse:focus-within TreeViewItem:selected > Panel.tree-row :is(TextBlock).meta">
+    <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
+  </Style>
+  <Style Selector="TreeView.browse:focus-within TreeViewItem:selected > Panel.tree-row :is(TextBlock).unsaved">
+    <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
+  </Style>
+  <!-- An unread container's chip: 11, muted, a dashed 1 px border with radius 4. -->
+  <Style Selector="TreeView.browse Panel.not-read">
+    <Setter Property="Margin" Value="6,0,0,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TreeView.browse Panel.not-read > Rectangle">
+    <Setter Property="Stroke" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="StrokeThickness" Value="1" />
+    <Setter Property="StrokeDashArray" Value="2,2" />
+    <Setter Property="RadiusX" Value="4" />
+    <Setter Property="RadiusY" Value="4" />
+  </Style>
+  <Style Selector="TreeView.browse Panel.not-read > TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="Margin" Value="5,0,5,1" />
+  </Style>
+  <!-- The row being dragged out: a dashed CmAccent outline. -->
+  <Style Selector="TreeView.browse Rectangle.drag-outline">
+    <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
+    <Setter Property="StrokeThickness" Value="1" />
+    <Setter Property="StrokeDashArray" Value="3,2" />
+    <Setter Property="RadiusX" Value="4" />
+    <Setter Property="RadiusY" Value="4" />
+    <Setter Property="Margin" Value="-4,0" />
+  </Style>
+  <!-- The loading placeholder's 16 px spinner: a CmBorder ring and a turning CmAccent arc. -->
+  <Style Selector="TreeView.browse Panel.spinner">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="RenderTransform" Value="rotate(0deg)" />
+    <Style.Animations>
+      <Animation Duration="0:0:1" IterationCount="Infinite">
+        <KeyFrame Cue="0%">
+          <Setter Property="RotateTransform.Angle" Value="0" />
+        </KeyFrame>
+        <KeyFrame Cue="100%">
+          <Setter Property="RotateTransform.Angle" Value="360" />
+        </KeyFrame>
+      </Animation>
+    </Style.Animations>
+  </Style>
+  <Style Selector="TreeView.browse Panel.spinner > Ellipse.track">
+    <Setter Property="Stroke" Value="{DynamicResource CmBorder}" />
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="Margin" Value="1" />
+  </Style>
+  <Style Selector="TreeView.browse Panel.spinner > Path.arc">
+    <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+  </Style>
 
   <!-- Segmented control: a ListBox whose items sit side by side on CmSegmentTrack, the chosen one on CmSegmentOn. -->
   <Style Selector="ListBox.segmented">
