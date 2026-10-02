@@ -5,9 +5,11 @@ using ClassicMac.Resources;
 namespace ClassicMac.Code.Tests.Disassembly;
 
 // A linear sweep over real 68k code (CLASSICMAC_CODE_CORPUS) decodes without an exception, every instruction inside
-// the segment. The counts were measured by this disassembler [Verified: the samples named in each test]; the jsr
-// n(A5) count of ResEdit's CODE 1 matches an independent listing, and decoding at every address of Ghidra listings of
-// Realmz CODE 1 (121 337 instructions) and Disk Copy's CODE resources (69 737) gave the same lengths throughout.
+// the segment and the lengths adding up to it (invariants that a wrong length would break). The counts were measured
+// by this disassembler and are regression pins, not independent checks; only the jsr n(A5) count of ResEdit's CODE 1
+// matches an independent listing. Outside the repository, decoding at every address of independent listings of
+// Realmz CODE 1 and Disk Copy's CODE resources gave the same lengths; the listings are not committed, so no test
+// repeats that.
 public class M68kCorpusTests
 {
     private static readonly FourCC Code = FourCC.FromString("CODE");
@@ -47,8 +49,9 @@ public class M68kCorpusTests
     {
         var fork = ResourceFork.Read(CodeCorpus.Require("Realmz 7.1.2", 576955));
         var sweep = Disassemble(CodeResource(fork, 1), 4);
-        // 889 dc.w in 128 106 (0.69 %): data between functions (jump tables, strings, MacsBug names).
-        Assert.Equal(new Sweep(128106, 889, 485272, 0), sweep);
+        // 897 dc.w in 128 119 (0.70 %): data between functions (jump tables, strings, MacsBug names). No jsr n(A5):
+        // this CodeWarrior CODE 1 calls through relocated jsr (xxx).l (373) and jsr d(pc) (224).
+        Assert.Equal(new Sweep(128119, 897, 485272, 0), sweep);
     }
 
     [Fact]
@@ -76,7 +79,7 @@ public class M68kCorpusTests
             instructions += sweep.Instructions;
             invalid += sweep.Invalid;
         }
-        // 29 far segments (CODE 30 is the near-model entry); 794 dc.w in 72 675 (1.09 %).
-        Assert.Equal((29, 72675, 794), (segments, instructions, invalid));
+        // 29 far segments (CODE 30 is the near-model entry); 821 dc.w in 72 706 (1.13 %).
+        Assert.Equal((29, 72706, 821), (segments, instructions, invalid));
     }
 }

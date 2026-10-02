@@ -51,6 +51,9 @@ An instruction or data line is:
 | Text | The instruction in Motorola syntax (68k) or IBM syntax (PowerPC), lowercase, hex immediates as `$` (68k) or `0x` (PowerPC) |
 | `  ; ` and notes | The notes, separated by `; `: the decoder's operand comment, then the annotations (§1.3) |
 
+In the 68k text, an empty register list (a mask of 0) is written `#0` (`movem.l #0,-(sp)`), and the immediate of an
+`fmovem.l` of two or three control registers as one `#n` per register (`fmovem.l #0,#1,fpcr/fpsr`) [ClassicMac].
+
 A 68k data line holds up to 8 bytes as `dc.w $xxxx,$xxxx…` (a byte at an odd offset, or a last odd byte, as
 `dc.b $xx`), with what the data is (§1.4) on the run's first line and an ASCII preview (`'Main'`, `.` for bytes outside
 `$20`–`$7E`) on every line. A PowerPC data line is `dc.l $xxxxxxxx,…`. An embedded fragment is one line,
@@ -238,6 +241,40 @@ make `jsr`/`jmp (xxx).l` a call into the segment.
    TOC base + N. A slot no import fills is written `?slot s:0xoff`.
 5. A `lwz` from `d(r2)` is annotated with what the slot at TOC base + d holds.
 
+### 2.7 68k instructions
+
+`M68kDisassembler` decodes the 68000 to 68040 integer instructions, the 68881/68882 FPU (coprocessor 1) and the
+68030 MMU and 68851 PMMU (coprocessor 0) [Doc: M68000 Family Programmer's Reference Manual; MC68881/MC68882 User's
+Manual; MC68030 User's Manual; MC68851 PMMU User's Manual; MC68040 User's Manual]. A word is `dc.w` when it is no
+instruction on those processors, when the instruction does not allow its addressing mode, or when a bit is set that
+the instruction's format draws as 0:
+
+- bit 15 of a bit-field extension word; bits 14–12 of `bftst`, `bfchg`, `bfclr` and `bfset`; bits 10–9 when Do is
+  set and bits 4–3 when Dw is set;
+- bit 3 of a full extension word;
+- the reserved bits of `cas`, `cas2`, `chk2`/`cmp2`, `moves` and the PMMU extension words;
+- the high byte of the byte immediate of `ori`/`andi`/`eori` to CCR, of a static bit number and of `callm`'s argument
+  count.
+
+An ordinary byte immediate (`<ea>` mode 7, register 4, byte size: `ori.b`, `move.b`, `cmp.b`, `fmove.b`, `pmove` of a
+byte register …) is the low byte of its word; the high byte is ignored, as the processor ignores it [Doc: M68000
+Family Programmer's Reference Manual, "Immediate Data"]. Reserved bits 9–3 of a 32-bit multiply or divide extension
+word are ignored too [Reference: Ghidra].
+
+The 68060's own forms (`plpa`, `lpstop`, `movec` of BUSCR and PCR) and the CPU32's (`tbl`, `bgnd`) are `dc.w`: no
+Macintosh has those processors [ClassicMac].
+
+A PC-relative operand's base is the address of its own extension word, after any words before it in the instruction
+(a bit number, an immediate, a register mask, a bit-field or coprocessor command word): `btst #3,16(pc)` at $1000 reads
+$1014, `movem.w 16(pc,d0.w),d0-d1` reads $1014 + d0 [Doc: M68000 Family Programmer's Reference Manual, "Program
+Counter Indirect"; Verified: an independent disassembler]. `fdbcc` and `pdbcc` branch from their displacement
+word (§7).
+
+`fmovem.l` of two or three FPU control registers takes every memory mode from memory and the memory alterable modes
+to it (a data or address register only for one register). Its immediate holds one long per register, in the order
+FPCR, FPSR, FPIAR, so the instruction is 4 + 4n bytes [Doc: MC68881/MC68882 User's Manual, FMOVEM]; some
+assemblers and disassemblers read one long.
+
 ## 3. Writing
 
 ### 3.1 Files
@@ -333,7 +370,10 @@ documents). These are its own and the decoders':
 - `tests/ClassicMac.Code.Tests/Disassembly/CodeListingTests.cs`: golden listings of hand-built near and far segments,
   each code-resource form, `'CODE'` 0, fragments with glue and TOC slots, a fat resource, a CFM-68K fragment, the
   bootstrap entry, Retro68 and CodeWarrior models.
-- `M68kDisassemblerTests`, `PpcDisassemblerTests`, `PpcDisassemblerFormTests`: the instruction vectors.
+- `M68kDisassemblerTests`, `M68kMmuTests`, `PpcDisassemblerTests`, `PpcDisassemblerFormTests`: the instruction
+  vectors; for the 68k, every opcode line, every `movec` register, FPU register fields other than FP0, PC-relative
+  bases after extension words, the reserved bits and byte immediates of §2.7, empty register lists and `fmovem.l` of
+  the control registers. Each valid 68k vector decodes the same way in at least one independent disassembler.
 - `M68kCodeMapTests`, `M68kAnnotatorTests`, `MacsBugNamesTests`, `PpcFragmentMapTests`, `TrapTableTests`: §2.
 - `tests/ClassicMac.Resources.Decoders.Tests/CodeDecoderTests.cs`: each decoder's files and model, the application
   rebuilt from the fork, and each diagnostic; `CodeExportTests.cs`: `disasm`'s files, the CPU choice, every fragment
@@ -362,6 +402,7 @@ documents). These are its own and the decoders':
   named.
 - Selectors set further back than three instructions, or through registers, are not named.
 - No re-assembly: the listing is for reading; `pack` takes the `.bin`.
+- The 68060's and the CPU32's own instructions are `dc.w` (§2.7).
 
 ## 9. References
 
@@ -373,3 +414,6 @@ documents). These are its own and the decoders':
 5. *MacsBug Reference and Debugging Guide*, Apple: procedure names.
 6. Multiversal Interfaces (Executor), MIT: trap, selector and low-memory names.
 7. resource_dasm (Martin Michelsen), MIT: the 68k and PowerPC disassemblers ClassicMac's are ported from.
+8. *MC68881/MC68882 Floating-Point Coprocessor User's Manual*, *MC68030 User's Manual*, *MC68040 User's Manual*,
+   *MC68851 Paged Memory Management Unit User's Manual*, Motorola.
+9. Ghidra (NSA), Apache 2.0: a behavioural reference for the 68k decoder (the reserved bits of a 32-bit divide).

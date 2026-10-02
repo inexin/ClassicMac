@@ -354,64 +354,208 @@ public class M68kDisassemblerTests
     [InlineData("F27A 0001 0005", "ftrapeq.w #5")]
     [InlineData("F327", "fsave -(sp)")]
     [InlineData("F35F", "frestore (sp)+")]
+    // 68020 additions and more forms of each line [Verified: Ghidra and objdump decode each the same way]
+    [InlineData("0CD0 0081", "cas.w d1,d2,(a0)")]
+    [InlineData("0ED0 0081", "cas.l d1,d2,(a0)")]
+    [InlineData("0EF9 0081 0000 1000", "cas.l d1,d2,($00001000).l")]
+    [InlineData("0CFC 8080 90C1", "cas2.w d0:d1,d2:d3,(a0):(a1)")]
+    [InlineData("0EFC 0080 10C1", "cas2.l d0:d1,d2:d3,(d0):(d1)")]
+    [InlineData("00D0 1800", "chk2.b (a0),d1")]
+    [InlineData("02D0 9800", "chk2.w (a0),a1")]
+    [InlineData("04D0 1000", "cmp2.l (a0),d1")]
+    [InlineData("8348 0000", "pack -(a0),-(a1),#0")]
+    [InlineData("8380 FFFF", "unpk d0,d1,#-1")]
+    [InlineData("0E10 1000", "moves.b (a0),d1")]
+    [InlineData("0E91 8800", "moves.l a0,(a1)")]
+    [InlineData("06FA 0002 0010", "callm #2,16(pc)  ; $1014")]
+    [InlineData("480E 0000 0010", "link.l a6,#16")]
+    [InlineData("484F", "bkpt #7")]
+    [InlineData("4E40", "trap #0")]
+    [InlineData("4E74 FFFC", "rtd #-4")]
+    [InlineData("41BC 0010", "chk.w #16,d0")]
+    [InlineData("4A48", "tst.w a0")]
+    [InlineData("4A3C 0001", "tst.b #1")]
+    [InlineData("50FC", "trapt")]
+    [InlineData("51FA 1234", "trapf.w #$1234")]
+    [InlineData("50C8 FFFE", "dbt d0,$1000")]
+    [InlineData("61FF 0000 0010", "bsr.l $1012")]
+    [InlineData("80FC 000A", "divu.w #10,d0")]
+    [InlineData("4C00 0C01", "muls.l d0,d1:d0")]
+    [InlineData("4C10 2000", "mulu.l (a0),d2")]
+    [InlineData("4C7C 0800 0000 0002", "divs.l #2,d0")]
+    [InlineData("4C40 0C01", "divs.l d0,d1:d0")]
+    [InlineData("49C0", "extb.l d0")]
+    [InlineData("5000", "addq.b #8,d0")]
+    [InlineData("5388", "subq.l #1,a0")]
+    [InlineData("D308", "addx.b -(a0),-(a1)")]
+    [InlineData("4010", "negx.b (a0)")]
+    [InlineData("E3A8", "lsl.l d1,d0")]
+    [InlineData("E107", "asl.b #8,d7")]
+    [InlineData("E573", "roxl.w d2,d3")]
+    [InlineData("E69C", "ror.l #3,d4")]
+    [InlineData("E1F9 0001 0000", "asl.w ($00010000).l")]
+    [InlineData("E0F8 1234", "asr.w ($1234).w")]
+    [InlineData("4C98 0103", "movem.w (a0)+,d0-d1/a0")]
+    [InlineData("48E7 8080", "movem.l d0/a0,-(sp)")]
+    [InlineData("48E7 FFFE", "movem.l d0-d7/a0-a6,-(sp)")]
+    [InlineData("48A8 0003 0010", "movem.w d0-d1,16(a0)")]
+    [InlineData("4C9F 4000", "movem.w (sp)+,a6")]
+    [InlineData("41F8 0904", "lea ($0904).w,a0")]
+    [InlineData("487B 0000", "pea 0(pc,d0.w)")]
+    [InlineData("57D0", "seq (a0)")]
+    [InlineData("4AD0", "tas (a0)")]
+    [InlineData("4820", "nbcd -(a0)")]
+    [InlineData("42D0", "move.w ccr,(a0)")]
+    [InlineData("007C 0700", "ori.w #$0700,sr")]
+    [InlineData("0A7C 2000", "eori.w #$2000,sr")]
+    [InlineData("023C 00FE", "andi.b #$FE,ccr")]
+    [InlineData("0618 0001", "addi.b #1,(a0)+")]
+    [InlineData("0C00 0080", "cmpi.b #-128,d0")]
+    [InlineData("0C40 8000", "cmpi.w #$8000,d0")]
+    [InlineData("0C80 FFFF F000", "cmpi.l #-4096,d0")]
+    [InlineData("907C 0010", "sub.w #16,d0")]
+    [InlineData("D1FC 0001 0000", "adda.l #$00010000,a0")]
+    [InlineData("B0FC 0010", "cmpa.w #16,a0")]
+    [InlineData("B101", "eor.b d0,d1")]
+    [InlineData("8110", "or.b d0,(a0)")]
+    [InlineData("C07C 00FF", "and.w #255,d0")]   // and/or with <ea>,Dn keep decimal: only the *i forms are hex
+    [InlineData("C188", "exg d0,a0")]
+    [InlineData("0100", "btst d0,d0")]
+    [InlineData("EFC0 1108", "bfins d1,d0{4:8}")]
+    [InlineData("E9C0 18A3", "bfextu d0{d2:d3},d1")]
+    [InlineData("EDC0 37C1", "bfffo d0{31:1},d3")]
+    [InlineData("EFE8 2863 0010", "bfins d2,16(a0){d1:d3}")]
+    // movec: each control register of the 68010, 68020, 68030 and 68040
+    [InlineData("4E7A 0000", "movec sfc,d0")]
+    [InlineData("4E7A 0001", "movec dfc,d0")]
+    [InlineData("4E7A 0003", "movec tc,d0")]
+    [InlineData("4E7A 0004", "movec itt0,d0")]
+    [InlineData("4E7A 0005", "movec itt1,d0")]
+    [InlineData("4E7A 0006", "movec dtt0,d0")]
+    [InlineData("4E7A 0007", "movec dtt1,d0")]
+    [InlineData("4E7A 0800", "movec usp,d0")]
+    [InlineData("4E7A 0801", "movec vbr,d0")]
+    [InlineData("4E7A 0802", "movec caar,d0")]
+    [InlineData("4E7A 0803", "movec msp,d0")]
+    [InlineData("4E7A 0804", "movec isp,d0")]
+    [InlineData("4E7A 0805", "movec mmusr,d0")]
+    [InlineData("4E7A 0806", "movec urp,d0")]
+    [InlineData("4E7B 0807", "movec d0,srp")]
+    [InlineData("4E7A 9801", "movec vbr,a1")]
+    [InlineData("4E7B 0003", "movec d0,tc")]
+    // FPU: registers other than fp0 in bits 9-7 (the destination, or the source of fmove FPn,<ea>) and 12-10
+    [InlineData("F200 0080", "fmove.x fp0,fp1")]
+    [InlineData("F200 5080", "fmove.w d0,fp1")]
+    [InlineData("F203 6500", "fmove.s fp2,d3")]
+    [InlineData("F210 5531", "fsincos.d (a0),fp1:fp2")]
+    [InlineData("F200 4431", "fsincos.s d0,fp1:fp0")]
+    [InlineData("F200 5C80", "fmovecr #$00,fp1")]
+    [InlineData("F200 1E80", "fmove.x fp7,fp5")]
+    [InlineData("F210 7B80", "fmove.b fp7,(a0)")]
+    [InlineData("F212 4D00", "fmove.p (a2),fp2")]
+    [InlineData("F210 6EC0", "fmove.p fp5,(a0){#-64}")]
+    [InlineData("F210 7FF0", "fmove.p fp7,(a0){d7}")]
+    [InlineData("F205 5B22", "fadd.b d5,fp6")]
+    [InlineData("F200 1E38", "fcmp.x fp7,fp4")]
+    [InlineData("F200 1C3A", "ftst.x fp7")]
+    [InlineData("F200 5F80", "fmovecr #$00,fp7")]
+    // FPU: the other formats and forms
+    [InlineData("F210 7800", "fmove.b fp0,(a0)")]
+    [InlineData("F210 7000", "fmove.w fp0,(a0)")]
+    [InlineData("F210 7400", "fmove.d fp0,(a0)")]
+    [InlineData("F210 4800", "fmove.x (a0),fp0")]
+    [InlineData("F210 4C00", "fmove.p (a0),fp0")]
+    [InlineData("F210 6C40", "fmove.p fp0,(a0){#-64}")]
+    [InlineData("F200 4400", "fmove.s d0,fp0")]
+    [InlineData("F200 403A", "ftst.l d0")]
+    [InlineData("F210 483A", "ftst.x (a0)")]
+    [InlineData("F23C 4038 0000 0005", "fcmp.l #5,fp0")]
+    [InlineData("F201 4418", "fabs.s d1,fp0")]
+    [InlineData("F210 4822", "fadd.x (a0),fp0")]
+    [InlineData("F218 D810", "fmovem.x (a0)+,d1")]
+    [InlineData("F210 F0FF", "fmovem.x fp0-fp7,(a0)")]
+    [InlineData("F210 F001", "fmovem.x fp7,(a0)")]       // control mode: FP0 is bit 7
+    [InlineData("F227 E001", "fmovem.x fp0,-(sp)")]      // predecrement: FP0 is bit 0
+    [InlineData("F23C 9000 0000 0000", "fmove.l #0,fpcr")]
+    [InlineData("F23C 8400 0000 1234", "fmove.l #$00001234,fpiar")]
+    [InlineData("F208 A400", "fmove.l fpiar,a0")]
+    [InlineData("F281 0000", "fbeq.w $1002")]
+    [InlineData("F2C1 0000 0010", "fbeq.l $1012")]
+    [InlineData("F29F 0010", "fbst.w $1012")]
+    [InlineData("F240 001F", "fsst d0")]
+    [InlineData("F250 0001", "fseq (a0)")]
+    [InlineData("F278 0001 1234", "fseq ($1234).w")]
+    [InlineData("F27B 0001 0000 0005", "ftrapeq.l #5")]
+    [InlineData("F310", "fsave (a0)")]
+    [InlineData("F350", "frestore (a0)")]
+    [InlineData("F448", "cinvl dc,(a0)")]
+    [InlineData("F4B0", "cpushp ic,(a0)")]
     public void Opcode_lines(string hex, string expected) => Text(hex, expected);
 
+    // Each opmode with FP2 as the source (bits 12-10) and FP5 as the destination (bits 9-7), so a swapped or ignored
+    // register field shows.
     [Theory]
-    [InlineData("F200 0001", "fint")]
-    [InlineData("F200 0002", "fsinh")]
-    [InlineData("F200 0003", "fintrz")]
-    [InlineData("F200 0004", "fsqrt")]
-    [InlineData("F200 0006", "flognp1")]
-    [InlineData("F200 0008", "fetoxm1")]
-    [InlineData("F200 0009", "ftanh")]
-    [InlineData("F200 000A", "fatan")]
-    [InlineData("F200 000C", "fasin")]
-    [InlineData("F200 000D", "fatanh")]
-    [InlineData("F200 000E", "fsin")]
-    [InlineData("F200 000F", "ftan")]
-    [InlineData("F200 0010", "fetox")]
-    [InlineData("F200 0011", "ftwotox")]
-    [InlineData("F200 0012", "ftentox")]
-    [InlineData("F200 0014", "flogn")]
-    [InlineData("F200 0015", "flog10")]
-    [InlineData("F200 0016", "flog2")]
-    [InlineData("F200 0018", "fabs")]
-    [InlineData("F200 0019", "fcosh")]
-    [InlineData("F200 001A", "fneg")]
-    [InlineData("F200 001C", "facos")]
-    [InlineData("F200 001D", "fcos")]
-    [InlineData("F200 001E", "fgetexp")]
-    [InlineData("F200 001F", "fgetman")]
-    [InlineData("F200 0020", "fdiv")]
-    [InlineData("F200 0021", "fmod")]
-    [InlineData("F200 0023", "fmul")]
-    [InlineData("F200 0024", "fsgldiv")]
-    [InlineData("F200 0025", "frem")]
-    [InlineData("F200 0026", "fscale")]
-    [InlineData("F200 0027", "fsglmul")]
-    [InlineData("F200 0028", "fsub")]
-    [InlineData("F200 0040", "fsmove")]
-    [InlineData("F200 0041", "fssqrt")]
-    [InlineData("F200 0044", "fdmove")]
-    [InlineData("F200 0045", "fdsqrt")]
-    [InlineData("F200 0058", "fsabs")]
-    [InlineData("F200 005A", "fsneg")]
-    [InlineData("F200 005C", "fdabs")]
-    [InlineData("F200 005E", "fdneg")]
-    [InlineData("F200 0060", "fsdiv")]
-    [InlineData("F200 0062", "fsadd")]
-    [InlineData("F200 0063", "fsmul")]
-    [InlineData("F200 0064", "fddiv")]
-    [InlineData("F200 0066", "fdadd")]
-    [InlineData("F200 0067", "fdmul")]
-    [InlineData("F200 0068", "fssub")]
-    [InlineData("F200 006C", "fdsub")]
-    public void Fpu_general_operations(string hex, string mnemonic)
+    [InlineData(0x00, "fmove")]
+    [InlineData(0x01, "fint")]
+    [InlineData(0x02, "fsinh")]
+    [InlineData(0x03, "fintrz")]
+    [InlineData(0x04, "fsqrt")]
+    [InlineData(0x06, "flognp1")]
+    [InlineData(0x08, "fetoxm1")]
+    [InlineData(0x09, "ftanh")]
+    [InlineData(0x0A, "fatan")]
+    [InlineData(0x0C, "fasin")]
+    [InlineData(0x0D, "fatanh")]
+    [InlineData(0x0E, "fsin")]
+    [InlineData(0x0F, "ftan")]
+    [InlineData(0x10, "fetox")]
+    [InlineData(0x11, "ftwotox")]
+    [InlineData(0x12, "ftentox")]
+    [InlineData(0x14, "flogn")]
+    [InlineData(0x15, "flog10")]
+    [InlineData(0x16, "flog2")]
+    [InlineData(0x18, "fabs")]
+    [InlineData(0x19, "fcosh")]
+    [InlineData(0x1A, "fneg")]
+    [InlineData(0x1C, "facos")]
+    [InlineData(0x1D, "fcos")]
+    [InlineData(0x1E, "fgetexp")]
+    [InlineData(0x1F, "fgetman")]
+    [InlineData(0x20, "fdiv")]
+    [InlineData(0x21, "fmod")]
+    [InlineData(0x22, "fadd")]
+    [InlineData(0x23, "fmul")]
+    [InlineData(0x24, "fsgldiv")]
+    [InlineData(0x25, "frem")]
+    [InlineData(0x26, "fscale")]
+    [InlineData(0x27, "fsglmul")]
+    [InlineData(0x28, "fsub")]
+    [InlineData(0x40, "fsmove")]
+    [InlineData(0x41, "fssqrt")]
+    [InlineData(0x44, "fdmove")]
+    [InlineData(0x45, "fdsqrt")]
+    [InlineData(0x58, "fsabs")]
+    [InlineData(0x5A, "fsneg")]
+    [InlineData(0x5C, "fdabs")]
+    [InlineData(0x5E, "fdneg")]
+    [InlineData(0x60, "fsdiv")]
+    [InlineData(0x62, "fsadd")]
+    [InlineData(0x63, "fsmul")]
+    [InlineData(0x64, "fddiv")]
+    [InlineData(0x66, "fdadd")]
+    [InlineData(0x67, "fdmul")]
+    [InlineData(0x68, "fssub")]
+    [InlineData(0x6C, "fdsub")]
+    public void Fpu_general_operations(int opmode, string mnemonic)
     {
-        var ins = D(hex);
+        var ins = D($"F200 {0x0A80 | opmode:X4}");
         Assert.Equal((mnemonic, M68kSize.Extended), (ins.Mnemonic, ins.Size));
-        Assert.Equal($"{mnemonic}.x fp0,fp0", ins.Text);
+        Assert.Equal($"{mnemonic}.x fp2,fp5", ins.Text);
         Assert.Equal(M68kFlags.FLine, ins.Flags);
+        Assert.Equal(4, ins.Length);
+        Assert.Equal(
+            [new M68kRegisterOperand(M68kRegisterKind.FloatingPoint, 2), new M68kRegisterOperand(M68kRegisterKind.FloatingPoint, 5)],
+            ins.Operands);
     }
 
     // Each effective-address mode, as the source of move.w <ea>,d0.
@@ -440,7 +584,76 @@ public class M68kDisassemblerTests
     [InlineData("303B 0161 FFFE", "move.w ([-2,pc]),d0  ; $1000")]
     [InlineData("303B 0160 0010", "move.w (16,pc),d0  ; $1012")]
     [InlineData("303B 01E0 1234", "move.w ($1234,zpc),d0")]
+    [InlineData("3030 0E00", "move.w 0(a0,d0.l*8),d0")]
+    [InlineData("3030 9800", "move.w 0(a0,a1.l),d0")]
+    [InlineData("3038 FFFE", "move.w ($FFFE).w,d0")]
+    [InlineData("3039 FFFF FFFE", "move.w ($FFFFFFFE).l,d0")]
+    [InlineData("303B 10FE", "move.w -2(pc,d1.w),d0")]
+    [InlineData("3030 0990", "move.w (d0.l),d0")]                      // base suppressed, index only
+    [InlineData("3030 0130 0000 1000", "move.w (4096,a0,d0.w),d0")]    // long base displacement
+    [InlineData("303B 0170 0000 0010", "move.w (16,pc),d0  ; $1012")]
+    // Pre-indexed (I/IS 001-011) and post-indexed (101-111) [Doc: M68000 Family Programmer's Reference Manual, table
+    // 2-2; Verified: objdump]
+    [InlineData("3030 0122 0010 0004", "move.w ([16,a0,d0.w],4),d0")]
+    [InlineData("3030 0126 0010 0004", "move.w ([16,a0],d0.w,4),d0")]
+    [InlineData("3030 0163 0010 0000 0004", "move.w ([16,a0],4),d0")]  // index suppressed, long outer displacement
+    [InlineData("3030 0161 FFFE", "move.w ([-2,a0]),d0")]
+    [InlineData("3030 01D1", "move.w ([$0000]),d0")]                   // base and index suppressed, null displacement
+    [InlineData("303B 0122 0010 0004", "move.w ([16,pc,d0.w],4),d0")]  // the pointer's address depends on d0
+    [InlineData("303B 0126 0010 0004", "move.w ([16,pc],d0.w,4),d0  ; $1012")]
+    [InlineData("303B 01E1 1234", "move.w ([$1234,zpc]),d0")]
     public void Effective_address_modes(string hex, string expected) => Text(hex, expected);
+
+    // A PC-relative operand's base is the address of its own extension word, after any words the instruction has
+    // before it (a bit number, an immediate, a register mask, a bit-field or coprocessor command word) [Doc: M68000
+    // Family Programmer's Reference Manual, "Program Counter Indirect"; Verified: objdump].
+    [Theory]
+    [InlineData("083A 0003 0010", "btst #3,16(pc)  ; $1014")]
+    [InlineData("013A 0010", "btst d0,16(pc)  ; $1012")]
+    [InlineData("0C3A 0001 0010", "cmpi.b #1,16(pc)  ; $1014")]
+    [InlineData("0C7A 0001 0010", "cmpi.w #1,16(pc)  ; $1014")]
+    [InlineData("0CBA 0000 0001 0010", "cmpi.l #1,16(pc)  ; $1016")]
+    [InlineData("00FA 1000 0010", "cmp2.b 16(pc),d1  ; $1014")]
+    [InlineData("4A7A 0010", "tst.w 16(pc)  ; $1012")]
+    [InlineData("4CFA 0001 0010", "movem.l 16(pc),d0  ; $1014")]
+    [InlineData("4CBB 0003 0010", "movem.w 16(pc,d0.w),d0-d1")]
+    [InlineData("4CBB 0003 0170 0000 0010", "movem.w (16,pc),d0-d1  ; $1014")]
+    [InlineData("46FA 0010", "move.w 16(pc),sr  ; $1012")]
+    [InlineData("90FA 0010", "suba.w 16(pc),a0  ; $1012")]
+    [InlineData("EBFA 3000 0010", "bfexts 16(pc){0:32},d3  ; $1014")]
+    [InlineData("F23A 5400 0010", "fmove.d 16(pc),fp0  ; $1014")]
+    [InlineData("F37A 0010", "frestore 16(pc)  ; $1012")]
+    [InlineData("4EBA 0010", "jsr 16(pc)  ; $1012")]
+    [InlineData("4EFA 0010", "jmp 16(pc)  ; $1012")]
+    [InlineData("4EBB 0170 0000 0010", "jsr (16,pc)  ; $1012")]
+    [InlineData("4EB8 1234", "jsr ($1234).w")]
+    [InlineData("4EB0 0161 0010", "jsr ([16,a0])")]
+    public void Pc_relative_bases(string hex, string expected) => Text(hex, expected);
+
+    // (d8,PC,Xn) after a register mask: the base is the extension word at $1004, so the table is at $1014 + Xn; with
+    // the index suppressed (a full extension word) the address is fixed and shows.
+    [Fact]
+    public void Pc_indexed_base_after_extra_words()
+    {
+        var brief = (M68kEffectiveAddress)D("4CBB 0003 0010").Operands[0];
+        Assert.Equal((M68kAddressingMode.PcIndexed, 16), (brief.Mode, brief.BaseDisplacement));
+        Assert.Null(brief.Address);
+        var full = D("4CBB 0003 0170 0000 0010");
+        Assert.Equal(0x1014u, ((M68kEffectiveAddress)full.Operands[0]).Address);
+        Assert.Equal([new M68kReference(0x1014, M68kReferenceKind.Data)], full.References);
+    }
+
+    // A call or jump to a fixed address is a Call or Branch reference, not Data; the text keeps the address note.
+    [Fact]
+    public void Calls_keep_the_address_note()
+    {
+        var jsr = D("4EBA 0010");
+        Assert.Equal(("$1012", M68kFlags.Call), (jsr.Comment, jsr.Flags));
+        Assert.Equal([new M68kReference(0x1012, M68kReferenceKind.Call)], jsr.References);
+        Assert.Equal([new M68kReference(0x1012, M68kReferenceKind.Call)], D("4EBB 0170 0000 0010").References);
+        Assert.Equal([new M68kReference(0x1234, M68kReferenceKind.Call)], D("4EB8 1234").References);
+        Assert.Empty(D("4EB0 0161 0010").References);
+    }
 
     [Fact]
     public void Memory_indirect_operand_structure()
@@ -615,6 +828,30 @@ public class M68kDisassemblerTests
     [InlineData("F367")]                   // frestore -(sp)
     [InlineData("F31F")]                   // fsave (sp)+
     [InlineData("F200 6800")]              // fmove.x fp0,d0
+    [InlineData("4A08")]                   // tst.b a0
+    [InlineData("F33A 0010")]              // fsave (d16,pc): not alterable
+    [InlineData("F208 B000")]              // fmove.l fpcr,a0: only FPIAR takes an address register
+    [InlineData("F208 4022")]              // fadd.l a0,fp0
+    [InlineData("F200 5400")]              // fmove.d d0,fp0: a data register holds b, w, l or s only
+    [InlineData("F200 7C00")]              // fmove.p fp0,d0{d0}
+    [InlineData("F200 0005")]              // FPU opmode 5
+    [InlineData("F200 0039")]              // FPU opmode $39
+    [InlineData("F200 003B")]              // FPU opmode $3B
+    [InlineData("F588")]                   // the 68060's plpa
+    [InlineData("F800 01C0")]              // the 68060's lpstop
+    [InlineData("4E7A 0008")]              // movec of the 68060's BUSCR
+    [InlineData("4E7A 0808")]              // movec of the 68060's PCR
+    [InlineData("F208 9800")]              // fmovem.l of two control registers from an address register
+    [InlineData("F23A B800 0010")]         // fmovem.l of two control registers to PC space
+    [InlineData("F23C B800")]              // fmovem.l of two control registers to an immediate
+    [InlineData("F23C 9800 0000 0000")]    // fmovem.l #imm of two control registers cut short (a long each)
+    [InlineData("E8C0 1000")]              // bftst with a register in the reserved bits 14-12
+    [InlineData("EAC0 7000")]              // bfchg with a register in the reserved bits 14-12
+    [InlineData("ECC0 1000")]              // bfclr with a register in the reserved bits 14-12
+    [InlineData("EEC0 1000")]              // bfset with a register in the reserved bits 14-12
+    [InlineData("E9C0 1E08")]              // bfextu with Do set and bits 10-9 set
+    [InlineData("E9C0 1038")]              // bfextu with Dw set and bits 4-3 set
+    [InlineData("3030 0118")]              // full extension word with the reserved bit 3 set
     public void Invalid_words_are_dc_w(string hex)
     {
         var bytes = Bytes(hex);
@@ -622,9 +859,69 @@ public class M68kDisassemblerTests
         Assert.True(ins.IsInvalid, ins.Text);
         Assert.Equal(("dc", M68kSize.Word, 2), (ins.Mnemonic, ins.Size, ins.Length));
         Assert.Equal($"dc.w ${hex[..4]}", ins.Text);
+        Assert.Equal(M68kFlags.Invalid | (bytes[0] >= 0xF0 ? M68kFlags.FLine : 0), ins.Flags);
         Assert.Equal([new M68kImmediate(bytes[0] << 8 | bytes[1], M68kSize.Word, [bytes[0], bytes[1]])], ins.Operands);
         Assert.Equal([(ushort)(bytes[0] << 8 | bytes[1])], ins.Words);
         Assert.Empty(ins.References);
+    }
+
+    // fmovem.l of two or three FPU control registers: from memory, every memory mode, an immediate holding one long
+    // per register in the order FPCR, FPSR, FPIAR; to memory, the memory alterable modes. Dn and An only with one
+    // register [Doc: MC68881/MC68882 User's Manual, FMOVEM; Verified: GNU as and objdump for -(An) and (An)+].
+    [Theory]
+    [InlineData("F220 9800", "fmovem.l -(a0),fpcr/fpsr")]
+    [InlineData("F218 B800", "fmovem.l fpcr/fpsr,(a0)+")]
+    [InlineData("F220 B800", "fmovem.l fpcr/fpsr,-(a0)")]
+    [InlineData("F218 9800", "fmovem.l (a0)+,fpcr/fpsr")]
+    [InlineData("F23A 9800 0010", "fmovem.l 16(pc),fpcr/fpsr  ; $1014")]
+    [InlineData("F23C 9800 0000 0000 0000 0001", "fmovem.l #0,#1,fpcr/fpsr")]
+    [InlineData("F23C 8C00 0000 0002 0000 0003", "fmovem.l #2,#3,fpsr/fpiar")]
+    [InlineData("F23C 9C00 0000 0001 0000 0002 0000 0003", "fmovem.l #1,#2,#3,fpcr/fpsr/fpiar")]
+    public void Fmovem_of_control_registers(string hex, string expected) => Text(hex, expected);
+
+    [Fact]
+    public void Fmovem_immediate_is_one_long_per_register()
+    {
+        var ins = D("F23C 9C00 0000 0001 0000 0002 0000 0003");
+        Assert.Equal(("fmovem", M68kSize.Long, 16), (ins.Mnemonic, ins.Size, ins.Length));
+        Assert.Equal(
+        [
+            new M68kImmediate(1, M68kSize.Long, [0, 0, 0, 1]), new M68kImmediate(2, M68kSize.Long, [0, 0, 0, 2]),
+            new M68kImmediate(3, M68kSize.Long, [0, 0, 0, 3]),
+            new M68kRegisterList(7, M68kRegisterListKind.FloatingPointControl),
+        ], ins.Operands);
+    }
+
+    // A byte immediate is the low byte of its word: where Motorola's encoding draws the high byte as zeros (ori, andi
+    // and eori to CCR, a static bit number, callm's argument count) a nonzero high byte is dc.w
+    // (Invalid_words_are_dc_w); an ordinary byte immediate (<ea> mode 7 register 4) ignores it, as the processor does
+    // [Doc: M68000 Family Programmer's Reference Manual, "Immediate Data" and each instruction's format].
+    [Theory]
+    [InlineData("0000 01FF", "ori.b #$FF,d0")]
+    [InlineData("0C00 8001", "cmpi.b #1,d0")]
+    [InlineData("103C 01FF", "move.b #-1,d0")]
+    [InlineData("4A3C 01FF", "tst.b #-1")]
+    [InlineData("B03C FF41", "cmp.b #65,d0")]
+    [InlineData("F23C 5800 FF01", "fmove.b #1,fp0")]
+    public void Byte_immediates_ignore_the_high_byte(string hex, string expected)
+    {
+        Text(hex, expected);
+        var imm = D(hex).Operands.OfType<M68kImmediate>().First();
+        Assert.Equal(M68kSize.Byte, imm.Size);
+        Assert.Equal(2, imm.Bytes.Count);
+    }
+
+    // An empty register list is written #0, the mask [Verified: objdump writes #0].
+    [Theory]
+    [InlineData("48E7 0000", "movem.l #0,-(sp)")]
+    [InlineData("4CDF 0000", "movem.l (sp)+,#0")]
+    [InlineData("48D0 0000", "movem.l #0,(a0)")]
+    [InlineData("F227 E000", "fmovem.x #0,-(sp)")]
+    [InlineData("F21F D000", "fmovem.x (sp)+,#0")]
+    public void Empty_register_lists(string hex, string expected)
+    {
+        Text(hex, expected);
+        Assert.Contains(D(hex).Operands, o => o is M68kRegisterList { Mask: 0 });
     }
 
     [Fact]

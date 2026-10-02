@@ -20,8 +20,10 @@ namespace ClassicMac.Code.Disassembly;
 /// <c>cinv</c>/<c>cpush</c>/<c>move16</c>/<c>pflush</c>/<c>ptest</c>, the 68881/68882 FPU (coprocessor 1) and the
 /// 68030 MMU and 68851 PMMU (coprocessor 0: <c>pmove</c>, <c>pflush</c>, <c>pload</c>, <c>ptest</c>, <c>pvalid</c>,
 /// the PMMU's conditionals, <c>psave</c>/<c>prestore</c>). A-line words ($Axxx) are Mac OS traps. Other words
-/// (among them the CPU32's <c>tbl</c> and <c>bgnd</c>, which no Macintosh processor has), and instructions with an
-/// addressing mode they do not allow, are <c>dc.w</c>. [Doc: M68000 Family Programmer's Reference Manual (Motorola)]
+/// (among them the CPU32's <c>tbl</c> and <c>bgnd</c> and the 68060's <c>plpa</c>, <c>lpstop</c> and <c>movec</c> of
+/// BUSCR and PCR, which no Macintosh processor has), instructions with an addressing mode they do not allow, and
+/// words with a bit set that the instruction's format draws as 0, are <c>dc.w</c>. [Doc: M68000 Family Programmer's
+/// Reference Manual (Motorola)]
 /// </summary>
 public static class M68kDisassembler
 {
@@ -691,8 +693,13 @@ public static class M68kDisassembler
                 if (ea.Mode != DReg && !(alterable ? ea.IsControlAlterable : ea.IsControl))
                     return null;
                 // Offset: Do (bit 11) and bits 10-6; width: Dw (bit 5) and bits 4-0, 0 meaning 32. resource_dasm tests
-                // bit 6 for Dw.
+                // bit 6 for Dw. The bits Motorola's format draws as 0 must be: bits 14-12 of bftst, bfchg, bfclr and
+                // bfset (no register), bits 10-9 with Do set and bits 4-3 with Dw set [Doc: M68000 Family
+                // Programmer's Reference Manual, BFTST ... BFINS].
                 bool offsetIsRegister = (ext & 0x0800) != 0, widthIsRegister = (ext & 0x0020) != 0;
+                if ((which is 0 or 2 or 4 or 6 && (ext & 0x7000) != 0)
+                    || (offsetIsRegister && (ext & 0x0600) != 0) || (widthIsRegister && (ext & 0x0018) != 0))
+                    return null;
                 int offset = offsetIsRegister ? (ext >> 6) & 7 : (ext >> 6) & 31;
                 int width = widthIsRegister ? ext & 7 : ((ext & 31) == 0 ? 32 : ext & 31);
                 var field = new M68kBitField(offset, offsetIsRegister, width, widthIsRegister);
@@ -926,8 +933,7 @@ public static class M68kDisassembler
             bool ok = controlOnly
                 ? ea.IsControlAlterable
                 : (!toMemory || ea.IsAlterable)
-                    && !(size == M68kSize.Double && ea.Mode is DReg or AReg)
-                    && !(ea.Operand is M68kImmediate { Size: M68kSize.Byte } imm && imm.Bytes[0] != 0);
+                    && !(size == M68kSize.Double && ea.Mode is DReg or AReg);
             if (!ok)
                 return null;
             var mr = new M68kRegisterOperand(M68kRegisterKind.MemoryManagement, register);
@@ -1066,16 +1072,31 @@ public static class M68kDisassembler
                 if ((args & 0x03FF) != 0 || u == 0)
                     return null;
                 bool single = (u & (u - 1)) == 0;
-                if (ReadEa(m, xn, single ? M68kSize.Long : M68kSize.None) is not { } ea)
-                    return null;
-                bool ok = single
-                    ? (!toMemory || ea.IsAlterable) && (ea.Mode != AReg || u == 1)
-                    : toMemory ? ea.IsControlAlterable || ea.Mode == PreDec : ea.IsControl || ea.Mode == PostInc;
-                if (!ok)
-                    return null;
                 M68kOperand registers = single
                     ? new M68kRegisterOperand(M68kRegisterKind.FloatingPointControl, u)
                     : new M68kRegisterList((ushort)u, M68kRegisterListKind.FloatingPointControl);
+                if (!single && !toMemory && m == 7 && xn == 4)
+                {
+                    // An immediate for two or three registers holds one long per register, FPCR first, then FPSR,
+                    // then FPIAR: the FPU asks for 4 bytes per register and the CPU reads them from the instruction
+                    // stream [Doc: MC68881/MC68882 User's Manual, FMOVEM]. (GNU as and Ghidra take one long.)
+                    var operands = new List<M68kOperand>(4);
+                    for (int bit = 4; bit != 0; bit >>= 1)
+                        if ((u & bit) != 0)
+                            operands.Add(ReadImmediate(M68kSize.Long)!);
+                    operands.Add(registers);
+                    return Make("fmovem", M68kSize.Long, [.. operands]);
+                }
+                if (ReadEa(m, xn, single ? M68kSize.Long : M68kSize.None) is not { } ea)
+                    return null;
+                // One register: any mode from memory, an alterable one to it, An only for FPIAR. Two or three: any
+                // memory mode from memory, a memory alterable one to it [Doc: MC68881/MC68882 User's Manual, FMOVE
+                // and FMOVEM of the control registers].
+                bool ok = single
+                    ? (!toMemory || ea.IsAlterable) && (ea.Mode != AReg || u == 1)
+                    : toMemory ? ea.IsMemoryAlterable : ea.IsMemory;
+                if (!ok)
+                    return null;
                 string name = single ? "fmove" : "fmovem";
                 return toMemory ? Make(name, M68kSize.Long, registers, ea.Operand) : Make(name, M68kSize.Long, ea.Operand, registers);
             }
@@ -1160,6 +1181,9 @@ public static class M68kDisassembler
                 return new Ea(pcBased ? PcIndex : Index, new M68kEffectiveAddress(
                     pcBased ? M68kAddressingMode.PcIndexed : M68kAddressingMode.Indexed, reg, (sbyte)ext, index, 0, false, false, null));
 
+            // Bit 3 of the full extension word is drawn as 0.
+            if ((ext & 0x08) != 0)
+                return null;
             bool baseSuppressed = (ext & 0x80) != 0, indexSuppressed = (ext & 0x40) != 0;
             int bd;
             switch ((ext >> 4) & 3)
@@ -1196,7 +1220,10 @@ public static class M68kDisassembler
             return new Ea(cls, new M68kEffectiveAddress(mode, reg, bd, idx, od, baseSuppressed, true, pointer));
         }
 
-        // An immediate operand of the given size; null when the instruction allows none.
+        // An immediate operand of the given size; null when the instruction allows none. A byte immediate is the low
+        // byte of its word; the high byte is ignored, as the processor ignores it [Doc: M68000 Family Programmer's
+        // Reference Manual, "Immediate Data"]. Where an instruction's format draws the high byte as zeros
+        // (ori/andi/eori to CCR, a static bit number, callm's argument count), the caller rejects a nonzero one.
         private M68kImmediate? ReadImmediate(M68kSize size)
         {
             int position = r.Position;
@@ -1381,9 +1408,12 @@ public static class M68kDisassembler
         _ => reg.Number switch { 1 => "dc", 2 => "ic", _ => "bc" },
     };
 
-    // d3-d7/a2-a4, fp0-fp3/fp7, fpcr/fpsr/fpiar; A7 is written a7 in a list.
+    // d3-d7/a2-a4, fp0-fp3/fp7, fpcr/fpsr/fpiar; A7 is written a7 in a list. An empty list (a mask of 0, which
+    // moves nothing) is written #0, so the operand still shows.
     private static string FormatList(M68kRegisterList list)
     {
+        if (list.Mask == 0)
+            return "#0";
         if (list.Kind == M68kRegisterListKind.FloatingPointControl)
         {
             var names = new List<string>(3);

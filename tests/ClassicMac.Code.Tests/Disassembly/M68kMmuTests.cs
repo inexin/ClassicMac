@@ -51,6 +51,7 @@ public class M68kMmuTests
     // the 68851's other addressing modes
     [InlineData("F03C 4000 0000 8000", "pmove #$00008000,tc")]
     [InlineData("F03C 5000 0005", "pmove #5,cal")]
+    [InlineData("F03C 5000 0105", "pmove #5,cal")]          // a byte immediate is the low byte of its word
     [InlineData("F03C 5C00 0102", "pmove #258,ac")]
     [InlineData("F03C 4800 0000 0001 0000 0002", "pmove #$0000000100000002,srp")]
     [InlineData("F000 5C00", "pmove d0,ac")]
@@ -135,7 +136,6 @@ public class M68kMmuTests
     [InlineData("F03A 4200 0000")]         // pmove tc to PC space
     [InlineData("F000 4800")]              // pmove srp from a data register (64 bits)
     [InlineData("F008 4C00")]              // pmove crp from an address register
-    [InlineData("F03C 5000 0105")]         // pmove #imm,cal with the immediate's high byte set
     [InlineData("F010 2400")]              // pflusha with an effective address
     [InlineData("F000 2410")]              // pflusha with a function code
     [InlineData("F000 3002")]              // function code 00010
@@ -205,10 +205,15 @@ public class M68kMmuTests
     [InlineData("F000 2408")]              // pflusha with function code D0
     public void Invalid_words_are_dc_w(string hex)
     {
+        var bytes = M68kDisassemblerTests.Bytes(hex);
         var ins = D(hex);
-        Assert.True(ins.IsInvalid);
-        Assert.Equal("dc", ins.Mnemonic);
-        Assert.Equal(2, ins.Length);
+        ushort word = (ushort)(bytes[0] << 8 | bytes[1]);
+        Assert.Equal(("dc", M68kSize.Word, 2), (ins.Mnemonic, ins.Size, ins.Length));
+        Assert.Equal($"dc.w ${hex[..4]}", ins.Text);
+        Assert.Equal(M68kFlags.Invalid | M68kFlags.FLine, ins.Flags);
+        Assert.Equal([new M68kImmediate(word, M68kSize.Word, [bytes[0], bytes[1]])], ins.Operands);
+        Assert.Equal([word], ins.Words);
+        Assert.Empty(ins.References);
     }
 
     [Fact]
