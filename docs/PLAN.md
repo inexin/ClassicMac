@@ -849,7 +849,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 
 ### Todo (not in a phase)
 
-- [ ] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager).
+- [x] **Verify imported icons and cursors on Mac OS 9** (`ImageImport` output loaded by a real Resource Manager): all
+  14 types load; PlotIconID draws every family member with 0 mismatched pixels at depths 1–32 (2026-10-02).
 - [ ] **Real Dialog Manager previews** for `DLOG`/`ALRT` (today drawn by ClassicMac's own rules).
 - [ ] **8-bit icon masks in icon suites** (Mac OS 9's deep CopyMask in `IconSuite.Plot`): needs a Mac OS 9 oracle run for 8-bit-mask cases first.
 - [ ] **Publish the NuGet packages** (owner's step; then deprecate the QuickDraw.Pict ones).
@@ -859,8 +860,8 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   and the delta types, LHa archives. Each needs a redistributable archive made by the original application.
 - [ ] **DiskDup+ and PCE MAR** inputs (Inputs, priority 3).
 - [ ] **Mac ROM images:** read the ROM's built-in resource map (Inputs, priority 3).
-- [ ] **Fork repair beyond `fork.map-recovered`:** more of ResEdit's recovery rules if a damaged corpus fork needs them
-  (a damaged fork opened and saved already comes out clean).
+- [x] **Fork repair beyond `fork.map-recovered`:** not needed: no corpus fork reports a `fork.*` diagnostic
+  (checked 2026-10-02); reopen if one does.
 - [x] **Big-endian reading and writing through Core:** every big-endian read and write goes through `BigEndianReader`
   and `BigEndianWriter` (done 2026-10-01; see CLAUDE.md).
 
