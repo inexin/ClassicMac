@@ -91,18 +91,20 @@ These hold in every document unless it says otherwise.
 
 ## Where the rules come from
 
-Every rule carries one of these tags:
+Every rule carries one of these tags, written in plain square brackets with an optional detail after a colon
+(`[Code: Mac OS 9.0 IconUtils]`, `[Verified: Compact Pro 1.52]`):
 
 | Tag | Meaning |
 | --- | --- |
-| **[Doc]** | Apple's documentation: *Inside Macintosh* (named volume), a Technical Note, a Developer Note, or a standard (ECMA-119 for ISO 9660, Microsoft's FAT specification) |
-| **[Code]** | Apple's own code, traced in disassembly, with the software and version named (the Mac OS 9.0 System file, the 68k ROM, Disk Copy 6.3.3, Sound Manager 3.5.1, File Exchange 3.0, …) |
-| **[Verified]** | Checked against the real software's output, running in an emulator (SheepShaver or Basilisk II, Mac OS 9.0 unless stated) |
-| **[Author]** | The published specification of a format's author, for formats Apple did not define (MacBinary, BinHex, LZHUF) |
-| **[Fitted]** | Fitted to real files, with no code traced: the weakest source, and marked so it can be replaced |
+| [Doc] | Apple's documentation: *Inside Macintosh* (named volume), a Technical Note, a Developer Note, or a standard (ECMA-119 for ISO 9660, Microsoft's FAT specification) |
+| [Code] | Apple's own code, traced in disassembly, with the software and version named (the Mac OS 9.0 System file, the 68k ROM, Disk Copy 6.3.3, Sound Manager 3.5.1, File Exchange 3.0, …) |
+| [Verified] | Checked against the real software or its output: running in an emulator (SheepShaver or Basilisk II, Mac OS 9.0 unless stated), or files made by the original application |
+| [Author] | The published specification of a format's author, for formats Apple did not define (MacBinary, BinHex, LZHUF) |
+| [Fitted] | Fitted to real files, with no code traced: the weakest source, and marked so it can be replaced |
+| [Reference] | Taken from another implementation (named in the detail) and not yet confirmed by code or by the original application's files |
 
 What ClassicMac itself decides (its output formats, names, limits, severities, and how it recovers where the Mac would
-crash or read stray memory) is design, not format. It is marked **[ClassicMac]**, or said in a sentence that begins
+crash or read stray memory) is design, not format. It is marked [ClassicMac], or said in a sentence that begins
 "ClassicMac …", and carries no source tag.
 
 Where Apple's implementations disagree (Mac OS 9 and the 68k ROM, Disk Copy versions, PowerPC and 68k code), each
@@ -115,8 +117,9 @@ ClassicMac.
 
 ClassicMac reads damaged files as far as it can. It reports each problem as a diagnostic with a severity (Info,
 Warning, Error) and a stable code (`fork.map-length`, `ndif.bad-checksum`, …), and throws only when a file cannot be
-read at all. Each document lists its codes, and what the Mac does in the same case.
+read at all. Each document lists its codes in one table: `Code | Severity | When | ClassicMac does | The Mac does`.
 
 ## Keeping them current
 
-A change to how ClassicMac reads or writes a format updates its document in the same commit.
+A change to how ClassicMac reads or writes a format updates its document in the same commit. The authoring rules are
+in [CLAUDE.md](CLAUDE.md), the skeleton in [TEMPLATE.md](TEMPLATE.md).

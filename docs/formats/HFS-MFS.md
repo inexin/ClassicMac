@@ -37,7 +37,8 @@ Contents
 10. [Consistency checks](#10-consistency-checks)
 11. [HFS Plus](#11-hfs-plus)
 12. [Diagnostics](#12-diagnostics)
-13. [Not covered and open questions](#13-not-covered-and-open-questions)
+13. [Conservative HFS writing](#13-conservative-hfs-writing)
+14. [Not covered and open questions](#14-not-covered-and-open-questions)
 
 ---
 

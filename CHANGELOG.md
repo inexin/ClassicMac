@@ -62,8 +62,8 @@
 - `QuickDrawPort`: the renderer as a public colour QuickDraw port (shapes, lines, regions, patterns, CopyBits, text)
   with QuickDraw's names, drawing exactly what the picture player draws, which now runs on it. Public `RgbColor`,
   `TransferMode`, `QuickDrawStyle`, `QuickDrawPattern`, `QuickDrawOptions`, `Region` and `PixMap`
-  ([docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)).
-- Renamed for the public drawing API ([docs/QUICKDRAW-API.md](docs/QUICKDRAW-API.md)): `PictBitmap` → `RgbaBitmap`,
+  (`docs/QUICKDRAW-API.md`, since removed).
+- Renamed for the public drawing API (`docs/QUICKDRAW-API.md`, since removed): `PictBitmap` → `RgbaBitmap`,
   `PictColor` → `RgbaColor`, `PictQuickDraw` → `QuickDrawVersion`, `PictFontLibrary` → `FontLibrary`,
   `IPictTextFallback` → `ITextFallback` (with `TextFallbackMask`, `TextFallbackStyle`); the last four are in
   `ClassicMac.Graphics.QuickDraw`.
