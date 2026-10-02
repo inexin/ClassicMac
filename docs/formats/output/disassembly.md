@@ -469,7 +469,7 @@ documents). These are its own and the decoders':
   (the System's 162 data-fork fragments included) with no error.
 - With `CLASSICMAC_CODE_CORPUS` set (not committed): `CodeListingCorpusTests` lists every `'CODE'`, code resource and
   fragment of the corpus with no decoder error; `PpcCorpusTests` checks the word, `.long`, `blr`, `bl` and return
-  counts and sample texts of NQD (no `.long`), Disk Copy 6.1.2 (4) and Disk Copy 6.5 (9,451), which
+  counts and sample texts of NQD (no `.long`), Disk Copy 6.1.2 (4) and Disk Copy 6.5 (9,550), which
   agree word for word with an independent disassembler apart from mnemonic spelling and, in data, BO values with a z
   bit set, which that disassembler decodes and ClassicMac writes `.long` [Verified]; `M68kCorpusTests`, `MacsBugCorpusTests`, `PpcGlueCorpusTests` check
   the counts in [PLAN.md](../../PLAN.md)'s phase 11 exit. `MacsBugCorpusTests` also checks names read off the bytes

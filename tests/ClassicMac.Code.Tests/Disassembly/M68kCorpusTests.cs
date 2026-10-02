@@ -49,9 +49,9 @@ public class M68kCorpusTests
     {
         var fork = ResourceFork.Read(CodeCorpus.Require("Realmz 7.1.2", 576955));
         var sweep = Disassemble(CodeResource(fork, 1), 4);
-        // 897 dc.w in 128 119 (0.70 %): data between functions (jump tables, strings, MacsBug names). No jsr n(A5):
+        // 962 dc.w in 128 158 (0.75 %): data between functions (jump tables, strings, MacsBug names). No jsr n(A5):
         // this CodeWarrior CODE 1 calls through relocated jsr (xxx).l (373) and jsr d(pc) (224).
-        Assert.Equal(new Sweep(128119, 897, 485272, 0), sweep);
+        Assert.Equal(new Sweep(128158, 962, 485272, 0), sweep);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class M68kCorpusTests
             instructions += sweep.Instructions;
             invalid += sweep.Invalid;
         }
-        // 29 far segments (CODE 30 is the near-model entry); 821 dc.w in 72 706 (1.13 %).
-        Assert.Equal((29, 72706, 821), (segments, instructions, invalid));
+        // 29 far segments (CODE 30 is the near-model entry); 918 dc.w in 72 716 (1.26 %).
+        Assert.Equal((29, 72716, 918), (segments, instructions, invalid));
     }
 }

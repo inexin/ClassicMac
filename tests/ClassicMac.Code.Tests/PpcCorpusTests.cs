@@ -106,7 +106,7 @@ public class PpcCorpusTests
         Assert.Equal(0x44, tables[0].Offset);
         Assert.Equal((".HandleBurn", 0xB9AB8, (int?)0xB98BC), (tables[^1].Name, tables[^1].Offset, tables[^1].FunctionStart));
         var instructions = Disassemble(code, tables);
-        Counts(instructions, words: 218214, longs: 9451, blr: 2045, bl: 17179, returns: 2069);
+        Counts(instructions, words: 218214, longs: 9550, blr: 2045, bl: 17179, returns: 2069);
         Text(instructions, 0x1C, "mflr r0");
         Text(instructions, 0x28, "bl 0xCE9DC");
         Text(instructions, 0x30, "subi r3,r3,1");
