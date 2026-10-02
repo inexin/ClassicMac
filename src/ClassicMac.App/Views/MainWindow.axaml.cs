@@ -396,6 +396,20 @@ namespace ClassicMac.App.Views
                 return;
             }
 
+            // Editing a menu: Alt+Up and Alt+Down move the selected row (boards/read-then-edit.md).
+            if (e.KeyModifiers == KeyModifiers.Alt && e.Key is Key.Up or Key.Down
+                && DataContext is MainViewModel { IsEditingForm: true, Form: MenuForm menu })
+            {
+                var move = e.Key == Key.Up ? menu.MoveSelectedUpCommand : menu.MoveSelectedDownCommand;
+                if (move.CanExecute(null))
+                {
+                    move.Execute(null);
+                }
+
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
             {
                 TreeFilter.Focus();

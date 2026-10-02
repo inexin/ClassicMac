@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Editor: the menu form's rows move with chevron icon buttons and with Alt+Up / Alt+Down on the selected row; the Mark
+  select reads in words with each mark's Mac character code in the list (None, Check mark `$12`, Diamond `$13`,
+  Bullet `$A5`, Other…, which shows a field for any other code such as `$2A`), and the table's Mark column names the
+  mark ("Check mark", "* $2A") instead of drawing a symbol.
 - Viewer: the files in a "No name" group show their names as ASCII token chips instead of symbol glyphs the UI font may
   lack (boards/tree-no-name.md): `sp`, `nbsp`, `tab`, `cr`, `lf`, other control characters as `^A`/`^?`, a run of
   one character as `sp×3`; mono 10 on CmSegmentTrack, on the new CmTokenOnSelection in the selected row; hovering

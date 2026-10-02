@@ -12,10 +12,17 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels
 {
-    /// <summary>A mark a menu item can carry: its character (as the item's text has it) and how the menu shows it.</summary>
-    public sealed record MarkChoice(string Mark, string Label)
+    /// <summary>
+    /// A choice in the Mark select (design/boards/read-then-edit.md): the mark's character (as the item's text has it;
+    /// null for "Other…", whose code is typed), its name in words and its Mac character code ("$12"), so the list needs
+    /// no symbol glyphs.
+    /// </summary>
+    public sealed record MarkChoice(string? Mark, string Label, string Code = "")
     {
-        public override string ToString() => Label;
+        /// <summary>The label in the closed select, beside the code field for Other: without its ellipsis.</summary>
+        public string ShortLabel => Label.TrimEnd('…');
+
+        public override string ToString() => Code.Length == 0 ? Label : $"{Label} {Code}";
     }
 
     /// <summary>One item of a <c>'MENU'</c>: its values, and how the read-only table shows them.</summary>
@@ -26,18 +33,26 @@ namespace ClassicMac.App.ViewModels
         private static readonly string[] StyleNames = ["Bold", "Italic", "Underline", "Outline", "Shadow", "Condense", "Extend"];
 
         /// <summary>
-        /// The marks the Mark select offers: none, the check mark ($12 in the system font), the bullet ($A5) and the
-        /// diamond ($13).
+        /// The marks the Mark select offers: none, the check mark ($12 in the system font), the diamond ($13), the
+        /// bullet ($A5), and Other…, whose code is typed.
         /// </summary>
         public static IReadOnlyList<MarkChoice> Marks { get; } =
-            [new("", "None"), new(MacRoman.ToChar(0x12).ToString(), "✓"), new(MacRoman.ToChar(0xA5).ToString(), "•"), new(MacRoman.ToChar(0x13).ToString(), "◆")];
+        [
+            new("", "None"), new(MacRoman.ToChar(0x12).ToString(), "Check mark", "$12"), new(MacRoman.ToChar(0x13).ToString(), "Diamond", "$13"),
+            new(MacRoman.ToChar(0xA5).ToString(), "Bullet", "$A5"), new(null, "Other…"),
+        ];
+
+        private static MarkChoice Other => Marks[^1];
+
+        // Other… chosen with no code typed yet: the select shows it while the mark is still the old one.
+        private bool otherChosen;
 
         public MenuItemRow(MenuItem item)
         {
             (text, enabled, icon, face) = (item.Text, item.Enabled, item.Icon, item.Face);
             key = item.KeyEquivalent is 0 ? "" : item.KeyKind is null ? MacRoman.ToChar(item.KeyEquivalent).ToString() : $"${item.KeyEquivalent:X2}";
             mark = item.Submenu is { } submenu ? $"menu {submenu}" : item.Mark is 0 ? "" : MacRoman.ToChar(item.Mark).ToString();
-            MarkChoices = Marks.Any(m => m.Mark == mark) ? Marks : [.. Marks, new MarkChoice(mark, Shown(mark))];
+            MarkChoices = item.Submenu is { } sub ? [.. Marks, new MarkChoice(mark, $"Submenu {sub}")] : Marks;
         }
 
         /// <summary>Its number in the menu, from 1.</summary>
@@ -68,7 +83,7 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>The mark character; for a submenu (key $1B) "menu N".</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(MarkText), nameof(MarkChoice))]
+        [NotifyPropertyChangedFor(nameof(MarkText), nameof(MarkChoice), nameof(MarkCode), nameof(IsOtherMark))]
         private string mark;
 
         /// <summary>Whether its Command key is also another item's (both key fields show the error).</summary>
@@ -112,7 +127,12 @@ namespace ClassicMac.App.ViewModels
             var k => "⌘" + k.ToUpperInvariant(),
         };
 
-        public string MarkText => Mark.Length == 0 ? "—" : Shown(Mark);
+        /// <summary>The table's Mark: the mark's name ("Check mark"), another one as its character and code ("* $2A"), "—" for none.</summary>
+        public string MarkText => Mark.Length == 0
+            ? "—"
+            : Marks.FirstOrDefault(m => m.Mark == Mark) is { } known ? known.Label
+            : MarkCode.Length > 0 ? $"{Mark} {MarkCode}"
+            : Mark;
 
         public string IconText => Icon == 0 ? "—" : ((int)Icon).ToString(CultureInfo.InvariantCulture);
 
@@ -122,27 +142,52 @@ namespace ClassicMac.App.ViewModels
 
         public string EnabledText => Enabled ? "Yes" : "No";
 
-        /// <summary>The Mark select's choices: the four marks, and the item's own when it is another.</summary>
+        /// <summary>The Mark select's choices: <see cref="Marks"/>, and for a submenu item its submenu.</summary>
         public IReadOnlyList<MarkChoice> MarkChoices { get; }
 
+        /// <summary>The chosen mark: a named one, the submenu, or Other… for any other character (or when Other… was just chosen).</summary>
         public MarkChoice MarkChoice
         {
-            get => MarkChoices.FirstOrDefault(m => m.Mark == Mark) ?? MarkChoices[^1];
+            get => otherChosen ? Other : MarkChoices.FirstOrDefault(m => m.Mark == Mark) ?? Other;
             set
             {
-                if (value is not null)
+                if (value is null)
                 {
-                    Mark = value.Mark;
+                    return;
                 }
+
+                otherChosen = value.Mark is null;
+                if (value.Mark is { } chosen)
+                {
+                    Mark = chosen;
+                }
+
+                OnPropertyChanged(nameof(MarkChoice));
+                OnPropertyChanged(nameof(IsOtherMark));
             }
         }
 
-        private static string Shown(string mark) => mark switch
+        /// <summary>Whether the mark is Other… (its code field shows).</summary>
+        public bool IsOtherMark => ReferenceEquals(MarkChoice, Other);
+
+        /// <summary>
+        /// The mark's Mac character code ("$2A"); typing one (or the character) sets the mark, and a code of a named mark
+        /// chooses it. Empty for none or a submenu.
+        /// </summary>
+        public string MarkCode
         {
-            "\u0012" => "✓",
-            "\u0013" => "◆",
-            _ => mark,
-        };
+            get => Mark.Length == 1 && MacRoman.TryGetByte(Mark[0], out var b) ? $"${b:X2}" : "";
+            set
+            {
+                var typed = (value ?? "").Trim();
+                Mark = typed.StartsWith('$') && byte.TryParse(typed[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code)
+                    ? MacRoman.ToChar(code).ToString()
+                    : typed;
+                otherChosen = Marks.All(m => m.Mark != Mark || m.Mark.Length == 0);
+                OnPropertyChanged(nameof(MarkChoice));
+                OnPropertyChanged(nameof(IsOtherMark));
+            }
+        }
 
         /// <summary>The Command key's character for comparing items (⌘s is ⌘S), or null for none or a code.</summary>
         internal char? CommandKey => Key.Trim() is { Length: 1 } k ? char.ToUpperInvariant(k[0]) : null;
@@ -213,6 +258,7 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The selected row, highlighted in the preview too; null for none.</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(PreviewIndex))]
+        [NotifyCanExecuteChangedFor(nameof(MoveSelectedUpCommand), nameof(MoveSelectedDownCommand))]
         private MenuItemRow? selectedItem;
 
         /// <summary>The menu as the values make it, for the live preview (the last good one while they have an error).</summary>
@@ -293,6 +339,18 @@ namespace ClassicMac.App.ViewModels
         [RelayCommand]
         private void MoveDown(MenuItemRow row) => Move(Items, row, 1);
 
+        private bool CanMoveSelectedUp() => SelectedItem is { } row && Items.IndexOf(row) > 0;
+
+        private bool CanMoveSelectedDown() => SelectedItem is { } row && Items.IndexOf(row) is var i && i >= 0 && i < Items.Count - 1;
+
+        /// <summary>Alt+Up: the selected row up one place (it stays selected).</summary>
+        [RelayCommand(CanExecute = nameof(CanMoveSelectedUp))]
+        private void MoveSelectedUp() => Move(Items, SelectedItem!, -1);
+
+        /// <summary>Alt+Down: the selected row down one place.</summary>
+        [RelayCommand(CanExecute = nameof(CanMoveSelectedDown))]
+        private void MoveSelectedDown() => Move(Items, SelectedItem!, 1);
+
         public MenuResource ToMenu() => menu with
         {
             Id = (short)Id,
@@ -330,6 +388,8 @@ namespace ClassicMac.App.ViewModels
         {
             Renumber();
             OnPropertyChanged(nameof(PreviewIndex));
+            MoveSelectedUpCommand.NotifyCanExecuteChanged();
+            MoveSelectedDownCommand.NotifyCanExecuteChanged();
             RaiseEdited();
         }
 

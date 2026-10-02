@@ -43,7 +43,7 @@ public class MenuFormTests
         Assert.Equal(("⌘O", "—", "—", "Bold", "Yes"), (rows[0].KeyText, rows[0].MarkText, rows[0].IconText, rows[0].StyleText, rows[0].EnabledText));
         Assert.True(rows[1].IsDivider);
         Assert.False(rows[0].IsDivider);
-        Assert.Equal(("⌘S", "✓", "Italic, Underline"), (rows[2].KeyText, rows[2].MarkText, rows[2].StyleText));
+        Assert.Equal(("⌘S", "Check mark", "Italic, Underline"), (rows[2].KeyText, rows[2].MarkText, rows[2].StyleText));
         Assert.Equal(("—", "3", "No"), (rows[3].KeyText, rows[3].IconText, rows[3].EnabledText));
         Assert.True(rows[3].IsDimmed);                                     // disabled items in CmTextMuted
         Assert.False(rows[4].IsDimmed);
@@ -105,23 +105,62 @@ public class MenuFormTests
     }
 
     [Fact]
-    public void Marks_are_chosen_from_none_check_bullet_and_diamond_and_others_are_kept()
+    public void Marks_are_chosen_in_words_with_their_codes_and_others_by_code()
     {
+        // The board's list: no symbol glyphs, the Mac character code beside each word.
         var form = Form();
         var row = form.Items[0];
-        Assert.Equal(["None", "✓", "•", "◆"], MenuItemRow.Marks.Select(m => m.Label));
-        Assert.Equal("None", row.MarkChoice.Label);
-        row.MarkChoice = MenuItemRow.Marks[3];
-        Assert.Equal(0x13, form.ToMenu().Items[0].Mark);
-        Assert.Equal("◆", row.MarkText);
+        Assert.Equal([("None", ""), ("Check mark", "$12"), ("Diamond", "$13"), ("Bullet", "$A5"), ("Other…", "")],
+            MenuItemRow.Marks.Select(m => (m.Label, m.Code)));
+        Assert.Equal("Check mark $12", MenuItemRow.Marks[1].ToString());
+        Assert.Equal(("Other", "Check mark"), (MenuItemRow.Marks[4].ShortLabel, MenuItemRow.Marks[1].ShortLabel));
+        Assert.Equal(("None", "—", false), (row.MarkChoice.Label, row.MarkText, row.IsOtherMark));
         row.MarkChoice = MenuItemRow.Marks[2];
+        Assert.Equal(0x13, form.ToMenu().Items[0].Mark);
+        Assert.Equal("Diamond", row.MarkText);
+        row.MarkChoice = MenuItemRow.Marks[3];
         Assert.Equal(0xA5, form.ToMenu().Items[0].Mark);
-        Assert.Same(MenuItemRow.Marks[1], form.Items[2].MarkChoice);       // ✓ read from $12
+        Assert.Equal("Bullet", row.MarkText);
+        Assert.Same(MenuItemRow.Marks[1], form.Items[2].MarkChoice);       // read from $12
+        Assert.Equal("Check mark", form.Items[2].MarkText);
+
+        // Other…: the code is typed ($2A, or the character itself); a bad one is the form's error.
+        row.MarkChoice = MenuItemRow.Marks[4];
+        Assert.True(row.IsOtherMark);
+        Assert.Same(MenuItemRow.Marks[4], row.MarkChoice);
+        row.MarkCode = "$2A";
+        Assert.Equal(((byte)'*', "$2A", "* $2A"), (form.ToMenu().Items[0].Mark, row.MarkCode, row.MarkText));
+        Assert.Same(MenuItemRow.Marks[4], row.MarkChoice);
+        row.MarkCode = "$12";                                              // a known mark typed: its word
+        Assert.Same(MenuItemRow.Marks[1], row.MarkChoice);
+        Assert.False(row.IsOtherMark);
+        row.MarkChoice = MenuItemRow.Marks[4];
+        row.MarkCode = "$ZZ";
+        Assert.Contains("not a mark", form.Error);
+        row.MarkChoice = MenuItemRow.Marks[0];
+        Assert.Null(form.Error);
 
         var other = Form(new MenuResource(1, 0, 0, 0, 0xFFFFFFFF, "M", [new MacMenuItem("Odd", 0, 0, (byte)'*', 0, true)])).Items[0];
-        Assert.Equal(5, other.MarkChoices.Count);                          // the four, and its own
-        Assert.Equal("*", other.MarkChoice.Label);
+        Assert.Same(MenuItemRow.Marks[4], other.MarkChoice);              // read as Other…, with its code
+        Assert.Equal(("$2A", "* $2A"), (other.MarkCode, other.MarkText));
         Assert.Equal((byte)'*', other.ToItem().Mark);
+    }
+
+    [Fact]
+    public void The_selected_row_moves_up_and_down()
+    {
+        var form = Form();
+        Assert.False(form.MoveSelectedUpCommand.CanExecute(null));          // nothing selected
+        form.SelectedItem = form.Items[1];
+        Assert.True(form.MoveSelectedUpCommand.CanExecute(null));
+        form.MoveSelectedUpCommand.Execute(null);
+        Assert.Equal(("-", 1), (form.Items[0].Text, form.SelectedItem!.Number));
+        Assert.False(form.MoveSelectedUpCommand.CanExecute(null));          // already first
+        form.MoveSelectedDownCommand.Execute(null);
+        form.MoveSelectedDownCommand.Execute(null);
+        Assert.Same(form.Items[2], form.SelectedItem);
+        form.SelectedItem = form.Items[^1];
+        Assert.False(form.MoveSelectedDownCommand.CanExecute(null));        // already last
     }
 
     [Fact]

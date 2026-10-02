@@ -784,6 +784,8 @@ public class WindowTests
             Assert.DoesNotContain(host.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);   // read only
             Assert.Contains(rows[0].GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Open…" && t.IsEffectivelyVisible);
             Assert.Contains(rows[1].GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "divider" && t.IsEffectivelyVisible);
+            var checkMark = rows[2].GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Check mark" && t.IsEffectivelyVisible);
+            Assert.True(checkMark.TextLayout.WidthIncludingTrailingWhitespace <= checkMark.Bounds.Width + 0.5, "the Mark cell cuts “Check mark”");
             Capture(window, "menu-form", baselines);
 
             // A double-click on the third row: editing, with that row selected and highlighted in the preview.
@@ -804,6 +806,38 @@ public class WindowTests
             Assert.Same(menu.Items[4], menu.SelectedItem);
             Assert.Contains("selected", rows[4].Classes);
             Assert.DoesNotContain("selected", rows[2].Classes);
+
+            // The move buttons are chevron icons, not glyphs; Alt+Up and Alt+Down move the selected row.
+            var moves = host.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible
+                && Avalonia.Automation.AutomationProperties.GetName(b) is "Move up" or "Move down").ToList();
+            Assert.Equal(10, moves.Count);
+            Assert.All(moves, b => Assert.IsType<PathIcon>(b.Content));
+            void AltKey(Avalonia.Input.Key key) => host.GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible).RaiseEvent(
+                new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = key, KeyModifiers = Avalonia.Input.KeyModifiers.Alt });
+            AltKey(Avalonia.Input.Key.Up);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(("Quit", "Save As…"), (menu.Items[3].Text, menu.Items[4].Text));
+            Assert.Same(menu.Items[3], menu.SelectedItem);
+            AltKey(Avalonia.Input.Key.Down);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Quit", menu.Items[4].Text);
+
+            // The Mark select: words, its code in the list, the word fitting the select; Other… shows the code field.
+            var marks = host.GetVisualDescendants().OfType<ComboBox>().Where(c => c.IsEffectivelyVisible && c.SelectedItem is MarkChoice).ToList();
+            Assert.Equal(5, marks.Count);
+            Assert.NotNull(marks[0].ItemTemplate);
+            Assert.All(marks, c => Assert.All(c.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible),
+                t => Assert.True(t.TextLayout.WidthIncludingTrailingWhitespace <= t.Bounds.Width + 0.5, $"“{t.Text}” is cut ({t.TextLayout.WidthIncludingTrailingWhitespace} in {t.Bounds.Width})")));
+            Assert.Contains(marks[2].GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Check mark" && t.IsEffectivelyVisible);
+            var codes = host.GetVisualDescendants().OfType<TextBox>().Where(t => t.Classes.Contains("mark-code")).ToList();
+            Assert.DoesNotContain(codes, t => t.IsEffectivelyVisible);
+            menu.Items[0].MarkChoice = MenuItemRow.Marks[^1];
+            Dispatcher.UIThread.RunJobs();
+            Assert.Single(codes, t => t.IsEffectivelyVisible);
+            Assert.All(marks[0].GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible),
+                t => Assert.True(t.TextLayout.WidthIncludingTrailingWhitespace <= t.Bounds.Width + 0.5, $"“{t.Text}” is cut beside the code ({t.TextLayout.WidthIncludingTrailingWhitespace} in {t.Bounds.Width})"));
+            menu.Items[0].MarkChoice = MenuItemRow.Marks[0];
+            Dispatcher.UIThread.RunJobs();
 
             // ⌘S twice: both key fields marked, the error shown, Apply disabled.
             menu.Items[3].Key = "S";

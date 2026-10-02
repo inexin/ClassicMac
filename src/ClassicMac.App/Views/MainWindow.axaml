@@ -666,6 +666,15 @@
     <Style Selector="Button.row-tool.remove">
       <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
     </Style>
+    <!-- The menu rows' Mark select: a little less inner padding, so "Check mark" fits, and "Other" beside its code field. -->
+    <Style Selector="ComboBox.mark">
+      <Setter Property="Padding" Value="8,5,0,7" />
+      <Setter Property="MinWidth" Value="0" />
+    </Style>
+    <Style Selector="Button.row-tool PathIcon.row-chevron">
+      <Setter Property="Width" Value="10" />
+      <Setter Property="Height" Value="10" />
+    </Style>
     <Style Selector="WrapPanel.menu-fields > StackPanel">
       <Setter Property="Orientation" Value="Horizontal" />
       <Setter Property="Spacing" Value="6" />
@@ -2089,7 +2098,7 @@
                               </StackPanel>
                             </WrapPanel>
                             <StackPanel Classes="menu-table" Classes.editing="{Binding IsEditing}">
-                              <Grid Classes="menu-columns read-only" ColumnDefinitions="28,*,52,44,40,120,60">
+                              <Grid Classes="menu-columns read-only" ColumnDefinitions="28,*,52,84,40,120,60">
                                 <TextBlock Classes="caption" Text="#" />
                                 <TextBlock Grid.Column="1" Classes="caption" Text="TEXT" />
                                 <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
@@ -2098,7 +2107,7 @@
                                 <TextBlock Grid.Column="5" Classes="caption" Text="STYLE" />
                                 <TextBlock Grid.Column="6" Classes="caption" Text="ENABLED" />
                               </Grid>
-                              <Grid Classes="menu-columns editing" ColumnDefinitions="28,*,40,84,40,126,28,28">
+                              <Grid Classes="menu-columns editing" ColumnDefinitions="28,*,40,130,40,126,28,28">
                                 <TextBlock Grid.Column="1" Classes="caption" Text="TEXT" />
                                 <TextBlock Grid.Column="2" Classes="caption" Text="⌘ KEY" />
                                 <TextBlock Grid.Column="3" Classes="caption" Text="MARK" />
@@ -2113,7 +2122,7 @@
                                             Classes.divider="{Binding IsDivider}">
                                       <Panel>
                                         <Border Classes="bar" />
-                                        <Grid Classes="read-only" ColumnDefinitions="28,*,52,44,40,120,60">
+                                        <Grid Classes="read-only" ColumnDefinitions="28,*,52,84,40,120,60">
                                           <TextBlock Classes="muted mono" Text="{Binding Number}" />
                                           <TextBlock Grid.Column="1" Classes="item-text" Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
                                           <StackPanel Grid.Column="1" Classes="divider-mark" Orientation="Horizontal" Spacing="8">
@@ -2126,17 +2135,42 @@
                                           <TextBlock Grid.Column="5" Classes="cell" Text="{Binding StyleText}" TextTrimming="CharacterEllipsis" />
                                           <TextBlock Grid.Column="6" Classes="cell" Text="{Binding EnabledText}" />
                                         </Grid>
-                                        <Grid Classes="editing" ColumnDefinitions="28,*,40,84,40,126,28,28">
+                                        <Grid Classes="editing" ColumnDefinitions="28,*,40,130,40,126,28,28">
                                           <StackPanel Classes="move">
-                                            <Button Classes="flat row-tool" Content="▲" ToolTip.Tip="Move up" AutomationProperties.Name="Move up"
-                                                    Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}" />
-                                            <Button Classes="flat row-tool" Content="▼" ToolTip.Tip="Move down" AutomationProperties.Name="Move down"
-                                                    Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveDownCommand}" CommandParameter="{Binding}" />
+                                            <!-- Chevron icons, not glyphs (boards/read-then-edit.md); Alt+Up and Alt+Down move the selected row. -->
+                                            <Button Classes="flat row-tool" ToolTip.Tip="Move up (Alt+Up)" AutomationProperties.Name="Move up"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveUpCommand}" CommandParameter="{Binding}">
+                                              <PathIcon Classes="row-chevron" Data="M1,6.5 L5,2.5 L9,6.5 L7.6,7.9 L5,5.3 L2.4,7.9 Z" />
+                                            </Button>
+                                            <Button Classes="flat row-tool" ToolTip.Tip="Move down (Alt+Down)" AutomationProperties.Name="Move down"
+                                                    Command="{Binding $parent[ItemsControl].((vm:MenuForm)DataContext).MoveDownCommand}" CommandParameter="{Binding}">
+                                              <PathIcon Classes="row-chevron" Data="M1,3.5 L5,7.5 L9,3.5 L7.6,2.1 L5,4.7 L2.4,2.1 Z" />
+                                            </Button>
                                           </StackPanel>
                                           <TextBox Grid.Column="1" Text="{Binding Text}" AutomationProperties.Name="Text" />
                                           <TextBox Grid.Column="2" Classes="mono key" Classes.conflict="{Binding HasKeyConflict}" Text="{Binding Key}"
                                                    HorizontalContentAlignment="Center" AutomationProperties.Name="Command key" />
-                                          <ComboBox Grid.Column="3" ItemsSource="{Binding MarkChoices}" SelectedItem="{Binding MarkChoice}" AutomationProperties.Name="Mark" />
+                                          <!-- The marks in words; the list adds each one's Mac character code. Other… shows a code field. -->
+                                          <Grid Grid.Column="3" ColumnDefinitions="*,Auto">
+                                            <ComboBox Classes="mark" ItemsSource="{Binding MarkChoices}" SelectedItem="{Binding MarkChoice}" AutomationProperties.Name="Mark"
+                                                      HorizontalAlignment="Stretch">
+                                              <ComboBox.ItemTemplate>
+                                                <DataTemplate DataType="vm:MarkChoice">
+                                                  <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding Label}" />
+                                                    <TextBlock Classes="mono muted" Text="{Binding Code}" />
+                                                  </StackPanel>
+                                                </DataTemplate>
+                                              </ComboBox.ItemTemplate>
+                                              <ComboBox.SelectionBoxItemTemplate>
+                                                <DataTemplate DataType="vm:MarkChoice">
+                                                  <TextBlock Text="{Binding ShortLabel}" />
+                                                </DataTemplate>
+                                              </ComboBox.SelectionBoxItemTemplate>
+                                            </ComboBox>
+                                            <TextBox Grid.Column="1" Classes="mono mark-code" Width="40" Margin="4,0,0,0" Text="{Binding MarkCode}"
+                                                     IsVisible="{Binding IsOtherMark}" Watermark="$2A" AutomationProperties.Name="Mark code" />
+                                          </Grid>
                                           <NumericUpDown Grid.Column="4" Classes="mono" Value="{Binding Icon}" FormatString="0" ShowButtonSpinner="False"
                                                          Minimum="0" Maximum="255" AutomationProperties.Name="Icon" />
                                           <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="2">
