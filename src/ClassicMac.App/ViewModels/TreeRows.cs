@@ -128,7 +128,7 @@ namespace ClassicMac.App.ViewModels
             return string.Create(CultureInfo.InvariantCulture, $"{Math.Round(value, 1):0.#} {units[unit]}");
         }
 
-        private static long HostSize(InputNode input)
+        internal static long HostSize(InputNode input)
         {
             try
             {

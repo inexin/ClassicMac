@@ -193,6 +193,7 @@ namespace ClassicMac.App.ViewModels
         public async Task<InputNode?> OpenAsync(string path)
         {
             Status = $"Reading {Path.GetFileName(path)}…";
+            var reading = BeginProgress($"Reading {Path.GetFileName(path)}…", 0);
             var diagnostics = new List<Diagnostic>();
             try
             {
@@ -224,6 +225,10 @@ namespace ClassicMac.App.ViewModels
                 Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "input.unreadable", e.Message), Path.GetFileName(path), null));
                 Status = $"{Path.GetFileName(path)} could not be read: {e.Message}";
                 return null;
+            }
+            finally
+            {
+                reading.Finish(null);
             }
         }
 
@@ -273,6 +278,7 @@ namespace ClassicMac.App.ViewModels
         {
             TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
             Details = DetailsViewModel.For(value);
+            OnSelectionChangedForInspector();
             // The hex view comes once the preview is known: only a resource without one shows its bytes.
             Hex = HexViewModel.Empty;
             HexSource = null;

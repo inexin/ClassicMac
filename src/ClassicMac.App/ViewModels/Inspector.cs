@@ -1,0 +1,172 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using ClassicMac.Core;
+using ClassicMac.Resources;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+
+namespace ClassicMac.App.ViewModels
+{
+    /// <summary>One fact in the inspector's header: a label and its value, the value in mono for codes.</summary>
+    public sealed record InspectorFact(string Label, string Value, bool IsMono);
+
+    /// <summary>
+    /// The inspector's header for a node (design/boards/main-window.md, S3): its name, its kind and owner ("String list
+    /// in Prefs") and a row of facts.
+    /// </summary>
+    public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kind, IReadOnlyList<InspectorFact> Facts)
+    {
+        private static readonly HashSet<string> ApplicationTypes = ["APPL", "APPC", "APPD", "appe"];
+
+        // What resource types are called (singular, plural).
+        private static readonly Dictionary<string, (string One, string Many)> TypeNames = new()
+        {
+            ["STR "] = ("String", "Strings"), ["STR#"] = ("String list", "String lists"), ["TEXT"] = ("Text", "Texts"),
+            ["styl"] = ("Text style", "Text styles"), ["PICT"] = ("Picture", "Pictures"), ["ICON"] = ("Icon", "Icons"),
+            ["ICN#"] = ("Icon list", "Icon lists"), ["icl4"] = ("4-bit icon", "4-bit icons"), ["icl8"] = ("8-bit icon", "8-bit icons"),
+            ["ics#"] = ("Small icon list", "Small icon lists"), ["ics4"] = ("Small 4-bit icon", "Small 4-bit icons"),
+            ["ics8"] = ("Small 8-bit icon", "Small 8-bit icons"), ["icns"] = ("Icon family", "Icon families"),
+            ["cicn"] = ("Colour icon", "Colour icons"), ["SICN"] = ("Small icons", "Small icons"), ["CURS"] = ("Cursor", "Cursors"),
+            ["crsr"] = ("Colour cursor", "Colour cursors"), ["snd "] = ("Sound", "Sounds"), ["MENU"] = ("Menu", "Menus"),
+            ["DLOG"] = ("Dialog", "Dialogs"), ["DITL"] = ("Dialog item list", "Dialog item lists"), ["ALRT"] = ("Alert", "Alerts"),
+            ["WIND"] = ("Window", "Windows"), ["CNTL"] = ("Control", "Controls"), ["vers"] = ("Version", "Versions"),
+            ["PAT "] = ("Pattern", "Patterns"), ["PAT#"] = ("Pattern list", "Pattern lists"), ["ppat"] = ("Pixel pattern", "Pixel patterns"),
+            ["FOND"] = ("Font family", "Font families"), ["NFNT"] = ("Bitmap font", "Bitmap fonts"), ["FONT"] = ("Font", "Fonts"),
+            ["sfnt"] = ("TrueType font", "TrueType fonts"), ["CODE"] = ("Code segment", "Code segments"), ["TMPL"] = ("Template", "Templates"),
+            ["BNDL"] = ("Bundle", "Bundles"), ["FREF"] = ("File reference", "File references"), ["clut"] = ("Colour table", "Colour tables"),
+        };
+
+        /// <summary>The header for <paramref name="node"/>; null for none and the loading placeholder.</summary>
+        public static InspectorHeader? For(NodeViewModel? node) => node switch
+        {
+            ResourceNode resource => Resource(resource),
+            ResourceTypeNode type => Type(type),
+            FileNode file => new InspectorHeader(file, file.Name, $"{(ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? "Application" : "Document")} in {OwnerName(file)}",
+                [TypeCreator(file.File), Size(file.File.DataFork.Length + file.File.ResourceFork.Length), Resources(file)]),
+            ContainerFileNode container => new InspectorHeader(container, container.File.Name.ToMacRoman(), $"{container.ContentFormat} in {OwnerName(container)}",
+                [TypeCreator(container.File), Size(container.File.DataFork.Length + container.File.ResourceFork.Length)]),
+            FolderNode folder => new InspectorHeader(folder, folder.Name, $"Folder in {OwnerName(folder)}", [Items(folder)]),
+            NoNameGroupNode group => new InspectorHeader(group, group.Name, $"Files with no name in {OwnerName(group)}",
+                [new("Items", group.Children.Count.ToString(CultureInfo.InvariantCulture), false)]),
+            InputNode input => new InspectorHeader(input, input.Name, input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "Resource fork",
+                [new("Files", input.Root.Leaves().Count().ToString("N0", CultureInfo.InvariantCulture), false), new("Size", NodeViewModel.FormatSize(NodeViewModel.HostSize(input)), false)]),
+            _ => null,
+        };
+
+        private static InspectorHeader Resource(ResourceNode node)
+        {
+            var resource = node.Resource;
+            var type = resource.Type.ToString();
+            var kind = TypeNames.TryGetValue(type, out var names) ? names.One : $"'{type}' resource";
+            return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}",
+            [
+                new("Type", $"'{type}'", true),
+                new("ID", resource.Id.ToString(CultureInfo.InvariantCulture), false),
+                Bytes(resource.Length),
+                new("Attributes", resource.Attributes == ResourceAttributes.None ? "none" : resource.Attributes.ToString(), false),
+            ]);
+        }
+
+        private static InspectorHeader Type(ResourceTypeNode node)
+        {
+            var type = node.Type.ToString();
+            var resources = node.Fork.OfType(node.Type).ToList();
+            var kind = TypeNames.TryGetValue(type, out var names) ? names.Many : $"'{type}' resources";
+            return new InspectorHeader(node, $"'{type}'", $"{kind} in {OwnerName(node)}",
+            [
+                new("Type", $"'{type}'", true),
+                new("Resources", resources.Count.ToString(CultureInfo.InvariantCulture), false),
+                Bytes(resources.Sum(r => (long)r.Length)),
+            ]);
+        }
+
+        private static InspectorFact TypeCreator(ClassicMac.Files.MacFile file) =>
+            new("Type / creator", $"{file.FinderInfo.Type} · {file.FinderInfo.Creator}", true);
+
+        private static InspectorFact Size(long bytes) => new("Total size", bytes.ToString("N0", CultureInfo.InvariantCulture) + " bytes", false);
+
+        private static InspectorFact Bytes(long bytes) => new("Size", bytes.ToString("N0", CultureInfo.InvariantCulture) + (bytes == 1 ? " byte" : " bytes"), false);
+
+        private static InspectorFact Items(FolderNode folder) =>
+            new("Items", (folder.Items?.Count ?? folder.Children.Count).ToString(CultureInfo.InvariantCulture), false);
+
+        // A file's resources: their count once read, "none" when it has no fork, else "not read".
+        private static InspectorFact Resources(FileNode file) => new("Resources", file.Resources is { } found
+            ? (found.Fork?.Resources.Count ?? 0).ToString(CultureInfo.InvariantCulture)
+            : file.Children.Count == 0 ? "none" : "not read", false);
+
+        // The file, folder or input a node is in, by name.
+        private static string OwnerName(NodeViewModel node)
+        {
+            var at = node.Parent;
+            while (at is ResourceTypeNode or NoNameGroupNode)
+            {
+                at = at.Parent;
+            }
+
+            return at switch
+            {
+                FileNode file => file.File.Name.ToMacRoman(),
+                ContainerFileNode container => container.File.Name.ToMacRoman(),
+                InputNode input => input.BaseTitle,
+                null => "",
+                _ => at.Name,
+            };
+        }
+    }
+
+    // The inspector's header and the editing of forms in place (the Edit tab is gone: a form opens from the header's
+    // Edit button, in the Preview tab, until Apply or Cancel).
+    public sealed partial class MainViewModel
+    {
+        /// <summary>The selection's header; null with nothing selected.</summary>
+        public InspectorHeader? Header => InspectorHeader.For(Selected);
+
+        /// <summary>What the header's Export… does for the selection: save a resource, export a file's or type's resources, or extract all.</summary>
+        public IRelayCommand HeaderExportCommand => Selected switch
+        {
+            ResourceNode => SaveResourceAsCommand,
+            FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => ExportResourcesCommand,
+            _ => ExtractAllCommand,
+        };
+
+        /// <summary>Whether the selection's form is open for editing (in the Preview tab).</summary>
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(EditFormCommand), nameof(CancelFormCommand))]
+        private bool isEditingForm;
+
+        private bool CanEditForm() => Form is not null && Selected is ResourceNode && !IsEditingForm;
+
+        /// <summary>Opens the selection's form for editing, in the Preview tab.</summary>
+        [RelayCommand(CanExecute = nameof(CanEditForm))]
+        private void EditForm()
+        {
+            if (!CanEditForm())
+            {
+                return;
+            }
+
+            IsEditingForm = true;
+            SelectedTab = 1;
+        }
+
+        /// <summary>Drops the form's unapplied values and ends editing.</summary>
+        [RelayCommand(CanExecute = nameof(IsEditingForm))]
+        private void CancelForm()
+        {
+            DiscardDraft();
+            IsEditingForm = false;
+        }
+
+        // The header, its Export… and editing follow the selection.
+        private void OnSelectionChangedForInspector()
+        {
+            IsEditingForm = false;
+            OnPropertyChanged(nameof(Header));
+            OnPropertyChanged(nameof(HeaderExportCommand));
+            EditFormCommand.NotifyCanExecuteChanged();
+        }
+    }
+}

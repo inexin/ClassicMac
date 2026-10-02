@@ -216,7 +216,7 @@ namespace ClassicMac.App.ViewModels
     {
         /// <summary>The typed editor for the selection, or null.</summary>
         [ObservableProperty]
-        [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand), nameof(SaveCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand), nameof(SaveCommand), nameof(EditFormCommand))]
         private ResourceForm? form;
 
         public bool HasForm => Form is not null;
@@ -316,6 +316,7 @@ namespace ClassicMac.App.ViewModels
             // Applied: no longer a draft, so the selection the edit moves to is not refused.
             form.MarkClean();
             Execute(owner, edit, () => resource);
+            IsEditingForm = false;
         }
     }
 }

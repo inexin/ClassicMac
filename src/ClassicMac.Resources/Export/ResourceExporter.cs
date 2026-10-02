@@ -34,10 +34,11 @@ namespace ClassicMac.Resources.Export
         /// Writes <paramref name="fork"/>'s resources into <paramref name="directory"/>. Throws <see cref="IOException"/>
         /// when the folder already holds files and <see cref="ExportOptions.Overwrite"/> is off. With
         /// <see cref="ExportOptions.Documents"/>, a file that is a document is also converted into <c>document/</c>;
-        /// <paramref name="dataFork"/> reads the file's data fork for that (none when null).
+        /// <paramref name="dataFork"/> reads the file's data fork for that (none when null). <paramref name="progress"/>
+        /// hears the count of resources written so far, after each.
         /// </summary>
         public static ExportResult Export(ResourceFork fork, string directory, ExportSource source, ExportOptions? options = null,
-            Func<ReadOnlyMemory<byte>>? dataFork = null)
+            Func<ReadOnlyMemory<byte>>? dataFork = null, IProgress<int>? progress = null)
         {
             ArgumentNullException.ThrowIfNull(fork);
             ArgumentNullException.ThrowIfNull(directory);
@@ -131,6 +132,7 @@ namespace ClassicMac.Resources.Export
                     (int)resource.Attributes, outputs[0].Content.Length, stored.Length, Dcmp(resource),
                     decoderName, decoderVersion, written[0].Path, written[0].Sha256, Hash(stored.Span), rawPath,
                     warnings.Select(w => w.Message).ToList(), written.Skip(1).ToList(), outputs[0].Encoding));
+                progress?.Report(entries.Count);
             }
 
             ManifestDocument? document = null;

@@ -225,6 +225,7 @@ namespace ClassicMac.App.ViewModels
             theme = saved.Theme;
             TreeDisplay.PropertyChanged += (_, _) => OnTreeDisplayChanged();
             TreeDisplay.LaidOut += UpdateHiddenCount;
+            WatchSummary();
         }
 
         /// <summary>Which files the tree hides or groups.</summary>

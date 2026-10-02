@@ -266,6 +266,13 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
+        /// <summary>The errors and warnings among all entries (filtered or not) that <paramref name="match"/> takes.</summary>
+        public (int Errors, int Warnings) CountsFor(Func<DiagnosticEntry, bool> match)
+        {
+            var taken = all.Where(match).ToList();
+            return (taken.Count(e => e.IsError), taken.Count(e => e.IsWarning));
+        }
+
         public void RemoveAll(Predicate<DiagnosticEntry> match)
         {
             if (all.RemoveAll(match) == 0)

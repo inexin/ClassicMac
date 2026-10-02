@@ -57,6 +57,26 @@ public class ExportTests : IDisposable
 
     private static string Sha(byte[] data) => Convert.ToHexStringLower(SHA256.HashData(data));
 
+    private sealed class Recorder : IProgress<int>
+    {
+        public List<int> Values { get; } = [];
+
+        public void Report(int value) => Values.Add(value);
+    }
+
+    // For a progress bar: the count of resources written so far, after each, of those the export takes.
+    [Fact]
+    public void Export_reports_each_resource_written()
+    {
+        var fork = Fork(Res("PICT", 128, [1]), Res("snd ", 200, [2]), Res("STR#", 1, [3]));
+        var progress = new Recorder();
+
+        ResourceExporter.Export(fork, folder, Source, ExportOptions.Default with { Types = new HashSet<FourCC> { FourCC.FromString("PICT"), FourCC.FromString("STR#") } },
+            progress: progress);
+
+        Assert.Equal([1, 2], progress.Values);
+    }
+
     [Fact]
     public void Resources_go_to_type_folders_with_a_manifest()
     {

@@ -231,7 +231,7 @@ public class WindowTests
                 model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
                 Pump(model.PreviewTask);
                 Assert.IsType(form, model.Form);
-                model.SelectedTab = 3;
+                model.EditFormCommand.Execute(null);
                 Dispatcher.UIThread.RunJobs();
                 Capture(window, "edit-" + type.TrimEnd('#'), type == "DITL" ? baselines : null);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
@@ -747,7 +747,7 @@ public class WindowTests
             Pump(model.Roots[0].EnsureLoadedAsync());
             model.Selected = model.Roots[0].Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR ").Children[0];
             Pump(model.PreviewTask);
-            model.SelectedTab = 3;
+            model.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.IsType<StringForm>(model.Form).Text = "edited";
             var box = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Content as string == "Edit with template");

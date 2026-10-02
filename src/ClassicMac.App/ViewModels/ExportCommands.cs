@@ -85,8 +85,18 @@ namespace ClassicMac.App.ViewModels
 
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(file.Name) + " resources");
             var source = new ExportSource(file.Name, [], file.FinderInfo.Type, file.FinderInfo.Creator, (ushort)file.FinderInfo.Flags);
-            var result = await Task.Run(() => ResourceExporter.Export(fork, target, source, ExportOptionsFor(types),
-                () => file.DataFork.ToArray(ReadOptions.MaxResourceSize)));
+            var progress = BeginProgress($"Exporting {file.Name.ToMacRoman()}…", fork.Resources.Count(r => types is null || types.Contains(r.Type)));
+            ExportResult result;
+            try
+            {
+                result = await Task.Run(() => ResourceExporter.Export(fork, target, source, ExportOptionsFor(types),
+                    () => file.DataFork.ToArray(ReadOptions.MaxResourceSize), progress));
+            }
+            finally
+            {
+                progress.Finish(null);
+            }
+
             foreach (var d in result.Diagnostics.Skip(fork.Diagnostics.Count))
             {
                 Report(new DiagnosticEntry(d, fileNode.Source, fileNode));
@@ -105,8 +115,7 @@ namespace ClassicMac.App.ViewModels
 
             var root = await Whole(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
-            var total = root.Leaves().Count();
-            var progress = new StatusProgress(this, n => $"Extracting {n} of {total} files…");
+            var progress = BeginProgress($"Extracting {NameOf(node)}…", root.Leaves().Count());
             var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
             var result = await Task.Run(() =>
             {
@@ -145,6 +154,7 @@ namespace ClassicMac.App.ViewModels
             var root = await Whole(node);
             var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
             var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
+            var progress = BeginProgress($"Converting {NameOf(node)}…", root.Leaves().Count());
             var (target, result) = await Task.Run(() =>
             {
                 var forks = new List<ForkToExtract>();
@@ -158,7 +168,7 @@ namespace ClassicMac.App.ViewModels
                 }
                 var target = ExportFolders.CreateNew(parent, name + " documents");
                 var result = DocumentConverter.Convert(root, forks, target, ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
-                    ReadOptions, overwrite: false, diagnostics);
+                    ReadOptions, overwrite: false, diagnostics, progress);
                 // No documents: the new folder, still empty, is not left behind.
                 if (result.Documents.Count == 0 && result.Failed.Count == 0)
                 {
@@ -177,6 +187,7 @@ namespace ClassicMac.App.ViewModels
                 Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", failure), node.Source, node));
             }
 
+            progress.Finish(null);
             Status = result.Documents.Count switch
             {
                 0 => $"No documents in {NameOf(node)}.",
@@ -200,8 +211,7 @@ namespace ClassicMac.App.ViewModels
 
             var root = await Whole(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
-            var total = root.Leaves().Count();
-            var progress = new StatusProgress(this, n => $"Unpacking {n} of {total} files…");
+            var progress = BeginProgress($"Unpacking {NameOf(node)}…", root.Leaves().Count());
             var diagnostics = new List<Diagnostic>();
             var result = await Task.Run(() => Unpacker.Unpack(root, target, HostWriteOptions.Default with { Layout = layout }, diagnostics, progress));
             foreach (var d in diagnostics)
@@ -216,42 +226,6 @@ namespace ClassicMac.App.ViewModels
 
             progress.Finish($"{result.Files} files ({result.Bytes:N0} bytes) to {target}.");
         });
-
-        // Progress in the status line. Progress<T> posts its reports, so one can arrive after the export has finished; the
-        // final message is set under the same lock, and reports after it are dropped.
-        private sealed class StatusProgress : IProgress<int>
-        {
-            private readonly object gate = new();
-            private readonly MainViewModel model;
-            private readonly Progress<int> inner;
-            private bool finished;
-
-            public StatusProgress(MainViewModel model, Func<int, string> text)
-            {
-                this.model = model;
-                inner = new Progress<int>(n =>
-                {
-                    lock (gate)
-                    {
-                        if (!finished)
-                        {
-                            model.Status = text(n);
-                        }
-                    }
-                });
-            }
-
-            public void Report(int value) => ((IProgress<int>)inner).Report(value);
-
-            public void Finish(string status)
-            {
-                lock (gate)
-                {
-                    finished = true;
-                    model.Status = status;
-                }
-            }
-        }
 
         // One export at a time; failures to write are reported, not thrown.
         private Task Run(Func<Task> export)
@@ -271,6 +245,7 @@ namespace ClassicMac.App.ViewModels
                 finally
                 {
                     IsExporting = false;
+                    ProgressText = null;         // ended, failed or not
                 }
             }
             return ExportTask = Guarded();

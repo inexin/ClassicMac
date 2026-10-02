@@ -150,11 +150,12 @@ namespace ClassicMac.Files.Export
         /// <paramref name="directory"/>, converted by the first of <paramref name="converters"/> that knows it: one
         /// document straight into it, several into a folder each, placed by <see cref="OutputLayout"/>. Problems go to
         /// <paramref name="diagnostics"/>, as (Mac path, diagnostic). Throws <see cref="IOException"/> when the folder
-        /// already holds files and <paramref name="overwrite"/> is off.
+        /// already holds files and <paramref name="overwrite"/> is off. <paramref name="progress"/> hears the count of
+        /// files looked at so far, after each.
         /// </summary>
         public static ConvertResult Convert(ContainerNode root, IReadOnlyList<ForkToExtract> forks, string directory,
             IReadOnlyList<IDocumentConverter> converters, ReadOptions? readOptions = null, bool overwrite = false,
-            ICollection<(string Source, Diagnostic Diagnostic)>? diagnostics = null)
+            ICollection<(string Source, Diagnostic Diagnostic)>? diagnostics = null, IProgress<int>? progress = null)
         {
             ArgumentNullException.ThrowIfNull(root);
             ArgumentNullException.ThrowIfNull(forks);
@@ -168,6 +169,7 @@ namespace ClassicMac.Files.Export
 
             // Converted first, to know whether there are several.
             var converted = new List<(ForkToExtract Entry, IDocumentConverter Converter, IReadOnlyList<DocumentFile> Files)>();
+            var looked = 0;
             foreach (var entry in forks)
             {
                 var file = entry.Node.File;
@@ -183,6 +185,8 @@ namespace ClassicMac.Files.Export
                 {
                     diagnostics?.Add((file.MacPath, d));
                 }
+
+                progress?.Report(++looked);
             }
 
             var layout = new OutputLayout(name => HostNames.ToHostName(name));

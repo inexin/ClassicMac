@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Viewer: the inspector has a header above its tabs: the selection's icon on a checkerboard tile, its name, its kind
+  and owner ("String list in Prefs") and its facts (type, ID, size and attributes for a resource; type / creator, total
+  size and resources for a file), with Export… and, for resources with a form, Edit. The Edit tab is gone: Edit opens
+  the form in the Preview tab with Cancel and Apply, and the header shows "Editing" until either.
+- Viewer: the status bar shows the selected file's name, format and file count with its errors and warnings in their
+  colours; while a file is read or resources are extracted, exported, unpacked or converted, it shows what runs, how
+  far ("1,240 of 3,906") and a progress bar. `ResourceExporter.Export` and `DocumentConverter.Convert` take an
+  `IProgress<int>`.
 - Viewer: a custom title bar on Windows and macOS (the window extends into its decorations; the platform's caption
   buttons stay, the bar drags the window), with the selected file's name, a " •" while it has unsaved edits, and the
   app's name; Linux keeps the system title bar (S1).
