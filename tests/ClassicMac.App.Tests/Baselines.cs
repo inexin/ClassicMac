@@ -26,6 +26,17 @@ internal static class Baselines
     /// </summary>
     public const int Tolerance = 2;
 
+    /// <summary>
+    /// How many pixels may differ by more than <see cref="Tolerance"/>, each by at most <see cref="StrayLimit"/>. Skia
+    /// caches stroked paths and glyph masks for the process, so the anti-aliased edge of an identical path (a toolbar
+    /// icon's corner) can come out a few levels apart depending on what earlier tests drew; a real change moves more
+    /// pixels, or moves them further.
+    /// </summary>
+    public const int StrayPixels = 8;
+
+    /// <inheritdoc cref="StrayPixels"/>
+    public const int StrayLimit = 32;
+
     public enum Variant { Light, Dark, Scaled150 }
 
     public static readonly Variant[] All = [Variant.Light, Variant.Dark, Variant.Scaled150];
@@ -123,7 +134,7 @@ internal static class Baselines
             return $"{name}: frame {actual.Size.Width} × {actual.Size.Height}, baseline {expected.Size.Width} × {expected.Size.Height} ({path}); actual frame: {actualPath}";
         }
         var diff = Differences(expected.Pixels, actual.Pixels, Tolerance);
-        if (diff.Count == 0)
+        if (diff.Count <= StrayPixels && Differences(expected.Pixels, actual.Pixels, StrayLimit).Count == 0)
         {
             return null;
         }

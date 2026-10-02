@@ -47,6 +47,12 @@ public class BaselineTests
             Assert.Null(Baselines.Compare(name, red));
             Assert.Null(Baselines.Compare(name, Png(4, 3, 253, 2, 0)));
             Assert.Contains("frame 5 × 3, baseline 4 × 3", Baselines.Compare(name, Png(5, 3, 255, 0, 0)));
+            // A few stray edge pixels a little off pass (Skia's caches); many, or one far off, do not.
+            byte[] Stray(int count, byte red) => PngEncoder.Instance.Encode(4, 3,
+                [.. Enumerable.Range(0, 12).SelectMany(i => new byte[] { i < count ? red : (byte)255, 0, 0, 255 })]);
+            Assert.Null(Baselines.Compare(name, Stray(Baselines.StrayPixels, 245)));
+            Assert.Contains("12 pixels differ", Baselines.Compare(name, Stray(12, 245)));
+            Assert.Contains("1 pixels differ", Baselines.Compare(name, Stray(1, 255 - Baselines.StrayLimit - 1)));
             var changed = Baselines.Compare(name, Png(4, 3, 0, 0, 255));
             Assert.Contains("12 pixels differ", changed);
             var diff = Path.Combine(Baselines.FailureFolder, name + "-diff.png");
