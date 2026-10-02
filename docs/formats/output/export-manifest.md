@@ -569,7 +569,7 @@ The image extensions are those of the configured image encoder (`.png` by defaul
 The image decoders hand each resource to `ClassicMac.Graphics` (`PictReader` for pictures, `QuickDrawResources` for icons,
 cursors and patterns), which draws it as the Mac would into a width × height grid of 8-bit RGBA pixels. How each
 resource is laid out and drawn is specified in [pict.md](../graphics/pict.md), [icons.md](../resources/icons.md) (icons, cursors
-and patterns) and [quickdraw.md](../graphics/quickdraw.md) ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths) for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
+and patterns) and [quickdraw.md](../graphics/quickdraw.md) ([quickdraw.md §4.6](../graphics/quickdraw.md#46-screen-depths) for screen depths) and is not repeated here. ClassicMac adds the file encoding, the choice of
 masks for colour icons, the cursor JSON, numbered list outputs and a size limit.
 
 `ClassicMac.Graphics` reports damaged data only by throwing. The image decoders turn such an exception (not-supported,
@@ -600,14 +600,14 @@ message, and the resource is written raw. **[ClassicMac]**
 
 - A `PICT` is drawn by `PictReader.Decode` at its native resolution, with `ClassicMac.Graphics`'s default options otherwise.
 - **Screen depth:** `DecodeOptions.ScreenDepth` (32 by default; 1, 2, 4, 8 or 16) is the depth of the screen the
-  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([quickdraw.md §8](../graphics/quickdraw.md#8-screen-depths)); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
+  picture is drawn on. Below 32, QuickDraw's colour matching and dithering for that depth apply ([quickdraw.md §4.6](../graphics/quickdraw.md#46-screen-depths)); the file is still 8-bit RGBA. Only pictures use it; icons, cursors and patterns are drawn at full colour.
 - **QuickDraw model:** Mac OS 9's QuickDraw by default, or the 68k ROM's when `DecodeOptions.QuickDraw` is
-  `Rom68k` ([quickdraw.md §9](../graphics/quickdraw.md#9-mac-os-9-differences) and [pict.md §10](../graphics/pict.md#10-mac-os-9-differences) list the differences).
+  `Rom68k` ([quickdraw.md §4](../graphics/quickdraw.md#4-variants) and [pict.md §4](../graphics/pict.md#4-variants) list the differences).
 - **Pixel limit:** before drawing, the picture frame (`picFrame`, the `Rect` at bytes 2–9 of the resource) gives the
   canvas size. If width × height exceeds `DecodeOptions.MaxImagePixels` (64 Mi pixels, 67,108,864, by default), the
   picture is not drawn: `image.too-large`, and the resource is written raw. The check needs at least 10 bytes; shorter
   data goes to `ClassicMac.Graphics`, which rejects it. **[ClassicMac]**
-- Parts of the canvas the picture does not draw on are transparent ([pict.md §2.4](../graphics/pict.md#24-the-drawing-space-and-the-canvas)).
+- Parts of the canvas the picture does not draw on are transparent ([quickdraw.md §5](../graphics/quickdraw.md#5-classicmac)).
 
 ### 8.3 Icons and their masks
 
