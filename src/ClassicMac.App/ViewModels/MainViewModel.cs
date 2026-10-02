@@ -143,7 +143,7 @@ namespace ClassicMac.App.ViewModels
         private DiagnosticEntry? selectedDiagnostic;
 
         [ObservableProperty]
-        private string status = "Open a Mac file, disk image or resource fork (File ▸ Open, or drop it here).";
+        private string status = "Ready";
 
         private CancellationTokenSource? previewing;
 

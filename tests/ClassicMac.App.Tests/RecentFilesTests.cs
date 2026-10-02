@@ -171,4 +171,50 @@ public sealed class RecentFilesTests : IDisposable
         model.IsDropTarget = true;
         Assert.True(model.IsDropTarget);
     }
+
+    [Fact]
+    public async Task With_nothing_open_the_diagnostics_are_collapsed_and_the_status_is_Ready()
+    {
+        var model = new MainViewModel();
+        var panel = model.DiagnosticsPanel;
+        Assert.Equal("Ready", model.Status);
+        Assert.False(panel.IsExpanded);
+        Assert.Equal("Nothing opened yet", panel.Placeholder);
+
+        var input = (await model.OpenAsync(Fork("A.rsrc")))!;               // something open: the panel opens
+        Assert.True(panel.IsExpanded);
+        Assert.Null(panel.Placeholder);
+        Assert.NotEqual("Ready", model.Status);
+
+        model.Selected = input;
+        await model.CloseCommand.ExecuteAsync(null);                         // all closed: back as it was
+        Assert.False(panel.IsExpanded);
+        Assert.Equal("Nothing opened yet", panel.Placeholder);
+        Assert.Equal("Ready", model.Status);
+    }
+
+    [Fact]
+    public async Task A_panel_the_user_opened_or_closed_stays_so()
+    {
+        var model = new MainViewModel();
+        var panel = model.DiagnosticsPanel;
+        panel.IsExpanded = true;                                             // opened while empty: kept open
+        var input = (await model.OpenAsync(Fork("A.rsrc")))!;
+        Assert.True(panel.IsExpanded);
+        panel.IsExpanded = false;                                            // closed with a file open
+        model.Selected = input;
+        await model.CloseCommand.ExecuteAsync(null);
+        await model.OpenAsync(Fork("B.rsrc"));
+        Assert.False(panel.IsExpanded);                                      // the user's choice stands
+    }
+
+    [Fact]
+    public async Task A_diagnostic_while_nothing_is_open_opens_the_panel()
+    {
+        var model = new MainViewModel();
+        await model.OpenAsync(Path.Combine(folder, "missing.img"));          // unreadable: reported, nothing opened
+        Assert.True(model.IsEmpty);
+        Assert.True(model.DiagnosticsPanel.IsExpanded);
+        Assert.Null(model.DiagnosticsPanel.Placeholder);
+    }
 }

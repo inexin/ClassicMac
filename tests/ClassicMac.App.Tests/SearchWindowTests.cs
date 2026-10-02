@@ -41,6 +41,9 @@ public sealed class SearchWindowTests : IDisposable
         Assert.Contains("Drop a Mac file, disk image or archive here", Texts(empty));
         Assert.Contains("Kept.rsrc", Texts(empty));
         Assert.Contains("Not found", Texts(empty));
+        // The diagnostics collapsed with "Nothing opened yet"; the status bar says "Ready".
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Nothing opened yet" && t.IsEffectivelyVisible);
+        Assert.Contains(Named<Border>(window, "StatusBar").GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Ready" && t.IsEffectivelyVisible);
 
         // The baseline shows fixed paths (the temporary folder's name changes from run to run).
         model.RecentFiles.Insert(0, new RecentFile(@"C:\Mac\Mac OS 9.hfv", true));

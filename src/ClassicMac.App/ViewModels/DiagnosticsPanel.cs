@@ -109,6 +109,10 @@ namespace ClassicMac.App.ViewModels
         [NotifyPropertyChangedFor(nameof(PanelHeight))]
         private bool isExpanded = true;
 
+        /// <summary>What the collapsed header says when there is nothing to report ("Nothing opened yet"), or null.</summary>
+        [ObservableProperty]
+        private string? placeholder;
+
         private double expandedHeight = DefaultHeight;
 
         /// <summary>The panel's height: the remembered one when expanded, the header's when collapsed.</summary>

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Viewer: with nothing open, the status bar says "Ready" and the diagnostics panel is collapsed to its header, which
+  says "Nothing opened yet"; it opens again when a file opens or something is reported, unless you opened or closed it
+  yourself (S5).
 - Viewer: byte meanings for the hex inspector (E8, model only): `MainViewModel.MeaningAt(node, offset)` says what a
   byte of a resource is ("Character 1 of string 1, “Untitled”", "Length of string 2", "ID of item 3") with the field's
   range and value, for `'STR '`, `'STR#'` and any type a `TMPL` in an open file describes (`ByteMeanings`,

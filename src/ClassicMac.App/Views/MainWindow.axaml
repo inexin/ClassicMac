@@ -1201,6 +1201,15 @@
               </ListBox>
               <ToggleButton Classes="flat outlined" Content="By file" IsChecked="{Binding ByFile, Mode=TwoWay}" />
             </StackPanel>
+            <!-- Collapsed with nothing open: "Nothing opened yet" (boards/empty-state.md). -->
+            <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" Classes="muted" Text="{Binding Placeholder}">
+              <TextBlock.IsVisible>
+                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                  <Binding Path="!IsExpanded" />
+                  <Binding Path="Placeholder" Converter="{x:Static ObjectConverters.IsNotNull}" />
+                </MultiBinding>
+              </TextBlock.IsVisible>
+            </TextBlock>
             <!-- Collapsed: the latest problem. -->
             <TextBlock VerticalAlignment="Center" Margin="10,0,0,0" TextTrimming="CharacterEllipsis" Classes="muted">
               <TextBlock.IsVisible>

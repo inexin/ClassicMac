@@ -55,6 +55,11 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         private bool isDropTarget;
 
+        // Whether the empty state collapsed the diagnostics panel (it opens it again when a file opens, unless the user
+        // opened or closed it since); set while the panel is changed here.
+        private bool panelCollapsedForEmpty;
+        private bool changingPanel;
+
         // Called once from the constructor: the list from the settings, and the empty state following the open inputs.
         private void InitRecentFiles(IReadOnlyList<string> paths)
         {
@@ -63,12 +68,73 @@ namespace ClassicMac.App.ViewModels
             Roots.CollectionChanged += (_, _) =>
             {
                 OnPropertyChanged(nameof(IsEmpty));
-                // Back to the empty state: whether each file is still there is looked at again.
                 if (IsEmpty)
                 {
+                    // Back to the empty state: whether each file is still there is looked at again.
                     ShowRecent(RecentFiles.Select(r => r.Path).ToList());
+                    EnterEmptyState();
+                }
+                else
+                {
+                    LeaveEmptyState();
                 }
             };
+            DiagnosticsPanel.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(DiagnosticsPanel.IsExpanded) && !changingPanel)
+                {
+                    panelCollapsedForEmpty = false;
+                }
+            };
+            DiagnosticsPanel.Entries.CollectionChanged += (_, _) =>
+            {
+                if (DiagnosticsPanel.Entries.Count > 0 && DiagnosticsPanel.Placeholder is not null)
+                {
+                    LeaveEmptyState();
+                }
+            };
+            EnterEmptyState();
+        }
+
+        // Nothing open (board: empty-state.md): the status says "Ready"; with nothing to report, the diagnostics panel
+        // collapses to its header, which says "Nothing opened yet".
+        private void EnterEmptyState()
+        {
+            Status = "Ready";
+            if (DiagnosticsPanel.Entries.Count > 0)
+            {
+                return;
+            }
+            DiagnosticsPanel.Placeholder = "Nothing opened yet";
+            if (DiagnosticsPanel.IsExpanded)
+            {
+                SetPanelExpanded(false);
+                panelCollapsedForEmpty = true;
+            }
+        }
+
+        // Something opened (or reported): the placeholder goes, and a panel the empty state collapsed opens again.
+        private void LeaveEmptyState()
+        {
+            DiagnosticsPanel.Placeholder = null;
+            if (panelCollapsedForEmpty)
+            {
+                SetPanelExpanded(true);
+                panelCollapsedForEmpty = false;
+            }
+        }
+
+        private void SetPanelExpanded(bool expanded)
+        {
+            changingPanel = true;
+            try
+            {
+                DiagnosticsPanel.IsExpanded = expanded;
+            }
+            finally
+            {
+                changingPanel = false;
+            }
         }
 
         private void ShowRecent(IEnumerable<string> paths)
