@@ -618,7 +618,7 @@ message, and the resource is written raw. **[ClassicMac]**
 | `icl4`, `icl8`, `ics4`, `ics8`, `icm4`, `icm8` | the colour icon, masked by the icon list of the **same ID and size** in the same fork: `icl*` by `ICN#`, `ics*` by `ics#`, `icm*` by `icm#` |
 | `cicn` | the colour icon with its own mask |
 | `SICN` | one image per 16 × 16 icon, numbered (§8.4), unmasked |
-| `icns` | one image per image member, named by it: `.it32.png`, `.ih32.png`, `.ich8.png`, `.ich4.png`, `.ich.png`, `.il32.png`, `.icl8.png`, `.icl4.png`, `.ICN.png`, `.is32.png`, `.ics8.png`, `.ics4.png`, `.ics.png`, `.icm8.png`, `.icm4.png`, `.icm.png`, in that order (the 1-bit members drop their `#`); each through the mask Icon Services picks for its size ([icons.md](../resources/icons.md)): an 8-bit mask of the same size as alpha, any other as a hard edge |
+| `icns` | one image per image member, named by it: `.it32.png`, `.ih32.png`, `.ich8.png`, `.ich4.png`, `.ich.png`, `.il32.png`, `.icl8.png`, `.icl4.png`, `.ICN.png`, `.is32.png`, `.ics8.png`, `.ics4.png`, `.ics.png`, `.icm8.png`, `.icm4.png`, `.icm.png`, in that order (the 1-bit members drop their `#`); each through the mask Icon Services picks for its size ([icon-families.md §2.4](../resources/icon-families.md#24-drawing-a-family)): an 8-bit mask of the same size as alpha, any other as a hard edge |
 
 - The mask of a colour icon is taken as the Finder draws it: from the 1-bit list of the same ID
   ([icons.md](../resources/icons.md)). The list is read through `DecodeInput.Find`, decompressed if needed; diagnostics from reading it are
@@ -643,7 +643,7 @@ A cursor (`CURS`, `crsr`) gives two files, **[ClassicMac]**:
 - `<stem>.json`, what a PNG cannot hold, described below.
 
 On the Mac a cursor is drawn as `screen = (screen AND NOT mask) XOR image`: where the mask is 0, a `CURS` data bit 1
-inverts the screen, and a `crsr` pixel XORs the screen with its complement ([icons.md](../resources/icons.md)). The JSON
+inverts the screen, and a `crsr` pixel XORs the screen with its complement ([cursors.md §2](../resources/cursors.md#2-reading)). The JSON
 records that as follows:
 
 | Name | Type | Meaning | Example |
