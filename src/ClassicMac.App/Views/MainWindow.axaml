@@ -2461,7 +2461,7 @@
                                               </ComboBox.SelectionBoxItemTemplate>
                                             </ComboBox>
                                             <TextBox Grid.Column="1" Classes="mono mark-code" Width="40" Margin="4,0,0,0" Text="{Binding MarkCode}"
-                                                     IsVisible="{Binding IsOtherMark}" Watermark="$2A" AutomationProperties.Name="Mark code" />
+                                                     IsVisible="{Binding IsOtherMark}" PlaceholderText="$2A" AutomationProperties.Name="Mark code" />
                                           </Grid>
                                           <NumericUpDown Grid.Column="4" Classes="mono" Value="{Binding Icon}" FormatString="0" ShowButtonSpinner="False"
                                                          Minimum="0" Maximum="255" AutomationProperties.Name="Icon" />
