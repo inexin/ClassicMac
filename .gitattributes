@@ -25,3 +25,6 @@
 
 # Golden decoder outputs are compared byte for byte: never convert their line endings.
 tests/ClassicMac.Resources.Decoders.Tests/Golden/** -text
+
+# Original-application archives and their source forks: byte for byte.
+tests/ClassicMac.Files.Tests/TestData/StuffIt151/** -text

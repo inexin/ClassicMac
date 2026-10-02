@@ -1,0 +1,44 @@
+{
+ "ReadMe": {
+  "type": "TEXT",
+  "creator": "ttxt",
+  "flags": 0,
+  "data_len": 75,
+  "data_md5": "f441e67d3085986546d9c6202fb51001",
+  "rsrc_len": 373,
+  "rsrc_md5": "0f233d181a8786c0ba5ed674e1218c87"
+ },
+ "Empty": {
+  "type": "TEXT",
+  "creator": "ttxt",
+  "flags": 0,
+  "data_len": 0,
+  "data_md5": "d41d8cd98f00b204e9800998ecf8427e",
+  "rsrc_len": 0,
+  "rsrc_md5": "d41d8cd98f00b204e9800998ecf8427e"
+ },
+ "Folder/Inner": {
+  "type": "TEXT",
+  "creator": "ttxt",
+  "flags": 0,
+  "data_len": 32,
+  "data_md5": "1842b28d99f2a8cd7e4633509c5a8e38",
+  "rsrc_len": 0,
+  "rsrc_md5": "d41d8cd98f00b204e9800998ecf8427e"
+ },
+ "Big.txt": {
+  "type": "TEXT",
+  "creator": "ttxt",
+  "flags": 0,
+  "data_len": 40800,
+  "data_md5": "8e52f0436ea16e18707b8ae61c4edcd2",
+  "rsrc_len": 0,
+  "rsrc_md5": "d41d8cd98f00b204e9800998ecf8427e"
+ },
+ "Folder": {
+  "kind": "folder",
+  "items": [
+   "Inner"
+  ]
+ }
+}

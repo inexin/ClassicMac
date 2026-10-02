@@ -157,7 +157,10 @@ public sealed class StuffItSplitReader : IContainerReader
     private static bool TryReadHeader(ReadOnlySpan<byte> bytes, out SplitHeader? header)
     {
         header = null;
-        if (bytes.Length < HeaderLength || bytes[0] != 0xB0 || bytes[1] != 0x56 || bytes[2] != 0 || bytes[3] == 0)
+        // $B056 is SegmentIt's magic; $41A7 is StuffIt 1.5.1's own Segment command. Both use the same layout. The
+        // 1.5.1 headers leave the bytes after the name and after the metadata (94–99) uninitialised, so only the
+        // name's length bytes and 68–93 are read. [Fitted] to StuffIt 1.5.1's segments.
+        if (bytes.Length < HeaderLength || !IsMagic(bytes[0], bytes[1]) || bytes[2] != 0 || bytes[3] == 0)
             return false;
 
         int nameLength = bytes[4];
@@ -168,15 +171,17 @@ public sealed class StuffItSplitReader : IContainerReader
 
         byte[] metadata = bytes.Slice(SharedMetadataOffset, SharedMetadataLength).ToArray();
         var reader = new BigEndianReader(metadata);
-        header = new SplitHeader(bytes[3], nameBytes.ToArray(), metadata, reader.ReadUInt32At(18),
-            reader.ReadUInt32At(22));
+        header = new SplitHeader((ushort)(bytes[0] << 8 | bytes[1]), bytes[3], nameBytes.ToArray(), metadata,
+            reader.ReadUInt32At(18), reader.ReadUInt32At(22));
         return true;
     }
 
-    private sealed record SplitHeader(byte PartNumber, byte[] NameBytes, byte[] Metadata,
+    private static bool IsMagic(byte high, byte low) => (high, low) is (0xB0, 0x56) or (0x41, 0xA7);
+
+    private sealed record SplitHeader(ushort Magic, byte PartNumber, byte[] NameBytes, byte[] Metadata,
         uint ResourceLength, uint DataLength)
     {
-        public bool Matches(SplitHeader other) =>
+        public bool Matches(SplitHeader other) => Magic == other.Magic &&
             NameBytes.AsSpan().SequenceEqual(other.NameBytes) && Metadata.AsSpan().SequenceEqual(other.Metadata);
     }
 }

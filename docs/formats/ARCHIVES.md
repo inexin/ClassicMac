@@ -34,8 +34,12 @@ verifies version-2 traversal and method-13 extraction of both `testfile.PICT` fo
 fork. A second original StuffIt Deluxe 4.5 sample and its AppleDouble companion verify that an archive-level comment is
 read from resource type `SitC`, ID 0 in the archive file's resource fork and decoded as MacRoman. This placement was
 first **[Reference]** based on [XADMaster](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADStuffItParser.m/).
-Version 1 and method 6 are **[Fitted]**: they have hand-built tests only, with no archive made by the original
-application yet. Encrypted entries are reported and skipped.
+Version 1 is **[Verified]** against archives made by StuffIt 1.5.1 on Mac OS 9 (`TestData/StuffIt151`): the member
+layout, folder start/end entries and methods 0 (stored), 1 (RLE90), 2 (LZW) and 3 (Huffman) expand every file with
+both forks, Finder type/creator/flags and dates. StuffIt 1.5.1 leaves stale lengths in a folder-end entry (data
+lengths 32 and 256 in three of the four samples, as in the folder-start entry); folder entries carry no payload, so the reader ignores their
+lengths. Method 6 is still **[Fitted]**: StuffIt 1.5.1 cannot write it, and it has hand-built tests only. Encrypted
+entries are reported and skipped.
 
 ## StuffIt split files (SegmentIt)
 
@@ -48,6 +52,16 @@ missing volume rather than returning truncated forks. When the embedded filename
 continues into the reconstructed StuffIt archive. This layout and sibling matching are **[Fitted]** against
 [XADMaster's split-file parser](https://sources.debian.org/src/unar/1.10.8%2Bds1-9/XADStuffItSplitParser.m/); feature
 tests use hand-built volumes, and an archive made with the original SegmentIt application remains to be verified.
+
+StuffIt 1.5.1's own Other > Segment… command writes the same layout with the magic `$41A7` in place of `$B056`: a
+100-byte header (bytes 2–3 the segment number, then the Pascal filename), then up to the segment size minus 100 bytes
+of the file, in segment order. The segment files are type `SegM`, creator `SIT!`. Bytes 68–93 hold the source file's
+type/creator/flags, dates and fork lengths as above. The bytes after the filename's length and 94–99 are uninitialised
+(they differ between segments of one set) and are never read; the Pascal filename may be shorter than the file's name
+(the sample set records `non` for `fx151_non.sit`), and the reassembled file takes it as is. Segments of one set must
+share the magic, filename and metadata. The reader reassembles a set from any segment and reports a missing segment
+as `archive.missing-volume`. This layout is **[Fitted]** to StuffIt 1.5.1's segments of a 41 974-byte archive
+(`TestData/StuffIt151/fx151_non.seg1`–`seg5`), not read from its code.
 
 ## PackIt (stored, Huffman, and encrypted entries)
 
