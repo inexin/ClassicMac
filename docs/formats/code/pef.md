@@ -490,7 +490,14 @@ table. On top of that:
 - Disk Copy 6.5's: main 1:$22D0, 688 imports, 2,921 fixups, TOC base `$8000`;
 - Mac OS 9.2.2's 90 fragments (`FragmentFacts`, counted by an independent reader): imports, libraries, exports,
   re-exports, hash power, main, init, term, the fixup count and the count of each relocation mnemonic, for every one;
-- every `.pef` in the corpus verifies;
+- the Mac OS 9 System file's 114 resources that hold a container from offset 0 (`'ncod'`, `'nlib'`, `'ndrv'`,
+  `'nift'`, `'ntrb'`, `'fovr'`, `'vdig'`, `'cdek'`, `'sfvr'` and others) each verify, with their fixup counts, 21,784
+  in all; `'ncod'` 3's Constant section and its repeated SECN (fixups at $188, $18C and $190 to section 2, over the
+  words $0, $10 and $18); `'ntrb'` -20987, a pidata section and the loader with main 0:$0 and DTIS first;
+- all 288 sample containers (the 90 fragments, NQD's two builds, FontManager, both Disk Copies, the System file's
+  data-fork fragments, each offset once, and its native resources) make 117,236 fixups, the count the Code Fragment
+  Manager's relocation interpreter gives for them;
+- every `.pef` in the corpus verifies.
 - `PpcCorpusTests`: NQD has no traceback table; Disk Copy 6.1.2 has one (`__uitrunc` at `$3B064`, tb_offset `$68`,
   one floating-point parameter); Disk Copy 6.5 has 1,619, all named, the first `.TradHighestUnitNumber` at `$44`
   (function `$1C`) and the last `.HandleBurn` at `$B9AB8` (function `$B98BC`).
