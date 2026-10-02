@@ -38,7 +38,7 @@
   file, as ResEdit 2.1.3 reads and writes them; `ResourceTemplate` in the decoders library (resources/templates.md).
 - Editor II, import: Resource ▸ Import Image or Sound makes a `PICT`, `cicn`, icon, icon family or cursor from an image
   (PNG, JPEG, …) and a `snd ` from a WAV file, as an undoable edit; `ImageImport` and `SoundImport` in the decoders
-  library (resources/icons.md, graphics/pict.md §9, resources/sound.md §9).
+  library (resources/icons.md, graphics/pict.md §9, resources/sound.md §3).
 - Editor II, UI templates: forms for `DLOG`, `ALRT`, `WIND`, `DITL`, `MENU` and `CNTL` in the Edit tab, the dialog or
   menu preview beside them redrawn as they change; `InterfaceWriter` writes the templates (the Writing sections of resources/windows-dialogs.md, menus.md and dialog-items.md).
 - Editor II, first part: an Edit tab with forms for `STR `, `STR#`, `TEXT` (its `styl` runs kept in step) and `vers`,
