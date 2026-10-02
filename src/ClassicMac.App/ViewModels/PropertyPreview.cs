@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -10,7 +11,7 @@ namespace ClassicMac.App.ViewModels
     {
         /// <summary>Whether a JSON preview shows its JSON rather than its properties.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(ShowsProperties), nameof(ShowsJsonText), nameof(PropertyModeIndex))]
+        [NotifyPropertyChangedFor(nameof(ShowsProperties), nameof(ShowsJsonText), nameof(PropertyModeIndex), nameof(ShowsFontFamily), nameof(ShowsFontJson))]
         private bool showJson;
 
         /// <summary>The switch's segments, in <see cref="PropertyModeIndex"/> order.</summary>
@@ -29,6 +30,40 @@ namespace ClassicMac.App.ViewModels
         /// <summary>Whether the preview shows the JSON text: on request, or when it has no properties to show.</summary>
         public bool ShowsJsonText => Preview.IsJson && (ShowJson || Preview.PropertyCards.Count == 0);
 
+        /// <summary>Whether a font family shows its sample and tables (P6).</summary>
+        public bool ShowsFontFamily => Preview.IsFontFamily && !ShowJson;
+
+        /// <summary>Whether a font family shows its JSON.</summary>
+        public bool ShowsFontJson => Preview.IsFontFamily && ShowJson;
+
+        /// <summary>
+        /// A font family's resource link (a matrix cell or the sample's source): selects that resource of the family's
+        /// file in the tree.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanSelectFontResource))]
+        private void SelectFontResource(object? target)
+        {
+            if (Link(target) is not { } link || Selected is not ResourceNode { Parent.Parent: { } owner })
+            {
+                return;
+            }
+
+            if (owner.Children.OfType<ResourceTypeNode>().FirstOrDefault(t => t.Type.ToString() == link.Type)?
+                .Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == link.Id) is { } node)
+            {
+                Selected = node;
+            }
+        }
+
+        private static bool CanSelectFontResource(object? target) => Link(target) is not null;
+
+        private static FontResourceLink? Link(object? target) => target switch
+        {
+            FontAssociationCell cell => cell.Link,
+            FontResourceLink link => link,
+            _ => null,
+        };
+
         /// <summary>A row's right-click Copy as decimal, hex or JSON: <paramref name="text"/> on the clipboard.</summary>
         [RelayCommand(CanExecute = nameof(CanCopyProperty))]
         private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
@@ -39,6 +74,8 @@ namespace ClassicMac.App.ViewModels
         {
             OnPropertyChanged(nameof(ShowsProperties));
             OnPropertyChanged(nameof(ShowsJsonText));
+            OnPropertyChanged(nameof(ShowsFontFamily));
+            OnPropertyChanged(nameof(ShowsFontJson));
         }
     }
 }

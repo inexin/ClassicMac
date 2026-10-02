@@ -34,6 +34,9 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>A sound that cannot be decoded: what it is, why, and the way to its bytes (boards/sound.md).</summary>
         SoundError,
+
+        /// <summary>A font family: a sample from its strikes and its tables (boards/font-family.md).</summary>
+        FontFamily,
     }
 
     /// <summary>One of a sound's detail chips: "Rate" "22,254.545 Hz".</summary>
@@ -123,7 +126,12 @@ namespace ClassicMac.App.ViewModels
         public MenuResource? Menu { get; private init; }
 
         public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document
-            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError;
+            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError or PreviewKind.FontFamily;
+
+        /// <summary>A font family's sample and tables (P6); its JSON is <see cref="Text"/>.</summary>
+        public FontFamilyPreview? FontFamily { get; private init; }
+
+        public bool IsFontFamily => Kind == PreviewKind.FontFamily;
 
         public bool IsDocument => Kind == PreviewKind.Document;
 
@@ -131,8 +139,8 @@ namespace ClassicMac.App.ViewModels
 
         public bool IsMenu => Kind == PreviewKind.Menu;
 
-        /// <summary>Whether the zoom applies (images, folders, dialogs and menus).</summary>
-        public bool IsZoomable => Kind is PreviewKind.Image or PreviewKind.Folder or PreviewKind.Dialog or PreviewKind.Menu;
+        /// <summary>Whether the zoom applies (images, folders, dialogs, menus and font samples).</summary>
+        public bool IsZoomable => Kind is PreviewKind.Image or PreviewKind.Folder or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.FontFamily;
 
         public bool IsSound => Kind == PreviewKind.Sound;
 
@@ -247,6 +255,12 @@ namespace ClassicMac.App.ViewModels
 
             var files = decoder.Decode(new DecodeInput(resource, data, fork, readOptions, diagnostics));
             var preview = FromFiles(files, $"'{type}'", type);
+            // A font family: its sample and tables, the JSON a click away.
+            if (type == "FOND" && preview.IsJson && FontFamilyPreview.Create(resource, data, fork, readOptions) is { } font)
+            {
+                return new PreviewViewModel(PreviewKind.FontFamily, "") { Text = preview.Text, FontFamily = font };
+            }
+
             // Icons: every member of their ID's family, its masks, and the suite as the Finder draws it.
             if (preview.Kind == PreviewKind.Image && FinderIcons.Applies(resource))
             {

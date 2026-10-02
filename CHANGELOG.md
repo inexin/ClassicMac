@@ -6,6 +6,14 @@
   select reads in words with each mark's Mac character code in the list (None, Check mark `$12`, Diamond `$13`,
   Bullet `$A5`, Other…, which shows a field for any other code such as `$2A`), and the table's Mark column names the
   mark ("Check mark", "* $2A") instead of drawing a symbol.
+- Viewer: a font family ('FOND', boards/font-family.md, P6) previews as its sample and tables, with Properties | JSON:
+  size chips from the association table (and TrueType), a style select (styles without a strike marked "(QuickDraw)",
+  synthesised from the plain strike as the Font Manager does), an editable sample line drawn by QuickDraw from the
+  strike in the family's file at the zoom, black on white ("From 'NFNT' 393 · 12 pt plain · 1-bit", a link to it);
+  the association matrix (sizes down, styles across, links that select the resource, missing ones muted with a warning,
+  depth badges); the metrics in ems and pixels at the chosen size with the flags as chips; the style extra widths,
+  width tables and style-mapping names; the kerning pairs of the chosen style, strongest first, 8 then "Show all", a
+  pair highlighted in the sample. The header shows the family's facts and "Aa" from its 24 pt (or largest) strike.
 - Viewer: the files in a "No name" group show their names as ASCII token chips instead of symbol glyphs the UI font may
   lack (boards/tree-no-name.md): `sp`, `nbsp`, `tab`, `cr`, `lf`, other control characters as `^A`/`^?`, a run of
   one character as `sp×3`; mono 10 on CmSegmentTrack, on the new CmTokenOnSelection in the selected row; hovering

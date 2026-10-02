@@ -64,6 +64,11 @@ namespace ClassicMac.App.ViewModels
             var resource = node.Resource;
             var type = resource.Type.ToString();
             var kind = TypeNames.TryGetValue(type, out var names) ? names.One : $"'{type}' resource";
+            if (type == "FOND" && FamilyFacts(node) is { } family)
+            {
+                return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}", family);
+            }
+
             var facts = new List<InspectorFact>
             {
                 new("Type", $"'{type}'", true),
@@ -82,6 +87,42 @@ namespace ClassicMac.App.ViewModels
             facts.Add(Bytes(draftSize ?? resource.Length));
             facts.Add(new("Attributes", resource.Attributes == ResourceAttributes.None ? "none" : resource.Attributes.ToString(), false));
             return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}", facts);
+        }
+
+        // A font family's facts (boards/font-family.md): its ID, version, strikes and whether it is fixed width; null when
+        // it cannot be read.
+        private static List<InspectorFact>? FamilyFacts(ResourceNode node)
+        {
+            ClassicMac.Graphics.Fonts.FontFamily family;
+            try
+            {
+                var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, []);
+                family = ClassicMac.Graphics.Fonts.FontFamily.Read(data, "");
+            }
+            catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+            {
+                return null;
+            }
+
+            var strikes = new List<string> { $"{family.Fonts.Count(f => f.Size > 0)} bitmap" };
+            if (family.Fonts.Count(f => f.Size == 0) is > 0 and var trueType)
+            {
+                strikes.Add($"{trueType} TrueType");
+            }
+
+            if (family.Fonts.Count(f => f.Size < 0) is > 0 and var type1)
+            {
+                strikes.Add($"{type1} Type 1");
+            }
+
+            return
+            [
+                new("Type", "'FOND'", true),
+                new("Family ID", family.FamilyId.ToString(CultureInfo.InvariantCulture), false),
+                new("Version", family.Version.ToString(CultureInfo.InvariantCulture), false),
+                new("Strikes", string.Join(", ", strikes), false),
+                new("Fixed width", (family.Flags & 0x8000) != 0 ? "Yes" : "No", false),
+            ];
         }
 
         // An item list's items, and the dialog or alert that uses it (boards/dialog-item-list.md).

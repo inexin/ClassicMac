@@ -792,6 +792,62 @@
     <Style Selector="TextBlock.sound-time">
       <Setter Property="FontSize" Value="14" />
     </Style>
+    <!-- The font family preview (boards/font-family.md). -->
+    <Style Selector="TextBlock.font-size">
+      <Setter Property="Width" Value="72" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.font-cell, StackPanel.font-cell">
+      <Setter Property="Width" Value="128" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="StackPanel.font-matrix">
+      <Setter Property="Margin" Value="16,4,16,8" />
+    </Style>
+    <Style Selector="Button.mono">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    </Style>
+    <Style Selector="TextBlock.missing">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="PathIcon.warning">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource CmWarning}" />
+    </Style>
+    <Style Selector="Border.depth">
+      <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.depth">
+      <Setter Property="FontSize" Value="10" />
+    </Style>
+    <Style Selector="Border.font-flag">
+      <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="Margin" Value="0,0,6,4" />
+    </Style>
+    <Style Selector="StackPanel.font-extra">
+      <Setter Property="Margin" Value="0,0,8,4" />
+      <Setter Property="MinWidth" Value="56" />
+    </Style>
+    <Style Selector="ListBox.font-kerns ListBoxItem">
+      <Setter Property="Padding" Value="12,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="Grid.font-kern-header">
+      <Setter Property="Margin" Value="16,8,16,0" />
+    </Style>
+    <Style Selector="ListBox.font-kerns">
+      <Setter Property="Margin" Value="4,0,4,4" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
     <Style Selector="Border.chip">
       <Setter Property="BorderBrush" Value="{DynamicResource CmCardBorder}" />
       <Setter Property="BorderThickness" Value="1" />
@@ -1492,6 +1548,239 @@
                       </ItemsControl>
                     </ScrollViewer>
                     <ScrollViewer IsVisible="{Binding ShowsJsonText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+                      <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
+                    </ScrollViewer>
+                  </Panel>
+                </DockPanel>
+                <!-- A font family (boards/font-family.md, P6): Properties | JSON; the sample from the chosen strike, the
+                     association matrix, the metrics, style and kerning cards. -->
+                <DockPanel IsVisible="{Binding Preview.IsFontFamily}">
+                  <ListBox x:Name="FontMode" DockPanel.Dock="Top" Classes="segmented" HorizontalAlignment="Left" Margin="16,12,16,0"
+                           ItemsSource="{x:Static vm:MainViewModel.PropertyModes}" SelectedIndex="{Binding PropertyModeIndex, Mode=TwoWay}"
+                           AutomationProperties.Name="Properties or JSON" />
+                  <Panel>
+                    <ScrollViewer x:Name="FontFamilyView" IsVisible="{Binding ShowsFontFamily}" Padding="16,12">
+                      <StackPanel Classes="cards" DataContext="{Binding Preview.FontFamily}" x:DataType="vm:FontFamilyPreview">
+                        <!-- The sample: size chips, the style, the text; the line on the checkerboard; where it comes from. -->
+                        <StackPanel Spacing="8">
+                          <WrapPanel>
+                            <ListBox x:Name="FontSizes" Classes="segmented" Margin="0,0,8,8" ItemsSource="{Binding Sizes}"
+                                     SelectedItem="{Binding ChosenSize, Mode=TwoWay}" AutomationProperties.Name="Size">
+                              <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:FontSizeChoice">
+                                  <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                              </ListBox.ItemTemplate>
+                            </ListBox>
+                            <ComboBox x:Name="FontStyles" Margin="0,0,8,8" MinWidth="200" ItemsSource="{Binding Styles}"
+                                      SelectedItem="{Binding ChosenStyle, Mode=TwoWay}" AutomationProperties.Name="Style">
+                              <ComboBox.ItemTemplate>
+                                <DataTemplate DataType="vm:FontStyleChoice">
+                                  <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                              </ComboBox.ItemTemplate>
+                            </ComboBox>
+                            <TextBox x:Name="FontSampleText" Margin="0,0,8,8" Width="360" Text="{Binding SampleText}" AutomationProperties.Name="Sample text" />
+                          </WrapPanel>
+                          <Border Background="{DynamicResource CmCheckerboard}" Padding="12" CornerRadius="6" HorizontalAlignment="Left"
+                                  IsVisible="{Binding HasSample}">
+                            <views:FontSampleView x:Name="FontSample" Sample="{Binding Sample}" Highlight="{Binding Highlight}"
+                                                  Zoom="{Binding $parent[Window].((vm:MainViewModel)DataContext).Zoom, FallbackValue=1}" />
+                          </Border>
+                          <TextBlock Classes="muted" Text="{Binding SampleMessage}" IsVisible="{Binding HasSampleMessage}" />
+                          <Button Classes="link font-source" Padding="0" HorizontalAlignment="Left" Content="{Binding SampleSource}"
+                                  IsVisible="{Binding SampleLink, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectFontResourceCommand, FallbackValue={x:Null}}" CommandParameter="{Binding SampleLink}" />
+                          <TextBlock Classes="muted" Text="Read as far as the data goes" IsVisible="{Binding IsShort}" />
+                        </StackPanel>
+                        <!-- The association table: sizes down, styles across. -->
+                        <Border x:Name="FontMatrix" Classes="card">
+                          <StackPanel>
+                            <TextBlock Classes="card-title" Text="Association table" />
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <StackPanel Classes="font-matrix">
+                              <StackPanel Orientation="Horizontal">
+                                <TextBlock Classes="label font-size" Text="Size" />
+                                <ItemsControl ItemsSource="{Binding Columns}">
+                                  <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                      <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                  </ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="x:String">
+                                      <TextBlock Classes="label font-cell" Text="{Binding}" />
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </StackPanel>
+                              <ItemsControl ItemsSource="{Binding Rows}">
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate DataType="vm:FontAssociationRow">
+                                    <Border Classes="card-line">
+                                      <StackPanel Orientation="Horizontal">
+                                        <TextBlock Classes="font-size" Text="{Binding Label}" />
+                                        <ItemsControl ItemsSource="{Binding Cells}">
+                                          <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                              <StackPanel Orientation="Horizontal" />
+                                            </ItemsPanelTemplate>
+                                          </ItemsControl.ItemsPanel>
+                                          <ItemsControl.ItemTemplate>
+                                            <DataTemplate DataType="vm:FontAssociationCell">
+                                              <StackPanel Classes="font-cell" Orientation="Horizontal" Spacing="6">
+                                                <Button Classes="link mono" Padding="0" Content="{Binding Text}" IsVisible="{Binding IsLink}"
+                                                        Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).SelectFontResourceCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
+                                                <PathIcon Classes="warning" IsVisible="{Binding IsMissing}" ToolTip.Tip="{Binding ToolTip}"
+                                                          Data="F1 M8,1 L15,14 H1 Z M7.25,5 V10 H8.75 V5 Z M7.25,11 V12.5 H8.75 V11 Z" />
+                                                <TextBlock Classes="missing" Text="{Binding Text}" IsVisible="{Binding IsMissing}" ToolTip.Tip="{Binding ToolTip}" />
+                                                <TextBlock Classes="muted" Text="{Binding Text}" IsVisible="{Binding IsEmpty}" />
+                                                <Border Classes="depth" IsVisible="{Binding HasDepth}">
+                                                  <TextBlock Classes="depth" Text="{Binding Depth}" />
+                                                </Border>
+                                              </StackPanel>
+                                            </DataTemplate>
+                                          </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                      </StackPanel>
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                            </StackPanel>
+                            </ScrollViewer>
+                          </StackPanel>
+                        </Border>
+                        <!-- Metrics: in ems and in pixels at the chosen size; the character range; the flags as chips. -->
+                        <Border x:Name="FontMetrics" Classes="card">
+                          <StackPanel>
+                            <TextBlock Classes="card-title" Text="Metrics" />
+                            <ItemsControl ItemsSource="{Binding Metrics}">
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="vm:PropertyRow">
+                                  <Border Classes="card-line">
+                                    <Grid Classes="card-row" ColumnDefinitions="180,*">
+                                      <TextBlock Classes="label" Text="{Binding Label}" />
+                                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                        <SelectableTextBlock Classes="property-value mono" Text="{Binding Value}" />
+                                        <TextBlock Classes="muted" Text="{Binding Note}" IsVisible="{Binding HasNote}" VerticalAlignment="Center" />
+                                      </StackPanel>
+                                    </Grid>
+                                  </Border>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Classes="card-line">
+                              <Grid Classes="card-row" ColumnDefinitions="180,*">
+                                <TextBlock Classes="label" Text="Flags" />
+                                <WrapPanel Grid.Column="1">
+                                  <ItemsControl ItemsSource="{Binding Flags}">
+                                    <ItemsControl.ItemsPanel>
+                                      <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                      </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate DataType="x:String">
+                                        <Border Classes="font-flag">
+                                          <TextBlock Text="{Binding}" />
+                                        </Border>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                  <TextBlock Classes="property-raw" Text="{Binding FlagsRaw}" VerticalAlignment="Center" />
+                                </WrapPanel>
+                              </Grid>
+                            </Border>
+                          </StackPanel>
+                        </Border>
+                        <!-- Style: the extra widths, the width tables, the style mapping's names. -->
+                        <Border x:Name="FontStyleCard" Classes="card">
+                          <StackPanel>
+                            <TextBlock Classes="card-title" Text="Style" />
+                            <Border Classes="card-line">
+                              <Grid Classes="card-row" ColumnDefinitions="180,*">
+                                <TextBlock Classes="label" Text="Style extra widths" />
+                                <ItemsControl Grid.Column="1" ItemsSource="{Binding StyleExtras}">
+                                  <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                      <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                  </ItemsControl.ItemsPanel>
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:FontStyleExtra">
+                                      <StackPanel Classes="font-extra">
+                                        <TextBlock Classes="muted" FontSize="{DynamicResource CmFontSizeMeta}" Text="{Binding Label}" />
+                                        <TextBlock Classes="mono" Classes.muted="{Binding IsZero}" Text="{Binding Value}" />
+                                      </StackPanel>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </Grid>
+                            </Border>
+                            <Border Classes="card-line">
+                              <Grid Classes="card-row" ColumnDefinitions="180,*">
+                                <TextBlock Classes="label" Text="Width tables" />
+                                <TextBlock Grid.Column="1" Text="{Binding WidthTables}" />
+                              </Grid>
+                            </Border>
+                            <Border Classes="card-line">
+                              <Grid Classes="card-row" ColumnDefinitions="180,*">
+                                <TextBlock Classes="label" Text="Style mapping" />
+                                <TextBlock Grid.Column="1" Text="None" IsVisible="{Binding !HasStyleMapping}" />
+                                <StackPanel Grid.Column="1" IsVisible="{Binding HasStyleMapping}" Spacing="2">
+                                  <Grid ColumnDefinitions="120,*">
+                                    <TextBlock Classes="muted" Text="Font class" />
+                                    <TextBlock Grid.Column="1" Classes="mono" Text="{Binding FontClass}" />
+                                  </Grid>
+                                  <ItemsControl ItemsSource="{Binding StyleNames}">
+                                    <ItemsControl.ItemTemplate>
+                                      <DataTemplate DataType="vm:FontStyleName">
+                                        <Grid ColumnDefinitions="120,*">
+                                          <TextBlock Classes="muted" Text="{Binding Style}" />
+                                          <SelectableTextBlock Grid.Column="1" Classes="mono" Text="{Binding Name}" />
+                                        </Grid>
+                                      </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </StackPanel>
+                        </Border>
+                        <!-- Kerning: the summary, then the chosen style's pairs, strongest first; a pair is highlighted in the sample. -->
+                        <Border x:Name="FontKerning" Classes="card">
+                          <StackPanel>
+                            <TextBlock Classes="card-title" Text="Kerning" />
+                            <Border Classes="card-line">
+                              <Grid Classes="card-row">
+                                <TextBlock Text="{Binding KerningSummary}" />
+                              </Grid>
+                            </Border>
+                            <Grid ColumnDefinitions="80,120,*" Classes="font-kern-header" IsVisible="{Binding HasKernPairs}">
+                              <TextBlock Classes="label" Text="Pair" />
+                              <TextBlock Grid.Column="1" Classes="label" Text="Kern" />
+                              <TextBlock Grid.Column="2" Classes="label" Text="At the chosen size" />
+                            </Grid>
+                            <ListBox x:Name="FontKernPairs" Classes="font-kerns" ItemsSource="{Binding KernPairs}" SelectedItem="{Binding SelectedPair, Mode=TwoWay}"
+                                     IsVisible="{Binding HasKernPairs}" AutomationProperties.Name="Kerning pairs">
+                              <ListBox.ItemTemplate>
+                                <DataTemplate DataType="vm:FontKernRow">
+                                  <Grid ColumnDefinitions="80,120,*">
+                                    <TextBlock Classes="mono" Text="{Binding Pair}" ToolTip.Tip="{Binding Codes}" />
+                                    <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Em}" />
+                                    <TextBlock Grid.Column="2" Classes="mono" Text="{Binding Pixels}" />
+                                  </Grid>
+                                </DataTemplate>
+                              </ListBox.ItemTemplate>
+                            </ListBox>
+                            <Button Classes="link" Padding="12,4" HorizontalAlignment="Left" Content="{Binding ShowAllPairsLabel}"
+                                    IsVisible="{Binding CanShowAllPairs}" Command="{Binding ShowAllPairsCommand}" />
+                          </StackPanel>
+                        </Border>
+                      </StackPanel>
+                    </ScrollViewer>
+                    <ScrollViewer x:Name="FontJson" IsVisible="{Binding ShowsFontJson}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
                       <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
                     </ScrollViewer>
                   </Panel>

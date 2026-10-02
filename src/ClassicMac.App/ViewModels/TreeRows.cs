@@ -205,6 +205,7 @@ namespace ClassicMac.App.ViewModels
         {
             ResourceNode resource when IsIconResource(resource.Resource.Type.ToString()) => ResourceIcon(resource, large: true),
             ResourceNode { Resource.Type: var type } resource when type.ToString() == "PICT" => Thumbnail(resource),
+            ResourceNode { Resource.Type: var type } resource when type.ToString() == "FOND" => FamilyTile(resource),
             FileNode file => FolderPreviews.FinderIcon(file, 32),
             _ => null,
         };
@@ -223,6 +224,13 @@ namespace ClassicMac.App.ViewModels
             {
                 return null;
             }
+        }
+
+        // A font family: "Aa" in its 24 pt (or largest) strike; none without a strike in its file.
+        private static byte[]? FamilyTile(ResourceNode node)
+        {
+            var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, []);
+            return FontFamilyPreview.Create(node.Resource, data, node.Fork, node.Input.Options)?.Tile();
         }
 
         private static readonly HashSet<string> LargeMembers = ["ICN#", "icl4", "icl8", "il32"];
