@@ -20,7 +20,8 @@ internal static class HfsPlusReader
     private const ushort HasLinkChainMask = 0x0020;
     private const ushort HasChildLinkMask = 0x0040;
 
-    public static IReadOnlyList<MacFile> Read(ForkData image, ContainerContext context)
+    // The volume's files; its folders (but the private hard-link folders) go to folderList when one is given.
+    public static IReadOnlyList<MacFile> Read(ForkData image, ContainerContext context, List<MacFolder>? folderList = null)
     {
         byte[] header = image.Slice(HeaderOffset, HeaderLength).ToArray();
         var headerReader = new BigEndianReader(header);
@@ -128,6 +129,7 @@ internal static class HfsPlusReader
             records.Add(record);
         }
         var folders = new Dictionary<uint, (uint Parent, string Name, uint Valence, uint FolderCount, ushort Flags)>();
+        var folderRecords = new Dictionary<uint, byte[]>();
         var folderHardLinkCounts = new Dictionary<uint, uint>();
         var folderSecurity = new Dictionary<uint, (byte OwnerFlags, ushort Mode)>();
         var catalogIds = new HashSet<uint>();
@@ -165,6 +167,7 @@ internal static class HfsPlusReader
                         (parent, name, U32(dataReader, 4), U32(dataReader, 84), U16(dataReader, 2))))
                         throw new InvalidDataException("Duplicate HFS Plus folder ID.");
                     folderHardLinkCounts.Add(id, U32(dataReader, 44));
+                    folderRecords.Add(id, data);
                     folderSecurity.Add(id, (data[41], U16(dataReader, 42)));
                     catalogNodes.Add(id, new CatalogNode(parent, name, IsFolder: true));
                     break;
@@ -518,6 +521,25 @@ internal static class HfsPlusReader
         if (freeBlocks != declaredFreeBlocks)
             context.Report(DiagnosticSeverity.Info, "hfs.plus-free-blocks",
                 $"The allocation bitmap has {freeBlocks} free blocks; the volume header says {declaredFreeBlocks}.");
+        if (folderList is not null)
+        {
+            // HFSPlusCatalogFolder (TN1150): dates at +12 and +16, userInfo (DInfo) at +48, finderInfo (DXInfo) at +64.
+            foreach (var (id, folder) in folders)
+            {
+                if (privateDataFolderIds.Contains(id)) continue;
+                var record = folderRecords[id];
+                var recordReader = new BigEndianReader(record);
+                folderList.Add(new MacFolder
+                {
+                    Name = LegacyName(folder.Name),
+                    IsRoot = id == RootFolderId,
+                    FolderPath = id == RootFolderId ? [] : FolderPath(folder.Parent, folders).Select(LegacyName).ToArray(),
+                    FinderInfo = FolderFinderInfo.Read(record.AsSpan(48, FolderFinderInfo.Length)),
+                    Created = Date(U32(recordReader, 12)),
+                    Modified = Date(U32(recordReader, 16)),
+                });
+            }
+        }
         uint expectedFiles = U32(headerReader, 32);
         uint expectedFolders = U32(headerReader, 36);
         if (catalogFiles.Count != expectedFiles || folders.Count - 1 != expectedFolders)

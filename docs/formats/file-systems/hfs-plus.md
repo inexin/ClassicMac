@@ -180,8 +180,9 @@ File record:
 | +$58 | 80 | `dataFork` | Fork data (§1.3) |
 | +$A8 | 80 | `resourceFork` | |
 
-A folder record has the same fields to +$53 with `valence` (u32) at +$04, `folderID` at +$08, `DInfo` and `DXInfo` for
-the Finder fields, and at +$54 `folderCount` (u32): the folders it contains, used on HFSX when the has-folder-count
+A folder record has the same fields to +$53 with `valence` (u32) at +$04, `folderID` at +$08, `DInfo` (`userInfo`,
++$30) and `DXInfo` (`finderInfo`, +$40) for the Finder fields ([finder-windows.md §1.1](finder-windows.md#11-folder-finder-information-dinfo-dxinfo)),
+and at +$54 `folderCount` (u32): the folders it contains, used on HFSX when the has-folder-count
 flag is set [Code: Apple hfs_format.h `HFSPlusCatalogFolder`].
 
 Catalog flags: bit 0 file locked, bit 1 thread exists, bit 2 has attributes, bit 3 has security (ACL), bit 4 has folder
@@ -423,6 +424,9 @@ None.
   `MacFile.HardLinkReference`. Directory hard links expose the inode's files at every valid alias path. The two private
   folders' subtrees are left out of the list.
 - Symbolic links keep their data fork and expose it as `MacFile.SymbolicLinkTarget`, strict UTF-8.
+- `HfsReader.ReadFolders` returns the folder records, the root included, as on HFS
+  ([hfs.md §5.2](hfs.md#52-what-comes-out)): Mac OS Roman names and paths as for files, `userInfo` and `finderInfo`,
+  `createDate` and `contentModDate`. The private folders and their subtrees are left out.
 - Catalog lookup by name is not offered; key order is only validated, with the volume's comparison. The comparison
   uses fixed Unicode 3.2 tables, decomposition and Hangul included, not the host runtime's.
 - The catalog B-tree is read into memory within `ContainerReadOptions.MaxExpandedBytesPerInput`; more file and folder
@@ -505,7 +509,8 @@ The wrapper's bitmap not fitting in the image is `hfs.bitmap-truncated` ([hfs.md
   links, file and directory hard links with each of their diagnostics, B-tree node sizes of 512, 1024 and 2048 bytes
   for the extents tree, journal headers in 512- and 2,048-byte sectors (a changed byte past the fixed fields
   included), forks whose logical size exceeds their blocks (catalog data and resource forks, and the startup file), and
-  the Unicode 2.1 forms and `FixDecomps` sequences.
+  the Unicode 2.1 forms and `FixDecomps` sequences; folder records' `DInfo`, `DXInfo` and dates through
+  `ReadFolders`, plain, wrapped and with the private folder left out.
 - `tests/ClassicMac.Files.Tests/HfsPlusOriginalImageTests.cs` reads a 10 MiB journaled Mac OS X HFS Plus image from
   Digital Corpora's `nps-2009-hfsjtest1` corpus (`image.gen1.dmg`, SHA-256
   `BEB7795DD6D1A5319F9C20101855FFFF9665FCC11C6B23DE822D50C0D1E388EE`), given through

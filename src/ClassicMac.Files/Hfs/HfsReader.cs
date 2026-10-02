@@ -41,17 +41,33 @@ namespace ClassicMac.Files.Hfs
         }
 
         /// <inheritdoc/>
-        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => Read(input, context, null);
+
+        /// <summary>
+        /// The volume's folders with their Finder information (window, icon place, flags) and dates, the root folder
+        /// included (HFS and HFS Plus, plain or wrapped). The volume is read as <see cref="Read(ForkData, ContainerContext)"/>
+        /// reads it, with the same checks and diagnostics; HFS Plus's private hard-link folders are left out.
+        /// </summary>
+        public IReadOnlyList<MacFolder> ReadFolders(ForkData input, ContainerContext context)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            ArgumentNullException.ThrowIfNull(context);
+            var folders = new List<MacFolder>();
+            Read(input, context, folders);
+            return folders;
+        }
+
+        private IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context, List<MacFolder>? folders)
         {
             if (!CanRead(input)) throw new InvalidDataException("Not an HFS volume.");
             var mdb = input.Slice(MdbOffset, MdbLength).ToArray();
             var reader = new BigEndianReader(mdb);
             if (reader.ReadUInt16At(0) is HfsPlusSignature or HfsXSignature)
-                return HfsPlusReader.Read(input, context);
+                return HfsPlusReader.Read(input, context, folders);
             if (reader.ReadUInt16At(0x7C) == HfsPlusSignature)
-                return ReadEmbeddedPlus(input, mdb, context);
+                return ReadEmbeddedPlus(input, mdb, context, folders);
             ReportAlternateMdbProblem(input, context);
-            return new Volume(input, mdb, context).Files();
+            return new Volume(input, mdb, context).Files(folders);
         }
 
         private static void ReportAlternateMdbProblem(ForkData input, ContainerContext context)
@@ -65,7 +81,7 @@ namespace ClassicMac.Files.Hfs
                     Math.Max(0, input.Length - AlternateMdbOffsetFromEnd));
         }
 
-        private static IReadOnlyList<MacFile> ReadEmbeddedPlus(ForkData input, byte[] mdb, ContainerContext context)
+        private static IReadOnlyList<MacFile> ReadEmbeddedPlus(ForkData input, byte[] mdb, ContainerContext context, List<MacFolder>? folders)
         {
             var reader = new BigEndianReader(mdb);
             uint blockSize = reader.ReadUInt32At(0x14);
@@ -85,7 +101,7 @@ namespace ClassicMac.Files.Hfs
                 offset + length > allocationAreaEnd || length < 1536)
                 throw new InvalidDataException("The HFS wrapper's embedded HFS Plus volume lies outside the image.");
             ReportUnallocatedEmbeddedVolume(input, mdb, embeddedStart, embeddedBlocks, context);
-            return HfsPlusReader.Read(input.Slice(checked((long)offset), checked((long)length)), context);
+            return HfsPlusReader.Read(input.Slice(checked((long)offset), checked((long)length)), context, folders);
         }
 
         private static void ReportUnallocatedEmbeddedVolume(ForkData input, byte[] mdb, uint embeddedStart,
@@ -161,7 +177,8 @@ namespace ClassicMac.Files.Hfs
 
             private byte[] CatalogRecord { get; }
 
-            public IReadOnlyList<MacFile> Files()
+            // The volume's files; its folders go to folderList when one is given.
+            public IReadOnlyList<MacFile> Files(List<MacFolder>? folderList)
             {
                 if (blockSize == 0 || blockSize % 512 != 0)
                     throw new InvalidDataException($"The allocation block size {blockSize} is not a multiple of 512.");
@@ -173,6 +190,7 @@ namespace ClassicMac.Files.Hfs
                     ?? throw new InvalidDataException("The catalog file cannot be read.");
 
                 var folders = new Dictionary<uint, (uint Parent, MacString Name)>();
+                var folderRecords = new List<(uint Id, byte[] Record)>();
                 var files = new List<(uint Parent, MacString Name, byte[] Record)>();
                 var catalogIds = new HashSet<uint>();
                 var entries = 0;
@@ -193,7 +211,10 @@ namespace ClassicMac.Files.Hfs
                                 context.Report(DiagnosticSeverity.Warning, "hfs.duplicate-id",
                                     $"Catalog folder ID {folderId} appears more than once.");
                             else
+                            {
                                 folders[folderId] = (parent, name);
+                                folderRecords.Add((folderId, data));
+                            }
                             break;
                         case 2 when data.Length >= 102: // file
                             uint fileId = new BigEndianReader(data).ReadUInt32At(20);
@@ -222,6 +243,8 @@ namespace ClassicMac.Files.Hfs
 
                 var result = new List<MacFile>(files.Count);
                 foreach (var (parent, name, r) in files) result.Add(File(parent, name, r, folders));
+                if (folderList is not null)
+                    foreach (var (id, r) in folderRecords) folderList.Add(Folder(id, r, folders));
 
                 var foldersBelowRoot = folders.Count(f => f.Key != RootFolderId);
                 if (files.Count != FileCount || foldersBelowRoot != FolderCount)
@@ -274,6 +297,22 @@ namespace ClassicMac.Files.Hfs
                     Modified = Date(reader.ReadUInt32At(48)),
                     DataFork = data ?? ForkData.Empty,
                     ResourceFork = resource ?? ForkData.Empty,
+                };
+            }
+
+            // A folder from its cdrDirRec (Inside Macintosh: Files): dates at +10 and +14, DInfo at +22, DXInfo at +38.
+            private MacFolder Folder(uint id, byte[] r, Dictionary<uint, (uint Parent, MacString Name)> folders)
+            {
+                var reader = new BigEndianReader(r);
+                var (parent, name) = folders[id];
+                return new MacFolder
+                {
+                    Name = name,
+                    IsRoot = id == RootFolderId,
+                    FolderPath = id == RootFolderId ? [] : FolderPath(parent, folders, $"Folder \"{name}\""),
+                    FinderInfo = FolderFinderInfo.Read(r.AsSpan(22, FolderFinderInfo.Length)),
+                    Created = Date(reader.ReadUInt32At(10)),
+                    Modified = Date(reader.ReadUInt32At(14)),
                 };
             }
 

@@ -223,8 +223,8 @@ Folder record:
 | +$0A | 4 | `dirCrDat` | When it was created |
 | +$0E | 4 | `dirMdDat` | When it was last modified |
 | +$12 | 4 | `dirBkDat` | When it was last backed up |
-| +$16 | 16 | `dirUsrInfo` | `DInfo`: window rectangle, flags, location, view [Doc: Inside Macintosh: Macintosh Toolbox Essentials] |
-| +$26 | 16 | `dirFndrInfo` | `DXInfo` [Doc: Inside Macintosh: Macintosh Toolbox Essentials] |
+| +$16 | 16 | `dirUsrInfo` | `DInfo`: window rectangle, flags, location, view [Doc: Inside Macintosh: Macintosh Toolbox Essentials] ([finder-windows.md §1.1](finder-windows.md#11-folder-finder-information-dinfo-dxinfo)) |
+| +$26 | 16 | `dirFndrInfo` | `DXInfo`: scroll position, open chain, script, flags, comment, put-away folder [Doc: Inside Macintosh: Macintosh Toolbox Essentials] |
 | +$36 | 16 | `dirResrv` | Reserved, 4 × u32 |
 
 The root folder's record has the key (1, volume name) and `dirDirID` 2.
@@ -470,8 +470,13 @@ are [ClassicMac].
 - One entry per file record: the name (the raw bytes of the key's name), the folder path from the root down without
   the volume name, the Finder information (`filUsrWds` then `filFndrInfo`, 32 bytes), the creation and modification
   dates (a stored 0 is "no date") and both forks.
-- Folder records serve only for paths: folders do not come out as entries, so an empty folder is not listed. Thread
-  records are skipped.
+- Folder records serve for paths: folders do not come out as entries of `Read`, so an empty folder is not listed.
+  Thread records are skipped.
+- `HfsReader.ReadFolders` reads the volume the same way, with the same checks and diagnostics, and returns its folder
+  records instead (`MacFolder`): the name (the volume name for the root, `IsRoot`), the folder path above it, the
+  `DInfo` and `DXInfo` (`FolderFinderInfo`, 32 bytes) and the creation and modification dates. A folder whose parent
+  is missing is reported (`hfs.orphan`) and its path starts there. The viewer's folder previews use them
+  ([finder-windows.md](finder-windows.md)).
 - The volume name is cut to 27 bytes. The MDB fields used are `drNmAlBlks`, `drAlBlkSiz`, `drAlBlSt`, `drVBMSt`,
   `drFreeBks`, `drVN`, `drFilCnt`, `drDirCnt`, the two B-tree files' lengths and extents, and `drEmbedSigWord`.
 - Forks are read in place: a fork is a list of byte ranges in the image (`ExtentForkData`), read each time it is
@@ -592,7 +597,9 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - `tests/ClassicMac.Files.Tests/HfsTests.cs` builds volumes with `HfsBuilder.cs`: files with folders, Finder
   information, dates and both forks; forks through overflow records; and one test for each damage case of §5.3 and
   each diagnostic of §6 (B-tree headers, node maps and map nodes, links, keys, IDs, bitmap and alternate MDB checks,
-  extents outside the volume, a truncated image, counts). `A_classic_hfs_catalog_with_mac_os_key_lengths_that_leave_out_the_alignment_byte_reads_cleanly`
+  extents outside the volume, a truncated image, counts). `Folders_come_out_with_their_window_and_icon_info` and
+  `A_folder_whose_parent_is_missing_is_reported_and_its_path_starts_there` cover `ReadFolders`, with `DInfo`,
+  `DXInfo` and dates `HfsBuilder` writes into the root's and a folder's records. `A_classic_hfs_catalog_with_mac_os_key_lengths_that_leave_out_the_alignment_byte_reads_cleanly`
   covers the `6 + n` key lengths of §1.9.
 - `HfsTests.Corpus_disk_images_read_cleanly` reads every disk image under `CLASSICMAC_CORPUS` (not in the repository)
   and requires no Error and no `hfs.counts`: Disk Copy 6 images of volumes Mac OS wrote in Basilisk II, whose

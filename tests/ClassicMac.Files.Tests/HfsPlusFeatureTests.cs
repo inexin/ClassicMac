@@ -2627,6 +2627,46 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void HfsPlusFoldersComeOutWithTheirWindowAndIconInfo()
+    {
+        var info = FolderFinderInfo.Read(FolderFinderInfoTests.Sample);
+        byte[] image = HfsPlusFixture.Build(folderFinderInfo: info);
+        var diagnostics = new List<Diagnostic>();
+
+        IReadOnlyList<MacFolder> folders = HfsReader.Instance.ReadFolders(ForkData.FromBytes(image),
+            new ContainerContext(diagnostics: diagnostics));
+
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.Equal(["", "Documents"], folders.Select(f => f.MacPath).Order());
+        MacFolder root = folders.Single(f => f.IsRoot);
+        Assert.Equal("Volume", root.Name.ToMacRoman());
+        Assert.Equal(FolderFinderInfo.Empty, root.FinderInfo);
+        MacFolder documents = folders.Single(f => !f.IsRoot);
+        Assert.Equal(info, documents.FinderInfo);
+        Assert.Equal(new MacDate(2_500_000_000), documents.Created);
+        Assert.Equal(new MacDate(2_600_000_000), documents.Modified);
+    }
+
+    [Fact]
+    public void HfsPlusFoldersLeaveOutThePrivateDataFolder()
+    {
+        byte[] image = HfsPlusFixture.BuildWithHardLink();
+
+        IReadOnlyList<MacFolder> folders = HfsReader.Instance.ReadFolders(ForkData.FromBytes(image), new ContainerContext());
+
+        Assert.Equal(["", "Documents"], folders.Select(f => f.MacPath).Order());
+    }
+
+    [Fact]
+    public void HfsWrapperReadsTheEmbeddedHfsPlusVolumesFolders()
+    {
+        IReadOnlyList<MacFolder> folders = HfsReader.Instance.ReadFolders(ForkData.FromBytes(HfsPlusFixture.BuildWrapped()),
+            new ContainerContext());
+
+        Assert.Equal(["", "Documents"], folders.Select(f => f.MacPath).Order());
+    }
+
+    [Fact]
     public void HfsWrapperReadsTheEmbeddedHfsPlusVolume()
     {
         byte[] image = HfsPlusFixture.BuildWrapped();
@@ -4047,7 +4087,8 @@ public sealed class HfsPlusFeatureTests
             bool fileHasUnexpectedLinkChainFlag = false, uint? catalogFileLinkCount = null,
             uint catalogFolderParentId = 2, int? catalogSplitIndex = null,
             bool emptySecondCatalogLeaf = false, bool emptyExtentsRootLeaf = false,
-            bool emptyOverflowSecondLeaf = false, bool includeJournalFiles = false)
+            bool emptyOverflowSecondLeaf = false, bool includeJournalFiles = false,
+            FolderFinderInfo? folderFinderInfo = null)
         {
             uint volumeBlocks = deepCatalogTree ? 40u : indexedOverflowTree ? 48u : fragmentedData ? 32u : 16u;
             byte[] image = new byte[checked((int)volumeBlocks * Block)];
@@ -4106,6 +4147,13 @@ public sealed class HfsPlusFeatureTests
             U32(folder, 80, folderTextEncoding);
             U32(folder, 84, catalogFolderCount ?? 0);
             U16(folder, 42, catalogFolderMode);
+            if (folderFinderInfo is not null)
+            {
+                // HFSPlusCatalogFolder (TN1150): dates at +12/+16, userInfo (DInfo) at +48, finderInfo (DXInfo) at +64.
+                U32(folder, 12, 2_500_000_000);
+                U32(folder, 16, 2_600_000_000);
+                folderFinderInfo.Write(folder.AsSpan(48));
+            }
             byte[] file = new byte[248];
             U16(file, 0, 2);
             U16(file, 2, missingFileThreadFlag ? (ushort)0 : (ushort)2); // file thread exists

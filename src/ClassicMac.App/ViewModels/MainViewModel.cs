@@ -234,7 +234,8 @@ namespace ClassicMac.App.ViewModels
             {
                 result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
                     ReadOptions, diagnostics, cancellation.Token,
-                    node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL" ? DialogSources.From(Roots) : null);
+                    node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL"
+                        || node is FolderNode or InputNode or ContainerFileNode ? DialogSources.From(Roots) : null);
             }
             catch (OperationCanceledException)
             {
@@ -250,6 +251,7 @@ namespace ClassicMac.App.ViewModels
             // Small images (icons, patterns) open enlarged.
             if (result.Kind == PreviewKind.Image) Zoom = result.Images[0] is { Width: <= 64, Height: <= 64 } ? (result.Images.Any(i => i.Width > 256) ? 2 : 4) : 1;
             else if (result.Kind is PreviewKind.Dialog or PreviewKind.Menu) Zoom = 2;
+            else if (result.Kind == PreviewKind.Folder) Zoom = 1;
             Preview = result;
             if (result.HasPreview) SelectedTab = 1;
             else if (SelectedTab == 1) SelectedTab = 0;

@@ -47,6 +47,71 @@ public class HfsTests
     }
 
     [Fact]
+    public void Folders_come_out_with_their_window_and_icon_info()
+    {
+        var info = FolderFinderInfo.Read(FolderFinderInfoTests.Sample);
+        var rootInfo = new FolderFinderInfo { WindowBounds = new MacRect(50, 60, 250, 460), ScrollPosition = new MacPoint(0, 4) };
+        var builder = new HfsBuilder { RootInfo = rootInfo };
+        var games = builder.Folder(HfsBuilder.Root, "Games", info);
+        builder.Folder(games, "Realmz");
+        builder.File(games, "Read Me", [], []);
+        var image = builder.Build("Test Disk");
+        var diagnostics = new List<Diagnostic>();
+
+        var folders = HfsReader.Instance.ReadFolders(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Empty(diagnostics);
+        Assert.Equal(["", "Games", "Games:Realmz"], folders.Select(f => f.MacPath).Order());
+        var root = folders.Single(f => f.IsRoot);
+        Assert.Equal("Test Disk", root.Name.ToMacRoman());
+        Assert.Equal(rootInfo, root.FinderInfo);
+        var read = folders.Single(f => f.MacPath == "Games");
+        Assert.False(read.IsRoot);
+        Assert.Empty(read.FolderPath);
+        Assert.Equal(info, read.FinderInfo);
+        Assert.Equal(new DateTime(1984, 1, 24), read.Created!.Value.ToDateTime());
+        Assert.Equal(new DateTime(1984, 1, 24, 0, 1, 0), read.Modified!.Value.ToDateTime());
+        var inner = folders.Single(f => f.MacPath == "Games:Realmz");
+        Assert.Equal(FolderFinderInfo.Empty, inner.FinderInfo);
+        Assert.Null(inner.Created);
+        // Read is unchanged: files only.
+        Assert.Equal(["Games:Read Me"], HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()).Select(f => f.MacPath));
+    }
+
+    [Fact]
+    public void A_folder_whose_parent_is_missing_is_reported_and_its_path_starts_there()
+    {
+        var builder = new HfsBuilder();
+        builder.Folder(999, "Lost");
+        var diagnostics = new List<Diagnostic>();
+
+        var folders = HfsReader.Instance.ReadFolders(ForkData.FromBytes(builder.Build("Disk")), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal("Lost", folders.Single(f => !f.IsRoot).MacPath);
+        Assert.Contains(diagnostics, d => d.Code == "hfs.orphan");
+    }
+
+    [Fact]
+    public void ReadFolders_rejects_what_is_not_a_volume() =>
+        Assert.Throws<InvalidDataException>(() => HfsReader.Instance.ReadFolders(ForkData.FromBytes(new byte[2048]), new ContainerContext()));
+
+    [Fact]
+    public void Files_keep_the_Finder_info_the_builder_writes()
+    {
+        var builder = new HfsBuilder();
+        var finder = new FinderInfo
+        {
+            Type = FourCC.FromString("APPL"), Creator = FourCC.FromString("ABCD"),
+            Flags = FinderFlags.HasCustomIcon, Location = new MacPoint(12, 34),
+        };
+        builder.File(HfsBuilder.Root, "App", [], [], info: finder);
+
+        var (files, _) = Read(builder.Build("Disk"));
+
+        Assert.Equal(finder.ToArray(), Assert.Single(files).FinderInfo.ToArray());
+    }
+
+    [Fact]
     public void Forks_in_many_extents_use_the_overflow_file()
     {
         var builder = new HfsBuilder();

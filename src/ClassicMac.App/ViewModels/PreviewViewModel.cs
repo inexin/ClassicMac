@@ -30,6 +30,7 @@ namespace ClassicMac.App.ViewModels
         Document,
         Dialog,
         Menu,
+        Folder,
     }
 
     /// <summary>One decoded image: PNG bytes, its size, and a caption (a list item's number, a cursor's hotspot).</summary>
@@ -38,7 +39,8 @@ namespace ClassicMac.App.ViewModels
     /// <summary>
     /// The preview of a resource or file, made by the same decoders as <c>extract</c>: images (pictures, icons, cursors,
     /// patterns), text (strings, styled text), JSON (version resources, lone style runs), sound (<c>snd </c>, drawn and
-    /// played) or a document (DOCMaker, SimpleText with pictures); otherwise a note to look at the hex view.
+    /// played) or a document (DOCMaker, SimpleText with pictures); a folder as the Finder's window shows it; otherwise a
+    /// note to look at the hex view.
     /// </summary>
     public sealed class PreviewViewModel
     {
@@ -80,7 +82,7 @@ namespace ClassicMac.App.ViewModels
         public MenuResource? Menu { get; private init; }
 
         public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document
-            or PreviewKind.Dialog or PreviewKind.Menu;
+            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder;
 
         public bool IsDocument => Kind == PreviewKind.Document;
 
@@ -88,12 +90,13 @@ namespace ClassicMac.App.ViewModels
 
         public bool IsMenu => Kind == PreviewKind.Menu;
 
-        /// <summary>Whether the zoom applies (images, dialogs and menus).</summary>
-        public bool IsZoomable => Kind is PreviewKind.Image or PreviewKind.Dialog or PreviewKind.Menu;
+        /// <summary>Whether the zoom applies (images, folders, dialogs and menus).</summary>
+        public bool IsZoomable => Kind is PreviewKind.Image or PreviewKind.Folder or PreviewKind.Dialog or PreviewKind.Menu;
 
         public bool IsSound => Kind == PreviewKind.Sound;
 
-        public bool IsImage => Kind == PreviewKind.Image;
+        /// <summary>Whether the preview is images: decoded ones, or a folder's window.</summary>
+        public bool IsImage => Kind is PreviewKind.Image or PreviewKind.Folder;
 
         public bool IsStyledText => Kind == PreviewKind.Text && Styled is not null;
 
@@ -114,10 +117,18 @@ namespace ClassicMac.App.ViewModels
             {
                 ResourceNode resource => ForResource(resource.Resource, resource.Fork, options, readOptions, diagnostics, dialogSources),
                 FileNode file => ForFile(file.File, options, readOptions, diagnostics),
-                ContainerFileNode container => ForFile(container.File, options, readOptions, diagnostics),
+                ContainerFileNode container => ForFile(container.File, options, readOptions, diagnostics) is { Kind: not PreviewKind.None } shown
+                    ? shown : ForFolder(container, options, readOptions, dialogSources),
                 InputNode input when input.Root.Children.Count == 0 => ForFile(input.Root.File, options, readOptions, diagnostics),
+                InputNode or FolderNode => ForFolder(node, options, readOptions, dialogSources),
                 _ => None,
             };
+
+        // A folder, volume root or container's contents as the Finder's icon view of its window.
+        private static PreviewViewModel ForFolder(NodeViewModel node, DecodeOptions options, ReadOptions readOptions, DialogSources? sources) =>
+            FolderPreviews.Build(node, options, readOptions, sources) is { } image
+                ? new PreviewViewModel(PreviewKind.Folder, "") { Images = [image] }
+                : None;
 
         private static PreviewViewModel ForResource(Resource resource, ResourceFork fork, DecodeOptions options, ReadOptions readOptions,
             ICollection<Diagnostic> diagnostics, DialogSources? dialogSources = null)

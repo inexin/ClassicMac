@@ -5,6 +5,7 @@ using ClassicMac.Core;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
+using ClassicMac.Resources.Decoders.Finder;
 using ClassicMac.Resources.Decoders.Images;
 using ClassicMac.Resources.Decoders.Interface;
 
@@ -30,8 +31,11 @@ namespace ClassicMac.App.ViewModels
     {
         public static DialogSources None { get; } = new([], null);
 
+        /// <summary>Forks with the System's generic Finder icons (<c>ICN#</c> −4000 and its neighbours), for folder previews.</summary>
+        public IReadOnlyList<ResourceFork> GenericIconForks { get; init; } = [];
+
         private static readonly FourCC Fond = FourCC.FromString("FOND"), Nfnt = FourCC.FromString("NFNT"), Font = FourCC.FromString("FONT"),
-            Icon = FourCC.FromString("ICON"), Cicn = FourCC.FromString("cicn");
+            Icon = FourCC.FromString("ICON"), Cicn = FourCC.FromString("cicn"), IconList = FourCC.FromString("ICN#");
 
         /// <summary>The sources among the forks whose resources are loaded in the tree.</summary>
         public static DialogSources From(IEnumerable<NodeViewModel> roots)
@@ -48,8 +52,9 @@ namespace ClassicMac.App.ViewModels
             }
             foreach (var root in roots) Walk(root);
             var system = forks.Where(f => Enumerable.Range(0, 3).Any(id => f.Find(Cicn, (short)id) is not null || f.Find(Icon, (short)id) is not null)).ToList();
+            var generic = forks.Where(f => f.Find(IconList, FinderIconResolver.GenericDocumentId) is not null).ToList();
             var withFonts = forks.Where(f => f.OfType(Fond).Any() || f.OfType(Font).Any()).ToList();
-            if (withFonts.Count == 0) return new(system, null);
+            if (withFonts.Count == 0) return new(system, null) { GenericIconForks = generic };
             // Mac OS 9's system font is Charcoal; without it, Chicago (family 0) as earlier systems.
             var charcoal = withFonts.SelectMany(f => f.OfType(Fond)).FirstOrDefault(r => r.Name?.ToMacRoman() == "Charcoal");
             var library = new FontLibrary { SystemFontId = charcoal?.Id ?? 0 };
@@ -59,7 +64,7 @@ namespace ClassicMac.App.ViewModels
                 foreach (var r in fork.OfType(Nfnt)) library.AddNfnt(r.Id, Data(r, fork));
                 foreach (var r in fork.OfType(Font)) library.AddFont(r.Id, Data(r, fork), r.Name?.ToMacRoman());
             }
-            return new(system, library);
+            return new(system, library) { GenericIconForks = generic };
         }
 
         private static byte[] Data(Resource resource, ResourceFork fork) => ResourceDecompression.Default.GetData(resource, fork).ToArray();

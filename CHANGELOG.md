@@ -11,6 +11,17 @@
   registers loaded, `lswx` with rD = rA or rB, and conditional branches with a BO z bit set are `.long`. `ptest` at
   level 0 ignores the register field when A is clear. A 68k full extension word with only a base register is written
   `(0,a0)`, `(0,pc)` or `($0000,zpc)` instead of `(a0)`, `(pc)` or `(zpc)` (output/disassembly.md §1.1, §2.6, §2.7).
+- Viewer: a folder, a volume's root or a container read open previews as the Finder's icon view of its window: the
+  window's size and scroll from the folder record, each icon where the Finder put it (so folder art shows as it was
+  arranged), invisible items left out; icons are the item's custom icon (a folder's in its `Icon` file), its
+  application's bundle icon or the System's generic icon, found on the same volume or in the open files; names in
+  Geneva 9 from the volume's System file. Items with no place, and folders in archives, are arranged in a grid
+  (file-systems/finder-windows.md).
+- Files: `HfsReader.ReadFolders` returns an HFS or HFS Plus volume's folders (`MacFolder`) with their `DInfo` and
+  `DXInfo` (`FolderFinderInfo`: window rectangle, flags, icon location, view, scroll position, …) and dates; `Read` is
+  unchanged (file-systems/hfs.md §5.2).
+- Decoders: `FinderIconResolver` picks the icon the Finder shows for an item (custom icon, bundle, generic) and
+  `FinderWindowRenderer` draws a folder's window in icon view through the QuickDraw renderer.
 - Files: a container's files are probed for formats in parallel, all probes of a file sharing one read of its head and
   tail: opening a 500 MB disk of 5,170 files takes 0.4 s, and unwrapping everything on it (`list`) 2.4 s instead of 11 s.
 - StuffIt: archives decode about ten times faster: forks decode in parallel, method 15 (Arsenic) writes into arrays

@@ -320,3 +320,91 @@ public class MacFileTests
         Assert.Equal(info with { }, info);
     }
 }
+
+public class MacFolderTests
+{
+    [Fact]
+    public void A_folder_s_path_is_its_parents_then_its_name()
+    {
+        var folder = new MacFolder
+        {
+            Name = MacString.FromMacRoman("Realmz"),
+            FolderPath = [MacString.FromMacRoman("Games")],
+        };
+
+        Assert.False(folder.IsRoot);
+        Assert.Same(FolderFinderInfo.Empty, folder.FinderInfo);
+        Assert.Null(folder.Created);
+        Assert.Null(folder.Modified);
+        Assert.Equal(["Games", "Realmz"], folder.Path.Select(p => p.ToMacRoman()));
+        Assert.Equal("Games:Realmz", folder.MacPath);
+    }
+
+    [Fact]
+    public void The_root_folder_has_the_volume_s_name_and_an_empty_path()
+    {
+        var root = new MacFolder { Name = MacString.FromMacRoman("Macintosh HD"), IsRoot = true };
+
+        Assert.Empty(root.Path);
+        Assert.Equal("", root.MacPath);
+    }
+}
+
+public class FolderFinderInfoTests
+{
+    // DInfo then DXInfo, every field a distinct value.
+    internal static readonly byte[] Sample =
+    [
+        0x00, 0x28, 0x00, 0x0A, 0x01, 0x2C, 0x01, 0xF4, // frRect: top 40, left 10, bottom 300, right 500
+        0x44, 0x00,                                     // frFlags: invisible, custom icon
+        0x00, 0x14, 0x00, 0x1E,                         // frLocation: v 20, h 30
+        0x01, 0x00,                                     // frView
+        0xFF, 0xF6, 0x00, 0x05,                         // frScroll: v -10, h 5
+        0x00, 0x00, 0x00, 0x07,                         // frOpenChain
+        0x02,                                           // frScript
+        0x81,                                           // frXFlags
+        0x00, 0x03,                                     // frComment
+        0x00, 0x00, 0x00, 0x63,                         // frPutAway
+    ];
+
+    [Fact]
+    public void Reads_DInfo_and_DXInfo()
+    {
+        var info = FolderFinderInfo.Read(Sample);
+
+        Assert.Equal(new MacRect(40, 10, 300, 500), info.WindowBounds);
+        Assert.Equal(FinderFlags.IsInvisible | FinderFlags.HasCustomIcon, info.Flags);
+        Assert.Equal(new MacPoint(20, 30), info.Location);
+        Assert.Equal(0x0100, info.View);
+        Assert.Equal(new MacPoint(-10, 5), info.ScrollPosition);
+        Assert.Equal(7, info.OpenChain);
+        Assert.Equal(2, info.Script);
+        Assert.Equal(unchecked((sbyte)0x81), info.ExtendedFlags);
+        Assert.Equal(3, info.Comment);
+        Assert.Equal(0x63, info.PutAway);
+    }
+
+    [Fact]
+    public void Writes_what_it_reads()
+    {
+        var info = FolderFinderInfo.Read(Sample);
+
+        Assert.Equal(Sample, info.ToArray());
+        var destination = new byte[40];
+        info.Write(destination);
+        Assert.Equal(Sample, destination[..32]);
+        Assert.Throws<ArgumentException>(() => info.Write(new byte[31]));
+    }
+
+    [Fact]
+    public void Short_input_is_padded_with_zeros()
+    {
+        var info = FolderFinderInfo.Read(Sample.AsSpan(0, 16));
+
+        Assert.Equal(new MacRect(40, 10, 300, 500), info.WindowBounds);
+        Assert.Equal(default, info.ScrollPosition);
+        Assert.Equal(0, info.PutAway);
+        Assert.Equal(FolderFinderInfo.Length, FolderFinderInfo.Empty.ToArray().Length);
+        Assert.Equal(new byte[32], FolderFinderInfo.Empty.ToArray());
+    }
+}

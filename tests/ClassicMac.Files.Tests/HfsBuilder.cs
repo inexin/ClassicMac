@@ -15,23 +15,31 @@ internal sealed class HfsBuilder
 
     public int ExtentsTreeNodes { get; init; } = 2;
 
+    /// <summary>The catalog's leaf nodes (two by default), for catalogs too big for two.</summary>
+    public int CatalogLeaves { get; init; } = 2;
+
     /// <summary>Leaf keys with <c>ckrKeyLen</c> = 6 + n, the alignment byte not counted, as the Mac OS File Manager writes them.</summary>
     public bool UncountedKeyPadding { get; init; }
 
-    private readonly List<(uint Id, uint Parent, string Name)> folders = [];
-    private readonly List<(uint Parent, string Name, string Type, string Creator, byte[] Data, byte[] Resource, int Fragments, uint Id, bool Thread)> files = [];
+    /// <summary>The root folder's DInfo and DXInfo; with it, the root's dates are set too.</summary>
+    public FolderFinderInfo? RootInfo { get; init; }
+
+    private readonly List<(uint Id, uint Parent, string Name, FolderFinderInfo? Info)> folders = [];
+    private readonly List<(uint Parent, string Name, string Type, string Creator, byte[] Data, byte[] Resource, int Fragments, uint Id, bool Thread, FinderInfo? Info)> files = [];
     private uint nextId = 16;
 
-    public uint Folder(uint parent, string name)
+    /// <summary>A folder; with <paramref name="info"/>, its DInfo, DXInfo and dates are set (created 1984-01-24, modified a minute later).</summary>
+    public uint Folder(uint parent, string name, FolderFinderInfo? info = null)
     {
         var id = nextId++;
-        folders.Add((id, parent, name));
+        folders.Add((id, parent, name, info));
         return id;
     }
 
+    /// <summary>A file; <paramref name="info"/>, when given, replaces the type, creator and the default flags (hasBeenInited).</summary>
     public void File(uint parent, string name, byte[] data, byte[] resource, string type = "TEXT", string creator = "ttxt",
-        int fragments = 1, bool thread = false) =>
-        files.Add((parent, name, type, creator, data, resource, fragments, nextId++, thread));
+        int fragments = 1, bool thread = false, FinderInfo? info = null) =>
+        files.Add((parent, name, type, creator, data, resource, fragments, nextId++, thread, info));
 
     // Where the first file's first data extent starts, for tests that patch it.
     public int FirstFileRecordOffset { get; private set; }
@@ -48,8 +56,12 @@ internal sealed class HfsBuilder
             allocated.Add(true);
         }
         var catalogStart = allocation.Count;
-        allocation.AddRange([new byte[Block], new byte[Block], new byte[Block], new byte[Block]]);
-        allocated.AddRange([true, true, true, true]);
+        var catalogNodes = CatalogLeaves + 2; // header, leaves, index
+        for (var i = 0; i < catalogNodes; i++)
+        {
+            allocation.Add(new byte[Block]);
+            allocated.Add(true);
+        }
 
         // Place each fork, fragmented, and remember its extents.
         byte[] ForkExtents(byte[] fork, int fragments, byte forkType, uint id)
@@ -85,11 +97,11 @@ internal sealed class HfsBuilder
         }
 
         var records = new List<(uint Parent, string Name, byte[] Record)>();
-        records.Add((1, volumeName, FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root))));
+        records.Add((1, volumeName, FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root), RootInfo)));
         records.Add((Root, "", ThreadRecord(1, volumeName)));
-        foreach (var (id, parent, name) in folders)
+        foreach (var (id, parent, name, info) in folders)
         {
-            records.Add((parent, name, FolderRecord(id, folders.Count(f => f.Parent == id) + files.Count(f => f.Parent == id))));
+            records.Add((parent, name, FolderRecord(id, folders.Count(f => f.Parent == id) + files.Count(f => f.Parent == id), info)));
             records.Add((id, "", ThreadRecord(parent, name)));
         }
         foreach (var f in files)
@@ -106,25 +118,39 @@ internal sealed class HfsBuilder
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(44), 2_526_595_200); // 1984-01-24
             BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(48), 2_526_595_260);
             r[56] = 0xFE; // a recognisable FXInfo byte
+            if (f.Info is { } info)
+            {
+                var bytes = info.ToArray();
+                bytes.AsSpan(0, 16).CopyTo(r.AsSpan(4));
+                bytes.AsSpan(16, 16).CopyTo(r.AsSpan(56));
+            }
             ForkExtents(f.Data, f.Fragments, 0x00, f.Id).CopyTo(r, 74);
             ForkExtents(f.Resource, 1, 0xFF, f.Id).CopyTo(r, 86);
             records.Add((f.Parent, f.Name, r));
             if (f.Thread) records.Add((f.Id, "", ThreadRecord(f.Parent, f.Name, kind: 4)));
         }
 
-        // Catalog: records in two leaves, linked in order.
+        // Catalog: records in the leaves, linked in order, under one index node.
         var keyed = records.OrderBy(r => r.Parent).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
             .Select(r => Keyed(r.Parent, r.Name, r.Record, UncountedKeyPadding)).ToList();
-        var half = (keyed.Count + 1) / 2;
-        allocation[catalogStart + 1] = Leaf(keyed.Take(half).ToList(), forward: 2, backward: 0);
-        allocation[catalogStart + 2] = Leaf(keyed.Skip(half).ToList(), forward: 0, backward: 1);
-        allocation[catalogStart + 3] = Leaf([IndexRecord(keyed[0], 1), IndexRecord(keyed[half], 2)],
-            forward: 0, backward: 0, kind: 0, height: 2);
-        allocation[catalogStart] = Header(firstLeaf: 1, lastLeaf: 2, nodes: 4, records: keyed.Count,
-            usedNodes: 4, maxKeyLength: 37, root: 3, depth: 2);
-        var leafWithFile = FindFirstFileRecord(allocation[catalogStart + 1]) >= 0 ? 1 : 2;
-        var fileKeyOffset = FindFirstFileRecord(allocation[catalogStart + leafWithFile]);
-        FirstFileRecordOffset = fileKeyOffset < 0 ? -1 : (FirstAllocationBlock + catalogStart + leafWithFile) * Block + fileKeyOffset;
+        var perLeaf = (keyed.Count + CatalogLeaves - 1) / CatalogLeaves;
+        var index = new List<byte[]>();
+        for (var leaf = 1; leaf <= CatalogLeaves; leaf++)
+        {
+            var chunk = keyed.Skip((leaf - 1) * perLeaf).Take(perLeaf).ToList();
+            allocation[catalogStart + leaf] = Leaf(chunk, forward: leaf == CatalogLeaves ? 0u : (uint)leaf + 1, backward: (uint)leaf - 1);
+            if (chunk.Count > 0) index.Add(IndexRecord(chunk[0], (uint)leaf));
+        }
+        var root = (uint)CatalogLeaves + 1;
+        allocation[catalogStart + (int)root] = Leaf(index, forward: 0, backward: 0, kind: 0, height: 2);
+        allocation[catalogStart] = Header(firstLeaf: 1, lastLeaf: (uint)CatalogLeaves, nodes: (uint)catalogNodes, records: keyed.Count,
+            usedNodes: catalogNodes, maxKeyLength: 37, root: root, depth: 2);
+        FirstFileRecordOffset = -1;
+        for (var leaf = 1; leaf <= CatalogLeaves && FirstFileRecordOffset < 0; leaf++)
+        {
+            var fileKeyOffset = FindFirstFileRecord(allocation[catalogStart + leaf]);
+            if (fileKeyOffset >= 0) FirstFileRecordOffset = (FirstAllocationBlock + catalogStart + leaf) * Block + fileKeyOffset;
+        }
 
         // Build a one- or two-leaf extents tree, leaving any unused nodes mapped free.
         if (overflow.Count > 22)
@@ -166,8 +192,8 @@ internal sealed class HfsBuilder
         BinaryPrimitives.WriteUInt16BigEndian(mdb[0x52..], checked((ushort)folders.Count(f => f.Parent == Root)));
         BinaryPrimitives.WriteUInt32BigEndian(mdb[0x82..], (uint)(ExtentsTreeNodes * Block));
         ExtentRecord([(0, ExtentsTreeNodes)]).CopyTo(mdb[0x86..]);
-        BinaryPrimitives.WriteUInt32BigEndian(mdb[0x92..], 4 * Block);
-        ExtentRecord([(catalogStart, 4)]).CopyTo(mdb[0x96..]);
+        BinaryPrimitives.WriteUInt32BigEndian(mdb[0x92..], (uint)(catalogNodes * Block));
+        ExtentRecord([(catalogStart, catalogNodes)]).CopyTo(mdb[0x96..]);
         for (var i = 0; i < allocated.Count; i++)
             if (allocated[i]) image[3 * Block + (i >> 3)] |= (byte)(0x80 >> (i & 7));
         image.AsSpan(1024, 162).CopyTo(image.AsSpan(image.Length - 1024, 162));
@@ -185,12 +211,19 @@ internal sealed class HfsBuilder
         return record;
     }
 
-    private static byte[] FolderRecord(uint id, int valence)
+    // cdrDirRec (Inside Macintosh: Files): type, flags, valence, ID, dates at +10/+14, DInfo at +22, DXInfo at +38.
+    private static byte[] FolderRecord(uint id, int valence, FolderFinderInfo? info = null)
     {
         var r = new byte[70];
         r[0] = 1;
         BinaryPrimitives.WriteUInt16BigEndian(r.AsSpan(4), checked((ushort)valence));
         BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(6), id);
+        if (info is not null)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(10), 2_526_595_200); // 1984-01-24
+            BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(14), 2_526_595_260);
+            info.Write(r.AsSpan(22));
+        }
         return r;
     }
 
