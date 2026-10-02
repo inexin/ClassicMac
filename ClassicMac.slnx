@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/ClassicMac.App/ClassicMac.App.csproj" />
+    <Project Path="src/ClassicMac.Code/ClassicMac.Code.csproj" />
     <Project Path="src/ClassicMac.Core/ClassicMac.Core.csproj" />
     <Project Path="src/ClassicMac.Files/ClassicMac.Files.csproj" />
     <Project Path="src/ClassicMac.Resources.Cli/ClassicMac.Resources.Cli.csproj" />
@@ -12,6 +13,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ClassicMac.App.Tests/ClassicMac.App.Tests.csproj" />
+    <Project Path="tests/ClassicMac.Code.Tests/ClassicMac.Code.Tests.csproj" />
     <Project Path="tests/ClassicMac.Core.Tests/ClassicMac.Core.Tests.csproj" />
     <Project Path="tests/ClassicMac.Files.Tests/ClassicMac.Files.Tests.csproj" />
     <Project Path="tests/ClassicMac.Resources.Cli.Tests/ClassicMac.Resources.Cli.Tests.csproj" />
