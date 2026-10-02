@@ -1,6 +1,6 @@
 # bzip2
 
-bzip2 is UDIF run type `$80000006` ([udif.md §3](../disk-images/udif.md#3-mish-block-tables)), a block-sorting compressor. The rules are
+bzip2 is UDIF run type `$80000006` ([udif.md §1.4](../disk-images/udif.md#14-runs)), a block-sorting compressor. The rules are
 Julian Seward's bzip2 1.0 format [Author]; ClassicMac's decoder is written from the format, with no GPL code, and is
 checked on streams libbzip2 1.0 wrote (Python's `bz2`: a short stream, one of three 100 kB blocks, and two streams
 back to back). No UDIF image with bzip2 runs is in the corpus.
@@ -99,4 +99,4 @@ The used bytes, in increasing order, form the **symbol map** (*inUse* entries, a
 - **Combined CRC:** start at 0; after each block, `c = ((c << 1) | (c >> 31)) ^ blockCRC`.
 
 ClassicMac checks both; a mismatch, bad data, output that overflows the run, or a stream ending short of the run's
-size is a damaged run (`udif.bad-run`, [udif.md §7](../disk-images/udif.md#7-diagnostics)).
+size is a damaged run (`udif.bad-run`, [udif.md §6](../disk-images/udif.md#6-diagnostics)).
