@@ -67,8 +67,8 @@ These hold for MFS ([mfs.md](mfs.md)), HFS, HFS Plus ([hfs-plus.md](hfs-plus.md)
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
 | +$00 | 2 | `drSigWord` | `$4244` (`'BD'`) |
-| +$02 | 4 | `drCrDate` | When the volume was created |
-| +$06 | 4 | `drLsMod` | When it was last modified |
+| +$02 | 4 | `drCrDate` | When the volume was created, in local time [Doc: Inside Macintosh: Files] |
+| +$06 | 4 | `drLsMod` | When it was last modified, in local time |
 | +$0A | 2 | `drAtrb` | Volume attributes: bit 7 locked by hardware, 8 unmounted cleanly, 9 bad blocks spared, 15 locked by software [Doc: Inside Macintosh: Files; TN1150] |
 | +$0C | 2 | `drNmFls` | Files in the root folder |
 | +$0E | 2 | `drVBMSt` | First logical block of the volume bitmap |
@@ -80,7 +80,7 @@ These hold for MFS ([mfs.md](mfs.md)), HFS, HFS Plus ([hfs-plus.md](hfs-plus.md)
 | +$1E | 4 | `drNxtCNID` | Next unused catalog node ID |
 | +$22 | 2 | `drFreeBks` | Free allocation blocks |
 | +$24 | 28 | `drVN` | Volume name, `Str27` |
-| +$40 | 4 | `drVolBkUp` | When the volume was last backed up |
+| +$40 | 4 | `drVolBkUp` | When the volume was last backed up, in local time; 0 = never |
 | +$44 | 2 | `drVSeqNum` | Backup sequence number |
 | +$46 | 4 | `drWrCnt` | Volume write count |
 | +$4A | 4 | `drXTClpSiz` | Extents overflow file's clump size |
@@ -470,6 +470,10 @@ are [ClassicMac].
 - One entry per file record: the name (the raw bytes of the key's name), the folder path from the root down without
   the volume name, the Finder information (`filUsrWds` then `filFndrInfo`, 32 bytes), the creation and modification
   dates (a stored 0 is "no date"), both forks, and `filFlags` bit 0 as `MacFile.IsLocked`.
+- `HfsReader.ReadVolumeInfo` (the `IVolumeReader` interface) gives the volume's own dates as a `VolumeInfo`: `drCrDate`,
+  `drLsMod` and `drVolBkUp`, a stored 0 as "no date"; for HFS Plus, plain or wrapped, see
+  [hfs-plus.md §5.1](hfs-plus.md#51-what-comes-out). The unwrapper keeps them on the `ContainerNode` whose data fork is
+  the volume (`ContainerNode.Volume`) [ClassicMac].
 - Folder records serve for paths: folders do not come out as entries of `Read`, so an empty folder is not listed.
   Thread records are skipped.
 - `HfsReader.ReadFolders` reads the volume the same way, with the same checks and diagnostics, and returns its folder

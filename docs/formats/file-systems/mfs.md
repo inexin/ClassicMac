@@ -45,8 +45,8 @@ Allocation block `n` (n ≥ 2) starts at byte `drAlBlSt × 512 + (n − 2) × dr
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
 | +$00 | 2 | `drSigWord` | `$D2D7` |
-| +$02 | 4 | `drCrDate` | When the volume was initialised |
-| +$06 | 4 | `drLsBkUp` | When it was last backed up |
+| +$02 | 4 | `drCrDate` | When the volume was initialised, in local time |
+| +$06 | 4 | `drLsBkUp` | When it was last backed up, in local time; MFS keeps no modification date |
 | +$0A | 2 | `drAtrb` | Volume attributes: bit 7 locked by hardware, bit 15 locked by software |
 | +$0C | 2 | `drNmFls` | Files in the directory, that is on the volume |
 | +$0E | 2 | `drDirSt` | The directory's first logical block |
@@ -154,6 +154,8 @@ None. HFS replaced MFS ([hfs.md](hfs.md)); the Mac OS 9.0 ROM's `MountVol` still
 - Each entry comes out with its name (the raw bytes of `flNam`), its Finder information (`flUsrWds`, with an all-zero
   `FXInfo`), its creation and modification dates (a stored 0 is "no date") and both forks. Files have an empty folder
   path; `fdFldr` is kept in the Finder information as stored.
+- `MfsReader.ReadVolumeInfo` gives `drCrDate` and `drLsBkUp` as the volume's creation and backup dates, with no
+  modification date ([hfs.md §5.2](hfs.md#52-what-comes-out)) [ClassicMac].
 - The entries read are compared with `drNmFls`. After `ContainerReadOptions.MaxVolumeEntries` files (1,000,000 by
   default) reading stops.
 - The reader throws, and the unwrapper reports `container.unreadable`, when `drAlBlkSiz` is 0 or not a multiple of 512,

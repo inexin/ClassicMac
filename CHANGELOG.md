@@ -10,6 +10,15 @@
   bounds inputs are compact, and the Text column is at least 160 wide in a 1200-pixel window. Dialog, alert, item
   list and menu previews keep their scroll bars in view, so a dialog wider than its pane scrolls at 1:1; the dialog
   beside a form's cards keeps a 16 margin from the window's edge.
+- Files: volumes report their own dates: `HfsReader.ReadVolumeInfo` and `MfsReader.ReadVolumeInfo` (`IVolumeReader`)
+  give a `VolumeInfo` with the creation, modification and backup dates of an HFS volume's MDB, an HFS Plus volume's
+  header (plain or wrapped; creation in local time, the others in UTC) or an MFS volume's (no modification date);
+  the unwrapper keeps them on the node holding the volume (`ContainerNode.Volume`).
+- Viewer: Details shows a Volume card for a disk image and for a disk image found on a volume: format, created,
+  modified, backed up, with how the volume keeps time; dates stored in UTC (HFS Plus, zip, tar) are shown in this
+  computer's time zone, and a file's time note follows its volume's real format (HFS Plus read as "HFS volume" said
+  local time). The hex inspector's readings and meaning stay clear of its scroll bar and fit "4,284,572,259", and a
+  byte of template bit fields says which bits are on and which off.
 - Editor: the hex byte inspector fits under the Find bar at 1200 × 780 with diagnostics open (rows without spacing,
   8 px padding); "In this resource" scrolls inside the panel when it does not fit.
 - Viewer: a sound's header has Save as WAV… (the decoded sound, as `extract` writes it) and Replace from WAV… (the

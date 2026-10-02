@@ -103,7 +103,8 @@ public class ByteMeaningsTests
         var template = Template(("High", "BBIT"), ("Mid", "BBIT"), ("", "BBIT"), ("", "BBIT"), ("", "BBIT"), ("", "BBIT"), ("", "BBIT"),
             ("Low", "BBIT"), ("", "AWRD"), ("", "FBYT"), ("Items", "LSTZ"), ("Code", "HBYT"), ("*****", "LSTE"));
         byte[] data = [0x81, 0, 0, 7, 9, 0];
-        Assert.Equal(new ByteMeaning("Bits: High, Mid, Low", 0, 1, "$81"), ByteMeanings.MeaningAt(type, data, 0, template));
+        Assert.Equal(new ByteMeaning("Bits on: High, Low; off: Mid", 0, 1, "$81"), ByteMeanings.MeaningAt(type, data, 0, template));   // which named bits are set
+        Assert.Equal(new ByteMeaning("Bits on: none; off: High, Mid, Low", 0, 1, "$00"), ByteMeanings.MeaningAt(type, [0, 0, 0, 7, 9, 0], 0, template));
         Assert.Equal(new ByteMeaning("Alignment", 1, 1, null), ByteMeanings.MeaningAt(type, data, 1, template));
         Assert.Equal(new ByteMeaning("Filler", 2, 1, null), ByteMeanings.MeaningAt(type, data, 2, template));
         Assert.Equal(new ByteMeaning("Code of item 2", 4, 1, "$09"), ByteMeanings.MeaningAt(type, data, 4, template));

@@ -26,6 +26,9 @@ namespace ClassicMac.Files
         /// </summary>
         public string? UnreadFormat { get; init; }
 
+        /// <summary>The volume's own dates when the file's data fork is a volume that was read (HFS, HFS Plus, MFS); null otherwise.</summary>
+        public VolumeInfo? Volume { get; init; }
+
         /// <summary>The files at the bottom of the tree: those whose data fork is not a container.</summary>
         public IEnumerable<ContainerNode> Leaves() => Children.Count == 0 ? [this] : Children.SelectMany(c => c.Leaves());
     }
@@ -254,7 +257,7 @@ namespace ClassicMac.Files
                 children.Add(Unwrap(inner, reader.FormatName, outer.For(null, () => SiblingsOf(contents, inner)), depth + 1,
                     below, Within(location, inner), probed[index].Reader, ref expanded));
             }
-            return new ContainerNode(format, file, children);
+            return new ContainerNode(format, file, children) { Volume = (reader as IVolumeReader)?.ReadVolumeInfo(file.DataFork) };
         }
 
         // Adds a location to the diagnostics that have none.

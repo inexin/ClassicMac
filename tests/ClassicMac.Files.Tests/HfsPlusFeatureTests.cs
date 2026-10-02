@@ -26,6 +26,29 @@ public sealed class HfsPlusFeatureTests
     }
 
     [Fact]
+    public void TheVolumeHeaderGivesTheDatesPlainOrWrapped()
+    {
+        static void Stamp(byte[] image, int header)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(header + 0x10), 3_100_000_000);   // createDate, local time
+            BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(header + 0x14), 3_100_000_100);   // modifyDate, UTC
+            BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(header + 0x18), 3_100_000_200);   // backupDate, UTC
+        }
+
+        var expected = new VolumeInfo("HFS Plus", new MacDate(3_100_000_000), new MacDate(3_100_000_100), new MacDate(3_100_000_200));
+        var plain = HfsPlusFixture.Build();
+        Stamp(plain, 1024);
+        var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(plain))!;
+        Assert.Equal(expected, info);
+        Assert.True(info.UtcAfterCreation);
+
+        var wrapped = HfsPlusFixture.BuildWrapped();
+        Stamp(wrapped, 6 * 512 + 1024);                                                         // the embedded volume's header
+        Assert.Equal(expected, HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(wrapped)));
+        Assert.Null(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(HfsPlusFixture.BuildWrapped(invalidEmbeddedSignature: true))));
+    }
+
+    [Fact]
     public void PlainHfsPlusVolumeListsNestedFileWithBothForksAndMetadata()
     {
         byte[] image = HfsPlusFixture.Build();

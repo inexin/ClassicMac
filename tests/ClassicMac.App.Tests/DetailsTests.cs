@@ -160,6 +160,56 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal("Stored in UTC, shown in your time zone.", DetailsViewModel.DateNote("tar archive"));
         Assert.Equal("Mac local time, as stored. No time zone.", DetailsViewModel.DateNote("MFS volume"));
         Assert.Null(DetailsViewModel.DateNote("StuffIt archive"));
+
+        // HFS and HFS Plus volumes have one reader name; the volume's own format decides.
+        var plus = new VolumeInfo("HFS Plus", null, null, null);
+        Assert.Equal("Stored in UTC, shown in your time zone.", DetailsViewModel.DateNote("HFS volume", plus));
+        Assert.Equal("Mac local time, as stored. No time zone.", DetailsViewModel.DateNote("HFS volume", plus with { Format = "HFS" }));
+    }
+
+    [Fact]
+    public void Dates_stored_in_utc_are_shown_in_local_time()
+    {
+        var date = new MacDate(3_000_000_000);
+        Assert.Equal(date.ToString(), DetailsViewModel.DisplayDate(date, utc: false));          // as stored
+        var local = DateTime.SpecifyKind(date.ToDateTime(), DateTimeKind.Utc).ToLocalTime();
+        Assert.Equal(local.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture), DetailsViewModel.DisplayDate(date, utc: true));
+        Assert.Equal("—", DetailsViewModel.DisplayDate(null, utc: true));
+    }
+
+    [Theory]
+    [InlineData("HFS", "Created|Modified|Backed up", "Mac local time, as stored. No time zone.")]
+    [InlineData("MFS", "Created|Backed up", "Mac local time, as stored. No time zone.")]
+    [InlineData("HFS Plus", "Created|Modified|Backed up", "Created in Mac local time, as stored; the others stored in UTC, shown in your time zone.")]
+    public void A_volume_card_has_its_dates_and_how_they_are_kept(string format, string labels, string note)
+    {
+        var created = new MacDate(3_000_000_000);
+        var modified = new MacDate(3_000_000_100);
+        var volume = new VolumeInfo(format, created, format == "MFS" ? null : modified, null);
+        var group = DetailsViewModel.VolumeGroup(volume);
+        Assert.Equal("Volume", group.Title);
+        Assert.Equal(["Format", .. labels.Split('|')], group.Rows.Select(r => r.Label));
+        Assert.Equal($"{format} volume", Value(group, "Format"));
+        Assert.Equal(DetailsViewModel.DisplayDate(created, utc: false), Value(group, "Created"));      // creation: always as stored
+        Assert.Equal("never", Value(group, "Backed up"));
+        if (format != "MFS")
+        {
+            Assert.Equal(DetailsViewModel.DisplayDate(modified, utc: format == "HFS Plus"), Value(group, "Modified"));
+        }
+
+        Assert.All(group.Rows.Skip(1).Where(r => r.Value != "never"), r => Assert.True(r.Mono));
+        Assert.Equal(note, group.Note);
+    }
+
+    [Fact]
+    public async Task A_disk_image_shows_its_volume_card()
+    {
+        var (model, input, _, _) = await Open();
+        model.Selected = input;
+        Assert.Equal(["Input", "Volume", "How it was read"], model.Details.Groups.Select(g => g.Title));
+        var volume = Group(model.Details, "Volume");
+        Assert.Equal(("HFS volume", "1984-01-24 00:00:00"), (Value(volume, "Format"), Value(volume, "Created")));
+        Assert.Contains("Format: HFS volume", model.Details.CopyText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -222,7 +272,7 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal(["Path", "Read as", "Holds"], details.Groups[0].Rows.Select(r => r.Label));
         Assert.Equal("host file", Value(details.Groups[0], "Read as"));
         Assert.Equal("HFS volume", Value(details.Groups[0], "Holds"));
-        Assert.Equal(["Input", "How it was read"], details.Groups.Select(g => g.Title));   // a host file has no Mac dates: no Dates card
+        Assert.Equal(["Input", "Volume", "How it was read"], details.Groups.Select(g => g.Title));   // a host file has no Mac dates: no Dates card
 
         var type = realmz.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "ICN#");
         model.Selected = type.Children[0];

@@ -44,9 +44,9 @@ lie in a trailing partial allocation block when the volume's length is not a mul
 | +$004 | 4 | `attributes` | Volume attributes (below) |
 | +$008 | 4 | `lastMountedVersion` | |
 | +$00C | 4 | `journalInfoBlock` | Allocation block of the JournalInfoBlock (§1.6) |
-| +$010 | 4 | `createDate` | |
-| +$014 | 4 | `modifyDate` | |
-| +$018 | 4 | `backupDate` | |
+| +$010 | 4 | `createDate` | When the volume was created, in local time (unlike every other HFS Plus date) [Doc: TN1150] |
+| +$014 | 4 | `modifyDate` | When it was last modified, in UTC [Doc: TN1150] |
+| +$018 | 4 | `backupDate` | When it was last backed up, in UTC [Doc: TN1150] |
 | +$01C | 4 | `checkedDate` | |
 | +$020 | 4 | `fileCount` | File records in the catalog |
 | +$024 | 4 | `folderCount` | Folder records, the root not counted |
@@ -418,6 +418,9 @@ None.
 - `HfsReader` recognises `'H+'` and `'HX'` at 1024, and a wrapper by `drEmbedSigWord`; both go to `HfsPlusReader`
   ([hfs.md §5.1](hfs.md#51-recognising-a-volume)). HFSX is read like HFS Plus, independently of Mac OS 9.0. A wrapper
   read returns the embedded volume's entries, not the wrapper's placeholder.
+- `HfsReader.ReadVolumeInfo` gives the volume header's `createDate`, `modifyDate` and `backupDate` (for a wrapper, the
+  embedded volume's; null when the embedded extent is unusable or its signature wrong). `VolumeInfo.UtcAfterCreation`
+  says that the last two are UTC while `createDate` is local time [ClassicMac].
 - Each visible file comes out with its path, Finder information, dates, both forks, and the file-locked catalog flag
   (bit 0) as `MacFile.IsLocked`. Unicode names are kept in
   `MacFile.MacPath`; the Mac OS Roman `Name` is a best-effort rendering.

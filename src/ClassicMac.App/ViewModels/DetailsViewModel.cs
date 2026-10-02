@@ -174,6 +174,11 @@ namespace ClassicMac.App.ViewModels
                 groups.Add(Dates(input.Root.File, DateNote(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "")));
             }
 
+            if (VolumeOf(input.Root) is { } volume)
+            {
+                groups.Add(VolumeGroup(volume));
+            }
+
             groups.Add(new("How it was read", [], Wide: true) { Chain = Chain(input) });
             return new DetailsViewModel(input.Title, groups, problems: problems);
         }
@@ -240,30 +245,120 @@ namespace ClassicMac.App.ViewModels
             {
                 new("File", fileRows),
                 new("Forks", forkRows),
-                Dates(file, DateNote(chain.Count > 1 ? chain[^2].Text : "")),
+                Dates(file, DateNote(chain.Count > 1 ? chain[^2].Text : "", VolumeAbove(node))),
                 flags,
-                new("How it was read", [], Wide: true) { Chain = chain },
             };
+            // A disk image's file: the volume in it.
+            if (node is ContainerFileNode container && VolumeOf(container.Node) is { } volume)
+            {
+                groups.Add(VolumeGroup(volume));
+            }
+
+            groups.Add(new("How it was read", [], Wide: true) { Chain = chain });
             return new DetailsViewModel(file.Name.ToMacRoman(), groups, parent, problems);
         }
 
-        private static DetailGroup Dates(MacFile file, string? note) =>
-            new("Dates", [new("Created", Date(file.Created), Mono: true), new("Modified", Date(file.Modified), Mono: true)]) { Note = note };
+        private const string LocalNote = "Mac local time, as stored. No time zone.";
+        private const string UtcNote = "Stored in UTC, shown in your time zone.";
+
+        private static DetailGroup Dates(MacFile file, string? note)
+        {
+            var utc = note == UtcNote;
+            return new("Dates", [new("Created", DisplayDate(file.Created, utc), Mono: true), new("Modified", DisplayDate(file.Modified, utc), Mono: true)])
+            {
+                Note = note,
+            };
+        }
+
+        // The volume a container holds: its own, or that of the one file it holds (a disk image's disk), and so on down.
+        private static VolumeInfo? VolumeOf(ContainerNode node)
+        {
+            for (var at = node; ; at = at.Children[0])
+            {
+                if (at.Volume is { } volume)
+                {
+                    return volume;
+                }
+
+                if (at.Children.Count != 1)
+                {
+                    return null;
+                }
+            }
+        }
+
+        // The volume a file was read from: the nearest input or disk image above it that holds one.
+        private static VolumeInfo? VolumeAbove(NodeViewModel node)
+        {
+            for (var at = node.Parent; at is not null; at = at.Parent)
+            {
+                var volume = at switch
+                {
+                    ContainerFileNode container => VolumeOf(container.Node),
+                    InputNode input => VolumeOf(input.Root),
+                    _ => null,
+                };
+                if (volume is not null || at is ContainerFileNode or InputNode)
+                {
+                    return volume;
+                }
+            }
+
+            return null;
+        }
 
         /// <summary>
-        /// How dates were kept, by the format that held the file: HFS and MFS in Mac local time, HFS Plus, zip and tar in
-        /// UTC; null for others.
+        /// The Volume card: the volume's format and dates — creation as stored (local time on every Mac volume), the
+        /// others in local time on HFS and MFS and in UTC, shown in local time, on HFS Plus; MFS has no modification date.
         /// </summary>
-        public static string? DateNote(string format)
+        public static DetailGroup VolumeGroup(VolumeInfo volume)
         {
+            ArgumentNullException.ThrowIfNull(volume);
+            var utc = volume.UtcAfterCreation;
+            var rows = new List<DetailRow> { new("Format", $"{volume.Format} volume"), new("Created", DisplayDate(volume.Created, utc: false), Mono: true) };
+            if (volume.Format != "MFS")
+            {
+                rows.Add(new("Modified", DisplayDate(volume.Modified, utc), Mono: true));
+            }
+
+            rows.Add(volume.BackedUp is { } backup ? new("Backed up", DisplayDate(backup, utc), Mono: true) : new("Backed up", "never"));
+            return new("Volume", rows)
+            {
+                Note = utc ? "Created in Mac local time, as stored; the others stored in UTC, shown in your time zone." : LocalNote,
+            };
+        }
+
+        /// <summary>A date as <c>yyyy-MM-dd HH:mm:ss</c>: as stored, or, when it is stored in UTC, in this computer's time zone; "—" for none.</summary>
+        public static string DisplayDate(MacDate? date, bool utc)
+        {
+            if (date is not { } d)
+            {
+                return "—";
+            }
+
+            var time = utc ? DateTime.SpecifyKind(d.ToDateTime(), DateTimeKind.Utc).ToLocalTime() : d.ToDateTime();
+            return time.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>
+        /// How dates were kept: by the volume the file was read from when known (HFS and HFS Plus share a reader name),
+        /// else by the format that held it — HFS and MFS in Mac local time, HFS Plus, zip and tar in UTC; null for others.
+        /// </summary>
+        public static string? DateNote(string format, VolumeInfo? volume = null)
+        {
+            if (volume is not null)
+            {
+                return volume.Format == "HFS Plus" ? UtcNote : LocalNote;
+            }
+
             var f = format.ToUpperInvariant();
             if (f.Contains("HFS PLUS", StringComparison.Ordinal) || f.Contains("HFS+", StringComparison.Ordinal) || f.Contains("ZIP", StringComparison.Ordinal)
                 || f.Contains("TAR", StringComparison.Ordinal))
             {
-                return "Stored in UTC, shown in your time zone.";
+                return UtcNote;
             }
 
-            return f.Contains("HFS", StringComparison.Ordinal) || f.Contains("MFS", StringComparison.Ordinal) ? "Mac local time, as stored. No time zone." : null;
+            return f.Contains("HFS", StringComparison.Ordinal) || f.Contains("MFS", StringComparison.Ordinal) ? LocalNote : null;
         }
 
         /// <summary>The first types of a fork in mono, and how many more ("'ICN#' 'STR#' +54 more").</summary>
@@ -388,9 +483,6 @@ namespace ClassicMac.App.ViewModels
             return new DetailsViewModel(resource.ToString(),
                 [new("Resource", rows), new("How it was read", [], Wide: true) { Chain = Chain(node) }], problems: problems);
         }
-
-        private static string Date(MacDate? date) =>
-            date is { } d ? d.ToDateTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) : "—";
 
         private static string Bytes(long count) => count.ToString("N0", CultureInfo.InvariantCulture) + " bytes";
     }

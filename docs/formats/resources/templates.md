@@ -155,8 +155,9 @@ its bottom or whose left is right of its right. [Code: ResEdit 2.1.3]
   items it is in, and its value), fillers, alignment and the 0 byte ending an `LSTZ` included; a `BBIT` lies in the
   byte holding it. `ByteMeanings.MeaningAt` turns it into what a byte means, for the hex inspector: the field's label
   with its item numbers ("ID of item 3", "Value of item 2.1"); for strings their length, characters and padding
-  ("Length of Name of item 1", "Character 2 of Name of item 1"); "Byte *k* of" a hex field; "Bits: a, b" for a byte of
-  bit fields; "Filler", "Alignment", "End of" a list or C string; "After the template's fields" for data past it.
+  ("Length of Name of item 1", "Character 2 of Name of item 1"); "Byte *k* of" a hex field; "Bits on: a; off: b"
+  for a byte of bit fields (the named ones set, then those clear, most significant first); "Filler", "Alignment",
+  "End of" a list or C string; "After the template's fields" for data past it.
   [ClassicMac]
 - ClassicMac ships its own templates (`BuiltInTemplates`, made with `ResourceTemplate.FromFields`) for common types
   with no form of their own, written in its own words from Apple's documentation of each layout; none of ResEdit's

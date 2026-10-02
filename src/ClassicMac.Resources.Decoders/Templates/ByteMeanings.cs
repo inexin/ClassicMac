@@ -97,8 +97,12 @@ namespace ClassicMac.Resources.Decoders.Templates
             }
             if (here.Count > 1 || here[0].Node.Type == "BBIT")
             {
-                var labels = here.Select(s => s.Node.Label).Where(l => l.Length > 0);
-                return new ByteMeaning("Bits: " + string.Join(", ", labels), here[0].Offset, 1, "$" + Convert.ToHexString(data.Slice(offset, 1)));
+                // The byte's bit fields, most significant first (templates.md §5): which named ones are set.
+                var bits = data[offset];
+                var named = here.Select((s, i) => (s.Node.Label, On: i < 8 && (bits & (0x80 >> i)) != 0)).Where(b => b.Label.Length > 0).ToList();
+                static string List(IEnumerable<string> labels) => labels.Any() ? string.Join(", ", labels) : "none";
+                var text = $"Bits on: {List(named.Where(b => b.On).Select(b => b.Label))}; off: {List(named.Where(b => !b.On).Select(b => b.Label))}";
+                return new ByteMeaning(text, here[0].Offset, 1, "$" + Convert.ToHexString(data.Slice(offset, 1)));
             }
             return InField(here[0], data, offset);
         }

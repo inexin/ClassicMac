@@ -30,6 +30,33 @@ public class HfsTests
     }
 
     [Fact]
+    public void The_volume_reports_its_dates_from_the_mdb()
+    {
+        var (_, image) = Sample();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x02), 3_000_000_000);   // drCrDate
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x06), 3_000_000_100);   // drLsMod
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x40), 3_000_000_200);   // drVolBkUp
+        var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+        Assert.Equal(new VolumeInfo("HFS", new MacDate(3_000_000_000), new MacDate(3_000_000_100), new MacDate(3_000_000_200)), info);
+        Assert.False(info.UtcAfterCreation);
+
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x40), 0);                // never backed up
+        Assert.Null(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!.BackedUp);
+        Assert.Null(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(new byte[4096])));  // not a volume
+    }
+
+    [Fact]
+    public void Unwrapping_a_volume_keeps_its_dates_on_the_node_that_holds_it()
+    {
+        var (_, image) = Sample();
+        var host = new MacFile { Name = MacString.FromMacRoman("Disk.img"), DataFork = ForkData.FromBytes(image) };
+        var root = ContainerUnwrapper.Default.Unwrap(host, "host file", new ContainerContext());
+        Assert.Equal(HfsReader.Instance.ReadVolumeInfo(host.DataFork), root.Volume);
+        Assert.NotNull(root.Volume);
+        Assert.All(root.Children, c => Assert.Null(c.Volume));                              // files on it are not volumes
+    }
+
+    [Fact]
     public void Files_come_out_with_folders_Finder_info_dates_and_forks()
     {
         var (files, diagnostics) = Read(Sample().Image);

@@ -140,6 +140,24 @@ public sealed class HexViewTests
                 .First(b => b.Classes.Contains("hex-char") && b.DataContext is HexCell c && c.Offset == 15);
             var right = last.TranslatePoint(new Point(last.Bounds.Width, 0), window)!.Value.X;
             Assert.True(right <= inspector.TranslatePoint(default, window)!.Value.X, $"text column ends at {right}");
+
+            // The inspector's text stays clear of its overlay scroll bar (seen cut on a 'SIZE' byte's bit names).
+            var scroll = window.FindControl<ScrollViewer>("HexInspectorScroll")!;
+            Assert.All(inspector.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible),
+                t => Assert.True(t.TranslatePoint(new Point(t.Bounds.Width, 0), scroll)!.Value.X <= scroll.Bounds.Width - 8, $"“{t.Text}” runs under the scroll bar"));
+            // and the widest reading, a 13-character UInt32 ($FF616263 = 4,284,572,259), fits its column.
+            var widest = Cell(window, 2).TranslatePoint(new Point(4, 4), window)!.Value;
+            window.MouseDown(widest, MouseButton.Left);
+            window.MouseUp(widest, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+            Assert.All(inspector.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible && t.TextWrapping == TextWrapping.NoWrap),
+                t => Assert.True(t.TextLayout.WidthIncludingTrailingWhitespace <= t.Bounds.Width + 0.5, $"“{t.Text}” is cut"));
+            foreach (var reading in inspector.GetVisualDescendants().OfType<Grid>().Where(g => g.DataContext is HexReading))
+            {
+                var label = (TextBlock)reading.Children[0];
+                Assert.True(label.TextLayout.WidthIncludingTrailingWhitespace + 6 <= reading.ColumnDefinitions[0].ActualWidth, $"“{label.Text}” touches its value");
+            }
+
             window.Close();
         }
         finally

@@ -91,6 +91,16 @@ public class MfsTests
     }
 
     [Fact]
+    public void The_volume_reports_its_creation_and_backup_dates()
+    {
+        var image = Volume();
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x06), 2_600_000_000);  // drLsBkUp
+        var info = MfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+        Assert.Equal(new VolumeInfo("MFS", new MacDate(2_526_595_200), null, new MacDate(2_600_000_000)), info);
+        Assert.Null(MfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(new byte[4096])));
+    }
+
+    [Fact]
     public void Files_follow_their_block_chains()
     {
         var image = Volume(

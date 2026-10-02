@@ -12,7 +12,7 @@ namespace ClassicMac.Files.Hfs
     /// file on the volume comes out with its folder path, Finder info, dates and both forks, which are read from the
     /// image in place. HFS Plus volumes use the corresponding HFS Plus reader.
     /// </summary>
-    public sealed class HfsReader : IContainerReader
+    public sealed class HfsReader : IContainerReader, IVolumeReader
     {
         private const int MdbOffset = 1024;
         private const int MdbLength = 162;
@@ -46,6 +46,60 @@ namespace ClassicMac.Files.Hfs
 
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => Read(input, context, null);
+
+        /// <summary>
+        /// The volume's dates (docs/formats/file-systems/hfs.md §1.3, hfs-plus.md §1.1): an HFS volume's from its MDB, an
+        /// HFS Plus volume's from its header, and a wrapped one's from the embedded volume's header; null when the input
+        /// is not a volume or the wrapper's embedded extent is unusable.
+        /// </summary>
+        public VolumeInfo? ReadVolumeInfo(ForkData input)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            if (!CanRead(input))
+            {
+                return null;
+            }
+
+            var mdb = new BigEndianReader(input.Slice(MdbOffset, MdbLength).ToArray());
+            var signature = mdb.ReadUInt16At(0);
+            if (signature is HfsPlusSignature or HfsXSignature)
+            {
+                return PlusInfo(mdb);
+            }
+
+            if (mdb.ReadUInt16At(0x7C) == HfsPlusSignature)
+            {
+                return EmbeddedOffset(input, mdb) is { } offset && offset <= input.Length - (MdbOffset + MdbLength)
+                    && new BigEndianReader(input.Slice(offset + MdbOffset, MdbLength).ToArray()) is var header
+                    && header.ReadUInt16At(0) is HfsPlusSignature or HfsXSignature
+                    ? PlusInfo(header)
+                    : null;
+            }
+
+            return new VolumeInfo("HFS", Date(mdb.ReadUInt32At(0x02)), Date(mdb.ReadUInt32At(0x06)), Date(mdb.ReadUInt32At(0x40)));
+        }
+
+        // createDate (local time), modifyDate and backupDate (UTC), at +$10, +$14 and +$18 of the volume header.
+        private static VolumeInfo PlusInfo(BigEndianReader header) =>
+            new("HFS Plus", Date(header.ReadUInt32At(0x10)), Date(header.ReadUInt32At(0x14)), Date(header.ReadUInt32At(0x18)));
+
+        private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
+
+        // Where a wrapper's embedded HFS Plus volume starts, as ReadEmbeddedPlus finds it; null when the extent is invalid.
+        private static long? EmbeddedOffset(ForkData input, BigEndianReader mdb)
+        {
+            uint blockSize = mdb.ReadUInt32At(0x14);
+            uint allocationBlocks = mdb.ReadUInt16At(0x12);
+            uint embeddedStart = mdb.ReadUInt16At(0x7E);
+            uint embeddedBlocks = mdb.ReadUInt16At(0x80);
+            if (blockSize == 0 || allocationBlocks == 0 || embeddedBlocks == 0 || (ulong)embeddedStart + embeddedBlocks > allocationBlocks)
+            {
+                return null;
+            }
+
+            ulong offset = (ulong)mdb.ReadUInt16At(0x1C) * 512 + (ulong)embeddedStart * blockSize;
+            return offset > (ulong)input.Length ? null : (long)offset;
+        }
 
         /// <summary>
         /// The volume's folders with their Finder information (window, icon place, flags) and dates, the root folder

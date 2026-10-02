@@ -11,7 +11,7 @@ namespace ClassicMac.Files.Hfs
     /// a fork's last block), and a flat file directory. MFS has no real folders (the Finder kept them), so the files
     /// have no folder path.
     /// </summary>
-    public sealed class MfsReader : IContainerReader
+    public sealed class MfsReader : IContainerReader, IVolumeReader
     {
         private const int InfoOffset = 1024;
         private const int MapOffset = InfoOffset + 64;
@@ -31,6 +31,22 @@ namespace ClassicMac.Files.Hfs
         /// <inheritdoc/>
         public bool CanRead(ForkData input) =>
             input.Length >= MapOffset && new BigEndianReader(input.Slice(InfoOffset, 2).ToArray()).ReadUInt16At(0) == Signature;
+
+        /// <summary>
+        /// The volume's dates (docs/formats/file-systems/mfs.md §1): <c>drCrDate</c> and <c>drLsBkUp</c>, in local time;
+        /// MFS keeps no modification date. Null when the input is not an MFS volume.
+        /// </summary>
+        public VolumeInfo? ReadVolumeInfo(ForkData input)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            if (!CanRead(input))
+            {
+                return null;
+            }
+
+            var info = new BigEndianReader(input.Slice(InfoOffset, 10).ToArray());
+            return new VolumeInfo("MFS", Date(info.ReadUInt32At(0x02)), null, Date(info.ReadUInt32At(0x06)));
+        }
 
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
