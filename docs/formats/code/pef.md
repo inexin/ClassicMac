@@ -279,13 +279,18 @@ word, 8 flag bytes, then optional fields in this order [Doc: Mac OS Runtime Arch
 | Field | Size | Present when |
 | --- | --- | --- |
 | Zero word | 4 | Always |
-| Flags | 8 | Always. Byte 0: version (0). Byte 1: language (0 C, 1 FORTRAN, 2 Pascal, 9 C++). Byte 2: `$20` has tb_offset, `$08` has ctl_info. Byte 3: `$80` interrupt handler, `$40` has the name, `$20` uses alloca. Byte 6: fixed-point parameter count. Byte 7 bits 1–7: floating-point parameter count |
+| Flags | 8 | Always. Byte 0: version (0). Byte 1: language (0 C, 1 FORTRAN, 2 Pascal, 9 C++). Byte 2: `$20` has tb_offset, `$08` has ctl_info. Byte 3: `$80` interrupt handler, `$40` has the name, `$20` uses alloca. Byte 4: `$80` stores_bc, `$40` fixup, bits 0–5 the FPRs saved. Byte 5: `$80` has_ext_table, `$40` has_vec, bits 0–5 the GPRs saved. Byte 6: fixed-point parameter count. Byte 7: bits 1–7 the floating-point parameter count, bit 0 parmsonstk (parameters on the stack; not a count) |
 | parminfo | 4 | There are fixed-point or floating-point parameters |
 | tb_offset | 4 | Byte 2 bit `$20`: the distance from the function's first instruction to the zero word |
 | hand_mask | 4 | Byte 3 bit `$80` |
 | ctl_info | 4 + 4n | Byte 2 bit `$08`: a count n, then n words |
 | Name | 2 + n | Byte 3 bit `$40`: a 16-bit length, then the name in Mac OS Roman |
 | alloca_reg | 1 | Byte 3 bit `$20` |
+| vec_ext | 6 | Byte 5 bit `$40`: the AltiVec extension (vector registers saved, vector parameters) |
+| ext_table | 1 | Byte 5 bit `$80` |
+
+Bytes 4 and 5's register counts and bits describe the frame and add no field. No table in the corpus sets has_vec or
+has_ext_table, Mac OS 9.2.2's vecLib included [Verified: 2,449 tables in Mac OS 9.2.2's fragments, NQD and Disk Copy].
 
 Apple's libraries carry no names; Disk Copy 6.5 names 1,619 functions [Verified: the Mac OS 9 System file, Disk
 Copy 6.5].
@@ -393,6 +398,7 @@ Fragments are listed and modelled as [disassembly.md](../output/disassembly.md) 
 | `pef.sections-truncated` | Error | The section headers run past the container | Reads the headers that fit | Not traced |
 | `pef.string-unterminated` | Warning | A section name or loader string has no NUL before the end | Takes the bytes to the end | Not traced |
 | `traceback.bad-offset` | Warning | A tb_offset reaches before the start of the code | Keeps the table without a function start | Not traced |
+| `traceback.extension-unread` | Warning | A table sets has_vec or has_ext_table | Keeps the table; its length stops at alloca_reg | Not traced |
 | `traceback.truncated` | Error | A traceback table runs past the code | Leaves the table out | Not traced |
 
 ## 7. Verification
@@ -411,8 +417,9 @@ Hand-built containers (`tests/ClassicMac.Code.Tests`, built with `PefBuilder`):
   counting instructions, undefined and truncated instructions, repeats at the start and of repeats, out-of-range words,
   imports and sections, runaways, listing without an image.
 - `TransitionVectorTests`: main, init and tvector exports read as code and TOC offsets with their sections.
-- `TracebackTableTests`: each optional field alone and all in order, the scan after `blr`, truncation and a
-  tb_offset before the code.
+- `TracebackTableTests`: each optional field alone and all in order, bytes 4 and 5 and parmsonstk adding no field,
+  has_vec and has_ext_table reported, the scan after `blr` (and not after `b` or `bctr`), truncation (an offset at the
+  end of the code included) and a tb_offset before the code.
 
 Real fragments, gated on `CLASSICMAC_CODE_CORPUS` (they skip without it; Apple's files are never committed).
 `CorpusTests` checks each fragment the way the Code Fragment Manager would use it: every section image builds to
@@ -428,7 +435,10 @@ table. On top of that:
 - Disk Copy 6.5's: main 1:$22D0, 688 imports, 2,921 fixups, TOC base `$8000`;
 - Mac OS 9.2.2's 90 fragments (`FragmentFacts`, counted by an independent reader): imports, libraries, exports,
   re-exports, hash power, main, init, term, the fixup count and the count of each relocation mnemonic, for every one;
-- every `.pef` in the corpus verifies.
+- every `.pef` in the corpus verifies;
+- `PpcCorpusTests`: NQD has no traceback table; Disk Copy 6.1.2 has one (`__uitrunc` at `$3B064`, tb_offset `$68`,
+  one floating-point parameter); Disk Copy 6.5 has 1,619, all named, the first `.TradHighestUnitNumber` at `$44`
+  (function `$1C`) and the last `.HandleBurn` at `$B9AB8` (function `$B98BC`).
 
 `PpcCorpusTests` scans the code sections of NQD (no names), Disk Copy 6.1.2 (one) and Disk Copy 6.5 (1,619 names,
 the first `.TradHighestUnitNumber` at `$1C` with tb_offset `$28`): every located function starts on a valid
@@ -442,6 +452,9 @@ in [cfrg.md §7](cfrg.md#7-verification) and [code-resources.md §7](code-resour
 - Section kinds 3, 5, 6 and 8, named sections and the CDIS, SECN, LRPT and LSEC opcodes: read as documented, not
   seen in a sample.
 - The exception section's contents.
+- A traceback table's vec_ext and ext_table: reported, not read (§1.12).
+- A traceback table after a function that does not end in `blr` (a tail call `b`, or `bctr`): the scan does not find
+  it.
 - What the Code Fragment Manager does with a damaged container (every "The Mac does" above).
 - Resolving imports against other fragments: addresses are the caller's.
 

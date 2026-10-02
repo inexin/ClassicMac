@@ -9,7 +9,8 @@ namespace ClassicMac.Code.Ppc;
 /// final <c>blr</c>, which carries the function's name for debuggers [Doc: Mac OS Runtime Architectures; the layout is
 /// AIX's tbtable.h]. It is a zero word, 8 flag bytes, then the optional fields in this order: parminfo (when there are
 /// fixed or floating-point parameters), tb_offset, hand_mask, ctl_info (a count and that many words), the name (a
-/// 16-bit length and the characters) and alloca_reg.
+/// 16-bit length and the characters) and alloca_reg. The AIX vector extension and extension table that may follow are
+/// not read (reported as <c>traceback.extension-unread</c>).
 /// </summary>
 public sealed record TracebackTable
 {
@@ -18,7 +19,8 @@ public sealed record TracebackTable
     /// <summary>The offset of the table's zero word in the code.</summary>
     public int Offset { get; init; }
 
-    /// <summary>The table's length in bytes, from the zero word to the end of its last field.</summary>
+    /// <summary>The table's length in bytes, from the zero word to the end of its last field read (alloca_reg at the
+    /// latest).</summary>
     public int Length { get; init; }
 
     /// <summary>The 8 flag bytes as a big-endian number: version, language, then the bit fields.</summary>
@@ -44,6 +46,13 @@ public sealed record TracebackTable
 
     /// <summary>The function uses alloca and the table has alloca_reg (byte 3, bit 0x20).</summary>
     public bool UsesAlloca => (Flags & 0x0000_0020_0000_0000) != 0;
+
+    /// <summary>The table has the vector extension after alloca_reg (byte 5, bit 0x40); it is not read.</summary>
+    public bool HasVectorInfo => (Flags & 0x0000_0000_0040_0000) != 0;
+
+    /// <summary>The table has the extension table byte after the vector extension (byte 5, bit 0x80); it is not
+    /// read.</summary>
+    public bool HasExtensionTable => (Flags & 0x0000_0000_0080_0000) != 0;
 
     /// <summary>The number of fixed-point parameters (byte 6).</summary>
     public int FixedParameterCount => (int)(Flags >> 8) & 0xFF;
@@ -77,7 +86,7 @@ public sealed record TracebackTable
     /// Reads the table whose zero word is at <paramref name="offset"/>. Returns null when the word there is not zero
     /// (not a table) or when the table runs past the end of the code (reported as <c>traceback.truncated</c>). A
     /// tb_offset that points before the code is reported as <c>traceback.bad-offset</c> and leaves
-    /// <see cref="FunctionStart"/> null.
+    /// <see cref="FunctionStart"/> null; vector or extension fields are reported as <c>traceback.extension-unread</c>.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="offset"/> is outside the code.</exception>
     public static TracebackTable? Read(ReadOnlyMemory<byte> code, int offset, ICollection<Diagnostic> diagnostics)
@@ -149,6 +158,13 @@ public sealed record TracebackTable
             if (!reader.TryReadByte(out byte r)) return Truncated();
             allocaRegister = r;
         }
+
+        // has_vec and has_ext_table add the vector extension and an extension byte after alloca_reg [Doc: AIX
+        // sys/debug.h]. Whether a Mac OS compiler sets them is not known, so they are reported, not read.
+        if (table.HasVectorInfo || table.HasExtensionTable)
+            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "traceback.extension-unread",
+                $"The traceback table at 0x{offset:X} has vector or extension fields after alloca_reg, not read.",
+                offset));
 
         int? functionStart = null;
         if (tbOffset is { } tb)
