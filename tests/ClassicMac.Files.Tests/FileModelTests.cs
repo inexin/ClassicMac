@@ -173,6 +173,86 @@ public class ForkSliceTests
     }
 }
 
+// The cache probes read through: a file's head (up to 256 KB) and last 4 KB come from the underlying fork once, the
+// rest as asked.
+public class ProbeForkTests
+{
+    private static readonly byte[] Bytes = Enumerable.Range(0, 600_000).Select(i => (byte)(i * 7 + i / 251)).ToArray();
+
+    // Counts the reads that reach it.
+    private sealed class Counting(byte[] bytes) : ForkData
+    {
+        public int Reads { get; private set; }
+
+        public override long Length => bytes.Length;
+
+        public override Stream Open() => new MemoryStream(bytes, writable: false);
+
+        protected override void ReadAtCore(long offset, Span<byte> buffer)
+        {
+            Reads++;
+            bytes.AsSpan((int)offset, buffer.Length).CopyTo(buffer);
+        }
+    }
+
+    [Theory]
+    [InlineData(0, 4)]
+    [InlineData(100, 65_536)]
+    [InlineData(32_768, 2048)]
+    [InlineData(250_000, 20_000)] // across the end of the head
+    [InlineData(599_500, 500)] // the tail
+    [InlineData(400_000, 1000)] // neither
+    [InlineData(595_000, 5000)] // into the tail from before it
+    public void Reads_give_the_forks_bytes(int offset, int length)
+    {
+        var probe = ForkData.ForProbing(new Counting(Bytes));
+        var buffer = new byte[length];
+        Assert.Equal(length, probe.ReadAt(offset, buffer));
+        Assert.Equal(Bytes.AsSpan(offset, length).ToArray(), buffer);
+        Assert.Equal(Bytes.AsSpan(offset, 100).ToArray(), probe.Slice(offset, 100).ReadPrefix(100));
+        Assert.Equal(Bytes.Length, probe.Length);
+    }
+
+    [Fact]
+    public void The_head_and_tail_are_read_once()
+    {
+        var fork = new Counting(Bytes);
+        var probe = ForkData.ForProbing(fork);
+
+        probe.ReadPrefix(4);
+        probe.ReadPrefix(65_536);
+        probe.Slice(32_768, 2048).ReadPrefix(2048);
+        probe.Slice(Bytes.Length - 512, 512).ReadPrefix(512);
+        probe.Slice(Bytes.Length - 8, 8).ReadPrefix(8);
+        var reads = fork.Reads;
+        probe.ReadPrefix(65_536);
+        probe.Slice(Bytes.Length - 512, 512).ReadPrefix(512);
+
+        Assert.True(reads <= 4, $"{reads} reads");
+        Assert.Equal(reads, fork.Reads);
+    }
+
+    [Fact]
+    public void Small_forks_are_read_whole_once()
+    {
+        var fork = new Counting(Bytes[..3000]);
+        var probe = ForkData.ForProbing(fork);
+        probe.ReadPrefix(4);
+        probe.Slice(2990, 10).ReadPrefix(10);
+        probe.ReadPrefix(3000);
+        Assert.Equal(1, fork.Reads);
+    }
+
+    [Fact]
+    public void Streams_open_the_fork_itself()
+    {
+        var probe = ForkData.ForProbing(ForkData.FromBytes(Bytes));
+        using var stream = probe.Open();
+        stream.Seek(400_000, SeekOrigin.Begin);
+        Assert.Equal(Bytes[400_000], stream.ReadByte());
+    }
+}
+
 public class ExtentForkTests
 {
     private static readonly byte[] Image = Enumerable.Range(0, 100).Select(i => (byte)i).ToArray();

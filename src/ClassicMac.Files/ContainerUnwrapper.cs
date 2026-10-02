@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.ExceptionServices;
+using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files.Archives;
 using ClassicMac.Files.Containers;
@@ -107,7 +109,7 @@ namespace ClassicMac.Files
             ArgumentNullException.ThrowIfNull(context);
             ArgumentOutOfRangeException.ThrowIfLessThan(levels, 1);
             long expanded = 0;
-            return Unwrap(file, format, context, 0, levels, null, ref expanded);
+            return Unwrap(file, format, context, 0, levels, null, Probe(file), ref expanded);
         }
 
         /// <summary>
@@ -127,7 +129,7 @@ namespace ClassicMac.Files
 
         private ContainerNode Expand(ContainerNode node, ContainerContext context, int depth, int levels, string? location, ref long expanded)
         {
-            if (node.UnreadFormat is not null) return Unwrap(node.File, node.Format, context, depth, levels, location, ref expanded);
+            if (node.UnreadFormat is not null) return Unwrap(node.File, node.Format, context, depth, levels, location, Probe(node.File), ref expanded);
             if (node.Children.Count == 0) return node;
             var files = node.Children.Select(c => c.File).ToList();
             var children = new List<ContainerNode>(node.Children.Count);
@@ -155,10 +157,37 @@ namespace ClassicMac.Files
                 context.For(null, HostFiles.Siblings(path, context.Options, context.Diagnostics)));
         }
 
-        private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, int levels, string? location, ref long expanded)
+        // The first reader whose format the file's data fork is in, or null. The probes share one read of each fork's
+        // head and tail.
+        private IContainerReader? Probe(MacFile file)
         {
-            if (file.DataFork.Length == 0) return new ContainerNode(format, file, []);
-            var reader = readers.FirstOrDefault(r => r.CanRead(file));
+            if (file.DataFork.Length == 0) return null;
+            var probe = file with { DataFork = ForkData.ForProbing(file.DataFork), ResourceFork = ForkData.ForProbing(file.ResourceFork) };
+            return readers.FirstOrDefault(r => r.CanRead(probe));
+        }
+
+        // Probes the files side by side (each probe only reads its own file; a disk holds thousands): the readers in
+        // the files' order, and the first probe that failed, in order, rethrown when its file is reached.
+        private (IContainerReader? Reader, ExceptionDispatchInfo? Error)[] ProbeAll(IReadOnlyList<MacFile> files)
+        {
+            var found = new (IContainerReader?, ExceptionDispatchInfo?)[files.Count];
+            Parallel.For(0, files.Count, index =>
+            {
+                try
+                {
+                    found[index] = (Probe(files[index]), null);
+                }
+                catch (Exception e)
+                {
+                    found[index] = (null, ExceptionDispatchInfo.Capture(e));
+                }
+            });
+            return found;
+        }
+
+        private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, int levels, string? location,
+            IContainerReader? reader, ref long expanded)
+        {
             if (reader is null) return new ContainerNode(format, file, []);
             if (levels == 0) return new ContainerNode(format, file, []) { UnreadFormat = reader.FormatName };
             // What reading this file's container reports is about this file; the files inside it get their own locations.
@@ -184,9 +213,12 @@ namespace ClassicMac.Files
                 return new ContainerNode(format, file, []);
             }
 
+            var probed = ProbeAll(contents);
             var children = new List<ContainerNode>(contents.Count);
-            foreach (var inner in contents)
+            for (var index = 0; index < contents.Count; index++)
             {
+                var inner = contents[index];
+                probed[index].Error?.Throw();
                 expanded += inner.DataFork.Length + inner.ResourceFork.Length;
                 if (expanded > context.Options.MaxExpandedBytesPerInput)
                 {
@@ -197,7 +229,7 @@ namespace ClassicMac.Files
                 // A container holding one file (a wrapper, a disk image's disk) does not use up a level.
                 var below = levels == int.MaxValue || contents.Count == 1 ? levels : levels - 1;
                 children.Add(Unwrap(inner, reader.FormatName, outer.For(null, () => SiblingsOf(contents, inner)), depth + 1,
-                    below, Within(location, inner), ref expanded));
+                    below, Within(location, inner), probed[index].Reader, ref expanded));
             }
             return new ContainerNode(format, file, children);
         }

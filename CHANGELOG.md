@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Files: a container's files are probed for formats in parallel, all probes of a file sharing one read of its head and
+  tail: opening a 500 MB disk of 5,170 files takes 0.4 s, and unwrapping everything on it (`list`) 2.4 s instead of 11 s.
 - StuffIt: archives decode about ten times faster: forks decode in parallel, method 15 (Arsenic) writes into arrays
   and checks its CRC-32 from a table, and the fork CRC-16 is table-driven (a 38 MB archive of 1,826 files: 9.3 s to
   0.8 s).

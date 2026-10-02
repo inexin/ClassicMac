@@ -153,6 +153,69 @@ public class UnwrapTests
         Assert.Null(Named(disk, "Text").UnreadFormat);
     }
 
+    // A container that holds the files it is given, and a format whose probe only passes when four probes run at once.
+    private sealed class Holder(IReadOnlyList<MacFile> files) : IContainerReader
+    {
+        public string FormatName => "holder";
+
+        public bool CanRead(ForkData input) => input.Length == 1 && input.ReadPrefix(1)[0] == 0xEE;
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => files;
+    }
+
+    private sealed class Together(int count) : IContainerReader
+    {
+        private readonly Barrier barrier = new(count);
+
+        public string FormatName => "together";
+
+        public bool CanRead(ForkData input) =>
+            input.Length == 2 && barrier.SignalAndWait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => [];
+    }
+
+    // The files of a container are probed side by side (opening a disk probes every file on it); the tree keeps their
+    // order.
+    [Fact]
+    public void A_containers_files_are_probed_at_the_same_time()
+    {
+        var files = Enumerable.Range(0, 4).Select(i =>
+            new MacFile { Name = MacString.FromMacRoman($"File {i}"), DataFork = ForkData.FromBytes(new byte[] { 1, 2 }) }).ToList();
+        var unwrapper = new ContainerUnwrapper([new Holder(files), new Together(4)]);
+
+        var root = unwrapper.Unwrap(new MacFile { Name = MacString.FromMacRoman("in"), DataFork = ForkData.FromBytes(new byte[] { 0xEE }) },
+            "host file", new ContainerContext(), levels: 1);
+
+        Assert.Equal(["File 0", "File 1", "File 2", "File 3"], root.Children.Select(c => c.File.Name.ToMacRoman()));
+        Assert.All(root.Children, c => Assert.Equal("together", c.UnreadFormat));
+    }
+
+    // A probe that fails stops the unwrap as it would in order: the first such file's error is the one thrown.
+    private sealed class Failing : IContainerReader
+    {
+        public string FormatName => "failing";
+
+        public bool CanRead(ForkData input) => input.Length == 3
+            ? throw new InvalidOperationException($"probe {input.ReadPrefix(3)[2]}")
+            : false;
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => [];
+    }
+
+    [Fact]
+    public void The_first_failing_probe_in_order_is_thrown()
+    {
+        var files = new[] { 0, 7, 3, 9 }.Select(i =>
+            new MacFile { Name = MacString.FromMacRoman($"File {i}"), DataFork = ForkData.FromBytes(i == 0 ? new byte[] { 1 } : new byte[] { 0, 0, (byte)i }) }).ToList();
+        var unwrapper = new ContainerUnwrapper([new Holder(files), new Failing()]);
+
+        var error = Assert.Throws<InvalidOperationException>(() => unwrapper.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("in"), DataFork = ForkData.FromBytes(new byte[] { 0xEE }) }, "host file", new ContainerContext()));
+
+        Assert.Equal("probe 7", error.Message);
+    }
+
     // The formats and names of a tree, depth first.
     private static string Shape(ContainerNode node) =>
         $"{node.Format}:{node.File.Name.ToMacRoman()}({string.Join(",", node.Children.Select(Shape))})";

@@ -32,6 +32,13 @@ namespace ClassicMac.Files
             return FromFile(path, TimeSpan.FromSeconds(2));
         }
 
+        /// <summary>
+        /// The fork as container probes see it: reads of its head (up to 256 KB) and of its last 4 KB come from one read
+        /// of each, kept, since the probes of every format look at the same few places; other reads and streams go to
+        /// the fork itself.
+        /// </summary>
+        internal static ForkData ForProbing(ForkData fork) => fork is ProbeForkData ? fork : new ProbeForkData(fork);
+
         // A host file whose handle is closed once no read has used it for idle.
         internal static ForkData FromFile(string path, TimeSpan idle) =>
             new FileForkData(Path.GetFullPath(path), new FileInfo(path).Length, idle);
@@ -113,6 +120,55 @@ namespace ClassicMac.Files
             var buffer = new byte[Length];
             ReadAt(0, buffer);
             return buffer;
+        }
+
+        private sealed class ProbeForkData(ForkData fork) : ForkData
+        {
+            private const int HeadLimit = 256 * 1024, HeadStep = 64 * 1024, TailLength = 4096;
+            private readonly object gate = new();
+            private byte[] head = [];
+            private byte[]? tail;
+
+            public override long Length => fork.Length;
+
+            public override Stream Open() => fork.Open();
+
+            protected override void ReadAtCore(long offset, Span<byte> buffer)
+            {
+                long end = offset + buffer.Length;
+                long tailStart = Math.Max(0, Length - TailLength);
+                lock (gate)
+                {
+                    if (end <= Math.Min(Length, HeadLimit))
+                    {
+                        if (end > head.Length) GrowHead(end);
+                        head.AsSpan((int)offset, buffer.Length).CopyTo(buffer);
+                    }
+                    else if (offset >= tailStart)
+                    {
+                        if (tail is null)
+                        {
+                            tail = new byte[Length - tailStart];
+                            fork.ReadAt(tailStart, tail);
+                        }
+                        tail.AsSpan((int)(offset - tailStart), buffer.Length).CopyTo(buffer);
+                    }
+                    else
+                    {
+                        fork.ReadAt(offset, buffer);
+                    }
+                }
+            }
+
+            // Reads the head on to cover end, in 64 KB steps, in one read.
+            private void GrowHead(long end)
+            {
+                var length = (int)Math.Min(Math.Min(Length, HeadLimit), (end + HeadStep - 1) / HeadStep * HeadStep);
+                var larger = new byte[length];
+                head.CopyTo(larger, 0);
+                fork.ReadAt(head.Length, larger.AsSpan(head.Length));
+                head = larger;
+            }
         }
 
         private sealed class BytesForkData(ReadOnlyMemory<byte> bytes) : ForkData
