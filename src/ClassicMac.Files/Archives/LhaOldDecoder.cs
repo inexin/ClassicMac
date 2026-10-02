@@ -48,7 +48,9 @@ internal static class LhaOldDecoder
 
     private static int ReadOffset(ref LhaBitReader bits)
     {
-        int code = 0;
+        // LZHUF's d_code/d_len table as a canonical code: the shortest codes are 3 bits, so the first
+        // step reads 3 bits and each later one a single bit.
+        int code = bits.ReadBits(2);
         int firstCode = 0;
         int symbol = 0;
         for (int length = 3; length <= 8; length++)
@@ -118,7 +120,8 @@ internal sealed class LhaAdaptiveHuffmanTree
             _leafNodes[code] = nodeIndex;
             nodeIndex--;
         }
-        _groupLeaders[leafGroup] = _nodeCount - 1;
+        // A group's leader is its left-most (lowest-index) node: the last leaf placed.
+        _groupLeaders[leafGroup] = _nodeCount - _symbolCount;
 
         int child = _nodeCount - 1;
         for (nodeIndex = _symbolCount - 2; nodeIndex >= 0; nodeIndex--, child -= 2)

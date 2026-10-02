@@ -28,6 +28,28 @@ public sealed class MacLha224Tests
         Assert.Empty(diagnostics);
     }
 
+    [Theory]
+    [InlineData("l0_lh1.lzh")]
+    [InlineData("l1_lh1.lzh")]
+    [InlineData("l2_lh1.lzh")]
+    public void Lh1EntryDecodesToTheMacBinaryFile(string archiveName)
+    {
+        // -lh1-: LZHUF's adaptive Huffman tree and its fixed position table; this decoded 7 bytes, then failed at
+        // the first match (a 3-bit position code read as 1 bit) and then at the second code (the leaf group's
+        // leader was the right-most leaf, not the left-most).
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerNode result = ContainerUnwrapper.Default.Unwrap(Path.Combine(FixtureDirectory, archiveName),
+            diagnostics: diagnostics);
+
+        ContainerNode entry = Assert.Single(result.Children);
+        Assert.Equal(18304, entry.File.DataFork.Length);
+        MacFile file = Assert.Single(entry.Children).File;
+        Assert.Equal("gpl-2", file.MacPath);
+        Assert.Equal(Gpl2Md5, Md5(file.DataFork));
+        Assert.Empty(diagnostics);
+    }
+
     [Fact]
     public void NonMacEntryIsThePlainFile()
     {

@@ -157,7 +157,7 @@ compressed blocks, output-length and truncation checks, unwrapper integration, h
 data checksums, unsupported-method and unsupported-encoding continuation, input-size limits, and truncated payloads.
 
 **[Verified against MacLHA 2.24 archives (lhasa test suite)]** (`TestData/MacLha224`): header levels 0, 1 and 2,
-`-lh0-` and `-lh5-`, all 16 of lhasa's MacLHA archives except `-lh1-`:
+`-lh0-`, `-lh1-` and `-lh5-`, all 16 of lhasa's MacLHA archives:
 - A level-0 header has no OS identifier: it ends with the CRC (24 + name-length bytes in all). The OS byte is an
   optional extension; an entry without one is read with its name as MacRoman bytes, like an `m` entry.
 - A directory extension separates names with `$FF` (LHa's header.doc). A "full" path starts with `$FF` and the volume
@@ -167,9 +167,12 @@ data checksums, unsupported-method and unsupported-encoding continuation, input-
   reader returns it as stored and the default pipeline unwraps it as MacBinary one level down (the LHA entry's folders
   stay on the LHA node and place the Mac file on unpacking); `-lh0-` archives of a MacBinary file that holds a gzip
   file unwrap one level further.
-- Open: `-lh1-` (`l0_lh1.lzh`, `l1_lh1.lzh`, `l2_lh1.lzh`) decodes 7 bytes correctly, then the first match (a run of
-  zeros the encoder took from the initial window) and everything after it differ, and the CRC check reports it. The
-  `-lh1-` window setup or adaptive tree does not yet match MacLHA's; it stays **[Fitted]**.
+- `-lh1-` (`l0_lh1.lzh`, `l1_lh1.lzh`, `l2_lh1.lzh`) decodes to the same MacBinary file as `-lh5-`. It is LZHUF
+  (Okumura): a 314-symbol adaptive tree, rebuilt when the root's count reaches `$8000`, whose initial leaf group's
+  leader is its left-most (lowest-index) leaf; the position's upper 6 bits through LZHUF's fixed `d_code`/`d_len`
+  table, a canonical code of 1, 3, 8, 12, 24 and 16 codes of 3 to 8 bits (the first read is 3 bits), then 6 raw low
+  bits; a space-filled 4 KiB window (positions are relative, so LZHUF's start at 4096−60 changes nothing). lhasa's
+  `test/compressed/lh1.bin` decodes to its CRC-32 too.
 
 ## DiskDoubler (DDA2)
 

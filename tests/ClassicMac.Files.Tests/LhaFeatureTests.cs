@@ -128,8 +128,8 @@ public sealed class LhaFeatureTests
     [Fact]
     public void LhaAdaptsTheDynamicHuffmanTreeBetweenLiterals()
     {
-        // Initial A code: 111001101; after that code's frequency update: 11000100.
-        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh1-", "adaptive", [0xE6, 0xE2, 0x00], 2,
+        // Initial A code: 111001101; after that code's frequency update: 11000101.
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh1-", "adaptive", [0xE6, 0xE2, 0x80], 2,
             checksumData: "AA"u8.ToArray());
 
         MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));
@@ -376,7 +376,7 @@ public sealed class LhaFeatureTests
     [Fact]
     public void LhaUpdatesTheLh2AdaptiveTreeBetweenLiterals()
     {
-        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "adaptive", [0x05, 0xE0], 2,
+        byte[] archive = LhaFixture.BuildLevelZeroEntry("-lh2-", "adaptive", [0x05, 0xE1], 2,
             checksumData: "AA"u8.ToArray());
 
         MacFile file = Assert.Single(LhaReader.Instance.Read(ForkData.FromBytes(archive), new ContainerContext()));

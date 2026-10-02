@@ -161,9 +161,10 @@ SOFTWARE.
 
 ## lhasa MacLHA test archives
 
-`tests/ClassicMac.Files.Tests/TestData/MacLha224/` holds four MacLHA 2.24 archives from
-[lhasa](https://github.com/fragglet/lhasa)'s test suite (`test/archives/maclha_224/`), used under the ISC License. No
-lhasa code is used.
+`tests/ClassicMac.Files.Tests/TestData/MacLha224/` holds seven MacLHA 2.24 archives from
+[lhasa](https://github.com/fragglet/lhasa)'s test suite (`test/archives/maclha_224/`), used under the ISC License.
+The `-lh1-` adaptive tree in `src/ClassicMac.Files/Archives/LhaOldDecoder.cs` follows lhasa's `lib/lh1_decoder.c`
+(groups and leaders, reconstruction), used under the same licence.
 
 ```
 Copyright (c) 2011-2025, Simon Howard
