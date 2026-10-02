@@ -164,6 +164,22 @@ public class SelectorNamesTests
     [InlineData(0xAA59, 0u, "NewRoutineDescriptor")] // MixedModeDispatch, D0 word
     [InlineData(0xA816, 0x0204u, "AEDisposeDesc")] // Pack8, D0 word
     [InlineData(0xADEE, 1u, "StringToNum")]        // a dispatcher called auto-pop
+    [InlineData(0xA9EE, 3u, "FDEC2STR")]           // Pack7, SANE's decimal strings
+    [InlineData(0xA9EB, 0x100Eu, "FS2X")]          // FP68K: operation + operand format
+    [InlineData(0xA9EB, 0x0800u, "FADDD")]
+    [InlineData(0xA9EB, 0x0000u, "FADDX")]
+    [InlineData(0xA9EB, 0x2018u, "FSCALBX")]
+    [InlineData(0xA9EC, 0x8010u, "FXPWRI")]        // Elems68K: the operand-count bits are masked off
+    [InlineData(0xA9EC, 0xC014u, "FCOMPOUND")]
+    [InlineData(0xA9EC, 0x0098u, "FSINX96")]
+    [InlineData(0xA82A, 0xFFFFFFFFu, "CallComponentFunction")] // ComponentDispatch: moveq #-1,d0
+    [InlineData(0xA82A, 0u, "ComponentCallNow")]
+    [InlineData(0xA82A, 7u, "OpenComponent")]
+    [InlineData(0xA825, 0x0400u, "InsertFontResMenu")]
+    [InlineData(0xAA73, 0xFFFEu, "SendControlMessage")]
+    [InlineData(0xAA73, 0x0Cu, "IdleControls")]
+    [InlineData(0xABF2, 0x0504u, "DisposeThread")]
+    [InlineData(0xABFC, 0x0Eu, "TranslateScrap")]
     public void Names(int trap, uint selector, string expected)
     {
         Assert.True(SelectorNames.TryGet((ushort)trap, selector, out string name));
@@ -201,7 +217,9 @@ public class SelectorNamesTests
     {
         Assert.True(SelectorNames.TryGetConvention(0xA822, out var c));
         Assert.Equal((0xA822, "ResourceDispatch", 0xFu), (c.Trap, c.Name, c.Mask));
-        Assert.True(SelectorNames.TryGetConvention(0xA9EB, out c));     // Pack4: the opword's low byte
+        Assert.True(SelectorNames.TryGetConvention(0xA9EB, out c));     // Pack4: the whole opword
+        Assert.Equal(0xFFFFu, c.Mask);
+        Assert.True(SelectorNames.TryGetConvention(0xA9EC, out c));     // Pack5: the low byte
         Assert.Equal(0xFFu, c.Mask);
         Assert.True(SelectorNames.TryGetConvention(0xA800, out c));
         Assert.Equal(0xFFFFFFu, c.Mask);
@@ -215,7 +233,10 @@ public class SelectorNamesTests
         Assert.False(SelectorNames.TryGet(0xA9EE, 0x7F, out _));
         Assert.False(SelectorNames.TryGet(0xA9A0, 0, out _));
         Assert.False(SelectorNames.TryGetConvention(0xA9A0, out _));
-        Assert.False(SelectorNames.TryGet(0xA825, 0, out _));          // a dispatcher with no names in the tables
+        Assert.False(SelectorNames.TryGet(0xA825, 0, out _));          // MenuDispatch's 0 is not a selector
+        Assert.False(SelectorNames.TryGet(0xA9EB, 0x10, out _));        // FOX2Z to extended: no such opword
+        Assert.False(SelectorNames.TryGet(0xA9EB, 0x4000, out _));      // a bit outside the opword fields
+        Assert.False(SelectorNames.TryGet(0xA9EC, 0x22, out _));        // past FORANDX
         Assert.False(SelectorNames.TryGet(0xA1AD, 0x7A7A7A7A, out _));  // 'zzzz'
     }
 }

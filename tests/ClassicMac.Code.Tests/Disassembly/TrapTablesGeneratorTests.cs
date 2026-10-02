@@ -84,6 +84,118 @@ public sealed class TrapTablesGeneratorTests : IDisposable
     [InlineData("NotThis")]             // inside a block scalar
     public void SelectorsLeftOut(string name) => Assert.DoesNotContain(name, _selectors);
 
+    // The supplements' selector names, for the dispatchers Multiversal leaves empty.
+    [Theory]
+    // _FP68K: the whole opword (operation + operand format) is the selector, so the supplement replaces the
+    // fixture's StackWLookahead<0xFF>.
+    [InlineData("(0xA9EB, \"Pack4\", SelectorLocation.Stack, SelectorWidth.Word, 0xFFFF),")]
+    [InlineData("(0xA9EB, 0x0, \"FADDX\"),")]
+    [InlineData("(0xA9EB, 0x800, \"FADDD\"),")]
+    [InlineData("(0xA9EB, 0x1000, \"FADDS\"),")]
+    [InlineData("(0xA9EB, 0x2000, \"FADDI\"),")]
+    [InlineData("(0xA9EB, 0x2800, \"FADDL\"),")]
+    [InlineData("(0xA9EB, 0x3000, \"FADDC\"),")]
+    [InlineData("(0xA9EB, 0x20, \"FADDX96\"),")]
+    [InlineData("(0xA9EB, 0x1020, \"FADDS96\"),")]
+    [InlineData("(0xA9EB, 0x100E, \"FS2X\"),")]          // FOZ2X: the format is the source's
+    [InlineData("(0xA9EB, 0xE, \"FX2X\"),")]
+    [InlineData("(0xA9EB, 0x810, \"FX2D\"),")]           // FOX2Z: the format is the destination's
+    [InlineData("(0xA9EB, 0x3030, \"FX2C96\"),")]
+    [InlineData("(0xA9EB, 0xB, \"FX2DEC\"),")]
+    [InlineData("(0xA9EB, 0x280B, \"FL2DEC\"),")]
+    [InlineData("(0xA9EB, 0x2B, \"FX2DEC96\"),")]
+    [InlineData("(0xA9EB, 0x1009, \"FDEC2S\"),")]
+    [InlineData("(0xA9EB, 0x101C, \"FCLASSS\"),")]
+    [InlineData("(0xA9EB, 0x1013, \"FNEXTS\"),")]
+    [InlineData("(0xA9EB, 0x12, \"FSQRTX\"),")]
+    [InlineData("(0xA9EB, 0x32, \"FSQRTX96\"),")]
+    [InlineData("(0xA9EB, 0x14, \"FRINTX\"),")]
+    [InlineData("(0xA9EB, 0x16, \"FTINTX\"),")]
+    [InlineData("(0xA9EB, 0x2018, \"FSCALBX\"),")]       // the scale is an integer
+    [InlineData("(0xA9EB, 0x2038, \"FSCALBX96\"),")]
+    [InlineData("(0xA9EB, 0x1A, \"FLOGBX\"),")]
+    [InlineData("(0xA9EB, 0x11, \"FCPYSGNX\"),")]
+    [InlineData("(0xA9EB, 0xD, \"FNEGX\"),")]
+    [InlineData("(0xA9EB, 0xF, \"FABSX\"),")]
+    [InlineData("(0xA9EB, 0x1, \"FSETENV\"),")]
+    [InlineData("(0xA9EB, 0x3, \"FGETENV\"),")]
+    [InlineData("(0xA9EB, 0x5, \"FSETHV\"),")]
+    [InlineData("(0xA9EB, 0x7, \"FGETHV\"),")]
+    [InlineData("(0xA9EB, 0x15, \"FSETXCP\"),")]
+    [InlineData("(0xA9EB, 0x17, \"FPROCENTRY\"),")]
+    [InlineData("(0xA9EB, 0x19, \"FPROCEXIT\"),")]
+    [InlineData("(0xA9EB, 0x1B, \"FTESTXCP\"),")]
+    [InlineData("(0xA9EB, 0x300A, \"FCPXC\"),")]
+    [InlineData("(0xA9EB, 0x2808, \"FCMPL\"),")]
+    [InlineData("(0xA9EB, 0x200C, \"FREMI\"),")]
+    // _Elems68K: Multiversal's low-byte mask stays; ELEXT96 ($80) is inside it.
+    [InlineData("(0xA9EC, \"Pack5\", SelectorLocation.Stack, SelectorWidth.Word, 0xFF),")]
+    [InlineData("(0xA9EC, 0x0, \"FLNX\"),")]
+    [InlineData("(0xA9EC, 0x10, \"FXPWRI\"),")]
+    [InlineData("(0xA9EC, 0x14, \"FCOMPOUND\"),")]
+    [InlineData("(0xA9EC, 0x20, \"FRANDX\"),")]
+    [InlineData("(0xA9EC, 0x80, \"FLNX96\"),")]
+    [InlineData("(0xA9EC, 0xA0, \"FRANDX96\"),")]
+    // _Pack7 (DecStr68K): added to the fixture's NumToString and StringToNum.
+    [InlineData("(0xA9EE, 0x2, \"FPSTR2DEC\"),")]
+    [InlineData("(0xA9EE, 0x3, \"FDEC2STR\"),")]
+    [InlineData("(0xA9EE, 0x4, \"FCSTR2DEC\"),")]
+    // _ComponentDispatch: MOVEQ selectors; -1 is $FFFF once masked to the word.
+    [InlineData("(0xA82A, 0x0, \"ComponentCallNow\"),")]
+    [InlineData("(0xA82A, 0x1, \"RegisterComponent\"),")]
+    [InlineData("(0xA82A, 0x21, \"OpenDefaultComponent\"),")]
+    [InlineData("(0xA82A, 0x24, \"DelegateComponentCall\"),")]
+    [InlineData("(0xA82A, 0x29, \"GetComponentIconSuite\"),")]
+    [InlineData("(0xA82A, 0xFFFF, \"CallComponentFunction\"),")]
+    // _MenuDispatch: parameter words in the high byte.
+    [InlineData("(0xA825, 0x400, \"InsertFontResMenu\"),")]
+    [InlineData("(0xA825, 0x601, \"InsertIntlResMenu\"),")]
+    [InlineData("(0xA825, 0x20C, \"MenuEvent\"),")]
+    [InlineData("(0xA825, 0x408, \"SetMenuItemTextEncoding\"),")]
+    [InlineData("(0xA825, 0x20, \"DisableMenuItemIcon\"),")]
+    // _ControlDispatch
+    [InlineData("(0xAA73, 0x1, \"CreateRootControl\"),")]
+    [InlineData("(0xAA73, 0x12, \"SetControlData\"),")]
+    [InlineData("(0xAA73, 0x1E, \"SetControlVisibility\"),")]
+    [InlineData("(0xAA73, 0xFFFE, \"SendControlMessage\"),")]
+    [InlineData("(0xAA73, 0xFFFF, \"DumpControlHierarchy\"),")]
+    // _ThreadDispatch
+    [InlineData("(0xABF2, 0x501, \"CreateThreadPool\"),")]
+    [InlineData("(0xABF2, 0xE03, \"NewThread\"),")]
+    [InlineData("(0xABF2, 0x205, \"YieldToThread\"),")]
+    [InlineData("(0xABF2, 0x206, \"GetCurrentThread\"),")]
+    [InlineData("(0xABF2, 0xB, \"ThreadBeginCritical\"),")]
+    [InlineData("(0xABF2, 0x615, \"GetSpecificFreeThreadCount\"),")]
+    // _TranslationDispatch
+    [InlineData("(0xABFC, 0x9, \"ExtendFileTypeList\"),")]
+    [InlineData("(0xABFC, 0xC, \"TranslateFile\"),")]
+    [InlineData("(0xABFC, 0x1C, \"GetFileTypesThatAppCanNativelyOpen\"),")]
+    [InlineData("(0xABFC, 0x38, \"GetFileTranslationPaths\"),")]
+    public void SupplementSelectors(string line) => Assert.Contains(line, _selectors);
+
+    // Opwords no SANE macro defines: FOX2Z to extended, the undefined operations, a format on an
+    // environment call, the 96-bit form of a decimal conversion from a non-extended format.
+    [Theory]
+    [InlineData("(0xA9EB, 0x10, \"")]
+    [InlineData("(0xA9EB, 0x1E, \"")]
+    [InlineData("(0xA9EB, 0x1D, \"")]
+    [InlineData("(0xA9EB, 0x801, \"")]
+    [InlineData("(0xA9EB, 0x82B, \"")]
+    [InlineData("(0xA9EB, 0x201C, \"")]   // FCLASS has no integer forms
+    [InlineData("(0xA9EB, 0x2013, \"")]   // nor FNEXT
+    [InlineData("(0xA9EB, 0x812, \"")]    // FSQRT is extended only
+    [InlineData("(0xA9EB, 0x18, \"")]     // FSCALB's source is always an integer
+    public void SupplementSelectorsLeftOut(string prefix) => Assert.DoesNotContain(prefix, _selectors);
+
+    // Every FP68K macro of the SANE interface: 153 opwords, each named once.
+    [Fact]
+    public void Fp68kCount()
+    {
+        var lines = _selectors.Split('\n').Where(l => l.StartsWith("        (0xA9EB, 0x", StringComparison.Ordinal)).ToList();
+        Assert.Equal(153, lines.Count);
+        Assert.Equal(153, lines.Select(l => l.Split('"')[1]).Distinct().Count());
+    }
+
     [Theory]
     [InlineData("(0x0904, \"CurrentA5\", 4, \"Ptr\"),")]
     [InlineData("(0x0A00, \"Pats\", 8, \"Byte[8]\"),")]

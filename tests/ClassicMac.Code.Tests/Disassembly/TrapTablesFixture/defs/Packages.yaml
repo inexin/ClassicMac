@@ -6,6 +6,20 @@
 # ####
 
 - dispatcher:
+    name: Pack4
+    trap: 0xA9EB
+    selector-location: StackWLookahead<0xFF>
+
+# ####
+
+- dispatcher:
+    name: Pack5
+    trap: 0xA9EC
+    selector-location: StackWMasked<0xFF>
+
+# ####
+
+- dispatcher:
     name: ScriptUtil
     trap: 0xA8B5
     selector-location: StackL

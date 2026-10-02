@@ -92,7 +92,9 @@ public static class TrapTablesGenerator
             table.TryAdd(ParseLong(f["selector"]), f["name"]);
         }
         foreach (var (trap, name, location, width, mask) in Supplements.Conventions)
-            conventions.TryAdd(trap, (name, location, width, mask));
+            conventions[trap] = (name, location, width, mask);
+        foreach (var (trap, selector, name) in Supplements.Selectors)
+            (selectors.TryGetValue(trap, out var s) ? s : selectors[trap] = new())[selector] = name;
 
         // Gestalt: D0 holds an OSType selector; its names are the gestalt* constants.
         const ushort GestaltTrap = 0xA1AD;
