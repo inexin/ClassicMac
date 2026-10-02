@@ -845,6 +845,7 @@ public class M68kDisassemblerTests
     [InlineData("F23A B800 0010")]         // fmovem.l of two control registers to PC space
     [InlineData("F23C B800")]              // fmovem.l of two control registers to an immediate
     [InlineData("F23C 9800 0000 0000")]    // fmovem.l #imm of two control registers cut short (a long each)
+    [InlineData("F23C 8000 0000 0000")]    // fmovem.l #imm with an empty register list: undefined
     [InlineData("E8C0 1000")]              // bftst with a register in the reserved bits 14-12
     [InlineData("EAC0 7000")]              // bfchg with a register in the reserved bits 14-12
     [InlineData("ECC0 1000")]              // bfclr with a register in the reserved bits 14-12

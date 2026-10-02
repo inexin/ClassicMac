@@ -1079,7 +1079,10 @@ public static class M68kDisassembler
                 {
                     // An immediate for two or three registers holds one long per register, FPCR first, then FPSR,
                     // then FPIAR: the FPU asks for 4 bytes per register and the CPU reads them from the instruction
-                    // stream [Doc: MC68881/MC68882 User's Manual, FMOVEM]. (GNU as and Ghidra take one long.)
+                    // stream [Doc: MC68881/MC68882 User's Manual, FMOVEM (control registers) and Table 4-17: 4, 8 or 12
+                    // bytes] (GNU as and Ghidra take one long). An empty list is undefined (Table 4-17) and decodes as
+                    // dc.w. Bits 0-9 should be zero; the FPU takes no F-line trap when they are not, but ClassicMac
+                    // reads them as dc.w [ClassicMac].
                     var operands = new List<M68kOperand>(4);
                     for (int bit = 4; bit != 0; bit >>= 1)
                         if ((u & bit) != 0)
