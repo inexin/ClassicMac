@@ -169,6 +169,87 @@ public class CodeListingTests
             "00000004  FFFF                      dc.w $FFFF  ; '..'"), listing.Text);
     }
 
+    // Traps and MacsBug labels in one code resource:
+    // 00 move.l #'sysv',d0; _Gestalt; move.l #$40,d0; _NewPtr ,SYS,CLEAR; _A0FA (unknown); move.w #$7F,-(sp);
+    //    _Pack7 (selector $7F has no name); bsr $26; bsr $32; bsr $4A; _ExitToShell (the path ends);
+    // 26 nop; rts; 'MOT32   ' (fixed-8, bit 7 clear, then a link);
+    // 32 link a6; unlk a6; rts; 'DRAW    TView   ' (fixed-16: TView.DRAW);
+    // 4A _GetResource ,AUTOPOP (the path ends); 4C nop; rts (no path reaches them: the gap sweep finds them);
+    // 50 fmove.d #imm,fp0 (6 words, wider than the hex column); rts.
+    [Fact]
+    public void Traps_and_MacsBug_labels()
+    {
+        var data = Bytes("203C 7379 7376 A1AD 203C 0000 0040 A71E A0FA 3F3C 007F A9EE 6100 000C 6100 0014 6100 0028 A9F4"
+            + " 4E71 4E75 4D4F 5433 3220 2020"
+            + " 4E56 0000 4E5E 4E75 C4D2 4157 2020 2020 5456 6965 7720 2020"
+            + " ADA0 4E71 4E75"
+            + " F23C 5400 3FF0 0000 0000 0000 4E75");
+        var listing = CodeListing.ForCodeResource(FourCC.FromString("FKEY"), 4, data);
+        Assert.Equal(Lines(
+            "; 'FKEY' 4: 68k code resource",
+            "",
+            "entry:",
+            "00000000  203C 7379 7376            move.l #$73797376,d0  ; 'sysv'",
+            "00000006  A1AD                      _Gestalt  ; 'sysv' gestaltSystemVersion",
+            "00000008  203C 0000 0040            move.l #64,d0",
+            "0000000E  A71E                      _NewPtr ,SYS,CLEAR",
+            "00000010  A0FA                      _A0FA",
+            "00000012  3F3C 007F                 move.w #127,-(sp)",
+            "00000016  A9EE                      _Pack7  ; selector $7F",
+            "00000018  6100 000C                 bsr.w $0026  ; MOT32",
+            "0000001C  6100 0014                 bsr.w $0032  ; TView.DRAW",
+            "00000020  6100 0028                 bsr.w $004A  ; sub_004A",
+            "00000024  A9F4                      _ExitToShell",
+            "",
+            "MOT32:",
+            "00000026  4E71                      nop",
+            "00000028  4E75                      rts",
+            "0000002A  4D4F 5433 3220 2020       dc.w $4D4F,$5433,$3220,$2020  ; MacsBug name MOT32; 'MOT32   '",
+            "",
+            "TView.DRAW:",
+            "00000032  4E56 0000                 link a6,#0",
+            "00000036  4E5E                      unlk a6",
+            "00000038  4E75                      rts",
+            "0000003A  C4D2 4157 2020 2020       dc.w $C4D2,$4157,$2020,$2020  ; MacsBug name TView.DRAW; '..AW    '",
+            "00000042  5456 6965 7720 2020       dc.w $5456,$6965,$7720,$2020  ; 'TView   '",
+            "",
+            "sub_004A:",
+            "0000004A  ADA0                      _GetResource ,AUTOPOP",
+            "",
+            "sub_004C:",
+            "0000004C  4E71                      nop",
+            "0000004E  4E75                      rts",
+            "",
+            "sub_0050:",
+            "00000050  F23C 5400 3FF0 0000 0000 0000  fmove.d #$3FF0000000000000,fp0",
+            "0000005C  4E75                      rts"), listing.Text);
+        Assert.Equal(
+        [
+            new CodeFunction(0, 0, "entry", CodeFunctionSource.Entry),
+            new CodeFunction(0, 0x26, "MOT32", CodeFunctionSource.Call),
+            new CodeFunction(0, 0x32, "TView.DRAW", CodeFunctionSource.Call),
+            new CodeFunction(0, 0x4A, "sub_004A", CodeFunctionSource.Call),
+            new CodeFunction(0, 0x4C, "sub_004C", CodeFunctionSource.Gap),   // after the auto-pop trap
+            new CodeFunction(0, 0x50, "sub_0050", CodeFunctionSource.Gap),
+        ], listing.Functions);
+        Assert.Contains(new CodeReference(0, 0x16, CodeReferenceKind.Selector, "selector $7F"), listing.References);
+        Assert.Contains(new CodeReference(0, 0x10, CodeReferenceKind.Trap, "_A0FA"), listing.References);
+    }
+
+    // pea 4(pc) points at a Pascal string after the rts: it is data.
+    [Fact]
+    public void Pc_relative_string()
+    {
+        var listing = CodeListing.ForCodeResource(FourCC.FromString("FKEY"), 5, With("487A 0004 4E75 05", "Hello", ""));
+        Assert.Equal(Lines(
+            "; 'FKEY' 5: 68k code resource",
+            "",
+            "entry:",
+            "00000000  487A 0004                 pea 4(pc)  ; $0006; P'Hello'",
+            "00000004  4E75                      rts",
+            "00000006  0548 656C 6C6F            dc.w $0548,$656C,$6C6F  ; string; '.Hello'"), listing.Text);
+    }
+
     [Fact]
     public void Driver()
     {
@@ -176,12 +257,14 @@ public class CodeListingTests
         var data = Bytes("4F00 0000 0000 0000 0018 001A 001A 0000 001C 022E 4400 0000 7000 4E75 4E75");
         // $16 a pad word; $18 moveq #0,d0; $1A rts; $1C rts
         var listing = CodeListing.ForCodeResource(FourCC.FromString("DRVR"), 12, data);
+        // Control shares Prime's routine at $1A: a function has one label, the first given (docs/formats/output/disassembly.md §1.5).
         Assert.Equal(
         [
             new CodeFunction(0, 0x18, "Open", CodeFunctionSource.DriverRoutine),
             new CodeFunction(0, 0x1A, "Prime", CodeFunctionSource.DriverRoutine),
             new CodeFunction(0, 0x1C, "Close", CodeFunctionSource.DriverRoutine),
         ], listing.Functions);
+        Assert.DoesNotContain("Control:", listing.Text, StringComparison.Ordinal);
         Assert.StartsWith(Lines(
             "; 'DRVR' 12: 68k code resource",
             "; Driver \".D\": flags $4F00",

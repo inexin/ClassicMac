@@ -122,8 +122,8 @@ instruction.
 | `.symbol` | `glue` | A cross-TOC glue stub calling `symbol` |
 | `sub_XXXX` | `call`, `gap` | A call target, or the start of code found in a gap; XXXX the offset in hex, at least 4 digits |
 
-A function has one label. When sources disagree: 68k, a MacsBug name first, then the name given with the entry, then
-`sub_XXXX`; PowerPC, an export, then a traceback name, then main/init/term, then glue, then `sub_XXXX` [ClassicMac].
+A function has one label. When sources disagree: 68k, a MacsBug name first, then the name given with the entry (of
+two entries at one offset, the first: a driver's `Prime` before a `Control` at the same offset), then `sub_XXXX`; PowerPC, an export, then a traceback name, then main/init/term, then glue, then `sub_XXXX` [ClassicMac].
 
 ### 1.6 The model (`.json`)
 
