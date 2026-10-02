@@ -75,7 +75,7 @@ Arrays: `freq[T + 1]` (16-bit), `prnt[T + N_CHAR]`, `son[T]` [Author].
     `(r − position − 1) mod N` and the length `c − 253` (3–60). Copy byte by byte from the ring, writing each byte to
     the output and to `text[r]`, advancing `r`.
 - **End:** stop when the block's 20,960 bytes are written, or **after any token once the bit reader has fetched a
-  byte past the end of the input** (DART's own files can end a block one byte short, [dart.md §2](../disk-images/dart.md#2-blocks))
+  byte past the end of the input** (DART's own files can end a block one byte short, [dart.md §2](../disk-images/dart.md#2-reading))
   [Code: 6.3.3], [Verified]. A token that would write past the block's end is an error in Disk Copy (−50); ClassicMac
   stops at the end.
 
