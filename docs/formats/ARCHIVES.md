@@ -290,6 +290,18 @@ open a final segment and read both forks from an earlier sibling segment; a feat
 discovery depends on the host integration supplying the other segment files as siblings. Encrypted entries remain
 unsupported, and an authentic segmented archive from Compact Pro has not yet been verified.
 
+The RLE stage (used alone or after LZH) has a "half-escaped" state: after `81 81` the second `$81` is emitted and is
+itself an escape for the next byte, so `81 81 82 05` gives five `$81` and `81 81 81 82 05` six, while `81 81 41` is
+`81 81 41`. `81 82 00` gives `81 82`, `81 82 n` adds `n − 1` copies of the last byte (`81 82 01` adds none), and `81 x`
+is `81 x` **[Reference: pmarreck/compact_pro, fixed against real archives; munbox samples]**. The LZH stage always
+followed this rule; the RLE-only decoder now does too (before, `81 81 x` emitted `81`, then `x`, without a new
+escape). munbox's sample archive (`TestData/CompactProMunbox`, said to be made by Compact Pro 1.52; 27 files in two
+nested folders) expands every data fork to munbox's listed MD5 **[Reference: munbox samples, said to be Compact Pro
+1.33/1.52]**. It exercises the half-escape chain in its LZH + RLE forks (`81 81 81` and `81 81 82`), not in its
+RLE-only forks, and never `81 82 01`. Its directory comes after the forks, at the end of the archive; a fork may lie
+before or after the directory but not across it or the header (the reader formerly required forks after the
+directory and rejected the sample).
+
 ## StuffIt 5 (initial subset)
 
 StuffIt 5 is recognized by the eight-byte `StuffIt ` signature and version byte 5 at offset 82. The 100-byte archive

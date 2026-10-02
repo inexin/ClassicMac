@@ -82,7 +82,7 @@ internal static class CompactProLzhDecoder
         return HuffmanTree.Create(codeLengths);
     }
 
-    private sealed class RleOutput(int outputLength)
+    internal sealed class RleOutput(int outputLength)
     {
         private readonly byte[] result = new byte[outputLength];
         private int written;
@@ -93,6 +93,7 @@ internal static class CompactProLzhDecoder
 
         public byte[] Result => result;
         public bool IsComplete => written == result.Length;
+        public int Written => written;
 
         public void Write(byte value)
         {

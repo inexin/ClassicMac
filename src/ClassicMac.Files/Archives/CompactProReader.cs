@@ -102,7 +102,7 @@ public sealed class CompactProReader : IContainerReader
             CompactProFile file = entry.File!;
             int volume = file.Volume;
             byte[] dataVolume = archive;
-            int minimumDataOffset = directory.TableEnd;
+            bool directoryInVolume = true;
             if (volume != volumeNumber)
             {
                 byte siblingVolumeNumber = checked((byte)volume);
@@ -128,19 +128,23 @@ public sealed class CompactProReader : IContainerReader
                         $"Compact Pro entry '{entry.Name}' refers to unavailable volume {volume}.", entry.Offset);
                     continue;
                 }
-                minimumDataOffset = ArchiveHeaderLength;
+                directoryInVolume = false;
             }
 
             if (file.Offset > int.MaxValue)
                 throw new InvalidDataException("A Compact Pro fork data offset is too large.");
             int fileOffset = (int)file.Offset;
-            if (fileOffset < minimumDataOffset)
-                throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
             ushort flags = file.Flags;
             int resourceLength = ReadLength(file.ResourceLength, "resource fork");
             int dataLength = ReadLength(file.DataLength, "data fork");
             int resourceCompressedLength = ReadLength(file.ResourceCompressedLength, "compressed resource fork");
             int dataCompressedLength = ReadLength(file.DataCompressedLength, "compressed data fork");
+            // Compact Pro writes the forks first and the directory after them ([Reference: munbox samples, said to
+            // be Compact Pro 1.33/1.52]); a fork may lie on either side of the directory but not across it.
+            long forksEnd = (long)fileOffset + resourceCompressedLength + dataCompressedLength;
+            if (fileOffset < ArchiveHeaderLength ||
+                directoryInVolume && fileOffset < directory.TableEnd && forksEnd > directoryOffset)
+                throw new InvalidDataException("A Compact Pro fork overlaps its volume header or directory.");
             Require(dataVolume, fileOffset, checked(resourceCompressedLength + dataCompressedLength),
                 "Compact Pro fork data");
 
@@ -238,80 +242,21 @@ public sealed class CompactProReader : IContainerReader
         return new CompactProDirectory(storedCrc, crc, checked(baseOffset + directory.Position), comment, entries);
     }
 
+    // [Reference: pmarreck/compact_pro, fixed against real archives; munbox samples] The 0x81 escape is
+    // "half-escaped" after 81 81: the second 0x81 is emitted and also starts a new escape, so 81 81 82 n repeats
+    // 0x81 and 81 81 81 82 05 is six 0x81. 81 82 00 is 81 82, 81 82 n (n >= 1) adds n - 1 copies of the last byte
+    // (81 82 01 adds none), and 81 x is 81 x. The LZH stage feeds the same state machine.
     internal static byte[] DecodeRle8182(ReadOnlySpan<byte> input, int outputLength)
     {
-        var output = new byte[outputLength];
-        int source = 0;
-        int written = 0;
-        bool hasPrevious = false;
-        byte previous = 0;
-        while (source < input.Length && written < output.Length)
+        var output = new CompactProLzhDecoder.RleOutput(outputLength);
+        foreach (byte value in input)
         {
-            byte value = input[source++];
-            if (value != 0x81)
-            {
-                Emit(value);
-                continue;
-            }
-            if (source == input.Length)
-                throw new InvalidDataException("A Compact Pro RLE stream ends after an escape byte.");
-            byte escape = input[source++];
-            if (escape != 0x82)
-            {
-                Emit(0x81);
-                if (escape == 0x81)
-                {
-                    if (source == input.Length)
-                        throw new InvalidDataException("A Compact Pro RLE stream ends after an escape byte.");
-                    byte second = input[source++];
-                    if (second == 0x82)
-                    {
-                        if (source == input.Length)
-                            throw new InvalidDataException("A Compact Pro RLE run has no count byte.");
-                        EmitRun(input[source++]);
-                    }
-                    else
-                    {
-                        Emit(0x81);
-                        Emit(second);
-                    }
-                }
-                else Emit(escape);
-                continue;
-            }
-            if (source == input.Length)
-                throw new InvalidDataException("A Compact Pro RLE run has no count byte.");
-            byte count = input[source++];
-            if (count == 0)
-            {
-                Emit(0x81);
-                Emit(0x82);
-            }
-            else EmitRun(count);
+            if (output.IsComplete) break;
+            output.Write(value);
         }
-        if (written != output.Length)
-            throw new InvalidDataException($"Compact Pro RLE produced {written} of {output.Length} declared bytes.");
-        return output;
-
-        void Emit(byte value)
-        {
-            if (written == output.Length)
-                throw new InvalidDataException("Compact Pro RLE output exceeds its declared fork length.");
-            output[written++] = previous = value;
-            hasPrevious = true;
-        }
-
-        void EmitRun(byte count)
-        {
-            int repeats = count switch { <= 3 => count - 1, _ => count - 1 };
-            if (repeats == 0) return;
-            if (!hasPrevious)
-                throw new InvalidDataException("A Compact Pro RLE run has no preceding byte.");
-            if (repeats > output.Length - written)
-                throw new InvalidDataException("Compact Pro RLE output exceeds its declared fork length.");
-            output.AsSpan(written, repeats).Fill(previous);
-            written += repeats;
-        }
+        if (!output.IsComplete)
+            throw new InvalidDataException($"Compact Pro RLE produced {output.Written} of {outputLength} declared bytes.");
+        return output.Result;
     }
 
     private static ushort ReadUInt16(BigEndianReader directory, ref uint crc)
