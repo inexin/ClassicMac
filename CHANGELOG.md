@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Viewer: resources previewed as JSON with no form (style runs, font families, code fragments and others) read as
+  labelled values in cards (P2, `PropertyView`): plain labels, numbers in mono, a name beside its number with the
+  number raw ("Times `20`"), yes/no dots, rectangles as coordinates with their size, a card per nested object and per
+  item of a list (100 at most); Properties | JSON switches to the JSON for the session; right-click a row to copy it as
+  decimal, hex or JSON.
 - Viewer: the image preview (P1) shows cards: each image on a checkerboard with its type and size under it
   ("'icl8'", "32×32 · 8-bit"); an icon shows every member of its family, its masks with "Show masks", and the Finder
   states strip (five states, seven labels, captioned; 2× from zoom 2) with "Finder states"; a summary line ("3 members ·

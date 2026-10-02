@@ -456,6 +456,24 @@
       <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
       <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
     </Style>
+    <!-- The property view (boards/property-view.md, P2) on these cards: values selectable, raw values in mono
+         CmTextMuted beside them, no line under the last row. -->
+    <Style Selector="SelectableTextBlock.property-value">
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="SelectableTextBlock.property-value.mono">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+    </Style>
+    <Style Selector="SelectableTextBlock.property-raw">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+      <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
+    <Style Selector="ItemsControl.property-rows ContentPresenter:nth-last-child(1) > Border.card-line">
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
     <Style Selector="Ellipse.dot">
       <Setter Property="Width" Value="9" />
       <Setter Property="Height" Value="9" />
@@ -1360,6 +1378,60 @@
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
                   <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
                 </ScrollViewer>
+                <!-- The property view (boards/property-view.md, P2): Properties | JSON, then the values in cards (E4's card
+                     styles), or the JSON itself. -->
+                <DockPanel IsVisible="{Binding Preview.IsJson}">
+                  <ListBox x:Name="PropertyMode" DockPanel.Dock="Top" Classes="segmented" HorizontalAlignment="Left" Margin="16,12,16,0"
+                           ItemsSource="{x:Static vm:MainViewModel.PropertyModes}" SelectedIndex="{Binding PropertyModeIndex, Mode=TwoWay}"
+                           IsVisible="{Binding Preview.HasProperties}" AutomationProperties.Name="Properties or JSON" />
+                  <Panel>
+                    <ScrollViewer x:Name="PropertyCards" IsVisible="{Binding ShowsProperties}" Padding="16,12">
+                      <ItemsControl ItemsSource="{Binding Preview.PropertyCards}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Classes="cards" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate DataType="vm:PropertyCard">
+                            <Border Classes="card">
+                              <StackPanel>
+                                <TextBlock Classes="card-title" Text="{Binding Caption}" />
+                                <ItemsControl Classes="property-rows" ItemsSource="{Binding Rows}">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="vm:PropertyRow">
+                                      <Border Classes="card-line">
+                                        <Grid Classes="card-row property-row" ColumnDefinitions="150,*">
+                                          <Grid.ContextMenu>
+                                            <ContextMenu>
+                                              <MenuItem Header="Copy as _Decimal" Tag="{Binding Decimal}" IsVisible="{Binding IsNumber}" Click="OnCopyProperty" />
+                                              <MenuItem Header="Copy as _Hex" Tag="{Binding Hex}" IsVisible="{Binding IsNumber}" Click="OnCopyProperty" />
+                                              <MenuItem Header="Copy as _JSON" Tag="{Binding Json}" Click="OnCopyProperty" />
+                                            </ContextMenu>
+                                          </Grid.ContextMenu>
+                                          <TextBlock Classes="label" Text="{Binding Label}" />
+                                          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                            <Ellipse Classes="dot" Classes.on="{Binding IsYes}" IsVisible="{Binding IsFlag}" />
+                                            <SelectableTextBlock Classes="property-value" Classes.mono="{Binding IsMono}" Text="{Binding Value}" />
+                                            <SelectableTextBlock Classes="property-raw" Text="{Binding Raw}" IsVisible="{Binding HasRaw}" />
+                                            <TextBlock Classes="muted" Text="{Binding Note}" IsVisible="{Binding HasNote}" VerticalAlignment="Center" />
+                                          </StackPanel>
+                                        </Grid>
+                                      </Border>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                    <ScrollViewer IsVisible="{Binding ShowsJsonText}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+                      <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
+                    </ScrollViewer>
+                  </Panel>
+                </DockPanel>
                 <ScrollViewer IsVisible="{Binding Preview.IsDialog}" HorizontalScrollBarVisibility="Auto">
                   <views:DialogView Dialog="{Binding Preview.Dialog}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>

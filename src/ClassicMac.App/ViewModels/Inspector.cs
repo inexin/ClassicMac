@@ -39,7 +39,9 @@ namespace ClassicMac.App.ViewModels
             ["BNDL"] = ("Bundle", "Bundles"), ["FREF"] = ("File reference", "File references"), ["clut"] = ("Colour table", "Colour tables"),
         };
 
-        /// <summary>The header for <paramref name="node"/>; null for none and the loading placeholder.</summary>
+        /// <summary>What a resource of <paramref name="type"/> is called ("Text style"), else the type in quotes.</summary>
+        internal static string TypeName(string type) => TypeNames.TryGetValue(type, out var names) ? names.One : $"'{type}'";
+
         /// <summary>The header for <paramref name="node"/>; <paramref name="draftSize"/>, while a form is edited, is its resource's Size.</summary>
         public static InspectorHeader? For(NodeViewModel? node, long? draftSize = null) => node switch
         {

@@ -240,6 +240,15 @@ namespace ClassicMac.App.Views
         // A change the view-model refused (a selection or the template box, while it asks about unapplied edits) is
         // undone in the control once its own handling is over: a binding ignores the source while writing to it, and
         // afterwards does not push a value it thinks the control has.
+        // A property row's right-click Copy as decimal, hex or JSON (P2): the menu item carries the text.
+        private void OnCopyProperty(object? sender, RoutedEventArgs e)
+        {
+            if (DataContext is MainViewModel model && sender is MenuItem { Tag: string text })
+            {
+                model.CopyPropertyCommand.Execute(text);
+            }
+        }
+
         // A new preview's images start at the top.
         private void OnPreviewChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {

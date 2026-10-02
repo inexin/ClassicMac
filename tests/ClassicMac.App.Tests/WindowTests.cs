@@ -102,6 +102,46 @@ public class WindowTests
     });
 
     [Fact]
+    public void A_JSON_preview_draws_as_property_cards_with_a_JSON_switch() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-props-").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Styles.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("styl", 128, null, PreviewTests.Styl((0, 20, 1, 18, 0, 0, 0), (6, 4, 0, 10, 0xFFFF, 0, 0)))));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            var baselines = new List<string>();
+            window.Show();
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            var cards = window.FindControl<ScrollViewer>("PropertyCards")!;
+            Assert.True(cards.IsEffectivelyVisible);
+            var rows = cards.GetVisualDescendants().OfType<Grid>().Where(g => g.Classes.Contains("property-row")).ToList();
+            Assert.Equal(14, rows.Count);                                              // two runs of seven values
+            var font = rows.Single(r => r.DataContext is PropertyRow { Label: "Font", Raw: "20" });
+            Assert.Equal(["Copy as _Decimal", "Copy as _Hex", "Copy as _JSON"], font.ContextMenu!.Items.OfType<MenuItem>().Select(i => (string)i.Header!));
+            Capture(window, "properties", baselines);
+
+            window.FindControl<ListBox>("PropertyMode")!.SelectedIndex = 1;
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(model.ShowJson);
+            Assert.False(cards.IsEffectivelyVisible);
+            Capture(window, "properties-json");
+            window.Close();
+            Baselines.Verify(baselines);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
+    [Fact]
     public void The_main_window_draws_the_tree_and_previews() => OnUiThread(The_main_window_draws_the_tree_and_previewsBody);
 
     private static void The_main_window_draws_the_tree_and_previewsBody()

@@ -141,7 +141,15 @@ namespace ClassicMac.App.ViewModels
 
         public bool IsStyledText => Kind == PreviewKind.Text && Styled is not null;
 
-        public bool IsPlainText => Kind is PreviewKind.Text or PreviewKind.Json && Styled is null;
+        public bool IsPlainText => Kind is PreviewKind.Text && Styled is null;
+
+        /// <summary>Whether the preview is a decoder's JSON: shown as properties, or as the JSON itself.</summary>
+        public bool IsJson => Kind == PreviewKind.Json;
+
+        /// <summary>The JSON read as labelled values in cards (P2); empty when it is not an object.</summary>
+        public IReadOnlyList<PropertyCard> PropertyCards { get; private init; } = [];
+
+        public bool HasProperties => PropertyCards.Count > 0;
 
         public bool IsMessage => Kind is PreviewKind.None or PreviewKind.Loading;
 
@@ -466,7 +474,12 @@ namespace ClassicMac.App.ViewModels
                     var lines = strings.EnumerateArray().Select((s, i) => $"{i + 1,4}  {s.GetString()}");
                     return new PreviewViewModel(PreviewKind.Text, "") { Text = string.Join('\n', lines) };
                 }
-                return new PreviewViewModel(PreviewKind.Json, "") { Text = Encoding.UTF8.GetString(other.Content.Span).TrimEnd() };
+                var json = Encoding.UTF8.GetString(other.Content.Span).TrimEnd();
+                return new PreviewViewModel(PreviewKind.Json, "")
+                {
+                    Text = json,
+                    PropertyCards = PropertyView.FromJson(json, type is null ? "Properties" : InspectorHeader.TypeName(type)),
+                };
             }
             return Nothing(what);
         }
