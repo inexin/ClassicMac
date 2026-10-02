@@ -114,7 +114,7 @@ namespace ClassicMac.App.ViewModels
         private static IEnumerable<(NodeViewModel Node, EditState State)> EditedFiles(NodeViewModel root)
         {
             if (EditingOf(root) is { } state) yield return (root, state);
-            foreach (var child in root.Children)
+            foreach (var child in Tree.Contents(root))
                 foreach (var found in EditedFiles(child)) yield return found;
         }
 

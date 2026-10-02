@@ -64,7 +64,7 @@ namespace ClassicMac.App.ViewModels
     /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
     public sealed partial class MainViewModel : ObservableObject
     {
-        public MainViewModel() => DiagnosticsPanel = new DiagnosticsPanel(entry => SelectedDiagnostic = entry);
+        // (The constructors are in TreeDisplay.cs: the settings they read come first.)
 
         public ObservableCollection<InputNode> Roots { get; } = [];
 
@@ -188,8 +188,9 @@ namespace ClassicMac.App.ViewModels
                         context.For(null, HostFiles.Siblings(path, ContainerOptions, diagnostics)), levels: 1);
                     return (hostFile, tree);
                 });
-                var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report);
+                var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report, TreeDisplay);
                 Roots.Add(input);
+                UpdateHiddenCount();
                 foreach (var d in diagnostics) Report(new DiagnosticEntry(d, Tree.SourceOf(input, d), input));
                 Selected = input;
                 input.IsExpanded = true;
@@ -224,6 +225,7 @@ namespace ClassicMac.App.ViewModels
         {
             Roots.Remove(input);
             DiagnosticsPanel.RemoveAll(d => d.Node?.Input == input || d.Source == input.BaseTitle && d.Node is null);
+            UpdateHiddenCount();
             Selected = null;
         }
 
@@ -273,7 +275,7 @@ namespace ClassicMac.App.ViewModels
                 result = await PreviewViewModel.BuildAsync(node, DecodeOptions.Default with { ScreenDepth = ScreenDepth, QuickDraw = ReadOptions.ResourceManager },
                     ReadOptions, diagnostics, cancellation.Token,
                     node is ResourceNode { Resource.Type: var type } && type.ToString() is "DLOG" or "ALRT" or "DITL"
-                        || node is FolderNode or InputNode or ContainerFileNode ? DialogSources.From(Roots) : null);
+                        || node is FolderNode or InputNode or ContainerFileNode or NoNameGroupNode ? DialogSources.From(Roots) : null);
             }
             catch (OperationCanceledException)
             {

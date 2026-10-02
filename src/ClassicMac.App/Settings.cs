@@ -1,0 +1,70 @@
+using System;
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace ClassicMac.App
+{
+    /// <summary>The app's settings that last between sessions.</summary>
+    /// <param name="GroupNoName">Whether the tree groups a folder's files with no name under one "No name" node.</param>
+    /// <param name="HideInvisible">Whether the tree leaves out files with the Finder's invisible flag.</param>
+    public sealed record AppSettings(bool GroupNoName = true, bool HideInvisible = true);
+
+    /// <summary>Where settings are kept: a JSON file for the app, memory for tests.</summary>
+    public interface ISettingsStore
+    {
+        /// <summary>The settings saved last, or the defaults.</summary>
+        AppSettings Load();
+
+        void Save(AppSettings settings);
+    }
+
+    /// <summary>Settings kept in memory only.</summary>
+    public sealed class MemorySettingsStore(AppSettings? settings = null) : ISettingsStore
+    {
+        public AppSettings Settings { get; private set; } = settings ?? new AppSettings();
+
+        public AppSettings Load() => Settings;
+
+        public void Save(AppSettings settings) => Settings = settings;
+    }
+
+    /// <summary>Settings kept as JSON in a file (by default <c>%AppData%/ClassicMac/settings.json</c>).</summary>
+    public sealed class JsonSettingsStore(string path) : ISettingsStore
+    {
+        public static string DefaultPath { get; } =
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ClassicMac", "settings.json");
+
+        public string FilePath { get; } = path;
+
+        /// <summary>The saved settings; the defaults when there are none or they cannot be read.</summary>
+        public AppSettings Load()
+        {
+            try
+            {
+                return JsonSerializer.Deserialize(File.ReadAllText(FilePath), SettingsJson.Default.AppSettings) ?? new AppSettings();
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+            {
+                return new AppSettings();
+            }
+        }
+
+        /// <summary>Saves the settings; a failure to write is ignored (they last for this session only).</summary>
+        public void Save(AppSettings settings)
+        {
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+                File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, SettingsJson.Default.AppSettings));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
+        }
+    }
+
+    [JsonSourceGenerationOptions(WriteIndented = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
+    [JsonSerializable(typeof(AppSettings))]
+    internal sealed partial class SettingsJson : JsonSerializerContext;
+}

@@ -121,6 +121,7 @@ namespace ClassicMac.App.ViewModels
                     ? shown : ForFolder(container, options, readOptions, dialogSources),
                 InputNode input when input.Root.Children.Count == 0 => ForFile(input.Root.File, options, readOptions, diagnostics),
                 InputNode or FolderNode => ForFolder(node, options, readOptions, dialogSources),
+                NoNameGroupNode group => ForFolder(group.Parent!, options, readOptions, dialogSources),
                 _ => None,
             };
 

@@ -497,6 +497,18 @@ size, length, loop, base note) and plays through SoundFlow at its true pitch (co
 stereo); playback stops when the selection changes. **Icons (built):** an icon resource's preview adds its suite as the Finder draws it (`IconSuite` through the QuickDraw renderer): every size, plain, selected, disabled, offline and open, and the seven labels, at the preview's screen depth. **Folders (built):** a folder, a volume's root or a container read open previews as the Mac OS 9 Finder draws its window, by the rules traced in Finder 9.2.2 and matched pixel for pixel on Mac OS 9.0: HFS and HFS Plus folder records (`HfsReader.ReadFolders`) give the window (header pane and scroll bars included), scroll, view (large or small icons, large or small buttons; lists drawn as icons) and each icon's place, so folder art shows as it was arranged; items with no place are arranged in the view's grid as the Finder does; icons follow `GetIconRef` (custom icon, applications' bundles standing in for the desktop database, the System's icon mapping table and icons) with label tints and alias, lock and custom badges, from the same volume or the open files (none ship with ClassicMac); names in the views font (Geneva 10, or the volume's Finder Preferences) ([finder-windows.md](formats/file-systems/finder-windows.md)). **Next:** drag and drop out of the app, then the other previews
 (fonts, dialogs) as their decoders arrive.
 
+**Tree display (built 2026-10-02, design T1–T3):** the tree leaves out files with the Finder's invisible flag
+(`Icon`, the desktop database; never folders: `Desktop Folder` and `Trash` show), with a footer "N invisible items
+hidden · Show"; a folder's files whose names are empty or only whitespace (space, option-space, control characters)
+fold into one collapsed "No name" node when there are two or more, their names shown with the whitespace made visible
+(␣ ⍽ ↵); one alone is titled "(no name)". A "Tree display" popover switches both (on by default). Only the tree
+changes: each folder node keeps all its items for exports, previews, Details and the Volume commands.
+
+**Settings:** what the app remembers between sessions (the tree display options) is kept as JSON in
+`%AppData%/ClassicMac/settings.json` (`Environment.SpecialFolder.ApplicationData`, so `~/.config` on Linux and
+`~/Library/Application Support` on macOS) through `ISettingsStore` (`JsonSettingsStore`; tests use
+`MemorySettingsStore`). A missing or unreadable file gives the defaults; a failed write is ignored.
+
 **Editing, in three stages** — the viewer becomes an editor, ResEdit-style. Every save writes a verified round trip
 (read back and compared) and keeps the original; undo within a session.
 
@@ -521,7 +533,9 @@ stereo); playback stops when the selection changes. **Icons (built):** an icon r
   new data clears it; duplicating gives the next free ID from 128 up, with the same name.
 - **Hex editing** (built 2026-09-29): Edit Bytes in the hex tab; hex digits overwrite the byte under the cursor two
   digits at a time (insert mode inserts; at the end they append), Delete and Backspace remove bytes, arrows, Home, End and
-  Page keys move; Apply (or selecting another item) makes one undoable edit, Discard drops it. Editing the text column is
+  Page keys move; Apply makes one undoable edit, Discard drops it. Moving the selection, undo, the Resource commands,
+  "Edit with template", Save, closing and quitting with unapplied edits (here or in a form) first ask "Apply your
+  changes to 'STR#' 128?" (Apply, Discard, Cancel). Editing the text column is
   not done. Replacing the data from a file is for anything larger.
 - **What can be saved:** a raw fork file; a data file with its AppleDouble `._` file or its Basilisk II `.rsrc`/`.finf`
   companions; AppleSingle; MacBinary (written as MacBinary III); BinHex. Only the resource fork changes; the data fork,

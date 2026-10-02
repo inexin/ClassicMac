@@ -20,6 +20,9 @@ namespace ClassicMac.App.ViewModels
         ResourceType,
         Resource,
         Loading,
+
+        /// <summary>A folder's files with no name, grouped.</summary>
+        NoNameGroup,
     }
 
     /// <summary>
@@ -38,18 +41,40 @@ namespace ClassicMac.App.ViewModels
             Parent = parent;
         }
 
-        /// <summary>The title shown: the name, marked while the node has unsaved edits.</summary>
+        /// <summary>The title: the name, marked while the node has unsaved edits.</summary>
         [ObservableProperty]
         private string title;
+
+        /// <summary>What the tree shows as the name ("(no name)", or the name with its whitespace made visible), or null.</summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(Name))]
+        private string? alias;
+
+        /// <summary>Whether the tree shows the title in italics (no name).</summary>
+        [ObservableProperty]
+        private bool isItalic;
+
+        /// <summary>Whether the tree shows the title in a monospaced font (a name of whitespace made visible).</summary>
+        [ObservableProperty]
+        private bool isMono;
 
         /// <summary>The title without the unsaved-edits mark.</summary>
         public string BaseTitle { get; }
 
         public NodeKind Kind { get; }
 
-        public NodeViewModel? Parent { get; }
+        /// <summary>The node above in the tree (a "No name" group for the files in one).</summary>
+        public NodeViewModel? Parent { get; internal set; }
 
+        /// <summary>The nodes shown below this one.</summary>
         public ObservableCollection<NodeViewModel> Children { get; } = [];
+
+        /// <summary>
+        /// For a node holding files and folders (an input, a read container file, a folder): all of them, in the
+        /// container's order, including those the tree hides or groups; <see cref="Children"/> is what it shows.
+        /// Null for other nodes.
+        /// </summary>
+        internal List<NodeViewModel>? Items { get; set; }
 
         [ObservableProperty]
         private bool isExpanded;
@@ -80,9 +105,10 @@ namespace ClassicMac.App.ViewModels
     public sealed class InputNode : NodeViewModel
     {
         internal InputNode(string path, HostFile host, ContainerNode root, ContainerReadOptions containerOptions, ReadOptions options,
-            Action<DiagnosticEntry> report)
+            Action<DiagnosticEntry> report, TreeDisplayOptions? display = null)
             : base(System.IO.Path.GetFileName(path), NodeKind.Input, null)
         {
+            Display = display ?? new TreeDisplayOptions();
             Path = path;
             Host = host;
             Root = root;
@@ -104,6 +130,9 @@ namespace ClassicMac.App.ViewModels
         internal ContainerReadOptions ContainerOptions { get; }
 
         internal Action<DiagnosticEntry> Report { get; }
+
+        /// <summary>Which files the tree hides or groups.</summary>
+        internal TreeDisplayOptions Display { get; }
 
         /// <summary>The resources of a plain input read as a fork of its own, once loaded.</summary>
         public FileResources? RawResources { get; internal set; }
@@ -169,9 +198,19 @@ namespace ClassicMac.App.ViewModels
     }
 
     /// <summary>A folder inside a volume or archive.</summary>
-    public sealed class FolderNode(NodeViewModel parent, string name) : NodeViewModel(name, NodeKind.Folder, parent)
+    public sealed class FolderNode : NodeViewModel
     {
+        public FolderNode(NodeViewModel parent, string name) : base(name, NodeKind.Folder, parent) => Items = [];
+
         public override string Source => $"{Parent!.Source}:{Title}";
+    }
+
+    /// <summary>A folder's files whose names are empty or only whitespace, when it has two or more (shown collapsed).</summary>
+    public sealed class NoNameGroupNode : NodeViewModel
+    {
+        internal NoNameGroupNode(NodeViewModel folder) : base("No name", NodeKind.NoNameGroup, folder) => IsItalic = true;
+
+        public override string Source => Parent!.Source;
     }
 
     /// <summary>A Mac file; its resources load when it is first expanded.</summary>
@@ -193,7 +232,7 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The edits made to the file's resources, once any are.</summary>
         public EditState? Editing { get; internal set; }
 
-        public override string Source => Parent is FolderNode ? $"{Parent.Source}:{Title}" : $"{Parent!.Source} › {Title}";
+        public override string Source => Tree.FolderOf(this) is FolderNode folder ? $"{folder.Source}:{Title}" : $"{Parent!.Source} › {Title}";
 
         protected override Task LoadAsync() => LoadResourcesAsync(this, File, raw: false);
 
@@ -268,10 +307,11 @@ namespace ClassicMac.App.ViewModels
     }
 
     // Builds the nodes for what a container holds: its files, grouped into folder nodes by their folder paths.
-    internal static class Tree
+    internal static partial class Tree
     {
         public static void AddContents(NodeViewModel parent, IReadOnlyList<ContainerNode> contents)
         {
+            parent.Items = [];
             var folders = new Dictionary<string, FolderNode>(StringComparer.Ordinal);
             NodeViewModel FolderFor(IReadOnlyList<MacString> path)
             {
@@ -283,7 +323,7 @@ namespace ClassicMac.App.ViewModels
                     if (!folders.TryGetValue(key, out var folder))
                     {
                         folders[key] = folder = new FolderNode(at, part.ToMacRoman());
-                        at.Children.Add(folder);
+                        at.Items!.Add(folder);
                     }
                     at = folder;
                 }
@@ -292,8 +332,9 @@ namespace ClassicMac.App.ViewModels
             foreach (var child in contents)
             {
                 var into = FolderFor(child.File.FolderPath);
-                into.Children.Add(child.Children.Count > 0 || child.UnreadFormat is not null ? new ContainerFileNode(into, child) : new FileNode(into, child));
+                into.Items!.Add(child.Children.Count > 0 || child.UnreadFormat is not null ? new ContainerFileNode(into, child) : new FileNode(into, child));
             }
+            Relayout(parent);
         }
 
         // Where a diagnostic found while reading under a node came from: the node, and the nested file it is about.
@@ -305,7 +346,7 @@ namespace ClassicMac.App.ViewModels
         public static Func<IEnumerable<MacFile>> Siblings(ContainerFileNode node)
         {
             NodeViewModel? at = node.Parent;
-            while (at is FolderNode) at = at.Parent;
+            while (at is FolderNode or NoNameGroupNode) at = at.Parent;
             var holder = at switch { InputNode input => input.Root, ContainerFileNode container => container.Node, _ => null };
             var file = node.File;
             return () => holder is null ? []

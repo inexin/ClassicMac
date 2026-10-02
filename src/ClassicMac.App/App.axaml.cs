@@ -28,7 +28,7 @@ namespace ClassicMac.App
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var model = new MainViewModel();
+                var model = new MainViewModel(new JsonSettingsStore(JsonSettingsStore.DefaultPath));
                 desktop.MainWindow = new MainWindow { DataContext = model };
                 foreach (var path in desktop.Args ?? []) _ = model.OpenAsync(path);
             }

@@ -52,7 +52,7 @@ namespace ClassicMac.App.ViewModels
                     if (!forks.Any(f => ReferenceEquals(f, type.Fork))) forks.Add(type.Fork);
                     return;
                 }
-                foreach (var child in node.Children) Walk(child);
+                foreach (var child in Tree.Contents(node)) Walk(child);
             }
             foreach (var root in roots) Walk(root);
             var system = forks.Where(f => Enumerable.Range(0, 3).Any(id => f.Find(Cicn, (short)id) is not null || f.Find(Icon, (short)id) is not null)).ToList();

@@ -292,7 +292,7 @@ namespace ClassicMac.App.ViewModels
 
         private static void Collect(NodeViewModel folder, List<ContainerNode> items, int depth)
         {
-            foreach (var child in folder.Children)
+            foreach (var child in Tree.Contents(folder))
             {
                 var node = child switch { FileNode f => f.Node, ContainerFileNode c => c.Node, _ => null };
                 if (node is not null) items.Add(node with { File = node.File with { FolderPath = node.File.FolderPath.Skip(depth).ToList() } });

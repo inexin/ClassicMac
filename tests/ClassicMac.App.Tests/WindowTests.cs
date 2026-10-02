@@ -624,4 +624,55 @@ public class WindowTests
             Directory.Delete(folder, recursive: true);
         }
     });
+
+    // The tree's footer says how many invisible files are hidden and Show brings them back; the Tree display popover's
+    // check boxes switch the options; the "No name" group row shows its count.
+    [Fact]
+    public void The_tree_footer_and_display_options_work() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model, Width = 1200, Height = 800 };
+            window.Show();
+            Pump(model.OpenAsync(TreeDisplayTests.Disk(folder)));
+            var realmz = model.Roots[0].Children.OfType<FolderNode>().Single(f => f.Title == "Realmz");
+            model.Roots[0].IsExpanded = realmz.IsExpanded = true;
+            Dispatcher.UIThread.RunJobs();
+            var footer = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "HiddenFooter");
+            Assert.True(footer.IsVisible);
+            Assert.Contains(footer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "2 invisible items hidden");
+            var texts = window.GetVisualDescendants().OfType<TreeView>().Single().GetVisualDescendants().OfType<TextBlock>().ToList();
+            var group = texts.Single(t => t.Text == "No name");
+            Assert.Equal(Avalonia.Media.FontStyle.Italic, group.FontStyle);
+            Assert.Contains(texts, t => t.Text == "4 files" && t.FontSize == 11);
+            Capture(window, "tree-no-name");
+
+            footer.GetVisualDescendants().OfType<Button>().Single().Command!.Execute(null);   // Show
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(model.TreeDisplay.HideInvisible);
+            Assert.False(footer.IsVisible);
+
+            var options = window.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "TreeDisplayButton");
+            options.Flyout!.ShowAt(options);
+            Dispatcher.UIThread.RunJobs();
+            var panel = (StackPanel)((Flyout)options.Flyout).Content!;
+            var boxes = panel.Children.OfType<CheckBox>().ToList();
+            Assert.Equal(["Group files with no name", "Hide invisible files"], boxes.Select(b => (string)b.Content!));
+            Assert.Equal([true, false], boxes.Select(b => b.IsChecked == true));
+            boxes[0].IsChecked = false;
+            boxes[1].IsChecked = true;
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(model.TreeDisplay.GroupNoName);
+            Assert.True(model.TreeDisplay.HideInvisible);
+            Assert.DoesNotContain(realmz.Children, c => c is NoNameGroupNode);
+            options.Flyout.Hide();
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
 }

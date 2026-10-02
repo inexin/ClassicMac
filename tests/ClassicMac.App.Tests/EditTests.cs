@@ -451,7 +451,7 @@ public sealed partial class EditTests : IDisposable
         return (model, input, dialogs, picker, path, image);
     }
 
-    private static byte[] WithFreeSpace(byte[] image)
+    internal static byte[] WithFreeSpace(byte[] image)
     {
         const int allocationBlocks = 1600;
         int oldBlocks = image[2 * HfsBuilder.Block + 0x12] << 8 | image[2 * HfsBuilder.Block + 0x13];

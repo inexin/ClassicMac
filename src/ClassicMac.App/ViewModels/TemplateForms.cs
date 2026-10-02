@@ -216,7 +216,7 @@ namespace ClassicMac.App.ViewModels
             }
             if (node is ResourceTypeNode or ResourceNode) yield break;
             if (node is InputNode { RawResources.Fork: { } raw }) yield return (raw, node.BaseTitle);
-            foreach (var child in node.Children)
+            foreach (var child in Tree.Contents(node))
                 foreach (var found in Loaded(child)) yield return found;
         }
     }

@@ -151,6 +151,26 @@ namespace ClassicMac.App.Views
                 "..KWWWWWWWWWWK..",
                 "..KKKKKKKKKKKK..",
             ],
+            // A "No name" group: two pages with folded corners, the back one up and to the right.
+            [TreeIconKind.NoNameGroup] =
+            [
+                ".....KKKKKK.....",
+                ".....KWWWWKK....",
+                ".....KWWWWKWK...",
+                ".....KWWWWKKKK..",
+                "..KKKKKKWWWWWK..",
+                "..KWWWWKKWWWWK..",
+                "..KWWWWKWKWWWK..",
+                "..KWWWWKKKKWWK..",
+                "..KWWWWWWWKWWK..",
+                "..KWDDDDDWKWWK..",
+                "..KWWWWWWWKWWK..",
+                "..KWDDDDDWKKKK..",
+                "..KWWWWWWWK.....",
+                "..KWDDDWWWK.....",
+                "..KWWWWWWWK.....",
+                "..KKKKKKKKK.....",
+            ],
             // A resource type: two stacked cards with blue lines.
             [TreeIconKind.ResourceType] =
             [
@@ -217,6 +237,7 @@ namespace ClassicMac.App.Views
             NodeKind.File => TreeIconKind.Document,
             NodeKind.ResourceType => TreeIconKind.ResourceType,
             NodeKind.Resource => TreeIconKind.Resource,
+            NodeKind.NoNameGroup => TreeIconKind.NoNameGroup,
             _ => TreeIconKind.Folder,
         }));
 

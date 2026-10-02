@@ -24,6 +24,9 @@ namespace ClassicMac.App.ViewModels
         ResourceType,
         Resource,
         Loading,
+
+        /// <summary>A "No name" group: two stacked documents (design/boards/tree-no-name.md).</summary>
+        NoNameGroup,
     }
 
     // What a browse-tree row shows besides its title (design/boards/browse-tree.md): its icon, its own icon once
@@ -51,6 +54,7 @@ namespace ClassicMac.App.ViewModels
             ContainerFileNode container => IsArchive(container.ContentFormat) ? TreeIconKind.Parcel : TreeIconKind.Floppy,
             FileNode file => ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? TreeIconKind.Application : TreeIconKind.Document,
             ResourceTypeNode => TreeIconKind.ResourceType,
+            NoNameGroupNode => TreeIconKind.NoNameGroup,
             ResourceNode => TreeIconKind.Resource,
             LoadingNode => TreeIconKind.Loading,
             _ => TreeIconKind.Folder,
@@ -62,8 +66,8 @@ namespace ClassicMac.App.ViewModels
         /// <summary>A resource type's title (<c>'ICN#' (12)</c>) is set in mono.</summary>
         public bool IsResourceType => this is ResourceTypeNode;
 
-        /// <summary>The title without the unsaved mark.</summary>
-        public string Name => IsUnsaved ? Title[..^UnsavedMark.Length] : Title;
+        /// <summary>The name shown: the title without the unsaved mark, or the alias for a file with no name.</summary>
+        public string Name => Alias ?? (IsUnsaved ? Title[..^UnsavedMark.Length] : Title);
 
         /// <summary>Whether the node has unsaved edits (its title carries " •").</summary>
         public bool IsUnsaved => Title != BaseTitle && Title.EndsWith(UnsavedMark, StringComparison.Ordinal);
@@ -80,6 +84,7 @@ namespace ClassicMac.App.ViewModels
             FileNode file => $"{file.File.FinderInfo.Type} · {file.File.FinderInfo.Creator}",
             ContainerFileNode container => $"{container.File.FinderInfo.Type} · {container.File.FinderInfo.Creator}",
             ResourceNode resource => FormatSize(resource.Resource.Length),
+            NoNameGroupNode group => string.Create(CultureInfo.InvariantCulture, $"{group.Children.Count} files"),
             InputNode input => $"{(input.Root.Children.Count > 0 ? input.Root.Children[0].Format : "resource fork")} · {FormatSize(HostSize(input))}",
             _ => null,
         };
@@ -92,6 +97,9 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Tells the row the container was read, so its "not read" chip goes.</summary>
         internal void OnRead() => OnPropertyChanged(nameof(IsUnread));
+
+        /// <summary>Tells the row its meta changed (a "No name" group's count).</summary>
+        internal void OnMetaChanged() => OnPropertyChanged(nameof(Meta));
 
         /// <summary>A size for people: bytes below 1 KB, else KB, MB or GB to one decimal.</summary>
         public static string FormatSize(long bytes)

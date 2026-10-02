@@ -34,7 +34,7 @@ namespace ClassicMac.App.ViewModels
 
         // The selected file or folder, when it can be deleted from a plain HFS image.
         private static NodeViewModel? VolumeItem(NodeViewModel? node) =>
-            node is FileNode or ContainerFileNode or FolderNode && node.Parent is { } parent && VolumeFolder(parent) == parent ? node : null;
+            node is FileNode or ContainerFileNode or FolderNode && Tree.FolderOf(node) is { } parent && VolumeFolder(parent) == parent ? node : null;
 
         // A folder node's Mac path below the volume's root ("" for the root).
         private static List<string> FolderNames(NodeViewModel folder)
@@ -51,7 +51,7 @@ namespace ClassicMac.App.ViewModels
             _ => item.BaseTitle,
         };
 
-        private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(item.Parent!).Append(ItemName(item)));
+        private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(Tree.FolderOf(item)!).Append(ItemName(item)));
 
         private bool CanCreateInVolume() => !IsExporting && VolumeFolder(Selected) is not null;
 
@@ -123,7 +123,6 @@ namespace ClassicMac.App.ViewModels
             if (!ChangeVolume(folder.Input, image => HfsWriter.CreateFolder(ForkData.FromBytes(image), path), $"create folder {name}")) return;
             var node = new FolderNode(folder, name);
             Insert(folder, node);
-            Selected = node;
             Status = $"Created folder {name}; Save As ▸ HFS Volume Image writes it.";
         }
 
@@ -142,8 +141,10 @@ namespace ClassicMac.App.ViewModels
             var steps = new List<Func<byte[], byte[]>>();
             AddDeletes(item, steps);
             if (!ChangeVolume(item.Input, image => steps.Aggregate(image, (at, step) => step(at)), $"delete {name}")) return;
-            var parent = item.Parent!;
-            parent.Children.Remove(item);
+            // Shown or not (hidden, grouped), the item leaves its folder's items; the folder is laid out again.
+            var parent = Tree.FolderOf(item)!;
+            parent.Items!.Remove(item);
+            Tree.Relayout(parent);
             Selected = parent;
             NotifyEditCommands();
             Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
@@ -154,7 +155,7 @@ namespace ClassicMac.App.ViewModels
             var path = MacPathOf(item);
             if (item is FolderNode)
             {
-                foreach (var child in item.Children.Where(c => c is FileNode or ContainerFileNode or FolderNode)) AddDeletes(child, steps);
+                foreach (var child in Tree.Contents(item).Where(c => c is FileNode or ContainerFileNode or FolderNode)) AddDeletes(child, steps);
                 steps.Add(image => HfsWriter.DeleteFolder(ForkData.FromBytes(image), path));
             }
             else
@@ -164,7 +165,7 @@ namespace ClassicMac.App.ViewModels
         }
 
         private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>
-            node.Children.SelectMany(c => Descendants(c).Prepend(c));
+            Tree.Contents(node).SelectMany(c => Descendants(c).Prepend(c));
 
         private void AddFile(NodeViewModel folder, MacFile file)
         {
@@ -187,7 +188,6 @@ namespace ClassicMac.App.ViewModels
             // A file made without resources can be given some at once: its edits start from an empty fork.
             if (item is FileNode { Children.Count: 0 } empty) empty.Resources = new FileResources(null, ResourceForkSource.None);
             Insert(folder, item);
-            Selected = item;
             Status = $"Created {file.Name.ToMacRoman()}; Save As ▸ HFS Volume Image writes it.";
         }
 
@@ -210,13 +210,19 @@ namespace ClassicMac.App.ViewModels
             return true;
         }
 
-        // Keeps the tree's order: folders and files by name, as the reader lists them.
-        private static void Insert(NodeViewModel folder, NodeViewModel item)
+        // Adds a new item to its folder's items, keeping their order (folders and files by name, as the reader lists them),
+        // lays the folder out again and selects the item: where it shows (in the "No name" group, opened), or its folder
+        // when the tree hides it.
+        private void Insert(NodeViewModel folder, NodeViewModel item)
         {
+            var items = folder.Items!;
             var index = 0;
-            while (index < folder.Children.Count && string.Compare(folder.Children[index].BaseTitle, item.BaseTitle, StringComparison.OrdinalIgnoreCase) < 0) index++;
-            folder.Children.Insert(index, item);
+            while (index < items.Count && string.Compare(items[index].BaseTitle, item.BaseTitle, StringComparison.OrdinalIgnoreCase) < 0) index++;
+            items.Insert(index, item);
+            Tree.Relayout(folder);
             folder.IsExpanded = true;
+            if (item.Parent is NoNameGroupNode group) group.IsExpanded = true;
+            Selected = Tree.IsShown(item, Roots) ? item : folder;
         }
     }
 }
