@@ -915,6 +915,53 @@ public sealed class StuffItFeatureTests
         Assert.DoesNotContain(diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
+    // Forks decode side by side; the files, their order and the problems reported stay those of a reading in order.
+    [Fact]
+    public void StuffItMembersDecodeInArchiveOrder()
+    {
+        var datas = Enumerable.Range(0, 24).Select(i => Enumerable.Range(0, 500 + i * 97).Select(j => (byte)(j * (i + 3) % 251)).ToArray()).ToArray();
+        byte[] image = StuffItFixture.BuildFiles([.. datas.Select((data, i) => StuffItFixture.BuildFile($"File {i}", data, [],
+            dataMethod: 15, encodedData: ArsenicEncoder.Encode(data)))]);
+        var diagnostics = new List<Diagnostic>();
+
+        var files = StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal(Enumerable.Range(0, 24).Select(i => $"File {i}"), files.Select(f => f.MacPath));
+        Assert.Equal(datas, files.Select(f => f.DataFork.ToArray()));
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void StuffItReportsTheFirstUnreadableMemberInArchiveOrder()
+    {
+        byte[] good = "fine"u8.ToArray();
+        byte[] truncated = ArsenicEncoder.Encode(new byte[3000])[..6];
+        byte[] badSignature = new ArsenicEncoder { Signature = "Ax"u8.ToArray() }.Run(good);
+        byte[] image = StuffItFixture.BuildFiles(
+            StuffItFixture.BuildFile("good", good, []),
+            StuffItFixture.BuildFile("truncated", new byte[3000], [], dataMethod: 15, encodedData: truncated),
+            StuffItFixture.BuildFile("bad signature", good, [], dataMethod: 15, encodedData: badSignature));
+
+        var error = Assert.Throws<InvalidDataException>(() => StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()));
+
+        Assert.Contains("ends inside its arithmetic bitstream", error.Message);
+    }
+
+    [Fact]
+    public void StuffItForkChecksumsAreReportedInMemberOrder()
+    {
+        byte[] image = StuffItFixture.BuildFiles(
+            StuffItFixture.BuildFile("first", "one"u8.ToArray(), [], dataCrcOverride: 1),
+            StuffItFixture.BuildFile("second", "two"u8.ToArray(), []),
+            StuffItFixture.BuildFile("third", "three"u8.ToArray(), [], dataCrcOverride: 1));
+        var diagnostics = new List<Diagnostic>();
+
+        StuffItReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics));
+
+        Assert.Equal(["first", "third"], diagnostics.Where(d => d.Code == "archive.fork-crc")
+            .Select(d => d.Message.Split('\'')[1]));
+    }
+
     [Fact]
     public void StuffItMethod15RejectsATruncatedArithmeticStream()
     {
@@ -1517,6 +1564,26 @@ public sealed class StuffItFeatureTests
             name.CopyTo(marker.AsSpan(3));
             U16(marker, 110, Crc16Arc(marker.AsSpan(0, 110)));
             return marker;
+        }
+
+        // Several members in the root list, each built by BuildFile, linked in order.
+        public static byte[] BuildFiles(params byte[][] singles)
+        {
+            var members = singles.Select(single => single[ArchiveHeaderLength..]).ToArray();
+            byte[] image = new byte[ArchiveHeaderLength + members.Sum(m => m.Length)];
+            WriteArchiveHeader(image, checked((ushort)members.Length), ArchiveHeaderLength);
+            int at = ArchiveHeaderLength;
+            for (int index = 0; index < members.Length; index++)
+            {
+                members[index].CopyTo(image, at);
+                int next = index + 1 < members.Length ? at + members[index].Length : 0;
+                U32(image, at + 22, checked((uint)next));
+                int headerLength = (image[at + 6] << 8) | image[at + 7];
+                U16(image.AsSpan(at + 32), 0, HeaderCrc(image.AsSpan(at, headerLength)));
+                at += members[index].Length;
+            }
+            U32(image, 84, checked((uint)image.Length));
+            return image;
         }
 
         public static byte[] BuildNestedFile()

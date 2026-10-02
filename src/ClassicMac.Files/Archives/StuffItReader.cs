@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Text;
+using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Resources;
 
@@ -76,7 +78,7 @@ public sealed class StuffItReader : IContainerReader
         if (rootCount != 0 && (firstMember < ArchiveHeaderLength || firstMember >= archive.Length))
             throw new InvalidDataException("The first StuffIt archive member lies outside the archive.");
 
-        var files = new List<MacFile>();
+        var work = new List<(Member Member, MemberList List)>();
         var visited = new HashSet<int>();
         var pending = new Stack<MemberList>();
         pending.Push(new MemberList(firstMember, rootCount, [], []));
@@ -146,12 +148,38 @@ public sealed class StuffItReader : IContainerReader
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
                 throw new InvalidDataException("StuffIt extraction exceeds the configured expanded-size limit.");
 
-            byte[] data = DecodeFork(archive, member.DataOffset, member.DataCompressedLength, member.DataLength,
-                member.DataMethod);
-            byte[] resource = member.ResourceMethod is { } resourceMethod
-                ? DecodeFork(archive, member.ResourceOffset, member.ResourceCompressedLength, member.ResourceLength,
-                    resourceMethod)
-                : [];
+            work.Add((member, list));
+        }
+
+        // The forks decode side by side (each is independent and the decoders share no state); then, in archive
+        // order, the first that could not be decoded stops the reading as it would have in order, and the checksums
+        // are checked.
+        var decoded = new (byte[] Data, byte[] Resource, ExceptionDispatchInfo? Error)[work.Count];
+        Parallel.For(0, work.Count, index =>
+        {
+            Member member = work[index].Member;
+            try
+            {
+                byte[] data = DecodeFork(archive, member.DataOffset, member.DataCompressedLength, member.DataLength,
+                    member.DataMethod);
+                byte[] resource = member.ResourceMethod is { } resourceMethod
+                    ? DecodeFork(archive, member.ResourceOffset, member.ResourceCompressedLength, member.ResourceLength,
+                        resourceMethod)
+                    : [];
+                decoded[index] = (data, resource, null);
+            }
+            catch (Exception e)
+            {
+                decoded[index] = ([], [], ExceptionDispatchInfo.Capture(e));
+            }
+        });
+
+        var files = new List<MacFile>(work.Count);
+        for (int index = 0; index < work.Count; index++)
+        {
+            var (member, list) = work[index];
+            var (data, resource, error) = decoded[index];
+            error?.Throw();
             if (member.DataMethod != 15)
                 CheckForkCrc(data, member.DataCrc, "data", member.Name, list.Position, context);
             if (member.ResourceMethod is not null and not 15)
@@ -1378,11 +1406,21 @@ public sealed class StuffItReader : IContainerReader
         return crc;
     }
 
-    private static ushort CrcByte(ushort crc, byte value)
+    // CRC-16/ARC (reflected polynomial $A001), a byte at a time from a table.
+    private static ushort CrcByte(ushort crc, byte value) => (ushort)((crc >> 8) ^ CrcTable[(crc ^ value) & 0xFF]);
+
+    private static readonly ushort[] CrcTable = BuildCrcTable();
+
+    private static ushort[] BuildCrcTable()
     {
-        crc ^= value;
-        for (int bit = 0; bit < 8; bit++) crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
-        return crc;
+        var table = new ushort[256];
+        for (int index = 0; index < 256; index++)
+        {
+            var crc = (ushort)index;
+            for (int bit = 0; bit < 8; bit++) crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
+            table[index] = crc;
+        }
+        return table;
     }
 
     private static MacString LegacyName(string name)

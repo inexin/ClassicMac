@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- StuffIt: archives decode about ten times faster: forks decode in parallel, method 15 (Arsenic) writes into arrays
+  and checks its CRC-32 from a table, and the fork CRC-16 is table-driven (a 38 MB archive of 1,826 files: 9.3 s to
+  0.8 s).
 - Viewer: opening a disk reads its files, not what is inside them: archives and disk images on it are read when their
   node is first expanded (a 500 MB Mac OS 9 disk opens in under a second instead of 22 s); exports still read
   everything. Problems found inside a nested file name it (`disk.hfv › Disks:Tools.img`).
