@@ -196,4 +196,43 @@ public sealed class HexViewTests
             Directory.Delete(folder, recursive: true);
         }
     });
+
+    // The byte inspector fits under the Find bar at the default size (1200 × 780, diagnostics open): its last row, Binary,
+    // is inside the panel.
+    [Fact]
+    public void The_inspector_s_last_row_is_in_view_at_the_default_size() => Headless.OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("cm-hexinspector").FullName;
+        try
+        {
+            var path = Path.Combine(folder, "Fit.rsrc");
+            File.WriteAllBytes(path, PreviewTests.Fork(("ZZZZ", 1, null, [.. "Hello, hex editing works across lines"u8])));
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            Assert.Equal((1200, 780), ((int)window.Width, (int)window.Height));
+            var open = model.OpenAsync(path);
+            Pump(open);
+            Pump(open.Result!.EnsureLoadedAsync());
+            model.Selected = open.Result!.Children.OfType<ResourceTypeNode>().Single().Children[0];
+            Pump(model.PreviewTask);
+            model.BeginHexEditCommand.Execute(null);
+            model.SelectedTab = 2;
+            Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame();
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.True(model.DiagnosticsPanel.IsExpanded);
+            var inspector = window.FindControl<Border>("HexInspector")!;
+            var last = inspector.GetVisualDescendants().OfType<TextBlock>().Last(t => t.Text == "Binary");
+            var bottom = last.TranslatePoint(new Point(0, last.Bounds.Height), inspector)!.Value.Y;
+            Assert.True(bottom <= inspector.Bounds.Height - inspector.Padding.Bottom,
+                $"Binary ends at {bottom}, the panel at {inspector.Bounds.Height}");
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
 }

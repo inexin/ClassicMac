@@ -221,7 +221,7 @@
     </Style>
     <Style Selector="Border.hex-inspector">
       <Setter Property="Width" Value="200" />
-      <Setter Property="Padding" Value="12,10" />
+      <Setter Property="Padding" Value="12,8" />
       <Setter Property="Background" Value="{DynamicResource CmSidebarBackground}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
       <Setter Property="BorderThickness" Value="1,0,0,0" />
@@ -2426,12 +2426,14 @@
                 </DockPanel>
               </Border>
               <Border x:Name="HexInspector" DockPanel.Dock="Right" Classes="hex-inspector" IsVisible="{Binding HexInspection, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <!-- Rows without spacing so the readings fit under the Find bar at 1200 × 780; "In this resource" scrolls. -->
+                <ScrollViewer x:Name="HexInspectorScroll" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="4">
                   <TextBlock Classes="caption" Text="{Binding HexInspection.Heading, FallbackValue={x:Null}}" />
                   <ItemsControl ItemsSource="{Binding HexInspection.Rows, FallbackValue={x:Null}}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="vm:HexReading">
-                        <Grid ColumnDefinitions="76,*" Margin="0,2">
+                        <Grid ColumnDefinitions="76,*">
                           <TextBlock Text="{Binding Label}" Classes="muted" />
                           <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="mono" />
                         </Grid>
@@ -2446,6 +2448,7 @@
                                IsVisible="{Binding HexInspection.Meaning.Value, Converter={x:Static ObjectConverters.IsNotNull}, FallbackValue=False}" />
                   </StackPanel>
                 </StackPanel>
+                </ScrollViewer>
               </Border>
               <!-- As the read-then-edit host (E1): a 3 px CmAccent line over the values while editing. -->
               <Border x:Name="HexEditLine" DockPanel.Dock="Top" Height="3" Background="{DynamicResource CmAccent}" IsVisible="{Binding IsHexEditing}" />

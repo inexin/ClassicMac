@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Editor: the hex byte inspector fits under the Find bar at 1200 × 780 with diagnostics open (rows without spacing,
+  8 px padding); "In this resource" scrolls inside the panel when it does not fit.
 - Viewer: a sound's header has Save as WAV… (the decoded sound, as `extract` writes it) and Replace from WAV… (the
   sound's data from a WAV file, one undoable edit) in place of Export….
 - Viewer: resources previewed as JSON with no form (style runs, font families, code fragments and others) read as
