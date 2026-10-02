@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Viewer: the first selection after opening a disk no longer freezes the app (20 s on a 500 MB disk): the hex list's
+  source never goes null, which made Avalonia walk every line of the previous fork. Containers (an opened disk image
+  or archive, or one inside it) have no hex view.
 - Viewer: a folder's preview is the whole Finder window: the Platinum frame with the close, zoom and collapse boxes,
   the title with the folder's or the disk's icon, "n items, x MB available" in the header, scroll bars with
   proportional thumbs where the items reach beyond the window, and the grow box; checked against Mac OS 9.0

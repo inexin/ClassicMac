@@ -248,7 +248,7 @@
                 <TextBlock Text="Hex digits type; Insert toggles insert; Delete, Backspace remove." IsVisible="{Binding IsHexEditing}"
                            VerticalAlignment="Center" Opacity="0.5" />
               </StackPanel>
-              <ListBox x:Name="HexList" Classes="hex" ItemsSource="{Binding HexLines}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13">
+              <ListBox x:Name="HexList" Classes="hex" ItemsSource="{Binding HexLines, TargetNullValue={x:Static vm:HexLines.None}}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" FontSize="13">
                 <ListBox.ItemTemplate>
                   <DataTemplate DataType="vm:HexLine">
                     <StackPanel Orientation="Horizontal" Spacing="16">

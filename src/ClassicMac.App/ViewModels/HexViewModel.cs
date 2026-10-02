@@ -38,6 +38,13 @@ namespace ClassicMac.App.ViewModels
         private long cachedBlock = -1;
         private byte[] cache = [];
 
+        /// <summary>
+        /// No lines: what the hex list shows when there is nothing to show. An items control whose source becomes null
+        /// walks the old one item by item (Avalonia's ItemCollection raises a Remove of every item); one whose source
+        /// becomes another list does not, so the list never goes null.
+        /// </summary>
+        public static HexLines None { get; } = new(ForkData.Empty);
+
         public HexLines(ForkData data)
         {
             this.data = data;
@@ -157,8 +164,8 @@ namespace ClassicMac.App.ViewModels
         {
             ResourceNode r => new([new HexSource($"{r.Resource} ({r.Resource.Length:N0} bytes)", ForkData.FromBytes(r.Resource.GetData()))]),
             FileNode f => Forks(f.File),
-            ContainerFileNode c => Forks(c.File),
-            InputNode i => Forks(i.Root.File),
+            // Containers (a disk image or archive, opened or inside one) show their contents, not their bytes.
+            InputNode i when i.Root.Children.Count == 0 => Forks(i.Root.File),
             _ => Empty,
         };
 

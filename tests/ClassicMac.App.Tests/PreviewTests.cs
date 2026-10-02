@@ -174,4 +174,17 @@ public class PreviewTests : IDisposable
         model.Selected = file;
         Assert.Equal(["Resource fork"], model.Hex.Sources.Select(s => s.Label.Split(" (")[0]));
     }
+
+    // A container (an opened disk image or archive, or one inside it) has no hex view: its contents are what to look at.
+    [Fact]
+    public async Task Containers_have_no_hex_view()
+    {
+        var (model, _) = await Open(Disk());
+        var input = model.Roots[0];
+
+        model.Selected = input;
+
+        Assert.Empty(model.Hex.Sources);
+        Assert.Null(model.HexLines);
+    }
 }

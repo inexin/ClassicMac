@@ -293,4 +293,45 @@ public class WindowTests
             File.Delete(path);
         }
     });
+
+    // Leaving a large fork's hex view must not walk its lines: an items control told its source is now null walks the
+    // old one (Avalonia's ItemCollection raises a Remove of every item), which for a disk image was every line of it.
+    [Fact]
+    public void Leaving_a_large_fork_s_hex_view_does_not_read_it() => OnUiThread(Leaving_a_large_fork_s_hex_view_does_not_read_itBody);
+
+    private static void Leaving_a_large_fork_s_hex_view_does_not_read_itBody()
+    {
+        var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
+        try
+        {
+            var disk = new HfsBuilder();
+            disk.File(disk.Folder(HfsBuilder.Root, "Empty"), "Note", [1], []);
+            var path = Path.Combine(folder, "disk.img");
+            File.WriteAllBytes(path, disk.Build("Disk"));
+            var big = Path.Combine(folder, "big.bin");
+            File.WriteAllBytes(big, [.. Enumerable.Range(0, 8 << 20).Select(i => (byte)(i % 251))]);
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            Pump(model.OpenAsync(path));
+            Pump(model.OpenAsync(big));
+            model.Selected = model.Roots[1];
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            var lines = model.HexLines!;
+            Assert.Equal(1 << 19, lines.Count);
+
+            model.Selected = model.Roots[0].Children.OfType<FolderNode>().Single();
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+
+            Assert.Null(model.HexLines);
+            Assert.True(lines.BytesRead <= 1 << 20, $"{lines.BytesRead} bytes read");
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
 }
