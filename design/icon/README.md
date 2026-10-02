@@ -27,4 +27,4 @@ Sizes 16–32 are drawn pixel by pixel (fewer, chunkier stripes, a simpler stand
 
 ## Note
 
-Six stripes in this order echo Apple's old striped logo. The icon contains no Apple shape, but check the trademark question before a public release.
+Six stripes in this order echo Apple's old striped logo. The icon contains no Apple shape, and the owner decided (2026-10-02) to use it as it is.

@@ -478,8 +478,9 @@ like ResEdit, read-only at first.
   128. Packaging steps, not scripted yet: on macOS copy `classicmac.icns` into the bundle's `Contents/Resources` and set
   `CFBundleIconFile` to `classicmac`; on Linux install `png/classicmac-<n>.png` as
   `share/icons/hicolor/<n>x<n>/apps/classicmac.png` (16, 24, 32, 48, 64, 128, 256, 512) and `source/classicmac.svg`
-  as `share/icons/hicolor/scalable/apps/classicmac.svg`, with `Icon=classicmac` in the `.desktop` file. Check the
-  trademark question (six stripes echo Apple's old logo) before a public release.
+  as `share/icons/hicolor/scalable/apps/classicmac.svg`, with `Icon=classicmac` in the `.desktop` file. The icon
+  is kept as it is: the owner decided (2026-10-02) to use it although its six stripes echo Apple's old logo (it has no
+  Apple shape).
 
 **Structure:** the app adds nothing format-specific — it sits on the same `ClassicMac.Resources` and `Decoders`
 packages as the CLI. MVVM with plain C# view-models (testable without a UI), one preview control per kind (image, hex,
