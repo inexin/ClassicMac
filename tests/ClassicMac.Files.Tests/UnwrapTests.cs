@@ -69,6 +69,116 @@ public class UnwrapTests
 
         Assert.Equal("container.too-large", Assert.Single(diagnostics).Code);
     }
+
+    // A volume: Docs:Note.hqx (BinHex with a bad data CRC), Docs:Wrap.bin (MacBinary holding the same BinHex file) and
+    // Plain (no container).
+    private static byte[] Volume()
+    {
+        var hqx = Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), [], corruptDataCrc: true));
+        var builder = new HfsBuilder();
+        // First and past 64 KB, so the BinHex text is not in the part of the disk the BinHex reader searches.
+        builder.File(HfsBuilder.Root, "Plain", new byte[70_000], []);
+        var docs = builder.Folder(HfsBuilder.Root, "Docs");
+        builder.File(docs, "Note.hqx", hqx, []);
+        builder.File(docs, "Wrap.bin", MacBinary(2, "Inner.hqx", hqx, []), []);
+        return builder.Build("Vol");
+    }
+
+    private static ContainerNode Named(ContainerNode node, string name) =>
+        node.Children.Single(c => c.File.Name.ToMacRoman() == name);
+
+    [Fact]
+    public void Unwrap_marks_the_containers_below_its_levels_unread()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var volume = ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("Vol"), DataFork = ForkData.FromBytes(Volume()) },
+            "host file", new ContainerContext(null, diagnostics), levels: 1);
+
+        Assert.Equal(3, volume.Children.Count);
+        Assert.Equal("BinHex 4.0", Named(volume, "Note.hqx").UnreadFormat);
+        Assert.Equal("MacBinary II", Named(volume, "Wrap.bin").UnreadFormat);
+        Assert.Null(Named(volume, "Plain").UnreadFormat);
+        Assert.All(volume.Children, c => Assert.Empty(c.Children));
+        Assert.Equal(3, volume.Leaves().Count());
+        Assert.Empty(diagnostics);
+    }
+
+    [Fact]
+    public void Expand_reads_unread_containers_as_deep_as_asked()
+    {
+        var context = new ContainerContext(null, []);
+        var shallow = ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("Vol"), DataFork = ForkData.FromBytes(Volume()) }, "host file", context, levels: 1);
+
+        var wrap = ContainerUnwrapper.Default.Expand(Named(shallow, "Wrap.bin"), context, levels: 1);
+        Assert.Null(wrap.UnreadFormat);
+        var inner = Assert.Single(wrap.Children);
+        Assert.Equal("Inner.hqx", inner.File.Name.ToMacRoman());
+        Assert.Equal("BinHex 4.0", inner.UnreadFormat);
+
+        var full = ContainerUnwrapper.Default.Expand(shallow, context);
+        var whole = ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("Vol"), DataFork = ForkData.FromBytes(Volume()) }, "host file", new ContainerContext(null, []));
+        Assert.Equal(Shape(whole), Shape(full));
+        Assert.DoesNotContain(full.Leaves(), l => l.UnreadFormat is not null);
+        Assert.Same(Named(shallow, "Plain"), Named(full, "Plain"));
+    }
+
+    // The formats and names of a tree, depth first.
+    private static string Shape(ContainerNode node) =>
+        $"{node.Format}:{node.File.Name.ToMacRoman()}({string.Join(",", node.Children.Select(Shape))})";
+
+    [Fact]
+    public void Expand_leaves_a_read_tree_as_it_is()
+    {
+        var context = new ContainerContext(null, []);
+        var whole = Unwrap(MacBinary(2, "Inner", "data"u8.ToArray(), []), []);
+        Assert.Same(whole, ContainerUnwrapper.Default.Expand(whole, context));
+    }
+
+    [Fact]
+    public void Levels_must_be_positive() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("x"), DataFork = ForkData.FromBytes(new byte[] { 1 }) }, "host file", new ContainerContext(), levels: 0));
+
+    // A problem inside a nested file says where it is: the Mac path of the file whose container reported it, through
+    // the files around it; problems with the input itself have no location.
+    [Fact]
+    public void Nested_diagnostics_carry_their_location()
+    {
+        var diagnostics = new List<Diagnostic>();
+        Unwrap(Volume(), diagnostics);
+
+        Assert.NotEmpty(diagnostics);
+        Assert.Equal(
+            ["Docs:Note.hqx", "Docs:Wrap.bin > Inner.hqx"],
+            diagnostics.Select(d => d.Location).Distinct().Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void Diagnostics_about_the_input_itself_have_no_location()
+    {
+        var diagnostics = new List<Diagnostic>();
+        Unwrap(Encoding.ASCII.GetBytes(BinHex("Note", "note"u8.ToArray(), [], corruptDataCrc: true)), diagnostics);
+
+        Assert.NotEmpty(diagnostics);
+        Assert.All(diagnostics, d => Assert.Null(d.Location));
+    }
+
+    [Fact]
+    public void Expanding_one_node_reports_where_it_is_from_that_node()
+    {
+        var context = new ContainerContext(null, []);
+        var shallow = ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("Vol"), DataFork = ForkData.FromBytes(Volume()) }, "host file", context, levels: 1);
+        var diagnostics = new List<Diagnostic>();
+
+        ContainerUnwrapper.Default.Expand(Named(shallow, "Wrap.bin"), new ContainerContext(null, diagnostics));
+
+        Assert.NotEmpty(diagnostics);
+        Assert.All(diagnostics, d => Assert.Equal("Inner.hqx", d.Location));
+    }
 }
 
 public class HostFilesTests : IDisposable

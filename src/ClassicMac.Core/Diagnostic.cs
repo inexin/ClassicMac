@@ -19,5 +19,13 @@ namespace ClassicMac.Core
     /// <param name="Code">A stable identifier, such as <c>resource.data-out-of-range</c>, for filtering and tests.</param>
     /// <param name="Message">A description for people.</param>
     /// <param name="Offset">Where in the input it was found, if known.</param>
-    public sealed record Diagnostic(DiagnosticSeverity Severity, string Code, string Message, long? Offset = null);
+    public sealed record Diagnostic(DiagnosticSeverity Severity, string Code, string Message, long? Offset = null)
+    {
+        /// <summary>
+        /// Which file inside the input it is about, when not the input itself: the Mac path of the nested file whose
+        /// contents were being read, after the files that hold it (<c>Disks:Tools.img &gt; Read Me</c>). The offset
+        /// counts within that file.
+        /// </summary>
+        public string? Location { get; init; }
+    }
 }

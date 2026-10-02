@@ -18,6 +18,12 @@ namespace ClassicMac.Files
     /// <param name="Children">The files its data fork contained, if the data fork was itself a container.</param>
     public sealed record ContainerNode(string Format, MacFile File, IReadOnlyList<ContainerNode> Children)
     {
+        /// <summary>
+        /// The container format of the file's data fork when it was recognised but not read, because the unwrap stopped
+        /// at its level limit (<see cref="ContainerUnwrapper.Expand(ContainerNode, ContainerContext, int)"/> reads it); null otherwise.
+        /// </summary>
+        public string? UnreadFormat { get; init; }
+
         /// <summary>The files at the bottom of the tree: those whose data fork is not a container.</summary>
         public IEnumerable<ContainerNode> Leaves() => Children.Count == 0 ? [this] : Children.SelectMany(c => c.Leaves());
     }
@@ -83,13 +89,60 @@ namespace ClassicMac.Files
         public IReadOnlyList<IContainerReader> Readers => readers;
 
         /// <summary>Unwraps <paramref name="file"/>, which was found as <paramref name="format"/>.</summary>
-        public ContainerNode Unwrap(MacFile file, string format, ContainerContext context)
+        public ContainerNode Unwrap(MacFile file, string format, ContainerContext context) =>
+            Unwrap(file, format, context, int.MaxValue);
+
+        /// <summary>
+        /// Unwraps <paramref name="file"/>, reading at most <paramref name="levels"/> levels of containers: a file below
+        /// them whose data fork is a container is only recognised, and left with its
+        /// <see cref="ContainerNode.UnreadFormat"/> set. Browsing reads one level at a time, so opening a disk does not
+        /// decompress every archive on it.
+        /// </summary>
+        public ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int levels)
         {
             ArgumentNullException.ThrowIfNull(file);
+            ArgumentNullException.ThrowIfNull(format);
             ArgumentNullException.ThrowIfNull(context);
+            ArgumentOutOfRangeException.ThrowIfLessThan(levels, 1);
             long expanded = 0;
-            return Unwrap(file, format, context, 0, ref expanded);
+            return Unwrap(file, format, context, 0, levels, null, ref expanded);
         }
+
+        /// <summary>
+        /// Reads the unread containers in <paramref name="node"/>'s tree (see <see cref="ContainerNode.UnreadFormat"/>),
+        /// at most <paramref name="levels"/> levels below each. A tree with nothing unread comes back as it is. The
+        /// siblings of <paramref name="node"/> itself come from <paramref name="context"/>; those of the files below it
+        /// from the tree.
+        /// </summary>
+        public ContainerNode Expand(ContainerNode node, ContainerContext context, int levels = int.MaxValue)
+        {
+            ArgumentNullException.ThrowIfNull(node);
+            ArgumentNullException.ThrowIfNull(context);
+            ArgumentOutOfRangeException.ThrowIfLessThan(levels, 1);
+            long expanded = 0;
+            return Expand(node, context, 0, levels, null, ref expanded);
+        }
+
+        private ContainerNode Expand(ContainerNode node, ContainerContext context, int depth, int levels, string? location, ref long expanded)
+        {
+            if (node.UnreadFormat is not null) return Unwrap(node.File, node.Format, context, depth, levels, location, ref expanded);
+            if (node.Children.Count == 0) return node;
+            var files = node.Children.Select(c => c.File).ToList();
+            var children = new List<ContainerNode>(node.Children.Count);
+            var changed = false;
+            foreach (var child in node.Children)
+            {
+                var file = child.File;
+                var read = Expand(child, context.For(null, () => SiblingsOf(files, file)), depth + 1, levels, Within(location, file), ref expanded);
+                changed |= !ReferenceEquals(read, child);
+                children.Add(read);
+            }
+            return changed ? node with { Children = children } : node;
+        }
+
+        // A nested file's location: its Mac path, after the files holding it.
+        private static string Within(string? location, MacFile file) =>
+            location is null ? file.MacPath : $"{location} > {file.MacPath}";
 
         /// <summary>Reads a host file with its companions and unwraps it.</summary>
         public ContainerNode Unwrap(string path, ContainerReadOptions? options = null, ICollection<Diagnostic>? diagnostics = null)
@@ -100,11 +153,15 @@ namespace ClassicMac.Files
                 context.For(null, HostFiles.Siblings(path, context.Options, context.Diagnostics)));
         }
 
-        private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, ref long expanded)
+        private ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int depth, int levels, string? location, ref long expanded)
         {
             if (file.DataFork.Length == 0) return new ContainerNode(format, file, []);
             var reader = readers.FirstOrDefault(r => r.CanRead(file));
             if (reader is null) return new ContainerNode(format, file, []);
+            if (levels == 0) return new ContainerNode(format, file, []) { UnreadFormat = reader.FormatName };
+            // What reading this file's container reports is about this file; the files inside it get their own locations.
+            var outer = context;
+            if (location is not null) context = context.WithDiagnostics(new LocatedDiagnostics(context.Diagnostics, location));
             if (depth >= context.Options.MaxNestingDepth)
             {
                 context.Report(DiagnosticSeverity.Warning, "container.too-deep",
@@ -135,9 +192,32 @@ namespace ClassicMac.Files
                         $"Unwrapping produced more than {context.Options.MaxExpandedBytesPerInput} bytes; stopped.");
                     break;
                 }
-                children.Add(Unwrap(inner, reader.FormatName, context.For(null, () => SiblingsOf(contents, inner)), depth + 1, ref expanded));
+                children.Add(Unwrap(inner, reader.FormatName, outer.For(null, () => SiblingsOf(contents, inner)), depth + 1,
+                    levels == int.MaxValue ? levels : levels - 1, Within(location, inner), ref expanded));
             }
             return new ContainerNode(format, file, children);
+        }
+
+        // Adds a location to the diagnostics that have none.
+        private sealed class LocatedDiagnostics(ICollection<Diagnostic> inner, string location) : ICollection<Diagnostic>
+        {
+            public int Count => inner.Count;
+
+            public bool IsReadOnly => inner.IsReadOnly;
+
+            public void Add(Diagnostic item) => inner.Add(item.Location is null ? item with { Location = location } : item);
+
+            public void Clear() => inner.Clear();
+
+            public bool Contains(Diagnostic item) => inner.Contains(item);
+
+            public void CopyTo(Diagnostic[] array, int arrayIndex) => inner.CopyTo(array, arrayIndex);
+
+            public bool Remove(Diagnostic item) => inner.Remove(item);
+
+            public IEnumerator<Diagnostic> GetEnumerator() => inner.GetEnumerator();
+
+            System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
         }
 
         // The other files the same container read, in the same folder.

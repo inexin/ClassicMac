@@ -70,6 +70,9 @@ namespace ClassicMac.Files
         public ContainerContext For(MacString? hostName, Func<IEnumerable<MacFile>>? siblings) =>
             new(Options, Diagnostics, hostName, siblings);
 
+        // The same context with problems going to another sink.
+        internal ContainerContext WithDiagnostics(ICollection<Diagnostic> diagnostics) => new(Options, diagnostics, HostName, Siblings);
+
         /// <summary>Records a problem.</summary>
         public void Report(DiagnosticSeverity severity, string code, string message, long? offset = null) =>
             Diagnostics.Add(new Diagnostic(severity, code, message, offset));
