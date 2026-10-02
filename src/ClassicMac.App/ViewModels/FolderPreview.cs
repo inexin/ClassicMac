@@ -22,7 +22,8 @@ namespace ClassicMac.App.ViewModels
     /// </summary>
     internal static class FolderPreviews
     {
-        private static readonly FourCC Zsys = FourCC.FromString("zsys"), Ffil = FourCC.FromString("FFIL"), Macs = FourCC.FromString("MACS");
+        private static readonly FourCC Zsys = FourCC.FromString("zsys"), Zsyr = FourCC.FromString("zsyr"), Ffil = FourCC.FromString("FFIL"),
+            Macs = FourCC.FromString("MACS"), Pref = FourCC.FromString("pref");
         private static readonly HashSet<string> ApplicationTypes = ["APPL", "APPC", "APPD", "appe"];
         private static readonly byte[] IconFileName = "Icon\r"u8.ToArray();
 
@@ -37,17 +38,24 @@ namespace ClassicMac.App.ViewModels
             if (Locate(node) is not var (holder, path)) return null;
             sources ??= DialogSources.None;
             var volume = Volumes.GetValue(holder, h => new Volume(h, readOptions));
-            var window = volume.Window(path, sources);
+            var (window, resolver) = volume.Window(path, sources);
             var fonts = volume.Fonts ?? sources.Fonts;
-            var bitmap = FinderWindowRenderer.Render(window, new FinderWindowOptions
+            var preferences = volume.Preferences ?? FinderPreferences.Default;
+            var finderOptions = new FinderWindowOptions
             {
                 ScreenDepth = options.ScreenDepth,
                 QuickDraw = options.QuickDraw == ResourceManagerModel.Rom68k ? QuickDrawVersion.MacRom : QuickDrawVersion.MacOS9,
+                LabelFontId = preferences.ViewsFontId,
+                LabelFontSize = preferences.ViewsFontSize,
+                LabelColors = resolver.LabelColors,
                 Fonts = fonts,
                 TextFallback = SystemTextFallback.Instance,
-            });
-            int count = window.Items.Count(i => !i.IsInvisible);
-            var caption = string.Create(CultureInfo.InvariantCulture, $"{count} item{(count == 1 ? "" : "s")}");
+            };
+            var bitmap = FinderWindowRenderer.Render(window, finderOptions);
+            int count = FinderWindowRenderer.Place(window, finderOptions).Count;
+            // Views other than large icons are drawn as large icons; the caption says which the Finder would use.
+            var view = window.View.Kind == FinderViewKind.LargeIcon ? "" : $"; {window.View.Name}, shown as icons";
+            var caption = string.Create(CultureInfo.InvariantCulture, $"{count} item{(count == 1 ? "" : "s")}{view}");
             return new PreviewImage(PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels), bitmap.Width, bitmap.Height, caption);
         }
 
@@ -100,16 +108,22 @@ namespace ClassicMac.App.ViewModels
                         // Unreadable here means read as files only: folders preview with grid placement.
                     }
                 }
-                // The System files on the volume: generic icons and the label font. [ClassicMac: Mac OS keeps them there]
-                foreach (var system in files.Where(f => f.FinderInfo.Type == Zsys && f.FinderInfo.Creator == Macs))
+                // The System and System Resources files on the volume: system icons, badges, label colours and the views
+                // font; the Finder Preferences file: the views font's family and size. [ClassicMac: Mac OS keeps them there]
+                foreach (var system in files.Where(f => (f.FinderInfo.Type == Zsys || f.FinderInfo.Type == Zsyr) && f.FinderInfo.Creator == Macs))
                     if (Fork(system) is { } fork) systemForks.Add(fork);
+                foreach (var file in files.Where(f => f.FinderInfo.Type == Pref && f.FinderInfo.Creator == Macs && f.Name.ToMacRoman() == "Finder Preferences"))
+                    if (Preferences is null && Fork(file) is { } fork) Preferences = FinderPreferences.FromFork(fork, readOptions);
                 fonts = new(LoadFonts);
             }
 
             public FontLibrary? Fonts => fonts.Value;
 
-            // The window of the folder at `path`: its record's rectangle and scroll, and its items.
-            public FinderWindow Window(IReadOnlyList<string> path, DialogSources sources)
+            // The views font from the volume's Finder Preferences, if it has one.
+            public FinderPreferences? Preferences { get; }
+
+            // The window of the folder at `path`: its record's rectangle, scroll and view, and its items.
+            public (FinderWindow Window, FinderIconResolver Resolver) Window(IReadOnlyList<string> path, DialogSources sources)
             {
                 var key = Key(path);
                 var resolver = Resolver(sources);
@@ -120,8 +134,9 @@ namespace ClassicMac.App.ViewModels
                 {
                     seen.Add(folder.Name.ToMacRoman());
                     var info = folder.FinderInfo;
-                    var icon = resolver.Find(FinderItemKind.Folder, default, default, (ushort)info.Flags, () => IconFile(folder.Path));
-                    items.Add(new FinderWindowItem(folder.Name, info.Location, (ushort)info.Flags, icon.Suite, FinderItemKind.Folder));
+                    var icon = resolver.Find(FinderItemKind.Folder, default, default, (ushort)info.Flags, () => IconFile(folder.Path),
+                        (ushort)(((byte)info.Script << 8) | (byte)info.ExtendedFlags));
+                    items.Add(new FinderWindowItem(folder.Name, info.Location, (ushort)info.Flags, icon.Suite, FinderItemKind.Folder) { Badges = icon.Badges });
                 }
                 foreach (var file in files.Where(f => f.FolderPath.Count > path.Count && Key(f.FolderPath.Take(path.Count)) == key))
                 {
@@ -133,11 +148,23 @@ namespace ClassicMac.App.ViewModels
                 {
                     var finder = file.FinderInfo;
                     var kind = ApplicationTypes.Contains(finder.Type.ToString()) ? FinderItemKind.Application : FinderItemKind.Document;
-                    var icon = resolver.Find(kind, finder.Type, finder.Creator, (ushort)finder.Flags, () => Fork(file));
-                    items.Add(new FinderWindowItem(file.Name, finder.Location, (ushort)finder.Flags, icon.Suite, kind));
+                    // The extended Finder flags: FXInfo +8, a word over fdScript and fdXFlags (Finder.h, ExtendedFileInfo).
+                    var extended = finder.Extended.Span is { Length: >= 10 } x ? (ushort)((x[8] << 8) | x[9]) : (ushort)0;
+                    var icon = resolver.Find(kind, finder.Type, finder.Creator, (ushort)finder.Flags, () => Fork(file), extended, file.IsLocked);
+                    items.Add(new FinderWindowItem(file.Name, finder.Location, (ushort)finder.Flags, icon.Suite, kind) { Badges = icon.Badges });
                 }
-                var record = folders.GetValueOrDefault(key)?.FinderInfo ?? FolderFinderInfo.Empty;
-                return new FinderWindow { Bounds = record.WindowBounds, ScrollPosition = record.ScrollPosition, Items = items };
+                var self = folders.GetValueOrDefault(key);
+                var record = self?.FinderInfo ?? FolderFinderInfo.Empty;
+                var window = new FinderWindow
+                {
+                    Bounds = record.WindowBounds,
+                    ScrollPosition = record.ScrollPosition,
+                    Flags = (ushort)record.Flags,
+                    IsVolumeRoot = self?.IsRoot == true,
+                    View = FinderView.Read(record.View, record.Script, record.OpenChain),
+                    Items = items,
+                };
+                return (window, resolver);
             }
 
             // One resolver per volume, made again when the open files with generic icons change.

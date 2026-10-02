@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Viewer: folder previews follow the Mac OS 9 Finder's own rules (traced in Finder 9.2.2, checked on Mac OS 9.0, where
+  a folder-art window now matches the Finder's screenshot pixel for pixel): the window is `frRect`'s content with the
+  21-pixel header pane and the scroll bars' place, used only when the folder has been inited (else the Finder's
+  404 × 218 default window and scroll); positions follow `kHasBeenInited` and the +20000 rule, and items without one
+  are arranged in the Finder's 128 × 64 grid around the placed icons and names; names are in the views font (Geneva 10,
+  or the volume's Finder Preferences) at the Finder's label geometry; icons carry their colour label and the alias,
+  lock and custom badges; icons come from `GetIconRef`'s order (stationery, alias types, the system's creators, the
+  System's `'isrv'` icon mapping table and the `'icns'` in System Resources); the volume's own files are left out of its
+  root window; views other than large icons are named in the caption (file-systems/finder-windows.md).
 - Files: HFS and HFS Plus files say whether they are locked (`MacFile.IsLocked`: `filFlags` bit 0, the catalog's
   file-locked flag) (file-systems/hfs.md §5.2, hfs-plus.md §5.1).
 - Files: a disk image or volume whose first file is a `.hqx` or `.uu` file within 64 KB of its start is read as the
