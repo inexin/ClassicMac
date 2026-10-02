@@ -175,7 +175,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Core | `BigEndianReader`, `BigEndianWriter` | Cursor-based, allocation-free readers over `ReadOnlySpan<byte>` and writers over `Span<byte>`; big-endian scalar and Mac value reads/writes, with position, remaining length and checked bounds |
 | Files | `FinderInfo`, `FinderFlags` | `FInfo` fields and the raw 16 bytes of `FXInfo` |
 | Files | `MacFile` | Name, folder path inside its container (`MacPath` joins it with `:`), Finder info, dates, and both forks as `ForkData` (opened on demand) |
-| Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy |
+| Files | `ForkData` | A fork opened on demand: from bytes, a host file, or a `Slice` of another fork (no copy), so containers and disk images stay lazy; `ReadAt` reads in place (a host file through one handle kept open between reads, closed when idle or before a save replaces it) |
 | Files | `IContainerReader` | One per container format: `CanRead(ForkData)`, `Read(ForkData, ContainerContext)` → Mac files |
 | Files.Containers | `AppleSingleReader`, `MacBinaryReader`, `BinHexReader`, `PcExchange` | AppleSingle/AppleDouble v1–v2, MacBinary I/II/III (one reader per version), BinHex 4.0, PC Exchange records |
 | Files.Hfs | `HfsReader`, `MfsReader`, `DiskCopy42Reader`, `NdifReader`, `DartReader`, `UdifReader`, `PartitionMapReader` | HFS and MFS volumes (forks read in place through their extents), Disk Copy 4.2, UDIF, NDIF (chunks decoded on demand, segments joined) and DART images, Apple partition maps; each yields files the next can open |
@@ -187,7 +187,7 @@ read and write a fork; `ResourceDecompression` returns a resource's data as the 
 | Files | `MacFileResources` | A file's resources: its resource fork, or a data fork that is a clean resource fork (Realmz `.rsf`), or a plain file read as a fork when its header describes one; shared by the CLI and the app |
 | Core | `HostNames` | Mac names as safe, distinct host names (`%XX` escapes, reserved Windows names, collisions, length) and type folder names, shared by `unpack` and `extract`; SheepShaver's own naming for Basilisk II folders |
 | Files.Containers | `AppleDoubleWriter` | AppleDouble v2 `._` files: real name, dates, Finder info, resource fork |
-| Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree |
+| Files | `ContainerUnwrapper` | Tries the readers on each data fork and recurses, giving a `ContainerNode` tree; or reads a number of levels (a container holding one file does not count) and leaves the containers below unread (`UnreadFormat`) for `Expand`. Diagnostics from inside a nested file carry its `Location` |
 | Files | `ContainerReadOptions` | Unwrapping limits and the time zone (see Configuration) |
 | Resources | `Resource` | Type, ID, optional name, attributes, and data as stored (a slice of the fork read) |
 | Resources | `ResourceFork` | Resources in read order, map attributes, the reserved header areas and the map's runtime handle and file reference (kept so such forks round-trip exactly); add, remove, renumber, find |
@@ -463,7 +463,8 @@ like ResEdit, read-only at first.
   which the libraries could later reach through WebAssembly on their own), .NET MAUI (no Linux desktop), and a native
   UI per platform (three UIs).
 - **Browse:** open a disk image, archive or file; a tree of volumes → folders → files, showing type/creator, dates and
-  both forks; nested containers open in place.
+  both forks; nested containers open in place. Opening reads one level: archives and disk images inside are read when
+  their node is first expanded, and exports read them all (a 500 MB disk with 5,000 files opens in under a second).
 - **Resources:** a file's resource fork as types → resources, with ID, name, size and attributes; search by type, ID
   or name.
 - **Previews:** images (with a screen-depth switch), text, sound playback, font glyph sheet, dialogs drawn from

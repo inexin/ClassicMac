@@ -63,6 +63,86 @@ public class MainViewModelTests : IDisposable
         Assert.Empty(Child<FileNode>(input, "Read Me").Children); // no resources, no expander
     }
 
+    // An HFS disk holding containers: "Big" (70 KB, first, so the BinHex text is past where a BinHex reader looks),
+    // "Wrap.bin" (MacBinary of "Inner", with STR# 128 in its resource fork) and "Docs:Bad.hqx" (BinHex whose data
+    // CRC is wrong).
+    private string ContainerDisk()
+    {
+        var inner = new ClassicMac.Files.MacFile
+        {
+            Name = MacString.FromMacRoman("Inner"),
+            DataFork = ClassicMac.Files.ForkData.FromBytes("inner"u8.ToArray()),
+            ResourceFork = ClassicMac.Files.ForkData.FromBytes(Fork(("STR#", 128, null, [0, 0]))),
+        };
+        var text = ClassicMac.Files.Containers.BinHexWriter.ToText(new ClassicMac.Files.MacFile
+        {
+            Name = MacString.FromMacRoman("Note"), DataFork = ClassicMac.Files.ForkData.FromBytes(new byte[300]),
+        }).ToCharArray();
+        var data = Array.LastIndexOf(text, ':') - 20;
+        text[data] = text[data] == 'A' ? 'B' : 'A';
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Big", new byte[70_000], []);
+        disk.File(HfsBuilder.Root, "Wrap.bin", ClassicMac.Files.Containers.MacBinaryWriter.ToArray(inner), []);
+        disk.File(disk.Folder(HfsBuilder.Root, "Docs"), "Bad.hqx", System.Text.Encoding.ASCII.GetBytes(text), []);
+        var path = Path.Combine(folder, "containers.img");
+        File.WriteAllBytes(path, disk.Build("Disk"));
+        return path;
+    }
+
+    [Fact]
+    public async Task Containers_on_a_disk_are_read_when_expanded()
+    {
+        var model = new MainViewModel();
+
+        var input = (await model.OpenAsync(ContainerDisk()))!;
+
+        var wrap = Child<ContainerFileNode>(input, "Wrap.bin (MacBinary III)");
+        Assert.Equal(NodeKind.Loading, Assert.Single(wrap.Children).Kind);
+        Assert.Empty(model.Diagnostics);
+
+        wrap.IsExpanded = true;
+        await wrap.EnsureLoadedAsync();
+
+        var file = Child<FileNode>(wrap, "Inner");
+        await file.EnsureLoadedAsync();
+        Assert.Equal(["'STR#' (1)"], file.Children.Select(c => c.Title));
+        Assert.Equal("MacBinary III", file.Node.Format);
+    }
+
+    [Fact]
+    public async Task A_container_reports_its_problems_at_its_node_when_read()
+    {
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(ContainerDisk()))!;
+        var bad = Child<ContainerFileNode>(Child<FolderNode>(input, "Docs"), "Bad.hqx (BinHex 4.0)");
+
+        await bad.EnsureLoadedAsync();
+
+        Assert.NotEmpty(model.Diagnostics);
+        Assert.All(model.Diagnostics, d => Assert.Same(bad, d.Node));
+        Assert.All(model.Diagnostics, d => Assert.Equal(bad.Source, d.Source));
+    }
+
+    [Fact]
+    public async Task Problems_inside_nested_files_name_the_file()
+    {
+        var model = new MainViewModel();
+        var path = Path.Combine(folder, "outer.bin");
+        var bad = File.ReadAllBytes(ContainerDisk()); // the disk, MacBinary-wrapped: its files are one level further in
+        File.WriteAllBytes(path, ClassicMac.Files.Containers.MacBinaryWriter.ToArray(new ClassicMac.Files.MacFile
+        {
+            Name = MacString.FromMacRoman("Disk"), DataFork = ClassicMac.Files.ForkData.FromBytes(bad),
+        }));
+        var input = (await model.OpenAsync(path))!;
+        var disk = Child<ContainerFileNode>(input, "Disk (HFS volume)");
+        var hqx = Child<ContainerFileNode>(Child<FolderNode>(disk, "Docs"), "Bad.hqx (BinHex 4.0)");
+
+        await hqx.EnsureLoadedAsync();
+
+        Assert.NotEmpty(model.Diagnostics);
+        Assert.All(model.Diagnostics, d => Assert.Equal(hqx.Source, d.Source));
+    }
+
     [Fact]
     public async Task Details_follow_the_selection()
     {

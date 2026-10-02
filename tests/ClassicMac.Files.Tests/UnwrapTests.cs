@@ -111,11 +111,13 @@ public class UnwrapTests
         var shallow = ContainerUnwrapper.Default.Unwrap(
             new MacFile { Name = MacString.FromMacRoman("Vol"), DataFork = ForkData.FromBytes(Volume()) }, "host file", context, levels: 1);
 
+        // MacBinary holds one file, BinHex too: neither uses up the level (see below).
         var wrap = ContainerUnwrapper.Default.Expand(Named(shallow, "Wrap.bin"), context, levels: 1);
         Assert.Null(wrap.UnreadFormat);
         var inner = Assert.Single(wrap.Children);
         Assert.Equal("Inner.hqx", inner.File.Name.ToMacRoman());
-        Assert.Equal("BinHex 4.0", inner.UnreadFormat);
+        Assert.Null(inner.UnreadFormat);
+        Assert.Equal("Note", Assert.Single(inner.Children).File.Name.ToMacRoman());
 
         var full = ContainerUnwrapper.Default.Expand(shallow, context);
         var whole = ContainerUnwrapper.Default.Unwrap(
@@ -123,6 +125,32 @@ public class UnwrapTests
         Assert.Equal(Shape(whole), Shape(full));
         Assert.DoesNotContain(full.Leaves(), l => l.UnreadFormat is not null);
         Assert.Same(Named(shallow, "Plain"), Named(full, "Plain"));
+    }
+
+    // A container holding one file (a wrapper, a disk image's disk) does not use up a level: its file is read too,
+    // since showing the container means showing that file's contents. Here a disk image on a volume holds a disk with
+    // a MacBinary file: expanding the image one level reads the disk, and leaves the MacBinary file unread.
+    [Fact]
+    public void A_container_holding_one_file_does_not_use_up_a_level()
+    {
+        var inner = new HfsBuilder();
+        inner.File(HfsBuilder.Root, "Wrap.bin", MacBinary(2, "Deep", "x"u8.ToArray(), []), []);
+        inner.File(HfsBuilder.Root, "Text", "t"u8.ToArray(), []);
+        var outer = new HfsBuilder();
+        outer.File(HfsBuilder.Root, "Disk.image", DiskCopy42("Inner", inner.Build("Inner")), []);
+        outer.File(HfsBuilder.Root, "Other", "o"u8.ToArray(), []);
+        var context = new ContainerContext(null, []);
+        var root = ContainerUnwrapper.Default.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("Outer"), DataFork = ForkData.FromBytes(outer.Build("Outer")) }, "host file", context, levels: 1);
+        var image = Named(root, "Disk.image");
+        Assert.Equal("DiskCopy 4.2", image.UnreadFormat);
+
+        var read = ContainerUnwrapper.Default.Expand(image, context, levels: 1);
+
+        var disk = Assert.Single(read.Children);
+        Assert.Null(disk.UnreadFormat);
+        Assert.Equal("MacBinary II", Named(disk, "Wrap.bin").UnreadFormat);
+        Assert.Null(Named(disk, "Text").UnreadFormat);
     }
 
     // The formats and names of a tree, depth first.

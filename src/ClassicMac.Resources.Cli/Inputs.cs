@@ -111,7 +111,8 @@ namespace ClassicMac.Resources.Cli
                 if (d.Severity == DiagnosticSeverity.Error || (strict && d.Severity == DiagnosticSeverity.Warning)) Failed = true;
                 if (quiet && d.Severity != DiagnosticSeverity.Error) continue;
                 var at = d.Offset is { } offset ? $" at {offset}" : "";
-                error.WriteLine($"{source}: {d.Severity.ToString().ToLowerInvariant()}{at}: {d.Message} [{d.Code}]");
+                var where = d.Location is { } location ? $"{source} > {location}" : source;
+                error.WriteLine($"{where}: {d.Severity.ToString().ToLowerInvariant()}{at}: {d.Message} [{d.Code}]");
             }
         }
 

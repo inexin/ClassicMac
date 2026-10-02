@@ -151,6 +151,33 @@ public class ExportTests : IDisposable
         Assert.StartsWith("4 resources from 2 files", model.Status, StringComparison.Ordinal);
     }
 
+    // Containers on a disk open unread, but exporting the disk reads them: "Wrap.bin" is MacBinary holding "Inner" (a
+    // fork with ICN# 128), next to "Other".
+    [Fact]
+    public async Task Extract_all_reads_the_containers_not_yet_expanded()
+    {
+        var inner = new MacFile
+        {
+            Name = ClassicMac.Core.MacString.FromMacRoman("Inner"),
+            ResourceFork = ForkData.FromBytes(PreviewTests.Fork(("ICN#", 128, null, new byte[256]))),
+        };
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Wrap.bin", ClassicMac.Files.Containers.MacBinaryWriter.ToArray(inner), []);
+        disk.File(HfsBuilder.Root, "Other", "o"u8.ToArray(), []);
+        var path = Path.Combine(folder, "Wrapped.img");
+        File.WriteAllBytes(path, disk.Build("Wrapped"));
+        var output = Directory.CreateDirectory(Path.Combine(folder, "out")).FullName;
+        var model = new MainViewModel { FilePicker = new Picker(output) };
+        var input = (await model.OpenAsync(path))!;
+        Assert.Equal(NodeKind.Loading, Assert.Single(input.Children.OfType<ContainerFileNode>().Single().Children).Kind);
+        model.Selected = input;
+
+        await model.ExtractAllCommand.ExecuteAsync(null);
+
+        Assert.Contains("ICN#/128.png", Files(Path.Combine(output, "Wrapped resources")));
+        Assert.StartsWith("1 resources from 1 files", model.Status, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task A_folder_unpacks_only_its_files()
     {

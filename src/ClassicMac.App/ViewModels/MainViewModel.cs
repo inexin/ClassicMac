@@ -128,13 +128,14 @@ namespace ClassicMac.App.ViewModels
                 {
                     var context = new ContainerContext(ContainerOptions, diagnostics);
                     var hostFile = HostFiles.Read(path, ContainerOptions, diagnostics);
+                    // One level: the containers inside (archives, disk images on a disk) are read when expanded.
                     var tree = ContainerUnwrapper.Default.Unwrap(hostFile.File, HostFiles.FormatName(hostFile.Layout),
-                        context.For(null, HostFiles.Siblings(path, ContainerOptions, diagnostics)));
+                        context.For(null, HostFiles.Siblings(path, ContainerOptions, diagnostics)), levels: 1);
                     return (hostFile, tree);
                 });
-                var input = new InputNode(path, host, root, ReadOptions, Report);
+                var input = new InputNode(path, host, root, ContainerOptions, ReadOptions, Report);
                 Roots.Add(input);
-                foreach (var d in diagnostics) Report(new DiagnosticEntry(d, input.Title, input));
+                foreach (var d in diagnostics) Report(new DiagnosticEntry(d, Tree.SourceOf(input, d), input));
                 Selected = input;
                 input.IsExpanded = true;
                 var files = root.Leaves().Count();

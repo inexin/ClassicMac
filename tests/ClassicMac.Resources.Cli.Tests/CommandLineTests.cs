@@ -94,6 +94,24 @@ public class CommandLineTests
         return path;
     }
 
+    // A problem inside a nested file names it after the input: MacBinary holding a damaged BinHex file.
+    [Fact]
+    public void Diagnostics_inside_nested_files_name_the_file()
+    {
+        var note = new MacFile { Name = MacString.FromMacRoman("Note"), DataFork = ForkData.FromBytes(new byte[300]) };
+        var text = ClassicMac.Files.Containers.BinHexWriter.ToText(note).ToCharArray();
+        var data = Array.LastIndexOf(text, ':') - 20; // inside the encoded data: its CRC no longer matches
+        text[data] = text[data] == 'A' ? 'B' : 'A';
+        var hqx = new MacFile { Name = MacString.FromMacRoman("Inner.hqx"), DataFork = ForkData.FromBytes(System.Text.Encoding.ASCII.GetBytes(text)) };
+        var path = Path.Combine(Directory.CreateTempSubdirectory("classicmac-").FullName, "Wrap.bin");
+        File.WriteAllBytes(path, ClassicMac.Files.Containers.MacBinaryWriter.ToArray(hqx));
+
+        var (_, _, error) = Run("list", path);
+
+        Assert.Contains("Wrap.bin > Inner.hqx: ", error);
+        Assert.DoesNotContain("Wrap.bin: ", error);
+    }
+
     [Fact]
     public void List_prints_each_resource()
     {

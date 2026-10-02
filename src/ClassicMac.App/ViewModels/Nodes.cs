@@ -79,12 +79,14 @@ namespace ClassicMac.App.ViewModels
     /// <summary>An opened host file: its layout, companions and the diagnostics of reading it.</summary>
     public sealed class InputNode : NodeViewModel
     {
-        internal InputNode(string path, HostFile host, ContainerNode root, ReadOptions options, Action<DiagnosticEntry> report)
+        internal InputNode(string path, HostFile host, ContainerNode root, ContainerReadOptions containerOptions, ReadOptions options,
+            Action<DiagnosticEntry> report)
             : base(System.IO.Path.GetFileName(path), NodeKind.Input, null)
         {
             Path = path;
             Host = host;
             Root = root;
+            ContainerOptions = containerOptions;
             Options = options;
             Report = report;
             if (root.Children.Count > 0) Tree.AddContents(this, root.Children);
@@ -98,6 +100,8 @@ namespace ClassicMac.App.ViewModels
         public ContainerNode Root { get; }
 
         internal ReadOptions Options { get; }
+
+        internal ContainerReadOptions ContainerOptions { get; }
 
         internal Action<DiagnosticEntry> Report { get; }
 
@@ -122,21 +126,45 @@ namespace ClassicMac.App.ViewModels
             Root.Children.Count > 0 ? Task.CompletedTask : FileNode.LoadResourcesAsync(this, Root.File, raw: Host.Layout == HostLayout.Plain);
     }
 
-    /// <summary>A file that is itself a container (a disk image, a MacBinary file, …): what it holds, by folder.</summary>
+    /// <summary>
+    /// A file that is itself a container (a disk image, a MacBinary file, …): what it holds, by folder. One that was
+    /// opened unread (inside a disk or an archive) is read when it is first expanded.
+    /// </summary>
     public sealed class ContainerFileNode : NodeViewModel
     {
         internal ContainerFileNode(NodeViewModel parent, ContainerNode node)
-            : base($"{node.File.Name.ToMacRoman()} ({node.Children[0].Format})", NodeKind.Container, parent)
+            : base($"{node.File.Name.ToMacRoman()} ({ContentFormatOf(node)})", NodeKind.Container, parent)
         {
             Node = node;
-            Tree.AddContents(this, node.Children);
+            if (node.UnreadFormat is not null) Children.Add(new LoadingNode(this));
+            else Tree.AddContents(this, node.Children);
         }
 
-        public ContainerNode Node { get; }
+        /// <summary>The container as read so far (its contents once it has been expanded).</summary>
+        public ContainerNode Node { get; private set; }
 
         public MacFile File => Node.File;
 
+        /// <summary>The container format of the file's data fork.</summary>
+        public string ContentFormat => ContentFormatOf(Node);
+
         public override string Source => $"{Parent!.Source} › {Node.File.Name.ToMacRoman()}";
+
+        private static string ContentFormatOf(ContainerNode node) => node.UnreadFormat ?? node.Children[0].Format;
+
+        // Reads the container one level down, off the UI thread, then shows what it holds.
+        protected override async Task LoadAsync()
+        {
+            if (Node.UnreadFormat is null) return;
+            var diagnostics = new List<Diagnostic>();
+            var options = Input.ContainerOptions;
+            var siblings = Tree.Siblings(this);
+            var node = Node;
+            Node = await Task.Run(() => ContainerUnwrapper.Default.Expand(node, new ContainerContext(options, diagnostics, siblings: siblings), levels: 1));
+            Children.Clear();
+            Tree.AddContents(this, Node.Children);
+            foreach (var d in diagnostics) Input.Report(new DiagnosticEntry(d, Tree.SourceOf(this, d), this));
+        }
     }
 
     /// <summary>A folder inside a volume or archive.</summary>
@@ -263,8 +291,24 @@ namespace ClassicMac.App.ViewModels
             foreach (var child in contents)
             {
                 var into = FolderFor(child.File.FolderPath);
-                into.Children.Add(child.Children.Count > 0 ? new ContainerFileNode(into, child) : new FileNode(into, child));
+                into.Children.Add(child.Children.Count > 0 || child.UnreadFormat is not null ? new ContainerFileNode(into, child) : new FileNode(into, child));
             }
+        }
+
+        // Where a diagnostic found while reading under a node came from: the node, and the nested file it is about.
+        public static string SourceOf(NodeViewModel node, Diagnostic diagnostic) =>
+            diagnostic.Location is { } location ? $"{node.Source} › {location}" : node.Source;
+
+        // The files beside a container file in the container that holds it, in the same folder (for formats split
+        // across files, such as segmented disk images).
+        public static Func<IEnumerable<MacFile>> Siblings(ContainerFileNode node)
+        {
+            NodeViewModel? at = node.Parent;
+            while (at is FolderNode) at = at.Parent;
+            var holder = at switch { InputNode input => input.Root, ContainerFileNode container => container.Node, _ => null };
+            var file = node.File;
+            return () => holder is null ? []
+                : holder.Children.Select(c => c.File).Where(f => !ReferenceEquals(f, file) && f.FolderPath.SequenceEqual(file.FolderPath));
         }
     }
 }

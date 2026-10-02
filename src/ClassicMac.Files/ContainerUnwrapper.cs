@@ -95,8 +95,10 @@ namespace ClassicMac.Files
         /// <summary>
         /// Unwraps <paramref name="file"/>, reading at most <paramref name="levels"/> levels of containers: a file below
         /// them whose data fork is a container is only recognised, and left with its
-        /// <see cref="ContainerNode.UnreadFormat"/> set. Browsing reads one level at a time, so opening a disk does not
-        /// decompress every archive on it.
+        /// <see cref="ContainerNode.UnreadFormat"/> set. A container holding one file (a MacBinary or BinHex wrapper, a
+        /// disk image's disk) does not use up a level: its file is read too, since showing the container means showing
+        /// that file's contents. Browsing reads one level at a time, so opening a disk does not decompress every archive
+        /// on it.
         /// </summary>
         public ContainerNode Unwrap(MacFile file, string format, ContainerContext context, int levels)
         {
@@ -192,8 +194,10 @@ namespace ClassicMac.Files
                         $"Unwrapping produced more than {context.Options.MaxExpandedBytesPerInput} bytes; stopped.");
                     break;
                 }
+                // A container holding one file (a wrapper, a disk image's disk) does not use up a level.
+                var below = levels == int.MaxValue || contents.Count == 1 ? levels : levels - 1;
                 children.Add(Unwrap(inner, reader.FormatName, outer.For(null, () => SiblingsOf(contents, inner)), depth + 1,
-                    levels == int.MaxValue ? levels : levels - 1, Within(location, inner), ref expanded));
+                    below, Within(location, inner), ref expanded));
             }
             return new ContainerNode(format, file, children);
         }

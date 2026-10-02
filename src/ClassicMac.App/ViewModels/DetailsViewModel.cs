@@ -30,7 +30,7 @@ namespace ClassicMac.App.ViewModels
         public static DetailsViewModel For(NodeViewModel? node) => node switch
         {
             InputNode input => Input(input),
-            ContainerFileNode container => File(container.File, container.Node.Format, container.Node.Children[0].Format, null),
+            ContainerFileNode container => File(container.File, container.Node.Format, container.ContentFormat, null),
             FileNode file => File(file.File, file.Node.Format, null, file.Resources),
             FolderNode folder => new DetailsViewModel(folder.Title, [new("Kind", "Folder"), new("Items", folder.Children.Count.ToString(CultureInfo.InvariantCulture))]),
             ResourceTypeNode type => Type(type),

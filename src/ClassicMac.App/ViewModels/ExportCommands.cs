@@ -79,7 +79,7 @@ namespace ClassicMac.App.ViewModels
         private Task ExtractAll() => Run(async () =>
         {
             if (Selected is not { } node || await PickFolder("Extract all resources to") is not { } parent) return;
-            var root = Subtree(node);
+            var root = await Whole(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " resources");
             var total = root.Leaves().Count();
             var progress = new StatusProgress(this, n => $"Extracting {n} of {total} files…");
@@ -103,7 +103,7 @@ namespace ClassicMac.App.ViewModels
         private Task ConvertDocuments() => Run(async () =>
         {
             if (Selected is not { } node || await PickFolder("Convert documents to") is not { } parent) return;
-            var root = Subtree(node);
+            var root = await Whole(node);
             var name = HostNames.ToHostName(MacString.FromMacRoman(NameOf(node)));
             var diagnostics = new List<(string Source, Diagnostic Diagnostic)>();
             var (target, result) = await Task.Run(() =>
@@ -140,7 +140,7 @@ namespace ClassicMac.App.ViewModels
         private Task Unpack(HostLayout layout) => Run(async () =>
         {
             if (Selected is not { } node || await PickFolder("Unpack to") is not { } parent) return;
-            var root = Subtree(node);
+            var root = await Whole(node);
             var target = ExportFolders.CreateNew(parent, HostNames.ToHostName(MacString.FromMacRoman(NameOf(node))) + " unpacked");
             var total = root.Leaves().Count();
             var progress = new StatusProgress(this, n => $"Unpacking {n} of {total} files…");
@@ -254,6 +254,18 @@ namespace ClassicMac.App.ViewModels
             FileNode f => f.File.Name.ToMacRoman(),
             _ => node.Title,
         };
+
+        // The part of the tree a node stands for with the containers not yet expanded read (off the UI thread), as
+        // exports take everything; what reading them finds is reported at the node.
+        private async Task<ContainerNode> Whole(NodeViewModel node)
+        {
+            var part = Subtree(node);
+            var diagnostics = new List<Diagnostic>();
+            var options = ContainerOptions;
+            var whole = await Task.Run(() => ContainerUnwrapper.Default.Expand(part, new ContainerContext(options, diagnostics)));
+            foreach (var d in diagnostics) Report(new DiagnosticEntry(d, Tree.SourceOf(node, d), node));
+            return whole;
+        }
 
         // The part of the tree a node stands for, as a tree the exporters take: an input or container as it is; a folder
         // as the files and containers under it (folder paths shortened to below it); a file alone.

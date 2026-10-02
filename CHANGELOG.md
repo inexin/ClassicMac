@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Viewer: opening a disk reads its files, not what is inside them: archives and disk images on it are read when their
+  node is first expanded (a 500 MB Mac OS 9 disk opens in under a second instead of 22 s); exports still read
+  everything. Problems found inside a nested file name it (`disk.hfv › Disks:Tools.img`).
+- CLI: a diagnostic from inside a nested file names it after the input (`disk.hfv > Disks:Tools.img: …`).
+- Files: `ForkData.ReadAt` reads without opening a stream or copying, and a host file stays open between reads, so
+  probing a disk's files for containers is about six times faster. `ContainerUnwrapper.Unwrap(…, levels)` and
+  `Expand` read containers a level at a time; `Diagnostic.Location` names the nested file a problem is in.
 - Host folders: a file's own Basilisk II (`.rsrc`/`.finf`) or AppleDouble companions win over a `FINDER.DAT` or
   `RESOURCE.FRK` in its folder, so an unpacked Mac folder that holds a `FINDER.DAT` reads back as written
   (containers/host-folders.md §2.1).
