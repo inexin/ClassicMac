@@ -33,7 +33,7 @@
 - Hex editing in the hex view: Edit Bytes types hex digits over or into a resource's bytes, with Delete, Backspace and
   cursor keys, applied as one undoable edit.
 - Resource forks: a map offset past the end of the fork is recovered from the end of the data area, as ResEdit does
-  (`fork.map-recovered`; resources/resource-fork.md §9). A damaged fork opened this way saves as a clean one.
+  (`fork.map-recovered`; resources/resource-fork.md §5.3). A damaged fork opened this way saves as a clean one.
 - Templates: resources without a form of their own are edited through a `TMPL` from their file or any other open
   file, as ResEdit 2.1.3 reads and writes them; `ResourceTemplate` in the decoders library (resources/templates.md).
 - Editor II, import: Resource ▸ Import Image or Sound makes a `PICT`, `cicn`, icon, icon family or cursor from an image

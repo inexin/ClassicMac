@@ -52,7 +52,7 @@ QuickDraw].
 
 The same structure appears inside pictures, colour icons and pixel patterns ([pict.md](../graphics/pict.md),
 [icons.md](icons.md)), and as the window, dialog and control colour tables of
-[windows-dialogs.md](windows-dialogs.md#1-layout), where the value is a part code.
+[windows-dialogs.md §1.6](windows-dialogs.md#16-colour-tables-wctb-dctb-actb), where the value is a part code.
 
 ### 1.2 Palettes (pltt)
 

@@ -127,8 +127,8 @@ The classic IDs [Doc: Inside Macintosh: Macintosh Toolbox Essentials], and the A
 ### 1.6 Colour tables (wctb, dctb, actb)
 
 A window's, a dialog's and an alert's colours, by the `'WIND'`, `'DLOG'` and `'ALRT'` ID; a control's `'cctb'` has the
-same layout ([controls.md §1](controls.md#1-layout)) [Doc: Inside Macintosh: Macintosh Toolbox Essentials] [Code]. It is
-the `ColorTable` of a `'clut'` ([palettes.md §1](palettes.md#1-layout)), with part codes for values:
+same layout ([controls.md §1.2](controls.md#12-control-colour-tables-cctb)) [Doc: Inside Macintosh: Macintosh Toolbox Essentials] [Code]. It is
+the `ColorTable` of a `'clut'` ([palettes.md §1.1](palettes.md#11-colour-tables-clut)), with part codes for values:
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
@@ -203,7 +203,7 @@ short one [Code].
 | Template | By its own ID | By its item list's ID |
 | --- | --- | --- |
 | `'WIND'` | `'wctb'` | — |
-| `'DLOG'` | `'dctb'`, `'dlgx'` | `'DITL'`, `'ictb'` ([dialog-items.md §1](dialog-items.md#1-layout)) |
+| `'DLOG'` | `'dctb'`, `'dlgx'` | `'DITL'`, `'ictb'` ([dialog-items.md §1.3](dialog-items.md#13-item-colours-and-fonts-ictb)) |
 | `'ALRT'` | `'actb'`, `'alrx'` | `'DITL'`, `'ictb'` |
 | `'CNTL'` | `'cctb'` ([controls.md](controls.md)) | — |
 
@@ -314,7 +314,7 @@ default). [ClassicMac]
 | `WIND` | `ui.window` | `title`, `bounds`, `definition`, `definitionName` (for the IDs of §1.5), `visible`, `goAway`, `refCon`, `position` |
 | `DLOG` | `ui.dialog` | As `WIND`, and `items` (the `'DITL'` ID) |
 | `ALRT` | `ui.alert` | `bounds`, `items`, `stagesWord`, `stages[]` (stage 1 first: `stage`, `defaultItem`, `drawn`, `sound`), `position` |
-| `wctb`, `dctb`, `actb`, `cctb` | `ui.colors` | `seed`, `flags`, `entries[]`: `value`, `part` (when known: §1.6, or [controls.md §1](controls.md#1-layout) for `cctb`), `red`, `green`, `blue` (0–65535), `hex` (`#rrggbb`, the high bytes) |
+| `wctb`, `dctb`, `actb`, `cctb` | `ui.colors` | `seed`, `flags`, `entries[]`: `value`, `part` (when known: §1.6, or [controls.md §1.2](controls.md#12-control-colour-tables-cctb) for `cctb`), `red`, `green`, `blue` (0–65535), `hex` (`#rrggbb`, the high bytes) |
 | `dlgx` | `ui.dialog-extension` | `version`, `flags`, `flagsNames` (`useThemeBackground`, `useControlHierarchy`, `handleMovableModal`, `useThemeControls`) |
 | `alrx` | `ui.alert-extension` | `version`, `flags`, `flagsNames` (as `dlgx`, with `movable` for 4), `movable`, `refCon`, `useThemeWindow`, `title` |
 
