@@ -96,8 +96,23 @@ public class MfsTests
         var image = Volume();
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x06), 2_600_000_000);  // drLsBkUp
         var info = MfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
-        Assert.Equal(new VolumeInfo("MFS", new MacDate(2_526_595_200), null, new MacDate(2_600_000_000)), info);
+        Assert.Equal(("MFS", new MacDate(2_526_595_200), (MacDate?)null, new MacDate(2_600_000_000)), (info.Format, info.Created, info.Modified, info.BackedUp));
         Assert.Null(MfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(new byte[4096])));
+    }
+
+    [Fact]
+    public void The_volume_reports_its_name_space_files_and_locks()
+    {
+        var image = Volume(("A", "TEXT", [1], [2], [], []));
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(1024 + 0x22), 7);                     // drFreeBks
+        var info = MfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+
+        Assert.Equal("Disk", info.Name);
+        Assert.Equal((Block, (long)AllocationBlocks, 7L, 7L * Block), (info.BlockSize, info.TotalBlocks, info.FreeBlocks, info.FreeBytes));
+        Assert.Equal(1L, info.Files);                                                             // drNmFls
+        Assert.Null(info.Folders);                                                                // MFS has no folders
+        image[1024 + 0x0A] |= 0x80;
+        Assert.True(MfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!.SoftwareLocked);
     }
 
     [Fact]

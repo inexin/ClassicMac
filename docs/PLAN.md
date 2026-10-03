@@ -285,7 +285,8 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
 1. `check <input>`: the writer's checks without an edit, plus every diagnostic (built; [cli.md](cli.md) §2.7).
 2. `mv <path> <folder>`: move a file or folder to another folder on the same volume (built: `HfsWriter.Move`, the
    CLI, the MCP server's `mv` and the shell's `move`; [cli.md](cli.md) §3.2).
-3. Volume information in `stat` of a volume's root: block size, free space, file and folder counts, dates, the lock.
+3. Volume information in `stat` of a volume's root: block size, free space, file and folder counts, dates, the lock
+   (built: `VolumeInfo` from HFS, HFS Plus and MFS, [cli.md](cli.md) §2.2).
 4. `lock` / `unlock` (a file's locked flag) and `bless` (the System Folder in the MDB's Finder info).
 5. Transfers that convert: `put --text`/`get --text` (Mac OS Roman with CR to and from UTF-8 with LF), `get --as
    binhex` and `.hqx` read by `put`.

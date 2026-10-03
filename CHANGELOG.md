@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `stat` of a volume (`disk.img:`, or a disk image inside one) shows its name, size and free space, file and folder
+  counts, dates and locks, in text and --json (cli.md §2.2).
 - CLI: `mv <path> <folder>` moves a file or folder to another folder of an HFS volume, as PBCatMove does (its thread,
   the folders' valences and the root counts follow); also the MCP server's `mv` and the shell's `move` (cli.md §3.2).
 - CLI: `check <input>` reads an input through and reports its damage; a plain HFS volume also gets the checks the

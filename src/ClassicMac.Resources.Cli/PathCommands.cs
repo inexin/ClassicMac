@@ -165,6 +165,22 @@ namespace ClassicMac.Resources.Cli
             Line("Resource", info.ResourceId is { } id ? $"'{info.ResourceType}' {id}{(info.ResourceName is { } n ? $" \"{n}\"" : "")}" : null);
             Line("Attributes", info.ResourceAttributes);
             Line("Read from", info.ResourceForkSource);
+            if (info.Volume is { } volume)
+            {
+                output.WriteLine(volume.Name is { } volumeName ? $"Volume: {volume.Format} \"{volumeName}\"" : $"Volume: {volume.Format}");
+                output.WriteLine($"Size: {volume.TotalBytes.ToString("N0", CultureInfo.InvariantCulture)} bytes ({Bytes(volume.TotalBytes)}) in " +
+                    $"{volume.TotalBlocks.ToString("N0", CultureInfo.InvariantCulture)} blocks of {volume.BlockSize.ToString("N0", CultureInfo.InvariantCulture)} bytes");
+                output.WriteLine($"Free: {volume.FreeBytes.ToString("N0", CultureInfo.InvariantCulture)} bytes ({Bytes(volume.FreeBytes)}), " +
+                    $"{volume.FreeBlocks.ToString("N0", CultureInfo.InvariantCulture)} blocks");
+                output.WriteLine(volume.Folders is { } folders ? $"Files / folders: {volume.Files:N0} / {folders:N0}" : $"Files: {volume.Files:N0}");
+                Line("Volume created", volume.Created is { } created ? Date(created.ToDateTime()) : null);
+                Line("Volume modified", volume.Modified is { } modified ? Date(modified.ToDateTime()) + (volume.UtcAfterCreation ? " UTC" : "") : null);
+                Line("Backed up", volume.BackedUp is { } backedUp ? Date(backedUp.ToDateTime()) + (volume.UtcAfterCreation ? " UTC" : "") : null);
+                Line("Volume locked", volume.SoftwareLocked || volume.HardwareLocked
+                    ? string.Join(" and ", new[] { volume.SoftwareLocked ? "by software" : null, volume.HardwareLocked ? "by hardware" : null }.OfType<string>())
+                    : null);
+            }
+
             output.WriteLine("Read as: " + string.Join(" > ", info.Chain.Select(s => $"{s.Name} ({s.Format})")));
             return ExitCodes.Success;
 
@@ -337,5 +353,12 @@ namespace ClassicMac.Resources.Cli
         private void WriteJson(Action<Utf8JsonWriter> body) => output.WriteLine(MacPathJson.Document(body, indented: sessionTree is null));
 
         private static string Date(DateTime? date) => date?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "-";
+
+        // A size in KiB, MiB or GiB, one decimal.
+        private static string Bytes(long bytes)
+        {
+            var (value, unit) = bytes >= 1L << 30 ? (bytes / (double)(1L << 30), "GiB") : bytes >= 1L << 20 ? (bytes / (double)(1L << 20), "MiB") : (bytes / 1024.0, "KiB");
+            return value.ToString("0.0", CultureInfo.InvariantCulture) + " " + unit;
+        }
     }
 }

@@ -44,8 +44,19 @@ namespace ClassicMac.Files.Hfs
                 return null;
             }
 
-            var info = new BigEndianReader(input.Slice(InfoOffset, 10).ToArray());
-            return new VolumeInfo("MFS", Date(info.ReadUInt32At(0x02)), null, Date(info.ReadUInt32At(0x06)));
+            // The volume information (mfs.md §1): drAtrb +$0A, drNmFls +$0C, drNmAlBlks +$12, drAlBlkSiz +$14,
+            // drFreeBks +$22, drVN +$24.
+            var info = new BigEndianReader(input.Slice(InfoOffset, 0x24 + 28).ToArray());
+            return new VolumeInfo("MFS", Date(info.ReadUInt32At(0x02)), null, Date(info.ReadUInt32At(0x06)))
+            {
+                Name = HfsReader.VolumeName(info, 0x24),
+                BlockSize = info.ReadUInt32At(0x14),
+                TotalBlocks = info.ReadUInt16At(0x12),
+                FreeBlocks = info.ReadUInt16At(0x22),
+                Files = info.ReadUInt16At(0x0C),
+                SoftwareLocked = (info.ReadUInt16At(0x0A) & 0x8000) != 0,
+                HardwareLocked = (info.ReadUInt16At(0x0A) & 0x0080) != 0,
+            };
         }
 
         /// <inheritdoc/>

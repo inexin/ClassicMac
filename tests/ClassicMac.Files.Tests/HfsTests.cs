@@ -37,12 +37,35 @@ public class HfsTests
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x06), 3_000_000_100);   // drLsMod
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x40), 3_000_000_200);   // drVolBkUp
         var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
-        Assert.Equal(new VolumeInfo("HFS", new MacDate(3_000_000_000), new MacDate(3_000_000_100), new MacDate(3_000_000_200)), info);
+        Assert.Equal(("HFS", new MacDate(3_000_000_000), new MacDate(3_000_000_100), new MacDate(3_000_000_200)),
+            (info.Format, info.Created, info.Modified, info.BackedUp));
         Assert.False(info.UtcAfterCreation);
 
         BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(1024 + 0x40), 0);                // never backed up
         Assert.Null(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!.BackedUp);
         Assert.Null(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(new byte[4096])));  // not a volume
+    }
+
+    [Fact]
+    public void The_volume_reports_its_name_space_counts_and_locks_from_the_mdb()
+    {
+        var (_, image) = Sample();
+        var mdb = image.AsSpan(1024);
+        var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+
+        Assert.Equal("Test Disk", info.Name);                                              // drVN
+        Assert.Equal(BinaryPrimitives.ReadUInt32BigEndian(mdb[0x14..]), info.BlockSize);   // drAlBlkSiz
+        Assert.Equal(BinaryPrimitives.ReadUInt16BigEndian(mdb[0x12..]), info.TotalBlocks); // drNmAlBlks
+        Assert.Equal(BinaryPrimitives.ReadUInt16BigEndian(mdb[0x22..]), info.FreeBlocks);  // drFreeBks
+        Assert.Equal(info.FreeBlocks * info.BlockSize, info.FreeBytes);
+        Assert.Equal(info.TotalBlocks * info.BlockSize, info.TotalBytes);
+        Assert.Equal((2L, 2L), (info.Files, info.Folders));                                // drFilCnt, drDirCnt
+        Assert.Equal((false, false), (info.SoftwareLocked, info.HardwareLocked));
+
+        image[1024 + 0x0A] |= 0x80;                                                        // drAtrb bit 15
+        image[1024 + 0x0B] |= 0x80;                                                        // drAtrb bit 7
+        info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+        Assert.Equal((true, true), (info.SoftwareLocked, info.HardwareLocked));
     }
 
     [Fact]

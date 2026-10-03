@@ -35,17 +35,40 @@ public sealed class HfsPlusFeatureTests
             BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(header + 0x18), 3_100_000_200);   // backupDate, UTC
         }
 
-        var expected = new VolumeInfo("HFS Plus", new MacDate(3_100_000_000), new MacDate(3_100_000_100), new MacDate(3_100_000_200));
+        var expected = ("HFS Plus", new MacDate(3_100_000_000), new MacDate(3_100_000_100), new MacDate(3_100_000_200));
+        static (string, MacDate?, MacDate?, MacDate?) Dates(VolumeInfo info) => (info.Format, info.Created, info.Modified, info.BackedUp);
         var plain = HfsPlusFixture.Build();
         Stamp(plain, 1024);
         var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(plain))!;
-        Assert.Equal(expected, info);
+        Assert.Equal(expected, Dates(info));
         Assert.True(info.UtcAfterCreation);
 
         var wrapped = HfsPlusFixture.BuildWrapped();
         Stamp(wrapped, 6 * 512 + 1024);                                                         // the embedded volume's header
-        Assert.Equal(expected, HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(wrapped)));
+        Assert.Equal(expected, Dates(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(wrapped))!));
         Assert.Null(HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(HfsPlusFixture.BuildWrapped(invalidEmbeddedSignature: true))));
+    }
+
+    [Fact]
+    public void The_volume_reports_its_space_counts_and_locks_from_its_header()
+    {
+        var image = HfsPlusFixture.Build();
+        var header = image.AsSpan(1024);
+        BinaryPrimitives.WriteUInt32BigEndian(header[0x20..], 5);                                // fileCount
+        BinaryPrimitives.WriteUInt32BigEndian(header[0x24..], 3);                                // folderCount
+        BinaryPrimitives.WriteUInt32BigEndian(header[0x30..], 9);                                // freeBlocks
+        var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+
+        Assert.Equal(BinaryPrimitives.ReadUInt32BigEndian(header[0x28..]), info.BlockSize);       // blockSize
+        Assert.Equal(BinaryPrimitives.ReadUInt32BigEndian(header[0x2C..]), info.TotalBlocks);     // totalBlocks
+        Assert.Equal((9L, 5L, 3L), (info.FreeBlocks, info.Files, info.Folders));
+        Assert.Null(info.Name);                                                                   // the name is the root folder's
+        Assert.Equal((false, false), (info.SoftwareLocked, info.HardwareLocked));
+
+        header[4 + 2] |= 0x80;                                                                    // attributes bit 15
+        header[4 + 3] |= 0x80;                                                                    // attributes bit 7
+        info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
+        Assert.Equal((true, true), (info.SoftwareLocked, info.HardwareLocked));
     }
 
     [Fact]

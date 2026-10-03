@@ -292,6 +292,13 @@ namespace ClassicMac.Files
             return entry.Parent;
         }
 
+        /// <summary>The volume a container entry is (its name, space, counts and locks), or null when it is no volume.</summary>
+        public VolumeInfo? VolumeInfoOf(MacPathEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            return entry.Kind == MacPathKind.Container ? ContentsOf(entry).Volume : null;
+        }
+
         /// <summary>
         /// What an entry holds: a container's or folder's folders and files, in the container's order; a file's resource
         /// fork (when it has one); a fork's types; a type's resources.

@@ -77,6 +77,30 @@ public sealed class PathCommandTests : IDisposable
     }
 
     [Fact]
+    public void Stat_of_a_volume_shows_its_name_space_counts_and_locks()
+    {
+        var (code, output, _, _) = Run("stat", disk + ":");
+        Assert.Equal(0, code);
+        Assert.Contains("Volume: HFS \"Disk\"\n", output);
+        Assert.Matches(@"\nSize: [\d,]+ bytes \([\d.]+ [KMG]iB\) in [\d,]+ blocks of [\d,]+ bytes\n", output);
+        Assert.Matches(@"\nFree: [\d,]+ bytes \([\d.]+ [KMG]iB\), [\d,]+ blocks\n", output);
+        Assert.Matches(@"\nFiles / folders: \d+ / \d+\n", output);
+        Assert.DoesNotContain("Volume locked", output);
+        Assert.Contains("Volume: HFS \"Inner\"\n", Run("stat", P("Inner.img")).Output);              // a volume inside the volume
+
+        var volume = Json(Run("stat", disk + ":", "--json").Output).GetProperty("volume");
+        Assert.Equal(("HFS", "Disk"), (volume.GetProperty("format").GetString(), volume.GetProperty("name").GetString()));
+        var blockSize = volume.GetProperty("blockSize").GetInt64();
+        Assert.True(blockSize >= 512);
+        Assert.Equal(volume.GetProperty("totalBlocks").GetInt64() * blockSize, volume.GetProperty("totalBytes").GetInt64());
+        Assert.Equal(volume.GetProperty("freeBlocks").GetInt64() * blockSize, volume.GetProperty("freeBytes").GetInt64());
+        Assert.True(volume.GetProperty("files").GetInt64() > 0);
+        Assert.True(volume.GetProperty("folders").GetInt64() > 0);
+        Assert.Equal((false, false), (volume.GetProperty("softwareLocked").GetBoolean(), volume.GetProperty("hardwareLocked").GetBoolean()));
+        Assert.False(Json(Run("stat", P("Inner.img:Deep:Note"), "--json").Output).TryGetProperty("volume", out _));
+    }
+
+    [Fact]
     public void A_path_that_names_nothing_or_no_host_is_an_error()
     {
         var (code, _, error, _) = Run("stat", P("Nope"));

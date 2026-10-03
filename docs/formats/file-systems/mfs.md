@@ -155,7 +155,8 @@ None. HFS replaced MFS ([hfs.md](hfs.md)); the Mac OS 9.0 ROM's `MountVol` still
   `FXInfo`), its creation and modification dates (a stored 0 is "no date") and both forks. Files have an empty folder
   path; `fdFldr` is kept in the Finder information as stored.
 - `MfsReader.ReadVolumeInfo` gives `drCrDate` and `drLsBkUp` as the volume's creation and backup dates, with no
-  modification date ([hfs.md §5.2](hfs.md#52-what-comes-out)) [ClassicMac].
+  modification date, and its name (`drVN`), `drAlBlkSiz`, `drNmAlBlks`, `drFreeBks`, `drNmFls` as the file count (no
+  folders) and `drAtrb`'s locks ([hfs.md §5.2](hfs.md#52-what-comes-out)) [ClassicMac].
 - The entries read are compared with `drNmFls`. After `ContainerReadOptions.MaxVolumeEntries` files (1,000,000 by
   default) reading stops.
 - The reader throws, and the unwrapper reports `container.unreadable`, when `drAlBlkSiz` is 0 or not a multiple of 512,

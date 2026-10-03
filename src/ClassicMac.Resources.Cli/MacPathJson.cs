@@ -139,6 +139,35 @@ namespace ClassicMac.Resources.Cli
             w.WriteEndArray();
             Optional(w, "resourceForkSource", info.ResourceForkSource);
             Optional(w, "resourceAttributes", info.ResourceAttributes);
+            if (info.Volume is { } volume)
+            {
+                w.WriteStartObject("volume");
+                w.WriteString("format", volume.Format);
+                w.WriteString("name", volume.Name);
+                w.WriteNumber("blockSize", volume.BlockSize);
+                w.WriteNumber("totalBlocks", volume.TotalBlocks);
+                w.WriteNumber("totalBytes", volume.TotalBytes);
+                w.WriteNumber("freeBlocks", volume.FreeBlocks);
+                w.WriteNumber("freeBytes", volume.FreeBytes);
+                if (volume.Files is { } files)
+                {
+                    w.WriteNumber("files", files);
+                }
+
+                if (volume.Folders is { } folders)
+                {
+                    w.WriteNumber("folders", folders);
+                }
+
+                Optional(w, "created", volume.Created?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
+                Optional(w, "modified", volume.Modified?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
+                Optional(w, "backedUp", volume.BackedUp?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
+                w.WriteBoolean("utcAfterCreation", volume.UtcAfterCreation);
+                w.WriteBoolean("softwareLocked", volume.SoftwareLocked);
+                w.WriteBoolean("hardwareLocked", volume.HardwareLocked);
+                w.WriteEndObject();
+            }
+
             if (info.Alias is { } alias)
             {
                 w.WriteStartObject("alias");

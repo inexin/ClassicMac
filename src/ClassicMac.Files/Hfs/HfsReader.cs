@@ -76,12 +76,42 @@ namespace ClassicMac.Files.Hfs
                     : null;
             }
 
-            return new VolumeInfo("HFS", Date(mdb.ReadUInt32At(0x02)), Date(mdb.ReadUInt32At(0x06)), Date(mdb.ReadUInt32At(0x40)));
+            // The MDB (hfs.md §1.3): drAtrb +$0A, drNmAlBlks +$12, drAlBlkSiz +$14, drFreeBks +$22, drVN +$24 (a Str27),
+            // drFilCnt +$54, drDirCnt +$58.
+            var attributes = mdb.ReadUInt16At(0x0A);
+            return new VolumeInfo("HFS", Date(mdb.ReadUInt32At(0x02)), Date(mdb.ReadUInt32At(0x06)), Date(mdb.ReadUInt32At(0x40)))
+            {
+                Name = VolumeName(mdb, 0x24),
+                BlockSize = mdb.ReadUInt32At(0x14),
+                TotalBlocks = mdb.ReadUInt16At(0x12),
+                FreeBlocks = mdb.ReadUInt16At(0x22),
+                Files = mdb.ReadUInt32At(0x54),
+                Folders = mdb.ReadUInt32At(0x58),
+                SoftwareLocked = (attributes & 0x8000) != 0,
+                HardwareLocked = (attributes & 0x0080) != 0,
+            };
         }
 
-        // createDate (local time), modifyDate and backupDate (UTC), at +$10, +$14 and +$18 of the volume header.
-        private static VolumeInfo PlusInfo(BigEndianReader header) =>
-            new("HFS Plus", Date(header.ReadUInt32At(0x10)), Date(header.ReadUInt32At(0x14)), Date(header.ReadUInt32At(0x18)));
+        // A drVN: a length byte and up to 27 Mac OS Roman characters.
+        internal static string VolumeName(BigEndianReader mdb, int offset) =>
+            MacRoman.Decode(mdb.Source.Span.Slice(offset + 1, Math.Min(mdb.ReadByteAt(offset), (byte)27)));
+
+        // The volume header (hfs-plus.md §1.1): attributes +$04, createDate (local time), modifyDate and backupDate (UTC)
+        // at +$10, +$14 and +$18, fileCount +$20, folderCount +$24, blockSize +$28, totalBlocks +$2C, freeBlocks +$30.
+        private static VolumeInfo PlusInfo(BigEndianReader header)
+        {
+            var attributes = header.ReadUInt32At(0x04);
+            return new("HFS Plus", Date(header.ReadUInt32At(0x10)), Date(header.ReadUInt32At(0x14)), Date(header.ReadUInt32At(0x18)))
+            {
+                BlockSize = header.ReadUInt32At(0x28),
+                TotalBlocks = header.ReadUInt32At(0x2C),
+                FreeBlocks = header.ReadUInt32At(0x30),
+                Files = header.ReadUInt32At(0x20),
+                Folders = header.ReadUInt32At(0x24),
+                SoftwareLocked = (attributes & 0x8000) != 0,
+                HardwareLocked = (attributes & 0x0080) != 0,
+            };
+        }
 
         private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
 

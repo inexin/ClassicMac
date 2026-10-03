@@ -478,7 +478,8 @@ are [ClassicMac].
   the volume name, the Finder information (`filUsrWds` then `filFndrInfo`, 32 bytes), the creation and modification
   dates (a stored 0 is "no date"), both forks, and `filFlags` bit 0 as `MacFile.IsLocked`.
 - `HfsReader.ReadVolumeInfo` (the `IVolumeReader` interface) gives the volume's own dates as a `VolumeInfo`: `drCrDate`,
-  `drLsMod` and `drVolBkUp`, a stored 0 as "no date"; for HFS Plus, plain or wrapped, see
+  `drLsMod` and `drVolBkUp`, a stored 0 as "no date"; its name (`drVN`), `drAlBlkSiz`, `drNmAlBlks`, `drFreeBks`,
+  `drFilCnt`, `drDirCnt`, and `drAtrb`'s software lock (bit 15) and hardware lock (bit 7); for HFS Plus, plain or wrapped, see
   [hfs-plus.md §5.1](hfs-plus.md#51-what-comes-out). The unwrapper keeps them on the `ContainerNode` whose data fork is
   the volume (`ContainerNode.Volume`) [ClassicMac].
 - Folder records serve for paths: folders do not come out as entries of `Read`, so an empty folder is not listed.

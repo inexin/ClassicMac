@@ -107,6 +107,9 @@ namespace ClassicMac.Files.Commands
 
         /// <summary>For an alias file, where it points and whether that resolves (stat).</summary>
         public MacAliasInfo? Alias { get; init; }
+
+        /// <summary>For a volume (a container that is an HFS, HFS Plus or MFS volume), its name, space, counts and locks (stat).</summary>
+        public VolumeInfo? Volume { get; init; }
     }
 
     /// <summary>Where an alias file points (docs/formats/resources/aliases.md §2) and what resolving it found.</summary>
@@ -190,6 +193,7 @@ namespace ClassicMac.Files.Commands
                 ResourceForkSource = entry.Kind == MacPathKind.ResourceFork ? entry.ResourcesSource?.ToString() : null,
                 ResourceAttributes = entry.Resource is { } resource ? resource.Attributes.ToString() : null,
                 Alias = AliasOf(tree, entry),
+                Volume = tree.VolumeInfoOf(entry),
             };
         }
 
