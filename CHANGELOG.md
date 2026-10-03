@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Viewer, CLI and MCP: an alias whose original is not found says why: missing from its disk, on a disk that is not open
+  (with the kind of disk, e.g. an 800K floppy disk), or on a network volume (with the AppleShare server, zone, volume and
+  user from its mount information). The tree dims such an alias and marks its badge (a cross, a disk, a globe); the
+  header, the preview's card and Details say it; `stat` and its JSON give `state` and `explanation`.
 - CLI: `classicmac shell <input>`, a DOS-like shell on one input (docs/cli.md §5): `cd` into folders, disk images,
   archives, forks and types (`..`, `:`, paths from the input's name), `dir`, `type`, `info`, `res`, `find`, `copy` out
   to the host and in from it, `del`, `md`, `ren`, `set`, `save` (in place, keeping `.orig`) and `save as`; changes are

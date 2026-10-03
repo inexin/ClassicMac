@@ -157,11 +157,14 @@ public sealed class PathCommandTests : IDisposable
         Assert.Equal(0, code);
         Assert.Contains("Original: Aliases: Old: Note\n", output);
         Assert.Contains($"Resolves: yes, by its file ID: {aliases}:Docs:Note\n", output);
-        Assert.Contains("Resolves: no, the original is not found", Run("stat", aliases + ":Gone alias").Output);
+        Assert.Contains("Resolves: no. The original is not on Aliases any more.", Run("stat", aliases + ":Gone alias").Output);
         var json = Json(Run("stat", aliases + ":Stuff alias", "--json").Output).GetProperty("alias");
         Assert.Equal(("Aliases: Stuff", true, "by its folder ID", "Stuff"),
             (json.GetProperty("storedPath").GetString(), json.GetProperty("found").GetBoolean(), json.GetProperty("how").GetString(), json.GetProperty("target").GetString()));
-        Assert.False(Json(Run("stat", aliases + ":Gone alias", "--json").Output).GetProperty("alias").TryGetProperty("target", out _));
+        Assert.Equal("found", json.GetProperty("state").GetString());
+        var gone = Json(Run("stat", aliases + ":Gone alias", "--json").Output).GetProperty("alias");
+        Assert.False(gone.TryGetProperty("target", out _));
+        Assert.Equal(("missing", "The original is not on Aliases any more."), (gone.GetProperty("state").GetString(), gone.GetProperty("explanation").GetString()));
         Assert.False(Json(Run("stat", aliases + ":Docs:Note", "--json").Output).TryGetProperty("alias", out _));
     }
 

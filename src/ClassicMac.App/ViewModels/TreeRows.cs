@@ -174,8 +174,25 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         public Task RequestIconAsync() => iconLoading ??= LoadIconAsync();
 
+        /// <summary>
+        /// An alias row's state, learnt with its icon (rows on screen only): found, or why not (aliases.md §5); null for
+        /// other rows and before it is known.
+        /// </summary>
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(IsBrokenAlias))]
+        private ClassicMac.Files.AliasState? aliasState;
+
+        /// <summary>Whether the row is an alias whose original is not found: dimmed, a mark on its badge.</summary>
+        public bool IsBrokenAlias => AliasState is { } state && state != ClassicMac.Files.AliasState.Found;
+
         private async Task LoadIconAsync()
         {
+            if (IsAliasFile && Input is { } input)
+            {
+                var inputs = input.Display.Inputs().ToList();
+                AliasState = await Task.Run(() => Aliases.Of(this, inputs)?.Resolution.State);
+            }
+
             Func<byte[]?>? load = this switch
             {
                 FileNode file => () => FolderPreviews.TreeIcon(file),

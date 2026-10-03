@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using ClassicMac.Core;
+using ClassicMac.Files;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders.Finder;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -25,13 +26,21 @@ namespace ClassicMac.App.ViewModels
 
         public bool HasOriginal => Original is not null;
 
-        /// <summary>An alias's kind line: "Alias to Note Pad · application program", or "· original not found".</summary>
+        /// <summary>
+        /// An alias's kind line: "Alias to Note Pad · application program"; when not found, "· original missing", "· on
+        /// another disk" or "· on a network volume".
+        /// </summary>
         internal static string AliasKind(AliasLink link) => $"Alias to {link.TargetName} · " + link.Target switch
         {
             FileNode or ContainerFileNode => FileKinds.Of(link.Target).Text,
             FolderNode => "folder",
             InputNode or null when link.Resolution.Found => "disk",
-            _ => "original not found",
+            _ => link.Resolution.State switch
+            {
+                AliasState.Missing => "original missing",
+                AliasState.Network => "on a network volume",
+                _ => "on another disk",
+            },
         };
 
         /// <summary>What a resource of <paramref name="type"/> is called ("Text style"), else the type in quotes.</summary>

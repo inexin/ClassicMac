@@ -97,7 +97,7 @@ namespace ClassicMac.App.ViewModels
     {
         /// <summary>The selected alias file and its original; null when the selection is no alias.</summary>
         [ObservableProperty]
-        [NotifyPropertyChangedFor(nameof(AliasStrip), nameof(AliasNotFound), nameof(AliasNotFoundLines))]
+        [NotifyPropertyChangedFor(nameof(AliasStrip), nameof(AliasNotFound), nameof(AliasNotFoundLines), nameof(AliasNotFoundTitle), nameof(AliasNotFoundReason))]
         [NotifyCanExecuteChangedFor(nameof(ShowOriginalCommand))]
         private AliasLink? selectedAlias;
 
@@ -106,6 +106,19 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>Whether the selected alias's original is not found (the preview shows a card instead).</summary>
         public bool AliasNotFound => SelectedAlias is { Target: null };
+
+        /// <summary>The not-found card's title: "Original missing", "On a disk that is not open" or "On a network volume".</summary>
+        public string? AliasNotFoundTitle => SelectedAlias is { Target: null } link
+            ? link.Resolution.State switch
+            {
+                AliasState.Missing => "Original missing",
+                AliasState.Network => "On a network volume",
+                _ => "On a disk that is not open",
+            }
+            : null;
+
+        /// <summary>The not-found card's sentence: why the original is not found (<see cref="AliasResolution.Explanation"/>).</summary>
+        public string? AliasNotFoundReason => SelectedAlias is { Target: null } link ? link.Resolution.Explanation : null;
 
         /// <summary>The not-found card's lines: the volume, the recorded path and the alias's dates.</summary>
         public IReadOnlyList<string> AliasNotFoundLines => SelectedAlias is { Target: null } link

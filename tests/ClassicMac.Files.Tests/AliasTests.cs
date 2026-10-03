@@ -131,6 +131,54 @@ public class AliasTests
         Assert.False(other.Found);                                           // neither name nor date: another volume
     }
 
+    // Why an original is not found decides what the viewer shows (aliases.md §5): its volume is open but it is gone; its
+    // volume is not open; or it is on a network volume.
+    [Fact]
+    public void An_unresolved_alias_says_whether_the_original_is_missing_its_disk_is_not_open_or_it_is_on_a_network()
+    {
+        var (volume, old, _, note) = Volume();
+        Assert.Equal(AliasState.Found, AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Disk", old, "Note", note), out _), [volume]).State);
+        Assert.Equal(AliasState.Missing, AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Disk", old, "Gone", 999), out _), [volume]).State);
+        Assert.Equal(AliasState.Missing,                                     // the volume renamed (same date): still open
+            AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Renamed", old, "Gone", 999), out _), [volume]).State);
+        Assert.Equal(AliasState.VolumeNotOpen,
+            AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Bag of Holding", 2, "Note", 18, volumeCreated: 1), out _), [volume]).State);
+        Assert.Equal(AliasState.VolumeNotOpen, AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Disk", old, "Note", note), out _), []).State);
+
+        var share = AliasRecord.Read(AliasBuilder.Alias("Shared", 2, "Plans", 40, volumeCreated: 1, volumeType: 1, volumeAttributes: 0x11,
+            extras: [(9, AliasBuilder.AfpMount("Office", "Studio", "Shared", "lars"))]), out _);
+        var network = AliasResolver.Resolve(share, [volume]);
+        Assert.Equal(AliasState.Network, network.State);
+        Assert.Equal(new AliasNetwork("Office", "Studio", "Shared", "lars"), share.Network);
+        // An AppleShare volume type alone (no mount information) is a network volume too, its names unknown.
+        var bare = AliasRecord.Read(AliasBuilder.Alias("Shared", 2, "Plans", 40, volumeCreated: 1, volumeType: 1), out _);
+        Assert.Equal(AliasState.Network, AliasResolver.Resolve(bare, [volume]).State);
+        Assert.Equal(new AliasNetwork(null, null, "Shared", null), bare.Network);
+        Assert.Null(AliasRecord.Read(AliasBuilder.Alias("Disk", old, "Note", note), out _).Network);
+
+        // One sentence each, for the CLI, MCP and the viewer.
+        Assert.Equal("The original is not on Disk any more.",
+            AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Disk", old, "Gone", 999), out _), [volume]).Explanation);
+        Assert.Equal("The original is on the hard disk “Bag of Holding”, which is not open.",
+            AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Bag of Holding", 2, "Note", 18, volumeCreated: 1), out _), [volume]).Explanation);
+        Assert.Equal("The original is on the network volume “Shared” on the server “Studio” (zone “Office”, as “lars”).",
+            network.Explanation);
+        Assert.Equal("The original is on the network volume “Shared”.", AliasResolver.Resolve(bare, [volume]).Explanation);
+        Assert.Equal("Found by its file ID.", AliasResolver.Resolve(AliasRecord.Read(AliasBuilder.Alias("Disk", old, "Note", note), out _), [volume]).Explanation);
+    }
+
+    [Theory]
+    [InlineData(0, "hard disk")]
+    [InlineData(1, "network volume")]
+    [InlineData(2, "400K floppy disk")]
+    [InlineData(3, "800K floppy disk")]
+    [InlineData(4, "1.4 MB floppy disk")]
+    [InlineData(5, "removable disk")]
+    [InlineData(-1, null)]
+    [InlineData(9, null)]
+    public void The_volume_type_names_the_kind_of_disk(short type, string? name) =>
+        Assert.Equal(name, AliasRecord.Read(AliasBuilder.Alias("Disk", 2, "Note", 18, volumeType: type), out _).VolumeKindName);
+
     [Fact]
     public void Another_open_volume_with_the_aliass_volume_name_is_searched()
     {

@@ -115,7 +115,14 @@ namespace ClassicMac.Files.Commands
     /// <param name="How">How it was found ("by its file ID", "by name in its folder", "by its path", "not found").</param>
     /// <param name="ResolvedPath">Where the original is now, as Get Info shows a path; the stored path when not found.</param>
     /// <param name="Target">The original's full path in the tree, when found.</param>
-    public sealed record MacAliasInfo(string StoredPath, bool Found, string How, string ResolvedPath, string? Target);
+    public sealed record MacAliasInfo(string StoredPath, bool Found, string How, string ResolvedPath, string? Target)
+    {
+        /// <summary>found, missing, volumeNotOpen or network (aliases.md §5).</summary>
+        public string State { get; init; } = Found ? "found" : "volumeNotOpen";
+
+        /// <summary>The state in a sentence (<see cref="AliasResolution.Explanation"/>).</summary>
+        public string Explanation { get; init; } = "";
+    }
 
     /// <summary>What <see cref="MacCommands.Find"/> looks for; every given criterion must hold.</summary>
     public sealed record MacFindQuery
@@ -193,6 +200,16 @@ namespace ClassicMac.Files.Commands
             ArgumentNullException.ThrowIfNull(entry);
             return tree.ResolveAlias(entry) is { } resolution
                 ? new MacAliasInfo(resolution.StoredPath, resolution.Found, resolution.How, resolution.ResolvedPath, tree.TargetOf(resolution)?.Path)
+                {
+                    State = resolution.State switch
+                    {
+                        AliasState.Found => "found",
+                        AliasState.Missing => "missing",
+                        AliasState.Network => "network",
+                        _ => "volumeNotOpen",
+                    },
+                    Explanation = resolution.Explanation,
+                }
                 : null;
         }
 

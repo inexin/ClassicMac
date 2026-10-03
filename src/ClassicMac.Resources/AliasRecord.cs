@@ -16,6 +16,13 @@ namespace ClassicMac.Resources
         Folder = 1,
     }
 
+    /// <summary>
+    /// Where a network alias's volume is (aliases.md §1.3): the AppleShare zone, server, volume and user, from the alias's
+    /// volume mount information (an <c>AFPVolMountInfo</c>, tag 9) or its older tags (3 zone, 4 server, 5 user); each null
+    /// when the alias does not say.
+    /// </summary>
+    public sealed record AliasNetwork(string? Zone, string? Server, string? Volume, string? User);
+
     /// <summary>One item of an alias record's tagged data: its tag and bytes.</summary>
     /// <param name="Tag">The tag (0 the parent folder's name, 1 the folder IDs, 2 the full path, …; −1 ends the list).</param>
     /// <param name="Data">The item's bytes, without the pad byte.</param>
@@ -146,6 +153,74 @@ namespace ClassicMac.Resources
                 var reader = new BigEndianReader(extra.Data);
                 return [.. Enumerable.Range(0, extra.Data.Length / 4).Select(i => reader.ReadUInt32At(i * 4))];
             }
+        }
+
+        /// <summary>
+        /// The kind of disk the target's volume was, from the volume type (aliases.md §1.1): "hard disk", "network volume",
+        /// "400K floppy disk", "800K floppy disk", "1.4 MB floppy disk", "removable disk"; null for −1 (an alias made from a
+        /// full path) and types not known.
+        /// </summary>
+        public string? VolumeKindName => VolumeType switch
+        {
+            0 => "hard disk",
+            1 => "network volume",
+            2 => "400K floppy disk",
+            3 => "800K floppy disk",
+            4 => "1.4 MB floppy disk",
+            5 => "removable disk",
+            _ => null,
+        };
+
+        /// <summary>
+        /// Where the target's network volume is, when it is on one: the volume type is 1 (AppleShare), the volume attributes
+        /// say AFP media (bit 4), or the alias holds AFP mount information (tag 9, media <c>'afpm'</c>); null otherwise.
+        /// The names come from the mount information [Doc: Inside Macintosh: Files, AFPVolMountInfo], else the older tags
+        /// 3–5, the volume's from the record.
+        /// </summary>
+        public AliasNetwork? Network
+        {
+            get
+            {
+                var mount = Extras.FirstOrDefault(e => e.Tag == 9) is { } extra ? AfpMount(extra.Data) : null;
+                if (VolumeType != 1 && (VolumeAttributes & 0x10) == 0 && mount is null)
+                {
+                    return null;
+                }
+
+                string? Text(short tag) => Extra(tag)?.ToMacRoman() is { Length: > 0 } text ? text : null;
+                return new AliasNetwork(mount?.Zone ?? Text(3), mount?.Server ?? Text(ServerNameTag),
+                    mount?.Volume ?? (VolumeName.Length > 0 ? VolumeName.ToMacRoman() : null), mount?.User ?? Text(5));
+            }
+        }
+
+        // An AFPVolMountInfo: length, media 'afpm', flags, NBP interval and count, UAM type, then (at 12) the offsets (from the
+        // record's start) of the zone, server, volume and user names, Pascal strings; null when it is not one or is cut.
+        private static AliasNetwork? AfpMount(ReadOnlyMemory<byte> data)
+        {
+            if (data.Length < 24)
+            {
+                return null;
+            }
+
+            var reader = new BigEndianReader(data);
+            if (reader.ReadFourCCAt(2) != FourCC.FromString("afpm"))
+            {
+                return null;
+            }
+
+            string? Name(int at)
+            {
+                int offset = reader.ReadInt16At(at);
+                if (offset <= 0 || offset >= data.Length)
+                {
+                    return null;
+                }
+
+                int length = data.Span[offset];
+                return length == 0 || offset + 1 + length > data.Length ? null : MacRoman.Decode(data.Span.Slice(offset + 1, length));
+            }
+
+            return new AliasNetwork(Name(12), Name(14), Name(16), Name(18));
         }
 
         /// <summary>Whether the alias stands for a volume (a folder alias whose parent is 1, the root's parent).</summary>

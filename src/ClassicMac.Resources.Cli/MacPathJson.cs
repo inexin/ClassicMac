@@ -146,6 +146,8 @@ namespace ClassicMac.Resources.Cli
                 w.WriteBoolean("found", alias.Found);
                 w.WriteString("how", alias.How);
                 w.WriteString("resolvedPath", alias.ResolvedPath);
+                w.WriteString("state", alias.State);
+                w.WriteString("explanation", alias.Explanation);
                 Optional(w, "target", alias.Target is { } target ? Inside(tree, target) : null);
                 w.WriteEndObject();
             }

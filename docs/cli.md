@@ -195,9 +195,10 @@ $ classicmac ls "disk.img:System Folder" --json
 **stat** is an entry with `input`, and adds `kindName` and `kindSource` (a file's Finder kind, [finder.md](formats/resources/finder.md)), `chain`
 (`[{ "name", "format" }]`, from the host file down), `resourceForkSource` (a fork: `ResourceFork`, `AppleDouble`,
 `DataFork`…) and `resourceAttributes` (a resource). An alias file adds `alias`: `{ "storedPath", "found", "how",
-"resolvedPath", "target" }`: the recorded path and the original's now (Get Info's "Vol: folder: name"), how it was found
-(`by its file ID`, `by its folder ID`, `by name in its folder`, `by its path`, `not found`), and `target`, the
-original's path inside the input when found.
+"resolvedPath", "state", "explanation", "target" }`: the recorded path and the original's now (Get Info's "Vol: folder:
+name"), how it was found (`by its file ID`, `by its folder ID`, `by name in its folder`, `by its path`, `not found`),
+`state` (`found`, `missing` from its open volume, `volumeNotOpen`, or `network`, [aliases.md §5](formats/resources/aliases.md)),
+`explanation` (the state in a sentence), and `target`, the original's path inside the input when found.
 
 **cat**: `{ "input", "path", "encoding", "truncated", … }` with `encoding` `text` and `text` (a string), `hex` and `hex` (the
 bytes as hex digits) with `size` (the whole size), or `json` and `json` (the decoder's JSON, as it is).

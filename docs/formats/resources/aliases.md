@@ -72,6 +72,30 @@ the list ends with tag −1 and length 0.
 
 Mac OS 9.0 writes no Unicode or POSIX tags.
 
+### 1.3 Network volumes
+
+Tag 9's mount information for an AppleShare volume is an `AFPVolMountInfo` [Doc: Inside Macintosh: Files,
+AFPVolMountInfo]:
+
+| Offset | Size | Field | Meaning |
+| --- | --- | --- | --- |
+| +0 | 2 | `length` | The record's length |
+| +2 | 4 | `media` | `'afpm'` |
+| +6 | 2 | `flags` | |
+| +8 | 1 | `nbpInterval` | NBP retry interval |
+| +9 | 1 | `nbpCount` | NBP retry count |
+| +10 | 2 | `uamType` | The user authentication method |
+| +12 | 2 | `zoneNameOffset` | The zone's name, a Pascal string at this offset from the record's start |
+| +14 | 2 | `serverNameOffset` | The server's name |
+| +16 | 2 | `volNameOffset` | The volume's name |
+| +18 | 2 | `userNameOffset` | The user's name |
+| +20 | 2 | `userPasswordOffset` | The user's password (not read) |
+| +22 | 2 | `volPasswordOffset` | The volume's password (not read) |
+| +24 | | `AFPData` | The strings |
+
+An alias is on a network volume when its volume type is 1, its volume attributes have bit 4 (AFP media) set, or it holds
+`'afpm'` mount information; without the mount information the zone, server and user come from tags 3, 4 and 5.
+
 A complete alias has the fixed part and tags 0, 1 and 2 (with 6–9 for remote volumes); NewAliasMinimal's has the fixed
 part alone with both levels −1; NewAliasMinimalFromFullPath's has tag 2 alone, with −1 in the volume type, parent and
 number [Fitted].
@@ -139,10 +163,18 @@ None.
   catalog search and mounting are not done. `AliasResolver.Follow` follows aliases of aliases, at most ten. A volume is
   an `AliasVolume`: an HFS or HFS Plus volume's files and folders (with their catalog IDs, `MacFile.CatalogId`,
   `MacFolder.CatalogId`) and creation date. [ClassicMac]
+- An original not found is told apart as `AliasState`: `Missing` when a volume of the alias's (by name and date, date or
+  name) is open but the original is not on it; `Network` when the alias's volume is a network volume (§1.3,
+  `AliasRecord.Network`: zone, server, volume and user) and not open; `VolumeNotOpen` otherwise.
+  `AliasRecord.VolumeKindName` names the volume type ("800K floppy disk", "network volume"…), and
+  `AliasResolution.Explanation` says it in a sentence ("The original is on the 800K floppy disk “Bag of Holding”, which
+  is not open."). The Finder only says "original could not be found" (§2.1). [ClassicMac]
 - `MacPathTree.ResolveAlias`, `TargetOf` and `FollowAlias` resolve on the volume holding the alias file; the CLI's `stat`
   shows the recorded path and whether it resolves, and `ls`, `cat` and `get --follow` follow aliases (docs/cli.md §2).
   The app resolves on the alias's volume and the other open inputs, and shows the recorded path, the original and how
-  it was found. [ClassicMac]
+  it was found; an original not found is said apart by state in the header ("original missing", "on another disk", "on a
+  network volume"), the preview's card (with the explanation), Details (State, Disk kind or Server, Zone, User) and the
+  tree, where the row is dimmed and its badge carries a mark (a cross, a disk, a globe). [ClassicMac]
 - `finder.alias` writes one `.json`, version 1, recording its text encoding: `userType`, `size`, `version`, `kind` (`file`,
   `folder` or the number), `targetPath` (§2.2), `volume` (`name`, `created`, `signature`, `volumeType`, `attributes`,
   `fileSystemId`), `parentId`, `name`, `targetId`, `created`, `type`, `creator`, `levelsFrom`, `levelsTo`, and `extras`
@@ -167,7 +199,8 @@ None.
   diagnostics.
 - `tests/ClassicMac.Resources.Cli.Tests/PathCommandTests.cs` and `tests/ClassicMac.App.Tests/AliasViewTests.cs` on
   `AliasFixtures`: an alias whose original is in place, one whose original moved (found by its file ID), one whose
-  original is gone, a folder alias and an alias of an alias.
+  original is gone, a folder alias, an alias of an alias, one on an 800K floppy disk that is not open, and one on an
+  AppleShare volume with `'afpm'` mount information (§1.3).
 - The 36 alias files on a Mac OS 9.0 startup disk, read locally (not kept): every record reads whole with §1; the 19
   whose originals are on the disk resolve by number, and the 17 pointing at the emulator host's shared volume or at
   another volume do not.
@@ -175,7 +208,7 @@ None.
 ## 8. Not covered
 
 - The relative path, the walk of tag 1's IDs, the catalog search and mounting volumes (§2.1 steps 1, 3's last part, 4–6).
-- AppleShare names in the path (they come from tag 9's mount information).
+- AppleShare names in §2.2's path (they are shown apart, §5).
 - Writing or updating alias records.
 - Later systems' records and tags (§4).
 

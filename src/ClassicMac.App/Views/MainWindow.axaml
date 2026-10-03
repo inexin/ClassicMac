@@ -119,6 +119,10 @@
     <!-- The tree's rows (design/boards/tree-no-name.md): no-name titles in italics, whitespace made visible in mono
          (.mono), the group's count as the row's meta ("4 files"). The tree's header (the Tree display button) and footer
          ("N invisible items hidden · Show") sit on CmSidebarBackground with CmDivider rules; Show is a CmAccent link. -->
+    <!-- An alias whose original is not found: dimmed (its badge carries the mark). -->
+    <Style Selector="TextBlock.broken">
+      <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
+    </Style>
     <Style Selector="TextBlock.italic">
       <Setter Property="FontStyle" Value="Italic" />
     </Style>
@@ -1233,7 +1237,7 @@
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                    <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}"
+                    <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}" Classes.broken="{Binding IsBrokenAlias}"
                                Classes.dimmed="{Binding IsDimmed}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !HasNameTokens}">
                       <Run Text="{Binding NameBefore}" /><Run Classes="match" Classes.on="{Binding HasMatch}" Classes.current="{Binding IsCurrentMatch}" Text="{Binding NameMatch}" /><Run Text="{Binding NameAfter}" />
                     </TextBlock>
@@ -1475,7 +1479,8 @@
               <!-- An alias whose original is not found: what it recorded instead of a preview. -->
               <Border x:Name="AliasNotFoundCard" DockPanel.Dock="Top" Classes="detail-card alias-missing" IsVisible="{Binding AliasNotFound}">
                 <StackPanel Spacing="4">
-                  <TextBlock Classes="heading" Text="Original not found" />
+                  <TextBlock Classes="heading" Text="{Binding AliasNotFoundTitle}" />
+                  <TextBlock Text="{Binding AliasNotFoundReason}" TextWrapping="Wrap" />
                   <ItemsControl ItemsSource="{Binding AliasNotFoundLines}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate DataType="x:String">

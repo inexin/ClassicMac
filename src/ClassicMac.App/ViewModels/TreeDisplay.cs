@@ -32,6 +32,9 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The type and creator database the user chose, asked for kinds last (FileKinds); null when none.</summary>
         internal ClassicMac.Resources.Decoders.Finder.TypeCreatorDatabase? KindDatabase { get; set; }
 
+        /// <summary>The open inputs, whose volumes an alias row's original is looked for on (MainViewModel's roots).</summary>
+        internal Func<IEnumerable<InputNode>> Inputs { get; set; } = () => [];
+
         /// <summary>Raised after a part of the tree was laid out (files read or changed).</summary>
         internal event Action? LaidOut;
 
@@ -249,6 +252,7 @@ namespace ClassicMac.App.ViewModels
             DiagnosticsPanel = new DiagnosticsPanel(entry => SelectedDiagnostic = entry);
             var saved = settings.Load();
             TreeDisplay = new TreeDisplayOptions { GroupNoName = saved.GroupNoName, HideInvisible = saved.HideInvisible, ShowDetails = saved.ShowDetails };
+            TreeDisplay.Inputs = () => Roots.OfType<InputNode>();
             theme = saved.Theme;
             TreeDisplay.PropertyChanged += (_, e) =>
             {

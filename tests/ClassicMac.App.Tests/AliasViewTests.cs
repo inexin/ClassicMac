@@ -4,6 +4,7 @@ using Avalonia.VisualTree;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
+using ClassicMac.Files;
 using ClassicMac.Files.Tests;
 
 namespace ClassicMac.App.Tests;
@@ -93,13 +94,53 @@ public sealed class AliasViewTests : IDisposable
         Pump(model.PreviewTask);
         Assert.True(model.AliasNotFound);
         Assert.Null(model.AliasStrip);
-        Assert.Equal("Alias to Gone · original not found", model.Header!.Kind);
+        Assert.Equal("Alias to Gone · original missing", model.Header!.Kind);
+        Assert.Equal(AliasState.Missing, model.SelectedAlias!.Resolution.State);
+        Assert.Equal("Original missing", model.AliasNotFoundTitle);
+        Assert.Equal("The original is not on Aliases any more.", model.AliasNotFoundReason);
         Assert.Equal("Aliases: Old: Gone", model.Header.Original);
         Assert.Equal("Aliases", model.SelectedAlias!.Resolution.Alias.VolumeName.ToMacRoman());
         Assert.False(model.ShowOriginalCommand.CanExecute(null));
         var card = model.Details.Groups.Single(g => g.Title == "Alias").Rows.ToDictionary(r => r.Label, r => r.Value);
         Assert.Equal("No", card["Found"]);
+        Assert.Equal("The original is not on Aliases any more.", card["State"]);
         Assert.False(card.ContainsKey("Now at"));
+    });
+
+    // Not found because its disk is not open, or because it is on a network volume: said apart in the header, the card,
+    // Details and the tree (dimmed, with a mark on the badge).
+    [Fact]
+    public void An_alias_on_a_disk_that_is_not_open_or_on_a_network_volume_says_where() => Headless.OnUiThread(() =>
+    {
+        var (model, input) = Open();
+        model.Selected = Node(input, "Elsewhere alias");
+        Pump(model.PreviewTask);
+        Assert.Equal("Alias to Map · on another disk", model.Header!.Kind);
+        Assert.Equal("On a disk that is not open", model.AliasNotFoundTitle);
+        Assert.Equal("The original is on the 800K floppy disk “Bag of Holding”, which is not open.", model.AliasNotFoundReason);
+        Assert.Equal("Bag of Holding: Map", model.Header.Original);
+
+        model.Selected = Node(input, "Server alias");
+        Pump(model.PreviewTask);
+        Assert.Equal("Alias to Plans · on a network volume", model.Header!.Kind);
+        Assert.Equal("On a network volume", model.AliasNotFoundTitle);
+        Assert.Equal("The original is on the network volume “Shared” on the server “Studio” (zone “Office”, as “lars”).",
+            model.AliasNotFoundReason);
+        var card = model.Details.Groups.Single(g => g.Title == "Alias").Rows.ToDictionary(r => r.Label, r => r.Value);
+        Assert.Equal("Studio", card["Server"]);
+        Assert.Equal("Office", card["Zone"]);
+
+        // The tree learns each alias row's state when the row asks for its icon (rows on screen only).
+        foreach (var (name, state) in new[] { ("Note alias", AliasState.Found), ("Gone alias", AliasState.Missing),
+            ("Elsewhere alias", AliasState.VolumeNotOpen), ("Server alias", AliasState.Network) })
+        {
+            var row = Node(input, name);
+            Pump(row.RequestIconAsync());
+            Assert.Equal(state, row.AliasState);
+            Assert.Equal(state != AliasState.Found, row.IsBrokenAlias);
+        }
+
+        Assert.Null(Node(input, "Docs", "Note").AliasState);
     });
 
     [Fact]
@@ -139,7 +180,8 @@ public sealed class AliasViewTests : IDisposable
         Pump(model.PreviewTask);
         Dispatcher.UIThread.RunJobs();
         shown = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
-        Assert.Contains("Original not found", shown);
+        Assert.Contains("Original missing", shown);
+        Assert.Contains("The original is not on Aliases any more.", shown);
         Assert.Contains("Aliases: Old: Gone", shown);
         Baselines.Check(window, "alias-not-found", baselines, Baselines.Variant.Light);
         model.SelectedTab = 0;                                                 // Details: the Alias card

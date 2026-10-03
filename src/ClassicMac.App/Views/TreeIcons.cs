@@ -654,6 +654,12 @@ namespace ClassicMac.App.Views
             "#######",
         ];
 
+        // The mark on a broken alias's badge, 5 × 5 at the icon's bottom right: a cross (the original missing), a disk (its
+        // disk not open), a globe (on a network volume); '#' the mark's colour, '.' white.
+        private static readonly string[] MissingMark = ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"];
+        private static readonly string[] DiskMark = ["#####", "#.#.#", "#####", "#...#", "#####"];
+        private static readonly string[] NetworkMark = [".###.", "#.#.#", "#####", "#.#.#", ".###."];
+
         private NodeViewModel? watched;
         private Bitmap? own;
         private bool watchingViewport;
@@ -691,6 +697,12 @@ namespace ClassicMac.App.Views
 
         private void OnNodeChanged(object? sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(NodeViewModel.AliasState))
+            {
+                InvalidateVisual();
+                return;
+            }
+
             if (e.PropertyName != nameof(NodeViewModel.IconPng))
             {
                 return;
@@ -772,6 +784,27 @@ namespace ClassicMac.App.Views
                     {
                         var black = AliasBadge[y][x] == '#';
                         context.FillRectangle(black ? Brushes.Black : Brushes.White, new Rect(x0 + x * u, y0 + y * u, u, u));
+                    }
+                }
+            }
+
+            if (Node is { IsBrokenAlias: true, AliasState: { } state })
+            {
+                var (mark, colour) = state switch
+                {
+                    ClassicMac.Files.AliasState.Missing => (MissingMark, Color.FromRgb(0xC0, 0x20, 0x20)),
+                    ClassicMac.Files.AliasState.Network => (NetworkMark, Color.FromRgb(0x20, 0x50, 0xC0)),
+                    _ => (DiskMark, Color.FromRgb(0x50, 0x50, 0x50)),
+                };
+                var u = k / scaling;
+                var x0 = left + w / scaling - 5 * u;
+                var y0 = top + h / scaling - 5 * u;
+                var ink = new SolidColorBrush(colour);
+                for (var y = 0; y < 5; y++)
+                {
+                    for (var x = 0; x < 5; x++)
+                    {
+                        context.FillRectangle(mark[y][x] == '#' ? ink : Brushes.White, new Rect(x0 + x * u, y0 + y * u, u, u));
                     }
                 }
             }

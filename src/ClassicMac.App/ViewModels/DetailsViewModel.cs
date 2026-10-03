@@ -279,6 +279,26 @@ namespace ClassicMac.App.ViewModels
                 new("Volume", alias.VolumeName.ToMacRoman()),
                 new("Found", resolution.Found ? $"Yes, {resolution.How}" : "No"),
             };
+            if (!resolution.Found)
+            {
+                rows.Add(new("State", resolution.Explanation));
+            }
+
+            if (alias.Network is { } network)
+            {
+                foreach (var (label, value) in new[] { ("Server", network.Server), ("Zone", network.Zone), ("User", network.User) })
+                {
+                    if (value is not null)
+                    {
+                        rows.Add(new(label, value));
+                    }
+                }
+            }
+            else if (alias.VolumeKindName is { } kind)
+            {
+                rows.Add(new("Disk kind", kind));
+            }
+
             if (resolution.Found)
             {
                 rows.Add(new("Now at", resolution.ResolvedPath, Mono: true));

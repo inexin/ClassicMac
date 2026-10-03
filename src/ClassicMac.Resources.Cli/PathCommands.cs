@@ -148,7 +148,7 @@ namespace ClassicMac.Resources.Cli
             if (info.Alias is { } original)
             {
                 output.WriteLine($"Original: {original.StoredPath}");
-                output.WriteLine(original.Found ? $"Resolves: yes, {original.How}: {original.Target ?? original.ResolvedPath}" : "Resolves: no, the original is not found");
+                output.WriteLine(original.Found ? $"Resolves: yes, {original.How}: {original.Target ?? original.ResolvedPath}" : $"Resolves: no. {original.Explanation}");
             }
 
             Line("Data fork", info.DataSize?.ToString("N0", CultureInfo.InvariantCulture) + (info.DataSize is null ? null : " bytes"));

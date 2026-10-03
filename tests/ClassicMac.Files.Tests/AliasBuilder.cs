@@ -10,7 +10,8 @@ internal static class AliasBuilder
 
     public static byte[] Alias(string volume, uint parentId, string name, uint targetId, string type = "TEXT", string creator = "ttxt",
         short kind = 0, string? path = null, string? parentName = null, uint[]? folderIds = null, short version = 2,
-        bool terminate = true, (short Tag, byte[] Data)[]? extras = null, uint volumeCreated = VolumeCreated)
+        bool terminate = true, (short Tag, byte[] Data)[]? extras = null, uint volumeCreated = VolumeCreated, short volumeType = 0,
+        uint volumeAttributes = 0)
     {
         var w = new BigEndianWriter();
         w.WriteUInt32(0);                                   // userType
@@ -20,7 +21,7 @@ internal static class AliasBuilder
         Str(w, volume, 28);
         w.WriteUInt32(volumeCreated);
         w.WriteUInt16(0x4244);                              // 'BD': HFS
-        w.WriteInt16(0);                                    // drive type: fixed disk
+        w.WriteInt16(volumeType);                           // 0 hard disk, 1 AppleShare, 2–5 floppies and ejectables
         w.WriteUInt32(parentId);
         Str(w, name, 64);
         w.WriteUInt32(targetId);
@@ -29,7 +30,7 @@ internal static class AliasBuilder
         w.WriteFourCC(FourCC.FromString(creator));
         w.WriteInt16(1);                                    // levels from
         w.WriteInt16(2);                                    // levels to
-        w.WriteUInt32(0);                                   // volume attributes
+        w.WriteUInt32(volumeAttributes);
         w.WriteInt16(0);                                    // volume file-system ID
         w.WriteZeros(10);
         if (parentName is not null)
@@ -64,6 +65,38 @@ internal static class AliasBuilder
         }
 
         w.WriteUInt16At(4, w.Length);
+        return w.ToArray();
+    }
+
+    // An AFPVolMountInfo (Inside Macintosh: Files, "AFPVolMountInfo"): its header with each name's offset from the record's
+    // start, then the names as Pascal strings.
+    public static byte[] AfpMount(string zone, string server, string volume, string user)
+    {
+        var names = new BigEndianWriter();
+        var offsets = new List<int>();
+        foreach (var name in new[] { zone, server, volume, user })
+        {
+            offsets.Add(24 + names.Length);
+            var bytes = MacRoman.Encode(name);
+            names.WriteByte((byte)bytes.Length);
+            names.WriteBytes(bytes);
+        }
+
+        var w = new BigEndianWriter();
+        w.WriteInt16(24 + names.Length);                    // length
+        w.WriteFourCC(FourCC.FromString("afpm"));
+        w.WriteInt16(0);                                    // flags
+        w.WriteByte(7);                                     // nbpInterval
+        w.WriteByte(5);                                     // nbpCount
+        w.WriteInt16(6);                                    // uamType: cleartext password
+        foreach (var offset in offsets)
+        {
+            w.WriteInt16(offset);                           // zone, server, volume, user names
+        }
+
+        w.WriteInt16(0);                                    // user password offset
+        w.WriteInt16(0);                                    // volume password offset
+        w.WriteBytes(names.ToArray());
         return w.ToArray();
     }
 

@@ -113,6 +113,22 @@ namespace ClassicMac.Files
             left.Count == right.Count && left.Zip(right).All(p => Same(p.First, p.Second));
     }
 
+    /// <summary>Whether an alias's original was found, and if not, why (aliases.md §5).</summary>
+    public enum AliasState
+    {
+        /// <summary>Found on an open volume.</summary>
+        Found,
+
+        /// <summary>Its volume is open (by name and date, date or name), but the original is not on it.</summary>
+        Missing,
+
+        /// <summary>No open volume is its volume.</summary>
+        VolumeNotOpen,
+
+        /// <summary>Its volume is a network volume (AppleShare), not open.</summary>
+        Network,
+    }
+
     /// <summary>What resolving an alias found: the target on one of the volumes, or nothing, with the path the alias stored.</summary>
     /// <param name="Alias">The alias record.</param>
     /// <param name="Volume">The volume the target is on; null when not found.</param>
@@ -123,6 +139,49 @@ namespace ClassicMac.Files
     {
         /// <summary>Whether the target was found.</summary>
         public bool Found => By is not null;
+
+        /// <summary>Found; else missing from its open volume, on a volume that is not open, or on a network volume.</summary>
+        public AliasState State { get; init; } = By is not null ? AliasState.Found : AliasState.VolumeNotOpen;
+
+        /// <summary>
+        /// The state in a sentence: "Found by its file ID."; "The original is not on Disk any more."; "The original is on the
+        /// hard disk “Bag of Holding”, which is not open."; "The original is on the network volume “Shared” on the server
+        /// “Studio” (zone “Office”, as “lars”)."
+        /// </summary>
+        public string Explanation => State switch
+        {
+            AliasState.Found => $"Found {How}.",
+            AliasState.Missing => $"The original is not on {Alias.VolumeName.ToMacRoman()} any more.",
+            AliasState.Network => NetworkSentence(Alias.Network!),
+            _ => $"The original is on {(Alias.VolumeKindName is { } kind ? "the " + kind : "the disk")} “{Alias.VolumeName.ToMacRoman()}”, which is not open.",
+        };
+
+        private static string NetworkSentence(AliasNetwork network)
+        {
+            var text = new System.Text.StringBuilder("The original is on the network volume");
+            if (network.Volume is { } volume)
+            {
+                text.Append($" “{volume}”");
+            }
+
+            if (network.Server is { } server)
+            {
+                text.Append($" on the server “{server}”");
+            }
+
+            var details = new List<string>();
+            if (network.Zone is { } zone)
+            {
+                details.Add($"zone “{zone}”");
+            }
+
+            if (network.User is { } user)
+            {
+                details.Add($"as “{user}”");
+            }
+
+            return text.Append(details.Count > 0 ? $" ({string.Join(", ", details)})." : ".").ToString();
+        }
 
         /// <summary>The path the alias recorded (<see cref="AliasRecord.TargetPath"/>).</summary>
         public string StoredPath => Alias.TargetPath;
@@ -201,8 +260,10 @@ namespace ClassicMac.Files
             var candidates = all.Where(v => Named(v) && Dated(v)).Select(v => (Volume: v, Dated: true))
                 .Concat(all.Where(v => !Named(v) && Dated(v)).Select(v => (Volume: v, Dated: true)))
                 .Concat(all.Where(v => Named(v) && !Dated(v)).Select(v => (Volume: v, Dated: false)));
+            var searched = false;
             foreach (var (volume, dated) in candidates)
             {
+                searched = true;
                 foreach (var found in new[] { ById(alias, volume), ByParent(alias, volume), ByPath(alias, volume) })
                 {
                     if (found is not null && (aliasFile is null || !ReferenceEquals(found.File, aliasFile)) && (dated || found.By == AliasResolvedBy.TargetId || Matches(alias, found)))
@@ -212,7 +273,8 @@ namespace ClassicMac.Files
                 }
             }
 
-            return new AliasResolution(alias, null, null, null, null);
+            var state = searched ? AliasState.Missing : alias.Network is not null ? AliasState.Network : AliasState.VolumeNotOpen;
+            return new AliasResolution(alias, null, null, null, null) { State = state };
         }
 
         /// <summary>

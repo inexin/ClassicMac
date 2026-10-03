@@ -16,7 +16,7 @@ internal static class AliasFixtures
 
     public static string Disk(string folder, string name = "aliases.img")
     {
-        var disk = new HfsBuilder { CatalogLeaves = 4 };
+        var disk = new HfsBuilder { CatalogLeaves = 6 };
         var docs = disk.Folder(HfsBuilder.Root, "Docs");
         var old = disk.Folder(HfsBuilder.Root, "Old");
         var stuff = disk.Folder(HfsBuilder.Root, "Stuff");
@@ -33,6 +33,12 @@ internal static class AliasFixtures
             info: AliasInfo with { Type = FourCC.FromString("fdrp"), Creator = FourCC.FromString("MACS") });
         disk.File(HfsBuilder.Root, "Chain alias", [], AliasBuilder.Fork(
             AliasBuilder.Alias("Aliases", 2, "Note alias", noteAlias, path: "Aliases:Note alias")), info: AliasInfo);
+        // Originals on a disk that is not open, and on an AppleShare volume.
+        disk.File(HfsBuilder.Root, "Elsewhere alias", [], AliasBuilder.Fork(
+            AliasBuilder.Alias("Bag of Holding", 2, "Map", 30, path: "Bag of Holding:Map", volumeCreated: 1, volumeType: 3)), info: AliasInfo);
+        disk.File(HfsBuilder.Root, "Server alias", [], AliasBuilder.Fork(
+            AliasBuilder.Alias("Shared", 2, "Plans", 40, path: "Shared:Plans", volumeCreated: 1, volumeType: 1,
+                extras: [(9, AliasBuilder.AfpMount("Office", "Studio", "Shared", "lars"))])), info: AliasInfo);
         var path = Path.Combine(folder, name);
         File.WriteAllBytes(path, disk.Build("Aliases"));
         return path;
