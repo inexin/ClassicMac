@@ -1167,6 +1167,8 @@ public class WindowTests
             var tokens = window.GetVisualDescendants().OfType<ItemsControl>().First(i => i.Classes.Contains("name-tokens") && i.IsEffectivelyVisible);
             Assert.Matches("^[0-9A-F]{2}( [0-9A-F]{2})*$", (string)ToolTip.GetTip(tokens)!);
             model.Selected = noName.Children.Single(c => c.Name == "nbsp tab");
+            Pump(model.PreviewTask);                                         // the preview and header icon load in the
+            Pump(model.HeaderIconTask);                                      // background: settle before the captures
             Dispatcher.UIThread.RunJobs();
             window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected).Focus();
             Dispatcher.UIThread.RunJobs();
@@ -1207,6 +1209,8 @@ public class WindowTests
 
             // Any other file: its name as text.
             model.Selected = realmz.Children.Single(c => c.Title == "Realmz");
+            Pump(model.PreviewTask);
+            Pump(model.HeaderIconTask);
             Dispatcher.UIThread.RunJobs();
             Assert.True(window.FindControl<TextBlock>("HeaderName")!.IsEffectivelyVisible);
             Assert.Equal("Realmz", window.FindControl<TextBlock>("HeaderName")!.Text);
