@@ -223,7 +223,8 @@ tools use the same.
 ### 2.7 check
 
 `classicmac check <input>` reads the input through, as `info` and `list` do: its containers, every file inside them and
-each file's resource fork. Its diagnostics are the result, printed to standard output (`-q`: errors only). A plain
+each file's resource fork. Its diagnostics are the result, printed to standard output (`-q`: errors only), each
+named by the containers down to its file (`disk.img > Images:Inner.img > Broken`). A plain
 HFS volume image also gets the checks the writer makes before an edit (`HfsWriter.Check`,
 [hfs.md §5.5](formats/file-systems/hfs.md#55-the-writer)), run even on a software-locked volume, and the first fault
 found is shown as `volume: <fault>`, or `volume: passes the writer's checks`. The last line counts the errors and

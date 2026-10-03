@@ -91,6 +91,22 @@ public sealed class CheckCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_file_inside_a_container_inside_the_volume_is_named_through_the_container()
+    {
+        var inner = new HfsBuilder();
+        inner.File(HfsBuilder.Root, "Broken", [], [0, 0, 1, 0, 0, 0, 0x7F, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0]);
+        var outer = new HfsBuilder();
+        var images = outer.Folder(HfsBuilder.Root, "Images");
+        outer.File(images, "Inner.img", inner.Build("Inner"), [], type: "rohd", creator: "ddsk");
+        var disk = Path.Combine(folder, "outer.img");
+        File.WriteAllBytes(disk, outer.Build("Outer"));
+
+        var (_, output, _) = Run("check", disk);
+
+        Assert.Contains("outer.img > Images:Inner.img > Broken: error", output);
+    }
+
+    [Fact]
     public void A_damaged_resource_fork_in_the_volume_is_reported_as_an_error()
     {
         var builder = new HfsBuilder();

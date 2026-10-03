@@ -72,6 +72,24 @@ namespace ClassicMac.Resources.Cli
             return string.Join(":", folders.Append(leaf.File.MacPath));
         }
 
+        // Where a leaf is, through every container inside the input: "disk.img > Images:Inner.img > Broken".
+        public string Chain(FileInfo input, ContainerNode leaf)
+        {
+            if (parents is null)
+            {
+                parents = new Dictionary<ContainerNode, ContainerNode>(ReferenceEqualityComparer.Instance);
+                MapParents(Root, parents);
+            }
+
+            var names = new List<string>();
+            for (var node = leaf; node != Root; node = parents.TryGetValue(node, out var parent) ? parent : Root)
+            {
+                names.Insert(0, node.File.MacPath);
+            }
+
+            return string.Join(" > ", names.Prepend(input.Name));
+        }
+
         private static void MapParents(ContainerNode node, Dictionary<ContainerNode, ContainerNode> parents)
         {
             foreach (var child in node.Children)

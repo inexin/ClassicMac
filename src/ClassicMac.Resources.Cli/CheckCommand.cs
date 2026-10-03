@@ -35,7 +35,7 @@ namespace ClassicMac.Resources.Cli
                 {
                     var diagnostics = new List<Diagnostic>();
                     MacFileResources.Read(node.File, readOptions, diagnostics);
-                    found.AddRange(diagnostics.Select(d => (Input.Source(input, node.File), d)));
+                    found.AddRange(diagnostics.Select(d => (opened.Chain(input, node), d)));
                 }
             }
 
