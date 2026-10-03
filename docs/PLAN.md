@@ -294,6 +294,11 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
 6. Writes to an HFS partition inside an Apple Partition Map image, and to Disk Copy images (written back in their own
    format).
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name.
+8. `resize <volume> --size <n>` (decided 2026-10-03): grow a plain HFS volume within its allocation block size
+   (`drNmAlBlks` at most 65,535): the image lengthened, the block count and free count raised, the bitmap extended (the
+   allocation area moved up when the bitmap's sectors are full) and the alternate MDB moved to the new end, every
+   CNID kept. Later, shrinking: files and B-tree extents in the blocks cut off moved down into free space first,
+   refused when they do not fit; and growing past 65,535 blocks with a larger block size.
 
 ## Decoders
 
