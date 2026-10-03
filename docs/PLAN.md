@@ -304,6 +304,27 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    CNID kept. Later, shrinking: files and B-tree extents in the blocks cut off moved down into free space first,
    refused when they do not fit; and growing past 65,535 blocks with a larger block size.
 
+**Editing through a block overlay (decided 2026-10-03).** An edit touches only the MDB, the bitmap, the B-tree files and
+the edited forks, so the writer stops holding whole images:
+
+- `HfsVolume` (internal): a read-only base `ForkData` (the file, a partition's range, a Disk Copy disk, a decoded NDIF
+  disk) and an overlay of changed 512-byte sectors; `Read`, `Write`, `ChangedSectors`, `Fork()` (a failed edit leaves
+  the session as it was). `BigEndianReader`/`Writer` rules stay: the MDB, bitmap and trees are read into their own small
+  buffers, one reader or writer each, and written back to the overlay; a test fails any path asking for a whole image.
+- `HfsWriter` reads and writes through it; the public `X(ForkData) → byte[]` methods stay as wrappers. Verification:
+  every changed sector lies in the MDB, bitmap, B-tree files, the target fork's blocks or the alternate MDB, plus the
+  pre-edit checks and the record comparisons. Resize stays whole-image.
+- `InputEditSession` opens the volume without reading it; `Current()` reads through the overlay. Save As streams a copy
+  of the input and writes the changed sectors into it (Disk Copy 4.2's checksum made again by streaming). Save in place
+  does the same into a temporary copy and swaps it over the input (crash-safe, as now; the first save keeps `.orig`),
+  after checking the input can be opened exclusively (an image mounted elsewhere is refused). Patching in place with a
+  journal is not done (it could corrupt an image another program has open). NDIF keeps its disk decoded; the overlay
+  names the changed chunks.
+- `format` and resize lift the 2 GB limit (streamed writes).
+- Steps, each test-first with every suite and the hfsutils/`fsck_hfs` interop passing: a gated corpus write test first;
+  `HfsVolume`; writer reads; writer writes with byte-identical results against today's writer; the session and Save As;
+  Save in place; NDIF; past 2 GB; docs.
+
 **Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB
 Mac OS 9 volume).** Not ordered yet:
 
