@@ -457,8 +457,11 @@ are [ClassicMac].
 ### 3.1 A new volume
 
 Mac OS 9.0's HFS initializer, in the File Manager's HFS format code, computes the layout for a volume of N 512-byte
-sectors when its caller gives no values of its own [Code: Mac OS 9.0 ptch −20217 0x2C12]. A volume Finder's Erase made
-at 500 MB has exactly these values [Verified: Mac OS 9.hfv]. Below, a is the allocation block size in sectors.
+sectors when its caller gives no values of its own [Code: Mac OS 9.0 ptch −20217 0x2C12]. Volumes Mac OS 9.0 initialized
+in SheepShaver (Finder's Initialize, Mac OS Standard) at 800 KB, 1.4 MB, 20 MB, 100 MB, 500 MB and 2 GB match these rules
+byte for byte: the alternate MDB (which keeps the initializer's state; mounting rewrites only the primary), the extents
+header node and the layout fields of the primary MDB; the boot blocks are zero [Verified]. Below, a is the allocation block
+size in sectors.
 
 | Part | Rule | Source |
 | --- | --- | --- |
@@ -485,8 +488,14 @@ at 500 MB has exactly these values [Verified: Mac OS 9.hfv]. Below, a is the all
 
 ClassicMac's `Format` returns this layout as an image in memory (400 KB to just under 2 GB); `FormatTo` writes it to a
 file made the volume's length, writing only the MDB, bitmap, B-trees and alternate MDB (400 KB to 2 TB).
-Not traced: whether Finder's Erase passes values of its own (the 500 MB volume agrees with the default path), and
-whether a 400 KB disk gets HFS at all (the format list marks 400K and 720K differently).
+
+- Mac OS 9.0 does not offer to initialize an 800-sector (400 KB) disk: its format list clears the HFS bit for the 400K and
+  720K entries [Code: 0x27F6], [Verified: no dialog in SheepShaver]. ClassicMac makes 400 KB HFS volumes all the same,
+  laid out by the same rules [ClassicMac].
+- At the first mount the Finder adds Desktop DB, Desktop DF and DesktopPrinters DB, and the folders Desktop Folder,
+  TheVolumeSettingsFolder and Trash, and raises `drNxtCNID` and `drWrCnt`; ClassicMac's new volume is the state before
+  that mount, as the initializer leaves it [Verified].
+Finder's Initialize uses the default path (the live volumes above).
 
 ### 3.2 Growing a volume
 
@@ -746,7 +755,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - Writing partition maps, disk image formats, MFS or HFS Plus.
 - Open: the Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (§2.7).
 - Shrinking a volume, and growing one past 65,535 allocation blocks (§3.2).
-- Open: whether Finder's Erase passes the initializer values of its own, and whether 400 KB disks get HFS (§3.1).
+- Open: whether Finder's Erase (of a volume already initialized) passes the initializer values of its own (§3.1).
 - No rule in this document is fitted to data alone.
 
 ## 9. References
