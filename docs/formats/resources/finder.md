@@ -9,7 +9,7 @@ resources (`'vers'`) are in [version.md](version.md), icons in [icons.md](icons.
 | | |
 | --- | --- |
 | Identified by | Resource types `'BNDL'`, `'FREF'`, `'kind'`, `'SIZE'` |
-| ClassicMac | Reads; `ClassicMac.Resources.Decoders.Finder.FinderResources`, the decoders `finder.bundle`, `finder.file-reference`, `finder.kind`, `finder.size`; `FinderKindResolver` |
+| ClassicMac | Reads; `ClassicMac.Resources.Decoders.Finder.FinderResources`, the decoders `finder.bundle`, `finder.file-reference`, `finder.kind`, `finder.size`; `FinderKindResolver`, `KnownKinds`; `TypeCreatorDatabase` (a spreadsheet the user supplies, §2.6) |
 | Verified against | The 20 `'kind'` resources on a Mac OS 9.0 startup disk, read whole (§1.4); the kinds the Finder shows were not compared |
 | Sources | *Inside Macintosh: Macintosh Toolbox Essentials* (Finder Interface), *Inside Macintosh: Processes* (Process Manager), Apple's Rez templates (`Types.r`, MPW); Mac OS 9.0's own `'kind'` resources for the kind layout |
 
@@ -199,12 +199,44 @@ When the volume does not name a kind, ClassicMac uses its own table (`KnownKinds
    archive and disk-image formats ClassicMac reads, and about 140 others.
 2. §2.3 step 4, the System's `'istd'` kind.
 3. The table's kind of *T* for any creator ("text document", "PICT picture", "StuffIt archive", …).
-4. "*name* document", *name* being the table's name for *C* (about eighty applications).
-5. "document".
+4. When the user supplied a type and creator database (§2.6), its kind of (*T*, *C*), else of *T* for any creator.
+5. "*name* document", *name* being the table's name for *C* (about eighty applications), else the database's.
+6. "document".
 
 The table is ClassicMac's own words. Its codes were cross-checked against public type and creator lists (§9); no entry
 or description was copied from them. The Finder's strings of §2.4 have English copies there, used when the volume has
 no Finder to read them from.
+
+### 2.6 A type and creator database the user supplies
+
+A user may give ClassicMac a copy of a type and creator list as a spreadsheet (Office Open XML, `.xlsx`) laid out like
+TCDB's (§9): one header row, then one row per file seen. It is not shipped with ClassicMac: TCDB grants no licence to
+redistribute its data. [ClassicMac]
+
+| Column (header) | Holds |
+| --- | --- |
+| File Name | An example file name, often "*application*—*kind*" ("SimpleText—AIFF Sound File") |
+| Type | The file type |
+| Creator | The creator; `****` or `????` for any creator |
+| Comments | Usually the application or vendor; "Unspecified Creator" for none |
+| Category | A rough category ("Graphics GIF", "Pref", "Application") |
+
+Columns are found by their header, in any order; Type and Creator must be there. Only the first sheet
+(`xl/worksheets/sheet1.xml`) and the shared strings (`xl/sharedStrings.xml`) are read, by ECMA-376: shared, inline
+and formula strings are text; numbers are not. [Doc: ECMA-376 Part 1, SpreadsheetML]
+
+1. Each cell's text is Mac OS Roman read as Windows-1252: its characters are turned back into bytes by Windows-1252
+   (its five unassigned bytes as the control characters of the same value) and decoded as Mac OS Roman, so "Ñ" is
+   the em dash and "ð" the Apple logo. A text with a character Windows-1252 cannot have written is kept as it is.
+   [Fitted]
+2. A type or creator is its cell's bytes, exactly four. Anything else is skipped, including the codes the spreadsheet
+   turned into numbers ("26.2"). [Fitted]
+3. A row of type `APPL` names its creator's application by its File Name; a row of type `****` or `????` names its
+   creator by its Comments. An `APPL` row's name comes first.
+4. Any other row gives a kind of (*T*, *C*), or of *T* for any creator: "*application* *kind*" when its File Name has
+   an em dash, bullet or U+FFFD between them; else its Category; else "*Comments* document". A row with none of these
+   is skipped. Of several rows for the same pair, the first of the best of these three wins.
+5. The kind's application is the Comments, unless it is blank or "Unspecified Creator".
 
 ## 3. Writing
 
@@ -243,6 +275,12 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 - `KnownKinds.Resolve` gives every file a kind: §2.4 (from the volume's Finder, else the English copies), then §2.3
   steps 1–3, then §2.5; `KnownKinds.Describe` says where it came from ("from SimpleText’s 'kind' 128", "built-in").
   `KnownKinds.ResourceType` names resource types for the viewer. [ClassicMac]
+- `TypeCreatorDatabase.Load` reads §2.6's spreadsheet with the .NET library's zip and XML readers (no spreadsheet
+  package); a file that is no xlsx, or has no Type and Creator columns, is `InvalidDataException`. `Find` and
+  `ApplicationName` answer §2.5 steps 4 and 5, and its kinds are described as "TCDB (your copy)". [ClassicMac]
+- The app's View ▸ Type/Creator Database… chooses the file, reads it in the background and keeps its path in
+  `settings.json` (`typeCreatorDatabase`); the next session reads it again at start. A kept file that cannot be read
+  is reported in the status bar and stays kept; View ▸ Forget Type/Creator Database drops it. [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -264,6 +302,11 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 - `tests/ClassicMac.App.Tests/FileKindsTests.cs` and the CLI's `Info_names_kinds_from_the_volumes_applications`: an
   HFS volume made with `HfsBuilder` holding an application with a `'kind'`, one with only a bundle, System Resources
   with `'istd'` kinds and documents of each, one whose application is missing.
+- `tests/ClassicMac.Resources.Decoders.Tests/TypeCreatorDatabaseTests.cs`: §2.6 on spreadsheets made in code by
+  `XlsxBuilder` (shared strings as rich-text runs, inline strings, number cells, columns in another order, the
+  Windows-1252 decoding, codes of the wrong length, damaged files) and its place in §2.5's order. `FileKindsTests.cs`:
+  choosing, keeping, reading at start and forgetting it in the app.
+- TCDB 2003.8, read locally (not kept): about 44,200 rows give about 28,400 kinds, read in about a second.
 - The 20 `'kind'` resources on a Mac OS 9.0 startup disk (SimpleText, Disk Copy, Keychain Access, Sherlock 2, Script
   Editor, Netscape Communicator, System Resources, control panels and extensions) all read whole with §1.4, and the
   kinds of its 949 files were listed through the app, checked locally; no Apple data is kept.
@@ -286,4 +329,7 @@ The other resources are not checked against those of real applications.
 3. Apple, MPW Rez templates (`Types.r`): field order and the `'SIZE'` flag names.
 4. Cross-checks for the codes of §2.5's table only, none of whose entries or text is reused: Ilan Szekely, *TCDB*
    (Type/Creator Database, 2003, shareware, no reuse licence); macdisk.com's signature list; whitefiles.org's type and
-   creator list; BYU's creator code list; Wikipedia, "Creator code".
+   creator list; BYU's creator code list; Wikipedia, "Creator code". TCDB's spreadsheet is also the layout of §2.6,
+   which reads a copy the user has; ClassicMac holds none of its data.
+5. Ecma International, ECMA-376 *Office Open XML File Formats*, Part 1 (SpreadsheetML: shared strings, cells) and
+   Part 2 (Open Packaging Conventions): the xlsx of §2.6.

@@ -51,6 +51,9 @@
   Docs"), the Details tab's Kind with where it came from ("from SimpleText’s 'kind' 128", "built-in"), and a tooltip on
   the tree's type · creator.
 - CLI: `info` prints each file's kind and its source.
+- Viewer: View ▸ Type/Creator Database… uses your own copy of TCDB's spreadsheet (xlsx, read by
+  `TypeCreatorDatabase` with no new package) for kinds the volume and ClassicMac's table do not know, shown as "TCDB
+  (your copy)"; its path is kept in `settings.json`, and View ▸ Forget Type/Creator Database drops it.
 - Editor: editing a menu gives the table the room: the live preview narrows to 166 while editing (272 read only; it
   scrolls at 2× with its scroll bars shown, its title wrapping), so the Text column is at least 160 wide in a
   1200-pixel window.

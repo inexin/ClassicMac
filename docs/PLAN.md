@@ -1023,6 +1023,13 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   with English copies when they are absent. ClassicMac's own table (`KnownKinds`, its own words, codes cross-checked
   against public lists, none copied) is the fallback when the volume does not say, placed before the `'istd'` kinds
   for exact type and creator pairs.
+- **Type/Creator database is the user's (2026-10-03):** TCDB (Ilan Szekely's Type/Creator Database, 2003) is the
+  largest list of codes, but it is shareware with no licence to redistribute, so ClassicMac never ships it or entries
+  copied from it. A user with a copy can choose its spreadsheet (View ▸ Type/Creator Database…; the path kept in
+  `settings.json`); it is asked last, after the Finder's kinds and ClassicMac's table, and its kinds say "TCDB (your
+  copy)" ([finder.md §2.6](formats/resources/finder.md#26-a-type-and-creator-database-the-user-supplies)). The xlsx is
+  read with the .NET library's zip and XML readers: the spreadsheet packages (ClosedXML, ExcelDataReader, both MIT)
+  are far larger than the three parts needed.
 - **Disk images early:** phase 2, right after the core, because much classic software survives only as disk images.
 - **Decoder priority after images:** text, sound, UI, fonts.
 - **Fonts package:** part of `ClassicMac.Graphics` (`ClassicMac.Graphics.Fonts`), on Core only (2026-09-29, revising

@@ -211,6 +211,10 @@ public sealed class TreeDisplayTests : IDisposable
         Assert.Equal(new AppSettings(), store.Load());                      // none yet: the defaults
         store.Save(new AppSettings(GroupNoName: false, HideInvisible: true));
         Assert.Equal(new AppSettings(GroupNoName: false), new JsonSettingsStore(path).Load());
+        store.Save(new AppSettings(TypeCreatorDatabase: @"D:\TCDB\data.xlsx"));
+        Assert.Contains("\"typeCreatorDatabase\"", File.ReadAllText(path), StringComparison.Ordinal);
+        Assert.Equal(@"D:\TCDB\data.xlsx", new JsonSettingsStore(path).Load().TypeCreatorDatabase);
+        Assert.NotEqual(new AppSettings(), new AppSettings(TypeCreatorDatabase: "x"));
         File.WriteAllText(path, "{ not json");
         Assert.Equal(new AppSettings(), store.Load());                      // unreadable: the defaults
         Assert.EndsWith(Path.Combine("ClassicMac", "settings.json"), JsonSettingsStore.DefaultPath, StringComparison.Ordinal);

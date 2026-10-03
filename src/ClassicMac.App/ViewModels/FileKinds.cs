@@ -12,7 +12,8 @@ namespace ClassicMac.App.ViewModels
 {
     /// <summary>
     /// Files' kinds as the Finder names them (docs/formats/resources/finder.md §2.3, §5): one resolver per volume, over its
-    /// applications and System, made the first time one of its files' kinds is asked for, then the built-in table.
+    /// applications and System, made the first time one of its files' kinds is asked for, then the built-in table, then
+    /// the type and creator database the user chose (§2.6), if any.
     /// </summary>
     internal static class FileKinds
     {
@@ -33,7 +34,7 @@ namespace ClassicMac.App.ViewModels
                 return new FinderKind("alias", FinderKindSource.BuiltIn, null, null);
             }
 
-            return KnownKinds.Resolve(ResolverFor(node), info.Type, info.Creator);
+            return KnownKinds.Resolve(ResolverFor(node), info.Type, info.Creator, node.Input.Display.KindDatabase);
         }
 
         /// <summary>Where a kind came from, for people: "from SimpleText’s 'kind' 128", "from Teach, by its name", "built-in".</summary>

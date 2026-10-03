@@ -3,6 +3,7 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Tests;
 using ClassicMac.Resources;
+using ClassicMac.Resources.Decoders.Tests;
 
 namespace ClassicMac.App.Tests;
 
@@ -45,7 +46,7 @@ public sealed class FileKindsTests : IDisposable
 
     // Applications: SimpleText (a 'kind' naming TEXT, and its name) and Teach (a bundle, no 'kind'); the System Folder's
     // System Resources with the standard kinds; documents for each, one whose application is not here, and one unknown.
-    private async Task<(MainViewModel Model, InputNode Input)> Open()
+    private async Task<(MainViewModel Model, InputNode Input)> Open(MainViewModel? model = null)
     {
         var disk = new HfsBuilder { CatalogLeaves = 4 };
         var apps = HfsBuilder.Root;                                          // one catalog node: few folders
@@ -63,8 +64,11 @@ public sealed class FileKindsTests : IDisposable
         disk.File(docs, "Photo", [1], [], type: "PICT", creator: "WXYZ");
         disk.File(docs, "Mystery", [1], [], type: "ZZZZ", creator: "WXYZ");
         var path = Path.Combine(folder, "kinds.img");
-        File.WriteAllBytes(path, disk.Build("Kinds"));
-        var model = new MainViewModel();
+        if (!File.Exists(path))
+        {
+            File.WriteAllBytes(path, disk.Build("Kinds"));
+        }
+        model ??= new MainViewModel();
         var input = (await model.OpenAsync(path))!;
         return (model, input);
     }
@@ -121,5 +125,100 @@ public sealed class FileKindsTests : IDisposable
         _ = tip!.ToString();
         Assert.True(FileKinds.HasResolver(input));
         Assert.Same(FileKinds.ResolverFor(readMe), FileKinds.ResolverFor((FileNode)Node(input, "Docs", "Help")));
+    }
+
+    // ---- A type and creator database the user supplies (View ▸ Type/Creator Database…, finder.md §2.6) ----
+
+    private sealed class Picker(string? path) : IFilePicker
+    {
+        public string? Title { get; private set; }
+
+        public Task<IReadOnlyList<string>> PickFilesAsync() => Task.FromResult<IReadOnlyList<string>>(path is null ? [] : [path]);
+
+        public Task<string?> PickFileAsync(string title, IReadOnlyList<string> extensions)
+        {
+            Title = title;
+            return Task.FromResult(path);
+        }
+
+        public Task<string?> PickFolderAsync(string title) => Task.FromResult<string?>(null);
+
+        public Task<string?> PickSaveFileAsync(string title, string suggestedName, IReadOnlyList<string> extensions) => Task.FromResult<string?>(null);
+    }
+
+    private string Database()
+    {
+        var path = Path.Combine(folder, "tcdb.xlsx");
+        File.WriteAllBytes(path, XlsxBuilder.Xlsx(
+        [
+            ["File Name", "Type", "Creator", "Comments", "Category"],
+            ["WidgetÑwidget file", "ZZZZ", "WXYZ", "Widget", "Widget"],
+            ["SimpleTextÑtheir words", "TEXT", "ttxt", "SimpleText", "Text File"],
+        ]));
+        return path;
+    }
+
+    [Fact]
+    public async Task A_chosen_database_names_what_the_volume_and_the_table_do_not_and_is_kept()
+    {
+        var store = new MemorySettingsStore();
+        var (model, input) = await Open(new MainViewModel(store));
+        var mystery = (FileNode)Node(input, "Docs", "Mystery");
+        model.Selected = mystery;
+        Assert.Equal("document", model.Details.Groups.Single(g => g.Title == "File").Rows.Single(r => r.Label == "Kind").Value);
+        var path = Database();
+        var picker = new Picker(path);
+        model.FilePicker = picker;
+
+        await model.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
+        Assert.Equal("Type/Creator Database", picker.Title);
+        Assert.Equal(path, store.Settings.TypeCreatorDatabase);
+        Assert.Equal("Type/Creator database: 2 kinds from “tcdb.xlsx”.", model.Status);
+        var rows = model.Details.Groups.Single(g => g.Title == "File").Rows;     // the selection's details follow
+        Assert.Equal(("Widget widget file", "TCDB (your copy)"), (rows.Single(r => r.Label == "Kind").Value, rows.Single(r => r.Label == "Kind from").Value));
+        Assert.Equal("Widget widget file in Docs", model.Header!.Kind);
+        Assert.Equal("SimpleText text document", FileKinds.Of((FileNode)Node(input, "Docs", "Read Me")).Text);   // the volume first
+        Assert.True(model.HasTypeCreatorDatabase);
+
+        // The next session reads it from the settings.
+        var again = new MainViewModel(store);
+        await again.TypeCreatorDatabaseLoading;
+        var (_, reopened) = await Open(again);
+        Assert.Equal("Widget widget file", FileKinds.Of((FileNode)Node(reopened, "Docs", "Mystery")).Text);
+
+        model.ForgetTypeCreatorDatabaseCommand.Execute(null);
+        Assert.Null(store.Settings.TypeCreatorDatabase);
+        Assert.False(model.HasTypeCreatorDatabase);
+        Assert.Equal("document", FileKinds.Of(mystery).Text);
+    }
+
+    [Fact]
+    public async Task A_file_that_is_no_database_is_reported_and_not_kept()
+    {
+        var store = new MemorySettingsStore();
+        var model = new MainViewModel(store);
+        var path = Path.Combine(folder, "notes.xlsx");
+        File.WriteAllText(path, "not a spreadsheet");
+        model.FilePicker = new Picker(path);
+        await model.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
+        Assert.StartsWith("“notes.xlsx” could not be read as a type and creator database:", model.Status, StringComparison.Ordinal);
+        Assert.Null(store.Settings.TypeCreatorDatabase);
+        Assert.False(model.HasTypeCreatorDatabase);
+
+        model.FilePicker = new Picker(null);                                   // cancelled: nothing changes
+        await model.ChooseTypeCreatorDatabaseCommand.ExecuteAsync(null);
+        Assert.Null(store.Settings.TypeCreatorDatabase);
+    }
+
+    [Fact]
+    public async Task A_kept_database_that_is_gone_is_reported_and_kept_for_later()
+    {
+        var gone = Path.Combine(folder, "gone.xlsx");
+        var store = new MemorySettingsStore(new AppSettings(TypeCreatorDatabase: gone));
+        var model = new MainViewModel(store);
+        await model.TypeCreatorDatabaseLoading;
+        Assert.False(model.HasTypeCreatorDatabase);
+        Assert.StartsWith("“gone.xlsx” could not be read as a type and creator database:", model.Status, StringComparison.Ordinal);
+        Assert.Equal(gone, store.Settings.TypeCreatorDatabase);                // a drive not there today
     }
 }

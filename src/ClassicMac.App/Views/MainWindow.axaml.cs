@@ -347,6 +347,20 @@ namespace ClassicMac.App.Views
             return files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
         }
 
+        public async Task<string?> PickFileAsync(string title, IReadOnlyList<string> extensions)
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = title,
+                FileTypeFilter =
+                [
+                    .. extensions.Select(e => new FilePickerFileType(e.TrimStart('.').ToUpperInvariant()) { Patterns = ["*" + e] }),
+                    FilePickerFileTypes.All,
+                ],
+            });
+            return files.Select(f => f.TryGetLocalPath()).OfType<string>().FirstOrDefault();
+        }
+
         public async Task<string?> PickFolderAsync(string title)
         {
             var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title });

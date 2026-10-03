@@ -52,6 +52,9 @@ namespace ClassicMac.App.ViewModels
     {
         Task<IReadOnlyList<string>> PickFilesAsync();
 
+        /// <summary>One file to open, titled <paramref name="title"/> and offering <paramref name="extensions"/> (with the dot), or null when cancelled.</summary>
+        async Task<string?> PickFileAsync(string title, IReadOnlyList<string> extensions) => (await PickFilesAsync()).FirstOrDefault();
+
         /// <summary>A folder to export into, or null when cancelled.</summary>
         Task<string?> PickFolderAsync(string title);
 

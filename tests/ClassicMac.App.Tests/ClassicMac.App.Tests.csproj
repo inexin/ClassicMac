@@ -20,6 +20,7 @@
     <Compile Include="..\ClassicMac.Files.Tests\NdifBuilder.cs" Link="Builders\NdifBuilder.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\DocumentFixtures.cs" Link="Builders\DocumentFixtures.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\MacWordFixtures.cs" Link="Builders\MacWordFixtures.cs" />
+    <Compile Include="..\ClassicMac.Resources.Decoders.Tests\XlsxBuilder.cs" Link="Builders\XlsxBuilder.cs" />
   </ItemGroup>
 
   <ItemGroup>

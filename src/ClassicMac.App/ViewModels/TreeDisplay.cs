@@ -29,6 +29,9 @@ namespace ClassicMac.App.ViewModels
         [ObservableProperty]
         private bool showDetails;
 
+        /// <summary>The type and creator database the user chose, asked for kinds last (FileKinds); null when none.</summary>
+        internal ClassicMac.Resources.Decoders.Finder.TypeCreatorDatabase? KindDatabase { get; set; }
+
         /// <summary>Raised after a part of the tree was laid out (files read or changed).</summary>
         internal event Action? LaidOut;
 
@@ -262,6 +265,7 @@ namespace ClassicMac.App.ViewModels
             WatchSummary();
             TreeDisplay.LaidOut += ReapplySearch;
             InitRecentFiles(saved.RecentFiles);
+            InitTypeCreatorDatabase(saved.TypeCreatorDatabase);
         }
 
         // What the app remembers: the display options and the recent files, over what else is stored (the theme).

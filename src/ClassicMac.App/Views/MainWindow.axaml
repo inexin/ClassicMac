@@ -989,6 +989,9 @@
         <MenuItem Header="_Hide Invisible Files" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.HideInvisible, Mode=TwoWay}" />
         <MenuItem Header="Show _Details Column" ToggleType="CheckBox" IsChecked="{Binding TreeDisplay.ShowDetails, Mode=TwoWay}" />
         <Separator />
+        <MenuItem Header="Type/Creator Data_base…" Command="{Binding ChooseTypeCreatorDatabaseCommand}" />
+        <MenuItem Header="_Forget Type/Creator Database" Command="{Binding ForgetTypeCreatorDatabaseCommand}" />
+        <Separator />
         <MenuItem Header="_Theme">
           <MenuItem Header="_System" ToggleType="Radio" GroupName="theme" IsChecked="{Binding IsSystemTheme, Mode=OneWay}"
                     Command="{Binding SetThemeCommand}" CommandParameter="{x:Static app:AppTheme.System}" />
