@@ -13,6 +13,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- TCDB's records as ClassicMac's TSV, gzipped (tools/TcdbData; docs/formats/resources/finder.md §2.6). -->
+    <EmbeddedResource Include="Finder\tcdb.tsv.gz" LogicalName="ClassicMac.Resources.Decoders.Finder.tcdb.tsv.gz" Condition="Exists('Finder\tcdb.tsv.gz')" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="ClassicMac.Resources.Decoders.Tests" />
     <InternalsVisibleTo Include="ClassicMac.Graphics.Tests" />
   </ItemGroup>

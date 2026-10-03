@@ -14,6 +14,11 @@
   folder with contents), `rename`, `set` (type, creator, Finder flags), `res-add` and `res-rm`, each with `--dry-run`,
   `--json`, and `-o <new file>` or `--in-place` (keeping `.orig`); plain HFS images and single Mac files are written,
   nothing inside other containers.
+- Decoders: ClassicMac ships TCDB 2003.10 (Type/Creator Database by Ilan Szekely, credited) as its own gzipped TSV
+  (`TypeCreatorDatabase.Shipped`, read on first use; `tools/TcdbData` writes it from TCDB's export, less filext.com's
+  records): kinds the volume and ClassicMac's table do not know come from it, shown as "TCDB". A user's TCDB
+  spreadsheet (the app's setting, the CLI's `--type-creator-db`) replaces it, as "TCDB (your copy)".
+
 - Library: Mac paths (`MacPathTree`, `MacPaths` in `ClassicMac.Files`; docs/cli.md §1): a host file, then Mac names
   joined by ':' or '/' (a backslash escapes them in a name), going into disk images, archives and other containers as
   folders (read one level at a time when entered; a wrapper of one disk passes on to its contents), and on to a file's

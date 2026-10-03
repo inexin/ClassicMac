@@ -11,33 +11,52 @@ using ClassicMac.Core;
 namespace ClassicMac.Resources.Decoders.Finder
 {
     /// <summary>
-    /// A type and creator database the user supplies: a spreadsheet (xlsx) in TCDB's layout, with a header row naming the
-    /// columns File Name, Type, Creator, Comments and Category (docs/formats/resources/finder.md §2.6). It names documents
-    /// that neither the volume nor ClassicMac's own table knows; <see cref="KnownKinds.Resolve"/> asks it last.
+    /// A type and creator database (docs/formats/resources/finder.md §2.6): TCDB's records, which ClassicMac ships as its
+    /// own TSV (<see cref="Shipped"/>), or a spreadsheet (xlsx) in TCDB's layout the user supplies (<see cref="Load"/>),
+    /// which replaces the shipped one. It names documents that neither the volume nor ClassicMac's own table knows;
+    /// <see cref="KnownKinds.Resolve"/> asks it last.
     /// </summary>
     public sealed class TypeCreatorDatabase
     {
         private static readonly XNamespace Main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
         private static readonly FourCC Appl = FourCC.FromString("APPL");
-        private static readonly string[] AnyCode = ["****", "????"];
+        private static readonly FourCC[] AnyCode = [FourCC.FromString("****"), FourCC.FromString("????")];
         private const string Unspecified = "Unspecified Creator";
+
+        /// <summary>The embedded resource holding the shipped data (tools/TcdbData writes it).</summary>
+        internal const string ShippedResource = "ClassicMac.Resources.Decoders.Finder.tcdb.tsv.gz";
+
+        /// <summary>The shipped TSV's column header line.</summary>
+        internal const string TsvHeader = "Type\tCreator\tFile name\tComments\tCategory\tExtension";
+
+        private static readonly Lazy<TypeCreatorDatabase> shipped = new(LoadShipped);
 
         private readonly Dictionary<(FourCC Type, FourCC? Creator), Entry> kinds = [];
         private readonly Dictionary<FourCC, (string Name, int Rank)> applications = [];
 
         private sealed record Entry(string Text, string? Application, int Rank);
 
-        private TypeCreatorDatabase()
-        {
-        }
+        private TypeCreatorDatabase(FinderKindSource source) => Source = source;
+
+        /// <summary>
+        /// TCDB 2003.10 (Type/Creator Database by Ilan Szekely), as ClassicMac ships it: read from the embedded resource the
+        /// first time it is asked for, then kept.
+        /// </summary>
+        public static TypeCreatorDatabase Shipped => shipped.Value;
+
+        /// <summary>Where its kinds say they come from: <see cref="FinderKindSource.Database"/> (shipped) or <see cref="FinderKindSource.UserDatabase"/>.</summary>
+        public FinderKindSource Source { get; }
 
         /// <summary>How many kinds it holds: type and creator pairs, and types for any creator.</summary>
         public int Count => kinds.Count;
 
+        /// <summary>How many records (rows) were read, used or not.</summary>
+        public int RecordCount { get; private set; }
+
         /// <summary>The kind of a document of <paramref name="type"/> and <paramref name="creator"/>: the pair's, else the type's for any creator; null when unknown.</summary>
         public FinderKind? Find(FourCC type, FourCC creator) =>
             kinds.TryGetValue((type, creator), out var entry) || kinds.TryGetValue((type, null), out entry)
-                ? new FinderKind(entry.Text, FinderKindSource.Database, entry.Application, null)
+                ? new FinderKind(entry.Text, Source, entry.Application, null)
                 : null;
 
         /// <summary>The name of the application with <paramref name="signature"/> (its <c>APPL</c> row, else its "any type" row), or null.</summary>
@@ -53,7 +72,7 @@ namespace ClassicMac.Resources.Decoders.Finder
                 using var zip = new ZipArchive(xlsx, ZipArchiveMode.Read, leaveOpen: true);
                 var shared = zip.GetEntry("xl/sharedStrings.xml") is { } strings ? SharedStrings(strings) : [];
                 var sheet = zip.GetEntry("xl/worksheets/sheet1.xml") ?? throw new InvalidDataException("The spreadsheet has no first sheet (xl/worksheets/sheet1.xml).");
-                var database = new TypeCreatorDatabase();
+                var database = new TypeCreatorDatabase(FinderKindSource.UserDatabase);
                 database.Read(Rows(sheet, shared));
                 return database;
             }
@@ -61,6 +80,90 @@ namespace ClassicMac.Resources.Decoders.Finder
             {
                 throw new InvalidDataException($"The spreadsheet's XML cannot be read: {e.Message}", e);
             }
+        }
+
+        /// <summary>Whether this build carries the shipped data (a build without the generated file has none).</summary>
+        public static bool HasShippedData => typeof(TypeCreatorDatabase).Assembly.GetManifestResourceInfo(ShippedResource) is not null;
+
+        // The embedded data; an empty database when the build has none.
+        private static TypeCreatorDatabase LoadShipped()
+        {
+            using var resource = typeof(TypeCreatorDatabase).Assembly.GetManifestResourceStream(ShippedResource);
+            if (resource is null)
+            {
+                return new TypeCreatorDatabase(FinderKindSource.Database);
+            }
+
+            using var unzipped = new GZipStream(resource, CompressionMode.Decompress);
+            using var reader = new StreamReader(unzipped, Encoding.UTF8);
+            return ReadTsv(reader);
+        }
+
+        /// <summary>
+        /// Reads ClassicMac's TSV of TCDB's records (finder.md §2.6): UTF-8, '#' comment lines, then <see cref="TsvHeader"/>,
+        /// then one record a line. Codes are their four bytes, with <c>\xHH</c> for a byte that is not printable ASCII or is a
+        /// backslash; a code of another length is kept in the file and skipped here.
+        /// </summary>
+        /// <exception cref="InvalidDataException">The header is missing, a row has fewer than six columns, or an escape is bad.</exception>
+        internal static TypeCreatorDatabase ReadTsv(TextReader reader)
+        {
+            var database = new TypeCreatorDatabase(FinderKindSource.Database);
+            var header = false;
+            var number = 0;
+            while (reader.ReadLine() is { } line)
+            {
+                number++;
+                if (!header && line.StartsWith('#'))     // comments come before the header ("#BIN" is a type)
+                {
+                    continue;
+                }
+
+                if (!header)
+                {
+                    header = line == TsvHeader ? true : throw new InvalidDataException($"Line {number} is not the header \"{TsvHeader}\".");
+                    continue;
+                }
+
+                var fields = line.Split('\t');
+                if (fields.Length < 6)
+                {
+                    throw new InvalidDataException($"Line {number} has {fields.Length} columns, not 6.");
+                }
+
+                database.RecordCount++;
+                if (Unescape(fields[0], number) is { Length: 4 } type && Unescape(fields[1], number) is { Length: 4 } creator)
+                {
+                    database.Add(new FourCC(type), new FourCC(creator), Blank(fields[2]), Blank(fields[3]), Blank(fields[4]));
+                }
+            }
+
+            return header ? database : throw new InvalidDataException("The data has no header line.");
+        }
+
+        private static string? Blank(string text) => text.Trim() is { Length: > 0 } trimmed ? trimmed : null;
+
+        // A code's bytes from its text: printable ASCII as itself, \xHH for any other byte.
+        private static byte[] Unescape(string text, int line)
+        {
+            var bytes = new List<byte>(4);
+            for (var i = 0; i < text.Length; i++)
+            {
+                if (text[i] != '\\')
+                {
+                    bytes.Add(text[i] is >= ' ' and <= '~' ? (byte)text[i] : throw new InvalidDataException($"Line {line} has a code with a character to escape."));
+                    continue;
+                }
+
+                if (text.Length - i < 4 || text[i + 1] != 'x'
+                    || !byte.TryParse(text.AsSpan(i + 2, 2), System.Globalization.NumberStyles.AllowHexSpecifier, null, out var value))
+                {
+                    throw new InvalidDataException($"Line {line} has a bad escape in a code.");
+                }
+
+                bytes.Add(value);
+                i += 3;
+            }
+            return [.. bytes];
         }
 
         private void Read(IEnumerable<string?[]> rows)
@@ -102,35 +205,25 @@ namespace ClassicMac.Resources.Decoders.Finder
                 }
 
                 string? Cell(int i) => i >= 0 && i < row.Length ? row[i] : null;
-                Add(Cell(type), Cell(creator), Text(Cell(name)), Text(Cell(comments)), Text(Cell(category)));
+                RecordCount++;
+                if (Code(Cell(type)) is { } typeCode && Code(Cell(creator)) is { } creatorCode)   // not a number, four bytes
+                {
+                    Add(typeCode, creatorCode, Text(Cell(name)), Text(Cell(comments)), Text(Cell(category)));
+                }
             }
         }
 
-        // One row: an application's name (an APPL row, or a row for any type), else a document's kind (finder.md §2.6).
-        private void Add(string? typeCell, string? creatorCell, string? name, string? comments, string? category)
+        // One record: an application's name (an APPL record, or one for any type), else a document's kind (finder.md §2.6).
+        private void Add(FourCC typeCode, FourCC creator, string? name, string? comments, string? category)
         {
-            var creatorCode = Code(creatorCell);
-            if (AnyCode.Contains(creatorCell))
-            {
-                creatorCode = null;                         // any creator
-            }
-            else if (creatorCode is null)
-            {
-                return;                                     // a number (Excel's reading of the code), or not four bytes
-            }
-
+            FourCC? creatorCode = AnyCode.Contains(creator) ? null : creator;          // null: any creator
             var application = comments is null || comments.Equals(Unspecified, StringComparison.OrdinalIgnoreCase) ? null : comments;
-            if (AnyCode.Contains(typeCell))
+            if (AnyCode.Contains(typeCode))
             {
                 if (creatorCode is { } any && application is not null)
                 {
                     Name(any, application, 1);
                 }
-                return;
-            }
-
-            if (Code(typeCell) is not { } typeCode)
-            {
                 return;
             }
 

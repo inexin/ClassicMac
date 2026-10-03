@@ -21,6 +21,7 @@ namespace ClassicMac.App.ViewModels
 
         private void InitTypeCreatorDatabase(string? path)
         {
+            _ = Task.Run(() => TypeCreatorDatabase.Shipped);    // the shipped data, read once, before the first kind needs it
             if (path is not null)
             {
                 TypeCreatorDatabaseLoading = LoadKeptTypeCreatorDatabaseAsync(path);

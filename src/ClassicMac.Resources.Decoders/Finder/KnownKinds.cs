@@ -222,7 +222,8 @@ namespace ClassicMac.Resources.Decoders.Finder
                 FinderKindSource.ApplicationName => $"from {kind.Application}, by its file name",
                 FinderKindSource.SystemKind => string.Create(CultureInfo.InvariantCulture, $"from the System’s 'kind' {kind.ResourceId}"),
                 FinderKindSource.FinderKind => string.Create(CultureInfo.InvariantCulture, $"from the Finder’s {(kind.ResourceId == 6902 ? "'STR '" : "'STR#'")} {kind.ResourceId}"),
-                FinderKindSource.Database => "TCDB (your copy)",
+                FinderKindSource.Database => "TCDB",
+                FinderKindSource.UserDatabase => "TCDB (your copy)",
                 _ => "built-in",
             };
         }
@@ -232,9 +233,10 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// else <see cref="System"/>; an edition "&lt;application&gt; edition"; another file with creator <c>'MACS'</c> "system
         /// file"); else <c>GetDocumentKindString</c>'s steps 1–3 on <paramref name="volume"/>; then ClassicMac's table for the
         /// type and creator; the System's <c>'istd'</c> kind; the table for the type; "&lt;the table's name for the
-        /// creator&gt; document"; and last "document". A user-supplied <paramref name="database"/> comes after the Finder's
-        /// kinds and ClassicMac's table: its kind of the type and creator before "&lt;application&gt; document", and its name
-        /// for a creator the table does not know.
+        /// creator&gt; document"; and last "document". The type and creator database (<paramref name="database"/>, a user's
+        /// copy, else <see cref="TypeCreatorDatabase.Shipped"/>) comes after the Finder's kinds and ClassicMac's table: its
+        /// kind of the type and creator before "&lt;application&gt; document", and its name for a creator the table does not
+        /// know.
         /// </summary>
         public static FinderKind Resolve(FinderKindResolver? volume, FourCC type, FourCC creator, TypeCreatorDatabase? database = null)
         {
@@ -280,7 +282,8 @@ namespace ClassicMac.Resources.Decoders.Finder
                 return new FinderKind(generic, FinderKindSource.BuiltIn, known, null);
             }
 
-            if (database?.Find(type, creator) is { } listed)
+            database ??= TypeCreatorDatabase.Shipped;
+            if (database.Find(type, creator) is { } listed)
             {
                 return listed;
             }
@@ -290,8 +293,8 @@ namespace ClassicMac.Resources.Decoders.Finder
                 return new FinderKind(volume?.DocumentOf(known) ?? $"{known} document", FinderKindSource.BuiltIn, known, null);
             }
 
-            return database?.ApplicationName(creator) is { } named
-                ? new FinderKind(volume?.DocumentOf(named) ?? $"{named} document", FinderKindSource.Database, named, null)
+            return database.ApplicationName(creator) is { } named
+                ? new FinderKind(volume?.DocumentOf(named) ?? $"{named} document", database.Source, named, null)
                 : new FinderKind(volume?.DocumentWord ?? "document", FinderKindSource.BuiltIn, null, null);
         }
     }

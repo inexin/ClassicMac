@@ -183,6 +183,7 @@ public sealed class ShellTests : IDisposable
         Assert.StartsWith("# Third-party notices", about.Notices, StringComparison.Ordinal);
         Assert.Contains("IBM Plex", about.Notices, StringComparison.Ordinal);
         Assert.Contains("SIL Open Font License", about.Notices, StringComparison.Ordinal);
+        Assert.Contains("Type/Creator Database (TCDB) by Ilan Szekely, 1996–2003, https://www.lacikam.co.il/tcdb/", about.Notices, StringComparison.Ordinal);
         Assert.Equal(new Uri("https://github.com/inexin/ClassicMac"), about.Repository);
     }
 

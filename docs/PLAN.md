@@ -224,7 +224,7 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 
 | Command | Does | Options | Phase |
 | --- | --- | --- | --- |
-| `info <input>` | Companions, container chain, Finder info, kinds with their source, dates, fork sizes (built) | `--type-creator-db <xlsx>` (the user's TCDB copy, [finder.md §2.6](formats/resources/finder.md#26-a-type-and-creator-database-the-user-supplies); a missing or unreadable file is a usage error, exit 2) | 1 |
+| `info <input>` | Companions, container chain, Finder info, kinds with their source, dates, fork sizes (built) | `--type-creator-db <xlsx>` (the user's TCDB spreadsheet in place of the shipped TCDB, [finder.md §2.6](formats/resources/finder.md#26-the-type-and-creator-database-tcdb); a missing or unreadable file is a usage error, exit 2) | 1 |
 | `list <input>` | Resources of every file inside the input, through containers; a data fork holding a resource fork (Realmz `.rsf`) or a raw fork file is read as a fork (built) | `--format text\|json` | 1 |
 | `unpack <input>` | Every Mac file inside the input, through containers and disk images, to a folder with both forks and Finder info; folders kept, a container of one file replaced by it, a disk or archive of several becomes a folder (built) | `-o <dir>`, `--layout appledouble\|basilisk`, `--overwrite` | 2 |
 | `extract <input>` | Resources into a folder with a manifest; a folder per file when the input holds several; decoded by default; a DOCMaker or SimpleText document also as HTML in `document/` (built) | `-o <dir>`, `--raw`, `--keep-raw`, `-t <type>` (repeatable), `--overwrite`, `--screen-depth`, `--no-documents`; later `--encoding` | 1 (raw), 3 (decoded) |
@@ -1054,13 +1054,19 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   with English copies when they are absent. ClassicMac's own table (`KnownKinds`, its own words, codes cross-checked
   against public lists, none copied) is the fallback when the volume does not say, placed before the `'istd'` kinds
   for exact type and creator pairs.
-- **Type/Creator database is the user's (2026-10-03):** TCDB (Ilan Szekely's Type/Creator Database, 2003) is the
-  largest list of codes, but it is shareware with no licence to redistribute, so ClassicMac never ships it or entries
-  copied from it. A user with a copy can choose its spreadsheet (View ▸ Type/Creator Database…; the path kept in
-  `settings.json`); it is asked last, after the Finder's kinds and ClassicMac's table, and its kinds say "TCDB (your
-  copy)" ([finder.md §2.6](formats/resources/finder.md#26-a-type-and-creator-database-the-user-supplies)). The xlsx is
-  read with the .NET library's zip and XML readers: the spreadsheet packages (ClosedXML, ExcelDataReader, both MIT)
-  are far larger than the three parts needed.
+- **ClassicMac ships TCDB (2026-10-03, the owner's decision):** TCDB (Type/Creator Database by Ilan Szekely,
+  1996–2003) is the largest list of type and creator codes. ClassicMac ships its own copy of TCDB 2003.10, with the
+  file names, descriptions, comments, categories and extensions, credited in THIRD-PARTY-NOTICES.md and the About box.
+  The owner made this call after weighing the licence caveats: TCDB was a free download with no licence to
+  redistribute; the codes and what they belong to are facts, which are not protectable; the EU database right in a
+  2003 database expired about 2018 (fifteen years); the wording of the descriptions may still be. Records TCDB took
+  from filext.com (another site's data, and without codes) are left out. `tools/TcdbData` converts a tab-delimited
+  export into `Finder/tcdb.tsv.gz`, embedded in Resources.Decoders and read on first use; the export is never
+  committed. Kinds ask it after the Finder's kinds and ClassicMac's own table, as "TCDB"
+  ([finder.md §2.6](formats/resources/finder.md#26-the-type-and-creator-database-tcdb)). A user's own TCDB
+  spreadsheet (View ▸ Type/Creator Database…, the CLI's `--type-creator-db`) replaces it, as "TCDB (your copy)"; it
+  is read with the .NET library's zip and XML readers, as the spreadsheet packages (ClosedXML, ExcelDataReader) are
+  far larger than the parts needed. This replaces the decision of the same day to leave TCDB to the user.
 - **Disk images early:** phase 2, right after the core, because much classic software survives only as disk images.
 - **Decoder priority after images:** text, sound, UI, fonts.
 - **Fonts package:** part of `ClassicMac.Graphics` (`ClassicMac.Graphics.Fonts`), on Core only (2026-09-29, revising

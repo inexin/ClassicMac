@@ -25,8 +25,11 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// <summary>ClassicMac's own table, or the built-in English copies of the Finder's and System's strings.</summary>
         BuiltIn,
 
-        /// <summary>A type and creator database the user supplied (<see cref="TypeCreatorDatabase"/>).</summary>
+        /// <summary>The type and creator database ClassicMac ships (TCDB, <see cref="TypeCreatorDatabase.Shipped"/>).</summary>
         Database,
+
+        /// <summary>A type and creator database the user supplied (<see cref="TypeCreatorDatabase.Load"/>), in place of the shipped one.</summary>
+        UserDatabase,
     }
 
     /// <summary>A file's kind, as the Finder's Get Info and list views name it, and where it came from.</summary>

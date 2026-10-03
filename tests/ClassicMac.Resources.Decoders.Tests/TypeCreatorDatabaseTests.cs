@@ -38,7 +38,7 @@ public class TypeCreatorDatabaseTests
         var kind = Load().Find(F("AIFF"), F("ttxt"));
         Assert.NotNull(kind);
         Assert.Equal("SimpleText AIFF Sound File", kind.Text);         // the first row of the pair wins
-        Assert.Equal(FinderKindSource.Database, kind.Source);
+        Assert.Equal(FinderKindSource.UserDatabase, kind.Source);
         Assert.Equal("SimpleText", kind.Application);
         Assert.Null(kind.ResourceId);
     }
@@ -120,10 +120,10 @@ public class TypeCreatorDatabaseTests
         var system = KnownKinds.Resolve(null, F("APPL"), F("Thg2"), database);
         Assert.Equal("application program", system.Text);
         var pair = KnownKinds.Resolve(null, F("THNG"), F("Thng"), database);
-        Assert.Equal(("Thing thing document", FinderKindSource.Database), (pair.Text, pair.Source));
+        Assert.Equal(("Thing thing document", FinderKindSource.UserDatabase), (pair.Text, pair.Source));
         Assert.Equal("Anything file", KnownKinds.Resolve(null, F("ANYT"), F("ZZZZ"), database).Text);
         var named = KnownKinds.Resolve(null, F("ZZZZ"), F("Thg2"), database);
-        Assert.Equal(("Thing Maker document", FinderKindSource.Database, "Thing Maker"), (named.Text, named.Source, named.Application));
+        Assert.Equal(("Thing Maker document", FinderKindSource.UserDatabase, "Thing Maker"), (named.Text, named.Source, named.Application));
         Assert.Equal("document", KnownKinds.Resolve(null, F("ZZZZ"), F("Thg2")).Text);
         Assert.Equal("TCDB (your copy)", KnownKinds.Describe(pair));
     }

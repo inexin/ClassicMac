@@ -259,6 +259,16 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 ```
 
+## Type/Creator Database (TCDB)
+
+Type/Creator Database (TCDB) by Ilan Szekely, 1996–2003, https://www.lacikam.co.il/tcdb/
+
+`tools/TcdbData` converts a tab-delimited export of TCDB 2003.10 into
+`src/ClassicMac.Resources.Decoders/Finder/tcdb.tsv.gz`, which the kinds use (docs/formats/resources/finder.md §2.6):
+its file names, type and creator codes, comments, categories and extensions, less the records TCDB took from
+filext.com. TCDB was a free download with no licence for redistribution; its owner's decision to ship it is recorded in
+docs/PLAN.md (Decisions).
+
 ## Bundled with the viewer app
 
 The app (not the libraries) references these NuGet packages, which ship their own licence files:
