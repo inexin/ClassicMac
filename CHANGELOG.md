@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `format` lays a volume out as Mac OS 9.0's initializer does, traced in its code: the allocation block size, the B-tree
+  sizes and clumps, `drWrCnt` 2 and the root thread's key differed (hfs.md §3.1).
 - CLI: an NDIF (Disk Copy 6) image of an HFS disk can be written: the image is made again around the changed disk
   (unchanged chunks kept as they were, changed ones stored raw, the CRC made again) and saved in its own layout
   (AppleDouble, Basilisk II, MacBinary …); `check` runs the writer's checks on any disk image ClassicMac writes (ndif.md §3).

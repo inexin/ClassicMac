@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Numerics;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
@@ -15,7 +14,8 @@ public static partial class HfsWriter
     public const long MaximumFormatSize = int.MaxValue / BlockSize * BlockSize;
 
     /// <summary>
-    /// A new, empty HFS volume of <paramref name="size"/> bytes named <paramref name="volumeName"/> (hfs.md §3.1): boot
+    /// A new, empty HFS volume of <paramref name="size"/> bytes named <paramref name="volumeName"/>, laid out as Mac OS 9.0's
+    /// initializer lays it out (hfs.md §3.1): boot
     /// blocks zero, the MDB, the bitmap, the extents overflow file and the catalog (with the root folder and its thread)
     /// at the start of the allocation area, and the alternate MDB. <paramref name="created"/> is the creation and
     /// modification date (the local time now when omitted). The result passes <see cref="Check"/>.
@@ -35,38 +35,39 @@ public static partial class HfsWriter
             throw new ArgumentException("A volume name is 1 to 27 Mac OS Roman characters, with no colon.", nameof(volumeName));
         }
 
-        // The allocation block size: the smallest multiple of 512 that keeps drNmAlBlks to 16 bits, the bitmap from
-        // logical block 3 and the allocation area up to the alternate MDB and the spare block at the end [Fitted: Mac OS
-        // 9's 500 MB volume, 8,192-byte blocks, 63,998 of them, drAlBlSt 19].
+        // The layout Mac OS 9.0's HFS initializer computes for N sectors with no caller's values (hfs.md §3.1)
+        // [Code: Mac OS 9.0 ptch -20217 0x2C12]. The allocation block size: ((N >> 16) + 1) × 512, one sector more when
+        // that is a multiple of 65,536 [Code: 0x2C22]; the bitmap from sector 3, one sector per 4,096 blocks of
+        // ⌊N ÷ a⌋; the allocation area after it, up to the alternate MDB and the spare sector at the end.
         long sectors = size / BlockSize;
-        long factor = 1, count, bitmapSectors;
-        while (true)
+        long blockBytes = ((sectors >> 16) + 1) * BlockSize;
+        if (blockBytes % 65536 == 0)
         {
-            bitmapSectors = (sectors / factor + 4095) / 4096;
-            count = (sectors - 3 - bitmapSectors - 2) / factor;
-            if (count <= ushort.MaxValue)
-            {
-                break;
-            }
-
-            factor++;
+            blockBytes += BlockSize;
         }
 
-        uint blockSize = checked((uint)(factor * BlockSize));
+        long factor = blockBytes / BlockSize;
+        long bitmapSectors = (sectors / factor + 4095) / 4096;
+        long count = (sectors - 3 - bitmapSectors - 2) / factor;
+        uint blockSize = checked((uint)blockBytes);
 
-        // Each B-tree file starts as one clump: the next power of two at or above a 512th of the volume, in whole
-        // allocation blocks, at least two nodes [Fitted: Mac OS 9's 500 MB volume, 1 MB each; to be traced].
-        long clump = (long)BitOperations.RoundUpToPowerOf2((ulong)Math.Max(size / 512, 2 * NodeSize));
-        long treeBlocks = (clump + blockSize - 1) / blockSize;
+        // Each B-tree file: min(N ÷ 128, 2,048) sectors rounded down to whole allocation blocks; one block when a block
+        // is 1 MB or more, four when N ≤ 128. It is the files' size and their clump size [Code: 0x2F7A].
+        long treeBlocks = blockBytes >= 1024 * 1024 ? 1 : sectors <= 128 ? 4 : Math.Min(sectors >> 7, 2048) / factor;
         long treeBytes = treeBlocks * blockSize;
-        if (2 * treeBlocks >= count)
+        if (treeBytes < 2 * NodeSize || 2 * treeBlocks >= count)
         {
             throw new ArgumentOutOfRangeException(nameof(size), "The volume is too small for its catalog.");
         }
 
+        // The default clump size: four blocks, or one when four would pass 1 MB [Code: 0x2C12].
+        uint defaultClump = 4 * blockSize > 1024 * 1024 ? blockSize : 4 * blockSize;
+
         uint date = (created ?? MacDate.FromDateTime(DateTime.Now)).Seconds;
         var extents = EmptyTree(treeBytes, 7);
         var catalog = EmptyTree(treeBytes, 37);
+        new BigEndianWriter(extents).WriteUInt32At(0x2E, treeBytes);                  // the header's clump size [Code: 0x1D254]
+        new BigEndianWriter(catalog).WriteUInt32At(0x2E, treeBytes);
         var root = new byte[70];
         root[0] = 1;
         var rootWriter = new BigEndianWriter(root);
@@ -79,7 +80,8 @@ public static partial class HfsWriter
         thread[14] = (byte)nameBytes.Length;
         nameBytes.CopyTo(thread, 15);
         RebuildBTree(extents, [], validateExtents: true);
-        RebuildBTree(catalog, [(CatalogKey(1, volumeName), root), (CatalogKey(2, ""), thread)], validateExtents: false);
+        // The root's thread key is written with key length 6: no name, and no alignment byte counted [Code: 0x1D254].
+        RebuildBTree(catalog, [(CatalogKey(1, volumeName), root), (new byte[] { 6, 0, 0, 0, 0, 2, 0 }, thread)], validateExtents: false);
 
         var image = new byte[size];
         long allocationStart = (3 + bitmapSectors) * BlockSize;
@@ -94,14 +96,15 @@ public static partial class HfsWriter
         mdb.WriteUInt16At(MdbOffset + 0x00, 0x4244);                                  // drSigWord 'BD'
         mdb.WriteUInt32At(MdbOffset + 0x02, date);                                    // drCrDate
         mdb.WriteUInt32At(MdbOffset + 0x06, date);                                    // drLsMod
-        mdb.WriteUInt16At(MdbOffset + 0x0A, 0x0100);                                  // drAtrb: unmounted cleanly [Fitted]
+        mdb.WriteUInt16At(MdbOffset + 0x0A, 0x0100);                                  // drAtrb: unmounted cleanly [Code]
         mdb.WriteUInt16At(MdbOffset + 0x0E, 3);                                       // drVBMSt
         mdb.WriteUInt16At(MdbOffset + 0x12, count);                                   // drNmAlBlks
         mdb.WriteUInt32At(MdbOffset + 0x14, blockSize);                               // drAlBlkSiz
-        mdb.WriteUInt32At(MdbOffset + 0x18, 4 * blockSize);                           // drClpSiz [Fitted]
+        mdb.WriteUInt32At(MdbOffset + 0x18, defaultClump);                            // drClpSiz
         mdb.WriteUInt16At(MdbOffset + 0x1C, 3 + bitmapSectors);                       // drAlBlSt
         mdb.WriteUInt32At(MdbOffset + 0x1E, 16u);                                     // drNxtCNID
         mdb.WriteUInt16At(MdbOffset + 0x22, count - 2 * treeBlocks);                  // drFreeBks
+        mdb.WriteUInt32At(MdbOffset + 0x46, 2u);                                      // drWrCnt: 2 from the initializer [Code]
         image[MdbOffset + 0x24] = (byte)nameBytes.Length;                             // drVN
         nameBytes.CopyTo(image, MdbOffset + 0x25);
         mdb.WriteUInt32At(MdbOffset + 0x4A, treeBytes);                               // drXTClpSiz

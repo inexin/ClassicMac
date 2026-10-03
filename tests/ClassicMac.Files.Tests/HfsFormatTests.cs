@@ -15,28 +15,45 @@ public sealed class HfsFormatTests
 
     private static uint U32(byte[] image, int offset) => BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(offset));
 
+    // Mac OS 9.0's initializer (hfs.md §3.1), traced in its code: the allocation block size, the bitmap, the B-tree files
+    // and the free count for each size, as the trace's table gives them.
     [Theory]
-    [InlineData(400 * 1024, 512)]
-    [InlineData(800 * 1024, 512)]
-    [InlineData(20 * 1024 * 1024, 512)]
-    [InlineData(100 * 1024 * 1024, 2048)]
-    [InlineData(500 * 1024 * 1024, 8192)]                                              // as Mac OS 9.hfv, made by Mac OS
-    public void A_new_volume_is_empty_sound_and_uses_the_smallest_block_size_that_fits(int size, int blockSize)
+    [InlineData(400 * 1024, 512, 4, 794, 3072, 782)]
+    [InlineData(800 * 1024, 512, 4, 1594, 6144, 1570)]
+    [InlineData(1440 * 1024, 512, 4, 2874, 11264, 2830)]
+    [InlineData(20 * 1024 * 1024, 512, 13, 40945, 163840, 40305)]
+    [InlineData(32 * 1024 * 1024, 1024, 0, 0, 0, 0)]                                    // not the smallest size that fits
+    [InlineData(64 * 1024 * 1024, 1536, 0, 0, 0, 0)]
+    [InlineData(100 * 1024 * 1024, 2048, 16, 51195, 819200, 50395)]
+    [InlineData(500 * 1024 * 1024, 8192, 19, 63998, 1048576, 63742)]                    // as Mac OS 9.hfv, made by Mac OS
+    public void A_new_volume_is_laid_out_as_Mac_OS_9_lays_it_out(int size, int blockSize, int allocationStart, int blocks, int treeBytes, int free)
     {
         var image = HfsWriter.Format(size, "Untitled");
 
         Assert.Equal(size, image.Length);
         Assert.Equal(0x4244, U16(image, Mdb));
         Assert.Equal((uint)blockSize, U32(image, Mdb + 0x14));                         // drAlBlkSiz
-        Assert.True(U16(image, Mdb + 0x12) <= 65535);
+        if (blocks != 0)
+        {
+            Assert.Equal((allocationStart, blocks, free), (U16(image, Mdb + 0x1C), U16(image, Mdb + 0x12), U16(image, Mdb + 0x22)));
+            Assert.Equal(((uint)treeBytes, (uint)treeBytes), (U32(image, Mdb + 0x82), U32(image, Mdb + 0x92)));   // drXTFlSize, drCTFlSize
+            Assert.Equal(((uint)treeBytes, (uint)treeBytes), (U32(image, Mdb + 0x4A), U32(image, Mdb + 0x4E)));   // the clumps
+            var catalog = U16(image, Mdb + 0x1C) * 512 + treeBytes;
+            Assert.Equal((uint)treeBytes, U32(image, catalog + 0x2E));                // the header node's clump size
+            Assert.Equal((uint)(treeBytes / 512 - 2), U32(image, catalog + 14 + 26)); // bthFree: header and leaf in use
+        }
+
+        Assert.Equal(2u, U32(image, Mdb + 0x46));                                       // drWrCnt
+        Assert.Equal(0x0100, U16(image, Mdb + 0x0A));                                   // drAtrb
+        uint clump = U32(image, Mdb + 0x18);
+        Assert.Equal(4 * (uint)blockSize > 1024 * 1024 ? (uint)blockSize : 4 * (uint)blockSize, clump);   // drClpSiz
         var info = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!;
         Assert.Equal(("Untitled", 0L, 0L), (info.Name, info.Files, info.Folders));
-        Assert.True(info.FreeBlocks > info.TotalBlocks * 9 / 10);
         Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
         var diagnostics = new List<Diagnostic>();
         Assert.Empty(HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext(diagnostics: diagnostics)));
         Assert.Empty(diagnostics);
-        Assert.Equal(image.AsSpan(Mdb, 162).ToArray(), image.AsSpan(size - 1024, 162).ToArray());   // the alternate MDB
+        Assert.Equal(image.AsSpan(Mdb, 512).ToArray(), image.AsSpan(size - 1024, 512).ToArray());   // the alternate MDB
     }
 
     [Fact]

@@ -297,7 +297,7 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    format: built for Disk Copy 4.2, diskcopy42.md §3, and NDIF, ndif.md §3: changed chunks stored raw; still to do:
    compressing changed chunks, segmented images, checking against Disk Copy in SheepShaver).
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name (built: `HfsWriter.Format`, the CLI's
-   `format`; its sizes fitted to one Mac OS 9 volume until the initializer is traced, hfs.md §3.1).
+   `format`; laid out as Mac OS 9.0's initializer does, traced, hfs.md §3.1).
 8. `resize <volume> --size <n>` (decided 2026-10-03; growing built, hfs.md §3.2): grow a plain HFS volume within its allocation block size
    (`drNmAlBlks` at most 65,535): the image lengthened, the block count and free count raised, the bitmap extended (the
    allocation area moved up when the bitmap's sectors are full) and the alternate MDB moved to the new end, every

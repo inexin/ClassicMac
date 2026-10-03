@@ -456,23 +456,36 @@ are [ClassicMac].
 
 ### 3.1 A new volume
 
-A volume of N 512-byte logical blocks is laid out as below. The structure is §1's; the sizes and the MDB's attribute
-and clump values are fitted to one volume Mac OS 9.0 initialised (500 MB) and are to be checked against the
-initializer's code (§8).
+Mac OS 9.0's HFS initializer, in the File Manager's HFS format code, computes the layout for a volume of N 512-byte
+sectors when its caller gives no values of its own [Code: Mac OS 9.0 ptch −20217 0x2C12]. A volume Finder's Erase made
+at 500 MB has exactly these values [Verified: Mac OS 9.hfv]. Below, a is the allocation block size in sectors.
 
 | Part | Rule | Source |
 | --- | --- | --- |
-| Boot blocks 0–1 | Zero (not a startup disk) | [ClassicMac] |
-| `drAlBlkSiz` | The smallest multiple of 512 for which the allocation blocks fit `drNmAlBlks` (16 bits) | [Fitted: 8,192 for 500 MB] |
-| `drVBMSt`, bitmap | Block 3; ⌈(N ÷ (`drAlBlkSiz` ÷ 512)) ÷ 4096⌉ sectors | [Fitted] |
-| `drAlBlSt` | 3 + the bitmap's sectors | [Fitted: 19 for 500 MB] |
-| `drNmAlBlks` | ⌊(N − `drAlBlSt` − 2) ÷ (`drAlBlkSiz` ÷ 512)⌋: the alternate MDB and the last block outside | [Fitted: 63,998 for 500 MB] |
-| Extents and catalog files | One clump each, the extents file at allocation block 0 and the catalog after it: the next power of two at or above N ÷ 512 × 512 bytes, in whole allocation blocks, as `drXTFlSize`, `drCTFlSize`, `drXTClpSiz`, `drCTClpSiz` | [Fitted: 1 MB each for 500 MB] |
-| `drClpSiz` | 4 allocation blocks | [Fitted] |
-| `drAtrb` | `$0100`, unmounted cleanly | [Fitted] |
-| B-trees | 512-byte nodes; `bthKeyLen` 7 and 37 (§1.8); the extents tree empty (depth 0); the catalog one leaf holding the root folder (key: parent 1 and the volume's name; `dirDirID` 2, `dirVal` 0, the dates) and its thread (key: ID 2, no name; parent 1 and the name) | [Doc: Inside Macintosh: Files] |
-| MDB | `drCrDate` and `drLsMod` the dates given, `drNxtCNID` 16, `drFilCnt`, `drDirCnt`, `drNmFls`, `drNmRtDirs`, `drWrCnt` 0, `drFreeBks` the blocks the trees leave, `drVN` the name (1–27 Mac OS Roman characters, no colon) | [Doc: Inside Macintosh: Files] |
-| Alternate MDB | The MDB's block copied to block N − 2 | [Doc: Inside Macintosh: Files] |
+| Sectors 0 to `drAlBlSt` + both B-trees | Zero (no boot blocks); the rest of the disk is not written | [Code: 0x1D254] |
+| `drAlBlkSiz` | ((N >> 16) + 1) × 512, plus 512 when that is a multiple of 65,536. Not the smallest size that fits: 32 MB gets 1,024, 64 MB 1,536 | [Code: 0x2C22] |
+| `drVBMSt`, bitmap | Sector 3; ⌈⌊N ÷ a⌋ ÷ 4096⌉ sectors | [Code] |
+| `drAlBlSt` | 3 + the bitmap's sectors | [Code] |
+| `drNmAlBlks` | ⌊(N − `drAlBlSt` − 2) ÷ a⌋: the alternate MDB and the last sector outside | [Code] |
+| Extents and catalog files | Each min(N ÷ 128, 2,048) sectors rounded down to whole allocation blocks (one block when a block is 1 MB or more; four when N ≤ 128); the extents file at allocation block 0, the catalog after it; the size is also `drXTClpSiz`, `drCTClpSiz` and each header node's clump size (`+$2E`) | [Code: 0x2F7A] |
+| `drClpSiz` | 4 allocation blocks, or 1 when 4 would exceed 1 MB | [Code] |
+| B-trees | 512-byte nodes, `bthKeyLen` 7 and 37 (§1.8), type and attributes 0; the extents tree empty (free nodes: all but the header); the catalog one leaf (type `$FF`, height 1) holding the root folder (key length ((n + 2) & ~1) + 5 for an n-byte name, parent 1; `dirDirID` 2, `dirVal` 0, created and modified now) and its thread (key length 6, parent 2, no name; parent 1 and the volume's name) | [Code: 0x1D254] |
+| MDB | `drAtrb` `$0100`, `drCrDate` and `drLsMod` now (local time), `drWrCnt` 2, `drNxtCNID` 16, `drFilCnt`, `drDirCnt`, `drNmFls`, `drNmRtDirs` 0 (the root is not counted), `drFreeBks` `drNmAlBlks` − both B-trees' blocks, `drVN` the name | [Code] |
+| Alternate MDB | Sector N − 2, the MDB's copy | [Code] |
+
+| Size | N | `drAlBlkSiz` | `drAlBlSt` | `drNmAlBlks` | Each B-tree | `drFreeBks` |
+| --- | --- | --- | --- | --- | --- | --- |
+| 400 KB | 800 | 512 | 4 | 794 | 3,072 | 782 |
+| 800 KB | 1,600 | 512 | 4 | 1,594 | 6,144 | 1,570 |
+| 1.4 MB | 2,880 | 512 | 4 | 2,874 | 11,264 | 2,830 |
+| 20 MB | 40,960 | 512 | 13 | 40,945 | 163,840 | 40,305 |
+| 100 MB | 204,800 | 2,048 | 16 | 51,195 | 819,200 | 50,395 |
+| 500 MB | 1,024,000 | 8,192 | 19 | 63,998 | 1,048,576 | 63,742 |
+| 2 GB | 4,193,280 | 32,768 | 19 | 65,519 | 1,048,576 | 65,455 |
+
+ClassicMac's `Format` writes this layout, every sector of the image (the rest zero), for 400 KB to just under 2 GB.
+Not traced: whether Finder's Erase passes values of its own (the 500 MB volume agrees with the default path), and
+whether a 400 KB disk gets HFS at all (the format list marks 400K and 720K differently).
 
 ### 3.2 Growing a volume
 
@@ -683,8 +696,10 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
   the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
   `HfsMoveTests.cs` covers moves of files and folders (threads, valences, root counts) and the refusals;
-  `HfsFormatTests.cs` covers new volumes from 400 KB to 500 MB (block sizes, the alternate MDB, the root folder,
-  files and catalog growth on one) and the sizes and names refused;
+  `HfsFormatTests.cs` covers new volumes from 400 KB to 500 MB against §3.1's table (block sizes, bitmap, B-tree
+  sizes and clumps, `drWrCnt`, the alternate MDB, the root folder), files and catalog growth on one, and the sizes and
+  names refused; volumes of 400 KB to 100 MB were compared byte for byte with the traced initializer's output and
+  differ only in their dates;
   `HfsResizeTests.cs` covers growing with room in the bitmap and with the allocation area moved up, and the sizes
   refused; a copy of the 500 MB Mac OS 9 volume grew to 510 MB and passed `check`;
   `HfsLockBlessTests.cs` covers locking, unlocking and blessing and their refusals;
@@ -712,8 +727,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - Writing partition maps, disk image formats, MFS or HFS Plus.
 - Open: the Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (§2.7).
 - Shrinking a volume, and growing one past 65,535 allocation blocks (§3.2).
-- Open: the initializer's sizes for a new volume (§3.1: the allocation block size, the B-tree files' sizes and clumps,
-  `drClpSiz`, `drAtrb`) are fitted to one 500 MB volume, not traced in its code.
+- Open: whether Finder's Erase passes the initializer values of its own, and whether 400 KB disks get HFS (§3.1).
 - No rule in this document is fitted to data alone.
 
 ## 9. References
