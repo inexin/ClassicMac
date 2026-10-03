@@ -46,6 +46,23 @@ namespace ClassicMac.Files
         // Whether a host file's fork holds its file open (for tests).
         internal static bool IsHostFileOpen(ForkData fork) => fork is FileForkData { IsOpen: true };
 
+        /// <summary>
+        /// The array a fork made by <see cref="FromBytes"/> wraps whole, for readers that only read it (no copy); false for
+        /// any other fork. A caller must not change the array.
+        /// </summary>
+        internal bool TryGetArray(out byte[] array)
+        {
+            if (this is BytesForkData { Bytes: var bytes } && MemoryMarshal.TryGetArray(bytes, out var segment) &&
+                segment.Offset == 0 && segment.Count == segment.Array!.Length)
+            {
+                array = segment.Array;
+                return true;
+            }
+
+            array = [];
+            return false;
+        }
+
         // The host files' forks holding their file open.
         private static readonly ConcurrentDictionary<FileForkData, byte> OpenFiles = new();
 
@@ -197,6 +214,8 @@ namespace ClassicMac.Files
 
         private sealed class BytesForkData(ReadOnlyMemory<byte> bytes) : ForkData
         {
+            public ReadOnlyMemory<byte> Bytes => bytes;
+
             public override long Length => bytes.Length;
 
             // Over the bytes themselves when they are an array's, without copying.

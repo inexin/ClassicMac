@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: fork edits are checked by records and blocks instead of reading every file, and whole-image copies are made only
+  when written: on a 500 MB volume `check` takes 0.13 s instead of 0.6 s, adding a file 1.4 s instead of 2.7 s, a fork
+  edit 0.4 s instead of 0.63 s, and peak memory halves (hfs.md §5.5).
 - `format` lays a volume out as Mac OS 9.0's initializer does, traced in its code: the allocation block size, the B-tree
   sizes and clumps, `drWrCnt` 2 and the root thread's key differed (hfs.md §3.1).
 - CLI: an NDIF (Disk Copy 6) image of an HFS disk can be written: the image is made again around the changed disk

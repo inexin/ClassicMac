@@ -29,7 +29,7 @@ namespace ClassicMac.Files.Hfs
                 throw new ArgumentException("Use a colon-separated HFS path without empty components.", nameof(macPath));
             }
 
-            byte[] source = image.ToArray();
+            byte[] source = Bytes(image);
             var sourceReader = new BigEndianReader(source);
             if (source.Length < MdbOffset + MdbSize || U16(sourceReader, MdbOffset) != 0x4244)
             {
@@ -83,6 +83,8 @@ namespace ClassicMac.Files.Hfs
             var catalog = ReadFork(source, firstBlock, blockSize, blockCount, catalogExtents, U32(mdb, 0x92), overflow, 0, 4, true);
             ValidateCatalogTree(catalog);
             var catalogRecords = LeafRecords(catalog).ToArray();
+            var catalogBefore = catalogRecords.Select(r => (r.Key, r.Data.ToArray())).ToList();
+            var overflowBefore = extFileRecords.Select(r => (r.Key, r.Data.ToArray())).ToList();
             // Names as Mac OS Roman text to match the caller's path, and escaped as MacFile.MacPath shows them.
             var folders = new Dictionary<uint, (uint Parent, string Name)>();
             var shownFolders = new Dictionary<uint, (uint Parent, string Name)>();
@@ -236,6 +238,8 @@ namespace ClassicMac.Files.Hfs
             ValidateExtentsTree(ReadFork(result, firstBlock, blockSize, blockCount, extFileExtents,
                 U32(new BigEndianReader(result), MdbOffset + 0x82), overflow, 0xFF, 3, false));
             Verify(source, result, canonicalPath, fork, data.Span, writeTime, newlyAllocatedBlocks, releasedBlocks);
+            var targetBlocks = new HashSet<uint>(extents.SelectMany(e => Enumerable.Range(e.Start, e.Count).Select(b => (uint)b)));
+            VerifyKept(source, result, catalogBefore, [Convert.ToHexString(match.Key)], 0, overflowBefore, [fileId], targetBlocks);
             return result;
         }
 
@@ -522,6 +526,9 @@ namespace ClassicMac.Files.Hfs
             primary.CopyTo(context.CatalogRecord.Data, context.ExtentOffset);
             return new ForkResizeResult(changedTree, 0, releasedBlocks);
         }
+
+        // An image's bytes to read: the array itself when the fork wraps one whole (nothing here changes it), else a copy.
+        private static byte[] Bytes(ForkData image) => image.TryGetArray(out var array) ? array : image.ToArray();
 
         private static IEnumerable<TreeRecord> LeafRecords(byte[] tree)
         {
@@ -1552,39 +1559,27 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The original or rewritten HFS volume has structural errors; the edit was not verified.");
             }
 
-            var oldFiles = before.ToDictionary(f => f.MacPath, StringComparer.Ordinal);
-            var newFiles = after.ToDictionary(f => f.MacPath, StringComparer.Ordinal);
-            if (oldFiles.Count != newFiles.Count || oldFiles.Keys.Any(path => !newFiles.ContainsKey(path)))
+            // The target only: its metadata, the changed fork and the other one. Every other file is checked by its records
+            // and blocks (VerifyKept), without reading its forks.
+            var oldFile = before.FirstOrDefault(f => StringComparer.Ordinal.Equals(f.MacPath, targetPath));
+            var newFile = after.FirstOrDefault(f => StringComparer.Ordinal.Equals(f.MacPath, targetPath));
+            if (oldFile is null || newFile is null || before.Count != after.Count)
             {
                 throw new InvalidDataException("The rewritten HFS volume did not preserve its file list.");
             }
 
-            foreach (var (path, oldFile) in oldFiles)
+            if (!SameMetadata(oldFile, newFile, includeModified: false) || newFile.Modified != new MacDate(macWriteTime))
             {
-                var newFile = newFiles[path];
-                bool target = StringComparer.Ordinal.Equals(path, targetPath);
-                if (!SameMetadata(oldFile, newFile, includeModified: !target) ||
-                    (target && newFile.Modified != new MacDate(macWriteTime)))
-                {
-                    throw new InvalidDataException($"The rewritten HFS volume changed metadata incorrectly for '{path}'.");
-                }
+                throw new InvalidDataException($"The rewritten HFS volume changed metadata incorrectly for '{targetPath}'.");
+            }
 
-                if (target)
-                {
-                    var changed = changedFork == HfsFork.Data ? newFile.DataFork : newFile.ResourceFork;
-                    var unchanged = changedFork == HfsFork.Data ? newFile.ResourceFork : newFile.DataFork;
-                    var oldUnchanged = changedFork == HfsFork.Data ? oldFile.ResourceFork : oldFile.DataFork;
-                    if (!changed.ToArray().AsSpan().SequenceEqual(expected) ||
-                        !unchanged.ToArray().AsSpan().SequenceEqual(oldUnchanged.ToArray()))
-                    {
-                        throw new InvalidDataException($"The rewritten HFS volume did not preserve both forks for '{path}'.");
-                    }
-                }
-                else if (!oldFile.DataFork.ToArray().AsSpan().SequenceEqual(newFile.DataFork.ToArray()) ||
-                    !oldFile.ResourceFork.ToArray().AsSpan().SequenceEqual(newFile.ResourceFork.ToArray()))
-                {
-                    throw new InvalidDataException($"The rewritten HFS volume changed a fork in unrelated file '{path}'.");
-                }
+            var changed = changedFork == HfsFork.Data ? newFile.DataFork : newFile.ResourceFork;
+            var unchanged = changedFork == HfsFork.Data ? newFile.ResourceFork : newFile.DataFork;
+            var oldUnchanged = changedFork == HfsFork.Data ? oldFile.ResourceFork : oldFile.DataFork;
+            if (!changed.ToArray().AsSpan().SequenceEqual(expected) ||
+                !unchanged.ToArray().AsSpan().SequenceEqual(oldUnchanged.ToArray()))
+            {
+                throw new InvalidDataException($"The rewritten HFS volume did not preserve both forks for '{targetPath}'.");
             }
         }
 

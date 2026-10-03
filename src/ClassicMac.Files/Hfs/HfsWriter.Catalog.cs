@@ -513,16 +513,28 @@ public static partial class HfsWriter
         AddShortCount(state.Result, 0x22, checked((int)released));
         state.Bitmap.CopyTo(state.Result, state.BitmapOffset);
         var result = CommitCatalog(state);
-        VerifyKept(state.Source, result, before, removedKeys, parent);
+        VerifyKept(state.Source, result, before, removedKeys, parent, overflow.Select(r => (r.Key, r.Data)).ToList(), fileIds, []);
         return result;
     }
 
-    // After a deletion: the result opens as the writer opens a volume (its trees, counts, bitmap and extents agree), every
-    // catalog record kept is byte for byte the source's (the parent folder's valence aside), and every allocated block
-    // outside the catalog and extents files is the source's, so no file kept has changed.
-    private static void VerifyKept(byte[] source, byte[] result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent)
+    // After an edit: the result opens as the writer opens a volume (its trees, counts, bitmap and extents agree); every
+    // catalog record kept is byte for byte the source's (except the records in removedKeys, and the parent folder's
+    // valence); every extents overflow record is the source's except those of the files in overflowFiles and of the
+    // B-tree files; and every allocated block outside the catalog and extents files and skipBlocks is the source's. So no
+    // file kept has changed, without reading any fork.
+    private static void VerifyKept(byte[] source, byte[] result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
+        List<(byte[] Key, byte[] Data)> overflowBefore, HashSet<uint> overflowFiles, HashSet<uint> skipBlocks)
     {
         var after = OpenCatalog(ForkData.FromBytes(result), writable: false);
+        bool Kept(byte[] key) => !overflowFiles.Contains(U32(new BigEndianReader(key), 2)) && U32(new BigEndianReader(key), 2) is not (3 or 4);
+        var overflowAfter = LeafRecords(after.ExtentsTree).Where(r => Kept(r.Key)).ToDictionary(r => Convert.ToHexString(r.Key), r => r.Data);
+        var overflowKept = overflowBefore.Where(r => Kept(r.Key)).ToList();
+        if (overflowKept.Count != overflowAfter.Count ||
+            overflowKept.Any(r => !overflowAfter.TryGetValue(Convert.ToHexString(r.Key), out var now) || !now.AsSpan().SequenceEqual(r.Data)))
+        {
+            throw new InvalidDataException("The edited HFS extents tree changed a record of a file it kept.");
+        }
+
         var records = after.Records.ToDictionary(r => Convert.ToHexString(r.Key), r => r.Data);
         foreach (var (key, data) in before)
         {
@@ -550,7 +562,7 @@ public static partial class HfsWriter
 
         for (uint block = 0; block < after.BlockCount; block++)
         {
-            if (system.Contains(block) || !IsAllocated(after.Bitmap, (ushort)block))
+            if (system.Contains(block) || skipBlocks.Contains(block) || !IsAllocated(after.Bitmap, (ushort)block))
             {
                 continue;
             }
@@ -568,8 +580,12 @@ public static partial class HfsWriter
         List<(ushort Start, ushort Count)> catalogExtents, List<(byte[] Key, byte[] Data)> records,
         uint firstBlock, uint blockSize, uint blockCount, int bitmapOffset, byte[] bitmap)
     {
+        private byte[]? result;
+
         public byte[] Source { get; } = source;
-        public byte[] Result { get; } = source.ToArray();
+
+        // The image being edited: a copy of the source, made when first written (a check never makes it).
+        public byte[] Result => result ??= Source.ToArray();
         public byte[] Catalog { get; set; } = catalog;
         public byte[] ExtentsTree { get; set; } = extentsTree;
         public List<(ushort Start, ushort Count)> ExtentsTreeExtents { get; } = extentsTreeExtents;
@@ -595,7 +611,7 @@ public static partial class HfsWriter
     public static string? Check(ForkData image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        PlainVolume(image.ToArray());
+        PlainVolume(Bytes(image));
         try
         {
             OpenCatalog(image, writable: false);
@@ -628,7 +644,7 @@ public static partial class HfsWriter
     private static CatalogEditState OpenCatalog(ForkData image, bool writable = true)
     {
         ArgumentNullException.ThrowIfNull(image);
-        byte[] source = image.ToArray();
+        byte[] source = Bytes(image);
         var mdb = PlainVolume(source);
         if (writable && (U16(mdb, 0x0A) & 0x8000) != 0)
         {

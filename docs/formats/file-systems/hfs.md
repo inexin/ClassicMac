@@ -638,9 +638,12 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   `CreateFolder` take optional creation and modification dates, both the local time of the call when omitted.
 - Names are compared with the `_RelString` weights of §1.11, generated as 256 weights, for catalog order, duplicate
   names and every part of a path.
-- After the edit, the writer reopens the result with the reader and compares the file list, Finder information, dates,
-  paths, the changed forks and both forks of every other file, and validates both B-trees again (index graph, links,
-  node maps, counts, key order). Any structural diagnostic or difference fails the operation.
+- After the edit, the writer reopens the result with the reader and validates both B-trees again (index graph, links,
+  node maps, counts, key order). For a fork replaced, it compares the file's metadata and both its forks, and checks
+  every other file without reading its forks: the result passes the checks made before an edit, every other catalog
+  record and extents overflow record is byte for byte the source's, and every allocated block outside the edited file
+  and the B-tree files is the source's. Any structural diagnostic or difference fails the operation. The source is read
+  in place when it is already in memory, and the copy to edit is made only when something is written.
 - A deletion (`Delete`, `DeleteFile`) removes a file, or a folder with everything below it, in one pass: every fork's
   blocks (overflow extents included) are freed and their overflow records removed, the records and threads removed,
   and the counts changed once. It is then checked without reading any fork: the result passes the checks made before
