@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Viewer: byte meanings for `'CODE'` resources in the hex inspector: `'CODE'` 0's A5 sizes and jump-table entries
+  (near and far forms, the far marker), a segment's near or far header field by field, its code and far relocation
+  lists.
 - Viewer: help pages' CSS pictures (`url(…)` in stylesheets, `style` elements and `style` attributes) are put into
   the page, resolved from the stylesheet's own folder.
 - Viewer: styled text (SimpleText files, TEXT + styl) is drawn on white paper in the dark theme too, so its black runs

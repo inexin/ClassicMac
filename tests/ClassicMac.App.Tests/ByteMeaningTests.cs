@@ -41,6 +41,20 @@ public sealed class ByteMeaningTests : IDisposable
         Assert.Null(model.MeaningAt(compressed, 0));                         // the hex view shows its compressed bytes
     }
 
+    // 'CODE' by its ID: 'CODE' 0's jump table, another segment's header and code (code-segments.md).
+    [Fact]
+    public async Task Code_resources_have_meanings_by_their_ID()
+    {
+        var fork = new ResourceFork();
+        fork.Add(new Resource(FourCC.FromString("CODE"), 0, new byte[] { 0, 0, 0, 0x28, 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0x20, 0, 0, 0x3F, 0x3C, 0, 1, 0xA9, 0xF0 }));
+        fork.Add(new Resource(FourCC.FromString("CODE"), 1, new byte[] { 0, 0, 0, 1, 0x4E, 0x75 }));
+        var (model, input) = await Open("App.rsrc", fork);
+        var segments = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "CODE").Children.OfType<ResourceNode>().ToList();
+        Assert.Equal(new ByteMeaning("Entry 0: segment", 20, 2, "1"), model.MeaningAt(segments.Single(r => r.Resource.Id == 0), 21));
+        Assert.Equal(new ByteMeaning("Number of jump-table entries", 2, 2, "1"), model.MeaningAt(segments.Single(r => r.Resource.Id == 1), 3));
+        Assert.Equal(new ByteMeaning("Code, at +$0000", 4, 2, null), model.MeaningAt(segments.Single(r => r.Resource.Id == 1), 4));
+    }
+
     [Fact]
     public async Task Other_types_use_a_template_from_an_open_file_or_have_none()
     {

@@ -237,6 +237,11 @@ None.
   A long patched inside the far header is kept without a diagnostic. [ClassicMac]
 - `SegmentHeader.EntryIndices` caps a pair at 65,536 entries. [ClassicMac]
 - When both CodeWarrior and Retro68 shapes are present, Retro68 wins (§2.1's order). [ClassicMac]
+- The hex inspector's byte meanings (`ByteMeanings.MeaningAt` with the resource's ID): `'CODE'` 0's four sizes (§1.2)
+  and each jump-table entry's words by §1.3's forms (near: offset, `MOVE.W`, segment, `_LoadSeg`; the far marker at
+  entry 1; far: segment, `_LoadSeg`, offset); another segment's near or far header field by field (§1.4), then its code
+  as one field up to the first far relocation list, and each list (§1.5) to the next or the end. The form is decided per
+  resource as §1.3 and §1.4 say, without reading `'CODE'` 0 for a segment. [ClassicMac]
 
 Segments are exported with a listing and a model as [disassembly.md](../output/disassembly.md) describes.
 

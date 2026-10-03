@@ -39,6 +39,153 @@ namespace ClassicMac.Resources.Decoders.Templates
             };
         }
 
+        /// <summary>
+        /// The meaning of the byte at <paramref name="offset"/> of resource <paramref name="id"/>: as the other overload,
+        /// and for <c>'CODE'</c> its layout by ID (docs/formats/code/code-segments.md §1.2–§1.5): <c>'CODE'</c> 0's A5
+        /// world and jump-table entries, another segment's near or far header, its code and far relocation lists.
+        /// </summary>
+        public static ByteMeaning? MeaningAt(FourCC type, short id, ReadOnlySpan<byte> data, int offset, ResourceTemplate? template)
+        {
+            if (offset < 0 || offset >= data.Length)
+            {
+                return null;
+            }
+
+            return type.ToString() == "CODE" ? (id == 0 ? InJumpTable(data, offset) : InSegment(data, offset)) : MeaningAt(type, data, offset, template);
+        }
+
+        private static string Hex(int word) => "$" + word.ToString("X4", CultureInfo.InvariantCulture);
+
+        private static int Word(ReadOnlySpan<byte> data, int at) => at + 2 <= data.Length ? data[at] << 8 | data[at + 1] : -1;
+
+        private static long Long(ReadOnlySpan<byte> data, int at) =>
+            at + 4 <= data.Length ? (long)(uint)(data[at] << 24 | data[at + 1] << 16 | data[at + 2] << 8 | data[at + 3]) : -1;
+
+        // 'CODE' 0 (§1.2–§1.3): the four sizes, then 8-byte entries from +$10; entry 1 the far marker in a far table, whose
+        // later entries are segment, _LoadSeg and a 4-byte offset; near entries offset, MOVE.W #segment, segment, _LoadSeg.
+        private static ByteMeaning? InJumpTable(ReadOnlySpan<byte> data, int offset)
+        {
+            if (offset < 16)
+            {
+                var at = offset & ~3;
+                var label = (at / 4) switch
+                {
+                    0 => "Bytes above A5",
+                    1 => "Bytes below A5 (the globals)",
+                    2 => "Jump table size",
+                    _ => "Jump table offset from A5",
+                };
+                return Long(data, at) is >= 0 and var value ? new ByteMeaning(label, at, 4, Number(value)) : null;
+            }
+
+            var entry = (offset - 16) / 8;
+            var start = 16 + 8 * entry;
+            if (start + 8 > data.Length)
+            {
+                return null;
+            }
+
+            var far = data.Length >= 32 && Word(data, 24) == 0 && Word(data, 26) == 0xFFFF && Long(data, 28) == 0;
+            var name = $"Entry {entry}";
+            if (far && entry == 1)
+            {
+                return new ByteMeaning($"{name}: the far table's marker", start, 8, null);
+            }
+
+            var within = offset - start;
+            if (far && entry > 1)
+            {
+                return within switch
+                {
+                    < 2 => new ByteMeaning($"{name}: segment", start, 2, Number(Word(data, start))),
+                    < 4 => new ByteMeaning($"{name}: _LoadSeg", start + 2, 2, Hex(Word(data, start + 2))),
+                    _ => new ByteMeaning($"{name}: offset in segment {Word(data, start)}", start + 4, 4, Number(Long(data, start + 4))),
+                };
+            }
+
+            var segment = Word(data, start + 4);
+            return (within / 2) switch
+            {
+                0 => new ByteMeaning($"{name}: offset in segment {segment}'s code", start, 2, Number(Word(data, start))),
+                1 => new ByteMeaning($"{name}: MOVE.W #segment,-(SP)", start + 2, 2, Hex(Word(data, start + 2))),
+                2 => new ByteMeaning($"{name}: segment", start + 4, 2, Number(segment)),
+                _ => new ByteMeaning($"{name}: _LoadSeg", start + 6, 2, Hex(Word(data, start + 6))),
+            };
+        }
+
+        // A segment (§1.4–§1.5): the near header (first entry's offset, entry count) or the far one (marker $FFFF, the
+        // near and far entries, the relocation lists' offsets and last relocations), then the code, then any far
+        // relocation lists to the end.
+        private static ByteMeaning? InSegment(ReadOnlySpan<byte> data, int offset)
+        {
+            static string Entry(long jtOffset) => $"(entry {jtOffset / 8})";
+            if (Word(data, 0) != 0xFFFF)
+            {
+                if (offset < 4)
+                {
+                    if (offset < 2)
+                    {
+                        return new ByteMeaning($"First jump-table entry, as an offset {Entry(Word(data, 0))}", 0, 2, Number(Word(data, 0)));
+                    }
+
+                    return Word(data, 2) is >= 0 and var count ? new ByteMeaning("Number of jump-table entries", 2, 2, Number(count)) : null;
+                }
+
+                return new ByteMeaning($"Code, at +${offset - 4:X4}", 4, data.Length - 4, null);
+            }
+
+            if (offset < 0x28)
+            {
+                if (offset < 4)
+                {
+                    return offset < 2 ? new ByteMeaning("Far header marker", 0, 2, "$FFFF") : new ByteMeaning("Reserved", 2, 2, Number(Word(data, 2)));
+                }
+
+                var at = offset & ~3;
+                var value = Long(data, at);
+                if (value < 0)
+                {
+                    return null;
+                }
+
+                var label = at switch
+                {
+                    0x04 => $"First near jump-table entry, as an offset {Entry(value)}",
+                    0x08 => "Number of near entries",
+                    0x0C => $"First far jump-table entry, as an offset {Entry(value)}",
+                    0x10 => "Number of far entries",
+                    0x14 => "A5 relocation list's offset",
+                    0x18 => "A5 at the last relocation",
+                    0x1C => "PC relocation list's offset",
+                    0x20 => "Address at the last relocation",
+                    _ => "Reserved",
+                };
+                return new ByteMeaning(label, at, 4, Number(value));
+            }
+
+            // The relocation lists, each from its offset to the next list or the end; the code before the first.
+            var length = data.Length;
+            var lists = new[] { (Offset: Long(data, 0x14), Name: "A5 relocation list"), (Offset: Long(data, 0x1C), Name: "PC relocation list") }
+                .Where(l => l.Offset >= 0x28 && l.Offset < length).OrderBy(l => l.Offset).ToList();
+            var codeEnd = lists.Count > 0 ? (int)lists[0].Offset : data.Length;
+            if (offset < codeEnd)
+            {
+                return new ByteMeaning($"Code, at +${offset - 0x28:X4}", 0x28, codeEnd - 0x28, null);
+            }
+
+            for (var i = 0; i < lists.Count; i++)
+            {
+                var from = (int)lists[i].Offset;
+                var to = i + 1 < lists.Count ? (int)lists[i + 1].Offset : data.Length;
+                if (offset >= from && offset < to)
+                {
+                    return new ByteMeaning(lists[i].Name, from, to - from, null);
+                }
+            }
+
+            return null;
+        }
+
         private static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
         private static string Character(byte b) => MacRoman.Decode([b]);

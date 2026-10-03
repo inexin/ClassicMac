@@ -436,8 +436,9 @@ namespace ClassicMac.App.ViewModels
             }
 
             var type = node.Resource.Type;
-            var template = type.ToString() is "STR " or "STR#" ? null : FindTemplate(type, node.Fork, FileOwner(node))?.Template;
-            return (data, offset) => ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, data, offset, template);
+            var id = node.Resource.Id;
+            var template = type.ToString() is "STR " or "STR#" or "CODE" ? null : FindTemplate(type, node.Fork, FileOwner(node))?.Template;
+            return (data, offset) => ClassicMac.Resources.Decoders.Templates.ByteMeanings.MeaningAt(type, id, data, offset, template);
         }
 
         // A template form for a resource without a typed form, when a template for its type is at hand.

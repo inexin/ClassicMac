@@ -40,6 +40,62 @@ public class ByteMeaningsTests
         Assert.Equal(new ByteMeaning("Number of strings", 0, 2, "0"), ByteMeanings.MeaningAt(StrList, [0], 0, null)); // cut short
     }
 
+    private static readonly FourCC Code = FourCC.FromString("CODE");
+
+    private static byte[] Words(params int[] words) => [.. words.SelectMany(w => new[] { (byte)(w >> 8), (byte)w })];
+
+    // 'CODE' 0 (code-segments.md §1.2–§1.3): the A5 world's sizes, then the jump table's 8-byte entries, near or far.
+    [Fact]
+    public void Code_0_s_header_and_jump_table_entries()
+    {
+        byte[] near = [.. Words(0, 0x30, 0, 0x100, 0, 16, 0, 0x20), .. Words(0, 0x3F3C, 1, 0xA9F0), .. Words(4, 0x3F3C, 1, 0xA9F0)];
+        ByteMeaning? At(byte[] data, int offset) => ByteMeanings.MeaningAt(Code, 0, data, offset, null);
+        Assert.Equal(new ByteMeaning("Bytes above A5", 0, 4, "48"), At(near, 3));
+        Assert.Equal(new ByteMeaning("Bytes below A5 (the globals)", 4, 4, "256"), At(near, 4));
+        Assert.Equal(new ByteMeaning("Jump table size", 8, 4, "16"), At(near, 8));
+        Assert.Equal(new ByteMeaning("Jump table offset from A5", 12, 4, "32"), At(near, 12));
+        Assert.Equal(new ByteMeaning("Entry 0: offset in segment 1's code", 16, 2, "0"), At(near, 17));
+        Assert.Equal(new ByteMeaning("Entry 0: MOVE.W #segment,-(SP)", 18, 2, "$3F3C"), At(near, 18));
+        Assert.Equal(new ByteMeaning("Entry 0: segment", 20, 2, "1"), At(near, 20));
+        Assert.Equal(new ByteMeaning("Entry 0: _LoadSeg", 22, 2, "$A9F0"), At(near, 23));
+        Assert.Equal(new ByteMeaning("Entry 1: offset in segment 1's code", 24, 2, "4"), At(near, 24));
+
+        // A far table: entry 1 is the marker; later entries are segment, _LoadSeg, a 4-byte offset.
+        byte[] far = [.. Words(0, 0x38, 0, 0x100, 0, 24, 0, 0x20), .. Words(0, 0x3F3C, 1, 0xA9F0), .. Words(0, 0xFFFF, 0, 0), .. Words(2, 0xA9F0, 0, 40)];
+        Assert.Equal(new ByteMeaning("Entry 1: the far table's marker", 24, 8, null), At(far, 27));
+        Assert.Equal(new ByteMeaning("Entry 2: segment", 32, 2, "2"), At(far, 32));
+        Assert.Equal(new ByteMeaning("Entry 2: _LoadSeg", 34, 2, "$A9F0"), At(far, 35));
+        Assert.Equal(new ByteMeaning("Entry 2: offset in segment 2", 36, 4, "40"), At(far, 39));
+        Assert.Null(At(near, near.Length));
+    }
+
+    // A segment (code-segments.md §1.4): the near header (4 bytes) or the far one ($28 bytes), then the code.
+    [Fact]
+    public void A_segment_s_header_and_its_code()
+    {
+        byte[] near = [.. Words(8, 2), .. Words(0x4E56, 0, 0x4E5E, 0x4E75)];
+        ByteMeaning? At(byte[] data, int offset) => ByteMeanings.MeaningAt(Code, 1, data, offset, null);
+        Assert.Equal(new ByteMeaning("First jump-table entry, as an offset (entry 1)", 0, 2, "8"), At(near, 1));
+        Assert.Equal(new ByteMeaning("Number of jump-table entries", 2, 2, "2"), At(near, 2));
+        Assert.Equal(new ByteMeaning("Code, at +$0002", 4, 8, null), At(near, 6));
+
+        byte[] far = [.. Words(0xFFFF, 0, 0, 8, 0, 1, 0, 16, 0, 3, 0, 0x30, 0, 0, 0, 0, 0, 0, 0, 0), .. Words(0x4E75, 0, 0, 0), .. Words(0x0001, 0x0008, 0, 0)];
+        Assert.Equal(new ByteMeaning("Far header marker", 0, 2, "$FFFF"), At(far, 0));
+        Assert.Equal(new ByteMeaning("First near jump-table entry, as an offset (entry 1)", 4, 4, "8"), At(far, 7));
+        Assert.Equal(new ByteMeaning("Number of near entries", 8, 4, "1"), At(far, 8));
+        Assert.Equal(new ByteMeaning("First far jump-table entry, as an offset (entry 2)", 12, 4, "16"), At(far, 12));
+        Assert.Equal(new ByteMeaning("Number of far entries", 16, 4, "3"), At(far, 16));
+        Assert.Equal(new ByteMeaning("A5 relocation list's offset", 20, 4, "48"), At(far, 20));
+        Assert.Equal(new ByteMeaning("A5 at the last relocation", 24, 4, "0"), At(far, 24));
+        Assert.Equal(new ByteMeaning("PC relocation list's offset", 28, 4, "0"), At(far, 28));
+        Assert.Equal(new ByteMeaning("Address at the last relocation", 32, 4, "0"), At(far, 32));
+        Assert.Equal(new ByteMeaning("Reserved", 36, 4, "0"), At(far, 36));
+        Assert.Equal(new ByteMeaning("A5 relocation list", 48, 8, null), At(far, 50)); // from its offset to the end
+        Assert.Equal(new ByteMeaning("Code, at +$0000", 40, 8, null), At(far, 40));
+        // Without an ID ('CODE' with the old overload), nothing: whether it is 'CODE' 0 decides the layout.
+        Assert.Null(ByteMeanings.MeaningAt(Code, near, 0, null));
+    }
+
     private static ResourceTemplate Template(params (string Label, string Type)[] fields) => ResourceTemplate.Parse(TemplateTests.Tmpl(fields));
 
     [Fact]
