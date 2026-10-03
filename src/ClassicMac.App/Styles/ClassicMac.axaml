@@ -100,6 +100,25 @@
     <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
   </Style>
 
+  <!-- Alias files: the header's original path, the preview's strip over the original (CmRowHighlight, a divider under
+       it) and the card when the original is not found. -->
+  <Style Selector="StackPanel.alias-original">
+    <Setter Property="Margin" Value="0,4,0,2" />
+  </Style>
+  <Style Selector="Border.alias-strip">
+    <Setter Property="Background" Value="{DynamicResource CmRowHighlight}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmDivider}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="12,6" />
+  </Style>
+  <Style Selector="Border.alias-strip TextBlock">
+    <Setter Property="Margin" Value="0,0,8,0" />
+  </Style>
+  <Style Selector="Border.alias-missing">
+    <Setter Property="Margin" Value="16" />
+    <Setter Property="Padding" Value="16,12" />
+  </Style>
+
   <!-- Severity badges: a pill, the severity colour on its tint (boards/diagnostics.md). -->
   <Style Selector="Border.badge">
     <Setter Property="CornerRadius" Value="9" />

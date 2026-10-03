@@ -134,7 +134,7 @@ namespace ClassicMac.App.ViewModels
             foreach (var item in items.Where(i => FileOf(i) is not null))
             {
                 item.Parent = node;
-                (item.Alias, item.IsItalic, item.NameTokens, item.NameBytes) = (null, false, null, null);
+                (item.Alias, item.IsItalic, item.NameTokens, item.NameBytes) = (null, item.IsAliasFile, null, null);
             }
             var group = node.Children.OfType<NoNameGroupNode>().FirstOrDefault();
             List<NodeViewModel> desired;

@@ -288,12 +288,14 @@ namespace ClassicMac.App.ViewModels
         private void OnSelectedChanged(NodeViewModel? value)
         {
             TakeHexEdit();                       // unchanged bytes (changed ones were applied or discarded before the move)
-            Details = DetailsViewModel.For(value, ProblemsIn(value));
+            SelectedAlias = Aliases.Of(value, Roots);
+            Details = DetailsViewModel.For(value, ProblemsIn(value), SelectedAlias);
             OnSelectionChangedForInspector();
             // The hex view comes once the preview is known: only a resource without one shows its bytes.
             Hex = HexViewModel.Empty;
             HexSource = null;
-            PreviewTask = MakePreviewAsync(value);
+            // An alias previews its original (with a strip above); one whose original is not found shows a card instead.
+            PreviewTask = MakePreviewAsync(SelectedAlias is { } alias ? alias.Target : value);
         }
 
         partial void OnScreenDepthChanged(int value) => PreviewTask = MakePreviewAsync(Selected);

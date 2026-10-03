@@ -642,6 +642,18 @@ namespace ClassicMac.App.Views
     {
         public static readonly StyledProperty<NodeViewModel?> NodeProperty = AvaloniaProperty.Register<TreeIcon, NodeViewModel?>(nameof(Node));
 
+        // The alias badge, 7 × 7 pixels: a box with an arrow up and to the right ('#' black, '.' white).
+        private static readonly string[] AliasBadge =
+        [
+            "#######",
+            "#.###.#",
+            "#..##.#",
+            "#.#.#.#",
+            "##....#",
+            "#.....#",
+            "#######",
+        ];
+
         private NodeViewModel? watched;
         private Bitmap? own;
         private bool watchingViewport;
@@ -744,7 +756,25 @@ namespace ClassicMac.App.Views
             var slot = (int)Math.Round(TreeIcons.Size * scaling);
             int w = bitmap.PixelSize.Width * k, h = bitmap.PixelSize.Height * k;
             using var snap = PushSnap(context);
-            context.DrawImage(bitmap, new Rect((slot - w) / 2 / scaling, (slot - h) / 2 / scaling, w / scaling, h / scaling));
+            var left = (slot - w) / 2 / scaling;
+            var top = (slot - h) / 2 / scaling;
+            context.DrawImage(bitmap, new Rect(left, top, w / scaling, h / scaling));
+            // An alias file without its own (Finder-badged) icon: a 7-pixel arrow badge at the bottom left, as the
+            // Finder's alias badge sits.
+            if (own is null && Node is { IsAliasFile: true })
+            {
+                var u = k / scaling;
+                var x0 = left;
+                var y0 = top + h / scaling - 7 * u;
+                for (var y = 0; y < 7; y++)
+                {
+                    for (var x = 0; x < 7; x++)
+                    {
+                        var black = AliasBadge[y][x] == '#';
+                        context.FillRectangle(black ? Brushes.Black : Brushes.White, new Rect(x0 + x * u, y0 + y * u, u, u));
+                    }
+                }
+            }
         }
     }
 }

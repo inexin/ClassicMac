@@ -132,12 +132,15 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        /// <summary>The details of <paramref name="node"/>, with the errors and warnings reported for it.</summary>
-        public static DetailsViewModel For(NodeViewModel? node, int problems = 0) => node switch
+        /// <summary>
+        /// The details of <paramref name="node"/>, with the errors and warnings reported for it and, for an alias file, the
+        /// Alias card from <paramref name="alias"/>.
+        /// </summary>
+        public static DetailsViewModel For(NodeViewModel? node, int problems = 0, AliasLink? alias = null) => node switch
         {
             InputNode input => Input(input, problems),
-            ContainerFileNode container => File(container, container.File, container.ContentFormat, null, problems),
-            FileNode file => File(file, file.File, null, file.Resources, problems),
+            ContainerFileNode container => File(container, container.File, container.ContentFormat, null, problems, alias),
+            FileNode file => File(file, file.File, null, file.Resources, problems, alias),
             FolderNode folder => new DetailsViewModel(folder.Title,
                 [new("Folder", [new("Kind", "Folder"), new("Items", folder.Items!.Count.ToString(CultureInfo.InvariantCulture))])]),
             NoNameGroupNode group => new DetailsViewModel(group.Title,
@@ -183,7 +186,7 @@ namespace ClassicMac.App.ViewModels
             return new DetailsViewModel(input.Title, groups, problems: problems);
         }
 
-        private static DetailsViewModel File(NodeViewModel node, MacFile file, string? holds, FileResources? resources, int problems)
+        private static DetailsViewModel File(NodeViewModel node, MacFile file, string? holds, FileResources? resources, int problems, AliasLink? alias)
         {
             var info = file.FinderInfo;
             var kind = FileKinds.Of(node);
@@ -242,13 +245,18 @@ namespace ClassicMac.App.ViewModels
                 Flags = FlagNames.Select(f => new FinderFlagChip(f.Name, f.Flag == FinderFlags.None ? file.IsLocked : (info.Flags & f.Flag) != 0)).ToList(),
             };
             var chain = Chain(node);
-            var groups = new List<DetailGroup>
+            var groups = new List<DetailGroup> { new("File", fileRows) };
+            if (alias is not null)
             {
-                new("File", fileRows),
+                groups.Add(AliasGroup(alias));
+            }
+
+            groups.AddRange(
+            [
                 new("Forks", forkRows),
                 Dates(file, DateNote(chain.Count > 1 ? chain[^2].Text : "", VolumeAbove(node))),
                 flags,
-            };
+            ]);
             // A disk image's file: the volume in it.
             if (node is ContainerFileNode container && VolumeOf(container.Node) is { } volume)
             {
@@ -257,6 +265,31 @@ namespace ClassicMac.App.ViewModels
 
             groups.Add(new("How it was read", [], Wide: true) { Chain = chain });
             return new DetailsViewModel(file.Name.ToMacRoman(), groups, parent, problems);
+        }
+
+        // The Alias card (docs/formats/resources/aliases.md §5): where the alias points, whether that resolves and how, and
+        // the record's IDs and dates.
+        private static DetailGroup AliasGroup(AliasLink link)
+        {
+            var resolution = link.Resolution;
+            var alias = resolution.Alias;
+            var rows = new List<DetailRow>
+            {
+                new("Original", resolution.StoredPath, Mono: true),
+                new("Volume", alias.VolumeName.ToMacRoman()),
+                new("Found", resolution.Found ? $"Yes, {resolution.How}" : "No"),
+            };
+            if (resolution.Found)
+            {
+                rows.Add(new("Now at", resolution.ResolvedPath, Mono: true));
+            }
+
+            var number = alias.TargetId.ToString(CultureInfo.InvariantCulture);
+            rows.Add(new("Parent ID", alias.ParentId.ToString(CultureInfo.InvariantCulture), Mono: true));
+            rows.Add(alias.Kind == AliasKind.Folder ? new("Folder ID", number, Mono: true) : new("File ID", number, Mono: true));
+            rows.Add(new("Created", DisplayDate(alias.TargetCreated, false), Mono: true));
+            rows.Add(new("Volume created", DisplayDate(alias.VolumeCreated, false), Mono: true));
+            return new DetailGroup("Alias", rows);
         }
 
         private const string LocalNote = "Mac local time, as stored. No time zone.";

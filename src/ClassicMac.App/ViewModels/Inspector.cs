@@ -20,6 +20,20 @@ namespace ClassicMac.App.ViewModels
     /// </summary>
     public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kind, IReadOnlyList<InspectorFact> Facts)
     {
+        /// <summary>For an alias file, where its original is ("Mac OS 9: System Folder: Note Pad"); null otherwise.</summary>
+        public string? Original { get; init; }
+
+        public bool HasOriginal => Original is not null;
+
+        /// <summary>An alias's kind line: "Alias to Note Pad · application program", or "· original not found".</summary>
+        internal static string AliasKind(AliasLink link) => $"Alias to {link.TargetName} · " + link.Target switch
+        {
+            FileNode or ContainerFileNode => FileKinds.Of(link.Target).Text,
+            FolderNode => "folder",
+            InputNode or null when link.Resolution.Found => "disk",
+            _ => "original not found",
+        };
+
         /// <summary>What a resource of <paramref name="type"/> is called ("Text style"), else the type in quotes.</summary>
         internal static string TypeName(string type) => KnownKinds.ResourceType(FourCC.FromString(type)) is { } names ? names.One : $"'{type}'";
 
@@ -213,6 +227,11 @@ namespace ClassicMac.App.ViewModels
             get
             {
                 var header = InspectorHeader.For(Selected, IsEditingForm ? Form?.DraftLength : null);
+                if (header is not null && SelectedAlias is { } alias && ReferenceEquals(alias.Alias, Selected))
+                {
+                    header = header with { Kind = InspectorHeader.AliasKind(alias), Original = alias.Path };
+                }
+
                 // A resource shown through a template says which (boards/template-form.md).
                 return header is not null && Form is TemplateForm { ShownThrough: { } through }
                     ? header with { Facts = [.. header.Facts, new InspectorFact("Shown through", through, false)] }

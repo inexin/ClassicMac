@@ -90,7 +90,7 @@ namespace ClassicMac.App.ViewModels
         {
             TreeDisplay.KindDatabase = database;
             HasTypeCreatorDatabase = database is not null;
-            Details = DetailsViewModel.For(Selected, ProblemsIn(Selected));
+            Details = DetailsViewModel.For(Selected, ProblemsIn(Selected), SelectedAlias);
             OnPropertyChanged(nameof(Header));
         }
     }

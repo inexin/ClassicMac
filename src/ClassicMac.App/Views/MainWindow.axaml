@@ -978,6 +978,8 @@
         </MenuItem>
         <MenuItem Header="_Revert" Command="{Binding RevertCommand}" />
         <Separator />
+        <MenuItem Header="Show _Original" Command="{Binding ShowOriginalCommand}" InputGesture="Ctrl+R" HotKey="Ctrl+R" />
+        <Separator />
         <MenuItem Header="_Quit" Click="OnQuit" />
       </MenuItem>
       <MenuItem Header="_Edit">
@@ -1334,6 +1336,13 @@
               <TextBlock x:Name="HeaderName" Classes="heading" Text="{Binding Header.Name, FallbackValue={x:Null}}"
                          IsVisible="{Binding !Header.Node.HasNameTokens, FallbackValue=True}" />
               <TextBlock Classes="muted kind" Text="{Binding Header.Kind, FallbackValue={x:Null}}" />
+              <!-- An alias file: where its original is, and Show Original (Ctrl+R) when it is found. -->
+              <StackPanel x:Name="AliasOriginal" Classes="alias-original" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Header.HasOriginal, FallbackValue=False}">
+                <TextBlock Classes="mono original" Text="{Binding Header.Original, FallbackValue={x:Null}}" TextTrimming="CharacterEllipsis"
+                           ToolTip.Tip="{Binding Header.Original, FallbackValue={x:Null}}" VerticalAlignment="Center" />
+                <Button x:Name="ShowOriginalButton" Content="Show Original" Command="{Binding ShowOriginalCommand}"
+                        IsVisible="{Binding AliasStrip, Converter={x:Static ObjectConverters.IsNotNull}}" ToolTip.Tip="Ctrl+R" />
+              </StackPanel>
               <ItemsControl ItemsSource="{Binding Header.Facts, FallbackValue={x:Null}}">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate>
@@ -1456,6 +1465,26 @@
           <TabItem Header="Preview">
             <Panel>
             <DockPanel IsVisible="{Binding !ShowsForm}">
+              <!-- An alias previews its original under this strip (docs/formats/resources/aliases.md §5). -->
+              <Border x:Name="AliasStripBar" DockPanel.Dock="Top" Classes="alias-strip" IsVisible="{Binding AliasStrip, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <DockPanel>
+                  <Button DockPanel.Dock="Right" Content="Show Original" Command="{Binding ShowOriginalCommand}" />
+                  <TextBlock Text="{Binding AliasStrip}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </DockPanel>
+              </Border>
+              <!-- An alias whose original is not found: what it recorded instead of a preview. -->
+              <Border x:Name="AliasNotFoundCard" DockPanel.Dock="Top" Classes="detail-card alias-missing" IsVisible="{Binding AliasNotFound}">
+                <StackPanel Spacing="4">
+                  <TextBlock Classes="heading" Text="Original not found" />
+                  <ItemsControl ItemsSource="{Binding AliasNotFoundLines}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate DataType="x:String">
+                        <TextBlock Classes="mono muted" Text="{Binding}" TextWrapping="Wrap" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
               <Panel>
                 <TextBlock Text="{Binding Preview.Message}" Margin="16" Classes="muted" IsVisible="{Binding Preview.IsMessage}" />
                 <!-- The image grid (boards/main-window.md, P1): the sub-bar, then the cards cut into rows by the view-model

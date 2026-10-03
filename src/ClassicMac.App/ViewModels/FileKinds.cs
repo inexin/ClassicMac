@@ -73,7 +73,7 @@ namespace ClassicMac.App.ViewModels
 
         // The container whose files are the node's neighbours: the input's, or the disk image's or archive's above it; a
         // container holding one file that holds others (a disk image around a disk) stands for that file.
-        private static ContainerNode? Holder(NodeViewModel node)
+        internal static ContainerNode? Holder(NodeViewModel node)
         {
             for (var at = node.Parent; at is not null; at = at.Parent)
             {
@@ -89,7 +89,7 @@ namespace ClassicMac.App.ViewModels
             return null;
         }
 
-        private static ContainerNode Holder(ContainerNode holder)
+        internal static ContainerNode Holder(ContainerNode holder)
         {
             while (holder is { Children: [{ Children.Count: > 0 } only] })
             {

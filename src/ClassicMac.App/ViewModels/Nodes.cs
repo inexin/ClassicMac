@@ -84,6 +84,14 @@ namespace ClassicMac.App.ViewModels
 
         public bool HasNameTokens => NameTokens is { Count: > 0 };
 
+        /// <summary>Whether this is an alias file (the Finder's isAlias flag): the tree shows it in italics with a badge.</summary>
+        public bool IsAliasFile => this switch
+        {
+            FileNode file => ClassicMac.Files.AliasResolver.IsAlias(file.File),
+            ContainerFileNode container => ClassicMac.Files.AliasResolver.IsAlias(container.File),
+            _ => false,
+        };
+
         /// <summary>The title without the unsaved-edits mark.</summary>
         public string BaseTitle { get; }
 
