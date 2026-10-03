@@ -131,7 +131,7 @@ public class WordBinaryTests
         var diagnostics = new List<Diagnostic>();
         var data = Builder().Text("a\u001Eb\u001Fc\u0001d\ve\r").Build();
 
-        Assert.Equal("a‑b­cd\re\r", Assert.Single(Read(data, diagnostics).Chapters).Text.Text);
+        Assert.Equal("a‑b­cd" + (char)0x2028 + "e\r", Assert.Single(Read(data, diagnostics).Chapters).Text.Text); // \v: a line break
         Assert.Equal(["word.not-shown"], diagnostics.Select(d => d.Code));
     }
 

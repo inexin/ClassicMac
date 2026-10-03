@@ -1038,9 +1038,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   [word-binary.md](formats/documents/word-binary.md), by [MS-DOC], in a compound file read by `CompoundFile`,
   [compound-file.md](formats/containers/compound-file.md), by [MS-CFB]; verified only against fixtures built from the
   specifications). `W6BN` Word 6 (built, in the same reader: no public specification, so its structures follow other
-  readers' behaviour, LibreOffice, Apache POI and wv, and two are assumed from Word 97's; word-binary.md §4.1).
-  Needs real sample documents of each version, especially Word 6 and Word 98 ones and Word 5 ones saved without Fast
-  Save; until then only the Word 5 reading of a real file is verified.
+  readers' behaviour, LibreOffice, Apache POI and wv, and two are assumed from Word 97's; word-binary.md §4.1;
+  checked against 10 documents Word 6.0 for the Macintosh wrote). Still needed: Word 98 documents, and fast-saved
+  Word 6 ones.
 - [ ] **PCE MAR** input (Inputs, priority 3). Blocked: no sample, and its layout is published only in GPL source.
 - [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files ([rom.md](formats/disk-images/rom.md); 68k ROMs
   unverified).

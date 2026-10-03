@@ -147,6 +147,63 @@ public class WordSampleTests
         Assert.True(RunAt(Read(version + "-formats-fast"), " FAST MIDc").Italic);
     }
 
+    // Word 6.0 for the Macintosh ('W6BN'): a compound file whose FIB starts $A5DC, nFib 104 (word-binary.md §4.1).
+    private static StyledDocument ReadWord6(string name, List<Diagnostic>? diagnostics = null)
+    {
+        var document = WordBinaryDocuments.Read(DataFork(name), name, diagnostics: diagnostics ?? []);
+        Assert.NotNull(document);
+        return document!;
+    }
+
+    [Fact]
+    public void Word_6_plain_text_reads()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var document = ReadWord6("w6-plain", diagnostics);
+
+        Assert.Equal(["Plain text test document.", "The quick brown fox jumps over the lazy dog 0123456789.",
+            "Mac Roman: é ü ß • ™ © “quoted” – en — em.", "Tab:\tafter tab. Line one\u2028line two."], Paragraphs(document));
+        Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error);
+        Assert.Equal("FAST START Plain text test document.", Paragraphs(ReadWord6("w6-plain-fast"))[0]);
+    }
+
+    [Fact]
+    public void Word_6_character_and_paragraph_formats_read()
+    {
+        var formats = ReadWord6("w6-formats");
+        Assert.True(RunAt(formats, "Bold run").Bold);
+        Assert.True(RunAt(formats, "Italic run").Italic);
+        Assert.True(RunAt(formats, "Underline run").Underline);
+        Assert.True(RunAt(formats, "Outline run").Outline);
+        Assert.True(RunAt(formats, "Shadow run").Shadow);
+        Assert.Contains("ALL CAPS RUN.", formats.Chapters[0].Text.Text);
+        Assert.DoesNotContain("Hidden run", formats.Chapters[0].Text.Text);
+        Assert.Equal("Times", RunAt(formats, "Times run").FontName);
+        Assert.Equal("Geneva", RunAt(formats, "Geneva run").FontName);
+        Assert.Equal((9, 24), (RunAt(formats, "Size 9 run").Size, RunAt(formats, "Size 24 run").Size));
+        Assert.False(RunAt(formats, "Format: Normal").Bold);
+        Assert.True(RunAt(formats, "Small caps run").SmallCaps);
+        var red = RunAt(formats, "Red run");
+        Assert.Equal(((byte)0xFF, (byte)0x00, (byte)0x00), (red.Red, red.Green, red.Blue));     // Word 6's colour 6, red
+
+        var paragraphs = ReadWord6("w6-paragraphs");
+        Assert.Equal(Justification.Center, FormatAt(paragraphs, "Centered paragraph").Justification);
+        Assert.Equal(Justification.Right, FormatAt(paragraphs, "Right aligned").Justification);
+        Assert.Equal(36.0, FormatAt(paragraphs, "Left indent 0.5").LeftIndent);
+        Assert.Equal((36.0, -36.0), (FormatAt(paragraphs, "Hanging indent").LeftIndent, FormatAt(paragraphs, "Hanging indent").FirstLineIndent));
+        Assert.Equal((6.0, 12.0), (FormatAt(paragraphs, "Space before 6").SpaceBefore, FormatAt(paragraphs, "Space before 6").SpaceAfter));
+        Assert.Equal((0.0, 0.0), (FormatAt(paragraphs, "Normal paragraph after").SpaceBefore, FormatAt(paragraphs, "Normal paragraph after").SpaceAfter));
+    }
+
+    [Fact]
+    public void Word_6_table_reads_as_rows_of_cells()
+    {
+        var document = ReadWord6("w6-table");
+        var table = Assert.Single(document.Chapters[0].Tables);
+        Assert.Equal([-5.4, 144.0, 288.0, 432.0], table.CellEdges);
+        Assert.Equal(["Table follows.", "A1\tB1\tC1\t", "A2\tB2\tC2\t", "A3\tB3\tC3\t", "Text after table."], Paragraphs(document));
+    }
+
     [Fact]
     public void The_HTML_has_line_breaks_small_caps_colour_and_a_real_table()
     {

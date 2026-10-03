@@ -19,6 +19,9 @@ namespace ClassicMac.Resources.Decoders.Documents
     public static class WordBinaryDocuments
     {
         private const ushort WordIdent = 0xA5EC;
+
+        // Word 6 and 95's FIB identifier [Verified: Word 6.0 for the Macintosh documents; Reference: Apache POI].
+        private const ushort Word6Ident = 0xA5DC;
         private const int Page = 512;
 
         /// <summary>The first nFib of Word 97's FIB ([MS-DOC] §2.5.2); earlier ones are Word 6 and 95's.</summary>
@@ -72,7 +75,7 @@ namespace ClassicMac.Resources.Decoders.Documents
 
             var document = file.ReadStream(entry);
             var span = document.Span;
-            if (span.Length < 0x20 || BinaryPrimitives.ReadUInt16LittleEndian(span) != WordIdent)
+            if (span.Length < 0x20 || BinaryPrimitives.ReadUInt16LittleEndian(span) is not (WordIdent or Word6Ident))
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.bad-fib", $"\"{title}\": the WordDocument stream does not start with a Word FIB."));
                 return null;
@@ -116,10 +119,20 @@ namespace ClassicMac.Resources.Decoders.Documents
         internal readonly record struct Piece(int Cp, int CpEnd, long Fc, bool Compressed, ushort Prm);
 
         // Character properties as far as ClassicMac shows them.
-        internal readonly record struct Chp(bool Bold, bool Italic, bool Outline, bool Shadow, bool Caps, bool Hidden, bool Underline, int Font, int HalfPoints);
+        internal readonly record struct Chp(bool Bold, bool Italic, bool Outline, bool Shadow, bool Caps, bool Hidden, bool Underline, int Font, int HalfPoints,
+            bool SmallCaps = false, int Ico = 0);
+
+        // The Ico colours ([MS-DOC] §2.9.119): 0 automatic, 1 black, 2 blue, 3 cyan, 4 green, 5 magenta, 6 red, 7 yellow,
+        // 8 white, 9–16 the dark ones and grey [Doc; Verified: 6 is red in Word 6.0 for the Macintosh].
+        private static readonly (byte, byte, byte)[] Icos =
+        [
+            (0, 0, 0), (0, 0, 0), (0, 0, 0xFF), (0, 0xFF, 0xFF), (0, 0xFF, 0), (0xFF, 0, 0xFF), (0xFF, 0, 0), (0xFF, 0xFF, 0), (0xFF, 0xFF, 0xFF),
+            (0, 0, 0x80), (0, 0x80, 0x80), (0, 0x80, 0), (0x80, 0, 0x80), (0x80, 0, 0), (0x80, 0x80, 0), (0x80, 0x80, 0x80), (0xC0, 0xC0, 0xC0),
+        ];
 
         // Paragraph properties, in twips.
-        internal sealed record Pap(Justification Justification, int Left, int Right, int FirstLine, int Before, int After, bool InTable, bool RowEnd);
+        internal sealed record Pap(Justification Justification, int Left, int Right, int FirstLine, int Before, int After, bool InTable, bool RowEnd,
+            short[]? CellEdges = null);
 
         private sealed record Style(int Base, int Type, byte[] Papx, byte[] Chpx);
 
@@ -532,7 +545,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                 25 => (1, 0x2417),
                 29 => (1, 0),
                 12 or 15 or 23 or 64 or 68 or 74 or 77 or 79 or 81 or 82 or 103 or 105 or 106 or 108 or >= 111 and <= 116 or 179 or 181 or 191 or 207 => (-1, 0),
-                65 or 66 or 67 or 71 or 75 or 90 or 100 or 102 or 104 or 117 or 118 or 119 => (1, 0),
+                65 or 66 or 67 or 71 or 75 or 100 or 102 or 104 or 117 or 118 or 119 => (1, 0),
+                90 => (1, 0x083A),
                 69 or 72 or 80 or 96 or 97 or 101 or 107 or 109 or 110 or >= 121 and <= 124 => (2, 0),
                 70 => (4, 0),
                 73 or 95 => (3, 0),
@@ -546,7 +560,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                 92 => (1, 0x083C),
                 93 => (2, 0x4A4F),
                 94 => (1, 0x2A3E),
-                98 => (1, 0),
+                98 => (1, 0x2A42),
                 99 => (2, 0x4A43),
                 131 or 132 or 138 or 139 or 142 or 143 or 146 or 147 or 150 or 151 or 152 or 153 or 158 or 159 or 162 or 185 or 186 => (1, 0),
                 136 or 137 => (3, 0),
@@ -554,7 +568,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                 133 => (-1, 0),
                 163 => (0, 0),
                 187 => (12, 0),
-                188 or 190 => (-2, 0),
+                188 => (-2, 0),
+                190 => (-2, 0xD608),
                 192 or 194 or 196 or 200 => (4, 0),
                 193 or 199 => (5, 0),
                 _ => (-3, 0),
@@ -646,6 +661,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                         0x0839 => chp with { Shadow = Toggle(operand[0], style.Shadow) },
                         0x083B => chp with { Caps = Toggle(operand[0], style.Caps) },
                         0x083C => chp with { Hidden = Toggle(operand[0], style.Hidden) },
+                        0x083A => chp with { SmallCaps = Toggle(operand[0], style.SmallCaps) },
+                        0x2A42 => chp with { Ico = operand[0] },
                         0x2A3E => chp with { Underline = operand[0] != 0 },
                         0x4A43 => chp with { HalfPoints = BinaryPrimitives.ReadUInt16LittleEndian(operand) },
                         0x4A4F => chp with { Font = BinaryPrimitives.ReadUInt16LittleEndian(operand) },
@@ -681,11 +698,26 @@ namespace ClassicMac.Resources.Decoders.Documents
                         0xA414 => pap with { After = (ushort)Word() },
                         0x2416 => pap with { InTable = operand[0] != 0 },
                         0x2417 => pap with { RowEnd = operand[0] != 0 },
+                        // sprmTDefTable ([MS-DOC] §2.6.5): a size word, the cell count, then the row's left edge and each
+                        // cell's right edge (twips) [Verified: Word 6.0 for the Macintosh, its sprm 190].
+                        0xD608 when operand.Length >= 3 => pap with { CellEdges = Edges(operand) },
                         _ => pap,
                     };
                 }
 
                 return pap;
+            }
+
+            private static short[] Edges(byte[] operand)
+            {
+                var count = operand[2];
+                var edges = new List<short>();
+                for (var k = 0; k <= count && 4 + 2 * k <= operand.Length; k++)
+                {
+                    edges.Add(BinaryPrimitives.ReadInt16LittleEndian(operand.AsSpan(3 + 2 * k)));
+                }
+
+                return [.. edges];
             }
 
             private static int Find(List<(long From, long To, byte[] Block)> runs, long fc)
@@ -719,6 +751,9 @@ namespace ClassicMac.Resources.Decoders.Documents
                 var output = new StringBuilder(text.Count);
                 var runs = new List<TextRun>();
                 var formats = new List<ParagraphFormat>();
+                var tables = new List<DocumentTable>();
+                int? tableStart = null;
+                short[]? tableEdges = null;
                 var inField = new Stack<bool>();                 // per open field: whether its result has begun
                 for (var start = 0; start < text.Count;)
                 {
@@ -734,6 +769,22 @@ namespace ClassicMac.Resources.Decoders.Documents
                     var istd = block.Length >= 2 ? BinaryPrimitives.ReadUInt16LittleEndian(block) : 0;
                     var (styleChp, stylePap) = StyleProperties(istd);
                     var pap = block.Length > 2 ? ApplyPap(stylePap, block[2..]) : stylePap;
+                    // A table: the rows from its first cell to the paragraph after its last row.
+                    if (pap.InTable && tableStart is null)
+                    {
+                        tableStart = output.Length;
+                    }
+                    else if (!pap.InTable && tableStart is { } open)
+                    {
+                        tables.Add(new DocumentTable(open, output.Length, tableEdges?.Select(e => e / 20.0).ToArray() ?? []));
+                        (tableStart, tableEdges) = (null, null);
+                    }
+
+                    if (pap.RowEnd && pap.CellEdges is { } edges)
+                    {
+                        tableEdges ??= edges;
+                    }
+
                     formats.Add(new ParagraphFormat(output.Length, pap.Justification, pap.Left / 20.0, pap.Right / 20.0, pap.FirstLine / 20.0,
                         pap.Before / 20.0, pap.After / 20.0));
                     for (var i = start; i <= end; i++)
@@ -770,7 +821,8 @@ namespace ClassicMac.Resources.Decoders.Documents
 
                         char? shown = c switch
                         {
-                            '\r' or '\v' or '\f' or '\u000E' => '\r',
+                            '\r' or '\f' or '\u000E' => '\r',
+                            '\v' => (char)0x2028,                                // a line break within the paragraph [Verified: Word 6.0]
                             '\t' => '\t',
                             '\a' => pap.RowEnd ? '\r' : '\t',
                             '\u001E' => '‑',
@@ -793,7 +845,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                         var face = (byte)((chp.Bold ? 0x01 : 0) | (chp.Italic ? 0x02 : 0) | (chp.Underline ? 0x04 : 0) | (chp.Outline ? 0x08 : 0)
                             | (chp.Shadow ? 0x10 : 0));
                         var size = chp.HalfPoints / 2;
-                        var textRun = new TextRun(output.Length, 1, (short)chp.Font, name, size > 0 ? size : 10, face, 0, 0, 0);
+                        var (red, green, blue) = Icos[chp.Ico is >= 0 and < 17 ? chp.Ico : 0];
+                        var textRun = new TextRun(output.Length, 1, (short)chp.Font, name, size > 0 ? size : 10, face, red, green, blue) { SmallCaps = chp.SmallCaps };
                         if (runs.Count > 0 && runs[^1] with { Start = textRun.Start, Length = 1 } == textRun && runs[^1].Start + runs[^1].Length == textRun.Start)
                         {
                             runs[^1] = runs[^1] with { Length = runs[^1].Length + 1 };
@@ -809,9 +862,15 @@ namespace ClassicMac.Resources.Decoders.Documents
                     start = end + 1;
                 }
 
+                if (tableStart is { } last)
+                {
+                    tables.Add(new DocumentTable(last, output.Length, tableEdges?.Select(e => e / 20.0).ToArray() ?? []));
+                }
+
                 var chapter = new DocumentChapter(1, title, new StyledText(output.ToString(), runs, true), Justification.Left, null, [], 0)
                 {
                     Paragraphs = formats,
+                    Tables = tables,
                 };
                 return new StyledDocument(DocumentKind.Word, title, [chapter], []);
             }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documents: Word 6 documents read: checked against 10 that Word 6.0 for the Macintosh wrote, their FIB identifier
+  ($A5DC) is now accepted; line breaks, small caps, colour and tables (as HTML tables) as for Word 4 and 5.
 - Documents: Word 4 and 5 checked against 21 documents Word 4.0 and 5.1a wrote (now test fixtures): styles are found by
   their number, not their place (Normal paragraphs no longer took Heading 1's spacing and font); line breaks stay in
   their paragraph; small caps and colour show; tables are HTML tables with their cell widths; fast-saved documents

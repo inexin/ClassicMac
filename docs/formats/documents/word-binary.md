@@ -10,9 +10,9 @@ into a styled document, which the viewer shows and `convert` and `extract` write
 
 | | |
 | --- | --- |
-| Identified by | Type `'W8BN'` or `'W6BN'`; a compound file with a WordDocument stream that starts `$A5EC`: nFib `$00C1` or more for Word 97, `$0065`–`$0068` for Word 6 and 95 |
+| Identified by | Type `'W8BN'` or `'W6BN'`; a compound file with a WordDocument stream that starts `$A5EC` (Word 97, nFib `$00C1` or more) or `$A5DC` (Word 6 and 95, nFib `$0065`–`$0068`) |
 | ClassicMac | Reads; `ClassicMac.Resources.Decoders.Documents` (`WordBinaryDocuments`) |
-| Verified against | Nothing yet: fixtures built from the specification; no Word 6 or Word 98 document has been found |
+| Verified against | Word 6.0 for the Macintosh documents with known content (§7); no Word 98 document yet |
 | Sources | Microsoft's [MS-DOC] (the format's author); for Word 6, other readers' behaviour (LibreOffice, Apache POI, wv), no published specification |
 
 Contents
@@ -40,7 +40,7 @@ The WordDocument stream starts with the FIB ([MS-DOC] §2.5.1): FibBase (32 byte
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
-| +$00 | 2 | wIdent | `$A5EC` |
+| +$00 | 2 | wIdent | `$A5EC`; `$A5DC` in Word 6 and 95 (§4.1) |
 | +$02 | 2 | nFib | `$00C1` from Word 97 on; less for Word 6 and 95 |
 | +$0A | 2 | Flags | `$0004` fComplex (fast saved), `$0100` fEncrypted, `$0200` fWhichTblStm (the table stream is 1Table, else 0Table), `$8000` fObfuscated |
 | +$4C | 4 | ccpText | The main text's length in CPs (FibRgLw97 + 12) |
@@ -84,8 +84,10 @@ one; sprmPChgTabs `$C615`: a size byte, 255 meaning it must be worked out). The 
 | Sprm | Property |
 | --- | --- |
 | `$0835`, `$0836`, `$0838`, `$0839` | Bold, italic, outline, shadow (ToggleOperand) |
+| `$083A` | Small caps (ToggleOperand) |
 | `$083B`, `$083C` | All caps, hidden (ToggleOperand) |
 | `$2A3E` | Underline kind (0 none) |
+| `$2A42` | The colour, an Ico ([MS-DOC] §2.9.119): 0 automatic, 1 black, 2 blue, 3 cyan, 4 green, 5 magenta, 6 red, 7 yellow, 8 white, 9–16 the dark colours and grey |
 | `$4A43` | Size in half points |
 | `$4A4F` | The font: an index into SttbfFfn |
 | `$2403`, `$2461` | Alignment: 0 left, 1 centred, 2 right, 3 and 4 justified |
@@ -95,6 +97,7 @@ one; sprmPChgTabs `$C615`: a size byte, 255 meaning it must be worked out). The 
 | `$A413`, `$A414` | Space before, space after, twips |
 | `$2416` | In a table |
 | `$2417` | The row's end mark |
+| `$D608` | sprmTDefTable, on the row's end mark: after its size word, the cell count, then the row's left edge and each cell's right edge (`i16` twips) |
 
 A ToggleOperand ([MS-DOC] §2.9.327) is 0 off, 1 on, `$80` the style's value, `$81` its opposite. [Author]
 
@@ -154,8 +157,9 @@ None.
 ### 4.1 Word 6 and 95
 
 Microsoft documented Word 6's format only to licensees; no public specification was found. Its structures are Word
-97's forerunners, read as other readers read them. No Word 6 document has been seen, so none of this is checked against
-Word's own files.
+97's forerunners, read as other readers read them, and checked against documents Word 6.0 for the Macintosh wrote
+[Verified: Word 6.0 documents, §7]: their FIB starts `$A5DC` with nFib `$0068`, chse is 256 (Mac OS Roman), and their
+text, character and paragraph formats, line breaks and tables read as below. None of them was fast saved.
 
 | Part | Word 6 | Source |
 | --- | --- | --- |
@@ -165,7 +169,7 @@ Word's own files.
 | Pieces | A Clx as §1.2 when fast saved, its FCs plain byte offsets; else the text is ccpText bytes from fcMin | [Reference: Apache POI] |
 | Bin tables | Page numbers of 2 bytes | [Reference: Apache POI] |
 | PAPX FKP | BXs of 7 bytes (the offset byte, 6 bytes of line data); a PAPX is a count of words and that many words: the `istd` (2 bytes) and the grpprl | [ClassicMac]: assumed, as Word 97's forerunner |
-| Sprms | One-byte codes with sizes by code; the ones read: 5 alignment, 16 right, 17 left and 19 first-line indents, 21 and 22 space before and after, 24 in a table, 25 the row's end, 83 back to the style's character properties, 85 bold, 86 italic, 88 outline, 89 shadow, 91 caps, 92 hidden, 93 font, 94 underline, 99 size | [Reference: LibreOffice] |
+| Sprms | One-byte codes with sizes by code; the ones read: 5 alignment, 16 right, 17 left and 19 first-line indents, 21 and 22 space before and after, 24 in a table, 25 the row's end, 83 back to the style's character properties, 85 bold, 86 italic, 88 outline, 89 shadow, 90 small caps, 91 caps, 92 hidden, 93 font, 94 underline, 98 colour (an Ico, 6 red), 99 size, 190 the table's cell definitions (as `$D608`) | [Reference: LibreOffice; Verified: Word 6.0 documents] |
 | Fonts | The table's size in bytes, then per font a size byte (less one), ffid, a weight word, a charset, the alternate name's index, and the name, 8-bit and null-terminated | [Reference: Apache POI] |
 | Styles | As §1.5, with a 14-byte STSHI (the default font at +12) and the name as a length byte, the characters and a null, the UPXs from the next even offset | [ClassicMac]: assumed, as Word 97's forerunner |
 
@@ -173,8 +177,9 @@ Word's own files.
 
 - One chapter, titled with the file's name; paragraphs carry their alignment, indents and spacing in points; fonts are
   named as the document names them. [ClassicMac]
-- Paragraph ends, line, page, section and column breaks become CR; a cell's end becomes a tab and a row's end a CR.
-  [ClassicMac]
+- Paragraph ends, page, section and column breaks become CR; a line break (`$0B`) becomes U+2028, a `<br>` in HTML. A
+  cell's end becomes a tab and a row's end a CR, and the rows are a `DocumentTable` with the cell edges in points,
+  written as an HTML table. Small caps and the colour are carried on the runs. [ClassicMac]
 - A field shows its result; its instructions are left out. [ClassicMac]
 - Pictures, footnote references, annotation marks and drawings are left out; non-breaking and optional hyphens become
   U+2011 and U+00AD. Hidden text is left out and all-caps text upper-cased. [ClassicMac]
@@ -209,13 +214,17 @@ The compound file's own diagnostics are in [compound-file.md §6](../containers/
 - `tests/ClassicMac.Resources.Decoders.Tests/WordSixTests.cs` builds Word 6 documents byte by byte as §4.1 lays them
   out (`WordSixFixtures.cs`): Mac OS Roman and Windows text, character and paragraph sprms, styles and `sprmCPlain`,
   tables and fields, a piece table, an unknown sprm, encryption.
-- No real Word 6, Word 97 or Word 98 document has been read: none was found on the volumes searched.
+- `tests/ClassicMac.Resources.Decoders.Tests/WordSampleTests.cs` on `Word/w6-*.bin`: 10 documents Word 6.0 for the
+  Macintosh wrote in SheepShaver for ClassicMac (our own content, listed in `Word/CONTENTS.txt`): text, every character
+  format (small caps, red), the paragraph formats, a 3 × 3 table with its cell edges, and edited documents. Word saved
+  them in full.
+- No Word 97 or Word 98 document has been read yet.
 
 ## 8. Not covered
 
-- Checking §4.1 against Word 6's own documents; Word 95's East Asian and Unicode text.
+- Fast-saved Word 6 documents (none was made: Word saved every sample in full); Word 95's East Asian and Unicode text.
 - Pieces' Prm (fast saves' property changes), character styles (`sprmCIstd`), list numbering, tabs, borders, line
-  spacing, sections, headers, footnotes, pictures, colour and East Asian text.
+  spacing, sections, headers, footnotes, pictures and East Asian text.
 - Decrypting password-protected documents.
 
 ## 9. References
