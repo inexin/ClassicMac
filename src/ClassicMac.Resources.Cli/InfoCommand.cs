@@ -11,8 +11,25 @@ namespace ClassicMac.Resources.Cli
     // `info`: how the input was read (companions, container chain) and each file's Finder info, dates and fork sizes.
     internal sealed class InfoCommand(TextWriter output, TextWriter error)
     {
-        public int Run(FileInfo input, ContainerReadOptions options, bool strict, bool quiet)
+        // The user's type and creator database (--type-creator-db, finder.md §2.6), asked for kinds last.
+        private TypeCreatorDatabase? database;
+
+        public int Run(FileInfo input, ContainerReadOptions options, bool strict, bool quiet, FileInfo? typeCreatorDatabase = null)
         {
+            if (typeCreatorDatabase is not null)
+            {
+                try
+                {
+                    using var stream = typeCreatorDatabase.OpenRead();
+                    database = TypeCreatorDatabase.Load(stream);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+                {
+                    error.WriteLine($"{typeCreatorDatabase.Name}: not a type and creator database (xlsx): {e.Message}");
+                    return ExitCodes.Usage;
+                }
+            }
+
             var reporter = new Reporter(error, strict, quiet);
             Input opened;
             try
@@ -47,7 +64,7 @@ namespace ClassicMac.Resources.Cli
             output.WriteLine($"{indent}  type '{info.Type}'  creator '{info.Creator}'  flags {Flags(info.Flags)}");
             var kind = (info.Flags & FinderFlags.IsAlias) != 0
                 ? new FinderKind("alias", FinderKindSource.BuiltIn, null, null)
-                : KnownKinds.Resolve(volume, info.Type, info.Creator);
+                : KnownKinds.Resolve(volume, info.Type, info.Creator, database);
             output.WriteLine($"{indent}  kind \"{kind.Text}\" ({KnownKinds.Describe(kind)})");
             if (file.Created is not null || file.Modified is not null)
             {

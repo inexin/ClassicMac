@@ -281,6 +281,8 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 - The app's View ▸ Type/Creator Database… chooses the file, reads it in the background and keeps its path in
   `settings.json` (`typeCreatorDatabase`); the next session reads it again at start. A kept file that cannot be read
   is reported in the status bar and stays kept; View ▸ Forget Type/Creator Database drops it. [ClassicMac]
+- The CLI's `info --type-creator-db <xlsx>` uses it the same way for the kinds it prints. A file that is missing or
+  is no such spreadsheet is a usage error (exit 2), named with the reason on stderr. [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -305,7 +307,8 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 - `tests/ClassicMac.Resources.Decoders.Tests/TypeCreatorDatabaseTests.cs`: §2.6 on spreadsheets made in code by
   `XlsxBuilder` (shared strings as rich-text runs, inline strings, number cells, columns in another order, the
   Windows-1252 decoding, codes of the wrong length, damaged files) and its place in §2.5's order. `FileKindsTests.cs`:
-  choosing, keeping, reading at start and forgetting it in the app.
+  choosing, keeping, reading at start and forgetting it in the app. The CLI's `Info_takes_the_users_type_and_creator_database`: the option, a bad file and a
+  missing one.
 - TCDB 2003.8, read locally (not kept): about 44,200 rows give about 28,400 kinds, read in about a second.
 - The 20 `'kind'` resources on a Mac OS 9.0 startup disk (SimpleText, Disk Copy, Keychain Access, Sherlock 2, Script
   Editor, Netscape Communicator, System Resources, control panels and extensions) all read whole with §1.4, and the

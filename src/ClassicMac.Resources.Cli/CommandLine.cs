@@ -120,9 +120,14 @@ namespace ClassicMac.Resources.Cli
         private Command InfoCommand()
         {
             var input = InputArgument();
-            var command = new Command("info", "Show the container chain, Finder info and fork sizes") { input };
+            var database = new Option<FileInfo>("--type-creator-db")
+            {
+                Description = "Your copy of TCDB's spreadsheet (xlsx), asked for kinds after the volume's and ClassicMac's own",
+            }.AcceptExistingOnly();
+            var command = new Command("info", "Show the container chain, Finder info, kinds and fork sizes") { input, database };
             command.SetAction(result => new InfoCommand(output, error).Run(
-                result.GetRequiredValue(input), ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
+                result.GetRequiredValue(input), ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet),
+                result.GetValue(database)));
             return command;
         }
 

@@ -20,6 +20,7 @@
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\DocumentFixtures.cs" Link="Builders\DocumentFixtures.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\MacWordFixtures.cs" Link="Builders\MacWordFixtures.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\CodeFixtures.cs" Link="Builders\CodeFixtures.cs" />
+    <Compile Include="..\ClassicMac.Resources.Decoders.Tests\XlsxBuilder.cs" Link="Builders\XlsxBuilder.cs" />
     <Compile Include="..\ClassicMac.Code.Tests\PefBuilder.cs" Link="Builders\PefBuilder.cs" />
   </ItemGroup>
 

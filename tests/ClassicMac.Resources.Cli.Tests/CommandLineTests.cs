@@ -268,6 +268,45 @@ public class CommandLineTests
     }
 
     [Fact]
+    public void Info_takes_the_users_type_and_creator_database()
+    {
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Widget", [1], [], type: "ZZZZ", creator: "WXYZ");
+        var folder = Directory.CreateTempSubdirectory("cm-tcdb").FullName;
+        var path = Path.Combine(folder, "kinds.img");
+        File.WriteAllBytes(path, disk.Build("Kinds"));
+        var database = Path.Combine(folder, "tcdb.xlsx");
+        File.WriteAllBytes(database, ClassicMac.Resources.Decoders.Tests.XlsxBuilder.Xlsx(
+        [
+            ["File Name", "Type", "Creator", "Comments", "Category"],
+            ["WidgetÑwidget file", "ZZZZ", "WXYZ", "Widget", "Widget"],
+        ]));
+        var bad = Path.Combine(folder, "notes.xlsx");
+        File.WriteAllText(bad, "not a spreadsheet");
+        try
+        {
+            Assert.Contains("kind \"document\" (built-in)", Run("info", path).Output);
+            var (code, output, _) = Run("info", path, "--type-creator-db", database);
+            Assert.Equal(ExitCodes.Success, code);
+            Assert.Contains("kind \"Widget widget file\" (TCDB (your copy))", output);
+
+            var (badCode, badOutput, badError) = Run("info", path, "--type-creator-db", bad);
+            Assert.Equal(ExitCodes.Usage, badCode);
+            Assert.Empty(badOutput);
+            Assert.StartsWith("notes.xlsx: not a type and creator database (xlsx): ", badError, StringComparison.Ordinal);
+
+            var (missingCode, _, missingError) = Run("info", path, "--type-creator-db", Path.Combine(folder, "gone.xlsx"));
+            Assert.Equal(ExitCodes.Usage, missingCode);
+            Assert.Contains("gone.xlsx", missingError, StringComparison.Ordinal);
+            Assert.Contains("--type-creator-db", Run("info", "--help").Output, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Containers_without_a_resource_fork_say_so()
     {
         var path = Path.GetTempFileName();

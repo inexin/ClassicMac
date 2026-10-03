@@ -53,6 +53,8 @@
   Docs"), the Details tab's Kind with where it came from ("from SimpleText’s 'kind' 128", "built-in"), and a tooltip on
   the tree's type · creator.
 - CLI: `info` prints each file's kind and its source.
+- CLI: `info --type-creator-db <xlsx>` names kinds from your copy of TCDB too, as the app does; a missing or
+  unreadable file is a usage error.
 - Viewer: View ▸ Type/Creator Database… uses your own copy of TCDB's spreadsheet (xlsx, read by
   `TypeCreatorDatabase` with no new package) for kinds the volume and ClassicMac's table do not know, shown as "TCDB
   (your copy)"; its path is kept in `settings.json`, and View ▸ Forget Type/Creator Database drops it.
