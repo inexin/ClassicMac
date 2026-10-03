@@ -10,9 +10,9 @@ using ClassicMac.Files;
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c>, <c>disasm</c> and <c>pack</c>. Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
+    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c>, <c>disasm</c> and <c>pack</c>, and the write commands on Mac paths (<c>put</c>, <c>mkdir</c>, <c>rm</c>, <c>rename</c>, <c>set</c>, <c>res-add</c>, <c>res-rm</c>). Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
     /// </summary>
-    internal sealed class CommandLine(TextWriter output, TextWriter error)
+    internal sealed partial class CommandLine(TextWriter output, TextWriter error)
     {
         internal enum ListFormat
         {
@@ -107,6 +107,10 @@ namespace ClassicMac.Resources.Cli
             root.Subcommands.Add(ConvertCommand());
             root.Subcommands.Add(DisasmCommand());
             root.Subcommands.Add(PackCommand());
+            foreach (var write in WriteCommands())
+            {
+                root.Subcommands.Add(write);
+            }
             return root;
         }
 

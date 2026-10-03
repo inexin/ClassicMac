@@ -253,7 +253,8 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
    file or in place; `HostImport` reads a host file to add; `HfsWriter.Rename`, `SetFinderInfo`, `SetFolderFlags`,
    `Delete`. The app's Volume menu uses them.
 2. **CLI subcommands** for each operation with `--json` (stable, documented schemas in `docs/cli.md`), so any AI with a
-   shell can drive them.
+   shell can drive them. The write commands are built: `put`, `mkdir`, `rm`, `rename`, `set`, `res-add`, `res-rm`
+   ([cli.md §3](cli.md#3-write-commands)).
 3. **MCP server** (`classicmac mcp`, stdio): the same operations as MCP tools (list, stat, read, search, extract, add,
    delete, save as), with the same write safety and output-size limits.
 4. **Interactive shell** (`classicmac shell <input>`), DOS-like: `cd` (into disk images and archives as folders),

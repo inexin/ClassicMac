@@ -52,3 +52,65 @@ the type), or bare as its four characters (`TEXT`); below the type, a resource i
 | `…:Finder:#rsrc` | its resource fork |
 | `…:Finder:#rsrc:'snd '` | its `'snd '` resources |
 | `…:Finder:#rsrc:'snd ':128` | `'snd '` 128 |
+
+## 3. Write commands
+
+Each write command changes one thing on a Mac path, through the library's `InputEditSession`
+(`ClassicMac.Files.Editing`), and never changes its input unless asked.
+
+### 3.1 What can be written
+
+- **A plain HFS volume image** (the host file is the volume, with no partition map or disk image wrapper): files and
+  folders added, deleted (a folder only with `--recursive` when it holds anything), renamed in their folder, a file's
+  type, creator and Finder flags and a folder's Finder flags set, and a file's resources added, replaced and deleted.
+  The rules are [hfs.md §3](formats/file-systems/hfs.md#3-writing).
+- **One Mac file** (a resource fork file, MacBinary, BinHex, AppleSingle, AppleDouble or Basilisk II file): its
+  resources, and its type, creator and flags (a resource fork file has none). It is written back in its own form.
+- Nothing else: a path that goes into an archive, a disk image of another kind, or a container inside the volume is
+  refused.
+
+### 3.2 Commands
+
+| Command | Arguments and options | Does |
+| --- | --- | --- |
+| `put` | `<host file> <Mac path>` `[--name N] [--type T] [--creator C]` | Adds a host file: into the folder the path names (keeping its name), or as the file the path names. The host file is read with its AppleDouble or Basilisk II companions, MacBinary and AppleSingle unwrapped, else its bytes are the data fork |
+| `mkdir` | `<Mac path>` | Makes an empty folder |
+| `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`) |
+| `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
+| `set` | `<Mac path> [--type T] [--creator C] [--flags F]` | Sets a file's type and creator; `--flags` replaces the Finder flags: a number (`0x4000`, `$4000`, `16384`) or flag names joined with commas (`Invisible,HasBundle`; `IsInvisible` too) |
+| `res-add` | `<file>:#rsrc:<type>:<ID> <data file> [--name N] [--replace]` | Adds a resource with the data file's bytes; one that exists is replaced only with `--replace` |
+| `res-rm` | `<file>:#rsrc:<type>:<ID>` | Deletes a resource |
+
+Every command takes:
+
+| Option | Meaning |
+| --- | --- |
+| `-o`, `--output <file>` | Write the input with the change to this new file (verified by reading it back). It cannot be the input |
+| `--in-place` | Write over the input itself (verified first), keeping the original as `<input>.orig` the first time |
+| `--dry-run` | Print the change and write nothing (no `-o` needed) |
+| `--json` | Print the result as JSON (§3.3) |
+
+One of `-o` and `--in-place` is needed unless `--dry-run` is given.
+
+### 3.3 Output
+
+The text output is one line per change, `<action> <path> (<detail>)`, then `Wrote <file>` for each file written, or
+`Dry run: nothing written.`. Paths are inside the volume, without its name (`Docs:Letter`), and empty for a single-file
+input. With `--json`:
+
+```json
+{
+  "input": "/disks/disk.img",
+  "dryRun": false,
+  "written": [ "/disks/out.img" ],
+  "changes": [ { "action": "mkdir", "path": "Docs:Old", "detail": "a new folder" } ]
+}
+```
+
+`action` is `add`, `mkdir`, `delete`, `rename`, `set`, `res-set` or `res-delete`. An AppleDouble pair or a Basilisk II
+entry writes more than one file.
+
+### 3.4 Exit codes
+
+0 success; 2 a usage error or a refused change (a path that names nothing, a name in use, a folder that is not empty,
+an input ClassicMac does not write), with the reason on standard error; 4 the file could not be written.

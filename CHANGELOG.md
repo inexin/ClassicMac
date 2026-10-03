@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CLI: write commands on Mac paths (docs/cli.md §3): `put` (a host file into a volume), `mkdir`, `rm` (`-r` for a
+  folder with contents), `rename`, `set` (type, creator, Finder flags), `res-add` and `res-rm`, each with `--dry-run`,
+  `--json`, and `-o <new file>` or `--in-place` (keeping `.orig`); plain HFS images and single Mac files are written,
+  nothing inside other containers.
 - Library: Mac paths (`MacPathTree`, `MacPaths` in `ClassicMac.Files`; docs/cli.md §1): a host file, then Mac names
   joined by ':' or '/' (a backslash escapes them in a name), going into disk images, archives and other containers as
   folders (read one level at a time when entered; a wrapper of one disk passes on to its contents), and on to a file's
