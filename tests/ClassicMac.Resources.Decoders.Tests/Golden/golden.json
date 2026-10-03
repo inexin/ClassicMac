@@ -849,6 +849,17 @@
       ]
     },
     {
+      "key": "kind-128",
+      "decoder": "finder.kind 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "kind-128.json"
+        }
+      ]
+    },
+    {
       "key": "FOND-1024",
       "decoder": "font.family 1",
       "diagnostics": [],

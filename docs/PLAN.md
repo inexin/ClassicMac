@@ -1005,6 +1005,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   Inside Macintosh and the ResEdit Reference in its own words; ResEdit's `TMPL` resources are never copied (they are
   a cross-check only, and a layout known only from them is tagged `[Reference: ResEdit]`). A `TMPL` in an open file
   wins over a built-in one (templates.md §5).
+- **Document kinds (2026-10-03):** a file's kind is named the Finder's way first, from what is on the volume: the
+  creator application's `'kind'` resources, then "<application> document", then the System's `'istd'` kinds of standard
+  types (`FinderKindResolver`, one per volume, reading an application's fork only when one of its documents is asked
+  about; [finder.md §2.3](formats/resources/finder.md#23-a-documents-kind)). The order is fitted, not traced in the
+  Finder's code. A table of ClassicMac's own words is the fallback when the application is not on the volume.
 - **Disk images early:** phase 2, right after the core, because much classic software survives only as disk images.
 - **Decoder priority after images:** text, sound, UI, fonts.
 - **Fonts package:** part of `ClassicMac.Graphics` (`ClassicMac.Graphics.Fonts`), on Core only (2026-09-29, revising

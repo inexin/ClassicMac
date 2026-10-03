@@ -25,9 +25,66 @@ namespace ClassicMac.Resources.Decoders.Finder
     /// <param name="Minimum">The minimum partition size, in bytes.</param>
     public sealed record SizeResource(ushort Flags, uint Preferred, uint Minimum);
 
+    /// <summary>
+    /// A kind resource (<c>'kind'</c>, docs/formats/resources/finder.md §1.4): the kind strings an application gives the
+    /// Finder for its documents, by file type, for one region.
+    /// </summary>
+    /// <param name="Signature">The application's creator code (<c>'istd'</c> for the System's kinds of standard types).</param>
+    /// <param name="Region">The region code of the strings (0 for the United States).</param>
+    /// <param name="Entries">(file type, kind string) in order; <c>'apnm'</c> is the application's own name.</param>
+    public sealed record KindResource(FourCC Signature, short Region, IReadOnlyList<(FourCC Type, string Kind)> Entries)
+    {
+        /// <summary>The pseudo file type whose entry is the application's name.</summary>
+        public static FourCC ApplicationNameType { get; } = FourCC.FromString("apnm");
+
+        /// <summary>The application's name (its <c>'apnm'</c> entry), or null when it has none.</summary>
+        public string? ApplicationName => KindOf(ApplicationNameType);
+
+        /// <summary>The kind string for <paramref name="type"/> (the first entry for it), or null.</summary>
+        public string? KindOf(FourCC type) => Entries.Where(e => e.Type == type).Select(e => e.Kind).FirstOrDefault();
+    }
+
     /// <summary>Reads the Finder's resources (<i>Inside Macintosh: Macintosh Toolbox Essentials</i>, Finder Interface; <i>Processes</i>).</summary>
     public static class FinderResources
     {
+        /// <summary>
+        /// A <c>'kind'</c>: signature, region code, a zero word, the number of entries, then per entry a file type and a
+        /// Pascal string, each entry padded to an even length (finder.md §1.4). Data that ends early keeps the whole entries.
+        /// </summary>
+        public static KindResource ReadKind(ReadOnlyMemory<byte> data, out bool complete)
+        {
+            var entries = new List<(FourCC, string)>();
+            complete = data.Length >= 10;
+            if (!complete)
+            {
+                return new KindResource(data.Length >= 4 ? new FourCC(data.Span[..4]) : default, 0, entries);
+            }
+
+            var reader = new BigEndianReader(data);
+            var signature = reader.ReadFourCC();
+            var region = reader.ReadInt16();
+            reader.ReadInt16();
+            int count = reader.ReadUInt16();
+            for (var i = 0; i < count; i++)
+            {
+                if (reader.Remaining < 5 || reader.Remaining < 5 + data.Span[reader.Position + 4])
+                {
+                    complete = false;
+                    break;
+                }
+
+                var type = reader.ReadFourCC();
+                var length = reader.ReadByte();
+                entries.Add((type, MacRoman.Decode(reader.ReadBytes(length))));
+                if (reader.Position % 2 != 0 && reader.Remaining > 0)
+                {
+                    reader.ReadByte();
+                }
+            }
+
+            return new KindResource(signature, region, entries);
+        }
+
         /// <summary>
         /// A <c>'BNDL'</c>: signature, signature resource ID, the number of types less one, then per type the type, its
         /// number of mappings less one, and the (local ID, resource ID) pairs.
@@ -136,6 +193,7 @@ namespace ClassicMac.Resources.Decoders.Finder
             new FinderDecoder(options, "finder.bundle", "BNDL"),
             new FinderDecoder(options, "finder.file-reference", "FREF"),
             new FinderDecoder(options, "finder.size", "SIZE"),
+            new FinderDecoder(options, "finder.kind", "kind"),
         ];
 
         public IReadOnlyList<DecodedFile> Decode(DecodeInput input)
@@ -160,6 +218,28 @@ namespace ClassicMac.Resources.Decoders.Finder
                             w.WriteString("fileType", reference.FileType.ToString());
                             w.WriteNumber("localIconId", reference.LocalIconId);
                             w.WriteString("fileName", reference.FileName);
+                            w.WriteEndObject();
+                        });
+                        break;
+                    }
+                case "kind":
+                    {
+                        var kind = FinderResources.ReadKind(data, out complete);
+                        json = MacText.Json(w =>
+                        {
+                            w.WriteStartObject();
+                            w.WriteString("signature", kind.Signature.ToString());
+                            w.WriteNumber("region", kind.Region);
+                            w.WriteStartArray("kinds");
+                            foreach (var (type, text) in kind.Entries)
+                            {
+                                w.WriteStartObject();
+                                w.WriteString("type", type.ToString());
+                                w.WriteString("kind", text);
+                                w.WriteEndObject();
+                            }
+
+                            w.WriteEndArray();
                             w.WriteEndObject();
                         });
                         break;

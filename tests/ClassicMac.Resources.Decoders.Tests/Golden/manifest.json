@@ -1333,6 +1333,25 @@
       "encoding": "macintosh"
     },
     {
+      "type": "kind",
+      "typeBytes": "6B696E64",
+      "id": 128,
+      "name": null,
+      "attributes": 0,
+      "size": 245,
+      "storedSize": 58,
+      "dcmp": null,
+      "decoder": "finder.kind",
+      "decoderVersion": 1,
+      "path": "kind/128.json",
+      "sha256": "b488a39b92ac83f4f7c81242b67fd021530341e935437eccdf90790b9e61eb14",
+      "storedSha256": "b6ca849144d794ca767cc2dc7819bc58ea1cee343a072e9fe2ed460eaf24ddcd",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [],
+      "encoding": "macintosh"
+    },
+    {
       "type": "FOND",
       "typeBytes": "464F4E44",
       "id": 1024,

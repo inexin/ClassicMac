@@ -165,6 +165,9 @@ internal static class GoldenFixtures
         yield return Res("FREF", 128, [.. "APPL"u8, 0, 0, 0]);
         yield return Res("FREF", 129, [.. "TEXT"u8, 0, 7, 0]);
         yield return Res("SIZE", -1, [0x58, 0x80, 0, 0x20, 0, 0, 0, 0x10, 0, 0]);
+        // A kind resource: signature RLMZ, region 0, the application's name (odd length, so a pad byte) and two kinds.
+        yield return Res("kind", 128, [.. "RLMZ"u8, 0, 0, 0, 0, 0, 3, .. "apnm"u8, .. Pascal("Realmz"), 0, .. "scen"u8, .. Pascal("Realmz scenario"),
+            .. "save"u8, .. Pascal("saved game"), 0]);
 
         // Fonts: the family "Example" (FOND 1024) with a 9-point FONT (1033), a 12-point NFNT (1036, with width and height
         // tables), and its outline font (sfnt 1024); the old-style family-name FONT (family 8 × 128, empty); a 2-bit colour

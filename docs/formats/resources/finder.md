@@ -1,16 +1,17 @@
 # Finder resources
 
 The resources an application gives the Finder and the Process Manager: its bundle (`'BNDL'`), which ties its creator
-code to its icons and the file types it handles; its file references (`'FREF'`); and its size resource (`'SIZE'`),
-the memory partition and the events it handles. ClassicMac reads all three and writes each as JSON. Version
+code to its icons and the file types it handles; its file references (`'FREF'`); its kind strings (`'kind'`), the
+names the Finder shows for its documents' kinds; and its size resource (`'SIZE'`), the memory partition and the events
+it handles. ClassicMac reads all four, writes each as JSON, and names a document's kind from them (§2.3). Version
 resources (`'vers'`) are in [version.md](version.md), icons in [icons.md](icons.md).
 
 | | |
 | --- | --- |
-| Identified by | Resource types `'BNDL'`, `'FREF'`, `'SIZE'` |
-| ClassicMac | Reads; `ClassicMac.Resources.Decoders.Finder.FinderResources`, the decoders `finder.bundle`, `finder.file-reference`, `finder.size` |
-| Verified against | Nothing yet |
-| Sources | *Inside Macintosh: Macintosh Toolbox Essentials* (Finder Interface), *Inside Macintosh: Processes* (Process Manager), Apple's Rez templates (`Types.r`, MPW) |
+| Identified by | Resource types `'BNDL'`, `'FREF'`, `'kind'`, `'SIZE'` |
+| ClassicMac | Reads; `ClassicMac.Resources.Decoders.Finder.FinderResources`, the decoders `finder.bundle`, `finder.file-reference`, `finder.kind`, `finder.size`; `FinderKindResolver` |
+| Verified against | The 20 `'kind'` resources on a Mac OS 9.0 startup disk, read whole (§1.4); the kinds the Finder shows were not compared |
+| Sources | *Inside Macintosh: Macintosh Toolbox Essentials* (Finder Interface), *Inside Macintosh: Processes* (Process Manager), Apple's Rez templates (`Types.r`, MPW); Mac OS 9.0's own `'kind'` resources for the kind layout |
 
 Contents
 
@@ -85,6 +86,30 @@ The flags, by their Rez names [Doc: `Types.r`]:
 | 2 | `isDisplayManagerAware` |
 | 1–0 | Reserved |
 
+### 1.4 Kind strings (kind)
+
+[Fitted: the 20 `'kind'` resources of a Mac OS 9.0 startup disk, every one read whole by this layout]
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | Signature | `OSType`; the creator code of the application whose documents these are; `'istd'` in the System's kinds of standard types (§2.3) |
+| +$04 | 2 | Region | `i16`; the region code of the strings (0 in every one seen, the United States) |
+| +$06 | 2 | Reserved | 0 in every one seen |
+| +$08 | 2 | Count | `u16`; the number of entries (not less one) |
+| +$0A | … | Entries | One per kind |
+
+Each entry, padded with a zero byte to an even length:
+
+| Offset | Size | Field | Notes |
+| --- | --- | --- | --- |
+| +$00 | 4 | File type | `OSType`; `'apnm'` gives the application's own name instead of a kind |
+| +$04 | 1 + n | Kind | Pascal string, Mac OS Roman |
+
+- One file may hold several, for different signatures (Location Manager's `'walk'` and `'fall'`), and a signature need
+  not be the file's own creator (ColorSync Extension, creator `'Sync'`, names `'sync'` files). [Fitted]
+- The System's kinds of standard types are a `'kind'` signed `'istd'` (System Resources' −16550, named "industry
+  standards", on Mac OS 9.0). [Fitted]
+
 ## 2. Reading
 
 ### 2.1 A file type's icon
@@ -99,6 +124,28 @@ The local IDs connect the bundle's maps [Doc: Macintosh Toolbox Essentials]:
 
 The Process Manager reads `'SIZE'` −1, as the developer set it, or `'SIZE'` 0 when the user changed the memory
 requirements in the Finder's Get Info window [Doc: Processes].
+
+### 2.3 A document's kind
+
+How the Finder chooses the kind of a document of type *T* and creator *C*. The order below is fitted to the
+resources on the disk and to what the Finder's strings allow; the Finder's code that chooses was not traced, and its
+results were not compared on a running Mac. [Fitted]
+
+1. The application whose signature is *C* is found: the Finder asks its desktop database; ClassicMac looks for a file
+   on the volume with creator *C* that is an application (`'APPL'`, `'APPC'`, `'APPD'`, `'appe'`) or has the
+   hasBundle flag.
+2. If it is found and one of its `'kind'` resources signed *C* names *T* (resources in ID order, entries in order), that
+   string is the kind.
+3. If it is found but names no kind for *T*, the kind is "*name* document", *name* being its `'apnm'` entry, else its
+   file name. The System keeps the pattern as `'STR#'` −16552 item 2, "^0 document", next to "document" (item 1).
+4. Otherwise the System's `'kind'` signed `'istd'` (System Resources' −16550 on Mac OS 9.0) names standard types
+   whatever their creator.
+5. Otherwise the Finder shows "document"; ClassicMac's callers first try their own table of known types.
+
+Folders, disks, applications and system files have kinds of the Finder's own, by type, with no `'kind'` resource:
+the strings are in the Finder (`'STR#'` 1419: "folder", "System Folder", "Control Panels folder"…, "hard disk",
+"application"; `'STR#'` 5100: "control panel", "system extension", "Chooser extension"…), but which type takes which
+string is in the Finder's code, not traced.
 
 ## 3. Writing
 
@@ -117,6 +164,7 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 | --- | --- | --- |
 | `BNDL` | `finder.bundle` | `signature`, `signatureId`, `maps[]` (`type`, `ids[]` of `local` and `resource`), and `fileTypes[]`: for each mapping of the `'FREF'` map whose `'FREF'` exists in the fork, `fileType`, `fref` (its ID) and `icon` (the icon family's resource ID by §2.1, or null when the `'ICN#'` map has no such local ID) |
 | `FREF` | `finder.file-reference` | `fileType`, `localIconId`, `fileName` |
+| `kind` | `finder.kind` | `signature`, `region`, `kinds[]` of `type` and `kind` (the `'apnm'` entry included, as stored) |
 | `SIZE` | `finder.size` | `flags`, `flagNames` (the names of the bits set, from bit 15 down; reserved bits have none), `preferredSize`, `minimumSize` |
 
 - Data that ends early is reported, and the JSON holds what was read: a bundle under 8 bytes keeps only its
@@ -124,6 +172,15 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
   `'SIZE'` under 10 bytes keeps only its flags (when 2 bytes are there), with sizes 0. A `'FREF'` name that runs past
   the end is empty. [ClassicMac]
 - Each `'SIZE'` resource is listed on its own; ClassicMac does not choose between −1 and 0. [ClassicMac]
+- A `'kind'` under 10 bytes keeps only its signature (when 4 bytes are there); a longer one keeps the entries read
+  whole. Kind strings are read as Mac OS Roman. [ClassicMac]
+- `FinderKindResolver` follows §2.3 steps 1–4 over the applications it is given (`FinderApplicationSource`: the
+  signature, the file name, and a reader of the resource fork) and the System's forks, and returns the kind with its
+  source (`FinderKindSource`: the application's `'kind'` and its ID, the application's name, the System's `'istd'`
+  kind) and the application's name; null when none applies, for the caller's table. Each application's fork is read
+  once, the first time one of its documents is asked about, and its kinds are kept; the first application given for a
+  signature is used. A fork that cannot be read counts as one with no `'kind'`, a damaged `'kind'` as absent.
+  `FinderKindResolver.IsApplicationType` says which file types are applications. [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -136,14 +193,24 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 - `tests/ClassicMac.Resources.Decoders.Tests/GoldenFixtures.cs`, compared with `Golden/BNDL-128.json`,
   `FREF-128.json`, `FREF-129.json` and `SIZE--1.json` (`GoldenTests`), made in code with no Apple data: a bundle with
   `'ICN#'` and `'FREF'` maps, where `'FREF'` 128 (`APPL`, local icon 0) finds `'ICN#'` 128 and `'FREF'` 129 (`TEXT`,
-  local icon 7) finds no icon; a `'SIZE'` −1 with four flags.
+  local icon 7) finds no icon; a `'SIZE'` −1 with four flags; and `Golden/kind-128.json`, a `'kind'` with an
+  `'apnm'` entry and two kinds, one of them padded.
+- `tests/ClassicMac.Resources.Decoders.Tests/FinderKindTests.cs`: the layout (padding, a short resource) and the
+  resolver's steps, its laziness (one read per application, none for other creators) and damaged input, on forks made
+  in code.
+- The 20 `'kind'` resources on a Mac OS 9.0 startup disk (SimpleText, Disk Copy, Keychain Access, Sherlock 2, Script
+  Editor, Netscape Communicator, System Resources, control panels and extensions) all read whole with §1.4, checked
+  locally; no Apple data is kept.
 
-Nothing is checked against the resources of real applications.
+The other resources are not checked against those of real applications.
 
 ## 8. Not covered
 
 - The Finder's desktop database and how it caches bundles.
-- The other Finder resources: `'open'`, `'kind'`, `'mstr'`, `'hfdr'`.
+- The other Finder resources: `'open'`, `'mstr'`, `'hfdr'`.
+- The Finder's own kinds of folders, disks, applications and system files (§2.3), and a document's kind when its
+  application's signature differs from its creator code.
+- `'kind'` resources for other regions: the region code is read but not chosen by.
 - Writing these resources.
 
 ## 9. References

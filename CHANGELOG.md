@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Decoders: `'kind'` resources (the kind strings an application gives the Finder for its documents) are read
+  (`FinderResources.ReadKind`) and decoded as `finder.kind` JSON; `FinderKindResolver` names a document's kind the
+  Finder's way from a volume's applications (their `'kind'` for the type, else "<application> document") and the
+  System's kinds of standard types (`'istd'`), reading an application's resource fork only when one of its documents is
+  asked about.
 - Editor: editing a menu gives the table the room: the live preview narrows to 166 while editing (272 read only; it
   scrolls at 2× with its scroll bars shown, its title wrapping), so the Text column is at least 160 wide in a
   1200-pixel window.
