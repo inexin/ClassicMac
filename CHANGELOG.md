@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: an edit session's first change also clears file records' nonzero `filStBlk`, `filRStBlk` and `filResrv` (as
+  hfsutils leaves them), listed as a `repair` change, as Disk First Aid's Repair does; edited hfsutils volumes then pass
+  Disk First Aid (hfs.md §1.9).
 - NDIF: an edited chunk's runs of empty sectors are stored as zero chunks instead of raw zeros, so a compressed or
   read-only image no longer grows by its empty space on each save; read/write images stay all raw (ndif.md §3).
 - Editing: a Disk Copy 4.2 image, plain HFS image or partitioned disk with an AppleDouble header or Basilisk II

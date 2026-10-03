@@ -254,6 +254,12 @@ File record:
 | +$56 | 12 | `filRExtRec` | Resource fork's first three extents |
 | +$62 | 4 | `filResrv` | Reserved |
 
+Mac OS writes `filStBlk`, `filRStBlk` and `filResrv` as 0 (every Mac-made file record seen). hfsutils leaves the first
+blocks in `filStBlk` and `filRStBlk`; Disk First Aid 8.5 reports such a record as "Reserved fields in the catalog record
+have incorrect data, *CNID*, *n*" (the first number is the file's CNID), and its Repair clears both fields and nothing
+else in the record; `fsck_hfs` reports the same [Verified]. An edit session's first change clears them (and
+`filResrv`), listed as a `repair` change [ClassicMac].
+
 Thread record. A thread lets the File Manager find a folder (or file) from its CNID alone; its key is (the CNID, empty
 name), so it sorts first among the records with that parent ID (§1.11). Every folder has a thread; a file has one only
 when something asked for it (a file ID reference).
@@ -270,7 +276,7 @@ A thread record (type 3 or 4) is 46 bytes as Mac OS writes it: the type, a reser
 at +10 and the name at +14 as a `Str31`. hfsutils writes a thread only as long as its name, 15 bytes and the name's
 length (padded to even). Mac OS 9's File Manager reads and keeps such threads: a volume hfsutils made, holding them, was
 mounted and used under Mac OS 9, which added its own 46-byte threads beside them [Verified]. Disk First Aid 8.5 rejects
-them ("Invalid thread record length"), stops before checking the volume's counts, and cannot repair them [Verified]. ClassicMac reads either, and its writer
+them ("Invalid thread record length, *CNID*, *n*", the first number the thread's own CNID), stops before checking the volume's counts, and cannot repair them [Verified]. ClassicMac reads either, and its writer
 accepts either (a renamed item's thread written at 46 bytes, only `thdParID` changed when an item moves). An edit
 session's first change to such a volume writes every short thread at 46 bytes, listed as a `repair` change, so the
 saved volume passes Disk First Aid [ClassicMac]. `fsck_hfs` reports the short form as "Reserved fields in the catalog record have incorrect data" (§7).
@@ -427,6 +433,7 @@ The MDB's counts let a reader check it saw the whole catalog:
 - A wrong `drNmFls` is not damage to Mac OS 9.0: Disk First Aid 8.5 verifies a volume whose `drNmFls` is one too many
   as "appears to be OK", and the File Manager keeps the value when it rewrites the MDB [Verified]. The writer does not
   check it, and changes it by each file it adds to or removes from the root, as the File Manager does [ClassicMac].
+  Disk First Aid's Repair, run on a volume with other damage, does set it to the root's file count [Verified].
 
 ## 3. Writing
 
@@ -636,7 +643,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   `SetFolderFlags` a folder's Finder flags; `Format` and `FormatTo` make a new, empty volume (§3.1, up to 2 GB in memory or 2 TB to a file, checked
   with `Check` before it is returned); `Resize` grows a volume (§3.2); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
-  included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
+  included (a folder's `Icon
+`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
   image; the input is never modified.
   `ForkSaver.SaveHfsImageAs` writes the result to another file through a temporary file and a rename, and refuses the
   source image as its destination. The editor offers it as Save As ▸ HFS Volume Image. `InputEditSession` (in

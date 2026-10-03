@@ -1216,13 +1216,15 @@ public static partial class HfsWriter
         new BigEndianWriter(folder.Data).WriteUInt16At(4, updated);
     }
 
-    // The volume with every thread record shorter than Mac OS's 46 bytes (hfsutils writes a thread only as long as its
-    // name) written at full length, the name padded to a Str31, and how many there were; Disk First Aid rejects the
-    // short form (hfs.md §1.9). The volume itself, and 0, when there are none.
-    internal static (HfsVolume Volume, int Repaired) RepairThreads(HfsVolume image)
+    // The volume with what hfsutils writes and Disk First Aid rejects made as Mac OS writes it, and how many records of
+    // each: thread records shorter than Mac OS's 46 bytes (hfsutils writes a thread only as long as its name) written at
+    // full length, the name padded to a Str31; file records with nonzero filStBlk (+$18), filRStBlk (+$22) or filResrv
+    // (+$62), which Disk First Aid reports as reserved fields with incorrect data and its Repair clears (hfs.md §1.9,
+    // §1.7) [Verified: Disk First Aid 8.5]. The volume itself when there are none.
+    internal static (HfsVolume Volume, int Threads, int FileRecords) RepairCatalog(HfsVolume image)
     {
         var state = OpenCatalog(image);
-        var repaired = 0;
+        int threads = 0, files = 0;
         for (var index = 0; index < state.Records.Count; index++)
         {
             var (key, data) = state.Records[index];
@@ -1231,11 +1233,25 @@ public static partial class HfsWriter
                 var full = new byte[46];
                 data.AsSpan(0, 15 + data[14]).CopyTo(full);
                 state.Records[index] = (key, full);
-                repaired++;
+                threads++;
+            }
+            else if (data[0] == 2 && data.Length >= 0x66)
+            {
+                var reader = new BigEndianReader(data);
+                if (reader.ReadUInt16At(0x18) != 0 || reader.ReadUInt16At(0x22) != 0 || reader.ReadUInt32At(0x62) != 0)
+                {
+                    var cleared = data.ToArray();
+                    var writer = new BigEndianWriter(cleared);
+                    writer.WriteUInt16At(0x18, (ushort)0);
+                    writer.WriteUInt16At(0x22, (ushort)0);
+                    writer.WriteUInt32At(0x62, 0u);
+                    state.Records[index] = (key, cleared);
+                    files++;
+                }
             }
         }
 
-        return repaired == 0 ? (image, 0) : (CommitCatalog(state), repaired);
+        return threads + files == 0 ? (image, 0, 0) : (CommitCatalog(state), threads, files);
     }
 
     // A count in the MDB's sector (offset from its start) changed by delta.

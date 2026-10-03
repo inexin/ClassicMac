@@ -24,13 +24,27 @@ public sealed class HfsShortThreadTests
     // The thread record of an item (key: its ID, no name), from the catalog's leaf nodes.
     private static byte[] Thread(byte[] image, uint id)
     {
+        var (offset, length) = Record(image, (key, data) => BinaryPrimitives.ReadUInt32BigEndian(key[2..]) == id && key[6] == 0);
+        return image.AsSpan(offset, length).ToArray();
+    }
+
+    // Where a file's record (its type 2 and file number) is in the image.
+    private static int FileRecord(byte[] image, uint id) =>
+        Record(image, (key, data) => data[0] == 2 && BinaryPrimitives.ReadUInt32BigEndian(data[0x14..]) == id).Offset;
+
+    private delegate bool Match(ReadOnlySpan<byte> key, ReadOnlySpan<byte> data);
+
+    // A catalog leaf record's data (its offset in the image and length), the first the match takes.
+    private static (int Offset, int Length) Record(byte[] image, Match match)
+    {
         int blockSize = BinaryPrimitives.ReadInt32BigEndian(image.AsSpan(Mdb + 0x14));
         int firstBlock = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(Mdb + 0x1C)) * 512;
         int start = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(Mdb + 0x96)), count = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(Mdb + 0x98));
-        var catalog = image.AsSpan(firstBlock + start * blockSize, count * blockSize);
-        for (var node = 1; node * 512 < catalog.Length; node++)
+        int catalog = firstBlock + start * blockSize;
+        for (var node = 1; node * 512 < count * blockSize; node++)
         {
-            var bytes = catalog.Slice(node * 512, 512);
+            int at = catalog + node * 512;
+            var bytes = image.AsSpan(at, 512);
             if (bytes[8] != 0xFF)
             {
                 continue;
@@ -40,14 +54,15 @@ public sealed class HfsShortThreadTests
             for (var r = 0; r < records; r++)
             {
                 int offset = BinaryPrimitives.ReadUInt16BigEndian(bytes[(510 - 2 * r)..]), end = BinaryPrimitives.ReadUInt16BigEndian(bytes[(508 - 2 * r)..]);
-                if (BinaryPrimitives.ReadUInt32BigEndian(bytes[(offset + 2)..]) == id && bytes[offset + 6] == 0)
+                int data = offset + ((bytes[offset] + 2) & ~1);
+                if (match(bytes[offset..data], bytes[data..end]))
                 {
-                    return bytes[(offset + ((bytes[offset] + 2) & ~1))..end].ToArray();
+                    return (at + data, end - data);
                 }
             }
         }
 
-        throw new InvalidOperationException($"No thread for {id}.");
+        throw new InvalidOperationException("No such record.");
     }
 
     private static IReadOnlyList<MacFile> Files(byte[] image) => HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
@@ -87,6 +102,45 @@ public sealed class HfsShortThreadTests
             }
 
             Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
+        }
+        finally
+        {
+            ForkData.CloseHostFile(path);
+            ForkData.CloseHostFile(saved);
+            File.Delete(path);
+            File.Delete(saved);
+        }
+    }
+
+    // hfsutils leaves a file's first-block fields (filStBlk, filRStBlk) nonzero, which Disk First Aid reports as reserved
+    // fields with incorrect data and its Repair clears; the session clears them (and filResrv) on its first change too.
+    [Fact]
+    public void An_edit_session_clears_a_file_record_s_reserved_fields()
+    {
+        var image = Volume();
+        var letter = Files(image).Single(f => f.MacPath == "Docs:Letter").CatalogId!.Value;
+        int record = FileRecord(image, letter);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(record + 0x18), 5);
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(record + 0x22), 0x0313);
+        BinaryPrimitives.WriteUInt32BigEndian(image.AsSpan(record + 0x62), 1);
+        var path = Path.Combine(Path.GetTempPath(), $"cm-reserved-{Guid.NewGuid():N}.img");
+        File.WriteAllBytes(path, image);
+        var saved = path + ".out";
+        try
+        {
+            var session = Editing.InputEditSession.Open(path);
+            session.Delete("Read Me");
+            session.SaveAs(saved);
+
+            Assert.Equal(("repair", "", "1 file record's reserved fields cleared (Disk First Aid reports them)"),
+                (session.Changes[1].Action, session.Changes[1].Path, session.Changes[1].Detail));
+            Assert.Equal("delete", session.Changes[2].Action);
+            var written = File.ReadAllBytes(saved);
+            record = FileRecord(written, letter);
+            Assert.Equal((0, 0, 0u), (BinaryPrimitives.ReadUInt16BigEndian(written.AsSpan(record + 0x18)),
+                BinaryPrimitives.ReadUInt16BigEndian(written.AsSpan(record + 0x22)), BinaryPrimitives.ReadUInt32BigEndian(written.AsSpan(record + 0x62))));
+            Assert.Equal("data", System.Text.Encoding.ASCII.GetString(Files(written).Single(f => f.CatalogId == letter).DataFork.ToArray()));
+            Assert.Null(HfsWriter.Check(ForkData.FromBytes(written)));
         }
         finally
         {

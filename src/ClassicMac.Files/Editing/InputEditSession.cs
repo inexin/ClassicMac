@@ -238,8 +238,9 @@ namespace ClassicMac.Files.Editing
 
         private bool prepared;
 
-        // Before the first change to a volume: thread records shorter than Mac OS's 46 bytes (as hfsutils writes them)
-        // are written at full length, since Disk First Aid rejects them (hfs.md §1.9); listed as a change of its own.
+        // Before the first change to a volume: what hfsutils writes and Disk First Aid rejects is made as Mac OS writes it
+        // (short thread records at full length, file records' reserved fields cleared; hfs.md §1.9), each listed as a
+        // change of its own.
         private void Prepare()
         {
             if (prepared || Kind != InputEditKind.HfsVolume)
@@ -248,12 +249,18 @@ namespace ClassicMac.Files.Editing
             }
 
             prepared = true;
-            var (repaired, count) = HfsWriter.RepairThreads(Overlay);
-            if (count > 0)
+            var (repaired, threads, files) = HfsWriter.RepairCatalog(Overlay);
+            overlay = repaired;
+            if (threads > 0)
             {
-                overlay = repaired;
                 changes.Add(new PlannedChange("repair", "",
-                    $"{count} thread record{(count == 1 ? "" : "s")} written at Mac OS's full length (Disk First Aid rejects shorter ones)"));
+                    $"{threads} thread record{(threads == 1 ? "" : "s")} written at Mac OS's full length (Disk First Aid rejects shorter ones)"));
+            }
+
+            if (files > 0)
+            {
+                changes.Add(new PlannedChange("repair", "",
+                    $"{files} file record{(files == 1 ? "'s" : "s'")} reserved fields cleared (Disk First Aid reports them)"));
             }
         }
 
