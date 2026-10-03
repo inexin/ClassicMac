@@ -252,7 +252,10 @@ An image is made again around a changed disk of the same size, keeping what Disk
 1. The map keeps its version and header; only map versions 10 to 12 that are not segmented are rewritten.
 2. Chunk boundaries stay. A chunk whose decoded sectors are unchanged keeps its type and stored bytes. A changed chunk
    is stored raw (`$02`, its size in bytes), as Disk Copy stores a chunk that would not shrink (§1.4); raw chunks are
-   valid in every version and do not count against `+$48`, which is kept. Its runs of all-zero sectors become zero
+   valid in every version and do not count against `+$48`. In an image with ADC chunks (map version 11 or later), a
+   changed run is compressed again with Disk Copy's ADC encoder ([adc.md §3](../codecs/adc.md#3-writing)) and stored as
+   `$83` unless that is longer than the sectors, and `+$48` grows when the run and its margin need more. Its runs of
+   all-zero sectors become zero
    chunks of their own (offset and length 0, §1.3), so an edit does not store empty space; the map gains their entries
    and its count (`+$7C`) and size follow (§2.1). An image whose chunks are all raw (a read/write image, §4.3) stays
    all raw, since Disk Copy refuses a read/write mount with zero chunks (§2.1). Edited ADC and read-only raw images
@@ -422,7 +425,8 @@ The codecs have no codes of their own (no `adc.` or `kencode.` codes): their fai
 
 ## 7. Verification
 
-`NdifWriterTests.cs` covers §3: a changed chunk stored raw while the others keep their bytes, the CRC made again, an
+`NdifWriterTests.cs` covers §3: a changed chunk stored raw (bytes ADC cannot shrink) while the others keep their bytes,
+a changed chunk compressed again in an ADC image, an image without ADC chunks keeping changed ones raw, the CRC made again, an
 unchanged disk giving the same data and map, a changed chunk's zero runs stored as zero chunks, a read/write image
 staying raw with no CRC, and the refusals.
 `NdifSessionTests.cs` edits images given as an AppleDouble pair (saved as a new pair and in place) and in MacBinary.

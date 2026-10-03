@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- NDIF: an edited ADC image's changed chunks are compressed again with Disk Copy 6.3.3's ADC encoder (adc.md §3,
+  ndif.md §3), so an edit no longer stores them raw.
 - HFS: catalog edits change only the leaves their records are in, splitting a full leaf (and its parents, up to a new
   root) into free nodes, as Mac OS does, instead of repacking every node; an edit on a 500 MB volume writes a few
   sectors instead of the whole 4 MB catalog and the bitmap, and the catalog keeps Mac OS's layout (hfs.md §5.5).

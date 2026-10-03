@@ -54,7 +54,7 @@ public sealed class NdifWriterTests
         var volume = Volume();
         var image = Compressed(volume);
         var changed = volume.ToArray();
-        changed.AsSpan(100 * 512, 100 * 512).Fill(0x5A);                                     // the second ADC chunk, no zero sector
+        new Random(5).NextBytes(changed.AsSpan(100 * 512, 100 * 512));                       // the second ADC chunk: bytes ADC cannot shrink
 
         var written = NdifWriter.Rewrite(image, changed);
 
@@ -121,11 +121,52 @@ public sealed class NdifWriterTests
         Assert.Empty(diagnostics);
         var map = Map(written);
         var after = Entries(map);
-        Assert.Equal([(0L, 0x83), (100, 0x02), (120, 0x00), (180, 0x02), (200, 0x00), (796, 0x02), (800, 0xFF)],
-            after.Select(e => (e.Start, (int)e.Type)));
+        Assert.Equal([(0L, 0x83), (100, 0x83), (120, 0x00), (180, 0x83), (200, 0x00), (796, 0x02), (800, 0xFF)],
+            after.Select(e => (e.Start, (int)e.Type)));                                         // the runs between compressed
         Assert.Equal((0L, 0L), (after[2].Offset, after[2].Stored));
-        Assert.Equal((20 * 512L, 20 * 512L), (after[1].Stored, after[3].Stored));
+        Assert.InRange(after[1].Stored, 1, 20 * 512 / 10);
         Assert.Equal(0x80 + 12 * after.Length, map.Length);
+    }
+
+    // In an ADC image a changed chunk is compressed again, as Disk Copy stores it: ADC while it is no longer than the
+    // sectors, and the buffer size (+$48) still covers it.
+    [Fact]
+    public void A_changed_chunk_in_an_ADC_image_is_compressed()
+    {
+        var volume = Volume();
+        var image = Compressed(volume);
+        var changed = volume.ToArray();
+        for (var i = 100 * 512; i < 200 * 512; i++)
+        {
+            changed[i] = (byte)(i % 13 * 17);
+        }
+
+        var written = NdifWriter.Rewrite(image, changed, new HashSet<long> { 150 });
+
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(changed, Decoded(written, diagnostics));
+        Assert.Empty(diagnostics);
+        var map = Map(written);
+        var after = Entries(map);
+        Assert.Equal([(0L, 0x83), (100, 0x83), (200, 0x00), (796, 0x02), (800, 0xFF)], after.Select(e => (e.Start, (int)e.Type)));
+        Assert.InRange(after[1].Stored, 1, 100 * 512 / 10);
+        Assert.True(BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x48)) >= 101);
+    }
+
+    // An image with no ADC chunk (Disk Copy's read-only and read/write images, or a version 10 map, which cannot hold
+    // one) keeps changed chunks raw.
+    [Fact]
+    public void An_image_without_ADC_chunks_keeps_changed_ones_raw()
+    {
+        var volume = Volume();
+        var (data, resource) = Build(volume, "Test Disk", (200, Kind.Raw), (596, Kind.Zero), (4, Kind.Raw));
+        var changed = volume.ToArray();
+        changed.AsSpan(100 * 512, 100 * 512).Fill(0x5A);
+
+        var written = NdifWriter.Rewrite(Image(data, resource), changed, new HashSet<long> { 150 });
+
+        Assert.DoesNotContain(Entries(Map(written)), e => e.Type == 0x83);
+        Assert.Equal(changed, Decoded(written, []));
     }
 
     [Fact]
