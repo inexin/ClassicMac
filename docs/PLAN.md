@@ -238,6 +238,7 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
 | `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--follow`, `--json` | — |
 | `find <path>` | Folders and files below a path, through containers (built; §2.4) | `--name`, `--type`, `--creator`, `--kind`, `--resource-type`, `--contains`, `--contains-hex`, `--max-depth`, `--limit`, `--json` | — |
 | `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--follow`, `--json` | — |
+| `shell <input>` | A DOS-like shell on one input: cd, dir, type, info, res, find, copy in and out, del, md, ren, set, save, save as; history and tab completion; `--script` or piped input for automation (built; [cli.md](cli.md) §5) | `--script <file>`, `--json` | — |
 | `mcp` | An MCP server over standard input and output: sessions on opened inputs, the read and write commands as tools, saves only through `save_as` (built; [cli.md](cli.md) §4) | the limit options | — |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`
@@ -271,7 +272,10 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
    only with `in_place`), lists and reads in pages with a `more` cursor.
 4. **Interactive shell** (`classicmac shell <input>`), DOS-like: `cd` (into disk images and archives as folders),
    `dir`/`ls`, `type`, `info`, `res`, `copy` (in or out), `del`, `md`, `find`; prompt `Mac OS 9.hfv:System Folder>`,
-   tab completion, history; leaving with unsaved changes asks Save / Save As / Discard.
+   tab completion, history; leaving with unsaved changes asks Save / Save As / Discard. Built
+   ([cli.md §5](cli.md#5-shell)): on the MCP server's session (working copies), `save` in place and `save as`, a
+   script or piped input run without questions (stopping at the first failure; `--json`: one object per command),
+   the console behind an interface for tests.
 
 Order: core with the `--json` subcommands, then the MCP server, then the shell.
 

@@ -6,15 +6,16 @@ using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Editing;
 
-namespace ClassicMac.Resources.Cli.Mcp
+namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// An input opened by the MCP server (docs/cli.md §4): a tree for reading its Mac paths and the changes made to it.
+    /// An input opened by the MCP server or the shell (docs/cli.md §4, §5): a tree for reading its Mac paths and the
+    /// changes made to it.
     /// Each change is made on a working copy in a temporary folder, so later reads show it; the input changes only when
     /// saved in place, and Save As writes a new file. Both make the changes again on the input itself, so what is written
     /// is the library's verified save.
     /// </summary>
-    internal sealed class MacMcpSession : IDisposable
+    internal sealed class PathSession : IDisposable
     {
         private readonly ContainerReadOptions options;
         private readonly ReadOptions readOptions;
@@ -25,7 +26,7 @@ namespace ClassicMac.Resources.Cli.Mcp
         private int saved;
         private string current;
 
-        private MacMcpSession(string id, string input, InputEditKind kind, ContainerReadOptions options, ReadOptions readOptions)
+        private PathSession(string id, string input, InputEditKind kind, ContainerReadOptions options, ReadOptions readOptions)
         {
             Id = id;
             Input = input;
@@ -56,7 +57,7 @@ namespace ClassicMac.Resources.Cli.Mcp
         public int Unsaved => edits.Count - saved;
 
         /// <summary>Opens a host file; refused (not found) when there is none.</summary>
-        public static MacMcpSession Open(string id, string path, ContainerReadOptions options, ReadOptions readOptions)
+        public static PathSession Open(string id, string path, ContainerReadOptions options, ReadOptions readOptions)
         {
             var full = Path.GetFullPath(path);
             if (!File.Exists(full))
@@ -65,7 +66,7 @@ namespace ClassicMac.Resources.Cli.Mcp
             }
 
             var kind = InputEditSession.Open(full, options, readOptions).Kind;
-            return new MacMcpSession(id, full, kind, options, readOptions);
+            return new PathSession(id, full, kind, options, readOptions);
         }
 
         /// <summary>

@@ -1,7 +1,7 @@
 # The command line
 
 `classicmac` reads, lists, converts and extracts classic Mac OS files (`classicmac --help` lists the commands). This
-document describes the file commands that work on *Mac paths* and the MCP server that offers them (§4) (planned in [PLAN.md](PLAN.md), "File commands, shell
+document describes the file commands that work on *Mac paths* the MCP server that offers them (§4) and the shell (§5) (planned in [PLAN.md](PLAN.md), "File commands, shell
 and MCP"); the library's `MacPathTree` (`ClassicMac.Files`) implements the paths.
 
 ## 1. Mac paths
@@ -358,3 +358,71 @@ A call that fails is a tool error (`isError`) whose JSON is `{ "error": "<why>",
 | `badArguments` | An argument is missing or of the wrong kind, the session is not open, or the cursor is not one the server gave |
 | `refused` | The change or read is refused: a name in use, a folder that is not empty, an input ClassicMac does not write, a folder read as a file, `save_as` onto the input (exit 2) |
 | `ioError` | A host file could not be read or written (exit 4) |
+
+## 5. Shell
+
+`classicmac shell <input>` is a DOS-like shell on one input: a host file, or a Mac path inside it to start at
+(`classicmac shell "Mac OS 9.hfv:System Folder"`). It reads the input as the read commands do (§2) and changes it as
+the write commands do (§3), in a session like the MCP server's (§4.2): changes are made on working copies, so later
+commands see them, and the input changes only with `save`.
+
+### 5.1 Commands
+
+| Command | Does |
+| --- | --- |
+| `cd [path]` | Goes into a folder, disk image, archive, file (its `#rsrc`), fork or type; alone, prints where the shell is |
+| `dir`, `ls [path]` | What a path holds (§2.1) |
+| `type`, `cat <path> [--hex] [--rsrc] [--max-bytes N]` | A file's text, a resource decoded, or hex (§2.3) |
+| `info`, `stat <path>` | Everything known about an entry (§2.2) |
+| `res [file]` | A file's resources: type, ID, size and name |
+| `find [path] [--name P] [--type T] [--creator C] [--kind folder\|file\|container] [--resource-type T] [--contains TEXT] [--limit N]` | Folders and files below a path (§2.4) |
+| `copy <path> <host folder> [--as appledouble\|basilisk\|macbinary\|raw] [--overwrite]` | Copies out (§2.5); `get` always copies out |
+| `copy <host file> <path> [--name N] [--type T] [--creator C]` | Copies in (`put`, §3.2); `put` always copies in |
+| `del`, `rm <path> [-r]` | Deletes a file, or a folder (with contents only with `-r`) |
+| `md`, `mkdir <path>` | Makes a folder |
+| `ren`, `rename <path> <name>` | Renames |
+| `set <path> [--type T] [--creator C] [--flags F]` | Sets Finder info (§3.2) |
+| `save` | Writes the changes over the input, verified, keeping `<input>.orig` the first time |
+| `save as <file>` | Writes them to a new file, verified (never the input) |
+| `exit`, `quit [--discard]` | Leaves |
+| `help` | Lists the commands |
+
+`copy` copies out when its first path names something in the input, otherwise in from the host. A line starting with
+`#` is a comment. The prompt is the input's name and the path inside it: `Mac OS 9.hfv:System Folder>`.
+
+### 5.2 Words and paths
+
+Spaces separate words. Double quotes group a word with spaces and are taken off (`cd "System Folder"`); a backslash
+before a space or a double quote makes it part of the word. A name that starts with a single quote runs to the next
+one, quotes kept, as a resource type does in a Mac path (`type Finder:#rsrc:'STR ':128`); an apostrophe inside a name
+(`Bob's`) is not a quote. Other backslashes stay, for the Mac path's escapes (§1.2) and host paths.
+
+A path is a Mac path (§1) from where the shell is. `:` or `/` alone is the input itself, and a path that starts with
+one, or with the input's name (`Mac OS 9.hfv:System Folder`), starts from the input. `..` goes up a level and `.`
+stays. When a change takes away the folder the shell is in, it moves up to what is left.
+
+### 5.3 Typing
+
+At a terminal, a line is edited anywhere (Left, Right, Home, End, Backspace, Delete; Escape clears it). Up and Down
+recall the lines typed before in the session. Tab completes the word before the cursor: a command name first, then
+the names in the folder the word points into (ignoring case), quoted when they hold a space; a folder, container,
+fork or type gets a `:` to go on, a file a space. When several names fit, Tab completes what they share, and when that
+adds nothing it lists them. Ctrl+D (or Ctrl+Z) on an empty line ends the input, as `exit` does.
+
+Leaving with unsaved changes asks: Save (in place), Save As (asks for the file), Discard or Cancel.
+
+### 5.4 Scripts
+
+With `--script <file>`, or when standard input is not a terminal, the shell runs the lines it is given, without
+prompts or questions. It stops at the first command that fails, with that command's exit code. Leaving with unsaved
+changes is refused (exit 2, nothing written) unless the script ends with `save`, `save as` or `exit --discard`.
+
+With `--json`, each command prints its result as one JSON object on one line: the read commands' objects (§2.6), the
+write commands' (§3.3) with `unsaved`, `cd`'s `input` and `path`, `res`'s `input`, `path` and `resources` (entries
+as §2.6). A command that fails prints `{ "command": "<command>", "error": "<why>", "code": <exit code> }`.
+
+### 5.5 Exit codes
+
+As the commands' (§2, §3.4): 0 success, 2 a usage error or refused change, 4 a host file not read or written, 5 a path
+that names nothing. A script exits with the failing command's code; leaving with changes not saved (a script, or
+the input ending while the shell asks) exits 2; otherwise the shell exits 0.

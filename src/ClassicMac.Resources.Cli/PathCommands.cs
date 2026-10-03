@@ -15,16 +15,26 @@ using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Cli
 {
-    // ls, stat, cat, find and get on Mac paths (docs/cli.md §2), as text or --json; problems go to stderr.
+    // ls, stat, cat, find and get on Mac paths (docs/cli.md §2), as text or --json; problems go to stderr. The shell
+    // (docs/cli.md §5) gives its session's tree and input: paths are then inside the input, and JSON is one line each.
     internal sealed class PathCommands(TextWriter output, TextWriter error, Stream binary, ContainerReadOptions options, ReadOptions readOptions,
-        bool strict, bool quiet)
+        bool strict, bool quiet, MacPathTree? sessionTree = null, string? sessionInput = null)
     {
         /// <summary>--follow: an alias file stands for its original (through aliases of aliases), docs/cli.md §2.</summary>
         public bool Follow { get; init; }
 
+        // The input the current command's paths are in, as results name it.
+        private string input = "";
+
         // Opens the path's host file and resolves the rest; reports a path that names nothing (exit NotFound).
         private int With(string path, Func<MacPathTree, MacPathEntry, int> action)
         {
+            if (sessionTree is not null)
+            {
+                input = sessionInput!;
+                return sessionTree.Resolve(path) is { } found ? Run(path, sessionTree, found, action) : NotFound(path);
+            }
+
             var reporter = new Reporter(error, strict, quiet);
             var diagnostics = new List<Diagnostic>();
             MacPathTree? tree;
@@ -47,40 +57,46 @@ namespace ClassicMac.Resources.Cli
 
             using (tree)
             {
-                int code;
-                if (entry is null)
-                {
-                    error.WriteLine($"{path}: names nothing.");
-                    code = ExitCodes.NotFound;
-                }
-                else if (Follow && tree.FollowAlias(entry) is not { } original)
-                {
-                    var stored = tree.ResolveAlias(entry)?.StoredPath;
-                    error.WriteLine($"{path}: an alias whose original is not found{(stored is null ? "" : $" ({stored})")}.");
-                    code = ExitCodes.NotFound;
-                }
-                else
-                {
-                    try
-                    {
-                        code = action(tree, Follow ? tree.FollowAlias(entry)! : entry);
-                    }
-                    catch (InvalidOperationException e)
-                    {
-                        error.WriteLine($"{path}: {e.Message}");
-                        code = ExitCodes.Usage;
-                    }
-                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                    {
-                        error.WriteLine($"{path}: {e.Message}");
-                        code = ExitCodes.IoError;
-                    }
-                }
-
+                input = tree.Root.Path;
+                var code = entry is null ? NotFound(path) : Run(path, tree, entry, action);
                 reporter.Write(tree.Root.Name, diagnostics);
                 return code == ExitCodes.Success ? reporter.ExitCode : code;
             }
         }
+
+        private int NotFound(string path)
+        {
+            error.WriteLine($"{path}: names nothing.");
+            return ExitCodes.NotFound;
+        }
+
+        private int Run(string path, MacPathTree tree, MacPathEntry entry, Func<MacPathTree, MacPathEntry, int> action)
+        {
+            if (Follow && tree.FollowAlias(entry) is not { } original)
+            {
+                var stored = tree.ResolveAlias(entry)?.StoredPath;
+                error.WriteLine($"{path}: an alias whose original is not found{(stored is null ? "" : $" ({stored})")}.");
+                return ExitCodes.NotFound;
+            }
+
+            try
+            {
+                return action(tree, Follow ? tree.FollowAlias(entry)! : entry);
+            }
+            catch (InvalidOperationException e)
+            {
+                error.WriteLine($"{path}: {e.Message}");
+                return ExitCodes.Usage;
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                error.WriteLine($"{path}: {e.Message}");
+                return ExitCodes.IoError;
+            }
+        }
+
+        // An entry's full path as printed: the input, then the names inside it.
+        private string Display(MacPathTree tree, string path) => MacPathJson.Inside(tree, path) is { Length: > 0 } inside ? input + ":" + inside : input;
 
         public int Ls(string path, bool json) => With(path, (tree, entry) =>
         {
@@ -112,11 +128,11 @@ namespace ClassicMac.Resources.Cli
             var kind = MacPathJson.KindOf(entry);
             if (json)
             {
-                WriteJson(w => MacPathJson.Stat(w, tree.Root.Path, tree, entry, info));
+                WriteJson(w => MacPathJson.Stat(w, input, tree, entry, info));
                 return ExitCodes.Success;
             }
 
-            output.WriteLine($"Path: {info.Path}");
+            output.WriteLine($"Path: {Display(tree, info.Path)}");
             output.WriteLine($"Kind: {info.Kind}");
             Line("Format", info.Format);
             if (info.Type is not null && info.Creator is not null)
@@ -173,7 +189,7 @@ namespace ClassicMac.Resources.Cli
             var truncated = bytes.Length < all.Length;
             if (truncated)
             {
-                error.WriteLine($"{entry.Path}: shows the first {bytes.Length} of {all.Length} bytes (--max-bytes).");
+                error.WriteLine($"{Display(tree, entry.Path)}: shows the first {bytes.Length} of {all.Length} bytes (--max-bytes).");
             }
 
             if (raw)
@@ -270,7 +286,7 @@ namespace ClassicMac.Resources.Cli
             if (truncated)
             {
                 matches.RemoveAt(matches.Count - 1);
-                error.WriteLine($"{entry.Path}: shows the first {limit} matches (--limit).");
+                error.WriteLine($"{Display(tree, entry.Path)}: shows the first {limit} matches (--limit).");
             }
 
             if (json)
@@ -286,7 +302,7 @@ namespace ClassicMac.Resources.Cli
             {
                 foreach (var match in matches)
                 {
-                    output.WriteLine(match.Path);
+                    output.WriteLine(Display(tree, match.Path));
                 }
             }
 
@@ -316,9 +332,9 @@ namespace ClassicMac.Resources.Cli
             return ExitCodes.Success;
         });
 
-        private static void Where(Utf8JsonWriter w, MacPathTree tree, string path) => MacPathJson.Where(w, tree.Root.Path, tree, path);
+        private void Where(Utf8JsonWriter w, MacPathTree tree, string path) => MacPathJson.Where(w, input, tree, path);
 
-        private void WriteJson(Action<Utf8JsonWriter> body) => output.WriteLine(MacPathJson.Document(body));
+        private void WriteJson(Action<Utf8JsonWriter> body) => output.WriteLine(MacPathJson.Document(body, indented: sessionTree is null));
 
         private static string Date(DateTime? date) => date?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "-";
     }

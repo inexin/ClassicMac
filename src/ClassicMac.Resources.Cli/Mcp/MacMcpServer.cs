@@ -50,7 +50,7 @@ namespace ClassicMac.Resources.Cli.Mcp
             "session only (dry_run checks a change without making it); save_as writes them to a new file, or over the " +
             "input with in_place. Long results come in pages: pass the 'more' value back as cursor. close ends a session.";
 
-        private readonly Dictionary<string, MacMcpSession> sessions = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, PathSession> sessions = new(StringComparer.Ordinal);
         private readonly Lock gate = new();
         private readonly ContainerReadOptions options;
         private readonly ReadOptions readOptions;
@@ -246,16 +246,16 @@ namespace ClassicMac.Resources.Cli.Mcp
             }
         }
 
-        private MacMcpSession Session(Arguments args)
+        private PathSession Session(Arguments args)
         {
             var id = args.Required("session");
             return sessions.TryGetValue(id, out var session) ? session : throw new BadArguments($"There is no open session {id}; call open first.");
         }
 
         // The entry a path inside the session's input names.
-        private static MacPathEntry Entry(MacMcpSession session, Arguments args) => MacEdits.Existing(session.Tree, args.String("path") ?? "");
+        private static MacPathEntry Entry(PathSession session, Arguments args) => MacEdits.Existing(session.Tree, args.String("path") ?? "");
 
-        private static void Where(Utf8JsonWriter w, MacMcpSession session, MacPathEntry entry) =>
+        private static void Where(Utf8JsonWriter w, PathSession session, MacPathEntry entry) =>
             MacPathJson.Where(w, session.Input, session.Tree, entry.Path);
 
         private static void More(Utf8JsonWriter w, long next, long total)
@@ -270,7 +270,7 @@ namespace ClassicMac.Resources.Cli.Mcp
         private string Open(Arguments args)
         {
             var id = (++next).ToString(CultureInfo.InvariantCulture);
-            var session = MacMcpSession.Open(id, args.Required("path"), options, readOptions);
+            var session = PathSession.Open(id, args.Required("path"), options, readOptions);
             sessions[id] = session;
             var root = MacCommands.Stat(session.Tree, session.Tree.Root);
             return Json(w =>

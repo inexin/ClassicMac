@@ -122,8 +122,52 @@ namespace ClassicMac.Resources.Cli
             }
 
             root.Subcommands.Add(McpCommand());
+            root.Subcommands.Add(ShellCommand());
             return root;
         }
+
+        private Command ShellCommand()
+        {
+            var path = new Argument<string>("input") { Description = "The host file, or a Mac path inside it to start at" };
+            var script = new Option<FileInfo>("--script") { Description = "Run the commands in this file, one per line, instead of asking" }.AcceptExistingOnly();
+            var json = new Option<bool>("--json") { Description = "Print each command's result as one line of JSON" };
+            var command = new Command("shell", "A DOS-like shell on one input: cd into disk images and archives, dir, type, copy, del, md, save (docs/cli.md §5)")
+            {
+                path, script, json,
+            };
+            command.SetAction(result =>
+            {
+                var typed = result.GetRequiredValue(path);
+                if (MacPaths.SplitHost(typed) is not var (host, rest))
+                {
+                    error.WriteLine($"{typed}: no host file (the path starts with no existing file).");
+                    return ExitCodes.NotFound;
+                }
+
+                using var session = PathSession.Open("shell", host, ContainerOptionsFrom(result), ReadOptionsFrom(result));
+                using var reader = result.GetValue(script) is { } file ? new StreamReader(file.FullName) : null;
+                Shell.IShellConsole console = reader is not null ? new Shell.ScriptConsole(reader, output, error)
+                    : ShellInput is { } input ? new Shell.ScriptConsole(input, output, error)
+                    : Console.IsInputRedirected ? new Shell.ScriptConsole(Console.In, output, error)
+                    : new Shell.InteractiveConsole(new Shell.ConsoleTerminal(), output, error);
+                var shell = new Shell.MacShell(console, session, ContainerOptionsFrom(result), ReadOptionsFrom(result), result.GetValue(json));
+                try
+                {
+                    shell.Enter(rest);
+                }
+                catch (PathNotFound)
+                {
+                    error.WriteLine($"{typed}: names nothing.");
+                    return ExitCodes.NotFound;
+                }
+
+                return shell.Run();
+            });
+            return command;
+        }
+
+        /// <summary>The shell's commands when no script is given (tests; otherwise standard input).</summary>
+        internal TextReader? ShellInput { get; init; }
 
         private Command McpCommand()
         {

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- CLI: `classicmac shell <input>`, a DOS-like shell on one input (docs/cli.md §5): `cd` into folders, disk images,
+  archives, forks and types (`..`, `:`, paths from the input's name), `dir`, `type`, `info`, `res`, `find`, `copy` out
+  to the host and in from it, `del`, `md`, `ren`, `set`, `save` (in place, keeping `.orig`) and `save as`; changes are
+  seen at once and written only when saved; leaving with unsaved changes asks Save, Save As or Discard. At a terminal:
+  line editing, history and tab completion of names (quoted when they hold spaces); with `--script` or piped input it
+  runs without questions, stops at the first failure, and with `--json` prints one JSON object per command.
 - Viewer: DOCMaker, SimpleText and Word documents preview as the HTML Convert Documents writes, in the web view the help
   pages use (stylesheet and pictures put into the page): a DOCMaker document's contents page and chapters in the page
   list, links and Back pictures turning its pages, Back; Rendered | Text, the text also when there is no web view. The
