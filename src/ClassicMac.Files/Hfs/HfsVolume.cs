@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace ClassicMac.Files.Hfs
 {
@@ -16,6 +17,7 @@ namespace ClassicMac.Files.Hfs
         private readonly ForkData data;
         private readonly Dictionary<long, byte[]> sectors;
         private readonly HashSet<long> changed = [];
+        private static readonly AsyncLocal<WholeReads?> Counting = new();
 
         public HfsVolume(ForkData data)
             : this(data, [])
@@ -42,6 +44,11 @@ namespace ClassicMac.Files.Hfs
         public void Read(long offset, Span<byte> buffer)
         {
             Check(offset, buffer.Length);
+            if (buffer.Length == Length && Counting.Value is { } counter)
+            {
+                counter.Count++;
+            }
+
             data.ReadAt(offset, buffer);
             if (sectors.Count == 0)
             {
@@ -88,6 +95,24 @@ namespace ClassicMac.Files.Hfs
             var bytes = new byte[Length];
             Read(0, bytes);
             return bytes;
+        }
+
+        /// <summary>
+        /// Counts, until disposed, the reads of a whole volume made on this logical flow (a test's guard that edits hold
+        /// only what they change).
+        /// </summary>
+        internal static WholeReads CountWholeReads()
+        {
+            var counter = new WholeReads();
+            Counting.Value = counter;
+            return counter;
+        }
+
+        internal sealed class WholeReads : IDisposable
+        {
+            public int Count { get; set; }
+
+            public void Dispose() => Counting.Value = null;
         }
 
         private void Check(long offset, int length)

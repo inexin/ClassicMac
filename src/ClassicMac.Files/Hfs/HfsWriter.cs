@@ -246,7 +246,7 @@ namespace ClassicMac.Files.Hfs
                 U32(new BigEndianReader(mdbOut), 0x82), overflow, 0xFF, 3, false));
             Verify(source, result, canonicalPath, fork, data.Span, writeTime, newlyAllocatedBlocks, releasedBlocks);
             var targetBlocks = new HashSet<uint>(extents.SelectMany(e => Enumerable.Range(e.Start, e.Count).Select(b => (uint)b)));
-            VerifyKept(source, result, catalogBefore, [Convert.ToHexString(match.Key)], 0, overflowBefore, [fileId], targetBlocks);
+            VerifyKept(result, catalogBefore, [Convert.ToHexString(match.Key)], 0, overflowBefore, [fileId], targetBlocks);
             return result;
         }
 

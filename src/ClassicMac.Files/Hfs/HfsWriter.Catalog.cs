@@ -546,7 +546,7 @@ public static partial class HfsWriter
 
         AddShortCount(state.Mdb, 0x22, checked((int)released));
         var result = CommitCatalog(state);
-        VerifyKept(state.Source, result, before, removedKeys, parent, overflow.Select(r => (r.Key, r.Data)).ToList(), fileIds, []);
+        VerifyKept(result, before, removedKeys, parent, overflow.Select(r => (r.Key, r.Data)).ToList(), fileIds, []);
         return result;
     }
 
@@ -555,10 +555,9 @@ public static partial class HfsWriter
     // valence); every extents overflow record is the source's except those of the files in overflowFiles and of the
     // B-tree files; and every sector the edit wrote lies in the MDB, the alternate MDB, the bitmap, the catalog and extents
     // files, or the blocks of skipBlocks. So no file kept has changed, without reading any fork.
-    private static void VerifyKept(HfsVolume source, HfsVolume result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
+    private static void VerifyKept(HfsVolume result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent,
         List<(byte[] Key, byte[] Data)> overflowBefore, HashSet<uint> overflowFiles, HashSet<uint> skipBlocks)
     {
-        _ = source;
         var after = OpenCatalog(result, writable: false);
         bool Kept(byte[] key) => !overflowFiles.Contains(U32(new BigEndianReader(key), 2)) && U32(new BigEndianReader(key), 2) is not (3 or 4);
         var overflowAfter = LeafRecords(after.ExtentsTree).Where(r => Kept(r.Key)).ToDictionary(r => Convert.ToHexString(r.Key), r => r.Data);

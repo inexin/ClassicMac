@@ -205,6 +205,30 @@ public sealed class InputEditSessionTests : IDisposable
         Assert.DoesNotContain(Files(target), f => f.MacPath == "Read Me");
     }
 
+    // No edit or save of a plain volume reads it whole: what an edit holds stays its changed sectors, however large the
+    // volume (docs/PLAN.md, editing through a block overlay).
+    [Fact]
+    public void Edits_and_saves_never_read_the_whole_volume()
+    {
+        var path = Volume();
+        var session = InputEditSession.Open(path);
+        using var whole = HfsVolume.CountWholeReads();
+
+        session.AddFolder("Docs:Old");
+        session.AddFile("Docs:New", new MacFile { Name = MacString.FromMacRoman("New"), DataFork = ForkData.FromBytes(new byte[5000]) });
+        session.Rename("Read Me", "About");
+        session.Move("About", "Docs");
+        session.SetInfo("Docs:About", type: FourCC.FromString("ttro"));
+        session.SetResource("Docs:Letter", Str, 300, "x"u8.ToArray());
+        session.Delete("Docs:Empty");
+        _ = session.Current();
+        session.SaveAs(Path.Combine(directory, "Out.img"));
+
+        Assert.Equal(0, whole.Count);
+        _ = session.Volume;                                                     // the one call that asks for it whole
+        Assert.Equal(1, whole.Count);
+    }
+
     [Fact]
     public void A_folder_with_contents_is_deleted_only_when_asked()
     {
