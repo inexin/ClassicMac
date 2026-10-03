@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Viewer: the Volume menu (New File, New Folder, Import, Delete) and Save As ▸ HFS Volume Image work on the HFS volume in a
+  partitioned disk, a Disk Copy 4.2 image or an NDIF image, saved in the image's own format; folders inside an archive on
+  a volume are no longer offered as places for new items.
 - CLI: `rm` warns of each alias on the volume that will no longer find its original (also with --dry-run; in JSON the
   change's `warnings`), in the shell and the MCP server too (aliases.md §5).
 - HFS: fork edits are checked by records and blocks instead of reading every file, and whole-image copies are made only

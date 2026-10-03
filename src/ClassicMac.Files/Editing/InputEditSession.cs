@@ -475,7 +475,27 @@ namespace ClassicMac.Files.Editing
         /// Writes the input with the changes to <paramref name="destination"/>, a new file (never the input), verified;
         /// returns the paths written (an AppleDouble pair or a Basilisk II entry is more than one).
         /// </summary>
-        public IReadOnlyList<string> SaveAs(string destination)
+        public IReadOnlyList<string> SaveAs(string destination) => SaveAs(destination, []);
+
+        /// <summary>
+        /// Save As with forks edited outside the session (the app's resource editors) replaced too: a volume's files'
+        /// forks, by their paths in the volume.
+        /// </summary>
+        public IReadOnlyList<string> SaveAs(string destination, IReadOnlyList<HfsForkReplacement> otherForks)
+        {
+            ArgumentNullException.ThrowIfNull(otherForks);
+            extra = otherForks;
+            try
+            {
+                return SaveAsCore(destination);
+            }
+            finally
+            {
+                extra = [];
+            }
+        }
+
+        private IReadOnlyList<string> SaveAsCore(string destination)
         {
             ArgumentNullException.ThrowIfNull(destination);
             RequireEditable();
@@ -498,6 +518,19 @@ namespace ClassicMac.Files.Editing
             }
 
             return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements(), region)];
+        }
+
+        private IReadOnlyList<HfsForkReplacement> extra = [];
+
+        /// <summary>Opens an input already read (its host file and what it unwraps to), as the app has it.</summary>
+        public static InputEditSession Open(string path, HostFile host, ContainerNode root, ContainerReadOptions? options = null,
+            ReadOptions? readOptions = null, ICollection<Diagnostic>? diagnostics = null)
+        {
+            ArgumentNullException.ThrowIfNull(path);
+            ArgumentNullException.ThrowIfNull(host);
+            ArgumentNullException.ThrowIfNull(root);
+            return new InputEditSession(path, host, root, options ?? ContainerReadOptions.Default, readOptions ?? ReadOptions.Default,
+                diagnostics ?? new List<Diagnostic>());
         }
 
         /// <summary>Writes the changes over the input, verified, keeping the original as <c>.orig</c> on the first save.</summary>
@@ -576,6 +609,6 @@ namespace ClassicMac.Files.Editing
         }
 
         private List<HfsForkReplacement> Replacements() =>
-            forks.Where(f => f.Value.IsDirty).Select(f => new HfsForkReplacement(f.Key, f.Value.Fork)).ToList();
+            [.. forks.Where(f => f.Value.IsDirty).Select(f => new HfsForkReplacement(f.Key, f.Value.Fork)), .. extra];
     }
 }

@@ -757,6 +757,47 @@ public sealed partial class EditTests : IDisposable
         _ = fresh;
     }
 
+    // The Volume menu and Save As ▸ HFS Volume Image on a volume inside a Disk Copy 4.2 image and a partitioned disk: the
+    // volume node takes new folders and deletions, and Save As writes the image in its own format.
+    [Theory]
+    [InlineData("diskcopy")]
+    [InlineData("partitioned")]
+    public async Task A_volume_inside_a_disk_image_is_edited_and_saved_in_its_format(string kind)
+    {
+        var volume = HfsWriter.Format(800 * 1024, "Floppy");
+        volume = HfsWriter.CreateFile(ForkData.FromBytes(volume), "Read Me", "hello"u8.ToArray(), Array.Empty<byte>(), FinderInfo.Empty);
+        var path = Path.Combine(folder, kind == "diskcopy" ? "Floppy.image" : "Disk.img");
+        File.WriteAllBytes(path, kind == "diskcopy" ? Fixtures.DiskCopy42("Floppy", volume)
+            : Fixtures.PartitionMap(("Driver", "Apple_Driver43", new byte[1024]), ("Floppy", "Apple_HFS", volume)));
+        var original = File.ReadAllBytes(path);
+        var dialogs = new Dialogs();
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        Assert.True(input.IsWritableHfs);
+        var disk = input.Children.OfType<ContainerFileNode>().Single();
+
+        model.Selected = disk;
+        Assert.True(model.NewFolderCommand.CanExecute(null));
+        dialogs.FolderName = "Docs";
+        await model.NewFolderCommand.ExecuteAsync(null);
+        Assert.IsType<FolderNode>(model.Selected);
+        model.Selected = disk.Children.Single(n => n.Title == "Read Me");
+        dialogs.Confirm = true;
+        await model.DeleteItemCommand.ExecuteAsync(null);
+        Assert.True(model.HasUnsavedChanges);
+        Assert.Equal(original, File.ReadAllBytes(path));                 // nothing written until Save As
+
+        model.Selected = input;
+        await model.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = Path.Combine(folder, Path.GetFileNameWithoutExtension(path) + "-edited" + Path.GetExtension(path));
+        var session = ClassicMac.Files.Editing.InputEditSession.Open(saved);
+        Assert.Equal(ClassicMac.Files.Editing.InputEditKind.HfsVolume, session.Kind);
+        Assert.NotNull(session.Region);                                  // still a Disk Copy image or a partitioned disk
+        var folders = HfsReader.Instance.ReadFolders(ForkData.FromBytes(session.Volume), new ContainerContext());
+        Assert.Contains(folders, f => f.MacPath == "Docs");
+        Assert.Empty(HfsReader.Instance.Read(ForkData.FromBytes(session.Volume), new ContainerContext()));
+    }
+
     [Fact]
     public async Task Volume_commands_refuse_bad_names_and_other_containers()
     {

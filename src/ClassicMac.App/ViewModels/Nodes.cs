@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Editing;
 using ClassicMac.Resources;
 using CommunityToolkit.Mvvm.ComponentModel;
 
@@ -150,6 +151,7 @@ namespace ClassicMac.App.ViewModels
             ContainerOptions = containerOptions;
             Options = options;
             Report = report;
+            VolumeSession = InputEditSession.Open(path, host, root, containerOptions, options);
             if (root.Children.Count > 0)
             {
                 Tree.AddContents(this, root.Children);
@@ -182,13 +184,52 @@ namespace ClassicMac.App.ViewModels
         public EditState? Editing { get; internal set; }
 
         /// <summary>
-        /// Whether the input is a plain HFS volume image (no partition map or disk-image wrapper), whose files and
-        /// folders can be created and deleted.
+        /// The input's edit session for its volume: files and folders created and deleted, saved by Save As ▸ HFS Volume
+        /// Image in the input's own format.
         /// </summary>
-        public bool IsWritableHfs => Host.Layout == HostLayout.Plain && Root.Volume?.Format == "HFS";
+        internal InputEditSession VolumeSession { get; }
+
+        /// <summary>
+        /// Whether the input holds an HFS volume whose files and folders can be created and deleted: a plain volume image,
+        /// a partitioned disk with one HFS partition, or a Disk Copy 4.2 or NDIF image of an HFS disk.
+        /// </summary>
+        public bool IsWritableHfs => VolumeSession.Kind == InputEditKind.HfsVolume;
 
         /// <summary>The volume with the files and folders created and deleted so far, or null when there are none.</summary>
-        public byte[]? EditedVolume { get; internal set; }
+        public byte[]? EditedVolume => VolumeSession.HasChanges ? VolumeSession.Volume : null;
+
+        /// <summary>
+        /// The node the volume's files and folders are under: the input for a plain volume image, else the disk's node (a
+        /// partition, a Disk Copy disk) under the input's wrappers; null when the input is no writable volume.
+        /// </summary>
+        internal NodeViewModel? VolumeRoot
+        {
+            get
+            {
+                if (!IsWritableHfs)
+                {
+                    return null;
+                }
+
+                if (Root.Volume?.Format == "HFS")
+                {
+                    return this;
+                }
+
+                NodeViewModel at = this;
+                while (at.Children.OfType<ContainerFileNode>().ToList() is [var only])
+                {
+                    if (only.Node.Volume?.Format == "HFS")
+                    {
+                        return only;
+                    }
+
+                    at = only;
+                }
+
+                return null;
+            }
+        }
 
         // A plain file that is no container may itself be a resource fork (a .rsrc file).
         protected override Task LoadAsync() =>

@@ -791,9 +791,9 @@ namespace ClassicMac.App.ViewModels
 
             try
             {
-                var volume = input.EditedVolume;
-                var written = await Task.Run(() => ForkSaver.SaveHfsImageAs(input.Path, path, volume, forks));
-                Status = $"Saved HFS image {written} ({forks.Count} fork{(forks.Count == 1 ? "" : "s")}{(volume is null ? "" : ", files and folders")} changed).";
+                var volumeChanged = input.EditedVolume is not null;
+                var written = await Task.Run(() => input.VolumeSession.SaveAs(path, forks));
+                Status = $"Saved HFS image {written[0]} ({forks.Count} fork{(forks.Count == 1 ? "" : "s")}{(volumeChanged ? ", files and folders" : "")} changed).";
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or InvalidDataException)
             {

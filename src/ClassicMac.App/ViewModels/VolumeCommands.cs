@@ -20,23 +20,28 @@ namespace ClassicMac.App.ViewModels
     // image on disk is not touched, and the changes are written only by Save As ▸ HFS Volume Image, with the fork edits.
     public sealed partial class MainViewModel
     {
-        // The folder node a new item goes into (the selected folder, the input's root, or the folder of the selected
-        // file), when it is in a plain HFS image and not inside a container held in it.
+        // The folder node a new item goes into (the selected folder, the volume's root, or the folder of the selected
+        // file), when it is in the input's writable volume and not inside a container held in it.
         private static NodeViewModel? VolumeFolder(NodeViewModel? node)
         {
-            if (node is ResourceTypeNode or ResourceNode or LoadingNode)
+            if (node is null or ResourceTypeNode or ResourceNode or LoadingNode || node.Input.VolumeRoot is not { } root)
             {
                 return null;
             }
 
-            for (var at = node is ContainerFileNode ? node.Parent : node; at is not null; at = at.Parent)
+            NodeViewModel? folder = null;
+            for (var at = node is ContainerFileNode && node != root ? node.Parent : node; at is not null; at = at.Parent)
             {
-                if (at is FolderNode or InputNode)
+                if (at == root)
                 {
-                    return at.Input.IsWritableHfs ? at : null;
+                    return folder ?? at;
                 }
 
-                if (at is ContainerFileNode)
+                if (at is FolderNode)
+                {
+                    folder ??= at;
+                }
+                else if (at is ContainerFileNode or InputNode)
                 {
                     return null;
                 }
@@ -165,7 +170,7 @@ namespace ClassicMac.App.ViewModels
             }
 
             var path = string.Join(":", FolderNames(folder).Append(name));
-            if (!ChangeVolume(folder.Input, image => HfsWriter.CreateFolder(ForkData.FromBytes(image), path), $"create folder {name}"))
+            if (!ChangeVolume(folder.Input, session => session.AddFolder(path), $"create folder {name}"))
             {
                 return;
             }
@@ -195,7 +200,7 @@ namespace ClassicMac.App.ViewModels
             }
             // A folder with everything in it (deepest first); one failure leaves the volume as it was.
             var path = MacPathOf(item);
-            if (!ChangeVolume(item.Input, image => HfsWriter.Delete(ForkData.FromBytes(image), path, recursive: item is FolderNode), $"delete {name}"))
+            if (!ChangeVolume(item.Input, session => session.Delete(path, recursive: item is FolderNode), $"delete {name}"))
             {
                 return;
             }
@@ -217,8 +222,8 @@ namespace ClassicMac.App.ViewModels
             var path = string.Join(":", folderPath.Append(file.Name.ToMacRoman()));
             var data = file.DataFork.ToArray();
             var resource = file.ResourceFork.ToArray();
-            if (!ChangeVolume(folder.Input, image => HfsWriter.CreateFile(ForkData.FromBytes(image), path, data, resource, file.FinderInfo, file.Created, file.Modified),
-                    $"create {file.Name.ToMacRoman()}"))
+            var added = file with { DataFork = ForkData.FromBytes(data), ResourceFork = ForkData.FromBytes(resource) };
+            if (!ChangeVolume(folder.Input, session => session.AddFile(path, added), $"create {file.Name.ToMacRoman()}"))
             {
                 return;
             }
@@ -243,16 +248,15 @@ namespace ClassicMac.App.ViewModels
             Status = $"Created {file.Name.ToMacRoman()}; Save As ▸ HFS Volume Image writes it.";
         }
 
-        // Applies a change to the input's volume (its edited copy, or the image as read); false, with the reason in the
-        // status line, when HfsWriter refuses it.
-        private bool ChangeVolume(InputNode input, Func<byte[], byte[]> change, string what)
+        // Applies a change to the input's volume through its edit session; false, with the reason in the status line, when
+        // the writer refuses it (the session is left as it was).
+        private bool ChangeVolume(InputNode input, Action<InputEditSession> change, string what)
         {
             try
             {
-                var image = input.EditedVolume ?? input.Root.File.DataFork.ToArray();
-                input.EditedVolume = change(image);
+                change(input.VolumeSession);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or InvalidOperationException)
             {
                 Status = $"Could not {what}: {e.Message}";
                 return false;

@@ -314,8 +314,9 @@ Mac OS 9 volume).** Not ordered yet:
   whole-image copies in `HfsWriter` too, to lower peak memory.
 - **Aliases on rm** (built): a warning for each alias on the volume whose original a deletion removes
   (`aliases.md` §5), also with `--dry-run`, in JSON as the change's `warnings`.
-- **More partitioned disks:** writes to disks with several Mac volume partitions (the partition named in the Mac path),
-  and the app's Volume menu and Save As on partitioned disks.
+- **More partitioned disks:** writes to disks with several Mac volume partitions (the partition named in the Mac path).
+  The app's Volume menu and Save As ▸ HFS Volume Image work on every input the edit session writes (partitioned disks
+  with one HFS partition, Disk Copy 4.2 and NDIF images) through `InputEditSession` (built).
 - **A gated corpus write test:** under `CLASSICMAC_CORPUS`, edit copies of real Mac OS-written images (delete, add,
   rename, move) and require `check` to pass, so writer rules are tested against Mac OS's layouts, not only against
   `HfsBuilder`'s.
