@@ -141,11 +141,13 @@ listed. Text: one path per line.
 
 ### 2.5 get
 
-`classicmac get <path> [-o <dir>] [--as appledouble|basilisk|macbinary|raw] [--enter] [--overwrite] [--follow] [--json]` copies
+`classicmac get <path> [-o <dir>] [--as appledouble|basilisk|macbinary|raw|binhex|text] [--enter] [--overwrite] [--follow] [--json]` copies
 to a host folder (default: the current one) and lists the files written:
 
-- a file or container: as an AppleDouble pair (default), Basilisk II folders, a MacBinary III `.bin`, or its forks raw
-  (the data fork, and the resource fork as `.rsrc`); `--enter` writes a container's contents as a folder instead;
+- a file or container: as an AppleDouble pair (default), Basilisk II folders, a MacBinary III `.bin`, its forks raw
+  (the data fork, and the resource fork as `.rsrc`), a BinHex 4.0 `.hqx`, or `text`: the data fork alone, read as Mac
+  OS Roman with CR line ends and written as UTF-8 with LF line ends and no byte order mark (`.txt` added to a name
+  without an extension); `--enter` writes a container's contents as a folder instead;
 - a folder: a host folder of its files and folders;
 - a resource: its data (decompressed) as `TYPE_ID.bin`.
 
@@ -257,7 +259,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 
 | Command | Arguments and options | Does |
 | --- | --- | --- |
-| `put` | `<host file> <Mac path>` `[--name N] [--type T] [--creator C]` | Adds a host file: into the folder the path names (keeping its name), or as the file the path names. The host file is read with its AppleDouble or Basilisk II companions, MacBinary and AppleSingle unwrapped, else its bytes are the data fork |
+| `put` | `<host file> <Mac path>` `[--name N] [--type T] [--creator C] [--text]` | Adds a host file: into the folder the path names (keeping its name), or as the file the path names. The host file is read with its AppleDouble or Basilisk II companions, MacBinary, AppleSingle and BinHex unwrapped, else its bytes are the data fork. `--text`: a UTF-8 text file (a byte order mark dropped) made Mac OS Roman with CR line ends, type `TEXT`, creator `ttxt`; a character Mac OS Roman has not is refused, naming its line |
 | `mkdir` | `<Mac path>` | Makes an empty folder |
 | `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`) |
 | `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
@@ -354,8 +356,8 @@ it. Inputs ClassicMac does not write (§3.1) can be read but not changed.
 | `stat` | `session`, `path` | stat's object (§2.6) |
 | `read` | `session`, `path`, `fork` (`data` or `rsrc`), `hex`, `max_bytes` (65536, at most 1 MiB), `cursor` | cat's object (§2.6) with `offset`, `size`, `truncated`, `more`; text also `length` |
 | `search` | `session`, `path`, `name`, `type`, `creator`, `kind` (`folder`, `file`, `container`), `resource_type`, `contains`, `contains_hex`, `max_depth`, `limit` (100, at most 1000), `cursor` | find's object (§2.6) with `more` |
-| `extract` | `session`, `path`, `directory`, `format` (`appledouble`, `basilisk`, `macbinary`, `raw`), `overwrite`, `enter` | get's object (§2.6) |
-| `put` | `session`, `source` (a host file), `path`, `name`, `type`, `creator`, `dry_run` | §3.3's object with `unsaved` |
+| `extract` | `session`, `path`, `directory`, `format` (`appledouble`, `basilisk`, `macbinary`, `raw`, `binhex`, `text`), `overwrite`, `enter` | get's object (§2.6) |
+| `put` | `session`, `source` (a host file), `path`, `name`, `type`, `creator`, `text`, `dry_run` | §3.3's object with `unsaved` |
 | `mkdir` | `session`, `path`, `dry_run` | the same |
 | `rm` | `session`, `path`, `recursive`, `dry_run` | the same |
 | `rename` | `session`, `path`, `name`, `dry_run` | the same |
@@ -405,8 +407,8 @@ commands see them, and the input changes only with `save`.
 | `info`, `stat <path>` | Everything known about an entry (§2.2) |
 | `res [file]` | A file's resources: type, ID, size and name |
 | `find [path] [--name P] [--type T] [--creator C] [--kind folder\|file\|container] [--resource-type T] [--contains TEXT] [--limit N]` | Folders and files below a path (§2.4) |
-| `copy <path> <host folder> [--as appledouble\|basilisk\|macbinary\|raw] [--overwrite]` | Copies out (§2.5); `get` always copies out |
-| `copy <host file> <path> [--name N] [--type T] [--creator C]` | Copies in (`put`, §3.2); `put` always copies in |
+| `copy <path> <host folder> [--as appledouble\|basilisk\|macbinary\|raw\|binhex\|text] [--overwrite]` | Copies out (§2.5); `get` always copies out |
+| `copy <host file> <path> [--name N] [--type T] [--creator C] [--text]` | Copies in (`put`, §3.2); `put` always copies in |
 | `del`, `rm <path> [-r]` | Deletes a file, or a folder (with contents only with `-r`) |
 | `md`, `mkdir <path>` | Makes a folder |
 | `ren`, `rename <path> <name>` | Renames |

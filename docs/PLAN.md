@@ -289,8 +289,8 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    (built: `VolumeInfo` from HFS, HFS Plus and MFS, [cli.md](cli.md) §2.2).
 4. `lock` / `unlock` (a file's locked flag) and `bless` (the System Folder in the MDB's Finder info) (built: the CLI,
    MCP and shell; `stat` shows the blessed folder).
-5. Transfers that convert: `put --text`/`get --text` (Mac OS Roman with CR to and from UTF-8 with LF), `get --as
-   binhex` and `.hqx` read by `put`.
+5. Transfers that convert: `put --text`/`get --as text` (Mac OS Roman with CR to and from UTF-8 with LF), `get --as
+   binhex` and `.hqx` read by `put` (built: the CLI, MCP and shell; [cli.md](cli.md) §2.5, §3.2).
 6. Writes to an HFS partition inside an Apple Partition Map image, and to Disk Copy images (written back in their own
    format).
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name.

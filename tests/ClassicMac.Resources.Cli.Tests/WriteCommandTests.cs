@@ -66,6 +66,45 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void Put_text_converts_UTF8_to_Mac_OS_Roman_and_a_BinHex_file_is_unwrapped()
+    {
+        var disk = Disk();
+        var note = Path.Combine(folder, "note.txt");
+        File.WriteAllText(note, "Café\n§\n");
+
+        var (code, _, error) = Run("put", note, disk + ":Docs", "--text", "-o", Out);
+        Assert.True(code == ExitCodes.Success, error);
+        var added = Files(Out).Single(f => f.MacPath == "Docs:note.txt");
+        Assert.Equal(new byte[] { (byte)'C', (byte)'a', (byte)'f', 0x8E, 0x0D, 0xA4, 0x0D }, added.DataFork.ToArray());
+        Assert.Equal((FourCC.FromString("TEXT"), FourCC.FromString("ttxt")), (added.FinderInfo.Type, added.FinderInfo.Creator));
+
+        File.WriteAllText(note, "✓\n");
+        var refused = Run("put", note, disk + ":Docs", "--text", "-o", Out);
+        Assert.Equal(ExitCodes.Usage, refused.Code);
+        Assert.Contains("line 1", refused.Error);
+
+        // A BinHex file: get --as binhex, then put unwraps it.
+        var hqxFolder = Path.Combine(folder, "hqx");
+        Assert.Equal(ExitCodes.Success, Run("get", disk + ":Docs:Letter", "-o", hqxFolder, "--as", "binhex").Code);
+        var back = Path.Combine(folder, "back.img");
+        Assert.Equal(ExitCodes.Success, Run("put", Path.Combine(hqxFolder, "Letter.hqx"), disk + ":Copy", "-o", back).Code);
+        var copy = Files(back).Single(f => f.MacPath == "Copy");
+        Assert.Equal(Files(disk).Single(f => f.MacPath == "Docs:Letter").ResourceFork.ToArray(), copy.ResourceFork.ToArray());
+    }
+
+    [Fact]
+    public void Get_as_text_writes_UTF8_with_LF_line_ends()
+    {
+        var disk = Disk();
+        var output = Path.Combine(folder, "text");
+
+        var (code, _, error) = Run("get", disk + ":Read Me", "-o", output, "--as", "text");
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Equal("hello", File.ReadAllText(Path.Combine(output, "Read Me.txt")));
+    }
+
+    [Fact]
     public void Rm_deletes_a_file_and_a_folder_only_with_recursive()
     {
         var disk = Disk();

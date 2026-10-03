@@ -161,6 +161,17 @@ public sealed class McpServerTests : IAsyncLifetime
         var extracted = await Call("extract", new() { ["session"] = session, ["path"] = "Read Me", ["directory"] = target, ["format"] = "raw" });
         var written = extracted.GetProperty("written")[0].GetString()!;
         Assert.Equal("hello", File.ReadAllText(written));
+
+        extracted = await Call("extract", new() { ["session"] = session, ["path"] = "Read Me", ["directory"] = target, ["format"] = "text" });
+        Assert.EndsWith("Read Me.txt", extracted.GetProperty("written")[0].GetString(), StringComparison.Ordinal);
+        extracted = await Call("extract", new() { ["session"] = session, ["path"] = "Read Me", ["directory"] = target, ["format"] = "binhex" });
+        Assert.EndsWith("Read Me.hqx", extracted.GetProperty("written")[0].GetString(), StringComparison.Ordinal);
+
+        var note = Path.Combine(folder, "note.txt");
+        File.WriteAllText(note, "Café\n");
+        await Call("put", new() { ["session"] = session, ["source"] = note, ["path"] = "Docs", ["text"] = true });
+        var read = await Call("read", new() { ["session"] = session, ["path"] = "Docs:note.txt" });
+        Assert.Equal("Café\n", read.GetProperty("text").GetString());
     }
 
     [Fact]

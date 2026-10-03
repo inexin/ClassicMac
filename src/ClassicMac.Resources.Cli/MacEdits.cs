@@ -42,6 +42,19 @@ namespace ClassicMac.Resources.Cli
             return session => session.AddFile(path, added);
         }
 
+        /// <summary>A host file to add: as a text document (<see cref="HostImport.ReadText"/>) or as it is (<see cref="HostImport.Read"/>).</summary>
+        public static MacFile Import(string path, bool text, ContainerReadOptions options)
+        {
+            try
+            {
+                return text ? HostImport.ReadText(path) : HostImport.Read(path, options);
+            }
+            catch (System.IO.InvalidDataException e)
+            {
+                throw new WriteRefused(e.Message);
+            }
+        }
+
         /// <summary>Makes a folder.</summary>
         public static Action<InputEditSession> Mkdir(MacPathTree tree, string rest)
         {

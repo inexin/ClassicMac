@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: transfers that convert: `get --as text` (UTF-8 with LF line ends) and `--as binhex` (.hqx); `put --text` (UTF-8
+  made a Mac OS Roman TEXT document), and `put` unwraps BinHex files; also in the MCP server and the shell (cli.md §2.5, §3.2).
 - CLI: `lock` and `unlock` a file, and `bless` a folder holding a System file as the volume's System Folder; also in the
   MCP server and the shell. `stat` of a volume shows its blessed folder (cli.md §3.2).
 - CLI: `stat` of a volume (`disk.img:`, or a disk image inside one) shows its name, size and free space, file and folder

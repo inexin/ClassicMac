@@ -561,6 +561,8 @@ namespace ClassicMac.Resources.Cli
             Basilisk,
             MacBinary,
             Raw,
+            BinHex,
+            Text,
         }
 
         private Command GetCommand()
@@ -570,7 +572,7 @@ namespace ClassicMac.Resources.Cli
             var outputDir = new Option<DirectoryInfo>("--output", "-o") { Description = "The host folder written to (default: the current folder)" };
             var format = new Option<GetFormatChoice>("--as")
             {
-                Description = "How a file is written: an AppleDouble pair, Basilisk II folders, a MacBinary III file, or the forks raw (.rsrc)",
+                Description = "How a file is written: an AppleDouble pair, Basilisk II folders, a MacBinary III file, the forks raw (.rsrc), a BinHex file (.hqx), or the data fork as UTF-8 text (.txt)",
                 DefaultValueFactory = _ => GetFormatChoice.AppleDouble,
             };
             var overwrite = new Option<bool>("--overwrite") { Description = "Replace existing files" };
@@ -583,6 +585,8 @@ namespace ClassicMac.Resources.Cli
                     GetFormatChoice.Basilisk => MacGetFormat.Basilisk,
                     GetFormatChoice.MacBinary => MacGetFormat.MacBinary,
                     GetFormatChoice.Raw => MacGetFormat.Raw,
+                    GetFormatChoice.BinHex => MacGetFormat.BinHex,
+                    GetFormatChoice.Text => MacGetFormat.Text,
                     _ => MacGetFormat.AppleDouble,
                 }, result.GetValue(overwrite), result.GetValue(enter), result.GetValue(json)));
             return command;

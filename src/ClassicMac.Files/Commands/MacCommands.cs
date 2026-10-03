@@ -35,6 +35,15 @@ namespace ClassicMac.Files.Commands
 
         /// <summary>The data fork as the file and the resource fork as <c>.rsrc</c>, without Finder info.</summary>
         Raw,
+
+        /// <summary>One BinHex 4.0 file (<c>.hqx</c>): both forks and the Finder info, in 7-bit text.</summary>
+        BinHex,
+
+        /// <summary>
+        /// The data fork alone as UTF-8 text with LF line ends, read as Mac OS Roman with CR line ends (<c>.txt</c> added to
+        /// a name without an extension).
+        /// </summary>
+        Text,
     }
 
     /// <summary>One step of how an entry was read: a file and the format it was read as.</summary>
@@ -468,6 +477,13 @@ namespace ClassicMac.Files.Commands
                     {
                         case MacGetFormat.MacBinary:
                             written.Add(WriteFile(Path.Combine(directory, host + ".bin"), MacBinaryWriter.ToArray(file), overwrite));
+                            break;
+                        case MacGetFormat.BinHex:
+                            written.Add(WriteFile(Path.Combine(directory, host + ".hqx"), Encoding.ASCII.GetBytes(BinHexWriter.ToText(file)), overwrite));
+                            break;
+                        case MacGetFormat.Text:
+                            written.Add(WriteFile(Path.Combine(directory, Path.HasExtension(host) ? host : host + ".txt"),
+                                Encoding.UTF8.GetBytes(Text(file.DataFork.ToArray())), overwrite));
                             break;
                         case MacGetFormat.Raw:
                             written.Add(WriteFile(Path.Combine(directory, host), file.DataFork.ToArray(), overwrite));

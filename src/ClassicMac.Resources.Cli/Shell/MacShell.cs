@@ -32,8 +32,8 @@ namespace ClassicMac.Resources.Cli.Shell
             "info, stat <path>             everything known about an entry",
             "res [file]                    a file's resources",
             "find [path] [--name P] [--type T] [--creator C] [--kind folder|file|container] [--resource-type T] [--contains TEXT] [--limit N]",
-            "copy <path> <host folder> [--as appledouble|basilisk|macbinary|raw] [--overwrite]   copy out (also: get)",
-            "copy <host file> <path> [--name N] [--type T] [--creator C]                        copy in (also: put)",
+            "copy <path> <host folder> [--as appledouble|basilisk|macbinary|raw|binhex|text] [--overwrite]   copy out (also: get)",
+            "copy <host file> <path> [--name N] [--type T] [--creator C] [--text]                 copy in (also: put)",
             "del, rm <path> [-r]           delete a file or folder",
             "md, mkdir <path>              make a folder",
             "ren, rename <path> <name>     rename",
@@ -391,7 +391,7 @@ namespace ClassicMac.Resources.Cli.Shell
         // copy: out to the host when the source is in the input (get), in from the host when it is a host file (put).
         private int Copy(List<string> args, bool? outward)
         {
-            var o = ShellOptions.Parse(args, ["--overwrite"], ["--as", "--name", "--type", "--creator"], 2, 2);
+            var o = ShellOptions.Parse(args, ["--overwrite", "--text"], ["--as", "--name", "--type", "--creator"], 2, 2);
             var (source, destination) = (o.Positional[0], o.Positional[1]);
             var inside = outward ?? (session.Tree.Resolve(Resolve(source)) is not null || !File.Exists(source));
             if (inside)
@@ -402,13 +402,15 @@ namespace ClassicMac.Resources.Cli.Shell
                     "basilisk" => MacGetFormat.Basilisk,
                     "macbinary" => MacGetFormat.MacBinary,
                     "raw" => MacGetFormat.Raw,
-                    var other => throw new ShellUsage($"--as is appledouble, basilisk, macbinary or raw, not {other}."),
+                    "binhex" => MacGetFormat.BinHex,
+                    "text" => MacGetFormat.Text,
+                    var other => throw new ShellUsage($"--as is appledouble, basilisk, macbinary, raw, binhex or text, not {other}."),
                 };
                 Existing(source);
                 return Read([source], 1, 1, [], [], (paths, target, _) => paths.Get(target, Path.GetFullPath(destination), format, o.Flag("--overwrite"), enter: false, json));
             }
 
-            var file = HostImport.Read(Path.GetFullPath(source), options);
+            var file = MacEdits.Import(Path.GetFullPath(source), o.Flag("--text"), options);
             return Apply(destination, (_, tree, rest) => MacEdits.Put(tree, rest, file, o.Value("--name"), o.Value("--type"), o.Value("--creator")));
         }
 

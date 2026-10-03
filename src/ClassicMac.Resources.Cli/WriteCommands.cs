@@ -59,11 +59,12 @@ namespace ClassicMac.Resources.Cli
             var name = new Option<string>("--name") { Description = "The Mac name to give it" };
             var type = new Option<string>("--type") { Description = "Its file type (four characters)" };
             var creator = new Option<string>("--creator") { Description = "Its creator (four characters)" };
+            var text = new Option<bool>("--text") { Description = "A UTF-8 text file made a Mac OS Roman document with CR line ends, type TEXT, creator ttxt" };
             var options = NewWriteOptions();
-            var command = new Command("put", "Add a host file to a volume image") { source, destination, name, type, creator };
+            var command = new Command("put", "Add a host file to a volume image") { source, destination, name, type, creator, text };
             AddWriteOptions(command, options);
             command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(destination), (_, tree, rest) =>
-                MacEdits.Put(tree, rest, HostImport.Read(result.GetRequiredValue(source).FullName, ContainerOptionsFrom(result)),
+                MacEdits.Put(tree, rest, MacEdits.Import(result.GetRequiredValue(source).FullName, result.GetValue(text), ContainerOptionsFrom(result)),
                     result.GetValue(name), result.GetValue(type), result.GetValue(creator))));
             return command;
         }

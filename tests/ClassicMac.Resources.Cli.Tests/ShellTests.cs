@@ -116,6 +116,18 @@ public sealed class ShellTests : IDisposable
     }
 
     [Fact]
+    public void Copy_converts_text_both_ways()
+    {
+        var note = Path.Combine(folder, "note.txt");
+        File.WriteAllText(note, "Café\n");
+        var output = Path.Combine(folder, "text-out");
+        var (code, _, error) = Script(disk, $"copy \"{note}\" Docs --text\ncopy Docs:note.txt \"{output}\" --as text\nexit --discard\n");
+
+        Assert.True(code == 0, error);
+        Assert.Equal("Café\n", File.ReadAllText(Path.Combine(output, "note.txt")));
+    }
+
+    [Fact]
     public void Changes_stay_in_the_session_until_saved_as()
     {
         var before = File.ReadAllBytes(disk);
