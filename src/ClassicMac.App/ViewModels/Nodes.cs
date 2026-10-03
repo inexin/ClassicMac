@@ -39,7 +39,26 @@ namespace ClassicMac.App.ViewModels
             BaseTitle = title;
             Kind = kind;
             Parent = parent;
+            Children.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasChildren));
         }
+
+        /// <summary>How many rows are above this one in the tree: 0 for an input.</summary>
+        public int Depth
+        {
+            get
+            {
+                var depth = 0;
+                for (var up = Parent; up is not null; up = up.Parent)
+                {
+                    depth++;
+                }
+
+                return depth;
+            }
+        }
+
+        /// <summary>Whether the row has rows below it (its expander shows).</summary>
+        public bool HasChildren => Children.Count > 0;
 
         /// <summary>The title: the name, marked while the node has unsaved edits.</summary>
         [ObservableProperty]

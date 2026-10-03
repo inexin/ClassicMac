@@ -55,7 +55,7 @@ public sealed class TreePaneTests : IDisposable
         Dispatcher.UIThread.RunJobs();
 
         Baselines.Check(window, "tree-narrow", baselines, Baselines.Variant.Light, Baselines.Variant.Scaled150);
-        var tree = window.GetVisualDescendants().OfType<TreeView>().Single(t => t.Name == "Tree");
+        var tree = window.GetVisualDescendants().OfType<BrowseTree>().Single(t => t.Name == "Tree");
         var scrollBar = tree.GetVisualDescendants().OfType<ScrollBar>().Single(s => s.Orientation == Orientation.Vertical);
         Assert.True(scrollBar.IsVisible);
         var scrollLeft = BoundsIn(scrollBar, tree).Left;

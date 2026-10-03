@@ -68,6 +68,11 @@ namespace ClassicMac.App.ViewModels
 
         public ObservableCollection<InputNode> Roots { get; } = [];
 
+        /// <summary>The tree's visible rows, flattened for the view's one virtualized list.</summary>
+        public VisibleRows TreeRows => treeRows ??= new VisibleRows(Roots);
+
+        private VisibleRows? treeRows;
+
         /// <summary>The diagnostics panel: counts, filters, grouping by file, collapsing.</summary>
         public DiagnosticsPanel DiagnosticsPanel { get; }
 

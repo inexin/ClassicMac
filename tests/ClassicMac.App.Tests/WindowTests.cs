@@ -188,7 +188,7 @@ public class WindowTests
             Capture(window, "hex");
 
             // The tree's context menu, on a resource: the Resource commands and Save Resource As apply, not the file's.
-            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+            var tree = window.FindControl<BrowseTree>("Tree")!;
             var menu = tree.ContextMenu!;
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
@@ -484,14 +484,14 @@ public class WindowTests
             model.Selected = type.Children[0];
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+            var tree = window.FindControl<BrowseTree>("Tree")!;
             Assert.Same(type.Children[0], tree.SelectedItem);
             var form = Assert.IsType<StringForm>(model.Form);
             form.Text = "edited";
             var details = model.Details;
 
             // A click on 'STR ' 129.
-            var item = Assert.IsType<TreeViewItem>(tree.TreeContainerFromItem(type.Children[1]));
+            var item = Assert.IsType<BrowseRow>(tree.ContainerFromItem(type.Children[1]));
             var header = item.GetVisualDescendants().OfType<Control>().First(c => c.Bounds.Height > 0);
             var point = header.TranslatePoint(new Point(10, header.Bounds.Height / 2), window)!.Value;
             window.MouseDown(point, Avalonia.Input.MouseButton.Left);
@@ -509,7 +509,7 @@ public class WindowTests
 
             // The down arrow, from the focused 'STR ' 128.
             dialogs.Pending = new TaskCompletionSource<DraftChoice>();
-            Assert.IsType<TreeViewItem>(tree.TreeContainerFromItem(type.Children[0])).Focus();
+            Assert.IsType<BrowseRow>(tree.ContainerFromItem(type.Children[0])).Focus();
             window.KeyPress(Avalonia.Input.Key.Down, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.ArrowDown, null);
             window.KeyRelease(Avalonia.Input.Key.Down, Avalonia.Input.RawInputModifiers.None, Avalonia.Input.PhysicalKey.ArrowDown, null);
             Dispatcher.UIThread.RunJobs();
@@ -979,7 +979,7 @@ public class WindowTests
             panel.Add(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "input.unreadable", "No such file."), "Gone.img", null));
             panel.ByFile = false;
             Dispatcher.UIThread.RunJobs();
-            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+            var tree = window.FindControl<BrowseTree>("Tree")!;
             var list = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "DiagnosticList");
             Button[] Links() => list.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("show-item") && b.IsEffectivelyVisible).ToArray();
             Assert.Empty(Links());                                            // nothing selected
@@ -994,8 +994,8 @@ public class WindowTests
             bool InView()
             {
                 // The node's own row (its header), within the tree's scroll viewport.
-                var row = tree.GetVisualDescendants().OfType<TreeViewItem>().FirstOrDefault(i => i.DataContext == last);
-                var header = row?.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_Header");
+                var row = tree.GetVisualDescendants().OfType<ListBoxItem>().FirstOrDefault(i => i.DataContext == last);
+                var header = row;
                 var viewer = tree.GetVisualDescendants().OfType<ScrollViewer>().First();
                 if (header?.TranslatePoint(default, viewer) is not { } at)
                 {
@@ -1143,7 +1143,7 @@ public class WindowTests
             var footer = window.GetVisualDescendants().OfType<Border>().Single(b => b.Name == "HiddenFooter");
             Assert.True(footer.IsVisible);
             Assert.Contains(footer.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "2 invisible items hidden");
-            var texts = window.GetVisualDescendants().OfType<TreeView>().Single().GetVisualDescendants().OfType<TextBlock>().ToList();
+            var texts = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<TextBlock>().ToList();
             // A row's name is in runs (before, matched letters, after) for the search highlight.
             var group = texts.Single(t => string.Concat(t.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? []) == "No name");
             Assert.Equal(Avalonia.Media.FontStyle.Italic, group.FontStyle);
@@ -1162,9 +1162,9 @@ public class WindowTests
             Assert.Matches("^[0-9A-F]{2}( [0-9A-F]{2})*$", (string)ToolTip.GetTip(tokens)!);
             model.Selected = noName.Children.Single(c => c.Name == "nbsp tab");
             Dispatcher.UIThread.RunJobs();
-            window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => i.IsSelected).Focus();
+            window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected).Focus();
             Dispatcher.UIThread.RunJobs();
-            var selected = window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => i.IsSelected)
+            var selected = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.IsSelected)
                 .GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("name-token"));
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmTokenOnSelection"), selected.Background);
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmSelectionText"), ((TextBlock)selected.Child!).Foreground);

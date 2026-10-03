@@ -83,12 +83,12 @@ public sealed class TreeRevealTests : IDisposable
     // The node's row exists, is selected and lies inside the tree's viewport.
     private static void AssertInView(MainWindow window, NodeViewModel node)
     {
-        var row = window.GetVisualDescendants().OfType<TreeViewItem>()
+        var row = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ListBoxItem>()
             .SingleOrDefault(r => ReferenceEquals(r.DataContext, node) && r.IsEffectivelyVisible);
         Assert.True(row is not null, $"no row for {node.Title}");
-        var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
+        var tree = window.FindControl<BrowseTree>("Tree")!;
         var top = row!.TranslatePoint(default, tree)!.Value.Y;
-        var header = row.GetVisualDescendants().OfType<Control>().First(c => c.Name == "PART_Header").Bounds.Height;
+        var header = row.Bounds.Height;
         Assert.True(top >= -1 && top + header <= tree.Bounds.Height + 1, $"{node.Title}'s row at {top}, tree {tree.Bounds.Height}");
         Assert.True(row.IsSelected, $"{node.Title}'s row is not selected");
     }

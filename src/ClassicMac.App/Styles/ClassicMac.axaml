@@ -242,95 +242,114 @@
   <Style Selector="TreeView:not(:focus-within) TreeViewItem:selected /template/ ContentPresenter#PART_HeaderPresenter">
     <Setter Property="Foreground" Value="{DynamicResource CmText}" />
   </Style>
-  <!-- The browse tree's rows (boards/browse-tree.md): CmRowTree high, CmTreeIndent per level, the row's content stretched
-       so its meta sits on the right. -->
-  <Style Selector="TreeView.browse">
-    <Style.Resources>
-      <StaticResource x:Key="TreeViewItemMinHeight" ResourceKey="CmRowTree" />
-      <StaticResource x:Key="TreeViewItemIndent" ResourceKey="CmTreeIndent" />
-    </Style.Resources>
-  </Style>
-  <Style Selector="TreeView.browse TreeViewItem">
+  <!-- The browse tree's rows (boards/browse-tree.md): each CmRowTree high, CmTreeIndent per level, then the 12 px expander
+       with 12 on each side, the row's content stretched so its meta sits on the right. -->
+  <Style Selector="ListBox.browse ListBoxItem">
     <Setter Property="FontSize" Value="{DynamicResource CmFontSizeBody}" />
-    <Setter Property="ItemsPanel">
-      <ItemsPanelTemplate>
-        <VirtualizingStackPanel />
-      </ItemsPanelTemplate>
-    </Setter>
-  </Style>
-  <Style Selector="TreeView.browse TreeViewItem /template/ ContentPresenter#PART_HeaderPresenter">
-    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Height" Value="{StaticResource CmRowTree}" />
+    <Setter Property="MinHeight" Value="0" />
+    <!-- As a TreeViewItem drew its row: a 1 px transparent border with the control radius (the selection's edge), the
+         17 px content 2 below it. -->
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="CornerRadius" Value="{DynamicResource ControlCornerRadius}" />
+    <Setter Property="Padding" Value="0,2,0,1" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
   </Style>
-  <Style Selector="TreeView.browse :is(TextBlock).name.type">
+  <Style Selector="ListBox.browse Panel.tree-expander-slot">
+    <Setter Property="Width" Value="36" />
+  </Style>
+  <Style Selector="ListBox.browse Border.tree-expander">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ListBox.browse Border.tree-expander > Path">
+    <Setter Property="Fill" Value="{DynamicResource TreeViewItemForeground}" />
+    <Setter Property="Stretch" Value="Uniform" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ListBox.browse Border.tree-expander.open > Path">
+    <Setter Property="RenderTransform" Value="rotate(90deg)" />
+  </Style>
+  <Style Selector="ListBox.browse:focus-within ListBoxItem:selected Border.tree-expander > Path">
+    <Setter Property="Fill" Value="{DynamicResource CmSelectionText}" />
+  </Style>
+  <Style Selector="ListBox.browse DockPanel.tree-line">
+    <Setter Property="Margin" Value="0,0,1,0" />
+  </Style>
+  <Style Selector="ListBox.browse :is(TextBlock).name.type">
     <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
     <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="TreeView.browse :is(TextBlock).name.loading">
+  <Style Selector="ListBox.browse :is(TextBlock).name.loading">
     <Setter Property="FontStyle" Value="Italic" />
     <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
   </Style>
-  <Style Selector="TreeView.browse :is(TextBlock).meta">
+  <Style Selector="ListBox.browse :is(TextBlock).meta">
     <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
     <Setter Property="FontSize" Value="11" />
     <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Margin" Value="12,0,4,0" />
   </Style>
-  <Style Selector="TreeView.browse :is(TextBlock).unsaved">
+  <Style Selector="ListBox.browse :is(TextBlock).unsaved">
     <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
     <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
   </Style>
   <!-- Inside the selected row of the focused tree, the meta and the unsaved mark read in CmSelectionText (muted text fails
-       contrast on the dark selection). The child combinator stops at the row's own header: the header's content is the
-       item's logical child, as are the rows nested under it, which are TreeViewItems, not .tree-row panels. -->
-  <Style Selector="TreeView.browse:focus-within TreeViewItem:selected > Panel.tree-row :is(TextBlock).meta">
+       contrast on the dark selection). -->
+  <Style Selector="ListBox.browse:focus-within ListBoxItem:selected Panel.tree-row :is(TextBlock).meta">
     <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
   </Style>
-  <Style Selector="TreeView.browse:focus-within TreeViewItem:selected > Panel.tree-row :is(TextBlock).unsaved">
+  <Style Selector="ListBox.browse:focus-within ListBoxItem:selected Panel.tree-row :is(TextBlock).unsaved">
     <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
   </Style>
   <!-- A whitespace name's tokens (boards/tree-no-name.md): mono 10 SemiBold, CmTextMuted on CmSegmentTrack, radius 3,
        3 px side padding, 2 px apart; in the selected row, CmSelectionText on CmTokenOnSelection. -->
-  <Style Selector="TreeView.browse Border.name-token">
+  <Style Selector="ListBox.browse Border.name-token">
     <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
     <Setter Property="CornerRadius" Value="3" />
     <Setter Property="Padding" Value="3,0" />
     <Setter Property="Margin" Value="0,0,2,0" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="TreeView.browse Border.name-token > TextBlock">
+  <Style Selector="ListBox.browse Border.name-token > TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
     <Setter Property="FontSize" Value="10" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
   </Style>
-  <Style Selector="TreeView.browse:focus-within TreeViewItem:selected > Panel.tree-row Border.name-token">
+  <Style Selector="ListBox.browse:focus-within ListBoxItem:selected Panel.tree-row Border.name-token">
     <Setter Property="Background" Value="{DynamicResource CmTokenOnSelection}" />
   </Style>
-  <Style Selector="TreeView.browse:focus-within TreeViewItem:selected > Panel.tree-row Border.name-token > TextBlock">
+  <Style Selector="ListBox.browse:focus-within ListBoxItem:selected Panel.tree-row Border.name-token > TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
   </Style>
   <!-- An unread container's chip: 11, muted, a dashed 1 px border with radius 4. -->
-  <Style Selector="TreeView.browse Panel.not-read">
+  <Style Selector="ListBox.browse Panel.not-read">
     <Setter Property="Margin" Value="6,0,0,0" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="TreeView.browse Panel.not-read > Rectangle">
+  <Style Selector="ListBox.browse Panel.not-read > Rectangle">
     <Setter Property="Stroke" Value="{DynamicResource CmTextMuted}" />
     <Setter Property="StrokeThickness" Value="1" />
     <Setter Property="StrokeDashArray" Value="2,2" />
     <Setter Property="RadiusX" Value="4" />
     <Setter Property="RadiusY" Value="4" />
   </Style>
-  <Style Selector="TreeView.browse Panel.not-read > TextBlock">
+  <Style Selector="ListBox.browse Panel.not-read > TextBlock">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
     <Setter Property="Margin" Value="5,0,5,1" />
   </Style>
   <!-- The row being dragged out: a dashed CmAccent outline. -->
-  <Style Selector="TreeView.browse Rectangle.drag-outline">
+  <Style Selector="ListBox.browse Rectangle.drag-outline">
     <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
     <Setter Property="StrokeThickness" Value="1" />
     <Setter Property="StrokeDashArray" Value="3,2" />
@@ -339,7 +358,7 @@
     <Setter Property="Margin" Value="-4,0" />
   </Style>
   <!-- The loading placeholder's 16 px spinner: a CmBorder ring and a turning CmAccent arc. -->
-  <Style Selector="TreeView.browse Panel.spinner">
+  <Style Selector="ListBox.browse Panel.spinner">
     <Setter Property="Width" Value="16" />
     <Setter Property="Height" Value="16" />
     <Setter Property="RenderTransform" Value="rotate(0deg)" />
@@ -354,12 +373,12 @@
       </Animation>
     </Style.Animations>
   </Style>
-  <Style Selector="TreeView.browse Panel.spinner > Ellipse.track">
+  <Style Selector="ListBox.browse Panel.spinner > Ellipse.track">
     <Setter Property="Stroke" Value="{DynamicResource CmBorder}" />
     <Setter Property="StrokeThickness" Value="2" />
     <Setter Property="Margin" Value="1" />
   </Style>
-  <Style Selector="TreeView.browse Panel.spinner > Path.arc">
+  <Style Selector="ListBox.browse Panel.spinner > Path.arc">
     <Setter Property="Stroke" Value="{DynamicResource CmAccent}" />
     <Setter Property="StrokeThickness" Value="2" />
     <Setter Property="StrokeLineCap" Value="Round" />

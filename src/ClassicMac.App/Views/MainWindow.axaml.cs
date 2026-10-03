@@ -116,73 +116,39 @@ namespace ClassicMac.App.Views
         }
 
         /// <summary>
-        /// Scrolls the node's row into view and returns it. The rows are virtualized and sized only once made, so the first
-        /// scroll lands on an estimate: it is repeated until the row sits inside the tree's viewport.
+        /// Scrolls the node's row into view and returns it (null when the row does not show: an ancestor closed or the
+        /// node filtered out). The rows are one flat list of fixed height, so its index places it exactly.
         /// </summary>
-        private TreeViewItem? RevealNode(NodeViewModel node)
+        private Control? RevealNode(NodeViewModel node)
         {
-            TreeViewItem? row = null;
-            for (var attempt = 0; attempt < 4; attempt++)
-            {
-                Tree.UpdateLayout();
-                row = ContainerOf(node);
-                if (row is null)
-                {
-                    continue;
-                }
-
-                row.BringIntoView(HeaderBounds(row));
-                Tree.UpdateLayout();
-                if (IsInView(row, node))
-                {
-                    return row;
-                }
-            }
-
-            return row;
-        }
-
-        // A row's own line (its header), not its open children.
-        private static Rect HeaderBounds(TreeViewItem row) =>
-            row.GetVisualDescendants().OfType<Control>().FirstOrDefault(c => c.Name == "PART_Header") is { } header
-                ? new Rect(header.Bounds.Size)
-                : new Rect(row.Bounds.Size);
-
-        private bool IsInView(TreeViewItem row, NodeViewModel node)
-        {
-            if (!ReferenceEquals(row.DataContext, node) || row.TranslatePoint(default, Tree) is not { } at)
-            {
-                return false;
-            }
-
-            return at.Y >= -1 && at.Y + HeaderBounds(row).Height <= Tree.Bounds.Height + 1;
-        }
-
-        // The tree row of a node: each ancestor's container holds the next one.
-        // The rows are virtualized (only those on screen exist): each level scrolls the next row into view first.
-        private TreeViewItem? ContainerOf(NodeViewModel node)
-        {
-            ItemsControl? owner = node.Parent is null ? Tree : ContainerOf(node.Parent);
-            if (owner is null)
+            if (DataContext is not MainViewModel model || model.TreeRows.IndexOf(node) is not (>= 0 and var index))
             {
                 return null;
             }
 
-            // A row already made is used where it is (scrolling to each ancestor would jump the tree back up); one not
-            // made is scrolled to, again when the first scroll's estimate of the rows above it left it unmade.
-            for (var attempt = 0; attempt < 3; attempt++)
-            {
-                owner.UpdateLayout();
-                if (owner.ContainerFromItem(node) is TreeViewItem row)
-                {
-                    return row;
-                }
+            Tree.ScrollIntoView(index);
+            Tree.UpdateLayout();
+            return Tree.ContainerFromIndex(index);
+        }
 
-                owner.ScrollIntoView(node);
+        // The expander: a press opens or closes the row (without selecting it); with Alt, the row and every row below it.
+        private void OnExpanderPressed(object? sender, PointerPressedEventArgs e)
+        {
+            if (sender is not Control { DataContext: NodeViewModel node } || !e.GetCurrentPoint(sender as Visual).Properties.IsLeftButtonPressed)
+            {
+                return;
             }
 
-            owner.UpdateLayout();
-            return owner.ContainerFromItem(node) as TreeViewItem;
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            {
+                BrowseTree.SetExpandedDeep(node, !node.IsExpanded);
+            }
+            else
+            {
+                node.IsExpanded = !node.IsExpanded;
+            }
+
+            e.Handled = true;
         }
 
         // Drag out of the tree: a press on a file or resource that moves a few pixels writes it to the drag folder, then
@@ -210,7 +176,7 @@ namespace ClassicMac.App.Views
                 return;
             }
 
-            var node = (press.Source as Visual)?.FindAncestorOfType<TreeViewItem>(includeSelf: true)?.DataContext as NodeViewModel;
+            var node = (press.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext as NodeViewModel;
             if (DataContext is not MainViewModel model || !MainViewModel.CanDragOut(node))
             {
                 dragPress = null;

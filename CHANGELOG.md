@@ -22,6 +22,13 @@
   as tab-separated lines. The viewer previews them and `convert` writes them as HTML, also with no resource fork. The
   layout is fitted to a real Word 5 document (no specification was published); fast-saved documents and Word 1 and 3
   are reported (`word.fast-saved`, `word.unsupported-version`), not read.
+- Viewer: the browse tree is one virtualized list of its visible rows (VisibleRows: the roots and, under each open
+  row, its children the filter keeps), each a fixed 22 px high and indented by its depth, instead of a TreeView with
+  a panel per open row: scrolling past an open folder no longer makes the tree jump or the scroll bar's thumb change
+  size (the extent is the row count times the row height). Opening or closing a folder of thousands of files is one
+  change of the list. The tree keeps its keys (Right opens or goes to the first child, Left goes to the parent or
+  closes, + − and * open, close and open all below; Up, Down, Home, End, Page Up and Down), a press on the expander
+  opens or closes without selecting (Alt: every row below), a double click opens or closes.
 - Editor: editing a menu gives the table the room: the live preview narrows to 166 while editing (272 read only; it
   scrolls at 2× with its scroll bars shown, its title wrapping), so the Text column is at least 160 wide in a
   1200-pixel window.

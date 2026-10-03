@@ -128,10 +128,11 @@ public sealed class SearchWindowTests : IDisposable
         window.KeyTextInput("rea");
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("rea", model.FilterText);
-        var tree = Named<TreeView>(window, "Tree");
-        var manual = tree.GetVisualDescendants().OfType<TreeViewItem>().Single(i => i.DataContext is FileNode { Name: "Manual" });
-        Assert.False(manual.IsVisible);
-        var readMe = tree.GetVisualDescendants().OfType<TreeViewItem>().Single(i => i.DataContext is FileNode { Name: "Read Me" });
+        var tree = Named<BrowseTree>(window, "Tree");
+        // A row filtered out leaves the list of rows.
+        Assert.DoesNotContain(tree.GetVisualDescendants().OfType<ListBoxItem>(), i => i.DataContext is FileNode { Name: "Manual" });
+        Assert.DoesNotContain(model.TreeRows, n => n is FileNode { Name: "Manual" });
+        var readMe = tree.GetVisualDescendants().OfType<ListBoxItem>().Single(i => i.DataContext is FileNode { Name: "Read Me" });
         Assert.True(readMe.IsVisible);
         Assert.Contains(readMe.GetVisualDescendants().OfType<TextBlock>().SelectMany(t => t.Inlines?.OfType<Run>() ?? []),
             r => r.Text == "Rea" && r.Classes.Contains("match") && r.Classes.Contains("on"));
@@ -139,7 +140,7 @@ public sealed class SearchWindowTests : IDisposable
         window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("", model.FilterText);
-        Assert.True(manual.IsVisible);
+        Assert.Contains(tree.GetVisualDescendants().OfType<ListBoxItem>(), i => i.DataContext is FileNode { Name: "Manual" } && i.IsVisible);
         window.Close();
     });
 
@@ -149,8 +150,8 @@ public sealed class SearchWindowTests : IDisposable
         var window = new MainWindow { DataContext = new MainViewModel() };
         var baselines = new List<string>();
         var model = Opened(window);
-        var tree = Named<TreeView>(window, "Tree");
-        tree.GetVisualDescendants().OfType<TreeViewItem>().First().Focus();
+        var tree = Named<BrowseTree>(window, "Tree");
+        tree.GetVisualDescendants().OfType<ListBoxItem>().First().Focus();
         Dispatcher.UIThread.RunJobs();
         var pill = Named<Border>(window, "TypeAheadPill");
         Assert.False(pill.IsVisible);

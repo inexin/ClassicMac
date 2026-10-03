@@ -29,9 +29,9 @@ public class TreeViewTests
 
     private static Color ColorOf(IBrush? brush) => Assert.IsAssignableFrom<ISolidColorBrush>(brush).Color;
 
-    // The row of a node: its TreeViewItem's header panel.
+    // The row of a node: its row's panel.
     private static Panel Row(Window window, NodeViewModel node) =>
-        window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => ReferenceEquals(i.DataContext, node))
+        window.GetVisualDescendants().OfType<BrowseTree>().First().GetVisualDescendants().OfType<ListBoxItem>().Single(i => ReferenceEquals(i.DataContext, node))
             .GetVisualDescendants().OfType<Panel>().First(p => p.Classes.Contains("tree-row"));
 
     private static T Part<T>(Panel row, string @class) where T : Control =>
@@ -182,7 +182,7 @@ public class TreeViewTests
             Assert.All(files.Skip(60), f => Assert.Null(f.IconPng));
 
             // Scrolled to the end: the rows now on screen ask too, and only they.
-            var scroller = window.GetVisualDescendants().OfType<TreeView>().Single().GetVisualDescendants().OfType<ScrollViewer>().First();
+            var scroller = window.FindControl<BrowseTree>("Tree")!.GetVisualDescendants().OfType<ScrollViewer>().First();
             scroller.Offset = new Vector(0, scroller.Extent.Height);
             Settle(window);
             Assert.InRange(NodeViewModel.ResolvedIcons(files[0]) - resolved, 10, 40);
@@ -228,8 +228,8 @@ public class TreeViewTests
             double X(NodeViewModel n) => Row(window, n).TranslatePoint(default, window)!.Value.X;
             Assert.Equal(16, X(zip) - X(containers), 6);
             Assert.Equal(16, X(containers) - X(input), 6);
-            Assert.Equal(22, window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => ReferenceEquals(i.DataContext, app))
-                .GetVisualDescendants().OfType<Border>().First(b => b.Name == "PART_LayoutRoot").Bounds.Height, 6);
+            Assert.Equal(22, window.GetVisualDescendants().OfType<BrowseTree>().First().GetVisualDescendants().OfType<ListBoxItem>().Single(i => ReferenceEquals(i.DataContext, app))
+                .Bounds.Height, 6);
             Assert.True(Part<Panel>(Row(window, zip), "not-read").IsVisible);
             Assert.False(Part<Panel>(appRow, "not-read").IsVisible);
             Assert.False(Part<Rectangle>(appRow, "drag-outline").IsVisible);
@@ -238,8 +238,8 @@ public class TreeViewTests
             app.IsDragSource = false;
 
             // Selected in the focused tree: its own meta and mark turn CmSelectionText; the nested rows' meta stays muted.
-            var tree = window.GetVisualDescendants().OfType<TreeView>().Single();
-            TreeViewItem Item(NodeViewModel n) => window.GetVisualDescendants().OfType<TreeViewItem>().Single(i => ReferenceEquals(i.DataContext, n));
+            var tree = window.FindControl<BrowseTree>("Tree")!;
+            ListBoxItem Item(NodeViewModel n) => window.GetVisualDescendants().OfType<BrowseTree>().First().GetVisualDescendants().OfType<ListBoxItem>().Single(i => ReferenceEquals(i.DataContext, n));
             model.Selected = app;
             Item(app).Focus();
             Dispatcher.UIThread.RunJobs();
@@ -269,11 +269,7 @@ public class TreeViewTests
         parent.Children.Add(loading);
         parent.IsExpanded = true;
         var main = new MainWindow();
-        var tree = new TreeView { Classes = { "browse" }, ItemTemplate = main.FindControl<TreeView>("Tree")!.ItemTemplate, ItemsSource = new[] { parent } };
-        tree.Styles.Add(new Avalonia.Styling.Style(x => Avalonia.Styling.Selectors.OfType<TreeViewItem>(x))
-        {
-            Setters = { new Avalonia.Styling.Setter(TreeViewItem.IsExpandedProperty, true) },
-        });
+        var tree = new BrowseTree { Name = "Tree", Classes = { "browse" }, ItemTemplate = main.FindControl<BrowseTree>("Tree")!.ItemTemplate, ItemsSource = new VisibleRows([parent]) };
         var window = new Window { Width = 300, Height = 200, Content = tree };
         window.Show();
         Dispatcher.UIThread.RunJobs();

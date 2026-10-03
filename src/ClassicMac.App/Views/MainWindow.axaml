@@ -28,10 +28,6 @@
   </Window.Resources>
 
   <Window.Styles>
-    <Style Selector="TreeViewItem" x:DataType="vm:NodeViewModel">
-      <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
-      <Setter Property="IsVisible" Value="{Binding !IsFilteredOut}" />
-    </Style>
     <!-- The tree's filter and type-ahead (boards/browse-tree.md S6): the filter field (28 high, search icon, "Ctrl+F"),
          matched letters on CmMatchSoft (CmMatch on the current match), rows that do not match dimmed to CmTextMuted,
          and the type-ahead pill at the bottom of the tree (CmPaneBackground, CmAccent border, CmShadowPopover). -->
@@ -58,7 +54,7 @@
     <Style Selector="Run.match.on.current">
       <Setter Property="Background" Value="{DynamicResource CmMatch}" />
     </Style>
-    <Style Selector="TreeView.browse TextBlock.name.dimmed">
+    <Style Selector="ListBox.browse TextBlock.name.dimmed">
       <Setter Property="Foreground" Value="{DynamicResource CmTextMuted}" />
     </Style>
     <Style Selector="Border.type-ahead">
@@ -1173,14 +1169,24 @@
           </StackPanel>
         </Border>
         <Panel>
-        <TreeView x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding Roots}" SelectedItem="{Binding Selected, Mode=OneWay}"
+        <!-- One virtualized list of the visible rows (VisibleRows), each CmRowTree high and indented by its depth. -->
+        <views:BrowseTree x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding TreeRows}" SelectedItem="{Binding Selected, Mode=OneWay}"
                   ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
-          <TreeView.KeyBindings>
+          <ListBox.KeyBindings>
             <KeyBinding Gesture="Delete" Command="{Binding DeleteResourceCommand}" />
-          </TreeView.KeyBindings>
-          <TreeView.ItemTemplate>
-            <TreeDataTemplate DataType="vm:NodeViewModel" ItemsSource="{Binding Children}">
-              <!-- A row (boards/browse-tree.md): icon or spinner, name, unsaved mark, "not read" chip; meta on the right. -->
+          </ListBox.KeyBindings>
+          <ListBox.ItemTemplate>
+            <DataTemplate DataType="vm:NodeViewModel">
+              <!-- A row (boards/browse-tree.md): the indent, the expander, then icon or spinner, name, unsaved mark, "not
+                   read" chip; meta on the right. -->
+              <DockPanel Classes="tree-line">
+              <Border DockPanel.Dock="Left" Width="{Binding Depth, Converter={x:Static views:BrowseTree.IndentConverter}}" />
+              <Panel DockPanel.Dock="Left" Classes="tree-expander-slot">
+                <Border Classes="tree-expander" Classes.open="{Binding IsExpanded}" IsVisible="{Binding HasChildren}"
+                        PointerPressed="OnExpanderPressed">
+                  <Path Data="M 1,0 10,10 l -9,10 -1,-1 L 8,10 -0,1 z" />
+                </Border>
+              </Panel>
               <Panel Classes="tree-row">
                 <Rectangle Classes="drag-outline" IsVisible="{Binding IsDragSource}" />
                 <!-- The row fits the pane: the meta and the chip keep their width on the right, the name trims with an
@@ -1223,9 +1229,10 @@
                   </Grid>
                 </DockPanel>
               </Panel>
-            </TreeDataTemplate>
-          </TreeView.ItemTemplate>
-          <TreeView.ContextMenu>
+              </DockPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+          <ListBox.ContextMenu>
             <ContextMenu>
               <MenuItem Header="_New Resource…" Command="{Binding NewResourceCommand}" InputGesture="Ctrl+K" />
               <MenuItem Header="_Duplicate" Command="{Binding DuplicateResourceCommand}" InputGesture="Ctrl+D" />
@@ -1248,8 +1255,8 @@
               <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
               <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
             </ContextMenu>
-          </TreeView.ContextMenu>
-        </TreeView>
+          </ListBox.ContextMenu>
+        </views:BrowseTree>
         <!-- The type-ahead pill: what was typed, the matches, F3 and Esc. -->
         <Border x:Name="TypeAheadPill" Classes="type-ahead" IsVisible="{Binding IsTypeAheadOpen}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
           <StackPanel Orientation="Horizontal" Spacing="8">
