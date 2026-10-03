@@ -62,6 +62,26 @@ public class ConvertTests : IDisposable
     }
 
     [Fact]
+    public void A_Word_document_with_no_resource_fork_converts()
+    {
+        var word = new ClassicMac.Resources.Decoders.Tests.MacWordBuilder().Font(3, "Geneva").Style([0x00, 0x10, 0x00, 0x03], [])
+            .Text("Dear reader\r").Pap(0, 12, 0, 0x05, 0x01).Build();
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Letter", word, [], type: "WDBN", creator: "MSWD");
+        var input = Path.Combine(folder, "disk.img");
+        File.WriteAllBytes(input, disk.Build("Disk"));
+        var target = Path.Combine(folder, "out");
+
+        var (code, output, error) = Run("convert", input, "-o", target);
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("1 document, to", output);
+        var html = File.ReadAllText(Path.Combine(target, "index.html"));
+        Assert.Contains("Dear reader", html);
+        Assert.Contains("text-align:center", html);
+    }
+
+    [Fact]
     public void One_document_converts_straight_into_the_output_folder()
     {
         var input = Path.Combine(folder, "Manual.rsrc");

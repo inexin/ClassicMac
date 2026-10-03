@@ -7,6 +7,13 @@
   Finder's way from a volume's applications (their `'kind'` for the type, else "<application> document") and the
   System's kinds of standard types (`'istd'`), reading an application's resource fork only when one of its documents is
   asked about.
+- Documents: Microsoft Word 4 and 5 for the Macintosh documents (`'WDBN'`) read into the styled-document model
+  (`MacWordDocuments`, docs/formats/documents/word-mac.md): the text, its character formatting (bold, italic,
+  underline, outline, shadow, font by name, size; hidden text left out, all caps upper-cased) and its paragraphs'
+  alignment, indents and spacing (`DocumentChapter.Paragraphs`, `ParagraphFormat`, `Justification.Full`); tables read
+  as tab-separated lines. The viewer previews them and `convert` writes them as HTML, also with no resource fork. The
+  layout is fitted to a real Word 5 document (no specification was published); fast-saved documents and Word 1 and 3
+  are reported (`word.fast-saved`, `word.unsupported-version`), not read.
 - Editor: editing a menu gives the table the room: the live preview narrows to 166 while editing (272 read only; it
   scrolls at 2× with its scroll bars shown, its title wrapping), so the Text column is at least 160 wide in a
   1200-pixel window.

@@ -8,8 +8,8 @@ reference builds, the shared conventions and the source tags. [TEMPLATE.md](TEMP
 - An implementer's specification: enough to write a reader (and a writer, where ClassicMac writes the format) without
   reading ClassicMac's code, with the source of every rule.
 - **One file per format**, in its category folder: `containers/`, `archives/`, `disk-images/`, `file-systems/`,
-  `resources/`, `graphics/`, `code/`, `codecs/`, `output/`. A codec used by one format stays in that format's file; it
-  moves to `codecs/` when a second format uses it.
+  `resources/`, `documents/`, `graphics/`, `code/`, `codecs/`, `output/`. A codec used by one format stays in that
+  format's file; it moves to `codecs/` when a second format uses it.
 - File names are lowercase-kebab (`compact-pro.md`). A new file gets a row in the README index in the same commit.
 
 ## The skeleton

@@ -12,13 +12,17 @@ using CommunityToolkit.Mvvm.Input;
 
 namespace ClassicMac.App.ViewModels
 {
-    /// <summary>A stretch of a chapter's text between picture rows, with the chapter's alignment.</summary>
-    public sealed record DocumentTextItem(StyledText Text, Justification Justification)
+    /// <summary>
+    /// A stretch of a chapter's text between picture rows, with its alignment: the chapter's, or for a Word document the
+    /// paragraphs' own, with their side indents and spacing as the margin (a point a pixel).
+    /// </summary>
+    public sealed record DocumentTextItem(StyledText Text, Justification Justification, Thickness Margin = default)
     {
         public TextAlignment Alignment => Justification switch
         {
             Justification.Center => TextAlignment.Center,
             Justification.Right => TextAlignment.Right,
+            Justification.Full => TextAlignment.Justify,
             _ => TextAlignment.Left,
         };
     }
@@ -134,6 +138,7 @@ namespace ClassicMac.App.ViewModels
             var chapter = Document.Chapters[Math.Clamp(index, 0, Document.Chapters.Count - 1)];
             var items = new List<object>();
             var lines = new List<DocumentLine>();
+            ParagraphFormat? format = null;
             void Flush()
             {
                 if (lines.Count == 0)
@@ -141,13 +146,29 @@ namespace ClassicMac.App.ViewModels
                     return;
                 }
 
-                items.Add(new DocumentTextItem(Join(chapter.Text, lines), chapter.Justification));
+                var first = chapter.ParagraphAt(lines[0].Start);
+                var last = chapter.ParagraphAt(lines[^1].Start);
+                items.Add(first is null
+                    ? new DocumentTextItem(Join(chapter.Text, lines), chapter.Justification)
+                    : new DocumentTextItem(Join(chapter.Text, lines), first.Justification,
+                        new Thickness(first.LeftIndent, first.SpaceBefore, first.RightIndent, last?.SpaceAfter ?? 0)));
                 lines.Clear();
             }
             foreach (var block in DocumentFlow.Blocks(chapter))
             {
                 if (block is DocumentLine line)
                 {
+                    // A Word paragraph whose alignment or indents differ from the lines before starts a new stretch, as
+                    // does one with space around it (its own margins).
+                    var next = chapter.ParagraphAt(line.Start);
+                    if (next is not null && format is not null && next.Start == line.Start
+                        && (next with { Start = 0, FirstLineIndent = 0 } != format with { Start = 0, FirstLineIndent = 0 }
+                            || next.SpaceBefore != 0 || format.SpaceAfter != 0))
+                    {
+                        Flush();
+                    }
+
+                    format = next;
                     lines.Add(line);
                     continue;
                 }

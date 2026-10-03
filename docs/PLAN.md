@@ -980,9 +980,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   file); `help:` and AppleScript links are shown inert. Lists and tables need small additions to the model and the
   view. Not pixel-exact to Help Viewer. Needs real help books as fixtures (e.g. Mac OS 9's Help folder).
 - [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
-  then character and paragraph styles. `WDBN` (Word 3–5.1, a Mac-only format; its specification source is still to be
-  found, else the layout is fitted to documents and marked so), `W6BN` (Word 6, as Word 6 for Windows) and `W8BN`
-  (Word 98, as Word 97: Microsoft's [MS-DOC]). Needs Word sample documents of each version as fixtures.
+  then character and paragraph styles. `WDBN` Word 4 and 5 (built: [word-mac.md](formats/documents/word-mac.md); no
+  specification was found, so the layout is fitted to the one real document, a fast-saved Word 5 file, with libmwaw as
+  a behavioural reference; fast-saved documents and Word 1 and 3 are reported, not read). Still to do: `W6BN` (Word 6,
+  as Word 6 for Windows) and `W8BN` (Word 98, as Word 97: Microsoft's [MS-DOC]), both in OLE compound files (a CFB
+  reader, [MS-CFB]). Needs more Word sample documents of each version, especially ones saved without Fast Save.
 - [ ] **PCE MAR** input (Inputs, priority 3). Blocked: no sample, and its layout is published only in GPL source.
 - [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files ([rom.md](formats/disk-images/rom.md); 68k ROMs
   unverified).

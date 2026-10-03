@@ -307,9 +307,17 @@ namespace ClassicMac.App.ViewModels
             return None;
         }
 
-        // A DOCMaker document, or a SimpleText document that has pictures (one without is shown as styled text).
+        // A Word document, a DOCMaker document, or a SimpleText document that has pictures (one without is shown as styled text).
         private static StyledDocument? DocumentOf(MacFile file, DecodeOptions options, ReadOptions readOptions, ICollection<Diagnostic> diagnostics)
         {
+            // A Word document is its data fork.
+            if (StyledDocuments.IsWord(file.FinderInfo.Type))
+            {
+                return file.DataFork.Length <= MaxPictureFile
+                    ? StyledDocuments.Read(file.DataFork.ToArray(), null, file.FinderInfo.Type, file.Name.ToString(), options, readOptions, diagnostics)
+                    : null;
+            }
+
             if (MacFileResources.Read(file, readOptions).Fork is not { } fork)
             {
                 return null;

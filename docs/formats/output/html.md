@@ -1,8 +1,8 @@
 # HTML output
 
 The folder of HTML pages ClassicMac writes for a document: a DOCMaker stand-alone document or a SimpleText document
-with pictures ([documents.md](../resources/documents.md)), as UTF-8 pages, one style sheet and the pictures as image
-files. It is ClassicMac's own format: no Mac software reads or writes it. The pictures are reflowed into the text,
+with pictures ([documents.md](../resources/documents.md)), or a Word document ([word-mac.md](../documents/word-mac.md)),
+as UTF-8 pages, one style sheet and the pictures as image files. It is ClassicMac's own format: no Mac software reads or writes it. The pictures are reflowed into the text,
 where the Mac draws them over it. The converter is `document.html`, run by `extract`, `convert` and the viewer.
 
 | | |
@@ -30,7 +30,7 @@ Contents
 
 | File | Content |
 | --- | --- |
-| `index.html` | DOCMaker: the title and a list of the chapters, each with its `'cnt#'` entries. SimpleText: the text |
+| `index.html` | DOCMaker: the title and a list of the chapters, each with its `'cnt#'` entries. SimpleText and Word: the text |
 | `chapter-NN.html` | DOCMaker: one page per chapter, `NN` the chapter number with at least two digits |
 | `style.css` | The layout and one class per distinct text style (`s0`, `s1`, …) |
 | `images/pict-ID.png` | Each picture, drawn once per `'PICT'` ID (`pict-m5` for ID −5) |
@@ -68,8 +68,12 @@ None. ClassicMac does not read its HTML back.
 1. Each line (up to a CR) is a `<p>`, classed with the style of its first character; a run in another style is a
    `<span>` of its class.
 2. An empty line, or one of control characters only (which are dropped), is `<p><br></p>`, keeping its height.
-3. Spaces and tabs are kept (`white-space: pre-wrap`).
-4. A style is a CSS declaration, one class per distinct declaration:
+3. A Word document's paragraph ([word-mac.md](../documents/word-mac.md)) gives each of its lines an inline style: its
+   alignment when it differs from the column's (`justify` for justified), `margin-left` and `margin-right` from its
+   indents; its first line also `text-indent` (the first-line indent) and `margin-top` (the space before); its last
+   line `margin-bottom` (the space after). Zero values are left out; a point is a pixel.
+4. Spaces and tabs are kept (`white-space: pre-wrap`).
+5. A style is a CSS declaration, one class per distinct declaration:
    - the font: its Mac name, then a similar font found on other systems (§3.4);
    - the size in pixels (72 dpi: a point is a CSS pixel);
    - the line height from the style run, when it has one;

@@ -24,7 +24,9 @@ namespace ClassicMac.Resources.Cli
                 var diagnostics = new List<Diagnostic>();
                 opened = Input.Open(input, containerOptions, diagnostics);
                 reporter.Write(input.Name, diagnostics);
-                forks = opened.Forks(input, readOptions, reporter).Where(f => f.Fork is not null).ToList();
+                // Files with a resource fork, and Word documents (their data fork is the document) with or without one.
+                forks = opened.Forks(input, readOptions, reporter)
+                    .Where(f => f.Fork is not null || Decoders.Documents.StyledDocuments.IsWord(f.Node.File.FinderInfo.Type)).ToList();
             }
             catch (InvalidDataException e)
             {
@@ -43,7 +45,7 @@ namespace ClassicMac.Resources.Cli
             ConvertResult result;
             try
             {
-                result = DocumentConverter.Convert(opened.Root, forks.Select(f => new ForkToExtract(f.Node, f.Chain, f.Fork!)).ToList(), root,
+                result = DocumentConverter.Convert(opened.Root, forks.Select(f => new ForkToExtract(f.Node, f.Chain, f.Fork ?? new ResourceFork())).ToList(), root,
                     converters, readOptions, overwrite, found);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)

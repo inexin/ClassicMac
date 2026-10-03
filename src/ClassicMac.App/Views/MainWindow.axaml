@@ -1812,7 +1812,7 @@
                                   Width="{Binding Preview.Document.ColumnWidth, FallbackValue=NaN}">
                       <ItemsControl.DataTemplates>
                         <DataTemplate DataType="vm:DocumentTextItem">
-                          <views:StyledTextView Styled="{Binding Text}" Scale="1" TextWrapping="Wrap" TextAlignment="{Binding Alignment}" />
+                          <views:StyledTextView Styled="{Binding Text}" Scale="1" TextWrapping="Wrap" TextAlignment="{Binding Alignment}" Margin="{Binding Margin}" />
                         </DataTemplate>
                         <DataTemplate DataType="vm:DocumentRowItem">
                           <Grid ColumnDefinitions="*,Auto,*">

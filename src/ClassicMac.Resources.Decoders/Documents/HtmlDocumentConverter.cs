@@ -6,8 +6,8 @@ using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Decoders.Documents
 {
-    // DOCMaker and SimpleText documents to an HTML folder: StyledDocuments reads, HtmlDocuments writes. The data fork is
-    // read only for a TEXT or ttro file (a SimpleText document's text).
+    // DOCMaker, SimpleText and Word documents to an HTML folder: StyledDocuments reads, HtmlDocuments writes. The data
+    // fork is read only for a TEXT or ttro file (a SimpleText document's text) and a Word document (the document).
     internal sealed class HtmlDocumentConverter(DecodeOptions options) : IDocumentConverter
     {
         private static readonly FourCC Text = FourCC.FromString("TEXT"), Ttro = FourCC.FromString("ttro");
@@ -20,7 +20,7 @@ namespace ClassicMac.Resources.Decoders.Documents
         {
             ArgumentNullException.ThrowIfNull(input);
             var text = ReadOnlyMemory<byte>.Empty;
-            if (input.Type == Text || input.Type == Ttro)
+            if (input.Type == Text || input.Type == Ttro || StyledDocuments.IsWord(input.Type))
             {
                 try
                 {

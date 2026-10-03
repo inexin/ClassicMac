@@ -101,6 +101,39 @@ public class DocumentTests : IDisposable
     }
 
     [Fact]
+    public async Task A_Word_document_previews_with_its_paragraphs_alignment_and_indents()
+    {
+        var word = new ClassicMac.Resources.Decoders.Tests.MacWordBuilder().Font(3, "Geneva").Style([0x00, 0x10, 0x00, 0x03], [])
+            .Text("Title\rFirst\rSecond\rIndented\r")
+            .Pap(0, 6, 0, 0x05, 0x01).Pap(19, 28, 0, 0x11, 0x02, 0xD0, 0x10, 0x01, 0x68)
+            .Chp(0, 5, 0x80).Build();
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Letter", word, [], type: "WDBN", creator: "MSWD");
+        var path = Path.Combine(folder, "Word.img");
+        File.WriteAllBytes(path, disk.Build("Word"));
+        var output = Directory.CreateDirectory(Path.Combine(folder, "out")).FullName;
+        var model = new MainViewModel { FilePicker = new Picker(output) };
+        var input = (await model.OpenAsync(path))!;
+
+        // Converted, though it has no resource fork.
+        model.Selected = input;
+        await model.ConvertDocumentsCommand.ExecuteAsync(null);
+        Assert.True(File.Exists(Path.Combine(output, "Word documents", "index.html")), model.Status);
+
+        var preview = await Select(model, input.Children.Single(c => c.Title == "Letter"));
+
+        Assert.True(preview.IsDocument);
+        Assert.Equal(DocumentKind.Word, preview.Document!.Document.Kind);
+        Assert.False(preview.Document.HasChapters);
+        // The centred title, the two left paragraphs together, the indented one.
+        var items = preview.Document.Items.Cast<DocumentTextItem>().ToList();
+        Assert.Equal(["Title", "First\rSecond", "Indented"], items.Select(i => i.Text.Text));
+        Assert.Equal([Justification.Center, Justification.Left, Justification.Left], items.Select(i => i.Justification));
+        Assert.Equal(new Avalonia.Thickness(36, 0, 18, 0), items[2].Margin);
+        Assert.True(items[0].Text.Runs[0].Bold);
+    }
+
+    [Fact]
     public async Task Convert_documents_writes_each_as_HTML_and_extract_adds_them()
     {
         var output = Directory.CreateDirectory(Path.Combine(folder, "out")).FullName;

@@ -38,7 +38,7 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         // The file of chapter k, or index.html for a SimpleText document's only chapter.
         private static string PageName(StyledDocument document, int chapter) =>
-            document.Kind == DocumentKind.SimpleText ? "index.html" : $"chapter-{chapter.ToString("D2", CultureInfo.InvariantCulture)}.html";
+            document.Kind != DocumentKind.DocMaker ? "index.html" : $"chapter-{chapter.ToString("D2", CultureInfo.InvariantCulture)}.html";
 
         private sealed class Writer(StyledDocument document, DecodeOptions options, ICollection<Diagnostic> diagnostics)
         {
@@ -197,7 +197,7 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 var runs = chapter.Text.Runs;
                 var first = runs.FirstOrDefault(r => r.Start <= start && start < r.Start + r.Length) ?? runs.LastOrDefault();
-                html.Append("<p").Append(first is null ? "" : $" class=\"{Style(first)}\"").Append('>');
+                html.Append("<p").Append(first is null ? "" : $" class=\"{Style(first)}\"").Append(ParagraphStyle(chapter, start)).Append('>');
                 var line = chapter.Text.Text.AsSpan(start, end - start);
                 if (!line.ContainsAnyExceptInRange('\0', '\u001F') && !line.Contains('\t'))
                 {
@@ -220,6 +220,54 @@ namespace ClassicMac.Resources.Decoders.Documents
                     }
                 }
                 html.Append("</p>\n");
+            }
+
+            // A Word paragraph's own format as an inline style, at a point a pixel (empty when the chapter has none, or the
+            // line is not the paragraph's first: then only the alignment and side indents carry on).
+            private static string ParagraphStyle(DocumentChapter chapter, int start)
+            {
+                if (chapter.ParagraphAt(start) is not { } format)
+                {
+                    return "";
+                }
+
+                var first = format.Start == start;
+                var style = new StringBuilder();
+                void Add(string property, double value)
+                {
+                    if (value != 0)
+                    {
+                        style.Append(CultureInfo.InvariantCulture, $"{property}:{value}px;");
+                    }
+                }
+
+                if (format.Justification != chapter.Justification)
+                {
+                    style.Append("text-align:").Append(format.Justification switch
+                    {
+                        Justification.Center => "center",
+                        Justification.Right => "right",
+                        Justification.Full => "justify",
+                        _ => "left",
+                    }).Append(';');
+                }
+
+                Add("margin-left", format.LeftIndent);
+                Add("margin-right", format.RightIndent);
+                if (first)
+                {
+                    Add("text-indent", format.FirstLineIndent);
+                    Add("margin-top", format.SpaceBefore);
+                }
+
+                // The paragraph's last line: the next line starts another paragraph, or there is none.
+                var end = chapter.Text.Text.IndexOf('\r', start);
+                if (end < 0 || end + 1 >= chapter.Text.Text.Length || chapter.ParagraphAt(end + 1)?.Start == end + 1)
+                {
+                    Add("margin-bottom", format.SpaceAfter);
+                }
+
+                return style.Length == 0 ? "" : $" style=\"{style}\"";
             }
 
             // Pictures side by side: left, centre and right, each in its place across the column.

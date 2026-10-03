@@ -23,6 +23,9 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         /// <summary>A SimpleText (or TeachText) document.</summary>
         SimpleText,
+
+        /// <summary>A Microsoft Word document.</summary>
+        Word,
     }
 
     /// <summary>One chapter: styled text and the pictures drawn over it.</summary>
@@ -34,7 +37,47 @@ namespace ClassicMac.Resources.Decoders.Documents
     /// <param name="Pictures">The pictures, in anchor order.</param>
     /// <param name="ColumnWidth">The text column's width in pixels, or 0 when the document does not fix one.</param>
     public sealed record DocumentChapter(int Number, string Title, StyledText Text, Justification Justification, Rgb? Background,
-        IReadOnlyList<DocumentPicture> Pictures, int ColumnWidth);
+        IReadOnlyList<DocumentPicture> Pictures, int ColumnWidth)
+    {
+        /// <summary>
+        /// The paragraphs' own formats, by their first character, in order; empty when every line takes
+        /// <see cref="Justification"/> (TextEdit documents).
+        /// </summary>
+        public IReadOnlyList<ParagraphFormat> Paragraphs { get; init; } = [];
+
+        /// <summary>The format of the paragraph that character <paramref name="offset"/> is in, or null when there is none.</summary>
+        public ParagraphFormat? ParagraphAt(int offset)
+        {
+            var (low, high) = (0, Paragraphs.Count - 1);
+            ParagraphFormat? found = null;
+            while (low <= high)
+            {
+                var middle = (low + high) / 2;
+                if (Paragraphs[middle].Start <= offset)
+                {
+                    found = Paragraphs[middle];
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle - 1;
+                }
+            }
+
+            return found;
+        }
+    }
+
+    /// <summary>A paragraph's format, from its first character to the next paragraph's; lengths in points.</summary>
+    /// <param name="Start">The paragraph's first character.</param>
+    /// <param name="Justification">How its lines are aligned.</param>
+    /// <param name="LeftIndent">The indent from the left edge of the column.</param>
+    /// <param name="RightIndent">The indent from the right edge.</param>
+    /// <param name="FirstLineIndent">The first line's indent from <paramref name="LeftIndent"/> (negative for a hanging indent).</param>
+    /// <param name="SpaceBefore">The space above the paragraph.</param>
+    /// <param name="SpaceAfter">The space below it.</param>
+    public sealed record ParagraphFormat(int Start, Justification Justification, double LeftIndent = 0, double RightIndent = 0,
+        double FirstLineIndent = 0, double SpaceBefore = 0, double SpaceAfter = 0);
 
     /// <summary>A colour, 0–255 per component.</summary>
     public readonly record struct Rgb(byte Red, byte Green, byte Blue);
@@ -50,6 +93,9 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         /// <summary>Right.</summary>
         Right,
+
+        /// <summary>Justified to both edges (a Word paragraph).</summary>
+        Full,
     }
 
     /// <summary>

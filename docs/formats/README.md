@@ -128,6 +128,15 @@ One file per format, in its category folder. A codec used by more than one forma
 | [finder.md](resources/finder.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
 | [documents.md](resources/documents.md) | DOCMaker stand-alone documents and SimpleText documents with pictures | `ClassicMac.Resources.Decoders.Documents` |
 
+### Documents
+
+Documents whose data fork is the document (DOCMaker and SimpleText documents live in resources: see
+[documents.md](resources/documents.md)).
+
+| Document | Formats | Code |
+| --- | --- | --- |
+| [word-mac.md](documents/word-mac.md) | Microsoft Word 4 and 5 for the Macintosh (`'WDBN'`): text, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`MacWordDocuments`) |
+
 ### Graphics
 
 | Document | Formats | Code |

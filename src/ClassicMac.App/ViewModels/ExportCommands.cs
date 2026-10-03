@@ -165,6 +165,11 @@ namespace ClassicMac.App.ViewModels
                     {
                         forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
                     }
+                    else if (ClassicMac.Resources.Decoders.Documents.StyledDocuments.IsWord(leaf.File.FinderInfo.Type))
+                    {
+                        // A Word document is its data fork.
+                        forks.Add(new ForkToExtract(leaf, [leaf.Format], found.Fork ?? new ResourceFork()));
+                    }
                 }
                 var target = ExportFolders.CreateNew(parent, name + " documents");
                 var result = DocumentConverter.Convert(root, forks, target, ResourceDecoders.CreateDocumentConverters(CurrentDecodeOptions),
