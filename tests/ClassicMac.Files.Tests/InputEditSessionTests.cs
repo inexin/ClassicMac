@@ -93,6 +93,23 @@ public sealed class InputEditSessionTests : IDisposable
     }
 
     [Fact]
+    public void An_item_moves_to_another_folder_and_its_resource_edits_follow()
+    {
+        var session = InputEditSession.Open(Volume());
+        session.SetResource("Read Me", Str, 200, "x"u8.ToArray());
+        session.Move("Read Me", "Docs");
+        session.Move("Docs:Letter", "");
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+
+        Assert.Equal(["Docs:Empty", "Docs:Read Me", "Letter"], Files(target).Select(f => f.MacPath).Order());
+        var moved = ResourceFork.Read(Files(target).Single(f => f.MacPath == "Docs:Read Me").ResourceFork.ToArray());
+        Assert.Equal("x"u8.ToArray(), moved.Find(Str, 200)!.GetData().ToArray());
+        Assert.Equal([("move", "Read Me", "to Docs"), ("move", "Docs:Letter", "to the volume's top level")],
+            session.Changes.Skip(1).Select(c => (c.Action, c.Path, c.Detail)));
+    }
+
+    [Fact]
     public void A_folder_with_contents_is_deleted_only_when_asked()
     {
         var session = InputEditSession.Open(Volume());

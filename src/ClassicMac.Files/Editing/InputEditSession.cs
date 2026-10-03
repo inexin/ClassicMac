@@ -202,6 +202,27 @@ namespace ClassicMac.Files.Editing
         }
 
         /// <summary>
+        /// Moves the item at <paramref name="macPath"/> into the folder at <paramref name="folderPath"/> (empty: the volume's
+        /// top level); resource edits made to it (or in it) follow.
+        /// </summary>
+        public void Move(string macPath, string folderPath)
+        {
+            ArgumentNullException.ThrowIfNull(macPath);
+            ArgumentNullException.ThrowIfNull(folderPath);
+            RequireVolume("hold folders");
+            volume = HfsWriter.Move(ForkData.FromBytes(Volume), macPath, folderPath);
+            var name = macPath.Contains(':') ? macPath[(macPath.LastIndexOf(':') + 1)..] : macPath;
+            var moved = folderPath.Length == 0 ? name : folderPath + ":" + name;
+            foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
+            {
+                forks[moved + key[macPath.Length..]] = forks[key];
+                forks.Remove(key);
+            }
+
+            changes.Add(new PlannedChange("move", macPath, folderPath.Length == 0 ? "to the volume's top level" : $"to {folderPath}"));
+        }
+
+        /// <summary>
         /// Sets a file's type, creator and Finder flags (those given), or a folder's Finder flags. A resource fork file has
         /// no Finder info.
         /// </summary>

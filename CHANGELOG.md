@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `mv <path> <folder>` moves a file or folder to another folder of an HFS volume, as PBCatMove does (its thread,
+  the folders' valences and the root counts follow); also the MCP server's `mv` and the shell's `move` (cli.md §3.2).
 - CLI: `check <input>` reads an input through and reports its damage; a plain HFS volume also gets the checks the
   writer makes before an edit, so a volume can be tested before writing to it (cli.md §2.7).
 - CLI: output redirected to a file or pipe is UTF-8 on Windows too (it took the console's code page, so Mac names

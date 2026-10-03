@@ -238,7 +238,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 ### 3.1 What can be written
 
 - **A plain HFS volume image** (the host file is the volume, with no partition map or disk image wrapper): files and
-  folders added, deleted (a folder only with `--recursive` when it holds anything), renamed in their folder, a file's
+  folders added, deleted (a folder only with `--recursive` when it holds anything), renamed in their folder, moved to another folder, a file's
   type, creator and Finder flags and a folder's Finder flags set, and a file's resources added, replaced and deleted.
   The rules are [hfs.md §3](formats/file-systems/hfs.md#3-writing).
 - **One Mac file** (a resource fork file, MacBinary, BinHex, AppleSingle, AppleDouble or Basilisk II file): its
@@ -254,6 +254,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 | `mkdir` | `<Mac path>` | Makes an empty folder |
 | `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`) |
 | `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
+| `mv` | `<Mac path> <folder>` | Moves a file or folder into another folder of its volume, keeping its name; the folder is a path inside the same input, or a Mac path starting with the input (`disk.img:` for the top level). A folder cannot move into itself, nor anything onto a name the folder holds |
 | `set` | `<Mac path> [--type T] [--creator C] [--flags F]` | Sets a file's type and creator; `--flags` replaces the Finder flags: a number (`0x4000`, `$4000`, `16384`) or flag names joined with commas (`Invisible,HasBundle`; `IsInvisible` too) |
 | `res-add` | `<file>:#rsrc:<type>:<ID> <data file> [--name N] [--replace]` | Adds a resource with the data file's bytes; one that exists is replaced only with `--replace` |
 | `res-rm` | `<file>:#rsrc:<type>:<ID>` | Deletes a resource |
@@ -284,7 +285,7 @@ input. With `--json`:
 }
 ```
 
-`action` is `add`, `mkdir`, `delete`, `rename`, `set`, `res-set` or `res-delete`. An AppleDouble pair or a Basilisk II
+`action` is `add`, `mkdir`, `delete`, `rename`, `move`, `set`, `res-set` or `res-delete`. An AppleDouble pair or a Basilisk II
 entry writes more than one file.
 
 ### 3.4 Exit codes
@@ -349,6 +350,7 @@ it. Inputs ClassicMac does not write (§3.1) can be read but not changed.
 | `mkdir` | `session`, `path`, `dry_run` | the same |
 | `rm` | `session`, `path`, `recursive`, `dry_run` | the same |
 | `rename` | `session`, `path`, `name`, `dry_run` | the same |
+| `mv` | `session`, `path`, `to`, `dry_run` | the same (`to` a folder's path; empty for the top level) |
 | `set` | `session`, `path`, `type`, `creator`, `flags`, `dry_run` | the same |
 | `res_add` | `session`, `path` (`<file>:#rsrc:<type>:<ID>`), `data_file` or `data_hex`, `name`, `replace`, `dry_run` | the same |
 | `res_rm` | `session`, `path`, `dry_run` | the same |
@@ -398,6 +400,7 @@ commands see them, and the input changes only with `save`.
 | `del`, `rm <path> [-r]` | Deletes a file, or a folder (with contents only with `-r`) |
 | `md`, `mkdir <path>` | Makes a folder |
 | `ren`, `rename <path> <name>` | Renames |
+| `move`, `mv <path> <folder>` | Moves into a folder, named from where the shell is |
 | `set <path> [--type T] [--creator C] [--flags F]` | Sets Finder info (§3.2) |
 | `save` | Writes the changes over the input, verified, keeping `<input>.orig` the first time |
 | `save as <file>` | Writes them to a new file, verified (never the input) |

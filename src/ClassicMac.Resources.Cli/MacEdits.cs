@@ -64,6 +64,20 @@ namespace ClassicMac.Resources.Cli
             return session => session.Rename(path, newName);
         }
 
+        /// <summary>Moves a file or folder into a folder of the same volume (<paramref name="folder"/>, a path inside the input).</summary>
+        public static Action<InputEditSession> Mv(MacPathTree tree, string rest, string folder)
+        {
+            var path = VolumePath(tree, Existing(tree, rest));
+            var target = tree.Resolve(folder) ?? throw new PathNotFound($"{folder}: names nothing.");
+            if (!IsVolumeFolder(tree, target))
+            {
+                throw new WriteRefused($"{target.Path} is not a folder of the volume.");
+            }
+
+            var into = VolumePath(tree, target);
+            return session => session.Move(path, into);
+        }
+
         /// <summary>Sets a file's type and creator, or Finder flags (text as <see cref="Flags"/> reads it).</summary>
         public static Action<InputEditSession> Set(InputEditKind kind, MacPathTree tree, string rest, string? type, string? creator, string? flags)
         {

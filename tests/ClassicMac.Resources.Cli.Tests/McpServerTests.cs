@@ -74,7 +74,7 @@ public sealed class McpServerTests : IAsyncLifetime
     public async Task The_tools_are_listed_with_schemas_and_hints()
     {
         var listed = await client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(["open", "close", "list", "stat", "read", "search", "extract", "put", "mkdir", "rm", "rename", "set", "res_add", "res_rm", "save_as"],
+        Assert.Equal(["open", "close", "list", "stat", "read", "search", "extract", "put", "mkdir", "rm", "rename", "mv", "set", "res_add", "res_rm", "save_as"],
             listed.Select(t => t.Name));
         foreach (var tool in listed)
         {
@@ -179,6 +179,8 @@ public sealed class McpServerTests : IAsyncLifetime
         Assert.Equal((false, 1, 0), (made.GetProperty("dryRun").GetBoolean(), made.GetProperty("unsaved").GetInt32(), made.GetProperty("written").GetArrayLength()));
         Assert.Equal(["Docs:Letter", "Docs:New"], Names(await Call("list", new() { ["session"] = session, ["path"] = "Docs" }), "entries").Order());   // reads see it
         await Call("rename", new() { ["session"] = session, ["path"] = "Read Me", ["name"] = "Note" });
+        await Call("mv", new() { ["session"] = session, ["path"] = "Note", ["to"] = "Docs" });
+        await Call("mv", new() { ["session"] = session, ["path"] = "Docs:Note", ["to"] = "" });
         await Call("set", new() { ["session"] = session, ["path"] = "Note", ["type"] = "TEXT", ["creator"] = "ttxt", ["flags"] = "Invisible" });
         Assert.Equal(before, File.ReadAllBytes(disk));
 
@@ -188,7 +190,7 @@ public sealed class McpServerTests : IAsyncLifetime
         var output = Path.Combine(folder, "saved.img");
         var saved = await Call("save_as", new() { ["session"] = session, ["destination"] = output });
         Assert.Equal([output], saved.GetProperty("written").EnumerateArray().Select(e => e.GetString()));
-        Assert.Equal(["mkdir", "rename", "set"], saved.GetProperty("changes").EnumerateArray().Select(c => c.GetProperty("action").GetString()));
+        Assert.Equal(["mkdir", "rename", "move", "move", "set"], saved.GetProperty("changes").EnumerateArray().Select(c => c.GetProperty("action").GetString()));
         Assert.Equal(0, saved.GetProperty("unsaved").GetInt32());
         Assert.Contains(Folders(output), f => f.MacPath == "Docs:New");
         var note = Files(output).Single(f => f.MacPath == "Note");

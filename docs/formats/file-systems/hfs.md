@@ -440,7 +440,11 @@ are [ClassicMac].
    `drNmFls`, `drNmRtDirs` in the MDB, follow every file and folder added or removed. Names in one folder are unique
    under `_RelString` (§1.11). A name is at most 31 bytes. A renamed item's record moves to its new key in the same
    folder, keeping its CNID, and its thread record (a folder's, or a file's when it has one) takes the new name; the
-   counts do not change. A file's Finder info is its record's `filUsrWds` and `filFndrInfo`; a folder's flags are
+   counts do not change. A moved item (PBCatMove) keeps its name and CNID: its record moves to a key with the new
+   folder's CNID as the parent, its thread's `thdParID` becomes that CNID, the old folder's `dirVal` goes down by one
+   and the new one's up by one, and `drNmFls` or `drNmRtDirs` change when it leaves or enters the root. A folder cannot
+   move into itself or a folder inside it (`badMovErr`), nor onto a name the destination holds (`dupFNErr`)
+   [Doc: Inside Macintosh: Files, PBCatMove]. A file's Finder info is its record's `filUsrWds` and `filFndrInfo`; a folder's flags are
    `dirUsrInfo.frFlags`.
 6. **Dates and counters.** The changed file's `filMdDat` and the MDB's `drLsMod` are the write time, as local time;
    `drWrCnt` goes up. A new CNID comes from `drNxtCNID`.
@@ -551,7 +555,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 
 - `HfsWriter.ReplaceFork(image, path, fork, bytes)` replaces a data or resource fork; `CreateFile` and `DeleteFile` add
   or remove a file record and both forks; `CreateFolder` and `DeleteFolder` add or remove a folder record and its
-  thread; `Rename` renames a file or folder in its folder; `SetFinderInfo` sets a file's Finder info and
+  thread; `Rename` renames a file or folder in its folder; `Move` moves one into another folder (§3), and refuses a
+  move into the folder it is in, which PBCatMove allows as a no-op [ClassicMac]; `SetFinderInfo` sets a file's Finder info and
   `SetFolderFlags` a folder's Finder flags; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
@@ -630,6 +635,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   and contents following), Finder info and folder flags, and deleting a folder with its contents;
   `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
   the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
+  `HfsMoveTests.cs` covers moves of files and folders (threads, valences, root counts) and the refusals;
   `HfsCheckTests.cs` covers `HfsWriter.Check` on sound, damaged, truncated and locked volumes;
   `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
 - With `CLASSICMAC_HFS_INTEROP_INPUT` and the `…_OUTPUT` variables set, `ExternalClassicHfsImageCanBeEditedAndReopened`

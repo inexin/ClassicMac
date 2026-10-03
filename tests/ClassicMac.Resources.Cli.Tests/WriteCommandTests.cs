@@ -98,6 +98,24 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void Mv_moves_an_item_to_a_folder_of_the_same_input()
+    {
+        var disk = Disk();
+
+        var (code, _, error) = Run("mv", disk + ":Read Me", "Docs", "-o", Out);                 // a folder inside the input
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains(Files(Out), f => f.MacPath == "Docs:Read Me");
+        var back = Path.Combine(folder, "back.img");
+        Assert.Equal(ExitCodes.Success, Run("mv", Out + ":Docs:Letter", Out + ":", "-o", back).Code);   // a Mac path: the top level
+        Assert.Contains(Files(back), f => f.MacPath == "Letter");
+
+        Assert.Equal(ExitCodes.NotFound, Run("mv", disk + ":Read Me", "Nowhere", "-o", back).Code);
+        Assert.Equal(ExitCodes.Usage, Run("mv", disk + ":Read Me", "Docs:Letter", "-o", back).Code);   // not a folder
+        Assert.Equal(ExitCodes.Usage, Run("mv", disk + ":Docs", "Docs", "-o", back).Code);              // into itself
+        Assert.Equal(ExitCodes.Usage, Run("mv", disk + ":Read Me", back + ":Docs", "-o", Out).Code);    // another input
+    }
+
+    [Fact]
     public void Res_add_and_res_rm_change_a_file_s_resources()
     {
         var disk = Disk();

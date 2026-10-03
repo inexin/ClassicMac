@@ -37,6 +37,7 @@ namespace ClassicMac.Resources.Cli.Shell
             "del, rm <path> [-r]           delete a file or folder",
             "md, mkdir <path>              make a folder",
             "ren, rename <path> <name>     rename",
+            "move, mv <path> <folder>      move into another folder",
             "set <path> [--type T] [--creator C] [--flags F]",
             "save                          write the changes over the input (keeping <input>.orig)",
             "save as <file>                write them to a new file",
@@ -169,6 +170,7 @@ namespace ClassicMac.Resources.Cli.Shell
                         (_, tree, rest) => MacEdits.Rm(tree, rest, o.Flag("-r") || o.Flag("--recursive"))),
                     "md" or "mkdir" => Change(args, 1, [], [], (_, _) => (_, tree, rest) => MacEdits.Mkdir(tree, rest)),
                     "ren" or "rename" => Change(args, 2, [], [], (o, _) => (kind, tree, rest) => MacEdits.Rename(kind, tree, rest, o.Positional[1])),
+                    "move" or "mv" => Change(args, 2, [], [], (o, _) => (_, tree, rest) => MacEdits.Mv(tree, rest, Resolve(o.Positional[1]))),
                     "set" => Change(args, 1, [], ["--type", "--creator", "--flags"], (o, _) =>
                         (kind, tree, rest) => MacEdits.Set(kind, tree, rest, o.Value("--type"), o.Value("--creator"), o.Value("--flags"))),
                     "save" => Save(args),

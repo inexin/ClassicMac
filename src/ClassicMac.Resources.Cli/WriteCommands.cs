@@ -38,6 +38,7 @@ namespace ClassicMac.Resources.Cli
             yield return MkdirCommand();
             yield return RmCommand();
             yield return RenameCommand();
+            yield return MvCommand();
             yield return SetCommand();
             yield return ResAddCommand();
             yield return ResRmCommand();
@@ -96,6 +97,39 @@ namespace ClassicMac.Resources.Cli
             command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path),
                 (kind, tree, rest) => MacEdits.Rename(kind, tree, rest, result.GetRequiredValue(newName))));
             return command;
+        }
+
+        private Command MvCommand()
+        {
+            var path = MacPathArgument("path", "The file or folder to move");
+            var folder = new Argument<string>("folder")
+            {
+                Description = "The folder to move it into: a path inside the same input, or a Mac path starting with the input (disk.img: for the top level)",
+            };
+            var options = NewWriteOptions();
+            var command = new Command("mv", "Move a file or folder into another folder of its volume") { path, folder };
+            AddWriteOptions(command, options);
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path),
+                (_, tree, rest) => MacEdits.Mv(tree, rest, InSameInput(result.GetRequiredValue(path), result.GetRequiredValue(folder)))));
+            return command;
+        }
+
+        // A destination typed for mv: a Mac path starting with the same host file gives its path inside it; one starting
+        // with another file is refused; anything else is already a path inside the input.
+        private static string InSameInput(string source, string typed)
+        {
+            if (MacPaths.SplitHost(typed) is not var (host, rest))
+            {
+                return typed;
+            }
+
+            var (sourceHost, _) = MacPaths.SplitHost(source)!.Value;
+            if (!string.Equals(Path.GetFullPath(host), Path.GetFullPath(sourceHost), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            {
+                throw new WriteRefused($"{typed} is in another input; mv moves within one volume.");
+            }
+
+            return rest;
         }
 
         private Command SetCommand()

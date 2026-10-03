@@ -92,6 +92,18 @@ public sealed class ShellTests : IDisposable
     }
 
     [Fact]
+    public void Move_puts_an_item_in_another_folder_named_from_where_the_shell_is()
+    {
+        var output = Path.Combine(folder, "moved.img");
+        var (code, lines, error) = Script(disk, $"cd Docs\nmove Letter ..\nmove \"..:Read Me\" .\nsave as \"{output}\"\nexit\n");
+
+        Assert.True(code == 0, error);
+        Assert.Equal("move Docs:Letter (to the volume's top level)", lines[0]);
+        Assert.Equal("move Read Me (to Docs)", lines[1]);
+        Assert.Equal(["Docs:Read Me", "Letter"], Files(output).Select(f => f.MacPath).Order());
+    }
+
+    [Fact]
     public void Changes_stay_in_the_session_until_saved_as()
     {
         var before = File.ReadAllBytes(disk);

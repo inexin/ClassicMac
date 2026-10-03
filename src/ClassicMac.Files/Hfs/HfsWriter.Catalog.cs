@@ -236,6 +236,99 @@ public static partial class HfsWriter
         return CommitCatalog(state);
     }
 
+    /// <summary>
+    /// Moves a file or folder into another folder of its volume (<paramref name="folderPath"/>, empty for the root),
+    /// returning a new image, as PBCatMove moves it (hfs.md §3): the record's key takes the folder's ID as its parent,
+    /// its thread record (a folder's always, a file's when it has one) records the new parent, and both folders'
+    /// valences change, with the MDB's root counts. Its name, ID, forks, Finder info and dates stay. A move into the
+    /// folder it is in, onto a name the folder holds, or of a folder into itself or a folder inside it is refused.
+    /// </summary>
+    public static byte[] Move(ForkData image, string macPath, string folderPath)
+    {
+        ArgumentNullException.ThrowIfNull(folderPath);
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, macPath);
+        var item = FindCatalogRecord(state.Records, parent, name);
+        if (item.Data is null || item.Data[0] is not (1 or 2))
+        {
+            throw new InvalidDataException($"The HFS item '{name}' was not found.");
+        }
+
+        uint destination = 2;
+        if (folderPath.Length != 0)
+        {
+            var (folderParent, folderName) = ResolveParent(state.Records, folderPath);
+            var folder = FindCatalogRecord(state.Records, folderParent, folderName);
+            if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
+            {
+                throw new InvalidDataException($"The HFS folder '{folderPath}' was not found.");
+            }
+
+            destination = U32(new BigEndianReader(folder.Data), 6);
+        }
+
+        if (destination == parent)
+        {
+            throw new InvalidDataException($"The HFS item '{name}' is in that folder already.");
+        }
+
+        var isFolder = item.Data[0] == 1;
+        uint id = U32(new BigEndianReader(item.Data), isFolder ? 6 : 20);
+        if (isFolder)
+        {
+            // Up from the destination through the folder threads to the root's parent (1): the folder moved must not
+            // be on the way (PBCatMove's badMovErr).
+            for (uint at = destination; at > 1; at = ThreadParent(state.Records, at))
+            {
+                if (at == id)
+                {
+                    throw new InvalidDataException("An HFS folder cannot move into itself or a folder inside it.");
+                }
+            }
+        }
+
+        EnsureAbsent(state.Records, destination, name);
+        var thread = FindCatalogRecord(state.Records, id, "");
+        if (isFolder && (thread.Data is null || thread.Data[0] != 3))
+        {
+            throw new InvalidDataException("The HFS folder thread is missing.");
+        }
+
+        state.Records.Remove(item);
+        state.Records.Add((CatalogKey(destination, name), item.Data));
+        if (thread.Data is not null && thread.Data.Length >= 46)
+        {
+            new BigEndianWriter(thread.Data).WriteUInt32At(10, destination);
+        }
+
+        AdjustParentValence(state.Records, parent, -1);
+        AdjustParentValence(state.Records, destination, 1);
+        int rootCount = isFolder ? 0x52 : 0x0C;
+        if (parent == 2)
+        {
+            AddShortCount(state.Result, rootCount, -1);
+        }
+
+        if (destination == 2)
+        {
+            AddShortCount(state.Result, rootCount, 1);
+        }
+
+        return CommitCatalog(state);
+    }
+
+    // A folder's parent ID, from its thread record (+10).
+    private static uint ThreadParent(List<(byte[] Key, byte[] Data)> records, uint folder)
+    {
+        var thread = FindCatalogRecord(records, folder, "");
+        if (thread.Data is null || thread.Data.Length < 14 || thread.Data[0] != 3)
+        {
+            throw new InvalidDataException("The HFS folder thread is missing.");
+        }
+
+        return U32(new BigEndianReader(thread.Data), 10);
+    }
+
     /// <summary>Sets a file's Finder info (its <c>FInfo</c> and <c>FXInfo</c>), returning a new image.</summary>
     public static byte[] SetFinderInfo(ForkData image, string macPath, FinderInfo finderInfo)
     {
