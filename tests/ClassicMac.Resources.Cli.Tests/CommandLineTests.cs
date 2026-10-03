@@ -242,6 +242,31 @@ public class CommandLineTests
         Assert.Contains("kind \"Realmz scenario\" (built-in)", output);       // Realmz is not there: the table
     }
 
+    // A node holding a volume shows the volume's name: the files under it are labelled with the format they were read
+    // from ("HFS volume: \"Desktop DB\""), which read as the volume's name.
+    [Fact]
+    public void Info_names_a_partition_s_volume_by_its_name()
+    {
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Desktop DB", [1], []);
+        var path = Path.Combine(Path.GetTempPath(), $"part-{Guid.NewGuid():N}.dsk");
+        File.WriteAllBytes(path, Fixtures.PartitionMap(("CM part", "Apple_HFS", disk.Build("untitled"))));
+        try
+        {
+            var (code, output, _) = Run("info", path);
+
+            Assert.Equal(ExitCodes.Success, code);
+            var lines = output.Split('\n').Select(line => line.TrimEnd('\r')).ToList();
+            int partition = lines.IndexOf("  Apple partition map: \"CM part\"");
+            int volume = lines.IndexOf("    HFS volume \"untitled\"");              // the partition's own details
+            Assert.InRange(volume, partition + 1, lines.FindIndex(line => line.Contains("HFS volume: \"Desktop DB\"", StringComparison.Ordinal)) - 1);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void Info_names_kinds_from_the_volumes_applications()
     {

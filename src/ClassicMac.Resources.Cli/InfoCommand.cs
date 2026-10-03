@@ -72,6 +72,12 @@ namespace ClassicMac.Resources.Cli
             }
 
             output.WriteLine($"{indent}  data fork {file.DataFork.Length} bytes  resource fork {file.ResourceFork.Length} bytes");
+            if (node.Volume is { } held)
+            {
+                // The volume this file holds, by its own name (the files under it are labelled by the format they came from).
+                output.WriteLine(held.Name is null ? $"{indent}  {held.Format} volume" : $"{indent}  {held.Format} volume \"{held.Name}\"");
+            }
+
             var neighbours = node.Children.Count == 0 ? null : Resolver(node);
             foreach (var child in node.Children)
             {

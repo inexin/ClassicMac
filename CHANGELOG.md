@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `info` shows a volume's own name under the file or partition holding it (`HFS volume "untitled"`); the files
+  under it are labelled with the format they were read from, which read as the volume's name.
 - HFS: an edit session's first change also clears file records' nonzero `filStBlk`, `filRStBlk` and `filResrv` (as
   hfsutils leaves them), listed as a `repair` change, as Disk First Aid's Repair does; edited hfsutils volumes then pass
   Disk First Aid (hfs.md §1.9).
