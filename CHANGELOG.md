@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: output redirected to a file or pipe is UTF-8 on Windows too (it took the console's code page, so Mac names
+  such as "§" came out as other bytes in text and --json output).
 - File systems: HFS volumes Mac OS wrote can be edited: their catalog index keys, stored at the maximum length, were
   refused as invalid; the writer now accepts them and writes rebuilt index keys the same way (hfs.md §1.8).
 - Documents: Word 6 documents read: checked against 10 that Word 6.0 for the Macintosh wrote, their FIB identifier

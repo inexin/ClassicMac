@@ -59,7 +59,8 @@ volume's catalog (its folder records), so they list too.
 ## 2. Read commands
 
 Each takes a Mac path (§1). Results go to standard output, diagnostics to standard error; `--json` writes one JSON
-object (§2.6). The limit options of every command (`--max-resource-size`, `--max-nesting-depth`,
+object (§2.6). Text redirected to a file or a pipe is UTF-8 without a byte order mark, whatever the console's
+code page. The limit options of every command (`--max-resource-size`, `--max-nesting-depth`,
 `--max-expanded-bytes`, `--strict`, `-q`) apply.
 
 `ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
