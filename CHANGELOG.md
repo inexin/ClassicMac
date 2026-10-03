@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: catalog edits change only the leaves their records are in, splitting a full leaf (and its parents, up to a new
+  root) into free nodes, as Mac OS does, instead of repacking every node; an edit on a 500 MB volume writes a few
+  sectors instead of the whole 4 MB catalog and the bitmap, and the catalog keeps Mac OS's layout (hfs.md §5.5).
 - HFS: each edit checks and rebuilds the catalog in about 100 ms instead of 230 ms on a 500 MB volume: folder valences
   counted in one pass (was a pass per folder), nodes filled by a running size, catalog keys compared without allocating;
   ten shell `md`s 1.6 s instead of 2.8 s.

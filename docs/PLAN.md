@@ -326,8 +326,9 @@ the edited forks, so the writer stops holding whole images:
   Save in place; NDIF; past 2 GB; docs. Built: the corpus test, `HfsVolume`, the writer through it, the session and
   both saves (a 500 MB session peaks at 100 MB instead of 2.6 GB; Save As 0.44 s). Still to do: NDIF's changed chunks
   past 2 GB. The shell's per-command tree reopening: 350 ms to 40 ms (probes deferred); each edit's catalog check and
-  rebuild 230 ms to 100 ms (one-pass valences, cheaper packing and key comparison); the rebuild still repacks every
-  node, where Mac OS inserts into one. Since built: NDIF's changed chunks from the overlay;
+  rebuild 230 ms to 100 ms (one-pass valences, cheaper packing and key comparison); catalog edits now change only
+  their leaves (splits into free nodes, as Mac OS), writing a few sectors; per command on 500 MB about 80 ms remain
+  (the check on opening ~15, the reader's re-read ~20, the shell's tree ~15–30). Since built: NDIF's changed chunks from the overlay;
   `format` to 2 TB (`FormatTo`); edit sessions opened one level deep and once per shell session (9.3 s to 5.6 s).
 
 **Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB

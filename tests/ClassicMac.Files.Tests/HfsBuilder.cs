@@ -196,7 +196,9 @@ internal sealed class HfsBuilder
             for (var i = 0; i < index.Count; i += IndexRecordsPerNode)
             {
                 var chunk = index.Skip(i).Take(IndexRecordsPerNode).ToList();
-                allocation[catalogStart + (int)nextIndexNode] = Leaf(chunk, forward: 0, backward: 0, kind: 0, height: (byte)depth);
+                // Index nodes of one level are linked as the leaves are.
+                allocation[catalogStart + (int)nextIndexNode] = Leaf(chunk, forward: i + IndexRecordsPerNode < index.Count ? nextIndexNode + 1 : 0,
+                    backward: i > 0 ? nextIndexNode - 1 : 0, kind: 0, height: (byte)depth);
                 above.Add(IndexRecord(chunk[0], nextIndexNode));
                 nextIndexNode++;
             }
