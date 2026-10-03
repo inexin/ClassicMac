@@ -6,13 +6,17 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Commands;
 
 namespace ClassicMac.Resources.Cli
 {
     /// <summary>
-    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c>, <c>disasm</c> and <c>pack</c>, and the write commands on Mac paths (<c>put</c>, <c>mkdir</c>, <c>rm</c>, <c>rename</c>, <c>set</c>, <c>res-add</c>, <c>res-rm</c>). Every limit option maps onto <see cref="ReadOptions"/> or <see cref="ContainerReadOptions"/>.
+    /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c>, <c>disasm</c> and <c>pack</c>,
+    /// the read commands on Mac paths (<c>ls</c>, <c>stat</c>, <c>cat</c>, <c>find</c>, <c>get</c>) and the write commands (<c>put</c>, <c>mkdir</c>,
+    /// <c>rm</c>, <c>rename</c>, <c>set</c>, <c>res-add</c>, <c>res-rm</c>) (docs/cli.md). Every limit option maps onto <see cref="ReadOptions"/> or
+    /// <see cref="ContainerReadOptions"/>. <paramref name="binary"/> takes <c>cat --raw</c>'s bytes (standard output).
     /// </summary>
-    internal sealed partial class CommandLine(TextWriter output, TextWriter error)
+    internal sealed partial class CommandLine(TextWriter output, TextWriter error, Stream? binary = null)
     {
         internal enum ListFormat
         {
@@ -107,6 +111,11 @@ namespace ClassicMac.Resources.Cli
             root.Subcommands.Add(ConvertCommand());
             root.Subcommands.Add(DisasmCommand());
             root.Subcommands.Add(PackCommand());
+            root.Subcommands.Add(LsCommand());
+            root.Subcommands.Add(StatCommand());
+            root.Subcommands.Add(CatCommand());
+            root.Subcommands.Add(FindCommand());
+            root.Subcommands.Add(GetCommand());
             foreach (var write in WriteCommands())
             {
                 root.Subcommands.Add(write);
@@ -315,6 +324,186 @@ namespace ClassicMac.Resources.Cli
                 result.GetRequiredValue(folder), result.GetRequiredValue(outputFile), result.GetValue(baseFork), result.GetValue(dataFork),
                 result.GetValue(container), result.GetValue(allowDeletes), result.GetValue(overwrite), ReadOptionsFrom(result),
                 ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet)));
+            return command;
+        }
+
+        // The file commands on Mac paths (docs/cli.md §2).
+        private static Argument<string> MacPathArgument() => new("path")
+        {
+            Description = "A Mac path: a host file, then Mac names joined by ':' or '/' (\\ escapes them), through disk images and archives, " +
+                "and on to #rsrc:'TYPE':ID (docs/cli.md)",
+        };
+
+        private static Option<bool> JsonOption() => new("--json") { Description = "Write JSON (the schemas are in docs/cli.md)" };
+
+        private PathCommands Paths(ParseResult result) => new(output, error, binary ?? Stream.Null, ContainerOptionsFrom(result), ReadOptionsFrom(result),
+            result.GetValue(strict), result.GetValue(quiet));
+
+        private Command LsCommand()
+        {
+            var path = MacPathArgument();
+            var json = JsonOption();
+            var command = new Command("ls", "List what a Mac path holds: a folder's or container's files and folders, a fork's types, a type's resources") { path, json };
+            command.SetAction(result => Paths(result).Ls(result.GetRequiredValue(path), result.GetValue(json)));
+            return command;
+        }
+
+        private Command StatCommand()
+        {
+            var path = MacPathArgument();
+            var json = JsonOption();
+            var command = new Command("stat", "Show everything about a Mac path: kind, type and creator, Finder kind, forks, dates, flags, how it was read") { path, json };
+            command.SetAction(result => Paths(result).Stat(result.GetRequiredValue(path), result.GetValue(json)));
+            return command;
+        }
+
+        internal enum ForkChoice
+        {
+            Data,
+            Rsrc,
+        }
+
+        private Command CatCommand()
+        {
+            var path = MacPathArgument();
+            var json = JsonOption();
+            var hex = new Option<bool>("--hex") { Description = "A hex dump instead of text (or a decoded resource)" };
+            var raw = new Option<bool>("--raw") { Description = "The bytes themselves to standard output" };
+            var fork = new Option<ForkChoice>("--fork") { Description = "Which fork of a file", DefaultValueFactory = _ => ForkChoice.Data };
+            var maxBytes = new Option<long>("--max-bytes")
+            {
+                Description = "The most bytes shown (bytes, or with KiB/MiB/GiB)",
+                DefaultValueFactory = _ => 16L << 20,
+                CustomParser = ParseSize,
+            };
+            var command = new Command("cat", "Show a file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded")
+            {
+                path, json, hex, raw, fork, maxBytes,
+            };
+            command.Validators.Add(r =>
+            {
+                if (r.GetValue(raw) && (r.GetValue(json) || r.GetValue(hex)))
+                {
+                    r.AddError("--raw writes the bytes themselves; it goes with neither --json nor --hex.");
+                }
+            });
+            command.SetAction(result => Paths(result).Cat(result.GetRequiredValue(path), result.GetValue(hex), result.GetValue(raw),
+                result.GetValue(fork) == ForkChoice.Rsrc ? MacFork.Resource : MacFork.Data, result.GetValue(maxBytes), result.GetValue(json)));
+            return command;
+        }
+
+        internal enum KindChoice
+        {
+            Folder,
+            File,
+            Container,
+        }
+
+        private Command FindCommand()
+        {
+            var path = MacPathArgument();
+            var json = JsonOption();
+            var name = new Option<string>("--name") { Description = "A name pattern: * any characters, ? one; case ignored as HFS ignores it" };
+            var type = FourCCOption("--type", "The file type");
+            var creator = FourCCOption("--creator", "The file creator");
+            var kind = new Option<KindChoice?>("--kind") { Description = "Folders, files or containers only" };
+            var resourceType = FourCCOption("--resource-type", "Files whose resource fork holds this type");
+            var contains = new Option<string>("--contains") { Description = "Files either of whose forks holds this text (Mac OS Roman)" };
+            var containsHex = new Option<string>("--contains-hex") { Description = "Files either of whose forks holds these bytes (hex, spaces allowed)" };
+            containsHex.Validators.Add(r =>
+            {
+                if (r.GetValueOrDefault<string>() is { } text && !TryHex(text, out _))
+                {
+                    r.AddError($"'{text}' is not hex.");
+                }
+            });
+            var maxDepth = new Option<int>("--max-depth") { Description = "How many levels of containers are entered", DefaultValueFactory = _ => 8 };
+            var limit = new Option<int>("--limit") { Description = "The most matches listed", DefaultValueFactory = _ => 1000 };
+            var command = new Command("find", "Find folders and files below a Mac path, through containers")
+            {
+                path, json, name, type, creator, kind, resourceType, contains, containsHex, maxDepth, limit,
+            };
+            command.SetAction(result =>
+            {
+                FourCC? Code(Option<string> option) => result.GetValue(option) is { } text && FourCC.TryParse(text, out var code) ? code : null;
+                byte[]? needle = result.GetValue(contains) is { } c ? MacRoman.Encode(c)
+                    : result.GetValue(containsHex) is { } h && TryHex(h, out var bytes) ? bytes : null;
+                var query = new MacFindQuery
+                {
+                    Name = result.GetValue(name),
+                    Type = Code(type),
+                    Creator = Code(creator),
+                    Kind = result.GetValue(kind) switch
+                    {
+                        KindChoice.Folder => MacPathKind.Folder,
+                        KindChoice.File => MacPathKind.File,
+                        KindChoice.Container => MacPathKind.Container,
+                        _ => null,
+                    },
+                    ResourceType = Code(resourceType),
+                    Contains = needle,
+                    MaxDepth = result.GetValue(maxDepth),
+                };
+                return Paths(result).Find(result.GetRequiredValue(path), query, result.GetValue(limit), result.GetValue(json));
+            });
+            return command;
+        }
+
+        private static Option<string> FourCCOption(string name, string description)
+        {
+            var option = new Option<string>(name) { Description = description + " (four characters, or \\xHH escapes)" };
+            option.Validators.Add(r =>
+            {
+                if (r.GetValueOrDefault<string>() is { } text && !FourCC.TryParse(text, out _))
+                {
+                    r.AddError($"'{text}' is not a four-character code.");
+                }
+            });
+            return option;
+        }
+
+        private static bool TryHex(string text, out byte[] bytes)
+        {
+            bytes = [];
+            var digits = string.Concat(text.Where(c => !char.IsWhiteSpace(c)));
+            if (digits.Length == 0 || digits.Length % 2 != 0 || !digits.All(char.IsAsciiHexDigit))
+            {
+                return false;
+            }
+
+            bytes = Convert.FromHexString(digits);
+            return true;
+        }
+
+        internal enum GetFormatChoice
+        {
+            AppleDouble,
+            Basilisk,
+            MacBinary,
+            Raw,
+        }
+
+        private Command GetCommand()
+        {
+            var path = MacPathArgument();
+            var json = JsonOption();
+            var outputDir = new Option<DirectoryInfo>("--output", "-o") { Description = "The host folder written to (default: the current folder)" };
+            var format = new Option<GetFormatChoice>("--as")
+            {
+                Description = "How a file is written: an AppleDouble pair, Basilisk II folders, a MacBinary III file, or the forks raw (.rsrc)",
+                DefaultValueFactory = _ => GetFormatChoice.AppleDouble,
+            };
+            var overwrite = new Option<bool>("--overwrite") { Description = "Replace existing files" };
+            var enter = new Option<bool>("--enter") { Description = "Write a container's contents as a folder instead of the container file" };
+            var command = new Command("get", "Copy a file (both forks), folder or resource from a Mac path to the host") { path, json, outputDir, format, overwrite, enter };
+            command.SetAction(result => Paths(result).Get(result.GetRequiredValue(path), result.GetValue(outputDir)?.FullName ?? Directory.GetCurrentDirectory(),
+                result.GetValue(format) switch
+                {
+                    GetFormatChoice.Basilisk => MacGetFormat.Basilisk,
+                    GetFormatChoice.MacBinary => MacGetFormat.MacBinary,
+                    GetFormatChoice.Raw => MacGetFormat.Raw,
+                    _ => MacGetFormat.AppleDouble,
+                }, result.GetValue(overwrite), result.GetValue(enter), result.GetValue(json)));
             return command;
         }
 

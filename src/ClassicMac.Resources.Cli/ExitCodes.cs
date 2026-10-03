@@ -18,6 +18,9 @@ namespace ClassicMac.Resources.Cli
         /// <summary>Reading the input or writing the output failed at the file-system level.</summary>
         public const int IoError = 4;
 
+        /// <summary>A Mac path names nothing, or starts with no host file.</summary>
+        public const int NotFound = 5;
+
         /// <summary>The command is specified but not built yet.</summary>
         public const int NotImplemented = 70;
     }

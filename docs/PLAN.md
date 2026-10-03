@@ -231,12 +231,18 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 | `convert <input>` | Every DOCMaker and SimpleText document inside the input as an HTML folder; a folder per document when there are several (built) | `-o <dir>`, `--overwrite`, `--screen-depth` | 3 |
 | `disasm <input>` | The code of every Mac file inside the input: a listing (`.s`) per 68k segment, code resource and fragment (the data fork's included) and `code.json`; a folder per file when several have code (built; [disassembly.md](formats/output/disassembly.md)) | `-o <dir>`, `--cpu 68k\|ppc\|both`, `--overwrite` | 11 |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest (built; changed decoded files wait for encoders) | `-o <file>`, `--base <file>`, `--data <file>`, `--allow-deletes`, `--overwrite`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
+| `ls <path>` | What a Mac path holds: files and folders (through containers), a fork's types, a type's resources (built; [cli.md](cli.md) §2.1) | `--json` | — |
+| `stat <path>` | Kind, type/creator and Finder kind, forks, dates, flags, how it was read (built; §2.2) | `--json` | — |
+| `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--json` | — |
+| `find <path>` | Folders and files below a path, through containers (built; §2.4) | `--name`, `--type`, `--creator`, `--kind`, `--resource-type`, `--contains`, `--contains-hex`, `--max-depth`, `--limit`, `--json` | — |
+| `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--json` | — |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`
   onto `ContainerReadOptions` (sizes in bytes or KiB/MiB/GiB), defaults taken from each record's `Default`;
   `--strict` makes warnings fail; `-q` prints errors only. The CLI references Files and Resources.
 - **Exit codes:** 0 success (warnings printed); 1 part of the input could not be read (or warnings with `--strict`);
-  2 usage error; 3 input not recognised or unusable; 4 file-system error; 70 command not built yet.
+  2 usage error; 3 input not recognised or unusable; 4 file-system error; 5 a Mac path names nothing (or starts with no
+  host file); 70 command not built yet.
 - **Output:** results to stdout, diagnostics to stderr, so `list --format json` can be piped.
 
 **File commands, shell and MCP (planned, decided 2026-10-03).** One command core in the library, three front ends:
@@ -245,7 +251,8 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
    (`Mac OS 9.hfv:System Folder:Finder`, an archive inside a disk inside a disk image): `ls`, `stat`, `cat` (text,
    hex, or a resource decoded as JSON), `find` (by name, type/creator, kind, resource type, content), `get` (extract),
    `put`/`add`, `rm`, `mkdir`, `save-as`. The paths are built: `MacPathTree` and `MacPaths` (syntax in
-   [cli.md](cli.md) §1). Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
+   [cli.md](cli.md) §1), and so are the read operations (`MacCommands`: ls, stat, cat's bytes, find, get) with their
+   CLI subcommands and `--json` (§2). Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
    in the app moves into the library). The original is never changed unless `--in-place`; otherwise writes go to a
    new file. `--dry-run` on every write. The write side is built: `InputEditSession` (`ClassicMac.Files.Editing`) on
    an opened input (a plain HFS image: add file, add folder, delete, recursive delete, rename, type/creator/flags,

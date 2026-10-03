@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- CLI: file commands on Mac paths (docs/cli.md §2), through disk images and archives: `ls` (files and folders,
+  empty ones too, with kind, type/creator, sizes, dates and flags; a fork's types, a type's resources), `stat` (all of
+  it with the Finder kind and its source and how the entry was read), `cat` (text as UTF-8 from Mac OS Roman, `--hex`,
+  `--raw` bytes, `--fork rsrc`, a resource decoded as JSON or text, `--max-bytes`), `find` (name pattern, type,
+  creator, kind, resource type, `--contains` text or hex, `--max-depth`, `--limit`) and `get` (a file with both forks
+  as AppleDouble, Basilisk II, MacBinary or raw forks, a folder, a container's contents with `--enter`, or a
+  resource). Each takes `--json` with a documented schema; exit code 5 when a path names nothing. The operations are
+  the library's `MacCommands` (`ClassicMac.Files.Commands`), for the MCP server and the shell to come.
 - CLI: write commands on Mac paths (docs/cli.md §3): `put` (a host file into a volume), `mkdir`, `rm` (`-r` for a
   folder with contents), `rename`, `set` (type, creator, Finder flags), `res-add` and `res-rm`, each with `--dry-run`,
   `--json`, and `-o <new file>` or `--in-place` (keeping `.orig`); plain HFS images and single Mac files are written,

@@ -16,6 +16,8 @@
   <ItemGroup>
     <Compile Include="..\Shared\CorpusFolders.cs" Link="Shared\CorpusFolders.cs" />
     <Compile Include="..\ClassicMac.Files.Tests\HfsBuilder.cs" Link="Builders\HfsBuilder.cs" />
+    <Compile Include="..\ClassicMac.Files.Tests\Fixtures.cs" Link="Builders\Fixtures.cs" />
+    <Compile Include="..\ClassicMac.Files.Tests\MacPathFixtures.cs" Link="Builders\MacPathFixtures.cs" />
     <Compile Include="..\ClassicMac.Files.Tests\NdifBuilder.cs" Link="Builders\NdifBuilder.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\DocumentFixtures.cs" Link="Builders\DocumentFixtures.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\MacWordFixtures.cs" Link="Builders\MacWordFixtures.cs" />

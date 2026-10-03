@@ -53,6 +53,150 @@ the type), or bare as its four characters (`TEXT`); below the type, a resource i
 | `…:Finder:#rsrc:'snd '` | its `'snd '` resources |
 | `…:Finder:#rsrc:'snd ':128` | `'snd '` 128 |
 
+The library's `MacPathTree` reads the forks of the entries listed in a container; empty folders come from an HFS
+volume's catalog (its folder records), so they list too.
+
+## 2. Read commands
+
+Each takes a Mac path (§1). Results go to standard output, diagnostics to standard error; `--json` writes one JSON
+object (§2.6). The limit options of every command (`--max-resource-size`, `--max-nesting-depth`,
+`--max-expanded-bytes`, `--strict`, `-q`) apply.
+
+| Exit code | When |
+| --- | --- |
+| 0 | Done (warnings printed) |
+| 1 | Part of the input could not be read (or warnings with `--strict`) |
+| 2 | The command line is wrong, or the entry has nothing for the command (`cat` of a folder) |
+| 4 | Reading or writing a host file failed (`get` onto a file that exists, without `--overwrite`) |
+| 5 | The path names nothing, or starts with no host file |
+
+### 2.1 ls
+
+`classicmac ls <path> [--json]` lists what the path holds: a container's or folder's files and folders, a fork's types,
+a type's resources; a file or resource lists itself. Text: one line each, kind, type and creator, data fork size (or a
+count), resource fork size, modified, name.
+
+```
+$ classicmac ls "Mac OS 9.hfv:System Folder"
+folder                         -          -  2001-02-28 10:04:12  Appearance
+file          FNDR MACS     614400     501242  2000-11-03 09:00:00  Finder
+container     rohd ddsk    1474560          0  1999-07-15 12:00:00  Disk Tools.img
+```
+
+### 2.2 stat
+
+`classicmac stat <path> [--json]`: everything about the entry: its kind, type and creator, the Finder's kind with
+where the name came from ([finder.md](formats/resources/finder.md)), the forks' sizes, dates, Finder flags, locked, how
+many entries it holds, a resource's type, ID, name and attributes, a fork's source, and the chain of formats it was read
+through from the host file.
+
+```
+$ classicmac stat "disk.img:Inner.img:Deep:Note"
+Path: /data/disk.img:Inner.img:Deep:Note
+Kind: file
+Type / creator: 'TEXT' / 'ttxt'
+Finder kind: SimpleText text document (ClassicMac's list)
+Data fork: 9 bytes
+Resource fork: 0 bytes
+Finder flags: $0100 (inited)
+Read as: disk.img (host file) > disk.img (HFS volume) > Inner.img (HFS volume)
+```
+
+### 2.3 cat
+
+`classicmac cat <path> [--hex] [--raw] [--fork data|rsrc] [--max-bytes <size>] [--json]`:
+
+- A file: its data fork as text, Mac OS Roman decoded to UTF-8 and CR made LF; `--fork rsrc` the resource fork (as a hex
+  dump).
+- A resource: decoded by the built-in decoders, as JSON (`'vers'`, `'STR#'`, `'MENU'`…) or text (`'STR '`, `'TEXT'`);
+  anything else (a picture, a sound) as a hex dump (use `get` or `extract` for the decoded files).
+- `--hex`: a hex dump (offset, 16 bytes, the bytes as Mac OS Roman). `--raw`: the bytes themselves to standard output (not
+  with `--json` or `--hex`).
+- `--max-bytes` (default 16 MiB): only the first bytes are shown, and standard error says so.
+- A folder or a type has nothing to show (exit 2).
+
+### 2.4 find
+
+`classicmac find <path> [--name <pattern>] [--type T] [--creator C] [--kind folder|file|container] [--resource-type T]
+[--contains <text>] [--contains-hex <hex>] [--max-depth <n>] [--limit <n>] [--json]` lists the folders, files and
+containers below the path that match every criterion, depth first. `--name` is a pattern (`*` any characters, `?` one;
+case ignored as HFS ignores it); `--contains` looks for Mac OS Roman text in either fork (forks up to 64 MiB);
+`--max-depth` (default 8) is how many levels of containers are entered; `--limit` (default 1000) the most matches
+listed. Text: one path per line.
+
+### 2.5 get
+
+`classicmac get <path> [-o <dir>] [--as appledouble|basilisk|macbinary|raw] [--enter] [--overwrite] [--json]` copies
+to a host folder (default: the current one) and lists the files written:
+
+- a file or container: as an AppleDouble pair (default), Basilisk II folders, a MacBinary III `.bin`, or its forks raw
+  (the data fork, and the resource fork as `.rsrc`); `--enter` writes a container's contents as a folder instead;
+- a folder: a host folder of its files and folders;
+- a resource: its data (decompressed) as `TYPE_ID.bin`.
+
+Names the host does not allow have those characters replaced by `_`.
+
+### 2.6 JSON
+
+Names are camelCase, as the write commands' (§3.3); a fact that does not apply is left out (never null). Every object
+starts with `input` (the host file) and `path` (the entry's Mac path inside it, empty for the host file itself). Dates are the Mac's local time, as stored,
+without a zone: `"1999-01-24T05:20:00"`. Sizes are bytes.
+
+**An entry** (the elements of `ls` and `find`, and `stat`'s object):
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `name` | string | |
+| `path` | string | The Mac path inside the input, without the host file (`System Folder:Finder`), as §3.3 names paths |
+| `kind` | string | `folder`, `file`, `container`, `resource-fork`, `resource-type` or `resource` |
+| `type`, `creator` | string | Four characters (a resource: its type) |
+| `dataSize`, `resourceSize` | number | A file's forks; a resource's data (decompressed); a fork's size |
+| `created`, `modified` | string | |
+| `flags` | number | The Finder flags word |
+| `flagNames` | string[] | `onDesk`, `shared`, `noInits`, `inited`, `customIcon`, `stationery`, `nameLocked`, `hasBundle`, `invisible`, `alias` |
+| `locked` | true | Only when locked |
+| `format` | string | A container: what it holds (`HFS volume`, `MacBinary II`…) |
+| `count` | number | A fork's types, a type's resources (`stat`: a folder's or container's entries) |
+| `resourceType`, `resourceId`, `resourceName` | string, number, string | A resource; `resourceType` also for a type |
+
+```json
+$ classicmac ls "disk.img:System Folder" --json
+{
+  "input": "/data/disk.img",
+  "path": "System Folder",
+  "entries": [
+    {
+      "name": "Finder",
+      "path": "System Folder:Finder",
+      "kind": "file",
+      "type": "FNDR",
+      "creator": "MACS",
+      "dataSize": 6,
+      "resourceSize": 350,
+      "flags": 24576,
+      "flagNames": [ "hasBundle", "invisible" ]
+    }
+  ]
+}
+```
+
+**stat** is an entry with `input`, and adds `kindName` and `kindSource` (a file's Finder kind, [finder.md](formats/resources/finder.md)), `chain`
+(`[{ "name", "format" }]`, from the host file down), `resourceForkSource` (a fork: `ResourceFork`, `AppleDouble`,
+`DataFork`…) and `resourceAttributes` (a resource).
+
+**cat**: `{ "input", "path", "encoding", "truncated", … }` with `encoding` `text` and `text` (a string), `hex` and `hex` (the
+bytes as hex digits) with `size` (the whole size), or `json` and `json` (the decoder's JSON, as it is).
+
+**ls**: `{ "input", "path", "entries": [entry…] }`.
+
+**find**: `{ "input", "path", "matches": [entry…], "truncated" }` (`truncated`: more matched than `--limit`).
+
+**get**: `{ "input", "path", "written": [host path…] }` (`written` as in §3.3).
+
+The library behind them is `MacCommands` (`ClassicMac.Files.Commands`): `List`, `Stat`, `Info`, `Chain`, `ReadBytes`,
+`Text`, `Hex`, `Find` (with `MacFindQuery`), `Matches` and `Get` (with `MacGetFormat`), returning `MacEntryInfo`
+records; the MCP server's read tools use the same.
+
 ## 3. Write commands
 
 Each write command changes one thing on a Mac path, through the library's `InputEditSession`

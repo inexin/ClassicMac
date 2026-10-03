@@ -185,6 +185,12 @@ namespace ClassicMac.Files
         // A container's read contents (past a wrapper of one container); set when it is first entered.
         internal ContainerNode? Contents { get; set; }
 
+        // A container's volume folder records, once read.
+        internal IReadOnlyList<MacFolder>? Folders { get; set; }
+
+        /// <summary>For a folder, the volume's record of it (its dates and Finder info), when the volume keeps folder records.</summary>
+        public MacFolder? Folder { get; internal init; }
+
         // The name of the container a wrapper holds, which a path may give or leave out.
         internal string? WrappedName { get; set; }
 
@@ -409,15 +415,51 @@ namespace ClassicMac.Files
                 else if (folders.Add(path[folder.Count]))
                 {
                     var name = child.File.UnicodeFolderPath is { } unicode && unicode.Count == path.Count ? unicode[folder.Count] : path[folder.Count].ToMacRoman();
-                    entries.Add(new MacPathEntry(MacPathKind.Folder, name, parent.Path + ":" + MacPaths.Escape(name), parent)
-                    {
-                        Holder = holder,
-                        FolderPath = [.. folder, path[folder.Count]],
-                    });
+                    entries.Add(FolderEntry(parent, holder, name, [.. folder, path[folder.Count]]));
                 }
             }
 
+            // The folders the volume's catalog records that hold no files (an empty folder has no file to show it).
+            foreach (var record in FoldersOf(holder).Where(f => !f.IsRoot && f.FolderPath.SequenceEqual(folder) && !folders.Contains(f.Name)))
+            {
+                folders.Add(record.Name);
+                entries.Add(FolderEntry(parent, holder, record.Name.ToMacRoman(), record.Path));
+            }
+
             return entries;
+        }
+
+        private MacPathEntry FolderEntry(MacPathEntry parent, MacPathEntry holder, string name, IReadOnlyList<MacString> path) =>
+            new(MacPathKind.Folder, name, parent.Path + ":" + MacPaths.Escape(name), parent)
+            {
+                Holder = holder,
+                FolderPath = path,
+                Folder = FoldersOf(holder).FirstOrDefault(f => !f.IsRoot && f.Path.SequenceEqual(path)),
+            };
+
+        // An HFS volume's folder records (names, dates, Finder info), read once per volume; none for other containers.
+        private IReadOnlyList<MacFolder> FoldersOf(MacPathEntry holder)
+        {
+            if (holder.Folders is { } read)
+            {
+                return read;
+            }
+
+            var contents = holder.Contents!;
+            IReadOnlyList<MacFolder> folders = [];
+            if (contents.Children.FirstOrDefault()?.Format == HfsReader.Instance.FormatName || contents.Children.Count == 0 && holder.Format == HfsReader.Instance.FormatName)
+            {
+                try
+                {
+                    folders = HfsReader.Instance.ReadFolders(contents.File.DataFork, context.For(null, () => []));
+                }
+                catch (Exception e) when (e is InvalidDataException or EndOfStreamException or IOException)
+                {
+                    folders = [];
+                }
+            }
+
+            return holder.Folders = folders;
         }
 
         // A file's resource fork entry, made once; null when it has none.
