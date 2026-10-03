@@ -1013,6 +1013,14 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   temporary files, JavaScript off) and turns links to the disk's files into tree selections; `help:`, AppleScript and
   outside links are not followed. Without an engine the page shows as its source. The CLI leaves help pages as the
   files they are.
+- [ ] **Documents previewed through their HTML export** (decided 2026-10-03): DOCMaker, SimpleText and Word documents
+  are previewed by showing the HTML that `convert` writes (`HtmlDocuments`, a page per chapter, pictures as PNG) in the
+  NativeWebView the help pages use, served the same way (self-contained pages, no scripts; chapter links and
+  "next/previous/back" pictures navigate within the document), so the preview and the export are one layout. The app's
+  own document layout (`DocumentFlow` in the app, the document view's text and picture rows) is then removed. Single
+  `TEXT` + `styl` resources keep the native styled-text view. Without a web engine the preview falls back to plain text
+  with a message. Document screenshot baselines go (a web view cannot be captured headless); tests cover the HTML and
+  the navigation instead.
 - [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
   then character and paragraph styles. `WDBN` Word 4 and 5 (built: [word-mac.md](formats/documents/word-mac.md); no
   specification was found, so the layout is fitted to the one real document, a fast-saved Word 5 file, with libmwaw as
