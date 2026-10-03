@@ -641,9 +641,15 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - After the edit, the writer reopens the result with the reader and validates both B-trees again (index graph, links,
   node maps, counts, key order). For a fork replaced, it compares the file's metadata and both its forks, and checks
   every other file without reading its forks: the result passes the checks made before an edit, every other catalog
-  record and extents overflow record is byte for byte the source's, and every allocated block outside the edited file
-  and the B-tree files is the source's. Any structural diagnostic or difference fails the operation. The source is read
-  in place when it is already in memory, and the copy to edit is made only when something is written.
+  record and extents overflow record is byte for byte the source's, and every sector the edit wrote lies in the MDB,
+  the alternate MDB, the bitmap, the B-tree files or the edited fork's blocks. Any structural diagnostic or difference
+  fails the operation.
+- Edits are made on an `HfsVolume`: the volume as read (from the file, a partition, a Disk Copy disk or a decoded NDIF
+  disk) and the 512-byte sectors written over it, so an edit holds only what it changes. The edit session saves a
+  volume by copying the input to a temporary file beside the destination, writing the changed sectors into it (a Disk
+  Copy 4.2 image's data checksum made again), reading it back (the checks made before an edit, every changed sector
+  compared) and moving it into place. Save in place keeps the original as `.orig` the first time and refuses an input
+  another program has open. A resized volume is held and saved whole.
 - A deletion (`Delete`, `DeleteFile`) removes a file, or a folder with everything below it, in one pass: every fork's
   blocks (overflow extents included) are freed and their overflow records removed, the records and threads removed,
   and the counts changed once. It is then checked without reading any fork: the result passes the checks made before

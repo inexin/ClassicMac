@@ -105,6 +105,17 @@ namespace ClassicMac.Files.Hfs
 
         private static void CheckSum(ForkData data, int skip, uint stored, string what, ContainerContext context)
         {
+            var sum = Sum(data, skip);
+            if (sum != stored)
+            {
+                context.Report(DiagnosticSeverity.Warning, "diskcopy.checksum",
+                    $"The {what} checksum is ${stored:X8} but the image gives ${sum:X8}.");
+            }
+        }
+
+        // The note's checksum over a fork, read in pieces (a whole disk is never held at once); bytes before skip are left out.
+        internal static uint Sum(ForkData data, int skip = 0)
+        {
             using var stream = data.Open();
             var buffer = new byte[65536];
             uint sum = 0;
@@ -123,11 +134,8 @@ namespace ClassicMac.Files.Hfs
                 }
                 position += read;
             }
-            if (sum != stored)
-            {
-                context.Report(DiagnosticSeverity.Warning, "diskcopy.checksum",
-                    $"The {what} checksum is ${stored:X8} but the image gives ${sum:X8}.");
-            }
+
+            return sum;
         }
     }
 }

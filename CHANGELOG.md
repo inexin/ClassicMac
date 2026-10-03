@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS edits hold only the sectors they change (`HfsVolume`): an edit session on a 500 MB volume peaks at 100 MB instead
+  of 2.6 GB, and saving copies the input by streaming and writes the changed sectors (Save As 0.44 s); Save in place refuses
+  an image another program has open (hfs.md §5.5).
 - CLI: the shell and the MCP server read a volume's changes from memory instead of writing a working copy after each
   (a 4-deletion session on a 500 MB volume, saved, 10 s instead of 14 s); a dry run sees the changes made before it (cli.md §4.2).
 - CLI: `check` checks the input's own structures by default and counts the archives and disk images stored in it without

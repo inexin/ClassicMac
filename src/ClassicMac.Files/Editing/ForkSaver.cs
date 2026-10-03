@@ -337,30 +337,37 @@ namespace ClassicMac.Files.Editing
         public static byte[] ApplyHfsForks(byte[] volume, IReadOnlyList<HfsForkReplacement> forks)
         {
             ArgumentNullException.ThrowIfNull(volume);
+            return ApplyHfsForks(new HfsVolume(ForkData.FromBytes(volume)), forks).ToArray();
+        }
+
+        // The volume with each fork replaced (a fork of it: the volume itself is left as it was), read back and compared.
+        internal static HfsVolume ApplyHfsForks(HfsVolume volume, IReadOnlyList<HfsForkReplacement> forks)
+        {
+            ArgumentNullException.ThrowIfNull(volume);
             ArgumentNullException.ThrowIfNull(forks);
-            var image = volume.ToArray();
+            var image = volume;
             var written = new List<(string MacPath, HfsFork Kind, byte[] Data)>();
             foreach (var replacement in forks)
             {
                 var kind = replacement.ForkInDataFork ? HfsFork.Data : HfsFork.Resource;
                 var data = replacement.Fork.ToArray();
-                image = HfsWriter.ReplaceFork(ForkData.FromBytes(image), replacement.MacPath, kind, data);
+                image = HfsWriter.ReplaceFork(image, replacement.MacPath, kind, data);
                 written.Add((replacement.MacPath, kind, data));
             }
 
-            VerifyHfsForks(image, written);
+            VerifyHfsForks(image.AsForkData(), written);
             return image;
         }
 
         // Reads the written volume back and compares each replaced fork (HfsWriter checks the volume's own structures).
-        private static void VerifyHfsForks(byte[] image, List<(string MacPath, HfsFork Kind, byte[] Data)> written)
+        private static void VerifyHfsForks(ForkData image, List<(string MacPath, HfsFork Kind, byte[] Data)> written)
         {
             if (written.Count == 0)
             {
                 return;
             }
 
-            var files = HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext());
+            var files = HfsReader.Instance.Read(image, new ContainerContext());
             var found = new List<string>();
             foreach (var (macPath, kind, data) in written)
             {

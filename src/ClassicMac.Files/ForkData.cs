@@ -65,6 +65,22 @@ namespace ClassicMac.Files
             }
         }
 
+        /// <summary>
+        /// <paramref name="whole"/> read with the bytes from <paramref name="offset"/> replaced by <paramref name="part"/>'s,
+        /// with nothing copied (an edited volume put back in its partition or disk image).
+        /// </summary>
+        internal static ForkData Splice(ForkData whole, long offset, ForkData part)
+        {
+            ArgumentNullException.ThrowIfNull(whole);
+            ArgumentNullException.ThrowIfNull(part);
+            if (offset < 0 || offset > whole.Length - part.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset), $"{offset}+{part.Length} lies outside the {whole.Length}-byte fork.");
+            }
+
+            return new SplicedForkData(whole, offset, part);
+        }
+
         /// <summary>A range of this fork, opened through it; no bytes are copied.</summary>
         public virtual ForkData Slice(long offset, long length)
         {
@@ -304,6 +320,68 @@ namespace ClassicMac.Files
                     OpenFiles.TryRemove(this, out _);
                 }
             }
+        }
+
+        private sealed class SplicedForkData(ForkData whole, long offset, ForkData part) : ForkData
+        {
+            public override long Length => whole.Length;
+
+            public override Stream Open() => new ReadAtStream(this);
+
+            protected override void ReadAtCore(long start, Span<byte> buffer)
+            {
+                whole.ReadAtCore(start, buffer);
+                long from = Math.Max(start, offset), to = Math.Min(start + buffer.Length, offset + part.Length);
+                if (from < to)
+                {
+                    part.ReadAtCore(from - offset, buffer.Slice((int)(from - start), (int)(to - from)));
+                }
+            }
+        }
+
+        // A read-only, seekable stream over a fork's ReadAt.
+        private sealed class ReadAtStream(ForkData fork) : Stream
+        {
+            private long position;
+
+            public override bool CanRead => true;
+
+            public override bool CanSeek => true;
+
+            public override bool CanWrite => false;
+
+            public override long Length => fork.Length;
+
+            public override long Position
+            {
+                get => position;
+                set => position = value;
+            }
+
+            public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+            public override int Read(Span<byte> buffer)
+            {
+                var count = (int)Math.Max(0, Math.Min(buffer.Length, Length - position));
+                fork.ReadAtCore(position, buffer[..count]);
+                position += count;
+                return count;
+            }
+
+            public override long Seek(long offset, SeekOrigin origin) => position = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => position + offset,
+                _ => Length + offset,
+            };
+
+            public override void Flush()
+            {
+            }
+
+            public override void SetLength(long value) => throw new NotSupportedException();
+
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         }
 
         private sealed class SliceForkData(ForkData parent, long offset, long length) : ForkData

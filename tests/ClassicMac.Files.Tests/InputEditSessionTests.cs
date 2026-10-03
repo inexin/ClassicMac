@@ -166,6 +166,45 @@ public sealed class InputEditSessionTests : IDisposable
         Assert.Equal(("resize", "", "to 4,194,304 bytes"), (session.Changes[0].Action, session.Changes[0].Path, session.Changes[0].Detail));
     }
 
+    // Save in place swaps a verified copy over the input; an input another program has open (a mounted image) is refused
+    // and left as it was.
+    [Fact]
+    public void Save_in_place_refuses_an_input_another_program_has_open()
+    {
+        var path = Volume();
+        var original = File.ReadAllBytes(path);
+        var session = InputEditSession.Open(path);
+        session.AddFolder("Docs:New");
+
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))      // open in another program
+        {
+            var error = Assert.Throws<IOException>(session.SaveInPlace);
+            Assert.Contains("open in another program", error.Message);
+        }
+
+        Assert.Equal(original, File.ReadAllBytes(path));
+        session.SaveInPlace();
+        Assert.Contains(Folders(path), f => f.MacPath == "Docs:New");
+        Assert.Equal(original, File.ReadAllBytes(path + ".orig"));
+    }
+
+    // Edits hold only the sectors they change: the session's changes are sectors over the input, and Save As writes the
+    // input's bytes with those sectors.
+    [Fact]
+    public void A_session_holds_only_the_sectors_it_changes()
+    {
+        var path = Volume();
+        var session = InputEditSession.Open(path);
+
+        session.Delete("Read Me");
+
+        Assert.InRange(session.ChangedBytes, 1, 64 * 1024);                 // the MDB, bitmap and catalog nodes, not the volume
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+        Assert.Equal(new FileInfo(path).Length, new FileInfo(target).Length);
+        Assert.DoesNotContain(Files(target), f => f.MacPath == "Read Me");
+    }
+
     [Fact]
     public void A_folder_with_contents_is_deleted_only_when_asked()
     {

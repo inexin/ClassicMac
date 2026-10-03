@@ -129,7 +129,7 @@ namespace ClassicMac.App.ViewModels
         internal Task SaveTask { get; private set; } = Task.CompletedTask;
 
         /// <summary>Whether any open file has unsaved edits.</summary>
-        public bool HasUnsavedChanges => Roots.Any(r => r.EditedVolume is not null) || Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
+        public bool HasUnsavedChanges => Roots.Any(r => r.HasVolumeChanges) || Roots.SelectMany(EditedFiles).Any(e => e.State.Session.IsDirty);
 
         // The file node (a FileNode, or an input read as a fork) that the node belongs to, when its resources are loaded.
         private static NodeViewModel? FileOwner(NodeViewModel? node)
@@ -791,7 +791,7 @@ namespace ClassicMac.App.ViewModels
 
             try
             {
-                var volumeChanged = input.EditedVolume is not null;
+                var volumeChanged = input.HasVolumeChanges;
                 var written = await Task.Run(() => input.VolumeSession.SaveAs(path, forks));
                 Status = $"Saved HFS image {written[0]} ({forks.Count} fork{(forks.Count == 1 ? "" : "s")}{(volumeChanged ? ", files and folders" : "")} changed).";
             }
@@ -802,7 +802,7 @@ namespace ClassicMac.App.ViewModels
             }
         }
 
-        private bool CanRevert() => SelectedState is { Session.IsDirty: true } || Selected?.Input.EditedVolume is not null;
+        private bool CanRevert() => SelectedState is { Session.IsDirty: true } || Selected?.Input.HasVolumeChanges == true;
 
         /// <summary>Revert: the input read again from disk, discarding its edits.</summary>
         [RelayCommand(CanExecute = nameof(CanRevert))]
@@ -840,7 +840,7 @@ namespace ClassicMac.App.ViewModels
                 return false;
             }
 
-            foreach (var input in inputs.Where(i => i.EditedVolume is not null))
+            foreach (var input in inputs.Where(i => i.HasVolumeChanges))
             {
                 var choice = EditDialogs is null ? SaveChanges.Discard : await EditDialogs.AskSaveChangesAsync(input.BaseTitle, "Files and folders were created or deleted.");
                 if (choice == SaveChanges.Cancel)

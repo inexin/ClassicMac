@@ -47,7 +47,8 @@ namespace ClassicMac.Files.Editing
         private readonly SaveLocation? location;
         private readonly SaveAsFormat singleFormat;
         private readonly bool forkInDataFork;
-        private byte[]? volume;
+        private HfsVolume? overlay;
+        private bool resized;
         private readonly MacPartition? partition;
         private readonly HfsImageRegion? region;
         private readonly MacFile? ndif;
@@ -161,8 +162,18 @@ namespace ClassicMac.Files.Editing
         /// <summary>Whether anything has changed.</summary>
         public bool HasChanges => changes.Count > 0;
 
-        /// <summary>A volume's image with the item changes made so far (the input's own bytes before any; for a partitioned disk, its HFS partition's).</summary>
-        public byte[] Volume => volume ??= Kind == InputEditKind.HfsVolume ? ReadVolume() : throw NotVolume("have a volume image");
+        /// <summary>
+        /// A volume's image with the item changes made so far (the input's own bytes before any; for a partitioned disk, its
+        /// HFS partition's), made whole in memory: the session itself holds only the sectors it changed.
+        /// </summary>
+        public byte[] Volume => Overlay.ToArray();
+
+        /// <summary>How many bytes the session's changes hold (the sectors written over the input's volume).</summary>
+        public long ChangedBytes => (overlay?.Sectors.Count ?? 0) * 512L;
+
+        // The volume as edited: the input's, read where it lies (the file, a partition, a Disk Copy disk, the decoded NDIF
+        // disk), and the sectors written over it.
+        private HfsVolume Overlay => overlay ??= Kind == InputEditKind.HfsVolume ? new HfsVolume(VolumeData()) : throw NotVolume("have a volume image");
 
         /// <summary>For a partitioned disk, the HFS partition edited; null for a plain volume image.</summary>
         public MacPartition? Partition => partition;
@@ -170,15 +181,15 @@ namespace ClassicMac.Files.Editing
         /// <summary>Where the volume lies in the input when it is not the whole file (a partition, a Disk Copy image's disk).</summary>
         public HfsImageRegion? Region => region;
 
-        private byte[] ReadVolume()
+        private ForkData VolumeData()
         {
             if (ndif is not null)
             {
-                return NdifReader.Instance.Read(ndif, new ContainerContext(options)).Single().DataFork.ToArray();
+                return NdifReader.Instance.Read(ndif, new ContainerContext(options)).Single().DataFork;
             }
 
-            // From the host file as read (on disk, or in memory for a session over changes not saved yet).
-            return region is null ? host.File.DataFork.ToArray() : host.File.DataFork.Slice(region.Offset, region.Length).ToArray();
+            // The host file as read (on disk, or in memory for a session over changes not saved yet).
+            return region is null ? host.File.DataFork : host.File.DataFork.Slice(region.Offset, region.Length);
         }
 
         // An HFS volume (signature 'BD') that does not wrap HFS Plus.
@@ -236,7 +247,7 @@ namespace ClassicMac.Files.Editing
             RequireVolume("hold files");
             var data = file.DataFork.ToArray();
             var resource = file.ResourceFork.ToArray();
-            volume = HfsWriter.CreateFile(ForkData.FromBytes(Volume), macPath, data, resource, file.FinderInfo, file.Created, file.Modified);
+            overlay = HfsWriter.CreateFile(Overlay, macPath, data, resource, file.FinderInfo, file.Created, file.Modified);
             changes.Add(new PlannedChange("add", macPath,
                 $"data {data.Length} bytes, resources {resource.Length} bytes, {file.FinderInfo.Type}/{file.FinderInfo.Creator}"));
         }
@@ -245,7 +256,7 @@ namespace ClassicMac.Files.Editing
         public void AddFolder(string macPath)
         {
             RequireVolume("hold folders");
-            volume = HfsWriter.CreateFolder(ForkData.FromBytes(Volume), macPath);
+            overlay = HfsWriter.CreateFolder(Overlay, macPath);
             changes.Add(new PlannedChange("mkdir", macPath, "a new folder"));
         }
 
@@ -257,7 +268,7 @@ namespace ClassicMac.Files.Editing
         {
             ArgumentNullException.ThrowIfNull(macPath);
             RequireVolume("hold files");
-            volume = HfsWriter.Delete(ForkData.FromBytes(Volume), macPath, recursive);
+            overlay = HfsWriter.Delete(Overlay, macPath, recursive);
             foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
             {
                 forks.Remove(key);
@@ -284,7 +295,7 @@ namespace ClassicMac.Files.Editing
                 return;
             }
 
-            volume = HfsWriter.Rename(ForkData.FromBytes(Volume), macPath, newName);
+            overlay = HfsWriter.Rename(Overlay, macPath, newName);
             var parent = macPath.Contains(':') ? macPath[..(macPath.LastIndexOf(':') + 1)] : "";
             var renamed = parent + newName;
             foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
@@ -312,7 +323,9 @@ namespace ClassicMac.Files.Editing
                     : "A Disk Copy image's disk cannot be resized yet.");
             }
 
-            volume = HfsWriter.Resize(ForkData.FromBytes(Volume), size);
+            // Resizing rewrites the volume whole: it is held in memory from here, and saved whole.
+            overlay = new HfsVolume(ForkData.FromBytes(HfsWriter.Resize(Overlay.AsForkData(), size)));
+            resized = true;
             changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"));
         }
 
@@ -321,7 +334,7 @@ namespace ClassicMac.Files.Editing
         {
             ArgumentNullException.ThrowIfNull(macPath);
             RequireVolume("hold files");
-            volume = HfsWriter.SetLocked(ForkData.FromBytes(Volume), macPath, locked);
+            overlay = HfsWriter.SetLocked(Overlay, macPath, locked);
             changes.Add(new PlannedChange(locked ? "lock" : "unlock", macPath, ""));
         }
 
@@ -330,7 +343,7 @@ namespace ClassicMac.Files.Editing
         {
             ArgumentNullException.ThrowIfNull(folderPath);
             RequireVolume("hold folders");
-            volume = HfsWriter.Bless(ForkData.FromBytes(Volume), folderPath);
+            overlay = HfsWriter.Bless(Overlay, folderPath);
             changes.Add(new PlannedChange("bless", folderPath, "as the System Folder"));
         }
 
@@ -343,7 +356,7 @@ namespace ClassicMac.Files.Editing
             ArgumentNullException.ThrowIfNull(macPath);
             ArgumentNullException.ThrowIfNull(folderPath);
             RequireVolume("hold folders");
-            volume = HfsWriter.Move(ForkData.FromBytes(Volume), macPath, folderPath);
+            overlay = HfsWriter.Move(Overlay, macPath, folderPath);
             var name = macPath.Contains(':') ? macPath[(macPath.LastIndexOf(':') + 1)..] : macPath;
             var moved = folderPath.Length == 0 ? name : folderPath + ":" + name;
             foreach (var key in forks.Keys.Where(k => Within(k, macPath)).ToList())
@@ -383,7 +396,7 @@ namespace ClassicMac.Files.Editing
 
             if (FileAt(macPath) is { } file)
             {
-                volume = HfsWriter.SetFinderInfo(ForkData.FromBytes(Volume), macPath, With(file.FinderInfo, type, creator, flags));
+                overlay = HfsWriter.SetFinderInfo(Overlay, macPath, With(file.FinderInfo, type, creator, flags));
             }
             else
             {
@@ -392,7 +405,7 @@ namespace ClassicMac.Files.Editing
                     throw new InvalidOperationException($"{macPath} is a folder: it has no type or creator.");
                 }
 
-                volume = HfsWriter.SetFolderFlags(ForkData.FromBytes(Volume), macPath, flags ?? FinderFlags.None);
+                overlay = HfsWriter.SetFolderFlags(Overlay, macPath, flags ?? FinderFlags.None);
             }
 
             changes.Add(new PlannedChange("set", macPath, detail));
@@ -460,7 +473,7 @@ namespace ClassicMac.Files.Editing
 
         // The file at a path in the volume as edited so far, or null (a folder, or nothing).
         private MacFile? FileAt(string macPath) =>
-            HfsReader.Instance.Read(ForkData.FromBytes(Volume), new ContainerContext(options))
+            HfsReader.Instance.Read(Overlay.AsForkData(), new ContainerContext(options))
                 .FirstOrDefault(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman())) == macPath);
 
         private static bool Within(string key, string macPath) => key == macPath || key.StartsWith(macPath + ":", StringComparison.Ordinal);
@@ -511,7 +524,80 @@ namespace ClassicMac.Files.Editing
                 return ForkSaver.SaveAs(full, singleFormat, image, ResourceForkOf(image));
             }
 
-            return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements(), region)];
+            WriteVolume(full);
+            return [full];
+        }
+
+        // Writes the input with the volume's changes to destination through a temporary file beside it: a streamed copy of
+        // the input with the changed sectors written into it (a resized volume whole), a Disk Copy 4.2 image's checksum
+        // made again; the copy is read back (the writer's checks on its volume, every changed sector compared) and then
+        // moved into place, so destination is never half written.
+        private void WriteVolume(string destination)
+        {
+            var edited = Replacements() is { Count: > 0 } replaced ? ForkSaver.ApplyHfsForks(Overlay, replaced) : Overlay;
+            var temporary = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(destination)!, $".classicmac-{Guid.NewGuid():N}.tmp");
+            long at = region?.Offset ?? 0;
+            try
+            {
+                if (resized)
+                {
+                    File.WriteAllBytes(temporary, edited.ToArray());
+                }
+                else
+                {
+                    File.Copy(Path, temporary);
+                    using var stream = new FileStream(temporary, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                    var sector = new byte[512];
+                    foreach (var number in edited.Sectors.Order())
+                    {
+                        var length = (int)Math.Min(512, edited.Length - number * 512);
+                        edited.Read(number * 512, sector.AsSpan(0, length));
+                        stream.Position = at + number * 512;
+                        stream.Write(sector, 0, length);
+                    }
+
+                    if (region is { DiskCopy42: true })
+                    {
+                        var sum = new BigEndianWriter(4);
+                        sum.WriteUInt32(DiskCopy42Reader.Sum(edited.AsForkData()));
+                        stream.Position = 0x48;
+                        stream.Write(sum.WrittenSpan);
+                    }
+                }
+
+                var written = ForkData.FromFile(temporary);
+                var disk = region is null ? written : written.Slice(region.Offset, region.Length);
+                var fault = HfsWriter.Check(disk);
+                var original = new byte[512];
+                var copy = new byte[512];
+                foreach (var number in resized ? [] : edited.Sectors)
+                {
+                    var length = (int)Math.Min(512, edited.Length - number * 512);
+                    edited.Read(number * 512, original.AsSpan(0, length));
+                    disk.ReadAt(number * 512, copy.AsSpan(0, length));
+                    if (!original.AsSpan(0, length).SequenceEqual(copy.AsSpan(0, length)))
+                    {
+                        fault ??= $"sector {number} reads back differently";
+                    }
+                }
+
+                ForkData.CloseHostFile(temporary);
+                if (fault is not null)
+                {
+                    throw new SaveVerificationException([$"The saved volume did not read back as edited: {fault}"]);
+                }
+
+                ForkData.CloseHostFile(destination);
+                File.Move(temporary, destination, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporary))
+                {
+                    ForkData.CloseHostFile(temporary);
+                    File.Delete(temporary);
+                }
+            }
         }
 
         private IReadOnlyList<HfsForkReplacement> extra = [];
@@ -543,30 +629,28 @@ namespace ClassicMac.Files.Editing
                 return;
             }
 
-            var temporary = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, $".classicmac-{Guid.NewGuid():N}.tmp");
+            // An input another program has open (an image mounted in an emulator) is not replaced.
+            ForkData.CloseHostFile(Path);
             try
             {
-                ForkSaver.SaveHfsImageAs(Path, temporary, volume, Replacements(), region);
-                var backup = Path + ".orig";
-                if (!File.Exists(backup))
-                {
-                    File.Copy(Path, backup);
-                }
-
-                ForkData.CloseHostFile(Path);
-                File.Move(temporary, Path, overwrite: true);
+                using var exclusive = new FileStream(Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
             }
-            finally
+            catch (IOException e)
             {
-                if (File.Exists(temporary))
-                {
-                    File.Delete(temporary);
-                }
+                throw new IOException($"{System.IO.Path.GetFileName(Path)} is open in another program (a mounted disk image?); close it there and save again.", e);
             }
+
+            var backup = Path + ".orig";
+            if (!File.Exists(backup))
+            {
+                File.Copy(Path, backup);
+            }
+
+            WriteVolume(Path);
         }
 
         // The NDIF image made again around the edited disk (its forks' edits made too).
-        private MacFile Rewritten() => NdifWriter.Rewrite(ndif!, ForkSaver.ApplyHfsForks(Volume, Replacements()));
+        private MacFile Rewritten() => NdifWriter.Rewrite(ndif!, ForkSaver.ApplyHfsForks(Overlay, Replacements()).ToArray());
 
         private static ResourceFork ResourceForkOf(MacFile file) => ResourceFork.Read(file.ResourceFork.ToArray());
 
@@ -619,20 +703,21 @@ namespace ClassicMac.Files.Editing
                 return host.File == ndif ? host with { File = Rewritten() } : null;
             }
 
-            var image = Replacements() is { Count: > 0 } replaced ? ForkSaver.ApplyHfsForks(Volume, replaced) : Volume;
+            var edited = (Replacements() is { Count: > 0 } replaced ? ForkSaver.ApplyHfsForks(Overlay, replaced) : Overlay).AsForkData();
             if (region is not null)
             {
-                var whole = host.File.DataFork.ToArray();
-                image.CopyTo(whole.AsSpan((int)region.Offset));
+                var whole = ForkData.Splice(host.File.DataFork, region.Offset, edited);
                 if (region.DiskCopy42)
                 {
-                    new BigEndianWriter(whole).WriteUInt32At(0x48, DiskCopy42Reader.Sum(image));
+                    var sum = new BigEndianWriter(4);
+                    sum.WriteUInt32(DiskCopy42Reader.Sum(edited));
+                    whole = ForkData.Splice(whole, 0x48, ForkData.FromBytes(sum.ToArray()));
                 }
 
-                image = whole;
+                edited = whole;
             }
 
-            return host with { File = host.File with { DataFork = ForkData.FromBytes(image) } };
+            return host with { File = host.File with { DataFork = edited } };
         }
 
         private List<HfsForkReplacement> Replacements() =>

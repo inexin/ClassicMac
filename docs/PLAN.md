@@ -323,7 +323,9 @@ the edited forks, so the writer stops holding whole images:
 - `format` and resize lift the 2 GB limit (streamed writes).
 - Steps, each test-first with every suite and the hfsutils/`fsck_hfs` interop passing: a gated corpus write test first;
   `HfsVolume`; writer reads; writer writes with byte-identical results against today's writer; the session and Save As;
-  Save in place; NDIF; past 2 GB; docs.
+  Save in place; NDIF; past 2 GB; docs. Built: the corpus test, `HfsVolume`, the writer through it, the session and
+  both saves (a 500 MB session peaks at 100 MB instead of 2.6 GB; Save As 0.44 s). Still to do: NDIF's changed chunks
+  from the overlay, `format` and resize past 2 GB, and the shell's per-command tree reopening and alias scan.
 
 **Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB
 Mac OS 9 volume).** Not ordered yet:

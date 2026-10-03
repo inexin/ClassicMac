@@ -73,7 +73,7 @@ namespace ClassicMac.App.ViewModels
         public string? TitleFile => Selected?.Input.BaseTitle;
 
         /// <summary>Whether the selected input has unsaved edits (the title's " •").</summary>
-        public bool TitleUnsaved => Selected?.Input is { } input && (input.EditedVolume is not null || EditedFiles(input).Any(e => e.State.Session.IsDirty));
+        public bool TitleUnsaved => Selected?.Input is { } input && (input.HasVolumeChanges || EditedFiles(input).Any(e => e.State.Session.IsDirty));
 
         /// <summary>The window's title: "Mac OS 9.hfv • — ClassicMac".</summary>
         public string WindowTitle => TitleFile is { } file ? $"{file}{(TitleUnsaved ? " •" : "")} — ClassicMac" : "ClassicMac";

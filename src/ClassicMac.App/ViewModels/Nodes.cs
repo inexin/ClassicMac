@@ -195,7 +195,10 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         public bool IsWritableHfs => VolumeSession.Kind == InputEditKind.HfsVolume;
 
-        /// <summary>The volume with the files and folders created and deleted so far, or null when there are none.</summary>
+        /// <summary>Whether files or folders have been created or deleted in the volume (nothing is read to tell).</summary>
+        public bool HasVolumeChanges => VolumeSession.HasChanges;
+
+        /// <summary>The volume with the files and folders created and deleted so far, made whole in memory; null when there are none.</summary>
         public byte[]? EditedVolume => VolumeSession.HasChanges ? VolumeSession.Volume : null;
 
         /// <summary>
