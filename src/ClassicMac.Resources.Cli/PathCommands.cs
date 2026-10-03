@@ -176,6 +176,7 @@ namespace ClassicMac.Resources.Cli
                 Line("Volume created", volume.Created is { } created ? Date(created.ToDateTime()) : null);
                 Line("Volume modified", volume.Modified is { } modified ? Date(modified.ToDateTime()) + (volume.UtcAfterCreation ? " UTC" : "") : null);
                 Line("Backed up", volume.BackedUp is { } backedUp ? Date(backedUp.ToDateTime()) + (volume.UtcAfterCreation ? " UTC" : "") : null);
+                Line("Blessed folder", info.BlessedFolder ?? (volume.BlessedFolderId is { } blessedId ? $"ID {blessedId} (not found)" : null));
                 Line("Volume locked", volume.SoftwareLocked || volume.HardwareLocked
                     ? string.Join(" and ", new[] { volume.SoftwareLocked ? "by software" : null, volume.HardwareLocked ? "by hardware" : null }.OfType<string>())
                     : null);

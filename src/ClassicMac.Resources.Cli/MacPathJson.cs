@@ -163,6 +163,12 @@ namespace ClassicMac.Resources.Cli
                 Optional(w, "modified", volume.Modified?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
                 Optional(w, "backedUp", volume.BackedUp?.ToDateTime().ToString("s", CultureInfo.InvariantCulture));
                 w.WriteBoolean("utcAfterCreation", volume.UtcAfterCreation);
+                if (volume.BlessedFolderId is { } blessed)
+                {
+                    w.WriteNumber("blessedFolderId", blessed);
+                    Optional(w, "blessedFolder", info.BlessedFolder);
+                }
+
                 w.WriteBoolean("softwareLocked", volume.SoftwareLocked);
                 w.WriteBoolean("hardwareLocked", volume.HardwareLocked);
                 w.WriteEndObject();

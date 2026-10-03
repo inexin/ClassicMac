@@ -89,8 +89,11 @@ namespace ClassicMac.Files.Hfs
                 Folders = mdb.ReadUInt32At(0x58),
                 SoftwareLocked = (attributes & 0x8000) != 0,
                 HardwareLocked = (attributes & 0x0080) != 0,
+                BlessedFolderId = Blessed(mdb.ReadUInt32At(0x5C)),                                  // drFndrInfo[0]
             };
         }
+
+        private static uint? Blessed(uint id) => id == 0 ? null : id;
 
         // A drVN: a length byte and up to 27 Mac OS Roman characters.
         internal static string VolumeName(BigEndianReader mdb, int offset) =>
@@ -110,6 +113,7 @@ namespace ClassicMac.Files.Hfs
                 Folders = header.ReadUInt32At(0x24),
                 SoftwareLocked = (attributes & 0x8000) != 0,
                 HardwareLocked = (attributes & 0x0080) != 0,
+                BlessedFolderId = Blessed(header.ReadUInt32At(0x50)),                               // finderInfo[0]
             };
         }
 

@@ -201,6 +201,24 @@ namespace ClassicMac.Files.Editing
             changes.Add(new PlannedChange("rename", macPath, $"to {newName}"));
         }
 
+        /// <summary>Locks or unlocks a volume's file (an HFS folder has no lock).</summary>
+        public void SetLocked(string macPath, bool locked)
+        {
+            ArgumentNullException.ThrowIfNull(macPath);
+            RequireVolume("hold files");
+            volume = HfsWriter.SetLocked(ForkData.FromBytes(Volume), macPath, locked);
+            changes.Add(new PlannedChange(locked ? "lock" : "unlock", macPath, ""));
+        }
+
+        /// <summary>Blesses a folder holding a System file as the volume's System Folder.</summary>
+        public void Bless(string folderPath)
+        {
+            ArgumentNullException.ThrowIfNull(folderPath);
+            RequireVolume("hold folders");
+            volume = HfsWriter.Bless(ForkData.FromBytes(Volume), folderPath);
+            changes.Add(new PlannedChange("bless", folderPath, "as the System Folder"));
+        }
+
         /// <summary>
         /// Moves the item at <paramref name="macPath"/> into the folder at <paramref name="folderPath"/> (empty: the volume's
         /// top level); resource edits made to it (or in it) follow.

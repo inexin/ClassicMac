@@ -110,6 +110,9 @@ namespace ClassicMac.Files.Commands
 
         /// <summary>For a volume (a container that is an HFS, HFS Plus or MFS volume), its name, space, counts and locks (stat).</summary>
         public VolumeInfo? Volume { get; init; }
+
+        /// <summary>For a volume, its blessed System Folder's path inside it (stat); null when none is blessed or found.</summary>
+        public string? BlessedFolder { get; init; }
     }
 
     /// <summary>Where an alias file points (docs/formats/resources/aliases.md §2) and what resolving it found.</summary>
@@ -194,6 +197,7 @@ namespace ClassicMac.Files.Commands
                 ResourceAttributes = entry.Resource is { } resource ? resource.Attributes.ToString() : null,
                 Alias = AliasOf(tree, entry),
                 Volume = tree.VolumeInfoOf(entry),
+                BlessedFolder = tree.VolumeInfoOf(entry)?.BlessedFolderId is { } blessed ? tree.FolderPathOf(entry, blessed) : null,
             };
         }
 

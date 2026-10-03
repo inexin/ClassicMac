@@ -104,6 +104,18 @@ public sealed class ShellTests : IDisposable
     }
 
     [Fact]
+    public void Lock_and_unlock_change_a_file_s_lock_and_bless_needs_a_System_file()
+    {
+        var output = Path.Combine(folder, "locked.img");
+        var (_, lines, error) = Script(disk, $"lock \"Read Me\"\nlock Docs:Letter\nunlock Docs:Letter\nsave as \"{output}\"\nbless Docs\nexit\n");   // a script stops at its first failure
+
+        Assert.Equal(["lock Read Me", "lock Docs:Letter", "unlock Docs:Letter"], lines.Take(3));
+        Assert.Contains("System file", error);                                                  // Docs holds no System file
+        Assert.True(Files(output).Single(f => f.MacPath == "Read Me").IsLocked);
+        Assert.False(Files(output).Single(f => f.MacPath == "Docs:Letter").IsLocked);
+    }
+
+    [Fact]
     public void Changes_stay_in_the_session_until_saved_as()
     {
         var before = File.ReadAllBytes(disk);

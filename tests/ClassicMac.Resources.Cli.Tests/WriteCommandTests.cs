@@ -116,6 +116,34 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void Lock_unlock_and_bless_change_a_file_s_lock_and_the_blessed_folder()
+    {
+        var builder = new HfsBuilder();
+        var system = builder.Folder(HfsBuilder.Root, "System Folder");
+        builder.File(system, "System", [], [], type: "zsys", creator: "MACS");
+        builder.Folder(HfsBuilder.Root, "Docs");
+        builder.File(HfsBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
+        var disk = Path.Combine(folder, "system.img");
+        File.WriteAllBytes(disk, builder.Build("Disk"));
+
+        Assert.Equal(ExitCodes.Success, Run("lock", disk + ":Read Me", "-o", Out).Code);
+        Assert.True(Files(Out).Single(f => f.MacPath == "Read Me").IsLocked);
+        var unlocked = Path.Combine(folder, "unlocked.img");
+        Assert.Equal(ExitCodes.Success, Run("unlock", Out + ":Read Me", "-o", unlocked).Code);
+        Assert.False(Files(unlocked).Single(f => f.MacPath == "Read Me").IsLocked);
+        Assert.Equal(ExitCodes.Usage, Run("lock", disk + ":Docs", "-o", Out).Code);                 // a folder has no lock
+
+        var blessed = Path.Combine(folder, "blessed.img");
+        var (code, _, error) = Run("bless", disk + ":System Folder", "-o", blessed);
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Equal(Folders(blessed).Single(f => f.MacPath == "System Folder").CatalogId,
+            HfsReader.Instance.ReadVolumeInfo(ForkData.FromFile(blessed))!.BlessedFolderId);
+        Assert.Equal(ExitCodes.Usage, Run("bless", disk + ":Docs", "-o", blessed).Code);             // no System file
+        Assert.Contains("Blessed folder: System Folder", Run("stat", blessed + ":").Output);
+        Assert.DoesNotContain("Blessed folder", Run("stat", disk + ":").Output);
+    }
+
+    [Fact]
     public void Res_add_and_res_rm_change_a_file_s_resources()
     {
         var disk = Disk();

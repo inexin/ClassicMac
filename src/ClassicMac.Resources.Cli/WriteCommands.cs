@@ -39,6 +39,9 @@ namespace ClassicMac.Resources.Cli
             yield return RmCommand();
             yield return RenameCommand();
             yield return MvCommand();
+            yield return LockCommand("lock", "Lock a file (an HFS folder has no lock)", true);
+            yield return LockCommand("unlock", "Unlock a file", false);
+            yield return BlessCommand();
             yield return SetCommand();
             yield return ResAddCommand();
             yield return ResRmCommand();
@@ -130,6 +133,26 @@ namespace ClassicMac.Resources.Cli
             }
 
             return rest;
+        }
+
+        private Command LockCommand(string name, string description, bool locked)
+        {
+            var path = MacPathArgument("path", "The file");
+            var options = NewWriteOptions();
+            var command = new Command(name, description) { path };
+            AddWriteOptions(command, options);
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Lock(tree, rest, locked)));
+            return command;
+        }
+
+        private Command BlessCommand()
+        {
+            var path = MacPathArgument("folder", "The folder holding the System file");
+            var options = NewWriteOptions();
+            var command = new Command("bless", "Make a folder the volume's System Folder (it must hold a System file)") { path };
+            AddWriteOptions(command, options);
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Bless(tree, rest)));
+            return command;
         }
 
         private Command SetCommand()

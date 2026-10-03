@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `lock` and `unlock` a file, and `bless` a folder holding a System file as the volume's System Folder; also in the
+  MCP server and the shell. `stat` of a volume shows its blessed folder (cli.md §3.2).
 - CLI: `stat` of a volume (`disk.img:`, or a disk image inside one) shows its name, size and free space, file and folder
   counts, dates and locks, in text and --json (cli.md §2.2).
 - CLI: `mv <path> <folder>` moves a file or folder to another folder of an HFS volume, as PBCatMove does (its thread,

@@ -74,7 +74,7 @@ public sealed class McpServerTests : IAsyncLifetime
     public async Task The_tools_are_listed_with_schemas_and_hints()
     {
         var listed = await client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(["open", "close", "list", "stat", "read", "search", "extract", "put", "mkdir", "rm", "rename", "mv", "set", "res_add", "res_rm", "save_as"],
+        Assert.Equal(["open", "close", "list", "stat", "read", "search", "extract", "put", "mkdir", "rm", "rename", "mv", "lock", "unlock", "bless", "set", "res_add", "res_rm", "save_as"],
             listed.Select(t => t.Name));
         foreach (var tool in listed)
         {
@@ -182,6 +182,7 @@ public sealed class McpServerTests : IAsyncLifetime
         await Call("mv", new() { ["session"] = session, ["path"] = "Note", ["to"] = "Docs" });
         await Call("mv", new() { ["session"] = session, ["path"] = "Docs:Note", ["to"] = "" });
         await Call("set", new() { ["session"] = session, ["path"] = "Note", ["type"] = "TEXT", ["creator"] = "ttxt", ["flags"] = "Invisible" });
+        await Call("lock", new() { ["session"] = session, ["path"] = "Note" });
         Assert.Equal(before, File.ReadAllBytes(disk));
 
         var refused = await Call("close", new() { ["session"] = session }, error: true);
@@ -190,10 +191,11 @@ public sealed class McpServerTests : IAsyncLifetime
         var output = Path.Combine(folder, "saved.img");
         var saved = await Call("save_as", new() { ["session"] = session, ["destination"] = output });
         Assert.Equal([output], saved.GetProperty("written").EnumerateArray().Select(e => e.GetString()));
-        Assert.Equal(["mkdir", "rename", "move", "move", "set"], saved.GetProperty("changes").EnumerateArray().Select(c => c.GetProperty("action").GetString()));
+        Assert.Equal(["mkdir", "rename", "move", "move", "set", "lock"], saved.GetProperty("changes").EnumerateArray().Select(c => c.GetProperty("action").GetString()));
         Assert.Equal(0, saved.GetProperty("unsaved").GetInt32());
         Assert.Contains(Folders(output), f => f.MacPath == "Docs:New");
         var note = Files(output).Single(f => f.MacPath == "Note");
+        Assert.True(note.IsLocked);
         Assert.Equal((FourCC.FromString("TEXT"), FourCC.FromString("ttxt"), FinderFlags.IsInvisible),
             (note.FinderInfo.Type, note.FinderInfo.Creator, note.FinderInfo.Flags & FinderFlags.IsInvisible));
         Assert.Equal(before, File.ReadAllBytes(disk));

@@ -78,6 +78,26 @@ namespace ClassicMac.Resources.Cli
             return session => session.Move(path, into);
         }
 
+        /// <summary>Locks or unlocks a file of the volume.</summary>
+        public static Action<InputEditSession> Lock(MacPathTree tree, string rest, bool locked)
+        {
+            var path = VolumePath(tree, Existing(tree, rest));
+            return session => session.SetLocked(path, locked);
+        }
+
+        /// <summary>Blesses a folder of the volume as its System Folder.</summary>
+        public static Action<InputEditSession> Bless(MacPathTree tree, string rest)
+        {
+            var entry = Existing(tree, rest);
+            if (entry == tree.Root || !IsVolumeFolder(tree, entry))
+            {
+                throw new WriteRefused($"{entry.Path} is not a folder of the volume.");
+            }
+
+            var path = VolumePath(tree, entry);
+            return session => session.Bless(path);
+        }
+
         /// <summary>Sets a file's type and creator, or Finder flags (text as <see cref="Flags"/> reads it).</summary>
         public static Action<InputEditSession> Set(InputEditKind kind, MacPathTree tree, string rest, string? type, string? creator, string? flags)
         {

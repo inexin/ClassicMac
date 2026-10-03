@@ -39,6 +39,8 @@ namespace ClassicMac.Resources.Cli.Shell
             "ren, rename <path> <name>     rename",
             "move, mv <path> <folder>      move into another folder",
             "set <path> [--type T] [--creator C] [--flags F]",
+            "lock, unlock <path>           lock or unlock a file",
+            "bless <folder>                make it the System Folder (it must hold a System file)",
             "save                          write the changes over the input (keeping <input>.orig)",
             "save as <file>                write them to a new file",
             "exit, quit [--discard]        leave",
@@ -170,6 +172,9 @@ namespace ClassicMac.Resources.Cli.Shell
                         (_, tree, rest) => MacEdits.Rm(tree, rest, o.Flag("-r") || o.Flag("--recursive"))),
                     "md" or "mkdir" => Change(args, 1, [], [], (_, _) => (_, tree, rest) => MacEdits.Mkdir(tree, rest)),
                     "ren" or "rename" => Change(args, 2, [], [], (o, _) => (kind, tree, rest) => MacEdits.Rename(kind, tree, rest, o.Positional[1])),
+                    "lock" => Change(args, 1, [], [], (_, _) => (_, tree, rest) => MacEdits.Lock(tree, rest, true)),
+                    "unlock" => Change(args, 1, [], [], (_, _) => (_, tree, rest) => MacEdits.Lock(tree, rest, false)),
+                    "bless" => Change(args, 1, [], [], (_, _) => (_, tree, rest) => MacEdits.Bless(tree, rest)),
                     "move" or "mv" => Change(args, 2, [], [], (o, _) => (_, tree, rest) => MacEdits.Mv(tree, rest, Resolve(o.Positional[1]))),
                     "set" => Change(args, 1, [], ["--type", "--creator", "--flags"], (o, _) =>
                         (kind, tree, rest) => MacEdits.Set(kind, tree, rest, o.Value("--type"), o.Value("--creator"), o.Value("--flags"))),

@@ -110,6 +110,31 @@ public sealed class InputEditSessionTests : IDisposable
     }
 
     [Fact]
+    public void A_file_is_locked_and_unlocked_and_a_System_Folder_blessed()
+    {
+        var builder = new HfsBuilder();
+        var system = builder.Folder(HfsBuilder.Root, "System Folder");
+        builder.File(system, "System", [], [], type: "zsys", creator: "MACS");
+        builder.File(HfsBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
+        var path = Path.Combine(directory, "System.img");
+        File.WriteAllBytes(path, builder.Build("Disk"));
+        var session = InputEditSession.Open(path);
+
+        session.SetLocked("Read Me", true);
+        session.SetLocked("System Folder:System", true);
+        session.SetLocked("System Folder:System", false);
+        session.Bless("System Folder");
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+
+        Assert.True(Files(target).Single(f => f.MacPath == "Read Me").IsLocked);
+        Assert.False(Files(target).Single(f => f.MacPath == "System Folder:System").IsLocked);
+        Assert.NotNull(HfsReader.Instance.ReadVolumeInfo(ForkData.FromFile(target))!.BlessedFolderId);
+        Assert.Equal([("lock", "Read Me", ""), ("lock", "System Folder:System", ""), ("unlock", "System Folder:System", ""),
+            ("bless", "System Folder", "as the System Folder")], session.Changes.Select(c => (c.Action, c.Path, c.Detail)));
+    }
+
+    [Fact]
     public void A_folder_with_contents_is_deleted_only_when_asked()
     {
         var session = InputEditSession.Open(Volume());

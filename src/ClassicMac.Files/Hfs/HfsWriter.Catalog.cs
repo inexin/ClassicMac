@@ -329,6 +329,52 @@ public static partial class HfsWriter
         return U32(new BigEndianReader(thread.Data), 10);
     }
 
+    /// <summary>
+    /// Locks or unlocks a file (<c>filFlags</c> bit 0, as PBHSetFLock and PBHRstFLock set it), returning a new image. An
+    /// HFS folder has no lock.
+    /// </summary>
+    public static byte[] SetLocked(ForkData image, string macPath, bool locked)
+    {
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, macPath);
+        var file = FindCatalogRecord(state.Records, parent, name);
+        if (file.Data is null || file.Data.Length < 102 || file.Data[0] != 2)
+        {
+            throw new InvalidDataException(file.Data is { } data && data[0] == 1
+                ? "An HFS folder cannot be locked; only files have a lock."
+                : $"The HFS file '{name}' was not found.");
+        }
+
+        file.Data[2] = (byte)(locked ? file.Data[2] | 0x01 : file.Data[2] & ~0x01);
+        return CommitCatalog(state);
+    }
+
+    /// <summary>
+    /// Blesses a folder as the volume's System Folder (hfs.md §3): its ID goes in the MDB's <c>drFndrInfo[0]</c>, where
+    /// the boot code looks for the System file. Only a folder holding a System file (type <c>zsys</c>) is blessed.
+    /// </summary>
+    public static byte[] Bless(ForkData image, string folderPath)
+    {
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, folderPath);
+        var folder = FindCatalogRecord(state.Records, parent, name);
+        if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
+        {
+            throw new InvalidDataException($"The HFS folder '{folderPath}' was not found.");
+        }
+
+        uint id = U32(new BigEndianReader(folder.Data), 6);
+        var system = FourCC.FromString("zsys");
+        if (!state.Records.Any(record => record.Data.Length >= 102 && record.Data[0] == 2 &&
+                U32(new BigEndianReader(record.Key), 2) == id && new BigEndianReader(record.Data).ReadFourCCAt(4) == system))
+        {
+            throw new InvalidDataException($"The HFS folder '{folderPath}' holds no System file (type 'zsys'), so it cannot be blessed.");
+        }
+
+        new BigEndianWriter(state.Result).WriteUInt32At(MdbOffset + 0x5C, id);
+        return CommitCatalog(state);
+    }
+
     /// <summary>Sets a file's Finder info (its <c>FInfo</c> and <c>FXInfo</c>), returning a new image.</summary>
     public static byte[] SetFinderInfo(ForkData image, string macPath, FinderInfo finderInfo)
     {

@@ -421,8 +421,8 @@ None.
 - `HfsReader.ReadVolumeInfo` gives the volume header's `createDate`, `modifyDate` and `backupDate` (for a wrapper, the
   embedded volume's; null when the embedded extent is unusable or its signature wrong). `VolumeInfo.UtcAfterCreation`
   says that the last two are UTC while `createDate` is local time [ClassicMac]. It also gives `blockSize`,
-  `totalBlocks`, `freeBlocks`, `fileCount`, `folderCount` and `attributes`' software and hardware locks (bits 15 and
-  7); the name is the root folder's, so it has none.
+  `totalBlocks`, `freeBlocks`, `fileCount`, `folderCount`, `attributes`' software and hardware locks (bits 15 and
+  7) and `finderInfo[0]` as the blessed folder's ID; the name is the root folder's, so it has none.
 - Each visible file comes out with its path, Finder information, dates, both forks, and the file-locked catalog flag
   (bit 0) as `MacFile.IsLocked`. Unicode names are kept in
   `MacFile.MacPath`; the Mac OS Roman `Name` is a best-effort rendering.

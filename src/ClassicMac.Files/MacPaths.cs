@@ -299,6 +299,21 @@ namespace ClassicMac.Files
             return entry.Kind == MacPathKind.Container ? ContentsOf(entry).Volume : null;
         }
 
+        /// <summary>The path inside a volume entry of its folder with this catalog ID (colon-separated), or null.</summary>
+        public string? FolderPathOf(MacPathEntry volume, uint catalogId)
+        {
+            ArgumentNullException.ThrowIfNull(volume);
+            if (volume.Kind != MacPathKind.Container)
+            {
+                return null;
+            }
+
+            ContentsOf(volume);
+            return FoldersOf(volume).FirstOrDefault(f => f.CatalogId == catalogId) is { } folder
+                ? string.Join(":", folder.Path.Select(n => n.ToString()))
+                : null;
+        }
+
         /// <summary>
         /// What an entry holds: a container's or folder's folders and files, in the container's order; a file's resource
         /// fork (when it has one); a fork's types; a type's resources.

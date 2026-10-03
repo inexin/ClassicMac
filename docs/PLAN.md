@@ -260,12 +260,12 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
    CLI subcommands and `--json` (§2). Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
    in the app moves into the library). The original is never changed unless `--in-place`; otherwise writes go to a
    new file. `--dry-run` on every write. The write side is built: `InputEditSession` (`ClassicMac.Files.Editing`) on
-   an opened input (a plain HFS image: add file, add folder, delete, recursive delete, rename, move, type/creator/flags,
+   an opened input (a plain HFS image: add file, add folder, delete, recursive delete, rename, move, lock, bless, type/creator/flags,
    resources; a single Mac file: resources, Finder info, name), its changes listed as `PlannedChange`s, saved as a new
    file or in place; `HostImport` reads a host file to add; `HfsWriter.Rename`, `SetFinderInfo`, `SetFolderFlags`,
    `Delete`. The app's Volume menu uses them.
 2. **CLI subcommands** for each operation with `--json` (stable, documented schemas in `docs/cli.md`), so any AI with a
-   shell can drive them. The write commands are built: `put`, `mkdir`, `rm`, `rename`, `mv`, `set`, `res-add`, `res-rm`
+   shell can drive them. The write commands are built: `put`, `mkdir`, `rm`, `rename`, `mv`, `lock`, `unlock`, `bless`, `set`, `res-add`, `res-rm`
    ([cli.md §3](cli.md#3-write-commands)).
 3. **MCP server** (`classicmac mcp`, stdio): the same operations as MCP tools (list, stat, read, search, extract, add,
    delete, save as), with the same write safety and output-size limits. Built ([cli.md §4](cli.md#4-mcp-server)): a
@@ -287,7 +287,8 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    CLI, the MCP server's `mv` and the shell's `move`; [cli.md](cli.md) §3.2).
 3. Volume information in `stat` of a volume's root: block size, free space, file and folder counts, dates, the lock
    (built: `VolumeInfo` from HFS, HFS Plus and MFS, [cli.md](cli.md) §2.2).
-4. `lock` / `unlock` (a file's locked flag) and `bless` (the System Folder in the MDB's Finder info).
+4. `lock` / `unlock` (a file's locked flag) and `bless` (the System Folder in the MDB's Finder info) (built: the CLI,
+   MCP and shell; `stat` shows the blessed folder).
 5. Transfers that convert: `put --text`/`get --text` (Mac OS Roman with CR to and from UTF-8 with LF), `get --as
    binhex` and `.hqx` read by `put`.
 6. Writes to an HFS partition inside an Apple Partition Map image, and to Disk Copy images (written back in their own

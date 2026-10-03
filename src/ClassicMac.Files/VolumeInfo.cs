@@ -48,6 +48,12 @@ namespace ClassicMac.Files
 
         /// <summary>Whether the volume was locked by hardware when last mounted (attribute bit 7, <c>kHFSVolumeHardwareLockBit</c>).</summary>
         public bool HardwareLocked { get; init; }
+
+        /// <summary>
+        /// The blessed System Folder's ID (HFS's <c>drFndrInfo[0]</c>, HFS Plus's <c>finderInfo[0]</c>); null when none is
+        /// blessed, and for MFS.
+        /// </summary>
+        public uint? BlessedFolderId { get; init; }
     }
 
     /// <summary>A container reader for a volume format, which can also give the volume's own dates.</summary>

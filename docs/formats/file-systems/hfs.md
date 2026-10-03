@@ -444,7 +444,10 @@ are [ClassicMac].
    folder's CNID as the parent, its thread's `thdParID` becomes that CNID, the old folder's `dirVal` goes down by one
    and the new one's up by one, and `drNmFls` or `drNmRtDirs` change when it leaves or enters the root. A folder cannot
    move into itself or a folder inside it (`badMovErr`), nor onto a name the destination holds (`dupFNErr`)
-   [Doc: Inside Macintosh: Files, PBCatMove]. A file's Finder info is its record's `filUsrWds` and `filFndrInfo`; a folder's flags are
+   [Doc: Inside Macintosh: Files, PBCatMove]. A file is locked by `filFlags` bit 0, as PBHSetFLock sets it; an HFS
+   folder has no lock [Doc: Inside Macintosh: Files, PBHSetFLock]. A blessed System Folder's ID is `drFndrInfo[0]`
+   (§1.3); ClassicMac blesses only a folder that holds a file of type `zsys` (the System file the boot code opens)
+   [ClassicMac]. A file's Finder info is its record's `filUsrWds` and `filFndrInfo`; a folder's flags are
    `dirUsrInfo.frFlags`.
 6. **Dates and counters.** The changed file's `filMdDat` and the MDB's `drLsMod` are the write time, as local time;
    `drWrCnt` goes up. A new CNID comes from `drNxtCNID`.
@@ -479,7 +482,8 @@ are [ClassicMac].
   dates (a stored 0 is "no date"), both forks, and `filFlags` bit 0 as `MacFile.IsLocked`.
 - `HfsReader.ReadVolumeInfo` (the `IVolumeReader` interface) gives the volume's own dates as a `VolumeInfo`: `drCrDate`,
   `drLsMod` and `drVolBkUp`, a stored 0 as "no date"; its name (`drVN`), `drAlBlkSiz`, `drNmAlBlks`, `drFreeBks`,
-  `drFilCnt`, `drDirCnt`, and `drAtrb`'s software lock (bit 15) and hardware lock (bit 7); for HFS Plus, plain or wrapped, see
+  `drFilCnt`, `drDirCnt`, `drAtrb`'s software lock (bit 15) and hardware lock (bit 7), and `drFndrInfo[0]` as the
+  blessed folder's ID; for HFS Plus, plain or wrapped, see
   [hfs-plus.md §5.1](hfs-plus.md#51-what-comes-out). The unwrapper keeps them on the `ContainerNode` whose data fork is
   the volume (`ContainerNode.Volume`) [ClassicMac].
 - Folder records serve for paths: folders do not come out as entries of `Read`, so an empty folder is not listed.
@@ -558,7 +562,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   or remove a file record and both forks; `CreateFolder` and `DeleteFolder` add or remove a folder record and its
   thread; `Rename` renames a file or folder in its folder; `Move` moves one into another folder (§3), and refuses a
   move into the folder it is in, which PBCatMove allows as a no-op [ClassicMac]; `SetFinderInfo` sets a file's Finder info and
-  `SetFolderFlags` a folder's Finder flags; `Delete` removes a file, or a folder (an empty one, or with `recursive`
+  `SetFolderFlags` a folder's Finder flags; `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
   image; the input is never modified.
@@ -637,6 +641,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
   the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
   `HfsMoveTests.cs` covers moves of files and folders (threads, valences, root counts) and the refusals;
+  `HfsLockBlessTests.cs` covers locking, unlocking and blessing and their refusals;
   `HfsCheckTests.cs` covers `HfsWriter.Check` on sound, damaged, truncated and locked volumes;
   `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
 - With `CLASSICMAC_HFS_INTEROP_INPUT` and the `…_OUTPUT` variables set, `ExternalClassicHfsImageCanBeEditedAndReopened`
