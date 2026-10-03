@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viewer: styled text (SimpleText files, TEXT + styl) is drawn on white paper in the dark theme too, so its black runs
+  stay readable (Mac content keeps its own colours).
 - Viewer, CLI and MCP: an alias whose original is not found says why: missing from its disk, on a disk that is not open
   (with the kind of disk, e.g. an 800K floppy disk), or on a network volume (with the AppleShare server, zone, volume and
   user from its mount information). The tree dims such an alias and marks its badge (a cross, a disk, a globe); the

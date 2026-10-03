@@ -1569,7 +1569,8 @@
                   </ScrollViewer>
                 </DockPanel>
                 <!-- 24 on the right: the overlay scroll bar never covers the text. -->
-                <ScrollViewer x:Name="StyledTextScroller" IsVisible="{Binding Preview.IsStyledText}" Padding="16,12,24,12">
+                <!-- Mac content keeps its colours: styled text on white paper, as the Mac draws it, in both themes. -->
+                <ScrollViewer x:Name="StyledTextScroller" IsVisible="{Binding Preview.IsStyledText}" Padding="16,12,24,12" Background="White">
                   <views:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12,24,12" HorizontalScrollBarVisibility="Auto">

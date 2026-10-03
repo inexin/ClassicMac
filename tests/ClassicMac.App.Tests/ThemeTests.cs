@@ -246,6 +246,32 @@ public class ThemeTests
         Assert.Equal(step, WaveformView.NiceStep(minimum), 12);
 
     // Muted text is a colour, not an opacity; inside a selected row of a focused list it reads in CmSelectionText.
+    // Mac content keeps its own colours: styled text (a SimpleText file, TEXT + styl) is drawn in its runs' colours on
+    // white paper, as the Mac draws it, in the dark theme too (not dark runs on the dark pane).
+    [Fact]
+    public void Styled_text_is_drawn_on_white_paper_in_both_themes() => OnUiThread(() =>
+    {
+        var folder = Directory.CreateTempSubdirectory("cm-theme-text").FullName;
+        try
+        {
+            var model = new MainViewModel();
+            var window = new MainWindow { DataContext = model };
+            window.Show();
+            Pump(model.OpenAsync(DocumentTests.Disk(folder)));
+            model.Selected = model.Roots[0].Children.Single(c => c.Title == "Plain");
+            Pump(model.PreviewTask);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(model.Preview.IsStyledText);
+            var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "StyledTextScroller");
+            InEachTheme(_ => Assert.Equal(Colors.White, BrushColour(scroller.Background)));
+            window.Close();
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    });
+
     [Fact]
     public void Muted_text_uses_its_token_and_the_selection_text_in_a_selected_row() => OnUiThread(() =>
     {
