@@ -59,7 +59,7 @@ public sealed class CheckCommandTests : IDisposable
     {
         var disk = WritableDisk.Build(folder, "counts.img");
         var image = File.ReadAllBytes(disk);
-        image[Mdb + 0x0D]++;                                                            // drNmFls one too many
+        image[Mdb + 0x57]++;                                                            // drFilCnt one too many
         File.WriteAllBytes(disk, image);
 
         var json = JsonDocument.Parse(Run("check", disk, "--json").Output).RootElement;
