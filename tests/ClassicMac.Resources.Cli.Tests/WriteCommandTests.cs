@@ -105,6 +105,25 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_partitioned_disk_s_HFS_partition_is_written_in_place()
+    {
+        var volume = File.ReadAllBytes(Disk());
+        var disk = Path.Combine(folder, "partitioned.img");
+        File.WriteAllBytes(disk, Fixtures.PartitionMap(("Driver", "Apple_Driver43", new byte[1024]), ("Macintosh HD", "Apple_HFS", volume)));
+
+        var (code, _, error) = Run("rm", disk + ":Read Me", "-o", Out);
+        Assert.True(code == ExitCodes.Success, error);
+        var written = File.ReadAllBytes(Out);
+        var partition = written.AsSpan(written.Length - volume.Length).ToArray();
+        Assert.DoesNotContain(HfsReader.Instance.Read(ForkData.FromBytes(partition), new ContainerContext()), f => f.MacPath == "Read Me");
+        Assert.Equal(File.ReadAllBytes(disk).AsSpan(0, written.Length - volume.Length).ToArray(), written.AsSpan(0, written.Length - volume.Length).ToArray());
+
+        var (checkCode, output, _) = Run("check", Out);
+        Assert.Equal(ExitCodes.Success, checkCode);
+        Assert.Contains("partition 3 \"Macintosh HD\": passes the writer's checks\n", output.Replace("\r\n", "\n"));
+    }
+
+    [Fact]
     public void Rm_deletes_a_file_and_a_folder_only_with_recursive()
     {
         var disk = Disk();

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using ClassicMac.Core;
 
@@ -65,15 +66,30 @@ namespace ClassicMac.Files.Hfs
         /// <inheritdoc/>
         public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
         {
-            var stride = Stride(input);
-            if (stride == 0)
+            if (Stride(input) == 0)
             {
                 throw new InvalidDataException("Not an Apple partition map.");
             }
 
+            return [.. Entries(input, context).Select(p => new MacFile { Name = new MacString(p.NameBytes), DataFork = input.Slice(p.Partition.Offset, p.Partition.Length) })];
+        }
+
+        /// <summary>
+        /// The map's Mac volume partitions (<c>Apple_HFS</c>, <c>Apple_MFS</c>) with where each lies in the image, as
+        /// <see cref="Read"/> finds them; empty when the input has no map.
+        /// </summary>
+        public static IReadOnlyList<MacPartition> Partitions(ForkData input)
+        {
+            ArgumentNullException.ThrowIfNull(input);
+            return Stride(input) == 0 ? [] : [.. Entries(input, new ContainerContext()).Select(p => p.Partition)];
+        }
+
+        private static List<(MacPartition Partition, byte[] NameBytes)> Entries(ForkData input, ContainerContext context)
+        {
+            var stride = Stride(input);
             var first = input.Slice(stride, Block).ToArray();
             long entries = new BigEndianReader(first).ReadUInt32At(4);
-            var files = new List<MacFile>();
+            var found = new List<(MacPartition, byte[])>();
             for (long i = 0; i < entries; i++)
             {
                 var at = (1 + i) * stride;
@@ -90,7 +106,7 @@ namespace ClassicMac.Files.Hfs
                     context.Report(DiagnosticSeverity.Error, "partition.bad-entry", $"Partition entry {i + 1} has no 'PM' signature.", at);
                     continue;
                 }
-                var name = CString(entry.AsSpan(16, 32));
+                var name = CString(entry.AsSpan(16, 32)).ToArray();
                 var type = Encoding.ASCII.GetString(CString(entry.AsSpan(48, 32)));
                 if (type is not ("Apple_HFS" or "Apple_MFS"))
                 {
@@ -115,9 +131,9 @@ namespace ClassicMac.Files.Hfs
                     context.Report(DiagnosticSeverity.Error, "partition.truncated", $"Partition {i + 1} runs past the end of the image.", at);
                     length = input.Length - offset;
                 }
-                files.Add(new MacFile { Name = new MacString(name), DataFork = input.Slice(offset, length) });
+                found.Add((new MacPartition((int)(i + 1), MacRoman.Decode(name), type, offset, length), name));
             }
-            return files;
+            return found;
         }
 
         private static ReadOnlySpan<byte> CString(ReadOnlySpan<byte> field)
@@ -126,4 +142,7 @@ namespace ClassicMac.Files.Hfs
             return end < 0 ? field : field[..end];
         }
     }
+
+    /// <summary>A Mac volume partition of an Apple partition map: its entry's number (the map itself is 1), name and type, and where its bytes lie in the image.</summary>
+    public sealed record MacPartition(int Number, string Name, string Type, long Offset, long Length);
 }

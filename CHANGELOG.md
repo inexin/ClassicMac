@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: a partitioned disk image whose map holds one HFS partition can be written: the partition is edited in place and
+  everything outside it kept; `check` runs the writer's checks on each HFS partition (partition-map.md §5).
 - CLI: transfers that convert: `get --as text` (UTF-8 with LF line ends) and `--as binhex` (.hqx); `put --text` (UTF-8
   made a Mac OS Roman TEXT document), and `put` unwraps BinHex files; also in the MCP server and the shell (cli.md §2.5, §3.2).
 - CLI: `lock` and `unlock` a file, and `bless` a folder holding a System file as the volume's System Folder; also in the

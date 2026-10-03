@@ -275,11 +275,13 @@ namespace ClassicMac.Files.Editing
         /// Writes a copy of a plain HFS image: <paramref name="volume"/> (the source image with files and folders already
         /// created or deleted by <see cref="HfsWriter"/>), or the source image itself when null, with each of
         /// <paramref name="forks"/> replaced. The image is read back and every replaced fork compared before it is
-        /// atomically placed at <paramref name="destinationPath"/>, which cannot be the source image.
+        /// atomically placed at <paramref name="destinationPath"/>, which cannot be the source image. With
+        /// <paramref name="region"/>, the volume is that range of the source (an HFS partition of a partitioned disk): it is
+        /// put back there and the rest of the source copied unchanged.
         /// </summary>
         /// <returns>The full path of the saved HFS image.</returns>
         public static string SaveHfsImageAs(string sourcePath, string destinationPath, byte[]? volume,
-            IReadOnlyList<HfsForkReplacement> forks)
+            IReadOnlyList<HfsForkReplacement> forks, (long Offset, long Length)? region = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
@@ -296,7 +298,8 @@ namespace ClassicMac.Files.Editing
             var temporary = System.IO.Path.Combine(directory, $".classicmac-{Guid.NewGuid():N}.tmp");
             try
             {
-                var image = volume?.ToArray() ?? File.ReadAllBytes(source);
+                var whole = region is null ? null : File.ReadAllBytes(source);
+                var image = volume?.ToArray() ?? (region is { } range ? whole.AsSpan((int)range.Offset, (int)range.Length).ToArray() : File.ReadAllBytes(source));
                 var written = new List<(string MacPath, HfsFork Kind, byte[] Data)>();
                 foreach (var replacement in forks)
                 {
@@ -306,6 +309,17 @@ namespace ClassicMac.Files.Editing
                     written.Add((replacement.MacPath, kind, data));
                 }
                 VerifyHfsForks(image, written);
+                if (region is { } at)
+                {
+                    if (image.Length != at.Length)
+                    {
+                        throw new InvalidOperationException("The edited partition changed size.");
+                    }
+
+                    image.CopyTo(whole.AsSpan((int)at.Offset));
+                    image = whole!;
+                }
+
                 File.WriteAllBytes(temporary, image);
                 ForkData.CloseHostFile(destination);
                 File.Move(temporary, destination, overwrite: true);

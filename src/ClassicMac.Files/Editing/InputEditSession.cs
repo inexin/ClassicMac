@@ -44,6 +44,7 @@ namespace ClassicMac.Files.Editing
         private readonly SaveAsFormat singleFormat;
         private readonly bool forkInDataFork;
         private byte[]? volume;
+        private readonly MacPartition? partition;
         private MacFile? single;
 
         private InputEditSession(string path, HostFile host, ContainerNode root, ContainerReadOptions options, ReadOptions readOptions,
@@ -54,6 +55,21 @@ namespace ClassicMac.Files.Editing
             if (host.Layout == HostLayout.Plain && root.Children.Count > 0 && root.Children.All(c => c.Format == HfsReader.Instance.FormatName))
             {
                 Kind = InputEditKind.HfsVolume;
+                return;
+            }
+
+            // A partitioned disk whose map holds one Mac volume, a plain HFS one: that partition is edited and put back in
+            // place (partition-map.md §5). A disk with more is not written.
+            if (host.Layout == HostLayout.Plain && PartitionMapReader.Partitions(host.File.DataFork) is { Count: > 0 } partitions)
+            {
+                if (partitions is [var only] && IsPlainHfs(host.File.DataFork.Slice(only.Offset, only.Length)))
+                {
+                    partition = only;
+                    Kind = InputEditKind.HfsVolume;
+                    return;
+                }
+
+                Kind = InputEditKind.ReadOnly;
                 return;
             }
 
@@ -94,8 +110,33 @@ namespace ClassicMac.Files.Editing
         /// <summary>Whether anything has changed.</summary>
         public bool HasChanges => changes.Count > 0;
 
-        /// <summary>A volume's image with the item changes made so far (the input's own bytes before any).</summary>
-        public byte[] Volume => volume ??= Kind == InputEditKind.HfsVolume ? File.ReadAllBytes(Path) : throw NotVolume("have a volume image");
+        /// <summary>A volume's image with the item changes made so far (the input's own bytes before any; for a partitioned disk, its HFS partition's).</summary>
+        public byte[] Volume => volume ??= Kind == InputEditKind.HfsVolume ? ReadVolume() : throw NotVolume("have a volume image");
+
+        /// <summary>For a partitioned disk, the HFS partition edited; null for a plain volume image.</summary>
+        public MacPartition? Partition => partition;
+
+        private byte[] ReadVolume()
+        {
+            if (partition is null)
+            {
+                return File.ReadAllBytes(Path);
+            }
+
+            using var stream = File.OpenRead(Path);
+            stream.Position = partition.Offset;
+            var bytes = new byte[partition.Length];
+            stream.ReadExactly(bytes);
+            return bytes;
+        }
+
+        // An HFS volume (signature 'BD') that does not wrap HFS Plus.
+        private static bool IsPlainHfs(ForkData data)
+        {
+            var mdb = data.ReadPrefix(1024 + 0x7E);
+            return mdb.Length == 1024 + 0x7E && new BigEndianReader(mdb) is var reader &&
+                reader.ReadUInt16At(1024) == 0x4244 && reader.ReadUInt16At(1024 + 0x7C) != 0x482B;
+        }
 
         /// <summary>Opens <paramref name="path"/> as the CLI and the app read it.</summary>
         public static InputEditSession Open(string path, ContainerReadOptions? options = null, ReadOptions? readOptions = null,
@@ -370,7 +411,7 @@ namespace ClassicMac.Files.Editing
                 return ForkSaver.SaveAs(full, singleFormat, single!, forks[""].Fork, forkInDataFork);
             }
 
-            return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements())];
+            return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements(), Region())];
         }
 
         /// <summary>Writes the changes over the input, verified, keeping the original as <c>.orig</c> on the first save.</summary>
@@ -386,7 +427,7 @@ namespace ClassicMac.Files.Editing
             var temporary = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, $".classicmac-{Guid.NewGuid():N}.tmp");
             try
             {
-                ForkSaver.SaveHfsImageAs(Path, temporary, volume, Replacements());
+                ForkSaver.SaveHfsImageAs(Path, temporary, volume, Replacements(), Region());
                 var backup = Path + ".orig";
                 if (!File.Exists(backup))
                 {
@@ -404,6 +445,8 @@ namespace ClassicMac.Files.Editing
                 }
             }
         }
+
+        private (long Offset, long Length)? Region() => partition is null ? null : (partition.Offset, partition.Length);
 
         private List<HfsForkReplacement> Replacements() =>
             forks.Where(f => f.Value.IsDirty).Select(f => new HfsForkReplacement(f.Key, f.Value.Fork)).ToList();

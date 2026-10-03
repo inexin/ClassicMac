@@ -47,6 +47,24 @@ namespace ClassicMac.Resources.Cli
                 fault = HfsWriter.Check(opened.Root.File.DataFork);
             }
 
+            // A partitioned disk: each HFS partition gets the writer's checks (one that wraps HFS Plus or is no HFS is left out).
+            var partitions = new List<(MacPartition Partition, string? Fault)>();
+            if (opened.Host.Layout == HostLayout.Plain)
+            {
+                foreach (var partition in PartitionMapReader.Partitions(opened.Root.File.DataFork).Where(p => p.Type == "Apple_HFS"))
+                {
+                    try
+                    {
+                        partitions.Add((partition, HfsWriter.Check(opened.Root.File.DataFork.Slice(partition.Offset, partition.Length))));
+                    }
+                    catch (InvalidDataException)
+                    {
+                    }
+                }
+            }
+
+            fault ??= partitions.Select(p => p.Fault).FirstOrDefault(f => f is not null);
+
             int errors = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Error);
             int warnings = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Warning);
             if (json)
@@ -88,6 +106,22 @@ namespace ClassicMac.Resources.Cli
                         w.WriteNull("volume");
                     }
 
+                    if (partitions.Count > 0)
+                    {
+                        w.WriteStartArray("partitions");
+                        foreach (var (partition, partitionFault) in partitions)
+                        {
+                            w.WriteStartObject();
+                            w.WriteNumber("number", partition.Number);
+                            w.WriteString("name", partition.Name);
+                            w.WriteBoolean("passes", partitionFault is null);
+                            w.WriteString("fault", partitionFault);
+                            w.WriteEndObject();
+                        }
+
+                        w.WriteEndArray();
+                    }
+
                     w.WriteNumber("errors", errors);
                     w.WriteNumber("warnings", warnings);
                 }));
@@ -102,6 +136,11 @@ namespace ClassicMac.Resources.Cli
                 if (volume)
                 {
                     output.WriteLine($"volume: {fault ?? "passes the writer's checks"}");
+                }
+
+                foreach (var (partition, partitionFault) in partitions)
+                {
+                    output.WriteLine($"partition {partition.Number} \"{partition.Name}\": {partitionFault ?? "passes the writer's checks"}");
                 }
 
                 output.WriteLine($"{errors} {(errors == 1 ? "error" : "errors")}, {warnings} {(warnings == 1 ? "warning" : "warnings")}");

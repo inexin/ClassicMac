@@ -236,8 +236,9 @@ reported.
 
 Exit 0 when nothing is wrong (warnings allowed, unless `--strict`), 1 when there is an error or a volume fault, 4 when
 the input cannot be read. `--json` writes `{ "input", "diagnostics": [{ "source", "severity", "code", "message",
-"location"?, "offset"? }], "volume": { "passes", "fault" } or null, "errors", "warnings" }`; `volume` is null for
-input that is not a plain HFS volume.
+"location"?, "offset"? }], "volume": { "passes", "fault" } or null, "partitions"?: [{ "number", "name", "passes",
+"fault" }], "errors", "warnings" }`; `volume` is null for input that is not a plain HFS volume, and `partitions` lists a
+partitioned disk's HFS partitions (text: `partition 3 "Macintosh HD": passes the writer's checks`).
 
 ## 3. Write commands
 
@@ -246,7 +247,9 @@ Each write command changes one thing on a Mac path, through the library's `Input
 
 ### 3.1 What can be written
 
-- **A plain HFS volume image** (the host file is the volume, with no partition map or disk image wrapper): files and
+- **A plain HFS volume image** (the host file is the volume, with no disk image wrapper), or **a partitioned disk**
+  whose map holds one Mac volume partition, a plain HFS one (edited in place within the partition,
+  [partition-map.md §5](formats/file-systems/partition-map.md#5-classicmac)): files and
   folders added, deleted (a folder only with `--recursive` when it holds anything), renamed in their folder, moved to another folder, a file locked or unlocked, a System Folder blessed, a file's
   type, creator and Finder flags and a folder's Finder flags set, and a file's resources added, replaced and deleted.
   The rules are [hfs.md §3](formats/file-systems/hfs.md#3-writing).

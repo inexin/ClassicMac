@@ -291,7 +291,9 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    MCP and shell; `stat` shows the blessed folder).
 5. Transfers that convert: `put --text`/`get --as text` (Mac OS Roman with CR to and from UTF-8 with LF), `get --as
    binhex` and `.hqx` read by `put` (built: the CLI, MCP and shell; [cli.md](cli.md) §2.5, §3.2).
-6. Writes to an HFS partition inside an Apple Partition Map image, and to Disk Copy images (written back in their own
+6. Writes to an HFS partition inside an Apple Partition Map image (built for a disk with one Mac volume partition:
+   edited in place, [partition-map.md §5](formats/file-systems/partition-map.md#5-classicmac); still to do: disks with
+   several, and the app's Volume menu on partitioned disks), and to Disk Copy images (written back in their own
    format).
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name.
 8. `resize <volume> --size <n>` (decided 2026-10-03): grow a plain HFS volume within its allocation block size

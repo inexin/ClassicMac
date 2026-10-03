@@ -134,7 +134,8 @@ it is non-zero, so 0 means "not given" [Code: Disk Copy 6.5].
 
 ## 3. Writing
 
-None.
+The map is never written. A volume in a partition is changed in place, within the partition's bytes (§2.2): the volume
+keeps its size, so no entry changes, and every byte outside the partition stays as it was [ClassicMac].
 
 ## 4. Variants
 
@@ -171,6 +172,13 @@ Damaged and truncated maps, for each entry:
 
 The `'TS'` map is not read.
 
+`PartitionMapReader.Partitions` lists the Mac volume partitions with their entry number, name, type and byte range, as
+`Read` finds them. A disk whose map holds exactly one Mac volume partition, a plain HFS one, is writable: the edit
+session (`InputEditSession`) edits that partition as a volume ([hfs.md §3](hfs.md#3-writing)) and saves the disk with
+the partition put back, the map, drivers and free space unchanged. A disk with more than one Mac volume partition, or
+whose only one is MFS or wraps HFS Plus, is read only. The CLI's `check` runs the writer's checks on each HFS
+partition.
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code.
@@ -186,13 +194,15 @@ The `'TS'` map is not read.
 ## 7. Verification
 
 `tests/ClassicMac.Files.Tests/PartitionMapTests.cs` builds maps in code: Mac volumes come out and drivers are skipped,
-a CD map at a 2048-byte stride, a partition past the end of the image cut, and plain volumes not taken for maps. The
+a CD map at a 2048-byte stride, a partition past the end of the image cut, and plain volumes not taken for maps.
+`PartitionedVolumeTests.cs` covers `Partitions`, an HFS partition edited and saved (as a new file and in place) with
+every byte outside it unchanged, and a disk with two HFS partitions left read only. The
 rules of §2 come from the code only; they cannot be checked in SheepShaver, which uses its own disk and CD drivers
 rather than Apple's.
 
 ## 8. Not covered
 
-- The `'TS'` map; drivers and boot code; writing maps.
+- The `'TS'` map; drivers and boot code; writing maps; writing a disk with more than one Mac volume partition.
 - No rule in this document is fitted to data alone.
 
 ## 9. References
