@@ -13,14 +13,15 @@ namespace ClassicMac.Resources.Cli
     // printed as results; a plain HFS volume also gets the checks the writer makes before an edit (HfsWriter.Check).
     internal sealed class CheckCommand(TextWriter output, TextWriter error)
     {
-        public int Run(FileInfo input, ContainerReadOptions containerOptions, ReadOptions readOptions, bool strict, bool quiet, bool json)
+        public int Run(FileInfo input, ContainerReadOptions containerOptions, ReadOptions readOptions, bool strict, bool quiet, bool json, bool deep = false)
         {
             var found = new List<(string Source, Diagnostic Diagnostic)>();
             Input opened;
             try
             {
                 var diagnostics = new List<Diagnostic>();
-                opened = Input.Open(input, containerOptions, diagnostics);
+                // Without --deep the input's own structures only: containers stored in it are not opened (cli.md §2.7).
+                opened = Input.Open(input, containerOptions, diagnostics, deep ? int.MaxValue : 1);
                 found.AddRange(diagnostics.Select(d => (input.Name, d)));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -71,6 +72,7 @@ namespace ClassicMac.Resources.Cli
 
             fault ??= partitions.Select(p => p.Fault).FirstOrDefault(f => f is not null);
 
+            int notOpened = opened.Leaves.Count(leaf => leaf.Node.UnreadFormat is not null);
             int errors = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Error);
             int warnings = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Warning);
             if (json)
@@ -128,6 +130,7 @@ namespace ClassicMac.Resources.Cli
                         w.WriteEndArray();
                     }
 
+                    w.WriteNumber("notOpened", notOpened);
                     w.WriteNumber("errors", errors);
                     w.WriteNumber("warnings", warnings);
                 }));
@@ -147,6 +150,11 @@ namespace ClassicMac.Resources.Cli
                 foreach (var (partition, partitionFault) in partitions)
                 {
                     output.WriteLine($"partition {partition.Number} \"{partition.Name}\": {partitionFault ?? "passes the writer's checks"}");
+                }
+
+                if (notOpened > 0)
+                {
+                    output.WriteLine($"{notOpened} {(notOpened == 1 ? "container" : "containers")} in it not opened (--deep checks inside them)");
                 }
 
                 output.WriteLine($"{errors} {(errors == 1 ? "error" : "errors")}, {warnings} {(warnings == 1 ? "warning" : "warnings")}");

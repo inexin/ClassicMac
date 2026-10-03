@@ -15,12 +15,14 @@ namespace ClassicMac.Resources.Cli
         // resource fork (a .rsrc file, or a fork copied out on its own).
         public bool IsPlain => Host.Layout == HostLayout.Plain && Root.Children.Count == 0;
 
-        public static Input Open(FileInfo file, ContainerReadOptions options, ICollection<Diagnostic> diagnostics)
+        // levels: how many levels of containers holding several files are read (wrappers of one file do not count); the
+        // containers below are leaves, unread.
+        public static Input Open(FileInfo file, ContainerReadOptions options, ICollection<Diagnostic> diagnostics, int levels = int.MaxValue)
         {
             var host = HostFiles.Read(file.FullName, options, diagnostics);
             var root = ContainerUnwrapper.Default.Unwrap(
                 host.File, HostFiles.FormatName(host.Layout),
-                new ContainerContext(options, diagnostics, siblings: HostFiles.Siblings(file.FullName, options, diagnostics)));
+                new ContainerContext(options, diagnostics, siblings: HostFiles.Siblings(file.FullName, options, diagnostics)), levels);
             var leaves = new List<(ContainerNode, IReadOnlyList<string>)>();
             Collect(root, [], leaves);
             return new Input(host, root, leaves);

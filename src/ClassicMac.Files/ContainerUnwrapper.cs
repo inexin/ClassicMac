@@ -252,8 +252,9 @@ namespace ClassicMac.Files
                         $"Unwrapping produced more than {context.Options.MaxExpandedBytesPerInput} bytes; stopped.");
                     break;
                 }
-                // A container holding one file (a wrapper, a disk image's disk) does not use up a level.
-                var below = levels == int.MaxValue || contents.Count == 1 ? levels : levels - 1;
+                // A container holding one file (a wrapper, a disk image's disk) does not use up a level; a volume always
+                // does, even with one file on it.
+                var below = levels == int.MaxValue || contents.Count == 1 && reader is not IVolumeReader ? levels : levels - 1;
                 children.Add(Unwrap(inner, reader.FormatName, outer.For(null, () => SiblingsOf(contents, inner)), depth + 1,
                     below, Within(location, inner), probed[index].Reader, ref expanded));
             }

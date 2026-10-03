@@ -196,6 +196,10 @@ and Apple's published descriptions are the whole reference.
   `ContainerUnwrapper.Default` has the built-in readers, and an application passes its own `IContainerReader`s to the
   constructor to have them tried first. `Unwrap(path)` reads a host file with its companions
   ([host-folders.md](host-folders.md)) and unwraps it. [ClassicMac]
+- `Unwrap(file, format, context, levels)` and `Expand(node, context, levels)` read at most `levels` levels of
+  containers; the containers below are leaves with `UnreadFormat` set, read later by `Expand`. A container holding one
+  file (a wrapper, a disk image's disk) does not count as a level, so a wrapped volume is reached at level 1; a volume
+  always counts, even with one file on it, so its files are never opened by a level 1 read. [ClassicMac]
 - `ContainerReadOptions` holds every limit [ClassicMac]:
 
   | Option | Default | Use |

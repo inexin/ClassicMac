@@ -207,13 +207,14 @@ namespace ClassicMac.Resources.Cli
         {
             var input = InputArgument();
             var json = JsonOption();
-            var command = new Command("check", "Read the input through and report its damage; a plain HFS volume also gets the checks the writer makes before an edit")
+            var deep = new Option<bool>("--deep") { Description = "Also open the archives and disk images stored in the input, and check inside them" };
+            var command = new Command("check", "Check the input's own structures and report their damage; a volume ClassicMac writes also gets the writer's checks")
             {
-                input, json,
+                input, json, deep,
             };
             command.SetAction(result => new CheckCommand(output, error).Run(
                 result.GetRequiredValue(input), ContainerOptionsFrom(result), ReadOptionsFrom(result), result.GetValue(strict),
-                result.GetValue(quiet), result.GetValue(json)));
+                result.GetValue(quiet), result.GetValue(json), result.GetValue(deep)));
             return command;
         }
 

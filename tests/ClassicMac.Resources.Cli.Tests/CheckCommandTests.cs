@@ -101,9 +101,31 @@ public sealed class CheckCommandTests : IDisposable
         var disk = Path.Combine(folder, "outer.img");
         File.WriteAllBytes(disk, outer.Build("Outer"));
 
-        var (_, output, _) = Run("check", disk);
+        var (_, output, _) = Run("check", disk, "--deep");
 
         Assert.Contains("outer.img > Images:Inner.img > Broken: error", output);
+    }
+
+    // Without --deep, containers stored in the input are not opened: their damage is their contents', not the volume's.
+    [Fact]
+    public void Containers_inside_the_input_are_opened_only_with_deep()
+    {
+        var inner = new HfsBuilder();
+        inner.File(HfsBuilder.Root, "Broken", [], [0, 0, 1, 0, 0, 0, 0x7F, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0]);
+        var outer = new HfsBuilder();
+        var images = outer.Folder(HfsBuilder.Root, "Images");
+        outer.File(images, "Inner.img", inner.Build("Inner"), [], type: "rohd", creator: "ddsk");
+        var disk = Path.Combine(folder, "outer.img");
+        File.WriteAllBytes(disk, outer.Build("Outer"));
+
+        var (code, output, _) = Run("check", disk);
+
+        Assert.Equal(0, code);
+        Assert.DoesNotContain("Broken", output);
+        Assert.Contains("1 container in it not opened (--deep checks inside them)", output);
+        Assert.Equal(1, Run("check", disk, "--deep").Code);
+        var json = System.Text.Json.JsonDocument.Parse(Run("check", disk, "--json").Output).RootElement;
+        Assert.Equal(1, json.GetProperty("notOpened").GetInt32());
     }
 
     [Fact]
