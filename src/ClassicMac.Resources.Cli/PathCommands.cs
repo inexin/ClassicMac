@@ -19,8 +19,6 @@ namespace ClassicMac.Resources.Cli
     internal sealed class PathCommands(TextWriter output, TextWriter error, Stream binary, ContainerReadOptions options, ReadOptions readOptions,
         bool strict, bool quiet)
     {
-        private static readonly JsonWriterOptions JsonOptions = new() { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-
         // Opens the path's host file and resolves the rest; reports a path that names nothing (exit NotFound).
         private int With(string path, Func<MacPathTree, MacPathEntry, int> action)
         {
@@ -83,15 +81,7 @@ namespace ClassicMac.Resources.Cli
                 WriteJson(w =>
                 {
                     Where(w, tree, entry.Path);
-                    w.WriteStartArray("entries");
-                    foreach (var e in entries)
-                    {
-                        w.WriteStartObject();
-                        WriteEntry(w, tree, e);
-                        w.WriteEndObject();
-                    }
-
-                    w.WriteEndArray();
+                    MacPathJson.Entries(w, "entries", tree, entries);
                 });
                 return ExitCodes.Success;
             }
@@ -110,36 +100,10 @@ namespace ClassicMac.Resources.Cli
         public int Stat(string path, bool json) => With(path, (tree, entry) =>
         {
             var info = MacCommands.Stat(tree, entry);
-            var kind = entry.File is { } file && entry.Kind is MacPathKind.File or MacPathKind.Container
-                ? (file.FinderInfo.Flags & FinderFlags.IsAlias) != 0
-                    ? new FinderKind("alias", FinderKindSource.BuiltIn, null, null)
-                    : KnownKinds.Resolve(null, file.FinderInfo.Type, file.FinderInfo.Creator)
-                : null;
+            var kind = MacPathJson.KindOf(entry);
             if (json)
             {
-                WriteJson(w =>
-                {
-                    w.WriteString("input", tree.Root.Path);
-                    WriteEntry(w, tree, info);
-                    if (kind is not null)
-                    {
-                        w.WriteString("kindName", kind.Text);
-                        w.WriteString("kindSource", KnownKinds.Describe(kind));
-                    }
-
-                    w.WriteStartArray("chain");
-                    foreach (var step in info.Chain)
-                    {
-                        w.WriteStartObject();
-                        w.WriteString("name", step.Name);
-                        w.WriteString("format", step.Format);
-                        w.WriteEndObject();
-                    }
-
-                    w.WriteEndArray();
-                    Optional(w, "resourceForkSource", info.ResourceForkSource);
-                    Optional(w, "resourceAttributes", info.ResourceAttributes);
-                });
+                WriteJson(w => MacPathJson.Stat(w, tree.Root.Path, tree, entry, info));
                 return ExitCodes.Success;
             }
 
@@ -205,7 +169,7 @@ namespace ClassicMac.Resources.Cli
             }
 
             // A resource without --hex: decoded, as JSON or text; otherwise a hex dump.
-            if (entry.Kind == MacPathKind.Resource && !hex && Decode(entry, all) is { } decoded)
+            if (entry.Kind == MacPathKind.Resource && !hex && MacPathJson.Decode(entry, all, readOptions) is { } decoded)
             {
                 if (decoded.Extension == ".json")
                 {
@@ -284,14 +248,6 @@ namespace ClassicMac.Resources.Cli
             }
         });
 
-        // A resource decoded by the built-in decoders: its main file, or null when none decodes it.
-        private DecodedFile? Decode(MacPathEntry entry, byte[] data)
-        {
-            var resource = entry.Resource!;
-            var decoder = ResourceDecoders.Create(DecodeOptions.Default).FirstOrDefault(d => d.CanDecode(resource.Type));
-            return decoder?.Decode(new DecodeInput(resource, data, entry.Resources!, readOptions, new List<Diagnostic>())).FirstOrDefault();
-        }
-
         public int Find(string path, MacFindQuery query, int limit, bool json) => With(path, (tree, entry) =>
         {
             var matches = MacCommands.Find(tree, entry, query).Take(limit + 1).ToList();
@@ -307,15 +263,7 @@ namespace ClassicMac.Resources.Cli
                 WriteJson(w =>
                 {
                     Where(w, tree, entry.Path);
-                    w.WriteStartArray("matches");
-                    foreach (var match in matches)
-                    {
-                        w.WriteStartObject();
-                        WriteEntry(w, tree, match);
-                        w.WriteEndObject();
-                    }
-
-                    w.WriteEndArray();
+                    MacPathJson.Entries(w, "matches", tree, matches);
                     w.WriteBoolean("truncated", truncated);
                 });
             }
@@ -339,13 +287,7 @@ namespace ClassicMac.Resources.Cli
                 WriteJson(w =>
                 {
                     Where(w, tree, entry.Path);
-                    w.WriteStartArray("written");
-                    foreach (var file in written)
-                    {
-                        w.WriteStringValue(file);
-                    }
-
-                    w.WriteEndArray();
+                    MacPathJson.Strings(w, "written", written);
                 });
             }
             else
@@ -359,80 +301,9 @@ namespace ClassicMac.Resources.Cli
             return ExitCodes.Success;
         });
 
-        // One entry's facts; those that do not apply are left out.
-        private static void WriteEntry(Utf8JsonWriter w, MacPathTree tree, MacEntryInfo e)
-        {
-            w.WriteString("name", e.Name);
-            w.WriteString("path", Inside(tree, e.Path));
-            w.WriteString("kind", e.Kind);
-            Optional(w, "type", e.Type);
-            Optional(w, "creator", e.Creator);
-            Optional(w, "dataSize", e.DataSize);
-            Optional(w, "resourceSize", e.ResourceSize);
-            Optional(w, "created", e.Created?.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture));
-            Optional(w, "modified", e.Modified?.ToString("yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture));
-            Optional(w, "flags", e.Flags);
-            if (e.FlagNames.Count > 0)
-            {
-                w.WriteStartArray("flagNames");
-                foreach (var name in e.FlagNames)
-                {
-                    w.WriteStringValue(name);
-                }
+        private static void Where(Utf8JsonWriter w, MacPathTree tree, string path) => MacPathJson.Where(w, tree.Root.Path, tree, path);
 
-                w.WriteEndArray();
-            }
-
-            if (e.Locked == true)
-            {
-                w.WriteBoolean("locked", true);
-            }
-
-            Optional(w, "format", e.Format);
-            Optional(w, "count", e.Count);
-            Optional(w, "resourceType", e.ResourceType);
-            Optional(w, "resourceId", e.ResourceId);
-            Optional(w, "resourceName", e.ResourceName);
-        }
-
-        // The input (the host file) and an entry's path inside it, as the write commands name them (docs/cli.md §3.3).
-        private static void Where(Utf8JsonWriter w, MacPathTree tree, string path)
-        {
-            w.WriteString("input", tree.Root.Path);
-            w.WriteString("path", Inside(tree, path));
-        }
-
-        // A full Mac path without its host file: the names inside the input ("" for the input itself).
-        private static string Inside(MacPathTree tree, string path) => path.Length > tree.Root.Path.Length ? path[(tree.Root.Path.Length + 1)..] : "";
-
-        private static void Optional(Utf8JsonWriter w, string name, string? value)
-        {
-            if (value is not null)
-            {
-                w.WriteString(name, value);
-            }
-        }
-
-        private static void Optional(Utf8JsonWriter w, string name, long? value)
-        {
-            if (value is { } number)
-            {
-                w.WriteNumber(name, number);
-            }
-        }
-
-        private void WriteJson(Action<Utf8JsonWriter> body)
-        {
-            using var stream = new MemoryStream();
-            using (var w = new Utf8JsonWriter(stream, JsonOptions))
-            {
-                w.WriteStartObject();
-                body(w);
-                w.WriteEndObject();
-            }
-
-            output.WriteLine(Encoding.UTF8.GetString(stream.ToArray()));
-        }
+        private void WriteJson(Action<Utf8JsonWriter> body) => output.WriteLine(MacPathJson.Document(body));
 
         private static string Date(DateTime? date) => date?.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) ?? "-";
     }

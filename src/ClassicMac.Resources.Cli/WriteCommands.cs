@@ -16,12 +16,6 @@ namespace ClassicMac.Resources.Cli
     // new file (-o) or, only with --in-place, the input itself; --dry-run writes nothing.
     internal sealed partial class CommandLine
     {
-        // A refused write: a usage error with its message.
-        private class WriteRefused(string message) : Exception(message);
-
-        // A path that names nothing: exit NotFound, as the read commands do.
-        private sealed class PathNotFound(string message) : WriteRefused(message);
-
         private sealed record WriteOptions(Option<FileInfo> Output, Option<bool> InPlace, Option<bool> DryRun, Option<bool> Json);
 
         private static WriteOptions NewWriteOptions() => new(
@@ -64,20 +58,9 @@ namespace ClassicMac.Resources.Cli
             var options = NewWriteOptions();
             var command = new Command("put", "Add a host file to a volume image") { source, destination, name, type, creator };
             AddWriteOptions(command, options);
-            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(destination), (session, tree, entry, path) =>
-            {
-                var file = HostImport.Read(result.GetRequiredValue(source).FullName, ContainerOptionsFrom(result));
-                var (folder, newName) = entry is { Kind: MacPathKind.Folder or MacPathKind.Container } && IsVolumeFolder(tree, entry)
-                    ? (VolumePath(tree, entry), result.GetValue(name) ?? file.Name.ToMacRoman())
-                    : NewItem(tree, path);
-                newName = result.GetValue(name) ?? newName;
-                var info = file.FinderInfo with
-                {
-                    Type = Code(result.GetValue(type), "type") ?? file.FinderInfo.Type,
-                    Creator = Code(result.GetValue(creator), "creator") ?? file.FinderInfo.Creator,
-                };
-                session.AddFile(Join(folder, newName), file with { Name = MacString.FromMacRoman(newName), FinderInfo = info });
-            }, mustExist: false));
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(destination), (_, tree, rest) =>
+                MacEdits.Put(tree, rest, HostImport.Read(result.GetRequiredValue(source).FullName, ContainerOptionsFrom(result)),
+                    result.GetValue(name), result.GetValue(type), result.GetValue(creator))));
             return command;
         }
 
@@ -87,11 +70,7 @@ namespace ClassicMac.Resources.Cli
             var options = NewWriteOptions();
             var command = new Command("mkdir", "Make a folder in a volume image") { path };
             AddWriteOptions(command, options);
-            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (session, tree, _, full) =>
-            {
-                var (folder, name) = NewItem(tree, full);
-                session.AddFolder(Join(folder, name));
-            }, mustExist: false));
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Mkdir(tree, rest)));
             return command;
         }
 
@@ -103,7 +82,7 @@ namespace ClassicMac.Resources.Cli
             var command = new Command("rm", "Delete a file or folder from a volume image") { path, recursive };
             AddWriteOptions(command, options);
             command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path),
-                (session, tree, entry, _) => session.Delete(VolumePath(tree, entry!), result.GetValue(recursive))));
+                (_, tree, rest) => MacEdits.Rm(tree, rest, result.GetValue(recursive))));
             return command;
         }
 
@@ -115,7 +94,7 @@ namespace ClassicMac.Resources.Cli
             var command = new Command("rename", "Rename a file or folder in its folder") { path, newName };
             AddWriteOptions(command, options);
             command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path),
-                (session, tree, entry, _) => session.Rename(ItemPath(session, tree, entry!), result.GetRequiredValue(newName))));
+                (kind, tree, rest) => MacEdits.Rename(kind, tree, rest, result.GetRequiredValue(newName))));
             return command;
         }
 
@@ -131,18 +110,8 @@ namespace ClassicMac.Resources.Cli
             var options = NewWriteOptions();
             var command = new Command("set", "Set a file's type, creator and Finder flags, or a folder's Finder flags") { path, type, creator, flags };
             AddWriteOptions(command, options);
-            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (session, tree, entry, _) =>
-            {
-                var setFlags = result.GetValue(flags) is { } text ? Flags(text) : (FinderFlags?)null;
-                var setType = Code(result.GetValue(type), "type");
-                var setCreator = Code(result.GetValue(creator), "creator");
-                if (setFlags is null && setType is null && setCreator is null)
-                {
-                    throw new WriteRefused("Give --type, --creator or --flags.");
-                }
-
-                session.SetInfo(ItemPath(session, tree, entry!), setType, setCreator, setFlags);
-            }));
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (kind, tree, rest) =>
+                MacEdits.Set(kind, tree, rest, result.GetValue(type), result.GetValue(creator), result.GetValue(flags))));
             return command;
         }
 
@@ -155,17 +124,8 @@ namespace ClassicMac.Resources.Cli
             var options = NewWriteOptions();
             var command = new Command("res-add", "Add a resource to a file, or replace one") { path, data, name, replace };
             AddWriteOptions(command, options);
-            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (session, tree, _, full) =>
-            {
-                var (file, type, id) = ResourcePath(session, tree, full);
-                if (!result.GetValue(replace) && session.Resources(file).Find(type, id) is not null)
-                {
-                    throw new WriteRefused($"'{type}' {id} exists; give --replace to replace it.");
-                }
-
-                var resourceName = result.GetValue(name) is { } text ? MacString.FromMacRoman(text) : (MacString?)null;
-                session.SetResource(file, type, id, File.ReadAllBytes(result.GetRequiredValue(data).FullName), resourceName);
-            }, mustExist: false));
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (kind, tree, rest) =>
+                MacEdits.ResAdd(kind, tree, rest, File.ReadAllBytes(result.GetRequiredValue(data).FullName), result.GetValue(name), result.GetValue(replace))));
             return command;
         }
 
@@ -175,17 +135,13 @@ namespace ClassicMac.Resources.Cli
             var options = NewWriteOptions();
             var command = new Command("res-rm", "Delete a resource from a file") { path };
             AddWriteOptions(command, options);
-            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (session, tree, _, full) =>
-            {
-                var (file, type, id) = ResourcePath(session, tree, full);
-                session.DeleteResource(file, type, id);
-            }, mustExist: false));
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (kind, tree, rest) => MacEdits.ResRm(kind, tree, rest)));
             return command;
         }
 
         // Opens the host file a path starts with, resolves the path, makes the change, prints it and saves.
         private int RunWrite(System.CommandLine.ParseResult result, WriteOptions options, string path,
-            Action<InputEditSession, MacPathTree, MacPathEntry?, string> change, bool mustExist = true)
+            Func<InputEditKind, MacPathTree, string, Action<InputEditSession>> plan)
         {
             var target = result.GetValue(options.Output);
             var inPlace = result.GetValue(options.InPlace);
@@ -215,19 +171,14 @@ namespace ClassicMac.Resources.Cli
             try
             {
                 using var tree = MacPathTree.Open(host, ContainerOptionsFrom(result), ReadOptionsFrom(result), diagnostics);
-                var entry = tree.Resolve(rest);
-                if (mustExist && entry is null)
-                {
-                    throw new PathNotFound("names nothing.");
-                }
-
                 session = InputEditSession.Open(host, ContainerOptionsFrom(result), ReadOptionsFrom(result), diagnostics);
+                var change = plan(session.Kind, tree, rest);
                 if (session.Kind == InputEditKind.ReadOnly)
                 {
                     throw new WriteRefused($"{Path.GetFileName(host)} cannot be changed: ClassicMac writes plain HFS volume images and single Mac files.");
                 }
 
-                change(session, tree, entry, rest);
+                change(session);
                 if (!dryRun)
                 {
                     if (inPlace)
@@ -282,192 +233,7 @@ namespace ClassicMac.Resources.Cli
             return ExitCodes.Success;
         }
 
-        private void WriteJson(InputEditSession session, bool dryRun, IReadOnlyList<string> written)
-        {
-            using var stream = new MemoryStream();
-            using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
-            {
-                writer.WriteStartObject();
-                writer.WriteString("input", session.Path);
-                writer.WriteBoolean("dryRun", dryRun);
-                writer.WriteStartArray("written");
-                foreach (var file in written)
-                {
-                    writer.WriteStringValue(file);
-                }
-
-                writer.WriteEndArray();
-                writer.WriteStartArray("changes");
-                foreach (var planned in session.Changes)
-                {
-                    writer.WriteStartObject();
-                    writer.WriteString("action", planned.Action);
-                    writer.WriteString("path", planned.Path);
-                    writer.WriteString("detail", planned.Detail);
-                    writer.WriteEndObject();
-                }
-
-                writer.WriteEndArray();
-                writer.WriteEndObject();
-            }
-
-            output.WriteLine(System.Text.Encoding.UTF8.GetString(stream.ToArray()));
-        }
-
-        // Whether an entry is the volume's root or a folder in it, not in a container inside it.
-        private static bool IsVolumeFolder(MacPathTree tree, MacPathEntry entry) =>
-            (entry == tree.Root || entry.Kind == MacPathKind.Folder) && InVolume(tree, entry);
-
-        // Whether every entry between the root and this one is a folder (the path does not go into a nested container).
-        private static bool InVolume(MacPathTree tree, MacPathEntry entry)
-        {
-            for (var at = entry.Parent; at is not null && at != tree.Root; at = at.Parent)
-            {
-                if (at.Kind != MacPathKind.Folder)
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        // An item's path in the volume: its folders and its name, as Mac OS Roman text (empty for the root).
-        private static string VolumePath(MacPathTree tree, MacPathEntry entry)
-        {
-            if (entry == tree.Root)
-            {
-                return "";
-            }
-
-            if (!InVolume(tree, entry) || entry.Kind is not (MacPathKind.Folder or MacPathKind.File or MacPathKind.Container))
-            {
-                throw new WriteRefused($"{entry.Path} is not a file or folder of the volume ClassicMac can change.");
-            }
-
-            var names = entry.Kind == MacPathKind.Folder
-                ? entry.FolderPath!.Select(n => n.ToMacRoman())
-                : entry.File!.FolderPath.Select(n => n.ToMacRoman()).Append(entry.File.Name.ToMacRoman());
-            return string.Join(":", names);
-        }
-
-        // A file's or folder's path for a session: in a volume, its path; for a single-file input, "".
-        private static string ItemPath(InputEditSession session, MacPathTree tree, MacPathEntry entry)
-        {
-            if (session.Kind == InputEditKind.SingleFile)
-            {
-                if (entry != tree.Root && entry.Parent != tree.Root)
-                {
-                    throw new WriteRefused($"{entry.Path} is not the file the input holds.");
-                }
-
-                return "";
-            }
-
-            return VolumePath(tree, entry);
-        }
-
-        // A new item: its folder's path in the volume (which must exist) and its name.
-        private static (string Folder, string Name) NewItem(MacPathTree tree, string rest)
-        {
-            var names = MacPaths.Split(rest);
-            if (names.Count == 0)
-            {
-                throw new WriteRefused("Give the new item's name after the volume.");
-            }
-
-            var parent = tree.Resolve(string.Join(":", names.Take(names.Count - 1).Select(MacPaths.Escape)));
-            if (parent is null)
-            {
-                throw new PathNotFound($"There is no folder to put {names[^1]} in.");
-            }
-
-            if (!IsVolumeFolder(tree, parent))
-            {
-                throw new WriteRefused($"There is no folder to put {names[^1]} in.");
-            }
-
-            return (VolumePath(tree, parent), names[^1]);
-        }
-
-        private static string Join(string folder, string name) => folder.Length == 0 ? name : folder + ":" + name;
-
-        // A resource path: the file before #rsrc, the type and the ID.
-        private static (string File, FourCC Type, short Id) ResourcePath(InputEditSession session, MacPathTree tree, string rest)
-        {
-            var names = MacPaths.Split(rest);
-            var fork = names.Count >= 3 && names[^3] == MacPaths.ResourceFork ? names.Count - 3 : -1;
-            if (fork < 0)
-            {
-                throw new WriteRefused("Give the resource as <file>:#rsrc:<type>:<ID>.");
-            }
-
-            var typeText = names[^2].Length >= 2 && names[^2][0] == '\'' && names[^2][^1] == '\'' ? names[^2][1..^1] : names[^2];
-            if (!FourCC.TryParse(typeText, out var type))
-            {
-                throw new WriteRefused($"{names[^2]} is not a resource type (four Mac OS Roman characters).");
-            }
-
-            if (!short.TryParse(names[^1], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var id))
-            {
-                throw new WriteRefused($"{names[^1]} is not a resource ID (-32768 to 32767).");
-            }
-
-            var file = tree.Resolve(string.Join(":", names.Take(fork).Select(MacPaths.Escape)));
-            if (file is null)
-            {
-                throw new PathNotFound("The path before #rsrc names nothing.");
-            }
-
-            if (file.Kind is not (MacPathKind.File or MacPathKind.Container))
-            {
-                throw new WriteRefused("The path before #rsrc names no file.");
-            }
-
-            return (ItemPath(session, tree, file), type, id);
-        }
-
-        private static FourCC? Code(string? text, string what)
-        {
-            if (text is null)
-            {
-                return null;
-            }
-
-            return InputEditSession.TryParseCode(text, out var code) ? code : throw new WriteRefused($"'{text}' is not a {what}: up to four Mac OS Roman characters.");
-        }
-
-        // Finder flags: a number (0x…, $…, decimal), or names joined with commas (with or without their Is/Has).
-        private static FinderFlags Flags(string text)
-        {
-            var trimmed = text.Trim();
-            if (trimmed.StartsWith("0x", StringComparison.OrdinalIgnoreCase) || trimmed.StartsWith('$'))
-            {
-                var hex = trimmed.StartsWith('$') ? trimmed[1..] : trimmed[2..];
-                if (ushort.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value))
-                {
-                    return (FinderFlags)value;
-                }
-            }
-            else if (ushort.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
-            {
-                return (FinderFlags)number;
-            }
-            else
-            {
-                var flags = FinderFlags.None;
-                foreach (var part in trimmed.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                {
-                    var found = new[] { part, "Is" + part, "Has" + part }
-                        .Select(name => Enum.TryParse<FinderFlags>(name, ignoreCase: true, out var flag) && !int.TryParse(name, out _) ? flag : (FinderFlags?)null)
-                        .FirstOrDefault(f => f is not null);
-                    flags |= found ?? throw new WriteRefused($"'{part}' is not a Finder flag ({string.Join(", ", Enum.GetNames<FinderFlags>().Where(n => n is not "None" and not "ColorMask"))}).");
-                }
-
-                return flags;
-            }
-
-            throw new WriteRefused($"'{text}' is not a set of Finder flags.");
-        }
+        private void WriteJson(InputEditSession session, bool dryRun, IReadOnlyList<string> written) =>
+            output.WriteLine(MacPathJson.Document(w => MacPathJson.Changes(w, session.Path, dryRun, written, session.Changes)));
     }
 }
