@@ -673,19 +673,25 @@ namespace ClassicMac.Files.Hfs
                 return available[nextNode++];
             }
 
+            // The records in node-sized groups, each as full as it goes: a record joins the group while its key (padded to
+            // even) and data end before the offset table, one entry longer (TryBuildLeafNode's layout).
             List<List<(byte[] Key, byte[] Data)>> Partition(List<(byte[] Key, byte[] Data)> entries)
             {
+                static int After(int end, (byte[] Key, byte[] Data) entry) => checked(((end + entry.Key.Length + 1) & ~1) + entry.Data.Length);
+
                 var groups = new List<List<(byte[] Key, byte[] Data)>>();
                 var group = new List<(byte[] Key, byte[] Data)>();
+                int end = 14;
                 foreach (var entry in entries)
                 {
-                    group.Add(entry);
-                    if (TryBuildLeafNode(new byte[NodeSize], group, out _))
+                    int next = After(end, entry);
+                    if (next <= NodeSize - 2 * (group.Count + 2))
                     {
+                        group.Add(entry);
+                        end = next;
                         continue;
                     }
 
-                    group.RemoveAt(group.Count - 1);
                     if (group.Count == 0)
                     {
                         throw new InvalidDataException("An extents-overflow record cannot fit in a B-tree node.");
@@ -693,7 +699,8 @@ namespace ClassicMac.Files.Hfs
 
                     groups.Add(group);
                     group = [entry];
-                    if (!TryBuildLeafNode(new byte[NodeSize], group, out _))
+                    end = After(14, entry);
+                    if (end > NodeSize - 4)
                     {
                         throw new InvalidDataException("An extents-overflow record cannot fit in a B-tree node.");
                     }

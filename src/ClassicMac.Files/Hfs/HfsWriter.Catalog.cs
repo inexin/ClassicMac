@@ -829,6 +829,7 @@ public static partial class HfsWriter
 
         var diagnostics = new List<Diagnostic>();
         HfsReader.Instance.Read(state.Result.AsForkData(), new ContainerContext(diagnostics: diagnostics));
+
         if (diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
         {
             throw new InvalidDataException("The edited HFS catalog did not reopen cleanly.");
@@ -1005,6 +1006,17 @@ public static partial class HfsWriter
             throw new InvalidDataException("The HFS root folder is missing or duplicated.");
         }
 
+        // Each folder's children (folder and file records) by their keys' parent ID, counted in one pass.
+        var children = new Dictionary<uint, int>();
+        foreach (var record in records)
+        {
+            if (record.Data.Length > 0 && record.Data[0] is 1 or 2)
+            {
+                uint parent = U32(new BigEndianReader(record.Key), 2);
+                children[parent] = children.GetValueOrDefault(parent) + 1;
+            }
+        }
+
         foreach (var folder in folders)
         {
             var data = new BigEndianReader(folder.Data);
@@ -1015,9 +1027,7 @@ public static partial class HfsWriter
                 throw new InvalidDataException("An HFS folder has no parent folder.");
             }
 
-            int children = records.Count(record => record.Data.Length > 0 && record.Data[0] is 1 or 2 &&
-                U32(new BigEndianReader(record.Key), 2) == id);
-            if (U16(data, 4) != children)
+            if (U16(data, 4) != children.GetValueOrDefault(id))
             {
                 throw new InvalidDataException("An HFS folder valence disagrees with its catalog children.");
             }
@@ -1084,7 +1094,8 @@ public static partial class HfsWriter
 
     internal static int CompareCatalogKeys(byte[] left, byte[] right)
     {
-        int byParent = U32(new BigEndianReader(left), 2).CompareTo(U32(new BigEndianReader(right), 2));
+        // The parent IDs, big-endian, compare as their bytes do (no reader per comparison: a sort makes thousands).
+        int byParent = left.AsSpan(2, 4).SequenceCompareTo(right.AsSpan(2, 4));
         if (byParent != 0)
         {
             return byParent;

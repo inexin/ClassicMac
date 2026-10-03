@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: each edit checks and rebuilds the catalog in about 100 ms instead of 230 ms on a 500 MB volume: folder valences
+  counted in one pass (was a pass per folder), nodes filled by a running size, catalog keys compared without allocating;
+  ten shell `md`s 1.6 s instead of 2.8 s.
 - CLI: the shell and MCP server read a changed volume again in 40 ms instead of 350 ms (500 MB, 4,874 files): files left
   at the level limit are probed only when their format is asked for, and NDIF and Compact Pro probes read the resource map
   or the first bytes, not the fork; ten `md`s 2.8 s instead of 5.8 s, opening the shell 0.7 s instead of 1.2 s
