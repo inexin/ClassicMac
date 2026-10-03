@@ -239,6 +239,24 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
   2 usage error; 3 input not recognised or unusable; 4 file-system error; 70 command not built yet.
 - **Output:** results to stdout, diagnostics to stderr, so `list --format json` can be piped.
 
+**File commands, shell and MCP (planned, decided 2026-10-03).** One command core in the library, three front ends:
+
+1. **Core** (library, under Files): operations on *Mac paths* that go through containers
+   (`Mac OS 9.hfv:System Folder:Finder`, an archive inside a disk inside a disk image): `ls`, `stat`, `cat` (text,
+   hex, or a resource decoded as JSON), `find` (by name, type/creator, kind, resource type, content), `get` (extract),
+   `put`/`add`, `rm`, `mkdir`, `save-as`. Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
+   in the app moves into the library). The original is never changed unless `--in-place`; otherwise writes go to a
+   new file. `--dry-run` on every write.
+2. **CLI subcommands** for each operation with `--json` (stable, documented schemas in `docs/cli.md`), so any AI with a
+   shell can drive them.
+3. **MCP server** (`classicmac mcp`, stdio): the same operations as MCP tools (list, stat, read, search, extract, add,
+   delete, save as), with the same write safety and output-size limits.
+4. **Interactive shell** (`classicmac shell <input>`), DOS-like: `cd` (into disk images and archives as folders),
+   `dir`/`ls`, `type`, `info`, `res`, `copy` (in or out), `del`, `md`, `find`; prompt `Mac OS 9.hfv:System Folder>`,
+   tab completion, history; leaving with unsaved changes asks Save / Save As / Discard.
+
+Order: core with the `--json` subcommands, then the MCP server, then the shell.
+
 ## Decoders
 
 Each decoder turns one resource type into a modern file; anything without a decoder is exported raw.
