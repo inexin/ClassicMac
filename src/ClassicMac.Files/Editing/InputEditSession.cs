@@ -62,7 +62,7 @@ namespace ClassicMac.Files.Editing
             this.options = options;
             this.host = host;
             // A plain HFS volume image, known by its MDB (an empty volume has no files to show it).
-            if (host.Layout == HostLayout.Plain && root.Volume?.Format == "HFS")
+            if (DataFileIsDisk(host) && root.Volume?.Format == "HFS")
             {
                 Kind = InputEditKind.HfsVolume;
                 return;
@@ -70,7 +70,7 @@ namespace ClassicMac.Files.Editing
 
             // A partitioned disk whose map holds one Mac volume, a plain HFS one: that partition is edited and put back in
             // place (partition-map.md §5). A disk with more is not written.
-            if (host.Layout == HostLayout.Plain && PartitionMapReader.Partitions(host.File.DataFork) is { Count: > 0 } partitions)
+            if (DataFileIsDisk(host) && PartitionMapReader.Partitions(host.File.DataFork) is { Count: > 0 } partitions)
             {
                 if (partitions is [var only] && IsPlainHfs(host.File.DataFork.Slice(only.Offset, only.Length)))
                 {
@@ -86,7 +86,7 @@ namespace ClassicMac.Files.Editing
 
             // A Disk Copy 4.2 image of an HFS disk: the disk is edited in place and the data checksum made again
             // (diskcopy42.md §3).
-            if (host.Layout == HostLayout.Plain && DiskCopy42Reader.Instance.CanRead(host.File.DataFork))
+            if (DataFileIsDisk(host) && DiskCopy42Reader.Instance.CanRead(host.File.DataFork))
             {
                 long dataSize = new BigEndianReader(host.File.DataFork.ReadPrefix(84)).ReadUInt32At(0x40);
                 if (84 + dataSize <= host.File.DataFork.Length && IsPlainHfs(host.File.DataFork.Slice(84, dataSize)))
@@ -554,7 +554,39 @@ namespace ClassicMac.Files.Editing
             }
 
             WriteVolume(full);
-            return [full];
+            return host.Layout == HostLayout.Plain ? [full] : [full, .. WriteCompanion(full)];
+        }
+
+        // The disk is the data file itself, alone or with an AppleDouble header or Basilisk II companions beside it (its
+        // type, creator and resource fork), which an edit leaves alone.
+        private static bool DataFileIsDisk(HostFile host) => host.Layout is HostLayout.Plain or HostLayout.AppleDouble or HostLayout.BasiliskII;
+
+        // The input's companions written beside destination: the pair written with no data in a temporary folder, its
+        // files other than the data file moved into place.
+        private IReadOnlyList<string> WriteCompanion(string destination)
+        {
+            var directory = System.IO.Path.GetDirectoryName(destination)!;
+            var staging = System.IO.Path.Combine(directory, $".classicmac-{Guid.NewGuid():N}");
+            try
+            {
+                var name = System.IO.Path.GetFileName(destination);
+                var paths = HostFiles.Write(host.File with { DataFork = ForkData.Empty }, staging,
+                    new HostWriteOptions { Layout = host.Layout, Overwrite = true }, name);
+                var moved = new List<string>();
+                foreach (var path in paths.Where(p => System.IO.Path.GetFullPath(p) != System.IO.Path.Combine(staging, name)))
+                {
+                    var target = System.IO.Path.Combine(directory, System.IO.Path.GetRelativePath(staging, path));
+                    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
+                    File.Move(path, target, overwrite: true);
+                    moved.Add(target);
+                }
+
+                return moved;
+            }
+            finally
+            {
+                Directory.Delete(staging, recursive: true);
+            }
         }
 
         // Writes the input with the volume's changes to destination through a temporary file beside it: a streamed copy of

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Editing: a Disk Copy 4.2 image, plain HFS image or partitioned disk with an AppleDouble header or Basilisk II
+  companions beside it is edited like a lone one (it was read-only); Save As writes the companions too (diskcopy42.md §5).
 - HFS: a volume whose count of the root's files (drNmFls) is wrong is edited, the count kept and changed by each edit as
   Mac OS does; Disk First Aid passes such a volume (hfs.md §2.7).
 - HFS: editing a volume with short thread records (hfsutils') writes them all at Mac OS's 46 bytes first, listed as a

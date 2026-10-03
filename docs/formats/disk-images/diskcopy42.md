@@ -99,10 +99,11 @@ the new sectors as in [§1.2](#12-the-checksum); the name, sizes, format bytes, 
   `diskcopy.tags-truncated` is reported; the data checksum is still checked.
 - **Checksums**: both are checked whenever the data are complete (no option needed); a mismatch is a warning and the
   disk is read anyway.
-- **Writing**: an image, not wrapped (no MacBinary or AppleDouble around it), whose disk is a plain HFS volume is
-  writable: the edit session (`InputEditSession`) edits the disk as a volume
+- **Writing**: an image whose data file is the image itself (alone, or with an AppleDouble header or Basilisk II
+  companions beside it, holding its type, creator and resource fork; not in MacBinary, AppleSingle or BinHex) and whose
+  disk is a plain HFS volume is writable: the edit session (`InputEditSession`) edits the disk as a volume
   ([hfs.md §3](../file-systems/hfs.md#3-writing)) and saves the image with the disk put back and the data checksum made
-  again (§3). Its disk is not resized. The CLI's `check` runs the writer's checks on the disk.
+  again (§3). Save in place leaves the companions alone; Save As writes them beside the new file. Its disk is not resized. The CLI's `check` runs the writer's checks on the disk.
 
 ## 6. Diagnostics
 
