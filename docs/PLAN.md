@@ -973,6 +973,12 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **Archive bugs from the samples** (2026-10-02): LHA `-lh1-` (position code and tree), StuffIt method 15's last
   symbol, DiskDoubler split files (`SPLT`), and `list` paths through single-file wrappers.
 - [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] ([raw-images.md](formats/disk-images/raw-images.md)).
+- [ ] **Apple Help pages** (`TEXT`/`hbwr`, Mac OS 8.5+ Help Viewer books; also `.html`/`.htm` files): a document
+  decoder that reads the page's HTML (3.2/4: headings, paragraphs, bold/italic, fonts, lists, simple tables, images,
+  links) into `StyledDocument`, shown by the existing document preview, with a Rendered | Source switch; no HTML
+  rendering engine. Images and links resolve to files in the same help folder on the volume (a link selects that
+  file); `help:` and AppleScript links are shown inert. Lists and tables need small additions to the model and the
+  view. Not pixel-exact to Help Viewer. Needs real help books as fixtures (e.g. Mac OS 9's Help folder).
 - [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
   then character and paragraph styles. `WDBN` (Word 3–5.1, a Mac-only format; its specification source is still to be
   found, else the layout is fitted to documents and marked so), `W6BN` (Word 6, as Word 6 for Windows) and `W8BN`
