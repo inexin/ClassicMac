@@ -15,7 +15,7 @@
 - CLI: write commands on Mac paths (docs/cli.md §3): `put` (a host file into a volume), `mkdir`, `rm` (`-r` for a
   folder with contents), `rename`, `set` (type, creator, Finder flags), `res-add` and `res-rm`, each with `--dry-run`,
   `--json`, and `-o <new file>` or `--in-place` (keeping `.orig`); plain HFS images and single Mac files are written,
-  nothing inside other containers.
+  nothing inside other containers; exit code 5 when a path names nothing, as for the read commands.
 - Decoders: ClassicMac ships TCDB 2003.10 (Type/Creator Database by Ilan Szekely, credited) as its own gzipped TSV
   (`TypeCreatorDatabase.Shipped`, read on first use; `tools/TcdbData` writes it from TCDB's export, less filext.com's
   records): kinds the volume and ClassicMac's table do not know come from it, shown as "TCDB". A user's TCDB

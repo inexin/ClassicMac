@@ -256,5 +256,6 @@ entry writes more than one file.
 
 ### 3.4 Exit codes
 
-0 success; 2 a usage error or a refused change (a path that names nothing, a name in use, a folder that is not empty,
-an input ClassicMac does not write), with the reason on standard error; 4 the file could not be written.
+0 success; 2 a usage error or a refused change (a name in use, a folder that is not empty, an input ClassicMac does not
+write), with the reason on standard error; 4 the file could not be written; 5 a path that names nothing (no host file,
+no such item, no folder for a new item, no file before `#rsrc`), as for the read commands (§2).

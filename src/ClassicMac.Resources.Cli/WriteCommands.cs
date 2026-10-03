@@ -17,7 +17,10 @@ namespace ClassicMac.Resources.Cli
     internal sealed partial class CommandLine
     {
         // A refused write: a usage error with its message.
-        private sealed class WriteRefused(string message) : Exception(message);
+        private class WriteRefused(string message) : Exception(message);
+
+        // A path that names nothing: exit NotFound, as the read commands do.
+        private sealed class PathNotFound(string message) : WriteRefused(message);
 
         private sealed record WriteOptions(Option<FileInfo> Output, Option<bool> InPlace, Option<bool> DryRun, Option<bool> Json);
 
@@ -202,8 +205,8 @@ namespace ClassicMac.Resources.Cli
 
             if (MacPaths.SplitHost(path) is not var (host, rest))
             {
-                error.WriteLine($"{path}: no file starts this path.");
-                return ExitCodes.Usage;
+                error.WriteLine($"{path}: no host file (the path starts with no existing file).");
+                return ExitCodes.NotFound;
             }
 
             var diagnostics = new List<Diagnostic>();
@@ -215,7 +218,7 @@ namespace ClassicMac.Resources.Cli
                 var entry = tree.Resolve(rest);
                 if (mustExist && entry is null)
                 {
-                    throw new WriteRefused($"{path} names nothing.");
+                    throw new PathNotFound("names nothing.");
                 }
 
                 session = InputEditSession.Open(host, ContainerOptionsFrom(result), ReadOptionsFrom(result), diagnostics);
@@ -237,6 +240,11 @@ namespace ClassicMac.Resources.Cli
                         written = session.SaveAs(target!.FullName);
                     }
                 }
+            }
+            catch (PathNotFound e)
+            {
+                error.WriteLine($"{path}: {e.Message}");
+                return ExitCodes.NotFound;
             }
             catch (Exception e) when (e is WriteRefused or InvalidOperationException or InvalidDataException or ArgumentException or EndOfStreamException)
             {
@@ -369,7 +377,12 @@ namespace ClassicMac.Resources.Cli
             }
 
             var parent = tree.Resolve(string.Join(":", names.Take(names.Count - 1).Select(MacPaths.Escape)));
-            if (parent is null || !IsVolumeFolder(tree, parent))
+            if (parent is null)
+            {
+                throw new PathNotFound($"There is no folder to put {names[^1]} in.");
+            }
+
+            if (!IsVolumeFolder(tree, parent))
             {
                 throw new WriteRefused($"There is no folder to put {names[^1]} in.");
             }
@@ -401,7 +414,12 @@ namespace ClassicMac.Resources.Cli
             }
 
             var file = tree.Resolve(string.Join(":", names.Take(fork).Select(MacPaths.Escape)));
-            if (file is null || file.Kind is not (MacPathKind.File or MacPathKind.Container))
+            if (file is null)
+            {
+                throw new PathNotFound("The path before #rsrc names nothing.");
+            }
+
+            if (file.Kind is not (MacPathKind.File or MacPathKind.Container))
             {
                 throw new WriteRefused("The path before #rsrc names no file.");
             }

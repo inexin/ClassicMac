@@ -176,13 +176,15 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
-    public void Paths_that_name_nothing_or_go_into_a_container_are_refused()
+    public void Paths_that_name_nothing_exit_not_found()
     {
         var disk = Disk();
 
-        Assert.Equal(ExitCodes.Usage, Run("rm", disk + ":Missing", "-o", Out).Code);
-        Assert.Equal(ExitCodes.Usage, Run("mkdir", disk + ":Missing:New", "-o", Out).Code);
-        Assert.Equal(ExitCodes.Usage, Run("rm", Path.Combine(folder, "nothing.img") + ":X", "-o", Out).Code);
+        Assert.Equal(ExitCodes.NotFound, Run("rm", disk + ":Missing", "-o", Out).Code);
+        Assert.Equal(ExitCodes.NotFound, Run("mkdir", disk + ":Missing:New", "-o", Out).Code);
+        Assert.Equal(ExitCodes.NotFound, Run("rm", Path.Combine(folder, "nothing.img") + ":X", "-o", Out).Code);
+        Assert.Equal(ExitCodes.NotFound, Run("res-rm", disk + ":Missing:#rsrc:'STR ':128", "-o", Out).Code);
+        Assert.Equal(ExitCodes.Usage, Run("res-rm", disk + ":Docs:Letter:#rsrc:'STR '", "-o", Out).Code);   // no ID: a usage error
     }
 
     [Fact]
