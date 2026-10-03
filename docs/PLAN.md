@@ -320,8 +320,8 @@ Mac OS 9 volume).** Not ordered yet:
 - **A gated corpus write test:** under `CLASSICMAC_CORPUS`, edit copies of real Mac OS-written images (delete, add,
   rename, move) and require `check` to pass, so writer rules are tested against Mac OS's layouts, not only against
   `HfsBuilder`'s.
-- **`check --no-nested`:** check the input's own structures without reading into the containers inside it, for a
-  quick verdict on a volume full of archives and disk images.
+- **`check` of the input's own structures** (built, the default; `--deep` reads into the archives and disk images
+  stored in it).
 
 ## Decoders
 

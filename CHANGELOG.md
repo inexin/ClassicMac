@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- CLI: `check` checks the input's own structures by default and counts the archives and disk images stored in it without
+  opening them; `--deep` checks inside them too (the Mac OS 9 volume: 0 errors in 2.4 s instead of 33 errors from test images
+  stored on it, in 10 s). A volume holding one file now counts as a level when containers are read level by level (cli.md §2.7).
 - Viewer: the Volume menu (New File, New Folder, Import, Delete) and Save As ▸ HFS Volume Image work on the HFS volume in a
   partitioned disk, a Disk Copy 4.2 image or an NDIF image, saved in the image's own format; folders inside an archive on
   a volume are no longer offered as places for new items.
