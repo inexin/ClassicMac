@@ -233,7 +233,7 @@ named by the containers down to its file (`disk.img > Images:Inner.img > Broken`
 HFS volume image also gets the checks the writer makes before an edit (`HfsWriter.Check`,
 [hfs.md §5.5](formats/file-systems/hfs.md#55-the-writer)), run even on a software-locked volume, and the first fault
 found is shown as `volume: <fault>`, or `volume: passes the writer's checks`. The last line counts the errors and
-warnings.
+warnings; a volume or partition the writer refuses counts as an error (in JSON's `errors` too).
 
 Exit 0 when nothing is wrong (warnings allowed, unless `--strict`), 1 when there is an error or a volume fault, 4 when
 the input cannot be read. `--json` writes `{ "input", "diagnostics": [{ "source", "severity", "code", "message",

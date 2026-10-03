@@ -73,7 +73,10 @@ namespace ClassicMac.Resources.Cli
             fault ??= partitions.Select(p => p.Fault).FirstOrDefault(f => f is not null);
 
             int notOpened = opened.Leaves.Count(leaf => leaf.Node.UnreadFormat is not null);
-            int errors = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Error);
+            // A volume or partition the writer refuses is an error too, counted with the reader's.
+            int errors = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Error)
+                         + (volume && fault is not null && partitions.Count == 0 ? 1 : 0)
+                         + partitions.Count(p => p.Fault is not null);
             int warnings = found.Count(f => f.Diagnostic.Severity == DiagnosticSeverity.Warning);
             if (json)
             {

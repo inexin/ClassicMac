@@ -53,6 +53,23 @@ public sealed class CheckCommandTests : IDisposable
         Assert.Contains("volume: The HFS volume free-block count disagrees with its allocation bitmap.\n", output);
     }
 
+    // A volume the writer refuses counts as an error in the summary, not only in its own line.
+    [Fact]
+    public void A_volume_fault_is_counted_with_the_errors()
+    {
+        var disk = WritableDisk.Build(folder, "counts.img");
+        var image = File.ReadAllBytes(disk);
+        image[Mdb + 0x0D]++;                                                            // drNmFls one too many
+        File.WriteAllBytes(disk, image);
+
+        var json = JsonDocument.Parse(Run("check", disk, "--json").Output).RootElement;
+        var diagnosed = json.GetProperty("diagnostics").EnumerateArray().Count(d => d.GetProperty("severity").GetString() == "error");
+
+        Assert.False(json.GetProperty("volume").GetProperty("passes").GetBoolean());
+        Assert.Equal(diagnosed + 1, json.GetProperty("errors").GetInt32());
+        Assert.Matches($@"\n{diagnosed + 1} errors?, ", Run("check", disk).Output);
+    }
+
     [Fact]
     public void JSON_gives_the_diagnostics_the_volume_s_fault_and_the_counts()
     {
