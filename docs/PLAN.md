@@ -247,7 +247,11 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
    `put`/`add`, `rm`, `mkdir`, `save-as`. The paths are built: `MacPathTree` and `MacPaths` (syntax in
    [cli.md](cli.md) §1). Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
    in the app moves into the library). The original is never changed unless `--in-place`; otherwise writes go to a
-   new file. `--dry-run` on every write.
+   new file. `--dry-run` on every write. The write side is built: `InputEditSession` (`ClassicMac.Files.Editing`) on
+   an opened input (a plain HFS image: add file, add folder, delete, recursive delete, rename, type/creator/flags,
+   resources; a single Mac file: resources, Finder info, name), its changes listed as `PlannedChange`s, saved as a new
+   file or in place; `HostImport` reads a host file to add; `HfsWriter.Rename`, `SetFinderInfo`, `SetFolderFlags`,
+   `Delete`. The app's Volume menu uses them.
 2. **CLI subcommands** for each operation with `--json` (stable, documented schemas in `docs/cli.md`), so any AI with a
    shell can drive them.
 3. **MCP server** (`classicmac mcp`, stdio): the same operations as MCP tools (list, stat, read, search, extract, add,

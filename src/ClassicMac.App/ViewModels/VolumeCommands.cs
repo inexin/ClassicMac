@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Containers;
+using ClassicMac.Files.Editing;
 using ClassicMac.Files.Hfs;
 using CommunityToolkit.Mvvm.Input;
 
@@ -113,7 +114,7 @@ namespace ClassicMac.App.ViewModels
             MacFile imported;
             try
             {
-                imported = await Task.Run(() => ReadHostFile(path));
+                imported = await Task.Run(() => HostImport.Read(path, ContainerOptions));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
             {
@@ -140,27 +141,9 @@ namespace ClassicMac.App.ViewModels
             AddFile(folder, imported with { Name = MacString.FromMacRoman(choice.Name), FinderInfo = finder });
         }
 
-        // A host file as a Mac file: with its companions, and unwrapped when it is a MacBinary or AppleSingle file.
-        private MacFile ReadHostFile(string path)
-        {
-            var host = HostFiles.Read(path, ContainerOptions);
-            if (host.Layout != HostLayout.Plain)
-            {
-                return host.File;
-            }
-
-            IContainerReader[] wrappers = [MacBinaryReader.III, MacBinaryReader.II, MacBinaryReader.I, AppleSingleReader.AppleSingle];
-            if (wrappers.FirstOrDefault(r => r.CanRead(host.File)) is { } reader && reader.Read(host.File, new ContainerContext(ContainerOptions)) is [var inner])
-            {
-                return inner;
-            }
-
-            return host.File;
-        }
-
         private FinderInfo? FinderInfoFor(NewFileChoice choice, FinderInfo initial)
         {
-            if (!FourCC.TryParse(choice.Type.PadRight(4), out var type) || !FourCC.TryParse(choice.Creator.PadRight(4), out var creator))
+            if (!InputEditSession.TryParseCode(choice.Type, out var type) || !InputEditSession.TryParseCode(choice.Creator, out var creator))
             {
                 Status = "The type and creator must each be four Mac OS Roman characters.";
                 return null;
@@ -210,10 +193,9 @@ namespace ClassicMac.App.ViewModels
             {
                 return;
             }
-            // Contents first, deepest first; one failure leaves the volume as it was.
-            var steps = new List<Func<byte[], byte[]>>();
-            AddDeletes(item, steps);
-            if (!ChangeVolume(item.Input, image => steps.Aggregate(image, (at, step) => step(at)), $"delete {name}"))
+            // A folder with everything in it (deepest first); one failure leaves the volume as it was.
+            var path = MacPathOf(item);
+            if (!ChangeVolume(item.Input, image => HfsWriter.Delete(ForkData.FromBytes(image), path, recursive: item is FolderNode), $"delete {name}"))
             {
                 return;
             }
@@ -224,24 +206,6 @@ namespace ClassicMac.App.ViewModels
             Selected = parent;
             NotifyEditCommands();
             Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
-        }
-
-        private static void AddDeletes(NodeViewModel item, List<Func<byte[], byte[]>> steps)
-        {
-            var path = MacPathOf(item);
-            if (item is FolderNode)
-            {
-                foreach (var child in Tree.Contents(item).Where(c => c is FileNode or ContainerFileNode or FolderNode))
-                {
-                    AddDeletes(child, steps);
-                }
-
-                steps.Add(image => HfsWriter.DeleteFolder(ForkData.FromBytes(image), path));
-            }
-            else
-            {
-                steps.Add(image => HfsWriter.DeleteFile(ForkData.FromBytes(image), path));
-            }
         }
 
         private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>

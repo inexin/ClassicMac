@@ -7,6 +7,12 @@
   folders (read one level at a time when entered; a wrapper of one disk passes on to its contents), and on to a file's
   resource fork (`#rsrc`), a type (`'TYPE'`) and a resource ID; names compare as HFS compares them. Resolve, children
   and parent.
+- Files: an edit session on an opened input, for the app and the coming CLI write commands (`InputEditSession`,
+  `PlannedChange`, `HostImport`): in a plain HFS image add files and folders, delete (recursively when asked), rename,
+  set type, creator and Finder flags, and set or delete resources; in a single Mac file its resources, Finder info and
+  name; saved as a new file (never over the input) or in place keeping `.orig`. `HfsWriter` gains `Rename`,
+  `SetFinderInfo`, `SetFolderFlags` and a recursive `Delete` (hfs.md §3, §5.5). The app's Import File and Delete use
+  the moved code.
 - Viewer: a file in a "No name" group is named in the inspector header with its row's chips (`sp`, `tab`, `sp×3` …,
   the bytes on hover), in their plain colours; other files keep their name as text.
 - Decoders: `'kind'` resources (the kind strings an application gives the Finder for its documents) are read

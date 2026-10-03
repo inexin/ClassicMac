@@ -438,7 +438,10 @@ are [ClassicMac].
 5. **Catalog records.** A new folder has a folder record and a folder thread; a file thread exists only when
    `filFlags` bit 1 says so, and goes with its file. The parent folder's `dirVal`, and `drFilCnt`, `drDirCnt`,
    `drNmFls`, `drNmRtDirs` in the MDB, follow every file and folder added or removed. Names in one folder are unique
-   under `_RelString` (§1.11). A name is at most 31 bytes.
+   under `_RelString` (§1.11). A name is at most 31 bytes. A renamed item's record moves to its new key in the same
+   folder, keeping its CNID, and its thread record (a folder's, or a file's when it has one) takes the new name; the
+   counts do not change. A file's Finder info is its record's `filUsrWds` and `filFndrInfo`; a folder's flags are
+   `dirUsrInfo.frFlags`.
 6. **Dates and counters.** The changed file's `filMdDat` and the MDB's `drLsMod` are the write time, as local time;
    `drWrCnt` goes up. A new CNID comes from `drNxtCNID`.
 7. **The alternate MDB.** When the MDB's extents for a B-tree change, the copy at block N − 2 is refreshed too.
@@ -545,11 +548,15 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 
 - `HfsWriter.ReplaceFork(image, path, fork, bytes)` replaces a data or resource fork; `CreateFile` and `DeleteFile` add
   or remove a file record and both forks; `CreateFolder` and `DeleteFolder` add or remove a folder record and its
-  thread. Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
+  thread; `Rename` renames a file or folder in its folder; `SetFinderInfo` sets a file's Finder info and
+  `SetFolderFlags` a folder's Finder flags; `Delete` removes a file, or a folder (an empty one, or with `recursive`
+  everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
   image; the input is never modified.
   `ForkSaver.SaveHfsImageAs` writes the result to another file through a temporary file and a rename, and refuses the
-  source image as its destination. The editor offers it as Save As ▸ HFS Volume Image.
+  source image as its destination. The editor offers it as Save As ▸ HFS Volume Image. `InputEditSession` (in
+  `ClassicMac.Files.Editing`) gathers these edits and resource edits on an opened input for the app and the CLI and
+  saves them to a new file, or in place only when asked, keeping the original as `.orig`.
 - Only plain HFS is written: not partition maps, disk image formats, MFS, HFS Plus or HFS wrappers. A volume with
   `drAtrb` bit 15 set, a locked file, a non-empty folder to delete, a duplicate name, a name over 31 bytes and a
   volume without enough free blocks are refused. Growth of the extents overflow file past its three extents is
@@ -614,7 +621,9 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - `HfsWriterFeatureTests.cs`, `HfsCatalogWriterFeatureTests.cs` and `HfsSaveAsFeatureTests.cs` cover the writer:
   fork growth and shrinking through overflow records and tree splits, extents tree growth with the alternate MDB,
   catalog growth with map nodes and overflow extents, creating and deleting files and folders, the refusals of §5.5,
-  and `_RelString` order for accented names.
+  and `_RelString` order for accented names. `HfsItemEditTests.cs` covers renaming files and folders (their threads
+  and contents following), Finder info and folder flags, and deleting a folder with its contents;
+  `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
 - With `CLASSICMAC_HFS_INTEROP_INPUT` and the `…_OUTPUT` variables set, `ExternalClassicHfsImageCanBeEditedAndReopened`
   and `ExternalVolumeCatalogMutationsReopen` edit a real hfsutils-formatted volume; the outputs were remounted with
   hfsutils, for fork edits, folder changes and catalog growth.

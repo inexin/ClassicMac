@@ -191,6 +191,120 @@ public static partial class HfsWriter
         return CommitCatalog(state);
     }
 
+    /// <summary>
+    /// Renames a file or folder in its folder, returning a new image: the catalog record moves to its new key, and its
+    /// thread record (a folder's always, a file's when it has one) takes the new name. Its ID, forks and Finder info stay.
+    /// </summary>
+    public static byte[] Rename(ForkData image, string macPath, string newName)
+    {
+        ArgumentNullException.ThrowIfNull(newName);
+        ValidateCatalogName(newName);
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, macPath);
+        var item = FindCatalogRecord(state.Records, parent, name);
+        if (item.Data is null || item.Data[0] is not (1 or 2))
+        {
+            throw new InvalidDataException($"The HFS item '{name}' was not found.");
+        }
+
+        var newKey = CatalogKey(parent, newName);
+        var taken = FindCatalogRecord(state.Records, parent, newName);
+        if (taken.Data is not null && !ReferenceEquals(taken.Data, item.Data))
+        {
+            throw new InvalidDataException("An HFS catalog item with that name already exists.");
+        }
+
+        state.Records.Remove(item);
+        state.Records.Add((newKey, item.Data));
+        var isFolder = item.Data[0] == 1;
+        uint id = U32(new BigEndianReader(item.Data), isFolder ? 6 : 20);
+        var thread = FindCatalogRecord(state.Records, id, "");
+        if (isFolder && (thread.Data is null || thread.Data[0] != 3))
+        {
+            throw new InvalidDataException("The HFS folder thread is missing.");
+        }
+
+        if (thread.Data is not null && thread.Data.Length >= 46)
+        {
+            // The thread's name: a length byte and up to 31 bytes at +14.
+            var encoded = MacRoman.Encode(newName);
+            thread.Data.AsSpan(14, 32).Clear();
+            thread.Data[14] = (byte)encoded.Length;
+            encoded.CopyTo(thread.Data, 15);
+        }
+
+        return CommitCatalog(state);
+    }
+
+    /// <summary>Sets a file's Finder info (its <c>FInfo</c> and <c>FXInfo</c>), returning a new image.</summary>
+    public static byte[] SetFinderInfo(ForkData image, string macPath, FinderInfo finderInfo)
+    {
+        ArgumentNullException.ThrowIfNull(finderInfo);
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, macPath);
+        var file = FindCatalogRecord(state.Records, parent, name);
+        if (file.Data is null || file.Data.Length < 102 || file.Data[0] != 2)
+        {
+            throw new InvalidDataException($"The HFS file '{name}' was not found.");
+        }
+
+        var bytes = finderInfo.ToArray();
+        bytes.AsSpan(0, 16).CopyTo(file.Data.AsSpan(4));
+        bytes.AsSpan(16, 16).CopyTo(file.Data.AsSpan(56));
+        return CommitCatalog(state);
+    }
+
+    /// <summary>Sets a folder's Finder flags (<c>DInfo.frFlags</c>), returning a new image.</summary>
+    public static byte[] SetFolderFlags(ForkData image, string macPath, FinderFlags flags)
+    {
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, macPath);
+        var folder = FindCatalogRecord(state.Records, parent, name);
+        if (folder.Data is null || folder.Data.Length < 70 || folder.Data[0] != 1)
+        {
+            throw new InvalidDataException($"The HFS folder '{name}' was not found.");
+        }
+
+        new BigEndianWriter(folder.Data).WriteUInt16At(30, (ushort)flags);
+        return CommitCatalog(state);
+    }
+
+    /// <summary>
+    /// Deletes a file, or a folder: an empty one, or with <paramref name="recursive"/> one and everything in it (files
+    /// and folders deepest first). Returns a new image; a failure on the way leaves the given image as it was.
+    /// </summary>
+    public static byte[] Delete(ForkData image, string macPath, bool recursive)
+    {
+        var state = OpenCatalog(image);
+        var (parent, name) = ResolveParent(state.Records, macPath);
+        var item = FindCatalogRecord(state.Records, parent, name);
+        if (item.Data is null || item.Data[0] is not (1 or 2))
+        {
+            throw new InvalidDataException($"The HFS item '{name}' was not found.");
+        }
+
+        if (item.Data[0] == 2)
+        {
+            return DeleteFile(ForkData.FromBytes(state.Source), macPath);
+        }
+
+        uint id = U32(new BigEndianReader(item.Data), 6);
+        var children = state.Records.Where(r => U32(new BigEndianReader(r.Key), 2) == id && DecodeName(r.Key).Length != 0)
+            .Select(r => DecodeName(r.Key)).ToList();
+        if (children.Count > 0 && !recursive)
+        {
+            throw new InvalidDataException("A nonempty HFS folder cannot be deleted.");
+        }
+
+        var result = state.Source;
+        foreach (var child in children)
+        {
+            result = Delete(ForkData.FromBytes(result), macPath + ":" + child, recursive: true);
+        }
+
+        return DeleteFolder(ForkData.FromBytes(result), macPath);
+    }
+
     private sealed class CatalogEditState(byte[] source, byte[] catalog, byte[] extentsTree,
         List<(ushort Start, ushort Count)> extentsTreeExtents,
         List<(ushort Start, ushort Count)> catalogExtents, List<(byte[] Key, byte[] Data)> records,
