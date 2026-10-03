@@ -128,6 +128,7 @@ One file per format, in its category folder. A codec used by more than one forma
 | [templates.md](resources/templates.md) | `TMPL` resource templates, as ResEdit 2.1.3 reads and writes resources through them | `ClassicMac.Resources.Decoders.Templates` |
 | [finder.md](resources/finder.md) | `BNDL`, `FREF`, `SIZE`; the JSON output | `ClassicMac.Resources.Decoders.Finder` |
 | [documents.md](resources/documents.md) | DOCMaker stand-alone documents and SimpleText documents with pictures | `ClassicMac.Resources.Decoders.Documents` |
+| [help-pages.md](resources/help-pages.md) | Apple Help pages (`TEXT`/`hbwr`, `.htm`/`.html`): decoding, links and pictures resolved on the disk, the page made ready for a web view | `ClassicMac.Resources.Decoders.Documents` (`HelpPages`) |
 
 ### Documents
 

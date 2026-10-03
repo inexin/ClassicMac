@@ -18,6 +18,10 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="NativeWebView" />
+    <PackageReference Include="NativeWebView.Platform.Linux" />
+    <PackageReference Include="NativeWebView.Platform.macOS" />
+    <PackageReference Include="NativeWebView.Platform.Windows" />
   </ItemGroup>
 
   <ItemGroup>

@@ -37,6 +37,9 @@ namespace ClassicMac.App.ViewModels
 
         /// <summary>A font family: a sample from its strikes and its tables (boards/font-family.md).</summary>
         FontFamily,
+
+        /// <summary>An Apple Help page (or another HTML file), rendered by a web view (docs/formats/resources/help-pages.md).</summary>
+        HelpPage,
     }
 
     /// <summary>One of a sound's detail chips: "Rate" "22,254.545 Hz".</summary>
@@ -126,7 +129,12 @@ namespace ClassicMac.App.ViewModels
         public MenuResource? Menu { get; private init; }
 
         public bool HasPreview => Kind is PreviewKind.Image or PreviewKind.Text or PreviewKind.Json or PreviewKind.Sound or PreviewKind.Document
-            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError or PreviewKind.FontFamily;
+            or PreviewKind.Dialog or PreviewKind.Menu or PreviewKind.Folder or PreviewKind.SoundError or PreviewKind.FontFamily or PreviewKind.HelpPage;
+
+        /// <summary>An Apple Help page: its source and the page made ready for the web view.</summary>
+        public HelpPagePreview? Help { get; private init; }
+
+        public bool IsHelpPage => Kind == PreviewKind.HelpPage;
 
         /// <summary>A font family's sample and tables (P6); its JSON is <see cref="Text"/>.</summary>
         public FontFamilyPreview? FontFamily { get; private init; }
@@ -173,6 +181,8 @@ namespace ClassicMac.App.ViewModels
             node switch
             {
                 ResourceNode resource => ForResource(resource.Resource, resource.Fork, options, readOptions, diagnostics, dialogSources),
+                FileNode file when HelpPagePreview.Applies(file) =>
+                    new PreviewViewModel(PreviewKind.HelpPage, "") { Help = HelpPagePreview.Create(file, options, diagnostics) },
                 FileNode file => ForFile(file.File, options, readOptions, diagnostics),
                 ContainerFileNode container => ForFile(container.File, options, readOptions, diagnostics) is { Kind: not PreviewKind.None } shown
                     ? shown : ForFolder(container, options, readOptions, dialogSources),

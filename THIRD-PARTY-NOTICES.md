@@ -266,6 +266,10 @@ The app (not the libraries) references these NuGet packages, which ship their ow
 - [SoundFlow](https://github.com/LSXPrime/SoundFlow) 1.4.1, MIT, for sound playback. It bundles native
   [miniaudio](https://miniaud.io) builds (MIT or public domain, at your choice).
 - Avalonia and CommunityToolkit.Mvvm, MIT.
+- [NativeWebView](https://github.com/wieslawsoltes/NativeWebView) 12.0.4.9 (`NativeWebView` and its Windows, macOS and
+  Linux platform packages), MIT, which hosts the platform's web engine for Apple Help pages. On Windows it brings
+  Microsoft's WebView2 SDK (`Microsoft.Web.WebView2`, BSD-3-Clause, © Microsoft Corporation), which uses the WebView2
+  runtime installed with Windows; on macOS it uses WKWebView, and on Linux WebKitGTK, from the system.
 
 The app also bundles fonts as assets:
 

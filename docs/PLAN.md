@@ -973,12 +973,15 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [x] **Archive bugs from the samples** (2026-10-02): LHA `-lh1-` (position code and tree), StuffIt method 15's last
   symbol, DiskDoubler split files (`SPLT`), and `list` paths through single-file wrappers.
 - [x] **DiskDup+** images: raw sectors, read by the raw-image path [Verified with DiskDup+ 2.9.2] ([raw-images.md](formats/disk-images/raw-images.md)).
-- [ ] **Apple Help pages** (`TEXT`/`hbwr`, Mac OS 8.5+ Help Viewer books; also `.html`/`.htm` files): a document
-  decoder that reads the page's HTML (3.2/4: headings, paragraphs, bold/italic, fonts, lists, simple tables, images,
-  links) into `StyledDocument`, shown by the existing document preview, with a Rendered | Source switch; no HTML
-  rendering engine. Images and links resolve to files in the same help folder on the volume (a link selects that
-  file); `help:` and AppleScript links are shown inert. Lists and tables need small additions to the model and the
-  view. Not pixel-exact to Help Viewer. Needs real help books as fixtures (e.g. Mac OS 9's Help folder).
+- [x] **Apple Help pages** (`TEXT`/`hbwr`, Mac OS 8.5+ Help Viewer books; also `.html`/`.htm` files)
+  ([help-pages.md](formats/resources/help-pages.md)): shown by the platform's own web engine through NativeWebView
+  (MIT; WebView2, WKWebView, WebKitGTK), with a Rendered | Source switch. Decided instead of parsing the HTML into
+  `StyledDocument`: help books are table layouts with fonts, frames and pictures that a hand-written renderer would
+  only approximate, while the platform engines render HTML 3.2/4 well and are already on every desktop. ClassicMac
+  makes each page self-contained (pictures, a PICT drawn to PNG, stylesheets and frames inline as `data:` URIs, no
+  temporary files, JavaScript off) and turns links to the disk's files into tree selections; `help:`, AppleScript and
+  outside links are not followed. Without an engine the page shows as its source. The CLI leaves help pages as the
+  files they are.
 - [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
   then character and paragraph styles. `WDBN` Word 4 and 5 (built: [word-mac.md](formats/documents/word-mac.md); no
   specification was found, so the layout is fitted to the one real document, a fast-saved Word 5 file, with libmwaw as

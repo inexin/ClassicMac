@@ -1806,6 +1806,23 @@
                 <ScrollViewer IsVisible="{Binding Preview.IsMenu}" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False">
                   <views:MenuView Menu="{Binding Preview.Menu}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
+                <!-- An Apple Help page (docs/formats/resources/help-pages.md): Rendered | Source; the page in a native web view
+                     (made in code, MainWindow.Help.cs), else its source with why; the status line under it. -->
+                <DockPanel IsVisible="{Binding Preview.IsHelpPage}">
+                  <ListBox x:Name="HelpMode" DockPanel.Dock="Top" Classes="segmented" HorizontalAlignment="Left" Margin="16,12,16,0"
+                           ItemsSource="{x:Static vm:MainViewModel.HelpModes}" SelectedIndex="{Binding HelpModeIndex, Mode=TwoWay}"
+                           AutomationProperties.Name="Rendered or source" />
+                  <TextBlock x:Name="HelpEngineMessage" DockPanel.Dock="Top" Classes="muted" Margin="16,8,16,0" TextWrapping="Wrap"
+                             Text="{Binding WebEngineMessage}" IsVisible="{Binding HasWebEngineMessage}" />
+                  <TextBlock x:Name="HelpStatusText" DockPanel.Dock="Bottom" Classes="muted" Margin="16,4" TextTrimming="CharacterEllipsis"
+                             Text="{Binding HelpStatus}" IsVisible="{Binding HelpStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  <Panel>
+                    <Panel x:Name="HelpHost" Margin="0,8,0,0" IsVisible="{Binding ShowsHelpRendered}" />
+                    <ScrollViewer IsVisible="{Binding ShowsHelpSource}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
+                      <SelectableTextBlock x:Name="HelpSource" Text="{Binding Preview.Help.Source, FallbackValue={x:Null}}" FontFamily="{StaticResource CmFontMono}" />
+                    </ScrollViewer>
+                  </Panel>
+                </DockPanel>
                 <DockPanel IsVisible="{Binding Preview.IsDocument}">
                   <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8">
                     <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}" />

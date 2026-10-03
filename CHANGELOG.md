@@ -22,6 +22,13 @@
   as tab-separated lines. The viewer previews them and `convert` writes them as HTML, also with no resource fork. The
   layout is fitted to a real Word 5 document (no specification was published); fast-saved documents and Word 1 and 3
   are reported (`word.fast-saved`, `word.unsupported-version`), not read.
+- Viewer: Apple Help pages (Help Viewer's `TEXT`/`hbwr` files of Mac OS 8.5–9, and other `.htm`/`.html` files) show
+  rendered by the platform's web engine (NativeWebView: WebView2, WKWebView, WebKitGTK), with Rendered | Source. The
+  page is decoded (Mac OS Roman unless it declares a charset) and made self-contained: its pictures (GIF, JPEG, PNG,
+  a PICT file drawn to PNG), stylesheets and frames are read from the disk and put into it, JavaScript is off, and a
+  link to a page or file of the disk selects it in the tree; `help:`, AppleScript and outside links are not followed,
+  the status line saying why. Without a web engine the page shows as its source
+  (docs/formats/resources/help-pages.md).
 - Viewer: the browse tree is one virtualized list of its visible rows (VisibleRows: the roots and, under each open
   row, its children the filter keeps), each a fixed 22 px high and indented by its depth, instead of a TreeView with
   a panel per open row: scrolling past an open folder no longer makes the tree jump or the scroll bar's thumb change

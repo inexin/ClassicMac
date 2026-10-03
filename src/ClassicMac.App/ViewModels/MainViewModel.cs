@@ -302,6 +302,7 @@ namespace ClassicMac.App.ViewModels
             Images = ItemsAt(value, Zoom);
             OnSoundPreviewChanged();
             OnPropertyPreviewChanged();
+            OnHelpPreviewChanged();
         }
 
         partial void OnHexSourceChanged(HexSource? value) => HexLines = value is null ? null : new HexLines(value.Data);
