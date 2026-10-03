@@ -258,7 +258,8 @@ Mac OS writes `filStBlk`, `filRStBlk` and `filResrv` as 0 (every Mac-made file r
 blocks in `filStBlk` and `filRStBlk`; Disk First Aid 8.5 reports such a record as "Reserved fields in the catalog record
 have incorrect data, *CNID*, *n*" (the first number is the file's CNID), and its Repair clears both fields and nothing
 else in the record; `fsck_hfs` reports the same [Verified]. An edit session's first change clears them (and
-`filResrv`), listed as a `repair` change [ClassicMac].
+`filResrv`), listed as a `repair` change [ClassicMac]; an hfsutils floppy edited so passes Disk First Aid 8.5 and
+`fsck_hfs` [Verified].
 
 Thread record. A thread lets the File Manager find a folder (or file) from its CNID alone; its key is (the CNID, empty
 name), so it sorts first among the records with that parent ID (§1.11). Every folder has a thread; a file has one only

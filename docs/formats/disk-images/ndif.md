@@ -255,7 +255,8 @@ An image is made again around a changed disk of the same size, keeping what Disk
    valid in every version and do not count against `+$48`, which is kept. Its runs of all-zero sectors become zero
    chunks of their own (offset and length 0, §1.3), so an edit does not store empty space; the map gains their entries
    and its count (`+$7C`) and size follow (§2.1). An image whose chunks are all raw (a read/write image, §4.3) stays
-   all raw, since Disk Copy refuses a read/write mount with zero chunks (§2.1).
+   all raw, since Disk Copy refuses a read/write mount with zero chunks (§2.1). Edited ADC and read-only raw images
+   mount in Disk Copy 6.3.3 with the checksum valid and pass Disk First Aid 8.5 [Verified].
 3. Stored bytes are written in entry order from the data start; each entry's offset and length are made again; the end
    entry's offset is the data's end and its length 0, as Disk Copy 6.3.3 writes it (§1.3).
 4. The CRC (`+$50`) is computed again over the new disk (§1.5) when the image had one, and stays 0 when it had none. The
