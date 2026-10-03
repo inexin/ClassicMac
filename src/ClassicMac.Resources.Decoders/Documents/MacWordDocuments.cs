@@ -105,7 +105,7 @@ namespace ClassicMac.Resources.Decoders.Documents
             public MacWordFacts Facts()
             {
                 var flags = file.ReadByteAt(0x0A);
-                var fast = (flags & 0x04) != 0 || Zone(PieceTable).Length > 0;
+                var fast = Zone(PieceTable).Length > 0;
                 var characters = Bins(CharacterBins, words: false);
                 var paragraphs = Bins(ParagraphBins, words: true);
                 return new MacWordFacts(version, fast, flags >> 4, (int)file.ReadUInt32At(0x24), ReadFonts(Zone(FontNames)),
@@ -117,7 +117,9 @@ namespace ClassicMac.Resources.Decoders.Documents
             {
                 var flags = file.ReadByteAt(0x0A);
                 var pieces = Zone(PieceTable);
-                if ((flags & 0x04) != 0 || pieces.Length > 0)
+                // A fast save leaves a piece table (zone 18); the flag byte's $04 is set in Word 5.1a's full saves too
+                // [Verified: Word 5.1a documents], so it says nothing about fast saving.
+                if (pieces.Length > 0)
                 {
                     var saves = flags >> 4;
                     diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.fast-saved",

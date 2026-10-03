@@ -136,30 +136,37 @@ public class MacWordTests
         Assert.Equal(["word.not-shown"], diagnostics.Select(d => d.Code));
     }
 
-    [Fact]
-    public void A_fast_saved_document_is_reported_and_not_read()
+    // A fast-saved document is one with a piece table (zone 18); the flag byte's $04 is set in every Word 5.1a document,
+    // fast saved or not, and $08 when it has a picture [Verified: Word 5.1a and 4.0 documents made for ClassicMac].
+    [Theory]
+    [InlineData(0x04)]
+    [InlineData(0x0C)]
+    public void The_flag_byte_alone_does_not_make_a_document_fast_saved(byte flags)
     {
-        var data = Builder().Text("Text\r").Build();
-        data[0x0A] = 0x24;                                                     // fast saved twice
+        var builder = Builder().Text("Text\r");
+        builder.Flags = flags;
         var diagnostics = new List<Diagnostic>();
 
-        Assert.Null(MacWordDocuments.Read(data, "Saved", diagnostics: diagnostics));
+        var document = MacWordDocuments.Read(builder.Build(), "Saved", diagnostics: diagnostics);
 
-        var fast = Assert.Single(diagnostics);
-        Assert.Equal(("word.fast-saved", DiagnosticSeverity.Error), (fast.Code, fast.Severity));
-        Assert.Contains("Word 5", fast.Message);
-        Assert.Contains("2 fast saves", fast.Message);
+        Assert.NotNull(document);
+        Assert.Equal("Text", document!.Chapters[0].Text.Text.TrimEnd('\r'));
+        Assert.DoesNotContain(diagnostics, d => d.Code == "word.fast-saved");
     }
 
     [Fact]
-    public void A_piece_table_marks_a_document_fast_saved_too()
+    public void A_piece_table_marks_a_document_fast_saved()
     {
         var builder = Builder().Text("Text\r");
+        builder.Flags = 0x24;                                                  // two fast saves, as Word 5 counts them
         builder.PieceTable = [1, 0, 2, 0x80, 0];
         var diagnostics = new List<Diagnostic>();
 
         Assert.Null(MacWordDocuments.Read(builder.Build(), "Saved", diagnostics: diagnostics));
-        Assert.Equal(["word.fast-saved"], diagnostics.Select(d => d.Code));
+        var fast = Assert.Single(diagnostics);
+        Assert.Equal(("word.fast-saved", DiagnosticSeverity.Error), (fast.Code, fast.Severity));
+        Assert.Contains("Word 5", fast.Message);
+        Assert.Contains("2 fast saves", fast.Message);
     }
 
     [Theory]

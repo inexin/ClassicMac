@@ -37,7 +37,7 @@ an *FC*; FCs of the text run from the header's text start. Pages are 512 bytes, 
 | +$00 | 2 | Signature | `$FE37` for Word 4 and 5 [Fitted]; `$FE34` Word 3, `$FE32` Word 1 [Reference: libmwaw] |
 | +$02 | 2 | Version | `$0023` Word 5 [Fitted]; `$001C` Word 4 [Reference: libmwaw] |
 | +$04 | 6 | Reserved | Zero [Fitted] |
-| +$0A | 1 | Flags | `$04` fast saved; bits 4–7 the number of fast saves since the last full save [Fitted] |
+| +$0A | 1 | Flags | `$04` set in every Word 5.1a document, fast saved or not; `$08` when the document holds a picture [Verified: Word 5.1a and 4.0 documents, §7]; bits 4–7 the number of fast saves since the last full save [Fitted] |
 | +$0B | 9 | Reserved | [Fitted] |
 | +$14 | 4 | Text start | FC of the first character, `$100` [Fitted] |
 | +$18 | 4 | Text end | FC after the last character of all the text (main text, then footnotes and headers) [Fitted] |
@@ -162,7 +162,7 @@ The text is Mac OS Roman [Fitted]. These bytes are not characters:
 ## 2. Reading
 
 1. Check the signature and version (§1.1); a data fork shorter than `$100` bytes is no Word document.
-2. When the flags say fast saved, or zone 18 is not empty, the text is in pieces listed by the piece table: report it
+2. When zone 18 (the piece table) is not empty, the document was fast saved and the text is in pieces listed by the piece table: report it
    and stop (§5).
 3. The main text is the main text length's characters from the text start; the text end and the data end must lie in
    the fork.

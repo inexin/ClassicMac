@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documents: Word 5 documents saved normally are read: the header flag $04 is set in every Word 5.1a document, so it no
+  longer marks a fast save; only a piece table (zone 18) does. Checked against real Word 5.1a and 4.0 documents.
 - Viewer: byte meanings for `'CODE'` resources in the hex inspector: `'CODE'` 0's A5 sizes and jump-table entries
   (near and far forms, the far marker), a segment's near or far header field by field, its code and far relocation
   lists.
