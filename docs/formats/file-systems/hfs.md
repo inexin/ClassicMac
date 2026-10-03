@@ -626,10 +626,13 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   catalog growth with map nodes and overflow extents, creating and deleting files and folders, the refusals of §5.5,
   and `_RelString` order for accented names. `HfsItemEditTests.cs` covers renaming files and folders (their threads
   and contents following), Finder info and folder flags, and deleting a folder with its contents;
+  `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
+  the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
   `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
 - With `CLASSICMAC_HFS_INTEROP_INPUT` and the `…_OUTPUT` variables set, `ExternalClassicHfsImageCanBeEditedAndReopened`
   and `ExternalVolumeCatalogMutationsReopen` edit a real hfsutils-formatted volume; the outputs were remounted with
   hfsutils, for fork edits, folder changes and catalog growth.
+- A file was deleted from a Mac OS 9 boot volume (an image SheepShaver used) and the output listed again.
 - The 256 `_RelString` weights the writer generates were compared with Apple's `gCompareTable` with no differences
   (the table is not in the repository).
 - Disk Copy's block N − 2 rule (§2.6) was checked on images Disk Copy 6.1.2 made in SheepShaver, Mac OS 9.0.

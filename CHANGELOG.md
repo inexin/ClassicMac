@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- File systems: HFS volumes Mac OS wrote can be edited: their catalog index keys, stored at the maximum length, were
+  refused as invalid; the writer now accepts them and writes rebuilt index keys the same way (hfs.md §1.8).
 - Documents: Word 6 documents read: checked against 10 that Word 6.0 for the Macintosh wrote, their FIB identifier
   ($A5DC) is now accepted; line breaks, small caps, colour and tables (as HTML tables) as for Word 4 and 5.
 - Documents: Word 4 and 5 checked against 21 documents Word 4.0 and 5.1a wrote (now test fixtures): styles are found by

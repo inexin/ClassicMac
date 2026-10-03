@@ -23,6 +23,60 @@ public sealed class HfsItemEditTests
         return builder.Build("Disk");
     }
 
+    // The catalog's index records (hfs.md §1.8): every key's length byte, from the image's catalog file.
+    private static List<int> IndexKeyLengths(byte[] image)
+    {
+        var mdb = image.AsSpan(1024);
+        int blockSize = (mdb[0x14] << 24) | (mdb[0x15] << 16) | (mdb[0x16] << 8) | mdb[0x17];
+        int firstBlock = ((mdb[0x1C] << 8) | mdb[0x1D]) * 512;
+        int start = (mdb[0x96] << 8) | mdb[0x97], count = (mdb[0x98] << 8) | mdb[0x99];
+        var catalog = image.AsSpan(firstBlock + start * blockSize, count * blockSize);
+        var lengths = new List<int>();
+        for (var node = 0; node * 512 < catalog.Length; node++)
+        {
+            var bytes = catalog.Slice(node * 512, 512);
+            int records = (bytes[10] << 8) | bytes[11];
+            if (bytes[8] != 0 || records == 0 || node == 0)
+            {
+                continue;                                                      // not an index node
+            }
+
+            for (var r = 0; r < records; r++)
+            {
+                int offset = (bytes[510 - 2 * r] << 8) | bytes[511 - 2 * r];
+                lengths.Add(bytes[offset]);
+            }
+        }
+
+        return lengths;
+    }
+
+    // Mac OS writes an HFS catalog's index keys at the maximum key length, 37, zero-padded (its B-trees do not set
+    // kBTVariableIndexKeysMask, TN1150). A volume written so is edited, and its rebuilt index keeps that form.
+    [Fact]
+    public void A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them()
+    {
+        var builder = new HfsBuilder { CatalogLeaves = 6, FixedIndexKeys = true };
+        var docs = builder.Folder(HfsBuilder.Root, "Docs");
+        for (var i = 0; i < 12; i++)
+        {
+            builder.File(docs, $"File {i:D2}", [(byte)i], []);
+        }
+
+        builder.File(HfsBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
+        var source = builder.Build("Disk");
+        Assert.All(IndexKeyLengths(source), length => Assert.Equal(37, length));
+
+        var output = HfsWriter.Delete(ForkData.FromBytes(source), "Read Me", recursive: false);
+
+        Assert.DoesNotContain(Files(output), f => f.Name.ToMacRoman() == "Read Me");
+        Assert.Equal(12, Files(output).Count);
+        Assert.NotEmpty(IndexKeyLengths(output));
+        Assert.All(IndexKeyLengths(output), length => Assert.Equal(37, length));
+        var renamed = HfsWriter.Rename(ForkData.FromBytes(output), "Docs:File 03", "Third");
+        Assert.Contains(Files(renamed), f => f.Name.ToMacRoman() == "Third");
+    }
+
     [Fact]
     public void A_file_is_renamed_keeping_its_forks_info_and_ID()
     {

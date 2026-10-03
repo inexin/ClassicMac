@@ -612,6 +612,22 @@ namespace ClassicMac.Files.Hfs
         {
             var treeReader = new BigEndianReader(tree);
             uint nodeCount = U32(treeReader, 14 + 22);
+            // Index keys are written at the tree's maximum key length, zero-padded, as Mac OS writes them: HFS B-trees do
+            // not set kBTVariableIndexKeysMask [Code: Mac OS 9.0 ROM; Verified: Mac OS 9's catalog] (hfs.md §1.8).
+            int maxKeyLength = U16(treeReader, 14 + 20);
+            byte[] IndexKey(byte[] key)
+            {
+                if (key.Length == 0 || key[0] >= maxKeyLength)
+                {
+                    return key;
+                }
+
+                var padded = new byte[maxKeyLength + 1];
+                key.AsSpan(0, Math.Min(key.Length, key[0] + 1)).CopyTo(padded);
+                padded[0] = (byte)maxKeyLength;
+                return padded;
+            }
+
             var reserved = new HashSet<uint> { 0 };
             var maps = new List<(int Offset, int Length)>
             {
@@ -718,7 +734,7 @@ namespace ClassicMac.Files.Hfs
                 }
 
                 depth++;
-                var entries = levelNodes.Select(node => (node.FirstKey, ChildNode(node.Number))).ToList();
+                var entries = levelNodes.Select(node => (IndexKey(node.FirstKey), ChildNode(node.Number))).ToList();
                 levelNodes = BuildLevel(entries, depth);
             }
 
@@ -1144,10 +1160,13 @@ namespace ClassicMac.Files.Hfs
                 byte[]? first = null, last = null;
                 foreach (var (key, data) in records)
                 {
+                    // A catalog key is as long as its name (padded to even), or in an index node the tree's maximum key
+                    // length, zero-padded after the name, as Mac OS writes index keys (hfs.md §1.8).
                     bool validKey = catalog
                         ? key.Length >= 7 && key[0] == key.Length - 1 &&
                           (key.Length == 7 + key[6] ||
-                           (key.Length == ((8 + key[6]) & ~1) && key[^1] == 0))
+                           (key.Length == ((8 + key[6]) & ~1) && key[^1] == 0) ||
+                           (height > 1 && key.Length == 38 && 7 + key[6] <= 38 && key.AsSpan(7 + key[6]).IndexOfAnyExcept((byte)0) < 0))
                         : key.Length == 8 && key[0] == 7 && key[1] is 0 or 0xFF;
                     if (!validKey)
                     {

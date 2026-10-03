@@ -20,6 +20,12 @@ internal sealed class HfsBuilder
     /// <summary>The catalog's leaf nodes (two by default), for catalogs too big for two.</summary>
     public int CatalogLeaves { get; init; } = 2;
 
+    /// <summary>
+    /// Writes the catalog's index keys at the tree's maximum key length (37, zero-padded) as Mac OS does, instead of the
+    /// leaf keys' own lengths (hfs.md §1.8).
+    /// </summary>
+    public bool FixedIndexKeys { get; init; }
+
     /// <summary>Leaf keys with <c>ckrKeyLen</c> = 6 + n, the alignment byte not counted, as the Mac OS File Manager writes them.</summary>
     public bool UncountedKeyPadding { get; init; }
 
@@ -339,8 +345,17 @@ internal sealed class HfsBuilder
         return [.. key, .. record];
     }
 
-    private static byte[] IndexRecord(byte[] leafRecord, uint child)
+    private byte[] IndexRecord(byte[] leafRecord, uint child)
     {
+        if (FixedIndexKeys)
+        {
+            var fixedRecord = new byte[38 + 4];
+            leafRecord.AsSpan(0, leafRecord[0] + 1).CopyTo(fixedRecord);
+            fixedRecord[0] = 37;
+            BinaryPrimitives.WriteUInt32BigEndian(fixedRecord.AsSpan(38), child);
+            return fixedRecord;
+        }
+
         int keyBytes = (leafRecord[0] + 2) & ~1;
         var record = new byte[keyBytes + 4];
         leafRecord.AsSpan(0, keyBytes).CopyTo(record);
