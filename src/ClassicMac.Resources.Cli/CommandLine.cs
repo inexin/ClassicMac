@@ -350,15 +350,21 @@ namespace ClassicMac.Resources.Cli
 
         private static Option<bool> JsonOption() => new("--json") { Description = "Write JSON (the schemas are in docs/cli.md)" };
 
-        private PathCommands Paths(ParseResult result) => new(output, error, binary ?? Stream.Null, ContainerOptionsFrom(result), ReadOptionsFrom(result),
-            result.GetValue(strict), result.GetValue(quiet));
+        private PathCommands Paths(ParseResult result, Option<bool>? follow = null) => new(output, error, binary ?? Stream.Null, ContainerOptionsFrom(result), ReadOptionsFrom(result),
+            result.GetValue(strict), result.GetValue(quiet))
+        {
+            Follow = follow is not null && result.GetValue(follow),
+        };
+
+        private static Option<bool> FollowOption() => new("--follow") { Description = "An alias file stands for its original (through aliases of aliases)" };
 
         private Command LsCommand()
         {
             var path = MacPathArgument();
             var json = JsonOption();
-            var command = new Command("ls", "List what a Mac path holds: a folder's or container's files and folders, a fork's types, a type's resources") { path, json };
-            command.SetAction(result => Paths(result).Ls(result.GetRequiredValue(path), result.GetValue(json)));
+            var follow = FollowOption();
+            var command = new Command("ls", "List what a Mac path holds: a folder's or container's files and folders, a fork's types, a type's resources") { path, json, follow };
+            command.SetAction(result => Paths(result, follow).Ls(result.GetRequiredValue(path), result.GetValue(json)));
             return command;
         }
 
@@ -366,7 +372,7 @@ namespace ClassicMac.Resources.Cli
         {
             var path = MacPathArgument();
             var json = JsonOption();
-            var command = new Command("stat", "Show everything about a Mac path: kind, type and creator, Finder kind, forks, dates, flags, how it was read") { path, json };
+            var command = new Command("stat", "Show everything about a Mac path: kind, type and creator, Finder kind, an alias's original, forks, dates, flags, how it was read") { path, json };
             command.SetAction(result => Paths(result).Stat(result.GetRequiredValue(path), result.GetValue(json)));
             return command;
         }
@@ -384,6 +390,7 @@ namespace ClassicMac.Resources.Cli
             var hex = new Option<bool>("--hex") { Description = "A hex dump instead of text (or a decoded resource)" };
             var raw = new Option<bool>("--raw") { Description = "The bytes themselves to standard output" };
             var fork = new Option<ForkChoice>("--fork") { Description = "Which fork of a file", DefaultValueFactory = _ => ForkChoice.Data };
+            var follow = FollowOption();
             var maxBytes = new Option<long>("--max-bytes")
             {
                 Description = "The most bytes shown (bytes, or with KiB/MiB/GiB)",
@@ -392,7 +399,7 @@ namespace ClassicMac.Resources.Cli
             };
             var command = new Command("cat", "Show a file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded")
             {
-                path, json, hex, raw, fork, maxBytes,
+                path, json, hex, raw, fork, maxBytes, follow,
             };
             command.Validators.Add(r =>
             {
@@ -401,7 +408,7 @@ namespace ClassicMac.Resources.Cli
                     r.AddError("--raw writes the bytes themselves; it goes with neither --json nor --hex.");
                 }
             });
-            command.SetAction(result => Paths(result).Cat(result.GetRequiredValue(path), result.GetValue(hex), result.GetValue(raw),
+            command.SetAction(result => Paths(result, follow).Cat(result.GetRequiredValue(path), result.GetValue(hex), result.GetValue(raw),
                 result.GetValue(fork) == ForkChoice.Rsrc ? MacFork.Resource : MacFork.Data, result.GetValue(maxBytes), result.GetValue(json)));
             return command;
         }
@@ -509,8 +516,9 @@ namespace ClassicMac.Resources.Cli
             };
             var overwrite = new Option<bool>("--overwrite") { Description = "Replace existing files" };
             var enter = new Option<bool>("--enter") { Description = "Write a container's contents as a folder instead of the container file" };
-            var command = new Command("get", "Copy a file (both forks), folder or resource from a Mac path to the host") { path, json, outputDir, format, overwrite, enter };
-            command.SetAction(result => Paths(result).Get(result.GetRequiredValue(path), result.GetValue(outputDir)?.FullName ?? Directory.GetCurrentDirectory(),
+            var follow = FollowOption();
+            var command = new Command("get", "Copy a file (both forks), folder or resource from a Mac path to the host") { path, json, outputDir, format, overwrite, enter, follow };
+            command.SetAction(result => Paths(result, follow).Get(result.GetRequiredValue(path), result.GetValue(outputDir)?.FullName ?? Directory.GetCurrentDirectory(),
                 result.GetValue(format) switch
                 {
                     GetFormatChoice.Basilisk => MacGetFormat.Basilisk,

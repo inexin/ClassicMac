@@ -1352,6 +1352,25 @@
       "encoding": "macintosh"
     },
     {
+      "type": "alis",
+      "typeBytes": "616C6973",
+      "id": 0,
+      "name": "Read Me",
+      "attributes": 0,
+      "size": 801,
+      "storedSize": 200,
+      "dcmp": null,
+      "decoder": "finder.alias",
+      "decoderVersion": 1,
+      "path": "alis/0 Read Me.json",
+      "sha256": "f82024b89b8758c43d2772769a8b3b54d3857e59671d0111cfeca35830e8297d",
+      "storedSha256": "56f392a24ab1b451f117152ea3cf5521a8b3acdbb039d97082e46298cb4495d3",
+      "rawPath": null,
+      "warnings": [],
+      "otherFiles": [],
+      "encoding": "macintosh"
+    },
+    {
       "type": "FOND",
       "typeBytes": "464F4E44",
       "id": 1024,

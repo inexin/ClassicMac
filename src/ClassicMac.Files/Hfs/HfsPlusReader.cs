@@ -715,6 +715,8 @@ internal static class HfsPlusReader
                         content.DataFork, content.ResourceFork,
                         context.Options.MaxExpandedBytesPerInput),
                     HardLinkReference = isHardLink ? file.Special : null,
+                    CatalogId = fileId,
+                    ParentId = parent,
                 });
             }
         }
@@ -754,6 +756,7 @@ internal static class HfsPlusReader
                 {
                     Name = LegacyName(folder.Name),
                     IsRoot = id == RootFolderId,
+                    CatalogId = id,
                     FreeBytes = id == RootFolderId ? (long)U32(headerReader, 48) * blockSize : null,
                     FolderPath = id == RootFolderId ? [] : FolderPath(folder.Parent, folders).Select(LegacyName).ToArray(),
                     FinderInfo = FolderFinderInfo.Read(record.AsSpan(48, FolderFinderInfo.Length)),

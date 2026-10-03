@@ -62,6 +62,10 @@ Each takes a Mac path (§1). Results go to standard output, diagnostics to stand
 object (§2.6). The limit options of every command (`--max-resource-size`, `--max-nesting-depth`,
 `--max-expanded-bytes`, `--strict`, `-q`) apply.
 
+`ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
+the volume holding it ([aliases.md §2](formats/resources/aliases.md#2-reading)), through aliases of aliases (at most
+ten). An original that is not found is an error naming the path the alias recorded (exit 5).
+
 | Exit code | When |
 | --- | --- |
 | 0 | Done (warnings printed) |
@@ -72,7 +76,7 @@ object (§2.6). The limit options of every command (`--max-resource-size`, `--ma
 
 ### 2.1 ls
 
-`classicmac ls <path> [--json]` lists what the path holds: a container's or folder's files and folders, a fork's types,
+`classicmac ls <path> [--follow] [--json]` lists what the path holds: a container's or folder's files and folders, a fork's types,
 a type's resources; a file or resource lists itself. Text: one line each, kind, type and creator, data fork size (or a
 count), resource fork size, modified, name.
 
@@ -88,7 +92,15 @@ container     rohd ddsk    1474560          0  1999-07-15 12:00:00  Disk Tools.i
 `classicmac stat <path> [--json]`: everything about the entry: its kind, type and creator, the Finder's kind with
 where the name came from ([finder.md](formats/resources/finder.md)), the forks' sizes, dates, Finder flags, locked, how
 many entries it holds, a resource's type, ID, name and attributes, a fork's source, and the chain of formats it was read
-through from the host file.
+through from the host file. For an alias file, where it points as the Finder's Get Info shows it ("Original:"), and
+whether that resolves on the volume, how, and to which entry:
+
+```
+$ classicmac stat "Mac OS 9.hfv:Late Breaking News"
+…
+Original: Mac OS 9: System Folder: Help: Mac Help: ln: pgs: lnFmSet.htm
+Resolves: yes, by its file ID: /data/Mac OS 9.hfv:System Folder:Help:Mac Help:ln:pgs:lnFmSet.htm
+```
 
 ```
 $ classicmac stat "disk.img:Inner.img:Deep:Note"
@@ -104,7 +116,7 @@ Read as: disk.img (host file) > disk.img (HFS volume) > Inner.img (HFS volume)
 
 ### 2.3 cat
 
-`classicmac cat <path> [--hex] [--raw] [--fork data|rsrc] [--max-bytes <size>] [--json]`:
+`classicmac cat <path> [--hex] [--raw] [--fork data|rsrc] [--max-bytes <size>] [--follow] [--json]`:
 
 - A file: its data fork as text, Mac OS Roman decoded to UTF-8 and CR made LF; `--fork rsrc` the resource fork (as a hex
   dump).
@@ -126,7 +138,7 @@ listed. Text: one path per line.
 
 ### 2.5 get
 
-`classicmac get <path> [-o <dir>] [--as appledouble|basilisk|macbinary|raw] [--enter] [--overwrite] [--json]` copies
+`classicmac get <path> [-o <dir>] [--as appledouble|basilisk|macbinary|raw] [--enter] [--overwrite] [--follow] [--json]` copies
 to a host folder (default: the current one) and lists the files written:
 
 - a file or container: as an AppleDouble pair (default), Basilisk II folders, a MacBinary III `.bin`, or its forks raw
@@ -182,7 +194,10 @@ $ classicmac ls "disk.img:System Folder" --json
 
 **stat** is an entry with `input`, and adds `kindName` and `kindSource` (a file's Finder kind, [finder.md](formats/resources/finder.md)), `chain`
 (`[{ "name", "format" }]`, from the host file down), `resourceForkSource` (a fork: `ResourceFork`, `AppleDouble`,
-`DataFork`…) and `resourceAttributes` (a resource).
+`DataFork`…) and `resourceAttributes` (a resource). An alias file adds `alias`: `{ "storedPath", "found", "how",
+"resolvedPath", "target" }`: the recorded path and the original's now (Get Info's "Vol: folder: name"), how it was found
+(`by its file ID`, `by its folder ID`, `by name in its folder`, `by its path`, `not found`), and `target`, the
+original's path inside the input when found.
 
 **cat**: `{ "input", "path", "encoding", "truncated", … }` with `encoding` `text` and `text` (a string), `hex` and `hex` (the
 bytes as hex digits) with `size` (the whole size), or `json` and `json` (the decoder's JSON, as it is).
@@ -194,8 +209,9 @@ bytes as hex digits) with `size` (the whole size), or `json` and `json` (the dec
 **get**: `{ "input", "path", "written": [host path…] }` (`written` as in §3.3).
 
 The library behind them is `MacCommands` (`ClassicMac.Files.Commands`): `List`, `Stat`, `Info`, `Chain`, `ReadBytes`,
-`Text`, `Hex`, `Find` (with `MacFindQuery`), `Matches` and `Get` (with `MacGetFormat`), returning `MacEntryInfo`
-records; the MCP server's read tools use the same.
+`Text`, `Hex`, `Find` (with `MacFindQuery`), `Matches`, `Get` (with `MacGetFormat`) and `AliasOf` (`MacAliasInfo`),
+returning `MacEntryInfo` records, and `MacPathTree.ResolveAlias`, `TargetOf` and `FollowAlias`; the MCP server's read
+tools use the same.
 
 ## 3. Write commands
 

@@ -188,6 +188,9 @@ namespace ClassicMac.Files
         // A container's volume folder records, once read.
         internal IReadOnlyList<MacFolder>? Folders { get; set; }
 
+        // A container's volume for resolving aliases, once made.
+        internal AliasVolume? AliasVolume { get; set; }
+
         /// <summary>For a folder, the volume's record of it (its dates and Finder info), when the volume keeps folder records.</summary>
         public MacFolder? Folder { get; internal init; }
 
@@ -305,6 +308,91 @@ namespace ClassicMac.Files
                 MacPathKind.ResourceType => [.. entry.Resources!.OfType(entry.ResourceType!.Value).Select(r => ResourceEntry(entry, r))],
                 _ => [],
             };
+        }
+
+        /// <summary>
+        /// An alias file's record resolved on the volume holding it (docs/formats/resources/aliases.md §2); null when the
+        /// entry is not an alias file (the isAlias flag) or has no readable <c>'alis'</c>.
+        /// </summary>
+        public AliasResolution? ResolveAlias(MacPathEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            if (entry.File is not { } file || entry.Kind is not (MacPathKind.File or MacPathKind.Container) || !AliasResolver.IsAlias(file)
+                || AliasResolver.ReadAlias(file, readOptions) is not { } alias)
+            {
+                return null;
+            }
+
+            return AliasResolver.Resolve(alias, entry.Holder is { } holder && VolumeOf(holder) is { } volume ? [volume] : [], file);
+        }
+
+        /// <summary>The entry of a resolved alias's target in this tree; null when it was not found here.</summary>
+        public MacPathEntry? TargetOf(AliasResolution resolution)
+        {
+            ArgumentNullException.ThrowIfNull(resolution);
+            if (resolution.Volume?.Tag is not MacPathEntry holder)
+            {
+                return null;
+            }
+
+            var names = resolution.File is { } file ? [.. file.FolderPath, file.Name] : resolution.Folder?.Path ?? [];
+            var at = holder;
+            foreach (var name in names)
+            {
+                if (Children(at).FirstOrDefault(c => c.Kind is MacPathKind.Folder or MacPathKind.File or MacPathKind.Container
+                    && MacPaths.NamesEqual(c.Name, name.ToMacRoman())) is not { } next)
+                {
+                    return null;
+                }
+
+                at = next;
+            }
+
+            return at;
+        }
+
+        /// <summary>
+        /// The entry an alias file leads to, through aliases of aliases (at most ten, as ResolveAliasFile follows them); the
+        /// entry itself when it is no alias; null when an original is not found.
+        /// </summary>
+        public MacPathEntry? FollowAlias(MacPathEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            var at = entry;
+            for (var hop = 0; hop < 10; hop++)
+            {
+                if (ResolveAlias(at) is not { } resolution)
+                {
+                    return at;
+                }
+
+                if (!resolution.Found || TargetOf(resolution) is not { } next)
+                {
+                    return null;
+                }
+
+                at = next;
+            }
+
+            return ResolveAlias(at) is null ? at : null;
+        }
+
+        // The volume a container holds, for aliases (read once): its files, folder records and creation date.
+        private AliasVolume? VolumeOf(MacPathEntry holder)
+        {
+            if (holder.AliasVolume is { } read)
+            {
+                return read;
+            }
+
+            var folders = FoldersOf(holder);
+            if (!folders.Any(f => f.IsRoot) || holder.Contents is not { } contents)
+            {
+                return null;
+            }
+
+            return holder.AliasVolume = new AliasVolume([.. contents.Children.Select(c => c.File)], folders, holder,
+                HfsReader.Instance.ReadVolumeInfo(contents.File.DataFork)?.Created);
         }
 
         /// <summary>Releases the tree.</summary>

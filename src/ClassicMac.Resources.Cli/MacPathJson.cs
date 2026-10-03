@@ -139,6 +139,16 @@ namespace ClassicMac.Resources.Cli
             w.WriteEndArray();
             Optional(w, "resourceForkSource", info.ResourceForkSource);
             Optional(w, "resourceAttributes", info.ResourceAttributes);
+            if (info.Alias is { } alias)
+            {
+                w.WriteStartObject("alias");
+                w.WriteString("storedPath", alias.StoredPath);
+                w.WriteBoolean("found", alias.Found);
+                w.WriteString("how", alias.How);
+                w.WriteString("resolvedPath", alias.ResolvedPath);
+                Optional(w, "target", alias.Target is { } target ? Inside(tree, target) : null);
+                w.WriteEndObject();
+            }
         }
 
         /// <summary>A list of host files (get's and the writes' <c>written</c>).</summary>

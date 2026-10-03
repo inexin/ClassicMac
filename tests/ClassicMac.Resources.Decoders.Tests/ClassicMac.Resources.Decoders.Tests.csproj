@@ -23,5 +23,6 @@
     <Compile Include="..\ClassicMac.Code.Tests\PefBuilder.cs" Link="Builders\PefBuilder.cs" />
     <Compile Include="..\ClassicMac.Core.Tests\CompoundFileBuilder.cs" Link="Builders\CompoundFileBuilder.cs" />
     <Compile Include="..\ClassicMac.Code.Tests\CodeCorpus.cs" Link="Shared\CodeCorpus.cs" />
+    <Compile Include="..\ClassicMac.Files.Tests\AliasBuilder.cs" Link="Builders\AliasBuilder.cs" />
   </ItemGroup>
 </Project>

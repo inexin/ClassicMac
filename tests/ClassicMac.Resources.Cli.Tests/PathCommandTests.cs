@@ -148,4 +148,35 @@ public sealed class PathCommandTests : IDisposable
         Assert.Equal(0, Run("get", P("Inner.img"), "-o", output, "--enter").Code);
         Assert.True(File.Exists(Path.Combine(output, "Inner.img", "Deep", "Note")));
     }
+
+    [Fact]
+    public void Stat_shows_where_an_alias_points_and_whether_it_resolves()
+    {
+        var aliases = AliasFixtures.Disk(folder);
+        var (code, output, _, _) = Run("stat", aliases + ":Moved alias");
+        Assert.Equal(0, code);
+        Assert.Contains("Original: Aliases: Old: Note\n", output);
+        Assert.Contains($"Resolves: yes, by its file ID: {aliases}:Docs:Note\n", output);
+        Assert.Contains("Resolves: no, the original is not found", Run("stat", aliases + ":Gone alias").Output);
+        var json = Json(Run("stat", aliases + ":Stuff alias", "--json").Output).GetProperty("alias");
+        Assert.Equal(("Aliases: Stuff", true, "by its folder ID", "Stuff"),
+            (json.GetProperty("storedPath").GetString(), json.GetProperty("found").GetBoolean(), json.GetProperty("how").GetString(), json.GetProperty("target").GetString()));
+        Assert.False(Json(Run("stat", aliases + ":Gone alias", "--json").Output).GetProperty("alias").TryGetProperty("target", out _));
+        Assert.False(Json(Run("stat", aliases + ":Docs:Note", "--json").Output).TryGetProperty("alias", out _));
+    }
+
+    [Fact]
+    public void Ls_cat_and_get_follow_aliases_with_follow()
+    {
+        var aliases = AliasFixtures.Disk(folder);
+        Assert.Equal("Hello\n", Run("cat", aliases + ":Chain alias", "--follow").Output);   // an alias of an alias
+        Assert.Equal("", Run("cat", aliases + ":Note alias").Output.Trim());                 // without: the alias's empty data fork
+        Assert.EndsWith("Thing\n", Run("ls", aliases + ":Stuff alias", "--follow").Output);
+        var output = Path.Combine(folder, "out");
+        Assert.Equal(0, Run("get", aliases + ":Moved alias", "-o", output, "--follow").Code);
+        Assert.Equal("Hello", File.ReadAllText(Path.Combine(output, "Note")));
+        var (code, _, error, _) = Run("cat", aliases + ":Gone alias", "--follow");
+        Assert.Equal(ExitCodes.NotFound, code);
+        Assert.Contains("an alias whose original is not found (Aliases: Old: Gone)", error);
+    }
 }

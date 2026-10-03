@@ -531,6 +531,7 @@ The built-in decoders, in this order; each type is handled by exactly one, and a
 | `ui.colors`, `ui.menu-colors`, `ui.item-colors`, `ui.dialog-extension`, `ui.alert-extension`, `ui.menu-extension` | `wctb`, `dctb`, `actb`, `cctb`; `mctb`; `ictb`; `dlgx`; `alrx`; `xmnu` | `.json` | — | null | [windows-dialogs.md](../resources/windows-dialogs.md) |
 | `color.table`, `color.palette` | `clut`, `pltt` | `.json` | `.act` | null | [palettes.md](../resources/palettes.md) |
 | `finder.bundle`, `finder.file-reference`, `finder.size`, `finder.kind` | `BNDL`, `FREF`, `SIZE`, `kind` | `.json` | — | `macintosh` | [finder.md](../resources/finder.md) |
+| `finder.alias` | `alis` | `.json` | — | `macintosh` | [aliases.md](../resources/aliases.md) |
 | `font.bitmap`, `font.family`, `font.outline`, `font.colors` | `NFNT`, `FONT`; `FOND`; `sfnt`; `fctb` | strikes `.png`; `.json`; `.ttf`; `.json` | strikes `.bdf`, `.json`; `sfnt` `.json` | `FOND`: `macintosh` | [bitmap-fonts.md](../resources/bitmap-fonts.md) |
 | `code.segment` | `CODE` | `.bin`, the data | `.s`, `.json`; `'CODE'` 0: `.json` | null | [disassembly.md](disassembly.md) |
 | `code.cfrg` | `cfrg` | `.bin`, the data | `.json` | null | [disassembly.md](disassembly.md) |

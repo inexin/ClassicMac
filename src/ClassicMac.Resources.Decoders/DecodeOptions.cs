@@ -83,6 +83,7 @@ namespace ClassicMac.Resources.Decoders
                 .. Interface.ExtensionDecoder.All(options),
                 .. Colors.PaletteDecoder.All(),
                 .. Finder.FinderDecoder.All(options),
+                new Finder.AliasDecoder(options),
                 .. Fonts.FontDecoder.All(options),
                 new Code.CodeSegmentDecoder(),
                 new Code.CfrgDecoder(),

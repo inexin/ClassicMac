@@ -233,11 +233,11 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
 | `convert <input>` | Every DOCMaker and SimpleText document inside the input as an HTML folder; a folder per document when there are several (built) | `-o <dir>`, `--overwrite`, `--screen-depth` | 3 |
 | `disasm <input>` | The code of every Mac file inside the input: a listing (`.s`) per 68k segment, code resource and fragment (the data fork's included) and `code.json`; a folder per file when several have code (built; [disassembly.md](formats/output/disassembly.md)) | `-o <dir>`, `--cpu 68k\|ppc\|both`, `--overwrite` | 11 |
 | `pack <dir>` | Rebuild a fork or container from a folder and manifest (built; changed decoded files wait for encoders) | `-o <file>`, `--base <file>`, `--data <file>`, `--allow-deletes`, `--overwrite`, `--container raw\|appledouble\|applesingle\|macbinary\|binhex` | 5 |
-| `ls <path>` | What a Mac path holds: files and folders (through containers), a fork's types, a type's resources (built; [cli.md](cli.md) §2.1) | `--json` | — |
-| `stat <path>` | Kind, type/creator and Finder kind, forks, dates, flags, how it was read (built; §2.2) | `--json` | — |
-| `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--json` | — |
+| `ls <path>` | What a Mac path holds: files and folders (through containers), a fork's types, a type's resources (built; [cli.md](cli.md) §2.1) | `--follow`, `--json` | — |
+| `stat <path>` | Kind, type/creator and Finder kind, an alias's original and whether it resolves, forks, dates, flags, how it was read (built; §2.2) | `--json` | — |
+| `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--follow`, `--json` | — |
 | `find <path>` | Folders and files below a path, through containers (built; §2.4) | `--name`, `--type`, `--creator`, `--kind`, `--resource-type`, `--contains`, `--contains-hex`, `--max-depth`, `--limit`, `--json` | — |
-| `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--json` | — |
+| `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--follow`, `--json` | — |
 | `mcp` | An MCP server over standard input and output: sessions on opened inputs, the read and write commands as tools, saves only through `save_as` (built; [cli.md](cli.md) §4) | the limit options | — |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`
@@ -1067,6 +1067,14 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   with English copies when they are absent. ClassicMac's own table (`KnownKinds`, its own words, codes cross-checked
   against public lists, none copied) is the fallback when the volume does not say, placed before the `'istd'` kinds
   for exact type and creator pairs.
+- **Alias files (2026-10-03):** `'alis'` records are read in `ClassicMac.Resources` (`AliasRecord`) so the File layer can
+  resolve them (`AliasResolver`, `AliasVolume`, `MacPathTree.ResolveAlias`; HFS and HFS Plus files and folders keep
+  their catalog IDs for it), and the CLI, the MCP server and the app share that one resolver. Resolving follows the
+  Alias Manager's fast search on the volumes that are open (volume by name and date, then by number, by parent and
+  name, by full path), not the relative path, catalog search or mounting; paths are shown as the Finder's Get Info shows
+  "Original:" ("Vol: folder: name"). The app shows an alias's original path in the header with Show Original (Ctrl+R),
+  previews the original under a strip, and says when it is not found
+  ([aliases.md](formats/resources/aliases.md)).
 - **ClassicMac ships TCDB (2026-10-03, the owner's decision):** TCDB (Type/Creator Database by Ilan Szekely,
   1996–2003) is the largest list of type and creator codes. ClassicMac ships its own copy of TCDB 2003.10, with the
   file names, descriptions, comments, categories and extensions, credited in THIRD-PARTY-NOTICES.md and the About box.

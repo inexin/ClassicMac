@@ -20,6 +20,9 @@ namespace ClassicMac.Files
         /// <summary>Whether this is the volume's root folder, whose window is the volume's.</summary>
         public bool IsRoot { get; init; }
 
+        /// <summary>The folder's ID in the volume's catalog (the directory ID; 2 for the root), which aliases record; null when not known.</summary>
+        public uint? CatalogId { get; init; }
+
         /// <summary>The <c>DInfo</c> and <c>DXInfo</c>.</summary>
         public FolderFinderInfo FinderInfo { get; init; } = FolderFinderInfo.Empty;
 

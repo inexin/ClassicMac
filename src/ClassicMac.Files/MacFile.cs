@@ -51,6 +51,12 @@ namespace ClassicMac.Files
         /// <summary>The HFS Plus indirect-node reference when this file is a hard link.</summary>
         public uint? HardLinkReference { get; init; }
 
+        /// <summary>The file's ID in its volume's catalog (HFS <c>filFlNum</c>, HFS Plus <c>fileID</c>), which aliases record; null outside a volume.</summary>
+        public uint? CatalogId { get; init; }
+
+        /// <summary>The ID of the folder holding the file in its volume's catalog (2 for the root); null outside a volume.</summary>
+        public uint? ParentId { get; init; }
+
         /// <summary>The Mac path inside the container, folders and name joined with ':' as the Mac wrote paths.</summary>
         public string MacPath => UnicodeName is { } name
             ? string.Join(":", (UnicodeFolderPath ?? FolderPath.Select(n => n.ToString()).ToArray()).Append(name))

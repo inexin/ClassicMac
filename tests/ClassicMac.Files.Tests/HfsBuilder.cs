@@ -40,11 +40,18 @@ internal sealed class HfsBuilder
 
     /// <summary>
     /// A file; <paramref name="info"/>, when given, replaces the type, creator and the default flags (hasBeenInited);
-    /// <paramref name="locked"/> sets <c>filFlags</c> bit 0.
+    /// <paramref name="locked"/> sets <c>filFlags</c> bit 0. Returns the file's ID.
     /// </summary>
-    public void File(uint parent, string name, byte[] data, byte[] resource, string type = "TEXT", string creator = "ttxt",
-        int fragments = 1, bool thread = false, FinderInfo? info = null, bool locked = false) =>
-        files.Add((parent, name, type, creator, data, resource, fragments, nextId++, thread, info, locked));
+    public uint File(uint parent, string name, byte[] data, byte[] resource, string type = "TEXT", string creator = "ttxt",
+        int fragments = 1, bool thread = false, FinderInfo? info = null, bool locked = false)
+    {
+        var id = nextId++;
+        files.Add((parent, name, type, creator, data, resource, fragments, id, thread, info, locked));
+        return id;
+    }
+
+    /// <summary>The ID the next file or folder gets.</summary>
+    public uint NextId => nextId;
 
     // Where the first file's first data extent starts, for tests that patch it.
     public int FirstFileRecordOffset { get; private set; }

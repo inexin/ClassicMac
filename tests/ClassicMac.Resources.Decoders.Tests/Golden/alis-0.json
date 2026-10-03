@@ -1,0 +1,47 @@
+{
+  "userType": null,
+  "size": 200,
+  "version": 2,
+  "kind": "file",
+  "targetPath": "Disk: Docs: Read Me",
+  "volume": {
+    "name": "Disk",
+    "created": "1997-07-26T19:26:56",
+    "signature": "BD",
+    "volumeType": 0,
+    "attributes": 0,
+    "fileSystemId": 0
+  },
+  "parentId": 20,
+  "name": "Read Me",
+  "targetId": 30,
+  "created": "1998-02-05T23:47:12",
+  "type": "TEXT",
+  "creator": "ttxt",
+  "levelsFrom": 1,
+  "levelsTo": 2,
+  "extras": [
+    {
+      "tag": 0,
+      "name": "parent folder name",
+      "text": "Docs"
+    },
+    {
+      "tag": 1,
+      "name": "folder IDs",
+      "ids": [
+        20
+      ]
+    },
+    {
+      "tag": 2,
+      "name": "full path",
+      "text": "Disk:Docs:Read Me"
+    },
+    {
+      "tag": 42,
+      "name": null,
+      "data": "010203"
+    }
+  ]
+}

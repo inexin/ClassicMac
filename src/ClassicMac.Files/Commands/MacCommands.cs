@@ -104,7 +104,18 @@ namespace ClassicMac.Files.Commands
 
         /// <summary>The formats the entry was read through, from the host file down (stat).</summary>
         public IReadOnlyList<MacReadStep> Chain { get; init; } = [];
+
+        /// <summary>For an alias file, where it points and whether that resolves (stat).</summary>
+        public MacAliasInfo? Alias { get; init; }
     }
+
+    /// <summary>Where an alias file points (docs/formats/resources/aliases.md §2) and what resolving it found.</summary>
+    /// <param name="StoredPath">The path the alias recorded, as Get Info shows it ("Mac OS 9: System Folder: Note Pad").</param>
+    /// <param name="Found">Whether the original was found.</param>
+    /// <param name="How">How it was found ("by its file ID", "by name in its folder", "by its path", "not found").</param>
+    /// <param name="ResolvedPath">Where the original is now, as Get Info shows a path; the stored path when not found.</param>
+    /// <param name="Target">The original's full path in the tree, when found.</param>
+    public sealed record MacAliasInfo(string StoredPath, bool Found, string How, string ResolvedPath, string? Target);
 
     /// <summary>What <see cref="MacCommands.Find"/> looks for; every given criterion must hold.</summary>
     public sealed record MacFindQuery
@@ -171,7 +182,18 @@ namespace ClassicMac.Files.Commands
                 Chain = Chain(tree, entry),
                 ResourceForkSource = entry.Kind == MacPathKind.ResourceFork ? entry.ResourcesSource?.ToString() : null,
                 ResourceAttributes = entry.Resource is { } resource ? resource.Attributes.ToString() : null,
+                Alias = AliasOf(tree, entry),
             };
+        }
+
+        /// <summary>An alias file's target and how it resolves on the volume holding it; null for other entries.</summary>
+        public static MacAliasInfo? AliasOf(MacPathTree tree, MacPathEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(tree);
+            ArgumentNullException.ThrowIfNull(entry);
+            return tree.ResolveAlias(entry) is { } resolution
+                ? new MacAliasInfo(resolution.StoredPath, resolution.Found, resolution.How, resolution.ResolvedPath, tree.TargetOf(resolution)?.Path)
+                : null;
         }
 
         /// <summary>An entry's facts, as ls lists them.</summary>

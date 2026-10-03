@@ -412,6 +412,8 @@ namespace ClassicMac.Files.Hfs
                     Modified = Date(reader.ReadUInt32At(48)),
                     DataFork = data ?? ForkData.Empty,
                     ResourceFork = resource ?? ForkData.Empty,
+                    CatalogId = id,
+                    ParentId = parent,
                 };
             }
 
@@ -424,6 +426,7 @@ namespace ClassicMac.Files.Hfs
                 {
                     Name = name,
                     IsRoot = id == RootFolderId,
+                    CatalogId = id,
                     FreeBytes = id == RootFolderId ? (long)freeBlockCount * blockSize : null,
                     FolderPath = id == RootFolderId ? [] : FolderPath(parent, folders, $"Folder \"{name}\""),
                     FinderInfo = FolderFinderInfo.Read(r.AsSpan(22, FolderFinderInfo.Length)),

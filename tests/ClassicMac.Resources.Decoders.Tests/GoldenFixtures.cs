@@ -168,6 +168,10 @@ internal static class GoldenFixtures
         // A kind resource: signature RLMZ, region 0, the application's name (odd length, so a pad byte) and two kinds.
         yield return Res("kind", 128, [.. "RLMZ"u8, 0, 0, 0, 0, 0, 3, .. "apnm"u8, .. Pascal("Realmz"), 0, .. "scen"u8, .. Pascal("Realmz scenario"),
             .. "save"u8, .. Pascal("saved game"), 0]);
+        // An alias record: a file "Read Me" in "Docs" on "Disk", with the parent's name, the folder IDs, the full path and an
+        // unknown tag.
+        yield return Res("alis", 0, ClassicMac.Files.Tests.AliasBuilder.Alias("Disk", 20, "Read Me", 30, path: "Disk:Docs:Read Me",
+            parentName: "Docs", folderIds: [20], extras: [(42, [1, 2, 3])]), "Read Me");
 
         // Fonts: the family "Example" (FOND 1024) with a 9-point FONT (1033), a 12-point NFNT (1036, with width and height
         // tables), and its outline font (sfnt 1024); the old-style family-name FONT (family 8 × 128, empty); a 2-bit colour

@@ -19,6 +19,9 @@ namespace ClassicMac.Resources.Cli
     internal sealed class PathCommands(TextWriter output, TextWriter error, Stream binary, ContainerReadOptions options, ReadOptions readOptions,
         bool strict, bool quiet)
     {
+        /// <summary>--follow: an alias file stands for its original (through aliases of aliases), docs/cli.md §2.</summary>
+        public bool Follow { get; init; }
+
         // Opens the path's host file and resolves the rest; reports a path that names nothing (exit NotFound).
         private int With(string path, Func<MacPathTree, MacPathEntry, int> action)
         {
@@ -50,11 +53,17 @@ namespace ClassicMac.Resources.Cli
                     error.WriteLine($"{path}: names nothing.");
                     code = ExitCodes.NotFound;
                 }
+                else if (Follow && tree.FollowAlias(entry) is not { } original)
+                {
+                    var stored = tree.ResolveAlias(entry)?.StoredPath;
+                    error.WriteLine($"{path}: an alias whose original is not found{(stored is null ? "" : $" ({stored})")}.");
+                    code = ExitCodes.NotFound;
+                }
                 else
                 {
                     try
                     {
-                        code = action(tree, entry);
+                        code = action(tree, Follow ? tree.FollowAlias(entry)! : entry);
                     }
                     catch (InvalidOperationException e)
                     {
@@ -118,6 +127,12 @@ namespace ClassicMac.Resources.Cli
             if (kind is not null)
             {
                 output.WriteLine($"Finder kind: {kind.Text} ({KnownKinds.Describe(kind)})");
+            }
+
+            if (info.Alias is { } original)
+            {
+                output.WriteLine($"Original: {original.StoredPath}");
+                output.WriteLine(original.Found ? $"Resolves: yes, {original.How}: {original.Target ?? original.ResolvedPath}" : "Resolves: no, the original is not found");
             }
 
             Line("Data fork", info.DataSize?.ToString("N0", CultureInfo.InvariantCulture) + (info.DataSize is null ? null : " bytes"));

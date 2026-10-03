@@ -860,6 +860,17 @@
       ]
     },
     {
+      "key": "alis-0",
+      "decoder": "finder.alias 1",
+      "diagnostics": [],
+      "outputs": [
+        {
+          "extension": ".json",
+          "file": "alis-0.json"
+        }
+      ]
+    },
+    {
       "key": "FOND-1024",
       "decoder": "font.family 1",
       "diagnostics": [],

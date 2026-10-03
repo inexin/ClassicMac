@@ -12,6 +12,18 @@
   only, on working copies that later reads see; `save_as` writes a new file, or over the input only with `in_place`.
   Results are docs/cli.md's JSON; lists and reads come in pages with a `more` cursor; errors carry a code. The write
   commands' changes and the path commands' kinds, decoding and JSON are shared with the CLI.
+- Aliases: `'alis'` records are read (`AliasRecord`: the version 2 record and its tagged data, verified on Mac OS 9's
+  aliases) and decoded as `finder.alias` JSON; alias files resolve on the open volumes as the Alias Manager's fast
+  search does (`AliasResolver`: volume by name and date, then the file or folder number, the parent and name, the full
+  path; aliases of aliases), with the path shown as Get Info shows it. HFS and HFS Plus files and folders keep their
+  catalog IDs (`MacFile.CatalogId`, `ParentId`, `MacFolder.CatalogId`). docs/formats/resources/aliases.md.
+- Viewer: alias files are italic in the tree with an arrow badge; the header says "Alias to Note · kind" with the
+  original's path and Show Original (File menu, Ctrl+R); the Preview shows the original under an "Alias of …" strip, or
+  an "Original not found" card with the recorded volume and path; Details has an Alias card (original, volume, found and
+  how, IDs, dates).
+- CLI: `stat` shows an alias's original and whether it resolves (`alias` in `--json`); `ls`, `cat` and `get` take
+  `--follow`.
+
 - CLI: file commands on Mac paths (docs/cli.md §2), through disk images and archives: `ls` (files and folders,
   empty ones too, with kind, type/creator, sizes, dates and flags; a fork's types, a type's resources), `stat` (all of
   it with the Finder kind and its source and how the entry was read), `cat` (text as UTF-8 from Mac OS Roman, `--hex`,

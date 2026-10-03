@@ -479,6 +479,9 @@ are [ClassicMac].
   the volume (`ContainerNode.Volume`) [ClassicMac].
 - Folder records serve for paths: folders do not come out as entries of `Read`, so an empty folder is not listed.
   Thread records are skipped.
+- Each file keeps its catalog IDs (`MacFile.CatalogId`, `filFlNum`, and `ParentId`), and each folder record its
+  directory ID (`MacFolder.CatalogId`), for resolving aliases ([aliases.md §2.1](../resources/aliases.md#21-resolving));
+  HFS Plus files and folders keep theirs the same way [ClassicMac].
 - `HfsReader.ReadFolders` reads the volume the same way, with the same checks and diagnostics, and returns its folder
   records instead (`MacFolder`): the name (the volume name for the root, `IsRoot`), the folder path above it, the
   `DInfo` and `DXInfo` (`FolderFinderInfo`, 32 bytes) and the creation and modification dates. A folder whose parent
