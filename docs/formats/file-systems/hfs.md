@@ -208,8 +208,8 @@ Every catalog data record starts with a type byte (`cdrType`) and a reserved byt
 | --- | --- | --- |
 | 1 | Folder (`cdrDirRec`) | 70 |
 | 2 | File (`cdrFilRec`) | 102 |
-| 3 | Folder thread (`cdrThdRec`) | 46 |
-| 4 | File thread (`cdrFThdRec`) | 46 |
+| 3 | Folder thread (`cdrThdRec`) | 46; hfsutils writes 15 + the name's length (§1.9) |
+| 4 | File thread (`cdrFThdRec`) | 46; hfsutils writes 15 + the name's length (§1.9) |
 
 Folder record:
 
@@ -265,6 +265,13 @@ when something asked for it (a file ID reference).
 | +$02 | 8 | `thdResrv` | Reserved, 2 × u32 |
 | +$0A | 4 | `thdParID` | The parent's CNID |
 | +$0E | 32 | `thdCName` | The folder's or file's name, `Str31` |
+
+A thread record (type 3 or 4) is 46 bytes as Mac OS writes it: the type, a reserved byte, 8 reserved bytes, `thdParID`
+at +10 and the name at +14 as a `Str31`. hfsutils writes a thread only as long as its name, 15 bytes and the name's
+length (padded to even), and Mac OS 9 reads and keeps such threads: a volume hfsutils made, holding them, was mounted
+and used under Mac OS 9, which added its own 46-byte threads beside them [Verified]. ClassicMac reads either; its writer
+accepts either, writes a renamed item's thread at 46 bytes, and changes only `thdParID` when an item moves
+[ClassicMac]. `fsck_hfs` reports the short form as "Reserved fields in the catalog record have incorrect data" (§7).
 
 ### 1.10 Extents overflow records
 

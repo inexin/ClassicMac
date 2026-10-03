@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: volumes with short thread records (as hfsutils writes them, and Mac OS 9 keeps them) can be edited: they were
+  refused as invalid; a renamed item's thread is written at full length, and a moved item's short thread now takes its new
+  parent (hfs.md §1.9).
 - CLI: `format` makes volumes up to 2 TB, writing only their MDB, bitmap and B-trees into a file of the volume's length
   (hfs.md §3.1).
 - CLI: an edit session opens its input one level deep (the archives and disk images on a volume are not unwrapped to

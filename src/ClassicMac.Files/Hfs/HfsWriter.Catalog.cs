@@ -208,13 +208,16 @@ public static partial class HfsWriter
             throw new InvalidDataException("The HFS folder thread is missing.");
         }
 
-        if (thread.Data is not null && thread.Data.Length >= 46)
+        if (thread.Data is not null)
         {
-            // The thread's name: a length byte and up to 31 bytes at +14.
+            // The thread's name, written at Mac OS's full length (46 bytes, the name padded to a Str31) whatever length it
+            // had: a length byte and up to 31 bytes at +14 (hfs.md §1.9).
             var encoded = MacRoman.Encode(newName);
-            thread.Data.AsSpan(14, 32).Clear();
-            thread.Data[14] = (byte)encoded.Length;
-            encoded.CopyTo(thread.Data, 15);
+            var full = new byte[46];
+            thread.Data.AsSpan(0, 14).CopyTo(full);
+            full[14] = (byte)encoded.Length;
+            encoded.CopyTo(full, 15);
+            state.Records[state.Records.IndexOf(thread)] = (thread.Key, full);
         }
 
         return CommitCatalog(state);
@@ -283,9 +286,9 @@ public static partial class HfsWriter
 
         state.Records.Remove(item);
         state.Records.Add((CatalogKey(destination, name), item.Data));
-        if (thread.Data is not null && thread.Data.Length >= 46)
+        if (thread.Data is not null)
         {
-            new BigEndianWriter(thread.Data).WriteUInt32At(10, destination);
+            new BigEndianWriter(thread.Data).WriteUInt32At(10, destination);       // thdParID, in every thread's first 14 bytes
         }
 
         AdjustParentValence(state.Records, parent, -1);

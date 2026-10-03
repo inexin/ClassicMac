@@ -1191,7 +1191,9 @@ namespace ClassicMac.Files.Hfs
                             {
                                 1 => data.Length >= 70,
                                 2 => data.Length >= 102,
-                                3 or 4 => data.Length >= 46,
+                                // A thread as long as its name, as hfsutils writes it and Mac OS keeps it, or Mac OS's 46
+                                // bytes (hfs.md §1.9) [Verified: Mac OS 9 used such a volume].
+                                3 or 4 => data.Length >= 15 && data[14] <= 31 && data.Length >= 15 + data[14],
                                 _ => false,
                             }
                             : data.Length == 12;

@@ -26,6 +26,12 @@ internal sealed class HfsBuilder
     /// </summary>
     public bool FixedIndexKeys { get; init; }
 
+    /// <summary>
+    /// Writes thread records only as long as their name (15 bytes and the name, padded to even), as hfsutils writes them,
+    /// instead of Mac OS's 46 bytes with the name padded to a Str31 (hfs.md §1.9).
+    /// </summary>
+    public bool ShortThreads { get; init; }
+
     /// <summary>Leaf keys with <c>ckrKeyLen</c> = 6 + n, the alignment byte not counted, as the Mac OS File Manager writes them.</summary>
     public bool UncountedKeyPadding { get; init; }
 
@@ -121,11 +127,11 @@ internal sealed class HfsBuilder
 
         var records = new List<(uint Parent, string Name, byte[] Record)>();
         records.Add((1, volumeName, FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root), RootInfo)));
-        records.Add((Root, "", ThreadRecord(1, volumeName)));
+        records.Add((Root, "", ThreadRecord(1, volumeName, @short: ShortThreads)));
         foreach (var (id, parent, name, info) in folders)
         {
             records.Add((parent, name, FolderRecord(id, folders.Count(f => f.Parent == id) + files.Count(f => f.Parent == id), info)));
-            records.Add((id, "", ThreadRecord(parent, name)));
+            records.Add((id, "", ThreadRecord(parent, name, @short: ShortThreads)));
         }
         foreach (var f in files)
         {
@@ -161,7 +167,7 @@ internal sealed class HfsBuilder
             records.Add((f.Parent, f.Name, r));
             if (f.Thread)
             {
-                records.Add((f.Id, "", ThreadRecord(f.Parent, f.Name, kind: 4)));
+                records.Add((f.Id, "", ThreadRecord(f.Parent, f.Name, kind: 4, @short: ShortThreads)));
             }
         }
 
@@ -317,9 +323,9 @@ internal sealed class HfsBuilder
         return r;
     }
 
-    private static byte[] ThreadRecord(uint parent, string name, byte kind = 3)
+    private static byte[] ThreadRecord(uint parent, string name, byte kind = 3, bool @short = false)
     {
-        var r = new byte[46];
+        var r = new byte[@short ? (15 + MacRoman.Encode(name).Length + 1) & ~1 : 46];
         r[0] = kind;
         BinaryPrimitives.WriteUInt32BigEndian(r.AsSpan(10), parent);
         r[14] = (byte)name.Length;
