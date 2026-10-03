@@ -362,8 +362,9 @@ Mac path after the host file (§1), names joined by `:` or `/`, `""` for the inp
 `close`, which is refused while changes are unsaved unless `discard` is true.
 
 The write tools change the session only. The changes are made once, on one edit session of the input kept for the
-session's life, and each is written to a working copy in the temporary folder, so `list`, `stat`, `read` and `search`
-see it; the input is not touched. `save_as` writes every change from that edit session: to `destination`, a new file
+session's life, so `list`, `stat`, `read` and `search` see them: a volume's are read from memory (the volume as it stands,
+put back in its partition or Disk Copy image), other inputs' from a working copy in the temporary folder. A dry run is
+tried on the input as it stands. The input is not touched. `save_as` writes every change from that edit session: to `destination`, a new file
 (never the input), or with `in_place: true` over the input, the original kept as `<input>.orig` the first time. The
 result is read back to verify it, as the write commands' `-o` and `--in-place` do (§3). A write with `dry_run: true` checks the change and reports it without making
 it. Inputs ClassicMac does not write (§3.1) can be read but not changed.

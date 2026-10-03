@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: the shell and the MCP server read a volume's changes from memory instead of writing a working copy after each
+  (a 4-deletion session on a 500 MB volume, saved, 10 s instead of 14 s); a dry run sees the changes made before it (cli.md §4.2).
 - CLI: `check` checks the input's own structures by default and counts the archives and disk images stored in it without
   opening them; `--deep` checks inside them too (the Mac OS 9 volume: 0 errors in 2.4 s instead of 33 errors from test images
   stored on it, in 10 s). A volume holding one file now counts as a level when containers are read level by level (cli.md §2.7).

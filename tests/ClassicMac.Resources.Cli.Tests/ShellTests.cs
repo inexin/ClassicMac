@@ -67,6 +67,29 @@ public sealed class ShellTests : IDisposable
         Assert.Matches(@"^'STR '\s+128\s+2$", lines[^1]);                         // res
     }
 
+    // A volume's changes are read from memory: the session's tree stays on the input (no working copy is written), and
+    // shows each change, resource edits included.
+    [Fact]
+    public void A_volume_s_changes_are_read_from_memory_without_a_working_copy()
+    {
+        using var session = Open();
+        var before = File.ReadAllBytes(disk);
+
+        session.Apply((_, tree, rest) => MacEdits.Mkdir(tree, rest), "Docs:New", dryRun: false);
+        session.Apply((kind, tree, rest) => MacEdits.ResRm(kind, tree, rest), "Docs:Letter:#rsrc:'STR ':128", dryRun: false);
+
+        Assert.Equal(Path.GetFullPath(disk), session.Tree.Root.Path);
+        Assert.NotNull(session.Tree.Resolve("Docs:New"));
+        Assert.Null(session.Tree.Resolve("Docs:Letter:#rsrc:'STR ':128"));
+        Assert.Equal(before, File.ReadAllBytes(disk));
+        var dry = session.Apply((_, tree, rest) => MacEdits.Rm(tree, rest, recursive: false), "Docs:New", dryRun: true);   // sees the new folder
+        Assert.Equal("delete", dry.Single().Action);
+        Assert.NotNull(session.Tree.Resolve("Docs:New"));
+        var output = Path.Combine(folder, "saved.img");
+        session.SaveAs(output);
+        Assert.Contains(Folders(output), f => f.MacPath == "Docs:New");
+    }
+
     [Fact]
     public void Paths_are_relative_absolute_or_up()
     {

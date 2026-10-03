@@ -307,8 +307,8 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
 **Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB
 Mac OS 9 volume).** Not ordered yet:
 
-- **Faster sessions:** a `MacPathTree` over in-memory bytes, so the shell and the MCP server stop writing a working
-  copy and reopening the tree after each change (about 2.5 s per change on a 500 MB volume).
+- **Faster sessions** (built): a volume's changes are read from memory (`InputEditSession.Current`, `MacPathTree.Open`
+  over a host file), with no working copy written per change.
 - **Cheaper fork edits:** `ReplaceFork` (put, resource edits, Save As) checked as deletions are, by kept catalog
   records and allocated blocks, instead of reading every fork of every file (about 0.9 s per fork on 500 MB). Fewer
   whole-image copies in `HfsWriter` too, to lower peak memory.

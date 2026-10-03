@@ -213,12 +213,12 @@ namespace ClassicMac.Files
         private readonly ReadOptions? readOptions;
         private readonly bool rawHost;
 
-        private MacPathTree(string hostPath, ContainerUnwrapper unwrapper, ContainerContext context, ReadOptions? readOptions)
+        private MacPathTree(string hostPath, ContainerUnwrapper unwrapper, ContainerContext context, ReadOptions? readOptions, HostFile? given = null)
         {
             this.unwrapper = unwrapper;
             this.context = context;
             this.readOptions = readOptions;
-            var host = HostFiles.Read(hostPath, context.Options, context.Diagnostics);
+            var host = given ?? HostFiles.Read(hostPath, context.Options, context.Diagnostics);
             rawHost = host.Layout == HostLayout.Plain;
             HostLayout = host.Layout;
             var node = unwrapper.Unwrap(host.File, HostFiles.FormatName(host.Layout),
@@ -247,6 +247,18 @@ namespace ClassicMac.Files
         {
             ArgumentNullException.ThrowIfNull(hostPath);
             return new MacPathTree(hostPath, unwrapper ?? ContainerUnwrapper.Default, new ContainerContext(options, diagnostics), readOptions);
+        }
+
+        /// <summary>
+        /// Opens a host file already read, or made in memory (an edited volume), under its path: the tree reads
+        /// <paramref name="host"/> and names entries by <paramref name="hostPath"/>.
+        /// </summary>
+        public static MacPathTree Open(string hostPath, HostFile host, ContainerReadOptions? options = null, ReadOptions? readOptions = null,
+            ICollection<Diagnostic>? diagnostics = null)
+        {
+            ArgumentNullException.ThrowIfNull(hostPath);
+            ArgumentNullException.ThrowIfNull(host);
+            return new MacPathTree(hostPath, ContainerUnwrapper.Default, new ContainerContext(options, diagnostics), readOptions, host);
         }
 
         /// <summary>

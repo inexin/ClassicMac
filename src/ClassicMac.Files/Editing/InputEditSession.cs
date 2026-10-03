@@ -51,6 +51,7 @@ namespace ClassicMac.Files.Editing
         private readonly MacPartition? partition;
         private readonly HfsImageRegion? region;
         private readonly MacFile? ndif;
+        private readonly HostFile host;
         private MacFile? single;
 
         private InputEditSession(string path, HostFile host, ContainerNode root, ContainerReadOptions options, ReadOptions readOptions,
@@ -58,6 +59,7 @@ namespace ClassicMac.Files.Editing
         {
             Path = System.IO.Path.GetFullPath(path);
             this.options = options;
+            this.host = host;
             // A plain HFS volume image, known by its MDB (an empty volume has no files to show it).
             if (host.Layout == HostLayout.Plain && root.Volume?.Format == "HFS")
             {
@@ -175,16 +177,8 @@ namespace ClassicMac.Files.Editing
                 return NdifReader.Instance.Read(ndif, new ContainerContext(options)).Single().DataFork.ToArray();
             }
 
-            if (region is null)
-            {
-                return File.ReadAllBytes(Path);
-            }
-
-            using var stream = File.OpenRead(Path);
-            stream.Position = region.Offset;
-            var bytes = new byte[region.Length];
-            stream.ReadExactly(bytes);
-            return bytes;
+            // From the host file as read (on disk, or in memory for a session over changes not saved yet).
+            return region is null ? host.File.DataFork.ToArray() : host.File.DataFork.Slice(region.Offset, region.Length).ToArray();
         }
 
         // An HFS volume (signature 'BD') that does not wrap HFS Plus.
@@ -606,6 +600,39 @@ namespace ClassicMac.Files.Editing
                     Directory.Delete(temporary, recursive: true);
                 }
             }
+        }
+
+        /// <summary>
+        /// The input as it stands with the changes made so far, in memory, as Save As would write it: a volume with its
+        /// fork edits, put back in its partition or Disk Copy image, or an NDIF image made again (as an AppleDouble pair or
+        /// a Basilisk II entry). Null for other inputs, which are read from a saved copy.
+        /// </summary>
+        public HostFile? Current()
+        {
+            if (Kind != InputEditKind.HfsVolume)
+            {
+                return null;
+            }
+
+            if (ndif is not null)
+            {
+                return host.File == ndif ? host with { File = Rewritten() } : null;
+            }
+
+            var image = Replacements() is { Count: > 0 } replaced ? ForkSaver.ApplyHfsForks(Volume, replaced) : Volume;
+            if (region is not null)
+            {
+                var whole = host.File.DataFork.ToArray();
+                image.CopyTo(whole.AsSpan((int)region.Offset));
+                if (region.DiskCopy42)
+                {
+                    new BigEndianWriter(whole).WriteUInt32At(0x48, DiskCopy42Reader.Sum(image));
+                }
+
+                image = whole;
+            }
+
+            return host with { File = host.File with { DataFork = ForkData.FromBytes(image) } };
         }
 
         private List<HfsForkReplacement> Replacements() =>

@@ -84,7 +84,11 @@ namespace ClassicMac.Resources.Cli
 
             if (dryRun)
             {
-                var trial = InputEditSession.Open(current, options, readOptions);
+                // Tried on the input as it stands: the changes made so far, in memory or in the working copy.
+                var trial = live?.Current() is { } changed
+                    ? InputEditSession.Open(Input, changed, ContainerUnwrapper.Default.Unwrap(changed.File, HostFiles.FormatName(changed.Layout),
+                        new ContainerContext(options)), options, readOptions)
+                    : InputEditSession.Open(current, options, readOptions);
                 change(trial);
                 return [.. trial.Changes];
             }
@@ -93,14 +97,25 @@ namespace ClassicMac.Resources.Cli
             var before = live.Changes.Count;
             change(live);
             var planned = live.Changes.Skip(before).ToList();
-            var folder = Path.Combine(work, (++copies).ToString(System.Globalization.CultureInfo.InvariantCulture));
-            Directory.CreateDirectory(folder);
-            var copy = Path.Combine(folder, Path.GetFileName(Input));
-            live.SaveAs(copy);
             Tree.Dispose();
-            Tree = MacPathTree.Open(copy, options, readOptions);
-            DeleteCopy(current);
-            current = copy;
+            if (live.Current() is { } inMemory)
+            {
+                // A volume: read from memory, under the input's name, with no working copy written.
+                Tree = MacPathTree.Open(Input, inMemory, options, readOptions);
+                DeleteCopy(current);
+                current = Input;
+            }
+            else
+            {
+                var folder = Path.Combine(work, (++copies).ToString(System.Globalization.CultureInfo.InvariantCulture));
+                Directory.CreateDirectory(folder);
+                var copy = Path.Combine(folder, Path.GetFileName(Input));
+                live.SaveAs(copy);
+                Tree = MacPathTree.Open(copy, options, readOptions);
+                DeleteCopy(current);
+                current = copy;
+            }
+
             made++;
             changes.AddRange(planned);
             return planned;
