@@ -148,6 +148,38 @@ public class HelpPageTests
         Assert.Contains("gone.gif", diagnostics[0].Message);
     }
 
+    // CSS pictures (url(...)) are put in as data: URIs too: in a linked stylesheet (relative to the stylesheet's own
+    // folder), in a <style> element and in a style attribute; addresses outside the disk and data: URIs are kept.
+    [Fact]
+    public void Pictures_in_CSS_are_inlined()
+    {
+        var asked = new List<string>();
+        HelpFile? Resolve(IReadOnlyList<string> path)
+        {
+            asked.Add(string.Join("/", path));
+            return path[^1] switch
+            {
+                "dot.gif" => new HelpFile(Gif, FourCC.FromString("GIFf")),
+                "sheet.css" => new HelpFile("body { background: url(img/dot.gif) } h1 { background: url('http://x/y.gif') }"u8.ToArray(), FourCC.FromString("TEXT")),
+                _ => null,
+            };
+        }
+
+        var html = HelpPages.Render("""
+            <HTML><HEAD><LINK REL="stylesheet" HREF="../css/sheet.css">
+            <STYLE>p { background-image: URL( "dot.gif" ) } q { background: url(data:image/png;base64,AA==) }</STYLE></HEAD>
+            <BODY><DIV STYLE="background: url('dot.gif')">x</DIV></BODY></HTML>
+            """, Folder, Resolve);
+
+        const string gifUri = "data:image/gif;base64,R0lGODlhAQABAAAAAA==";
+        Assert.Contains($"<style>body {{ background: url(\"{gifUri}\") }} h1 {{ background: url('http://x/y.gif') }}</style>", html);
+        Assert.Contains($"p {{ background-image: url(\"{gifUri}\") }}", html);
+        Assert.Contains("q { background: url(data:image/png;base64,AA==) }", html);
+        Assert.Contains($"""<DIV STYLE="background: url(&quot;{gifUri}&quot;)">""", html);
+        Assert.Contains("System Folder/Help/AppleScript Help/at/css/img/dot.gif", asked);       // the stylesheet's folder
+        Assert.Contains("System Folder/Help/AppleScript Help/at/pgs/dot.gif", asked);           // the page's folder
+    }
+
     [Fact]
     public void A_frameset_s_frames_are_rendered_inline()
     {

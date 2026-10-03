@@ -260,9 +260,11 @@ namespace ClassicMac.Resources.Decoders.Documents
             var output = new StringBuilder(html.Length + 256);
             var copied = 0;
             var policy = false;
-            HelpFile? Read(string url, out IReadOnlyList<string>? path)
+            HelpFile? Read(string url, out IReadOnlyList<string>? path) => ReadIn(folder, url, out path);
+
+            HelpFile? ReadIn(IReadOnlyList<string> from, string url, out IReadOnlyList<string>? path)
             {
-                path = Resolve(folder, url);
+                path = Resolve(from, url);
                 if (path is null)
                 {
                     return null;
@@ -278,11 +280,33 @@ namespace ClassicMac.Resources.Decoders.Documents
                 return file;
             }
 
+            // CSS's pictures, url(...), as data: URIs, resolved against the folder the CSS is in.
+            string Css(string css, IReadOnlyList<string> from) => CssUrl().Replace(css, m =>
+            {
+                var url = m.Groups[2].Value.Trim();
+                if (url.Length == 0 || url.StartsWith('#') || url.StartsWith("data:", StringComparison.OrdinalIgnoreCase) || url.Contains("://", StringComparison.Ordinal))
+                {
+                    return m.Value;
+                }
+
+                var picture = Picture(ReadIn(from, url, out _), options, diagnostics);
+                return picture.Length == 0 ? m.Value : $"url(\"{picture}\")";
+            });
+
             foreach (var tag in Tags(html))
             {
+                if (tag.Start < copied)
+                {
+                    continue; // inside a <style> element already written
+                }
+
                 string? replacement = null;
                 switch (tag.Name)
                 {
+                    case "style" when html.IndexOf("</style", tag.End, StringComparison.OrdinalIgnoreCase) is var close and >= 0:
+                        output.Append(html, copied, tag.End - copied).Append(Css(html[tag.End..close], folder));
+                        copied = close;
+                        continue;
                     case "head" when !policy:
                         policy = true;
                         output.Append(html, copied, tag.End - copied).Append(Policy);
@@ -292,7 +316,9 @@ namespace ClassicMac.Resources.Decoders.Documents
                         replacement = "";
                         break;
                     case "link" when (tag.Value("rel") ?? "").Contains("stylesheet", StringComparison.OrdinalIgnoreCase) && tag.Value("href") is { } css:
-                        replacement = Read(css, out _) is { } sheet ? "<style>" + Decode(sheet.Data.Span) + "</style>" : "";
+                        replacement = Read(css, out var sheetPath) is { } sheet && sheetPath is not null
+                            ? "<style>" + Css(Decode(sheet.Data.Span), sheetPath.Take(sheetPath.Count - 1).ToList()) + "</style>"
+                            : "";
                         break;
                     case "img" or "input" when tag.Attribute("src") is { } src:
                         replacement = tag.With(src, Picture(Read(src.Value, out _), options, diagnostics));
@@ -312,6 +338,15 @@ namespace ClassicMac.Resources.Decoders.Documents
                         break;
                 }
 
+                if (replacement is null && tag.Attribute("style") is { } style && style.Value.Contains("url(", StringComparison.OrdinalIgnoreCase))
+                {
+                    var rewritten = Css(style.Value, folder);
+                    if (rewritten != style.Value)
+                    {
+                        replacement = tag.With(style, rewritten.Replace("&", "&amp;", StringComparison.Ordinal).Replace("\"", "&quot;", StringComparison.Ordinal));
+                    }
+                }
+
                 if (replacement is not null)
                 {
                     output.Append(html, copied, tag.Start - copied).Append(replacement);
@@ -322,6 +357,10 @@ namespace ClassicMac.Resources.Decoders.Documents
             output.Append(html, copied, html.Length - copied);
             return policy ? output.ToString() : Policy + output;
         }
+
+        // url(…) in CSS, quoted or not, any case: group 2 is the address.
+        [GeneratedRegex("""url\(\s*(["']?)(.*?)\1\s*\)""", RegexOptions.IgnoreCase)]
+        private static partial Regex CssUrl();
 
         // A file's address: the origin, the path's names escaped, the fragment of the URL it came from.
         private static string Address(IReadOnlyList<string> path, string url)

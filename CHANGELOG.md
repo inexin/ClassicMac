@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viewer: help pages' CSS pictures (`url(…)` in stylesheets, `style` elements and `style` attributes) are put into
+  the page, resolved from the stylesheet's own folder.
 - Viewer: styled text (SimpleText files, TEXT + styl) is drawn on white paper in the dark theme too, so its black runs
   stay readable (Mac content keeps its own colours).
 - Viewer, CLI and MCP: an alias whose original is not found says why: missing from its disk, on a disk that is not open

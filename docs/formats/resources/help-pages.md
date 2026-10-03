@@ -103,7 +103,10 @@ platform engines ClassicMac uses do not render exactly as it did.
 1. A `Content-Security-Policy` meta tag goes right after `<head>` (at the start, without a `head`): only `data:`
    content, inline styles, no scripts.
 2. `base` tags are dropped (every URL is made absolute or inline instead).
-3. A stylesheet (`link rel=stylesheet`) becomes a `style` element with the file's text.
+3. A stylesheet (`link rel=stylesheet`) becomes a `style` element with the file's text. CSS pictures, `url(…)` quoted or
+   not, in that text (resolved from the stylesheet's own folder), in the page's `style` elements and in `style`
+   attributes become `data:` URIs as pictures do; `data:` URIs, fragments and addresses with a scheme (`http://`) are
+   kept.
 4. A picture (`img src`, `input src`, the `background` of `body`, `table`, `tr`, `td`, `th`) becomes a `data:` URI:
    GIF, JPEG and PNG files by their signature, as they are; a `'PICT'` file drawn to PNG
    ([pict.md](../graphics/pict.md)). A file that is missing, or of another kind, gives an empty URL.
@@ -149,8 +152,7 @@ A page, and each file it reads, is at most 16 MB.
 
 ## 8. Not covered
 
-- `url(…)` references inside stylesheets and `style` attributes, `embed` (QuickTime movies), `object` and `applet`:
-  not resolved.
+- `embed` (QuickTime movies), `object` and `applet`: not resolved. CSS `@import` is not followed.
 - `help:` commands are not carried out (no books are opened, searched or run), and scripts never run.
 - Help Viewer's own pages (the `toc.htm` a book's frameset names, built from its index) and its search index
   (`'STOT'`).
