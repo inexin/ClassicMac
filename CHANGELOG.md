@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- CLI: the shell and MCP server read a changed volume again in 40 ms instead of 350 ms (500 MB, 4,874 files): files left
+  at the level limit are probed only when their format is asked for, and NDIF and Compact Pro probes read the resource map
+  or the first bytes, not the fork; ten `md`s 2.8 s instead of 5.8 s, opening the shell 0.7 s instead of 1.2 s
+  (unwrapping.md §5).
 - CLI: `info` shows a volume's own name under the file or partition holding it (`HFS volume "untitled"`); the files
   under it are labelled with the format they were read from, which read as the volume's name.
 - HFS: an edit session's first change also clears file records' nonzero `filStBlk`, `filRStBlk` and `filResrv` (as

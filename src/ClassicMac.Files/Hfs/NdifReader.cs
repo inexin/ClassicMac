@@ -55,7 +55,8 @@ namespace ClassicMac.Files.Hfs
         public bool CanRead(MacFile file)
         {
             ArgumentNullException.ThrowIfNull(file);
-            return Resources(file) is { } fork && fork.Find(Bcem, 128) is { Length: >= 0x58 };
+            return file.ResourceFork.Length is >= 256 and <= ResourceFork.MaxForkLength && MapHolds(file.ResourceFork, Bcem) &&
+                Resources(file) is { } fork && fork.Find(Bcem, 128) is { Length: >= 0x58 };
         }
 
         /// <inheritdoc/>
@@ -104,6 +105,47 @@ namespace ClassicMac.Files.Hfs
             catch (InvalidDataException)
             {
                 return null;
+            }
+        }
+
+        // Whether a resource fork's type list names the type, read from the header and the map alone (a probe reads only
+        // these, not the fork; the fork is parsed when the type is there). A map that cannot be read names nothing.
+        private static bool MapHolds(ForkData fork, FourCC type)
+        {
+            try
+            {
+                var header = new byte[16];
+                fork.ReadAt(0, header);
+                var reader = new BigEndianReader(header);
+                long mapOffset = reader.ReadUInt32At(4), mapLength = reader.ReadUInt32At(12);
+                if (mapLength < 30 || mapOffset > fork.Length - mapLength || mapLength > ResourceFork.MaxForkLength)
+                {
+                    return false;
+                }
+
+                var map = new byte[mapLength];
+                fork.ReadAt(mapOffset, map);
+                var mapReader = new BigEndianReader(map);
+                int typeList = mapReader.ReadUInt16At(24);
+                if (typeList > map.Length - 2)
+                {
+                    return false;
+                }
+
+                int types = (ushort)(mapReader.ReadUInt16At(typeList) + 1);
+                for (var index = 0; index < types && typeList + 2 + (index + 1) * 8 <= map.Length; index++)
+                {
+                    if (mapReader.ReadUInt32At(typeList + 2 + index * 8) == type.Value)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch (EndOfStreamException)
+            {
+                return false;
             }
         }
 

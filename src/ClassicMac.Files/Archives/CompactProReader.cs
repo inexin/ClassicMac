@@ -37,10 +37,8 @@ public sealed class CompactProReader : IContainerReader
 
         try
         {
-            using Stream stream = input.Open();
-            var header = new byte[8];
-            stream.ReadExactly(header);
-            var reader = new BigEndianReader(header);
+            // The header from the fork's first bytes (a probe's shared read); a stream is opened only for a likely archive.
+            var reader = new BigEndianReader(input.ReadPrefix(8));
             if (reader.ReadByte() != 1)
             {
                 return false;
@@ -52,6 +50,7 @@ public sealed class CompactProReader : IContainerReader
                 return false;
             }
 
+            using Stream stream = input.Open();
             stream.Seek(offset, SeekOrigin.Begin);
             CompactProDirectory directory = ReadDirectory(new BigEndianReader(stream), (int)offset);
             return directory.StoredCrc == directory.ComputedCrc;

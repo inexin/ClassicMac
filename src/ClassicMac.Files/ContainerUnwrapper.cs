@@ -24,7 +24,23 @@ namespace ClassicMac.Files
         /// The container format of the file's data fork when it was recognised but not read, because the unwrap stopped
         /// at its level limit (<see cref="ContainerUnwrapper.Expand(ContainerNode, ContainerContext, int)"/> reads it); null otherwise.
         /// </summary>
-        public string? UnreadFormat { get; init; }
+        public string? UnreadFormat
+        {
+            get => probe is null ? unreadFormat : probe.Value?.FormatName;
+            init => unreadFormat = value;
+        }
+
+        private readonly string? unreadFormat;
+
+        // The probe that tells UnreadFormat when it is first asked for (a file at the level limit, among thousands on a
+        // volume, is not probed until something looks at it).
+        private readonly Lazy<IContainerReader?>? probe;
+
+        internal Lazy<IContainerReader?>? Probe
+        {
+            get => probe;
+            init => probe = value;
+        }
 
         /// <summary>The volume's own dates when the file's data fork is a volume that was read (HFS, HFS Plus, MFS); null otherwise.</summary>
         public VolumeInfo? Volume { get; init; }
@@ -134,13 +150,26 @@ namespace ClassicMac.Files
         {
             if (node.UnreadFormat is not null)
             {
-                return Unwrap(node.File, node.Format, context, depth, levels, location, Probe(node.File), ref expanded);
+                return Unwrap(node.File, node.Format, context, depth, levels, location, node.Probe?.Value ?? Probe(node.File), ref expanded);
             }
 
             if (node.Children.Count == 0)
             {
                 return node;
             }
+
+            // The files not yet probed, side by side (in order, the first that fails is thrown when reached).
+            Parallel.ForEach(node.Children.Where(c => c.Probe is { IsValueCreated: false }), child =>
+            {
+                try
+                {
+                    _ = child.Probe!.Value;
+                }
+                catch (Exception)
+                {
+                    // Lazy keeps the exception; the loop below meets it in order.
+                }
+            });
 
             var files = node.Children.Select(c => c.File).ToList();
             var children = new List<ContainerNode>(node.Children.Count);
@@ -239,12 +268,15 @@ namespace ClassicMac.Files
                 return new ContainerNode(format, file, []);
             }
 
-            var probed = ProbeAll(contents);
+            // A container holding one file (a wrapper, a disk image's disk) does not use up a level; a volume always does,
+            // even with one file on it. Files at the level limit are probed when their format is asked for.
+            var below = levels == int.MaxValue || contents.Count == 1 && reader is not IVolumeReader ? levels : levels - 1;
+            var probed = below == 0 ? null : ProbeAll(contents);
             var children = new List<ContainerNode>(contents.Count);
             for (var index = 0; index < contents.Count; index++)
             {
                 var inner = contents[index];
-                probed[index].Error?.Throw();
+                probed?[index].Error?.Throw();
                 expanded += inner.DataFork.Length + inner.ResourceFork.Length;
                 if (expanded > context.Options.MaxExpandedBytesPerInput)
                 {
@@ -252,9 +284,12 @@ namespace ClassicMac.Files
                         $"Unwrapping produced more than {context.Options.MaxExpandedBytesPerInput} bytes; stopped.");
                     break;
                 }
-                // A container holding one file (a wrapper, a disk image's disk) does not use up a level; a volume always
-                // does, even with one file on it.
-                var below = levels == int.MaxValue || contents.Count == 1 && reader is not IVolumeReader ? levels : levels - 1;
+                if (probed is null)
+                {
+                    children.Add(new ContainerNode(reader.FormatName, inner, []) { Probe = new Lazy<IContainerReader?>(() => Probe(inner)) });
+                    continue;
+                }
+
                 children.Add(Unwrap(inner, reader.FormatName, outer.For(null, () => SiblingsOf(contents, inner)), depth + 1,
                     below, Within(location, inner), probed[index].Reader, ref expanded));
             }

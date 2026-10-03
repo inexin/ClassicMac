@@ -200,6 +200,11 @@ and Apple's published descriptions are the whole reference.
   containers; the containers below are leaves with `UnreadFormat` set, read later by `Expand`. A container holding one
   file (a wrapper, a disk image's disk) does not count as a level, so a wrapped volume is reached at level 1; a volume
   always counts, even with one file on it, so its files are never opened by a level 1 read. [ClassicMac]
+- Files read side by side are probed side by side (a volume holds thousands); files left at the level limit are probed
+  only when their `UnreadFormat` is first asked for (listing one folder probes that folder's files), and `Expand`
+  probes those still unprobed side by side. A probe that fails is thrown in the files' order. Probes read little: each
+  fork's head and tail once, shared by every reader; NDIF looks for `'bcem'` in the resource map's type list before
+  parsing the fork, and Compact Pro checks its first byte before opening a stream. [ClassicMac]
 - `ContainerReadOptions` holds every limit [ClassicMac]:
 
   | Option | Default | Use |

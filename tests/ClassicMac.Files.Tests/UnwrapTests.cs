@@ -133,6 +133,40 @@ public class UnwrapTests
         Assert.Empty(diagnostics);
     }
 
+    // Counts its probes; never matches.
+    private sealed class CountingReader : IContainerReader
+    {
+        public int Probes;
+
+        public string FormatName => "Counting";
+
+        public bool CanRead(ForkData input)
+        {
+            Interlocked.Increment(ref Probes);
+            return false;
+        }
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => throw new InvalidDataException();
+    }
+
+    // Files at the level limit are probed when their format is asked for, not when the volume is read: a volume of
+    // thousands of files read to list one folder probes none of them.
+    [Fact]
+    public void Files_at_the_level_limit_are_probed_when_asked()
+    {
+        var counting = new CountingReader();
+        var unwrapper = new ContainerUnwrapper([counting]);
+        var volume = unwrapper.Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("Vol"), DataFork = ForkData.FromBytes(Volume()) }, "host file", new ContainerContext(null, []), levels: 1);
+
+        Assert.Equal(1, counting.Probes);                                               // the host file
+        Assert.Equal("MacBinary II", Named(volume, "Wrap.bin").UnreadFormat);
+        Assert.Equal(2, counting.Probes);
+        Assert.Null(Named(volume, "Plain").UnreadFormat);
+        Assert.Null(Named(volume, "Plain").UnreadFormat);
+        Assert.Equal(3, counting.Probes);                                               // once each
+    }
+
     [Fact]
     public void Expand_reads_unread_containers_as_deep_as_asked()
     {
@@ -201,23 +235,38 @@ public class UnwrapTests
         public bool CanRead(ForkData input) =>
             input.Length == 2 && barrier.SignalAndWait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
-        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => [];
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) =>
+            [new MacFile { Name = MacString.FromMacRoman("inside"), DataFork = ForkData.FromBytes(new byte[] { 9 }) }];
     }
 
-    // The files of a container are probed side by side (opening a disk probes every file on it); the tree keeps their
-    // order.
+    private static List<MacFile> TogetherFiles() => [.. Enumerable.Range(0, 4).Select(i =>
+        new MacFile { Name = MacString.FromMacRoman($"File {i}"), DataFork = ForkData.FromBytes(new byte[] { 1, 2 }) })];
+
+    private static readonly MacFile HolderInput = new() { Name = MacString.FromMacRoman("in"), DataFork = ForkData.FromBytes(new byte[] { 0xEE }) };
+
+    // The files of a container read through are probed side by side (opening a disk probes every file on it); the tree
+    // keeps their order.
     [Fact]
     public void A_containers_files_are_probed_at_the_same_time()
     {
-        var files = Enumerable.Range(0, 4).Select(i =>
-            new MacFile { Name = MacString.FromMacRoman($"File {i}"), DataFork = ForkData.FromBytes(new byte[] { 1, 2 }) }).ToList();
-        var unwrapper = new ContainerUnwrapper([new Holder(files), new Together(4)]);
+        var unwrapper = new ContainerUnwrapper([new Holder(TogetherFiles()), new Together(4)]);
 
-        var root = unwrapper.Unwrap(new MacFile { Name = MacString.FromMacRoman("in"), DataFork = ForkData.FromBytes(new byte[] { 0xEE }) },
-            "host file", new ContainerContext(), levels: 1);
+        var root = unwrapper.Unwrap(HolderInput, "host file", new ContainerContext());
 
         Assert.Equal(["File 0", "File 1", "File 2", "File 3"], root.Children.Select(c => c.File.Name.ToMacRoman()));
-        Assert.All(root.Children, c => Assert.Equal("together", c.UnreadFormat));
+        Assert.All(root.Children, c => Assert.Equal("inside", Assert.Single(c.Children).File.Name.ToMacRoman()));
+    }
+
+    // Expanding a container whose files were left at the level limit probes them side by side too.
+    [Fact]
+    public void Expanding_probes_the_unread_files_at_the_same_time()
+    {
+        var unwrapper = new ContainerUnwrapper([new Holder(TogetherFiles()), new Together(4)]);
+        var shallow = unwrapper.Unwrap(HolderInput, "host file", new ContainerContext(), levels: 1);
+
+        var root = unwrapper.Expand(shallow, new ContainerContext());
+
+        Assert.All(root.Children, c => Assert.Equal("inside", Assert.Single(c.Children).File.Name.ToMacRoman()));
     }
 
     // A probe that fails stops the unwrap as it would in order: the first such file's error is the one thrown.
