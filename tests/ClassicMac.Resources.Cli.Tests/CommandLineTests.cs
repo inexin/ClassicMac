@@ -239,6 +239,32 @@ public class CommandLineTests
         Assert.Contains("  AppleSingle: \"Game Data\"", output);
         Assert.Contains("type 'scen'  creator 'RLMZ'", output);
         Assert.Contains("resource fork", output);
+        Assert.Contains("kind \"Realmz scenario\" (built-in)", output);       // Realmz is not there: the table
+    }
+
+    [Fact]
+    public void Info_names_kinds_from_the_volumes_applications()
+    {
+        // SimpleText with a 'kind' naming TEXT, and a document of its.
+        byte[] kind = [.. "ttxt"u8, 0, 0, 0, 0, 0, 1, .. "TEXT"u8, 24, .. "SimpleText text document"u8, 0];
+        var fork = new ClassicMac.Resources.ResourceFork();
+        fork.Add(new ClassicMac.Resources.Resource(FourCC.FromString("kind"), 128, kind));
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "SimpleText", [], fork.ToArray(), type: "APPL", creator: "ttxt");
+        disk.File(HfsBuilder.Root, "Read Me", [1], [], type: "TEXT", creator: "ttxt");
+        var path = Path.Combine(Path.GetTempPath(), $"kinds-{Guid.NewGuid():N}.img");
+        File.WriteAllBytes(path, disk.Build("Kinds"));
+        try
+        {
+            var (code, output, _) = Run("info", path);
+            Assert.Equal(ExitCodes.Success, code);
+            Assert.Contains("kind \"SimpleText text document\" (from SimpleText’s 'kind' 128)", output);
+            Assert.Contains("kind \"application program\" (built-in)", output);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

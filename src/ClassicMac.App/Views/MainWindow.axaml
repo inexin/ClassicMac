@@ -1193,7 +1193,7 @@
                      ellipsis (a left-aligned grid: the name's star column is as wide as the name until the row is
                      full), the unsaved mark right after it. -->
                 <DockPanel>
-                  <TextBlock DockPanel.Dock="Right" Classes="meta" Text="{Binding Meta}"
+                  <TextBlock DockPanel.Dock="Right" Classes="meta" Text="{Binding Meta}" ToolTip.Tip="{Binding KindTip}"
                              IsVisible="{Binding Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   <Panel DockPanel.Dock="Right" Classes="not-read" IsVisible="{Binding IsUnread}">
                     <Rectangle />

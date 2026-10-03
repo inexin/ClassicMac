@@ -186,12 +186,13 @@ namespace ClassicMac.App.ViewModels
         private static DetailsViewModel File(NodeViewModel node, MacFile file, string? holds, FileResources? resources, int problems)
         {
             var info = file.FinderInfo;
-            var kind = InspectorHeader.For(node)?.Kind is { } k && k.IndexOf(" in ", StringComparison.Ordinal) is var at and > 0 ? k[..at] : "File";
+            var kind = FileKinds.Of(node);
             var parent = Tree.FolderOf(node);
             var fileRows = new List<DetailRow>
             {
                 new("Name", file.Name.ToMacRoman()),
-                new("Kind", kind),
+                new("Kind", kind.Text),
+                new("Kind from", FileKinds.Source(kind)),
                 new("Type / creator", $"'{info.Type}' / '{info.Creator}'", Mono: true),
                 new("Mac path", file.MacPath, Mono: true),
             };

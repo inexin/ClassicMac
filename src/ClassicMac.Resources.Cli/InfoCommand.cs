@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Resources.Decoders.Finder;
 
 namespace ClassicMac.Resources.Cli
 {
@@ -31,26 +33,54 @@ namespace ClassicMac.Resources.Cli
                 output.WriteLine($"  with {companion}");
             }
 
-            Write(opened.Root, 0);
+            Write(opened.Root, 0, null);
             return reporter.ExitCode;
         }
 
-        private void Write(ContainerNode node, int depth)
+        // A node and the files it holds; `volume` names kinds from the applications beside the node (finder.md §2.3).
+        private void Write(ContainerNode node, int depth, FinderKindResolver? volume)
         {
             var indent = new string(' ', depth * 2);
             var file = node.File;
             var info = file.FinderInfo;
             output.WriteLine($"{indent}{node.Format}: \"{file.MacPath}\"");
             output.WriteLine($"{indent}  type '{info.Type}'  creator '{info.Creator}'  flags {Flags(info.Flags)}");
+            var kind = (info.Flags & FinderFlags.IsAlias) != 0
+                ? new FinderKind("alias", FinderKindSource.BuiltIn, null, null)
+                : KnownKinds.Resolve(volume, info.Type, info.Creator);
+            output.WriteLine($"{indent}  kind \"{kind.Text}\" ({KnownKinds.Describe(kind)})");
             if (file.Created is not null || file.Modified is not null)
             {
                 output.WriteLine($"{indent}  created {Date(file.Created)}  modified {Date(file.Modified)}");
             }
 
             output.WriteLine($"{indent}  data fork {file.DataFork.Length} bytes  resource fork {file.ResourceFork.Length} bytes");
+            var neighbours = node.Children.Count == 0 ? null : Resolver(node);
             foreach (var child in node.Children)
             {
-                Write(child, depth + 1);
+                Write(child, depth + 1, neighbours);
+            }
+        }
+
+        // The files a container holds, as a volume of applications and System for kinds; forks are read only when asked.
+        private static FinderKindResolver Resolver(ContainerNode node) =>
+            FinderKindResolver.ForFiles(node.Children.Select(c => c.File), f => f.FinderInfo.Type, f => f.FinderInfo.Creator,
+                f => (ushort)f.FinderInfo.Flags, f => f.Name.ToMacRoman(), Fork);
+
+        private static ResourceFork? Fork(MacFile file)
+        {
+            if (file.ResourceFork.Length == 0)
+            {
+                return null;
+            }
+
+            try
+            {
+                return MacFileResources.Read(file, ReadOptions.Default).Fork;
+            }
+            catch (Exception e) when (e is InvalidDataException or IOException or EndOfStreamException)
+            {
+                return null;
             }
         }
 

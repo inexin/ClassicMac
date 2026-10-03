@@ -37,6 +37,9 @@ namespace ClassicMac.Resources.Decoders.Finder
         /// <summary>The pseudo file type whose entry is the application's name.</summary>
         public static FourCC ApplicationNameType { get; } = FourCC.FromString("apnm");
 
+        /// <summary>The word after the region (+$06): 0 in a valid resource; the Finder ignores one where it is not [Code: Finder 9.2.2 KindResourceIsValid].</summary>
+        public short Reserved { get; init; }
+
         /// <summary>The application's name (its <c>'apnm'</c> entry), or null when it has none.</summary>
         public string? ApplicationName => KindOf(ApplicationNameType);
 
@@ -63,7 +66,7 @@ namespace ClassicMac.Resources.Decoders.Finder
             var reader = new BigEndianReader(data);
             var signature = reader.ReadFourCC();
             var region = reader.ReadInt16();
-            reader.ReadInt16();
+            var reserved = reader.ReadInt16();
             int count = reader.ReadUInt16();
             for (var i = 0; i < count; i++)
             {
@@ -82,7 +85,7 @@ namespace ClassicMac.Resources.Decoders.Finder
                 }
             }
 
-            return new KindResource(signature, region, entries);
+            return new KindResource(signature, region, entries) { Reserved = reserved };
         }
 
         /// <summary>

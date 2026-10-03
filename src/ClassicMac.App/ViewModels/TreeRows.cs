@@ -81,6 +81,12 @@ namespace ClassicMac.App.ViewModels
         /// </summary>
         public string? Meta => DetailsShown ? Details : null;
 
+        /// <summary>
+        /// The tooltip of a file's type · creator: its kind and where it came from ("SimpleText text document", "from
+        /// SimpleText’s 'kind' 128"), found only when the tooltip is shown; null for other rows.
+        /// </summary>
+        public object? KindTip => this is FileNode or ContainerFileNode ? new KindTip(this) : null;
+
         // Whether the tree shows the details column (Tree display ▸ Show details column; off when the node is in no input).
         private bool DetailsShown
         {

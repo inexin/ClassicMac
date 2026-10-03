@@ -89,12 +89,13 @@ public sealed class DetailsTests : IDisposable
         Assert.Equal(details.Groups.Where(g => g.Wide), details.WideCards);
 
         var file = Group(details, "File");
-        Assert.Equal(["Name", "Kind", "Type / creator", "Mac path", "In"], file.Rows.Select(r => r.Label));
+        Assert.Equal(["Name", "Kind", "Kind from", "Type / creator", "Mac path", "In"], file.Rows.Select(r => r.Label));
+        Assert.Equal(("application program", "built-in"), (Value(file, "Kind"), Value(file, "Kind from")));   // the Finder's kind of an application
         Assert.Equal(("Realmz", "'APPL' / 'RLMZ'", "Games:Realmz", "Disk.img › Games"),
             (Value(file, "Name"), Value(file, "Type / creator"), Value(file, "Mac path"), Value(file, "In")));
         Assert.True(file.Rows.Single(r => r.Label == "Type / creator").Mono);
         Assert.True(file.Rows.Single(r => r.Label == "Mac path").Mono);
-        Assert.Equal([false, false, false, false, true], file.Rows.Select(r => r.Link));             // "In" leads to the folder
+        Assert.Equal([false, false, false, false, false, true], file.Rows.Select(r => r.Link));      // "In" leads to the folder
         Assert.Equal((true, false), (Group(details, "Forks").Rows[0].HasBar, file.Rows[0].HasBar));
         Assert.Same(realmz.Parent, details.InNode);
     }

@@ -36,6 +36,17 @@
   change of the list. The tree keeps its keys (Right opens or goes to the first child, Left goes to the parent or
   closes, + − and * open, close and open all below; Up, Down, Home, End, Page Up and Down), a press on the expander
   opens or closes without selecting (Alt: every row below), a double click opens or closes.
+  (`FinderResources.ReadKind`) and decoded as `finder.kind` JSON. `FinderKindResolver` names kinds as Mac OS 9's Finder
+  does from a volume's files: the Finder's own kinds of applications, system files, clippings and the like (from its
+  `'STR '` 6902, `'fmap'` 5111 and `'STR#'` 5100), and a document's kind in `GetDocumentKindString`'s order (the `'kind'`
+  for its creator and type, of the system's region; the creator's `'apnm'` and " document"; the application's file name
+  and " document"; the System's `'istd'` kind; "document"), reading a file's resource fork only when needed.
+  `KnownKinds` adds ClassicMac's own table of about 140 type and creator pairs, 40 types and 80 applications, and the
+  English copies of the Finder's strings, as the fallback, and names resource types.
+- Viewer: files show their kinds as the Finder names them: the inspector's kind line ("SimpleText text document in
+  Docs"), the Details tab's Kind with where it came from ("from SimpleText’s 'kind' 128", "built-in"), and a tooltip on
+  the tree's type · creator.
+- CLI: `info` prints each file's kind and its source.
 - Editor: editing a menu gives the table the room: the live preview narrows to 166 while editing (272 read only; it
   scrolls at 2× with its scroll bars shown, its title wrapping), so the Text column is at least 160 wide in a
   1200-pixel window.

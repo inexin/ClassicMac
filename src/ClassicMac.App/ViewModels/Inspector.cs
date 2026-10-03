@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Resources;
+using ClassicMac.Resources.Decoders.Finder;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -19,35 +20,15 @@ namespace ClassicMac.App.ViewModels
     /// </summary>
     public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kind, IReadOnlyList<InspectorFact> Facts)
     {
-        private static readonly HashSet<string> ApplicationTypes = ["APPL", "APPC", "APPD", "appe"];
-
-        // What resource types are called (singular, plural).
-        private static readonly Dictionary<string, (string One, string Many)> TypeNames = new()
-        {
-            ["STR "] = ("String", "Strings"), ["STR#"] = ("String list", "String lists"), ["TEXT"] = ("Text", "Texts"),
-            ["styl"] = ("Text style", "Text styles"), ["PICT"] = ("Picture", "Pictures"), ["ICON"] = ("Icon", "Icons"),
-            ["ICN#"] = ("Icon list", "Icon lists"), ["icl4"] = ("4-bit icon", "4-bit icons"), ["icl8"] = ("8-bit icon", "8-bit icons"),
-            ["ics#"] = ("Small icon list", "Small icon lists"), ["ics4"] = ("Small 4-bit icon", "Small 4-bit icons"),
-            ["ics8"] = ("Small 8-bit icon", "Small 8-bit icons"), ["icns"] = ("Icon family", "Icon families"),
-            ["cicn"] = ("Colour icon", "Colour icons"), ["SICN"] = ("Small icons", "Small icons"), ["CURS"] = ("Cursor", "Cursors"),
-            ["crsr"] = ("Colour cursor", "Colour cursors"), ["snd "] = ("Sound", "Sounds"), ["MENU"] = ("Menu", "Menus"),
-            ["DLOG"] = ("Dialog", "Dialogs"), ["DITL"] = ("Dialog item list", "Dialog item lists"), ["ALRT"] = ("Alert", "Alerts"),
-            ["WIND"] = ("Window", "Windows"), ["CNTL"] = ("Control", "Controls"), ["vers"] = ("Version", "Versions"),
-            ["PAT "] = ("Pattern", "Patterns"), ["PAT#"] = ("Pattern list", "Pattern lists"), ["ppat"] = ("Pixel pattern", "Pixel patterns"),
-            ["FOND"] = ("Font family", "Font families"), ["NFNT"] = ("Bitmap font", "Bitmap fonts"), ["FONT"] = ("Font", "Fonts"),
-            ["sfnt"] = ("TrueType font", "TrueType fonts"), ["CODE"] = ("Code segment", "Code segments"), ["TMPL"] = ("Template", "Templates"),
-            ["BNDL"] = ("Bundle", "Bundles"), ["FREF"] = ("File reference", "File references"), ["clut"] = ("Colour table", "Colour tables"),
-        };
-
         /// <summary>What a resource of <paramref name="type"/> is called ("Text style"), else the type in quotes.</summary>
-        internal static string TypeName(string type) => TypeNames.TryGetValue(type, out var names) ? names.One : $"'{type}'";
+        internal static string TypeName(string type) => KnownKinds.ResourceType(FourCC.FromString(type)) is { } names ? names.One : $"'{type}'";
 
         /// <summary>The header for <paramref name="node"/>; <paramref name="draftSize"/>, while a form is edited, is its resource's Size.</summary>
         public static InspectorHeader? For(NodeViewModel? node, long? draftSize = null) => node switch
         {
             ResourceNode resource => Resource(resource, draftSize),
             ResourceTypeNode type => Type(type),
-            FileNode file => new InspectorHeader(file, file.Name, $"{(ApplicationTypes.Contains(file.File.FinderInfo.Type.ToString()) ? "Application" : "Document")} in {OwnerName(file)}",
+            FileNode file => new InspectorHeader(file, file.Name, $"{FileKinds.Capitalized(FileKinds.Of(file).Text)} in {OwnerName(file)}",
                 [TypeCreator(file.File), Size(file.File.DataFork.Length + file.File.ResourceFork.Length), Resources(file)]),
             ContainerFileNode container => new InspectorHeader(container, container.File.Name.ToMacRoman(), $"{container.ContentFormat} in {OwnerName(container)}",
                 [TypeCreator(container.File), Size(container.File.DataFork.Length + container.File.ResourceFork.Length)]),
@@ -63,7 +44,7 @@ namespace ClassicMac.App.ViewModels
         {
             var resource = node.Resource;
             var type = resource.Type.ToString();
-            var kind = TypeNames.TryGetValue(type, out var names) ? names.One : $"'{type}' resource";
+            var kind = KnownKinds.ResourceType(resource.Type) is { } names ? names.One : $"'{type}' resource";
             if (type == "FOND" && FamilyFacts(node) is { } family)
             {
                 return new InspectorHeader(node, node.Name, $"{kind} in {OwnerName(node)}", family);
@@ -178,7 +159,7 @@ namespace ClassicMac.App.ViewModels
         {
             var type = node.Type.ToString();
             var resources = node.Fork.OfType(node.Type).ToList();
-            var kind = TypeNames.TryGetValue(type, out var names) ? names.Many : $"'{type}' resources";
+            var kind = KnownKinds.ResourceType(FourCC.FromString(type)) is { } names ? names.Many : $"'{type}' resources";
             return new InspectorHeader(node, $"'{type}'", $"{kind} in {OwnerName(node)}",
             [
                 new("Type", $"'{type}'", true),

@@ -93,7 +93,7 @@ public sealed class InspectorTests : IDisposable
 
         model.Selected = prefs;
         var header = model.Header!;
-        Assert.Equal(("Prefs", "Document in inspect.img"), (header.Name, header.Kind));
+        Assert.Equal(("Prefs", "SimpleText text document in inspect.img"), (header.Name, header.Kind));   // SimpleText is not on the disk: the table
         Assert.Equal(["Type / creator", "Total size", "Resources"], header.Facts.Select(f => f.Label));
         Assert.Equal(new InspectorFact("Type / creator", "TEXT · ttxt", true), Facts(header)["Type / creator"]);
         Assert.Equal("not read", Facts(header)["Resources"].Value);
@@ -104,7 +104,7 @@ public sealed class InspectorTests : IDisposable
         Assert.Equal($"{4 + prefs.File.ResourceFork.Length:N0} bytes", Facts(model.Header!)["Total size"].Value);
 
         model.Selected = Child<FileNode>(input, "App");
-        Assert.Equal("Application in inspect.img", model.Header!.Kind);
+        Assert.Equal("Application program in inspect.img", model.Header!.Kind);
         Assert.Equal("none", Facts(model.Header)["Resources"].Value);
 
         var docs = Child<FolderNode>(input, "Docs");
@@ -112,7 +112,7 @@ public sealed class InspectorTests : IDisposable
         Assert.Equal(("Docs", "Folder in inspect.img"), (model.Header!.Name, model.Header.Kind));
         Assert.Equal("2", Facts(model.Header)["Items"].Value);
         model.Selected = Child<FileNode>(docs, "One");
-        Assert.Equal("Document in Docs", model.Header!.Kind);
+        Assert.Equal("SimpleText text document in Docs", model.Header!.Kind);
 
         model.Selected = input;
         Assert.Equal(("inspect.img", "HFS volume"), (model.Header!.Name, model.Header.Kind));
@@ -299,8 +299,10 @@ public sealed class InspectorTests : IDisposable
 
         async Task<(int Width, int Height, uint TopLeft, uint TopRight)?> Select(NodeViewModel node)
         {
+            var previous = model.HeaderIconPng;
             model.Selected = node;
-            Assert.Null(model.HeaderIconPng); // the previous one goes at once
+            // The previous one goes at once (the new one may already be there: it loads on another thread).
+            Assert.True(model.HeaderIconPng is null || !ReferenceEquals(previous, model.HeaderIconPng));
             await model.HeaderIconTask;
             return model.HeaderIconPng is { } png ? Png(png) : null;
         }

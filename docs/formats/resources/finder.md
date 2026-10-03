@@ -88,13 +88,14 @@ The flags, by their Rez names [Doc: `Types.r`]:
 
 ### 1.4 Kind strings (kind)
 
-[Fitted: the 20 `'kind'` resources of a Mac OS 9.0 startup disk, every one read whole by this layout]
+[Code: Finder 9.2.2 KindResourceIsValid, InstallKindResource] [Verified: the 20 `'kind'` resources of a Mac OS 9.0
+startup disk all read whole]
 
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
-| +$00 | 4 | Signature | `OSType`; the creator code of the application whose documents these are; `'istd'` in the System's kinds of standard types (§2.3) |
-| +$04 | 2 | Region | `i16`; the region code of the strings (0 in every one seen, the United States) |
-| +$06 | 2 | Reserved | 0 in every one seen |
+| +$00 | 4 | Signature | `OSType`; the creator code whose documents these kinds name; `'istd'` in the System's kinds of standard types (§2.3) |
+| +$04 | 2 | Region | `i16`; the region code of the strings; only kinds of the system's own region are used, with no fallback to another |
+| +$06 | 2 | Reserved | Must be 0, or the resource is ignored |
 | +$08 | 2 | Count | `u16`; the number of entries (not less one) |
 | +$0A | … | Entries | One per kind |
 
@@ -103,12 +104,18 @@ Each entry, padded with a zero byte to an even length:
 | Offset | Size | Field | Notes |
 | --- | --- | --- | --- |
 | +$00 | 4 | File type | `OSType`; `'apnm'` gives the application's own name instead of a kind |
-| +$04 | 1 + n | Kind | Pascal string, Mac OS Roman |
+| +$04 | 1 + n | Kind | Pascal string, Mac OS Roman; the desktop database keeps at most 63 characters |
 
-- One file may hold several, for different signatures (Location Manager's `'walk'` and `'fall'`), and a signature need
-  not be the file's own creator (ColorSync Extension, creator `'Sync'`, names `'sync'` files). [Fitted]
+- A resource under 8 bytes is ignored. [Code: Finder 9.2.2 KindResourceIsValid]
+- The Finder copies kinds into the desktop database when it registers a file with a bundle (the hasBundle flag, or type
+  `'APPL'`; also an uninited `'thng'` in the Extensions folder), keyed by (the `'kind'`'s signature, the file type).
+  An entry already there is replaced only by a `'kind'` whose signature is the installing file's own creator. [Code:
+  Finder 9.2.2 InstallKindResource]
+- So one file may hold kinds for several signatures (Location Manager's `'walk'` and `'fall'`), and a signature need
+  not be the file's own creator: ColorSync Extension (creator `'Sync'`) names `'sync'` files, and its `'kind'` never
+  serves `'Sync'`. Keys are binary `OSType`s, so case counts. [Fitted]
 - The System's kinds of standard types are a `'kind'` signed `'istd'` (System Resources' −16550, named "industry
-  standards", on Mac OS 9.0). [Fitted]
+  standards", on Mac OS 9.0).
 
 ## 2. Reading
 
@@ -127,25 +134,77 @@ requirements in the Finder's Get Info window [Doc: Processes].
 
 ### 2.3 A document's kind
 
-How the Finder chooses the kind of a document of type *T* and creator *C*. The order below is fitted to the
-resources on the disk and to what the Finder's strings allow; the Finder's code that chooses was not traced, and its
-results were not compared on a running Mac. [Fitted]
+The kind of a document of type *T* and creator *C*, as `GetDocumentKindString` finds it; the first step that gives a
+string wins [Code: Translation library, GetDocumentKindString]. A file whose type has a kind of the Finder's own (§2.4)
+does not get here.
 
-1. The application whose signature is *C* is found: the Finder asks its desktop database; ClassicMac looks for a file
-   on the volume with creator *C* that is an application (`'APPL'`, `'APPC'`, `'APPD'`, `'appe'`) or has the
-   hasBundle flag.
-2. If it is found and one of its `'kind'` resources signed *C* names *T* (resources in ID order, entries in order), that
-   string is the kind.
-3. If it is found but names no kind for *T*, the kind is "*name* document", *name* being its `'apnm'` entry, else its
-   file name. The System keeps the pattern as `'STR#'` −16552 item 2, "^0 document", next to "document" (item 1).
-4. Otherwise the System's `'kind'` signed `'istd'` (System Resources' −16550 on Mac OS 9.0) names standard types
-   whatever their creator.
-5. Otherwise the Finder shows "document"; ClassicMac's callers first try their own table of known types.
+1. The desktop database's kind for (*C*, *T*), of the system's region.
+2. Its kind for (*C*, `'apnm'`) and " document": System Resources' `'STR#'` −16552 item 2, "^0 document", the result at
+   most 64 bytes.
+3. The file name of *C*'s application (`PBDTGetAPPL`: on the file's volume, then the startup volume, then the others)
+   and " document", the same way.
+4. The desktop database's kind for (`'istd'`, *T*), from System Resources' `'kind'` −16550.
+5. "document", System Resources' `'STR#'` −16552 item 1.
 
-Folders, disks, applications and system files have kinds of the Finder's own, by type, with no `'kind'` resource:
-the strings are in the Finder (`'STR#'` 1419: "folder", "System Folder", "Control Panels folder"…, "hard disk",
-"application"; `'STR#'` 5100: "control panel", "system extension", "Chooser extension"…), but which type takes which
-string is in the Finder's code, not traced.
+So the application's name comes before the standard kinds: a `'TEXT'` file whose application is found reads
+"*application* document", not "Text document". Stationery is not told apart.
+
+Without a desktop database ClassicMac does the same from the volume's files: a `'kind'` matched by its signature,
+then the creator's `'apnm'`, then the application's file name, then `'istd'`, then "document". [Fitted: equivalent to
+the desktop database's contents after registering every file with a bundle]
+
+### 2.4 The Finder's own kinds
+
+The Finder names some items by their type before asking for a document's kind [Code: Finder 9.2.2]:
+
+| Types | Kind |
+| --- | --- |
+| `'APPL'`, `'APPC'`, `'APPD'` | "application program" (the Finder's `'STR '` 6902) |
+| `'dfil'` | "desk accessory" |
+| `'DFIL'` | "desk accessory suitcase" |
+| `'FFIL'` | "font suitcase" |
+| `'ffil'`, `'tfil'`, `'sfnt'`, `'ttcf'` | "font" |
+| `'kfil'` | "keyboard layout" |
+| `'sfil'` | "sound" |
+| `'ifil'` | "script" |
+| `'edtP'`, `'edtp'`, `'edtT'`, `'edts'`, `'edtt'`, `'edtu'`, `'publ'` | "*application* edition" (the creator's application name), else "edition" |
+| `'clpp'`, `'clpt'`, `'clps'`, other `'clp?'` | "picture clipping", "text clipping", "sound clipping", "clipping" |
+| `'url '`, `'ilht'`, `'ilft'`, `'ilaf'`, `'ilfi'`, `'ilma'`, `'ilnw'`, `'ilat'`, `'ilge'`, `'ilns'` | The Finder's `'fmap'` 11010 into `'STR#'` 11000: "internet location", "web page location", "ftp location", "network location", "file location", "email address", "news location", "AppleTalk zone location", "internet location", "neighborhood location" [Fitted: the method] |
+| `'slnk'` | "Mac OS X alias" |
+| `'zsys'` | "system file" |
+| System files: types in the Finder's `'fmap'` 5111 | Its `'STR#'` 5100 item *n* (below) |
+
+`'fmap'` 5111 holds entries {`OSType` type, `i16` 0, `i16` *n*}, ended by a zero type. On Mac OS 9.0: 1 "Chooser
+extension" (`'RDEV'`, `'PRER'`, `'PRES'`, `'pdvr'`); 2 "system extension" (`'INIT'`, `'thng'`, `'sLnk'`, `'adev'`,
+`'mdev'`, `'appe'`, `'etpp'`, `'ttpp'`, `'atlk'`, `'scri'`, `'ndrv'`, `'comd'`, `'CLMP'`); 3 (`'fext'`); 4 "database
+extension" (`'ddev'`); 5 "communications tool" (`'cbnd'`, `'tbnd'`, `'fbnd'`); 6 "control panel" (`'cdev'`); 7
+"PostScript® font" (`'LWFN'`); 8 "printing extension" (`'pext'`); 9 "paper type" (`'drpt'`, `'uspt'`); 10 "control strip
+module" (`'sdev'`); 11 "OpenDoc® editor" (`'oded'`); 12 "library" (`'shlb'`, `'libr'`); 13 "Text Encoding Converter
+document" (`'utbl'`, `'ecpg'`); 14 "contextual menu plug-in" (`'cmpi'`); 15 "modem script" (`'mlts'`); 16 "scripting
+addition" (`'osax'`).
+
+- A file with the hasBundle flag and such a type keeps the Finder's kind ("system extension"); its `'kind'` names its
+  documents. An application's own `'kind'` entry for `'APPL'` is not used for it. [Fitted]
+- Other items: folders "folder" [Fitted]; disks "disk", server volumes "shared disk"; aliases (the isAlias flag)
+  "alias"; the Trash "trash".
+- Other files of the Finder and System (type `'FNDR'`, or creator `'MACS'` with a type not above) read "system file".
+  [Fitted]
+
+### 2.5 ClassicMac's table
+
+When the volume does not name a kind, ClassicMac uses its own table (`KnownKinds`), in this order after §2.3's steps
+1–3 [ClassicMac]:
+
+1. The table's kind of (*T*, *C*): "SimpleText text document", "Apple Help page", "Microsoft Word 3–5 document", the
+   archive and disk-image formats ClassicMac reads, and about 140 others.
+2. §2.3 step 4, the System's `'istd'` kind.
+3. The table's kind of *T* for any creator ("text document", "PICT picture", "StuffIt archive", …).
+4. "*name* document", *name* being the table's name for *C* (about eighty applications).
+5. "document".
+
+The table is ClassicMac's own words. Its codes were cross-checked against public type and creator lists (§9); no entry
+or description was copied from them. The Finder's strings of §2.4 have English copies there, used when the volume has
+no Finder to read them from.
 
 ## 3. Writing
 
@@ -174,13 +233,16 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
 - Each `'SIZE'` resource is listed on its own; ClassicMac does not choose between −1 and 0. [ClassicMac]
 - A `'kind'` under 10 bytes keeps only its signature (when 4 bytes are there); a longer one keeps the entries read
   whole. Kind strings are read as Mac OS Roman. [ClassicMac]
-- `FinderKindResolver` follows §2.3 steps 1–4 over the applications it is given (`FinderApplicationSource`: the
-  signature, the file name, and a reader of the resource fork) and the System's forks, and returns the kind with its
-  source (`FinderKindSource`: the application's `'kind'` and its ID, the application's name, the System's `'istd'`
-  kind) and the application's name; null when none applies, for the caller's table. Each application's fork is read
-  once, the first time one of its documents is asked about, and its kinds are kept; the first application given for a
-  signature is used. A fork that cannot be read counts as one with no `'kind'`, a damaged `'kind'` as absent.
-  `FinderKindResolver.IsApplicationType` says which file types are applications. [ClassicMac]
+- `FinderKindResolver` stands in for the desktop database on one volume: `ForFiles` takes the files the Finder would
+  register (an application type, or the hasBundle flag) and, for the System's and Finder's strings, the System
+  Resources, Finder and System files (creator `'MACS'`). It follows §2.3 steps 1–4 (`Find`, `FindByApplication`,
+  `FindStandard`) and §2.4 from the Finder's resources (`FindFinderKind`), with the region set when it is made (0 by
+  default), and returns the kind with its source (`FinderKindSource`) and the resource it came from. A file's fork is
+  read only when needed: first the files whose creator is asked about; when they do not have the kind, every file with
+  a bundle, once. A fork that cannot be read counts as one with no `'kind'`. [ClassicMac]
+- `KnownKinds.Resolve` gives every file a kind: §2.4 (from the volume's Finder, else the English copies), then §2.3
+  steps 1–3, then §2.5; `KnownKinds.Describe` says where it came from ("from SimpleText’s 'kind' 128", "built-in").
+  `KnownKinds.ResourceType` names resource types for the viewer. [ClassicMac]
 
 ## 6. Diagnostics
 
@@ -195,12 +257,16 @@ encoding (`macintosh` by default). The decoders are version 1. [ClassicMac]
   `'ICN#'` and `'FREF'` maps, where `'FREF'` 128 (`APPL`, local icon 0) finds `'ICN#'` 128 and `'FREF'` 129 (`TEXT`,
   local icon 7) finds no icon; a `'SIZE'` −1 with four flags; and `Golden/kind-128.json`, a `'kind'` with an
   `'apnm'` entry and two kinds, one of them padded.
-- `tests/ClassicMac.Resources.Decoders.Tests/FinderKindTests.cs`: the layout (padding, a short resource) and the
-  resolver's steps, its laziness (one read per application, none for other creators) and damaged input, on forks made
-  in code.
+- `tests/ClassicMac.Resources.Decoders.Tests/FinderKindTests.cs`: the layout (padding, a short resource), the
+  resolver's steps, the region and the reserved word, the 63-character cut, kinds signed for another creator, the
+  Finder's and System's strings, its laziness and damaged input, on forks made in code. `KnownKindsTests.cs`: §2.4's
+  English copies, §2.5's order and the source descriptions.
+- `tests/ClassicMac.App.Tests/FileKindsTests.cs` and the CLI's `Info_names_kinds_from_the_volumes_applications`: an
+  HFS volume made with `HfsBuilder` holding an application with a `'kind'`, one with only a bundle, System Resources
+  with `'istd'` kinds and documents of each, one whose application is missing.
 - The 20 `'kind'` resources on a Mac OS 9.0 startup disk (SimpleText, Disk Copy, Keychain Access, Sherlock 2, Script
-  Editor, Netscape Communicator, System Resources, control panels and extensions) all read whole with §1.4, checked
-  locally; no Apple data is kept.
+  Editor, Netscape Communicator, System Resources, control panels and extensions) all read whole with §1.4, and the
+  kinds of its 949 files were listed through the app, checked locally; no Apple data is kept.
 
 The other resources are not checked against those of real applications.
 
@@ -208,9 +274,8 @@ The other resources are not checked against those of real applications.
 
 - The Finder's desktop database and how it caches bundles.
 - The other Finder resources: `'open'`, `'mstr'`, `'hfdr'`.
-- The Finder's own kinds of folders, disks, applications and system files (§2.3), and a document's kind when its
-  application's signature differs from its creator code.
-- `'kind'` resources for other regions: the region code is read but not chosen by.
+- The desktop database files themselves (Desktop DB, Desktop DF); kinds are rebuilt from the volume's files.
+- `PBDTGetAPPL`'s search of other volumes: only the file's own volume is searched.
 - Writing these resources.
 
 ## 9. References
@@ -219,3 +284,6 @@ The other resources are not checked against those of real applications.
    families.
 2. Apple, *Inside Macintosh: Processes* (1992), Process Manager: the size resource.
 3. Apple, MPW Rez templates (`Types.r`): field order and the `'SIZE'` flag names.
+4. Cross-checks for the codes of §2.5's table only, none of whose entries or text is reused: Ilan Szekely, *TCDB*
+   (Type/Creator Database, 2003, shareware, no reuse licence); macdisk.com's signature list; whitefiles.org's type and
+   creator list; BYU's creator code list; Wikipedia, "Creator code".
