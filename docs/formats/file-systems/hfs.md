@@ -697,7 +697,9 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   it sorts first); a leaf that overflows is split about equally, its second half moved into a free node (the first free
   one by the node map) linked after it, with a record for it in its parent, which splits the same way up to a new root;
   a leaf's new first key is written into the index records above it, at their stored length. Only the nodes, bitmap
-  sectors and MDB that change are written [ClassicMac]. When a leaf would be left empty, two nodes cannot hold its
+  sectors and MDB that change are written [ClassicMac]. Volumes split so (a Mac OS-initialized 20 MB volume with 100 new
+  folders, catalog depth 1 to 3; a new 20 MB volume with 600, depth 4) mount in Mac OS 9.0, pass Disk First Aid 8.5,
+  take the Finder's own copies and deletions, and pass it again [Verified]. When a leaf would be left empty, two nodes cannot hold its
   records, or no node is free, the writer instead rebuilds the tree's leaf and index nodes from the sorted records,
   each node filled in turn (Mac OS merges nodes and extends the file instead; the result is a valid tree either way),
   using the nodes already in the tree file first. The extents tree is always rebuilt so. It

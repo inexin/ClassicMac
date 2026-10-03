@@ -254,7 +254,9 @@ An image is made again around a changed disk of the same size, keeping what Disk
    is stored raw (`$02`, its size in bytes), as Disk Copy stores a chunk that would not shrink (§1.4); raw chunks are
    valid in every version and do not count against `+$48`. In an image with ADC chunks (map version 11 or later), a
    changed run is compressed again with Disk Copy's ADC encoder ([adc.md §3](../codecs/adc.md#3-writing)) and stored as
-   `$83` unless that is longer than the sectors, and `+$48` grows when the run and its margin need more. Its runs of
+   `$83` unless that is longer than the sectors, and `+$48` grows when the run and its margin need more. An edited ADC
+   image of an 800 KB volume is 148,295 bytes (153,375 before the edit), mounts in Disk Copy 6.3.3 with the checksum
+   valid and passes Disk First Aid 8.5 [Verified]. Its runs of
    all-zero sectors become zero
    chunks of their own (offset and length 0, §1.3), so an edit does not store empty space; the map gains their entries
    and its count (`+$7C`) and size follow (§2.1). An image whose chunks are all raw (a read/write image, §4.3) stays
