@@ -55,60 +55,78 @@ public sealed class HfsCorpusWriteTests : IDisposable
         Assert.NotEmpty(images);
         foreach (var path in images)
         {
-            var name = Path.GetFileName(path);
-            var session = InputEditSession.Open(path);
-            var before = HfsReader.Instance.Read(ForkData.FromBytes(session.Volume), new ContainerContext());
-            var problemsBefore = Fsck(session.Volume);
-
-            // A folder, a file with both forks in it, renamed and moved to the top level; one of the volume's own files
-            // (unlocked, at the top level or one folder down) renamed, and another deleted.
-            session.AddFolder("ClassicMac Test");
-            session.AddFile("ClassicMac Test:Note", new MacFile
+            try
             {
-                Name = MacString.FromMacRoman("Note"),
-                DataFork = ForkData.FromBytes(Enumerable.Range(0, 70_000).Select(i => (byte)i).ToArray()),
-                ResourceFork = ForkData.FromBytes(new byte[300]),
-                FinderInfo = new FinderInfo { Type = FourCC.FromString("TEXT"), Creator = FourCC.FromString("ttxt") },
-            });
-            session.Rename("ClassicMac Test:Note", "Renamed Note");
-            session.Move("ClassicMac Test:Renamed Note", "");
-            var own = before.Where(f => !f.IsLocked && f.FolderPath.Count <= 1 && f.Name.ToMacRoman().Length > 0 && !f.Name.ToMacRoman().Contains(':'))
-                .Select(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman()))).ToList();
-            string? renamed = null, deleted = null;
-            if (own.Count >= 2)
-            {
-                session.Rename(own[0], "Renamed by ClassicMac");
-                renamed = own[0];
-                deleted = own[^1];
-                session.Delete(deleted);
+                EditAndCheck(path);
             }
-
-            var output = Path.Combine(work, name);
-            var written = session.SaveAs(output);
-
-            var saved = InputEditSession.Open(written[0]);
-            Assert.True(saved.Kind == InputEditKind.HfsVolume, name);
-            var volume = saved.Volume;
-            Assert.True(HfsWriter.Check(ForkData.FromBytes(volume)) is null, $"{name}: {HfsWriter.Check(ForkData.FromBytes(volume))}");
-            var after = HfsReader.Instance.Read(ForkData.FromBytes(volume), new ContainerContext());
-            var paths = after.Select(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman()))).ToHashSet();
-            Assert.Contains("Renamed Note", paths);
-            Assert.Equal(70_000, after.Single(f => f.FolderPath.Count == 0 && f.Name.ToMacRoman() == "Renamed Note").DataFork.Length);
-            if (renamed is not null)
+            catch (Exception e)
             {
-                Assert.DoesNotContain(renamed, paths);
-                Assert.DoesNotContain(deleted!, paths);
+                throw new InvalidOperationException($"{Path.GetFileName(path)}: {e.Message}", e);
             }
-
-            Assert.Equal(before.Count + 1 - (deleted is null ? 0 : 1), after.Count);
-            if (Fsck(volume) is { } problemsAfter)
-            {
-                Assert.True(problemsAfter.IsSubsetOf(problemsBefore!),
-                    $"{name}: fsck.hfs finds more after the edits: {string.Join("; ", problemsAfter.Except(problemsBefore!))}");
-            }
-
-            File.Delete(written[0]);
         }
+    }
+
+    private void EditAndCheck(string path)
+    {
+        var name = Path.GetFileName(path);
+        var session = InputEditSession.Open(path);
+        var before = HfsReader.Instance.Read(ForkData.FromBytes(session.Volume), new ContainerContext());
+        var problemsBefore = Fsck(session.Volume);
+
+        // The Note is 70,000 bytes, or what the volume's free space holds besides its resource fork's block and a
+        // block's room to spare (a full distribution floppy has almost none).
+        var mdb = new BigEndianReader(session.Volume.AsMemory(1024, 162));
+        long blockSize = mdb.ReadUInt32At(0x14), free = mdb.ReadUInt16At(0x22) * blockSize;
+        int noteLength = (int)Math.Clamp(free - 3 * blockSize, 0, 70_000);
+
+        // A folder, a file with both forks in it, renamed and moved to the top level; one of the volume's own files
+        // (unlocked, at the top level or one folder down) renamed, and another deleted.
+        session.AddFolder("ClassicMac Test");
+        session.AddFile("ClassicMac Test:Note", new MacFile
+        {
+            Name = MacString.FromMacRoman("Note"),
+            DataFork = ForkData.FromBytes(Enumerable.Range(0, noteLength).Select(i => (byte)i).ToArray()),
+            ResourceFork = ForkData.FromBytes(new byte[300]),
+            FinderInfo = new FinderInfo { Type = FourCC.FromString("TEXT"), Creator = FourCC.FromString("ttxt") },
+        });
+        session.Rename("ClassicMac Test:Note", "Renamed Note");
+        session.Move("ClassicMac Test:Renamed Note", "");
+        var own = before.Where(f => !f.IsLocked && f.FolderPath.Count <= 1 && f.Name.ToMacRoman().Length > 0 && !f.Name.ToMacRoman().Contains(':'))
+            .Select(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman()))).ToList();
+        string? renamed = null, deleted = null;
+        if (own.Count >= 2)
+        {
+            session.Rename(own[0], "Renamed by ClassicMac");
+            renamed = own[0];
+            deleted = own[^1];
+            session.Delete(deleted);
+        }
+
+        var output = Path.Combine(work, name);
+        var written = session.SaveAs(output);
+
+        var saved = InputEditSession.Open(written[0]);
+        Assert.True(saved.Kind == InputEditKind.HfsVolume, name);
+        var volume = saved.Volume;
+        Assert.True(HfsWriter.Check(ForkData.FromBytes(volume)) is null, $"{name}: {HfsWriter.Check(ForkData.FromBytes(volume))}");
+        var after = HfsReader.Instance.Read(ForkData.FromBytes(volume), new ContainerContext());
+        var paths = after.Select(f => string.Join(":", f.FolderPath.Select(n => n.ToMacRoman()).Append(f.Name.ToMacRoman()))).ToHashSet();
+        Assert.Contains("Renamed Note", paths);
+        Assert.Equal(noteLength, after.Single(f => f.FolderPath.Count == 0 && f.Name.ToMacRoman() == "Renamed Note").DataFork.Length);
+        if (renamed is not null)
+        {
+            Assert.DoesNotContain(renamed, paths);
+            Assert.DoesNotContain(deleted!, paths);
+        }
+
+        Assert.Equal(before.Count + 1 - (deleted is null ? 0 : 1), after.Count);
+        if (Fsck(volume) is { } problemsAfter)
+        {
+            Assert.True(problemsAfter.IsSubsetOf(problemsBefore!),
+                $"{name}: fsck.hfs finds more after the edits: {string.Join("; ", problemsAfter.Except(problemsBefore!))}");
+        }
+
+        File.Delete(written[0]);
     }
 
     // What fsck.hfs -n finds wrong in a volume, one message each (file IDs and record numbers left out); null without
