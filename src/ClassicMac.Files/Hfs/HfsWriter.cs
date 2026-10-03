@@ -15,7 +15,10 @@ namespace ClassicMac.Files.Hfs
         /// Replaces one fork on a plain HFS volume and returns a new image. The source image is never modified.
         /// </summary>
         /// <exception cref="InvalidDataException">The image, target, or requested edit is not supported or valid.</exception>
-        public static byte[] ReplaceFork(ForkData image, string macPath, HfsFork fork, ReadOnlyMemory<byte> data)
+        public static byte[] ReplaceFork(ForkData image, string macPath, HfsFork fork, ReadOnlyMemory<byte> data) =>
+            ReplaceFork(new HfsVolume(image), macPath, fork, data).ToArray();
+
+        internal static HfsVolume ReplaceFork(HfsVolume image, string macPath, HfsFork fork, ReadOnlyMemory<byte> data)
         {
             ArgumentNullException.ThrowIfNull(image);
             ArgumentException.ThrowIfNullOrEmpty(macPath);
@@ -29,14 +32,15 @@ namespace ClassicMac.Files.Hfs
                 throw new ArgumentException("Use a colon-separated HFS path without empty components.", nameof(macPath));
             }
 
-            byte[] source = Bytes(image);
-            var sourceReader = new BigEndianReader(source);
-            if (source.Length < MdbOffset + MdbSize || U16(sourceReader, MdbOffset) != 0x4244)
+            var source = image;
+            if (source.Length < MdbOffset + MdbSize || ReadUInt16(source, MdbOffset) != 0x4244)
             {
                 throw new InvalidDataException("The input is not a plain HFS volume.");
             }
 
-            var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
+            var mdbSector = new byte[BlockSize];
+            source.Read(MdbOffset, mdbSector.AsSpan(0, (int)Math.Min(BlockSize, source.Length - MdbOffset)));
+            var mdb = new BigEndianReader(mdbSector.AsMemory(0, MdbSize));
             if (U16(mdb, 0x7C) == 0x482B)
             {
                 throw new InvalidDataException("Writing an HFS wrapper around HFS Plus is not supported.");
@@ -156,8 +160,9 @@ namespace ClassicMac.Files.Hfs
                 }
             }
 
-            byte[] result = source.ToArray();
-            var volume = new BigEndianWriter(result);
+            var result = source.Fork();
+            var mdbOut = mdbSector.ToArray();
+            var volume = new BigEndianWriter(mdbOut);
             var bitmapOffset = checked((int)U16(mdb, 0x0E) * 512);
             int bitmapLength = checked(((int)blockCount + 7) / 8);
             if (bitmapOffset < 0 || bitmapOffset + bitmapLength > source.Length)
@@ -165,7 +170,8 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The HFS volume bitmap lies outside the image.");
             }
 
-            var workingBitmap = source.AsSpan(bitmapOffset, bitmapLength).ToArray();
+            var workingBitmap = new byte[bitmapLength];
+            source.Read(bitmapOffset, workingBitmap);
             ValidateBitmapFreeCount(blockCount, workingBitmap, U16(mdb, 0x22));
             ValidateExtentOwnership(blockCount, workingBitmap, extFileExtents,
                 WithOverflow(catalogExtents, overflow, 0, 4), catalogRecords, overflow, match, fileId, forkExtentOffset, extents);
@@ -183,19 +189,19 @@ namespace ClassicMac.Files.Hfs
 
             if (resize.AllocatedBlocks != 0 || resize.ReleasedBlocks != 0)
             {
-                volume.WriteUInt16At(MdbOffset + 0x22, remainingFreeBlocks);
-                workingBitmap.CopyTo(result.AsSpan(bitmapOffset, bitmapLength));
+                volume.WriteUInt16At(0x22, remainingFreeBlocks);
+                result.Write(bitmapOffset, workingBitmap);
             }
             bool changedExtentsTree = resize.TreeChanged;
             uint newlyAllocatedBlocks = resize.AllocatedBlocks;
             uint releasedBlocks = resize.ReleasedBlocks;
             if (resizeContext.AllocatedTreeBlocks != 0)
             {
-                volume.WriteUInt32At(MdbOffset + 0x82, extFile.Length);
-                result.AsSpan(MdbOffset + 0x86, 12).Clear();
+                volume.WriteUInt32At(0x82, extFile.Length);
+                mdbOut.AsSpan(0x86, 12).Clear();
                 for (int index = 0; index < extFileExtents.Count; index++)
                 {
-                    WriteExtent(result.AsSpan(MdbOffset + 0x86, 12), index,
+                    WriteExtent(mdbOut.AsSpan(0x86, 12), index,
                         extFileExtents[index].Start, extFileExtents[index].Count);
                 }
             }
@@ -213,8 +219,8 @@ namespace ClassicMac.Files.Hfs
             DateTime writeTime = DateTime.Now;
             uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
             matchRecord.WriteUInt32At(48, macWriteTime);
-            volume.WriteUInt32At(MdbOffset + 0x06, macWriteTime);
-            volume.WriteUInt32At(MdbOffset + 0x46, unchecked(U32(mdb, 0x46) + 1));
+            volume.WriteUInt32At(0x06, macWriteTime);
+            volume.WriteUInt32At(0x46, unchecked(U32(mdb, 0x46) + 1));
 
             WriteFork(result, firstBlock, blockSize, extents, data.Span);
             // Clear the unused tail within the existing allocation, so shortening a fork does not leave stale bytes.
@@ -227,16 +233,17 @@ namespace ClassicMac.Files.Hfs
                 WriteFork(result, firstBlock, blockSize, extFileExtents, extFile);
             }
 
-            int alternateMdbOffset = result.Length - 2 * BlockSize;
+            result.Write(MdbOffset, mdbOut);
+            long alternateMdbOffset = result.Length - 2 * BlockSize;
             if (resizeContext.AllocatedTreeBlocks != 0 && alternateMdbOffset >= 0 &&
                 (ulong)alternateMdbOffset >= firstBlock + (ulong)blockCount * blockSize &&
-                U16(sourceReader, alternateMdbOffset) == 0x4244)
+                ReadUInt16(source, alternateMdbOffset) == 0x4244)
             {
-                result.AsSpan(MdbOffset, BlockSize).CopyTo(result.AsSpan(alternateMdbOffset, BlockSize));
+                result.Write(alternateMdbOffset, mdbOut);
             }
 
             ValidateExtentsTree(ReadFork(result, firstBlock, blockSize, blockCount, extFileExtents,
-                U32(new BigEndianReader(result), MdbOffset + 0x82), overflow, 0xFF, 3, false));
+                U32(new BigEndianReader(mdbOut), 0x82), overflow, 0xFF, 3, false));
             Verify(source, result, canonicalPath, fork, data.Span, writeTime, newlyAllocatedBlocks, releasedBlocks);
             var targetBlocks = new HashSet<uint>(extents.SelectMany(e => Enumerable.Range(e.Start, e.Count).Select(b => (uint)b)));
             VerifyKept(source, result, catalogBefore, [Convert.ToHexString(match.Key)], 0, overflowBefore, [fileId], targetBlocks);
@@ -526,9 +533,6 @@ namespace ClassicMac.Files.Hfs
             primary.CopyTo(context.CatalogRecord.Data, context.ExtentOffset);
             return new ForkResizeResult(changedTree, 0, releasedBlocks);
         }
-
-        // An image's bytes to read: the array itself when the fork wraps one whole (nothing here changes it), else a copy.
-        private static byte[] Bytes(ForkData image) => image.TryGetArray(out var array) ? array : image.ToArray();
 
         private static IEnumerable<TreeRecord> LeafRecords(byte[] tree)
         {
@@ -1312,7 +1316,7 @@ namespace ClassicMac.Files.Hfs
             }
         }
 
-        private static byte[] ReadFork(byte[] image, uint firstBlock, uint blockSize, uint blockCount,
+        private static byte[] ReadFork(HfsVolume image, uint firstBlock, uint blockSize, uint blockCount,
             List<(ushort Start, ushort Count)> firstExtents, uint logicalLength,
             Dictionary<(byte Fork, uint File), List<(ushort Start, byte[] Extents)>> overflow,
             byte overflowFork, uint fileId, bool includeOverflow)
@@ -1346,7 +1350,7 @@ namespace ClassicMac.Files.Hfs
                     throw new InvalidDataException("An HFS extent lies outside the image.");
                 }
 
-                image.AsSpan((int)sourceOffset, take).CopyTo(output.AsSpan(written));
+                image.Read(sourceOffset, output.AsSpan(written, take));
                 written += take;
                 if (written == output.Length)
                 {
@@ -1483,7 +1487,7 @@ namespace ClassicMac.Files.Hfs
             }
         }
 
-        private static void WriteFork(byte[] image, uint firstBlock, uint blockSize, List<(ushort Start, ushort Count)> extents, ReadOnlySpan<byte> data)
+        private static void WriteFork(HfsVolume image, uint firstBlock, uint blockSize, List<(ushort Start, ushort Count)> extents, ReadOnlySpan<byte> data)
         {
             int at = 0;
             foreach (var (start, count) in extents)
@@ -1494,8 +1498,8 @@ namespace ClassicMac.Files.Hfs
                     break;
                 }
 
-                int offset = checked((int)(firstBlock + (uint)start * blockSize));
-                data.Slice(at, take).CopyTo(image.AsSpan(offset, take));
+                long offset = firstBlock + (long)start * blockSize;
+                image.Write(offset, data.Slice(at, take));
                 at += take;
             }
             if (at != data.Length)
@@ -1504,17 +1508,17 @@ namespace ClassicMac.Files.Hfs
             }
         }
 
-        private static void ClearForkTail(byte[] image, uint firstBlock, uint blockSize, List<(ushort Start, ushort Count)> extents, int dataLength)
+        private static void ClearForkTail(HfsVolume image, uint firstBlock, uint blockSize, List<(ushort Start, ushort Count)> extents, int dataLength)
         {
             long skip = dataLength;
             foreach (var (start, count) in extents)
             {
                 int bytes = checked((int)((uint)count * blockSize));
-                int offset = checked((int)(firstBlock + (uint)start * blockSize));
+                long offset = firstBlock + (long)start * blockSize;
                 int clearFrom = (int)Math.Clamp(skip, 0, bytes);
                 if (clearFrom < bytes)
                 {
-                    image.AsSpan(offset + clearFrom, bytes - clearFrom).Clear();
+                    image.Write(offset + clearFrom, new byte[bytes - clearFrom]);
                 }
 
                 skip -= bytes;
@@ -1534,26 +1538,30 @@ namespace ClassicMac.Files.Hfs
             return result;
         }
 
-        private static void Verify(byte[] source, byte[] result, string targetPath, HfsFork changedFork, ReadOnlySpan<byte> expected,
+        private static void Verify(HfsVolume source, HfsVolume result, string targetPath, HfsFork changedFork, ReadOnlySpan<byte> expected,
             DateTime writeTime, uint newlyAllocatedBlocks, uint releasedBlocks)
         {
             uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
-            var sourceReader = new BigEndianReader(source);
-            var resultReader = new BigEndianReader(result);
-            uint previousWriteCount = U32(sourceReader, MdbOffset + 0x46);
-            ushort previousFreeBlocks = U16(sourceReader, MdbOffset + 0x22);
+            var sourceMdb = new byte[MdbSize];
+            var resultMdb = new byte[MdbSize];
+            source.Read(MdbOffset, sourceMdb);
+            result.Read(MdbOffset, resultMdb);
+            var sourceReader = new BigEndianReader(sourceMdb);
+            var resultReader = new BigEndianReader(resultMdb);
+            uint previousWriteCount = U32(sourceReader, 0x46);
+            ushort previousFreeBlocks = U16(sourceReader, 0x22);
             ushort expectedFreeBlocks = checked((ushort)((uint)previousFreeBlocks - newlyAllocatedBlocks + releasedBlocks));
-            if (U32(resultReader, MdbOffset + 0x06) != macWriteTime ||
-                U32(resultReader, MdbOffset + 0x46) != unchecked(previousWriteCount + 1) ||
-                U16(resultReader, MdbOffset + 0x22) != expectedFreeBlocks)
+            if (U32(resultReader, 0x06) != macWriteTime ||
+                U32(resultReader, 0x46) != unchecked(previousWriteCount + 1) ||
+                U16(resultReader, 0x22) != expectedFreeBlocks)
             {
                 throw new InvalidDataException("The rewritten HFS volume metadata did not record its modification and allocation changes.");
             }
 
             var beforeDiagnostics = new List<Diagnostic>();
             var afterDiagnostics = new List<Diagnostic>();
-            var before = HfsReader.Instance.Read(ForkData.FromBytes(source), new ContainerContext(diagnostics: beforeDiagnostics));
-            var after = HfsReader.Instance.Read(ForkData.FromBytes(result), new ContainerContext(diagnostics: afterDiagnostics));
+            var before = HfsReader.Instance.Read(source.AsForkData(), new ContainerContext(diagnostics: beforeDiagnostics));
+            var after = HfsReader.Instance.Read(result.AsForkData(), new ContainerContext(diagnostics: afterDiagnostics));
             if (beforeDiagnostics.Any(d => d.Severity == DiagnosticSeverity.Error) || afterDiagnostics.Any(d => d.Severity == DiagnosticSeverity.Error))
             {
                 throw new InvalidDataException("The original or rewritten HFS volume has structural errors; the edit was not verified.");

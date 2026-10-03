@@ -26,7 +26,7 @@ public static partial class HfsWriter
         }
 
         var state = OpenCatalog(image);
-        var source = state.Source;
+        var source = state.Source.ToArray();
         if (size < source.Length)
         {
             throw new InvalidDataException("Shrinking an HFS volume is not supported yet.");

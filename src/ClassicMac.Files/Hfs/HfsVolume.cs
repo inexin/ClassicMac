@@ -15,6 +15,7 @@ namespace ClassicMac.Files.Hfs
         private const int SectorSize = 512;
         private readonly ForkData data;
         private readonly Dictionary<long, byte[]> sectors;
+        private readonly HashSet<long> changed = [];
 
         public HfsVolume(ForkData data)
             : this(data, [])
@@ -31,8 +32,11 @@ namespace ClassicMac.Files.Hfs
         /// <summary>The volume's length in bytes (the base's).</summary>
         public long Length => data.Length;
 
-        /// <summary>The numbers of the sectors written so far.</summary>
-        public IReadOnlyCollection<long> ChangedSectors => sectors.Keys;
+        /// <summary>The numbers of the sectors this volume has written (a fork's: since it was forked).</summary>
+        public IReadOnlyCollection<long> ChangedSectors => changed;
+
+        /// <summary>The numbers of every sector over the base (a fork's include those it was forked with), for saving.</summary>
+        public IReadOnlyCollection<long> Sectors => sectors.Keys;
 
         /// <summary>Reads <paramref name="buffer"/>'s length of bytes at <paramref name="offset"/>, the written sectors over the base.</summary>
         public void Read(long offset, Span<byte> buffer)
@@ -65,10 +69,14 @@ namespace ClassicMac.Files.Hfs
                 long from = Math.Max(offset, sector * SectorSize), to = Math.Min(offset + bytes.Length, (sector + 1) * SectorSize);
                 bytes.Slice((int)(from - offset), (int)(to - from)).CopyTo(copy.AsSpan((int)(from - sector * SectorSize)));
                 sectors[sector] = copy;
+                changed.Add(sector);
             }
         }
 
-        /// <summary>A copy that changes on its own (the written sectors shared until either writes them again).</summary>
+        /// <summary>
+        /// A copy that changes on its own (the written sectors shared until either writes them again); its
+        /// <see cref="ChangedSectors"/> start empty.
+        /// </summary>
         public HfsVolume Fork() => new(data, new Dictionary<long, byte[]>(sectors));
 
         /// <summary>The volume as a fork, reading through the written sectors, with nothing copied.</summary>
