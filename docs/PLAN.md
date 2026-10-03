@@ -244,7 +244,8 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 1. **Core** (library, under Files): operations on *Mac paths* that go through containers
    (`Mac OS 9.hfv:System Folder:Finder`, an archive inside a disk inside a disk image): `ls`, `stat`, `cat` (text,
    hex, or a resource decoded as JSON), `find` (by name, type/creator, kind, resource type, content), `get` (extract),
-   `put`/`add`, `rm`, `mkdir`, `save-as`. Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
+   `put`/`add`, `rm`, `mkdir`, `save-as`. The paths are built: `MacPathTree` and `MacPaths` (syntax in
+   [cli.md](cli.md) §1). Writes reuse the editing code (`HfsWriter`, fork editing, Save As; what lives
    in the app moves into the library). The original is never changed unless `--in-place`; otherwise writes go to a
    new file. `--dry-run` on every write.
 2. **CLI subcommands** for each operation with `--json` (stable, documented schemas in `docs/cli.md`), so any AI with a

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Library: Mac paths (`MacPathTree`, `MacPaths` in `ClassicMac.Files`; docs/cli.md §1): a host file, then Mac names
+  joined by ':' or '/' (a backslash escapes them in a name), going into disk images, archives and other containers as
+  folders (read one level at a time when entered; a wrapper of one disk passes on to its contents), and on to a file's
+  resource fork (`#rsrc`), a type (`'TYPE'`) and a resource ID; names compare as HFS compares them. Resolve, children
+  and parent.
 - Viewer: a file in a "No name" group is named in the inspector header with its row's chips (`sp`, `tab`, `sp×3` …,
   the bytes on hover), in their plain colours; other files keep their name as text.
 - Decoders: `'kind'` resources (the kind strings an application gives the Finder for its documents) are read

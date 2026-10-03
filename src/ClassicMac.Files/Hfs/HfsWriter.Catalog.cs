@@ -627,6 +627,25 @@ public static partial class HfsWriter
         return leftLength.CompareTo(rightLength);
     }
 
+    /// <summary>Whether two Mac OS Roman names are the same name to an HFS catalog: equal by its ordering (case-insensitive, diacritics kept).</summary>
+    internal static bool CatalogNamesEqual(ReadOnlySpan<byte> left, ReadOnlySpan<byte> right)
+    {
+        if (left.Length != right.Length)
+        {
+            return false;
+        }
+
+        for (int index = 0; index < left.Length; index++)
+        {
+            if (CatalogNameWeights[left[index]] != CatalogNameWeights[right[index]])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static ushort[] BuildCatalogNameWeights()
     {
         // Inside Macintosh: Text, RelString; the exceptions here follow the Mac OS 9 ROM rules
