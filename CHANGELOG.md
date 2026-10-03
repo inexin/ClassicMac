@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `check <input>` reads an input through and reports its damage; a plain HFS volume also gets the checks the
+  writer makes before an edit, so a volume can be tested before writing to it (cli.md §2.7).
 - CLI: output redirected to a file or pipe is UTF-8 on Windows too (it took the console's code page, so Mac names
   such as "§" came out as other bytes in text and --json output).
 - File systems: HFS volumes Mac OS wrote can be edited: their catalog index keys, stored at the maximum length, were

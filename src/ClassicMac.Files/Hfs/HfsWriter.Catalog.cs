@@ -327,19 +327,54 @@ public static partial class HfsWriter
         public uint AllocatedCatalogBlocks { get; set; }
     }
 
-    private static CatalogEditState OpenCatalog(ForkData image)
+    /// <summary>
+    /// Checks a plain HFS volume as the writer does before every edit (hfs.md §5.5): the MDB's allocation area, both
+    /// B-trees, the catalog's counts and valences, the bitmap's free count and every extent's ownership. A software lock
+    /// does not stop the check.
+    /// </summary>
+    /// <returns>The first fault found, or null when the writer would edit the volume (were it not locked).</returns>
+    /// <exception cref="InvalidDataException">The image is not a plain HFS volume (no HFS signature, or an HFS Plus wrapper).</exception>
+    public static string? Check(ForkData image)
     {
         ArgumentNullException.ThrowIfNull(image);
-        byte[] source = image.ToArray();
+        PlainVolume(image.ToArray());
+        try
+        {
+            OpenCatalog(image, writable: false);
+            return null;
+        }
+        catch (Exception fault) when (fault is InvalidDataException or EndOfStreamException or OverflowException or
+                                          ArgumentException or IndexOutOfRangeException)
+        {
+            return fault.Message;
+        }
+    }
+
+    // The MDB of a plain HFS volume: refused when the image has no HFS signature or wraps HFS Plus.
+    private static BigEndianReader PlainVolume(byte[] source)
+    {
         if (source.Length < MdbOffset + MdbSize || U16(new BigEndianReader(source), MdbOffset) != 0x4244)
         {
             throw new InvalidDataException("The input is not a plain HFS volume.");
         }
 
         var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
-        if (U16(mdb, 0x7C) == 0x482B || (U16(mdb, 0x0A) & 0x8000) != 0)
+        if (U16(mdb, 0x7C) == 0x482B)
         {
-            throw new InvalidDataException("The HFS volume is wrapped or software-locked.");
+            throw new InvalidDataException("The HFS volume wraps an HFS Plus volume.");
+        }
+
+        return mdb;
+    }
+
+    private static CatalogEditState OpenCatalog(ForkData image, bool writable = true)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        byte[] source = image.ToArray();
+        var mdb = PlainVolume(source);
+        if (writable && (U16(mdb, 0x0A) & 0x8000) != 0)
+        {
+            throw new InvalidDataException("The HFS volume is software-locked.");
         }
 
         uint blockSize = U32(mdb, 0x14);

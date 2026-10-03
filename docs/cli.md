@@ -215,6 +215,21 @@ The library behind them is `MacCommands` (`ClassicMac.Files.Commands`): `List`, 
 returning `MacEntryInfo` records, and `MacPathTree.ResolveAlias`, `TargetOf` and `FollowAlias`; the MCP server's read
 tools use the same.
 
+### 2.7 check
+
+`classicmac check <input>` reads the input through, as `info` and `list` do: its containers, every file inside them and
+each file's resource fork. Its diagnostics are the result, printed to standard output (`-q`: errors only). A plain
+HFS volume image also gets the checks the writer makes before an edit (`HfsWriter.Check`,
+[hfs.md §5.5](formats/file-systems/hfs.md#55-the-writer)), run even on a software-locked volume, and the first fault
+found is shown as `volume: <fault>`, or `volume: passes the writer's checks`. The last line counts the errors and
+warnings. Containers inside the input are read through too, so a damaged disk image stored on a sound volume is
+reported.
+
+Exit 0 when nothing is wrong (warnings allowed, unless `--strict`), 1 when there is an error or a volume fault, 4 when
+the input cannot be read. `--json` writes `{ "input", "diagnostics": [{ "source", "severity", "code", "message",
+"location"?, "offset"? }], "volume": { "passes", "fault" } or null, "errors", "warnings" }`; `volume` is null for
+input that is not a plain HFS volume.
+
 ## 3. Write commands
 
 Each write command changes one thing on a Mac path, through the library's `InputEditSession`

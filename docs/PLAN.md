@@ -238,6 +238,7 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
 | `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--follow`, `--json` | — |
 | `find <path>` | Folders and files below a path, through containers (built; §2.4) | `--name`, `--type`, `--creator`, `--kind`, `--resource-type`, `--contains`, `--contains-hex`, `--max-depth`, `--limit`, `--json` | — |
 | `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--follow`, `--json` | — |
+| `check <input>` | Read the input through and report its diagnostics; a plain HFS volume also gets the writer's checks (built; [cli.md](cli.md) §2.7) | `--json`, `--strict`, `-q` | — |
 | `shell <input>` | A DOS-like shell on one input: cd, dir, type, info, res, find, copy in and out, del, md, ren, set, save, save as; history and tab completion; `--script` or piped input for automation (built; [cli.md](cli.md) §5) | `--script <file>`, `--json` | — |
 | `mcp` | An MCP server over standard input and output: sessions on opened inputs, the read and write commands as tools, saves only through `save_as` (built; [cli.md](cli.md) §4) | the limit options | — |
 
@@ -278,6 +279,19 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
    the console behind an interface for tests.
 
 Order: core with the `--json` subcommands, then the MCP server, then the shell.
+
+**More file commands (planned, decided 2026-10-03; suggested by the Mac RE session).** In this order:
+
+1. `check <input>`: the writer's checks without an edit, plus every diagnostic (built; [cli.md](cli.md) §2.7).
+2. `mv <path> <folder>`: move a file or folder to another folder on the same volume (its thread and the valences
+   follow).
+3. Volume information in `stat` of a volume's root: block size, free space, file and folder counts, dates, the lock.
+4. `lock` / `unlock` (a file's locked flag) and `bless` (the System Folder in the MDB's Finder info).
+5. Transfers that convert: `put --text`/`get --text` (Mac OS Roman with CR to and from UTF-8 with LF), `get --as
+   binhex` and `.hqx` read by `put`.
+6. Writes to an HFS partition inside an Apple Partition Map image, and to Disk Copy images (written back in their own
+   format).
+7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name.
 
 ## Decoders
 

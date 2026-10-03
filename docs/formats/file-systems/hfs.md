@@ -568,6 +568,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   bounds and not shared with another fork or the B-tree files; `drFreeBks` equal to the bitmap's free count; catalog
   IDs unique; folder valences and the MDB's file and folder counts equal to the catalog's; both B-trees' header, index
   keys and child pointers, node order and sibling links, node maps, free-node and leaf-record counts, and key order.
+  `HfsWriter.Check` runs these checks without an edit, even on a software-locked volume, and returns the first fault
+  (the CLI's `check`).
 - The writer follows §3. It rebuilds a changed B-tree's leaf and index nodes from the sorted records (including
   first-key changes and trees becoming empty or non-empty), using the nodes already in the tree file first. It
   extends a tree file with free blocks when needed, through the MDB's extents and, for the catalog, overflow records;
@@ -628,6 +630,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   and contents following), Finder info and folder flags, and deleting a folder with its contents;
   `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
   the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
+  `HfsCheckTests.cs` covers `HfsWriter.Check` on sound, damaged, truncated and locked volumes;
   `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
 - With `CLASSICMAC_HFS_INTEROP_INPUT` and the `…_OUTPUT` variables set, `ExternalClassicHfsImageCanBeEditedAndReopened`
   and `ExternalVolumeCatalogMutationsReopen` edit a real hfsutils-formatted volume; the outputs were remounted with

@@ -116,6 +116,7 @@ namespace ClassicMac.Resources.Cli
             root.Subcommands.Add(CatCommand());
             root.Subcommands.Add(FindCommand());
             root.Subcommands.Add(GetCommand());
+            root.Subcommands.Add(CheckCommand());
             foreach (var write in WriteCommands())
             {
                 root.Subcommands.Add(write);
@@ -199,6 +200,20 @@ namespace ClassicMac.Resources.Cli
             command.SetAction(result => new InfoCommand(output, error).Run(
                 result.GetRequiredValue(input), ContainerOptionsFrom(result), result.GetValue(strict), result.GetValue(quiet),
                 result.GetValue(database)));
+            return command;
+        }
+
+        private Command CheckCommand()
+        {
+            var input = InputArgument();
+            var json = JsonOption();
+            var command = new Command("check", "Read the input through and report its damage; a plain HFS volume also gets the checks the writer makes before an edit")
+            {
+                input, json,
+            };
+            command.SetAction(result => new CheckCommand(output, error).Run(
+                result.GetRequiredValue(input), ContainerOptionsFrom(result), ReadOptionsFrom(result), result.GetValue(strict),
+                result.GetValue(quiet), result.GetValue(json)));
             return command;
         }
 
