@@ -310,7 +310,8 @@ entry writes more than one file.
 ### 3.4 format
 
 `classicmac format <file> --size <n> [--name <name>] [--overwrite] [--json]` writes a new, empty HFS volume image:
-`--size` in bytes or with K/KiB, M/MiB, G/GiB (400 KB to just under 2 GB, whole 512-byte blocks), `--name` 1 to 27
+`--size` in bytes or with K/KiB, M/MiB, G/GiB (400 KB to 2 TB, whole 512-byte blocks; only the volume's MDB, bitmap and B-trees are written, so a
+large volume is as quick to make as a small one), `--name` 1 to 27
 characters with no colon (default `Untitled`), laid out as [hfs.md §3.1](formats/file-systems/hfs.md#31-a-new-volume)
 and checked before it is written. An existing file is replaced only with `--overwrite` (exit 4 otherwise); a size or
 name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<name>", <size> bytes, <n>-byte blocks)`;

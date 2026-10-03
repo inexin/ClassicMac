@@ -56,6 +56,40 @@ public sealed class HfsFormatTests
         Assert.Equal(image.AsSpan(Mdb, 512).ToArray(), image.AsSpan(size - 1024, 512).ToArray());   // the alternate MDB
     }
 
+    // Past 2 GB the volume is built over zeros, only its MDB, bitmap and B-trees written, and saved by writing those.
+    [Fact]
+    public void A_volume_past_2_GB_is_laid_out_and_written_without_holding_it()
+    {
+        const long size = 4L << 30;
+        var volume = HfsWriter.FormatVolume(size, "Large");
+
+        Assert.Equal(size, volume.Length);
+        Assert.InRange(volume.Sectors.Count * 512L, 1, 8L << 20);                       // a few MB of metadata
+        var mdb = new byte[512];
+        volume.Read(Mdb, mdb);
+        Assert.Equal(66048u, U32(mdb, 0x14));                                           // ((N >> 16) + 1) × 512
+        Assert.Null(HfsWriter.Check(volume.AsForkData()));
+        var info = HfsReader.Instance.ReadVolumeInfo(volume.AsForkData())!;
+        Assert.Equal(("Large", 0L), (info.Name, info.Files));
+        var edited = HfsWriter.CreateFile(volume, "Note", new byte[300_000], new byte[100], FinderInfo.Empty);   // edits past 2 GB
+        edited = HfsWriter.CreateFolder(edited, "Docs");
+        Assert.Null(HfsWriter.Check(edited.AsForkData()));
+        Assert.Equal(300_000, HfsReader.Instance.Read(edited.AsForkData(), new ContainerContext()).Single().DataFork.Length);
+
+        var path = Path.Combine(Path.GetTempPath(), $"cm-format-{Guid.NewGuid():N}.img");
+        try
+        {
+            HfsWriter.FormatTo(path, 20 * 1024 * 1024, "Small");
+            Assert.Equal(HfsWriter.Format(20 * 1024 * 1024, "Small", HfsReader.Instance.ReadVolumeInfo(ForkData.FromFile(path))!.Created).AsSpan(),
+                File.ReadAllBytes(path).AsSpan());
+        }
+        finally
+        {
+            ForkData.CloseHostFile(path);
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public void The_root_folder_has_the_volume_s_name_and_the_dates_given()
     {

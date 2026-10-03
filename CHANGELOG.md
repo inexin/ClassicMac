@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `format` makes volumes up to 2 TB, writing only their MDB, bitmap and B-trees into a file of the volume's length
+  (hfs.md §3.1).
 - CLI: an edit session opens its input one level deep (the archives and disk images on a volume are not unwrapped to
   tell what it can change) and the shell and MCP server open it once: a 5-step shell session on a 500 MB volume, saved,
   5.6 s instead of 9.3 s; starting the shell 1.7 s instead of 3 s.

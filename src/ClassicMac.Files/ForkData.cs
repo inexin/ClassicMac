@@ -81,6 +81,9 @@ namespace ClassicMac.Files
             return new SplicedForkData(whole, offset, part);
         }
 
+        /// <summary>A fork of zeros, held as nothing (the base of a volume being made).</summary>
+        internal static ForkData Zeros(long length) => new ZeroForkData(length);
+
         /// <summary>A range of this fork, opened through it; no bytes are copied.</summary>
         public virtual ForkData Slice(long offset, long length)
         {
@@ -320,6 +323,15 @@ namespace ClassicMac.Files
                     OpenFiles.TryRemove(this, out _);
                 }
             }
+        }
+
+        private sealed class ZeroForkData(long length) : ForkData
+        {
+            public override long Length => length;
+
+            public override Stream Open() => new ReadAtStream(this);
+
+            protected override void ReadAtCore(long offset, Span<byte> buffer) => buffer.Clear();
         }
 
         private sealed class SplicedForkData(ForkData whole, long offset, ForkData part) : ForkData

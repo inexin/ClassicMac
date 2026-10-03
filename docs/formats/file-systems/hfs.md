@@ -483,7 +483,8 @@ at 500 MB has exactly these values [Verified: Mac OS 9.hfv]. Below, a is the all
 | 500 MB | 1,024,000 | 8,192 | 19 | 63,998 | 1,048,576 | 63,742 |
 | 2 GB | 4,193,280 | 32,768 | 19 | 65,519 | 1,048,576 | 65,455 |
 
-ClassicMac's `Format` writes this layout, every sector of the image (the rest zero), for 400 KB to just under 2 GB.
+ClassicMac's `Format` returns this layout as an image in memory (400 KB to just under 2 GB); `FormatTo` writes it to a
+file made the volume's length, writing only the MDB, bitmap, B-trees and alternate MDB (400 KB to 2 TB).
 Not traced: whether Finder's Erase passes values of its own (the 500 MB volume agrees with the default path), and
 whether a 400 KB disk gets HFS at all (the format list marks 400K and 720K differently).
 
@@ -611,7 +612,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   or remove a file record and both forks; `CreateFolder` and `DeleteFolder` add or remove a folder record and its
   thread; `Rename` renames a file or folder in its folder; `Move` moves one into another folder (§3), and refuses a
   move into the folder it is in, which PBCatMove allows as a no-op [ClassicMac]; `SetFinderInfo` sets a file's Finder info and
-  `SetFolderFlags` a folder's Finder flags; `Format` makes a new, empty volume (§3.1, 400 KB to just under 2 GB, checked
+  `SetFolderFlags` a folder's Finder flags; `Format` and `FormatTo` make a new, empty volume (§3.1, up to 2 GB in memory or 2 TB to a file, checked
   with `Check` before it is returned); `Resize` grows a volume (§3.2); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new

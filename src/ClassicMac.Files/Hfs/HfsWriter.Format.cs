@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
@@ -13,21 +14,57 @@ public static partial class HfsWriter
     /// <summary>The largest volume <see cref="Format"/> makes, as one in-memory image: just under 2 GB.</summary>
     public const long MaximumFormatSize = int.MaxValue / BlockSize * BlockSize;
 
+    /// <summary>The largest volume <see cref="FormatTo"/> makes: 2 TB, HFS's limit (65,535 allocation blocks).</summary>
+    public const long MaximumFormatToSize = 2L << 40;
+
     /// <summary>
     /// A new, empty HFS volume of <paramref name="size"/> bytes named <paramref name="volumeName"/>, laid out as Mac OS 9.0's
-    /// initializer lays it out (hfs.md §3.1): boot
-    /// blocks zero, the MDB, the bitmap, the extents overflow file and the catalog (with the root folder and its thread)
-    /// at the start of the allocation area, and the alternate MDB. <paramref name="created"/> is the creation and
-    /// modification date (the local time now when omitted). The result passes <see cref="Check"/>.
+    /// initializer lays it out (hfs.md §3.1): boot blocks zero, the MDB, the bitmap, the extents overflow file and the
+    /// catalog (with the root folder and its thread) at the start of the allocation area, and the alternate MDB.
+    /// <paramref name="created"/> is the creation and modification date (the local time now when omitted). The result
+    /// passes <see cref="Check"/>.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or outside 400 KB to 2 GB.</exception>
     /// <exception cref="ArgumentException">The name is empty, over 27 bytes, has a colon, or a character Mac OS Roman has not.</exception>
     public static byte[] Format(long size, string volumeName, MacDate? created = null)
     {
-        ArgumentNullException.ThrowIfNull(volumeName);
-        if (size % BlockSize != 0 || size < MinimumFormatSize || size > MaximumFormatSize)
+        if (size > MaximumFormatSize)
         {
-            throw new ArgumentOutOfRangeException(nameof(size), "An HFS volume is whole 512-byte blocks, from 400 KB to just under 2 GB.");
+            throw new ArgumentOutOfRangeException(nameof(size), "An HFS volume made in memory is at most just under 2 GB; FormatTo writes larger ones.");
+        }
+
+        return FormatVolume(size, volumeName, created).ToArray();
+    }
+
+    /// <summary>
+    /// Writes a new, empty HFS volume to the file at <paramref name="path"/> (created, or replaced), laid out as
+    /// <see cref="Format"/> lays it out, up to 2 TB: the file is made <paramref name="size"/> bytes long and only the MDB,
+    /// the bitmap, the B-tree files and the alternate MDB are written (a few MB).
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The size is not whole 512-byte blocks, or outside 400 KB to 2 TB.</exception>
+    /// <exception cref="ArgumentException">The name is empty, over 27 bytes, has a colon, or a character Mac OS Roman has not.</exception>
+    public static void FormatTo(string path, long size, string volumeName, MacDate? created = null)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        var volume = FormatVolume(size, volumeName, created);
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+        stream.SetLength(size);
+        var sector = new byte[BlockSize];
+        foreach (var number in volume.Sectors.Order())
+        {
+            volume.Read(number * BlockSize, sector);
+            stream.Position = number * BlockSize;
+            stream.Write(sector);
+        }
+    }
+
+    // The new volume over zeros, only its MDB, bitmap, B-trees and alternate MDB written.
+    internal static HfsVolume FormatVolume(long size, string volumeName, MacDate? created = null)
+    {
+        ArgumentNullException.ThrowIfNull(volumeName);
+        if (size % BlockSize != 0 || size < MinimumFormatSize || size > MaximumFormatToSize)
+        {
+            throw new ArgumentOutOfRangeException(nameof(size), "An HFS volume is whole 512-byte blocks, from 400 KB to 2 TB.");
         }
 
         if (volumeName.Length == 0 || volumeName.Contains(':', StringComparison.Ordinal) || !MacRoman.TryEncode(volumeName, out var nameBytes) || nameBytes.Length > 27)
@@ -83,46 +120,50 @@ public static partial class HfsWriter
         // The root's thread key is written with key length 6: no name, and no alignment byte counted [Code: 0x1D254].
         RebuildBTree(catalog, [(CatalogKey(1, volumeName), root), (new byte[] { 6, 0, 0, 0, 0, 2, 0 }, thread)], validateExtents: false);
 
-        var image = new byte[size];
-        long allocationStart = (3 + bitmapSectors) * BlockSize;
-        extents.CopyTo(image, allocationStart);
-        catalog.CopyTo(image, allocationStart + treeBytes);
+        var bitmap = new byte[bitmapSectors * BlockSize];
         for (long block = 0; block < 2 * treeBlocks; block++)
         {
-            image[3 * BlockSize + block / 8] |= (byte)(0x80 >> (int)(block % 8));
+            bitmap[block / 8] |= (byte)(0x80 >> (int)(block % 8));
         }
 
-        var mdb = new BigEndianWriter(image);
-        mdb.WriteUInt16At(MdbOffset + 0x00, 0x4244);                                  // drSigWord 'BD'
-        mdb.WriteUInt32At(MdbOffset + 0x02, date);                                    // drCrDate
-        mdb.WriteUInt32At(MdbOffset + 0x06, date);                                    // drLsMod
-        mdb.WriteUInt16At(MdbOffset + 0x0A, 0x0100);                                  // drAtrb: unmounted cleanly [Code]
-        mdb.WriteUInt16At(MdbOffset + 0x0E, 3);                                       // drVBMSt
-        mdb.WriteUInt16At(MdbOffset + 0x12, count);                                   // drNmAlBlks
-        mdb.WriteUInt32At(MdbOffset + 0x14, blockSize);                               // drAlBlkSiz
-        mdb.WriteUInt32At(MdbOffset + 0x18, defaultClump);                            // drClpSiz
-        mdb.WriteUInt16At(MdbOffset + 0x1C, 3 + bitmapSectors);                       // drAlBlSt
-        mdb.WriteUInt32At(MdbOffset + 0x1E, 16u);                                     // drNxtCNID
-        mdb.WriteUInt16At(MdbOffset + 0x22, count - 2 * treeBlocks);                  // drFreeBks
-        mdb.WriteUInt32At(MdbOffset + 0x46, 2u);                                      // drWrCnt: 2 from the initializer [Code]
-        image[MdbOffset + 0x24] = (byte)nameBytes.Length;                             // drVN
-        nameBytes.CopyTo(image, MdbOffset + 0x25);
-        mdb.WriteUInt32At(MdbOffset + 0x4A, treeBytes);                               // drXTClpSiz
-        mdb.WriteUInt32At(MdbOffset + 0x4E, treeBytes);                               // drCTClpSiz
-        mdb.WriteUInt32At(MdbOffset + 0x82, treeBytes);                               // drXTFlSize
-        mdb.WriteUInt16At(MdbOffset + 0x86, 0);                                       // drXTExtRec: allocation block 0
-        mdb.WriteUInt16At(MdbOffset + 0x88, treeBlocks);
-        mdb.WriteUInt32At(MdbOffset + 0x92, treeBytes);                               // drCTFlSize
-        mdb.WriteUInt16At(MdbOffset + 0x96, treeBlocks);                              // drCTExtRec: after the extents file
-        mdb.WriteUInt16At(MdbOffset + 0x98, treeBlocks);
-        image.AsSpan(MdbOffset, BlockSize).CopyTo(image.AsSpan((int)(size - 2 * BlockSize)));   // the alternate MDB
+        var sector = new byte[BlockSize];
+        var mdb = new BigEndianWriter(sector);
+        mdb.WriteUInt16At(0x00, 0x4244);                                              // drSigWord 'BD'
+        mdb.WriteUInt32At(0x02, date);                                                // drCrDate
+        mdb.WriteUInt32At(0x06, date);                                                // drLsMod
+        mdb.WriteUInt16At(0x0A, 0x0100);                                              // drAtrb: unmounted cleanly [Code]
+        mdb.WriteUInt16At(0x0E, 3);                                                   // drVBMSt
+        mdb.WriteUInt16At(0x12, count);                                               // drNmAlBlks
+        mdb.WriteUInt32At(0x14, blockSize);                                           // drAlBlkSiz
+        mdb.WriteUInt32At(0x18, defaultClump);                                        // drClpSiz
+        mdb.WriteUInt16At(0x1C, 3 + bitmapSectors);                                   // drAlBlSt
+        mdb.WriteUInt32At(0x1E, 16u);                                                 // drNxtCNID
+        mdb.WriteUInt16At(0x22, count - 2 * treeBlocks);                              // drFreeBks
+        mdb.WriteUInt32At(0x46, 2u);                                                  // drWrCnt: 2 from the initializer [Code]
+        sector[0x24] = (byte)nameBytes.Length;                                        // drVN
+        nameBytes.CopyTo(sector, 0x25);
+        mdb.WriteUInt32At(0x4A, treeBytes);                                           // drXTClpSiz
+        mdb.WriteUInt32At(0x4E, treeBytes);                                           // drCTClpSiz
+        mdb.WriteUInt32At(0x82, treeBytes);                                           // drXTFlSize
+        mdb.WriteUInt16At(0x86, 0);                                                   // drXTExtRec: allocation block 0
+        mdb.WriteUInt16At(0x88, treeBlocks);
+        mdb.WriteUInt32At(0x92, treeBytes);                                           // drCTFlSize
+        mdb.WriteUInt16At(0x96, treeBlocks);                                          // drCTExtRec: after the extents file
+        mdb.WriteUInt16At(0x98, treeBlocks);
 
-        if (Check(ForkData.FromBytes(image)) is { } fault)
+        var volume = new HfsVolume(ForkData.Zeros(size));
+        long allocationStart = (3 + bitmapSectors) * BlockSize;
+        volume.Write(MdbOffset, sector);
+        volume.Write(3 * BlockSize, bitmap);
+        volume.Write(allocationStart, extents);
+        volume.Write(allocationStart + treeBytes, catalog);
+        volume.Write(size - 2 * BlockSize, sector);                                   // the alternate MDB
+        if (Check(volume.AsForkData()) is { } fault)
         {
             throw new InvalidOperationException($"The new HFS volume failed its own check: {fault}");
         }
 
-        return image;
+        return volume;
     }
 
     // An empty B-tree file of 512-byte nodes: the header node (its header record, 128 bytes of user data and a map

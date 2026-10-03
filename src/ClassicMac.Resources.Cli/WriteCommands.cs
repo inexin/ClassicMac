@@ -164,7 +164,7 @@ namespace ClassicMac.Resources.Cli
             var file = new Argument<FileInfo>("file") { Description = "The new volume image" };
             var size = new Option<long>("--size")
             {
-                Description = "Its size: bytes, or with K/KiB, M/MiB, G/GiB (400K to just under 2G, whole 512-byte blocks)",
+                Description = "Its size: bytes, or with K/KiB, M/MiB, G/GiB (400K to 2T, whole 512-byte blocks)",
                 Required = true,
                 CustomParser = ParseSize,
             };
@@ -176,42 +176,44 @@ namespace ClassicMac.Resources.Cli
             {
                 var path = result.GetRequiredValue(file).FullName;
                 var volumeName = result.GetRequiredValue(name);
-                byte[] image;
+                var bytes = result.GetRequiredValue(size);
+                if (File.Exists(path) && !result.GetValue(overwrite))
+                {
+                    error.WriteLine($"{path} exists (--overwrite to replace it).");
+                    return ExitCodes.IoError;
+                }
+
+                // Only the MDB, bitmap and B-trees are written into a file made the volume's length, so a large volume
+                // takes no more time or memory than a small one.
                 try
                 {
-                    image = HfsWriter.Format(result.GetRequiredValue(size), volumeName);
+                    HfsWriter.FormatTo(path, bytes, volumeName);
                 }
                 catch (ArgumentException e)
                 {
                     error.WriteLine($"{Path.GetFileName(path)}: {e.Message.Split(" (Parameter", 2)[0]}");
                     return ExitCodes.Usage;
                 }
-
-                try
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
                 {
-                    using var stream = new FileStream(path, result.GetValue(overwrite) ? FileMode.Create : FileMode.CreateNew, FileAccess.Write);
-                    stream.Write(image);
-                }
-                catch (IOException e)
-                {
-                    error.WriteLine(File.Exists(path) && !result.GetValue(overwrite) ? $"{path} exists (--overwrite to replace it)." : $"{path}: {e.Message}");
+                    error.WriteLine($"{path}: {e.Message}");
                     return ExitCodes.IoError;
                 }
 
-                var blockSize = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!.BlockSize;
+                var blockSize = HfsReader.Instance.ReadVolumeInfo(ForkData.FromFile(path))!.BlockSize;
                 if (result.GetValue(json))
                 {
                     output.WriteLine(MacPathJson.Document(w =>
                     {
                         MacPathJson.Strings(w, "written", [path]);
                         w.WriteString("name", volumeName);
-                        w.WriteNumber("size", image.LongLength);
+                        w.WriteNumber("size", bytes);
                         w.WriteNumber("blockSize", blockSize);
                     }));
                 }
                 else
                 {
-                    output.WriteLine($"Wrote {path} (HFS \"{volumeName}\", {image.LongLength.ToString("N0", CultureInfo.InvariantCulture)} bytes, {blockSize.ToString("N0", CultureInfo.InvariantCulture)}-byte blocks)");
+                    output.WriteLine($"Wrote {path} (HFS \"{volumeName}\", {bytes.ToString("N0", CultureInfo.InvariantCulture)} bytes, {blockSize.ToString("N0", CultureInfo.InvariantCulture)}-byte blocks)");
                 }
 
                 return ExitCodes.Success;
