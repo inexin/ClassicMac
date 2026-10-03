@@ -10,6 +10,8 @@
   as AppleDouble, Basilisk II, MacBinary or raw forks, a folder, a container's contents with `--enter`, or a
   resource). Each takes `--json` with a documented schema; exit code 5 when a path names nothing. The operations are
   the library's `MacCommands` (`ClassicMac.Files.Commands`), for the MCP server and the shell to come.
+- Tests: the app tests that watch PropertyChanged while a preview or header icon finishes on the thread pool collect
+  into a concurrent queue and await those tasks first (a flake in the window-title test).
 - CLI: write commands on Mac paths (docs/cli.md §3): `put` (a host file into a volume), `mkdir`, `rm` (`-r` for a
   folder with contents), `rename`, `set` (type, creator, Finder flags), `res-add` and `res-rm`, each with `--dry-run`,
   `--json`, and `-o <new file>` or `--in-place` (keeping `.orig`); plain HFS images and single Mac files are written,

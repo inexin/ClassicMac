@@ -21,8 +21,8 @@ public sealed partial class EditTests
         Assert.True(model.HasDraft);
 
         dialogs.Pending = new TaskCompletionSource<DraftChoice>();
-        var changes = new List<string?>();
-        model.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
+        model.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
         model.Selected = Resource(file, 129);
         // Not answered yet: nothing moved or rebuilt.
         Assert.Equal([("'STR ' 128", (string?)null)], dialogs.DraftAsked);
@@ -354,8 +354,8 @@ public sealed partial class EditTests
         form.Text = "edited";
 
         dialogs.Pending = new TaskCompletionSource<DraftChoice>();
-        var changes = new List<string?>();
-        model.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
+        model.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
         model.UseTemplate = true;
         Assert.False(model.UseTemplate);                                    // not until answered
         Assert.Same(form, model.Form);

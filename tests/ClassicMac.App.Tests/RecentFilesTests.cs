@@ -25,8 +25,8 @@ public sealed class RecentFilesTests : IDisposable
     public async Task The_empty_state_shows_while_nothing_is_open()
     {
         var model = new MainViewModel();
-        var changes = new List<string?>();
-        model.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        var changes = new System.Collections.Concurrent.ConcurrentQueue<string?>();  // background preview tasks raise on the thread pool
+        model.PropertyChanged += (_, e) => changes.Enqueue(e.PropertyName);
         Assert.True(model.IsEmpty);
         var input = (await model.OpenAsync(Fork("A.rsrc")))!;
         await model.PreviewTask;
