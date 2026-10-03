@@ -11,17 +11,18 @@ namespace ClassicMac.Resources.Cli
     /// <summary>
     /// An input opened by the MCP server or the shell (docs/cli.md §4, §5): a tree for reading its Mac paths and the
     /// changes made to it.
-    /// Each change is made on a working copy in a temporary folder, so later reads show it; the input changes only when
-    /// saved in place, and Save As writes a new file. Both make the changes again on the input itself, so what is written
-    /// is the library's verified save.
+    /// Changes are made on one edit session of the input, kept for the session's life, and written to a working copy in a
+    /// temporary folder after each, so later reads show them; the input changes only when saved in place, and Save As writes
+    /// a new file, both the library's verified save of that edit session.
     /// </summary>
     internal sealed class PathSession : IDisposable
     {
         private readonly ContainerReadOptions options;
         private readonly ReadOptions readOptions;
         private readonly string work;
-        private readonly List<Action<InputEditSession>> edits = [];
         private readonly List<PlannedChange> changes = [];
+        private InputEditSession? live;
+        private int made;
         private int copies;
         private int saved;
         private string current;
@@ -54,7 +55,7 @@ namespace ClassicMac.Resources.Cli
         public IReadOnlyList<PlannedChange> Changes => changes;
 
         /// <summary>How many changes no save has written yet.</summary>
-        public int Unsaved => edits.Count - saved;
+        public int Unsaved => made - saved;
 
         /// <summary>Opens a host file; refused (not found) when there is none.</summary>
         public static PathSession Open(string id, string path, ContainerReadOptions options, ReadOptions readOptions)
@@ -81,59 +82,78 @@ namespace ClassicMac.Resources.Cli
                 throw new WriteRefused($"{Path.GetFileName(Input)} cannot be changed: ClassicMac writes plain HFS volume images and single Mac files.");
             }
 
-            var session = InputEditSession.Open(current, options, readOptions);
-            change(session);
-            var made = session.Changes.ToList();
-            if (!dryRun)
+            if (dryRun)
             {
-                var folder = Path.Combine(work, (++copies).ToString(System.Globalization.CultureInfo.InvariantCulture));
-                Directory.CreateDirectory(folder);
-                var copy = Path.Combine(folder, Path.GetFileName(Input));
-                session.SaveAs(copy);
-                Tree = MacPathTree.Open(copy, options, readOptions);
-                current = copy;
-                edits.Add(change);
-                changes.AddRange(made);
+                var trial = InputEditSession.Open(current, options, readOptions);
+                change(trial);
+                return [.. trial.Changes];
             }
 
-            return made;
+            live ??= InputEditSession.Open(Input, options, readOptions);
+            var before = live.Changes.Count;
+            change(live);
+            var planned = live.Changes.Skip(before).ToList();
+            var folder = Path.Combine(work, (++copies).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            Directory.CreateDirectory(folder);
+            var copy = Path.Combine(folder, Path.GetFileName(Input));
+            live.SaveAs(copy);
+            Tree.Dispose();
+            Tree = MacPathTree.Open(copy, options, readOptions);
+            DeleteCopy(current);
+            current = copy;
+            made++;
+            changes.AddRange(planned);
+            return planned;
         }
 
         /// <summary>Writes the input with every change to a new file (verified); returns the files written.</summary>
         public IReadOnlyList<string> SaveAs(string destination)
         {
-            var session = Replayed();
-            var written = session.SaveAs(destination);
-            saved = edits.Count;
+            var written = Live().SaveAs(destination);
+            saved = made;
             return written;
         }
 
         /// <summary>Writes the changes over the input (verified), keeping the original as <c>.orig</c> the first time.</summary>
         public void SaveInPlace()
         {
-            Replayed().SaveInPlace();
+            Live().SaveInPlace();
+            Tree.Dispose();
             Tree = MacPathTree.Open(Input, options, readOptions);
+            DeleteCopy(current);
             current = Input;
-            edits.Clear();
+            live = null;
             changes.Clear();
+            made = 0;
             saved = 0;
         }
 
-        // A session of the input with the changes made again.
-        private InputEditSession Replayed()
+        // The edit session holding the changes (the input itself when none has been made).
+        private InputEditSession Live()
         {
             if (Kind == InputEditKind.ReadOnly)
             {
                 throw new WriteRefused($"{Path.GetFileName(Input)} cannot be changed: ClassicMac writes plain HFS volume images and single Mac files.");
             }
 
-            var session = InputEditSession.Open(Input, options, readOptions);
-            foreach (var edit in edits)
+            return live ??= InputEditSession.Open(Input, options, readOptions);
+        }
+
+        // Deletes a working copy once nothing reads it (never the input).
+        private void DeleteCopy(string path)
+        {
+            if (path == Input)
             {
-                edit(session);
+                return;
             }
 
-            return session;
+            try
+            {
+                Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+            }
         }
 
         /// <summary>Deletes the working copies.</summary>

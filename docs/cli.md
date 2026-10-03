@@ -342,11 +342,11 @@ the command.
 Mac path after the host file (§1), names joined by `:` or `/`, `""` for the input itself. A session lasts until
 `close`, which is refused while changes are unsaved unless `discard` is true.
 
-The write tools change the session only. Each change is made on a working copy in the temporary folder, so `list`,
-`stat`, `read` and `search` see it; the input is not touched. `save_as` writes every change: to `destination`, a new
-file (never the input), or with `in_place: true` over the input, the original kept as `<input>.orig` the first time.
-Either way the changes are made again on the input itself and the result is read back to verify it, as the write
-commands' `-o` and `--in-place` do (§3). A write with `dry_run: true` checks the change and reports it without making
+The write tools change the session only. The changes are made once, on one edit session of the input kept for the
+session's life, and each is written to a working copy in the temporary folder, so `list`, `stat`, `read` and `search`
+see it; the input is not touched. `save_as` writes every change from that edit session: to `destination`, a new file
+(never the input), or with `in_place: true` over the input, the original kept as `<input>.orig` the first time. The
+result is read back to verify it, as the write commands' `-o` and `--in-place` do (§3). A write with `dry_run: true` checks the change and reports it without making
 it. Inputs ClassicMac does not write (§3.1) can be read but not changed.
 
 ### 4.3 Tools

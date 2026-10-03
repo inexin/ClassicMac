@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- CLI: the shell and the MCP server keep one edit session for an input, so each change is made once instead of being
+  replayed on every save, and the input is no longer reopened for every change (a 4-deletion session on a 500 MB volume
+  14 s instead of 24 s) (cli.md §4.2).
 - HFS: deleting a folder with everything in it is done in one pass and checked without reading every file: on a 500 MB
   Mac OS 9 volume a 57-item folder took 0.8 s instead of 136 s (13.7 GB), and a 4-deletion shell session 24 s instead
   of 18 minutes; deleting one file takes 0.7 s instead of 1.8 s (hfs.md §5.5).
