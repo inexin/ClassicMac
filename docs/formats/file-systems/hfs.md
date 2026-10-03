@@ -711,6 +711,15 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - With `CLASSICMAC_HFS_INTEROP_INPUT` and the `…_OUTPUT` variables set, `ExternalClassicHfsImageCanBeEditedAndReopened`
   and `ExternalVolumeCatalogMutationsReopen` edit a real hfsutils-formatted volume; the outputs were remounted with
   hfsutils, for fork edits, folder changes and catalog growth.
+- `HfsCorpusWriteTests.cs`, with `CLASSICMAC_CORPUS` set: copies of real volumes Mac OS wrote (plain, partitioned, Disk
+  Copy 4.2, NDIF) get a folder, a file with both forks, renames, a move and deletions, are saved, and must pass the
+  writer's checks and read back with every change; with `CLASSICMAC_HFSUTILS` set too, `fsck_hfs` must find nothing the
+  source lacked. On the 500 MB Mac OS 9 boot volume it passes.
+- `fsck_hfs` 540.1 (hfsprogs) reports any extent that uses a volume's last allocation block as an "Invalid extent entry",
+  with a wrong block count for its file and orphaned blocks. Mac OS 9 allocates that block itself (a StuffIt 7.0.3
+  installer's folder icon on the Mac OS 9 volume ends there), and a ClassicMac volume filled to its last block draws the
+  same report while one filled to the block before passes; so these findings are `fsck_hfs`'s, and the interop tests
+  compare its findings before and after an edit rather than require none [Verified].
 - A file was deleted from a Mac OS 9 boot volume (an image SheepShaver used) and the output listed again.
 - `HfsUtilsInteropTests.cs`, with `CLASSICMAC_HFSUTILS` set (hfsutils' folder, or `docker:<image>` built from
   `tools/hfsutils/Dockerfile`): a volume ClassicMac formats and edits is mounted, listed and copied from by hfsutils
