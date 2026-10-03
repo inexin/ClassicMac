@@ -302,7 +302,12 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    (`drNmAlBlks` at most 65,535): the image lengthened, the block count and free count raised, the bitmap extended (the
    allocation area moved up when the bitmap's sectors are full) and the alternate MDB moved to the new end, every
    CNID kept. Later, shrinking: files and B-tree extents in the blocks cut off moved down into free space first,
-   refused when they do not fit; and growing past 65,535 blocks with a larger block size.
+   refused when they do not fit; and growing with a larger allocation block size (decided 2026-10-03: wanted, not now).
+   Growing within the block size cannot reach far: Mac OS picks the smallest block size that fits, so a formatted
+   volume already uses most of its 65,535 blocks (500 MB, 8 KB blocks: at most ~537 MB). Real growth (20 MB to 1 GB)
+   needs a new block size: every extent in the catalog and extents tree remapped and file data moved to the new block
+   boundaries, the MDB's clump sizes and `drAlBlSt` set again; checked with Disk First Aid. Whether any Apple tool does
+   this (the reference) is asked of the Mac RE session.
 
 **Editing through a block overlay (decided 2026-10-03).** An edit touches only the MDB, the bitmap, the B-tree files and
 the edited forks, so the writer stops holding whole images:
@@ -320,12 +325,13 @@ the edited forks, so the writer stops holding whole images:
   after checking the input can be opened exclusively (an image mounted elsewhere is refused). Patching in place with a
   journal is not done (it could corrupt an image another program has open). NDIF keeps its disk decoded; the overlay
   names the changed chunks.
-- `format` and resize lift the 2 GB limit (streamed writes).
+- `format` lifts the 2 GB limit (streamed writes; built, `FormatTo`). Resize does not need to: within its block size a
+  volume cannot pass 65,535 blocks, which Mac OS's own block sizes leave little room for (item 8).
 - Steps, each test-first with every suite and the hfsutils/`fsck_hfs` interop passing: a gated corpus write test first;
   `HfsVolume`; writer reads; writer writes with byte-identical results against today's writer; the session and Save As;
   Save in place; NDIF; past 2 GB; docs. Built: the corpus test, `HfsVolume`, the writer through it, the session and
   both saves (a 500 MB session peaks at 100 MB instead of 2.6 GB; Save As 0.44 s). Still to do: NDIF's changed chunks
-  past 2 GB. The shell's per-command tree reopening: 350 ms to 40 ms (probes deferred); each edit's catalog check and
+  past 2 GB (resize past 2 GB dropped: see item 8). The shell's per-command tree reopening: 350 ms to 40 ms (probes deferred); each edit's catalog check and
   rebuild 230 ms to 100 ms (one-pass valences, cheaper packing and key comparison); catalog edits now change only
   their leaves (splits into free nodes, as Mac OS), writing a few sectors; per command on 500 MB about 80 ms remain
   (the check on opening ~15, the reader's re-read ~20, the shell's tree ~15–30). Since built: NDIF's changed chunks from the overlay;
