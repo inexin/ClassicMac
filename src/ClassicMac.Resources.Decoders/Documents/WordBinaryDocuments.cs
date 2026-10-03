@@ -24,6 +24,9 @@ namespace ClassicMac.Resources.Decoders.Documents
         /// <summary>The first nFib of Word 97's FIB ([MS-DOC] §2.5.2); earlier ones are Word 6 and 95's.</summary>
         internal const ushort Word97 = 0x00C1;
 
+        /// <summary>Word 6's nFib; Word 95's is $0068 (docs/formats/documents/word-binary.md §4).</summary>
+        internal const ushort Word6 = 0x0065;
+
         // The FibRgFcLcb97 pairs ClassicMac reads ([MS-DOC] §2.5.6), by index.
         private const int Stshf = 1, PlcfBteChpx = 12, PlcfBtePapx = 13, SttbfFfn = 15, Clx = 33;
 
@@ -76,10 +79,10 @@ namespace ClassicMac.Resources.Decoders.Documents
             }
 
             var nFib = BinaryPrimitives.ReadUInt16LittleEndian(span[2..]);
-            if (nFib < Word97)
+            if (nFib < Word6)
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.unsupported-version",
-                    $"\"{title}\" is a Word 6 or 95 document (nFib ${nFib:X4}); only Word 97 and later are read."));
+                    $"\"{title}\": a FIB older than Word 6's (nFib ${nFib:X4}); only Word 6 and later are read."));
                 return null;
             }
 
@@ -89,6 +92,13 @@ namespace ClassicMac.Resources.Decoders.Documents
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.encrypted",
                     $"\"{title}\" is a password-protected Word document ({((flags & 0x8000) != 0 ? "obfuscated" : "encrypted")}); it is not read."));
                 return null;
+            }
+
+            // Word 6 and 95 keep everything in the WordDocument stream, in Mac OS Roman when the FIB's chse says so [Reference: Apache POI; wv].
+            if (nFib < Word97)
+            {
+                var mac = span.Length >= 0x16 && BinaryPrimitives.ReadUInt16LittleEndian(span[0x14..]) == 256;
+                return new Reader(document, document, title, diagnostics, word6: true, mac).Read();
             }
 
             var tableName = (flags & 0x0200) != 0 ? "1Table" : "0Table";
@@ -113,7 +123,8 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         private sealed record Style(int Base, int Type, byte[] Papx, byte[] Chpx);
 
-        private sealed class Reader(ReadOnlyMemory<byte> document, ReadOnlyMemory<byte> table, string title, ICollection<Diagnostic> diagnostics)
+        private sealed class Reader(ReadOnlyMemory<byte> document, ReadOnlyMemory<byte> table, string title, ICollection<Diagnostic> diagnostics,
+            bool word6 = false, bool mac = false)
         {
             private readonly HashSet<string> reported = [];
             private readonly Dictionary<int, (Chp Chp, Pap Pap)> styleCache = [];
@@ -131,17 +142,18 @@ namespace ClassicMac.Resources.Decoders.Documents
                 }
             }
 
-            // A FibRgFcLcb97 pair as a slice of the table stream, or empty when absent or out of range (reported).
+            // A FibRgFcLcb97 pair as a slice of the table stream, or empty when absent or out of range (reported). Word 6's FIB
+            // has the same pairs in the same order from +$58, with no count [Reference: Apache POI].
             private ReadOnlyMemory<byte> Table(int index)
             {
-                var count = BinaryPrimitives.ReadUInt16LittleEndian(Fib[152..]);
-                if (index >= count || Fib.Length < 154 + 8 * (index + 1))
+                var at = word6 ? 0x58 + 8 * index : 154 + 8 * index;
+                if (!word6 && index >= BinaryPrimitives.ReadUInt16LittleEndian(Fib[152..]) || Fib.Length < at + 8)
                 {
                     return ReadOnlyMemory<byte>.Empty;
                 }
 
-                long fc = BinaryPrimitives.ReadUInt32LittleEndian(Fib[(154 + 8 * index)..]);
-                long lcb = BinaryPrimitives.ReadUInt32LittleEndian(Fib[(158 + 8 * index)..]);
+                long fc = BinaryPrimitives.ReadUInt32LittleEndian(Fib[at..]);
+                long lcb = BinaryPrimitives.ReadUInt32LittleEndian(Fib[(at + 4)..]);
                 if (lcb == 0)
                 {
                     return ReadOnlyMemory<byte>.Empty;
@@ -158,8 +170,15 @@ namespace ClassicMac.Resources.Decoders.Documents
 
             public StyledDocument? Read()
             {
-                var ccpText = Fib.Length >= 0x50 ? BinaryPrimitives.ReadInt32LittleEndian(Fib[0x4C..]) : 0;
+                var ccpAt = word6 ? 0x34 : 0x4C;
+                var ccpText = Fib.Length >= ccpAt + 4 ? BinaryPrimitives.ReadInt32LittleEndian(Fib[ccpAt..]) : 0;
                 var pieces = Pieces(Table(Clx));
+                if (word6 && pieces.Count == 0 && Fib.Length >= 0x20)
+                {
+                    // A Word 6 document that was not fast saved has no piece table: its text is one run of bytes from fcMin
+                    // [Reference: Apache POI].
+                    pieces.Add(new Piece(0, ccpText, BinaryPrimitives.ReadUInt32LittleEndian(Fib[0x18..]), true, 0));
+                }
                 if (pieces.Count == 0)
                 {
                     Report(DiagnosticSeverity.Error, "word.bad-pieces", "the document has no piece table, so its text cannot be found.");
@@ -172,7 +191,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                         "some text was formatted by a fast save's property changes, which this reader does not apply.");
                 }
 
-                fonts = ReadFonts(Table(SttbfFfn));
+                fonts = word6 ? ReadSixFonts(Table(SttbfFfn), mac) : ReadFonts(Table(SttbfFfn));
                 ReadStyles(Table(Stshf));
                 var characters = Bins(Table(PlcfBteChpx), paragraphs: false);
                 var paragraphs = Bins(Table(PlcfBtePapx), paragraphs: true);
@@ -190,7 +209,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                             break;
                         }
 
-                        var c = piece.Compressed ? Compressed(document.Span[(int)fc]) : (char)BinaryPrimitives.ReadUInt16LittleEndian(document.Span[(int)fc..]);
+                        var c = !piece.Compressed ? (char)BinaryPrimitives.ReadUInt16LittleEndian(document.Span[(int)fc..])
+                            : mac ? MacRoman.ToChar(document.Span[(int)fc]) : Compressed(document.Span[(int)fc]);
                         text.Add((c, fc));
                     }
                 }
@@ -225,12 +245,44 @@ namespace ClassicMac.Resources.Decoders.Documents
                     var end = BinaryPrimitives.ReadInt32LittleEndian(plc[(4 * (i + 1))..]);
                     var pcd = plc[(4 * (count + 1) + 8 * i)..];
                     var fcCompressed = BinaryPrimitives.ReadUInt32LittleEndian(pcd[2..]);
+                    if (word6)
+                    {
+                        // Word 6's pieces are 8-bit text at a plain FC [Reference: Apache POI].
+                        pieces.Add(new Piece(cp, end, fcCompressed, true, BinaryPrimitives.ReadUInt16LittleEndian(pcd[6..])));
+                        continue;
+                    }
+
                     var compressed = (fcCompressed & 0x40000000) != 0;
                     var fc = (long)(fcCompressed & 0x3FFFFFFF);
                     pieces.Add(new Piece(cp, end, compressed ? fc / 2 : fc, compressed, BinaryPrimitives.ReadUInt16LittleEndian(pcd[6..])));
                 }
 
                 return pieces;
+            }
+
+            // Word 6's font table: its size in bytes, then per font a size byte (less one), ffid, a weight word, a charset, the
+            // alternate name's index, and the name, 8-bit and null-terminated [Reference: Apache POI].
+            private static List<string> ReadSixFonts(ReadOnlyMemory<byte> table, bool mac)
+            {
+                var span = table.Span;
+                var found = new List<string>();
+                if (span.Length < 2)
+                {
+                    return found;
+                }
+
+                var end = Math.Min(BinaryPrimitives.ReadUInt16LittleEndian(span), span.Length);
+                for (var at = 2; at + 6 <= end;)
+                {
+                    var size = span[at] + 1;
+                    var name = span.Slice(at + 6, Math.Max(0, Math.Min(size - 6, end - at - 6)));
+                    var zero = name.IndexOf((byte)0);
+                    name = zero >= 0 ? name[..zero] : name;
+                    found.Add(mac ? MacRoman.Decode(name) : string.Concat(name.ToArray().Select(Compressed)));
+                    at += size;
+                }
+
+                return found;
             }
 
             // SttbfFfn ([MS-DOC] §2.9.286): a count, a zero extra size, then per font a size byte and an FFN ([MS-DOC] §2.9.82)
@@ -281,7 +333,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                 }
 
                 var cbStshi = BinaryPrimitives.ReadUInt16LittleEndian(span);
-                if (cbStshi < 18 || 2 + cbStshi > span.Length)
+                if (cbStshi < (word6 ? 14 : 18) || 2 + cbStshi > span.Length)
                 {
                     Report(DiagnosticSeverity.Warning, "word.bad-styles", "the style sheet's header is damaged; styles are left out.");
                     return;
@@ -303,12 +355,12 @@ namespace ClassicMac.Resources.Decoders.Documents
                         continue;
                     }
 
-                    styles.Add(ReadStd(span.Slice(at, cbStd), stdfSize));
+                    styles.Add(ReadStd(span.Slice(at, cbStd), stdfSize, word6));
                     at += cbStd;
                 }
             }
 
-            private static Style? ReadStd(ReadOnlySpan<byte> std, int stdfSize)
+            private static Style? ReadStd(ReadOnlySpan<byte> std, int stdfSize, bool word6)
             {
                 if (std.Length < 10)
                 {
@@ -323,8 +375,18 @@ namespace ClassicMac.Resources.Decoders.Documents
                     return new Style(istdBase, type, [], []);
                 }
 
-                var cch = BinaryPrimitives.ReadUInt16LittleEndian(std[at..]);
-                at += 2 + 2 * cch + 2;
+                if (word6)
+                {
+                    // Word 6's name: a length byte, the 8-bit characters, a null; the UPXs start at an even offset
+                    // (assumed: docs/formats/documents/word-binary.md §4.1).
+                    at += 1 + std[at] + 1;
+                    at += at & 1;
+                }
+                else
+                {
+                    var cch = BinaryPrimitives.ReadUInt16LittleEndian(std[at..]);
+                    at += 2 + 2 * cch + 2;
+                }
                 byte[] papxBytes = [], chpxBytes = [];
                 if (type == 1)
                 {
@@ -365,10 +427,13 @@ namespace ClassicMac.Resources.Decoders.Documents
                     return runs;
                 }
 
-                var count = (span.Length - 4) / 8;
+                // Word 6's page numbers are 2 bytes [Reference: Apache POI].
+                var pnSize = word6 ? 2 : 4;
+                var count = (span.Length - 4) / (4 + pnSize);
                 for (var i = 0; i < count; i++)
                 {
-                    var pn = BinaryPrimitives.ReadUInt32LittleEndian(span[(4 * (count + 1) + 4 * i)..]) & 0x3FFFFF;
+                    var pnAt = 4 * (count + 1) + pnSize * i;
+                    var pn = word6 ? BinaryPrimitives.ReadUInt16LittleEndian(span[pnAt..]) : BinaryPrimitives.ReadUInt32LittleEndian(span[pnAt..]) & 0x3FFFFF;
                     if ((pn + 1L) * Page > document.Length)
                     {
                         Report(DiagnosticSeverity.Warning, "word.bad-zone", $"formatting page {pn} is past the end of the WordDocument stream; left out.");
@@ -377,7 +442,8 @@ namespace ClassicMac.Resources.Decoders.Documents
 
                     var page = document.Span.Slice((int)pn * Page, Page);
                     var crun = page[Page - 1];
-                    var entry = paragraphs ? 13 : 1;
+                    // Word 6's BX is the offset byte and 6 bytes of line data (assumed: word-binary.md §4.1).
+                    var entry = paragraphs ? (word6 ? 7 : 13) : 1;
                     if (4 * (crun + 1) + entry * crun > Page - 1)
                     {
                         Report(DiagnosticSeverity.Warning, "word.bad-zone", $"formatting page {pn} says {crun} runs, more than a page holds; left out.");
@@ -394,7 +460,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                             {
                                 // PapxInFkp: cb, or 0 and a second count; the GrpPrlAndIstd is 2 × cb − 1 bytes, or 2 × the second.
                                 var cb = page[at];
-                                var (start, size) = cb != 0 ? (at + 1, 2 * cb - 1) : (at + 2, 2 * page[at + 1]);
+                                // Word 6's PAPX: a count of words, then that many words (assumed: word-binary.md §4.1).
+                                var (start, size) = word6 ? (at + 1, 2 * cb) : cb != 0 ? (at + 1, 2 * cb - 1) : (at + 2, 2 * page[at + 1]);
                                 block = page.Slice(start, Math.Max(0, Math.Min(size, Page - 1 - start))).ToArray();
                             }
                             else
@@ -447,8 +514,64 @@ namespace ClassicMac.Resources.Decoders.Documents
                 _ => -1,
             };
 
+            // Word 6's one-byte sprms and their operand sizes (0 none, −1 a size byte and that many, −2 a size word, −3
+            // unknown), and the Word 97 sprm each sets the same property as [Reference: LibreOffice].
+            private static (int Size, ushort Same) SixSprm(byte sprm) => sprm switch
+            {
+                2 => (2, 0),
+                4 or 6 or 7 or 8 or 9 or 10 or 11 or 13 or 14 or 37 or 44 or 50 or 51 => (1, 0),
+                5 => (1, 0x2403),
+                16 => (2, 0x840E),
+                17 => (2, 0x840F),
+                18 or 26 or 27 or 28 or >= 30 and <= 36 or >= 38 and <= 43 or 45 or 46 or 47 or 48 or 49 => (2, 0),
+                19 => (2, 0x8411),
+                20 => (4, 0),
+                21 => (2, 0xA413),
+                22 => (2, 0xA414),
+                24 => (1, 0x2416),
+                25 => (1, 0x2417),
+                29 => (1, 0),
+                12 or 15 or 23 or 64 or 68 or 74 or 77 or 79 or 81 or 82 or 103 or 105 or 106 or 108 or >= 111 and <= 116 or 179 or 181 or 191 or 207 => (-1, 0),
+                65 or 66 or 67 or 71 or 75 or 90 or 100 or 102 or 104 or 117 or 118 or 119 => (1, 0),
+                69 or 72 or 80 or 96 or 97 or 101 or 107 or 109 or 110 or >= 121 and <= 124 => (2, 0),
+                70 => (4, 0),
+                73 or 95 => (3, 0),
+                83 => (0, 0xFFFF),
+                85 => (1, 0x0835),
+                86 => (1, 0x0836),
+                87 => (1, 0),
+                88 => (1, 0x0838),
+                89 => (1, 0x0839),
+                91 => (1, 0x083B),
+                92 => (1, 0x083C),
+                93 => (2, 0x4A4F),
+                94 => (1, 0x2A3E),
+                98 => (1, 0),
+                99 => (2, 0x4A43),
+                131 or 132 or 138 or 139 or 142 or 143 or 146 or 147 or 150 or 151 or 152 or 153 or 158 or 159 or 162 or 185 or 186 => (1, 0),
+                136 or 137 => (3, 0),
+                140 or 141 or 144 or 145 or 148 or 149 or 154 or 155 or 156 or 157 or 160 or 161 or >= 164 and <= 171 or 182 or 183 or 184 or 189 or 195 or 197 or 198 => (2, 0),
+                133 => (-1, 0),
+                163 => (0, 0),
+                187 => (12, 0),
+                188 or 190 => (-2, 0),
+                192 or 194 or 196 or 200 => (4, 0),
+                193 or 199 => (5, 0),
+                _ => (-3, 0),
+            };
+
             private IEnumerable<(ushort Sprm, byte[] Operand)> Sprms(byte[] grpprl)
             {
+                if (word6)
+                {
+                    foreach (var sprm in SixSprms(grpprl))
+                    {
+                        yield return sprm;
+                    }
+
+                    yield break;
+                }
+
                 for (var i = 0; i + 2 <= grpprl.Length;)
                 {
                     var sprm = BinaryPrimitives.ReadUInt16LittleEndian(grpprl.AsSpan(i));
@@ -461,6 +584,41 @@ namespace ClassicMac.Resources.Decoders.Documents
 
                     yield return (sprm, grpprl.AsSpan(i + 2, size).ToArray());
                     i += 2 + size;
+                }
+            }
+
+            private IEnumerable<(ushort Sprm, byte[] Operand)> SixSprms(byte[] grpprl)
+            {
+                for (var i = 0; i < grpprl.Length;)
+                {
+                    var code = grpprl[i];
+                    var (size, same) = SixSprm(code);
+                    if (code == 0)
+                    {
+                        yield break;
+                    }
+
+                    if (size == -1 && i + 1 < grpprl.Length)
+                    {
+                        size = 1 + grpprl[i + 1];
+                    }
+                    else if (size == -2 && i + 2 < grpprl.Length)
+                    {
+                        size = 2 + BinaryPrimitives.ReadUInt16LittleEndian(grpprl.AsSpan(i + 1)) - 1;
+                    }
+
+                    if (size < 0 || i + 1 + size > grpprl.Length)
+                    {
+                        Report(DiagnosticSeverity.Warning, "word.bad-sprm", $"a property this reader does not know (Word 6 sprm {code}); the rest of its list is left out.");
+                        yield break;
+                    }
+
+                    if (same != 0)
+                    {
+                        yield return (same, grpprl.AsSpan(i + 1, size).ToArray());
+                    }
+
+                    i += 1 + size;
                 }
             }
 
@@ -481,6 +639,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                 {
                     chp = sprm switch
                     {
+                        0xFFFF => style,
                         0x0835 => chp with { Bold = Toggle(operand[0], style.Bold) },
                         0x0836 => chp with { Italic = Toggle(operand[0], style.Italic) },
                         0x0838 => chp with { Outline = Toggle(operand[0], style.Outline) },

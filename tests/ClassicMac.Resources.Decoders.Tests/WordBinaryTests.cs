@@ -172,10 +172,10 @@ public class WordBinaryTests
     }
 
     [Fact]
-    public void Word_6_and_95_documents_are_reported_for_now()
+    public void A_FIB_older_than_Word_6_s_is_reported()
     {
-        var builder = Builder().Text("Six\r");
-        builder.NFib = 0x0065;
+        var builder = Builder().Text("Two\r");
+        builder.NFib = 0x002D;
         var diagnostics = new List<Diagnostic>();
 
         Assert.Null(WordBinaryDocuments.Read(builder.Build(), "Six", diagnostics: diagnostics));

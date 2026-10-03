@@ -7,6 +7,10 @@
   Finder's way from a volume's applications (their `'kind'` for the type, else "<application> document") and the
   System's kinds of standard types (`'istd'`), reading an application's resource fork only when one of its documents is
   asked about.
+- Documents: Word 6 and 95 documents (Word 6 for the Macintosh, `'W6BN'`) read by the Word 97 reader's Word 6 mode
+  (docs/formats/documents/word-binary.md §4.1): one WordDocument stream, 8-bit text in Mac OS Roman or Windows-1252 by
+  the FIB's character set, one-byte sprms, the older font table, bin tables and style sheet. No public specification
+  exists; the rules follow LibreOffice's, Apache POI's and wv's behaviour, two are assumed from Word 97's.
 - Documents: Word 97 binary documents (Word 98 for the Macintosh, `'W8BN'`) read by Microsoft's [MS-DOC]
   (`WordBinaryDocuments`, docs/formats/documents/word-binary.md): the main text through the piece table (compressed
   and UTF-16 pieces), character formatting through styles and their base styles, paragraph alignment, indents and

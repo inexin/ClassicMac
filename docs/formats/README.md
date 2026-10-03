@@ -138,7 +138,7 @@ Documents whose data fork is the document (DOCMaker and SimpleText documents liv
 | Document | Formats | Code |
 | --- | --- | --- |
 | [word-mac.md](documents/word-mac.md) | Microsoft Word 4 and 5 for the Macintosh (`'WDBN'`): text, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`MacWordDocuments`) |
-| [word-binary.md](documents/word-binary.md) | Microsoft Word 97 binary documents (Word 98 for the Macintosh, `'W8BN'`): text through the piece table, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`WordBinaryDocuments`) |
+| [word-binary.md](documents/word-binary.md) | Microsoft Word 6 to 97 binary documents (Word 6 and Word 98 for the Macintosh, `'W6BN'`, `'W8BN'`): text through the piece table, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`WordBinaryDocuments`) |
 
 ### Graphics
 
