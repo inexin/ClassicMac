@@ -12,7 +12,7 @@ namespace ClassicMac.App.ViewModels
     /// An Apple Help page in the preview (docs/formats/resources/help-pages.md): its source, and the page made ready for
     /// the web view (<see cref="HelpPages.Render"/>) from the files of its disk.
     /// </summary>
-    public sealed class HelpPagePreview
+    public sealed class HelpPagePreview : IWebPreview
     {
         /// <summary>The largest file a page reads (itself, or a picture, stylesheet or frame it shows).</summary>
         private const int MaxFile = 16 * 1024 * 1024;
@@ -114,8 +114,11 @@ namespace ClassicMac.App.ViewModels
     // The help page's Rendered | Source switch and its links (boards: the document preview's switch, as Properties | JSON).
     public sealed partial class MainViewModel
     {
-        /// <summary>The switch's segments, in <see cref="HelpModeIndex"/> order.</summary>
-        public static IReadOnlyList<string> HelpModes { get; } = ["Rendered", "Source"];
+        /// <summary>The switch's segments, in <see cref="HelpModeIndex"/> order: Rendered, then Source (a help page's HTML) or Text (a document's).</summary>
+        public IReadOnlyList<string> WebModes => ["Rendered", Preview.IsDocument ? "Text" : "Source"];
+
+        /// <summary>The address the web view loads: the help page, or the document's page shown.</summary>
+        public string? WebUri => Preview.Web?.DataUri;
 
         /// <summary>Whether a help page shows its source rather than the rendered page (kept for the session).</summary>
         [ObservableProperty]
@@ -144,10 +147,10 @@ namespace ClassicMac.App.ViewModels
         public bool HasWebEngineMessage => WebEngineMessage is not null;
 
         /// <summary>Whether the help page shows in the web view.</summary>
-        public bool ShowsHelpRendered => Preview.IsHelpPage && !ShowHelpSource && WebEngineMessage is null;
+        public bool ShowsHelpRendered => Preview.IsWebPage && !ShowHelpSource && WebEngineMessage is null;
 
         /// <summary>Whether the help page shows as its source: on request, or when there is no web view.</summary>
-        public bool ShowsHelpSource => Preview.IsHelpPage && (ShowHelpSource || WebEngineMessage is not null);
+        public bool ShowsHelpSource => Preview.IsWebPage && (ShowHelpSource || WebEngineMessage is not null);
 
         /// <summary>
         /// The web view asks to go to <paramref name="url"/>: true to let it (the page itself); otherwise a page or file
@@ -160,6 +163,11 @@ namespace ClassicMac.App.ViewModels
             {
                 HelpStatus = null;
                 return true;
+            }
+
+            if (Preview.Document is { } document)
+            {
+                return FollowDocumentLink(document, url, link);
             }
 
             if (link.Kind != HelpLinkKind.File || Preview.Help is not { } page)
@@ -184,11 +192,54 @@ namespace ClassicMac.App.ViewModels
             return false;
         }
 
+        // A document's links turn its pages; its Back pictures (the HTML's history.back()) go back; nothing else is followed.
+        private bool FollowDocumentLink(DocumentWebPreview document, string url, HelpLink link)
+        {
+            if (url.StartsWith("javascript:history.back", StringComparison.OrdinalIgnoreCase))
+            {
+                HelpStatus = null;
+                document.BackCommand.Execute(null);
+                return false;
+            }
+
+            if (link.Kind == HelpLinkKind.File && link.Path is [var page] && document.Open(page, link.Fragment))
+            {
+                HelpStatus = null;
+                return false;
+            }
+
+            HelpStatus = link.Kind == HelpLinkKind.File ? "Not in this document: " + string.Join('/', link.Path!) : link.Description;
+            return false;
+        }
+
+        private DocumentWebPreview? watchedDocument;
+
+        private void OnDocumentChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(DocumentWebPreview.DataUri))
+            {
+                OnPropertyChanged(nameof(WebUri));
+            }
+        }
+
         /// <summary>The web view's hovered link (null when none): the status line says where it goes.</summary>
         public void HoverHelpLink(string? url) => HelpStatus = string.IsNullOrEmpty(url) ? null : HelpPages.Classify(url).Description;
 
         private void OnHelpPreviewChanged()
         {
+            if (watchedDocument is not null)
+            {
+                watchedDocument.PropertyChanged -= OnDocumentChanged;
+            }
+
+            watchedDocument = Preview.Document;
+            if (watchedDocument is not null)
+            {
+                watchedDocument.PropertyChanged += OnDocumentChanged;
+            }
+
+            OnPropertyChanged(nameof(WebModes));
+            OnPropertyChanged(nameof(WebUri));
             HelpStatus = null;
             OnPropertyChanged(nameof(ShowsHelpRendered));
             OnPropertyChanged(nameof(ShowsHelpSource));

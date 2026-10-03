@@ -215,9 +215,9 @@ public class WindowTests
     }
 
     [Fact]
-    public void The_document_preview_draws_text_and_pictures() => OnUiThread(The_document_preview_draws_text_and_picturesBody);
+    public void The_document_preview_shows_its_text_without_a_web_view() => OnUiThread(The_document_preview_shows_its_text_without_a_web_viewBody);
 
-    private static void The_document_preview_draws_text_and_picturesBody()
+    private static void The_document_preview_shows_its_text_without_a_web_viewBody()
     {
         var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
         try
@@ -231,9 +231,15 @@ public class WindowTests
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
             Capture(window, "document", baselines);
-            var pictures = window.GetVisualDescendants().OfType<DocumentPictureView>().ToList();
-            Assert.Equal(3, pictures.Count);
-            Assert.Equal(new Size(260, 65), pictures[2].Bounds.Size); // scaled to the column
+            // Headless there is no native web view: the chapter list and Back stay, and the text shows with why.
+            Assert.Contains("no native web view", model.WebEngineMessage!, StringComparison.Ordinal);
+            var chapters = window.GetVisualDescendants().OfType<ComboBox>().Single(c => c.Name == "DocumentChapters");
+            Assert.True(chapters.IsEffectivelyVisible);
+            Assert.Equal(1, chapters.SelectedIndex);
+            var text = window.GetVisualDescendants().OfType<SelectableTextBlock>().Single(t => t.Name == "HelpSource");
+            Assert.True(text.IsEffectivelyVisible);
+            Assert.Contains("The game begins here.", text.Text, StringComparison.Ordinal);
+            Assert.Contains("IBM Plex Sans", text.FontFamily.ToString(), StringComparison.Ordinal); // a document's text, not mono
             window.Close();
             Baselines.Verify(baselines);
         }

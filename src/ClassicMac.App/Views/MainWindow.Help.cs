@@ -9,7 +9,7 @@ using WebView = NativeWebView.Controls.NativeWebView;
 
 namespace ClassicMac.App.Views
 {
-    // Apple Help pages (docs/formats/resources/help-pages.md): the page made ready by HelpPages is loaded into a native
+    // Apple Help pages (docs/formats/resources/help-pages.md) and documents' HTML exports: the page made ready by HelpPages is loaded into a native
     // web view (NativeWebView: WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux) as a data: URI, with
     // JavaScript off; every navigation it starts goes through the model, which lets only the page itself load and turns a
     // link to a file of the disk into a selection in the tree. Without an engine (or in a window without a native
@@ -39,7 +39,7 @@ namespace ClassicMac.App.Views
 
         private void OnHelpModelChanged(object? sender, PropertyChangedEventArgs e)
         {
-            if (sender is MainViewModel model && e.PropertyName is nameof(MainViewModel.Preview) or nameof(MainViewModel.ShowsHelpRendered))
+            if (sender is MainViewModel model && e.PropertyName is nameof(MainViewModel.Preview) or nameof(MainViewModel.ShowsHelpRendered) or nameof(MainViewModel.WebUri))
             {
                 ShowHelpPage(model);
             }
@@ -48,7 +48,7 @@ namespace ClassicMac.App.Views
         // The page into the web view, made the first time a page is to be rendered.
         private async void ShowHelpPage(MainViewModel model)
         {
-            if (model.Preview.Help is not { } page || model.ShowHelpSource)
+            if (model.Preview.Web is not { } page || model.ShowHelpSource)
             {
                 return;
             }
@@ -70,7 +70,7 @@ namespace ClassicMac.App.Views
                     await webView.InitializeAsync();
                 }
 
-                if (ReferenceEquals(model.Preview.Help, page))
+                if (ReferenceEquals(model.Preview.Web, page))
                 {
                     webView.Navigate(page.DataUri);
                 }
@@ -78,7 +78,7 @@ namespace ClassicMac.App.Views
             catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException or IOException or UnauthorizedAccessException
                 or System.Runtime.InteropServices.COMException)
             {
-                model.WebEngineMessage = $"The web view could not start ({e.Message}), so the page shows as its HTML.";
+                model.WebEngineMessage = $"The web view could not start ({e.Message}), so the page shows as text.";
             }
         }
 
@@ -88,7 +88,7 @@ namespace ClassicMac.App.Views
             // A window with no native handle (Avalonia's headless platform gives a zero "STUB" handle) cannot host one.
             if (TryGetPlatformHandle() is not { } handle || handle.Handle == IntPtr.Zero)
             {
-                return "This window has no native web view, so the page shows as its HTML.";
+                return "This window has no native web view, so the page shows as text.";
             }
 
             try
@@ -98,12 +98,12 @@ namespace ClassicMac.App.Views
                 if (!diagnostics.IsReady)
                 {
                     var why = diagnostics.Issues.FirstOrDefault()?.Message ?? "the platform's web engine is missing";
-                    return $"No web engine ({why}), so the page shows as its HTML.";
+                    return $"No web engine ({why}), so the page shows as text.";
                 }
 
                 if (!NativeWebViewRuntime.Factory.TryCreateNativeWebViewBackend(NativeWebViewRuntime.CurrentPlatform, out var backend))
                 {
-                    return "No web engine for this system, so the page shows as its HTML.";
+                    return "No web engine for this system, so the page shows as text.";
                 }
 
                 var view = new WebView(backend);
@@ -122,7 +122,7 @@ namespace ClassicMac.App.Views
             }
             catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException or DllNotFoundException or TypeLoadException)
             {
-                return $"The web view could not start ({e.Message}), so the page shows as its HTML.";
+                return $"The web view could not start ({e.Message}), so the page shows as text.";
             }
         }
 

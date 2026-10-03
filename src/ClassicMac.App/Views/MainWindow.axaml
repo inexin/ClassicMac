@@ -307,6 +307,13 @@
 
     <!-- Title bar (S1): CmBarTitle high on CmTitleBarBackground, the title in CmFontMeta and CmTextMuted, the unsaved
          mark in CmAccent. The caption buttons (Avalonia's drawn ones on Windows, the system's on macOS) sit over its right or left end. -->
+    <!-- A help page's source in mono; a document's text in the body font. -->
+    <Style Selector="SelectableTextBlock#HelpSource">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
+    </Style>
+    <Style Selector="SelectableTextBlock#HelpSource.document">
+      <Setter Property="FontFamily" Value="{StaticResource CmFontSans}" />
+    </Style>
     <Style Selector="Border.titlebar">
       <Setter Property="Height" Value="{DynamicResource CmBarTitle}" />
       <Setter Property="Background" Value="{DynamicResource CmTitleBarBackground}" />
@@ -1827,12 +1834,19 @@
                 <ScrollViewer IsVisible="{Binding Preview.IsMenu}" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False">
                   <views:MenuView Menu="{Binding Preview.Menu}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
-                <!-- An Apple Help page (docs/formats/resources/help-pages.md): Rendered | Source; the page in a native web view
-                     (made in code, MainWindow.Help.cs), else its source with why; the status line under it. -->
-                <DockPanel IsVisible="{Binding Preview.IsHelpPage}">
-                  <ListBox x:Name="HelpMode" DockPanel.Dock="Top" Classes="segmented" HorizontalAlignment="Left" Margin="16,12,16,0"
-                           ItemsSource="{x:Static vm:MainViewModel.HelpModes}" SelectedIndex="{Binding HelpModeIndex, Mode=TwoWay}"
-                           AutomationProperties.Name="Rendered or source" />
+                <!-- A page in the web view: an Apple Help page (docs/formats/resources/help-pages.md), or a document's HTML export
+                     (DOCMaker, SimpleText, Word; with Back and its pages). Rendered | Source (or Text); the page in a native web
+                     view (made in code, MainWindow.Help.cs), else its source or text with why; the status line under it. -->
+                <DockPanel IsVisible="{Binding Preview.IsWebPage}">
+                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="16,12,16,0">
+                    <ListBox x:Name="HelpMode" Classes="segmented" ItemsSource="{Binding WebModes}" SelectedIndex="{Binding HelpModeIndex, Mode=TwoWay}"
+                             AutomationProperties.Name="Rendered or source" />
+                    <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}"
+                            IsVisible="{Binding Preview.IsDocument}" />
+                    <ComboBox x:Name="DocumentChapters" ItemsSource="{Binding Preview.Document.ChapterTitles, FallbackValue={x:Null}}" MinWidth="260"
+                              SelectedIndex="{Binding Preview.Document.ChapterIndex, Mode=TwoWay, FallbackValue=0}"
+                              IsVisible="{Binding Preview.Document.HasChapters, FallbackValue=False}" AutomationProperties.Name="Page" />
+                  </StackPanel>
                   <TextBlock x:Name="HelpEngineMessage" DockPanel.Dock="Top" Classes="muted" Margin="16,8,16,0" TextWrapping="Wrap"
                              Text="{Binding WebEngineMessage}" IsVisible="{Binding HasWebEngineMessage}" />
                   <TextBlock x:Name="HelpStatusText" DockPanel.Dock="Bottom" Classes="muted" Margin="16,4" TextTrimming="CharacterEllipsis"
@@ -1840,44 +1854,9 @@
                   <Panel>
                     <Panel x:Name="HelpHost" Margin="0,8,0,0" IsVisible="{Binding ShowsHelpRendered}" />
                     <ScrollViewer IsVisible="{Binding ShowsHelpSource}" Padding="16,12" HorizontalScrollBarVisibility="Auto">
-                      <SelectableTextBlock x:Name="HelpSource" Text="{Binding Preview.Help.Source, FallbackValue={x:Null}}" FontFamily="{StaticResource CmFontMono}" />
+                      <SelectableTextBlock x:Name="HelpSource" Classes.document="{Binding Preview.IsDocument}" Text="{Binding Preview.Web.Source, FallbackValue={x:Null}}" TextWrapping="Wrap" />
                     </ScrollViewer>
                   </Panel>
-                </DockPanel>
-                <DockPanel IsVisible="{Binding Preview.IsDocument}">
-                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,8">
-                    <Button Content="Back" Command="{Binding Preview.Document.BackCommand, FallbackValue={x:Null}}" />
-                    <ComboBox ItemsSource="{Binding Preview.Document.ChapterTitles, FallbackValue={x:Null}}" MinWidth="260"
-                              SelectedIndex="{Binding Preview.Document.ChapterIndex, Mode=TwoWay, FallbackValue=0}"
-                              IsVisible="{Binding Preview.Document.HasChapters, FallbackValue=False}" />
-                  </StackPanel>
-                  <ScrollViewer HorizontalScrollBarVisibility="Auto" Background="{Binding Preview.Document.Background, FallbackValue={x:Null}}"
-                                Offset="{Binding Preview.Document.Offset, Mode=TwoWay, FallbackValue={x:Static Vector.Zero}}">
-                    <ItemsControl ItemsSource="{Binding Preview.Document.Items, FallbackValue={x:Null}}" Margin="16,12" HorizontalAlignment="Center"
-                                  Width="{Binding Preview.Document.ColumnWidth, FallbackValue=NaN}">
-                      <ItemsControl.DataTemplates>
-                        <DataTemplate DataType="vm:DocumentTextItem">
-                          <views:StyledTextView Styled="{Binding Text}" Scale="1" TextWrapping="Wrap" TextAlignment="{Binding Alignment}" Margin="{Binding Margin}" />
-                        </DataTemplate>
-                        <DataTemplate DataType="vm:DocumentRowItem">
-                          <Grid ColumnDefinitions="*,Auto,*">
-                            <ItemsControl ItemsSource="{Binding Left}" HorizontalAlignment="Left">
-                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                              <ItemsControl.ItemTemplate><DataTemplate DataType="vm:DocumentPictureItem"><views:DocumentPictureView Item="{Binding}" VerticalAlignment="Top" /></DataTemplate></ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <ItemsControl Grid.Column="1" ItemsSource="{Binding Center}">
-                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                              <ItemsControl.ItemTemplate><DataTemplate DataType="vm:DocumentPictureItem"><views:DocumentPictureView Item="{Binding}" VerticalAlignment="Top" /></DataTemplate></ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <ItemsControl Grid.Column="2" ItemsSource="{Binding Right}" HorizontalAlignment="Right">
-                              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                              <ItemsControl.ItemTemplate><DataTemplate DataType="vm:DocumentPictureItem"><views:DocumentPictureView Item="{Binding}" VerticalAlignment="Top" /></DataTemplate></ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                          </Grid>
-                        </DataTemplate>
-                      </ItemsControl.DataTemplates>
-                    </ItemsControl>
-                  </ScrollViewer>
                 </DockPanel>
                 <!-- The sound preview (boards/sound.md, P3): the transport (Play/Stop, the playhead's time, Repeat the loop),
                      the detail chips, and the channel lanes with the loop band and the playhead; a click on the waveform

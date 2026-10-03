@@ -6,7 +6,7 @@ using static ClassicMac.Resources.Decoders.Tests.DocumentFixtures;
 
 namespace ClassicMac.App.Tests;
 
-// Documents in the viewer: the preview (a chapter at a time, pictures reflowed, links followed) and Convert Documents.
+// Documents in the viewer: the preview (their HTML export in the web view, a page at a time, links followed) and Convert Documents.
 public class DocumentTests : IDisposable
 {
     private readonly string folder = Directory.CreateTempSubdirectory("classicmac-document-").FullName;
@@ -50,40 +50,67 @@ public class DocumentTests : IDisposable
         return model.Preview;
     }
 
+    // The page as the web view gets it: the data: URI's HTML (and its fragment, if any).
+    private static string HtmlOf(DocumentWebPreview document)
+    {
+        var uri = document.DataUri;
+        var hash = uri.IndexOf('#', StringComparison.Ordinal);
+        var base64 = (hash < 0 ? uri : uri[..hash])["data:text/html;charset=utf-8;base64,".Length..];
+        return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+    }
+
+    // Documents are previewed as the HTML that Convert Documents writes, in the web view the help pages use
+    // (docs/PLAN.md "Documents previewed through their HTML export").
     [Fact]
-    public async Task A_DOCMaker_document_previews_a_chapter_at_a_time_with_its_pictures_in_the_text()
+    public async Task A_DOCMaker_document_previews_its_HTML_a_chapter_at_a_time()
     {
         var (model, input) = await Open();
 
         var preview = await Select(model, input.Children.Single(c => c.Title == "Manual"));
 
         Assert.True(preview.IsDocument);
+        Assert.True(preview.IsWebPage);
         Assert.Equal(1, model.SelectedTab);
         var document = preview.Document!;
-        Assert.Equal(["Welcome", "Chapter 2"], document.ChapterTitles);
-        Assert.Equal(260, document.ColumnWidth);
-        // Heading and first line; the two pictures of one line (left, right); the next line; the wide picture scaled to
-        // the column; the last line.
-        var items = document.Items;
-        Assert.Equal([typeof(DocumentTextItem), typeof(DocumentRowItem), typeof(DocumentTextItem), typeof(DocumentRowItem), typeof(DocumentTextItem)],
-            items.Select(i => i.GetType()));
-        Assert.Equal("Welcome\rThe game begins here.", ((DocumentTextItem)items[0]).Text.Text);
-        var row = (DocumentRowItem)items[1];
-        Assert.Equal((1, 0, 1), (row.Left.Count, row.Center.Count, row.Right.Count));
-        Assert.NotNull(row.Left[0].Png);
-        Assert.Equal((260, 65), (((DocumentRowItem)items[3]).Center[0].Width, ((DocumentRowItem)items[3]).Center[0].Height));
-        Assert.Null(row.Right[0].Open); // its chapter 9 does not exist
-
-        // The left picture goes to chapter 2; Back returns.
-        document.Offset = new Avalonia.Vector(0, 40);
-        row.Left[0].Open!.Execute(null);
+        Assert.Same(document, preview.Web);
+        // The contents page, then a page per chapter; the first chapter shows first.
+        Assert.Equal(["Contents", "Welcome", "Chapter 2"], document.ChapterTitles);
+        Assert.True(document.HasChapters);
         Assert.Equal(1, document.ChapterIndex);
-        Assert.Equal(default, document.Offset);
-        Assert.Equal(Justification.Center, ((DocumentTextItem)document.Items[0]).Justification);
+        Assert.Equal("chapter-01.html", document.Page);
+        var html = HtmlOf(document);
+        Assert.Contains("The game begins here.", html, StringComparison.Ordinal);
+        Assert.Contains("<img src=\"data:image/png;base64,", html, StringComparison.Ordinal); // pictures inline
+        Assert.DoesNotContain("<link", html, StringComparison.Ordinal); // the stylesheet inline too
+        Assert.StartsWith("data:text/html;charset=utf-8;base64,", model.WebUri, StringComparison.Ordinal);
+        // The text, for the Text view and when there is no web view.
+        Assert.Contains("Welcome", document.Source, StringComparison.Ordinal);
+        Assert.Contains("The game begins here.", document.Source, StringComparison.Ordinal);
+        Assert.Equal(["Rendered", "Text"], model.WebModes);
+
+        // A link to another chapter turns its page (the web view's navigation is cancelled), with its anchor.
+        var changed = new List<string?>();
+        model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        Assert.False(model.FollowHelpLink(ClassicMac.Resources.Decoders.Documents.HelpPages.Origin + "chapter-02.html#p0"));
+        Assert.Equal(2, document.ChapterIndex);
+        Assert.EndsWith("#p0", document.DataUri, StringComparison.Ordinal);
+        Assert.Contains(nameof(MainViewModel.WebUri), changed);
         Assert.True(document.BackCommand.CanExecute(null));
-        document.BackCommand.Execute(null);
-        Assert.Equal(0, document.ChapterIndex);
+
+        // A "back" picture (the HTML's history.back()) goes back.
+        Assert.False(model.FollowHelpLink("javascript:history.back()"));
+        Assert.Equal(1, document.ChapterIndex);
         Assert.False(document.BackCommand.CanExecute(null));
+
+        // Choosing a chapter in the list turns to it; the contents page is one too.
+        document.ChapterIndex = 0;
+        Assert.Equal("index.html", document.Page);
+        Assert.Contains("chapter-02.html", HtmlOf(document), StringComparison.Ordinal);
+
+        // A link to a page the document does not have is not followed.
+        Assert.False(model.FollowHelpLink(ClassicMac.Resources.Decoders.Documents.HelpPages.Origin + "chapter-09.html"));
+        Assert.Equal(0, document.ChapterIndex);
+        Assert.NotNull(model.HelpStatus);
     }
 
     [Fact]
@@ -94,10 +121,12 @@ public class DocumentTests : IDisposable
         var readMe = await Select(model, input.Children.Single(c => c.Title == "Read Me"));
         Assert.True(readMe.IsDocument);
         Assert.False(readMe.Document!.HasChapters);
-        Assert.Equal([typeof(DocumentTextItem), typeof(DocumentRowItem), typeof(DocumentTextItem)], readMe.Document.Items.Select(i => i.GetType()));
+        Assert.Equal("index.html", readMe.Document.Page);
+        Assert.Contains("<img src=\"data:image/png;base64,", HtmlOf(readMe.Document), StringComparison.Ordinal);
 
         var plain = await Select(model, input.Children.Single(c => c.Title == "Plain"));
         Assert.True(plain.IsStyledText);
+        Assert.False(plain.IsWebPage);
     }
 
     [Fact]
@@ -125,12 +154,13 @@ public class DocumentTests : IDisposable
         Assert.True(preview.IsDocument);
         Assert.Equal(DocumentKind.Word, preview.Document!.Document.Kind);
         Assert.False(preview.Document.HasChapters);
-        // The centred title, the two left paragraphs together, the indented one.
-        var items = preview.Document.Items.Cast<DocumentTextItem>().ToList();
-        Assert.Equal(["Title", "First\rSecond", "Indented"], items.Select(i => i.Text.Text));
-        Assert.Equal([Justification.Center, Justification.Left, Justification.Left], items.Select(i => i.Justification));
-        Assert.Equal(new Avalonia.Thickness(36, 0, 18, 0), items[2].Margin);
-        Assert.True(items[0].Text.Runs[0].Bold);
+        // The preview is the converted page: the centred title, the indented paragraph.
+        var html = HtmlOf(preview.Document);
+        var written = File.ReadAllText(Path.Combine(output, "Word documents", "index.html"));
+        Assert.Contains("text-align:center", html, StringComparison.Ordinal);
+        Assert.Contains("margin-left:", html, StringComparison.Ordinal);
+        Assert.Contains("Indented", html, StringComparison.Ordinal);
+        Assert.Contains("Indented", written, StringComparison.Ordinal);
     }
 
     [Fact]

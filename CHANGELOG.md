@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Viewer: DOCMaker, SimpleText and Word documents preview as the HTML Convert Documents writes, in the web view the help
+  pages use (stylesheet and pictures put into the page): a DOCMaker document's contents page and chapters in the page
+  list, links and Back pictures turning its pages, Back; Rendered | Text, the text also when there is no web view. The
+  app's own document layout is removed.
 - CLI: file commands on Mac paths (docs/cli.md §2), through disk images and archives: `ls` (files and folders,
   empty ones too, with kind, type/creator, sizes, dates and flags; a fork's types, a type's resources), `stat` (all of
   it with the Finder kind and its source and how the entry was read), `cat` (text as UTF-8 from Mac OS Roman, `--hex`,

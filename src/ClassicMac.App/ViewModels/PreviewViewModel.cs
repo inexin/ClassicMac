@@ -119,8 +119,8 @@ namespace ClassicMac.App.ViewModels
         /// <summary>The waveform card's title: "Channel 1", or "Channels 1–2" for a stereo sound.</summary>
         public string SoundLanesTitle => Sound is { Channels: > 1 } s ? $"Channels 1–{s.Channels}" : "Channel 1";
 
-        /// <summary>A DOCMaker or SimpleText document, a chapter at a time.</summary>
-        public DocumentPreview? Document { get; private init; }
+        /// <summary>A DOCMaker, SimpleText or Word document: its HTML export, a page at a time, in the web view.</summary>
+        public DocumentWebPreview? Document { get; private init; }
 
         /// <summary>A dialog, alert or item list, drawn as Mac OS 9's Platinum appearance draws it.</summary>
         public DialogPreview? Dialog { get; private init; }
@@ -135,6 +135,12 @@ namespace ClassicMac.App.ViewModels
         public HelpPagePreview? Help { get; private init; }
 
         public bool IsHelpPage => Kind == PreviewKind.HelpPage;
+
+        /// <summary>The page the web view shows: a help page, or a document's HTML.</summary>
+        public IWebPreview? Web => (IWebPreview?)Help ?? Document;
+
+        /// <summary>Whether the preview is a page for the web view (a help page or a document).</summary>
+        public bool IsWebPage => Web is not null;
 
         /// <summary>A font family's sample and tables (P6); its JSON is <see cref="Text"/>.</summary>
         public FontFamilyPreview? FontFamily { get; private init; }
@@ -293,7 +299,7 @@ namespace ClassicMac.App.ViewModels
             var type = file.FinderInfo.Type.ToString();
             if (DocumentOf(file, options, readOptions, diagnostics) is { } document)
             {
-                return new PreviewViewModel(PreviewKind.Document, "") { Document = DocumentPreview.Create(document, options, diagnostics) };
+                return new PreviewViewModel(PreviewKind.Document, "") { Document = DocumentWebPreview.Create(document, options, diagnostics) };
             }
 
             if (type == "PICT" && file.DataFork.Length is > 512 + 10 and <= MaxPictureFile)

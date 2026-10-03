@@ -155,13 +155,11 @@ public class PixelScalingTests
 
     // The interface previews size themselves by the same rule: at 150%, zoom 2 is 3 device pixels per Mac pixel.
     [Fact]
-    public void Dialogs_menus_and_document_pictures_are_sized_in_device_pixels() => Headless.OnUiThread(() =>
+    public void Dialogs_and_menus_are_sized_in_device_pixels() => Headless.OnUiThread(() =>
     {
         var dialog = new DialogView { Dialog = new DialogPreview(null!, Png(40, 30), 40, 30), Scale = 2 };
         var menu = new MenuView { Menu = new MenuResource(128, 0, 0, 0, 0xFFFFFFFF, "File", [new MenuItem("Open", 0, 0, 0, 0, true)]), Scale = 2 };
-        var natural = new DocumentPictureView { Item = new DocumentPictureItem(Png(30, 20), 30, 20, "", null) };
-        var shrunk = new DocumentPictureView { Item = new DocumentPictureItem(Png(300, 100), 150, 50, "", null) };
-        var panel = new StackPanel { Children = { dialog, menu, natural, shrunk } };
+        var panel = new StackPanel { Children = { dialog, menu } };
         var window = new Window { Width = 800, Height = 600, Content = new ScrollViewer { Content = panel } };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -172,8 +170,6 @@ public class PixelScalingTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(new Size(3 * (40 + 24) / 1.5, 3 * (30 + 24) / 1.5), dialog.DesiredSize);
         Assert.Equal(menuAt100.Height * 3 / 2 / 1.5, menu.DesiredSize.Height, 9);
-        Assert.Equal(new Size(30 / 1.5, 20 / 1.5), natural.DesiredSize);
-        Assert.Equal(new Size(150, 50), shrunk.DesiredSize); // half size: 0.75 device pixels per Mac pixel
         window.Close();
     });
 

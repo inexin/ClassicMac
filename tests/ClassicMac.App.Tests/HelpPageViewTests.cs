@@ -120,7 +120,7 @@ public sealed class HelpPageViewTests : IDisposable
         var (model, input) = await Open(Book());
         model.Selected = Child(HelpFolder(input), "page");
         await model.PreviewTask;
-        Assert.Equal(["Rendered", "Source"], MainViewModel.HelpModes);
+        Assert.Equal(["Rendered", "Source"], model.WebModes);
         Assert.Equal(0, model.HelpModeIndex);
         Assert.True(model.ShowsHelpRendered);
         Assert.False(model.ShowsHelpSource);
@@ -151,7 +151,7 @@ public sealed class HelpPageViewTests : IDisposable
         window.CaptureRenderedFrame();
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal("This window has no native web view, so the page shows as its HTML.", model.WebEngineMessage);
+        Assert.Equal("This window has no native web view, so the page shows as text.", model.WebEngineMessage);
         Assert.True(window.FindControl<ListBox>("HelpMode")!.IsEffectivelyVisible);
         var source = window.FindControl<SelectableTextBlock>("HelpSource")!;
         Assert.True(source.IsEffectivelyVisible);
