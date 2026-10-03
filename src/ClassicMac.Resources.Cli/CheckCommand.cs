@@ -40,8 +40,7 @@ namespace ClassicMac.Resources.Cli
             }
 
             string? fault = null;
-            var volume = opened.Host.Layout == HostLayout.Plain && opened.Root.Children.Count > 0 &&
-                         opened.Root.Children.All(c => c.Format == HfsReader.Instance.FormatName);
+            var volume = opened.Host.Layout == HostLayout.Plain && opened.Root.Volume?.Format == "HFS";
             if (volume)
             {
                 fault = HfsWriter.Check(opened.Root.File.DataFork);

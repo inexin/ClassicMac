@@ -52,7 +52,8 @@ namespace ClassicMac.Files.Editing
         {
             Path = System.IO.Path.GetFullPath(path);
             this.options = options;
-            if (host.Layout == HostLayout.Plain && root.Children.Count > 0 && root.Children.All(c => c.Format == HfsReader.Instance.FormatName))
+            // A plain HFS volume image, known by its MDB (an empty volume has no files to show it).
+            if (host.Layout == HostLayout.Plain && root.Volume?.Format == "HFS")
             {
                 Kind = InputEditKind.HfsVolume;
                 return;

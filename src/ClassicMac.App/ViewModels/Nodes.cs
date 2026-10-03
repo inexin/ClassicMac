@@ -185,8 +185,7 @@ namespace ClassicMac.App.ViewModels
         /// Whether the input is a plain HFS volume image (no partition map or disk-image wrapper), whose files and
         /// folders can be created and deleted.
         /// </summary>
-        public bool IsWritableHfs => Host.Layout == HostLayout.Plain && Root.Children.Count > 0
-            && Root.Children.All(c => c.Format == ClassicMac.Files.Hfs.HfsReader.Instance.FormatName);
+        public bool IsWritableHfs => Host.Layout == HostLayout.Plain && Root.Volume?.Format == "HFS";
 
         /// <summary>The volume with the files and folders created and deleted so far, or null when there are none.</summary>
         public byte[]? EditedVolume { get; internal set; }

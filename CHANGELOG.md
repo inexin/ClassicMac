@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `format <file> --size <n> --name <name>` makes a new, empty HFS volume image (hfs.md §3.1). An empty HFS volume is
+  now recognised as a volume to edit (the edit session, `check` and the app looked for files in it).
 - CLI: the shell and the MCP server keep one edit session for an input, so each change is made once instead of being
   replayed on every save, and the input is no longer reopened for every change (a 4-deletion session on a 500 MB volume
   14 s instead of 24 s) (cli.md §4.2).

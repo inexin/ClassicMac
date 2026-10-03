@@ -632,10 +632,12 @@ namespace ClassicMac.Files
             };
         }
 
-        private static bool IsContainer(ContainerNode node) => node.Children.Count > 0 || node.UnreadFormat is not null;
+        // A node holding files, to be read, or a volume (an empty one holds none).
+        private static bool IsContainer(ContainerNode node) => node.Children.Count > 0 || node.UnreadFormat is not null || node.Volume is not null;
 
         // The format of what a container node holds.
-        private static string? ContentFormat(ContainerNode node) => node.UnreadFormat ?? node.Children.FirstOrDefault()?.Format;
+        private static string? ContentFormat(ContainerNode node) => node.UnreadFormat ?? node.Children.FirstOrDefault()?.Format
+            ?? (node.Volume is { } volume ? volume.Format == "MFS" ? MfsReader.Instance.FormatName : HfsReader.Instance.FormatName : null);
 
         private static string NameOf(MacFile file) => file.UnicodeName ?? file.Name.ToMacRoman();
     }

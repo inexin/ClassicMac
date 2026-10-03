@@ -135,6 +135,21 @@ public sealed class InputEditSessionTests : IDisposable
     }
 
     [Fact]
+    public void An_empty_volume_is_a_volume_to_edit()
+    {
+        var path = Path.Combine(directory, "Blank.img");
+        File.WriteAllBytes(path, HfsWriter.Format(800 * 1024, "Blank"));
+        var session = InputEditSession.Open(path);
+        Assert.Equal(InputEditKind.HfsVolume, session.Kind);
+
+        session.AddFolder("Docs");
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+
+        Assert.Contains(Folders(target), f => f.MacPath == "Docs");
+    }
+
+    [Fact]
     public void A_folder_with_contents_is_deleted_only_when_asked()
     {
         var session = InputEditSession.Open(Volume());

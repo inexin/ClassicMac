@@ -8,6 +8,7 @@ using System.Text.Json;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Files.Editing;
+using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Resources.Cli
 {
@@ -42,6 +43,7 @@ namespace ClassicMac.Resources.Cli
             yield return LockCommand("lock", "Lock a file (an HFS folder has no lock)", true);
             yield return LockCommand("unlock", "Unlock a file", false);
             yield return BlessCommand();
+            yield return FormatCommand();
             yield return SetCommand();
             yield return ResAddCommand();
             yield return ResRmCommand();
@@ -153,6 +155,66 @@ namespace ClassicMac.Resources.Cli
             var command = new Command("bless", "Make a folder the volume's System Folder (it must hold a System file)") { path };
             AddWriteOptions(command, options);
             command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Bless(tree, rest)));
+            return command;
+        }
+
+        private Command FormatCommand()
+        {
+            var file = new Argument<FileInfo>("file") { Description = "The new volume image" };
+            var size = new Option<long>("--size")
+            {
+                Description = "Its size: bytes, or with K/KiB, M/MiB, G/GiB (400K to just under 2G, whole 512-byte blocks)",
+                Required = true,
+                CustomParser = ParseSize,
+            };
+            var name = new Option<string>("--name") { Description = "The volume's name (1 to 27 characters, no colon)", DefaultValueFactory = _ => "Untitled" };
+            var overwrite = new Option<bool>("--overwrite") { Description = "Replace an existing file" };
+            var json = new Option<bool>("--json") { Description = "Print the result as JSON" };
+            var command = new Command("format", "Make a new, empty HFS volume image") { file, size, name, overwrite, json };
+            command.SetAction(result =>
+            {
+                var path = result.GetRequiredValue(file).FullName;
+                var volumeName = result.GetRequiredValue(name);
+                byte[] image;
+                try
+                {
+                    image = HfsWriter.Format(result.GetRequiredValue(size), volumeName);
+                }
+                catch (ArgumentException e)
+                {
+                    error.WriteLine($"{Path.GetFileName(path)}: {e.Message.Split(" (Parameter", 2)[0]}");
+                    return ExitCodes.Usage;
+                }
+
+                try
+                {
+                    using var stream = new FileStream(path, result.GetValue(overwrite) ? FileMode.Create : FileMode.CreateNew, FileAccess.Write);
+                    stream.Write(image);
+                }
+                catch (IOException e)
+                {
+                    error.WriteLine(File.Exists(path) && !result.GetValue(overwrite) ? $"{path} exists (--overwrite to replace it)." : $"{path}: {e.Message}");
+                    return ExitCodes.IoError;
+                }
+
+                var blockSize = HfsReader.Instance.ReadVolumeInfo(ForkData.FromBytes(image))!.BlockSize;
+                if (result.GetValue(json))
+                {
+                    output.WriteLine(MacPathJson.Document(w =>
+                    {
+                        MacPathJson.Strings(w, "written", [path]);
+                        w.WriteString("name", volumeName);
+                        w.WriteNumber("size", image.LongLength);
+                        w.WriteNumber("blockSize", blockSize);
+                    }));
+                }
+                else
+                {
+                    output.WriteLine($"Wrote {path} (HFS \"{volumeName}\", {image.LongLength.ToString("N0", CultureInfo.InvariantCulture)} bytes, {blockSize.ToString("N0", CultureInfo.InvariantCulture)}-byte blocks)");
+                }
+
+                return ExitCodes.Success;
+            });
             return command;
         }
 

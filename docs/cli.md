@@ -302,7 +302,16 @@ input. With `--json`:
 `action` is `add`, `mkdir`, `delete`, `rename`, `move`, `lock`, `unlock`, `bless`, `set`, `res-set` or `res-delete`. An AppleDouble pair or a Basilisk II
 entry writes more than one file.
 
-### 3.4 Exit codes
+### 3.4 format
+
+`classicmac format <file> --size <n> [--name <name>] [--overwrite] [--json]` writes a new, empty HFS volume image:
+`--size` in bytes or with K/KiB, M/MiB, G/GiB (400 KB to just under 2 GB, whole 512-byte blocks), `--name` 1 to 27
+characters with no colon (default `Untitled`), laid out as [hfs.md §3.1](formats/file-systems/hfs.md#31-a-new-volume)
+and checked before it is written. An existing file is replaced only with `--overwrite` (exit 4 otherwise); a size or
+name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<name>", <size> bytes, <n>-byte blocks)`;
+`--json`: `{ "written": [file], "name", "size", "blockSize" }`.
+
+### 3.5 Exit codes
 
 0 success; 2 a usage error or a refused change (a name in use, a folder that is not empty, an input ClassicMac does not
 write), with the reason on standard error; 4 the file could not be written; 5 a path that names nothing (no host file,
@@ -459,6 +468,6 @@ as §2.6). A command that fails prints `{ "command": "<command>", "error": "<why
 
 ### 5.5 Exit codes
 
-As the commands' (§2, §3.4): 0 success, 2 a usage error or refused change, 4 a host file not read or written, 5 a path
+As the commands' (§2, §3.5): 0 success, 2 a usage error or refused change, 4 a host file not read or written, 5 a path
 that names nothing. A script exits with the failing command's code; leaving with changes not saved (a script, or
 the input ending while the shell asks) exits 2; otherwise the shell exits 0.

@@ -295,7 +295,8 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    edited in place, [partition-map.md §5](formats/file-systems/partition-map.md#5-classicmac); still to do: disks with
    several, and the app's Volume menu on partitioned disks), and to Disk Copy images (written back in their own
    format).
-7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name.
+7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name (built: `HfsWriter.Format`, the CLI's
+   `format`; its sizes fitted to one Mac OS 9 volume until the initializer is traced, hfs.md §3.1).
 8. `resize <volume> --size <n>` (decided 2026-10-03): grow a plain HFS volume within its allocation block size
    (`drNmAlBlks` at most 65,535): the image lengthened, the block count and free count raised, the bitmap extended (the
    allocation area moved up when the bitmap's sectors are full) and the alternate MDB moved to the new end, every

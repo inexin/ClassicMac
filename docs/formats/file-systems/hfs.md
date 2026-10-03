@@ -454,6 +454,26 @@ are [ClassicMac].
 7. **The alternate MDB.** When the MDB's extents for a B-tree change, the copy at block N − 2 is refreshed too.
 8. **Locks.** A file with `filFlags` bit 0 set, and a volume with `drAtrb` bit 15 set, are not changed.
 
+### 3.1 A new volume
+
+A volume of N 512-byte logical blocks is laid out as below. The structure is §1's; the sizes and the MDB's attribute
+and clump values are fitted to one volume Mac OS 9.0 initialised (500 MB) and are to be checked against the
+initializer's code (§8).
+
+| Part | Rule | Source |
+| --- | --- | --- |
+| Boot blocks 0–1 | Zero (not a startup disk) | [ClassicMac] |
+| `drAlBlkSiz` | The smallest multiple of 512 for which the allocation blocks fit `drNmAlBlks` (16 bits) | [Fitted: 8,192 for 500 MB] |
+| `drVBMSt`, bitmap | Block 3; ⌈(N ÷ (`drAlBlkSiz` ÷ 512)) ÷ 4096⌉ sectors | [Fitted] |
+| `drAlBlSt` | 3 + the bitmap's sectors | [Fitted: 19 for 500 MB] |
+| `drNmAlBlks` | ⌊(N − `drAlBlSt` − 2) ÷ (`drAlBlkSiz` ÷ 512)⌋: the alternate MDB and the last block outside | [Fitted: 63,998 for 500 MB] |
+| Extents and catalog files | One clump each, the extents file at allocation block 0 and the catalog after it: the next power of two at or above N ÷ 512 × 512 bytes, in whole allocation blocks, as `drXTFlSize`, `drCTFlSize`, `drXTClpSiz`, `drCTClpSiz` | [Fitted: 1 MB each for 500 MB] |
+| `drClpSiz` | 4 allocation blocks | [Fitted] |
+| `drAtrb` | `$0100`, unmounted cleanly | [Fitted] |
+| B-trees | 512-byte nodes; `bthKeyLen` 7 and 37 (§1.8); the extents tree empty (depth 0); the catalog one leaf holding the root folder (key: parent 1 and the volume's name; `dirDirID` 2, `dirVal` 0, the dates) and its thread (key: ID 2, no name; parent 1 and the name) | [Doc: Inside Macintosh: Files] |
+| MDB | `drCrDate` and `drLsMod` the dates given, `drNxtCNID` 16, `drFilCnt`, `drDirCnt`, `drNmFls`, `drNmRtDirs`, `drWrCnt` 0, `drFreeBks` the blocks the trees leave, `drVN` the name (1–27 Mac OS Roman characters, no colon) | [Doc: Inside Macintosh: Files] |
+| Alternate MDB | The MDB's block copied to block N − 2 | [Doc: Inside Macintosh: Files] |
+
 ## 4. Variants
 
 - **MFS**, the flat file system of the first Macs, is specified in [mfs.md](mfs.md).
@@ -562,7 +582,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   or remove a file record and both forks; `CreateFolder` and `DeleteFolder` add or remove a folder record and its
   thread; `Rename` renames a file or folder in its folder; `Move` moves one into another folder (§3), and refuses a
   move into the folder it is in, which PBCatMove allows as a no-op [ClassicMac]; `SetFinderInfo` sets a file's Finder info and
-  `SetFolderFlags` a folder's Finder flags; `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
+  `SetFolderFlags` a folder's Finder flags; `Format` makes a new, empty volume (§3.1, 400 KB to just under 2 GB, checked
+  with `Check` before it is returned); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
   image; the input is never modified.
@@ -646,6 +667,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
   the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
   `HfsMoveTests.cs` covers moves of files and folders (threads, valences, root counts) and the refusals;
+  `HfsFormatTests.cs` covers new volumes from 400 KB to 500 MB (block sizes, the alternate MDB, the root folder,
+  files and catalog growth on one) and the sizes and names refused;
   `HfsLockBlessTests.cs` covers locking, unlocking and blessing and their refusals;
   `HfsCheckTests.cs` covers `HfsWriter.Check` on sound, damaged, truncated and locked volumes;
   `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
@@ -663,6 +686,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   repair.
 - Writing partition maps, disk image formats, MFS or HFS Plus.
 - Open: the Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (§2.7).
+- Open: the initializer's sizes for a new volume (§3.1: the allocation block size, the B-tree files' sizes and clumps,
+  `drClpSiz`, `drAtrb`) are fitted to one 500 MB volume, not traced in its code.
 - No rule in this document is fitted to data alone.
 
 ## 9. References
