@@ -696,8 +696,11 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - A file was deleted from a Mac OS 9 boot volume (an image SheepShaver used) and the output listed again.
 - `HfsUtilsInteropTests.cs`, with `CLASSICMAC_HFSUTILS` set (hfsutils' folder, or `docker:<image>` built from
   `tools/hfsutils/Dockerfile`): a volume ClassicMac formats and edits is mounted, listed and copied from by hfsutils
-  and checked by hfsprogs' `fsck.hfs -n`; a volume `hformat` makes is checked, read and edited by ClassicMac, then
-  read back by hfsutils and `fsck.hfs`.
+  and checked by hfsprogs' `fsck.hfs -n` (Apple's `fsck_hfs` 540.1); new volumes (400 KB, 100 MB), a catalog grown to
+  index levels and then deleted in one pass, and a volume grown past its bitmap's sector then locked, renamed, moved and
+  blessed all pass `fsck_hfs` with nothing found; a volume `hformat` makes is checked, read and edited by ClassicMac,
+  then read back by hfsutils, and the edit adds nothing to what `fsck_hfs` finds. (`hcopy`'s own file threads draw
+  "Reserved fields in the catalog record have incorrect data" from `fsck_hfs` before ClassicMac touches them.)
 - The 256 `_RelString` weights the writer generates were compared with Apple's `gCompareTable` with no differences
   (the table is not in the repository).
 - Disk Copy's block N − 2 rule (§2.6) was checked on images Disk Copy 6.1.2 made in SheepShaver, Mac OS 9.0.

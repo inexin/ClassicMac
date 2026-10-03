@@ -51,13 +51,21 @@ public sealed class HfsUtilsInteropTests : IDisposable
         Assert.True(code == 0, $"{tool} {string.Join(' ', args)}: {output}");
     }
 
-    // fsck.hfs -n (check only, no changes), when the tools have it.
-    private void Fsck(string image)
+    // What fsck.hfs -n (check only) finds wrong, one message each; null when the tools have no fsck.hfs.
+    private HashSet<string>? Fsck(string image)
     {
-        if (Run("sh", "-c", "command -v fsck.hfs").Code == 0)
+        if (Run("sh", "-c", "command -v fsck.hfs").Code != 0)
         {
-            Ok("fsck.hfs", "-n", "-f", image);
+            return null;
         }
+
+        var (code, output) = Run("fsck.hfs", "-n", "-f", image);
+        var problems = output.Split('\n').Select(l => l.Trim())
+            .Where(l => l.Length > 0 && !l.StartsWith("**", StringComparison.Ordinal) && !l.StartsWith('(') &&
+                        !l.StartsWith("Executing", StringComparison.Ordinal) && !l.StartsWith("The volume name", StringComparison.Ordinal))
+            .ToHashSet();
+        Assert.True(code == 0 || problems.Count > 0, output);
+        return problems;
     }
 
     private string Host(string name) => Path.Combine(work, name);
@@ -92,7 +100,56 @@ public sealed class HfsUtilsInteropTests : IDisposable
         Ok("hcopy", "-r", ":Docs:Note", "note.out");
         Assert.Equal(note, File.ReadAllBytes(Host("note.out")));
         Ok("humount");
-        Fsck("ours.img");
+        Assert.Empty(Fsck("ours.img") ?? []);                                                  // Apple's fsck_hfs finds nothing
+    }
+
+    // Each kind of volume ClassicMac writes passes Apple's fsck_hfs with nothing found.
+    [Fact]
+    public void Formats_catalog_growth_resizing_and_item_edits_pass_fsck_hfs()
+    {
+        if (Tools is null)
+        {
+            Assert.Skip("Set CLASSICMAC_HFSUTILS to hfsutils' folder, or docker:<image>, to run this.");
+        }
+
+        var images = new Dictionary<string, byte[]>
+        {
+            ["format-400k.img"] = HfsWriter.Format(400 * 1024, "Small"),
+            ["format-100m.img"] = HfsWriter.Format(100 * 1024 * 1024, "Large"),
+        };
+
+        // A catalog grown past its first clump into index levels, then most of it deleted in one pass.
+        var many = HfsWriter.Format(4 * 1024 * 1024, "Many");
+        many = HfsWriter.CreateFolder(ForkData.FromBytes(many), "Docs");
+        for (var i = 0; i < 400; i++)
+        {
+            many = HfsWriter.CreateFile(ForkData.FromBytes(many), $"Docs:A file with a longer name {i:D3}", new byte[i % 7 * 300], Array.Empty<byte>(), FinderInfo.Empty);
+        }
+
+        images["catalog-grown.img"] = many;
+        images["tree-deleted.img"] = HfsWriter.Delete(ForkData.FromBytes(many), "Docs", recursive: true);
+
+        // Grown past its bitmap's sector (the allocation area moved up), then a file locked, renamed, moved and the
+        // System Folder blessed.
+        var grown = HfsWriter.Format(400 * 1024, "Grown");
+        grown = HfsWriter.CreateFolder(ForkData.FromBytes(grown), "System Folder");
+        grown = HfsWriter.CreateFile(ForkData.FromBytes(grown), "System Folder:System", new byte[2000], new byte[300],
+            new FinderInfo { Type = FourCC.FromString("zsys"), Creator = FourCC.FromString("MACS") });
+        grown = HfsWriter.Resize(ForkData.FromBytes(grown), 4 * 1024 * 1024);
+        grown = HfsWriter.CreateFile(ForkData.FromBytes(grown), "Big", new byte[3 * 1024 * 1024], Array.Empty<byte>(), FinderInfo.Empty);
+        grown = HfsWriter.Rename(ForkData.FromBytes(grown), "Big", "Bigger");
+        grown = HfsWriter.SetLocked(ForkData.FromBytes(grown), "Bigger", true);
+        grown = HfsWriter.Move(ForkData.FromBytes(grown), "Bigger", "System Folder");
+        images["grown-edited.img"] = HfsWriter.Bless(ForkData.FromBytes(grown), "System Folder");
+
+        foreach (var (name, bytes) in images)
+        {
+            File.WriteAllBytes(Host(name), bytes);
+            if (Fsck(name) is { } problems)
+            {
+                Assert.True(problems.Count == 0, $"{name}: {string.Join("; ", problems)}");
+            }
+        }
     }
 
     [Fact]
@@ -111,6 +168,9 @@ public sealed class HfsUtilsInteropTests : IDisposable
         Ok("hcopy", "-r", "in.txt", ":Docs:In");
         Ok("hcopy", "-r", "in.txt", ":Gone");
         Ok("humount");
+        // hcopy's file threads draw "Reserved fields in the catalog record have incorrect data" from fsck_hfs already;
+        // ClassicMac's edits must add nothing to what it finds.
+        var before = Fsck("theirs.img");
 
         var image = File.ReadAllBytes(Host("theirs.img"));
         Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
@@ -130,6 +190,9 @@ public sealed class HfsUtilsInteropTests : IDisposable
         Ok("hcopy", "-r", ":New:Ours", "ours.out");
         Assert.Equal("from ClassicMac", File.ReadAllText(Host("ours.out")));
         Ok("humount");
-        Fsck("edited.img");
+        if (Fsck("edited.img") is { } after)
+        {
+            Assert.Subset(before!, after);
+        }
     }
 }
