@@ -297,7 +297,7 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    format).
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name (built: `HfsWriter.Format`, the CLI's
    `format`; its sizes fitted to one Mac OS 9 volume until the initializer is traced, hfs.md §3.1).
-8. `resize <volume> --size <n>` (decided 2026-10-03): grow a plain HFS volume within its allocation block size
+8. `resize <volume> --size <n>` (decided 2026-10-03; growing built, hfs.md §3.2): grow a plain HFS volume within its allocation block size
    (`drNmAlBlks` at most 65,535): the image lengthened, the block count and free count raised, the bitmap extended (the
    allocation area moved up when the bitmap's sectors are full) and the alternate MDB moved to the new end, every
    CNID kept. Later, shrinking: files and B-tree extents in the blocks cut off moved down into free space first,

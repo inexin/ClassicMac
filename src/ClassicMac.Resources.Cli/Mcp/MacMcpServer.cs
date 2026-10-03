@@ -592,6 +592,13 @@ namespace ClassicMac.Resources.Cli.Mcp
             new("bless", "Bless", "Makes a folder holding a System file the volume's System Folder.",
                 Schema($"{SessionProperty}, {PathProperty}, {DryRunProperty}", "session", "path"), false, false,
                 args => Write(args, (_, tree, rest) => MacEdits.Bless(tree, rest))),
+            new("resize", "Resize", "Grows the session's volume image to size (bytes, or with K/M/G): free space added at its end.",
+                Schema($"{SessionProperty}, \"size\": {{ \"type\": \"string\" }}, {DryRunProperty}", "session", "size"), false, false,
+                args => Write(args, (_, _, _) =>
+                {
+                    var size = CommandLine.TryParseSize(args.Required("size"), out var bytes) ? bytes : throw new BadArguments("size is bytes, or a number with K/KiB, M/MiB or G/GiB.");
+                    return session => session.Resize(size);
+                })),
             new("set", "Set Finder info",
                 "Sets a file's type and creator, or the Finder flags (a number like 0x4000, or names joined with commas: Invisible,HasBundle; replaces them all).",
                 Schema($"{SessionProperty}, {PathProperty}, \"type\": {{ \"type\": \"string\" }}, \"creator\": {{ \"type\": \"string\" }}, \"flags\": {{ \"type\": \"string\" }}, {DryRunProperty}", "session", "path"), false, false,

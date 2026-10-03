@@ -443,7 +443,7 @@ namespace ClassicMac.Resources.Cli.Shell
 
             foreach (var planned in made)
             {
-                console.Out.WriteLine(planned.Detail.Length > 0 ? $"{planned.Action} {planned.Path} ({planned.Detail})" : $"{planned.Action} {planned.Path}");
+                console.Out.WriteLine(string.Join(" ", new[] { planned.Action, planned.Path, planned.Detail.Length > 0 ? $"({planned.Detail})" : "" }.Where(p => p.Length > 0)));
             }
 
             return ExitCodes.Success;

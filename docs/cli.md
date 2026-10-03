@@ -311,6 +311,11 @@ and checked before it is written. An existing file is replaced only with `--over
 name HFS cannot hold is a usage error (exit 2). It prints `Wrote <file> (HFS "<name>", <size> bytes, <n>-byte blocks)`;
 `--json`: `{ "written": [file], "name", "size", "blockSize" }`.
 
+`classicmac resize <file> --size <n>` grows a plain HFS volume image, with the write options (`-o`, `--in-place`,
+`--dry-run`, `--json`): the new space is free at the end ([hfs.md §3.2](formats/file-systems/hfs.md#32-growing-a-volume)).
+Shrinking, a size needing more than 65,535 allocation blocks of the volume's size, and a partitioned disk's partition
+are refused (exit 2). The MCP server's `resize` tool takes `session` and `size`.
+
 ### 3.5 Exit codes
 
 0 success; 2 a usage error or a refused change (a name in use, a folder that is not empty, an input ClassicMac does not

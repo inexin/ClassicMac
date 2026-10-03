@@ -243,6 +243,19 @@ namespace ClassicMac.Files.Editing
             changes.Add(new PlannedChange("rename", macPath, $"to {newName}"));
         }
 
+        /// <summary>Grows a plain volume image to <paramref name="size"/> bytes (hfs.md §3.2); not a partitioned disk's partition.</summary>
+        public void Resize(long size)
+        {
+            RequireVolume("have a size to change");
+            if (partition is not null)
+            {
+                throw new InvalidOperationException("A partition of a partitioned disk cannot be resized: its map would change.");
+            }
+
+            volume = HfsWriter.Resize(ForkData.FromBytes(Volume), size);
+            changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"));
+        }
+
         /// <summary>Locks or unlocks a volume's file (an HFS folder has no lock).</summary>
         public void SetLocked(string macPath, bool locked)
         {

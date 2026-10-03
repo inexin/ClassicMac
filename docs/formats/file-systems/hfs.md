@@ -474,6 +474,22 @@ initializer's code (§8).
 | MDB | `drCrDate` and `drLsMod` the dates given, `drNxtCNID` 16, `drFilCnt`, `drDirCnt`, `drNmFls`, `drNmRtDirs`, `drWrCnt` 0, `drFreeBks` the blocks the trees leave, `drVN` the name (1–27 Mac OS Roman characters, no colon) | [Doc: Inside Macintosh: Files] |
 | Alternate MDB | The MDB's block copied to block N − 2 | [Doc: Inside Macintosh: Files] |
 
+### 3.2 Growing a volume
+
+A volume grows within its allocation block size; allocation block numbers are counted from `drAlBlSt`, so no extent,
+catalog record or B-tree changes [Doc: Inside Macintosh: Files]. For the new size of N' logical blocks:
+
+1. `drNmAlBlks` becomes ⌊(N' − `drAlBlSt` − 2) ÷ (`drAlBlkSiz` ÷ 512)⌋, which must stay at most 65,535.
+2. When the sectors from `drVBMSt` to `drAlBlSt` hold fewer bits than that, the allocation area moves up by whole
+   sectors and `drAlBlSt` with it, until they hold enough; the new bitmap bits are 0 (free).
+3. `drFreeBks` goes up by the blocks added; `drLsMod` and `drWrCnt` change as for any write (§3).
+4. The old alternate MDB and the block after it, now inside the allocation area, are zero; the MDB's block is copied to
+   N' − 2.
+
+ClassicMac's `Resize` checks the result as it checks a deletion (§5.5), comparing each block in use at its new place.
+Shrinking (files and B-tree extents in the blocks cut off moved down first) and growing past 65,535 blocks (a larger
+block size, every extent rewritten) are not done [ClassicMac].
+
 ## 4. Variants
 
 - **MFS**, the flat file system of the first Macs, is specified in [mfs.md](mfs.md).
@@ -583,7 +599,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   thread; `Rename` renames a file or folder in its folder; `Move` moves one into another folder (§3), and refuses a
   move into the folder it is in, which PBCatMove allows as a no-op [ClassicMac]; `SetFinderInfo` sets a file's Finder info and
   `SetFolderFlags` a folder's Finder flags; `Format` makes a new, empty volume (§3.1, 400 KB to just under 2 GB, checked
-  with `Check` before it is returned); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
+  with `Check` before it is returned); `Resize` grows a volume (§3.2); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon`, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
   image; the input is never modified.
@@ -669,6 +685,8 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   `HfsMoveTests.cs` covers moves of files and folders (threads, valences, root counts) and the refusals;
   `HfsFormatTests.cs` covers new volumes from 400 KB to 500 MB (block sizes, the alternate MDB, the root folder,
   files and catalog growth on one) and the sizes and names refused;
+  `HfsResizeTests.cs` covers growing with room in the bitmap and with the allocation area moved up, and the sizes
+  refused; a copy of the 500 MB Mac OS 9 volume grew to 510 MB and passed `check`;
   `HfsLockBlessTests.cs` covers locking, unlocking and blessing and their refusals;
   `HfsCheckTests.cs` covers `HfsWriter.Check` on sound, damaged, truncated and locked volumes;
   `InputEditSessionTests.cs` the edit session's volume and single-file edits, Save As and Save In Place.
@@ -686,6 +704,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   repair.
 - Writing partition maps, disk image formats, MFS or HFS Plus.
 - Open: the Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (§2.7).
+- Shrinking a volume, and growing one past 65,535 allocation blocks (§3.2).
 - Open: the initializer's sizes for a new volume (§3.1: the allocation block size, the B-tree files' sizes and clumps,
   `drClpSiz`, `drAtrb`) are fitted to one 500 MB volume, not traced in its code.
 - No rule in this document is fitted to data alone.

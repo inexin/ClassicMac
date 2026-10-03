@@ -150,6 +150,23 @@ public sealed class InputEditSessionTests : IDisposable
     }
 
     [Fact]
+    public void A_volume_is_grown_and_further_changes_use_the_new_space()
+    {
+        var path = Path.Combine(directory, "Small.img");
+        File.WriteAllBytes(path, HfsWriter.Format(800 * 1024, "Small"));
+        var session = InputEditSession.Open(path);
+
+        session.Resize(4 * 1024 * 1024);
+        session.AddFile("Big", new MacFile { Name = MacString.FromMacRoman("Big"), DataFork = ForkData.FromBytes(new byte[2 * 1024 * 1024]) });
+        var target = Path.Combine(directory, "Out.img");
+        session.SaveAs(target);
+
+        Assert.Equal(4 * 1024 * 1024, new FileInfo(target).Length);
+        Assert.Contains(Files(target), f => f.MacPath == "Big");
+        Assert.Equal(("resize", "", "to 4,194,304 bytes"), (session.Changes[0].Action, session.Changes[0].Path, session.Changes[0].Detail));
+    }
+
+    [Fact]
     public void A_folder_with_contents_is_deleted_only_when_asked()
     {
         var session = InputEditSession.Open(Volume());

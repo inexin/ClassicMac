@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: `resize <file> --size <n>` grows a plain HFS volume image within its allocation block size, the new space free at
+  its end; also the MCP server's `resize` (hfs.md §3.2). Changes with no path print without a blank gap.
 - CLI: `format <file> --size <n> --name <name>` makes a new, empty HFS volume image (hfs.md §3.1). An empty HFS volume is
   now recognised as a volume to edit (the edit session, `check` and the app looked for files in it).
 - CLI: the shell and the MCP server keep one edit session for an input, so each change is made once instead of being

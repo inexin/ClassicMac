@@ -74,7 +74,7 @@ public sealed class McpServerTests : IAsyncLifetime
     public async Task The_tools_are_listed_with_schemas_and_hints()
     {
         var listed = await client.ListToolsAsync(cancellationToken: TestContext.Current.CancellationToken);
-        Assert.Equal(["open", "close", "list", "stat", "read", "search", "extract", "put", "mkdir", "rm", "rename", "mv", "lock", "unlock", "bless", "set", "res_add", "res_rm", "save_as"],
+        Assert.Equal(["open", "close", "list", "stat", "read", "search", "extract", "put", "mkdir", "rm", "rename", "mv", "lock", "unlock", "bless", "resize", "set", "res_add", "res_rm", "save_as"],
             listed.Select(t => t.Name));
         foreach (var tool in listed)
         {

@@ -38,6 +38,24 @@ public sealed class FormatCommandTests : IDisposable
     }
 
     [Fact]
+    public void Resize_grows_a_volume_image()
+    {
+        var disk = Path.Combine(folder, "small.img");
+        Assert.Equal(ExitCodes.Success, Run("format", disk, "--size", "800K", "--name", "Small").Code);
+        var grown = Path.Combine(folder, "grown.img");
+
+        var (code, output, error) = Run("resize", disk, "--size", "1440K", "-o", grown);
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("resize (to 1,474,560 bytes)", output);
+        Assert.Equal(1440 * 1024, new FileInfo(grown).Length);
+        Assert.Equal(800 * 1024, new FileInfo(disk).Length);
+        Assert.Equal(ExitCodes.Success, Run("check", grown).Code);
+        Assert.Equal(ExitCodes.Usage, Run("resize", disk, "--size", "400K", "-o", grown).Code);        // shrinking is not built
+        Assert.Equal(ExitCodes.Usage, Run("resize", disk, "--size", "1G", "-o", grown).Code);          // past 65,535 blocks of 512 bytes
+    }
+
+    [Fact]
     public void An_existing_file_is_replaced_only_with_overwrite()
     {
         var disk = Path.Combine(folder, "blank.img");

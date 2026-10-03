@@ -44,6 +44,7 @@ namespace ClassicMac.Resources.Cli
             yield return LockCommand("unlock", "Unlock a file", false);
             yield return BlessCommand();
             yield return FormatCommand();
+            yield return ResizeCommand();
             yield return SetCommand();
             yield return ResAddCommand();
             yield return ResRmCommand();
@@ -218,6 +219,26 @@ namespace ClassicMac.Resources.Cli
             return command;
         }
 
+        private Command ResizeCommand()
+        {
+            var path = MacPathArgument("volume", "The volume image");
+            var size = new Option<long>("--size")
+            {
+                Description = "Its new size: bytes, or with K/KiB, M/MiB, G/GiB (larger; within 65,535 allocation blocks of its size)",
+                Required = true,
+                CustomParser = ParseSize,
+            };
+            var options = NewWriteOptions();
+            var command = new Command("resize", "Grow a plain HFS volume image") { path, size };
+            AddWriteOptions(command, options);
+            command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, _, _) =>
+            {
+                var bytes = result.GetRequiredValue(size);
+                return session => session.Resize(bytes);
+            }));
+            return command;
+        }
+
         private Command SetCommand()
         {
             var path = MacPathArgument("path", "The file or folder");
@@ -336,7 +357,7 @@ namespace ClassicMac.Resources.Cli
             {
                 foreach (var planned in session.Changes)
                 {
-                    output.WriteLine(planned.Detail.Length > 0 ? $"{planned.Action} {planned.Path} ({planned.Detail})" : $"{planned.Action} {planned.Path}");
+                    output.WriteLine(string.Join(" ", new[] { planned.Action, planned.Path, planned.Detail.Length > 0 ? $"({planned.Detail})" : "" }.Where(p => p.Length > 0)));
                 }
 
                 foreach (var file in written)
