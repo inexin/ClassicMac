@@ -268,8 +268,9 @@ when something asked for it (a file ID reference).
 
 A thread record (type 3 or 4) is 46 bytes as Mac OS writes it: the type, a reserved byte, 8 reserved bytes, `thdParID`
 at +10 and the name at +14 as a `Str31`. hfsutils writes a thread only as long as its name, 15 bytes and the name's
-length (padded to even), and Mac OS 9 reads and keeps such threads: a volume hfsutils made, holding them, was mounted
-and used under Mac OS 9, which added its own 46-byte threads beside them [Verified]. ClassicMac reads either; its writer
+length (padded to even). Mac OS 9's File Manager reads and keeps such threads: a volume hfsutils made, holding them, was
+mounted and used under Mac OS 9, which added its own 46-byte threads beside them [Verified]. Disk First Aid 8.5 rejects
+them ("Invalid thread record length"), stops before checking the volume's counts, and cannot repair them [Verified]. ClassicMac reads either; its writer
 accepts either, writes a renamed item's thread at 46 bytes, and changes only `thdParID` when an item moves
 [ClassicMac]. `fsck_hfs` reports the short form as "Reserved fields in the catalog record have incorrect data" (§7).
 
