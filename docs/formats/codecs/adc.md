@@ -115,7 +115,8 @@ None.
   damaged chunk (§6) instead of reading stray memory. [ClassicMac]
 - A damaged chunk keeps the bytes decoded before the fault; the rest of the chunk reads as zeros
   ([ndif.md §5](../disk-images/ndif.md#5-classicmac), [udif.md §5](../disk-images/udif.md#5-classicmac)). [ClassicMac]
-- `Adc.Compress` follows §3 and returns the chunk's margin (step 8); the NDIF writer uses it for changed chunks
+- `Adc.Compress` follows §3 and returns the chunk's margin (step 8); it writes Disk Copy 6.3.3's bytes for 512- and
+  7-sector chunks (two- and one-byte prefix trees) [Verified: §7]; the NDIF writer uses it for changed chunks
   ([ndif.md §3](../disk-images/ndif.md#3-writing)). It starts each chunk with a fresh pool, which §3 shows gives the
   same output. [ClassicMac]
 
@@ -130,7 +131,11 @@ The decoder reports how it ended; the image readers raise the diagnostic.
 
 ## 7. Verification
 
-- `tests/ClassicMac.Files.Tests/AdcTests.cs`: what `Compress` writes decodes to its input (empty, one byte, zeros, random
+- `tests/ClassicMac.Files.Tests/AdcTests.cs`: `Large_chunks_are_Disk_Copy_s_bytes` and
+  `Small_chunks_are_Disk_Copy_s_bytes` compress a 2 MB volume ClassicMac made (`TestData/Adc/src2m.dsk.gz`: `format`
+  2M, then a 1,500,000-byte file of byte *i* = (*i* × 7 + *i* / 251) & `$FF`) in Disk Copy 6.3.3's 512-sector and
+  7-sector chunks and match the SHA-256 of every chunk Disk Copy wrote for it, and its margins (+$48 513 and 8)
+  [Verified: Disk Copy 6.3.3, Read-Only Compressed]. What `Compress` writes decodes to its input (empty, one byte, zeros, random
   bytes, text, a pattern, repeats past the window); zeros shrink to 67-byte matches and random bytes grow only by their
   run headers; the short and long forms where each fits; nothing reaches past the window.
 
@@ -146,7 +151,7 @@ The decoder reports how it ended; the image readers raise the diagnostic.
 
 ## 8. Not covered
 
-- ClassicMac's encoder has not yet been checked byte for byte against Disk Copy's own output.
+- The single-tree mode (chunks under 200 bytes) has no Disk Copy sample: Disk Copy's smallest chunk is one sector.
 
 ## 9. References
 
