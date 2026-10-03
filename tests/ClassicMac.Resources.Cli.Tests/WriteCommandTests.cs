@@ -165,6 +165,25 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void Rm_warns_of_aliases_that_lose_their_original()
+    {
+        var disk = AliasFixtures.Disk(folder);
+
+        var (code, output, error) = Run("rm", disk + ":Docs", "-r", "--dry-run");
+
+        Assert.Equal(ExitCodes.Success, code);
+        Assert.Contains("delete Docs (with everything in it)", output);
+        Assert.Contains("warning: Moved alias will no longer find its original, Docs:Note", output);
+        Assert.Contains("warning: Note alias will no longer find its original, Docs:Note", output);
+        var json = System.Text.Json.JsonDocument.Parse(Run("rm", disk + ":Docs", "-r", "--dry-run", "--json").Output).RootElement;
+        Assert.Equal(["Moved alias will no longer find its original, Docs:Note", "Note alias will no longer find its original, Docs:Note"],
+            json.GetProperty("changes")[0].GetProperty("warnings").EnumerateArray().Select(w => w.GetString()).Order());
+        Assert.DoesNotContain("warning", Run("rm", disk + ":Old", "-r", "--dry-run").Output);
+        Assert.False(System.Text.Json.JsonDocument.Parse(Run("rm", disk + ":Old", "-r", "--dry-run", "--json").Output).RootElement
+            .GetProperty("changes")[0].TryGetProperty("warnings", out _));
+    }
+
+    [Fact]
     public void Rm_deletes_a_file_and_a_folder_only_with_recursive()
     {
         var disk = Disk();

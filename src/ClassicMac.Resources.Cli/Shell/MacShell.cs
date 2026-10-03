@@ -444,6 +444,10 @@ namespace ClassicMac.Resources.Cli.Shell
             foreach (var planned in made)
             {
                 console.Out.WriteLine(string.Join(" ", new[] { planned.Action, planned.Path, planned.Detail.Length > 0 ? $"({planned.Detail})" : "" }.Where(p => p.Length > 0)));
+                foreach (var warning in planned.Warnings)
+                {
+                    console.Out.WriteLine($"  warning: {warning}");
+                }
             }
 
             return ExitCodes.Success;

@@ -348,6 +348,44 @@ namespace ClassicMac.Files
             return AliasResolver.Resolve(alias, entry.Holder is { } holder && VolumeOf(holder) is { } volume ? [volume] : [], file);
         }
 
+        /// <summary>
+        /// The alias files on the volume holding <paramref name="entry"/> (a file or folder) whose original is that entry or
+        /// inside it, and which are not inside it themselves: those that would no longer find their original if it were
+        /// deleted (docs/formats/resources/aliases.md §5). Paths are inside the volume, colon-separated.
+        /// </summary>
+        public IReadOnlyList<(string Alias, string Original)> AliasesTo(MacPathEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            if (entry.Kind is not (MacPathKind.Folder or MacPathKind.File or MacPathKind.Container) || entry.Holder is not { } holder ||
+                VolumeOf(holder) is not { } volume)
+            {
+                return [];
+            }
+
+            IReadOnlyList<MacString> target = entry.Kind == MacPathKind.Folder ? entry.FolderPath! : [.. entry.File!.FolderPath, entry.File.Name];
+            bool Within(IReadOnlyList<MacString> path) => path.Count >= target.Count &&
+                target.Select((name, i) => MacPaths.NamesEqual(name.ToMacRoman(), path[i].ToMacRoman())).All(same => same);
+            string Join(IEnumerable<MacString> path) => string.Join(":", path.Select(name => name.ToMacRoman()));
+
+            var found = new List<(string, string)>();
+            foreach (var file in ContentsOf(holder).Children.Select(node => node.File))
+            {
+                if (!AliasResolver.IsAlias(file) || Within([.. file.FolderPath, file.Name]) || AliasResolver.ReadAlias(file, readOptions) is not { } alias)
+                {
+                    continue;
+                }
+
+                var resolution = AliasResolver.Resolve(alias, [volume], file);
+                IReadOnlyList<MacString> original = resolution.File is { } to ? [.. to.FolderPath, to.Name] : resolution.Folder?.Path ?? [];
+                if (resolution.Found && Within(original))
+                {
+                    found.Add((Join([.. file.FolderPath, file.Name]), Join(original)));
+                }
+            }
+
+            return found;
+        }
+
         /// <summary>The entry of a resolved alias's target in this tree; null when it was not found here.</summary>
         public MacPathEntry? TargetOf(AliasResolution resolution)
         {

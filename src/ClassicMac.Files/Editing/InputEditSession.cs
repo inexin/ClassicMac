@@ -27,7 +27,11 @@ namespace ClassicMac.Files.Editing
     /// <param name="Action"><c>add</c>, <c>mkdir</c>, <c>delete</c>, <c>rename</c>, <c>set</c>, <c>res-set</c> or <c>res-delete</c>.</param>
     /// <param name="Path">The item's path in the input (folders and name joined with ':'; empty for a single-file input).</param>
     /// <param name="Detail">What changes, in words.</param>
-    public sealed record PlannedChange(string Action, string Path, string Detail);
+    public sealed record PlannedChange(string Action, string Path, string Detail)
+    {
+        /// <summary>What the change will break that the change itself does not show (aliases that lose their original), in sentences.</summary>
+        public IReadOnlyList<string> Warnings { get; init; } = [];
+    }
 
     /// <summary>
     /// An edit session on an opened input: files and folders added, deleted and renamed in a plain HFS volume, Finder
@@ -252,7 +256,10 @@ namespace ClassicMac.Files.Editing
         }
 
         /// <summary>Deletes a file, or a folder: an empty one, or with <paramref name="recursive"/> everything in it.</summary>
-        public void Delete(string macPath, bool recursive = false)
+        /// <param name="macPath">The item.</param>
+        /// <param name="recursive">Whether a folder with contents is deleted, with everything in it.</param>
+        /// <param name="warnings">What the deletion breaks, recorded on the change (for example the aliases that lose their original).</param>
+        public void Delete(string macPath, bool recursive = false, IReadOnlyList<string>? warnings = null)
         {
             ArgumentNullException.ThrowIfNull(macPath);
             RequireVolume("hold files");
@@ -262,7 +269,7 @@ namespace ClassicMac.Files.Editing
                 forks.Remove(key);
             }
 
-            changes.Add(new PlannedChange("delete", macPath, recursive ? "with everything in it" : ""));
+            changes.Add(new PlannedChange("delete", macPath, recursive ? "with everything in it" : "") { Warnings = warnings ?? [] });
         }
 
         /// <summary>Renames the item at <paramref name="macPath"/> in its folder; resource edits made to it (or in it) follow.</summary>

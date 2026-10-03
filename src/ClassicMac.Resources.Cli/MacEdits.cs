@@ -66,8 +66,11 @@ namespace ClassicMac.Resources.Cli
         /// <summary>Deletes a file or folder (a folder with contents only when <paramref name="recursive"/>).</summary>
         public static Action<InputEditSession> Rm(MacPathTree tree, string rest, bool recursive)
         {
-            var path = VolumePath(tree, Existing(tree, rest));
-            return session => session.Delete(path, recursive);
+            var entry = Existing(tree, rest);
+            var path = VolumePath(tree, entry);
+            var warnings = tree.AliasesTo(entry).OrderBy(a => a.Alias, StringComparer.Ordinal)
+                .Select(a => $"{a.Alias} will no longer find its original, {a.Original}").ToList();
+            return session => session.Delete(path, recursive, warnings);
         }
 
         /// <summary>Renames a file or folder.</summary>

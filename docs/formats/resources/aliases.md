@@ -154,6 +154,10 @@ None.
 
 ## 5. ClassicMac
 
+- `MacPathTree.AliasesTo` lists the alias files on an entry's volume whose original, as §2 resolves it, is that entry or
+  inside it, leaving out aliases inside it themselves: what a deletion would leave without an original. The CLI's `rm`
+  (and the shell's and MCP server's) records each as a warning on its change ([cli.md §3.2](../../cli.md#32-commands)).
+  Aliases to an alias that is deleted are listed; aliases further down such a chain are not [ClassicMac].
 - `AliasRecord.Read` reads §1; `TargetPath` is §2.2's path without the AppleShare names; `IsVolume` is a folder alias
   whose parent is 1. A record shorter than the fixed part, or of another version, is `InvalidDataException`; tagged data
   that ends early is kept as far as it goes. [ClassicMac]

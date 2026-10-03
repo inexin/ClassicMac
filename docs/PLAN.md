@@ -312,8 +312,8 @@ Mac OS 9 volume).** Not ordered yet:
 - **Cheaper fork edits:** `ReplaceFork` (put, resource edits, Save As) checked as deletions are, by kept catalog
   records and allocated blocks, instead of reading every fork of every file (about 0.9 s per fork on 500 MB). Fewer
   whole-image copies in `HfsWriter` too, to lower peak memory.
-- **Aliases on rm:** warn when a deleted item is the original of an alias on the volume (`aliases.md`), naming the
-  aliases that will no longer resolve; `--dry-run` lists them.
+- **Aliases on rm** (built): a warning for each alias on the volume whose original a deletion removes
+  (`aliases.md` §5), also with `--dry-run`, in JSON as the change's `warnings`.
 - **More partitioned disks:** writes to disks with several Mac volume partitions (the partition named in the Mac path),
   and the app's Volume menu and Save As on partitioned disks.
 - **A gated corpus write test:** under `CLASSICMAC_CORPUS`, edit copies of real Mac OS-written images (delete, add,

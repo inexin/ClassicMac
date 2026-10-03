@@ -213,6 +213,11 @@ namespace ClassicMac.Resources.Cli
                 w.WriteString("action", planned.Action);
                 w.WriteString("path", planned.Path);
                 w.WriteString("detail", planned.Detail);
+                if (planned.Warnings.Count > 0)
+                {
+                    Strings(w, "warnings", planned.Warnings);
+                }
+
                 w.WriteEndObject();
             }
 

@@ -268,7 +268,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 | --- | --- | --- |
 | `put` | `<host file> <Mac path>` `[--name N] [--type T] [--creator C] [--text]` | Adds a host file: into the folder the path names (keeping its name), or as the file the path names. The host file is read with its AppleDouble or Basilisk II companions, MacBinary, AppleSingle and BinHex unwrapped, else its bytes are the data fork. `--text`: a UTF-8 text file (a byte order mark dropped) made Mac OS Roman with CR line ends, type `TEXT`, creator `ttxt`; a character Mac OS Roman has not is refused, naming its line |
 | `mkdir` | `<Mac path>` | Makes an empty folder |
-| `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`) |
+| `rm` | `<Mac path> [--recursive/-r]` | Deletes a file, or a folder (with everything in it only with `-r`); each alias on the volume whose original it deletes is named in a warning (`  warning: <alias> will no longer find its original, <path>`; in JSON the change's `warnings`), also with `--dry-run` |
 | `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
 | `lock`, `unlock` | `<Mac path>` | Locks or unlocks a file (an HFS folder has no lock); a locked file cannot be deleted |
 | `bless` | `<Mac path>` | Makes a folder the volume's System Folder (`drFndrInfo[0]`); it must hold a System file (type `zsys`) |

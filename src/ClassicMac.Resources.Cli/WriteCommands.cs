@@ -358,6 +358,10 @@ namespace ClassicMac.Resources.Cli
                 foreach (var planned in session.Changes)
                 {
                     output.WriteLine(string.Join(" ", new[] { planned.Action, planned.Path, planned.Detail.Length > 0 ? $"({planned.Detail})" : "" }.Where(p => p.Length > 0)));
+                    foreach (var warning in planned.Warnings)
+                    {
+                        output.WriteLine($"  warning: {warning}");
+                    }
                 }
 
                 foreach (var file in written)
