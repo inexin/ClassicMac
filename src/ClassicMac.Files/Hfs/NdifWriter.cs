@@ -20,7 +20,7 @@ namespace ClassicMac.Files.Hfs
     public static class NdifWriter
     {
         private const int SectorSize = 512, HeaderLength = 0x80, EntryLength = 12;
-        private const byte ChunkZero = 0x00, ChunkRaw = 0x02, ChunkAdc = 0x83, ChunkEnd = 0xFF;
+        private const byte ChunkZero = 0x00, ChunkRaw = 0x02, ChunkKenCode = 0x80, ChunkAdc = 0x83, ChunkEnd = 0xFF;
         private static readonly FourCC Bcem = FourCC.FromString("bcem"), Vers = FourCC.FromString("vers");
 
         /// <summary>Whether <see cref="Rewrite"/> takes the image: an NDIF image with map version 10 to 12, not segmented.</summary>
@@ -81,9 +81,11 @@ namespace ClassicMac.Files.Hfs
             // A read/write image (raw chunks only) stays so: Disk Copy refuses a read/write mount with zero chunks (§2.1).
             bool zeroRuns = Enumerable.Range(0, count).Select(k => (byte)reader.ReadUInt32At(HeaderLength + k * EntryLength))
                 .Any(type => type != ChunkRaw && type != ChunkEnd);
-            // An ADC image (map version 11 or later, with ADC chunks) has changed runs compressed again, as Disk Copy stores
-            // them: ADC unless that is longer than the sectors (§1.4, adc.md §3); others stay raw.
-            bool adc = version >= 11 && Enumerable.Range(0, count).Any(k => (byte)reader.ReadUInt32At(HeaderLength + k * EntryLength) == ChunkAdc);
+            // A compressed image has changed runs compressed again with its own codec, as Disk Copy stores them: ADC (map
+            // version 11 or later) or KenCode, unless that is longer than the sectors (§1.4, adc.md §3, kencode.md §3);
+            // other images keep them raw.
+            var types = Enumerable.Range(0, count).Select(k => (byte)reader.ReadUInt32At(HeaderLength + k * EntryLength)).ToHashSet();
+            byte codec = version >= 11 && types.Contains(ChunkAdc) ? ChunkAdc : types.Contains(ChunkKenCode) ? ChunkKenCode : ChunkRaw;
             long buffer = reader.ReadUInt32At(0x48);
             var old = changedSectors is null ? NdifReader.Instance.Read(image, new ContainerContext()).Single().DataFork.ToArray() : null;
             var data = image.DataFork.ToArray();
@@ -146,12 +148,17 @@ namespace ClassicMac.Files.Hfs
                     {
                         var bytes = disk.Span.Slice(checked((int)(run * SectorSize)), checked((int)((end - run) * SectorSize)));
                         int margin = 0;
-                        var packed = adc ? Adc.Compress(bytes, out margin) : null;
+                        var packed = codec switch
+                        {
+                            ChunkAdc => Adc.Compress(bytes, out margin),
+                            ChunkKenCode => KenCode.Compress(bytes, out margin),
+                            _ => null,
+                        };
                         if (packed is not null && packed.Length <= bytes.Length)
                         {
                             // +$48 covers the chunk and its decoder's overrun, as Disk Copy sets it (§4.3).
                             buffer = Math.Max(buffer, end - run + (margin + SectorSize - 1) / SectorSize);
-                            Entry(entries, (uint)(run << 8) | ChunkAdc, output.Length - dataStart, packed.Length);
+                            Entry(entries, (uint)(run << 8) | codec, output.Length - dataStart, packed.Length);
                             output.Write(packed);
                         }
                         else

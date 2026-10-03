@@ -3,12 +3,12 @@
 KenCode is Disk Copy's "Smaller (KC)" compression, NDIF chunk type `$80`: an LZ77 bit stream of fixed prefix codes,
 with no stored tables, in which literal runs and matches alternate and the width of a distance grows with the bytes
 already written. It is the System's `'dcmp'` 3 codec with the distance classes capped for large outputs. ClassicMac
-decodes it with its own decoder.
+decodes it with its own decoder, and encodes it as Disk Copy 6.3.3 does.
 
 | | |
 | --- | --- |
 | Used by | [ndif.md](../disk-images/ndif.md) (chunk type `$80`); the same codec as [compressed-resources.md §2.8](../resources/compressed-resources.md#28-dcmp-3) (`'dcmp'` 3), with the difference of §4 |
-| ClassicMac | Reads; `ClassicMac.Files.Compression.KenCode` |
+| ClassicMac | Reads and writes; `ClassicMac.Files.Compression.KenCode` |
 | Verified against | Images made by Disk Copy 6.1.2 and 6.3.3, with 20-, 32- and 512-sector chunks, decoding to their CRC |
 | Sources | Disk Copy 6.3.3's codec, traced; Disk Copy 6.1.2, 6.5b13 and the self-mounting `oneb` code compared; the Mac OS 9.0 System's `'dcmp'` 3 |
 
@@ -122,7 +122,7 @@ literal run of 3 (`abc`); *afterRun* is then set, so length code 0 is a 3-byte m
 
 Disk Copy 6.3.3's encoder (`KCCOMPRESSDATA`; the 68k `CODE` 8 version is the same) [Code: 6.3.3]; a reimplementation
 of these rules re-encodes every KenCode chunk of the sample images byte for byte [Verified: 512-, 33- and 20-sector
-chunks]. ClassicMac does not write KenCode yet.
+chunks].
 
 1. **Matcher:** ADC's ([adc.md §3](adc.md#3-writing) steps 1–4: prefix-split binary trees, the same tie rule,
    full-match replacement, the end rule for 2-byte prefixes, a round-robin pool with the parity delete), with a
@@ -159,6 +159,10 @@ chunks]. ClassicMac does not write KenCode yet.
   decoded before the fault are kept and the rest of the chunk reads as zeros. An overread (§2) is reported the same
   way. [ClassicMac]
 
+- `KenCode.Compress` follows §3 with the match finder it shares with ADC (`TreeMatcher`), and returns the chunk's
+  margin; it writes Disk Copy 6.3.3's bytes for 512- and 7-sector chunks [Verified: §7]. The NDIF writer uses it for
+  changed chunks of KenCode images ([ndif.md §3](../disk-images/ndif.md#3-writing)). [ClassicMac]
+
 ## 6. Diagnostics
 
 The decoder reports how it ended; the NDIF reader raises the diagnostic.
@@ -175,9 +179,16 @@ The decoder reports how it ended; the NDIF reader raises the diagnostic.
   `F800 KC.img` decodes to its stored CRC; `Version_2_test_images_match_their_checksums`: the version 2 image
   `v2 kc.img` that Disk Copy 6.1.2 mounted ([ndif.md §7](../disk-images/ndif.md#7-verification)). Not committed.
 
+- `tests/ClassicMac.Files.Tests/KenCodeEncoderTests.cs`: `Large_chunks_are_Disk_Copy_s_bytes` and
+  `Small_chunks_are_Disk_Copy_s_bytes` compress the volume of [adc.md §7](adc.md#7-verification)
+  (`TestData/Adc/src2m.dsk.gz`) in Disk Copy 6.3.3's 512- and 7-sector KenCode chunks and match the SHA-256 of every
+  chunk Disk Copy wrote for it, and its margins (+$48 513 and 8) [Verified: Disk Copy 6.3.3, Read-Only Compressed,
+  Smaller (KC)]; what `Compress` writes decodes to its input, repeats shrink, and bytes that do not shrink come out
+  longer (stored raw).
+
 ## 8. Not covered
 
-- Writing KenCode (§3 is Disk Copy's encoder; ClassicMac's is not built yet).
+- The single-tree mode (chunks under 200 bytes) has no Disk Copy sample, as for ADC.
 - By Apple's release history, KenCode was the only compression of Disk Image Mounter and Disk Copy 6.0.1; neither was
   checked.
 

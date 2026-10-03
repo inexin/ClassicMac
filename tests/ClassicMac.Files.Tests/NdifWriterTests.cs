@@ -153,6 +153,31 @@ public sealed class NdifWriterTests
         Assert.True(BinaryPrimitives.ReadUInt32BigEndian(map.AsSpan(0x48)) >= 101);
     }
 
+    // In a KenCode image (map version 10) a changed chunk is compressed again with KenCode, as Disk Copy stores it.
+    [Fact]
+    public void A_changed_chunk_in_a_KenCode_image_is_compressed()
+    {
+        var volume = Volume();
+        var (data, resource) = Build(volume, "Test Disk", (100, Kind.KenCode), (100, Kind.KenCode), (596, Kind.Zero), (4, Kind.Raw));
+        var image = Image(data, resource);
+        var changed = volume.ToArray();
+        for (var i = 100 * 512; i < 200 * 512; i++)
+        {
+            changed[i] = (byte)(i % 13 * 17);
+        }
+
+        var written = NdifWriter.Rewrite(image, changed, new HashSet<long> { 150 });
+
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(changed, Decoded(written, diagnostics));
+        Assert.Empty(diagnostics);
+        var map = Map(written);
+        Assert.Equal(10, BinaryPrimitives.ReadUInt16BigEndian(map));
+        var after = Entries(map);
+        Assert.Equal([(0L, 0x80), (100, 0x80), (200, 0x00), (796, 0x02), (800, 0xFF)], after.Select(e => (e.Start, (int)e.Type)));
+        Assert.InRange(after[1].Stored, 1, 100 * 512 / 10);
+    }
+
     // An image with no ADC chunk (Disk Copy's read-only and read/write images, or a version 10 map, which cannot hold
     // one) keeps changed chunks raw.
     [Fact]

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- NDIF: KenCode encoder as Disk Copy 6.3.3's (byte for byte on its own images); an edited KenCode image's changed chunks
+  are compressed again (kencode.md §3, ndif.md §3).
 - NDIF: an edited ADC image's changed chunks are compressed again with Disk Copy 6.3.3's ADC encoder (adc.md §3,
   ndif.md §3), so an edit no longer stores them raw.
 - HFS: catalog edits change only the leaves their records are in, splitting a full leaf (and its parents, up to a new

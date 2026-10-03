@@ -340,9 +340,8 @@ the edited forks, so the writer stops holding whole images:
 
 **Next, with the rules in hand (2026-10-03).**
 
-- **KenCode encoder:** Disk Copy 6.3.3's, as written in kencode.md §3, checked like ADC against per-chunk SHA-256 of
-  Disk Copy's own Read-Only Compressed KenCode save of `TestData/Adc/src2m.dsk.gz` (asked of the Mac RE session);
-  then NDIF edits of KenCode images compress changed chunks again.
+- **KenCode encoder** (built): Disk Copy 6.3.3's (kencode.md §3), byte for byte against Disk Copy's own KenCode saves
+  of `TestData/Adc/src2m.dsk.gz`; NDIF edits of KenCode images compress changed chunks again.
 - **B-tree edits as Mac OS makes them:** hfs.md §1.8's insert (rotate left, split left, first free node, root split,
   parent keys deleted and inserted again) and delete (empty nodes zeroed and freed, root collapse), replacing the
   right split and the rebuild fallback; the rebuild stays only for growing the file.

@@ -9,7 +9,7 @@ namespace ClassicMac.Files.Tests;
 // with literal runs and one long match per run of repeated bytes, enough to exercise the decoder.
 internal static class NdifBuilder
 {
-    public enum Kind : byte { Zero = 0x00, Raw = 0x02, Adc = 0x83, Unknown = 0x84 }
+    public enum Kind : byte { Zero = 0x00, Raw = 0x02, KenCode = 0x80, Adc = 0x83, Unknown = 0x84 }
 
     public static (byte[] Data, byte[] Resource) Build(byte[] disk, string name, params (int Sectors, Kind Kind)[] chunks)
     {
@@ -19,7 +19,7 @@ internal static class NdifBuilder
         foreach (var (count, kind) in chunks)
         {
             var bytes = disk.AsSpan(sector * 512, count * 512).ToArray();
-            var stored = kind switch { Kind.Raw or Kind.Unknown => bytes, Kind.Adc => Adc(bytes), _ => [] };
+            var stored = kind switch { Kind.Raw or Kind.Unknown => bytes, Kind.Adc => Adc(bytes), Kind.KenCode => Compression.KenCode.Compress(bytes), _ => [] };
             entries.Add(((uint)sector, (byte)kind, (uint)data.Count, (uint)stored.Length));
             data.AddRange(stored);
             sector += count;
@@ -32,7 +32,7 @@ internal static class NdifBuilder
         MacRoman.Encode(name).CopyTo(map, 5);
         BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x44), (uint)(disk.Length / 512));
         // Buffer size, as Disk Copy writes it: the largest compressed chunk plus a sector of room (0 with none).
-        var compressed = chunks.Where(c => c.Kind == Kind.Adc).Select(c => c.Sectors).DefaultIfEmpty(-1).Max();
+        var compressed = chunks.Where(c => c.Kind is Kind.Adc or Kind.KenCode).Select(c => c.Sectors).DefaultIfEmpty(-1).Max();
         BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x48), (uint)(compressed + 1));
         BinaryPrimitives.WriteUInt32BigEndian(map.AsSpan(0x7C), (uint)entries.Count);
         for (var k = 0; k < entries.Count; k++)
