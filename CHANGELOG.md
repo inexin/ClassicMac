@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- NDIF: an edited chunk's runs of empty sectors are stored as zero chunks instead of raw zeros, so a compressed or
+  read-only image no longer grows by its empty space on each save; read/write images stay all raw (ndif.md §3).
 - Editing: a Disk Copy 4.2 image, plain HFS image or partitioned disk with an AppleDouble header or Basilisk II
   companions beside it is edited like a lone one (it was read-only); Save As writes the companions too (diskcopy42.md §5).
 - HFS: a volume whose count of the root's files (drNmFls) is wrong is edited, the count kept and changed by each edit as

@@ -12,7 +12,8 @@ namespace ClassicMac.Files.Hfs
     /// <summary>
     /// Makes an NDIF (Disk Copy 6) image again around a changed disk (docs/formats/disk-images/ndif.md §3): the chunk
     /// boundaries stay, a chunk whose sectors are unchanged keeps its stored bytes (compressed or not), and a changed one
-    /// is stored raw, as Disk Copy stores a chunk that would not shrink. The map's offsets, types and lengths, its CRC
+    /// is stored raw, as Disk Copy stores a chunk that would not shrink, its runs of zero sectors as zero chunks (not in a
+    /// read/write image, whose chunks are all raw). The map's offsets, types and lengths, its CRC
     /// (when the image has one) and the CRC in the <c>'vers'</c> text are made again.
     /// </summary>
     public static class NdifWriter
@@ -76,11 +77,15 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The NDIF map is shorter than its entries.");
             }
 
+            // A read/write image (raw chunks only) stays so: Disk Copy refuses a read/write mount with zero chunks (§2.1).
+            bool zeroRuns = Enumerable.Range(0, count).Select(k => (byte)reader.ReadUInt32At(HeaderLength + k * EntryLength))
+                .Any(type => type != ChunkRaw && type != ChunkEnd);
             var old = changedSectors is null ? NdifReader.Instance.Read(image, new ContainerContext()).Single().DataFork.ToArray() : null;
             var data = image.DataFork.ToArray();
             var output = new MemoryStream();
             output.Write(data.AsSpan(0, (int)Math.Min(dataStart, data.Length)));
-            var writer = new BigEndianWriter(map);
+            var entries = new BigEndianWriter();
+            int written = 0;
             for (var k = 0; k < count; k++)
             {
                 int at = HeaderLength + k * EntryLength;
@@ -89,8 +94,8 @@ namespace ClassicMac.Files.Hfs
                 byte type = (byte)word;
                 if (type == ChunkEnd)
                 {
-                    writer.WriteUInt32At(at + 4, output.Length - dataStart);
-                    writer.WriteUInt32At(at + 8, 0u);
+                    Entry(entries, word, output.Length - dataStart, 0);
+                    written++;
                     continue;
                 }
 
@@ -102,22 +107,55 @@ namespace ClassicMac.Files.Hfs
                     : !changedSectors!.Any(sector => sector >= start && sector < next);
                 if (same)
                 {
+                    long offset = reader.ReadUInt32At(at + 4), stored = reader.ReadUInt32At(at + 8);
                     if (type == ChunkZero)
                     {
-                        continue;
+                        Entry(entries, word, offset, stored);
+                    }
+                    else
+                    {
+                        Entry(entries, word, output.Length - dataStart, stored);
+                        output.Write(data.AsSpan((int)(dataStart + offset), (int)stored));
                     }
 
-                    long offset = reader.ReadUInt32At(at + 4), stored = reader.ReadUInt32At(at + 8);
-                    writer.WriteUInt32At(at + 4, output.Length - dataStart);
-                    output.Write(data.AsSpan((int)(dataStart + offset), (int)stored));
+                    written++;
                     continue;
                 }
 
-                writer.WriteUInt32At(at, (uint)(start << 8) | ChunkRaw);
-                writer.WriteUInt32At(at + 4, output.Length - dataStart);
-                writer.WriteUInt32At(at + 8, size);
-                output.Write(sectors);
+                // A changed chunk: stored raw, its runs of zero sectors as zero chunks (offset and length 0, as Disk Copy
+                // writes them, §1.3) where the image may hold them.
+                for (long run = start; run < next;)
+                {
+                    bool zero = zeroRuns && IsZero(disk.Span, run);
+                    long end = run + 1;
+                    while (end < next && (!zeroRuns || IsZero(disk.Span, end) == zero))
+                    {
+                        end++;
+                    }
+
+                    if (zero)
+                    {
+                        Entry(entries, (uint)(run << 8) | ChunkZero, 0, 0);
+                    }
+                    else
+                    {
+                        Entry(entries, (uint)(run << 8) | ChunkRaw, output.Length - dataStart, (end - run) * SectorSize);
+                        output.Write(disk.Span.Slice(checked((int)(run * SectorSize)), checked((int)((end - run) * SectorSize))));
+                    }
+
+                    written++;
+                    run = end;
+                }
             }
+
+            // The header, the entries, and anything the map held past its count (a Disk Copy 6.0 map's extra entry).
+            var writer = new BigEndianWriter();
+            writer.WriteBytes(map.AsSpan(0, HeaderLength));
+            writer.WriteBytes(entries.WrittenSpan);
+            writer.WriteBytes(map.AsSpan(HeaderLength + count * EntryLength));
+            writer.WriteUInt32At(0x7C, written);
+            map = writer.ToArray();
+            writer = new BigEndianWriter(map);
 
             uint crc = 0;
             if (reader.ReadUInt32At(0x50) != 0)
@@ -145,6 +183,16 @@ namespace ClassicMac.Files.Hfs
 
             return result;
         }
+
+        private static void Entry(BigEndianWriter entries, uint word, long offset, long stored)
+        {
+            entries.WriteUInt32(word);
+            entries.WriteUInt32(offset);
+            entries.WriteUInt32(stored);
+        }
+
+        private static bool IsZero(ReadOnlySpan<byte> disk, long sector) =>
+            !disk.Slice(checked((int)(sector * SectorSize)), SectorSize).ContainsAnyExcept((byte)0);
 
         // The 'vers' text's "CRC: $xxxxxxxx" (or "CRC28: $…") with the new value; the same length, so the strings' lengths stay.
         private static byte[] WithCrc(byte[] vers, uint crc)

@@ -54,7 +54,7 @@ public sealed class NdifWriterTests
         var volume = Volume();
         var image = Compressed(volume);
         var changed = volume.ToArray();
-        changed[150 * 512 + 7] ^= 0xFF;                                                      // in the second ADC chunk
+        changed.AsSpan(100 * 512, 100 * 512).Fill(0x5A);                                     // the second ADC chunk, no zero sector
 
         var written = NdifWriter.Rewrite(image, changed);
 
@@ -100,6 +100,32 @@ public sealed class NdifWriterTests
 
         Assert.Equal(image.DataFork.ToArray(), written.DataFork.ToArray());
         Assert.Equal(Map(image), Map(written));
+    }
+
+    // A changed chunk's runs of zero sectors become zero chunks, which store nothing, so an edit does not store empty
+    // space; the map gains their entries.
+    [Fact]
+    public void A_changed_chunk_s_zero_runs_become_zero_chunks()
+    {
+        var volume = Volume();
+        var image = Compressed(volume);
+        var changed = volume.ToArray();
+        changed.AsSpan(100 * 512, 20 * 512).Fill(0x11);
+        changed.AsSpan(120 * 512, 60 * 512).Clear();
+        changed.AsSpan(180 * 512, 20 * 512).Fill(0x22);                                      // the second ADC chunk
+
+        var written = NdifWriter.Rewrite(image, changed, new HashSet<long> { 100, 150, 199 });
+
+        var diagnostics = new List<Diagnostic>();
+        Assert.Equal(changed, Decoded(written, diagnostics));
+        Assert.Empty(diagnostics);
+        var map = Map(written);
+        var after = Entries(map);
+        Assert.Equal([(0L, 0x83), (100, 0x02), (120, 0x00), (180, 0x02), (200, 0x00), (796, 0x02), (800, 0xFF)],
+            after.Select(e => (e.Start, (int)e.Type)));
+        Assert.Equal((0L, 0L), (after[2].Offset, after[2].Stored));
+        Assert.Equal((20 * 512L, 20 * 512L), (after[1].Stored, after[3].Stored));
+        Assert.Equal(0x80 + 12 * after.Length, map.Length);
     }
 
     [Fact]
