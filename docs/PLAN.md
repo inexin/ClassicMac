@@ -302,6 +302,24 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    CNID kept. Later, shrinking: files and B-tree extents in the blocks cut off moved down into free space first,
    refused when they do not fit; and growing past 65,535 blocks with a larger block size.
 
+**Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB
+Mac OS 9 volume).** Not ordered yet:
+
+- **Faster sessions:** a `MacPathTree` over in-memory bytes, so the shell and the MCP server stop writing a working
+  copy and reopening the tree after each change (about 2.5 s per change on a 500 MB volume).
+- **Cheaper fork edits:** `ReplaceFork` (put, resource edits, Save As) checked as deletions are, by kept catalog
+  records and allocated blocks, instead of reading every fork of every file (about 0.9 s per fork on 500 MB). Fewer
+  whole-image copies in `HfsWriter` too, to lower peak memory.
+- **Aliases on rm:** warn when a deleted item is the original of an alias on the volume (`aliases.md`), naming the
+  aliases that will no longer resolve; `--dry-run` lists them.
+- **More partitioned disks:** writes to disks with several Mac volume partitions (the partition named in the Mac path),
+  and the app's Volume menu and Save As on partitioned disks.
+- **A gated corpus write test:** under `CLASSICMAC_CORPUS`, edit copies of real Mac OS-written images (delete, add,
+  rename, move) and require `check` to pass, so writer rules are tested against Mac OS's layouts, not only against
+  `HfsBuilder`'s.
+- **`check --no-nested`:** check the input's own structures without reading into the containers inside it, for a
+  quick verdict on a volume full of archives and disk images.
+
 ## Decoders
 
 Each decoder turns one resource type into a modern file; anything without a decoder is exported raw.
