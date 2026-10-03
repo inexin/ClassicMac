@@ -37,11 +37,15 @@ namespace ClassicMac.Files.Hfs
             }
         }
 
-        /// <summary>The image with its disk replaced by <paramref name="disk"/>; its name, Finder info and other resources stay.</summary>
+        /// <summary>
+        /// The image with its disk replaced by <paramref name="disk"/>; its name, Finder info and other resources stay. With
+        /// <paramref name="changedSectors"/> (the 512-byte sectors that may differ from the image's disk), a chunk holding
+        /// none of them keeps its stored bytes without the old disk being decoded to compare it.
+        /// </summary>
         /// <exception cref="InvalidDataException">
         /// The image is not one ClassicMac rewrites (map version 10–12, not segmented), or the disk is not the image's size.
         /// </exception>
-        public static MacFile Rewrite(MacFile image, ReadOnlyMemory<byte> disk)
+        public static MacFile Rewrite(MacFile image, ReadOnlyMemory<byte> disk, IReadOnlySet<long>? changedSectors = null)
         {
             ArgumentNullException.ThrowIfNull(image);
             var fork = ResourceFork.Read(image.ResourceFork.ToArray());
@@ -72,7 +76,7 @@ namespace ClassicMac.Files.Hfs
                 throw new InvalidDataException("The NDIF map is shorter than its entries.");
             }
 
-            var old = NdifReader.Instance.Read(image, new ContainerContext()).Single().DataFork.ToArray();
+            var old = changedSectors is null ? NdifReader.Instance.Read(image, new ContainerContext()).Single().DataFork.ToArray() : null;
             var data = image.DataFork.ToArray();
             var output = new MemoryStream();
             output.Write(data.AsSpan(0, (int)Math.Min(dataStart, data.Length)));
@@ -93,7 +97,10 @@ namespace ClassicMac.Files.Hfs
                 long next = k + 1 < count ? reader.ReadUInt32At(at + EntryLength) >> 8 : blocks;
                 int from = checked((int)(start * SectorSize)), size = checked((int)((next - start) * SectorSize));
                 var sectors = disk.Span.Slice(from, size);
-                if (sectors.SequenceEqual(old.AsSpan(from, size)))
+                bool same = old is not null
+                    ? sectors.SequenceEqual(old.AsSpan(from, size))
+                    : !changedSectors!.Any(sector => sector >= start && sector < next);
+                if (same)
                 {
                     if (type == ChunkZero)
                     {

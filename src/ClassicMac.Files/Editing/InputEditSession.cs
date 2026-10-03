@@ -652,7 +652,12 @@ namespace ClassicMac.Files.Editing
         }
 
         // The NDIF image made again around the edited disk (its forks' edits made too).
-        private MacFile Rewritten() => NdifWriter.Rewrite(ndif!, ForkSaver.ApplyHfsForks(Overlay, Replacements()).ToArray());
+        // The changed sectors name the chunks to store again, so the old disk is not decoded to compare them.
+        private MacFile Rewritten()
+        {
+            var edited = ForkSaver.ApplyHfsForks(Overlay, Replacements());
+            return NdifWriter.Rewrite(ndif!, edited.ToArray(), edited.Sectors.ToHashSet());
+        }
 
         private static ResourceFork ResourceForkOf(MacFile file) => ResourceFork.Read(file.ResourceFork.ToArray());
 

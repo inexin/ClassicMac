@@ -259,7 +259,8 @@ An image is made again around a changed disk of the same size, keeping what Disk
    `'vers'` 1 text's "CRC: $…" or "CRC28: $…" gets the new value (same length).
 5. Every other resource, the name and the Finder info stay.
 
-[ClassicMac], following §1–§2. Writing a new image from a disk (choosing chunks and compressing) is not done.
+[ClassicMac], following §1–§2. Writing a new image from a disk (choosing chunks and compressing) is not done. The edit
+session names the sectors it changed, so a chunk is found unchanged without the old disk being decoded.
 
 ## 4. Variants
 

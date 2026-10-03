@@ -73,6 +73,23 @@ public sealed class NdifWriterTests
         Assert.Equal(image.FinderInfo, written.FinderInfo);
     }
 
+    // Given the sectors that changed (an edit session knows them), the old disk is not decoded to compare chunks: a chunk
+    // with no changed sector keeps its stored bytes, and the result is the one a full comparison gives.
+    [Fact]
+    public void The_changed_sectors_name_the_chunks_to_store_again()
+    {
+        var volume = Volume();
+        var image = Compressed(volume);
+        var changed = volume.ToArray();
+        changed[150 * 512 + 7] ^= 0xFF;
+
+        var compared = NdifWriter.Rewrite(image, changed);
+        var named = NdifWriter.Rewrite(image, changed, changedSectors: new HashSet<long> { 150 });
+
+        Assert.Equal(compared.DataFork.ToArray(), named.DataFork.ToArray());
+        Assert.Equal(Map(compared), Map(named));
+    }
+
     [Fact]
     public void An_unchanged_disk_gives_the_same_data_and_map()
     {
