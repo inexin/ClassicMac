@@ -139,6 +139,32 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void An_NDIF_image_s_disk_is_written_and_the_image_made_again()
+    {
+        var (data, resource) = NdifBuilder.Build(File.ReadAllBytes(Disk()), "Disk", (64, NdifBuilder.Kind.Adc), (File.ReadAllBytes(Disk()).Length / 512 - 64, NdifBuilder.Kind.Raw));
+        var image = new MacFile
+        {
+            Name = MacString.FromMacRoman("disk.img"),
+            FinderInfo = new FinderInfo { Type = FourCC.FromString("rohd"), Creator = FourCC.FromString("ddsk") },
+            DataFork = ForkData.FromBytes(data),
+            ResourceFork = ForkData.FromBytes(resource),
+        };
+        var source = Directory.CreateDirectory(Path.Combine(folder, "ndif")).FullName;
+        HostFiles.Write(image, source);
+        var disk = Path.Combine(source, "disk.img");
+        var target = Path.Combine(folder, "edited.img");
+
+        var (code, _, error) = Run("rm", disk + ":Read Me", "-o", target);
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.True(File.Exists(Path.Combine(folder, "._edited.img")));                      // written as an AppleDouble pair
+        Assert.DoesNotContain("Read Me", Run("ls", target + ":").Output);
+        var (checkCode, output, _) = Run("check", target);
+        Assert.Equal(ExitCodes.Success, checkCode);
+        Assert.Contains("volume: passes the writer's checks", output);
+    }
+
+    [Fact]
     public void Rm_deletes_a_file_and_a_folder_only_with_recursive()
     {
         var disk = Disk();

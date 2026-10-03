@@ -46,12 +46,11 @@ namespace ClassicMac.Resources.Cli
             {
                 fault = HfsWriter.Check(opened.Root.File.DataFork);
             }
-            else if (opened.Host.Layout == HostLayout.Plain && DiskCopy42Reader.Instance.CanRead(opened.Root.File.DataFork) &&
-                     InputEditSession.Open(input.FullName, containerOptions, readOptions).Region is { DiskCopy42: true } disk)
+            else if (InputEditSession.Open(input.FullName, containerOptions, readOptions) is { Kind: InputEditKind.HfsVolume, Partition: null } session)
             {
-                // A Disk Copy 4.2 image of an HFS disk: the disk gets the writer's checks.
+                // A disk image the writer edits (Disk Copy 4.2, NDIF): its disk gets the writer's checks.
                 volume = true;
-                fault = HfsWriter.Check(opened.Root.File.DataFork.Slice(disk.Offset, disk.Length));
+                fault = HfsWriter.Check(ForkData.FromBytes(session.Volume));
             }
 
             // A partitioned disk: each HFS partition gets the writer's checks (one that wraps HFS Plus or is no HFS is left out).

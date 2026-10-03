@@ -300,16 +300,7 @@ namespace ClassicMac.Files.Editing
             try
             {
                 var whole = region is null ? null : File.ReadAllBytes(source);
-                var image = volume?.ToArray() ?? (region is { } range ? whole.AsSpan((int)range.Offset, (int)range.Length).ToArray() : File.ReadAllBytes(source));
-                var written = new List<(string MacPath, HfsFork Kind, byte[] Data)>();
-                foreach (var replacement in forks)
-                {
-                    var kind = replacement.ForkInDataFork ? HfsFork.Data : HfsFork.Resource;
-                    var data = replacement.Fork.ToArray();
-                    image = HfsWriter.ReplaceFork(ForkData.FromBytes(image), replacement.MacPath, kind, data);
-                    written.Add((replacement.MacPath, kind, data));
-                }
-                VerifyHfsForks(image, written);
+                var image = ApplyHfsForks(volume ?? (region is { } range ? whole.AsSpan((int)range.Offset, (int)range.Length).ToArray() : File.ReadAllBytes(source)), forks);
                 if (region is { } at)
                 {
                     if (image.Length != at.Length)
@@ -338,6 +329,27 @@ namespace ClassicMac.Files.Editing
                     File.Delete(temporary);
                 }
             }
+        }
+
+        /// <summary>
+        /// A copy of an HFS volume image with each of <paramref name="forks"/> replaced, read back and compared.
+        /// </summary>
+        public static byte[] ApplyHfsForks(byte[] volume, IReadOnlyList<HfsForkReplacement> forks)
+        {
+            ArgumentNullException.ThrowIfNull(volume);
+            ArgumentNullException.ThrowIfNull(forks);
+            var image = volume.ToArray();
+            var written = new List<(string MacPath, HfsFork Kind, byte[] Data)>();
+            foreach (var replacement in forks)
+            {
+                var kind = replacement.ForkInDataFork ? HfsFork.Data : HfsFork.Resource;
+                var data = replacement.Fork.ToArray();
+                image = HfsWriter.ReplaceFork(ForkData.FromBytes(image), replacement.MacPath, kind, data);
+                written.Add((replacement.MacPath, kind, data));
+            }
+
+            VerifyHfsForks(image, written);
+            return image;
         }
 
         // Reads the written volume back and compares each replaced fork (HfsWriter checks the volume's own structures).

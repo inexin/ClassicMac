@@ -46,6 +46,7 @@ namespace ClassicMac.Files.Editing
         private byte[]? volume;
         private readonly MacPartition? partition;
         private readonly HfsImageRegion? region;
+        private readonly MacFile? ndif;
         private MacFile? single;
 
         private InputEditSession(string path, HostFile host, ContainerNode root, ContainerReadOptions options, ReadOptions readOptions,
@@ -84,6 +85,31 @@ namespace ClassicMac.Files.Editing
                 if (84 + dataSize <= host.File.DataFork.Length && IsPlainHfs(host.File.DataFork.Slice(84, dataSize)))
                 {
                     region = new HfsImageRegion(84, dataSize, DiskCopy42: true);
+                    Kind = InputEditKind.HfsVolume;
+                    return;
+                }
+
+                Kind = InputEditKind.ReadOnly;
+                return;
+            }
+
+            // An NDIF (Disk Copy 6) image of an HFS disk, as an AppleDouble pair, a Basilisk II entry, or in MacBinary,
+            // AppleSingle or BinHex: the disk is edited as a volume and the image made again around it, saved in the
+            // input's own layout (ndif.md §3, §5).
+            var image = NdifReader.Instance.CanRead(root.File) ? root : root.Children is [var wrapped] && NdifReader.Instance.CanRead(wrapped.File) ? wrapped : null;
+            if (image is not null)
+            {
+                SaveAsFormat? format = image == root
+                    ? host.Layout switch { HostLayout.AppleDouble => SaveAsFormat.AppleDoublePair, HostLayout.BasiliskII => SaveAsFormat.BasiliskEntry, _ => null }
+                    : host.Layout != HostLayout.Plain ? null
+                    : image.Format.StartsWith("MacBinary", StringComparison.Ordinal) ? SaveAsFormat.MacBinary
+                    : image.Format.StartsWith("AppleSingle", StringComparison.Ordinal) ? SaveAsFormat.AppleSingle
+                    : image.Format.StartsWith("BinHex", StringComparison.Ordinal) ? SaveAsFormat.BinHex
+                    : null;
+                if (format is { } chosen && NdifWriter.CanRewrite(image.File) && image.Children is [var disk] && IsPlainHfs(disk.File.DataFork))
+                {
+                    ndif = image.File;
+                    singleFormat = chosen;
                     Kind = InputEditKind.HfsVolume;
                     return;
                 }
@@ -140,6 +166,11 @@ namespace ClassicMac.Files.Editing
 
         private byte[] ReadVolume()
         {
+            if (ndif is not null)
+            {
+                return NdifReader.Instance.Read(ndif, new ContainerContext(options)).Single().DataFork.ToArray();
+            }
+
             if (region is null)
             {
                 return File.ReadAllBytes(Path);
@@ -268,6 +299,11 @@ namespace ClassicMac.Files.Editing
         public void Resize(long size)
         {
             RequireVolume("have a size to change");
+            if (ndif is not null)
+            {
+                throw new InvalidOperationException("An NDIF image's disk cannot be resized yet.");
+            }
+
             if (region is not null)
             {
                 throw new InvalidOperationException(partition is not null
@@ -448,6 +484,12 @@ namespace ClassicMac.Files.Editing
                 return ForkSaver.SaveAs(full, singleFormat, single!, forks[""].Fork, forkInDataFork);
             }
 
+            if (ndif is not null)
+            {
+                var image = Rewritten();
+                return ForkSaver.SaveAs(full, singleFormat, image, ResourceForkOf(image));
+            }
+
             return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements(), region)];
         }
 
@@ -458,6 +500,12 @@ namespace ClassicMac.Files.Editing
             if (Kind == InputEditKind.SingleFile)
             {
                 ForkSaver.Save(location! with { File = single! }, forks[""].Fork);
+                return;
+            }
+
+            if (ndif is not null)
+            {
+                SaveNdifInPlace();
                 return;
             }
 
@@ -479,6 +527,43 @@ namespace ClassicMac.Files.Editing
                 if (File.Exists(temporary))
                 {
                     File.Delete(temporary);
+                }
+            }
+        }
+
+        // The NDIF image made again around the edited disk (its forks' edits made too).
+        private MacFile Rewritten() => NdifWriter.Rewrite(ndif!, ForkSaver.ApplyHfsForks(Volume, Replacements()));
+
+        private static ResourceFork ResourceForkOf(MacFile file) => ResourceFork.Read(file.ResourceFork.ToArray());
+
+        // Writes the image in a temporary folder beside the input, then moves each file written over its original (the
+        // data file, and the AppleDouble header or Basilisk II companions), keeping each original as .orig the first time.
+        private void SaveNdifInPlace()
+        {
+            var folder = System.IO.Path.GetDirectoryName(Path)!;
+            var temporary = System.IO.Path.Combine(folder, $".classicmac-{Guid.NewGuid():N}");
+            try
+            {
+                var image = Rewritten();
+                var written = ForkSaver.SaveAs(System.IO.Path.Combine(temporary, System.IO.Path.GetFileName(Path)), singleFormat, image, ResourceForkOf(image));
+                foreach (var file in written)
+                {
+                    var target = System.IO.Path.Combine(folder, System.IO.Path.GetRelativePath(temporary, file));
+                    if (File.Exists(target) && !File.Exists(target + ".orig"))
+                    {
+                        File.Copy(target, target + ".orig");
+                    }
+
+                    ForkData.CloseHostFile(target);
+                    Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target)!);
+                    File.Move(file, target, overwrite: true);
+                }
+            }
+            finally
+            {
+                if (Directory.Exists(temporary))
+                {
+                    Directory.Delete(temporary, recursive: true);
                 }
             }
         }

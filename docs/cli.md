@@ -250,7 +250,10 @@ Each write command changes one thing on a Mac path, through the library's `Input
 - **A plain HFS volume image** (the host file is the volume, with no disk image wrapper), or **a partitioned disk**
   whose map holds one Mac volume partition, a plain HFS one (edited in place within the partition,
   [partition-map.md §5](formats/file-systems/partition-map.md#5-classicmac)), or **a Disk Copy 4.2 image** of an HFS
-  disk (edited in place, its checksum made again, [diskcopy42.md §3](formats/disk-images/diskcopy42.md#3-writing)): files and
+  disk (edited in place, its checksum made again, [diskcopy42.md §3](formats/disk-images/diskcopy42.md#3-writing)), or
+  **an NDIF (Disk Copy 6) image** of an HFS disk as an AppleDouble pair, Basilisk II entry, MacBinary, AppleSingle or
+  BinHex file (made again around the changed disk and saved in the same layout,
+  [ndif.md §3](formats/disk-images/ndif.md#3-writing)): files and
   folders added, deleted (a folder only with `--recursive` when it holds anything), renamed in their folder, moved to another folder, a file locked or unlocked, a System Folder blessed, a file's
   type, creator and Finder flags and a folder's Finder flags set, and a file's resources added, replaced and deleted.
   The rules are [hfs.md §3](formats/file-systems/hfs.md#3-writing).

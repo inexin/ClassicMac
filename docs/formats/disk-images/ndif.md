@@ -9,7 +9,7 @@ or the partition-map reader to open next.
 | | |
 | --- | --- |
 | Identified by | Types `'dimg'`, `'rohd'`, `'hdro'` (creator `'ddsk'`), `'hdc '`, `'hdcm'`; `'APPL'`/`'oneb'` (self-mounting); `'dseg'`/`'ddsk'` for later parts ([raw-images.md §2.1](raw-images.md#21-how-disk-copy-chooses-a-format)). No signature in the data fork: a `'bcem'` 128 resource |
-| ClassicMac | Reads; `ClassicMac.Files.Hfs.NdifReader` |
+| ClassicMac | Reads; `ClassicMac.Files.Hfs.NdifReader`. Rewrites an image around a changed disk: `NdifWriter` |
 | Verified against | Disk Copy 6.1.2, 6.3.3 and 6.5b13 images made in SheepShaver (Mac OS 9.0), each decoded back to its source sectors with the stored checksum matching<br>Hand-built version 2 images mounted by Disk Copy 6.1.2<br>Damaged and segmented images as Disk Copy 6.3.3 handled them |
 | Sources | Disk Copy 6.1.2, 6.3.3 and 6.5b13 (disassembly: the `.HDI` block driver, its `'bcem'` validator and version converter, the `'hdi1'`/`'hdi2'` codec plug-ins); Aaru and ShrinkWrap 2.1 for behaviour only |
 
@@ -247,7 +247,19 @@ gives −39 [Code: 6.3.3].
 
 ## 3. Writing
 
-None.
+An image is made again around a changed disk of the same size, keeping what Disk Copy reads (§2.1) valid:
+
+1. The map keeps its version, header and entries; only map versions 10 to 12 that are not segmented are rewritten.
+2. Chunk boundaries stay. A chunk whose decoded sectors are unchanged keeps its type and stored bytes. A changed chunk
+   is stored raw (`$02`, its size in bytes), as Disk Copy stores a chunk that would not shrink (§1.4); raw chunks are
+   valid in every version and do not count against `+$48`, which is kept.
+3. Stored bytes are written in entry order from the data start; each entry's offset and length are made again; the end
+   entry's offset is the data's end and its length 0, as Disk Copy 6.3.3 writes it (§1.3).
+4. The CRC (`+$50`) is computed again over the new disk (§1.5) when the image had one, and stays 0 when it had none. The
+   `'vers'` 1 text's "CRC: $…" or "CRC28: $…" gets the new value (same length).
+5. Every other resource, the name and the Finder info stay.
+
+[ClassicMac], following §1–§2. Writing a new image from a disk (choosing chunks and compressing) is not done.
 
 ## 4. Variants
 
@@ -327,6 +339,12 @@ segmented image is NDIF version 12 cut into parts ([§1.6](#16-segmented-images)
 
 ## 5. ClassicMac
 
+- **Writing**: an image of a plain HFS disk, given as an AppleDouble pair, a Basilisk II entry, or in MacBinary,
+  AppleSingle or BinHex, is writable: the edit session (`InputEditSession`) edits the decoded disk as a volume
+  ([hfs.md §3](../file-systems/hfs.md#3-writing)) and saves the image made again (§3) in the input's own layout, as a new
+  file or in place (each file written kept as `.orig` the first time). Its disk is not resized. The CLI's `check` runs
+  the writer's checks on the disk.
+
 - **Recognition** [ClassicMac]: a file whose resource fork (256 bytes or more) parses and holds a `'bcem'` 128 of at
   least `$58` bytes, whatever its version or file type. The data fork alone never says it is NDIF; reading a data fork
   without its resource fork throws. Where this reader comes in the unwrapper's order is in
@@ -399,6 +417,10 @@ The codecs have no codes of their own (no `adc.` or `kencode.` codes): their fai
 
 ## 7. Verification
 
+`NdifWriterTests.cs` covers §3: a changed chunk stored raw while the others keep their bytes, the CRC made again, an
+unchanged disk giving the same data and map, a read/write image staying raw with no CRC, and the refusals.
+`NdifSessionTests.cs` edits images given as an AppleDouble pair (saved as a new pair and in place) and in MacBinary.
+
 Synthetic images, `tests/ClassicMac.Files.Tests/NdifTests.cs` (built by `NdifBuilder.cs`):
 
 - `Chunks_decode_to_the_disk`: raw, zero and compressed chunks decode to the volume.
@@ -430,7 +452,8 @@ Images made by Disk Copy in SheepShaver, read from the `CLASSICMAC_CORPUS` folde
 
 ## 8. Not covered
 
-- Writing NDIF images.
+- Writing new NDIF images, compressing changed chunks, and rewriting version 2 or segmented images.
+- Checking rewritten images against Disk Copy itself (mounting one in SheepShaver with "Verify checksum" on).
 - **Version 2's real layout.** No image from Disk Image Mounter or Disk Copy 6.0.x has been seen. Disk Copy 6.1.2's
   8-byte layout ([§4.2](#42-version-2)) was verified only on hand-built images; ShrinkWrap 2.1 reads such files with the
   12-byte layout. That version 2 was written by those two programs is inferred from the release history and from 6.1.2

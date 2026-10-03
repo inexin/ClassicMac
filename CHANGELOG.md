@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- CLI: an NDIF (Disk Copy 6) image of an HFS disk can be written: the image is made again around the changed disk
+  (unchanged chunks kept as they were, changed ones stored raw, the CRC made again) and saved in its own layout
+  (AppleDouble, Basilisk II, MacBinary …); `check` runs the writer's checks on any disk image ClassicMac writes (ndif.md §3).
 - CLI: a Disk Copy 4.2 image of an HFS disk can be written: the disk is edited in place and its data checksum made
   again, the header and tags kept; `check` runs the writer's checks on it (diskcopy42.md §3).
 - CLI: `resize <file> --size <n>` grows a plain HFS volume image within its allocation block size, the new space free at
