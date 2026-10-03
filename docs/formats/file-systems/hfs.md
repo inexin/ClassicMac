@@ -183,6 +183,37 @@ is `bthKeyLen`, the key is padded with zeros to that length, and the child node 
 37) and an extents index key 8 bytes (key length 7), each followed by the `u32` child; the initializer sets
 `bthKeyLen` to 37 and 7 [Code: System 7.1 File Manager]. Only leaf keys have their actual length (§1.9).
 
+How the BTree manager changes a tree [Doc: Apple's hfs sources, `BTreeTreeOps.c`, `BTreeAllocate.c`, `BTree.c`: the
+manager written for Mac OS 8.1's File Manager, which serves HFS and HFS Plus; not traced in Mac OS 9's own code]:
+
+- **Insert into a full node.** In order: the record is inserted at its place; if it does not fit, records are rotated
+  into the left sibling (when there is one); if that fails, the node is split to the left. There is no right rotation
+  and no right split. The second of two parent inserts skips the rotation.
+- **Rotation balances by bytes.** Each record's size counts its offset slot (key, its length byte and data, padded to
+  even, + 2). Records move from the front of the right node, the new one counted at its place, while the left node's
+  bytes are fewer than the right's, undoing the last move if it overfills the left; if the right node still overflows,
+  the rotation fails and a split follows. The new record lands on the side its index falls on.
+- **A split** takes a new node as the full node's left sibling (linked before it, the first leaf if it now is; kind and
+  height copied) and rotates into it, so about half the bytes move left.
+- **The new node** is the first free one by the node map: the map records in order (the header node's, then the map
+  nodes), the first 16-bit word that is not `$FFFF`, its highest clear bit.
+- **A root split** takes another free node as the new root (index, depth + 1) with two records: the new left node's
+  first key and the old node's, at the index key length (§1.8).
+- **First keys.** When a node's first record changes, its parent's index record for it is deleted and inserted again
+  with the new key, which may itself rotate or split upward; a split also inserts a record for the new left node.
+- **Delete.** A node left empty is unlinked from its siblings (`bthFNode`/`bthLNode` moved if it was an end leaf),
+  zeroed, freed in the map (`bthFree` + 1), and its parent's record for it deleted, up the tree. An emptied root leaves
+  an empty tree (root 0, depth 0); a root left with one record is replaced by its child, depth − 1, as long as that
+  holds. Siblings are never merged or rebalanced.
+- **Growth.** Before an insert, replace or delete (of a node's first record), when `bthFree` < depth + 1, the tree file
+  is extended to at least (`bthNNodes` + depth + 1 − `bthFree`) nodes (one more when the map is too small) through the
+  file system's set-EOF routine, whose clump and contiguity are the File Manager's (not traced); every node of the new
+  length counts. New map nodes go at the old end, chained from the last map node, their own bits set. A tree file never
+  shrinks.
+
+ClassicMac's in-place edits differ (§5.5): a full leaf splits to the right into equal halves, without rotation, and a
+node that would empty, or a tree with no free node, has the tree rebuilt; the result is a valid tree either way.
+
 ### 1.9 Catalog records
 
 The catalog file (CNID 4) has one record for each folder and file, and a thread record for each folder and for each

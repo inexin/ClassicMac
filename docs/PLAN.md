@@ -306,8 +306,9 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    Growing within the block size cannot reach far: Mac OS picks the smallest block size that fits, so a formatted
    volume already uses most of its 65,535 blocks (500 MB, 8 KB blocks: at most ~537 MB). Real growth (20 MB to 1 GB)
    needs a new block size: every extent in the catalog and extents tree remapped and file data moved to the new block
-   boundaries, the MDB's clump sizes and `drAlBlSt` set again; checked with Disk First Aid. Whether any Apple tool does
-   this (the reference) is asked of the Mac RE session.
+   boundaries, the MDB's clump sizes and `drAlBlSt` set again; checked with Disk First Aid. No Apple tool does this
+   (Drive Setup does not resize HFS volumes, Disk Copy 6 fixes an image's size, `hdiutil resize` is HFS Plus and keeps
+   the block size), so the design is [ClassicMac].
 
 **Editing through a block overlay (decided 2026-10-03).** An edit touches only the MDB, the bitmap, the B-tree files and
 the edited forks, so the writer stops holding whole images:
@@ -336,6 +337,15 @@ the edited forks, so the writer stops holding whole images:
   their leaves (splits into free nodes, as Mac OS), writing a few sectors; per command on 500 MB about 80 ms remain
   (the check on opening ~15, the reader's re-read ~20, the shell's tree ~15–30). Since built: NDIF's changed chunks from the overlay;
   `format` to 2 TB (`FormatTo`); edit sessions opened one level deep and once per shell session (9.3 s to 5.6 s).
+
+**Next, with the rules in hand (2026-10-03).**
+
+- **KenCode encoder:** Disk Copy 6.3.3's, as written in kencode.md §3, checked like ADC against per-chunk SHA-256 of
+  Disk Copy's own Read-Only Compressed KenCode save of `TestData/Adc/src2m.dsk.gz` (asked of the Mac RE session);
+  then NDIF edits of KenCode images compress changed chunks again.
+- **B-tree edits as Mac OS makes them:** hfs.md §1.8's insert (rotate left, split left, first free node, root split,
+  parent keys deleted and inserted again) and delete (empty nodes zeroed and freed, root collapse), replacing the
+  right split and the rebuild fallback; the rebuild stays only for growing the file.
 
 **Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB
 Mac OS 9 volume).** Not ordered yet:

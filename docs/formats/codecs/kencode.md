@@ -120,7 +120,27 @@ literal run of 3 (`abc`); *afterRun* is then set, so length code 0 is a 3-byte m
 
 ## 3. Writing
 
-None.
+Disk Copy 6.3.3's encoder (`KCCOMPRESSDATA`; the 68k `CODE` 8 version is the same) [Code: 6.3.3]; a reimplementation
+of these rules re-encodes every KenCode chunk of the sample images byte for byte [Verified: 512-, 33- and 20-sector
+chunks]. ClassicMac does not write KenCode yet.
+
+1. **Matcher:** ADC's ([adc.md §3](adc.md#3-writing) steps 1–4: prefix-split binary trees, the same tie rule,
+   full-match replacement, the end rule for 2-byte prefixes, a round-robin pool with the parity delete), with a
+   window and pool of `$2800` positions (`$2801` nodes; deletes once the position passes `$2800`) and matches of at
+   most `$40` bytes (`$40` − prefix bytes compared). Disk Copy 6.3.3 ignores the Match Len of its hidden dialog; 6.1.2
+   honours it.
+2. **Matches:** any length 3–64, at any distance the matcher finds.
+3. **Literals** wait in a run of at most 63, written (length code 0, the literal count of §1.5, the bytes) when 63 wait,
+   before a match, and at the chunk's end.
+4. **Lengths:** a match written right after a run of 1–62 literals has length code *L* − 3 (a match must follow such a
+   run, so code 0 is not needed there); any other match *L* − 2.
+5. **Distances:** the class of §1.3 is taken from the output position where the match starts (bytes covered so far +
+   literals waiting); with the window of `$2800` the classes stop at 10.
+6. **Bits** are written most significant first; zero bits pad the last byte.
+7. **Raw fallback:** after each flush, when ⌈bits ÷ 8⌉ exceeds the input's length the encoder gives up and the chunk
+   is stored raw; equal length stays KenCode.
+8. **Margin:** *d* = bytes covered − ⌊bits ÷ 8⌋ after each step, the largest (at least 0) − the final + 4; NDIF's
+   buffer size is the chunk size + ⌈largest margin ÷ 512⌉ (4 on 512-sector chunks; 185 on 20-sector chunks, so 21).
 
 ## 4. Variants
 
@@ -157,7 +177,7 @@ The decoder reports how it ended; the NDIF reader raises the diagnostic.
 
 ## 8. Not covered
 
-- Writing KenCode.
+- Writing KenCode (§3 is Disk Copy's encoder; ClassicMac's is not built yet).
 - By Apple's release history, KenCode was the only compression of Disk Image Mounter and Disk Copy 6.0.1; neither was
   checked.
 
