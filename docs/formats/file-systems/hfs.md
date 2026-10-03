@@ -694,6 +694,10 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   and `ExternalVolumeCatalogMutationsReopen` edit a real hfsutils-formatted volume; the outputs were remounted with
   hfsutils, for fork edits, folder changes and catalog growth.
 - A file was deleted from a Mac OS 9 boot volume (an image SheepShaver used) and the output listed again.
+- `HfsUtilsInteropTests.cs`, with `CLASSICMAC_HFSUTILS` set (hfsutils' folder, or `docker:<image>` built from
+  `tools/hfsutils/Dockerfile`): a volume ClassicMac formats and edits is mounted, listed and copied from by hfsutils
+  and checked by hfsprogs' `fsck.hfs -n`; a volume `hformat` makes is checked, read and edited by ClassicMac, then
+  read back by hfsutils and `fsck.hfs`.
 - The 256 `_RelString` weights the writer generates were compared with Apple's `gCompareTable` with no differences
   (the table is not in the repository).
 - Disk Copy's block N − 2 rule (§2.6) was checked on images Disk Copy 6.1.2 made in SheepShaver, Mac OS 9.0.
