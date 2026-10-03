@@ -1215,6 +1215,28 @@ public static partial class HfsWriter
         new BigEndianWriter(folder.Data).WriteUInt16At(4, updated);
     }
 
+    // The volume with every thread record shorter than Mac OS's 46 bytes (hfsutils writes a thread only as long as its
+    // name) written at full length, the name padded to a Str31, and how many there were; Disk First Aid rejects the
+    // short form (hfs.md §1.9). The volume itself, and 0, when there are none.
+    internal static (HfsVolume Volume, int Repaired) RepairThreads(HfsVolume image)
+    {
+        var state = OpenCatalog(image);
+        var repaired = 0;
+        for (var index = 0; index < state.Records.Count; index++)
+        {
+            var (key, data) = state.Records[index];
+            if (data[0] is 3 or 4 && data.Length < 46)
+            {
+                var full = new byte[46];
+                data.AsSpan(0, 15 + data[14]).CopyTo(full);
+                state.Records[index] = (key, full);
+                repaired++;
+            }
+        }
+
+        return repaired == 0 ? (image, 0) : (CommitCatalog(state), repaired);
+    }
+
     // A count in the MDB's sector (offset from its start) changed by delta.
     private static void AddCount(byte[] mdb, int offset, int delta) =>
         new BigEndianWriter(mdb).WriteUInt32At(offset, checked((uint)((long)U32(new BigEndianReader(mdb), offset) + delta)));

@@ -63,6 +63,40 @@ public sealed class HfsShortThreadTests
         Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
     }
 
+    // Disk First Aid rejects short threads, so an edit session's first change writes them all at Mac OS's full length,
+    // listed as a change of its own; the saved volume holds no short thread.
+    [Fact]
+    public void An_edit_session_writes_every_short_thread_at_full_length()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"cm-threads-{Guid.NewGuid():N}.img");
+        File.WriteAllBytes(path, Volume());
+        var saved = path + ".out";
+        try
+        {
+            var session = Editing.InputEditSession.Open(path);
+            session.Delete("Read Me");
+            session.SaveAs(saved);
+
+            Assert.Equal(("repair", "", "3 thread records written at Mac OS's full length (Disk First Aid rejects shorter ones)"),
+                (session.Changes[0].Action, session.Changes[0].Path, session.Changes[0].Detail));
+            Assert.Equal("delete", session.Changes[1].Action);
+            var image = File.ReadAllBytes(saved);
+            foreach (var id in new uint[] { 2, Folders(image).Single(f => f.MacPath == "Docs").CatalogId!.Value, Files(image).Single(f => f.MacPath == "Docs:Letter").CatalogId!.Value })
+            {
+                Assert.Equal(46, Thread(image, id).Length);
+            }
+
+            Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
+        }
+        finally
+        {
+            ForkData.CloseHostFile(path);
+            ForkData.CloseHostFile(saved);
+            File.Delete(path);
+            File.Delete(saved);
+        }
+    }
+
     [Fact]
     public void A_renamed_folder_s_short_thread_is_written_at_full_length()
     {

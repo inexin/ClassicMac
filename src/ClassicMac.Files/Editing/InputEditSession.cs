@@ -232,6 +232,29 @@ namespace ClassicMac.Files.Editing
             {
                 throw NotVolume(what);
             }
+
+            Prepare();
+        }
+
+        private bool prepared;
+
+        // Before the first change to a volume: thread records shorter than Mac OS's 46 bytes (as hfsutils writes them)
+        // are written at full length, since Disk First Aid rejects them (hfs.md §1.9); listed as a change of its own.
+        private void Prepare()
+        {
+            if (prepared || Kind != InputEditKind.HfsVolume)
+            {
+                return;
+            }
+
+            prepared = true;
+            var (repaired, count) = HfsWriter.RepairThreads(Overlay);
+            if (count > 0)
+            {
+                overlay = repaired;
+                changes.Add(new PlannedChange("repair", "",
+                    $"{count} thread record{(count == 1 ? "" : "s")} written at Mac OS's full length (Disk First Aid rejects shorter ones)"));
+            }
         }
 
         private void RequireEditable()
@@ -297,6 +320,7 @@ namespace ClassicMac.Files.Editing
                 return;
             }
 
+            Prepare();
             overlay = HfsWriter.Rename(Overlay, macPath, newName);
             var parent = macPath.Contains(':') ? macPath[..(macPath.LastIndexOf(':') + 1)] : "";
             var renamed = parent + newName;
@@ -398,6 +422,7 @@ namespace ClassicMac.Files.Editing
 
             if (FileAt(macPath) is { } file)
             {
+                Prepare();
                 overlay = HfsWriter.SetFinderInfo(Overlay, macPath, With(file.FinderInfo, type, creator, flags));
             }
             else
@@ -407,6 +432,7 @@ namespace ClassicMac.Files.Editing
                     throw new InvalidOperationException($"{macPath} is a folder: it has no type or creator.");
                 }
 
+                Prepare();
                 overlay = HfsWriter.SetFolderFlags(Overlay, macPath, flags ?? FinderFlags.None);
             }
 
@@ -466,6 +492,7 @@ namespace ClassicMac.Files.Editing
                 throw new InvalidOperationException("A single-file input's resources are at the path \"\".");
             }
 
+            Prepare();
             var file = FileAt(macPath) ?? throw new InvalidOperationException($"There is no file {macPath}.");
             var bytes = file.ResourceFork.ToArray();
             session = new EditSession(bytes.Length == 0 ? new ResourceFork() : ResourceFork.Read(bytes));

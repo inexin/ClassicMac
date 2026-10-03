@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- HFS: editing a volume with short thread records (hfsutils') writes them all at Mac OS's 46 bytes first, listed as a
+  `repair` change, since Disk First Aid rejects the short form; the saved volume passes it (hfs.md §1.9).
 - HFS: volumes with short thread records (as hfsutils writes them, and Mac OS 9 keeps them) can be edited: they were
   refused as invalid; a renamed item's thread is written at full length, and a moved item's short thread now takes its new
   parent (hfs.md §1.9).
