@@ -8,7 +8,7 @@ MFS reader ([hfs.md](../file-systems/hfs.md), [mfs.md](../file-systems/mfs.md)) 
 | | |
 | --- | --- |
 | Identified by | Type `'dImg'`, creator `'dCpy'` (Disk Copy) or `'Wrap'` (ShrinkWrap); `$0100` at `+$52` of the data fork |
-| ClassicMac | Reads; `ClassicMac.Files.Hfs.DiskCopy42Reader` |
+| ClassicMac | Reads; `ClassicMac.Files.Hfs.DiskCopy42Reader`. Writes the HFS disk in an image in place |
 | Verified against | Disk Copy 6.1.2's and 6.3.3's images (SheepShaver, Mac OS 9.0)<br>ShrinkWrap 2.1's images<br>The Disk Copy 4.2 image in DART 1.5.3's sample set |
 | Sources | Apple File Type Note $E0/$0005; Disk Copy 6.3.3 (disassembly) |
 
@@ -75,7 +75,9 @@ type alone ([raw-images.md §2](raw-images.md#2-reading)).
 
 ## 3. Writing
 
-None.
+A disk changed in place keeps its size, so the header changes only in its data checksum (`+$48`), computed again over
+the new sectors as in [§1.2](#12-the-checksum); the name, sizes, format bytes, tags and tag checksum stay
+[Doc: File Type Note $E0/$0005]. A new image is not written [ClassicMac].
 
 ## 4. Variants
 
@@ -97,6 +99,10 @@ None.
   `diskcopy.tags-truncated` is reported; the data checksum is still checked.
 - **Checksums**: both are checked whenever the data are complete (no option needed); a mismatch is a warning and the
   disk is read anyway.
+- **Writing**: an image, not wrapped (no MacBinary or AppleDouble around it), whose disk is a plain HFS volume is
+  writable: the edit session (`InputEditSession`) edits the disk as a volume
+  ([hfs.md §3](../file-systems/hfs.md#3-writing)) and saves the image with the disk put back and the data checksum made
+  again (§3). Its disk is not resized. The CLI's `check` runs the writer's checks on the disk.
 
 ## 6. Diagnostics
 
@@ -112,6 +118,8 @@ None.
   (`tests/ClassicMac.Files.Tests/Fixtures.cs`) prove the layout, the name, the checksum warning, the truncated read
   and the recognition checks.
 - `tests/ClassicMac.Files.Tests/HfsTests.cs`: a MacBinary-wrapped Disk Copy 4.2 image unwraps to its HFS volume.
+- `tests/ClassicMac.Files.Tests/DiskCopyWriteTests.cs`: a disk edited and saved keeps the header, tags and tag
+  checksum, and its new data checksum reads clean; the CLI's `WriteCommandTests` does the same through `rm` and `check`.
 - `tests/ClassicMac.Files.Tests/DartTests.cs` (`DART_153_files_decode_to_their_source_disks`): with the
   `CLASSICMAC_CORPUS` folders set, the Disk Copy 4.2 image in DART 1.5.3's sample set (CiderPress2's test data,
   Apache-2.0, not committed) is the reference disk; its header is the one the tag-checksum rule was fitted to.
@@ -120,7 +128,8 @@ None.
 
 ## 8. Not covered
 
-- Writing Disk Copy 4.2 images.
+- Writing new Disk Copy 4.2 images, and changing an image's disk size.
+- Checking Disk Copy 4.2 writes against Disk Copy itself (mounting an edited image in SheepShaver).
 - What Disk Copy does with a wrong checksum or a truncated image (not traced).
 - The tag checksum's skip of the first 12 bytes was matched on one image, not traced in code [Fitted].
 

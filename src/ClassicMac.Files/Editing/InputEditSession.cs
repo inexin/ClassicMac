@@ -45,6 +45,7 @@ namespace ClassicMac.Files.Editing
         private readonly bool forkInDataFork;
         private byte[]? volume;
         private readonly MacPartition? partition;
+        private readonly HfsImageRegion? region;
         private MacFile? single;
 
         private InputEditSession(string path, HostFile host, ContainerNode root, ContainerReadOptions options, ReadOptions readOptions,
@@ -66,6 +67,23 @@ namespace ClassicMac.Files.Editing
                 if (partitions is [var only] && IsPlainHfs(host.File.DataFork.Slice(only.Offset, only.Length)))
                 {
                     partition = only;
+                    region = new HfsImageRegion(only.Offset, only.Length);
+                    Kind = InputEditKind.HfsVolume;
+                    return;
+                }
+
+                Kind = InputEditKind.ReadOnly;
+                return;
+            }
+
+            // A Disk Copy 4.2 image of an HFS disk: the disk is edited in place and the data checksum made again
+            // (diskcopy42.md §3).
+            if (host.Layout == HostLayout.Plain && DiskCopy42Reader.Instance.CanRead(host.File.DataFork))
+            {
+                long dataSize = new BigEndianReader(host.File.DataFork.ReadPrefix(84)).ReadUInt32At(0x40);
+                if (84 + dataSize <= host.File.DataFork.Length && IsPlainHfs(host.File.DataFork.Slice(84, dataSize)))
+                {
+                    region = new HfsImageRegion(84, dataSize, DiskCopy42: true);
                     Kind = InputEditKind.HfsVolume;
                     return;
                 }
@@ -117,16 +135,19 @@ namespace ClassicMac.Files.Editing
         /// <summary>For a partitioned disk, the HFS partition edited; null for a plain volume image.</summary>
         public MacPartition? Partition => partition;
 
+        /// <summary>Where the volume lies in the input when it is not the whole file (a partition, a Disk Copy image's disk).</summary>
+        public HfsImageRegion? Region => region;
+
         private byte[] ReadVolume()
         {
-            if (partition is null)
+            if (region is null)
             {
                 return File.ReadAllBytes(Path);
             }
 
             using var stream = File.OpenRead(Path);
-            stream.Position = partition.Offset;
-            var bytes = new byte[partition.Length];
+            stream.Position = region.Offset;
+            var bytes = new byte[region.Length];
             stream.ReadExactly(bytes);
             return bytes;
         }
@@ -247,9 +268,11 @@ namespace ClassicMac.Files.Editing
         public void Resize(long size)
         {
             RequireVolume("have a size to change");
-            if (partition is not null)
+            if (region is not null)
             {
-                throw new InvalidOperationException("A partition of a partitioned disk cannot be resized: its map would change.");
+                throw new InvalidOperationException(partition is not null
+                    ? "A partition of a partitioned disk cannot be resized: its map would change."
+                    : "A Disk Copy image's disk cannot be resized yet.");
             }
 
             volume = HfsWriter.Resize(ForkData.FromBytes(Volume), size);
@@ -425,7 +448,7 @@ namespace ClassicMac.Files.Editing
                 return ForkSaver.SaveAs(full, singleFormat, single!, forks[""].Fork, forkInDataFork);
             }
 
-            return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements(), Region())];
+            return [ForkSaver.SaveHfsImageAs(Path, full, volume, Replacements(), region)];
         }
 
         /// <summary>Writes the changes over the input, verified, keeping the original as <c>.orig</c> on the first save.</summary>
@@ -441,7 +464,7 @@ namespace ClassicMac.Files.Editing
             var temporary = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, $".classicmac-{Guid.NewGuid():N}.tmp");
             try
             {
-                ForkSaver.SaveHfsImageAs(Path, temporary, volume, Replacements(), Region());
+                ForkSaver.SaveHfsImageAs(Path, temporary, volume, Replacements(), region);
                 var backup = Path + ".orig";
                 if (!File.Exists(backup))
                 {
@@ -459,8 +482,6 @@ namespace ClassicMac.Files.Editing
                 }
             }
         }
-
-        private (long Offset, long Length)? Region() => partition is null ? null : (partition.Offset, partition.Length);
 
         private List<HfsForkReplacement> Replacements() =>
             forks.Where(f => f.Value.IsDirty).Select(f => new HfsForkReplacement(f.Key, f.Value.Fork)).ToList();

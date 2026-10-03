@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- CLI: a Disk Copy 4.2 image of an HFS disk can be written: the disk is edited in place and its data checksum made
+  again, the header and tags kept; `check` runs the writer's checks on it (diskcopy42.md §3).
 - CLI: `resize <file> --size <n>` grows a plain HFS volume image within its allocation block size, the new space free at
   its end; also the MCP server's `resize` (hfs.md §3.2). Changes with no path print without a blank gap.
 - CLI: `format <file> --size <n> --name <name>` makes a new, empty HFS volume image (hfs.md §3.1). An empty HFS volume is

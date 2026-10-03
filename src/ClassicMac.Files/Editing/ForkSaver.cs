@@ -276,12 +276,13 @@ namespace ClassicMac.Files.Editing
         /// created or deleted by <see cref="HfsWriter"/>), or the source image itself when null, with each of
         /// <paramref name="forks"/> replaced. The image is read back and every replaced fork compared before it is
         /// atomically placed at <paramref name="destinationPath"/>, which cannot be the source image. With
-        /// <paramref name="region"/>, the volume is that range of the source (an HFS partition of a partitioned disk): it is
-        /// put back there and the rest of the source copied unchanged.
+        /// <paramref name="region"/>, the volume is that range of the source (an HFS partition of a partitioned disk, a Disk
+        /// Copy 4.2 image's disk): it is put back there, the rest of the source copied unchanged, and a Disk Copy 4.2
+        /// image's data checksum made again.
         /// </summary>
         /// <returns>The full path of the saved HFS image.</returns>
         public static string SaveHfsImageAs(string sourcePath, string destinationPath, byte[]? volume,
-            IReadOnlyList<HfsForkReplacement> forks, (long Offset, long Length)? region = null)
+            IReadOnlyList<HfsForkReplacement> forks, HfsImageRegion? region = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
             ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
@@ -317,6 +318,11 @@ namespace ClassicMac.Files.Editing
                     }
 
                     image.CopyTo(whole.AsSpan((int)at.Offset));
+                    if (at.DiskCopy42)
+                    {
+                        new BigEndianWriter(whole!).WriteUInt32At(0x48, DiskCopy42Reader.Sum(image));   // the data checksum
+                    }
+
                     image = whole!;
                 }
 
@@ -458,4 +464,10 @@ namespace ClassicMac.Files.Editing
             return differences;
         }
     }
+
+    /// <summary>
+    /// Where an HFS volume lies in an image that holds more than the volume: its offset and length, and whether it is a Disk
+    /// Copy 4.2 image's disk, whose data checksum is made again when it is saved.
+    /// </summary>
+    public sealed record HfsImageRegion(long Offset, long Length, bool DiskCopy42 = false);
 }

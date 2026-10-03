@@ -124,6 +124,21 @@ public sealed class WriteCommandTests : IDisposable
     }
 
     [Fact]
+    public void A_Disk_Copy_4_2_image_is_written_with_its_checksum_made_again()
+    {
+        var disk = Path.Combine(folder, "floppy.image");
+        File.WriteAllBytes(disk, Fixtures.DiskCopy42("Disk", File.ReadAllBytes(Disk()), withTags: true));
+
+        var (code, _, error) = Run("rm", disk + ":Read Me", "-o", Out);
+        Assert.True(code == ExitCodes.Success, error);
+        var (checkCode, output, _) = Run("check", Out);
+        Assert.Equal(ExitCodes.Success, checkCode);                                          // no diskcopy.checksum warning
+        Assert.Contains("volume: passes the writer's checks\n", output.Replace("\r\n", "\n"));
+        Assert.Contains("0 errors, 0 warnings", output);
+        Assert.DoesNotContain("Read Me", Run("ls", Out + ":").Output);
+    }
+
+    [Fact]
     public void Rm_deletes_a_file_and_a_folder_only_with_recursive()
     {
         var disk = Disk();

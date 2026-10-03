@@ -294,7 +294,7 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
 6. Writes to an HFS partition inside an Apple Partition Map image (built for a disk with one Mac volume partition:
    edited in place, [partition-map.md §5](formats/file-systems/partition-map.md#5-classicmac); still to do: disks with
    several, and the app's Volume menu on partitioned disks), and to Disk Copy images (written back in their own
-   format).
+   format: built for Disk Copy 4.2, diskcopy42.md §3; NDIF next).
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name (built: `HfsWriter.Format`, the CLI's
    `format`; its sizes fitted to one Mac OS 9 volume until the initializer is traced, hfs.md §3.1).
 8. `resize <volume> --size <n>` (decided 2026-10-03; growing built, hfs.md §3.2): grow a plain HFS volume within its allocation block size

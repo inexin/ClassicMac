@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Files.Editing;
 using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Resources.Cli
@@ -44,6 +45,13 @@ namespace ClassicMac.Resources.Cli
             if (volume)
             {
                 fault = HfsWriter.Check(opened.Root.File.DataFork);
+            }
+            else if (opened.Host.Layout == HostLayout.Plain && DiskCopy42Reader.Instance.CanRead(opened.Root.File.DataFork) &&
+                     InputEditSession.Open(input.FullName, containerOptions, readOptions).Region is { DiskCopy42: true } disk)
+            {
+                // A Disk Copy 4.2 image of an HFS disk: the disk gets the writer's checks.
+                volume = true;
+                fault = HfsWriter.Check(opened.Root.File.DataFork.Slice(disk.Offset, disk.Length));
             }
 
             // A partitioned disk: each HFS partition gets the writer's checks (one that wraps HFS Plus or is no HFS is left out).
