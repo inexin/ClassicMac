@@ -982,9 +982,11 @@ Each phase ships something usable and ends when its exit check passes; no dates 
 - [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
   then character and paragraph styles. `WDBN` Word 4 and 5 (built: [word-mac.md](formats/documents/word-mac.md); no
   specification was found, so the layout is fitted to the one real document, a fast-saved Word 5 file, with libmwaw as
-  a behavioural reference; fast-saved documents and Word 1 and 3 are reported, not read). Still to do: `W6BN` (Word 6,
-  as Word 6 for Windows) and `W8BN` (Word 98, as Word 97: Microsoft's [MS-DOC]), both in OLE compound files (a CFB
-  reader, [MS-CFB]). Needs more Word sample documents of each version, especially ones saved without Fast Save.
+  a behavioural reference; fast-saved documents and Word 1 and 3 are reported, not read). `W8BN` Word 98 (built:
+  [word-binary.md](formats/documents/word-binary.md), by [MS-DOC], in a compound file read by `CompoundFile`,
+  [compound-file.md](formats/containers/compound-file.md), by [MS-CFB]; verified only against fixtures built from the
+  specifications). Still to do: `W6BN` (Word 6, as Word 6 for Windows). Needs real sample documents of each version,
+  especially ones saved without Fast Save.
 - [ ] **PCE MAR** input (Inputs, priority 3). Blocked: no sample, and its layout is published only in GPL source.
 - [x] **Mac ROM images:** the ROM's built-in resource map, raw and New World `Mac OS ROM` files ([rom.md](formats/disk-images/rom.md); 68k ROMs
   unverified).

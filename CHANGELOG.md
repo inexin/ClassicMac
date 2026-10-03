@@ -7,6 +7,14 @@
   Finder's way from a volume's applications (their `'kind'` for the type, else "<application> document") and the
   System's kinds of standard types (`'istd'`), reading an application's resource fork only when one of its documents is
   asked about.
+- Documents: Word 97 binary documents (Word 98 for the Macintosh, `'W8BN'`) read by Microsoft's [MS-DOC]
+  (`WordBinaryDocuments`, docs/formats/documents/word-binary.md): the main text through the piece table (compressed
+  and UTF-16 pieces), character formatting through styles and their base styles, paragraph alignment, indents and
+  spacing, fields' results, tables as tab-separated lines; encrypted and obfuscated documents and Word 6/95 are reported
+  (`word.encrypted`, `word.unsupported-version`), a fast save's piece properties reported and not applied.
+- Core: compound files (OLE2 structured storage) read by Microsoft's [MS-CFB] (`CompoundFile`,
+  docs/formats/containers/compound-file.md): versions 3 and 4, the FAT through the header's and DIFAT sectors' lists,
+  the mini stream, the directory tree; damaged chains and links reported and cut (`cfb.*`).
 - Documents: Microsoft Word 4 and 5 for the Macintosh documents (`'WDBN'`) read into the styled-document model
   (`MacWordDocuments`, docs/formats/documents/word-mac.md): the text, its character formatting (bold, italic,
   underline, outline, shadow, font by name, size; hidden text left out, all caps upper-cased) and its paragraphs'

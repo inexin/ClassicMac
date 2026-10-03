@@ -59,6 +59,7 @@ One file per format, in its category folder. A codec used by more than one forma
 | [applesingle-appledouble.md](containers/applesingle-appledouble.md) | AppleSingle and AppleDouble; writing them | `ClassicMac.Files.Containers` |
 | [uuencode.md](containers/uuencode.md) | uuencode, historical and Base64 | `ClassicMac.Files.Containers` |
 | [writing.md](containers/writing.md) | Saving edited resources back into the container they came from | `ClassicMac.Files.Editing` |
+| [compound-file.md](containers/compound-file.md) | Microsoft compound files (OLE2 structured storage, [MS-CFB]), the container of Word 6 and later documents | `ClassicMac.Core` (`CompoundFile`) |
 | [host-folders.md](containers/host-folders.md) | Mac files on other file systems: Basilisk II / SheepShaver folders, AppleDouble `._` files, macOS named forks; host names; what `unpack` writes | `ClassicMac.Files` (`HostFiles`), `ClassicMac.Files.Export` |
 
 ### Archives
@@ -136,6 +137,7 @@ Documents whose data fork is the document (DOCMaker and SimpleText documents liv
 | Document | Formats | Code |
 | --- | --- | --- |
 | [word-mac.md](documents/word-mac.md) | Microsoft Word 4 and 5 for the Macintosh (`'WDBN'`): text, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`MacWordDocuments`) |
+| [word-binary.md](documents/word-binary.md) | Microsoft Word 97 binary documents (Word 98 for the Macintosh, `'W8BN'`): text through the piece table, character and paragraph formatting | `ClassicMac.Resources.Decoders.Documents` (`WordBinaryDocuments`) |
 
 ### Graphics
 

@@ -12,16 +12,18 @@ namespace ClassicMac.Resources.Decoders.Documents
         private static readonly FourCC Wndo = FourCC.FromString("Wndo"), Text = FourCC.FromString("TEXT"), Styl = FourCC.FromString("styl"),
             PInf = FourCC.FromString("pInf"), Str = FourCC.FromString("STR "), StrList = FourCC.FromString("STR#"), Pict = FourCC.FromString("PICT"),
             Clut = FourCC.FromString("clut"), STwD = FourCC.FromString("sTwD"), Contents = FourCC.FromString("cnt#"),
-            Ttro = FourCC.FromString("ttro"), Wdbn = FourCC.FromString("WDBN");
+            Ttro = FourCC.FromString("ttro"), Wdbn = FourCC.FromString("WDBN"),
+            W6bn = FourCC.FromString("W6BN"), W8bn = FourCC.FromString("W8BN");
 
         private const byte Anchor = 0xCA; // option-space
         private const int MaxPictures = 60, DefaultWindowWidth = 480, ScrollBar = 15;
 
         /// <summary>Whether files of <paramref name="type"/> are Word documents, whose data fork holds the document.</summary>
-        public static bool IsWord(FourCC type) => type == Wdbn;
+        public static bool IsWord(FourCC type) => type == Wdbn || type == W6bn || type == W8bn;
 
         /// <summary>
-        /// The document a file holds, or null when it holds none: a Word document (by its type: <c>WDBN</c>), a DOCMaker
+        /// The document a file holds, or null when it holds none: a Word document (by its type: <c>WDBN</c>, <c>W6BN</c>,
+        /// <c>W8BN</c>), a DOCMaker
         /// document (by its resources), else a SimpleText document (a <c>TEXT</c> or <c>ttro</c> file with a <c>styl</c>
         /// 128 or <c>PICT</c> 1000 and up).
         /// </summary>
@@ -32,7 +34,10 @@ namespace ClassicMac.Resources.Decoders.Documents
             diagnostics ??= new List<Diagnostic>();
             if (IsWord(type))
             {
-                return MacWordDocuments.Read(dataFork, title, options, diagnostics);
+                // Word 6 and later keep the document in a compound file; Word 4 and 5 in their own format.
+                return Core.CompoundFile.IsCompoundFile(dataFork.Span)
+                    ? WordBinaryDocuments.Read(dataFork, title, options, diagnostics)
+                    : MacWordDocuments.Read(dataFork, title, options, diagnostics);
             }
 
             if (fork is not null && ReadDocMaker(fork, title, options, readOptions, diagnostics) is { } docMaker)
