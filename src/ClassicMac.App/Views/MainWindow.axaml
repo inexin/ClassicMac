@@ -1307,7 +1307,25 @@
               </Panel>
             </Border>
             <StackPanel Classes="titles">
-              <TextBlock Classes="heading" Text="{Binding Header.Name, FallbackValue={x:Null}}" />
+              <!-- A file in a "No name" group is named with its row's chips (boards/tree-no-name.md), its bytes on hover. -->
+              <ItemsControl x:Name="HeaderNameTokens" Classes="name-tokens" ItemsSource="{Binding Header.Node.NameTokens, FallbackValue={x:Null}}"
+                            IsVisible="{Binding Header.Node.HasNameTokens, FallbackValue=False}"
+                            ToolTip.Tip="{Binding Header.Node.NameBytes, FallbackValue={x:Null}}" HorizontalAlignment="Left" Margin="0,4,0,3">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:NameToken">
+                    <Border Classes="name-token">
+                      <TextBlock Text="{Binding Label}" />
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock x:Name="HeaderName" Classes="heading" Text="{Binding Header.Name, FallbackValue={x:Null}}"
+                         IsVisible="{Binding !Header.Node.HasNameTokens, FallbackValue=True}" />
               <TextBlock Classes="muted kind" Text="{Binding Header.Kind, FallbackValue={x:Null}}" />
               <ItemsControl ItemsSource="{Binding Header.Facts, FallbackValue={x:Null}}">
                 <ItemsControl.ItemsPanel>

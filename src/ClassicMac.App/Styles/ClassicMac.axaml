@@ -311,15 +311,16 @@
     <Setter Property="Foreground" Value="{DynamicResource CmSelectionText}" />
   </Style>
   <!-- A whitespace name's tokens (boards/tree-no-name.md): mono 10 SemiBold, CmTextMuted on CmSegmentTrack, radius 3,
-       3 px side padding, 2 px apart; in the selected row, CmSelectionText on CmTokenOnSelection. -->
-  <Style Selector="ListBox.browse Border.name-token">
+       3 px side padding, 2 px apart, in the tree and the inspector header; in the selected row, CmSelectionText on
+       CmTokenOnSelection. -->
+  <Style Selector="Border.name-token">
     <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
     <Setter Property="CornerRadius" Value="3" />
     <Setter Property="Padding" Value="3,0" />
     <Setter Property="Margin" Value="0,0,2,0" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
-  <Style Selector="ListBox.browse Border.name-token > TextBlock">
+  <Style Selector="Border.name-token > TextBlock">
     <Setter Property="FontFamily" Value="{StaticResource CmFontMono}" />
     <Setter Property="FontSize" Value="10" />
     <Setter Property="FontWeight" Value="SemiBold" />

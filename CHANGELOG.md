@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Viewer: a file in a "No name" group is named in the inspector header with its row's chips (`sp`, `tab`, `sp×3` …,
+  the bytes on hover), in their plain colours; other files keep their name as text.
 - Decoders: `'kind'` resources (the kind strings an application gives the Finder for its documents) are read
   (`FinderResources.ReadKind`) and decoded as `finder.kind` JSON; `FinderKindResolver` names a document's kind the
   Finder's way from a volume's applications (their `'kind'` for the type, else "<application> document") and the

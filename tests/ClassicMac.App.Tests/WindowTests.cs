@@ -1168,6 +1168,14 @@ public class WindowTests
                 .GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("name-token"));
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmTokenOnSelection"), selected.Background);
             Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmSelectionText"), ((TextBlock)selected.Child!).Foreground);
+            // The inspector header names it with the same chips, in their plain colours, the bytes on hover.
+            var headerTokens = window.FindControl<ItemsControl>("HeaderNameTokens")!;
+            Assert.True(headerTokens.IsEffectivelyVisible);
+            Assert.False(window.FindControl<TextBlock>("HeaderName")!.IsEffectivelyVisible);
+            var headerChips = headerTokens.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("name-token")).ToList();
+            Assert.Equal(["nbsp", "tab"], headerChips.Select(c => ((TextBlock)c.Child!).Text));
+            Assert.Equal(Application.Current!.FindResource(window.ActualThemeVariant, "CmSegmentTrack"), headerChips[0].Background);
+            Assert.Equal("CA 09", ToolTip.GetTip(headerTokens));
             Capture(window, "tree-no-name");
             Baselines.Check(window, "tree-no-name", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
 
@@ -1190,6 +1198,13 @@ public class WindowTests
             Assert.True(model.TreeDisplay.HideInvisible);
             Assert.DoesNotContain(realmz.Children, c => c is NoNameGroupNode);
             options.Flyout.Hide();
+
+            // Any other file: its name as text.
+            model.Selected = realmz.Children.Single(c => c.Title == "Realmz");
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(window.FindControl<TextBlock>("HeaderName")!.IsEffectivelyVisible);
+            Assert.Equal("Realmz", window.FindControl<TextBlock>("HeaderName")!.Text);
+            Assert.False(window.FindControl<ItemsControl>("HeaderNameTokens")!.IsEffectivelyVisible);
             window.Close();
             Baselines.Verify(baselines);
         }
