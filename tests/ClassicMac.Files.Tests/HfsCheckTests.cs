@@ -44,6 +44,22 @@ public sealed class HfsCheckTests
         Assert.Equal("The HFS volume free-block count disagrees with its allocation bitmap.", HfsWriter.Check(ForkData.FromBytes(image)));
     }
 
+    // A wrong count of the root's files (drNmFls) is not damage: Disk First Aid passes it and the File Manager keeps it,
+    // changing it by each file added or removed (hfs.md §2.7). The writer does the same.
+    [Fact]
+    public void A_wrong_root_file_count_is_kept_and_changed_by_each_edit()
+    {
+        var image = Volume();
+        int count = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(Mdb + 0x0C));
+        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(Mdb + 0x0C), (ushort)(count + 1));
+
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(image)));
+        var edited = HfsWriter.Delete(ForkData.FromBytes(image), "Read Me", recursive: false);
+
+        Assert.Equal(count, BinaryPrimitives.ReadUInt16BigEndian(edited.AsSpan(Mdb + 0x0C)));    // still one more than the root holds
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(edited)));
+    }
+
     [Fact]
     public void A_software_locked_volume_is_checked_all_the_same()
     {

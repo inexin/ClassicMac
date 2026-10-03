@@ -424,6 +424,9 @@ The MDB's counts let a reader check it saw the whole catalog:
   records after it and rewrites `drDirCnt` if it differs.
 - The System 7.1 initializer leaves `drDirCnt` 0, and only folders made or deleted through the File Manager change it
   [Code: System 7.1 File Manager].
+- A wrong `drNmFls` is not damage to Mac OS 9.0: Disk First Aid 8.5 verifies a volume whose `drNmFls` is one too many
+  as "appears to be OK", and the File Manager keeps the value when it rewrites the MDB [Verified]. The writer does not
+  check it, and changes it by each file it adds to or removes from the root, as the File Manager does [ClassicMac].
 
 ## 3. Writing
 

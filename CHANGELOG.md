@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- HFS: a volume whose count of the root's files (drNmFls) is wrong is edited, the count kept and changed by each edit as
+  Mac OS does; Disk First Aid passes such a volume (hfs.md §2.7).
 - HFS: editing a volume with short thread records (hfsutils') writes them all at Mac OS's 46 bytes first, listed as a
   `repair` change, since Disk First Aid rejects the short form; the saved volume passes it (hfs.md §1.9).
 - HFS: volumes with short thread records (as hfsutils writes them, and Mac OS 9 keeps them) can be edited: they were

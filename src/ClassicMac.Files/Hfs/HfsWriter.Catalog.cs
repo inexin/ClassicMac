@@ -1035,8 +1035,9 @@ public static partial class HfsWriter
                 throw new InvalidDataException("An HFS file has no parent folder.");
             }
         }
+        // drNmFls is not checked: Disk First Aid passes a wrong one and the File Manager keeps it, changing it by each
+        // file added or removed, as the writer does (hfs.md §2.7) [Verified: Disk First Aid 8.5, Mac OS 9.0].
         if (U32(mdb, 0x54) != files.Length || U32(mdb, 0x58) != folders.Length - 1 ||
-            U16(mdb, 0x0C) != files.Count(file => U32(new BigEndianReader(file.Key), 2) == 2) ||
             U16(mdb, 0x52) != folders.Count(folder => U32(new BigEndianReader(folder.Key), 2) == 2))
         {
             throw new InvalidDataException("The HFS volume counts disagree with its catalog records.");
