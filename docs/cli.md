@@ -1,7 +1,7 @@
 # The command line
 
 `classicmac` reads, lists, converts and extracts classic Mac OS files (`classicmac --help` lists the commands). This
-document describes the file commands that work on *Mac paths* (planned in [PLAN.md](PLAN.md), "File commands, shell
+document describes the file commands that work on *Mac paths* and the MCP server that offers them (§4) (planned in [PLAN.md](PLAN.md), "File commands, shell
 and MCP"); the library's `MacPathTree` (`ClassicMac.Files`) implements the paths.
 
 ## 1. Mac paths
@@ -259,3 +259,86 @@ entry writes more than one file.
 0 success; 2 a usage error or a refused change (a name in use, a folder that is not empty, an input ClassicMac does not
 write), with the reason on standard error; 4 the file could not be written; 5 a path that names nothing (no host file,
 no such item, no folder for a new item, no file before `#rsrc`), as for the read commands (§2).
+
+## 4. MCP server
+
+`classicmac mcp` serves the file commands to an AI assistant as [Model Context Protocol](https://modelcontextprotocol.io)
+tools, over standard input and output (the official C# SDK, `ModelContextProtocol.Core`). It runs until the client
+closes its input. The limit options of every command (`--max-resource-size`, `--max-nesting-depth`,
+`--max-expanded-bytes`) apply to everything it reads.
+
+### 4.1 Setup
+
+Claude Code, for the current project (or with `--scope user` for every project):
+
+```sh
+claude mcp add classicmac -- classicmac mcp
+```
+
+Claude Desktop, in `claude_desktop_config.json` (Settings > Developer > Edit Config):
+
+```json
+{
+  "mcpServers": {
+    "classicmac": { "command": "classicmac", "args": [ "mcp" ] }
+  }
+}
+```
+
+`classicmac` must be on the path (`dotnet tool install -g ClassicMac.Resources.Cli`); otherwise give its full path as
+the command.
+
+### 4.2 Sessions
+
+`open` takes a host file and returns a session; every other tool takes that `session` and a `path` inside the input: the
+Mac path after the host file (§1), names joined by `:` or `/`, `""` for the input itself. A session lasts until
+`close`, which is refused while changes are unsaved unless `discard` is true.
+
+The write tools change the session only. Each change is made on a working copy in the temporary folder, so `list`,
+`stat`, `read` and `search` see it; the input is not touched. `save_as` writes every change: to `destination`, a new
+file (never the input), or with `in_place: true` over the input, the original kept as `<input>.orig` the first time.
+Either way the changes are made again on the input itself and the result is read back to verify it, as the write
+commands' `-o` and `--in-place` do (§3). A write with `dry_run: true` checks the change and reports it without making
+it. Inputs ClassicMac does not write (§3.1) can be read but not changed.
+
+### 4.3 Tools
+
+| Tool | Arguments | Result |
+| --- | --- | --- |
+| `open` | `path` (the host file) | `session`, `input`, `path` (`""`), `kind`, `format`, `editable` (`volume`, `file` or `no`) |
+| `close` | `session`, `discard` | `session`, `input`, `closed` |
+| `list` | `session`, `path`, `limit` (200, at most 1000), `cursor` | ls's object (§2.6) with `count`, `truncated`, `more` |
+| `stat` | `session`, `path` | stat's object (§2.6) |
+| `read` | `session`, `path`, `fork` (`data` or `rsrc`), `hex`, `max_bytes` (65536, at most 1 MiB), `cursor` | cat's object (§2.6) with `offset`, `size`, `truncated`, `more`; text also `length` |
+| `search` | `session`, `path`, `name`, `type`, `creator`, `kind` (`folder`, `file`, `container`), `resource_type`, `contains`, `contains_hex`, `max_depth`, `limit` (100, at most 1000), `cursor` | find's object (§2.6) with `more` |
+| `extract` | `session`, `path`, `directory`, `format` (`appledouble`, `basilisk`, `macbinary`, `raw`), `overwrite`, `enter` | get's object (§2.6) |
+| `put` | `session`, `source` (a host file), `path`, `name`, `type`, `creator`, `dry_run` | §3.3's object with `unsaved` |
+| `mkdir` | `session`, `path`, `dry_run` | the same |
+| `rm` | `session`, `path`, `recursive`, `dry_run` | the same |
+| `rename` | `session`, `path`, `name`, `dry_run` | the same |
+| `set` | `session`, `path`, `type`, `creator`, `flags`, `dry_run` | the same |
+| `res_add` | `session`, `path` (`<file>:#rsrc:<type>:<ID>`), `data_file` or `data_hex`, `name`, `replace`, `dry_run` | the same |
+| `res_rm` | `session`, `path`, `dry_run` | the same |
+| `save_as` | `session`, `destination` or `in_place: true` | §3.3's object: `written`, every change saved, `unsaved` (0) |
+
+The arguments mean what the commands' options mean (§2, §3). A write's result lists the changes it made (`written`
+empty); `unsaved` counts the session's changes no save has written. The tools' annotations mark the read tools
+read-only and `save_as` destructive.
+
+### 4.4 Pages
+
+Results are compact JSON, both as the tool's text and as its structured content. `list`, `search` and `read` give a
+page at a time: a result that stops short has `truncated: true` and `more`, a cursor to pass back as `cursor` for the
+next page. A read pages text by characters and hex by bytes (`max_bytes` sets either). A resource decoded as JSON comes
+as the `json` object when it fits in one page, otherwise as its JSON text in pages (`encoding` stays `json`).
+
+### 4.5 Errors
+
+A call that fails is a tool error (`isError`) whose JSON is `{ "error": "<why>", "code": "<code>" }`:
+
+| Code | When |
+| --- | --- |
+| `notFound` | The path names nothing, or the host file or a source file does not exist (exit 5 on the command line) |
+| `badArguments` | An argument is missing or of the wrong kind, the session is not open, or the cursor is not one the server gave |
+| `refused` | The change or read is refused: a name in use, a folder that is not empty, an input ClassicMac does not write, a folder read as a file, `save_as` onto the input (exit 2) |
+| `ioError` | A host file could not be read or written (exit 4) |

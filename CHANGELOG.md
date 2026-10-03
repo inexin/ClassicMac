@@ -6,6 +6,12 @@
   pages use (stylesheet and pictures put into the page): a DOCMaker document's contents page and chapters in the page
   list, links and Back pictures turning its pages, Back; Rendered | Text, the text also when there is no web view. The
   app's own document layout is removed.
+- CLI: `classicmac mcp`, an MCP server over standard input and output (docs/cli.md §4, on the official C# SDK's
+  `ModelContextProtocol.Core`, Apache-2.0): `open` an input as a session, then `list`, `stat`, `read`, `search` and
+  `extract`, and `put`, `mkdir`, `rm`, `rename`, `set`, `res_add`, `res_rm` (each with `dry_run`) changing the session
+  only, on working copies that later reads see; `save_as` writes a new file, or over the input only with `in_place`.
+  Results are docs/cli.md's JSON; lists and reads come in pages with a `more` cursor; errors carry a code. The write
+  commands' changes and the path commands' kinds, decoding and JSON are shared with the CLI.
 - CLI: file commands on Mac paths (docs/cli.md §2), through disk images and archives: `ls` (files and folders,
   empty ones too, with kind, type/creator, sizes, dates and flags; a fork's types, a type's resources), `stat` (all of
   it with the Finder kind and its source and how the entry was read), `cat` (text as UTF-8 from Mac OS Roman, `--hex`,

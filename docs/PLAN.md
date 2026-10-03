@@ -220,7 +220,9 @@ layout in resources (NDIF's `bcem`, early UDIF's `blkx`).
 
 ### CLI
 
-A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built on System.CommandLine.
+A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built on System.CommandLine; `classicmac mcp`
+uses the official MCP C# SDK's `ModelContextProtocol.Core` (Apache-2.0; decided 2026-10-03: a permissive licence is
+fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the core package, no hosting or DI).
 
 | Command | Does | Options | Phase |
 | --- | --- | --- | --- |
@@ -236,6 +238,7 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
 | `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--json` | — |
 | `find <path>` | Folders and files below a path, through containers (built; §2.4) | `--name`, `--type`, `--creator`, `--kind`, `--resource-type`, `--contains`, `--contains-hex`, `--max-depth`, `--limit`, `--json` | — |
 | `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--json` | — |
+| `mcp` | An MCP server over standard input and output: sessions on opened inputs, the read and write commands as tools, saves only through `save_as` (built; [cli.md](cli.md) §4) | the limit options | — |
 
 - **Every command:** `--max-resource-size` maps onto `ReadOptions`, `--max-nesting-depth` and `--max-expanded-bytes`
   onto `ContainerReadOptions` (sizes in bytes or KiB/MiB/GiB), defaults taken from each record's `Default`;
@@ -263,7 +266,9 @@ A `dotnet tool` (package `ClassicMac.Resources.Cli`, command `classicmac`) built
    shell can drive them. The write commands are built: `put`, `mkdir`, `rm`, `rename`, `set`, `res-add`, `res-rm`
    ([cli.md §3](cli.md#3-write-commands)).
 3. **MCP server** (`classicmac mcp`, stdio): the same operations as MCP tools (list, stat, read, search, extract, add,
-   delete, save as), with the same write safety and output-size limits.
+   delete, save as), with the same write safety and output-size limits. Built ([cli.md §4](cli.md#4-mcp-server)): a
+   session per opened input, changes made on working copies so reads see them, written only by `save_as` (in place
+   only with `in_place`), lists and reads in pages with a `more` cursor.
 4. **Interactive shell** (`classicmac shell <input>`), DOS-like: `cd` (into disk images and archives as folders),
    `dir`/`ls`, `type`, `info`, `res`, `copy` (in or out), `del`, `md`, `find`; prompt `Mac OS 9.hfv:System Folder>`,
    tab completion, history; leaving with unsaved changes asks Save / Save As / Discard.

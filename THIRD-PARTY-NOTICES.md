@@ -269,6 +269,16 @@ its file names, type and creator codes, comments, categories and extensions, les
 filext.com. TCDB was a free download with no licence for redistribution; its owner's decision to ship it is recorded in
 docs/PLAN.md (Decisions).
 
+## MCP C# SDK (the CLI's `mcp` command)
+
+The CLI references the NuGet package [ModelContextProtocol.Core](https://github.com/modelcontextprotocol/csharp-sdk)
+2.2.0, © Model Context Protocol a Series of LF Projects, LLC, under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0) (the project is moving from MIT to Apache-2.0; contributions whose
+authors have not agreed to relicense stay under MIT). It is used unmodified, as a binary dependency; the project ships
+no NOTICE file (checked 2026-10-03). It brings
+`Microsoft.Extensions.AI.Abstractions` and `Microsoft.Extensions.Logging.Abstractions` (MIT, © .NET Foundation and
+Contributors).
+
 ## Bundled with the viewer app
 
 The app (not the libraries) references these NuGet packages, which ship their own licence files:

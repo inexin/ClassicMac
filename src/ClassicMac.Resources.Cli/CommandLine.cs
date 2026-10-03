@@ -13,7 +13,7 @@ namespace ClassicMac.Resources.Cli
     /// <summary>
     /// The <c>classicmac</c> command tree. It has <c>info</c>, <c>list</c>, <c>unpack</c>, <c>extract</c>, <c>convert</c>, <c>disasm</c> and <c>pack</c>,
     /// the read commands on Mac paths (<c>ls</c>, <c>stat</c>, <c>cat</c>, <c>find</c>, <c>get</c>) and the write commands (<c>put</c>, <c>mkdir</c>,
-    /// <c>rm</c>, <c>rename</c>, <c>set</c>, <c>res-add</c>, <c>res-rm</c>) (docs/cli.md). Every limit option maps onto <see cref="ReadOptions"/> or
+    /// <c>rm</c>, <c>rename</c>, <c>set</c>, <c>res-add</c>, <c>res-rm</c>) and <c>mcp</c>, the MCP server (docs/cli.md). Every limit option maps onto <see cref="ReadOptions"/> or
     /// <see cref="ContainerReadOptions"/>. <paramref name="binary"/> takes <c>cat --raw</c>'s bytes (standard output).
     /// </summary>
     internal sealed partial class CommandLine(TextWriter output, TextWriter error, Stream? binary = null)
@@ -120,7 +120,21 @@ namespace ClassicMac.Resources.Cli
             {
                 root.Subcommands.Add(write);
             }
+
+            root.Subcommands.Add(McpCommand());
             return root;
+        }
+
+        private Command McpCommand()
+        {
+            var command = new Command("mcp", "Serve the file commands as MCP tools over standard input and output (docs/cli.md §4)");
+            command.SetAction(async (result, cancellationToken) =>
+            {
+                using var server = new Mcp.MacMcpServer(ContainerOptionsFrom(result), ReadOptionsFrom(result));
+                await server.RunStdioAsync(cancellationToken).ConfigureAwait(false);
+                return ExitCodes.Success;
+            });
+            return command;
         }
 
         private static Argument<FileInfo> InputArgument() => new Argument<FileInfo>("input")
@@ -462,7 +476,7 @@ namespace ClassicMac.Resources.Cli
             return option;
         }
 
-        private static bool TryHex(string text, out byte[] bytes)
+        internal static bool TryHex(string text, out byte[] bytes)
         {
             bytes = [];
             var digits = string.Concat(text.Where(c => !char.IsWhiteSpace(c)));

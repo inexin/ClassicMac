@@ -23,7 +23,8 @@ namespace ClassicMac.Resources.Cli
     /// </summary>
     internal static class MacPathJson
     {
-        private static readonly JsonWriterOptions Options = new() { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        private static readonly JsonWriterOptions Indented = new() { Indented = true, Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        private static readonly JsonWriterOptions Compact = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
         /// <summary>The Finder kind of a file (an alias by its flag, else by type and creator); null for anything else.</summary>
         public static FinderKind? KindOf(MacPathEntry entry) =>
@@ -41,11 +42,11 @@ namespace ClassicMac.Resources.Cli
             return decoder?.Decode(new DecodeInput(resource, data, entry.Resources!, readOptions, new List<Diagnostic>())).FirstOrDefault();
         }
 
-        /// <summary>One JSON object, indented, written by <paramref name="body"/>.</summary>
-        public static string Document(Action<Utf8JsonWriter> body)
+        /// <summary>One JSON object written by <paramref name="body"/>: indented for people, or compact (the MCP server).</summary>
+        public static string Document(Action<Utf8JsonWriter> body, bool indented = true)
         {
             using var stream = new MemoryStream();
-            using (var w = new Utf8JsonWriter(stream, Options))
+            using (var w = new Utf8JsonWriter(stream, indented ? Indented : Compact))
             {
                 w.WriteStartObject();
                 body(w);

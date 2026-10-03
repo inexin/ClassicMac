@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" />
     <PackageReference Include="System.CommandLine" />
   </ItemGroup>
 

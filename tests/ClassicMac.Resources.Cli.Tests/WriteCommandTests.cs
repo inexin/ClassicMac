@@ -1,4 +1,3 @@
-using System.Buffers.Binary;
 using System.Text.Json;
 using ClassicMac.Core;
 using ClassicMac.Files;
@@ -26,19 +25,7 @@ public sealed class WriteCommandTests : IDisposable
         return (code, output.ToString(), error.ToString());
     }
 
-    // A volume: Docs (holding Letter, with 'STR ' 128) and Read Me, with free space for new files.
-    private string Disk()
-    {
-        var builder = new HfsBuilder();
-        var docs = builder.Folder(HfsBuilder.Root, "Docs");
-        var fork = new ResourceFork();
-        fork.Add(new Resource(Str, 128, new byte[] { 1, (byte)'a' }));
-        builder.File(docs, "Letter", "data"u8.ToArray(), fork.ToArray());
-        builder.File(HfsBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
-        var path = Path.Combine(folder, "disk.img");
-        File.WriteAllBytes(path, WithFreeSpace(builder.Build("Disk")));
-        return path;
-    }
+    private string Disk() => WritableDisk.Build(folder);
 
     private string Out => Path.Combine(folder, "out.img");
 
@@ -203,17 +190,5 @@ public sealed class WriteCommandTests : IDisposable
         Assert.True(code == ExitCodes.Success, error);
         Assert.NotNull(ResourceFork.Read(ClassicMac.Files.Editing.HostImport.Read(output).ResourceFork.ToArray()).Find(Str, 130));
         Assert.Equal(ExitCodes.Usage, Run("mkdir", input + ":New", "-o", output).Code);            // no folders in one file
-    }
-
-    private static byte[] WithFreeSpace(byte[] image)
-    {
-        const int allocationBlocks = 1600;
-        int oldBlocks = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(2 * HfsBuilder.Block + 0x12));
-        int oldFree = BinaryPrimitives.ReadUInt16BigEndian(image.AsSpan(2 * HfsBuilder.Block + 0x22));
-        Array.Resize(ref image, (HfsBuilder.FirstAllocationBlock + allocationBlocks + 2) * HfsBuilder.Block);
-        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(2 * HfsBuilder.Block + 0x12), allocationBlocks);
-        BinaryPrimitives.WriteUInt16BigEndian(image.AsSpan(2 * HfsBuilder.Block + 0x22), checked((ushort)(oldFree + allocationBlocks - oldBlocks)));
-        image.AsSpan(2 * HfsBuilder.Block, HfsBuilder.Block).CopyTo(image.AsSpan(image.Length - 2 * HfsBuilder.Block));
-        return image;
     }
 }
