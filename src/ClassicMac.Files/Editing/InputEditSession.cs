@@ -208,8 +208,10 @@ namespace ClassicMac.Files.Editing
             options ??= ContainerReadOptions.Default;
             diagnostics ??= new List<Diagnostic>();
             var host = HostFiles.Read(path, options, diagnostics);
+            // One level is enough to tell what the input lets the session change (wrappers of one file do not count):
+            // the archives and disk images stored in a volume are not opened.
             var root = ContainerUnwrapper.Default.Unwrap(host.File, HostFiles.FormatName(host.Layout),
-                new ContainerContext(options, diagnostics, siblings: HostFiles.Siblings(path, options, diagnostics)));
+                new ContainerContext(options, diagnostics, siblings: HostFiles.Siblings(path, options, diagnostics)), levels: 1);
             return new InputEditSession(path, host, root, options, readOptions ?? ReadOptions.Default, diagnostics);
         }
 

@@ -27,11 +27,12 @@ namespace ClassicMac.Resources.Cli
         private int saved;
         private string current;
 
-        private PathSession(string id, string input, InputEditKind kind, ContainerReadOptions options, ReadOptions readOptions)
+        private PathSession(string id, string input, InputEditSession first, ContainerReadOptions options, ReadOptions readOptions)
         {
             Id = id;
             Input = input;
-            Kind = kind;
+            Kind = first.Kind;
+            live = first;
             this.options = options;
             this.readOptions = readOptions;
             current = input;
@@ -66,8 +67,7 @@ namespace ClassicMac.Resources.Cli
                 throw new PathNotFound($"{path}: no host file.");
             }
 
-            var kind = InputEditSession.Open(full, options, readOptions).Kind;
-            return new PathSession(id, full, kind, options, readOptions);
+            return new PathSession(id, full, InputEditSession.Open(full, options, readOptions), options, readOptions);
         }
 
         /// <summary>
