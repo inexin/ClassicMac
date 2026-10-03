@@ -4,14 +4,14 @@ Microsoft Word 4.0 (1989) and 5.0/5.1 (1991–1992) for the Macintosh saved docu
 `'MSWD'`, in a format of their own, not the Word for Windows formats: big-endian, with a header that maps the text, the
 formatting tables and the style sheet, everything in the data fork. Microsoft never published it. ClassicMac reads the
 text with its character and paragraph formatting into a styled document, which the viewer shows and `convert` and
-`extract` write as HTML ([html.md](../output/html.md)). A document saved with Fast Save is reported, not read.
+`extract` write as HTML ([html.md](../output/html.md)), fast-saved documents through their piece table.
 
 | | |
 | --- | --- |
 | Identified by | Type `'WDBN'`; the data fork starts `$FE37` and the version word `$001C` (Word 4) or `$0023` (Word 5) |
 | ClassicMac | Reads; `ClassicMac.Resources.Decoders.Documents` (`MacWordDocuments`) |
-| Verified against | One Word 5 document from a CD-ROM (§7), fast saved; nothing made by Word 4 |
-| Sources | Fitted to that document; libmwaw for names and for what the document does not show (behaviour only) |
+| Verified against | Documents Word 4.0 and Word 5.1a wrote with known content (§7); one Word 5 document from a CD-ROM, fast saved |
+| Sources | Fitted to those documents; libmwaw for names and for what they do not show (behaviour only); [MS-DOC]'s Clx for the piece table |
 
 Contents
 
@@ -113,7 +113,9 @@ A block applies on top of its paragraph style's CHP. Bytes past the block's leng
 | Paragraphs | A `u16` length counting itself, then per style a length byte (in bytes) and a block: the style number, 6 bytes of line-height data, the sprms (§1.6); `$FF` for none [Fitted] |
 | Links | A `u16` count, then per style its next style and the style it is based on, a byte each [Fitted] |
 
-A paragraph's style number is its index in these lists [Fitted: the document seen numbers its three styles from 0].
+A style's number (*stc*) is the first byte of its paragraph block: Normal is 0 and Heading 1 `$FF`, and a paragraph's
+block names its style by that number, not by the style's place in the lists (Heading 1 comes first) [Verified: Word
+5.1a and 4.0 documents]. A style without a paragraph block keeps its place as its number [ClassicMac].
 A style with no character block has New York 12 [Reference: libmwaw].
 
 ### 1.6 Paragraph sprms
@@ -135,8 +137,9 @@ A sprm is a code byte and its argument. Lengths are in twips (1/20 point) [Fitte
 | `$18` | 1 | In a table: 1 [Fitted] |
 | `$19` | 1 | The table row's end mark: 1 [Fitted] |
 | `$1E`–`$22` | 2 | Borders: top, left, bottom, right, between [Reference: libmwaw] |
-| `$94`, `$99` | 2 | Table properties [Fitted] |
-| `$98` | 2 + *n* | The row's cell definitions: a `u16` length, then *n* bytes [Fitted] |
+| `$94` | 2 | The gap between cells, half of it on each side (108 twips seen) [Verified] |
+| `$99` | 2 | Table properties [Fitted] |
+| `$98` | 2 + *n* | The row's cell definitions: a `u16` length *n* (even; the paragraph block may end before its pad byte), the cell count, then the row's left edge and each cell's right edge, `i16` twips (−108, 2880, 5760, 8640 for three 2-inch cells) [Verified] |
 | `$00` | | Padding: ends the list [Fitted] |
 
 ### 1.7 Font names
@@ -155,17 +158,34 @@ The text is Mac OS Roman [Fitted]. These bytes are not characters:
 | `$09` | Tab [Fitted] |
 | `$07` | End of a table cell; with sprm `$19`, the end of the row [Fitted] |
 | `$0C` | Page or section break, ending its paragraph [Fitted] |
-| `$0B` | Line break within a paragraph [Reference: libmwaw] |
+| `$0B` | Line break within a paragraph [Verified] |
 | `$1E`, `$1F` | Non-breaking hyphen, optional hyphen [Reference: libmwaw] |
 | `$01`, `$02`, other controls | A picture, a footnote reference and other special characters [Reference: libmwaw] |
+
+### 1.9 Tables and the piece table
+
+A table is a run of paragraphs with sprm `$18`: each cell is a paragraph ended by `$07`, and each row ends with a
+paragraph of a lone `$07` with sprms `$18`, `$19`, `$94` and `$98`, the row's cell definitions [Verified: Word 5.1a and
+4.0 tables].
+
+A fast-saved document has a piece table in zone 18; full saves leave zone 18 empty [Verified]. It matches [MS-DOC]'s
+`Clx` but for its 2-byte lengths [Fitted: a Word 5 document fast saved twice; Reference: MS-DOC]:
+
+| Part | Layout |
+| --- | --- |
+| `$01` blocks | A `u16` length, then property changes the pieces' property words refer to |
+| `$02` | A `u16` length, then the PlcPcd: *n* + 1 character positions (`u32`), then *n* piece descriptors |
+| Piece descriptor | Flags (`u16`, `$0002` and `$8002` seen), the piece's FC (`u32`), a property word (`u16`, 0 for none) |
+
+The text is the pieces in order; text a fast save added lies after the old text end (FC `$64E7` onward in the
+document seen), and formatting pages cover it by FC like any other text [Fitted].
 
 ## 2. Reading
 
 1. Check the signature and version (§1.1); a data fork shorter than `$100` bytes is no Word document.
-2. When zone 18 (the piece table) is not empty, the document was fast saved and the text is in pieces listed by the piece table: report it
-   and stop (§5).
-3. The main text is the main text length's characters from the text start; the text end and the data end must lie in
+2. The main text is the main text length's characters from the text start; the text end and the data end must lie in
    the fork.
+3. When zone 18 is not empty, the document was fast saved: its main text is the piece table's pieces in order (§1.9).
 4. Read the font names (§1.7) and the style sheet (§1.5).
 5. Read the character and paragraph runs from their bin tables' pages (§1.3).
 6. For each character: its paragraph's style gives the base CHP and paragraph properties; the paragraph run's sprms
@@ -192,15 +212,17 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
 
 - One chapter, titled with the file's name; the text's paragraphs carry their alignment, indents and spacing in
   points. [ClassicMac]
-- Paragraph ends, line breaks and page breaks become CR; a cell's end becomes a tab and a row's end a CR, so a table
-  reads as tab-separated lines. [ClassicMac]
+- Paragraph ends and page breaks become CR; a line break becomes U+2028 (a `<br>` in HTML). A cell's end becomes a tab
+  and a row's end a CR, and the rows are a `DocumentTable` with the row's cell edges in points, written as an HTML
+  table. [ClassicMac]
 - Non-breaking and optional hyphens become U+2011 and U+00AD; pictures, footnote references and other control
   characters are left out. [ClassicMac]
 - Hidden text is left out, as Word shows and prints it by default; all-caps text is upper-cased. [ClassicMac]
-- The face shows bold, italic, underline (any kind), outline and shadow; strike-through, small caps, colour,
-  raised and lowered text are not shown. [ClassicMac]
-- A fast-saved document is not read: its piece table's layout is not known from any source, and guessing it could put
-  the text together wrongly. The diagnostic says how to get a readable document. [ClassicMac]
+- The face shows bold, italic, underline (any kind), outline and shadow; small caps is `TextRun.SmallCaps`
+  (`font-variant: small-caps` in HTML); the colour is one of QuickDraw's eight [Doc: Inside Macintosh: Imaging With
+  QuickDraw] by Word's index (5 red [Verified]). Strike-through, raised and lowered text are not shown. [ClassicMac]
+- A fast-saved document is read through its piece table (§1.9); its pieces' property changes are not applied
+  (`word.piece-properties`). A piece table that cannot be read stops the reading (`word.bad-pieces`). [ClassicMac]
 - A zone outside the file, or a page past its end, is left out and reported once; the text still reads. [ClassicMac]
 
 ## 6. Diagnostics
@@ -210,7 +232,8 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
 | `word.bad-header` | Error | The text's start or end is not in the file | Reads nothing | Not traced |
 | `word.bad-styles` | Warning | The style sheet ends early | Reads without styles | Not traced |
 | `word.bad-zone` | Warning | A zone or a formatting page lies past the end of the file | Leaves it out | Not traced |
-| `word.fast-saved` | Error | The document was fast saved (§2 step 2) | Reads nothing; says to save it again with Fast Save off | Word reads it |
+| `word.bad-pieces` | Error | A fast-saved document's piece table (§1.9) cannot be read | Reads nothing | Not traced |
+| `word.piece-properties` | Info | A piece has a property word (a fast save's formatting change) | Reads its text without it | Word applies it |
 | `word.not-shown` | Info | The text has pictures, footnote references or other special characters | Leaves them out | Word shows them |
 | `word.unknown-sprm` | Warning | A paragraph sprm not in §1.6 | Stops reading that paragraph's sprms | Not traced |
 | `word.unsupported-version` | Error | A Word for the Macintosh signature with a version other than Word 4 or 5 | Reads nothing | Not traced |
@@ -220,23 +243,29 @@ Word 6 for the Macintosh (`'W6BN'`) and Word 98 (`'W8BN'`) saved the Word for Wi
 - `tests/ClassicMac.Resources.Decoders.Tests/MacWordTests.cs` builds documents byte by byte
   (`MacWordFixtures.cs`): character flags, sizes, fonts by name, underline, a style's toggles, hidden and all-caps
   text, paragraph alignment, indents and spacing, a style's alignment, line breaks and table rows, special
-  characters, fast-saved documents (by the flag and by the piece table), other versions, a bad zone, an unknown sprm,
-  and the HTML and converter output.
+  characters, a fast-saved document read through its piece table and one whose table cannot be read, the flag byte
+  alone not marking a fast save, other versions, a bad zone, an unknown sprm, and the HTML and converter output.
+- `tests/ClassicMac.Resources.Decoders.Tests/WordSampleTests.cs` on `Word/` (in the repository): 21 documents Word 4.0
+  and Word 5.1a wrote in SheepShaver (Mac OS 9.0) for ClassicMac, our own content made as RTF and saved in Word's own
+  format, listed in `Word/CONTENTS.txt`: their text (Mac OS Roman characters, a tab, a line break), every character
+  format (bold, italic, underline, outline, shadow, small caps, all caps, hidden, Times and Geneva, 9, 12 and 24 point,
+  red), every paragraph format (Heading 1, the four alignments, left, right, first-line and hanging indents, space
+  before and after), a 3 × 3 table with its cell edges, edited documents, and the HTML (a line break, small caps, the
+  colour, the table). Word saved them in full; none is fast saved.
 - `tests/ClassicMac.Resources.Decoders.Tests/WordCorpusTests.cs`, with `CLASSICMAC_WORD_CORPUS` set: a 132,608-byte
   Word 5 document from a game's CD-ROM, fast saved twice, reads as version 5 with a main text of 25,562 characters,
   39 fonts (Chicago, New York, Geneva and Times among them), 3 styles, 1,347 character runs (218 of them bold) and
-  4,443 paragraph runs, and is reported as fast saved. Every [Fitted] rule above was read from this document; it is
-  not in the repository.
-- Nothing was checked against Word itself.
+  4,443 paragraph runs, and reads through its 46 pieces from "Formatted to be printed in Landscape orientation."; it is
+  not in the repository. [Fitted] rules are read from it; [Verified] ones also hold in the documents Word wrote.
 
 ## 8. Not covered
 
-- Fast-saved documents (the piece table, zone 18).
+- A fast save's property changes (the `$01` blocks the pieces' property words refer to).
 - Word 1 and Word 3 documents.
-- Footnotes, headers and footers, sections, page layout, tabs, borders, line spacing and table column widths.
+- Footnotes, headers and footers, sections, page layout, tabs, borders and line spacing.
 - Pictures (inline `$01` characters and their data).
 - Styles based on other styles: a style's own blocks apply to the defaults, not to its parent's.
-- Character colour, strike-through, small caps and raised or lowered text.
+- Strike-through and raised or lowered text.
 - The document summary (zone 24).
 
 ## 9. References

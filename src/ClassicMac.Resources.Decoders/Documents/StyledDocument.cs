@@ -45,6 +45,12 @@ namespace ClassicMac.Resources.Decoders.Documents
         /// </summary>
         public IReadOnlyList<ParagraphFormat> Paragraphs { get; init; } = [];
 
+        /// <summary>
+        /// The tables, in order: each a run of rows in the text, a row one line of cells each ended by a tab (Word's
+        /// tables, word-mac.md §1.9); empty for documents with none.
+        /// </summary>
+        public IReadOnlyList<DocumentTable> Tables { get; init; } = [];
+
         /// <summary>The format of the paragraph that character <paramref name="offset"/> is in, or null when there is none.</summary>
         public ParagraphFormat? ParagraphAt(int offset)
         {
@@ -78,6 +84,13 @@ namespace ClassicMac.Resources.Decoders.Documents
     /// <param name="SpaceAfter">The space below it.</param>
     public sealed record ParagraphFormat(int Start, Justification Justification, double LeftIndent = 0, double RightIndent = 0,
         double FirstLineIndent = 0, double SpaceBefore = 0, double SpaceAfter = 0);
+
+    /// <summary>
+    /// A table: its rows are the lines from <paramref name="Start"/> up to <paramref name="End"/>, each row's cells ended by
+    /// a tab; <paramref name="CellEdges"/> are the row's left edge then each cell's right edge, in points from the column's
+    /// left.
+    /// </summary>
+    public sealed record DocumentTable(int Start, int End, IReadOnlyList<double> CellEdges);
 
     /// <summary>A colour, 0–255 per component.</summary>
     public readonly record struct Rgb(byte Red, byte Green, byte Blue);

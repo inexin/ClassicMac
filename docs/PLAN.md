@@ -1032,8 +1032,9 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   the navigation instead.
 - [ ] **Microsoft Word documents** (`MSWD`): a document decoder for the viewer, `convert` and `extract`, text first,
   then character and paragraph styles. `WDBN` Word 4 and 5 (built: [word-mac.md](formats/documents/word-mac.md); no
-  specification was found, so the layout is fitted to the one real document, a fast-saved Word 5 file, with libmwaw as
-  a behavioural reference; fast-saved documents and Word 1 and 3 are reported, not read). `W8BN` Word 98 (built:
+  specification was found, so the layout is fitted to real documents: 21 that Word 4.0 and 5.1a wrote with known
+  content (test fixtures, `tests/ClassicMac.Resources.Decoders.Tests/Word/`) and a fast-saved Word 5 file, read through
+  its piece table; libmwaw as a behavioural reference; Word 1 and 3 are reported, not read). `W8BN` Word 98 (built:
   [word-binary.md](formats/documents/word-binary.md), by [MS-DOC], in a compound file read by `CompoundFile`,
   [compound-file.md](formats/containers/compound-file.md), by [MS-CFB]; verified only against fixtures built from the
   specifications). `W6BN` Word 6 (built, in the same reader: no public specification, so its structures follow other

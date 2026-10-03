@@ -108,7 +108,7 @@ public class MacWordTests
     }
 
     [Fact]
-    public void Line_breaks_and_table_cells_become_line_ends_and_tabs()
+    public void Line_breaks_stay_in_their_paragraph_and_table_cells_become_tabs()
     {
         // A line break in a paragraph, then a row of two cells and the row's end mark.
         var text = "One\vtwo\rA\aB\a\a";
@@ -121,7 +121,8 @@ public class MacWordTests
 
         var chapter = Assert.Single(Read(data).Chapters);
 
-        Assert.Equal("One\rtwo\rA\tB\t\r", chapter.Text.Text);
+        Assert.Equal("One\u2028two\rA\tB\t\r", chapter.Text.Text);
+        Assert.Equal(new DocumentTable(8, 13, []), Assert.Single(chapter.Tables) with { CellEdges = [] });
     }
 
     [Fact]
@@ -154,19 +155,38 @@ public class MacWordTests
         Assert.DoesNotContain(diagnostics, d => d.Code == "word.fast-saved");
     }
 
+    // A fast-saved document's text is its pieces in order (zone 18: a $01 property block, then $02 and the pieces' n + 1
+    // character positions and n descriptors: flags, FC, property word), word-mac.md §1.9.
     [Fact]
-    public void A_piece_table_marks_a_document_fast_saved()
+    public void A_fast_saved_document_reads_through_its_piece_table()
+    {
+        var builder = Builder().Text("Hello World\r");
+        builder.Flags = 0x24;                                                  // two fast saves, as Word 5 counts them
+        builder.PieceTable =
+        [
+            1, 0, 2, 0x80, 0,                                                  // a property block: not applied
+            2, 0, 28,                                                          // the piece table: 28 bytes
+            0, 0, 0, 0, 0, 0, 0, 6, 0, 0, 0, 12,                               // positions 0, 6, 12
+            0, 2, 0, 0, 1, 6, 0, 0,                                            // piece 1: "World\r", at FC $106
+            0, 2, 0, 0, 1, 0, 0, 0,                                            // piece 2: "Hello ", at FC $100
+        ];
+        var diagnostics = new List<Diagnostic>();
+
+        var document = MacWordDocuments.Read(builder.Build(), "Saved", diagnostics: diagnostics);
+
+        Assert.Equal("World\rHello ", document!.Chapters[0].Text.Text);
+        Assert.DoesNotContain(diagnostics, d => d.Code == "word.fast-saved");
+    }
+
+    [Fact]
+    public void A_piece_table_that_cannot_be_read_is_reported()
     {
         var builder = Builder().Text("Text\r");
-        builder.Flags = 0x24;                                                  // two fast saves, as Word 5 counts them
-        builder.PieceTable = [1, 0, 2, 0x80, 0];
+        builder.PieceTable = [2, 0, 40, 0, 0];                                 // says 40 bytes, holds 2
         var diagnostics = new List<Diagnostic>();
 
         Assert.Null(MacWordDocuments.Read(builder.Build(), "Saved", diagnostics: diagnostics));
-        var fast = Assert.Single(diagnostics);
-        Assert.Equal(("word.fast-saved", DiagnosticSeverity.Error), (fast.Code, fast.Severity));
-        Assert.Contains("Word 5", fast.Message);
-        Assert.Contains("2 fast saves", fast.Message);
+        Assert.Equal(["word.bad-pieces"], diagnostics.Select(d => d.Code));
     }
 
     [Theory]

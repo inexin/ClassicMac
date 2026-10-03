@@ -39,6 +39,9 @@ namespace ClassicMac.Resources.Decoders.Text
 
         /// <summary>Extended.</summary>
         public bool Extend => (Face & 0x40) != 0;
+
+        /// <summary>Small capitals (a word processor's character format; QuickDraw has none).</summary>
+        public bool SmallCaps { get; init; }
     }
 
     /// <summary>

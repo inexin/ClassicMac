@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Documents: Word 4 and 5 checked against 21 documents Word 4.0 and 5.1a wrote (now test fixtures): styles are found by
+  their number, not their place (Normal paragraphs no longer took Heading 1's spacing and font); line breaks stay in
+  their paragraph; small caps and colour show; tables are HTML tables with their cell widths; fast-saved documents
+  read through their piece table (a game's spell list now opens, 9 tables).
 - Documents: Word 5 documents saved normally are read: the header flag $04 is set in every Word 5.1a document, so it no
   longer marks a fast save; only a piece table (zone 18) does. Checked against real Word 5.1a and 4.0 documents.
 - Viewer: byte meanings for `'CODE'` resources in the hex inspector: `'CODE'` 0's A5 sizes and jump-table entries

@@ -150,7 +150,7 @@ namespace ClassicMac.App.ViewModels
                     text.Append(chapter.Title).Append("\n\n");
                 }
 
-                text.Append(chapter.Text.Text.Replace('\r', '\n')).Append("\n\n");
+                text.Append(chapter.Text.Text.Replace('\r', '\n').Replace('\u2028', '\n')).Append("\n\n");
             }
 
             return text.ToString().TrimEnd('\n');

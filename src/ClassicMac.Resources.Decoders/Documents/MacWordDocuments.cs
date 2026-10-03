@@ -73,11 +73,13 @@ namespace ClassicMac.Resources.Decoders.Documents
             int Styles, int CharacterRuns, int ParagraphRuns, int BoldRuns);
 
         // The state of a character: Word's CHP as far as ClassicMac shows it.
-        private readonly record struct Chp(byte Flags, short Font, int HalfPoints, byte Underline)
+        private readonly record struct Chp(byte Flags, short Font, int HalfPoints, byte Underline, byte Colour = 0)
         {
             public bool Hidden => (Flags & 0x01) != 0;
 
             public bool AllCaps => (Flags & 0x02) != 0;
+
+            public bool SmallCaps => (Flags & 0x04) != 0;
 
             // QuickDraw's style bits: bold 1, italic 2, underline 4, outline 8, shadow $10.
             public byte Face => (byte)(((Flags & 0x80) != 0 ? 0x01 : 0) | ((Flags & 0x40) != 0 ? 0x02 : 0) | (Underline != 0 ? 0x04 : 0)
@@ -86,9 +88,23 @@ namespace ClassicMac.Resources.Decoders.Documents
 
         // A paragraph's properties, in twips.
         private sealed record Pap(Justification Justification, int Left, int Right, int FirstLine, int Before, int After, bool InTable,
-            bool RowEnd);
+            bool RowEnd, short[]? CellEdges = null);
 
-        private sealed record Style(byte[]? Chp, byte[]? Sprms);
+        // A style: its number (the stc its paragraph block starts with, else its place in the sheet), its CHP block and
+        // its paragraph sprms.
+        private sealed record Style(int Number, byte[]? Chp, byte[]? Sprms);
+
+        // Word's eight colours, as QuickDraw's eight standard colours: 0 black (automatic), 1 blue, 2 cyan, 3 green,
+        // 4 magenta, 5 red, 6 yellow, 7 white [Verified: 5 red, Word 5.1a and 4.0; Reference: libmwaw for the order;
+        // Doc: Inside Macintosh: Imaging With QuickDraw, the eight colours' RGB].
+        private static readonly (byte Red, byte Green, byte Blue)[] Colours =
+        [
+            (0, 0, 0), (0x00, 0x00, 0xD4), (0x02, 0xAB, 0xEA), (0x00, 0x80, 0x11),
+            (0xF2, 0x08, 0x84), (0xDD, 0x08, 0x06), (0xFC, 0xF3, 0x05), (0xFF, 0xFF, 0xFF),
+        ];
+
+        // A table from its characters and its rows' cell edges (twips to points; none when the rows had no definitions).
+        private static DocumentTable Table(int start, int end, short[]? edges) => new(start, end, edges?.Select(e => e / 20.0).ToArray() ?? []);
 
         private sealed class Reader(BigEndianReader file, int version, string title, ICollection<Diagnostic> diagnostics)
         {
@@ -115,19 +131,6 @@ namespace ClassicMac.Resources.Decoders.Documents
 
             public StyledDocument? Read()
             {
-                var flags = file.ReadByteAt(0x0A);
-                var pieces = Zone(PieceTable);
-                // A fast save leaves a piece table (zone 18); the flag byte's $04 is set in Word 5.1a's full saves too
-                // [Verified: Word 5.1a documents], so it says nothing about fast saving.
-                if (pieces.Length > 0)
-                {
-                    var saves = flags >> 4;
-                    diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.fast-saved",
-                        $"\"{title}\" is a Word {version} document saved with Fast Save ({saves} fast saves): its text is in " +
-                        "pieces this reader does not put together. Save it again in Word with Fast Save off to read it."));
-                    return null;
-                }
-
                 var fcMin = file.ReadUInt32At(0x14);
                 var fcMac = file.ReadUInt32At(0x18);
                 var ccpText = file.ReadUInt32At(0x24);
@@ -140,11 +143,91 @@ namespace ClassicMac.Resources.Decoders.Documents
                 }
 
                 var textLength = (int)Math.Min(ccpText == 0 ? fcMac - fcMin : ccpText, fcMac - fcMin);
+                // A fast save leaves a piece table (zone 18): the text is its pieces, in order (§1.9). The flag byte's $04
+                // is set in Word 5.1a's full saves too [Verified: Word 5.1a documents], so it says nothing about it.
+                var pieceZone = Zone(PieceTable);
+                List<(long Fc, int Length)> pieces = [(fcMin, textLength)];
+                if (pieceZone.Length > 0)
+                {
+                    if (Pieces(pieceZone, (int)Math.Max(ccpText, 0)) is not { } read)
+                    {
+                        diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "word.bad-pieces",
+                            $"\"{title}\" was saved with Fast Save, and its piece table (the list of where its text is) cannot be read."));
+                        return null;
+                    }
+
+                    pieces = read;
+                }
+
                 fonts = ReadFonts(Zone(FontNames));
                 styles = ReadStyles(Zone(StyleZone));
                 var characters = Bins(CharacterBins, words: false);
                 var paragraphs = Bins(ParagraphBins, words: true);
-                return Build(file.Source.Slice((int)fcMin, textLength).Span, (int)fcMin, characters, paragraphs);
+                return Build(pieces, characters, paragraphs);
+            }
+
+            // The piece table (§1.9) [Fitted: a Word 5 document Word fast saved twice; Reference: [MS-DOC] Clx, which it
+            // matches but for its 2-byte lengths]: $01 blocks (a length word, then property changes, not applied), then
+            // $02, a length word and the PlcPcd: n + 1 character positions (u32), then n piece descriptors (flags u16, FC
+            // u32, property word u16). The main text is the pieces up to its length; null when the table cannot be read.
+            private List<(long Fc, int Length)>? Pieces(ReadOnlyMemory<byte> zone, int mainText)
+            {
+                var reader = new BigEndianReader(zone);
+                while (reader.Position < zone.Length)
+                {
+                    var kind = reader.ReadByte();
+                    if (reader.Position + 2 > zone.Length)
+                    {
+                        return null;
+                    }
+
+                    var size = reader.ReadUInt16();
+                    if (reader.Position + size > zone.Length)
+                    {
+                        return null;
+                    }
+
+                    if (kind == 1)
+                    {
+                        reader.Skip(size);
+                        continue;
+                    }
+
+                    if (kind != 2 || size < 4 || (size - 4) % 12 != 0)
+                    {
+                        return null;
+                    }
+
+                    var count = (size - 4) / 12;
+                    var table = reader.ReadSubReader(size);
+                    var pieces = new List<(long, int)>();
+                    for (var k = 0; k < count; k++)
+                    {
+                        long from = table.ReadUInt32At(4 * k), to = table.ReadUInt32At(4 * (k + 1));
+                        var descriptor = 4 * (count + 1) + 8 * k;
+                        long fc = table.ReadUInt32At(descriptor + 2);
+                        if (table.ReadUInt16At(descriptor + 6) != 0)
+                        {
+                            Report(DiagnosticSeverity.Info, "word.piece-properties",
+                                $"\"{title}\": some text was formatted by a fast save's property changes, which this reader does not apply.");
+                        }
+
+                        if (to < from || fc + (to - from) > file.Source.Length)
+                        {
+                            return null;
+                        }
+
+                        var length = (int)Math.Min(to - from, Math.Max(0, mainText - from));
+                        if (length > 0)
+                        {
+                            pieces.Add((fc, length));
+                        }
+                    }
+
+                    return pieces;
+                }
+
+                return null;
             }
 
             // A zone's bytes (word-mac.md §1.2), or empty when it lies outside the file (reported).
@@ -226,7 +309,9 @@ namespace ClassicMac.Resources.Decoders.Documents
                         var chp = i < chps.Count ? chps[i] : null;
                         var pap = i < paps.Count ? paps[i] : null;
                         // A paragraph block is the style's number, six bytes of line data, then its sprms.
-                        list.Add(new Style(chp, pap is { Length: >= 7 } ? pap[7..] : null));
+                        // The paragraph block starts with the style's number (stc): Heading 1 is $FF, Normal 0 [Verified: Word
+                        // 5.1a and 4.0 documents]; paragraphs name their style by it, not by its place in the sheet.
+                        list.Add(new Style(pap is { Length: >= 1 } ? pap[0] : i, chp, pap is { Length: >= 7 } ? pap[7..] : null));
                     }
                 }
                 catch (System.IO.EndOfStreamException)
@@ -329,6 +414,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                     chp = chp with { Underline = (byte)((block[7] >> 1) & 0x07) };
                 }
 
+                if ((what & 0x20) != 0 && block.Length >= 8)
+                {
+                    chp = chp with { Colour = (byte)(block[7] >> 4) };
+                }
+
                 return chp;
             }
 
@@ -348,7 +438,8 @@ namespace ClassicMac.Resources.Decoders.Documents
                         0x02 or 0x05 or 0x07 or 0x08 or 0x09 or 0x0A or 0x0B or 0x18 or 0x19 => 1,
                         0x10 or 0x11 or 0x13 or 0x14 or 0x15 or 0x16 or >= 0x1E and <= 0x22 or 0x94 or 0x99 => 2,
                         0x0F or 0x17 when i < sprms.Length => 1 + sprms[i],
-                        0x98 when i + 1 < sprms.Length => 2 + ((sprms[i] << 8) | sprms[i + 1]),
+                        // The cell definitions' length is even, counting a pad byte the block may end before [Verified].
+                        0x98 when i + 1 < sprms.Length => Math.Min(2 + ((sprms[i] << 8) | sprms[i + 1]), Math.Max(sprms.Length - i, 3)),
                         _ => -1,
                     };
                     if (size < 0 || i + size > sprms.Length)
@@ -379,6 +470,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                         0x16 => pap with { After = word },
                         0x18 => pap with { InTable = arg[0] != 0 },
                         0x19 => pap with { RowEnd = arg[0] != 0 },
+                        0x98 when arg.Length >= 3 => pap with { CellEdges = CellEdges(arg) },
                         _ => pap,
                     };
                     i += size;
@@ -387,58 +479,113 @@ namespace ClassicMac.Resources.Decoders.Documents
                 return pap;
             }
 
-            private Style? StyleOf(int number) => number < styles.Count ? styles[number] : null;
+            // The cell definitions: a length word, the cell count, then the row's left edge and each cell's right edge,
+            // signed twips [Verified: Word 5.1a and 4.0 tables].
+            private static short[] CellEdges(ReadOnlySpan<byte> arg)
+            {
+                var count = arg[2];
+                var edges = new List<short>();
+                for (var k = 0; k <= count && 3 + 2 * k + 1 < arg.Length; k++)
+                {
+                    edges.Add((short)((arg[3 + 2 * k] << 8) | arg[4 + 2 * k]));
+                }
+
+                return [.. edges];
+            }
+
+            private Style? StyleOf(int number) => styles.FirstOrDefault(s => s.Number == number);
 
             private Chp StyleChp(int number) => StyleOf(number)?.Chp is { } block ? Apply(DefaultChp, block, DefaultChp) : DefaultChp;
 
             private Pap StylePap(int number) => StyleOf(number)?.Sprms is { } sprms ? Apply(DefaultPap, sprms) : DefaultPap;
 
-            private StyledDocument Build(ReadOnlySpan<byte> text, int fcMin, List<(long From, long To, byte[] Block)> characters,
+            // The run a character's FC is in: the runs are in FC order (a bin table's pages), so it is found by halving.
+            private static int RunAt(List<(long From, long To, byte[] Block)> runs, long fc)
+            {
+                var (low, high) = (0, runs.Count - 1);
+                while (low <= high)
+                {
+                    var middle = (low + high) / 2;
+                    if (runs[middle].To <= fc)
+                    {
+                        low = middle + 1;
+                    }
+                    else if (runs[middle].From > fc)
+                    {
+                        high = middle - 1;
+                    }
+                    else
+                    {
+                        return middle;
+                    }
+                }
+
+                return -1;
+            }
+
+            private StyledDocument Build(List<(long Fc, int Length)> pieces, List<(long From, long To, byte[] Block)> characters,
                 List<(long From, long To, byte[] Block)> paragraphs)
             {
-                var output = new StringBuilder(text.Length);
+                var all = file.Source.Span;
+                var text = new List<(byte Byte, long Fc)>(pieces.Sum(p => p.Length));
+                foreach (var (fcStart, count) in pieces)
+                {
+                    for (var k = 0; k < count; k++)
+                    {
+                        text.Add((all[(int)(fcStart + k)], fcStart + k));
+                    }
+                }
+
+                var output = new StringBuilder(text.Count);
                 var runs = new List<TextRun>();
                 var formats = new List<ParagraphFormat>();
-                var (c, p) = (0, 0);
+                var tables = new List<DocumentTable>();
+                int? tableStart = null;
+                short[]? tableEdges = null;
                 var paragraphStart = true;
                 Pap? pap = null;
+                var papRun = -2;
                 var style = 0;
-                for (var i = 0; i < text.Length; i++)
+                for (var i = 0; i < text.Count; i++)
                 {
-                    long fc = fcMin + i;
-                    while (p < paragraphs.Count && paragraphs[p].To <= fc)
+                    var fc = text[i].Fc;
+                    var p = RunAt(paragraphs, fc);
+                    if (pap is null || p != papRun)
                     {
-                        p++;
-                        pap = null;
-                    }
-
-                    if (pap is null)
-                    {
-                        var block = p < paragraphs.Count && paragraphs[p].From <= fc ? paragraphs[p].Block : [];
+                        papRun = p;
+                        var block = p >= 0 ? paragraphs[p].Block : [];
                         style = block.Length > 0 ? block[0] : 0;
                         pap = Apply(StylePap(style), block.Length > 7 ? block.AsSpan(7) : []);
                     }
 
-                    while (c < characters.Count && characters[c].To <= fc)
-                    {
-                        c++;
-                    }
-
-                    var chpx = c < characters.Count && characters[c].From <= fc ? characters[c].Block : [];
+                    var c = RunAt(characters, fc);
+                    var chpx = c >= 0 ? characters[c].Block : [];
                     var styleChp = StyleChp(style);
                     var chp = Apply(styleChp, chpx, styleChp);
                     if (paragraphStart)
                     {
+                        // A table: the rows from its first cell to the paragraph after its last row.
+                        if (pap.InTable && tableStart is null)
+                        {
+                            tableStart = output.Length;
+                        }
+                        else if (!pap.InTable && tableStart is { } open)
+                        {
+                            tables.Add(Table(open, output.Length, tableEdges));
+                            (tableStart, tableEdges) = (null, null);
+                        }
+
                         // One format per paragraph, so its first and last lines can be told (twips to points).
                         formats.Add(new ParagraphFormat(output.Length, pap.Justification, pap.Left / 20.0, pap.Right / 20.0,
                             pap.FirstLine / 20.0, pap.Before / 20.0, pap.After / 20.0));
                         paragraphStart = false;
                     }
 
-                    var b = text[i];
+                    var b = text[i].Byte;
                     char? shown = b switch
                     {
-                        0x0D or 0x0B or 0x0C => '\r',
+                        0x0D or 0x0C => '\r',
+                        0x0B => '\u2028',                                    // a line break within the paragraph
                         0x09 => '\t',
                         0x07 => pap.RowEnd ? '\r' : '\t',
                         0x1E => '‑',
@@ -449,6 +596,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                     if (b is 0x0D or 0x0C or 0x07)
                     {
                         paragraphStart = true;
+                    }
+
+                    if (b == 0x07 && pap.RowEnd && pap.CellEdges is { } edges)
+                    {
+                        tableEdges ??= edges;
                     }
 
                     // Hidden text is left out, as Word shows and prints it by default [ClassicMac]; its paragraph marks stay.
@@ -466,7 +618,8 @@ namespace ClassicMac.Resources.Decoders.Documents
 
                     var size = chp.HalfPoints / 2;
                     var name = fonts.TryGetValue(chp.Font, out var known) ? known : StyleRuns.FontName(chp.Font);
-                    var run = new TextRun(output.Length, 1, chp.Font, name, size > 0 ? size : 12, chp.Face, 0, 0, 0);
+                    var (red, green, blue) = Colours[chp.Colour & 7];
+                    var run = new TextRun(output.Length, 1, chp.Font, name, size > 0 ? size : 12, chp.Face, red, green, blue) { SmallCaps = chp.SmallCaps };
                     if (runs.Count > 0 && runs[^1] with { Start = run.Start, Length = 1 } == run && runs[^1].Start + runs[^1].Length == run.Start)
                     {
                         runs[^1] = runs[^1] with { Length = runs[^1].Length + 1 };
@@ -479,9 +632,15 @@ namespace ClassicMac.Resources.Decoders.Documents
                     output.Append(shown.Value);
                 }
 
+                if (tableStart is { } last)
+                {
+                    tables.Add(Table(last, output.Length, tableEdges));
+                }
+
                 var chapter = new DocumentChapter(1, title, new StyledText(output.ToString(), runs, true), Justification.Left, null, [], 0)
                 {
                     Paragraphs = formats,
+                    Tables = tables,
                 };
                 return new StyledDocument(DocumentKind.Word, title, [chapter], []);
             }

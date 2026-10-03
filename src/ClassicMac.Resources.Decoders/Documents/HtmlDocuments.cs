@@ -167,9 +167,13 @@ namespace ClassicMac.Resources.Decoders.Documents
                 foreach (var block in DocumentFlow.Blocks(chapter))
                 {
                     Targets(html, chapter, block.Paragraph);
-                    if (block is DocumentLine line)
+                    if (block is DocumentLine line && chapter.Tables.FirstOrDefault(t => t.Start <= line.Start && line.Start < t.End) is { } table)
                     {
-                        Paragraph(html, chapter, line.Start, line.End);
+                        TableRow(html, chapter, table, line.Start, line.End);
+                    }
+                    else if (block is DocumentLine other)
+                    {
+                        Paragraph(html, chapter, other.Start, other.End);
                     }
                     else if (block is PictureRow row)
                     {
@@ -205,21 +209,69 @@ namespace ClassicMac.Resources.Decoders.Documents
                 }
                 else
                 {
-                    foreach (var run in runs)
-                    {
-                        var from = Math.Max(start, run.Start);
-                        var to = Math.Min(end, run.Start + run.Length);
-                        if (from >= to)
-                        {
-                            continue;
-                        }
-
-                        var style = Style(run);
-                        var content = Escape(chapter.Text.Text[from..to]);
-                        html.Append(run == first ? content : $"<span class=\"{style}\">{content}</span>");
-                    }
+                    Runs(html, chapter, start, end, first);
                 }
                 html.Append("</p>\n");
+            }
+
+            // The text from start to end in spans per run; the run the paragraph is styled by needs none.
+            private void Runs(StringBuilder html, DocumentChapter chapter, int start, int end, TextRun? first)
+            {
+                foreach (var run in chapter.Text.Runs)
+                {
+                    var from = Math.Max(start, run.Start);
+                    var to = Math.Min(end, run.Start + run.Length);
+                    if (from >= to)
+                    {
+                        continue;
+                    }
+
+                    var style = Style(run);
+                    var content = Escape(chapter.Text.Text[from..to]);
+                    html.Append(run == first ? content : $"<span class=\"{style}\">{content}</span>");
+                }
+            }
+
+            // A table's row: a line whose cells each end with a tab. The table opens at its first row (its columns as wide as
+            // the cell edges say) and closes after its last.
+            private void TableRow(StringBuilder html, DocumentChapter chapter, DocumentTable table, int start, int end)
+            {
+                if (start == table.Start)
+                {
+                    html.Append("<table class=\"table\">");
+                    if (table.CellEdges.Count > 1)
+                    {
+                        html.Append("<colgroup>");
+                        for (var k = 1; k < table.CellEdges.Count; k++)
+                        {
+                            html.Append(CultureInfo.InvariantCulture, $"<col style=\"width:{table.CellEdges[k] - table.CellEdges[k - 1]}px\">");
+                        }
+
+                        html.Append("</colgroup>");
+                    }
+
+                    html.Append('\n');
+                }
+
+                html.Append("<tr>");
+                var text = chapter.Text.Text;
+                for (var from = start; from < end;)
+                {
+                    var tab = text.IndexOf('\t', from, end - from);
+                    var to = tab < 0 ? end : tab;
+                    // The cell is styled by its first run, as a paragraph is.
+                    var first = chapter.Text.Runs.FirstOrDefault(r => r.Start <= from && from < r.Start + r.Length);
+                    html.Append(first is null || from == to ? "<td>" : $"<td class=\"{Style(first)}\">");
+                    Runs(html, chapter, from, to, first);
+                    html.Append("</td>");
+                    from = to + 1;
+                }
+
+                html.Append("</tr>\n");
+                if (text.IndexOf('\r', start) is var close && (close < 0 || close + 1 >= table.End))
+                {
+                    html.Append("</table>\n");
+                }
             }
 
             // A Word paragraph's own format as an inline style, at a point a pixel (empty when the chapter has none, or the
@@ -402,6 +454,11 @@ namespace ClassicMac.Resources.Decoders.Documents
                     css.Append(";letter-spacing:1px");
                 }
 
+                if (run.SmallCaps)
+                {
+                    css.Append(";font-variant:small-caps");
+                }
+
                 if ((run.Red, run.Green, run.Blue) != (0, 0, 0))
                 {
                     css.Append(";color:").Append(Colour(run.Red, run.Green, run.Blue));
@@ -426,6 +483,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                 css.Append(".contents{max-width:640px;margin:0 auto;font:14px Geneva,Verdana,sans-serif}\n");
                 css.Append(".column{max-width:100%;margin:0 auto;white-space:pre-wrap;overflow-wrap:break-word}\n");
                 css.Append(".column p{margin:0}\n");
+                css.Append(".table{border-collapse:collapse;table-layout:fixed;white-space:normal}\n.table td{vertical-align:top;padding:0 5.4px}\n");
                 css.Append(".row{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;white-space:normal}\n");
                 css.Append(".row .l{grid-column:1;justify-self:start}\n.row .c{grid-column:2}\n.row .r{grid-column:3;justify-self:end}\n");
                 css.Append(".row img,.row .missing{display:inline-block;vertical-align:top}\n");
@@ -468,6 +526,7 @@ namespace ClassicMac.Resources.Decoders.Documents
                 escaped.Append(c switch
                 {
                     '&' => "&amp;",
+                    '\u2028' => "<br>",
                     '<' => "&lt;",
                     '>' => "&gt;",
                     '"' => "&quot;",
