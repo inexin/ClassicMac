@@ -81,39 +81,7 @@ public static partial class HfsWriter
             throw new InvalidDataException("The HFS file is locked.");
         }
 
-        byte[] cleared = ReplaceFork(ForkData.FromBytes(initial.Source), macPath, HfsFork.Data, Array.Empty<byte>());
-        cleared = ReplaceFork(ForkData.FromBytes(cleared), macPath, HfsFork.Resource, Array.Empty<byte>());
-        var state = OpenCatalog(ForkData.FromBytes(cleared));
-        var target = FindCatalogRecord(state.Records, parent, name);
-        if (!state.Records.Remove(target))
-        {
-            throw new InvalidDataException("The HFS file record disappeared during deletion.");
-        }
-
-        uint fileId = U32(new BigEndianReader(target.Data), 20);
-        var thread = FindCatalogRecord(state.Records, fileId, "");
-        if ((target.Data[2] & 2) != 0 && (thread.Data is null || thread.Data[0] != 4))
-        {
-            throw new InvalidDataException("The HFS file thread is missing.");
-        }
-
-        if (thread.Data is not null)
-        {
-            if (thread.Data[0] != 4)
-            {
-                throw new InvalidDataException("The HFS file has an invalid thread record.");
-            }
-
-            state.Records.Remove(thread);
-        }
-        AdjustParentValence(state.Records, parent, -1);
-        AddCount(state.Result, 0x54, -1);
-        if (parent == 2)
-        {
-            AddShortCount(state.Result, 0x0C, -1);
-        }
-
-        return CommitCatalog(state);
+        return DeleteTree(initial, parent, macPath, existing);
     }
 
     /// <summary>Creates an HFS folder and its catalog thread, returning a new image.</summary>
@@ -422,26 +390,177 @@ public static partial class HfsWriter
             throw new InvalidDataException($"The HFS item '{name}' was not found.");
         }
 
-        if (item.Data[0] == 2)
+        if (item.Data[0] == 1 && !recursive)
         {
-            return DeleteFile(ForkData.FromBytes(state.Source), macPath);
+            uint id = U32(new BigEndianReader(item.Data), 6);
+            if (state.Records.Any(r => U32(new BigEndianReader(r.Key), 2) == id && r.Key[6] != 0))
+            {
+                throw new InvalidDataException("A nonempty HFS folder cannot be deleted.");
+            }
         }
 
-        uint id = U32(new BigEndianReader(item.Data), 6);
-        var children = state.Records.Where(r => U32(new BigEndianReader(r.Key), 2) == id && DecodeName(r.Key).Length != 0)
-            .Select(r => DecodeName(r.Key)).ToList();
-        if (children.Count > 0 && !recursive)
+        return DeleteTree(state, parent, macPath, item);
+    }
+
+    // Deletes an item and, for a folder, everything below it, in one pass over the catalog (hfs.md §3): every fork's
+    // blocks freed in the bitmap (overflow extents too, and their records removed), the file, folder and thread records
+    // removed, the parent's valence, the MDB's counts and its free-block count changed. The result is checked as the
+    // writer checks a volume, and every record and allocated block it keeps is compared with the source.
+    private static byte[] DeleteTree(CatalogEditState state, uint parent, string macPath, (byte[] Key, byte[] Data) item)
+    {
+        var before = state.Records.Select(r => (r.Key, Data: r.Data.ToArray())).ToList();
+        var children = state.Records.Where(r => r.Data[0] is 1 or 2).ToLookup(r => U32(new BigEndianReader(r.Key), 2));
+        var files = new List<(byte[] Key, byte[] Data)>();
+        var folders = new List<(byte[] Key, byte[] Data)>();
+        var pending = new Queue<((byte[] Key, byte[] Data) Record, string Path)>([(item, macPath)]);
+        while (pending.TryDequeue(out var next))
         {
-            throw new InvalidDataException("A nonempty HFS folder cannot be deleted.");
+            var (record, path) = next;
+            if (record.Data[0] == 2)
+            {
+                if ((record.Data[2] & 1) != 0)
+                {
+                    throw new InvalidDataException($"The HFS file '{path}' is locked.");
+                }
+
+                files.Add(record);
+                continue;
+            }
+
+            folders.Add(record);
+            foreach (var child in children[U32(new BigEndianReader(record.Data), 6)])
+            {
+                pending.Enqueue((child, path + ":" + DecodeName(child.Key)));
+            }
         }
 
-        var result = state.Source;
-        foreach (var child in children)
+        var removed = new HashSet<byte[]>(ReferenceEqualityComparer.Instance);
+        var fileIds = new HashSet<uint>();
+        var overflow = LeafRecords(state.ExtentsTree).ToList();
+        long released = 0;
+        foreach (var file in files)
         {
-            result = Delete(ForkData.FromBytes(result), macPath + ":" + child, recursive: true);
+            var data = new BigEndianReader(file.Data);
+            uint id = U32(data, 20);
+            fileIds.Add(id);
+            foreach (var (offset, fork) in new[] { (74, (byte)0x00), (86, (byte)0xFF) })
+            {
+                var extents = ParseExtents(data, offset);
+                extents.AddRange(overflow.Where(r => r.Key[1] == fork && U32(new BigEndianReader(r.Key), 2) == id)
+                    .OrderBy(r => U16(new BigEndianReader(r.Key), 6)).SelectMany(r => ParseExtents(new BigEndianReader(r.Data))));
+                foreach (var (start, count) in extents)
+                {
+                    for (var block = start; block < start + count; block++)
+                    {
+                        if (block >= state.BlockCount || !IsAllocated(state.Bitmap, (ushort)block))
+                        {
+                            throw new InvalidDataException($"The HFS file '{DecodeName(file.Key)}' has a block that is free or outside the volume.");
+                        }
+
+                        SetBitmap(state.Bitmap, (ushort)block, false);
+                        released++;
+                    }
+                }
+            }
+
+            removed.Add(file.Data);
+            var thread = FindCatalogRecord(state.Records, id, "");
+            if ((file.Data[2] & 2) != 0 && (thread.Data is null || thread.Data[0] != 4))
+            {
+                throw new InvalidDataException("The HFS file thread is missing.");
+            }
+
+            if (thread.Data is { } fileThread)
+            {
+                if (fileThread[0] != 4)
+                {
+                    throw new InvalidDataException("The HFS file has an invalid thread record.");
+                }
+
+                removed.Add(fileThread);
+            }
         }
 
-        return DeleteFolder(ForkData.FromBytes(result), macPath);
+        foreach (var folder in folders)
+        {
+            removed.Add(folder.Data);
+            var thread = FindCatalogRecord(state.Records, U32(new BigEndianReader(folder.Data), 6), "");
+            if (thread.Data is null || thread.Data[0] != 3)
+            {
+                throw new InvalidDataException("The HFS folder thread is missing.");
+            }
+
+            removed.Add(thread.Data);
+        }
+
+        var removedKeys = state.Records.Where(r => removed.Contains(r.Data)).Select(r => Convert.ToHexString(r.Key)).ToHashSet();
+        state.Records.RemoveAll(r => removed.Contains(r.Data));
+        var kept = overflow.Where(r => !(r.Key[1] is 0x00 or 0xFF && fileIds.Contains(U32(new BigEndianReader(r.Key), 2)))).ToList();
+        if (kept.Count != overflow.Count)
+        {
+            RebuildBTree(state.ExtentsTree, kept.Select(r => (r.Key, r.Data)).ToList(), validateExtents: true);
+            state.ExtentsTreeChanged = true;
+        }
+
+        AdjustParentValence(state.Records, parent, -1);
+        AddCount(state.Result, 0x54, -files.Count);
+        AddCount(state.Result, 0x58, -folders.Count);
+        if (parent == 2)
+        {
+            AddShortCount(state.Result, item.Data[0] == 1 ? 0x52 : 0x0C, -1);
+        }
+
+        AddShortCount(state.Result, 0x22, checked((int)released));
+        state.Bitmap.CopyTo(state.Result, state.BitmapOffset);
+        var result = CommitCatalog(state);
+        VerifyKept(state.Source, result, before, removedKeys, parent);
+        return result;
+    }
+
+    // After a deletion: the result opens as the writer opens a volume (its trees, counts, bitmap and extents agree), every
+    // catalog record kept is byte for byte the source's (the parent folder's valence aside), and every allocated block
+    // outside the catalog and extents files is the source's, so no file kept has changed.
+    private static void VerifyKept(byte[] source, byte[] result, List<(byte[] Key, byte[] Data)> before, HashSet<string> removedKeys, uint parent)
+    {
+        var after = OpenCatalog(ForkData.FromBytes(result), writable: false);
+        var records = after.Records.ToDictionary(r => Convert.ToHexString(r.Key), r => r.Data);
+        foreach (var (key, data) in before)
+        {
+            if (removedKeys.Contains(Convert.ToHexString(key)))
+            {
+                continue;
+            }
+
+            bool isParent = data.Length >= 70 && data[0] == 1 && U32(new BigEndianReader(data), 6) == parent;
+            if (!records.TryGetValue(Convert.ToHexString(key), out var now) ||
+                !(isParent ? now.AsSpan(0, 4).SequenceEqual(data.AsSpan(0, 4)) && now.AsSpan(6).SequenceEqual(data.AsSpan(6)) : now.AsSpan().SequenceEqual(data)))
+            {
+                throw new InvalidDataException("The edited HFS catalog changed a record it should have kept.");
+            }
+        }
+
+        var system = new HashSet<uint>();
+        foreach (var (start, count) in after.ExtentsTreeExtents.Concat(after.CatalogExtents))
+        {
+            for (uint block = start; block < (uint)start + count; block++)
+            {
+                system.Add(block);
+            }
+        }
+
+        for (uint block = 0; block < after.BlockCount; block++)
+        {
+            if (system.Contains(block) || !IsAllocated(after.Bitmap, (ushort)block))
+            {
+                continue;
+            }
+
+            long offset = after.FirstBlock + (long)block * after.BlockSize;
+            if (!source.AsSpan((int)offset, (int)after.BlockSize).SequenceEqual(result.AsSpan((int)offset, (int)after.BlockSize)))
+            {
+                throw new InvalidDataException("The edited HFS volume changed a block of a file it kept.");
+            }
+        }
     }
 
     private sealed class CatalogEditState(byte[] source, byte[] catalog, byte[] extentsTree,

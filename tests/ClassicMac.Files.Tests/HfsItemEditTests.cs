@@ -51,6 +51,46 @@ public sealed class HfsItemEditTests
         return lengths;
     }
 
+    // A folder deleted with everything in it, in one pass (hfs.md §3): every fork's blocks freed (overflow extents too, and
+    // their records removed), the records and threads gone, the counts down, and every other file untouched.
+    [Fact]
+    public void A_folder_tree_with_fragmented_files_is_deleted_in_one_pass()
+    {
+        var builder = new HfsBuilder();
+        var docs = builder.Folder(HfsBuilder.Root, "Docs");
+        var deep = builder.Folder(docs, "Deep");
+        builder.File(docs, "Fragmented", new byte[5 * HfsBuilder.Block], new byte[2 * HfsBuilder.Block], fragments: 5, thread: true);
+        builder.File(deep, "Also", new byte[4 * HfsBuilder.Block], [], fragments: 4);
+        builder.File(deep, "Small", [1, 2, 3], []);
+        builder.File(HfsBuilder.Root, "Survivor", "keep"u8.ToArray(), "rsrc"u8.ToArray(), fragments: 1);
+        var source = builder.Build("Disk");
+        var original = source.ToArray();
+        int free = (source[1024 + 0x22] << 8) | source[1024 + 0x23];
+
+        var output = HfsWriter.Delete(ForkData.FromBytes(source), "Docs", recursive: true);
+
+        Assert.Equal(original, source);
+        var files = Files(output);
+        Assert.Equal(["Survivor"], files.Select(f => f.MacPath));
+        Assert.Equal(("keep", "rsrc"), (System.Text.Encoding.ASCII.GetString(files[0].DataFork.ToArray()), System.Text.Encoding.ASCII.GetString(files[0].ResourceFork.ToArray())));
+        Assert.DoesNotContain(Folders(output), f => f.MacPath.StartsWith("Docs", StringComparison.Ordinal));
+        Assert.Equal(free + 5 + 2 + 4 + 1, (output[1024 + 0x22] << 8) | output[1024 + 0x23]);   // every block of the deleted forks
+        Assert.Equal((1, 0), ((output[1024 + 0x56] << 8) | output[1024 + 0x57], (output[1024 + 0x5A] << 8) | output[1024 + 0x5B]));   // drFilCnt, drDirCnt
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(output)));
+    }
+
+    [Fact]
+    public void A_folder_tree_holding_a_locked_file_is_not_deleted()
+    {
+        var builder = new HfsBuilder();
+        var docs = builder.Folder(HfsBuilder.Root, "Docs");
+        builder.File(docs, "Locked", [1], [], locked: true);
+        var source = builder.Build("Disk");
+
+        var error = Assert.Throws<InvalidDataException>(() => HfsWriter.Delete(ForkData.FromBytes(source), "Docs", recursive: true));
+        Assert.Contains("Docs:Locked", error.Message);
+    }
+
     // Mac OS writes an HFS catalog's index keys at the maximum key length, 37, zero-padded (its B-trees do not set
     // kBTVariableIndexKeysMask, TN1150). A volume written so is edited, and its rebuilt index keeps that form.
     [Fact]

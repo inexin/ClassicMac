@@ -591,6 +591,11 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
 - After the edit, the writer reopens the result with the reader and compares the file list, Finder information, dates,
   paths, the changed forks and both forks of every other file, and validates both B-trees again (index graph, links,
   node maps, counts, key order). Any structural diagnostic or difference fails the operation.
+- A deletion (`Delete`, `DeleteFile`) removes a file, or a folder with everything below it, in one pass: every fork's
+  blocks (overflow extents included) are freed and their overflow records removed, the records and threads removed,
+  and the counts changed once. It is then checked without reading any fork: the result passes the checks made before
+  an edit, every catalog record kept is byte for byte the source's (the parent's `dirVal` aside), and every allocated
+  block outside the catalog and extents files is the source's. A tree holding a locked file is refused, naming it.
 
 ## 6. Diagnostics
 

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: deleting a folder with everything in it is done in one pass and checked without reading every file: on a 500 MB
+  Mac OS 9 volume a 57-item folder took 0.8 s instead of 136 s (13.7 GB), and a 4-deletion shell session 24 s instead
+  of 18 minutes; deleting one file takes 0.7 s instead of 1.8 s (hfs.md §5.5).
 - CLI: a partitioned disk image whose map holds one HFS partition can be written: the partition is edited in place and
   everything outside it kept; `check` runs the writer's checks on each HFS partition (partition-map.md §5).
 - CLI: transfers that convert: `get --as text` (UTF-8 with LF line ends) and `--as binhex` (.hqx); `put --text` (UTF-8
