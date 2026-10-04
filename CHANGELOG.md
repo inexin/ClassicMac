@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- HFS: the writer's dates come from one clock (`TimeProvider`), which tests set per flow, so an edit's output can be
+  pinned and reproduced.
 - Robustness (second review): damaged legacy StuffIt and PackIt entries whose lengths add up past `int` are refused as
   malformed instead of overflowing; PICT scaling from a zero-sized rectangle is refused (the Mac's `DIVU` traps) and a
   BitMap or PixMap whose rowBytes is too small for its width is drawn with overlapping rows instead of crashing; a

@@ -11,6 +11,23 @@ public static partial class HfsWriter
 {
     private const int MdbOffset = 1024, MdbSize = 162, BlockSize = 512, NodeSize = 512;
 
+    // The clock the writer's dates come from (the local time of the call), which a test may set for its own flow.
+    private static readonly System.Threading.AsyncLocal<TimeProvider?> Clock = new();
+
+    private static DateTime Now => (Clock.Value ?? TimeProvider.System).GetLocalNow().DateTime;
+
+    /// <summary>Takes the writer's dates from <paramref name="clock"/> on this logical flow until disposed (reproducible edits).</summary>
+    internal static IDisposable UseClock(TimeProvider clock)
+    {
+        Clock.Value = clock;
+        return new ClockScope();
+    }
+
+    private sealed class ClockScope : IDisposable
+    {
+        public void Dispose() => Clock.Value = null;
+    }
+
     /// <summary>
     /// Replaces one fork on a plain HFS volume and returns a new image. The source image is never modified.
     /// </summary>
@@ -216,7 +233,7 @@ public static partial class HfsWriter
         var matchRecord = new BigEndianWriter(match.Data);
         matchRecord.WriteUInt32At(forkPhysicalLengthOffset, physicalBytes);
         matchRecord.WriteUInt32At(forkLengthOffset, data.Length);
-        DateTime writeTime = DateTime.Now;
+        DateTime writeTime = Now;
         uint macWriteTime = MacDate.FromDateTime(writeTime).Seconds;
         matchRecord.WriteUInt32At(48, macWriteTime);
         volume.WriteUInt32At(0x06, macWriteTime);

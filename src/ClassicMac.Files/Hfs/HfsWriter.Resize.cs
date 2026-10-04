@@ -78,7 +78,7 @@ public static partial class HfsWriter
         writer.WriteUInt16At(MdbOffset + 0x12, count);                                // drNmAlBlks
         writer.WriteUInt16At(MdbOffset + 0x1C, start);                                // drAlBlSt
         writer.WriteUInt16At(MdbOffset + 0x22, U16(mdb, 0x22) + (count - oldCount));   // drFreeBks
-        writer.WriteUInt32At(MdbOffset + 0x06, MacDate.FromDateTime(DateTime.Now).Seconds);   // drLsMod
+        writer.WriteUInt32At(MdbOffset + 0x06, MacDate.FromDateTime(Now).Seconds);   // drLsMod
         writer.WriteUInt32At(MdbOffset + 0x46, unchecked(U32(mdb, 0x46) + 1));        // drWrCnt
         result.AsSpan(MdbOffset, BlockSize).CopyTo(result.AsSpan((int)(size - 2 * BlockSize)));
 

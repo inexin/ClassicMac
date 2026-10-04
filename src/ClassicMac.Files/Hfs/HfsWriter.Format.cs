@@ -100,7 +100,7 @@ public static partial class HfsWriter
         // The default clump size: four blocks, or one when four would pass 1 MB [Code: 0x2C12].
         uint defaultClump = 4 * blockSize > 1024 * 1024 ? blockSize : 4 * blockSize;
 
-        uint date = (created ?? MacDate.FromDateTime(DateTime.Now)).Seconds;
+        uint date = (created ?? MacDate.FromDateTime(Now)).Seconds;
         var extents = EmptyTree(treeBytes, 7);
         var catalog = EmptyTree(treeBytes, 37);
         new BigEndianWriter(extents).WriteUInt32At(0x2E, treeBytes);                  // the header's clump size [Code: 0x1D254]

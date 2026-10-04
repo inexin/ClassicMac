@@ -35,7 +35,7 @@ public static partial class HfsWriter
         finderBytes.AsSpan(16, 16).CopyTo(record.AsSpan(56));
         var writer = new BigEndianWriter(record);
         writer.WriteUInt32At(20, id);
-        uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
+        uint now = MacDate.FromDateTime(Now).Seconds;
         writer.WriteUInt32At(44, created?.Seconds ?? now);
         writer.WriteUInt32At(48, modified?.Seconds ?? now);
         state.Records.Add((CatalogKey(parent, name), record));
@@ -106,7 +106,7 @@ public static partial class HfsWriter
             throw new InvalidDataException("The HFS volume has no available catalog ID.");
         }
 
-        uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
+        uint now = MacDate.FromDateTime(Now).Seconds;
 
         var folder = new byte[70];
         folder[0] = 1;
@@ -842,7 +842,7 @@ public static partial class HfsWriter
                 }
             }
         }
-        uint now = MacDate.FromDateTime(DateTime.Now).Seconds;
+        uint now = MacDate.FromDateTime(Now).Seconds;
         volume.WriteUInt32At(0x06, now);
         volume.WriteUInt32At(0x46, unchecked(U32(volumeReader, 0x46) + 1));
         for (int at = 0; at < state.Bitmap.Length; at += BlockSize)
