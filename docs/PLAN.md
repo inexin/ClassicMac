@@ -243,7 +243,8 @@ fine for a dependency, with its notice in `THIRD-PARTY-NOTICES.md`; only the cor
 | `cat <path>` | A file's text (Mac OS Roman as UTF-8), a hex dump, its raw bytes, or a resource decoded (built; §2.3) | `--hex`, `--raw`, `--fork data\|rsrc`, `--max-bytes`, `--follow`, `--json` | — |
 | `find <path>` | Folders and files below a path, through containers (built; §2.4) | `--name`, `--type`, `--creator`, `--kind`, `--resource-type`, `--contains`, `--contains-hex`, `--max-depth`, `--limit`, `--json` | — |
 | `get <path>` | A file (both forks), folder or resource to the host (built; §2.5) | `-o <dir>`, `--as appledouble\|basilisk\|macbinary\|raw`, `--enter`, `--overwrite`, `--follow`, `--json` | — |
-| `check <input>` | Read the input through and report its diagnostics; a plain HFS volume also gets the writer's checks (built; [cli.md](cli.md) §2.7) | `--json`, `--strict`, `-q` | — |
+| `check <input>` | Read the input through and report its diagnostics; a plain HFS volume also gets the writer's checks and First Aid (built; [cli.md](cli.md) §2.7) | `--json`, `--strict`, `-q` | — |
+| `repair <volume>` | First Aid's repair of an HFS volume, then a check again (built; [cli.md](cli.md) §3.2) | `-o`, `--in-place`, `--dry-run`, `--json` | — |
 | `shell <input>` | A DOS-like shell on one input: cd, dir, type, info, res, find, copy in and out, del, md, ren, set, save, save as; history and tab completion; `--script` or piped input for automation (built; [cli.md](cli.md) §5) | `--script <file>`, `--json` | — |
 | `mcp` | An MCP server over standard input and output: sessions on opened inputs, the read and write commands as tools, saves only through `save_as` (built; [cli.md](cli.md) §4) | the limit options | — |
 
@@ -301,6 +302,14 @@ Order: core with the `--json` subcommands, then the MCP server, then the shell.
    several, and the app's Volume menu on partitioned disks), and to Disk Copy images (written back in their own
    format: built for Disk Copy 4.2, diskcopy42.md §3, and NDIF, ndif.md §3: changed chunks stored raw; still to do:
    compressing changed chunks, segmented images, checking against Disk Copy in SheepShaver).
+9. **First Aid** (decided and built 2026-10-04; [hfs.md §5.6](formats/file-systems/hfs.md#56-first-aid)): `check`
+   runs it on every HFS volume and partition, `repair` (CLI) and Volume ▸ First Aid… (app, check then Repair, written
+   by Save As) repair. Built from Disk First Aid 8.5.5's stages, problem numbers and words, traced from its code, with
+   checks and repairs it lacks (a missing or stale alternate MDB checked by a sound primary, overflow start blocks,
+   orphaned extents, short physical lengths, `drNmFls`/`drFreeBks`, extents past the end) in the same verdict.
+   Repairs: the B-trees written again with the repair list, forks that share blocks copied, then bitmap and MDB, then
+   a check again (at most three passes). Next: HFS Plus volumes (now "not checked"): the volume header, the catalog,
+   extents and attributes B-trees, the allocation file and the journal, repaired as for HFS.
 7. `format`/`mkvol`: a new, empty HFS volume image of a given size and name (built: `HfsWriter.Format`, the CLI's
    `format`; laid out as Mac OS 9.0's initializer does, traced, hfs.md §3.1).
 8. `resize <volume> --size <n>` (decided 2026-10-03; growing built, hfs.md §3.2): grow a plain HFS volume within its allocation block size
@@ -1157,6 +1166,10 @@ Each phase ships something usable and ends when its exit check passes; no dates 
   Inside Macintosh and the ResEdit Reference in its own words; ResEdit's `TMPL` resources are never copied (they are
   a cross-check only, and a layout known only from them is tagged `[Reference: ResEdit]`). A `TMPL` in an open file
   wins over a built-in one (templates.md §5).
+- **First Aid (2026-10-04):** a better check and repair, not a faithful copy of Disk First Aid. Its stages, numbers and
+  words are kept where they serve, but checks Disk First Aid lacks count in the same verdict, and where Disk First Aid
+  gives up (no alternate MDB: "not an HFS disk") ClassicMac checks by the primary and repairs. Behaviour is not
+  compared with Disk First Aid live any more.
 - **Document kinds (2026-10-03):** a file's kind is named the Finder's way first, from what is on the volume, as traced
   in Finder 9.2.2 and the Translation library: the Finder's own kinds by type (applications, system files through its
   `'fmap'`, clippings, …), then `GetDocumentKindString`'s order (the `'kind'` for creator and type, the creator's
