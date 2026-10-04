@@ -21,6 +21,9 @@ public enum InputEditKind
 
     /// <summary>One Mac file (a resource fork, MacBinary, BinHex, AppleSingle, AppleDouble or Basilisk II file): its resources and Finder info.</summary>
     SingleFile,
+
+    /// <summary>An HFS Plus volume image (bare or in an HFS wrapper, plain, in a partition or a Disk Copy image): repaired by First Aid only.</summary>
+    HfsPlusVolume,
 }
 
 /// <summary>One change an <see cref="InputEditSession"/> will make when saved.</summary>
@@ -61,10 +64,10 @@ public sealed class InputEditSession
         Path = System.IO.Path.GetFullPath(path);
         this.options = options;
         this.host = host;
-        // A plain HFS volume image, known by its MDB (an empty volume has no files to show it).
-        if (DataFileIsDisk(host) && root.Volume?.Format == "HFS")
+        // A plain HFS volume image, known by its MDB (an empty volume has no files to show it), or an HFS Plus one.
+        if (DataFileIsDisk(host) && root.Volume?.Format is "HFS" or "HFS Plus" && VolumeKind(host.File.DataFork) is { } plain)
         {
-            Kind = InputEditKind.HfsVolume;
+            Kind = plain;
             return;
         }
 
@@ -72,11 +75,11 @@ public sealed class InputEditSession
         // place (partition-map.md §5). A disk with more is not written.
         if (DataFileIsDisk(host) && PartitionMapReader.Partitions(host.File.DataFork) is { Count: > 0 } partitions)
         {
-            if (partitions is [var only] && IsPlainHfs(host.File.DataFork.Slice(only.Offset, only.Length)))
+            if (partitions is [var only] && VolumeKind(host.File.DataFork.Slice(only.Offset, only.Length)) is { } kind)
             {
                 partition = only;
                 region = new HfsImageRegion(only.Offset, only.Length);
-                Kind = InputEditKind.HfsVolume;
+                Kind = kind;
                 return;
             }
 
@@ -89,10 +92,10 @@ public sealed class InputEditSession
         if (DataFileIsDisk(host) && DiskCopy42Reader.Instance.CanRead(host.File.DataFork))
         {
             long dataSize = new BigEndianReader(host.File.DataFork.ReadPrefix(84)).ReadUInt32At(0x40);
-            if (84 + dataSize <= host.File.DataFork.Length && IsPlainHfs(host.File.DataFork.Slice(84, dataSize)))
+            if (84 + dataSize <= host.File.DataFork.Length && VolumeKind(host.File.DataFork.Slice(84, dataSize)) is { } kind)
             {
                 region = new HfsImageRegion(84, dataSize, DiskCopy42: true);
-                Kind = InputEditKind.HfsVolume;
+                Kind = kind;
                 return;
             }
 
@@ -113,11 +116,11 @@ public sealed class InputEditSession
                 : image.Format.StartsWith("AppleSingle", StringComparison.Ordinal) ? SaveAsFormat.AppleSingle
                 : image.Format.StartsWith("BinHex", StringComparison.Ordinal) ? SaveAsFormat.BinHex
                 : null;
-            if (format is { } chosen && NdifWriter.CanRewrite(image.File) && image.Children is [var disk] && IsPlainHfs(disk.File.DataFork))
+            if (format is { } chosen && NdifWriter.CanRewrite(image.File) && image.Children is [var disk] && VolumeKind(disk.File.DataFork) is { } kind)
             {
                 ndif = image.File;
                 singleFormat = chosen;
-                Kind = InputEditKind.HfsVolume;
+                Kind = kind;
                 return;
             }
 
@@ -173,7 +176,7 @@ public sealed class InputEditSession
 
     // The volume as edited: the input's, read where it lies (the file, a partition, a Disk Copy disk, the decoded NDIF
     // disk), and the sectors written over it.
-    private HfsVolume Overlay => overlay ??= Kind == InputEditKind.HfsVolume ? new HfsVolume(VolumeData()) : throw NotVolume("have a volume image");
+    private HfsVolume Overlay => overlay ??= Kind is InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume ? new HfsVolume(VolumeData()) : throw NotVolume("have a volume image");
 
     /// <summary>For a partitioned disk, the HFS partition edited; null for a plain volume image.</summary>
     public MacPartition? Partition => partition;
@@ -192,12 +195,23 @@ public sealed class InputEditSession
         return region is null ? host.File.DataFork : host.File.DataFork.Slice(region.Offset, region.Length);
     }
 
-    // An HFS volume (signature 'BD') that does not wrap HFS Plus.
-    private static bool IsPlainHfs(ForkData data)
+    // An HFS volume (signature 'BD') that does not wrap HFS Plus, an HFS Plus volume ('H+', or 'BD' wrapping it), or
+    // neither (HFSX among them, which First Aid does not repair).
+    private static InputEditKind? VolumeKind(ForkData data)
     {
         var mdb = data.ReadPrefix(1024 + 0x7E);
-        return mdb.Length == 1024 + 0x7E && new BigEndianReader(mdb) is var reader &&
-            reader.ReadUInt16At(1024) == 0x4244 && reader.ReadUInt16At(1024 + 0x7C) != 0x482B;
+        if (mdb.Length != 1024 + 0x7E)
+        {
+            return null;
+        }
+
+        var reader = new BigEndianReader(mdb);
+        return (reader.ReadUInt16At(1024), reader.ReadUInt16At(1024 + 0x7C)) switch
+        {
+            (0x482B, _) or (0x4244, 0x482B) => InputEditKind.HfsPlusVolume,
+            (0x4244, _) => InputEditKind.HfsVolume,
+            _ => null,
+        };
     }
 
     /// <summary>Opens <paramref name="path"/> as the CLI and the app read it.</summary>
@@ -369,7 +383,7 @@ public sealed class InputEditSession
     public FirstAidRepairResult Repair()
     {
         // Not prepared first: the writer's own checks refuse much of what First Aid repairs.
-        if (Kind != InputEditKind.HfsVolume)
+        if (Kind is not (InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume))
         {
             throw NotVolume("have a volume to repair");
         }
@@ -657,7 +671,8 @@ public sealed class InputEditSession
 
             var written = ForkData.FromFile(temporary);
             var disk = region is null ? written : written.Slice(region.Offset, region.Length);
-            var fault = HfsWriter.Check(disk);
+            // The writer's checks for HFS; an HFS Plus volume, which only First Aid writes, is compared sector by sector.
+            var fault = Kind == InputEditKind.HfsPlusVolume ? null : HfsWriter.Check(disk);
             var original = new byte[512];
             var copy = new byte[512];
             foreach (var number in resized ? [] : edited.Sectors)
@@ -788,7 +803,7 @@ public sealed class InputEditSession
     /// </summary>
     public HostFile? Current()
     {
-        if (Kind != InputEditKind.HfsVolume)
+        if (Kind is not (InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume))
         {
             return null;
         }

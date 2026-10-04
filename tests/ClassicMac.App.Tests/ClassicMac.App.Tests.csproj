@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <Compile Include="..\ClassicMac.Files.Tests\HfsBuilder.cs" Link="Builders\HfsBuilder.cs" />
+    <Compile Include="..\ClassicMac.Files.Tests\HfsPlusBuilder.cs" Link="Builders\HfsPlusBuilder.cs" />
     <Compile Include="..\ClassicMac.Files.Tests\NdifBuilder.cs" Link="Builders\NdifBuilder.cs" />
     <Compile Include="..\ClassicMac.Files.Tests\Fixtures.cs" Link="Builders\Fixtures.cs" />
     <Compile Include="..\ClassicMac.Resources.Decoders.Tests\DocumentFixtures.cs" Link="Builders\DocumentFixtures.cs" />

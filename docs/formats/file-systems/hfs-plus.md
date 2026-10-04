@@ -399,7 +399,11 @@ When the journaled bit is set [Doc: TN1150 Journal Info Block, Journal Header]:
 
 ## 3. Writing
 
-None.
+Only First Aid's repair writes HFS Plus (§5.4): B-trees written whole from their leaf records by
+`HfsPlusBTreeWriter` (the header node, map nodes after it when the header's map record is too short, the leaves packed
+full and the index levels above them, each level linked both ways; index keys the child's first key, padded to the
+maximum in the extents tree [Doc: TN1150]), the allocation file, and the volume header with its alternate. Files and
+folders are not created, deleted or renamed on HFS Plus.
 
 ## 4. Variants
 
@@ -505,6 +509,17 @@ traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked".
 7. **"Checking volume info."**: `fileCount`, `folderCount`, `freeBlocks` and `nextCatalogID` (above the highest CNID,
    unless `kHFSCatalogNodeIDsReusedBit`) against what the check counted: #59 "Volume Header needs minor repair".
    Overflow extents records of files not in the catalog are `firstaid.orphaned-extents`.
+
+**Repair** (`HfsFirstAid.Repair`, the CLI's `repair`, the app's Volume ▸ First Aid…), as on HFS, at most three
+passes, each verified again: the extents tree written again without orphaned records and with each fork's start blocks
+renumbered; the catalog written again with the repair list (a file thread without its file deleted, a folder made
+again from its thread, a thread naming another record deleted, a thread made for every folder and file without its
+right one, each file's thread flag set, a fork's block count raised to its extents, every valence set), both at their
+node size and node count and keeping their clump size, type and key comparison; the allocation file from the blocks
+the extents use; and the computed header written over the header and its alternate when either differs. Forks that
+share blocks, links and the attributes tree are not repaired yet. An edit session (`InputEditKind.HfsPlusVolume`)
+holds an HFS Plus image for repair only: it is saved with its changed sectors compared, and every other edit is
+refused.
 
 ## 6. Diagnostics
 

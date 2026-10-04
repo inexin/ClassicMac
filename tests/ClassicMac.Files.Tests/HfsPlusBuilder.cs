@@ -31,6 +31,31 @@ internal sealed class HfsPlusBuilder
         return nextId++;
     }
 
+    internal static byte[] CatalogKey(uint parent, string name)
+    {
+        var writer = new BigEndianWriter();
+        writer.WriteUInt16(6 + 2 * name.Length);
+        writer.WriteUInt32(parent);
+        writer.WriteUInt16(name.Length);
+        foreach (char c in name)
+        {
+            writer.WriteUInt16(c);
+        }
+
+        return writer.ToArray();
+    }
+
+    internal static byte[] ExtentsKey(byte fork, uint fileId, uint startBlock)
+    {
+        var writer = new BigEndianWriter();
+        writer.WriteUInt16(10);
+        writer.WriteByte(fork);
+        writer.WriteByte(0);
+        writer.WriteUInt32(fileId);
+        writer.WriteUInt32(startBlock);
+        return writer.ToArray();
+    }
+
     public byte[] Build(string volumeName)
     {
         // Blocks: 0 the header, then the allocation file (one block holds 32,768 bits), the trees, then the forks.
@@ -61,7 +86,7 @@ internal sealed class HfsPlusBuilder
             uint before = (uint)extents.Take(8).Sum(e => e.Count);
             for (var i = 8; i < extents.Count; i += 8)
             {
-                overflow.Add((HfsPlusBTreeWriterTests.ExtentsKey(fork, id, before), ExtentRecord(extents.Skip(i).Take(8))));
+                overflow.Add((ExtentsKey(fork, id, before), ExtentRecord(extents.Skip(i).Take(8))));
                 before += (uint)extents.Skip(i).Take(8).Sum(e => e.Count);
             }
         }
@@ -116,14 +141,14 @@ internal sealed class HfsPlusBuilder
     {
         var records = new List<(byte[] Key, byte[] Data)>
         {
-            (HfsPlusBTreeWriterTests.CatalogKey(1, volumeName), FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root))),
-            (HfsPlusBTreeWriterTests.CatalogKey(Root, ""), Thread(3, 1, volumeName)),
+            (CatalogKey(1, volumeName), FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root))),
+            (CatalogKey(Root, ""), Thread(3, 1, volumeName)),
         };
         foreach (var (parent, name, id) in folders)
         {
             int valence = folders.Count(f => f.Parent == id) + files.Count(f => f.Parent == id);
-            records.Add((HfsPlusBTreeWriterTests.CatalogKey(parent, name), FolderRecord(id, valence)));
-            records.Add((HfsPlusBTreeWriterTests.CatalogKey(id, ""), Thread(3, parent, name)));
+            records.Add((CatalogKey(parent, name), FolderRecord(id, valence)));
+            records.Add((CatalogKey(id, ""), Thread(3, parent, name)));
         }
 
         foreach (var file in files)
@@ -137,8 +162,8 @@ internal sealed class HfsPlusBuilder
             w.WriteFourCCAt(52, file.Creator);
             ForkData(w, 88, file.Data.Length, forks[(file.Id, 0)]);
             ForkData(w, 168, file.Resource.Length, forks[(file.Id, 0xFF)]);
-            records.Add((HfsPlusBTreeWriterTests.CatalogKey(file.Parent, file.Name), data));
-            records.Add((HfsPlusBTreeWriterTests.CatalogKey(file.Id, ""), Thread(4, file.Parent, file.Name)));
+            records.Add((CatalogKey(file.Parent, file.Name), data));
+            records.Add((CatalogKey(file.Id, ""), Thread(4, file.Parent, file.Name)));
         }
 
         records.Sort((a, b) => HfsPlusBTree.CompareCatalogKeys(a.Key, b.Key, caseFolding: true));

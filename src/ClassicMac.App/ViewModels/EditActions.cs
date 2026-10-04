@@ -727,7 +727,7 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
     }
 
     private bool CanSaveAs(SaveAsFormat format) =>
-        !appParts.ExportActions.IsExporting && (format == SaveAsFormat.HfsImage ? appSelection.Selected?.Input.IsWritableHfs == true : FileOwner(appSelection.Selected) is not null);
+        !appParts.ExportActions.IsExporting && (format == SaveAsFormat.HfsImage ? appSelection.Selected?.Input.IsFirstAidVolume == true : FileOwner(appSelection.Selected) is not null);
 
     [RelayCommand(CanExecute = nameof(CanSaveAs))]
     private async Task SaveAs(SaveAsFormat format)
@@ -775,7 +775,7 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
     // edited fork in it (the selected file's always), written and verified; the image itself is not changed.
     private async Task SaveHfsImageAs()
     {
-        if (appSelection.Selected?.Input is not { IsWritableHfs: true } input || appServices.FilePicker is null)
+        if (appSelection.Selected?.Input is not { IsFirstAidVolume: true } input || appServices.FilePicker is null)
         {
             return;
         }

@@ -214,7 +214,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         appServices.Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
     }
 
-    private bool CanFirstAid() => !appParts.ExportActions.IsExporting && appSelection.Selected?.Input is { IsWritableHfs: true };
+    private bool CanFirstAid() => !appParts.ExportActions.IsExporting && appSelection.Selected?.Input is { IsFirstAidVolume: true };
 
     // First Aid (hfs.md §5.6): the selected item's volume, as edited so far, is checked and the problems and verdict
     // shown; Repair repairs it in the session (shown as an edit, written by Save As) and shows what it did. The tree is
@@ -222,7 +222,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
     [RelayCommand(CanExecute = nameof(CanFirstAid))]
     private async Task FirstAid()
     {
-        if (appSelection.Selected?.Input is not { IsWritableHfs: true } input)
+        if (appSelection.Selected?.Input is not { IsFirstAidVolume: true } input)
         {
             return;
         }

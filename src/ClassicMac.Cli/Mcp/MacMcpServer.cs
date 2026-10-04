@@ -284,6 +284,7 @@ internal sealed class MacMcpServer : IDisposable
             w.WriteString("editable", session.Kind switch
             {
                 InputEditKind.HfsVolume => "volume",
+                InputEditKind.HfsPlusVolume => "repair",
                 InputEditKind.SingleFile => "file",
                 _ => "no",
             });

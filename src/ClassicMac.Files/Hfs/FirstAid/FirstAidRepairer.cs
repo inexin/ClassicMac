@@ -32,13 +32,13 @@ internal static class FirstAidRepairer
         for (var pass = 0; pass < MaxPasses && after.Verdict == FirstAidVerdict.NeedsRepair; pass++)
         {
             int made = changes.Count;
-            if ((run.Repairs & FirstAidRepairs.AlternateMdb) != 0)
+            if (!run.Plus && (run.Repairs & FirstAidRepairs.AlternateMdb) != 0)
             {
                 working.Write((run.Sectors - 2) * FirstAidRun.SectorSize, run.Primary);
                 changes.Add(new PlannedChange("repair", "", "alternate master directory block written from the primary"));
             }
 
-            if (Trees(run, working, changes))
+            if (run.Plus ? PlusRepair.Trees(run, working, changes) : Trees(run, working, changes))
             {
                 (run, after) = HfsFirstAid.Check(working);
                 if (run.Ended is not null)
@@ -47,8 +47,17 @@ internal static class FirstAidRepairer
                 }
             }
 
-            Bitmap(run, working, changes);
-            Mdb(run, working, changes);
+            if (run.Plus)
+            {
+                PlusRepair.Bitmap(run, working, changes);
+                PlusRepair.Header(run, working, changes);
+            }
+            else
+            {
+                Bitmap(run, working, changes);
+                Mdb(run, working, changes);
+            }
+
             (run, after) = HfsFirstAid.Check(working);
             if (changes.Count == made)
             {

@@ -641,6 +641,28 @@ public sealed class EditTests : EditTestsBase
     }
 
     [Fact]
+    public async Task First_Aid_repairs_an_HFS_Plus_volume()
+    {
+        var builder = new HfsPlusBuilder();
+        builder.File(HfsPlusBuilder.Root, "Read Me", "hello"u8.ToArray(), []);
+        var image = builder.Build("Plus");
+        image[1024 + 35]++;                                                        // fileCount one too many
+        var path = Path.Combine(folder, "Plus.img");
+        File.WriteAllBytes(path, image);
+        var dialogs = new Dialogs { FirstAid = _ => true };
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        model.Selected = input;
+        Assert.True(model.VolumeActions.FirstAidCommand.CanExecute(null));
+        Assert.False(model.VolumeActions.NewFolderCommand.CanExecute(null));      // HFS Plus is not otherwise written
+
+        await model.VolumeActions.FirstAidCommand.ExecuteAsync(null);
+
+        Assert.Equal("The volume “Plus” was repaired successfully.", dialogs.FirstAidShown[^1].Summary);
+        Assert.True(model.EditActions.HasUnsavedChanges);
+    }
+
+    [Fact]
     public async Task First_Aid_is_for_HFS_volumes()
     {
         var model = new MainViewModel { EditDialogs = new Dialogs() };

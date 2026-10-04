@@ -13,6 +13,7 @@ public sealed class FirstAidReport
         Problems = [.. run.Problems];
         Repairs = run.Repairs;
         VolumeName = run.VolumeName;
+        HfsPlus = run.Plus;
         Verdict = run.Ended ?? (run.Unrepairable ? FirstAidVerdict.CannotRepair
             : run.Repairs != FirstAidRepairs.None ? FirstAidVerdict.NeedsRepair : FirstAidVerdict.AppearsOk);
     }
@@ -25,6 +26,9 @@ public sealed class FirstAidReport
 
     /// <summary>The repairs the problems need.</summary>
     public FirstAidRepairs Repairs { get; }
+
+    /// <summary>Whether the volume is HFS Plus (bare or in its HFS wrapper).</summary>
+    public bool HfsPlus { get; }
 
     /// <summary>The volume's name (from its MDB).</summary>
     public string VolumeName { get; }

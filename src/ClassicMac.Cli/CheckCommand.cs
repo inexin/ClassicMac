@@ -45,10 +45,11 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
 
         string? fault = null;
         FirstAidReport? firstAid = null;
-        var volume = opened.Host.Layout == HostLayout.Plain && opened.Root.Volume?.Format == "HFS";
+        var volume = opened.Host.Layout == HostLayout.Plain && opened.Root.Volume?.Format is "HFS" or "HFS Plus";
         if (volume)
         {
-            fault = HfsWriter.Check(opened.Root.File.DataFork);
+            // The writer's checks are HFS's; an HFS Plus volume gets First Aid's.
+            fault = opened.Root.Volume?.Format == "HFS" ? HfsWriter.Check(opened.Root.File.DataFork) : null;
             firstAid = HfsFirstAid.Verify(opened.Root.File.DataFork);
         }
         else if (InputEditSession.Open(input.FullName, containerOptions, readOptions) is { Kind: InputEditKind.HfsVolume, Partition: null } session)
@@ -69,7 +70,8 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                 try
                 {
                     var slice = opened.Root.File.DataFork.Slice(partition.Offset, partition.Length);
-                    partitions.Add((partition, HfsWriter.Check(slice), HfsFirstAid.Verify(slice)));
+                    var report = HfsFirstAid.Verify(slice);
+                    partitions.Add((partition, report.HfsPlus ? null : HfsWriter.Check(slice), report));
                 }
                 catch (InvalidDataException)
                 {
@@ -113,7 +115,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                 }
 
                 w.WriteEndArray();
-                if (volume)
+                if (volume && firstAid?.HfsPlus != true)
                 {
                     w.WriteStartObject("volume");
                     w.WriteBoolean("passes", fault is null);
@@ -135,8 +137,12 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                         w.WriteStartObject();
                         w.WriteNumber("number", partition.Number);
                         w.WriteString("name", partition.Name);
-                        w.WriteBoolean("passes", partitionFault is null);
-                        w.WriteString("fault", partitionFault);
+                        if (!partitionFirstAid.HfsPlus)
+                        {
+                            w.WriteBoolean("passes", partitionFault is null);
+                            w.WriteString("fault", partitionFault);
+                        }
+
                         FirstAidOutput.Json(w, partitionFirstAid);
                         w.WriteEndObject();
                     }
@@ -161,7 +167,8 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                 FirstAidOutput.Text(output, "first aid: ", firstAid);
             }
 
-            if (volume)
+            // The writer's checks are HFS's; an HFS Plus volume has First Aid's lines only.
+            if (volume && firstAid?.HfsPlus != true)
             {
                 output.WriteLine($"volume: {fault ?? "passes the writer's checks"}");
             }
@@ -169,7 +176,10 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
             foreach (var (partition, partitionFault, partitionFirstAid) in partitions)
             {
                 FirstAidOutput.Text(output, $"partition {partition.Number} \"{partition.Name}\" first aid: ", partitionFirstAid);
-                output.WriteLine($"partition {partition.Number} \"{partition.Name}\": {partitionFault ?? "passes the writer's checks"}");
+                if (!partitionFirstAid.HfsPlus)
+                {
+                    output.WriteLine($"partition {partition.Number} \"{partition.Name}\": {partitionFault ?? "passes the writer's checks"}");
+                }
             }
 
             if (notOpened > 0)

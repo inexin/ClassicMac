@@ -384,7 +384,7 @@ it. Inputs ClassicMac does not write (§3.1) can be read but not changed.
 
 | Tool | Arguments | Result |
 | --- | --- | --- |
-| `open` | `path` (the host file) | `session`, `input`, `path` (`""`), `kind`, `format`, `editable` (`volume`, `file` or `no`) |
+| `open` | `path` (the host file) | `session`, `input`, `path` (`""`), `kind`, `format`, `editable` (`volume`, `file`, `repair` for an HFS Plus volume First Aid repairs, or `no`) |
 | `close` | `session`, `discard` | `session`, `input`, `closed` |
 | `list` | `session`, `path`, `limit` (200, at most 1000), `cursor` | ls's object (§2.6) with `count`, `truncated`, `more` |
 | `stat` | `session`, `path` | stat's object (§2.6) |

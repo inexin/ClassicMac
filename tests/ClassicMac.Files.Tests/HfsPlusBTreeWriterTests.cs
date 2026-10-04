@@ -8,34 +8,9 @@ namespace ClassicMac.Files.Tests;
 // which checks every node, key order, index and map.
 public class HfsPlusBTreeWriterTests
 {
-    internal static byte[] CatalogKey(uint parent, string name)
-    {
-        var writer = new BigEndianWriter();
-        writer.WriteUInt16(6 + 2 * name.Length);
-        writer.WriteUInt32(parent);
-        writer.WriteUInt16(name.Length);
-        foreach (char c in name)
-        {
-            writer.WriteUInt16(c);
-        }
-
-        return writer.ToArray();
-    }
-
-    internal static byte[] ExtentsKey(byte fork, uint fileId, uint startBlock)
-    {
-        var writer = new BigEndianWriter();
-        writer.WriteUInt16(10);
-        writer.WriteByte(fork);
-        writer.WriteByte(0);
-        writer.WriteUInt32(fileId);
-        writer.WriteUInt32(startBlock);
-        return writer.ToArray();
-    }
-
     private static List<(byte[] Key, byte[] Data)> CatalogRecords(int count) =>
         [.. Enumerable.Range(0, count)
-            .Select(i => (CatalogKey(16 + (uint)(i % 7), $"File number {i:D4} with a long name"), Encoding.ASCII.GetBytes($"record {i:D4}".PadRight(88))))
+            .Select(i => (HfsPlusBuilder.CatalogKey(16 + (uint)(i % 7), $"File number {i:D4} with a long name"), Encoding.ASCII.GetBytes($"record {i:D4}".PadRight(88))))
             .OrderBy(r => r.Item1, Comparer<byte[]>.Create((a, b) => HfsPlusBTree.CompareCatalogKeys(a, b, caseFolding: true)))];
 
     [Fact]
@@ -59,7 +34,7 @@ public class HfsPlusBTreeWriterTests
     public void An_extents_tree_has_fixed_index_keys()
     {
         var records = Enumerable.Range(0, 300)
-            .Select(i => (ExtentsKey(0, 16 + (uint)i, 8), new byte[64]))
+            .Select(i => (HfsPlusBuilder.ExtentsKey(0, 16 + (uint)i, 8), new byte[64]))
             .ToList();
 
         var tree = HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Extents, records, 512, totalNodes: 100, clumpSize: 512 * 100);
@@ -81,7 +56,7 @@ public class HfsPlusBTreeWriterTests
     [Fact]
     public void A_tree_past_its_header_map_gets_map_nodes()
     {
-        var records = Enumerable.Range(0, 10).Select(i => (ExtentsKey(0, 16 + (uint)i, 0), new byte[64])).ToList();
+        var records = Enumerable.Range(0, 10).Select(i => (HfsPlusBuilder.ExtentsKey(0, 16 + (uint)i, 0), new byte[64])).ToList();
 
         var tree = HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Extents, records, 512, totalNodes: 5000, clumpSize: 512 * 5000);
 

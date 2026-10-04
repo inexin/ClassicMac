@@ -380,6 +380,9 @@ public sealed class InputNode : NodeViewModel
     /// </summary>
     public bool IsWritableHfs => VolumeSession.Kind == InputEditKind.HfsVolume;
 
+    /// <summary>Whether First Aid checks and repairs the input's volume: an HFS one as above, or an HFS Plus one.</summary>
+    public bool IsFirstAidVolume => VolumeSession.Kind is InputEditKind.HfsVolume or InputEditKind.HfsPlusVolume;
+
     /// <summary>Whether files or folders have been created or deleted in the volume (nothing is read to tell).</summary>
     public bool HasVolumeChanges => VolumeSession.HasChanges;
 
