@@ -486,8 +486,9 @@ flowchart LR
     `.smi` and segmented images), DART, UDIF `.dmg`; HFS+ later;
   - `ClassicMac.Files.Iso`: ISO 9660 and High Sierra volumes as Mac OS 9 reads them, raw-sector CD images
     (`.bin`, 2352/2336-byte sectors) and cue sheets, multisession discs by their last session;
-  - `ClassicMac.Files.Compression`: decompressors shared by disk images and archives (ADC for NDIF and UDIF, KenCode,
-    DART RLE and LZH, bzip2 for UDIF; the StuffIt and Compact Pro methods later);
+  - `ClassicMac.Files.Compression`: the codecs of disk images and archives (ADC and KenCode, both ways, with Disk Copy's
+    match finder; DART RLE and LZH; bzip2; the StuffIt, Compact Pro, LHA and DiskDoubler methods);
+  - `ClassicMac.Files.Checksums`: the CRCs they check (CRC-16/XMODEM, CRC-16/ARC, CRC-32), one copy each;
   - `ClassicMac.Files.Fat`: FAT12/16/32 volumes with the PC Exchange / File Exchange data Mac OS kept on them, and DOS
     (MBR) partition tables;
   - `ClassicMac.Files.Archives` (later): zip and tar with Mac data, StuffIt, Compact Pro, DiskDoubler, PackIt.

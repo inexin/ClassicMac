@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Archives;
 
@@ -150,7 +151,7 @@ public sealed class DiskDoublerSplitReader : IContainerReader
             var header = new BigEndianReader(part);
             int payloadLength = checked((int)header.ReadUInt32At(44));
             ReadOnlySpan<byte> payload = part.AsSpan(HeaderLength, payloadLength);
-            if (header.ReadUInt16At(48) != Crc16Xmodem(payload))
+            if (header.ReadUInt16At(48) != Crc16Xmodem.Compute(payload))
             {
                 context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                     $"DiskDoubler split part {index + 1} has a CRC-16 mismatch; its data is retained.");
@@ -232,20 +233,6 @@ public sealed class DiskDoublerSplitReader : IContainerReader
         }
 
         return name[..dot];
-    }
-
-    private static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
-    {
-        ushort crc = 0;
-        foreach (byte value in bytes)
-        {
-            crc ^= (ushort)(value << 8);
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc & 0x8000) == 0 ? crc << 1 : (crc << 1) ^ 0x1021);
-            }
-        }
-        return crc;
     }
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);

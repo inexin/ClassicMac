@@ -1,10 +1,11 @@
-using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
-using System.IO;
 using System.IO.Compression;
+using System.IO;
 using System.Text;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Archives;
 

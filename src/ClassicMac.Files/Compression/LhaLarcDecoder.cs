@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes the LArc <c>-lzs-</c> and <c>-lz5-</c> methods used in LHA archives.</summary>
 internal static class LhaLarcDecoder

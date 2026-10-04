@@ -1,7 +1,8 @@
 using System.Buffers.Binary;
 using ClassicMac.Core;
-using ClassicMac.Files;
 using ClassicMac.Files.Archives;
+using ClassicMac.Files.Compression;
+using ClassicMac.Files;
 
 namespace ClassicMac.Files.Tests;
 

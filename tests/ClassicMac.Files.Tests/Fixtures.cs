@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using ClassicMac.Files.Checksums;
 using ClassicMac.Files.Containers;
 
 namespace ClassicMac.Files.Tests;
@@ -80,7 +81,7 @@ internal static class Fixtures
                 header[106] = 7; // fdScript
                 header[107] = 0x80; // fdXFlags
             }
-            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(124), Crc16.Compute(header.AsSpan(0, 124)));
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(124), Crc16Xmodem.Compute(header.AsSpan(0, 124)));
         }
         var output = new MemoryStream();
         output.Write(header);
@@ -212,7 +213,7 @@ internal static class Fixtures
     private static void WithCrc(Stream output, byte[] bytes, bool corrupt)
     {
         output.Write(bytes);
-        var crc = (ushort)(Crc16.Compute(bytes) ^ (corrupt ? 1 : 0));
+        var crc = (ushort)(Crc16Xmodem.Compute(bytes) ^ (corrupt ? 1 : 0));
         output.Write([(byte)(crc >> 8), (byte)crc]);
     }
 

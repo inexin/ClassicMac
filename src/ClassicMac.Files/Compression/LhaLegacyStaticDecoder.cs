@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes the legacy static-Huffman LZSS method used by LHA <c>-lh3-</c> files.</summary>
 internal static class LhaLegacyStaticDecoder

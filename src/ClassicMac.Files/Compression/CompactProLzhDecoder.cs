@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes a Compact Pro LZH+RLE fork.</summary>
 /// <remarks>The bitstream and window rules are fitted against the independent format description in

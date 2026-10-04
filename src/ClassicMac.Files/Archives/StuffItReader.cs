@@ -1,10 +1,12 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Threading.Tasks;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
+using ClassicMac.Files.Compression;
 using ClassicMac.Resources;
 
 namespace ClassicMac.Files.Archives;
@@ -459,7 +461,7 @@ public sealed class StuffItReader : IContainerReader
             ReadOnlyMemory<byte> header = archive.AsMemory(position, memberHeaderLength);
             var headerReader = new BigEndianReader(header);
             ushort expectedHeaderCrc = headerReader.ReadUInt16At(110);
-            if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
+            if (Crc16Arc.Compute(header.Span[..110]) != expectedHeaderCrc)
             {
                 context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                     $"The legacy StuffIt member header checksum is incorrect at offset {position}.", position);
@@ -599,7 +601,7 @@ public sealed class StuffItReader : IContainerReader
         }
 
         ushort expectedHeaderCrc = headerReader.ReadUInt16At(110);
-        if (Crc16Arc(header.Span[..110]) != expectedHeaderCrc)
+        if (Crc16Arc.Compute(header.Span[..110]) != expectedHeaderCrc)
         {
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The legacy StuffIt member header checksum is incorrect at offset {offset}.", offset);
@@ -834,7 +836,7 @@ public sealed class StuffItReader : IContainerReader
     private static void CheckForkCrc(ReadOnlySpan<byte> bytes, ushort expected, string fork, string name, int offset,
         ContainerContext context)
     {
-        if (Crc16Arc(bytes) != expected)
+        if (Crc16Arc.Compute(bytes) != expected)
         {
             context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                 $"The StuffIt {fork} fork checksum is incorrect for '{name}'.", offset);
@@ -1786,42 +1788,10 @@ public sealed class StuffItReader : IContainerReader
         ushort crc = 0;
         for (int index = 0; index < header.Length; index++)
         {
-            crc = CrcByte(crc, index is 32 or 33 ? (byte)0 : header[index]);
+            crc = Crc16Arc.Update(crc, index is 32 or 33 ? (byte)0 : header[index]);
         }
 
         return crc;
-    }
-
-    private static ushort Crc16Arc(ReadOnlySpan<byte> bytes)
-    {
-        ushort crc = 0;
-        foreach (byte value in bytes)
-        {
-            crc = CrcByte(crc, value);
-        }
-
-        return crc;
-    }
-
-    // CRC-16/ARC (reflected polynomial $A001), a byte at a time from a table.
-    private static ushort CrcByte(ushort crc, byte value) => (ushort)((crc >> 8) ^ CrcTable[(crc ^ value) & 0xFF]);
-
-    private static readonly ushort[] CrcTable = BuildCrcTable();
-
-    private static ushort[] BuildCrcTable()
-    {
-        var table = new ushort[256];
-        for (int index = 0; index < 256; index++)
-        {
-            var crc = (ushort)index;
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
-            }
-
-            table[index] = crc;
-        }
-        return table;
     }
 
     private static MacString LegacyName(string name)

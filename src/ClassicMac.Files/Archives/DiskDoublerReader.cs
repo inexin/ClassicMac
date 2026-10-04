@@ -1,7 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
+using ClassicMac.Files.Compression;
 
 namespace ClassicMac.Files.Archives;
 
@@ -412,7 +414,7 @@ public sealed class DiskDoublerReader : IContainerReader
     private static void CheckRecordCrc(byte[] archive, BigEndianReader reader, int offset, int crcOffset,
         MacString name, ContainerContext context)
     {
-        if (reader.ReadUInt16At(offset + crcOffset) != Crc16Xmodem(archive.AsSpan(offset, crcOffset)))
+        if (reader.ReadUInt16At(offset + crcOffset) != Crc16Xmodem.Compute(archive.AsSpan(offset, crcOffset)))
         {
             context.Report(DiagnosticSeverity.Warning, "archive.header-crc",
                 $"The DiskDoubler DDA2 record header checksum is incorrect for '{name}'.", offset);
@@ -449,7 +451,7 @@ public sealed class DiskDoublerReader : IContainerReader
                 code = "archive.fork-checksum";
                 break;
             case 8:
-                calculated = Crc16Ibm(decoded);
+                calculated = Crc16Arc.Compute(decoded);
                 code = "archive.fork-crc";
                 break;
             default:
@@ -1245,23 +1247,11 @@ public sealed class DiskDoublerReader : IContainerReader
         return (byte)code;
     }
 
-    private static ushort Crc16Ibm(ReadOnlySpan<byte> bytes)
-    {
-        ushort crc = 0;
-        foreach (byte value in bytes)
-        {
-            crc ^= value;
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xA001));
-            }
-        }
-        return crc;
-    }
-
     private static bool IsValidDda2Header(BigEndianReader header) =>
         header.Source.Length >= ArchiveHeaderLength && header.Source.Span[..4].SequenceEqual("DDA2"u8) &&
-        header.ReadUInt16At(60) == Crc16Xmodem(header.Source.Span[..60]);
+        // [Fitted] XADMaster validates the DDA2 header CRC with its reversed $1021 table; the stored big-endian result
+        // is CRC-16/XMODEM over the preceding 60 bytes.
+        header.ReadUInt16At(60) == Crc16Xmodem.Compute(header.Source.Span[..60]);
 
     private static bool IsValidStandaloneHeader(BigEndianReader header)
     {
@@ -1271,23 +1261,7 @@ public sealed class DiskDoublerReader : IContainerReader
         }
 
         ushort checksum = header.ReadUInt16At(82);
-        return checksum == 0 || checksum == Crc16Xmodem(header.Source.Span[..82]);
-    }
-
-    private static ushort Crc16Xmodem(ReadOnlySpan<byte> bytes)
-    {
-        // [Fitted] XADMaster validates the DDA2 header CRC using its reversed 0x1021 table; the stored
-        // big-endian result is equivalent to CRC-16/XMODEM over the preceding 60 bytes.
-        ushort crc = 0;
-        foreach (byte value in bytes)
-        {
-            crc ^= (ushort)(value << 8);
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc & 0x8000) == 0 ? crc << 1 : (crc << 1) ^ 0x1021);
-            }
-        }
-        return crc;
+        return checksum == 0 || checksum == Crc16Xmodem.Compute(header.Source.Span[..82]);
     }
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);

@@ -105,8 +105,8 @@ OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 
 ## StuffIt method-13 and method-15 interoperability tables
 
-The method-13 interoperability table values in `src/ClassicMac.Files/Archives/StuffItMethod13Tables.cs` and the
-method-15 randomization table in `src/ClassicMac.Files/Archives/StuffItMethod15Decoder.cs` are transcribed from
+The method-13 interoperability table values in `src/ClassicMac.Files/Compression/StuffItMethod13Tables.cs` and the
+method-15 randomization table in `src/ClassicMac.Files/Compression/StuffItMethod15Decoder.cs` are transcribed from
 [KarpelesLab/compcol](https://github.com/KarpelesLab/compcol), `src/sit13/tables.rs` and `src/arsenic/tables.rs`
 respectively. Both decoder implementations are independent. The table data is covered by the upstream MIT license:
 
@@ -171,7 +171,7 @@ SOFTWARE.
 
 `tests/ClassicMac.Files.Tests/TestData/MacLha224/` holds seven MacLHA 2.24 archives from
 [lhasa](https://github.com/fragglet/lhasa)'s test suite (`test/archives/maclha_224/`), used under the ISC License.
-The `-lh1-` adaptive tree in `src/ClassicMac.Files/Archives/LhaOldDecoder.cs` follows lhasa's `lib/lh1_decoder.c`
+The `-lh1-` adaptive tree in `src/ClassicMac.Files/Compression/LhaOldDecoder.cs` follows lhasa's `lib/lh1_decoder.c`
 (groups and leaders, reconstruction), used under the same licence.
 
 ```

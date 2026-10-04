@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes a StuffIt method 14 fork.</summary>
 /// <remarks>

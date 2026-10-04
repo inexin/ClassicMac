@@ -1,4 +1,5 @@
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 using ClassicMac.Files.Containers;
 using ClassicMac.Files.Editing;
 using ClassicMac.Resources;
@@ -80,7 +81,7 @@ public sealed class ForkSaverTests : IDisposable
         var bytes = MacBinaryWriter.ToArray(File(Fork(1)));
         bytes[102] = bytes[103] = bytes[104] = bytes[105] = 0;   // no 'mBIN': MacBinary II
         bytes[122] = 129;
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(124), Crc16.Compute(bytes.AsSpan(0, 124)));
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt16BigEndian(bytes.AsSpan(124), Crc16Xmodem.Compute(bytes.AsSpan(0, 124)));
         System.IO.File.WriteAllBytes(path, bytes);
         var (location, _) = Open(path);
         Assert.Equal(SaveTarget.MacBinary, location!.Target);

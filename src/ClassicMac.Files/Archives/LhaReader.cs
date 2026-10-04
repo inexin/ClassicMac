@@ -1,9 +1,11 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
+using ClassicMac.Files.Compression;
 
 namespace ClassicMac.Files.Archives;
 
@@ -288,7 +290,7 @@ public sealed class LhaReader : IContainerReader
                     continue;
                 }
 
-                if (Crc16Ibm(decodedData) != expectedCrc)
+                if (Crc16Arc.Compute(decodedData) != expectedCrc)
                 {
                     context.Report(DiagnosticSeverity.Error, "archive.fork-checksum",
                         "An LHA file has a CRC-16 mismatch; its decoded data is retained.", payloadOffset);
@@ -526,7 +528,7 @@ public sealed class LhaReader : IContainerReader
     private static void ValidateExtendedHeaderCrc(ReadOnlySpan<byte> header, int crcOffset)
     {
         ushort expectedCrc = U16(header, crcOffset);
-        ushort actualCrc = Crc16IbmWithZeroedRange(header, crcOffset, 2);
+        ushort actualCrc = Crc16ArcWithZeroedRange(header, crcOffset, 2);
         if (actualCrc != expectedCrc)
         {
             throw new InvalidDataException("An LHA level-2 header CRC is invalid.");
@@ -575,33 +577,12 @@ public sealed class LhaReader : IContainerReader
         return checksum;
     }
 
-    private static ushort Crc16Ibm(ReadOnlySpan<byte> bytes)
+    // The header's CRC-16/ARC with its own CRC field read as zeros.
+    private static ushort Crc16ArcWithZeroedRange(ReadOnlySpan<byte> bytes, int zeroOffset, int zeroLength)
     {
-        ushort crc = 0;
-        foreach (byte value in bytes)
-        {
-            crc ^= value;
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
-            }
-        }
-        return crc;
-    }
-
-    private static ushort Crc16IbmWithZeroedRange(ReadOnlySpan<byte> bytes, int zeroOffset, int zeroLength)
-    {
-        ushort crc = 0;
-        for (int index = 0; index < bytes.Length; index++)
-        {
-            byte value = index >= zeroOffset && index - zeroOffset < zeroLength ? (byte)0 : bytes[index];
-            crc ^= value;
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc & 1) != 0 ? (crc >> 1) ^ 0xA001 : crc >> 1);
-            }
-        }
-        return crc;
+        ushort crc = Crc16Arc.Compute(bytes[..zeroOffset]);
+        crc = Crc16Arc.Compute(new byte[zeroLength], crc);
+        return Crc16Arc.Compute(bytes[(zeroOffset + zeroLength)..], crc);
     }
 
     private static ushort U16(ReadOnlySpan<byte> source, int offset) =>

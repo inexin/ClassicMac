@@ -1,8 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Containers;
 
@@ -223,7 +224,7 @@ public sealed class BinHexReader : IContainerReader
             return;
         }
         var stored = new BigEndianReader(all).ReadUInt16At((int)at);
-        var computed = Crc16.Compute(covered);
+        var computed = Crc16Xmodem.Compute(covered);
         if (stored != computed)
         {
             context.Report(DiagnosticSeverity.Warning, "binhex.crc",

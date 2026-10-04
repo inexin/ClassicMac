@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Xml;
 using System.Xml.Linq;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 using ClassicMac.Files.Compression;
 using ClassicMac.Resources;
 
@@ -402,17 +403,6 @@ public sealed class UdifReader : IContainerReader
     // CRC-32 (zlib's) or MD5, fed incrementally; the result as the image stores it (CRC-32 big-endian).
     private sealed class Hasher
     {
-        private static readonly uint[] CrcTable = Enumerable.Range(0, 256).Select(i =>
-        {
-            var c = (uint)i;
-            for (var k = 0; k < 8; k++)
-            {
-                c = (c & 1) != 0 ? (c >> 1) ^ 0xEDB88320 : c >> 1;
-            }
-
-            return c;
-        }).ToArray();
-
         private readonly IncrementalHash? md5;
         private uint crc = 0xFFFFFFFF;
 
@@ -432,10 +422,7 @@ public sealed class UdifReader : IContainerReader
                 md5.AppendData(bytes);
                 return;
             }
-            foreach (var b in bytes)
-            {
-                crc = CrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
-            }
+            crc = Crc32.Update(crc, bytes);
         }
 
         public byte[] Finish()

@@ -1,8 +1,10 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
+using ClassicMac.Files.Compression;
 
 namespace ClassicMac.Files.Archives;
 
@@ -205,7 +207,7 @@ public sealed class CompactProReader : IContainerReader
             byte[] data = (flags & 4) != 0
                 ? CompactProLzhDecoder.Decode(dataInput, dataLength)
                 : DecodeRle8182(dataInput, dataLength);
-            if (~Crc32(resource, data) != file.Crc)
+            if (ForkCrc(resource, data) != file.Crc)
             {
                 context.Report(DiagnosticSeverity.Error, "archive.fork-crc",
                     $"The Compact Pro data/resource checksum is incorrect for '{entry.Name}'.", entry.Offset);
@@ -358,7 +360,7 @@ public sealed class CompactProReader : IContainerReader
     private static ushort ReadUInt16(BigEndianReader directory, ref uint crc)
     {
         var word = directory.ReadSubReader(2);
-        crc = UpdateCrc(crc, word.Source.Span);
+        crc = Crc32.Update(crc, word.Source.Span);
         return word.ReadUInt16();
     }
 
@@ -369,7 +371,7 @@ public sealed class CompactProReader : IContainerReader
             throw new InvalidDataException("The Compact Pro directory is truncated.");
         }
 
-        crc = UpdateCrcByte(crc, value);
+        crc = Crc32.Update(crc, value);
         return value;
     }
 
@@ -382,33 +384,13 @@ public sealed class CompactProReader : IContainerReader
         }
 
         var block = directory.ReadSubReader(length);
-        crc = UpdateCrc(crc, block.Source.Span);
+        crc = Crc32.Update(crc, block.Source.Span);
         return block;
     }
 
-    private static uint UpdateCrc(uint crc, ReadOnlySpan<byte> bytes)
-    {
-        foreach (byte value in bytes)
-        {
-            crc = UpdateCrcByte(crc, value);
-        }
-
-        return crc;
-    }
-
-    private static uint UpdateCrcByte(uint crc, byte value)
-    {
-        crc ^= value;
-        for (int bit = 0; bit < 8; bit++)
-        {
-            crc = (crc >> 1) ^ ((crc & 1) == 0 ? 0 : 0xEDB88320u);
-        }
-
-        return crc;
-    }
-
-    private static uint Crc32(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second) =>
-        ~UpdateCrc(UpdateCrc(uint.MaxValue, first), second);
+    // The CRC-32 register over both forks; Compact Pro stores it without the final XOR.
+    private static uint ForkCrc(ReadOnlySpan<byte> first, ReadOnlySpan<byte> second) =>
+        Crc32.Update(Crc32.Update(uint.MaxValue, first), second);
 
     private static int ReadLength(uint value, string what)
     {

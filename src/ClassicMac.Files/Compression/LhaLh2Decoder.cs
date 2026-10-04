@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes the dynamic-Huffman LZSS method used by LHA <c>-lh2-</c> files.</summary>
 internal static class LhaLh2Decoder

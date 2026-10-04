@@ -1,4 +1,5 @@
 using ClassicMac.Files.Archives;
+using ClassicMac.Files.Compression;
 
 namespace ClassicMac.Files.Tests;
 

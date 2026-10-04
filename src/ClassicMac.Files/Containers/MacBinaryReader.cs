@@ -1,7 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Containers;
 
@@ -71,7 +72,7 @@ public sealed class MacBinaryReader : IContainerReader
             return 0;
         }
 
-        if (Crc16.Compute(header.Span[..124]) == reader.ReadUInt16At(124))
+        if (Crc16Xmodem.Compute(header.Span[..124]) == reader.ReadUInt16At(124))
         {
             return reader.ReadUInt32At(102) == MBin ? 3 : 2;
         }

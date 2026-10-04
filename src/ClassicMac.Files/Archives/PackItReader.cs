@@ -1,8 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Archives;
 
@@ -178,7 +179,7 @@ public sealed class PackItReader : IContainerReader
             }
 
             ushort storedHeaderCrc = metadataReader.ReadUInt16At(0x5C);
-            ushort actualHeaderCrc = Crc16(metadata.Span[..0x5C]);
+            ushort actualHeaderCrc = Crc16Xmodem.Compute(metadata.Span[..0x5C]);
             if (storedHeaderCrc != actualHeaderCrc)
             {
                 context.Report(DiagnosticSeverity.Error, "archive.header-crc",
@@ -214,8 +215,8 @@ public sealed class PackItReader : IContainerReader
                 dataFork = ForkData.FromBytes(archive.AsMemory(payloadOffset, dataLength));
                 resourceFork = ForkData.FromBytes(archive.AsMemory(payloadOffset + dataLength, resourceLength));
             }
-            ushort actualForkCrc = Crc16(data);
-            actualForkCrc = Crc16(resource, actualForkCrc);
+            ushort actualForkCrc = Crc16Xmodem.Compute(data);
+            actualForkCrc = Crc16Xmodem.Compute(resource, actualForkCrc);
             var name = new MacString(metadata.Span.Slice(1, nameLength));
             if (storedForkCrc != actualForkCrc)
             {
@@ -409,18 +410,6 @@ public sealed class PackItReader : IContainerReader
         return new HuffmanNode(zero, one);
     }
 
-    private static ushort Crc16(ReadOnlySpan<byte> bytes, ushort crc = 0)
-    {
-        foreach (byte value in bytes)
-        {
-            crc ^= (ushort)(value << 8);
-            for (int bit = 0; bit < 8; bit++)
-            {
-                crc = (ushort)((crc << 1) ^ ((crc & 0x8000) == 0 ? 0 : 0x1021));
-            }
-        }
-        return crc;
-    }
 
     private sealed record DecodedHuffmanEntry(byte[] Metadata, byte[] Data, byte[] Resource, ushort StoredForkCrc,
         int BytesConsumed);

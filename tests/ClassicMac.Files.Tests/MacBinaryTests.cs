@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 using ClassicMac.Files.Containers;
 using static ClassicMac.Files.Tests.Fixtures;
 
@@ -23,7 +24,7 @@ public class MacBinaryTests
     [Fact]
     public void Crc16_is_XMODEM()
     {
-        Assert.Equal(0x31C3, Crc16.Compute("123456789"u8));
+        Assert.Equal(0x31C3, Crc16Xmodem.Compute("123456789"u8));
     }
 
     [Theory]

@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes DiskDoubler's block-based DDn compression method.</summary>
 /// <remarks>The block structure and token rules are fitted against XADMaster and checked against an original

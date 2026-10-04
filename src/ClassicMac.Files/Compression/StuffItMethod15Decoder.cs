@@ -1,7 +1,8 @@
-using System;
 using System.IO;
+using System;
+using ClassicMac.Files.Checksums;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes a StuffIt method 15 (Arsenic) fork.</summary>
 /// <remarks>

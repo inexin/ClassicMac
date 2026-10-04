@@ -1,5 +1,5 @@
 // Interoperability tables transcribed from compcol (MIT); see THIRD-PARTY-NOTICES.md.
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 internal static class StuffItMethod13Tables
 {

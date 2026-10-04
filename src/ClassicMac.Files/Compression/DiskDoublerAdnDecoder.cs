@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes AutoDoubler's block-based methods 6 (AD2) and 9 (AD1).</summary>
 /// <remarks>The block structure is fitted against XADMaster and checked against original DiskDoubler Pro 4.1.1

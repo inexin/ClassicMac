@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes the adaptive-Huffman LZSS method used by LHarc's <c>-lh1-</c>.</summary>
 internal static class LhaOldDecoder

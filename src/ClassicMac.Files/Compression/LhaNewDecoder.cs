@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace ClassicMac.Files.Archives;
+namespace ClassicMac.Files.Compression;
 
 /// <summary>Decodes the static-Huffman LZSS methods introduced by LHarc 2.</summary>
 internal static class LhaNewDecoder

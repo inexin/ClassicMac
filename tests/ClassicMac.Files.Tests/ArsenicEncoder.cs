@@ -105,7 +105,7 @@ internal sealed class ArsenicEncoder
     }
 
     private static readonly ushort[] RandomizationTable = typeof(ClassicMac.Files.Archives.StuffItReader).Assembly
-        .GetType("ClassicMac.Files.Archives.StuffItMethod15Decoder")!
+        .GetType("ClassicMac.Files.Compression.StuffItMethod15Decoder")!
         .GetField("RandomizationTable", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
         .GetValue(null) as ushort[] ?? throw new InvalidOperationException();
 

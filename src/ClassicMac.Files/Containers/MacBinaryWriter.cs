@@ -1,7 +1,8 @@
-using System;
 using System.IO;
 using System.Text;
+using System;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Containers;
 
@@ -57,7 +58,7 @@ public static class MacBinaryWriter
         header[107] = info.Extended.Length > 9 ? info.Extended.Span[9] : (byte)0;
         header[122] = 130;
         header[123] = 129;
-        writer.WriteUInt16At(124, Crc16.Compute(header.AsSpan(0, 124)));
+        writer.WriteUInt16At(124, Crc16Xmodem.Compute(header.AsSpan(0, 124)));
         output.Write(header);
         Fork(file.DataFork, output);
         Fork(file.ResourceFork, output);
@@ -126,7 +127,7 @@ public static class BinHexWriter
         header.WriteUInt16((ushort)file.FinderInfo.Flags);
         header.WriteUInt32(file.DataFork.Length);
         header.WriteUInt32(file.ResourceFork.Length);
-        header.WriteUInt16(Crc16.Compute(header.WrittenSpan));
+        header.WriteUInt16(Crc16Xmodem.Compute(header.WrittenSpan));
         header.WriteTo(stream);
         Part(file.DataFork, stream);
         Part(file.ResourceFork, stream);
@@ -152,7 +153,7 @@ public static class BinHexWriter
         var bytes = fork.ToArray();
         stream.Write(bytes);
         var crc = new BigEndianWriter(2);
-        crc.WriteUInt16(Crc16.Compute(bytes));
+        crc.WriteUInt16(Crc16Xmodem.Compute(bytes));
         crc.WriteTo(stream);
     }
 

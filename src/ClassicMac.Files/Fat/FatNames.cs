@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using ClassicMac.Core;
+using ClassicMac.Files.Checksums;
 
 namespace ClassicMac.Files.Fat;
 
@@ -75,20 +76,12 @@ internal static class FatNames
     // computes it (the OSTA UDF unique-name checksum).
     internal static int Crc(string units)
     {
-        var crc = 0;
+        ushort crc = 0;
         foreach (var c in units)
         {
-            foreach (var b in new[] { (byte)(c >> 8), (byte)c })
-            {
-                crc ^= b << 8;
-                for (var bit = 0; bit < 8; bit++)
-                {
-                    crc = (crc & 0x8000) != 0 ? (crc << 1) ^ 0x1021 : crc << 1;
-                }
-
-                crc &= 0xFFFF;
-            }
+            crc = Crc16Xmodem.Compute([(byte)(c >> 8), (byte)c], crc);
         }
+
         return crc;
     }
 }
