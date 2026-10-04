@@ -459,9 +459,14 @@ OpenPicture, OpenCPicture and ClosePicture record what is drawn into a port, as 
    HiliteColor `001D`; HiliteMode `001C` when the next drawing highlights; RGBFgCol `001A`; RGBBkCol `001B`; Origin
    `000C` (dh, dv); the clip `0001` with its region (a wide-open clip is the rect (−32767, −32767, 32767, 32767)).
 4. **The verb's state** (PutPicVerb): frame writes PnSize `0007` (v, h), PnMode `0008` and the pen pattern; paint the
-   pen mode and pattern; erase the background pattern; fill the fill pattern; invert nothing. An old 8-byte pattern
-   is PnPat `0009`, BkPat `0002` or FillPat `000A`; a pixel pattern PnPixPat `0013`, BkPixPat `0012` or FillPixPat
-   `0014`.
+   pen mode and pattern; erase the background pattern; fill the fill pattern; invert nothing. Patterns (UpdatePat):
+   - an old pattern (patType 0) is always PnPat `0009`, BkPat `0002` or FillPat `000A` and its 8 bytes, compared with
+     the saved 8 bytes only while the saved pattern is old (else written);
+   - any other pattern is PnPixPat `0013`, BkPixPat `0012` or FillPixPat `0014`, written unless the saved pattern is a
+     pixel pattern equal to it (EqualPat): patType, the 8-byte pat1Data, then for patType 2 the RGB colour (6 bytes);
+     otherwise the pixel map record without baseAddr, its colour table only when it has one (no minimal table), and
+     its rows as CopyBits writes them (a direct pattern packed as packType 3 or 4);
+   - the saved patterns start as old ones: a black pen, a white background, a black fill.
 5. **Lines** take the frame state, then: when dh and dv both fit in −128…127, ShortLineFrom `0023 dh dv` if the pen is
    where the picture last left it, else ShortLine `0022 v h dh dv`; otherwise LineFrom `0021` (the end) or Line `0020`
    (the start and the end). MoveTo writes nothing.
@@ -481,8 +486,9 @@ OpenPicture, OpenCPicture and ClosePicture record what is drawn into a port, as 
    when rowBytes ≥ 8; a direct pixel map DirectBitsRect `009A` (`009B` with a mask) and baseAddr $000000FF. A BitMap
    writes rowBytes and bounds; a pixel map its record without baseAddr (packType 1 when rowBytes < 8, else 0 indexed,
    3 for 16-bit, 4 for 32-bit) and, when indexed, its colour table (none: `00000000 0000 0000 4B4F 0000 0000 0000`).
-   Then srcRect, dstRect, the mode, the mask region and the rows: raw under 8 bytes, else each packed with its length
-   before it, a byte when rowBytes ≤ 250, else a word.
+   Then srcRect, dstRect, the mode, the mask region and the rows: raw under 8 bytes, else each packed by `_PackBits`
+   ([packbits.md §4.2](../codecs/packbits.md#42-quickdraws-_packbits)) with its length before it, a byte when
+   rowBytes ≤ 250, else a word.
 9. **PicComment** writes ShortComment `00A0 kind`, or LongComment `00A1 kind size` and the data; it writes no state and
    is recorded even when nothing else is.
 10. **Recording stops** when the pen is hidden twice (an open region or polygon, or one more HidePen): nothing but
@@ -550,6 +556,8 @@ Picture recording (§3.3) differs [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickD
   verified live).
 - **GlyphState:** Mac OS 9 writes FractEnable as $FF when it is set; the ROM writes the byte as stored.
 - **The pattern origin:** Mac OS 9 writes `0200` (v, h) when QDSetPatternOrigin changed it.
+- **A pixel pattern's pmVersion:** Mac OS 9 records 0; the ROM records the pixel map's own.
+- **Packed rows:** the two `_PackBits` differences of [packbits.md §4.2](../codecs/packbits.md#42-quickdraws-_packbits).
 - **Version 1 pictures** (an old GrafPort): the ROM also writes FontName, LineLayout and GlyphState (every ROM version 1
   picture with text gets `2E 0004 xxxxxxxx`); Mac OS 9 writes them only in version 2.
 
@@ -597,8 +605,8 @@ Picture recording (§3.3) differs [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickD
   `QuickDrawPort`'s drawing, and `QuickDrawPort.PicComment` adds comments. A port is a colour port, so pictures are
   version 2. ClassicMac records neither ScrollRect, nor CopyMask, nor a picture drawn into the port, writes no pattern
   origin and no LineLayout, has no memory limit (so no dead picture), and takes font names from the port's
-  `FontLibrary`. A pixel pattern is written as its PixPat with ClassicMac's pixel map record; rows are packed with
-  ClassicMac's PackBits (§3.2); OpenCPicture with a zero resolution keeps srcRect in both modes. [ClassicMac]
+  `FontLibrary`. A pixel pattern's pmVersion is 0 in both modes; OpenCPicture with a zero resolution keeps srcRect in both
+  modes. [ClassicMac]
 
 ## 6. Diagnostics
 

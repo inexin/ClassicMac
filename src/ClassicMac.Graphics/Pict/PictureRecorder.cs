@@ -271,9 +271,17 @@ public sealed class PictureRecorder : IPictureRecording
         {
             w.WriteUInt16(1);                                                       // a full PixPat
             w.WriteBytes(current.Bits);
-            PixMapRecord(current.Pixels!, current.Pixels!.Bounds, current.Pixels.RowBytes, current.Pixels.RowBytes < 8 ? 1 : 0);
-            ColorTable(current.Pixels);
-            Rows(current.Pixels, current.Pixels.Bounds, current.Pixels.RowBytes);
+            // PutPicPixPat: the pixel map (a direct one packed as packType 3 or 4), its colour table only when it has one
+            // (no minimal table, unlike CopyBits), and its rows.
+            var pixels = current.Pixels!;
+            int packType = pixels.RowBytes < 8 ? 1 : !pixels.IsDirect ? 0 : pixels.PixelSize == 16 ? 3 : 4;
+            PixMapRecord(pixels, pixels.Bounds, pixels.RowBytes, packType);
+            if (pixels.Palette16.Length > 0)
+            {
+                ColorTable(pixels);
+            }
+
+            Rows(pixels, pixels.Bounds, pixels.RowBytes, pixels.IsDirect && pixels.RowBytes >= 8 ? packType : 0);
         }
 
         return current;
@@ -629,7 +637,7 @@ public sealed class PictureRecorder : IPictureRecording
             {
                 3 => PackBits.Pack(row, 2),
                 4 => PackBits.Pack(Planes(row), 1),
-                _ => PackBits.Pack(row, 1),
+                _ => QuickDrawPackBits.Pack(row, Following(pixMap, area, y, rowBytes), rom: !macOS9),
             };
             if (rowBytes > 250)
             {
@@ -642,6 +650,14 @@ public sealed class PictureRecorder : IPictureRecording
 
             w.WriteBytes(packed);
         }
+    }
+
+    // The two bytes in the source's memory after a trimmed row (the rest of its row, or the next row), which the ROM's
+    // _PackBits reads past the row's end.
+    private static ReadOnlySpan<byte> Following(PixMap pixMap, PictRect area, int y, int rowBytes)
+    {
+        int start = (y - pixMap.Bounds.Top) * pixMap.RowBytes + (area.Left - pixMap.Bounds.Left) * pixMap.PixelSize / 8 + rowBytes;
+        return start >= 0 && start < pixMap.Data.Length ? pixMap.Data.AsSpan(start, Math.Min(2, pixMap.Data.Length - start)) : [];
     }
 
     // One row of the trimmed area, rowBytes long, its pixels shifted to start at the area's left.

@@ -82,6 +82,23 @@ The byte count before each row is [pict.md §3](../graphics/pict.md#3-writing)'s
 - The 68k ROM's QuickDraw skips a flag of −128 (`$80`): it is a no-op [Doc: Technical Note 1023].
 - Mac OS 9's native QuickDraw reads it as a run: 129 copies of the next unit [Code: Mac OS 9.0 NQD].
 
+### 4.2 QuickDraw's `_PackBits`
+
+The Toolbox's `_PackBits` ($A8CF), which QuickDraw uses for a recorded picture's rows ([pict.md §3.3](../graphics/pict.md#33-recording-a-picture)),
+packs bytes [Code: 68k ROM $077D] [Code: Mac OS 9.0 QuickDraw]:
+
+1. Three or more equal bytes are a run, (1 − count, byte), at most 128 ($81); two equal bytes stay in a literal.
+2. Everything else is literals, (count − 1, bytes), at most 128 ($7F); a single last byte is `00 xx`.
+
+So `AA AA AA 55 55 01 02 03 03 03 03` packs as `FE AA 03 55 55 01 02 FD 03`, 130 sevens as `81 07 01 07 07` and 129 as
+`81 07 00 07`. Mac OS 9's NQDPackBits ends a literal where a run of 3 begins, as §3 does. The ROM's differs twice:
+
+- Its look-ahead reads up to 2 bytes past the source: a row ending in two equal bytes followed in memory by a third
+  (in StdBits, the next row) ends with the 2-byte run `FF b`, where Mac OS 9 writes them as literals
+  (`00 00` then `00`: the ROM `FF 00`, Mac OS 9 `01 00 00`).
+- A run of 3 that begins at a literal's 128th byte goes into the literal, which ends at 128; Mac OS 9 ends the literal
+  at 127 and writes the run.
+
 ## 5. ClassicMac
 
 - One decoder and one packer, `ClassicMac.Core.PackBits`: `Unpack(source, destination, options)` takes the unit size
@@ -90,6 +107,8 @@ The byte count before each row is [pict.md §3](../graphics/pict.md#3-writing)'s
   (`PackBitsEnd`). Each format decides what a short stop means: pictures, MacPaint and QuickTime keep what was
   written; StuffIt's method 6 makes the fork unreadable. A repeat writes whole units only, so a word that does not fit
   at a row's end is left out. `Pack(data, unitSize)` is §3's packer. [ClassicMac]
+- A recorded picture's rows of bytes are packed as §4.2's `_PackBits` of the chosen QuickDraw, the ROM reading on into
+  the source's next bytes; rows of words and 32-bit planes use §3's packer. [ClassicMac]
 - Mac OS 9's component-plane reader (32-bit pictures, packType 4) keeps its own loop, as it reproduces Mac OS 9's
   overlapping buffers ([pict.md](../graphics/pict.md)). [ClassicMac]
 - Picture scan lines follow `PictDecodeOptions.QuickDraw` for the `$80` flag (§4.1): a no-op for `MacRom`, a run of

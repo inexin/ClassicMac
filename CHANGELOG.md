@@ -6,7 +6,8 @@
   `QuickDrawPort`'s drawing as version 2 opcodes as both QuickDraws do: state written lazily in CheckPic's order, the
   same-rect forms, the line and text opcodes by distance, CopyBits trimmed and packed, comments (`PicComment`), nothing
   while the pen is hidden twice; each QuickDraw's frame scaling and BitMap mode. The traced example matches byte for
-  byte, and recordings play back pixel-identical.
+  byte, and recordings play back pixel-identical. Patterns are recorded as UpdatePat does (old ones as 8 bytes, others
+  as PixPats), and rows packed by each QuickDraw's `_PackBits` (packbits.md §4.2), the ROM's two quirks included.
 - QuickDraw's region and polygon recording (quickdraw.md §2.26, §2.27, §4.13): `OpenRgn`/`CloseRgn` and
   `OpenPoly`/`ClosePoly` on `QuickDrawPort`, recording what both QuickDraws record (whole framed shapes and lines as
   inversion points; line ends for polygons, not closed), with each one's overflow.

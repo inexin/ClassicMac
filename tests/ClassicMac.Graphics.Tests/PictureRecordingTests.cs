@@ -209,6 +209,43 @@ public class PictureRecordingTests
         Assert.Equal(direct.Canvas.Pixels.ToArray(), played.Pixels.ToArray());
     }
 
+    // UpdatePat: an old pattern as its 8 bytes ($09/$02/$0A); a pixel or RGB pattern as a PixPat ($13/$12/$14).
+    [Theory]
+    [MemberData(nameof(Versions))]
+    public void Patterns_are_recorded_old_or_as_pixel_patterns(QuickDrawVersion version)
+    {
+        var pixels = PixMap.Indexed(Enumerable.Range(0, 8 * 8).Select(i => (byte)(i % 3)).ToArray(), 8, R(0, 0, 8, 8), 8,
+            [new RgbColor(0xFFFF, 0, 0), new RgbColor(0, 0xFFFF, 0), new RgbColor(0, 0, 0xFFFF)]);
+        var pixelPattern = QuickDrawPattern.FromMono([0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55]);
+        pixelPattern.Pixels = pixels;
+        var rgbPattern = QuickDrawPattern.FromMono([0xFF, 0, 0xFF, 0, 0xFF, 0, 0xFF, 0]);
+        (rgbPattern.Rgb, rgbPattern.Rgb16) = (new RgbaColor(0x80, 0x40, 0x20), (0x8080, 0x4040, 0x2020));
+        void Draw(QuickDrawPort p)
+        {
+            p.PenPattern = QuickDrawPattern.Gray;
+            p.PaintRect(R(0, 0, 20, 20));
+            p.PenPattern = pixelPattern;
+            p.PaintRect(R(20, 20, 50, 50));
+            p.FillOval(R(50, 0, 90, 40), rgbPattern);
+            p.BackPattern = QuickDrawPattern.DarkGray;
+            p.EraseRect(R(60, 60, 90, 90));
+        }
+
+        var direct = Port(version);
+        Draw(direct);
+        var recording = Port(version);
+        var picture = PictureRecorder.OpenCPicture(recording, R(0, 0, 100, 100));
+        Draw(recording);
+        var bytes = picture.ClosePicture();
+
+        Assert.True(bytes.AsSpan().IndexOf((ReadOnlySpan<byte>)[0x00, 0x09, 0xAA, 0x55]) > 0);                        // PnPat gray
+        Assert.True(bytes.AsSpan().IndexOf((ReadOnlySpan<byte>)[0x00, 0x13, 0x00, 0x01]) > 0);                        // PnPixPat, type 1
+        Assert.True(bytes.AsSpan().IndexOf((ReadOnlySpan<byte>)[0x00, 0x14, 0x00, 0x02]) > 0);                        // FillPixPat, type 2
+        Assert.True(bytes.AsSpan().IndexOf((ReadOnlySpan<byte>)[0x00, 0x02, 0x77, 0xDD]) > 0);                        // BkPat dark gray
+        var played = PictReader.Decode(bytes, new PictDecodeOptions { QuickDraw = version });
+        Assert.Equal(direct.Canvas.Pixels.ToArray(), played.Pixels.ToArray());
+    }
+
     private static List<int> Opcodes(byte[] picture)
     {
         // Walk only what the tests write: fixed-size state, lines and text, until OpEndPic.
