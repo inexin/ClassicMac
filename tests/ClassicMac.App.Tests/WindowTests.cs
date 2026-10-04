@@ -151,6 +151,8 @@ public class WindowTests
         var folder = Directory.CreateTempSubdirectory("classicmac-window-").FullName;
         try
         {
+            // The heading is in Helvetica (font 21), which maps to the app's own font: a host font (Times) would tie the
+            // frame to the fonts a machine has (StyledTextFontTests checks the mapping).
             var text = MacRoman.Encode("Divinity\rThis is NOT the full version of the manual.\rCafé ƒ™");
             var disk = new HfsBuilder();
             var games = disk.Folder(HfsBuilder.Root, "Games");
@@ -159,7 +161,7 @@ public class WindowTests
                 ("ICN#", 128, null, [.. Enumerable.Range(0, 128).Select(i => (byte)(i % 8 < 4 ? 0xF0 : 0x0F)), .. Enumerable.Repeat((byte)0xFF, 128)]),
                 ("TEXT", 128, null, text),
                 ("snd ", 128, "Sine", SoundPreviewTests.Sound(20000)),
-                ("styl", 128, null, PreviewTests.Styl((0, 20, 1, 24, 0, 0, 0), (9, 3, 0, 12, 0, 0, 0), (17, 3, 1, 12, 0xFFFF, 0, 0), (20, 3, 0, 12, 0, 0, 0)))));
+                ("styl", 128, null, PreviewTests.Styl((0, 21, 1, 24, 0, 0, 0), (9, 3, 0, 12, 0, 0, 0), (17, 3, 1, 12, 0xFFFF, 0, 0), (20, 3, 0, 12, 0, 0, 0)))));
             var path = Path.Combine(folder, "disk.img");
             File.WriteAllBytes(path, disk.Build("Disk"));
 

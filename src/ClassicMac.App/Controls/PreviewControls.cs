@@ -76,7 +76,7 @@ internal sealed class StyledTextView : SelectableTextBlock
     }
 
     // Classic Mac fonts rarely exist on the host: close relatives, then the default.
-    private static FontFamily Family(string name) => name switch
+    internal static FontFamily Family(string name) => name switch
     {
         "Monaco" or "Courier" => new FontFamily("Cascadia Mono, Consolas, Menlo, Courier New, monospace"),
         "Times" or "New York" => new FontFamily("Times New Roman, Times, serif"),
