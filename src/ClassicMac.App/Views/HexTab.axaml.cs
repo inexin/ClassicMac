@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using ClassicMac.App.Behaviors;
 using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views;

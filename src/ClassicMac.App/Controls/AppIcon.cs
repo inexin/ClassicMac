@@ -6,7 +6,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>
 /// The app's icon in a small slot (the title bar's 16 DIP): the hand-drawn pixel size for the display scaling (16 at

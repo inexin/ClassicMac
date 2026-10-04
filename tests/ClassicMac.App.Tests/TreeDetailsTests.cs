@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ClassicMac.App.Services;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 

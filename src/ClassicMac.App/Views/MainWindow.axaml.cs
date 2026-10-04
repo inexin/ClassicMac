@@ -9,7 +9,10 @@ using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
-using ClassicMac.App.Audio;
+using ClassicMac.App.Behaviors;
+using ClassicMac.App.Controls;
+using ClassicMac.App.Dialogs;
+using ClassicMac.App.Services;
 using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views;

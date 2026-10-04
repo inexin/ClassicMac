@@ -4,6 +4,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.FormHostPane"
@@ -28,7 +29,7 @@
             </StackPanel>
             <StackPanel x:Name="FormErrorLine" Orientation="Horizontal" Spacing="6"
                         IsVisible="{Binding FormLivePreview.FormError, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <views:SeverityIcon Severity="Error" Width="12" Height="12" VerticalAlignment="Center" />
+              <controls:SeverityIcon Severity="Error" Width="12" Height="12" VerticalAlignment="Center" />
               <TextBlock Text="{Binding FormLivePreview.FormError}" Classes="error form-error" TextWrapping="Wrap" />
             </StackPanel>
           </StackPanel>
@@ -39,7 +40,7 @@
     <DockPanel>
     <ScrollViewer DockPanel.Dock="Right" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Margin="16,0,16,0" MaxWidth="560"
                   IsVisible="{Binding FormLivePreview.ShowsHostDialog}">
-      <views:DialogView Dialog="{Binding FormLivePreview.FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
+      <controls:DialogView Dialog="{Binding FormLivePreview.FormDialog}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
     </ScrollViewer>
     <ContentControl Classes="form-content" Content="{Binding Forms.Form}">
       <ContentControl.DataTemplates>
@@ -107,7 +108,7 @@
           <Panel>
             <ScrollViewer IsVisible="{Binding !IsEditing}">
               <Border x:Name="TextRead" Classes="read-view form-row">
-                <views:StyledTextView Styled="{Binding Styled}" TextWrapping="Wrap" />
+                <controls:StyledTextView Styled="{Binding Styled}" TextWrapping="Wrap" />
               </Border>
             </ScrollViewer>
             <DockPanel IsVisible="{Binding IsEditing}">
@@ -266,7 +267,7 @@
             <Border Grid.Column="1" Classes="screen-panel" IsVisible="{Binding !IsDialog}">
               <StackPanel Spacing="8">
                 <TextBlock Classes="caption" Text="{Binding ScreenTitle}" />
-                <views:ScreenBoundsView Top="{Binding Top}" Left="{Binding Left}" Bottom="{Binding Bottom}" Right="{Binding Right}"
+                <controls:ScreenBoundsView Top="{Binding Top}" Left="{Binding Left}" Bottom="{Binding Bottom}" Right="{Binding Right}"
                                         Definition="{Binding Definition}" ScreenWidth="{Binding SelectedScreen.Width}" ScreenHeight="{Binding SelectedScreen.Height}"
                                         HorizontalAlignment="Left" />
                 <ComboBox ItemsSource="{x:Static vm:WindowForm.Screens}" SelectedItem="{Binding SelectedScreen}" MinWidth="200" AutomationProperties.Name="Screen" />
@@ -382,7 +383,7 @@
                 <TextBlock DockPanel.Dock="Top" Classes="muted preview-note"
                            Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormLivePreview.FormDialogNote, FallbackValue={x:Null}}" />
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Background="{DynamicResource CmCheckerboard}">
-                  <views:DialogView x:Name="ItemListPreview" Dialog="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormLivePreview.FormDialog, FallbackValue={x:Null}}"
+                  <controls:DialogView x:Name="ItemListPreview" Dialog="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormLivePreview.FormDialog, FallbackValue={x:Null}}"
                                     SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="1" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
               </DockPanel>
@@ -458,7 +459,7 @@
                   </WrapPanel>
                 </Border>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" AllowAutoHide="False" Background="{DynamicResource CmCheckerboard}">
-                  <views:MenuView x:Name="MenuPreview" Menu="{Binding Preview}" SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="2"
+                  <controls:MenuView x:Name="MenuPreview" Menu="{Binding Preview}" SelectedIndex="{Binding PreviewIndex, Mode=TwoWay}" Scale="2"
                                   HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
               </DockPanel>
@@ -710,7 +711,7 @@
             <DockPanel>
               <Border x:Name="TemplateNote" DockPanel.Dock="Top" Classes="note-banner" IsVisible="{Binding HasNote}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <views:SeverityIcon Severity="Warning" Width="14" Height="14" VerticalAlignment="Top" />
+                  <controls:SeverityIcon Severity="Warning" Width="14" Height="14" VerticalAlignment="Top" />
                   <TextBlock Text="{Binding Note}" TextWrapping="Wrap" />
                 </StackPanel>
               </Border>
@@ -728,7 +729,7 @@
                 <ItemsControl ItemsSource="{Binding Outline}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:TemplateOutlineLine">
-                      <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent, Converter={x:Static views:TemplateViews.Indent}}">
+                      <Grid ColumnDefinitions="*,Auto" Margin="{Binding Indent, Converter={x:Static controls:TemplateViews.Indent}}">
                         <TextBlock Classes="outline" Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="1" Classes="outline muted" Text="{Binding Type}" Margin="8,0,0,0" />
                       </Grid>

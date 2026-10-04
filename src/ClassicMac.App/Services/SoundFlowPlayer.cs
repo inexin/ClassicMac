@@ -9,7 +9,7 @@ using SoundFlow.Enums;
 using SoundFlow.Providers;
 using SoundFlow.Structs;
 
-namespace ClassicMac.App.Audio;
+namespace ClassicMac.App.Services;
 
 /// <summary>
 /// Playback through SoundFlow (miniaudio). The device opens on the first Play at 48 kHz stereo float; sounds are converted

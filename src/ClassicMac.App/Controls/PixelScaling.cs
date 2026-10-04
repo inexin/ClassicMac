@@ -4,7 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>
 /// Pixel content at any display scaling (design/TOKENS.md): a Mac pixel is drawn as a whole number of device pixels,

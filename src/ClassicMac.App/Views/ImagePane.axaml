@@ -4,6 +4,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.ImagePane"
@@ -44,7 +45,7 @@
                         </StackPanel>
                       </Border>
                       <Border Background="{DynamicResource CmCheckerboard}" Padding="12">
-                        <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
+                        <controls:PixelImage Source="{Binding Image.Png, Converter={x:Static controls:Images.FromPng}}" Zoom="{Binding Zoom}"
                                           HorizontalAlignment="Center" VerticalAlignment="Bottom" />
                       </Border>
                     </DockPanel>
@@ -66,7 +67,7 @@
                   <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:ImageItem">
                       <StackPanel Margin="0,0,12,4" Spacing="4">
-                        <views:PixelImage Source="{Binding Image.Png, Converter={x:Static views:Images.FromPng}}" Zoom="{Binding Zoom}"
+                        <controls:PixelImage Source="{Binding Image.Png, Converter={x:Static controls:Images.FromPng}}" Zoom="{Binding Zoom}"
                                           HorizontalAlignment="Center" />
                         <Border Classes="state-plate">
                           <TextBlock Text="{Binding Image.Caption}" FontSize="11" />

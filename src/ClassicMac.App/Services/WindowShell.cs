@@ -4,9 +4,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input.Platform;
 using Avalonia.Styling;
+using ClassicMac.App.Dialogs;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Services;
 
 // The shell (S1, S7): the window's part of the shell commands, the Window menu and the theme.
 internal sealed class WindowShell(Window window, MenuItem windowMenu) : IShell

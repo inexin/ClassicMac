@@ -1,6 +1,6 @@
 # Dialogs
 
-Item: P5. Applies to Get Info / New Resource, Import Image or Sound, New File / Import File / New Folder, Unsaved changes and Yes/No confirmations (`Views/EditDialogs.cs`). System pickers stay native.
+Item: P5. Applies to Get Info / New Resource, Import Image or Sound, New File / Import File / New Folder, Unsaved changes and Yes/No confirmations (`Dialogs/EditDialogs.cs`). System pickers stay native.
 
 ## Common frame
 

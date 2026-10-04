@@ -4,6 +4,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.TreePane"
@@ -46,7 +47,7 @@
   </Border>
   <Panel>
   <!-- One virtualized list of the visible rows (VisibleRows), each CmRowTree high and indented by its depth. -->
-  <views:BrowseTree x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding TreeRows}" SelectedItem="{Binding Selected, Mode=OneWay}"
+  <controls:BrowseTree x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding TreeRows}" SelectedItem="{Binding Selected, Mode=OneWay}"
             ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
     <ListBox.KeyBindings>
       <KeyBinding Gesture="Delete" Command="{Binding EditActions.DeleteResourceCommand}" />
@@ -56,7 +57,7 @@
         <!-- A row (boards/browse-tree.md): the indent, the expander, then icon or spinner, name, unsaved mark, "not
              read" chip; meta on the right. -->
         <DockPanel Classes="tree-line">
-        <Border DockPanel.Dock="Left" Width="{Binding Depth, Converter={x:Static views:BrowseTree.IndentConverter}}" />
+        <Border DockPanel.Dock="Left" Width="{Binding Depth, Converter={x:Static controls:BrowseTree.IndentConverter}}" />
         <Panel DockPanel.Dock="Left" Classes="tree-expander-slot">
           <Border Classes="tree-expander" Classes.open="{Binding IsExpanded}" IsVisible="{Binding HasChildren}"
                   PointerPressed="OnExpanderPressed">
@@ -75,7 +76,7 @@
               <Rectangle />
               <TextBlock Text="not read" />
             </Panel>
-            <views:TreeIcon DockPanel.Dock="Left" Margin="0,0,4,0" Node="{Binding}" IsVisible="{Binding !IsLoading}" />
+            <controls:TreeIcon DockPanel.Dock="Left" Margin="0,0,4,0" Node="{Binding}" IsVisible="{Binding !IsLoading}" />
             <Panel DockPanel.Dock="Left" Margin="0,0,4,0" Classes="spinner" IsVisible="{Binding IsLoading}">
               <Ellipse Classes="track" />
               <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
@@ -132,7 +133,7 @@
         <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding ExportActions.UnpackBasiliskCommand}" />
       </ContextMenu>
     </ListBox.ContextMenu>
-  </views:BrowseTree>
+  </controls:BrowseTree>
   <!-- The type-ahead pill: what was typed, the matches, F3 and Esc. -->
   <Border x:Name="TypeAheadPill" Classes="type-ahead" IsVisible="{Binding TreeSearch.IsTypeAheadOpen}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
     <StackPanel Orientation="Horizontal" Spacing="8">

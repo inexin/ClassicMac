@@ -3,6 +3,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.EmptyStateView"
@@ -15,10 +16,10 @@
             <Rectangle Classes="dash" />
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="460" Spacing="14">
               <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16">
-                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.HardDisk}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Floppy}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Parcel}, Converter={x:Static views:TreeIcons.IconConverter}}" />
-                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Application}, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.HardDisk}, Converter={x:Static controls:TreeIcons.IconConverter}}" />
+                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Floppy}, Converter={x:Static controls:TreeIcons.IconConverter}}" />
+                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Parcel}, Converter={x:Static controls:TreeIcons.IconConverter}}" />
+                <Image RenderOptions.BitmapInterpolationMode="None" Width="48" Height="48" Source="{Binding Source={x:Static vm:TreeIconKind.Application}, Converter={x:Static controls:TreeIcons.IconConverter}}" />
               </StackPanel>
               <TextBlock Classes="empty-title" Text="Drop a Mac file, disk image or archive here" />
               <TextBlock Classes="muted" TextAlignment="Center" TextWrapping="Wrap"
@@ -42,7 +43,7 @@
                   <Button Classes="flat recent" Command="{Binding #EmptyState.((vm:MainViewModel)DataContext).EmptyState.OpenRecentCommand}" CommandParameter="{Binding}"
                           ToolTip.Tip="{Binding Path}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Image RenderOptions.BitmapInterpolationMode="None" Width="16" Height="16" Source="{Binding IconKind, Converter={x:Static views:TreeIcons.IconConverter}}" />
+                      <Image RenderOptions.BitmapInterpolationMode="None" Width="16" Height="16" Source="{Binding IconKind, Converter={x:Static controls:TreeIcons.IconConverter}}" />
                       <TextBlock Text="{Binding Name}" Classes.muted="{Binding !Exists}" VerticalAlignment="Center" />
                       <TextBlock Classes="muted" Text="{Binding Folder}" TextTrimming="CharacterEllipsis" MaxWidth="380" VerticalAlignment="Center" />
                       <TextBlock Classes="muted" Text="Not found" IsVisible="{Binding !Exists}" VerticalAlignment="Center" />

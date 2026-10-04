@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Dialogs;
 
 // The editing dialogs (DialogViews builds them in one frame), shown modal over the window.
 internal sealed class EditDialogs(Window owner) : IEditDialogs

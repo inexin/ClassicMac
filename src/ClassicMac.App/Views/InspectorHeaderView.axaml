@@ -3,6 +3,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.InspectorHeaderView"
@@ -25,10 +26,10 @@
         <Panel>
           <!-- The selection's own large icon (an icon's image, a picture's thumbnail, a file's Finder icon), else its
                kind's 32-pixel icon; both 1:1. -->
-          <views:PixelImage x:Name="HeaderOwnIcon" Source="{Binding InspectorActions.HeaderIconPng, Converter={x:Static views:Images.FromPng}}" Zoom="1"
+          <controls:PixelImage x:Name="HeaderOwnIcon" Source="{Binding InspectorActions.HeaderIconPng, Converter={x:Static controls:Images.FromPng}}" Zoom="1"
                             HorizontalAlignment="Center" VerticalAlignment="Center"
                             IsVisible="{Binding InspectorActions.HeaderIconPng, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <views:PixelImage x:Name="HeaderKindIcon" Source="{Binding InspectorActions.Header.Node.IconKind, Converter={x:Static views:TreeIcons.LargeConverter}, FallbackValue={x:Null}}" Zoom="1"
+          <controls:PixelImage x:Name="HeaderKindIcon" Source="{Binding InspectorActions.Header.Node.IconKind, Converter={x:Static controls:TreeIcons.LargeConverter}, FallbackValue={x:Null}}" Zoom="1"
                             HorizontalAlignment="Center" VerticalAlignment="Center"
                             IsVisible="{Binding InspectorActions.HeaderIconPng, Converter={x:Static ObjectConverters.IsNull}}" />
         </Panel>

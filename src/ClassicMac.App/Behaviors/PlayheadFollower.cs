@@ -4,7 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Threading;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Behaviors;
 
 // The sound preview's playhead (boards/sound.md, on A1): while a sound plays, a timer asks the model to follow the
 // player's position about 30 times a second.

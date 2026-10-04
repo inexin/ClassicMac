@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Avalonia.Media.TextFormatting;
+using ClassicMac.App.Controls;
 using ClassicMac.App.Views;
 
 namespace ClassicMac.App.Tests;

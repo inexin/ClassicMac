@@ -3,7 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>
 /// A window's bounds on a Mac screen at half scale (design/boards/window-alert.md, the window form's right panel): the

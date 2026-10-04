@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ClassicMac.App.Controls;
+using ClassicMac.App.Dialogs;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
@@ -295,7 +297,7 @@ public class WindowTests
         File.WriteAllBytes(path, ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(2, 2, rgba));
         try
         {
-            var image = new ClassicMac.App.Views.AvaloniaImageReader().Read(path);
+            var image = new ClassicMac.App.Services.AvaloniaImageReader().Read(path);
             Assert.Equal((2, 2), (image.Width, image.Height));
             Assert.Equal(new byte[] { 255, 0, 0, 255 }, image.Pixels[..4]);
             Assert.Equal(new byte[] { 10, 200, 30, 255 }, image.Pixels[12..]);

@@ -1,4 +1,5 @@
 using Avalonia;
+using ClassicMac.App.Controls;
 using ClassicMac.App.Views;
 
 namespace ClassicMac.App.Tests;

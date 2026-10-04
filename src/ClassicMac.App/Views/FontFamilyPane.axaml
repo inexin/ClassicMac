@@ -4,6 +4,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.FontFamilyPane"
@@ -38,7 +39,7 @@
             </WrapPanel>
             <Border Background="{DynamicResource CmCheckerboard}" Padding="12" CornerRadius="6" HorizontalAlignment="Left"
                     IsVisible="{Binding HasSample}">
-              <views:FontSampleView x:Name="FontSample" Sample="{Binding Sample}" Highlight="{Binding Highlight}"
+              <controls:FontSampleView x:Name="FontSample" Sample="{Binding Sample}" Highlight="{Binding Highlight}"
                                     Zoom="{Binding $parent[Window].((vm:MainViewModel)DataContext).Zoom, FallbackValue=1}" />
             </Border>
             <TextBlock Classes="muted" Text="{Binding SampleMessage}" IsVisible="{Binding HasSampleMessage}" />

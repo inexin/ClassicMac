@@ -5,7 +5,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>
 /// A font family's sample line (design/boards/font-family.md, P6): the glyphs QuickDraw drew, black on white at the

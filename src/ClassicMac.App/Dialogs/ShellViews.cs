@@ -6,7 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Dialogs;
 
 internal static class ShellConverters
 {

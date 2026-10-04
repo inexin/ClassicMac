@@ -13,7 +13,7 @@ using ClassicMac.App.ViewModels;
 using ClassicMac.Resources.Decoders.Sound;
 using ClassicMac.Resources.Decoders.Text;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 // PNG bytes from the decoders as a bitmap.
 internal static class Images

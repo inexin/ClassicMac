@@ -1,7 +1,7 @@
 using Avalonia;
 using Avalonia.Data.Converters;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 // The template form's view helpers (boards/template-form.md).
 internal static class TemplateViews

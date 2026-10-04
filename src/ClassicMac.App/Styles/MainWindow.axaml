@@ -4,6 +4,7 @@
 -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:dialogs="using:ClassicMac.App.Dialogs"
         xmlns:vm="using:ClassicMac.App.ViewModels"
         xmlns:views="using:ClassicMac.App.Views">
   <!-- The tree's filter and type-ahead (boards/browse-tree.md S6): the filter field (28 high, search icon, "Ctrl+F"),
@@ -917,7 +918,7 @@
     <Setter Property="Command" Value="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShellActions.SetScreenDepthCommand, FallbackValue={x:Null}}" />
     <Setter Property="CommandParameter" Value="{Binding Depth}" />
     <Setter Property="IsChecked">
-      <MultiBinding Converter="{x:Static views:ShellConverters.AreEqual}">
+      <MultiBinding Converter="{x:Static dialogs:ShellConverters.AreEqual}">
         <Binding Path="Depth" />
         <Binding Path="$parent[Window].((vm:MainViewModel)DataContext).ScreenDepth" FallbackValue="0" />
       </MultiBinding>

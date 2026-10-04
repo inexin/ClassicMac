@@ -518,7 +518,7 @@
     <Setter Property="FontWeight" Value="{DynamicResource CmFontWeightStrong}" />
   </Style>
 
-  <!-- The dialogs' frame (design/boards/dialogs.md, Views/DialogViews.cs): CmPaneBackground, CmRadiusDialog corners and
+  <!-- The dialogs' frame (design/boards/dialogs.md, Dialogs/DialogViews.cs): CmPaneBackground, CmRadiusDialog corners and
        CmShadowDialog (room for it around the surface), a 42 px header under a CmDivider, the body padded 16, the footer
        on CmSidebarBackground under a CmDivider, padded 12 × 16. -->
   <Style Selector="Border.dialog-frame">

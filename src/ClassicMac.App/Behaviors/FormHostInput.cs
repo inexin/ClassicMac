@@ -5,7 +5,7 @@ using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Behaviors;
 
 // The read-then-edit host's keys and double-click (FormEditing.cs): Esc cancels and Ctrl+Enter applies while editing,
 // before a text box can take the keys; a double-click on a read-only "form-row" edits with that row selected.

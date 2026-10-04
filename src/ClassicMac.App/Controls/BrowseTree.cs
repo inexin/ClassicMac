@@ -6,7 +6,7 @@ using Avalonia.Input;
 using Avalonia.VisualTree;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>
 /// The browse tree (design/boards/browse-tree.md) as one virtualized list of the visible rows

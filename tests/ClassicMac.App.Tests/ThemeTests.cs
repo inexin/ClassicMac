@@ -12,6 +12,7 @@ using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ClassicMac.App.Controls;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Resources.Decoders.Sound;
@@ -457,11 +458,24 @@ public class ThemeTests
     private static string SourceFile(string relative, [CallerFilePath] string self = "") =>
         Path.GetFullPath(Path.Combine(Path.GetDirectoryName(self)!, "..", "..", relative));
 
+    // The window, its panes and their styles, and the views drawn in code.
+    public static TheoryData<string> ViewFiles()
+    {
+        var files = new TheoryData<string>();
+        foreach (var path in Directory.EnumerateFiles(SourceFile("src/ClassicMac.App/Views"), "*.axaml").Order(StringComparer.Ordinal))
+        {
+            files.Add("src/ClassicMac.App/Views/" + Path.GetFileName(path));
+        }
+
+        files.Add("src/ClassicMac.App/Styles/MainWindow.axaml");
+        files.Add("src/ClassicMac.App/Dialogs/EditDialogs.cs");
+        files.Add("src/ClassicMac.App/Controls/PreviewControls.cs");
+        return files;
+    }
+
     // F1, F3, F4: the views take colours from tokens, never literals, opacity or Fluent's base brushes.
     [Theory]
-    [InlineData("src/ClassicMac.App/Views/MainWindow.axaml")]
-    [InlineData("src/ClassicMac.App/Views/EditDialogs.cs")]
-    [InlineData("src/ClassicMac.App/Views/PreviewControls.cs")]
+    [MemberData(nameof(ViewFiles))]
     public void Views_hold_no_colour_literals_or_text_opacity(string file)
     {
         var text = File.ReadAllText(SourceFile(file));

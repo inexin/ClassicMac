@@ -1,7 +1,7 @@
 using Avalonia.Input;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Behaviors;
 
 // The hex view's keys for the byte editor: hex digits (the top row and the keypad, A–F), the cursor keys, Insert,
 // Delete and Backspace; a key with Ctrl, Alt or Meta is left to the window.

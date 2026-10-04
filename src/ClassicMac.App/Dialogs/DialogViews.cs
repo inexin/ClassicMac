@@ -9,11 +9,12 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using ClassicMac.App.Controls;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Resources;
 using CommunityToolkit.Mvvm.Input;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Dialogs;
 
 /// <summary>A dialog window built by <see cref="DialogViews"/>.</summary>
 internal interface IDialog

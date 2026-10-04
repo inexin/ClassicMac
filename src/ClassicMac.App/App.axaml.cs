@@ -7,6 +7,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
 using Avalonia.Threading;
+using ClassicMac.App.Services;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 

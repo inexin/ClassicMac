@@ -11,7 +11,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using ClassicMac.App.ViewModels;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>
 /// The tree's 16 × 16 pixel icons, one per kind of node (design/boards/browse-tree.md, T4): Finder-like, each with a

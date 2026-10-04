@@ -6,7 +6,7 @@ using Avalonia.Media;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Core;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 /// <summary>Labels for the diagnostics panel's controls.</summary>
 internal static class DiagnosticsLabels

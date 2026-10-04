@@ -4,6 +4,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:vm="using:ClassicMac.App.ViewModels"
              xmlns:views="using:ClassicMac.App.Views"
              x:Class="ClassicMac.App.Views.SoundPane"
@@ -59,7 +60,7 @@
               <TextBlock Classes="strong" Text="{Binding Preview.SoundLanesTitle}" />
             </DockPanel>
           </Border>
-          <views:WaveformView Sound="{Binding Preview.Sound}" LoopFrames="{Binding Preview.SoundLoopFrames}" Playhead="{Binding SoundPlayback.Playhead}"
+          <controls:WaveformView Sound="{Binding Preview.Sound}" LoopFrames="{Binding Preview.SoundLoopFrames}" Playhead="{Binding SoundPlayback.Playhead}"
                               ShowsPlayhead="{Binding SoundPlayback.IsPlaying}" SeekCommand="{Binding SoundPlayback.SeekSoundCommand}" />
         </DockPanel>
       </Border>

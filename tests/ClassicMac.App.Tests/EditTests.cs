@@ -40,9 +40,9 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal("00000000", editor.Lines[0].Offset);
         Assert.Equal(("", "CD", " 02 03"), (editor.Lines[0].Before, editor.Lines[0].At, editor.Lines[0].After));
 
-        Assert.True(ClassicMac.App.Views.HexKeys.Handle(editor, Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.None));
-        Assert.False(ClassicMac.App.Views.HexKeys.Handle(editor, Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.None));
-        Assert.False(ClassicMac.App.Views.HexKeys.Handle(editor, Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.Control));
+        Assert.True(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.None));
+        Assert.False(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.None));
+        Assert.False(ClassicMac.App.Behaviors.HexKeys.Handle(editor, Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.Control));
         Assert.Equal(2, new HexEditor(new byte[16]).Lines.Count);             // a line to append on
     }
 

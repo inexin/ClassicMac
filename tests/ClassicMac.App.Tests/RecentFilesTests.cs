@@ -1,3 +1,4 @@
+using ClassicMac.App.Services;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Resources;
 

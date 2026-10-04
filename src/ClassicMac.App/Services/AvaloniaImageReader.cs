@@ -5,7 +5,7 @@ using Avalonia.Platform;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Graphics;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Services;
 
 // Resource ▸ Import's images: any file Avalonia decodes (PNG, JPEG, BMP, GIF…), converted to unpremultiplied RGBA.
 internal sealed class AvaloniaImageReader : IImageReader

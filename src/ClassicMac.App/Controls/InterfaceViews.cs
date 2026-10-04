@@ -9,7 +9,7 @@ using Avalonia.Media.Imaging;
 using ClassicMac.App.ViewModels;
 using ClassicMac.Resources.Decoders.Interface;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Controls;
 
 // What the interface previews share: the system font (Chicago 12, else a close relative), black and grey pens.
 internal static class MacLook

@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:ClassicMac.App.Controls"
         xmlns:vm="using:ClassicMac.App.ViewModels"
         xmlns:views="using:ClassicMac.App.Views"
         xmlns:editing="using:ClassicMac.Files.Editing"
@@ -96,7 +97,7 @@
                 <!-- 24 on the right: the overlay scroll bar never covers the text. -->
                 <!-- Mac content keeps its colours: styled text on white paper, as the Mac draws it, in both themes. -->
                 <ScrollViewer x:Name="StyledTextScroller" IsVisible="{Binding Preview.IsStyledText}" Padding="16,12,24,12" Background="White">
-                  <views:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
+                  <controls:StyledTextView Styled="{Binding Preview.Styled}" TextWrapping="Wrap" />
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding Preview.IsPlainText}" Padding="16,12,24,12" HorizontalScrollBarVisibility="Auto">
                   <SelectableTextBlock Text="{Binding Preview.Text}" FontFamily="{StaticResource CmFontMono}" />
@@ -108,10 +109,10 @@
                      association matrix, the metrics, style and kerning cards. -->
                 <views:FontFamilyPane x:Name="FontFamilyPane" />
                 <ScrollViewer IsVisible="{Binding Preview.IsDialog}" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False">
-                  <views:DialogView Dialog="{Binding Preview.Dialog}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                  <controls:DialogView Dialog="{Binding Preview.Dialog}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding Preview.IsMenu}" HorizontalScrollBarVisibility="Auto" AllowAutoHide="False">
-                  <views:MenuView Menu="{Binding Preview.Menu}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                  <controls:MenuView Menu="{Binding Preview.Menu}" Scale="{Binding Zoom}" HorizontalAlignment="Left" VerticalAlignment="Top" />
                 </ScrollViewer>
                 <!-- A page in the web view: an Apple Help page (docs/formats/resources/help-pages.md), or a document's HTML export
                      (DOCMaker, SimpleText, Word; with Back and its pages). Rendered | Source (or Text); the page in a native web
@@ -125,7 +126,7 @@
                 <Border x:Name="SoundErrorCard" Classes="sound-error" IsVisible="{Binding Preview.IsSoundError}" VerticalAlignment="Top" HorizontalAlignment="Left">
                   <StackPanel Spacing="8">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <views:SeverityIcon Severity="Error" Width="16" Height="16" VerticalAlignment="Center" />
+                      <controls:SeverityIcon Severity="Error" Width="16" Height="16" VerticalAlignment="Center" />
                       <TextBlock Classes="strong" Text="{Binding Preview.ErrorTitle}" VerticalAlignment="Center" />
                     </StackPanel>
                     <TextBlock Classes="muted" Text="{Binding Preview.ErrorDetail}" TextWrapping="Wrap" />

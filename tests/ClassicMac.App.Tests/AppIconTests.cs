@@ -4,6 +4,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ClassicMac.App.Controls;
+using ClassicMac.App.Dialogs;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 

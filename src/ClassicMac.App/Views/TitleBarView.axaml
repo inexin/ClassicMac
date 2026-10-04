@@ -4,6 +4,7 @@
 -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ClassicMac.App.Controls"
              xmlns:views="using:ClassicMac.App.Views"
              xmlns:chrome="using:Avalonia.Controls.Chrome"
              xmlns:vm="using:ClassicMac.App.ViewModels"
@@ -13,7 +14,7 @@
           IsVisible="{Binding $parent[Window].ExtendClientAreaToDecorationsHint}">
     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
       <!-- The app's icon: the hand-drawn pixel size for the scaling, drawn 1:1 (AppIconView). -->
-      <views:AppIconView x:Name="TitleIcon" Slot="16" VerticalAlignment="Center" />
+      <controls:AppIconView x:Name="TitleIcon" Slot="16" VerticalAlignment="Center" />
       <TextBlock Text="{Binding ShellActions.TitleFile}" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Text="•" Classes="unsaved" IsVisible="{Binding ShellActions.TitleUnsaved}" />
       <TextBlock Text="—" IsVisible="{Binding ShellActions.TitleFile, Converter={x:Static ObjectConverters.IsNotNull}}" />

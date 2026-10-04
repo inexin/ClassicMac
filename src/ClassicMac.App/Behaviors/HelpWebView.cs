@@ -7,7 +7,7 @@ using ClassicMac.App.ViewModels;
 using NativeWebView.Core;
 using WebView = NativeWebView.Controls.NativeWebView;
 
-namespace ClassicMac.App.Views;
+namespace ClassicMac.App.Behaviors;
 
 // Apple Help pages (docs/formats/resources/help-pages.md) and documents' HTML exports: the page made ready by HelpPages is loaded into a native
 // web view (NativeWebView: WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux) as a data: URI, with
