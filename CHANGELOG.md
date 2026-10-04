@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Robustness (second review): damaged legacy StuffIt and PackIt entries whose lengths add up past `int` are refused as
+  malformed instead of overflowing; PICT scaling from a zero-sized rectangle is refused (the Mac's `DIVU` traps) and a
+  BitMap or PixMap whose rowBytes is too small for its width is drawn with overlapping rows instead of crashing; a
+  reader or image decoder failing with an index or arithmetic exception is reported as `container.reader-fault` or
+  `image.decoder-fault` (a ClassicMac bug) instead of ending the unwrap or passing as damaged data; the app reports any
+  unhandled exception as `app.unexpected-error` instead of closing.
 - Robustness: a mutation test over the test inputs (only malformed-input exceptions allowed); DiskDoubler method-10 blocks
   with a length past `int` are refused as malformed instead of overflowing.
 - HFS: catalog edits follow Apple's BTree manager: a full node rotates records into its left sibling or splits to the

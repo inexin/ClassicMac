@@ -401,10 +401,15 @@ public static partial class HelpPages
             var bitmap = PictureDecoder.Draw(data[512..].ToArray(), options);
             return "data:image/png;base64," + Convert.ToBase64String(PngEncoder.Instance.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels));
         }
-        catch (Exception e) when (e is NotSupportedException or System.IO.EndOfStreamException or ArgumentException
-            or OverflowException or System.IO.InvalidDataException or IndexOutOfRangeException)
+        catch (Exception e) when (e is NotSupportedException or System.IO.EndOfStreamException or ArgumentException or System.IO.InvalidDataException)
         {
             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "help.undrawable-picture", $"A PICT file the page shows cannot be drawn: {e.Message}"));
+            return "";
+        }
+        catch (Exception e) when (e is IndexOutOfRangeException or OverflowException or DivideByZeroException)
+        {
+            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "image.decoder-fault",
+                $"A PICT file the page shows: ClassicMac's decoder failed on its data ({e.GetType().Name}); please report it."));
             return "";
         }
     }

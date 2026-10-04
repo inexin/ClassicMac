@@ -481,9 +481,10 @@ public sealed class StuffItReader : IContainerReader
             int resourceCompressedLength = ReadLength(headerReader.ReadUInt32At(92), "compressed resource fork length");
             int dataCompressedLength = ReadLength(headerReader.ReadUInt32At(96), "compressed data fork length");
             int payloadOffset = checked(position + memberHeaderLength);
-            int payloadLength = startsFolder || endsFolder ? 0 :
-                checked(resourceCompressedLength + dataCompressedLength);
-            Require(archive, payloadOffset, payloadLength, "legacy StuffIt fork data");
+            // The sum of two file-supplied lengths in long, checked against the archive before it is an int again.
+            long storedLength = startsFolder || endsFolder ? 0 : (long)resourceCompressedLength + dataCompressedLength;
+            Require(archive, payloadOffset, storedLength, "legacy StuffIt fork data");
+            int payloadLength = (int)storedLength;
             if (payloadOffset > archiveEnd - payloadLength)
             {
                 throw new InvalidDataException("Legacy StuffIt fork data extends past the declared archive size.");
@@ -608,10 +609,10 @@ public sealed class StuffItReader : IContainerReader
         int dataLength = ReadLength(headerReader.ReadUInt32At(88), "data fork length");
         int resourceCompressedLength = ReadLength(headerReader.ReadUInt32At(92), "compressed resource fork length");
         int dataCompressedLength = ReadLength(headerReader.ReadUInt32At(96), "compressed data fork length");
+        // Sums of file-supplied lengths in long, checked against the archive before they are ints again.
         int resourceOffset = checked(offset + headerLength);
-        int dataOffset = checked(resourceOffset + resourceCompressedLength);
-        Require(archive, resourceOffset, checked(resourceCompressedLength + dataCompressedLength),
-            "legacy StuffIt fork data");
+        Require(archive, resourceOffset, (long)resourceCompressedLength + dataCompressedLength, "legacy StuffIt fork data");
+        int dataOffset = resourceOffset + resourceCompressedLength;
 
         uint firstChildRaw = headerReader.ReadUInt32At(62);
         // A folder is a folder-start record (method 32). A file's +62 is not a link: StuffIt Deluxe 4.5 leaves
@@ -1832,7 +1833,7 @@ public sealed class StuffItReader : IContainerReader
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
 
-    private static void Require(byte[] archive, int offset, int length, string what)
+    private static void Require(byte[] archive, long offset, long length, string what)
     {
         if (offset < 0 || length < 0 || offset > archive.Length - length)
         {

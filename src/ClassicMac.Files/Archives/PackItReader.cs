@@ -128,8 +128,8 @@ public sealed class PackItReader : IContainerReader
                     var entryReader = new BigEndianReader(entryInput);
                     int storedDataLength = ReadLength(entryReader.ReadUInt32At(0x4C), "data fork");
                     int storedResourceLength = ReadLength(entryReader.ReadUInt32At(0x50), "resource fork");
-                    int encryptedForksLength = checked(storedDataLength + storedResourceLength);
-                    int crcOffset = checked(EntryMetadataLength + encryptedForksLength);
+                    int encryptedForksLength = Sum(storedDataLength, storedResourceLength);
+                    int crcOffset = Sum(EntryMetadataLength, encryptedForksLength);
                     if (crcOffset > entryInput.Length - 2)
                     {
                         throw new InvalidDataException("A PackIt encrypted fork payload or checksum is truncated.");
@@ -157,7 +157,7 @@ public sealed class PackItReader : IContainerReader
                 metadataBytes = archive.AsMemory(offset + 4, EntryMetadataLength).ToArray();
                 int storedDataLength = ReadLength(archiveReader.ReadUInt32At(offset + 0x50), "data fork");
                 int storedResourceLength = ReadLength(archiveReader.ReadUInt32At(offset + 0x54), "resource fork");
-                int storedForkLength = checked(storedDataLength + storedResourceLength);
+                int storedForkLength = Sum(storedDataLength, storedResourceLength);
                 int payloadOffset = checked(offset + EntryHeaderLength);
                 int crcOffset = checked(payloadOffset + storedForkLength);
                 if (crcOffset > archive.Length - 2)
@@ -188,7 +188,7 @@ public sealed class PackItReader : IContainerReader
 
             int dataLength = ReadLength(metadataReader.ReadUInt32At(0x4C), "data fork");
             int resourceLength = ReadLength(metadataReader.ReadUInt32At(0x50), "resource fork");
-            int forksLength = checked(dataLength + resourceLength);
+            int forksLength = Sum(dataLength, resourceLength);
             expandedBytes = checked(expandedBytes + forksLength);
             if (expandedBytes > context.Options.MaxExpandedBytesPerInput)
             {
@@ -285,7 +285,7 @@ public sealed class PackItReader : IContainerReader
 
         int dataLength = ReadLength(metadataReader.ReadUInt32At(0x4C), "data fork");
         int resourceLength = ReadLength(metadataReader.ReadUInt32At(0x50), "resource fork");
-        int forksLength = checked(dataLength + resourceLength);
+        int forksLength = Sum(dataLength, resourceLength);
         if (forksLength > maxForkBytes)
         {
             throw new InvalidDataException("PackIt extraction exceeds the configured expanded-size limit.");
@@ -485,6 +485,18 @@ public sealed class PackItReader : IContainerReader
     }
 
     private static MacDate? Date(uint seconds) => seconds == 0 ? null : new MacDate(seconds);
+
+    // Two lengths from the file added: past int's range is malformed input, not an overflow.
+    private static int Sum(int left, int right)
+    {
+        long sum = (long)left + right;
+        if (sum > int.MaxValue)
+        {
+            throw new InvalidDataException("A PackIt entry's lengths exceed the supported size.");
+        }
+
+        return (int)sum;
+    }
 
     private static int ReadLength(uint value, string what)
     {

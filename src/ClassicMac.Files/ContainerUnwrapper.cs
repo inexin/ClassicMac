@@ -267,6 +267,13 @@ public sealed class ContainerUnwrapper
                 $"\"{file.Name}\" looks like {reader.FormatName} but cannot be read: {e.Message}");
             return new ContainerNode(format, file, []);
         }
+        catch (Exception e) when (e is OverflowException or IndexOutOfRangeException or ArgumentOutOfRangeException or DivideByZeroException)
+        {
+            // A reader that fails on damaged data this way has a bug; the file is kept as it is, and the unwrap goes on.
+            context.Report(DiagnosticSeverity.Error, "container.reader-fault",
+                $"\"{file.Name}\" looks like {reader.FormatName}, and ClassicMac's reader failed on its data ({e.GetType().Name}); it is kept unread.");
+            return new ContainerNode(format, file, []);
+        }
 
         // A container holding one file (a wrapper, a disk image's disk) does not use up a level; a volume always does,
         // even with one file on it. Files at the level limit are probed when their format is asked for.

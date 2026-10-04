@@ -506,6 +506,11 @@ differ from §2; it still uses the ROM's MapPt, MapRect, ScalePt, FixMul and Fix
 - **Errors:** an unexpected version opcode is refused with `NotSupportedException`, truncated data with
   `EndOfStreamException`; a length that runs past the data is truncation. An unsupported pixel format throws.
   [ClassicMac]
+- **Damaged pictures:** scaling from a rectangle of zero width or height (DrawPicture's MapPt and ScalePt divide by
+  it) is refused with `InvalidDataException`, since the 68k's `DIVU` traps on a zero divisor (a "zero divide" system
+  error). A BitMap or PixMap whose rowBytes is too small for its width is drawn with its rows overlapping as QuickDraw
+  reads them; what the last row would read past the pixel data is zeros, where the Mac reads whatever memory follows.
+  Both modes. [ClassicMac]
 - **Writing:** `PictWriter` writes §3: `PictWriteOptions.Format` (`Indexed1`, `Indexed2`, `Indexed4`, `Indexed8`,
   `Rgb555`, `Rgb888` (the default), `Argb8888`), `Palette` (else the bitmap's own colours, which must fit), the
   resolutions (72 dpi by default), `IccProfile`, and `FileHeader` (true by default; false writes a bare picture for a
@@ -529,6 +534,7 @@ resource ([export-manifest.md](../output/export-manifest.md)), it reports:
 | --- | --- | --- | --- | --- |
 | `image.too-large` | Warning | picFrame covers more than `DecodeOptions.MaxImagePixels` | Does not draw the picture; writes the resource raw | No such limit |
 | `image.undecodable` | Warning | The library refused the data (truncated, a bad structure, an unsupported variant) | Writes the resource raw | Not traced |
+| `image.decoder-fault` | Error | The decoder failed on the data with an index or arithmetic exception: a ClassicMac bug (found by mutation testing), not damaged data | Writes the resource raw | Not applicable |
 
 ## 7. Verification
 

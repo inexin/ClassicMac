@@ -136,6 +136,7 @@ A page, and each file it reads, is at most 16 MB.
 | --- | --- | --- | --- | --- |
 | `help.missing-file` | Warning | A picture, stylesheet or frame the page refers to is not on the disk | Leaves it out (an empty URL) | Shows a broken picture or an empty frame |
 | `help.undrawable-picture` | Warning | A `'PICT'` file the page shows cannot be drawn | Leaves it out | Not traced |
+| `image.decoder-fault` | Error | The decoder failed on the data with an index or arithmetic exception: a ClassicMac bug (found by mutation testing), not damaged data | Leaves it out | Not applicable |
 
 ## 7. Verification
 

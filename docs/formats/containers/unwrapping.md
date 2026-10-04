@@ -228,6 +228,7 @@ The single-file containers' own codes are in their files. Offsets, where given, 
 | `container.too-deep` | Warning | a container nested at or past the nesting limit | the file becomes a leaf | no Mac counterpart |
 | `container.too-large` | Error | unwrapping produced more than the expanded-bytes limit | drops the rest of that container's files | no Mac counterpart |
 | `container.unreadable` | Error | a reader accepted the file but cannot read it (each format's §2 says when) | the file becomes a leaf; other readers are not tried | no Mac counterpart |
+| `container.reader-fault` | Error | a reader failed on the file's data with an arithmetic or index exception (a ClassicMac bug, found by mutation testing) | the file becomes a leaf; the unwrap goes on | no Mac counterpart |
 
 ## 7. Verification
 

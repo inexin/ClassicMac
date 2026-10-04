@@ -270,6 +270,32 @@ public class UnwrapTests
     }
 
     // A probe that fails stops the unwrap as it would in order: the first such file's error is the one thrown.
+    // A reader that accepts every file and then fails as a bug would on damaged data.
+    private sealed class Overflowing : IContainerReader
+    {
+        public string FormatName => "overflowing";
+
+        public bool CanRead(ForkData input) => input.Length == 1;
+
+        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => throw new OverflowException();
+    }
+
+    // A reader failing on damaged data with an arithmetic or index exception (a ClassicMac bug) does not end the
+    // unwrap: the file becomes a leaf and container.reader-fault says what happened.
+    [Fact]
+    public void A_reader_fault_is_reported_and_the_file_kept()
+    {
+        var diagnostics = new List<Diagnostic>();
+        var root = new ContainerUnwrapper([new Overflowing()]).Unwrap(
+            new MacFile { Name = MacString.FromMacRoman("in"), DataFork = ForkData.FromBytes(new byte[] { 1 }) }, "host file",
+            new ContainerContext(null, diagnostics));
+
+        Assert.Empty(root.Children);
+        var fault = Assert.Single(diagnostics);
+        Assert.Equal(("container.reader-fault", DiagnosticSeverity.Error), (fault.Code, fault.Severity));
+        Assert.Contains("OverflowException", fault.Message);
+    }
+
     private sealed class Failing : IContainerReader
     {
         public string FormatName => "failing";

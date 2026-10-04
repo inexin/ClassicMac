@@ -567,11 +567,16 @@ public static class DocumentPictures
             var bitmap = PictureDecoder.Draw(data.ToArray(), options);
             return options.ImageEncoder.Encode(bitmap.Width, bitmap.Height, bitmap.Pixels);
         }
-        catch (Exception e) when (e is NotSupportedException or EndOfStreamException or ArgumentException
-            or OverflowException or InvalidDataException or IndexOutOfRangeException)
+        catch (Exception e) when (e is NotSupportedException or EndOfStreamException or ArgumentException or InvalidDataException)
         {
             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "document.undrawable-picture",
                 $"Chapter {chapter.Number}'s PICT {picture.PictureId} cannot be drawn: {e.Message}"));
+            return null;
+        }
+        catch (Exception e) when (e is IndexOutOfRangeException or OverflowException or DivideByZeroException)
+        {
+            diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "image.decoder-fault",
+                $"Chapter {chapter.Number}'s PICT {picture.PictureId}: ClassicMac's decoder failed on its data ({e.GetType().Name}); please report it."));
             return null;
         }
     }

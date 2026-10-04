@@ -5,7 +5,8 @@ namespace ClassicMac.Files.Tests;
 
 // Damaged input (PLAN "Hostile input"): the test inputs, each mutated in a few seeded ways (bytes flipped, a run zeroed,
 // the end cut off), unwrapped as deep as they go with every fork read. A reader may report the damage or refuse the input
-// with InvalidDataException or EndOfStreamException; any other exception is a bug.
+// with InvalidDataException or EndOfStreamException; any other exception, or a reader fault the unwrapper reports
+// (container.reader-fault), is a bug.
 public sealed class MutationTests
 {
     // 100 each in the suite (about 7 s); CLASSICMAC_MUTANTS sets more for a deeper run (1,500 took 100 s).
@@ -78,7 +79,10 @@ public sealed class MutationTests
                 try
                 {
                     var file = new MacFile { Name = MacString.FromMacRoman("input"), DataFork = ForkData.FromBytes(mutant) };
-                    ReadAll(ContainerUnwrapper.Default.Unwrap(file, "host file", new ContainerContext(null, [])));
+                    var diagnostics = new List<Diagnostic>();
+                    ReadAll(ContainerUnwrapper.Default.Unwrap(file, "host file", new ContainerContext(null, diagnostics)));
+                    // A reader fault the unwrapper caught is still a bug.
+                    failures.AddRange(diagnostics.Where(d => d.Code == "container.reader-fault").Select(d => $"{name} (seed {seed}): {d.Message}"));
                 }
                 catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
                 {

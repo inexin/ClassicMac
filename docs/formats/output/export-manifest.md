@@ -799,6 +799,7 @@ The exporter, the image decoders and the packer report these codes. Each exporte
 | `image.no-mask` | Info | `image.icon`, `image.icon-family`: a colour icon has no 1-bit icon list of the same ID for its mask, or an icon family has no mask at all | Draws it opaque (§3.10); the resource is still decoded | Draws nothing (noMaskFoundErr) |
 | `image.too-large` | Warning | `image.picture`: the picture's frame is over the pixel limit (§3.9) | Writes the resource raw | Not applicable |
 | `image.undecodable` | Warning | An image decoder: the renderer rejected the data (too short, a bad structure, an unsupported variant); the message is the renderer's | Writes the resource raw | Not applicable |
+| `image.decoder-fault` | Error | The decoder failed on the data with an index or arithmetic exception: a ClassicMac bug (found by mutation testing), not damaged data | Writes the resource raw | Not applicable |
 | `pack.base-differs` | Warning | The base's resource of that type and ID is not the one exported | Does not use it | Not applicable |
 | `pack.decompressed` | Warning | A compressed `raw` resource is written from its decompressed file | Clears its compressed attribute | Not applicable |
 | `pack.deleted` | Info | A resource's main file is gone, with deletes allowed | Leaves the resource out | Not applicable |

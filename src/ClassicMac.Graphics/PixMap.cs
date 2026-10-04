@@ -214,6 +214,22 @@ public sealed partial class PixMap
     // (a word when rowBytes > 250).
     internal void ReadPixData(ClassicMac.Core.BigEndianReader b)
     {
+        ReadPixDataRows(b);
+
+        // A rowBytes too small for the width (Inside Macintosh requires rowBytes × 8 ≥ width × pixelSize): QuickDraw reads
+        // the rows overlapping, and the last row past the data into whatever memory follows; here that is zeros
+        // [ClassicMac].
+        long needed = Height <= 0 || Width <= 0 ? 0 : (long)(Height - 1) * RowBytes + ((long)Width * PixelSize + 7) / 8;
+        if (needed > Data.Length)
+        {
+            var data = Data;
+            Array.Resize(ref data, checked((int)needed));
+            Data = data;
+        }
+    }
+
+    private void ReadPixDataRows(ClassicMac.Core.BigEndianReader b)
+    {
         int height = Math.Max(0, Height);
         Data = new byte[RowBytes * height];
         bool direct = IsPixMap && PixelType == 16;

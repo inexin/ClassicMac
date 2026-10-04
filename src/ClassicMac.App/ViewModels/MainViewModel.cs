@@ -237,10 +237,27 @@ public sealed partial class MainViewModel : ObservableObject
             Status = $"{Path.GetFileName(path)} could not be read: {e.Message}";
             return null;
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            ReportUnexpected(e, $"Opening {Path.GetFileName(path)}");
+            return null;
+        }
         finally
         {
             reading.Finish(null);
         }
+    }
+
+    /// <summary>
+    /// The last resort for an exception nothing else handles (a reader's bug on a damaged file, a failure in an async
+    /// event handler): shown as an error diagnostic and in the status line, so the app goes on.
+    /// </summary>
+    public void ReportUnexpected(Exception exception, string during)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "app.unexpected-error",
+            $"{exception.GetType().Name}: {exception.Message} (a ClassicMac error; please report it)"), during, null));
+        Status = $"{during} failed: {exception.Message}";
     }
 
     [RelayCommand]

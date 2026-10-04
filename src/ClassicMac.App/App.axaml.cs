@@ -1,10 +1,12 @@
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
+using Avalonia.Threading;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 
@@ -32,6 +34,17 @@ internal sealed partial class App : Application
         {
             var model = new MainViewModel(new JsonSettingsStore(JsonSettingsStore.DefaultPath));
             desktop.MainWindow = new MainWindow { DataContext = model };
+            // The last resort: what no handler catches (async void event handlers included) is reported, not fatal.
+            Dispatcher.UIThread.UnhandledException += (_, e) =>
+            {
+                model.ReportUnexpected(e.Exception, "An action");
+                e.Handled = true;
+            };
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                e.SetObserved();
+                Dispatcher.UIThread.Post(() => model.ReportUnexpected(e.Exception.InnerException ?? e.Exception, "A background task"));
+            };
             foreach (var path in desktop.Args ?? [])
             {
                 _ = model.OpenAsync(path);

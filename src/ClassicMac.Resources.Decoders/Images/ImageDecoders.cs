@@ -35,11 +35,17 @@ internal abstract class ImageDecoder(DecodeOptions options, string name, params 
         {
             return DecodeImages(input);
         }
-        catch (Exception e) when (e is NotSupportedException or EndOfStreamException or ArgumentException
-            or OverflowException or InvalidDataException or IndexOutOfRangeException)
+        catch (Exception e) when (e is NotSupportedException or EndOfStreamException or ArgumentException or InvalidDataException)
         {
             input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "image.undecodable",
                 $"{input.Resource}: {e.Message}"));
+            return [];
+        }
+        catch (Exception e) when (e is IndexOutOfRangeException or OverflowException or DivideByZeroException)
+        {
+            // A decoder failing this way on damaged data has a bug: reported as one, the resource still written raw.
+            input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Error, "image.decoder-fault",
+                $"{input.Resource}: ClassicMac's decoder failed on its data ({e.GetType().Name}); please report it."));
             return [];
         }
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using ClassicMac.Graphics;
 
 namespace ClassicMac.Graphics.QuickDraw;
@@ -33,7 +34,7 @@ internal static class PictureMapping
             }
 
             uint product = (uint)(ushort)c * (ushort)toSize + ((uint)(ushort)fromSize >> 1);
-            uint quotient = product / (ushort)fromSize;
+            uint quotient = product / Divisor(fromSize);
             c = quotient > 0xFFFF ? (short)product : (short)quotient;   // an overflowing divide leaves the product
             if (negative)
             {
@@ -42,6 +43,11 @@ internal static class PictureMapping
         }
         return (short)(c + toLo);
     }
+
+    // A size as DIVU's divisor; zero traps on the 68k (a "zero divide" system error), so such a picture is malformed.
+    private static ushort Divisor(int fromSize) => (ushort)fromSize != 0
+        ? (ushort)fromSize
+        : throw new InvalidDataException("The picture scales from a rectangle of zero width or height, which QuickDraw divides by.");
 
     // Pen and oval sizes: size * toSize / fromSize rounded; zero or negative becomes 0, a positive size at least 1.
     public static (int h, int v) ScaleSize(int h, int v, PictRect from, PictRect to) =>
@@ -59,7 +65,7 @@ internal static class PictureMapping
             return 0;
         }
 
-        uint scaled = ((uint)(ushort)size * (ushort)toSize + ((uint)(ushort)fromSize >> 1)) / (ushort)fromSize;
+        uint scaled = ((uint)(ushort)size * (ushort)toSize + ((uint)(ushort)fromSize >> 1)) / Divisor(fromSize);
         int result = (short)scaled;
         return result == 0 ? 1 : result;
     }

@@ -166,6 +166,7 @@ The codes the HTML converter raises. The reader's codes (`document.*`) are in
 | Code | Severity | When | ClassicMac does | The Mac does |
 | --- | --- | --- | --- | --- |
 | `document.undrawable-picture` | Warning | A picture cannot be drawn: damaged, unsupported or its frame over the pixel limit | Writes an empty dashed box | Not applicable |
+| `image.decoder-fault` | Error | The decoder failed on the data with an index or arithmetic exception: a ClassicMac bug (found by mutation testing), not damaged data | Writes an empty dashed box | Not applicable |
 | `document.unreadable-text` | Warning | A SimpleText document's data fork cannot be read (over the size limit, or a read error) | Writes no document | Not applicable |
 
 ## 7. Verification
