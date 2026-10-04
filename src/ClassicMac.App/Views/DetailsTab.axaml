@@ -5,6 +5,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:controls="using:ClassicMac.App.Controls"
              x:Class="ClassicMac.App.Views.DetailsTab"
              x:DataType="vm:MainViewModel">
   <ScrollViewer x:Name="DetailsScroll" Padding="16,12">
@@ -72,7 +73,7 @@
                         <Button Classes="link in" Padding="0" FontSize="{DynamicResource CmFontSizeBody}" HorizontalAlignment="Left" Content="{Binding Value}" IsVisible="{Binding Link}"
                                 Command="{Binding $parent[TabItem].((vm:MainViewModel)DataContext).DetailsActions.GoToInCommand, FallbackValue={x:Null}}"
                                 ToolTip.Tip="Select it in the tree" />
-                        <ProgressBar Classes="fork-bar" Value="{Binding Bar, FallbackValue=0}" IsVisible="{Binding HasBar}" />
+                        <controls:ShareBar Classes="fork-bar" Value="{Binding Bar, FallbackValue=0}" IsVisible="{Binding HasBar}" />
                       </StackPanel>
                     </Grid>
                   </DataTemplate>

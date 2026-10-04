@@ -3,7 +3,8 @@
   these classes instead of local setters; every colour is a token from Tokens.axaml.
 -->
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:ClassicMac.App.Controls">
   <Styles.Resources>
     <!--
       Fluent's resource keys, checked against Avalonia.Themes.Fluent 12.1.3 (decompiled):
@@ -620,15 +621,10 @@
   <Style Selector="Border.detail-card SelectableTextBlock.mono">
     <Setter Property="FontSize" Value="{DynamicResource CmFontSizeMonoSmall}" />
   </Style>
-  <Style Selector="ProgressBar.fork-bar">
+  <Style Selector="controls|ShareBar.fork-bar">
     <Setter Property="Height" Value="6" />
-    <Setter Property="MinHeight" Value="6" />
-    <Setter Property="MinWidth" Value="0" />
-    <Setter Property="CornerRadius" Value="3" />
-    <Setter Property="Background" Value="{DynamicResource CmSegmentTrack}" />
-    <Setter Property="Foreground" Value="{DynamicResource CmAccent}" />
-    <Setter Property="Minimum" Value="0" />
-    <Setter Property="Maximum" Value="1" />
+    <Setter Property="Track" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="Fill" Value="{DynamicResource CmAccent}" />
   </Style>
   <Style Selector="Panel.chip">
     <Setter Property="Margin" Value="0,0,6,6" />

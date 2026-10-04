@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using ClassicMac.App.Controls;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 using ClassicMac.Core;
@@ -343,7 +344,9 @@ public sealed class DetailsTests : IDisposable
         Assert.Contains(wide.GetVisualDescendants().OfType<TextBlock>(), t => t.Classes.Contains("problems") && t.IsVisible && t.Text == "No problems found in this file");
 
         // Fork bars, mono values, the dates' note.
-        Assert.Equal(2, cards.GetVisualDescendants().OfType<ProgressBar>().Count(b => b.IsVisible));
+        var bars = cards.GetVisualDescendants().OfType<ShareBar>().Where(b => b.IsVisible).ToList();
+        Assert.Equal(2, bars.Count);
+        Assert.All(bars, b => Assert.Equal(6, b.Bounds.Height));
         Assert.Contains(cards.GetVisualDescendants().OfType<SelectableTextBlock>(), t => t.Text == "'APPL' / 'RLMZ'" && t.Classes.Contains("mono"));
         Assert.Contains(cards.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Mac local time, as stored. No time zone." && t.IsVisible);
 
