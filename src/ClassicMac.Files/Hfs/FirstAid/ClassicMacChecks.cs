@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -14,7 +15,7 @@ internal static class ClassicMacChecks
     {
         foreach (var (key, _, _) in run.Extents!.Records)
         {
-            uint fileId = new BigEndianReader(key).ReadUInt32At(2);
+            uint fileId = KeyId(key);
             if (fileId >= 16 && !run.FileIds.Contains(fileId))
             {
                 run.Problem("Overflow extents records belong to a file not in the catalog", "firstaid.orphaned-extents", FirstAidRepairs.OrphanedExtents);

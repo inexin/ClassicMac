@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -48,7 +49,7 @@ internal sealed class CatalogScan
 
         foreach (var (key, data, node) in records)
         {
-            uint parent = new BigEndianReader(key).ReadUInt32At(2);
+            uint parent = KeyId(key);
             int type = data.Length >= 2 ? data[0] << 8 | data[1] : -1;
             bool done = type switch
             {
@@ -75,7 +76,7 @@ internal sealed class CatalogScan
 
     private bool Thread(byte[] key, byte[] data, uint node, bool folder)
     {
-        uint cnid = new BigEndianReader(key).ReadUInt32At(2);
+        uint cnid = KeyId(key);
         if (folder)
         {
             dirPairs++;
@@ -111,7 +112,7 @@ internal sealed class CatalogScan
         }
 
         currentParent = cnid;
-        var target = Find(new BigEndianReader(data).ReadUInt32At(0x0A), data.AsSpan(0x0F, data[0x0E]).ToArray());
+        var target = Find(ThreadParentId(data), data.AsSpan(0x0F, data[0x0E]).ToArray());
         if (folder)
         {
             if (target is null)

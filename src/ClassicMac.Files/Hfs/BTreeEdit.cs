@@ -5,6 +5,7 @@ using System.Linq;
 using ClassicMac.Core;
 using static ClassicMac.Files.Hfs.HfsWriter;
 using static ClassicMac.Files.Hfs.HfsBTreeWriting;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -76,7 +77,6 @@ internal sealed class BTreeEdit
 
     private List<(byte[] Key, byte[] Data)> Records(uint node) => ReadNodeRecords(Bytes, node);
 
-    private static uint Child(byte[] data) => new BigEndianReader(data).ReadUInt32At(0);
 
     // A record's bytes in a node, with its offset slot: key (padded to even) and data, + 2.
     private static int Size((byte[] Key, byte[] Data) record) => ((record.Key.Length + 1) & ~1) + record.Data.Length + 2;
@@ -107,7 +107,7 @@ internal sealed class BTreeEdit
         {
             var records = Records(node);
             int at = records.FindLastIndex(record => compare(record.Key, key) <= 0);
-            node = Child(records[Math.Max(0, at)].Data);
+            node = IndexChild(records[Math.Max(0, at)].Data);
         }
 
         return node;
@@ -237,7 +237,7 @@ internal sealed class BTreeEdit
         UpdateParentKey(node, Records(node)[0].Key);
         uint parent = ParentOf(node);
         var siblings = Records(parent);
-        int at = siblings.FindIndex(record => Child(record.Data) == node);
+        int at = siblings.FindIndex(record => IndexChild(record.Data) == node);
         siblings.Insert(at, (IndexKey(Records(added)[0].Key, siblings[0].Key.Length), ChildNode(added)));
         InsertInto(parent, siblings, at, skipRotate: true);
         parents = null;
@@ -300,7 +300,7 @@ internal sealed class BTreeEdit
     {
         uint parent = ParentOf(node);
         var records = Records(parent);
-        int at = records.FindIndex(record => Child(record.Data) == node);
+        int at = records.FindIndex(record => IndexChild(record.Data) == node);
         if (at < 0)
         {
             throw new RebuildException();
@@ -371,7 +371,7 @@ internal sealed class BTreeEdit
         Free(node);
         parents = null;
         var siblings = Records(parent);
-        int at = siblings.FindIndex(record => Child(record.Data) == node);
+        int at = siblings.FindIndex(record => IndexChild(record.Data) == node);
         siblings.RemoveAt(at);
         DeleteFrom(parent, siblings, at);
     }
@@ -382,7 +382,7 @@ internal sealed class BTreeEdit
         while (Depth > 1 && Records(Root) is [var only])
         {
             uint old = Root;
-            Root = Child(only.Data);
+            Root = IndexChild(only.Data);
             Depth--;
             Free(old);
             parents = null;
@@ -448,7 +448,7 @@ internal sealed class BTreeEdit
                 bool aboveIndex = Bytes[Offset(node) + 9] > 2;
                 foreach (var (_, data) in Records(node))
                 {
-                    uint child = Child(data);
+                    uint child = IndexChild(data);
                     parents[child] = node;
                     if (aboveIndex)
                     {

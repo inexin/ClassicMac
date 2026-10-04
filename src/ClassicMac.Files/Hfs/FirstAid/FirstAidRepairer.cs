@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Editing;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -92,7 +93,7 @@ internal static class FirstAidRepairer
             var orphans = new List<PlannedChange>();
             var records = extents.Records.Where(r =>
             {
-                uint fileId = new BigEndianReader(r.Key).ReadUInt32At(2);
+                uint fileId = KeyId(r.Key);
                 if (relocated.ContainsKey((fileId, r.Key[1])))
                 {
                     return false;                                                // a moved fork's: made again below

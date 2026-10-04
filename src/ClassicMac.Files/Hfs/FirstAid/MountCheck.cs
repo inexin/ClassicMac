@@ -1,5 +1,6 @@
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -20,7 +21,7 @@ internal static class MountCheck
             {
                 case 1:
                     valences += reader.ReadUInt16At(4);
-                    if (new BigEndianReader(key).ReadUInt32At(2) != 1)
+                    if (KeyId(key) != 1)
                     {
                         dirs++;
                     }

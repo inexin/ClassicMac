@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -77,7 +78,7 @@ internal static class PlusExtentRecords
         }
 
         var records = tree.Records;
-        int at = records.FindIndex(r => KeyIs(r.Key, fork, fileId) && new BigEndianReader(r.Key).ReadUInt32At(8) == blocks);
+        int at = records.FindIndex(r => KeyIs(r.Key, fork, fileId) && PlusExtentsStart(r.Key) == blocks);
         for (; at >= 0 && at < records.Count && KeyIs(records[at].Key, fork, fileId); at++)
         {
             if (!Check(run, records[at].Data, fileId, node))
@@ -86,7 +87,7 @@ internal static class PlusExtentRecords
             }
 
             // Beyond Disk First Aid: each record's start block is the fork's blocks before it.
-            if (new BigEndianReader(records[at].Key).ReadUInt32At(8) != blocks)
+            if (PlusExtentsStart(records[at].Key) != blocks)
             {
                 run.Problem("An overflow extents record's start block is not the fork's blocks before it", "firstaid.extent-start", FirstAidRepairs.ExtentStarts);
             }
@@ -102,5 +103,5 @@ internal static class PlusExtentRecords
     }
 
     private static bool KeyIs(byte[] key, byte fork, uint fileId) =>
-        key.Length >= 12 && key[2] == fork && new BigEndianReader(key).ReadUInt32At(4) == fileId;
+        key.Length >= 12 && key[2] == fork && PlusKeyFileId(key) == fileId;
 }

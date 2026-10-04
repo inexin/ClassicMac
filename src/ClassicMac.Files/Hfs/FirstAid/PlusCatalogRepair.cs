@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Editing;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -59,7 +60,7 @@ internal sealed class PlusCatalogRepair
                 continue;
             }
 
-            uint cnid = Parent(key);
+            uint cnid = KeyId(key);
             var reader = new BigEndianReader(data);
             var name = data.AsSpan(10, 2 * reader.ReadUInt16At(8)).ToArray();
             var target = Find(reader.ReadUInt32At(4), name);
@@ -173,7 +174,7 @@ internal sealed class PlusCatalogRepair
         var items = new Dictionary<uint, uint>();
         foreach (var (key, data) in records.Where(r => Type(r.Data) is Folder or File))
         {
-            items[Parent(key)] = items.GetValueOrDefault(Parent(key)) + 1;
+            items[KeyId(key)] = items.GetValueOrDefault(KeyId(key)) + 1;
         }
 
         foreach (var (_, data) in records.Where(r => Type(r.Data) == Folder && r.Data.Length >= 12))
@@ -251,9 +252,8 @@ internal sealed class PlusCatalogRepair
 
     private static ushort Type(byte[] data) => data.Length >= 2 ? (ushort)(data[0] << 8 | data[1]) : (ushort)0;
 
-    private static uint Id(byte[] data) => data.Length >= 12 ? new BigEndianReader(data).ReadUInt32At(8) : 0;
+    private static uint Id(byte[] data) => data.Length >= 12 ? PlusRecordId(data) : 0;
 
-    private static uint Parent(byte[] key) => new BigEndianReader(key).ReadUInt32At(2);
 
     // A catalog key (parent, name), the name in UTF-16 big-endian units.
     private static byte[] Key(uint parent, byte[] name)

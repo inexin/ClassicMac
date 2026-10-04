@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Editing;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -29,7 +30,7 @@ internal static class PlusRepair
             var records = new List<(byte[] Key, byte[] Data)>();
             foreach (var (key, data, _) in extents.Records)
             {
-                uint fileId = new BigEndianReader(key).ReadUInt32At(4);
+                uint fileId = PlusKeyFileId(key);
                 if (relocated.ContainsKey((fileId, key[2])))
                 {
                     continue;                                                        // a moved fork's: made again below
@@ -83,7 +84,7 @@ internal static class PlusRepair
             {
                 foreach (var key in bad)
                 {
-                    changes.Add(new PlannedChange("repair", "", $"attributes, CNID {new BigEndianReader(key).ReadUInt32At(4)}: a bad attribute record deleted"));
+                    changes.Add(new PlannedChange("repair", "", $"attributes, CNID {PlusKeyFileId(key)}: a bad attribute record deleted"));
                 }
 
                 written = true;

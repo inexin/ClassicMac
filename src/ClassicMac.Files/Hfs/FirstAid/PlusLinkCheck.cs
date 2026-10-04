@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Globalization;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -27,7 +28,7 @@ internal static class PlusLinkCheck
         foreach (var (key, data) in records)
         {
             var reader = new BigEndianReader(data);
-            if (data.Length >= 88 && reader.ReadUInt16At(0) == Folder && new BigEndianReader(key).ReadUInt32At(2) == 2)
+            if (data.Length >= 88 && reader.ReadUInt16At(0) == Folder && KeyId(key) == 2)
             {
                 string name = Name(key);
                 files = name == PrivateFiles ? reader.ReadUInt32At(8) : files;
@@ -68,14 +69,14 @@ internal static class PlusLinkCheck
         foreach (var (reference, count) in links)
         {
             var indirect = children.GetValueOrDefault(IndirectName(reference, folder));
-            if (indirect is null || new BigEndianReader(indirect).ReadUInt16At(0) != (folder ? Folder : File))
+            if (indirect is null || PlusRecordType(indirect) != (folder ? Folder : File))
             {
                 run.Problem(folder ? "A directory hard link's folder is missing" : "A hard link's indirect file is missing", "firstaid.link-target-missing",
                     FirstAidRepairs.None);
                 continue;
             }
 
-            if (new BigEndianReader(indirect).ReadUInt32At(44) != count)
+            if (new BigEndianReader(indirect).ReadUInt32At(44) != count)                 // its link count (bsdInfo.special)
             {
                 run.Problem("A hard link's link count is not its number of links", "firstaid.link-count", FirstAidRepairs.LinkCounts);
             }
@@ -84,7 +85,7 @@ internal static class PlusLinkCheck
 
     /// <summary>A private folder's records by name (none when there is no such folder).</summary>
     internal static Dictionary<string, byte[]> Children(IEnumerable<(byte[] Key, byte[] Data)> records, uint? parent) =>
-        parent is not { } p ? [] : records.Where(r => new BigEndianReader(r.Key).ReadUInt32At(2) == p)
+        parent is not { } p ? [] : records.Where(r => KeyId(r.Key) == p)
             .GroupBy(r => Name(r.Key), System.StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First().Data, System.StringComparer.Ordinal);
 
     internal static string Name(byte[] key)

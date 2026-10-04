@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -20,7 +21,7 @@ internal sealed class HierarchyCheck
         this.run = run;
         foreach (var record in run.Catalog!.Records)
         {
-            uint parent = new BigEndianReader(record.Key).ReadUInt32At(2);
+            uint parent = KeyId(record.Key);
             if (!children.TryGetValue(parent, out var list))
             {
                 children[parent] = list = [];

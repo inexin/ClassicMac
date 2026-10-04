@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
 using ClassicMac.Files.Editing;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -52,7 +53,7 @@ internal sealed class CatalogRepair
             {
                 case FolderThread or FileThread when data.AsSpan(2, 8).IndexOfAnyExcept((byte)0) >= 0:
                     data.AsSpan(2, 8).Clear();
-                    Add(Parent(key), "a thread record's reserved fields cleared");
+                    Add(KeyId(key), "a thread record's reserved fields cleared");
                     break;
                 case Folder:
                     FolderFields(key, data, reader, writer);
@@ -86,7 +87,7 @@ internal sealed class CatalogRepair
         }
 
         ushort flags = reader.ReadUInt16At(0x1E);
-        if (Parent(key) == 1 && (flags & NameLocked) != 0)
+        if (KeyId(key) == 1 && (flags & NameLocked) != 0)
         {
             flags &= unchecked((ushort)~NameLocked);
             Add(id, "the root folder's name lock cleared");
@@ -104,7 +105,7 @@ internal sealed class CatalogRepair
     // A fork given its own copy (#12): its first extent record, the rest in the extents tree.
     private void Relocated(byte[] data, int at, byte fork)
     {
-        uint id = new BigEndianReader(data).ReadUInt32At(0x14);
+        uint id = FileId(data);
         if (relocated.TryGetValue((id, fork), out var extents))
         {
             OverlapRepair.Records(id, fork, extents).First.CopyTo(data, at);
@@ -138,9 +139,9 @@ internal sealed class CatalogRepair
                 continue;
             }
 
-            uint id = Parent(key);
+            uint id = KeyId(key);
             var targetName = data.AsSpan(0x0F, data[0x0E]).ToArray();
-            uint targetParent = new BigEndianReader(data).ReadUInt32At(0x0A);
+            uint targetParent = ThreadParentId(data);
             var target = Find(targetParent, targetName);
             if (data[0] == FileThread && target is null)
             {
@@ -179,7 +180,7 @@ internal sealed class CatalogRepair
                 continue;
             }
 
-            uint id = new BigEndianReader(data).ReadUInt32At(folder ? 6 : 0x14);
+            uint id = folder ? FolderId(data) : FileId(data);
             if (Find(id, []) is not null)
             {
                 continue;
@@ -187,7 +188,7 @@ internal sealed class CatalogRepair
 
             var thread = new byte[46];
             thread[0] = folder ? FolderThread : FileThread;
-            new BigEndianWriter(thread).WriteUInt32At(0x0A, Parent(key));
+            new BigEndianWriter(thread).WriteUInt32At(0x0A, KeyId(key));
             key.AsSpan(6, 1 + key[6]).CopyTo(thread.AsSpan(0x0E));
             added.Add((Key(id, []), thread));
             Add(id, folder ? "a missing folder thread made" : "a missing file thread made");
@@ -205,7 +206,7 @@ internal sealed class CatalogRepair
         {
             if (data[0] is Folder or File)
             {
-                items[Parent(key)] = items.GetValueOrDefault(Parent(key)) + 1;
+                items[KeyId(key)] = items.GetValueOrDefault(KeyId(key)) + 1;
             }
         }
 
@@ -224,7 +225,6 @@ internal sealed class CatalogRepair
 
     private void Add(uint cnid, string detail) => changes.Add(new PlannedChange("repair", "", $"catalog, CNID {cnid}: {detail}"));
 
-    private static uint Parent(byte[] key) => new BigEndianReader(key).ReadUInt32At(2);
 
     private static byte[] Key(uint parent, byte[] name)
     {

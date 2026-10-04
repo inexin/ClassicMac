@@ -25,7 +25,7 @@ internal static class HfsCatalogEditing
             throw new InvalidDataException("The HFS folder thread is missing.");
         }
 
-        return new BigEndianReader(thread.Data).ReadUInt32At(10);
+        return ThreadParentId(thread.Data);
     }
 
     // Deletes an item and, for a folder, everything below it, in one pass over the catalog (hfs.md §3): every fork's

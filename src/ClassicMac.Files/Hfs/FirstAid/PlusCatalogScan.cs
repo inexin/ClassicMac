@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -112,7 +113,7 @@ internal sealed class PlusCatalogScan
         {
             run.Flag(folder ? 37 : 6, folder ? FirstAidRepairs.MissingFolder : FirstAidRepairs.FileThreads, cnid, node);
         }
-        else if (Type(target.Value.Data) != (folder ? Folder : File) || Id(target.Value.Data) != cnid)
+        else if (Type(target.Value.Data) != (folder ? Folder : File) || PlusRecordId(target.Value.Data) != cnid)
         {
             run.Flag(36, FirstAidRepairs.MissingThreads, cnid, node);           // the record's own thread is the wrong one
         }
@@ -122,7 +123,7 @@ internal sealed class PlusCatalogScan
 
     private bool FolderRecord(byte[] key, byte[] data, uint node, uint parent)
     {
-        uint id = data.Length >= 12 ? Id(data) : 0;
+        uint id = data.Length >= 12 ? PlusRecordId(data) : 0;
         if (data.Length != FolderLength)
         {
             return run.Fatal(32, id, node);
@@ -143,8 +144,9 @@ internal sealed class PlusCatalogScan
             Child(id, parent, node);
         }
 
-        folders[id] = (parent, new BigEndianReader(data).ReadUInt32At(4), node);
-        folderCounts[id] = ((data[3] & HasFolderCount) != 0, new BigEndianReader(data).ReadUInt32At(84));
+        var record = new BigEndianReader(data);
+        folders[id] = (parent, record.ReadUInt32At(4), node);                          // valence
+        folderCounts[id] = ((data[3] & HasFolderCount) != 0, record.ReadUInt32At(84));   // folderCount
         maxId = Math.Max(maxId, id);
         HasThread(key, id, FolderThread, node);
         return true;
@@ -152,7 +154,7 @@ internal sealed class PlusCatalogScan
 
     private bool FileRecord(byte[] key, byte[] data, uint node, uint parent)
     {
-        uint id = data.Length >= 12 ? Id(data) : 0;
+        uint id = data.Length >= 12 ? PlusRecordId(data) : 0;
         if (data.Length != FileLength)
         {
             return run.Fatal(34, id, node);
@@ -297,7 +299,7 @@ internal sealed class PlusCatalogScan
                 && reader.ReadUInt32At(48) == AliasType && reader.ReadUInt32At(52) == AliasCreator;
             if (folder || alias)
             {
-                uint parent = new BigEndianReader(key).ReadUInt32At(2);
+                uint parent = KeyId(key);
                 counts[parent] = counts.GetValueOrDefault(parent) + 1;
             }
         }
@@ -312,7 +314,6 @@ internal sealed class PlusCatalogScan
 
     private static ushort Type(byte[] data) => data.Length >= 2 ? (ushort)(data[0] << 8 | data[1]) : (ushort)0;
 
-    private static uint Id(byte[] data) => new BigEndianReader(data).ReadUInt32At(8);
 
     private static string Name(byte[] key)
     {

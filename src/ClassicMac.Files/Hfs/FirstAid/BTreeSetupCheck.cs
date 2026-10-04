@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -82,14 +83,15 @@ internal static class BTreeSetupCheck
             return null;
         }
 
-        int nodeSize = new BigEndianReader(bytes).ReadUInt16At(14 + 18);
+        var header = new BigEndianReader(bytes);
+        int nodeSize = header.ReadUInt16At(14 + 18);
         if (nodeSize is not (512 or 1024 or 2048 or 4096 or 8192 or 16384 or 32768) || bytes.Length < nodeSize)
         {
             run.Fatal(61, fileId);
             return null;
         }
 
-        int firstRecord = new BigEndianReader(bytes).ReadUInt16At(nodeSize - 2);
+        int firstRecord = header.ReadUInt16At(nodeSize - 2);
         if (firstRecord < 14 || firstRecord % 2 != 0 || firstRecord >= nodeSize)
         {
             run.Fatal(61, fileId);
@@ -123,7 +125,7 @@ internal static class BTreeSetupCheck
             for (var i = 0; i < descriptor.RecordCount; i++)
             {
                 if (tree.TryRecord(node, i, out var key, out var data) && key.Length >= 8 && data.Length >= 12
-                    && key.Span[1] == fork && new BigEndianReader(key).ReadUInt32At(2) == fileId)
+                    && key.Span[1] == fork && KeyId(key) == fileId)
                 {
                     found.AddRange(Extents(new BigEndianReader(data), 0));
                 }

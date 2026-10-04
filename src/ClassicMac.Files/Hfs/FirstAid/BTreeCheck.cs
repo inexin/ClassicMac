@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -197,7 +198,7 @@ internal sealed class BTreeCheck
                 return run.Fatal(22, 0, node);
             }
 
-            uint child = new BigEndianReader(data).ReadUInt32At(0);
+            uint child = IndexChild(data);
             if (child == 0 || child >= tree.TotalNodes)
             {
                 if (i == 0)

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using ClassicMac.Core;
+using static ClassicMac.Files.Hfs.HfsRecords;
 
 namespace ClassicMac.Files.Hfs;
 
@@ -40,7 +41,7 @@ internal static class PlusHeaderCompare
             run.Flag(59, FirstAidRepairs.Mdb, 1);
         }
 
-        if (run.Extents!.Records.Exists(r => new BigEndianReader(r.Key).ReadUInt32At(4) is var id && id >= 16 && !run.FileIds.Contains(id)))
+        if (run.Extents!.Records.Exists(r => PlusKeyFileId(r.Key) is var id && id >= 16 && !run.FileIds.Contains(id)))
         {
             run.Problem("Overflow extents records belong to a file not in the catalog", "firstaid.orphaned-extents", FirstAidRepairs.OrphanedExtents);
         }
