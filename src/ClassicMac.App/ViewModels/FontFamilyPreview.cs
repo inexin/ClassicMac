@@ -168,7 +168,7 @@ public sealed partial class FontFamilyPreview : ObservableObject
         {
             family = FontFamily.Read(data, resource.Name?.ToMacRoman() ?? "", found);
         }
-        catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+        catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
         {
             return null;
         }
@@ -613,7 +613,7 @@ public sealed partial class FontFamilyPreview : ObservableObject
         {
             return FontFamily.Strike(font, (type, id) => Find(type.ToString(), id) is { } r ? Data(r) : null);
         }
-        catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+        catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
         {
             return null;
         }

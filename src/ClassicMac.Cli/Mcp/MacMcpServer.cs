@@ -172,7 +172,7 @@ internal sealed class MacMcpServer : IDisposable
         {
             (text, code) = (e.Message, "refused");
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             (text, code) = (e.Message, "ioError");
         }

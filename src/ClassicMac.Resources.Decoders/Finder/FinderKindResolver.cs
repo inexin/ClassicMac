@@ -288,7 +288,7 @@ public sealed class FinderKindResolver
         {
             return ResourceDecompression.Default.GetData(resource, fork, readOptions, []);
         }
-        catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+        catch (Exception e) when (ExceptionFilters.IsMalformed(e))
         {
             return ReadOnlyMemory<byte>.Empty;
         }

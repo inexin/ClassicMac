@@ -180,7 +180,7 @@ public abstract partial class ResourceForm : ObservableObject
             var items = InterfaceResources.ReadDialogItems(data, DecodeOptions.Default, [], "");
             return new ItemList(ditl.Name?.ToMacRoman(), [.. items.Select(i => i.Text ?? "")]);
         }
-        catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+        catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
         {
             return null;
         }

@@ -80,7 +80,7 @@ public sealed partial class DragOut(MainViewModel main) : ObservableObject
             main.Status = before;
             return paths;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
         {
             main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), node.Source, node));
             main.Status = $"{node.BaseTitle} could not be dragged out: {e.Message}";
@@ -98,7 +98,7 @@ public sealed partial class DragOut(MainViewModel main) : ObservableObject
                 Directory.Delete(DragFolder, recursive: true);
             }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
         }
     }

@@ -22,7 +22,7 @@ internal sealed class UnpackCommand(TextWriter output, TextWriter error)
             opened = Input.Open(input, readOptions with { TimeZone = options.TimeZone }, diagnostics);
             reporter.Write(input.Name, diagnostics);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;

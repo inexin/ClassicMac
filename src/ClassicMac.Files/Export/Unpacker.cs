@@ -77,7 +77,7 @@ public static class Unpacker
                 bytes += file.DataFork.Length + file.ResourceFork.Length;
                 progress?.Report(files);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
             {
                 failed.Add($"{Path.Combine(target, name)}: {e.Message}");
             }
@@ -133,7 +133,7 @@ public static class Unpacker
                 files++;
                 progress?.Report(files);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
             {
                 failed.Add($"{target}: {e.Message}");
             }
@@ -212,7 +212,7 @@ public static class DocumentConverter
                 documents.Add((entry.Node.File.MacPath,
                     DocumentExport.Write(converter, files, target, parts.Count > 0 ? string.Join('/', parts) + "/" : "")));
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
             {
                 failed.Add($"{target}: {e.Message}");
             }

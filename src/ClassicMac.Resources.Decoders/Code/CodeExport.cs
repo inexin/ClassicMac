@@ -142,7 +142,7 @@ public static class CodeExport
             {
                 cfrg = Cfrg.Read(Data(cfrgResource), diagnostics);
             }
-            catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+            catch (Exception e) when (ExceptionFilters.IsMalformed(e))
             {
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.cfrg-unreadable",
                     $"{cfrgResource} is not a code fragment resource ({e.Message}); its fragments are not listed."));
@@ -169,7 +169,7 @@ public static class CodeExport
                             {
                                 pef = PefContainer.Read(slice, diagnostics);
                             }
-                            catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+                            catch (Exception e) when (ExceptionFilters.IsMalformed(e))
                             {
                                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.fragment-unreadable",
                                     $"Fragment \"{member.Name}\" in the data fork is not a PEF container ({e.Message}); not listed."));
@@ -210,7 +210,7 @@ public static class CodeExport
                             {
                                 try
                                 { pef = PefContainer.Read(data, new List<Diagnostic>()); }
-                                catch (Exception e) when (e is InvalidDataException or EndOfStreamException) { }
+                                catch (Exception e) when (ExceptionFilters.IsMalformed(e)) { }
                             }
                             var known = resources.FirstOrDefault(r => r.Resource == resource);
                             fragments.Add((cfrgId, i, member, file, pef, known.Listing));
@@ -315,7 +315,7 @@ public static class CodeExport
 
             return listing;
         }
-        catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+        catch (Exception e) when (ExceptionFilters.IsMalformed(e))
         {
             diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.pef-unreadable",
                 $"{resource}: its PEF container could not be read ({e.Message}); not listed."));

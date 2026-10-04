@@ -33,7 +33,7 @@ internal sealed class DisasmCommand(TextWriter output, TextWriter error)
             error.WriteLine($"{input.Name}: not a Mac container or a resource fork: {e.Message}");
             return ExitCodes.Unreadable;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;
@@ -93,7 +93,7 @@ internal sealed class DisasmCommand(TextWriter output, TextWriter error)
                 listings += files.Count(f => f.Name.EndsWith(".s", StringComparison.Ordinal));
             }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine(e.Message);
             return ExitCodes.IoError;

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using ClassicMac.Core;
 using ClassicMac.Resources.Decoders.Finder;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -80,7 +81,7 @@ public sealed partial class TypeCreatorActions(MainViewModel main) : ObservableO
         return TypeCreatorDatabase.Load(stream);
     }
 
-    private static bool IsReadFailure(Exception e) => e is IOException or UnauthorizedAccessException or InvalidDataException;
+    private static bool IsReadFailure(Exception e) => ExceptionFilters.IsFileAccess(e) || e is InvalidDataException;
 
     private static string CannotRead(string path, Exception e) =>
         $"“{Path.GetFileName(path)}” could not be read as a type and creator database: {e.Message}";

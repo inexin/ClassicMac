@@ -466,7 +466,7 @@ public sealed partial class MainViewModel : ObservableObject
             Status = $"{input.Title}: {files} file{(files == 1 ? "" : "s")}, {diagnostics.Count} diagnostic{(diagnostics.Count == 1 ? "" : "s")}.";
             return input;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "input.unreadable", e.Message), Path.GetFileName(path), null));
             Status = $"{Path.GetFileName(path)} could not be read: {e.Message}";

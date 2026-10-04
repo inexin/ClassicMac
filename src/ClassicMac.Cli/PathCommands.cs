@@ -44,7 +44,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         {
             tree = MacPathTree.OpenPath(path, out entry, options, readOptions, diagnostics);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{path}: {e.Message}");
             return ExitCodes.IoError;
@@ -89,7 +89,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
             error.WriteLine($"{path}: {e.Message}");
             return ExitCodes.Usage;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{path}: {e.Message}");
             return ExitCodes.IoError;

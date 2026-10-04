@@ -103,7 +103,7 @@ public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kin
             var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, []);
             family = ClassicMac.Graphics.Fonts.FontFamily.Read(data, "");
         }
-        catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+        catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
         {
             return null;
         }
@@ -138,7 +138,7 @@ public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kin
             var data = ResourceDecompression.Default.GetData(node.Resource, node.Fork, node.Input.Options, []);
             items = ClassicMac.Resources.Decoders.Interface.InterfaceResources.ReadDialogItems(data, ClassicMac.Resources.Decoders.DecodeOptions.Default, [], "");
         }
-        catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+        catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
         {
             yield break;
         }
@@ -172,7 +172,7 @@ public sealed record InspectorHeader(NodeViewModel Node, string Name, string Kin
             var data = ResourceDecompression.Default.GetData(resource, node.Fork, node.Input.Options, []);
             return string.Join(" · ", ClassicMac.Resources.Decoders.Images.IconFamily.ReadIcns(data, []).Members.Select(m => m.Key));
         }
-        catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+        catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
         {
             return null;
         }

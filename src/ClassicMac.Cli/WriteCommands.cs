@@ -194,7 +194,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
                 error.WriteLine($"{Path.GetFileName(path)}: {e.Message.Split(" (Parameter", 2)[0]}");
                 return ExitCodes.Usage;
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
             {
                 error.WriteLine($"{path}: {e.Message}");
                 return ExitCodes.IoError;
@@ -345,7 +345,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
             error.WriteLine($"{path}: {e.Message}");
             return ExitCodes.Usage;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{path}: {e.Message}");
             return ExitCodes.IoError;

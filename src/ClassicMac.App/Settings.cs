@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ClassicMac.Core;
 
 namespace ClassicMac.App;
 
@@ -98,7 +99,7 @@ public sealed class JsonSettingsStore(string path) : ISettingsStore
             Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
             File.WriteAllText(FilePath, JsonSerializer.Serialize(settings, SettingsJson.Default.AppSettings));
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
         }
     }

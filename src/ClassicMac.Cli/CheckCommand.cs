@@ -25,7 +25,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
             opened = Input.Open(input, containerOptions, diagnostics, deep ? int.MaxValue : 1);
             found.AddRange(diagnostics.Select(d => (input.Name, d)));
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;

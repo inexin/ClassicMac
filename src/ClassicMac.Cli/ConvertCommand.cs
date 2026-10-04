@@ -34,7 +34,7 @@ internal sealed class ConvertCommand(TextWriter output, TextWriter error)
             error.WriteLine($"{input.Name}: not a Mac container or a resource fork: {e.Message}");
             return ExitCodes.Unreadable;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;
@@ -49,7 +49,7 @@ internal sealed class ConvertCommand(TextWriter output, TextWriter error)
             result = DocumentConverter.Convert(opened.Root, forks.Select(f => new ForkToExtract(f.Node, f.Chain, f.Fork ?? new ResourceFork())).ToList(), root,
                 converters, readOptions, overwrite, found);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine(e.Message);
             return ExitCodes.IoError;

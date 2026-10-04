@@ -367,7 +367,7 @@ public sealed class FinderIconResolver
             var family = IconSuite.FromFamily(IconFamily.ReadIcns(Data(resource, fork)));
             return family.Members.Count > 0 ? family : null;
         }
-        catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+        catch (Exception e) when (ExceptionFilters.IsMalformed(e))
         {
             return null;
         }

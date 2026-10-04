@@ -24,7 +24,7 @@ internal sealed class InfoCommand(TextWriter output, TextWriter error)
                 using var stream = typeCreatorDatabase.OpenRead();
                 database = TypeCreatorDatabase.Load(stream);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
             {
                 error.WriteLine($"{typeCreatorDatabase.Name}: not a type and creator database (xlsx): {e.Message}");
                 return ExitCodes.Usage;
@@ -39,7 +39,7 @@ internal sealed class InfoCommand(TextWriter output, TextWriter error)
             opened = Input.Open(input, options, diagnostics);
             reporter.Write(input.Name, diagnostics);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;

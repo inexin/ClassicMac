@@ -202,7 +202,7 @@ internal sealed class MacShell(IShellConsole console, PathSession session, Conta
         {
             return Fail(command, e.Message, ExitCodes.Usage);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             return Fail(command, e.Message, ExitCodes.IoError);
         }

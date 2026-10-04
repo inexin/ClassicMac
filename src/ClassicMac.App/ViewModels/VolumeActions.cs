@@ -122,7 +122,7 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
         {
             imported = await Task.Run(() => HostImport.Read(path, main.ContainerOptions));
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
         {
             main.Status = $"{Path.GetFileName(path)} could not be read: {e.Message}";
             return;

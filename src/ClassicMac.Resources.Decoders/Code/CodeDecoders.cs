@@ -188,7 +188,7 @@ internal sealed class CfrgDecoder : IResourceDecoder, IBuiltInDecoder
         {
             cfrg = Cfrg.Read(input.Data, input.Diagnostics);
         }
-        catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+        catch (Exception e) when (ExceptionFilters.IsMalformed(e))
         {
             input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.cfrg-unreadable",
                 $"{input.Resource}: not a code fragment resource ({e.Message}); written as its data only."));
@@ -251,7 +251,7 @@ internal sealed class CodeResourceDecoder : IResourceDecoder, IBuiltInDecoder
         {
             listing = CodeListing.ForCodeResource(type, input.Resource.Id, input.Data, CodeSegmentDecoder.NamedFork(input));
         }
-        catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+        catch (Exception e) when (ExceptionFilters.IsMalformed(e))
         {
             input.Diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, "code.pef-unreadable",
                 $"{input.Resource}: its PEF container could not be read ({e.Message}); written as its data only."));
@@ -456,7 +456,7 @@ internal sealed class ApplicationCache
                 // Already decompressed: nothing is left for the decompressor but the data it could not expand.
                 cached = (CodeApplication.Read(fork, diagnostics), diagnostics, null);
             }
-            catch (Exception e) when (e is InvalidDataException or EndOfStreamException)
+            catch (Exception e) when (ExceptionFilters.IsMalformed(e))
             {
                 cached = (null, [], e.Message);
             }

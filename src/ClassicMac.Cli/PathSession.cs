@@ -167,7 +167,7 @@ internal sealed class PathSession : IDisposable
         {
             Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
         }
     }
@@ -182,7 +182,7 @@ internal sealed class PathSession : IDisposable
             {
                 Directory.Delete(work, recursive: true);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
             {
                 // A copy still held open elsewhere stays in the temporary folder.
             }

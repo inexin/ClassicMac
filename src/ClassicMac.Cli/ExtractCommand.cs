@@ -33,7 +33,7 @@ internal sealed class ExtractCommand(TextWriter output, TextWriter error)
             error.WriteLine($"{input.Name}: not a Mac container or a resource fork: {e.Message}");
             return ExitCodes.Unreadable;
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;

@@ -36,7 +36,7 @@ internal sealed class ListCommand(TextWriter output, TextWriter error)
                 return ExitCodes.Unreadable;
             }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e) when (ExceptionFilters.IsFileAccess(e))
         {
             error.WriteLine($"{input.Name}: {e.Message}");
             return ExitCodes.IoError;

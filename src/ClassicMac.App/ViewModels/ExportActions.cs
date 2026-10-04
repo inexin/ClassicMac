@@ -249,7 +249,7 @@ public sealed partial class ExportActions(MainViewModel main) : ObservableObject
             {
                 await export();
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+            catch (Exception e) when (ExceptionFilters.IsFileAccess(e) || e is InvalidDataException)
             {
                 main.Report(new DiagnosticEntry(new Diagnostic(DiagnosticSeverity.Error, "export.failed", e.Message), main.Selected?.Source ?? "", main.Selected));
                 main.Status = $"Export failed: {e.Message}";

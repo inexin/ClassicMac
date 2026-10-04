@@ -244,7 +244,7 @@ public sealed partial class DialogItemsForm : DataForm
                         return candidate;
                     }
                 }
-                catch (Exception e) when (e is System.IO.InvalidDataException or System.IO.EndOfStreamException or ArgumentException)
+                catch (Exception e) when (ExceptionFilters.IsMalformedOrOutOfRange(e))
                 {
                     // Unreadable: not the user.
                 }
