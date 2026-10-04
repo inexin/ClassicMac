@@ -24,6 +24,9 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
     /// <summary>--follow: an alias file stands for its original (through aliases of aliases), docs/cli.md §2.</summary>
     public bool Follow { get; init; }
 
+    /// <summary>--encoding: the Mac encoding text is read in (docs/cli.md §1).</summary>
+    public MacTextEncoding TextEncoding { get; init; }
+
     // The input the current command's paths are in, as results name it.
     private string input = "";
 
@@ -226,7 +229,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
         }
 
         // A resource without --hex: decoded, as JSON or text; otherwise a hex dump.
-        if (entry.Kind == MacPathKind.Resource && !hex && MacPathJson.Decode(entry, all, readOptions) is { } decoded)
+        if (entry.Kind == MacPathKind.Resource && !hex && MacPathJson.Decode(entry, all, readOptions, TextEncoding) is { } decoded)
         {
             if (decoded.Extension == ".json")
             {
@@ -274,7 +277,7 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
             return ExitCodes.Success;
         }
 
-        WriteText(MacCommands.Text(bytes));
+        WriteText(MacCommands.Text(bytes, TextEncoding));
         return ExitCodes.Success;
 
         void Header(Utf8JsonWriter w, string encoding)

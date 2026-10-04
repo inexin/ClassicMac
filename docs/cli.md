@@ -63,6 +63,12 @@ object (§2.6). Text redirected to a file or a pipe is UTF-8 without a byte orde
 code page. The limit options of every command (`--max-resource-size`, `--max-nesting-depth`,
 `--max-expanded-bytes`, `--strict`, `-q`) apply.
 
+`--encoding <name>` (every command) is the Mac encoding text is read in: `roman` (the default), `japanese`,
+`chinese-traditional`, `chinese-simplified`, `korean`, `arabic`, `hebrew`, `greek`, `cyrillic`, `ukrainian`, `thai`,
+`central-european`, `croatian`, `romanian`, `icelandic` or `turkish`, or an IANA name such as `x-mac-japanese`
+([text-encodings.md](formats/codecs/text-encodings.md)). It applies to `cat`'s text and decoded resources,
+`find --contains`, and the text `extract` and `convert` decode; names are still shown as Mac OS Roman.
+
 `ls`, `cat` and `get` take `--follow`: an alias file (the Finder's isAlias flag) stands for its original, resolved on
 the volume holding it ([aliases.md §2](formats/resources/aliases.md#2-reading)), through aliases of aliases (at most
 ten). An original that is not found is an error naming the path the alias recorded (exit 5).
@@ -123,7 +129,7 @@ Read as: disk.img (host file) > disk.img (HFS volume) > Inner.img (HFS volume)
 
 `classicmac cat <path> [--hex] [--raw] [--fork data|rsrc] [--max-bytes <size>] [--follow] [--json]`:
 
-- A file: its data fork as text, Mac OS Roman decoded to UTF-8 and CR made LF; `--fork rsrc` the resource fork (as a hex
+- A file: its data fork as text, Mac OS Roman (or `--encoding`'s) decoded to UTF-8 and CR made LF; `--fork rsrc` the resource fork (as a hex
   dump).
 - A resource: decoded by the built-in decoders, as JSON (`'vers'`, `'STR#'`, `'MENU'`…) or text (`'STR '`, `'TEXT'`);
   anything else (a picture, a sound) as a hex dump (use `get` or `extract` for the decoded files).

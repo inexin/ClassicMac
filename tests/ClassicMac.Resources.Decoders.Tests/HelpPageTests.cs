@@ -35,6 +35,10 @@ public class HelpPageTests
         Assert.EndsWith("é", HelpPages.Decode(mac));
         byte[] unknown = [.. "<meta charset=\"klingon\">"u8, 0x8E];
         Assert.EndsWith("é", HelpPages.Decode(unknown));                              // an unknown charset: Mac OS Roman
+        byte[] sjis = [.. "<meta charset=\"Shift_JIS\">"u8, 0x93, 0xFA, 0x96, 0x7B];
+        Assert.EndsWith("日本", HelpPages.Decode(sjis));                               // Mac OS Japanese
+        byte[] macJapanese = [.. "<meta charset=\"x-mac-japanese\">"u8, 0x93, 0xFA];
+        Assert.EndsWith("日", HelpPages.Decode(macJapanese));
     }
 
     [Fact]

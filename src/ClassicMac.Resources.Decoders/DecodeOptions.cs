@@ -5,13 +5,6 @@ using ClassicMac.Resources.Export;
 
 namespace ClassicMac.Resources.Decoders;
 
-/// <summary>The text encodings resources can be read with.</summary>
-public enum MacTextEncoding
-{
-    /// <summary>Mac OS Roman (IANA <c>macintosh</c>).</summary>
-    Roman,
-}
-
 /// <summary>How line breaks (CR on the Mac) are written in text output.</summary>
 public enum LineEndings
 {
@@ -31,7 +24,7 @@ public sealed record DecodeOptions
     /// <summary>The defaults.</summary>
     public static DecodeOptions Default { get; } = new();
 
-    /// <summary>The encoding text resources are read with. Default Mac OS Roman.</summary>
+    /// <summary>The encoding text in resources and documents is read with (docs/formats/codecs/text-encodings.md). Default Mac OS Roman.</summary>
     public MacTextEncoding TextEncoding { get; init; } = MacTextEncoding.Roman;
 
     /// <summary>How line breaks are written in <c>.txt</c> output. Default LF.</summary>

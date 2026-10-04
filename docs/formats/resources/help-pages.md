@@ -74,8 +74,9 @@ Windows-1252) [Fitted].
 1. A file is a page when §1's identification holds [ClassicMac].
 2. The page's text: its charset is the one a `meta` tag of its first 1,024 bytes declares (`charset=` in a
    `content-type` or a `<meta charset>`). UTF-8 is read as UTF-8; ISO 8859-1, Windows-1252 and US-ASCII as Windows-1252
-   (a byte $80–$9F is Windows-1252's character, as browsers read them) [Reference: WHATWG Encoding]; anything else,
-   and no charset, as Mac OS Roman [ClassicMac].
+   (a byte $80–$9F is Windows-1252's character, as browsers read them) [Reference: WHATWG Encoding]; a Mac encoding's
+   name (`x-mac-japanese`, …), and Shift_JIS, Big5, GB2312 and EUC-KR, as the Mac encoding built on them
+   ([text-encodings.md](../codecs/text-encodings.md)); anything else, and no charset, as Mac OS Roman [ClassicMac].
 3. The title: the `AppleTitle` meta tag, else the `title` element (character references decoded, white space
    collapsed), else the file's name [ClassicMac].
 4. A relative URL resolves against the page's folder, as a path from the volume's root [ClassicMac]: the query and

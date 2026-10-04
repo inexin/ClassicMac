@@ -10,15 +10,9 @@ namespace ClassicMac.Resources.Decoders.Text;
 // Shared by the text decoders: bytes to Unicode in the chosen encoding, line endings, and small JSON documents.
 internal static class MacText
 {
-    public static string EncodingName(MacTextEncoding encoding) => encoding switch
-    {
-        _ => "macintosh",
-    };
+    public static string EncodingName(MacTextEncoding encoding) => MacEncodings.Name(encoding);
 
-    public static string Decode(ReadOnlySpan<byte> bytes, DecodeOptions options) => options.TextEncoding switch
-    {
-        _ => MacRoman.Decode(bytes),
-    };
+    public static string Decode(ReadOnlySpan<byte> bytes, DecodeOptions options) => MacEncodings.Decode(bytes, options.TextEncoding);
 
     public static string Lines(string text, DecodeOptions options) =>
         options.LineEndings == LineEndings.Lf ? text.Replace('\r', '\n') : text;

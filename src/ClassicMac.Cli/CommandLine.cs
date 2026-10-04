@@ -48,6 +48,15 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         Recursive = true,
     };
 
+    private readonly Option<MacTextEncoding> encoding = new("--encoding")
+    {
+        Description = "The Mac encoding of text: roman (the default), japanese, chinese-traditional, chinese-simplified, korean, "
+            + "arabic, hebrew, greek, cyrillic, ukrainian, thai, central-european, croatian, romanian, icelandic or turkish (or an IANA name, x-mac-japanese)",
+        DefaultValueFactory = _ => MacTextEncoding.Roman,
+        CustomParser = ParseEncoding,
+        Recursive = true,
+    };
+
     private readonly Option<bool> verify = new("--verify")
     {
         Description = "Verify whole-image checksums that need a full read (NDIF's CRC-32, as Disk Copy's Verify checksum does)",
@@ -103,6 +112,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         root.Options.Add(maxNestingDepth);
         root.Options.Add(maxExpandedBytes);
         root.Options.Add(verify);
+        root.Options.Add(encoding);
         root.Options.Add(strict);
         root.Options.Add(quiet);
         root.Subcommands.Add(InfoCommand());
@@ -434,6 +444,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         result.GetValue(strict), result.GetValue(quiet))
     {
         Follow = follow is not null && result.GetValue(follow),
+        TextEncoding = result.GetValue(encoding),
     };
 
     private static Option<bool> FollowOption() => new("--follow") { Description = "An alias file stands for its original (through aliases of aliases)" };
@@ -527,7 +538,7 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
         command.SetAction(result =>
         {
             FourCC? Code(Option<string> option) => result.GetValue(option) is { } text && FourCC.TryParse(text, out var code) ? code : null;
-            byte[]? needle = result.GetValue(contains) is { } c ? MacRoman.Encode(c)
+            byte[]? needle = result.GetValue(contains) is { } c ? MacEncodings.Encode(c, result.GetValue(encoding))
                 : result.GetValue(containsHex) is { } h && TryHex(h, out var bytes) ? bytes : null;
             var query = new MacFindQuery
             {
@@ -628,7 +639,22 @@ internal sealed class CommandLine(TextWriter output, TextWriter error, Stream? b
     {
         ScreenDepth = result.GetValue(screenDepth),
         QuickDraw = ReadOptionsFrom(result).ResourceManager,
+        TextEncoding = result.GetValue(encoding),
     };
+
+    // --encoding: an encoding's name, as MacEncodings.TryParse reads it.
+    internal static MacTextEncoding ParseEncoding(ArgumentResult result)
+    {
+        var text = result.Tokens.Count == 1 ? result.Tokens[0].Value : string.Empty;
+        if (MacEncodings.TryParse(text, out var parsed))
+        {
+            return parsed;
+        }
+
+        result.AddError($"'{text}' is not a Mac encoding: use roman, japanese, chinese-traditional, chinese-simplified, korean, arabic, hebrew, "
+            + "greek, cyrillic, ukrainian, thai, central-european, croatian, romanian, icelandic or turkish.");
+        return MacTextEncoding.Roman;
+    }
 
     // Sizes: plain bytes, or a number with KiB, MiB or GiB (also K, M, G), case-insensitive.
     internal static long ParseSize(ArgumentResult result)

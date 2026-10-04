@@ -179,6 +179,7 @@ How ClassicMac lists this code (the disassembly, its annotations and the code mo
 | [mace.md](codecs/mace.md) | MACE 3:1 and 6:1 | `ClassicMac.Resources.Decoders.Sound` |
 | [ima4.md](codecs/ima4.md) | IMA 4:1 | `ClassicMac.Resources.Decoders.Sound` |
 | [ulaw.md](codecs/ulaw.md) | µ-law | `ClassicMac.Resources.Decoders.Sound` |
+| [text-encodings.md](codecs/text-encodings.md) | The Mac OS text encodings: Mac OS Roman, the other single-byte scripts, Japanese, Chinese and Korean | `ClassicMac.Core` (`MacEncodings`) |
 
 ### Output
 

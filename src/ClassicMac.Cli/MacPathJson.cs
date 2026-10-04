@@ -36,10 +36,13 @@ internal static class MacPathJson
             : null;
 
     /// <summary>A resource decoded by the built-in decoders: its main file, or null when none decodes it.</summary>
-    public static DecodedFile? Decode(MacPathEntry entry, byte[] data, ReadOptions readOptions)
+    public static DecodedFile? Decode(MacPathEntry entry, byte[] data, ReadOptions readOptions) => Decode(entry, data, readOptions, MacTextEncoding.Roman);
+
+    /// <summary>The resource <paramref name="entry"/> names, decoded with its text in <paramref name="encoding"/>, or null.</summary>
+    public static DecodedFile? Decode(MacPathEntry entry, byte[] data, ReadOptions readOptions, MacTextEncoding encoding)
     {
         var resource = entry.Resource!;
-        var decoder = ResourceDecoders.Create(DecodeOptions.Default).FirstOrDefault(d => d.CanDecode(resource.Type));
+        var decoder = ResourceDecoders.Create(DecodeOptions.Default with { TextEncoding = encoding }).FirstOrDefault(d => d.CanDecode(resource.Type));
         return decoder?.Decode(new DecodeInput(resource, data, entry.Resources!, readOptions, new List<Diagnostic>())).FirstOrDefault();
     }
 

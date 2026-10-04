@@ -12,3 +12,6 @@
 # Apple fonts for QuickDraw.Pict's golden text test are user-supplied
 tests/golden/fonts/
 *.bak
+
+# Apple's text-encoding mapping tables for MacEncodingsTests are user-supplied (Apple's licence)
+tests/golden/encodings/

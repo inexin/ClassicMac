@@ -76,7 +76,8 @@ public static partial class HelpPages
 
     /// <summary>
     /// A page's text: UTF-8 when it declares utf-8, ISO 8859-1 (as Windows-1252) when it declares that or
-    /// Windows-1252 or US-ASCII, else Mac OS Roman, the Mac's own encoding [ClassicMac].
+    /// Windows-1252 or US-ASCII, a Mac encoding when it declares one (x-mac-japanese, or Shift_JIS, Big5, GB2312 and
+    /// EUC-KR as the Mac encodings built on them), else Mac OS Roman, the Mac's own encoding [ClassicMac].
     /// </summary>
     public static string Decode(ReadOnlySpan<byte> page)
     {
@@ -92,6 +93,16 @@ public static partial class HelpPages
                 }
 
                 return text.ToString();
+            case "shift_jis" or "x-sjis" or "sjis":
+                return MacEncodings.Decode(page, MacTextEncoding.Japanese);
+            case "big5":
+                return MacEncodings.Decode(page, MacTextEncoding.ChineseTraditional);
+            case "gb2312" or "euc-cn":
+                return MacEncodings.Decode(page, MacTextEncoding.ChineseSimplified);
+            case "euc-kr" or "ks_c_5601-1987":
+                return MacEncodings.Decode(page, MacTextEncoding.Korean);
+            case { } named when MacEncodings.TryParse(named, out var mac):
+                return MacEncodings.Decode(page, mac);
             default:
                 return MacRoman.Decode(page);
         }

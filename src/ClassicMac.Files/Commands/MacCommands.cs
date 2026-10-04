@@ -319,7 +319,11 @@ public static class MacCommands
     }
 
     /// <summary>Mac OS Roman text as Unicode, its CRs (and CR LFs) as line feeds.</summary>
-    public static string Text(ReadOnlySpan<byte> bytes) => MacRoman.Decode(bytes).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+    public static string Text(ReadOnlySpan<byte> bytes) => Text(bytes, MacTextEncoding.Roman);
+
+    /// <summary>Text in a Mac encoding as Unicode, its CRs (and CR LFs) as line feeds.</summary>
+    public static string Text(ReadOnlySpan<byte> bytes, MacTextEncoding encoding) =>
+        MacEncodings.Decode(bytes, encoding).Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     /// <summary>A hex dump: offset, 16 bytes, and the bytes as Mac OS Roman (control characters as '.').</summary>
     public static string Hex(ReadOnlySpan<byte> bytes)

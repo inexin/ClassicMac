@@ -120,6 +120,26 @@ public sealed class PathCommandTests : IDisposable
         Assert.Contains("no host file", error);
     }
 
+    // --encoding (docs/cli.md §1): text in another Mac encoding, for files, decoded resources and find --contains.
+    [Fact]
+    public void Encoding_reads_text_in_another_Mac_script()
+    {
+        byte[] nihongo = [0x93, 0xFA, 0x96, 0x7B, 0x8C, 0xEA];                             // 日本語 in Mac OS Japanese
+        var japanese = new HfsBuilder();
+        japanese.File(HfsBuilder.Root, "Note", [.. nihongo, 0x0D], MacPathFixtures.Fork(("STR ", 128, null, [6, .. nihongo])));
+        var path = Path.Combine(folder, "japanese.img");
+        File.WriteAllBytes(path, japanese.Build("Disk"));
+
+        Assert.Equal("日本語\n", Run("cat", path + ":Note", "--encoding", "japanese").Output);
+        Assert.Equal("日本語\n", Run("--encoding", "x-mac-japanese", "cat", path + ":Note:#rsrc:'STR ':128").Output);
+        Assert.NotEqual("日本語\n", Run("cat", path + ":Note").Output);                        // Mac OS Roman by default
+        Assert.Contains("Note", Run("find", path + ":", "--contains", "本語", "--encoding", "japanese").Output);
+
+        var bad = Run("cat", path + ":Note", "--encoding", "ebcdic");
+        Assert.Equal(ExitCodes.Usage, bad.Code);
+        Assert.Contains("japanese", bad.Error);                                             // the names it takes
+    }
+
     [Fact]
     public void Cat_shows_text_hex_raw_bytes_or_a_decoded_resource()
     {
