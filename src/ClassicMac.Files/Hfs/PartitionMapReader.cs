@@ -5,144 +5,143 @@ using System.Linq;
 using System.Text;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files.Hfs
+namespace ClassicMac.Files.Hfs;
+
+/// <summary>
+/// Apple partition maps, from <i>Inside Macintosh: Devices</i> (SCSI Manager, "Partition Map"), read as the Mac OS 9
+/// CD driver reads them (disassembly): block 0 holds a driver descriptor ('ER') or starts with a zero word, and the
+/// partition entries ('PM') follow at a stride found by probing: 512 bytes, else 2048 (CDs mastered with 2048-byte
+/// blocks). Every block number in an entry is in units of that stride; the driver descriptor's block size is never
+/// used. Each HFS or MFS partition comes out as one file whose data fork is the volume, for the volume readers to
+/// open next; drivers and free space are skipped.
+/// </summary>
+public sealed class PartitionMapReader : IContainerReader
 {
-    /// <summary>
-    /// Apple partition maps, from <i>Inside Macintosh: Devices</i> (SCSI Manager, "Partition Map"), read as the Mac OS 9
-    /// CD driver reads them (disassembly): block 0 holds a driver descriptor ('ER') or starts with a zero word, and the
-    /// partition entries ('PM') follow at a stride found by probing: 512 bytes, else 2048 (CDs mastered with 2048-byte
-    /// blocks). Every block number in an entry is in units of that stride; the driver descriptor's block size is never
-    /// used. Each HFS or MFS partition comes out as one file whose data fork is the volume, for the volume readers to
-    /// open next; drivers and free space are skipped.
-    /// </summary>
-    public sealed class PartitionMapReader : IContainerReader
+    private const int Block = 512, CdBlock = 2048;
+    private const ushort DriverSignature = 0x4552; // 'ER'
+    private const ushort EntrySignature = 0x504D; // 'PM'
+
+    /// <summary>The reader.</summary>
+    public static PartitionMapReader Instance { get; } = new();
+
+    private PartitionMapReader()
     {
-        private const int Block = 512, CdBlock = 2048;
-        private const ushort DriverSignature = 0x4552; // 'ER'
-        private const ushort EntrySignature = 0x504D; // 'PM'
+    }
 
-        /// <summary>The reader.</summary>
-        public static PartitionMapReader Instance { get; } = new();
+    /// <inheritdoc/>
+    public string FormatName => "Apple partition map";
 
-        private PartitionMapReader()
+    /// <inheritdoc/>
+    public bool CanRead(ForkData input) => Stride(input) > 0;
+
+    // The entry stride: 'PM' at byte 512, else at byte 2048; 0 when there is no map. Block 0 must start with 'ER' or
+    // a zero word; nothing else in it is read.
+    private static int Stride(ForkData input)
+    {
+        var start = input.ReadPrefix(CdBlock + 2);
+        if (start.Length < Block + 2)
         {
-        }
-
-        /// <inheritdoc/>
-        public string FormatName => "Apple partition map";
-
-        /// <inheritdoc/>
-        public bool CanRead(ForkData input) => Stride(input) > 0;
-
-        // The entry stride: 'PM' at byte 512, else at byte 2048; 0 when there is no map. Block 0 must start with 'ER' or
-        // a zero word; nothing else in it is read.
-        private static int Stride(ForkData input)
-        {
-            var start = input.ReadPrefix(CdBlock + 2);
-            if (start.Length < Block + 2)
-            {
-                return 0;
-            }
-
-            var reader = new BigEndianReader(start);
-            if (reader.ReadUInt16At(0) is not (DriverSignature or 0))
-            {
-                return 0;
-            }
-
-            if (reader.ReadUInt16At(Block) == EntrySignature)
-            {
-                return Block;
-            }
-
-            if (start.Length == CdBlock + 2 && reader.ReadUInt16At(CdBlock) == EntrySignature)
-            {
-                return CdBlock;
-            }
-
             return 0;
         }
 
-        /// <inheritdoc/>
-        public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
+        var reader = new BigEndianReader(start);
+        if (reader.ReadUInt16At(0) is not (DriverSignature or 0))
         {
-            if (Stride(input) == 0)
-            {
-                throw new InvalidDataException("Not an Apple partition map.");
-            }
-
-            return [.. Entries(input, context).Select(p => new MacFile { Name = new MacString(p.NameBytes), DataFork = input.Slice(p.Partition.Offset, p.Partition.Length) })];
+            return 0;
         }
 
-        /// <summary>
-        /// The map's Mac volume partitions (<c>Apple_HFS</c>, <c>Apple_MFS</c>) with where each lies in the image, as
-        /// <see cref="Read"/> finds them; empty when the input has no map.
-        /// </summary>
-        public static IReadOnlyList<MacPartition> Partitions(ForkData input)
+        if (reader.ReadUInt16At(Block) == EntrySignature)
         {
-            ArgumentNullException.ThrowIfNull(input);
-            return Stride(input) == 0 ? [] : [.. Entries(input, new ContainerContext()).Select(p => p.Partition)];
+            return Block;
         }
 
-        private static List<(MacPartition Partition, byte[] NameBytes)> Entries(ForkData input, ContainerContext context)
+        if (start.Length == CdBlock + 2 && reader.ReadUInt16At(CdBlock) == EntrySignature)
         {
-            var stride = Stride(input);
-            var first = input.Slice(stride, Block).ToArray();
-            long entries = new BigEndianReader(first).ReadUInt32At(4);
-            var found = new List<(MacPartition, byte[])>();
-            for (long i = 0; i < entries; i++)
-            {
-                var at = (1 + i) * stride;
-                if (at + Block > input.Length)
-                {
-                    context.Report(DiagnosticSeverity.Error, "partition.map-truncated",
-                        $"The map lists {entries} partitions but the image ends after {i}.", at);
-                    break;
-                }
-                var entry = input.Slice(at, Block).ToArray();
-                var reader = new BigEndianReader(entry);
-                if (reader.ReadUInt16At(0) != EntrySignature)
-                {
-                    context.Report(DiagnosticSeverity.Error, "partition.bad-entry", $"Partition entry {i + 1} has no 'PM' signature.", at);
-                    continue;
-                }
-                var name = CString(entry.AsSpan(16, 32)).ToArray();
-                var type = Encoding.ASCII.GetString(CString(entry.AsSpan(48, 32)));
-                if (type is not ("Apple_HFS" or "Apple_MFS"))
-                {
-                    context.Report(DiagnosticSeverity.Info, "partition.skipped", $"Partition {i + 1} ({type}) is not a Mac volume; skipped.", at);
-                    continue;
-                }
-
-                // Physical start and size, and where the data starts in the partition, in units of the stride. The
-                // size comes from the partition's block count: no Mac mounting code reads pmDataCnt.
-                long start = reader.ReadUInt32At(8);
-                long count = reader.ReadUInt32At(12);
-                long dataStart = reader.ReadUInt32At(80);
-                var offset = (start + dataStart) * stride;
-                var length = Math.Max(0, count - dataStart) * stride;
-                if (offset >= input.Length)
-                {
-                    context.Report(DiagnosticSeverity.Error, "partition.outside", $"Partition {i + 1} starts past the end of the image.", at);
-                    continue;
-                }
-                if (offset + length > input.Length)
-                {
-                    context.Report(DiagnosticSeverity.Error, "partition.truncated", $"Partition {i + 1} runs past the end of the image.", at);
-                    length = input.Length - offset;
-                }
-                found.Add((new MacPartition((int)(i + 1), MacRoman.Decode(name), type, offset, length), name));
-            }
-            return found;
+            return CdBlock;
         }
 
-        private static ReadOnlySpan<byte> CString(ReadOnlySpan<byte> field)
-        {
-            var end = field.IndexOf((byte)0);
-            return end < 0 ? field : field[..end];
-        }
+        return 0;
     }
 
-    /// <summary>A Mac volume partition of an Apple partition map: its entry's number (the map itself is 1), name and type, and where its bytes lie in the image.</summary>
-    public sealed record MacPartition(int Number, string Name, string Type, long Offset, long Length);
+    /// <inheritdoc/>
+    public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context)
+    {
+        if (Stride(input) == 0)
+        {
+            throw new InvalidDataException("Not an Apple partition map.");
+        }
+
+        return [.. Entries(input, context).Select(p => new MacFile { Name = new MacString(p.NameBytes), DataFork = input.Slice(p.Partition.Offset, p.Partition.Length) })];
+    }
+
+    /// <summary>
+    /// The map's Mac volume partitions (<c>Apple_HFS</c>, <c>Apple_MFS</c>) with where each lies in the image, as
+    /// <see cref="Read"/> finds them; empty when the input has no map.
+    /// </summary>
+    public static IReadOnlyList<MacPartition> Partitions(ForkData input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        return Stride(input) == 0 ? [] : [.. Entries(input, new ContainerContext()).Select(p => p.Partition)];
+    }
+
+    private static List<(MacPartition Partition, byte[] NameBytes)> Entries(ForkData input, ContainerContext context)
+    {
+        var stride = Stride(input);
+        var first = input.Slice(stride, Block).ToArray();
+        long entries = new BigEndianReader(first).ReadUInt32At(4);
+        var found = new List<(MacPartition, byte[])>();
+        for (long i = 0; i < entries; i++)
+        {
+            var at = (1 + i) * stride;
+            if (at + Block > input.Length)
+            {
+                context.Report(DiagnosticSeverity.Error, "partition.map-truncated",
+                    $"The map lists {entries} partitions but the image ends after {i}.", at);
+                break;
+            }
+            var entry = input.Slice(at, Block).ToArray();
+            var reader = new BigEndianReader(entry);
+            if (reader.ReadUInt16At(0) != EntrySignature)
+            {
+                context.Report(DiagnosticSeverity.Error, "partition.bad-entry", $"Partition entry {i + 1} has no 'PM' signature.", at);
+                continue;
+            }
+            var name = CString(entry.AsSpan(16, 32)).ToArray();
+            var type = Encoding.ASCII.GetString(CString(entry.AsSpan(48, 32)));
+            if (type is not ("Apple_HFS" or "Apple_MFS"))
+            {
+                context.Report(DiagnosticSeverity.Info, "partition.skipped", $"Partition {i + 1} ({type}) is not a Mac volume; skipped.", at);
+                continue;
+            }
+
+            // Physical start and size, and where the data starts in the partition, in units of the stride. The
+            // size comes from the partition's block count: no Mac mounting code reads pmDataCnt.
+            long start = reader.ReadUInt32At(8);
+            long count = reader.ReadUInt32At(12);
+            long dataStart = reader.ReadUInt32At(80);
+            var offset = (start + dataStart) * stride;
+            var length = Math.Max(0, count - dataStart) * stride;
+            if (offset >= input.Length)
+            {
+                context.Report(DiagnosticSeverity.Error, "partition.outside", $"Partition {i + 1} starts past the end of the image.", at);
+                continue;
+            }
+            if (offset + length > input.Length)
+            {
+                context.Report(DiagnosticSeverity.Error, "partition.truncated", $"Partition {i + 1} runs past the end of the image.", at);
+                length = input.Length - offset;
+            }
+            found.Add((new MacPartition((int)(i + 1), MacRoman.Decode(name), type, offset, length), name));
+        }
+        return found;
+    }
+
+    private static ReadOnlySpan<byte> CString(ReadOnlySpan<byte> field)
+    {
+        var end = field.IndexOf((byte)0);
+        return end < 0 ? field : field[..end];
+    }
 }
+
+/// <summary>A Mac volume partition of an Apple partition map: its entry's number (the map itself is 1), name and type, and where its bytes lie in the image.</summary>
+public sealed record MacPartition(int Number, string Name, string Type, long Offset, long Length);

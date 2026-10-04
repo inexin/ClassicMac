@@ -1,117 +1,116 @@
 using System;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files
+namespace ClassicMac.Files;
+
+/// <summary>
+/// Finder flags (<c>fdFlags</c>), from <i>Inside Macintosh: Macintosh Toolbox Essentials</i>, the Finder Interface
+/// chapter.
+/// </summary>
+[Flags]
+public enum FinderFlags : ushort
 {
+    /// <summary>No flags.</summary>
+    None = 0,
+    /// <summary>The file is on the desktop (System 6 and earlier).</summary>
+    IsOnDesk = 0x0001,
+    /// <summary>The three-bit colour label.</summary>
+    ColorMask = 0x000E,
+    /// <summary>An application that can run multiple times from a shared volume.</summary>
+    IsShared = 0x0040,
+    /// <summary>The file contains no <c>INIT</c> resources.</summary>
+    HasNoInits = 0x0080,
+    /// <summary>The Finder has recorded the file's bundle information.</summary>
+    HasBeenInited = 0x0100,
+    /// <summary>The file has a custom icon (resource ID -16455).</summary>
+    HasCustomIcon = 0x0400,
+    /// <summary>The file is stationery.</summary>
+    IsStationery = 0x0800,
+    /// <summary>The file's name cannot be changed.</summary>
+    NameLocked = 0x1000,
+    /// <summary>The file has a <c>BNDL</c> resource.</summary>
+    HasBundle = 0x2000,
+    /// <summary>The file is invisible.</summary>
+    IsInvisible = 0x4000,
+    /// <summary>The file is an alias.</summary>
+    IsAlias = 0x8000,
+}
+
+/// <summary>
+/// A file's Finder information: the <c>FInfo</c> record (type, creator, flags, location, folder) and the 16 bytes
+/// of <c>FXInfo</c>, kept raw so containers round-trip them.
+/// </summary>
+public sealed record FinderInfo
+{
+    /// <summary>No type, creator or flags.</summary>
+    public static FinderInfo Empty { get; } = new();
+
+    /// <summary>The file type (<c>fdType</c>).</summary>
+    public FourCC Type { get; init; }
+
+    /// <summary>The creator (<c>fdCreator</c>).</summary>
+    public FourCC Creator { get; init; }
+
+    /// <summary>The Finder flags (<c>fdFlags</c>).</summary>
+    public FinderFlags Flags { get; init; }
+
+    /// <summary>The icon's position in its window (<c>fdLocation</c>).</summary>
+    public MacPoint Location { get; init; }
+
+    /// <summary>The window the icon is in (<c>fdFldr</c>).</summary>
+    public short Folder { get; init; }
+
+    /// <summary>The extended Finder information (<c>FXInfo</c>), 16 bytes, uninterpreted.</summary>
+    public ReadOnlyMemory<byte> Extended { get; init; } = new byte[16];
+
+    /// <summary>The size of <c>FInfo</c> followed by <c>FXInfo</c>, as containers store them.</summary>
+    public const int Length = 32;
+
     /// <summary>
-    /// Finder flags (<c>fdFlags</c>), from <i>Inside Macintosh: Macintosh Toolbox Essentials</i>, the Finder Interface
-    /// chapter.
+    /// Reads <c>FInfo</c> (16 bytes: type, creator, flags, location, folder) and, if present, <c>FXInfo</c> (the next
+    /// 16). Shorter input is padded with zeros, since some writers store only <c>FInfo</c>.
     /// </summary>
-    [Flags]
-    public enum FinderFlags : ushort
+    public static FinderInfo Read(ReadOnlySpan<byte> source)
     {
-        /// <summary>No flags.</summary>
-        None = 0,
-        /// <summary>The file is on the desktop (System 6 and earlier).</summary>
-        IsOnDesk = 0x0001,
-        /// <summary>The three-bit colour label.</summary>
-        ColorMask = 0x000E,
-        /// <summary>An application that can run multiple times from a shared volume.</summary>
-        IsShared = 0x0040,
-        /// <summary>The file contains no <c>INIT</c> resources.</summary>
-        HasNoInits = 0x0080,
-        /// <summary>The Finder has recorded the file's bundle information.</summary>
-        HasBeenInited = 0x0100,
-        /// <summary>The file has a custom icon (resource ID -16455).</summary>
-        HasCustomIcon = 0x0400,
-        /// <summary>The file is stationery.</summary>
-        IsStationery = 0x0800,
-        /// <summary>The file's name cannot be changed.</summary>
-        NameLocked = 0x1000,
-        /// <summary>The file has a <c>BNDL</c> resource.</summary>
-        HasBundle = 0x2000,
-        /// <summary>The file is invisible.</summary>
-        IsInvisible = 0x4000,
-        /// <summary>The file is an alias.</summary>
-        IsAlias = 0x8000,
+        Span<byte> bytes = stackalloc byte[Length];
+        source[..Math.Min(source.Length, Length)].CopyTo(bytes);
+        var reader = new BigEndianReader(bytes.ToArray());
+        return new FinderInfo
+        {
+            Type = new FourCC(bytes[..4]),
+            Creator = new FourCC(bytes[4..8]),
+            Flags = (FinderFlags)reader.ReadUInt16At(8),
+            Location = MacPoint.Read(bytes[10..]),
+            Folder = reader.ReadInt16At(14),
+            Extended = bytes[16..].ToArray(),
+        };
     }
 
-    /// <summary>
-    /// A file's Finder information: the <c>FInfo</c> record (type, creator, flags, location, folder) and the 16 bytes
-    /// of <c>FXInfo</c>, kept raw so containers round-trip them.
-    /// </summary>
-    public sealed record FinderInfo
+    /// <summary>Writes <c>FInfo</c> and <c>FXInfo</c>, 32 bytes, as <see cref="Read"/> reads them.</summary>
+    public void Write(Span<byte> destination)
     {
-        /// <summary>No type, creator or flags.</summary>
-        public static FinderInfo Empty { get; } = new();
-
-        /// <summary>The file type (<c>fdType</c>).</summary>
-        public FourCC Type { get; init; }
-
-        /// <summary>The creator (<c>fdCreator</c>).</summary>
-        public FourCC Creator { get; init; }
-
-        /// <summary>The Finder flags (<c>fdFlags</c>).</summary>
-        public FinderFlags Flags { get; init; }
-
-        /// <summary>The icon's position in its window (<c>fdLocation</c>).</summary>
-        public MacPoint Location { get; init; }
-
-        /// <summary>The window the icon is in (<c>fdFldr</c>).</summary>
-        public short Folder { get; init; }
-
-        /// <summary>The extended Finder information (<c>FXInfo</c>), 16 bytes, uninterpreted.</summary>
-        public ReadOnlyMemory<byte> Extended { get; init; } = new byte[16];
-
-        /// <summary>The size of <c>FInfo</c> followed by <c>FXInfo</c>, as containers store them.</summary>
-        public const int Length = 32;
-
-        /// <summary>
-        /// Reads <c>FInfo</c> (16 bytes: type, creator, flags, location, folder) and, if present, <c>FXInfo</c> (the next
-        /// 16). Shorter input is padded with zeros, since some writers store only <c>FInfo</c>.
-        /// </summary>
-        public static FinderInfo Read(ReadOnlySpan<byte> source)
+        if (destination.Length < Length)
         {
-            Span<byte> bytes = stackalloc byte[Length];
-            source[..Math.Min(source.Length, Length)].CopyTo(bytes);
-            var reader = new BigEndianReader(bytes.ToArray());
-            return new FinderInfo
-            {
-                Type = new FourCC(bytes[..4]),
-                Creator = new FourCC(bytes[4..8]),
-                Flags = (FinderFlags)reader.ReadUInt16At(8),
-                Location = MacPoint.Read(bytes[10..]),
-                Folder = reader.ReadInt16At(14),
-                Extended = bytes[16..].ToArray(),
-            };
+            throw new ArgumentException($"Finder info needs {Length} bytes.", nameof(destination));
         }
 
-        /// <summary>Writes <c>FInfo</c> and <c>FXInfo</c>, 32 bytes, as <see cref="Read"/> reads them.</summary>
-        public void Write(Span<byte> destination)
-        {
-            if (destination.Length < Length)
-            {
-                throw new ArgumentException($"Finder info needs {Length} bytes.", nameof(destination));
-            }
+        var writer = new BigEndianWriter(Length);
+        writer.WriteFourCC(Type);
+        writer.WriteFourCC(Creator);
+        writer.WriteUInt16((ushort)Flags);
+        writer.WriteMacPoint(Location);
+        writer.WriteInt16(Folder);
+        var extended = Extended.Span[..Math.Min(Extended.Length, 16)];
+        writer.WriteBytes(extended);
+        writer.WriteZeros(16 - extended.Length);
+        writer.WrittenSpan.CopyTo(destination);
+    }
 
-            var writer = new BigEndianWriter(Length);
-            writer.WriteFourCC(Type);
-            writer.WriteFourCC(Creator);
-            writer.WriteUInt16((ushort)Flags);
-            writer.WriteMacPoint(Location);
-            writer.WriteInt16(Folder);
-            var extended = Extended.Span[..Math.Min(Extended.Length, 16)];
-            writer.WriteBytes(extended);
-            writer.WriteZeros(16 - extended.Length);
-            writer.WrittenSpan.CopyTo(destination);
-        }
-
-        /// <summary>The 32 bytes <see cref="Write"/> writes.</summary>
-        public byte[] ToArray()
-        {
-            var bytes = new byte[Length];
-            Write(bytes);
-            return bytes;
-        }
+    /// <summary>The 32 bytes <see cref="Write"/> writes.</summary>
+    public byte[] ToArray()
+    {
+        var bytes = new byte[Length];
+        Write(bytes);
+        return bytes;
     }
 }

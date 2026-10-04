@@ -5,91 +5,90 @@ using ClassicMac.Graphics;
 using ClassicMac.Graphics.QuickDraw;
 using ClassicMac.Graphics.QuickTime;
 
-namespace ClassicMac.Graphics.Pict
-{
-    /// <summary>A decoded picture: its pixels, and its header and metadata.</summary>
-    /// <param name="Bitmap">The pixels.</param>
-    /// <param name="Info">The header and metadata.</param>
-    public sealed record PictPicture(RgbaBitmap Bitmap, PictInfo Info);
+namespace ClassicMac.Graphics.Pict;
 
-    /// <summary>Header and metadata of a picture.</summary>
-    public sealed class PictInfo
+/// <summary>A decoded picture: its pixels, and its header and metadata.</summary>
+/// <param name="Bitmap">The pixels.</param>
+/// <param name="Info">The header and metadata.</param>
+public sealed record PictPicture(RgbaBitmap Bitmap, PictInfo Info);
+
+/// <summary>Header and metadata of a picture.</summary>
+public sealed class PictInfo
+{
+    internal PictInfo(int version, bool extendedVersion2, PictRect pictureFrame, PictRect bounds,
+        double horizontalResolution, double verticalResolution)
     {
-        internal PictInfo(int version, bool extendedVersion2, PictRect pictureFrame, PictRect bounds,
-            double horizontalResolution, double verticalResolution)
+        Version = version;
+        IsExtendedVersion2 = extendedVersion2;
+        FrameRect = pictureFrame;
+        BoundsRect = bounds;
+        HorizontalResolution = horizontalResolution;
+        VerticalResolution = verticalResolution;
+    }
+
+    internal readonly List<PictComment> CommentList = new List<PictComment>();
+
+    /// <summary>1 or 2 (version 2 includes extended version 2).</summary>
+    public int Version { get; }
+
+    /// <summary>True for an extended version 2 picture (created by <c>OpenCPicture</c>, header version −2).</summary>
+    public bool IsExtendedVersion2 { get; }
+
+    /// <summary>The picture's <c>picFrame</c>: its bounding rectangle at 72 dpi.</summary>
+    public MacRect PictureFrame => FrameRect.ToMacRect();
+
+    /// <summary>
+    /// The rectangle the picture's opcodes draw in, which the decoded canvas covers: the header's optimal source
+    /// rectangle for an extended version 2 picture, otherwise <see cref="PictureFrame"/>.
+    /// </summary>
+    public MacRect Bounds => BoundsRect.ToMacRect();
+
+    // The engine's copies (32-bit, as it computes with them); the picture stores them as 16-bit Rects.
+    internal PictRect FrameRect { get; }
+
+    internal PictRect BoundsRect { get; }
+
+    /// <summary>Horizontal resolution of <see cref="Bounds"/> in dpi (72 unless an extended header says otherwise).</summary>
+    public double HorizontalResolution { get; }
+
+    /// <summary>Vertical resolution of <see cref="Bounds"/> in dpi.</summary>
+    public double VerticalResolution { get; }
+
+    /// <summary>The embedded ICC profile (picture comment 224, reassembled across begin/continuation/end), if any.</summary>
+    public byte[]? IccProfile { get; internal set; }
+
+    /// <summary>All picture comments, in order.</summary>
+    public IReadOnlyList<PictComment> Comments => CommentList;
+
+    // ICC profile accumulation (comment kind 224: u32 selector 0 begin / 1 continuation / 2 end, then data).
+    private List<byte>? iccAccumulator;
+
+    internal void AddComment(int kind, byte[] data)
+    {
+        CommentList.Add(new PictComment(kind, data));
+        if (kind != 224 || data.Length < 4)
         {
-            Version = version;
-            IsExtendedVersion2 = extendedVersion2;
-            FrameRect = pictureFrame;
-            BoundsRect = bounds;
-            HorizontalResolution = horizontalResolution;
-            VerticalResolution = verticalResolution;
+            return;
         }
 
-        internal readonly List<PictComment> CommentList = new List<PictComment>();
-
-        /// <summary>1 or 2 (version 2 includes extended version 2).</summary>
-        public int Version { get; }
-
-        /// <summary>True for an extended version 2 picture (created by <c>OpenCPicture</c>, header version −2).</summary>
-        public bool IsExtendedVersion2 { get; }
-
-        /// <summary>The picture's <c>picFrame</c>: its bounding rectangle at 72 dpi.</summary>
-        public MacRect PictureFrame => FrameRect.ToMacRect();
-
-        /// <summary>
-        /// The rectangle the picture's opcodes draw in, which the decoded canvas covers: the header's optimal source
-        /// rectangle for an extended version 2 picture, otherwise <see cref="PictureFrame"/>.
-        /// </summary>
-        public MacRect Bounds => BoundsRect.ToMacRect();
-
-        // The engine's copies (32-bit, as it computes with them); the picture stores them as 16-bit Rects.
-        internal PictRect FrameRect { get; }
-
-        internal PictRect BoundsRect { get; }
-
-        /// <summary>Horizontal resolution of <see cref="Bounds"/> in dpi (72 unless an extended header says otherwise).</summary>
-        public double HorizontalResolution { get; }
-
-        /// <summary>Vertical resolution of <see cref="Bounds"/> in dpi.</summary>
-        public double VerticalResolution { get; }
-
-        /// <summary>The embedded ICC profile (picture comment 224, reassembled across begin/continuation/end), if any.</summary>
-        public byte[]? IccProfile { get; internal set; }
-
-        /// <summary>All picture comments, in order.</summary>
-        public IReadOnlyList<PictComment> Comments => CommentList;
-
-        // ICC profile accumulation (comment kind 224: u32 selector 0 begin / 1 continuation / 2 end, then data).
-        private List<byte>? iccAccumulator;
-
-        internal void AddComment(int kind, byte[] data)
+        uint selector = (uint)(data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]);
+        var payload = data.AsSpan(4);
+        switch (selector)
         {
-            CommentList.Add(new PictComment(kind, data));
-            if (kind != 224 || data.Length < 4)
-            {
-                return;
-            }
+            case 0:
+                iccAccumulator = new List<byte>(payload.ToArray());
+                break;
+            case 1:
+                iccAccumulator?.AddRange(payload.ToArray());
+                break;
+            case 2:
+                if (iccAccumulator != null)
+                {
+                    IccProfile = iccAccumulator.ToArray();
+                }
 
-            uint selector = (uint)(data[0] << 24 | data[1] << 16 | data[2] << 8 | data[3]);
-            var payload = data.AsSpan(4);
-            switch (selector)
-            {
-                case 0:
-                    iccAccumulator = new List<byte>(payload.ToArray());
-                    break;
-                case 1:
-                    iccAccumulator?.AddRange(payload.ToArray());
-                    break;
-                case 2:
-                    if (iccAccumulator != null)
-                    {
-                        IccProfile = iccAccumulator.ToArray();
-                    }
-
-                    iccAccumulator = null;
-                    break;
-            }
+                iccAccumulator = null;
+                break;
         }
     }
 }

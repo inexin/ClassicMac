@@ -3,217 +3,216 @@ using System.IO;
 using System.Text;
 using ClassicMac.Core;
 
-namespace ClassicMac.Files.Containers
+namespace ClassicMac.Files.Containers;
+
+/// <summary>
+/// Writes MacBinary III files: the 128-byte header (signature <c>'mBIN'</c>, writer version 130, reader version 129,
+/// CRC-16), then the data fork and the resource fork, each padded with zeros to a multiple of 128. No secondary header
+/// or comment.
+/// </summary>
+public static class MacBinaryWriter
 {
+    private const int Block = 128;
+
     /// <summary>
-    /// Writes MacBinary III files: the 128-byte header (signature <c>'mBIN'</c>, writer version 130, reader version 129,
-    /// CRC-16), then the data fork and the resource fork, each padded with zeros to a multiple of 128. No secondary header
-    /// or comment.
+    /// Writes <paramref name="file"/>. Its name is cut to 63 bytes; forks over $7FFFFF bytes (the MacBinary limit) are
+    /// refused (an argument error, nothing written).
     /// </summary>
-    public static class MacBinaryWriter
+    public static void Write(MacFile file, Stream output)
     {
-        private const int Block = 128;
-
-        /// <summary>
-        /// Writes <paramref name="file"/>. Its name is cut to 63 bytes; forks over $7FFFFF bytes (the MacBinary limit) are
-        /// refused (an argument error, nothing written).
-        /// </summary>
-        public static void Write(MacFile file, Stream output)
+        ArgumentNullException.ThrowIfNull(file);
+        ArgumentNullException.ThrowIfNull(output);
+        if (file.DataFork.Length > 0x7FFFFF || file.ResourceFork.Length > 0x7FFFFF)
         {
-            ArgumentNullException.ThrowIfNull(file);
-            ArgumentNullException.ThrowIfNull(output);
-            if (file.DataFork.Length > 0x7FFFFF || file.ResourceFork.Length > 0x7FFFFF)
-            {
-                throw new ArgumentException("A fork is over MacBinary's 8 MiB limit.", nameof(file));
-            }
-
-            var header = new byte[Block];
-            var name = file.Name.Bytes;
-            var length = Math.Clamp(name.Length, 1, 63);
-            header[1] = (byte)length;
-            if (name.Length > 0)
-            {
-                name[..Math.Min(63, name.Length)].CopyTo(header.AsSpan(2));
-            }
-            else
-            {
-                header[2] = (byte)'?';
-            }
-
-            var info = file.FinderInfo;
-            var writer = new BigEndianWriter(header);
-            writer.WriteFourCCAt(65, info.Type);
-            writer.WriteFourCCAt(69, info.Creator);
-            header[73] = (byte)((ushort)info.Flags >> 8);
-            writer.WriteMacPointAt(75, info.Location);
-            writer.WriteInt16At(79, info.Folder);
-            writer.WriteUInt32At(83, file.DataFork.Length);
-            writer.WriteUInt32At(87, file.ResourceFork.Length);
-            writer.WriteUInt32At(91, file.Created?.Seconds ?? 0);
-            writer.WriteUInt32At(95, file.Modified?.Seconds ?? 0);
-            header[101] = (byte)info.Flags;
-            "mBIN"u8.CopyTo(header.AsSpan(102));
-            header[106] = info.Extended.Length > 9 ? info.Extended.Span[8] : (byte)0;
-            header[107] = info.Extended.Length > 9 ? info.Extended.Span[9] : (byte)0;
-            header[122] = 130;
-            header[123] = 129;
-            writer.WriteUInt16At(124, Crc16.Compute(header.AsSpan(0, 124)));
-            output.Write(header);
-            Fork(file.DataFork, output);
-            Fork(file.ResourceFork, output);
+            throw new ArgumentException("A fork is over MacBinary's 8 MiB limit.", nameof(file));
         }
 
-        /// <summary>The file's bytes.</summary>
-        public static byte[] ToArray(MacFile file)
+        var header = new byte[Block];
+        var name = file.Name.Bytes;
+        var length = Math.Clamp(name.Length, 1, 63);
+        header[1] = (byte)length;
+        if (name.Length > 0)
         {
-            using var output = new MemoryStream();
-            Write(file, output);
-            return output.ToArray();
+            name[..Math.Min(63, name.Length)].CopyTo(header.AsSpan(2));
+        }
+        else
+        {
+            header[2] = (byte)'?';
         }
 
-        private static void Fork(ForkData fork, Stream output)
-        {
-            using (var stream = fork.Open())
-            {
-                stream.CopyTo(output);
-            }
-
-            var pad = (int)((Block - fork.Length % Block) % Block);
-            output.Write(new byte[pad]);
-        }
+        var info = file.FinderInfo;
+        var writer = new BigEndianWriter(header);
+        writer.WriteFourCCAt(65, info.Type);
+        writer.WriteFourCCAt(69, info.Creator);
+        header[73] = (byte)((ushort)info.Flags >> 8);
+        writer.WriteMacPointAt(75, info.Location);
+        writer.WriteInt16At(79, info.Folder);
+        writer.WriteUInt32At(83, file.DataFork.Length);
+        writer.WriteUInt32At(87, file.ResourceFork.Length);
+        writer.WriteUInt32At(91, file.Created?.Seconds ?? 0);
+        writer.WriteUInt32At(95, file.Modified?.Seconds ?? 0);
+        header[101] = (byte)info.Flags;
+        "mBIN"u8.CopyTo(header.AsSpan(102));
+        header[106] = info.Extended.Length > 9 ? info.Extended.Span[8] : (byte)0;
+        header[107] = info.Extended.Length > 9 ? info.Extended.Span[9] : (byte)0;
+        header[122] = 130;
+        header[123] = 129;
+        writer.WriteUInt16At(124, Crc16.Compute(header.AsSpan(0, 124)));
+        output.Write(header);
+        Fork(file.DataFork, output);
+        Fork(file.ResourceFork, output);
     }
 
-    /// <summary>
-    /// Writes BinHex 4.0 files: the marker line, then the binary stream (header, data fork, resource fork, each with its
-    /// CRC-16) run-length encoded and written six bits per character between colons, in lines of 64 characters, CR line
-    /// ends as on the Mac.
-    /// </summary>
-    public static class BinHexWriter
+    /// <summary>The file's bytes.</summary>
+    public static byte[] ToArray(MacFile file)
     {
-        private const string Alphabet = "!\"#$%&'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr";
-        private const int LineLength = 64;
+        using var output = new MemoryStream();
+        Write(file, output);
+        return output.ToArray();
+    }
 
-        /// <summary>Writes <paramref name="file"/>. Its name is cut to 63 bytes.</summary>
-        public static void Write(MacFile file, Stream output)
+    private static void Fork(ForkData fork, Stream output)
+    {
+        using (var stream = fork.Open())
         {
-            ArgumentNullException.ThrowIfNull(file);
-            ArgumentNullException.ThrowIfNull(output);
-            var text = Encoding.ASCII.GetBytes(ToText(file));
-            output.Write(text);
+            stream.CopyTo(output);
         }
 
-        /// <summary>The file as BinHex text.</summary>
-        public static string ToText(MacFile file)
+        var pad = (int)((Block - fork.Length % Block) % Block);
+        output.Write(new byte[pad]);
+    }
+}
+
+/// <summary>
+/// Writes BinHex 4.0 files: the marker line, then the binary stream (header, data fork, resource fork, each with its
+/// CRC-16) run-length encoded and written six bits per character between colons, in lines of 64 characters, CR line
+/// ends as on the Mac.
+/// </summary>
+public static class BinHexWriter
+{
+    private const string Alphabet = "!\"#$%&'()*+,-012345689@ABCDEFGHIJKLMNPQRSTUVXYZ[`abcdefhijklmpqr";
+    private const int LineLength = 64;
+
+    /// <summary>Writes <paramref name="file"/>. Its name is cut to 63 bytes.</summary>
+    public static void Write(MacFile file, Stream output)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        ArgumentNullException.ThrowIfNull(output);
+        var text = Encoding.ASCII.GetBytes(ToText(file));
+        output.Write(text);
+    }
+
+    /// <summary>The file as BinHex text.</summary>
+    public static string ToText(MacFile file)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+        var stream = new MemoryStream();
+        var name = file.Name.Bytes;
+        var length = Math.Clamp(name.Length, 1, 63);
+        var header = new BigEndianWriter(22 + length);
+        header.WriteByte(length);
+        if (name.Length > 0)
         {
-            ArgumentNullException.ThrowIfNull(file);
-            var stream = new MemoryStream();
-            var name = file.Name.Bytes;
-            var length = Math.Clamp(name.Length, 1, 63);
-            var header = new BigEndianWriter(22 + length);
-            header.WriteByte(length);
-            if (name.Length > 0)
+            header.WriteBytes(name[..length]);
+        }
+        else
+        {
+            header.WriteByte((byte)'?');
+        }
+
+        header.WriteByte(0);
+        header.WriteFourCC(file.FinderInfo.Type);
+        header.WriteFourCC(file.FinderInfo.Creator);
+        header.WriteUInt16((ushort)file.FinderInfo.Flags);
+        header.WriteUInt32(file.DataFork.Length);
+        header.WriteUInt32(file.ResourceFork.Length);
+        header.WriteUInt16(Crc16.Compute(header.WrittenSpan));
+        header.WriteTo(stream);
+        Part(file.DataFork, stream);
+        Part(file.ResourceFork, stream);
+
+        var encoded = SixBits(RunLength(stream.ToArray()));
+        var text = new StringBuilder("(This file must be converted with BinHex 4.0)\r:");
+        var column = 1;
+        foreach (var c in encoded)
+        {
+            if (column == LineLength)
             {
-                header.WriteBytes(name[..length]);
+                text.Append('\r');
+                column = 0;
+            }
+            text.Append(c);
+            column++;
+        }
+        return text.Append(":\r").ToString();
+    }
+
+    private static void Part(ForkData fork, Stream stream)
+    {
+        var bytes = fork.ToArray();
+        stream.Write(bytes);
+        var crc = new BigEndianWriter(2);
+        crc.WriteUInt16(Crc16.Compute(bytes));
+        crc.WriteTo(stream);
+    }
+
+    // $90 is written as $90 $00; a byte repeated 3 to 255 times in all as the byte, $90, the count [ClassicMac: runs
+    // of 3 or more; any choice decodes the same].
+    internal static byte[] RunLength(ReadOnlySpan<byte> data)
+    {
+        var output = new MemoryStream(data.Length + data.Length / 16);
+        for (var i = 0; i < data.Length;)
+        {
+            var b = data[i];
+            var run = 1;
+            while (i + run < data.Length && data[i + run] == b && run < 255)
+            {
+                run++;
+            }
+
+            if (b == 0x90)
+            {
+                output.WriteByte(0x90);
+                output.WriteByte(0x00);
             }
             else
             {
-                header.WriteByte((byte)'?');
+                output.WriteByte(b);
             }
-
-            header.WriteByte(0);
-            header.WriteFourCC(file.FinderInfo.Type);
-            header.WriteFourCC(file.FinderInfo.Creator);
-            header.WriteUInt16((ushort)file.FinderInfo.Flags);
-            header.WriteUInt32(file.DataFork.Length);
-            header.WriteUInt32(file.ResourceFork.Length);
-            header.WriteUInt16(Crc16.Compute(header.WrittenSpan));
-            header.WriteTo(stream);
-            Part(file.DataFork, stream);
-            Part(file.ResourceFork, stream);
-
-            var encoded = SixBits(RunLength(stream.ToArray()));
-            var text = new StringBuilder("(This file must be converted with BinHex 4.0)\r:");
-            var column = 1;
-            foreach (var c in encoded)
+            if (run >= 3)
             {
-                if (column == LineLength)
-                {
-                    text.Append('\r');
-                    column = 0;
-                }
-                text.Append(c);
-                column++;
+                output.WriteByte(0x90);
+                output.WriteByte((byte)run);
+                i += run;
             }
-            return text.Append(":\r").ToString();
+            else
+            {
+                i++;
+            }
         }
+        return output.ToArray();
+    }
 
-        private static void Part(ForkData fork, Stream stream)
+    // Six bits per character, most significant first; the last character holds the remaining bits, zero-filled.
+    private static string SixBits(ReadOnlySpan<byte> data)
+    {
+        var text = new StringBuilder((data.Length * 4 + 2) / 3);
+        int bits = 0, count = 0;
+        foreach (var b in data)
         {
-            var bytes = fork.ToArray();
-            stream.Write(bytes);
-            var crc = new BigEndianWriter(2);
-            crc.WriteUInt16(Crc16.Compute(bytes));
-            crc.WriteTo(stream);
+            bits = (bits << 8) | b;
+            count += 8;
+            while (count >= 6)
+            {
+                count -= 6;
+                text.Append(Alphabet[(bits >> count) & 0x3F]);
+            }
         }
-
-        // $90 is written as $90 $00; a byte repeated 3 to 255 times in all as the byte, $90, the count [ClassicMac: runs
-        // of 3 or more; any choice decodes the same].
-        internal static byte[] RunLength(ReadOnlySpan<byte> data)
+        if (count > 0)
         {
-            var output = new MemoryStream(data.Length + data.Length / 16);
-            for (var i = 0; i < data.Length;)
-            {
-                var b = data[i];
-                var run = 1;
-                while (i + run < data.Length && data[i + run] == b && run < 255)
-                {
-                    run++;
-                }
-
-                if (b == 0x90)
-                {
-                    output.WriteByte(0x90);
-                    output.WriteByte(0x00);
-                }
-                else
-                {
-                    output.WriteByte(b);
-                }
-                if (run >= 3)
-                {
-                    output.WriteByte(0x90);
-                    output.WriteByte((byte)run);
-                    i += run;
-                }
-                else
-                {
-                    i++;
-                }
-            }
-            return output.ToArray();
+            text.Append(Alphabet[(bits << (6 - count)) & 0x3F]);
         }
 
-        // Six bits per character, most significant first; the last character holds the remaining bits, zero-filled.
-        private static string SixBits(ReadOnlySpan<byte> data)
-        {
-            var text = new StringBuilder((data.Length * 4 + 2) / 3);
-            int bits = 0, count = 0;
-            foreach (var b in data)
-            {
-                bits = (bits << 8) | b;
-                count += 8;
-                while (count >= 6)
-                {
-                    count -= 6;
-                    text.Append(Alphabet[(bits >> count) & 0x3F]);
-                }
-            }
-            if (count > 0)
-            {
-                text.Append(Alphabet[(bits << (6 - count)) & 0x3F]);
-            }
-
-            return text.ToString();
-        }
+        return text.ToString();
     }
 }

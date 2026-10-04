@@ -8,36 +8,35 @@ using Avalonia.Themes.Fluent;
 using ClassicMac.App.ViewModels;
 using ClassicMac.App.Views;
 
-namespace ClassicMac.App
-{
-    internal sealed partial class App : Application
-    {
-        public override void Initialize()
-        {
-            AvaloniaXamlLoader.Load(this);
-            // Fluent's accent and its six shades (focus rings, check boxes, sliders) from CmAccent, per theme variant.
-            var fluent = Styles.OfType<FluentTheme>().Single();
-            foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
-            {
-                if (Resources.TryGetResource("CmAccentColor", variant, out var accent) && accent is Color color)
-                {
-                    fluent.Palettes[variant] = new ColorPaletteResources { Accent = color };
-                }
-            }
-        }
+namespace ClassicMac.App;
 
-        public override void OnFrameworkInitializationCompleted()
+internal sealed partial class App : Application
+{
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        // Fluent's accent and its six shades (focus rings, check boxes, sliders) from CmAccent, per theme variant.
+        var fluent = Styles.OfType<FluentTheme>().Single();
+        foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
         {
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            if (Resources.TryGetResource("CmAccentColor", variant, out var accent) && accent is Color color)
             {
-                var model = new MainViewModel(new JsonSettingsStore(JsonSettingsStore.DefaultPath));
-                desktop.MainWindow = new MainWindow { DataContext = model };
-                foreach (var path in desktop.Args ?? [])
-                {
-                    _ = model.OpenAsync(path);
-                }
+                fluent.Palettes[variant] = new ColorPaletteResources { Accent = color };
             }
-            base.OnFrameworkInitializationCompleted();
         }
+    }
+
+    public override void OnFrameworkInitializationCompleted()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            var model = new MainViewModel(new JsonSettingsStore(JsonSettingsStore.DefaultPath));
+            desktop.MainWindow = new MainWindow { DataContext = model };
+            foreach (var path in desktop.Args ?? [])
+            {
+                _ = model.OpenAsync(path);
+            }
+        }
+        base.OnFrameworkInitializationCompleted();
     }
 }
