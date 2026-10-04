@@ -43,6 +43,8 @@ Each token becomes a `Color` (`<Name>Color`) per theme in `ThemeDictionaries` an
 | CmWarningTint | #FDF1DA | #3A2C14 | Warning badge, changed hex bytes | |
 | CmInfo | #245C9E | #8CBEF5 | Info icon and text | |
 | CmInfoTint | #E6EFF9 | #18283C | Info badge | |
+| CmSuccess | #2F7D3A | #7FD18B | Success icon: First Aid "appears to be OK" | |
+| CmSuccessTint | #E5F3E7 | #183020 | Success banner | |
 | **Mac content frame** | | | | |
 | CmCheckerLight | #FFFFFF | #2A2A2D | Checkerboard squares behind previews | `Images.Checkerboard` (fixed) |
 | CmCheckerDark | #ECECE8 | #323236 | Checkerboard squares, 8 DIP | |
@@ -50,6 +52,8 @@ Each token becomes a `Color` (`<Name>Color`) per theme in `ThemeDictionaries` an
 | CmPlayhead | #B42318 | #FF8A7A | Sound playhead | |
 
 Contrast, checked against WCAG AA: body text 16.9:1 light / 15.0:1 dark; muted text 5.7:1 or better on every surface; severity text on its tint 5.6:1 or better; accent buttons 7.0:1 light / 7.6:1 dark.
+
+CmSuccess is for the icon only (4.4:1 on CmSuccessTint in light, enough for graphics, not for text); text on the success banner is CmText (14.7:1 light / 12.1:1 dark).
 
 Match tints carry normal text: CmText on CmMatch 13.5:1 light / 6.0:1 dark, on CmMatchSoft 15.2:1 / 10.2:1; CmTextMuted on CmMatchSoft 6.0:1 / 5.0:1.
 

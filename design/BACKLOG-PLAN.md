@@ -2,7 +2,7 @@
 
 Exported 2026-10-02 from the plan doc. Design specs live next to this file: [TOKENS.md](TOKENS.md), [Tokens.axaml](Tokens.axaml) and [boards/](boards/). The "Spec" column names the file each item is checked against.
 
-The redesign ships in five milestones, M0 to M4: a token foundation first, then quick wins in the tree and diagnostics, then the shell, the read-then-edit forms and the previews. That is 36 backlog items in five epics, each item one or a few commits on `main` in `ClassicMac.App` (plus the audio player for A1).
+The redesign ships in six milestones, M0 to M5: a token foundation first, then quick wins in the tree and diagnostics, then the shell, the read-then-edit forms, the previews and the volume tools. That is 43 backlog items in six epics, each item one or a few commits on `main` in `ClassicMac.App` (plus the audio player for A1).
 
 ## Purpose and scope
 
@@ -26,7 +26,8 @@ Out of scope: the Platinum homage (dropped: the folder preview already shows the
 ```
 M0 Foundation ──gate──┬──> M1 Quick wins (tree, diagnostics)
                       └──> M2 Shell ──┬──> M3 Read, then edit
-                                      └──> M4 Previews, dialogs
+                                      ├──> M4 Previews, dialogs
+                                      └──> M5 Volume tools (after S4, P5)
 ```
 
 Gate after M0: screenshot baselines pass in light, dark and 150%. M1 and M2 can then run side by side; M3 and M4 build on the new inspector header from M2 (S3).
@@ -97,6 +98,17 @@ Gate after M0: screenshot baselines pass in light, dark and 150%. M1 and M2 can 
 | A1 | `IAudioPlayer`: playback position, seek and loop repeat (SoundFlow) | The sound preview's playhead follows playback, a click seeks, Repeat the loop loops | M | [boards/sound.md](boards/sound.md) |
 | P6 | Font family (`FOND`) preview: sample from the strikes, association matrix, metrics, style and kerning cards | Every FOND in the System file shows a sample when a strike exists; association cells select their NFNT/sfnt | M | [boards/font-family.md](boards/font-family.md) |
 
+### M5 · Volume tools (6 items)
+
+| ID | Item | Done when | Size | Spec |
+| --- | --- | --- | --- | --- |
+| V1 | Volume menu in two groups; maintenance on the volume node's context menu only; disabled items say why | HFS Plus and partitions show the disabled items with their reason; files and folders no longer offer First Aid, Defragment or Resize | S | [boards/volume-tools.md](boards/volume-tools.md) |
+| V2 | Progress state and Cancel for First Aid, Defragment and Resize, mirrored in the status bar | A 2 GB volume shows steps while it works; Cancel leaves the session's volume unchanged; the UI stays responsive | M | [boards/volume-tools.md](boards/volume-tools.md) |
+| V3 | First Aid window: verdict banner (icon, colour, text), one log with sections, Copy report, Extract All… when it can't repair; CmSuccess tokens | The four verdicts match the board in light and dark; Copy report puts plain text on the clipboard | M | [boards/volume-tools.md](boards/volume-tools.md) |
+| V4 | Resize dialog: number and unit, draggable log slider with snap points, block size (Automatic or larger), inline errors and notes, Defragment first… | No size error reaches the status line; the 65,535-block and shrink notes appear as you type | M | [boards/volume-tools.md](boards/volume-tools.md) |
+| V5 | Defragment dialog: explanation, allocation map, Now and After figures, result state; returns to Resize | Opened from Resize, Done comes back with the new smallest size | M | [boards/volume-tools.md](boards/volume-tools.md) |
+| V6 | Volume card: used bar, allocation map, 112 px labels with shorter names, Defragment… and First Aid… in the header | "Split files" and every label fit on one line at 100% and 150% | M | [boards/volume-tools.md](boards/volume-tools.md) |
+
 ## Risks
 
 | Risk | Effect | Mitigation |
@@ -115,6 +127,7 @@ Gate after M0: screenshot baselines pass in light, dark and 150%. M1 and M2 can 
 - Resources get their own unsaved " •" (T6).
 - Find in hex: a follow-up after E7.
 - "No name" group: no art thumbnail; selecting the group shows the parent folder's preview.
+- Volume tools: maintenance is a menu group, not a submenu; every long operation can be cancelled; Defragment explains itself first; Resize reports errors in the dialog ([boards/volume-tools.md](boards/volume-tools.md)).
 
 ## Open questions
 

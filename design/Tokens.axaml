@@ -37,6 +37,8 @@
       <Color x:Key="CmWarningTintColor">#FDF1DA</Color>
       <Color x:Key="CmInfoColor">#245C9E</Color>
       <Color x:Key="CmInfoTintColor">#E6EFF9</Color>
+      <Color x:Key="CmSuccessColor">#2F7D3A</Color>
+      <Color x:Key="CmSuccessTintColor">#E5F3E7</Color>
       <Color x:Key="CmCheckerLightColor">#FFFFFF</Color>
       <Color x:Key="CmCheckerDarkColor">#ECECE8</Color>
       <Color x:Key="CmLoopRegionColor">#E5EAFB</Color>
@@ -73,6 +75,8 @@
       <Color x:Key="CmWarningTintColor">#3A2C14</Color>
       <Color x:Key="CmInfoColor">#8CBEF5</Color>
       <Color x:Key="CmInfoTintColor">#18283C</Color>
+      <Color x:Key="CmSuccessColor">#7FD18B</Color>
+      <Color x:Key="CmSuccessTintColor">#183020</Color>
       <Color x:Key="CmCheckerLightColor">#2A2A2D</Color>
       <Color x:Key="CmCheckerDarkColor">#323236</Color>
       <Color x:Key="CmLoopRegionColor">#263058</Color>
@@ -110,6 +114,8 @@
   <SolidColorBrush x:Key="CmWarningTint" Color="{DynamicResource CmWarningTintColor}" />
   <SolidColorBrush x:Key="CmInfo" Color="{DynamicResource CmInfoColor}" />
   <SolidColorBrush x:Key="CmInfoTint" Color="{DynamicResource CmInfoTintColor}" />
+  <SolidColorBrush x:Key="CmSuccess" Color="{DynamicResource CmSuccessColor}" />
+  <SolidColorBrush x:Key="CmSuccessTint" Color="{DynamicResource CmSuccessTintColor}" />
   <SolidColorBrush x:Key="CmCheckerLight" Color="{DynamicResource CmCheckerLightColor}" />
   <SolidColorBrush x:Key="CmCheckerDark" Color="{DynamicResource CmCheckerDarkColor}" />
   <SolidColorBrush x:Key="CmLoopRegion" Color="{DynamicResource CmLoopRegionColor}" />

@@ -21,4 +21,5 @@ Screenshots of the boards can be dropped next to these files as `<name>.png`; th
 | [details.md](details.md) | P4 |
 | [dialogs.md](dialogs.md) | P5 |
 | [font-family.md](font-family.md) | P6 |
+| [volume-tools.md](volume-tools.md) | V1, V2, V3, V4, V5, V6 |
 | [folder-preview.md](folder-preview.md) | (built; frame only) |
