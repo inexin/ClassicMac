@@ -5,9 +5,9 @@ using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
 
-// The checks after Disk First Aid's stages that it lacks (hfs.md §5.6): overflow extents records of files not in the catalog, an extent past the last
-// allocation block, a fork's physical length short of its blocks, and the MDB's drNmFls and drFreeBks, which Disk First
-// Aid does not compare.
+// The checks after Disk First Aid's stages that it lacks (hfs.md §5.6): overflow extents records of files not in the
+// catalog, an extent past the last allocation block, a fork's physical length short of its blocks, and the MDB's
+// drNmFls and drFreeBks, which Disk First Aid does not compare.
 internal static class ClassicMacChecks
 {
     public static bool Run(FirstAidRun run)

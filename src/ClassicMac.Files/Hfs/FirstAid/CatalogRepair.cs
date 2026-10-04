@@ -19,18 +19,21 @@ internal sealed class CatalogRepair
     private readonly List<(byte[] Key, byte[] Data)> records;
     private readonly List<PlannedChange> changes;
     private readonly Dictionary<(uint FileId, byte Fork), long> allocated;
+    private readonly Dictionary<(uint FileId, byte Fork), List<(uint Start, uint Count)>> relocated;
 
-    private CatalogRepair(FirstAidRun run, List<PlannedChange> changes)
+    private CatalogRepair(FirstAidRun run, List<PlannedChange> changes, Dictionary<(uint FileId, byte Fork), List<(uint Start, uint Count)>> relocated)
     {
+        this.relocated = relocated;
         records = run.Catalog!.Records.Select(r => (r.Key.ToArray(), r.Data.ToArray())).ToList();
         this.changes = changes;
         allocated = ClassicMacChecks.Allocated(run);
     }
 
     /// <summary>The catalog's records with the repairs made, in key order; the changes are added to <paramref name="changes"/>.</summary>
-    public static List<(byte[] Key, byte[] Data)> Repair(FirstAidRun run, List<PlannedChange> changes)
+    public static List<(byte[] Key, byte[] Data)> Repair(FirstAidRun run, List<PlannedChange> changes,
+        Dictionary<(uint FileId, byte Fork), List<(uint Start, uint Count)>> relocated)
     {
-        var repair = new CatalogRepair(run, changes);
+        var repair = new CatalogRepair(run, changes, relocated);
         repair.Fields();
         repair.Threads();
         repair.MissingThreads();
@@ -64,6 +67,8 @@ internal sealed class CatalogRepair
                         Add(reader.ReadUInt32At(0x14), "a file record's reserved fields cleared");
                     }
 
+                    Relocated(data, 0x4A, 0x00);
+                    Relocated(data, 0x56, 0xFF);
                     ForkLength(data, 0x1E, 0x00, "data");
                     ForkLength(data, 0x28, 0xFF, "resource");
                     break;
@@ -94,6 +99,16 @@ internal sealed class CatalogRepair
         }
 
         writer.WriteUInt16At(0x1E, flags);
+    }
+
+    // A fork given its own copy (#12): its first extent record, the rest in the extents tree.
+    private void Relocated(byte[] data, int at, byte fork)
+    {
+        uint id = new BigEndianReader(data).ReadUInt32At(0x14);
+        if (relocated.TryGetValue((id, fork), out var extents))
+        {
+            OverlapRepair.Records(id, fork, extents).First.CopyTo(data, at);
+        }
     }
 
     // Beyond Disk First Aid: a fork's physical length short of its blocks set to them (Disk First Aid's MountCheck finds it, as

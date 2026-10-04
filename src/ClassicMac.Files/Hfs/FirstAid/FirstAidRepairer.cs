@@ -12,7 +12,8 @@ namespace ClassicMac.Files.Hfs;
 // bitmap and the MDB from what a verify of the result computes, then a verify; at most three passes, as Disk First Aid
 // verifies again up to twice [Code: Disk First Aid 8.5.5, CODE 1 $1DF2A]. A volume Disk First Aid cannot repair is not
 // written. Beyond Disk First Aid: first the alternate MDB from the primary, then with the trees the overflow records'
-// start blocks and short physical lengths, and with the MDB its drNmFls and drFreeBks.
+// start blocks and short physical lengths, and with the MDB its drNmFls and drFreeBks. Forks that share blocks (#12)
+// are copied first, and their new extents written with the trees.
 internal static class FirstAidRepairer
 {
     private const int MaxPasses = 3, HeaderRecord = 14;
@@ -67,12 +68,21 @@ internal static class FirstAidRepairer
             | FirstAidRepairs.ForkLengths;
         bool written = false;
         var wanted = run.Repairs;
-        if (run.Extents is { } extents && (run.TreesToRebuild.Contains(3) || (wanted & (FirstAidRepairs.OrphanedExtents | FirstAidRepairs.ExtentStarts)) != 0))
+        var relocated = (wanted & FirstAidRepairs.OverlappingExtents) != 0
+            ? OverlapRepair.Relocate(run, volume, changes)
+            : [];
+        if (run.Extents is { } extents
+            && (run.TreesToRebuild.Contains(3) || relocated.Count > 0 || (wanted & (FirstAidRepairs.OrphanedExtents | FirstAidRepairs.ExtentStarts)) != 0))
         {
             var orphans = new List<PlannedChange>();
             var records = extents.Records.Where(r =>
             {
                 uint fileId = new BigEndianReader(r.Key).ReadUInt32At(2);
+                if (relocated.ContainsKey((fileId, r.Key[1])))
+                {
+                    return false;                                                // a moved fork's: made again below
+                }
+
                 bool orphan = fileId >= 16 && !run.FileIds.Contains(fileId);
                 if (orphan)
                 {
@@ -81,24 +91,30 @@ internal static class FirstAidRepairer
 
                 return !orphan;
             }).Select(r => (r.Key.ToArray(), r.Data)).ToList();
+            foreach (var ((fileId, fork), moved) in relocated)
+            {
+                records.AddRange(OverlapRepair.Records(fileId, fork, moved).Overflow);
+            }
+
+            records.Sort((a, b) => HfsBTreeWriting.CompareExtentsKeys(a.Item1, b.Item1));
             int renumbered = Renumber(records);
             if (renumbered > 0)
             {
                 orphans.Add(new PlannedChange("repair", "", $"extents: {renumbered} overflow record{(renumbered == 1 ? "'s" : "s'")} start block renumbered"));
             }
 
-            if (orphans.Count > 0 || run.TreesToRebuild.Contains(3))
+            if (orphans.Count > 0 || relocated.Count > 0 || run.TreesToRebuild.Contains(3))
             {
                 written |= Write(run, volume, extents, records, changes);
                 changes.AddRange(orphans);
             }
         }
 
-        if (run.Catalog is { } catalog && (run.TreesToRebuild.Contains(4) || (wanted & catalogRepairs) != 0))
+        if (run.Catalog is { } catalog && (run.TreesToRebuild.Contains(4) || relocated.Count > 0 || (wanted & catalogRepairs) != 0))
         {
             var catalogChanges = new List<PlannedChange>();
-            var records = CatalogRepair.Repair(run, catalogChanges);
-            if (catalogChanges.Count > 0 || run.TreesToRebuild.Contains(4))
+            var records = CatalogRepair.Repair(run, catalogChanges, relocated);
+            if (catalogChanges.Count > 0 || relocated.Count > 0 || run.TreesToRebuild.Contains(4))
             {
                 written |= Write(run, volume, catalog, records, changes);
                 changes.AddRange(catalogChanges);

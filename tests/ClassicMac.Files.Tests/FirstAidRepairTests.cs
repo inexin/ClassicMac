@@ -182,6 +182,49 @@ public class FirstAidRepairTests
         Assert.Equal(["Survivor"], HfsReader.Instance.Read(ForkData.FromBytes(repaired), new ContainerContext()).Select(f => f.MacPath));
     }
 
+    // #12: the fork found second gets its own copy of the blocks it shares, in free blocks; its content reads the same.
+    [Fact]
+    public void A_fork_sharing_blocks_gets_its_own_copy()
+    {
+        var image = Base();
+        int t1 = Record(image, 2, "T1"), t2 = Record(image, D2, "T2");
+        int blockSize = (int)U32(image, Primary + 0x14), firstBlock = U16(image, Primary + 0x1C) * Sector;
+        int shared = U16(image, t1 + 0x4A);
+        "MARK"u8.CopyTo(image.AsSpan(firstBlock + shared * blockSize));
+        Put16(image, t2 + 0x4A, shared);                                           // T2's one block is T1's first
+        Assert.Contains(Verify(image).Problems, p => p.Number == 12);
+
+        var (repaired, result) = Repaired(image);
+
+        int moved = U16(repaired, Record(repaired, D2, "T2") + 0x4A);
+        Assert.NotEqual(shared, moved);
+        Assert.Equal(shared, U16(repaired, Record(repaired, 2, "T1") + 0x4A));
+        Assert.Equal("MARK"u8.ToArray(), repaired.AsSpan(firstBlock + moved * blockSize, 4).ToArray());
+        Assert.Equal("MARK"u8.ToArray(), repaired.AsSpan(firstBlock + shared * blockSize, 4).ToArray());
+        Assert.Contains(result.Changes, c => c.Detail.Contains("own copy", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_fragmented_fork_sharing_blocks_is_copied_whole_and_loses_its_overflow_records()
+    {
+        var builder = new HfsBuilder();
+        builder.File(HfsBuilder.Root, "A", Enumerable.Range(0, 2 * HfsBuilder.Block).Select(i => (byte)i).ToArray(), []);
+        builder.File(HfsBuilder.Root, "B", Enumerable.Range(0, 5 * HfsBuilder.Block).Select(i => (byte)(i * 7)).ToArray(), [], fragments: 5);
+        var image = builder.Build("Disk");
+        Assert.NotEmpty(ExtentsKeys(image));
+        Put16(image, Record(image, 2, "B") + 0x4A, U16(image, Record(image, 2, "A") + 0x4A));
+        var before = ReadData(image, "B");
+
+        var (repaired, _) = Repaired(image);
+
+        Assert.Equal(before, ReadData(repaired, "B"));
+        Assert.Equal(Enumerable.Range(0, 2 * HfsBuilder.Block).Select(i => (byte)i), ReadData(repaired, "A"));
+        Assert.Empty(ExtentsKeys(repaired));                                       // B in free blocks, in one piece
+    }
+
+    private static byte[] ReadData(byte[] image, string name) =>
+        HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()).Single(f => f.MacPath == name).DataFork.ToArray();
+
     [Fact]
     public void A_volume_that_appears_to_be_OK_is_left_alone()
     {

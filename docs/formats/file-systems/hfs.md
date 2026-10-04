@@ -920,8 +920,12 @@ verified again, at most three passes in all:
 3. **The MDB** that verify computes (#58) [Verified: RB6], with `drNmFls` and `drFreeBks` set as well (beyond
    Disk First Aid does not compare them).
 
-Overlapping extents (#12) are not repaired yet: Disk First Aid copies the blocks for each file. Each fix is a
-`PlannedChange` (`repair`, detail `catalog, CNID n: …`, `extents, file n: …`, `catalog B-tree written again (n
+Overlapping extents (#12) are repaired before step 1: each fork that shares blocks with one found before it (the
+B-tree files first, then the catalog's files in key order) is copied whole into free blocks, in one run when one is
+long enough, and its new extents written with the trees (its overflow records made again); with too few free blocks it
+is left. Which fork moves, and where, is ClassicMac's choice. Each fix is a
+`PlannedChange` (`repair`, detail `catalog, CNID n: …`, `extents, file n: …`, `file n: its data fork … given its
+own copy`, `catalog B-tree written again (n
 records)`, `volume bitmap …`, `master directory block …`).
 
 #### Beyond Disk First Aid
