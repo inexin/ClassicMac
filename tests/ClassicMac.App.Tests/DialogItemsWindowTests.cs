@@ -73,7 +73,7 @@ public sealed class DialogItemsWindowTests : IDisposable
         Baselines.Check(window, "ditl-read-only", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
 
         // A click on the OK button in the preview selects its row.
-        var dialog = model.FormDialog!;
+        var dialog = model.FormLivePreview.FormDialog!;
         var scale = preview.Bounds.Width / (dialog.PixelWidth + 24);
         var ok = dialog.Drawing.Items[0].Item.Bounds;
         Click(window, preview, new Point((12 + dialog.ContentLeft + ok.Left + 5) * scale, (12 + dialog.ContentTop + ok.Top + 5) * scale));
@@ -98,17 +98,17 @@ public sealed class DialogItemsWindowTests : IDisposable
         right.SelectAll();
         window.KeyTextInput("3");
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(3, model.FormDialog!.Drawing.Items[0].Item.Bounds.Right);        // the first keystroke
+        Assert.Equal(3, model.FormLivePreview.FormDialog!.Drawing.Items[0].Item.Bounds.Right);        // the first keystroke
         window.KeyTextInput("00");
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal(300, model.FormDialog!.Drawing.Items[0].Item.Bounds.Right);
+        Assert.Equal(300, model.FormLivePreview.FormDialog!.Drawing.Items[0].Item.Bounds.Right);
 
         var text = row.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "ItemText");
         text.Focus();
         text.SelectAll();
         window.KeyTextInput("Go");
         Dispatcher.UIThread.RunJobs();
-        Assert.Equal("Go", model.FormDialog!.Drawing.Items[0].Item.Text);
+        Assert.Equal("Go", model.FormLivePreview.FormDialog!.Drawing.Items[0].Item.Text);
         Assert.Equal("Live preview · unapplied changes", window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "ItemListPreviewTitle").Text);
         Baselines.Check(window, "ditl-editing", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
 
@@ -116,8 +116,8 @@ public sealed class DialogItemsWindowTests : IDisposable
         right.SelectAll();
         window.KeyTextInput("x");                                                   // not a number: the error, no move
         Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(model.FormError);
-        Assert.Equal(300, model.FormDialog!.Drawing.Items[0].Item.Bounds.Right);
+        Assert.NotNull(model.FormLivePreview.FormError);
+        Assert.Equal(300, model.FormLivePreview.FormDialog!.Drawing.Items[0].Item.Bounds.Right);
         window.Close();
         Baselines.Verify(baselines);
     });

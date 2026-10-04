@@ -225,7 +225,7 @@ public sealed partial class MainViewModel
         }
 
         Form = form;
-        WatchForm(Form, node as ResourceNode);
+        FormLivePreview.WatchForm(Form, node as ResourceNode);
     }
 
     private bool useTemplate;
@@ -276,7 +276,7 @@ public sealed partial class MainViewModel
     private bool hasTemplateChoice;
 
 
-    private bool CanApplyForm() => Form is not null && Selected is ResourceNode && FormError is null;
+    private bool CanApplyForm() => Form is not null && Selected is ResourceNode && FormLivePreview.FormError is null;
 
     [RelayCommand(CanExecute = nameof(CanApplyForm))]
     internal void ApplyForm()

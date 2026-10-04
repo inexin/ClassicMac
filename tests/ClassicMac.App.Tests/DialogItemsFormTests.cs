@@ -112,20 +112,20 @@ public sealed class DialogItemsFormTests : IDisposable
         var (model, node) = await Open(withDialog: true);
         var form = Assert.IsType<DialogItemsForm>(model.Form);
         Assert.Equal("'DLOG' 128", form.UsedBy);
-        var preview = Assert.IsType<DialogPreview>(model.FormDialog);
+        var preview = Assert.IsType<DialogPreview>(model.FormLivePreview.FormDialog);
         Assert.Equal(("Find", 300, 106), (preview.Drawing.Title, preview.Drawing.Width, preview.Drawing.Height));
-        Assert.Equal("Drawn from 'DLOG' 128 · 300 × 106", model.FormDialogNote);
+        Assert.Equal("Drawn from 'DLOG' 128 · 300 × 106", model.FormLivePreview.FormDialogNote);
         Assert.True(preview.ContentLeft > 0 && preview.ContentTop > 0);     // the window's frame around the content
 
         model.FormEditing.EditFormCommand.Execute(null);
         form.Items[0].Right = 300;                                         // one keystroke in a bounds field
-        var moved = model.FormDialog!;
+        var moved = model.FormLivePreview.FormDialog!;
         Assert.NotSame(preview, moved);
         Assert.Equal(300, moved.Drawing.Items[0].Item.Bounds.Right);
         form.Items[1].Text = "Find:";
-        Assert.Equal("Find:", model.FormDialog!.Drawing.Items[1].Item.Text);
-        Assert.Equal("Find", model.FormDialog.Drawing.Title);              // still in the dialog's window
-        Assert.False(model.ShowsHostDialog);                               // the form shows its own preview panel
+        Assert.Equal("Find:", model.FormLivePreview.FormDialog!.Drawing.Items[1].Item.Text);
+        Assert.Equal("Find", model.FormLivePreview.FormDialog.Drawing.Title);              // still in the dialog's window
+        Assert.False(model.FormLivePreview.ShowsHostDialog);                               // the form shows its own preview panel
         _ = node;
     }
 
@@ -135,8 +135,8 @@ public sealed class DialogItemsFormTests : IDisposable
         var (model, _) = await Open(withDialog: false);
         var form = Assert.IsType<DialogItemsForm>(model.Form);
         Assert.Null(form.UsedBy);
-        Assert.Equal(2, model.FormDialog!.Drawing.Definition);             // a plain box around the items
-        Assert.Equal($"Drawn on its own · {model.FormDialog.Drawing.Width} × {model.FormDialog.Drawing.Height}", model.FormDialogNote);
+        Assert.Equal(2, model.FormLivePreview.FormDialog!.Drawing.Definition);             // a plain box around the items
+        Assert.Equal($"Drawn on its own · {model.FormLivePreview.FormDialog.Drawing.Width} × {model.FormLivePreview.FormDialog.Drawing.Height}", model.FormLivePreview.FormDialogNote);
     }
 
     [Fact]

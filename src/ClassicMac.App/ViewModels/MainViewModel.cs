@@ -68,6 +68,11 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private FormLivePreview? formLivePreview;
+
+    /// <summary>The form's error line and the live preview of its dialog, alert or item list.</summary>
+    public FormLivePreview FormLivePreview => formLivePreview ??= new(this);
+
     private ExportActions? exportActions;
 
     /// <summary>Save Resource As, Export, Extract All, Convert Documents and Unpack.</summary>
@@ -386,7 +391,6 @@ public sealed partial class MainViewModel : ObservableObject
 
     partial void OnImagesChanged(IReadOnlyList<ImageItem> value) => ImageGrid.ImagesChanged();
 
-    partial void OnFormErrorChanged(string? value) => ApplyFormCommand.NotifyCanExecuteChanged();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasHex))]

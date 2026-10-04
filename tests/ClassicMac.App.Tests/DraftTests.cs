@@ -145,9 +145,9 @@ public sealed class DraftTests : EditTestsBase
         form.Title = "Other";
         Assert.True(model.Drafts.HasDraft);
         form.Title = "日本";                                                 // not Mac OS Roman: the form's error is the draft's
-        Assert.NotNull(model.FormError);
+        Assert.NotNull(model.FormLivePreview.FormError);
         model.Selected = Node(1);
-        Assert.Equal(model.FormError, Assert.Single(dialogs.DraftAsked).Error);
+        Assert.Equal(model.FormLivePreview.FormError, Assert.Single(dialogs.DraftAsked).Error);
         form.Title = "Untitled";
         Assert.False(model.Drafts.HasDraft);
         model.Selected = Node(1);

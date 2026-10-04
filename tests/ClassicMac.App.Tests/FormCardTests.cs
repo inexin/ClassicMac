@@ -214,9 +214,9 @@ public sealed class FormCardTests : IDisposable
 
         var form = Assert.IsType<AlertForm>(model.Form);
         Assert.Equal("'DITL' 129 “Save Changes”", form.ItemsText);
-        Assert.Equal(1, model.FormDialog!.Drawing.DefaultItem);
+        Assert.Equal(1, model.FormLivePreview.FormDialog!.Drawing.DefaultItem);
         form.SelectedStage = form.Stages[2];
-        Assert.Equal(2, model.FormDialog!.Drawing.DefaultItem);
+        Assert.Equal(2, model.FormLivePreview.FormDialog!.Drawing.DefaultItem);
 
         model.FormEditing.ShowItemListCommand.Execute(form);
         Assert.Equal("DITL", Assert.IsType<ResourceNode>(model.Selected).Resource.Type.ToString());

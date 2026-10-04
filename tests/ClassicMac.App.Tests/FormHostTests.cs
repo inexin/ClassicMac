@@ -127,12 +127,12 @@ public sealed class FormHostTests : IDisposable
         var menu = Assert.IsType<MenuForm>(model.Form);
         Assert.True(model.ApplyFormCommand.CanExecute(null));
         menu.Items[3].Key = "S";
-        Assert.Equal(menu.Error, model.FormError);
+        Assert.Equal(menu.Error, model.FormLivePreview.FormError);
         Assert.False(model.ApplyFormCommand.CanExecute(null));
         model.ApplyFormCommand.Execute(null);
         Assert.True(model.FormEditing.IsEditingForm);                                  // nothing applied
         menu.Items[3].Key = "";
-        Assert.Null(model.FormError);
+        Assert.Null(model.FormLivePreview.FormError);
         Assert.True(model.ApplyFormCommand.CanExecute(null));
     }
 

@@ -56,7 +56,7 @@ public sealed class DialogPreviewFitTests : IDisposable
         var (window, model) = Open(type);
         Assert.Equal(1200, window.Bounds.Width);
         var (view, scroller) = Shown(window);
-        var dialog = model.FormDialog!;
+        var dialog = model.FormLivePreview.FormDialog!;
         Assert.Equal(dialog.PixelWidth + 24, view.Bounds.Width);                      // 1:1, with its gutters
         Assert.True(Right(scroller, window) <= window.Bounds.Width, $"scroller ends at {Right(scroller, window)}");
         Assert.False(scroller.AllowAutoHide);                                          // its scroll bars stay in view
@@ -123,7 +123,7 @@ public sealed class DialogPreviewFitTests : IDisposable
         var bounds = window.GetVisualDescendants().OfType<TextBox>().First(t => t.Name == "RightBox" && t.IsEffectivelyVisible);
         Assert.True(Right(bounds, window) <= window.Bounds.Width - 12);
         var (view, scroller) = Shown(window);
-        Assert.Equal(model.FormDialog!.PixelWidth + 24, view.Bounds.Width);
+        Assert.Equal(model.FormLivePreview.FormDialog!.PixelWidth + 24, view.Bounds.Width);
         Assert.True(Right(scroller, window) <= window.Bounds.Width);
         Assert.False(scroller.AllowAutoHide);
         window.Close();

@@ -78,7 +78,7 @@ public sealed class CardViewTests
             window.MouseUp(at, Avalonia.Input.MouseButton.Left);
             Dispatcher.UIThread.RunJobs();
             Assert.Contains("selected", row.Classes);
-            Assert.Equal(2, model.FormDialog!.Drawing.DefaultItem);
+            Assert.Equal(2, model.FormLivePreview.FormDialog!.Drawing.DefaultItem);
             Assert.Contains("Stage 3: default button is Item 2 “Cancel”, plays no sound.", Shown(alert));
 
             // The control.

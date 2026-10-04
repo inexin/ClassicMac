@@ -356,9 +356,9 @@ public class WindowTests
             Pump(model.PreviewTask);
             var ditl = Assert.IsType<DialogItemsForm>(model.Form);
             ditl.Items[1].Text = "Changed";
-            Assert.Equal("Changed", model.FormDialog!.Drawing.Items[1].Item.Text);
+            Assert.Equal("Changed", model.FormLivePreview.FormDialog!.Drawing.Items[1].Item.Text);
             ditl.Items[0].Text = "日本";
-            Assert.Contains("Mac OS Roman", model.FormError);
+            Assert.Contains("Mac OS Roman", model.FormLivePreview.FormError);
             window.Close();
             Baselines.Verify(baselines);
         }
