@@ -691,10 +691,11 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
                     $"The {name} B-tree declares a maximum key length of {maxKeyLength}; expected {expectedMaxKeyLength}.");
             }
 
-            var mapNodes = ValidateNodeMap(tree, header, nodes, name);
-            var node = headerReader.ReadUInt32At(14 + 10);
-            var expectedLastLeaf = headerReader.ReadUInt32At(14 + 14);
-            var expectedLeafRecords = headerReader.ReadUInt32At(14 + 6);
+            var btree = new BTreeFile(tree, NodeSize, wordKeyLength: false);
+            var map = ValidateNodeMap(btree, nodes, name);
+            var node = btree.FirstLeaf;
+            var expectedLastLeaf = btree.LastLeaf;
+            var expectedLeafRecords = btree.LeafRecords;
             uint lastLeaf = 0;
             uint previousLeaf = 0;
             ulong leafRecordCount = 0;
@@ -708,67 +709,56 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
                         $"The {name} tree links to node {node}, which is outside the tree or already read; stopped.");
                     yield break;
                 }
-                if (mapNodes?.Contains(node) == true)
+                if (map?.MapNodes.Contains(node) == true)
                 {
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-map",
                         $"Node {node} of the {name} tree is also linked as a map node.");
                     yield break;
                 }
-                if (mapNodes is not null && !IsNodeAllocated(tree, header, mapNodes, node))
+                if (map is not null && !map.IsAllocated(node))
                 {
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-map",
                         $"Node {node} of the {name} tree is marked free in its node map.");
                 }
 
-                var bytes = Node(tree, node);
-                var nodeReader = new BigEndianReader(bytes);
-                if ((sbyte)bytes.Span[8] != -1 || bytes.Span[9] != 1)
+                var descriptor = btree.Node(node);
+                if (descriptor.Kind != BTreeNode.LeafKind || descriptor.Height != 1)
                 {
                     context.Report(DiagnosticSeverity.Error, "hfs.not-leaf",
-                        $"Node {node} of the {name} tree is linked as a leaf but has type {(sbyte)bytes.Span[8]} and height {bytes.Span[9]}; stopped.");
+                        $"Node {node} of the {name} tree is linked as a leaf but has type {descriptor.Kind} and height {descriptor.Height}; stopped.");
                     yield break;
                 }
-                uint backwardLink = nodeReader.ReadUInt32At(4);
-                if (backwardLink != previousLeaf)
+                if (descriptor.BLink != previousLeaf)
                 {
                     context.Report(DiagnosticSeverity.Warning, "hfs.bad-link",
-                        $"Leaf node {node} of the {name} tree links backward to {backwardLink}; expected {previousLeaf}.");
+                        $"Leaf node {node} of the {name} tree links backward to {descriptor.BLink}; expected {previousLeaf}.");
                 }
 
                 lastLeaf = node;
                 previousLeaf = node;
-                int records = nodeReader.ReadUInt16At(10);
+                int records = descriptor.RecordCount;
                 leafRecordCount += checked((uint)records);
+                // More records than the node's offset table can hold: none of them can be placed.
+                if (records > (NodeSize - 14) / 2 - 1)
+                {
+                    records = 0;
+                }
+
                 for (var i = 0; i < records; i++)
                 {
-                    var at = NodeSize - 2 * (i + 1);
-                    var next = NodeSize - 2 * (i + 2);
-                    if (next < 14)
-                    {
-                        break;
-                    }
-
-                    int start = nodeReader.ReadUInt16At(at);
-                    int end = nodeReader.ReadUInt16At(next);
-                    if (start < 14 || end > next || end <= start)
+                    if (!btree.TryRecordBounds(node, i, out int start, out int end))
                     {
                         context.Report(DiagnosticSeverity.Error, "hfs.bad-record-offset",
                             $"Record {i} of node {node} in the {name} tree has offsets {start}–{end}; skipped.");
                         continue;
                     }
-                    int keyLength = bytes.Span[start];
-                    var dataStart = start + 1 + keyLength;
-                    if ((dataStart & 1) != 0)
-                    {
-                        dataStart++;
-                    }
 
-                    if (dataStart > end)
+                    if (!btree.TryRecord(node, i, out var keyBytes, out var data))
                     {
                         continue;
                     }
 
-                    var key = bytes[start..(start + 1 + keyLength)].ToArray();
+                    var key = keyBytes.ToArray();
                     if (IsValidKey(name, key))
                     {
                         if (previousKey is not null && CompareKeys(name, previousKey, key) >= 0)
@@ -785,9 +775,9 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
                             $"Catalog record {i} of node {node} has a malformed key; skipped.");
                         continue;
                     }
-                    yield return (key, bytes[dataStart..end].ToArray());
+                    yield return (key, data.ToArray());
                 }
-                node = nodeReader.ReadUInt32At(0);
+                node = descriptor.FLink;
             }
 
             if (lastLeaf != expectedLastLeaf)
@@ -803,142 +793,76 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
             }
         }
 
-        private List<uint>? ValidateNodeMap(byte[] tree, ReadOnlyMemory<byte> header, int nodes, string name)
+        private BTreeMap? ValidateNodeMap(BTreeFile file, int nodes, string name)
         {
-            var headerReader = new BigEndianReader(header);
-            if (headerReader.ReadUInt16At(10) != 3)
+            var header = new BigEndianReader(file.Bytes.AsMemory(0, NodeSize));
+            if (header.ReadUInt16At(10) != 3)
             {
                 return null;
             }
 
-            int headerRecordStart = headerReader.ReadUInt16At(NodeSize - 2);
-            int userRecordStart = headerReader.ReadUInt16At(NodeSize - 4);
-            int mapStart = headerReader.ReadUInt16At(NodeSize - 6);
-            int mapEnd = headerReader.ReadUInt16At(NodeSize - 8);
-            if (headerRecordStart != 14 || userRecordStart != 14 + 106 || mapStart != 14 + 106 + 128 ||
-                mapEnd < mapStart || mapEnd > NodeSize - 8)
+            int mapStart = header.ReadUInt16At(NodeSize - 6), mapEnd = header.ReadUInt16At(NodeSize - 8);
+            if (header.ReadUInt16At(NodeSize - 2) != 14 || header.ReadUInt16At(NodeSize - 4) != 14 + 106 ||
+                mapStart != 14 + 106 + 128 || mapEnd < mapStart || mapEnd > NodeSize - 8)
             {
                 context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-header",
                     $"The {name} B-tree header, user, or map record has invalid boundaries.");
                 return null;
             }
 
-            byte[] headerMap = tree.AsSpan(mapStart, mapEnd - mapStart).ToArray();
-            uint headerCapacity = checked((uint)(headerMap.Length * 8));
-            const int MapNodeDataLength = NodeSize - 20;
-            const uint MapNodeCapacity = MapNodeDataLength * 8;
-            var mapNodes = new HashSet<uint>();
-            var mapNodeOrder = new List<uint>();
-            uint nextMapNode = headerReader.ReadUInt32At(0);
-            while (nextMapNode != 0)
+            if (!file.TryReadMap(out var map, out var problem))
             {
-                if (nextMapNode >= (uint)nodes || !mapNodes.Add(nextMapNode))
-                {
-                    ReportBadMap($"The {name} B-tree map-node chain is outside the tree or cyclic.");
-                    return null;
-                }
-                mapNodeOrder.Add(nextMapNode);
-
-                int offset = checked((int)nextMapNode * NodeSize);
-                var mapNode = new BigEndianReader(tree.AsMemory(offset, NodeSize));
-                if (mapNode.ReadByteAt(8) != 2 || mapNode.ReadByteAt(9) != 0 ||
-                    mapNode.ReadUInt16At(10) != 1 ||
-                    mapNode.ReadUInt16At(12) != 0 ||
-                    mapNode.ReadUInt32At(4) != 0 ||
-                    mapNode.ReadUInt16At(NodeSize - 2) != 14 ||
-                    mapNode.ReadUInt16At(NodeSize - 4) != NodeSize - 6)
-                {
-                    ReportBadMap($"Map node {nextMapNode} of the {name} B-tree has an invalid descriptor or record layout.");
-                    return null;
-                }
-                nextMapNode = mapNode.ReadUInt32At(0);
+                ReportBadMap($"The {name} B-tree node map is unusable: {problem}");
+                return null;
             }
 
+            // Map nodes as Mac OS writes them: height 0, reserved 0, backward link 0, one record from 14 to nodeSize - 6.
+            foreach (uint mapNode in map.MapNodes)
+            {
+                var descriptor = file.Node(mapNode);
+                var reader = new BigEndianReader(file.Bytes.AsMemory(file.Offset(mapNode), NodeSize));
+                if (descriptor.Height != 0 || reader.ReadUInt16At(12) != 0 || descriptor.BLink != 0 ||
+                    reader.ReadUInt16At(NodeSize - 2) != 14 || reader.ReadUInt16At(NodeSize - 4) != NodeSize - 6)
+                {
+                    ReportBadMap($"Map node {mapNode} of the {name} B-tree has an invalid descriptor or record layout.");
+                    return null;
+                }
+            }
+
+            uint headerCapacity = checked((uint)((mapEnd - mapStart) * 8));
+            const uint MapNodeCapacity = (NodeSize - 20) * 8;
             uint requiredMapNodes = (uint)nodes <= headerCapacity
                 ? 0
                 : checked((uint)(((ulong)(uint)nodes - headerCapacity + MapNodeCapacity - 1) / MapNodeCapacity));
-            if ((uint)mapNodes.Count != requiredMapNodes)
+            if ((uint)map.MapNodes.Count != requiredMapNodes)
             {
                 ReportBadMap($"The {name} B-tree map nodes do not provide the required bitmap coverage.");
                 return null;
             }
 
-            bool IsAllocated(uint nodeNumber)
-            {
-                if (nodeNumber < headerCapacity)
-                {
-                    uint headerByteOffset = nodeNumber / 8;
-                    return (headerMap[(int)headerByteOffset] & (0x80 >> (int)(nodeNumber & 7))) != 0;
-                }
-                uint continuationBit = nodeNumber - headerCapacity;
-                uint mapIndex = continuationBit / MapNodeCapacity;
-                if (mapIndex >= mapNodeOrder.Count)
-                {
-                    return false;
-                }
-
-                uint mapByte = continuationBit % MapNodeCapacity / 8;
-                uint mapNodeNumber = mapNodeOrder[(int)mapIndex];
-                int continuationByteOffset = checked((int)mapNodeNumber * NodeSize + 14 + (int)mapByte);
-                return (tree[continuationByteOffset] & (0x80 >> (int)(continuationBit & 7))) != 0;
-            }
-
-            if (!IsAllocated(0))
+            if (!map.IsAllocated(0))
             {
                 ReportBadMap($"The {name} B-tree header node is marked free in its node map.");
             }
 
-            foreach (uint mapNode in mapNodes)
+            foreach (uint mapNode in map.MapNodes)
             {
-                if (!IsAllocated(mapNode))
+                if (!map.IsAllocated(mapNode))
                 {
                     ReportBadMap($"Map node {mapNode} of the {name} B-tree is marked free.");
                 }
             }
 
-            uint freeNodes = 0;
-            for (uint nodeNumber = 0; nodeNumber < nodes; nodeNumber++)
+            uint freeNodes = map.CountFree((uint)nodes);
+            if (freeNodes != file.FreeNodes)
             {
-                if (!IsAllocated(nodeNumber))
-                {
-                    freeNodes++;
-                }
+                ReportBadMap($"The {name} B-tree declares {file.FreeNodes} free nodes, but its map contains {freeNodes}.");
             }
 
-            uint declaredFree = headerReader.ReadUInt32At(14 + 26);
-            if (freeNodes != declaredFree)
-            {
-                ReportBadMap($"The {name} B-tree declares {declaredFree} free nodes, but its map contains {freeNodes}.");
-            }
-
-            return mapNodeOrder;
+            return map;
 
             void ReportBadMap(string message) =>
                 context.Report(DiagnosticSeverity.Warning, "hfs.bad-btree-map", message);
-        }
-
-        private static bool IsNodeAllocated(byte[] tree, ReadOnlyMemory<byte> header, List<uint> mapNodes, uint nodeNumber)
-        {
-            var headerReader = new BigEndianReader(header);
-            int mapStart = headerReader.ReadUInt16At(NodeSize - 6);
-            int mapEnd = headerReader.ReadUInt16At(NodeSize - 8);
-            uint headerCapacity = checked((uint)((mapEnd - mapStart) * 8));
-            const uint MapNodeCapacity = (NodeSize - 20) * 8;
-            if (nodeNumber < headerCapacity)
-            {
-                return (tree[mapStart + (int)(nodeNumber / 8)] & (0x80 >> (int)(nodeNumber & 7))) != 0;
-            }
-
-            uint continuationBit = nodeNumber - headerCapacity;
-            uint mapIndex = continuationBit / MapNodeCapacity;
-            if (mapIndex >= mapNodes.Count)
-            {
-                return false;
-            }
-
-            int byteOffset = checked((int)mapNodes[(int)mapIndex] * NodeSize + 14 +
-                (int)(continuationBit % MapNodeCapacity / 8));
-            return (tree[byteOffset] & (0x80 >> (int)(continuationBit & 7))) != 0;
         }
 
         private static bool IsValidKey(string name, byte[] key)
