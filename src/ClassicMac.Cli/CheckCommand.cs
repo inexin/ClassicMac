@@ -197,11 +197,11 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
         return errors > 0 || fault is not null || (strict && warnings > 0) ? ExitCodes.Damaged : ExitCodes.Success;
     }
 
-    // 'BD' or 'H+' at byte 1024: an HFS or HFS Plus volume, whether or not the reader could read it.
+    // 'BD', 'H+' or 'HX' at byte 1024: an HFS, HFS Plus or HFSX volume, whether or not the reader could read it.
     private static bool HasVolumeSignature(ForkData data)
     {
         var head = data.ReadPrefix(1026);
-        return head.Length == 1026 && new Core.BigEndianReader(head).ReadUInt16At(1024) is 0x4244 or 0x482B;
+        return head.Length == 1026 && new Core.BigEndianReader(head).ReadUInt16At(1024) is 0x4244 or 0x482B or 0x4858;
     }
 
     // A volume First Aid does not find OK: one that needs repair, cannot be repaired, or is not an HFS disk.

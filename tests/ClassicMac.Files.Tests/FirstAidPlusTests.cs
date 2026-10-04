@@ -87,13 +87,15 @@ public class FirstAidPlusTests
     }
 
     [Fact]
-    public void HFSX_is_not_checked()
+    public void An_HFSX_volume_whose_catalog_names_no_key_order_cannot_be_repaired()
     {
-        var image = Base();
-        Put16(image, Header, 0x4858);
-        Put16(image, Header + 2, 5);
+        var image = Base();                                                        // an HFS Plus catalog: keyCompareType 0
+        PutBoth32(image, 0, 0x48580005);                                           // 'HX', version 5
 
-        Assert.Equal(FirstAidVerdict.NotChecked, Verify(image).Verdict);
+        var report = Verify(image);
+
+        Assert.Equal("firstaid.key-compare-type", Assert.Single(report.Problems).Code);
+        Assert.Equal(FirstAidVerdict.CannotRepair, report.Verdict);
     }
 
     [Fact]

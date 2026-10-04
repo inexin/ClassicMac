@@ -29,7 +29,7 @@ internal static class PlusVolumeCheck
         ushort signature = mdb.ReadUInt16At(0);
         if (signature is HfsPlus or Hfsx)
         {
-            return (signature == HfsPlus, signature == Hfsx, 0, volume.Length);
+            return (true, signature == Hfsx, 0, volume.Length);
         }
 
         // An HFS wrapper: the embedded volume is drEmbedExtent's blocks of the wrapper's allocation area.
@@ -44,10 +44,11 @@ internal static class PlusVolumeCheck
         return (false, false, 0, 0);
     }
 
-    public static bool Run(FirstAidRun run, long offset, long length)
+    public static bool Run(FirstAidRun run, long offset, long length, bool hfsx)
     {
         run.Stage(FirstAidMessages.CheckingDiskVolume);
         run.Plus = true;
+        run.Hfsx = hfsx;
         run.VolumeOffset = offset;
         run.AllocationStart = (int)(offset / FirstAidRun.SectorSize);
         if (length < 3 * 512)
@@ -103,12 +104,14 @@ internal static class PlusVolumeCheck
     private static int Problem(long length, byte[] header)
     {
         var reader = new BigEndianReader(header);
-        if (reader.ReadUInt16At(0) != HfsPlus)
+        // HFS Plus is 'H+' version 4, HFSX 'HX' version 5 [Doc: TN1150].
+        ushort signature = reader.ReadUInt16At(0);
+        if (signature is not (HfsPlus or Hfsx))
         {
             return 69;
         }
 
-        if (reader.ReadUInt16At(2) != 4)
+        if (reader.ReadUInt16At(2) != (signature == Hfsx ? 5 : 4))
         {
             return 66;
         }
@@ -279,7 +282,21 @@ internal static class PlusVolumeCheck
             return null;
         }
 
-        return new FirstAidTree(fileId, bytes, nodeSize, extents, plus: true);
+        // An HFSX catalog's order is its header's keyCompareType: $CF case folding, $BC binary [Doc: TN1150].
+        bool binary = false;
+        if (fileId == 4 && run.Hfsx)
+        {
+            byte compare = bytes[14 + 37];
+            if (compare is not (0xCF or 0xBC))
+            {
+                run.FatalProblem("The HFSX catalog names no key comparison it can be checked by", "firstaid.key-compare-type");
+                return null;
+            }
+
+            binary = compare == 0xBC;
+        }
+
+        return new FirstAidTree(fileId, bytes, nodeSize, extents, plus: true, binary);
     }
 
     // The extents tree's leaf records, by its leaf chain, for the other special files' overflow extents.

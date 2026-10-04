@@ -24,7 +24,7 @@ and the containers they travel in, disk images and archives, resources decoded t
 | Disk images | HFS, MFS, HFS Plus/HFSX (plain and wrapped), partition maps, Disk Copy 4.2, NDIF, DART, UDIF, ISO 9660/High Sierra, raw CD and cue sheets, FAT with DOS partitions, DiskDup+, ROM images | file-systems/, disk-images/ |
 | Archives | StuffIt 1–5 and segments, Compact Pro, DiskDoubler, PackIt, LHA, zip/tar/gzip with Mac data, `.sea` | archives/ |
 | Writing HFS | Plain HFS volumes, also in a single-HFS partition map, Disk Copy 4.2 and NDIF: files and folders added, deleted, renamed, moved, locked, blessed, Finder info and forks set, `format`, `resize` (growing within the block size); edited through a sector overlay, saved verified | hfs.md §3, §5.5 |
-| First Aid | HFS and HFS Plus (plain, wrapped, journaled) checked and repaired: `check`, `repair`, Volume ▸ First Aid…; HFSX not checked | hfs.md §5.6, hfs-plus.md §5.4 |
+| First Aid | HFS, HFS Plus and HFSX (plain, wrapped, journaled) checked and repaired: `check`, `repair`, Volume ▸ First Aid…; HFS checked live against Disk First Aid 8.5.5 | hfs.md §5.6, hfs-plus.md §5.4 |
 | Decoders | Images (PICT, icons, cursors, patterns), sound (`snd ` with MACE, IMA4, µ-law), text and styled text, fonts, UI resources with previews, palettes, Finder resources, aliases, documents (DOCMaker, SimpleText, Word 4/5/6/98, help pages) to HTML, code | resources/, documents/, output/ |
 | Graphics | `ClassicMac.Graphics`: QuickDraw renderer (two QuickDraws, screen depths), PICT read and write, QuickTime images, MacPaint, fonts; ImageSharp and SkiaSharp adapters | graphics/ |
 | Code | PEF, `cfrg`, 68k applications, data initialisers, code resources; 68k and PowerPC disassemblers; `disasm` | code/, output/disassembly.md |
@@ -124,25 +124,25 @@ Standing decisions, with their dates; superseded ones are dropped.
 
 In rough priority; each item names what blocks it, if anything.
 
-1. **First Aid on real volumes**: HFS Plus repair is tested only on built volumes. Waiting on the Mac RE session's
-   live run (Mac OS 9 disks, Disk First Aid on repaired copies) and the Digital Corpora journaled image.
-2. **HFSX**: First Aid says "not checked"; the reader already compares HFSX keys.
-3. **Writing, still to do**: disks with several Mac partitions (and the app's Volume menu on partitioned disks);
+1. **First Aid on real volumes**: HFS passes Disk First Aid 8.5.5 live (27 repaired faults, clean disks), and the
+   Digital Corpora journaled Mac OS X image checks out; HFS Plus repair on Mac OS 9-made volumes awaits the Mac RE
+   session's re-run, and HFSX has been tried only on built volumes.
+2. **Writing, still to do**: disks with several Mac partitions (and the app's Volume menu on partitioned disks);
    NDIF changed chunks compressed again, segmented images, a check against Disk Copy; cheaper fork edits
    (`ReplaceFork` checked as deletions are); the extents tree edited in place rather than rebuilt; `resize` shrinking
    and a new block size.
-4. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
+3. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
    cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
    HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.
-5. **Decoders, later**: `icns`, AIFF/AIFC files, the multi-byte encodings and `--encoding`, a "make loadable" option
+4. **Decoders, later**: `icns`, AIFF/AIFC files, the multi-byte encodings and `--encoding`, a "make loadable" option
    for exported fonts, lossless WebP; QuickDraw's ScrollRect, OpenRgn/OpenPoly and OpenPicture.
-6. **App**: editing the hex view's text column; packaging (macOS bundle icon, Linux icons and `.desktop` file).
-7. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
+5. **App**: editing the hex view's text column; packaging (macOS bundle icon, Linux icons and `.desktop` file).
+6. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
    encrypted entries, DiskDoubler methods 2–5 and 7 and the delta types; Word 98 and fast-saved Word 6 documents; a
    Mac-made zip; Mac OS X-made `.dmg`; NDIF version 2 and chunk type `$F0`; 68k ROM images; PEF section kinds 5, 6, 8
    and CFM-68K; THINK C code. PCE MAR is blocked (no sample; layout only in GPL source).
-8. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
-9. **Comparisons, optional**: corpus output against resource_dasm and DeRez; Rez-compiled fixtures (MPW kept out of
+7. **Owner's steps**: publish the NuGet packages, then deprecate the QuickDraw.Pict ones.
+8. **Comparisons, optional**: corpus output against resource_dasm and DeRez; Rez-compiled fixtures (MPW kept out of
    the repository and CI, the forks pinned by hash).
 
 ## Ideas

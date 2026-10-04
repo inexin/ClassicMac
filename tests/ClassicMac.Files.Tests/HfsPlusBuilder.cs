@@ -19,6 +19,15 @@ internal sealed class HfsPlusBuilder
     private uint nextId = 16;
     private uint? privateFiles, privateFolders;
 
+    /// <summary>An HFSX volume ('HX', version 5): case-folding names, or case-sensitive with <see cref="CaseSensitive"/>.</summary>
+    public bool Hfsx { get; init; }
+
+    /// <summary>On HFSX, a catalog in binary order ($BC), names that differ only in case kept apart.</summary>
+    public bool CaseSensitive { get; init; }
+
+    private int CompareKeys(byte[] left, byte[] right) =>
+        CaseSensitive ? HfsPlusBTree.CompareHfsXCatalogKeys(left, right) : HfsPlusBTree.CompareCatalogKeys(left, right, caseFolding: true);
+
     /// <summary>Free blocks left after the files (before the last block).</summary>
     public int FreeBlocks { get; init; } = 64;
 
@@ -176,7 +185,8 @@ internal sealed class HfsPlusBuilder
 
         var extentsTree = HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Extents, overflow, Block, ExtentsNodes, ExtentsNodes * Block);
         extentsTree.CopyTo(image, extentsStart * Block);
-        var catalog = HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Catalog, CatalogRecords(volumeName, forks), Block, CatalogNodes, CatalogNodes * Block);
+        var catalog = HfsPlusBTreeWriter.Build(HfsPlusBTreeWriter.Catalog, CatalogRecords(volumeName, forks), Block, CatalogNodes, CatalogNodes * Block,
+            keyCompareType: Hfsx ? (CaseSensitive ? (byte)0xBC : (byte)0xCF) : (byte)0);
         catalog.CopyTo(image, catalogStart * Block);
         if (attributes.Count > 0)
         {
@@ -307,8 +317,8 @@ internal sealed class HfsPlusBuilder
     {
         var header = new byte[512];
         var w = new BigEndianWriter(header);
-        w.WriteUInt16At(0, (ushort)0x482B);                                        // 'H+'
-        w.WriteUInt16At(2, (ushort)4);
+        w.WriteUInt16At(0, Hfsx ? (ushort)0x4858 : (ushort)0x482B);                // 'HX' or 'H+'
+        w.WriteUInt16At(2, Hfsx ? (ushort)5 : (ushort)4);
         w.WriteUInt32At(4, 0x100u);                                                // unmounted cleanly
         w.WriteUInt32At(8, 0x382E3130u);                                           // '8.10': Mac OS 8.1 to 9
         w.WriteUInt32At(32, files.Count);
@@ -330,7 +340,7 @@ internal sealed class HfsPlusBuilder
     {
         var records = new List<(byte[] Key, byte[] Data)>
         {
-            (CatalogKey(1, volumeName), FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root))),
+            (CatalogKey(1, volumeName), RootRecord()),
             (CatalogKey(Root, ""), Thread(3, 1, volumeName)),
         };
         foreach (var (parent, name, id) in folders)
@@ -348,6 +358,8 @@ internal sealed class HfsPlusBuilder
             {
                 folder[3] |= 0x04;
             }
+
+            FolderCount(folder, id);
 
             records.Add((CatalogKey(parent, name), folder));
             records.Add((CatalogKey(id, ""), Thread(3, parent, name)));
@@ -380,7 +392,7 @@ internal sealed class HfsPlusBuilder
             records.Add((CatalogKey(file.Id, ""), Thread(4, file.Parent, file.Name)));
         }
 
-        records.Sort((a, b) => HfsPlusBTree.CompareCatalogKeys(a.Key, b.Key, caseFolding: true));
+        records.Sort((a, b) => CompareKeys(a.Key, b.Key));
         return records;
     }
 
@@ -405,7 +417,27 @@ internal sealed class HfsPlusBuilder
         return record;
     }
 
+    private byte[] RootRecord()
+    {
+        var root = FolderRecord(Root, folders.Count(f => f.Parent == Root) + files.Count(f => f.Parent == Root));
+        FolderCount(root, Root);
+        return root;
+    }
+
     private bool HasAttributes(uint id) => attributes.Exists(a => a.FileId == id);
+
+    // HFSX: the has-folder-count flag, and the folders and directory hard-link aliases inside at +84.
+    private void FolderCount(byte[] folder, uint id)
+    {
+        if (!Hfsx)
+        {
+            return;
+        }
+
+        folder[3] |= 0x10;
+        int count = folders.Count(f => f.Parent == id) + files.Count(f => f.Parent == id && fileLinks.TryGetValue(f.Id, out var link) && link.Flags == 0x0020);
+        new BigEndianWriter(folder).WriteUInt32At(84, count);
+    }
 
     private static byte[] FolderRecord(uint id, int valence)
     {

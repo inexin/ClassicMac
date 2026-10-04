@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
@@ -18,6 +19,8 @@ internal sealed class PlusCatalogScan
     private readonly Dictionary<uint, (uint Parent, uint Valence, uint Node)> folders = [];
     private readonly Dictionary<uint, int> items = [];
     private readonly List<(uint Id, uint Parent, uint Node)> parents = [];
+    private readonly Dictionary<uint, (bool Flagged, uint Count)> folderCounts = [];
+    private const byte HasFolderCount = 0x10;
     private uint maxId = 15;
 
     private PlusCatalogScan(FirstAidRun run)
@@ -140,6 +143,7 @@ internal sealed class PlusCatalogScan
         }
 
         folders[id] = (parent, new BigEndianReader(data).ReadUInt32At(4), node);
+        folderCounts[id] = ((data[3] & HasFolderCount) != 0, new BigEndianReader(data).ReadUInt32At(84));
         maxId = Math.Max(maxId, id);
         HasThread(key, id, FolderThread, node);
         return true;
@@ -255,8 +259,41 @@ internal sealed class PlusCatalogScan
             }
         }
 
+        // HFSX: each folder's has-folder-count flag set, and its folder count its folders and directory hard links
+        // [Code: Apple fsck_hfs CheckFolderCount, reference only; hfs-plus.md §2.4].
+        if (run.Hfsx)
+        {
+            var expected = FolderCounts(run.Catalog!.Records.ConvertAll(r => (r.Key, r.Data)));
+            if (folderCounts.Any(f => !f.Value.Flagged || f.Value.Count != expected.GetValueOrDefault(f.Key)))
+            {
+                run.Problem("A folder's folder count is not its folders", "firstaid.folder-count", FirstAidRepairs.Valences);
+            }
+        }
+
         return true;
     }
+
+    /// <summary>The folders and directory hard-link aliases inside each folder (HFSX's folder count).</summary>
+    internal static Dictionary<uint, uint> FolderCounts(IEnumerable<(byte[] Key, byte[] Data)> records)
+    {
+        var counts = new Dictionary<uint, uint>();
+        foreach (var (key, data) in records)
+        {
+            var reader = new BigEndianReader(data);
+            bool folder = data.Length >= 88 && reader.ReadUInt16At(0) == Folder;
+            bool alias = data.Length >= 248 && reader.ReadUInt16At(0) == File && (reader.ReadUInt16At(2) & 0x0020) != 0
+                && reader.ReadUInt32At(48) == AliasType && reader.ReadUInt32At(52) == AliasCreator;
+            if (folder || alias)
+            {
+                uint parent = new BigEndianReader(key).ReadUInt32At(2);
+                counts[parent] = counts.GetValueOrDefault(parent) + 1;
+            }
+        }
+
+        return counts;
+    }
+
+    private static readonly uint AliasType = FourCC.FromString("alis").Value, AliasCreator = FourCC.FromString("MACS").Value;
 
     // 0, and 3 to 15 but the special files' CNIDs that never have records, are not a folder's or file's.
     private static bool InvalidId(uint id) => id < 16;

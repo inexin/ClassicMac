@@ -145,6 +145,9 @@ internal sealed class FirstAidRun(HfsVolume volume)
     /// <summary>An HFS Plus volume, at <see cref="VolumeOffset"/> (inside an HFS wrapper, or 0).</summary>
     public bool Plus { get; set; }
 
+    /// <summary>An HFSX volume ('HX'): HFS Plus with its catalog's own order and folder counts.</summary>
+    public bool Hfsx { get; set; }
+
     /// <summary>Where an HFS Plus volume starts in the image, in bytes.</summary>
     public long VolumeOffset { get; set; }
 

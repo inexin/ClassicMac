@@ -196,8 +196,8 @@ public sealed class InputEditSession
         return region is null ? host.File.DataFork : host.File.DataFork.Slice(region.Offset, region.Length);
     }
 
-    // An HFS volume (signature 'BD') that does not wrap HFS Plus, an HFS Plus volume ('H+', or 'BD' wrapping it), or
-    // neither (HFSX among them, which First Aid does not repair).
+    // An HFS volume (signature 'BD') that does not wrap HFS Plus, an HFS Plus or HFSX volume ('H+', 'HX', or 'BD'
+    // wrapping HFS Plus), or neither.
     private static InputEditKind? VolumeKind(ForkData data)
     {
         var mdb = data.ReadPrefix(1024 + 0x7E);
@@ -209,7 +209,7 @@ public sealed class InputEditSession
         var reader = new BigEndianReader(mdb);
         return (reader.ReadUInt16At(1024), reader.ReadUInt16At(1024 + 0x7C)) switch
         {
-            (0x482B, _) or (0x4244, 0x482B) => InputEditKind.HfsPlusVolume,
+            (0x482B or 0x4858, _) or (0x4244, 0x482B) => InputEditKind.HfsPlusVolume,
             (0x4244, _) => InputEditKind.HfsVolume,
             _ => null,
         };

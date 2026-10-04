@@ -98,6 +98,6 @@ public static class FirstAidMessages
     internal const string NotHfs = "This is not an HFS disk.";
     internal const string UnableToRead = "Unable to read from disk.";
 
-    // ClassicMac's own: an HFSX volume, which First Aid does not check (hfs-plus.md §5.4).
-    internal const string NotChecked = "An HFSX volume: First Aid checks Mac OS Standard (HFS) and Mac OS Extended (HFS Plus) volumes.";
+    // ClassicMac's own: a volume First Aid does not check (none at present; hfs-plus.md §5.4).
+    internal const string NotChecked = "This volume is of a kind First Aid does not check.";
 }

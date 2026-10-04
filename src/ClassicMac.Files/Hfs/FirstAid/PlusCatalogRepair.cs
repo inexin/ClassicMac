@@ -41,6 +41,7 @@ internal sealed class PlusCatalogRepair
         repair.Valences();
         repair.LinkCounts();
         repair.AttributeFlags();
+        repair.FolderCounts();
         return repair.records;
     }
 
@@ -183,6 +184,27 @@ internal sealed class PlusCatalogRepair
             {
                 new BigEndianWriter(data).WriteUInt32At(4, valence);
                 Add(id, $"the folder's valence set from {old} to {valence}");
+            }
+        }
+    }
+
+    // HFSX: each folder's has-folder-count flag set and its folder count its folders and directory hard links.
+    private void FolderCounts()
+    {
+        if (!run.Hfsx)
+        {
+            return;
+        }
+
+        var counts = PlusCatalogScan.FolderCounts(records);
+        foreach (var (_, data) in records.Where(r => Type(r.Data) == Folder && r.Data.Length >= 88))
+        {
+            uint id = Id(data), count = counts.GetValueOrDefault(id), old = new BigEndianReader(data).ReadUInt32At(84);
+            if ((data[3] & 0x10) == 0 || old != count)
+            {
+                data[3] |= 0x10;
+                new BigEndianWriter(data).WriteUInt32At(84, count);
+                Add(id, $"the folder count set from {old} to {count}");
             }
         }
     }

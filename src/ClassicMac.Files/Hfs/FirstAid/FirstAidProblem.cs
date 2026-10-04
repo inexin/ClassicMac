@@ -15,7 +15,7 @@ public enum FirstAidVerdict
     /// <summary>"This is not an HFS disk.": neither MDB is an HFS one.</summary>
     NotHfs,
 
-    /// <summary>An HFSX volume, which First Aid does not check.</summary>
+    /// <summary>A volume of a kind First Aid does not check (none at present: HFS, HFS Plus and HFSX are all checked).</summary>
     NotChecked,
 }
 

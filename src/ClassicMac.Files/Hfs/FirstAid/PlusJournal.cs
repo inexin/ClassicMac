@@ -28,7 +28,7 @@ internal static class PlusJournal
     {
         var header = Read(volume, offset + 1024, 512);
         var vh = new BigEndianReader(header);
-        if (vh.ReadUInt16At(0) != 0x482B || (vh.ReadUInt32At(4) & Journaled) == 0)
+        if (vh.ReadUInt16At(0) is not (0x482B or 0x4858) || (vh.ReadUInt32At(4) & Journaled) == 0)
         {
             return null;
         }

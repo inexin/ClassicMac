@@ -3,7 +3,7 @@
 ## Unreleased
 
 - First Aid on HFS Plus (hfs-plus.md §5.4): `check`, `repair` and Volume ▸ First Aid… check and repair HFS Plus
-  volumes, bare or in their HFS wrapper (HFSX is not checked): the volume header (a sound alternate stands in for a
+  and HFSX volumes, bare or in their HFS wrapper (HFSX in its catalog's own key order, with folder counts): the volume header (a sound alternate stands in for a
   damaged one), the special files, the B-trees with HFS Plus's keys, the catalog's records, threads and forks, the
   hierarchy, the allocation file and the header's counts, hard-link counts, the attributes tree's records,
   forks that share blocks; a journal is replayed (TN1150) before the

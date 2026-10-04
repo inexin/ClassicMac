@@ -6,8 +6,12 @@ namespace ClassicMac.Files.Hfs;
 // One of the volume's B-trees as First Aid sees it: the file's bytes from its extents, its node count from its PEOF (not
 // the header's), and what the walk computes, which the header record and node map are compared with. An HFS Plus tree
 // has 16-bit key lengths and its own key orders.
-internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<(uint Start, uint Count)> extents, bool plus = false)
+internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<(uint Start, uint Count)> extents, bool plus = false,
+    bool binary = false)
 {
+    /// <summary>An HFSX catalog in binary order ($BC): names that differ only in case are distinct.</summary>
+    public bool Binary { get; } = binary;
+
     /// <summary>An HFS Plus tree: the extents (3), catalog (4) or attributes (8) file's.</summary>
     public bool Plus { get; } = plus;
 
@@ -36,7 +40,7 @@ internal sealed class FirstAidTree(int fileId, byte[] bytes, int nodeSize, List<
     {
         (false, 4) => HfsCatalogKeys.CompareCatalogKeys(left, right),
         (false, _) => HfsBTreeWriting.CompareExtentsKeys(left, right),
-        (true, 4) => HfsPlusBTree.CompareCatalogKeys(left, right, caseFolding: true),
+        (true, 4) => Binary ? HfsPlusBTree.CompareHfsXCatalogKeys(left, right) : HfsPlusBTree.CompareCatalogKeys(left, right, caseFolding: true),
         (true, 8) => HfsPlusAttributes.CompareAttributeKeys(left, right),
         _ => HfsPlusBTree.CompareExtentKeys(left, right),
     };

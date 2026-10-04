@@ -54,7 +54,7 @@ public sealed class DeepMutationTests
         Assert.True(failures.Count == 0, string.Join("\n", failures.Take(40)));
     }
 
-    public static TheoryData<string> Volumes => ["HFS", "HFS Plus", "HFS Plus wrapped", "HFS Plus journaled"];
+    public static TheoryData<string> Volumes => ["HFS", "HFS Plus", "HFS Plus wrapped", "HFS Plus journaled", "HFSX case-sensitive"];
 
     private static byte[] Volume(string kind)
     {
@@ -63,7 +63,12 @@ public sealed class DeepMutationTests
             return FirstAidImages.Base();
         }
 
-        var builder = new HfsPlusBuilder { JournalBlocks = kind.EndsWith("journaled", StringComparison.Ordinal) ? 4 : 0 };
+        var builder = new HfsPlusBuilder
+        {
+            JournalBlocks = kind.EndsWith("journaled", StringComparison.Ordinal) ? 4 : 0,
+            Hfsx = kind.StartsWith("HFSX", StringComparison.Ordinal),
+            CaseSensitive = kind.StartsWith("HFSX", StringComparison.Ordinal),
+        };
         uint docs = builder.Folder(HfsPlusBuilder.Root, "Docs");
         builder.File(docs, "Letter", "dear sir"u8.ToArray(), new byte[300]);
         builder.File(HfsPlusBuilder.Root, "Fragmented", new byte[10 * HfsPlusBuilder.Block], [], fragments: 10);

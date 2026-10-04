@@ -246,7 +246,7 @@ the input cannot be read. `--json` writes `{ "input", "diagnostics": [{ "source"
 [{ "number", "name", "passes", "fault", "firstAid" }], "notOpened", "errors", "warnings" }`; `volume` and `firstAid`
 are null for input that is not a plain HFS volume, and `partitions` lists a partitioned disk's HFS partitions (text:
 `partition 3 "Macintosh HD": passes the writer's checks`). `verdict` is `appearsOk`, `needsRepair`, `cannotRepair`,
-`notHfs` or `notChecked` (an HFSX volume). A problem with number 0 is MountCheck's or one of the checks Disk
+`notHfs` or `notChecked` (not given at present: every HFS, HFS Plus and HFSX volume is checked). A problem with number 0 is MountCheck's or one of the checks Disk
 First Aid lacks, printed `first aid: Problem:  <text>.`.
 
 ## 3. Write commands

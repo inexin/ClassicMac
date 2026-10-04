@@ -480,7 +480,11 @@ Everything else is reported and the volume read (§6):
 `HfsFirstAid.Verify` checks an HFS Plus volume, bare or in its HFS wrapper, in stages like HFS's
 ([hfs.md §5.6](hfs.md#56-first-aid)), with the same report, verdicts and repair flags, and Disk First Aid's problem
 numbers and words where they mean the same. The rules are TN1150's; where Disk First Aid's own HFS Plus checks are not
-traced, the choices are ClassicMac's [ClassicMac]. HFSX is "not checked". A volume the reader refuses (§5.2) is still checked and repaired: `check`, the edit session and
+traced, the choices are ClassicMac's [ClassicMac]. HFSX (`'HX'`, version 5, never wrapped) is checked the same way:
+its catalog in the order its header's `keyCompareType` names (`$CF` case folding, `$BC` binary, so names differing
+only in case are distinct; any other is `firstaid.key-compare-type`, not repaired), kept when repair writes it again;
+and each folder's has-folder-count flag set and its `folderCount` its folders and directory hard-link aliases (§2.4
+item 7; `firstaid.folder-count`, repaired). A volume the reader refuses (§5.2) is still checked and repaired: `check`, the edit session and
 `repair` know it by its signature at byte 1024.
 
 1. **"Checking disk volume."**: the volume is the image (`'H+'` at 1024) or a wrapper's `drEmbedExtent`. A journaled

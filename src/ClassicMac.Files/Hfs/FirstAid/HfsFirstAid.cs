@@ -56,16 +56,9 @@ public static class HfsFirstAid
                 }
             }
 
-            if (hfsx)
-            {
-                run.Stage(FirstAidMessages.CheckingDiskVolume);
-                run.End(FirstAidVerdict.NotChecked);
-                return (run, new FirstAidReport(run));
-            }
-
             if (plus)
             {
-                _ = PlusVolumeCheck.Run(run, offset, length)
+                _ = PlusVolumeCheck.Run(run, offset, length, hfsx)
                     && Stage(run, FirstAidMessages.CheckingExtentsBTree) && BTreeCheck.Run(run, run.Extents!)
                     && Stage(run, FirstAidMessages.CheckingCatalogBTree) && BTreeCheck.Run(run, run.Catalog!)
                     && (run.AttributesTree is not { } attributes || Stage(run, FirstAidMessages.CheckingAttributesBTree) && BTreeCheck.Run(run, attributes))
