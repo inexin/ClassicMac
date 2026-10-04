@@ -20,13 +20,13 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
     /// <summary>Whether the selection is a 'snd ' resource (the header shows the sound's actions).</summary>
     public bool IsSoundResource => main.Selected is ResourceNode { Resource.Type: var type } && type.ToString() == "snd ";
 
-    private bool CanSaveAsWav() => !main.IsExporting && IsSoundResource;
+    private bool CanSaveAsWav() => !main.ExportActions.IsExporting && IsSoundResource;
 
     private bool CanReplaceFromWav() => CanSaveAsWav() && MainViewModel.FileOwner(main.Selected) is not null;
 
     /// <summary>Save as WAV…: the sound decoded as <c>extract</c> writes it.</summary>
     [RelayCommand(CanExecute = nameof(CanSaveAsWav))]
-    private Task SaveAsWav() => main.Run(async () =>
+    private Task SaveAsWav() => main.ExportActions.Run(async () =>
     {
         if (main.Selected is not ResourceNode node || main.FilePicker is null)
         {
@@ -34,7 +34,7 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
         }
 
         var diagnostics = new List<Diagnostic>();
-        var (outputs, _) = await Task.Run(() => main.Decode(node, diagnostics));
+        var (outputs, _) = await Task.Run(() => main.ExportActions.Decode(node, diagnostics));
         foreach (var d in diagnostics)
         {
             main.Report(new DiagnosticEntry(d, node.Source, node));
@@ -46,7 +46,7 @@ public sealed partial class SoundHeaderActions(MainViewModel main) : ObservableO
             return;
         }
 
-        var path = await main.FilePicker.PickSaveFileAsync($"Save {node.Resource} as WAV", HostNames.ToHostName(MainViewModel.Stem(node.Resource), 200) + ".wav", [".wav"]);
+        var path = await main.FilePicker.PickSaveFileAsync($"Save {node.Resource} as WAV", HostNames.ToHostName(ExportActions.Stem(node.Resource), 200) + ".wav", [".wav"]);
         if (path is null)
         {
             return;

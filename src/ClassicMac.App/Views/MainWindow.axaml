@@ -1032,13 +1032,13 @@
         <MenuItem Header="_Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
       </MenuItem>
       <MenuItem Header="E_xport">
-        <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
-        <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
-        <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
-        <MenuItem Header="_Convert Documents…" Command="{Binding ConvertDocumentsCommand}" />
+        <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" HotKey="Ctrl+E" />
+        <MenuItem Header="_Export Resources…" Command="{Binding ExportActions.ExportResourcesCommand}" />
+        <MenuItem Header="E_xtract All Resources…" Command="{Binding ExportActions.ExtractAllCommand}" />
+        <MenuItem Header="_Convert Documents…" Command="{Binding ExportActions.ConvertDocumentsCommand}" />
         <Separator />
-        <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
-        <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
+        <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding ExportActions.UnpackAppleDoubleCommand}" />
+        <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding ExportActions.UnpackBasiliskCommand}" />
         <Separator />
         <MenuItem Header="_Drag Files Out as MacBinary" ToggleType="CheckBox" IsChecked="{Binding DragOut.DragOutAsMacBinary, Mode=TwoWay}" />
       </MenuItem>
@@ -1108,7 +1108,7 @@
               <TextBlock Text="Export…" />
             </StackPanel>
           </Button>
-          <Button Classes="flat tool" Command="{Binding ExtractAllCommand}" ToolTip.Tip="Extract all resources" AutomationProperties.Name="Extract All">
+          <Button Classes="flat tool" Command="{Binding ExportActions.ExtractAllCommand}" ToolTip.Tip="Extract all resources" AutomationProperties.Name="Extract All">
             <StackPanel>
               <Path Classes="tool-icon" Data="M2,7 H16 V16 H2 Z M3.5,4.5 H14.5 M5,2 H13 M9,9 V14 M7,12 L9,14 L11,12" />
               <TextBlock Text="Extract All" />
@@ -1263,13 +1263,13 @@
               <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
               <MenuItem Header="Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
               <Separator />
-              <MenuItem Header="_Save Resource As…" Command="{Binding SaveResourceAsCommand}" InputGesture="Ctrl+E" />
-              <MenuItem Header="_Export Resources…" Command="{Binding ExportResourcesCommand}" />
-              <MenuItem Header="E_xtract All Resources…" Command="{Binding ExtractAllCommand}" />
-              <MenuItem Header="_Convert Documents…" Command="{Binding ConvertDocumentsCommand}" />
+              <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" />
+              <MenuItem Header="_Export Resources…" Command="{Binding ExportActions.ExportResourcesCommand}" />
+              <MenuItem Header="E_xtract All Resources…" Command="{Binding ExportActions.ExtractAllCommand}" />
+              <MenuItem Header="_Convert Documents…" Command="{Binding ExportActions.ConvertDocumentsCommand}" />
               <Separator />
-              <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding UnpackAppleDoubleCommand}" />
-              <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding UnpackBasiliskCommand}" />
+              <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding ExportActions.UnpackAppleDoubleCommand}" />
+              <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding ExportActions.UnpackBasiliskCommand}" />
             </ContextMenu>
           </ListBox.ContextMenu>
         </views:BrowseTree>

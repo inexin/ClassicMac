@@ -133,7 +133,7 @@ public sealed class TreeDisplayTests : IDisposable
         await model.PreviewTask;
         Assert.Equal(PreviewKind.Folder, model.Preview.Kind);
         Assert.Equal("No name", model.Details.Heading);
-        Assert.False(model.ExtractAllCommand.CanExecute(null));
+        Assert.False(model.ExportActions.ExtractAllCommand.CanExecute(null));
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public sealed class TreeDisplayTests : IDisposable
         Assert.Contains(model.Details.Rows, r => r.Label == "Items" && r.Value == "7");
         var output = Directory.CreateDirectory(Path.Combine(folder, "out")).FullName;
         model.FilePicker = new FolderPicker(output);
-        await model.ExtractAllCommand.ExecuteAsync(null);
+        await model.ExportActions.ExtractAllCommand.ExecuteAsync(null);
         Assert.StartsWith("7 resources from 7 files", model.Status, StringComparison.Ordinal);
     }
 

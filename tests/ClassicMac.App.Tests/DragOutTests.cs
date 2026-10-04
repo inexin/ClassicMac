@@ -118,7 +118,7 @@ public sealed class DragOutTests : IDisposable
 
         Directory.CreateDirectory(Path.Combine(folder, "saved"));
         model.Selected = resource;
-        await model.SaveResourceAsCommand.ExecuteAsync(null);
+        await model.ExportActions.SaveResourceAsCommand.ExecuteAsync(null);
         var saved = Assert.Single(Directory.GetFiles(Path.Combine(folder, "saved")));
         Assert.Equal(Path.GetFileName(saved), Path.GetFileName(dragged));
         Assert.Equal(File.ReadAllBytes(saved), File.ReadAllBytes(dragged));

@@ -185,12 +185,12 @@ public sealed class StatusBarTests : IDisposable
         model.Selected = which == "export" ? file : input;
         await (which switch
         {
-            "extract" => model.ExtractAllCommand.ExecuteAsync(null),
-            "unpack" => model.UnpackAppleDoubleCommand.ExecuteAsync(null),
-            "convert" => model.ConvertDocumentsCommand.ExecuteAsync(null),
-            _ => model.ExportResourcesCommand.ExecuteAsync(null),
+            "extract" => model.ExportActions.ExtractAllCommand.ExecuteAsync(null),
+            "unpack" => model.ExportActions.UnpackAppleDoubleCommand.ExecuteAsync(null),
+            "convert" => model.ExportActions.ConvertDocumentsCommand.ExecuteAsync(null),
+            _ => model.ExportActions.ExportResourcesCommand.ExecuteAsync(null),
         });
-        await model.ExportTask;
+        await model.ExportActions.ExportTask;
 
         var (text, maximum) = seen.First();
         Assert.Equal(which switch

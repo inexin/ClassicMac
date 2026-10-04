@@ -140,9 +140,9 @@ public sealed partial class DragOut(MainViewModel main) : ObservableObject
 
     private IReadOnlyList<string> WriteResource(ResourceNode node, string folder, List<Diagnostic> diagnostics)
     {
-        var (outputs, raw) = main.Decode(node, diagnostics);
+        var (outputs, raw) = main.ExportActions.Decode(node, diagnostics);
         var chosen = outputs.FirstOrDefault();
-        var path = Path.Combine(folder, HostNames.ToHostName(MainViewModel.Stem(node.Resource), 200) + (chosen?.Extension ?? ".bin"));
+        var path = Path.Combine(folder, HostNames.ToHostName(ExportActions.Stem(node.Resource), 200) + (chosen?.Extension ?? ".bin"));
         File.WriteAllBytes(path, (chosen?.Content ?? raw).ToArray());
         return [path];
     }

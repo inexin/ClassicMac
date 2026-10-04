@@ -251,9 +251,9 @@ public sealed partial class InspectorActions(MainViewModel main) : ObservableObj
     /// <summary>What the header's Export… does for the selection: save a resource, export a file's or type's resources, or extract all.</summary>
     public IRelayCommand HeaderExportCommand => main.Selected switch
     {
-        ResourceNode => main.SaveResourceAsCommand,
-        FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => main.ExportResourcesCommand,
-        _ => main.ExtractAllCommand,
+        ResourceNode => main.ExportActions.SaveResourceAsCommand,
+        FileNode or ResourceTypeNode or InputNode { Root.Children.Count: 0 } => main.ExportActions.ExportResourcesCommand,
+        _ => main.ExportActions.ExtractAllCommand,
     };
 
     /// <summary>The selection's large icon for the header's tile (PNG), once loaded; null while loading or when it has none.</summary>

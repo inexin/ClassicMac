@@ -161,7 +161,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
             return [];
         }
 
-        var options = main.CurrentDecodeOptions;
+        var options = main.ExportActions.CurrentDecodeOptions;
         return made.Select(m => PreviewViewModel.ForData(m.Type, m.Data, options, main.ReadOptions) is { Images.Count: > 0 } preview
                 ? preview.Images[0] with { Caption = m.Type }
                 : null)
@@ -170,7 +170,7 @@ public sealed partial class ImportActions(MainViewModel main) : ObservableObject
 
     // A sound's rate, channels, sample size and length, as its preview says them; nothing drawn.
     private ImportSource SoundSource(byte[] sound) =>
-        new(PreviewViewModel.ForData("snd ", sound, main.CurrentDecodeOptions, main.ReadOptions).SoundDetails, _ => []);
+        new(PreviewViewModel.ForData("snd ", sound, main.ExportActions.CurrentDecodeOptions, main.ReadOptions).SoundDetails, _ => []);
 
     // Any image Avalonia decodes, converted to unpremultiplied RGBA.
     private static RgbaBitmap ReadImage(string path)

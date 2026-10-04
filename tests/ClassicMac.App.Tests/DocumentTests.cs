@@ -146,7 +146,7 @@ public class DocumentTests : IDisposable
 
         // Converted, though it has no resource fork.
         model.Selected = input;
-        await model.ConvertDocumentsCommand.ExecuteAsync(null);
+        await model.ExportActions.ConvertDocumentsCommand.ExecuteAsync(null);
         Assert.True(File.Exists(Path.Combine(output, "Word documents", "index.html")), model.Status);
 
         var preview = await Select(model, input.Children.Single(c => c.Title == "Letter"));
@@ -169,20 +169,20 @@ public class DocumentTests : IDisposable
         var output = Directory.CreateDirectory(Path.Combine(folder, "out")).FullName;
         var (model, input) = await Open(output);
         model.Selected = input;
-        Assert.True(model.ConvertDocumentsCommand.CanExecute(null));
+        Assert.True(model.ExportActions.ConvertDocumentsCommand.CanExecute(null));
 
-        await model.ConvertDocumentsCommand.ExecuteAsync(null);
+        await model.ExportActions.ConvertDocumentsCommand.ExecuteAsync(null);
 
         Assert.Equal("2 documents to " + Path.Combine(output, "Disk documents") + ".", model.Status);
         Assert.True(File.Exists(Path.Combine(output, "Disk documents", "Manual", "chapter-02.html")));
         Assert.True(File.Exists(Path.Combine(output, "Disk documents", "Read Me", "index.html")));
 
-        await model.ExtractAllCommand.ExecuteAsync(null);
+        await model.ExportActions.ExtractAllCommand.ExecuteAsync(null);
         Assert.True(File.Exists(Path.Combine(output, "Disk resources", "Manual", "document", "index.html")));
 
         // A file with no document: nothing is written.
         model.Selected = input.Children.Single(c => c.Title == "Plain");
-        await model.ConvertDocumentsCommand.ExecuteAsync(null);
+        await model.ExportActions.ConvertDocumentsCommand.ExecuteAsync(null);
         Assert.Equal("No documents in Plain.", model.Status);
         Assert.False(Directory.Exists(Path.Combine(output, "Plain documents")));
     }

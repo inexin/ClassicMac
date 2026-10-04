@@ -79,11 +79,11 @@ public class ExportTests : IDisposable
         foreach (var (node, save, export, extract, unpack) in cases)
         {
             model.Selected = node;
-            Assert.Equal(save, model.SaveResourceAsCommand.CanExecute(null));
-            Assert.Equal(export, model.ExportResourcesCommand.CanExecute(null));
-            Assert.Equal(extract, model.ExtractAllCommand.CanExecute(null));
-            Assert.Equal(unpack, model.UnpackAppleDoubleCommand.CanExecute(null));
-            Assert.Equal(unpack, model.UnpackBasiliskCommand.CanExecute(null));
+            Assert.Equal(save, model.ExportActions.SaveResourceAsCommand.CanExecute(null));
+            Assert.Equal(export, model.ExportActions.ExportResourcesCommand.CanExecute(null));
+            Assert.Equal(extract, model.ExportActions.ExtractAllCommand.CanExecute(null));
+            Assert.Equal(unpack, model.ExportActions.UnpackAppleDoubleCommand.CanExecute(null));
+            Assert.Equal(unpack, model.ExportActions.UnpackBasiliskCommand.CanExecute(null));
         }
     }
 
@@ -94,13 +94,13 @@ public class ExportTests : IDisposable
         var pict = (await Loaded(input, "Picture")).Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "PICT").Children.OfType<ResourceNode>().Single();
         model.Selected = pict;
 
-        await model.SaveResourceAsCommand.ExecuteAsync(null);
+        await model.ExportActions.SaveResourceAsCommand.ExecuteAsync(null);
 
         Assert.Equal([".png", ".bin"], picker.Extensions);
         Assert.Equal([0x89, (byte)'P', (byte)'N', (byte)'G'], File.ReadAllBytes(Path.Combine(output, "128 Logo.png"))[..4]);
 
         picker.SaveAs = "logo.bin";
-        await model.SaveResourceAsCommand.ExecuteAsync(null);
+        await model.ExportActions.SaveResourceAsCommand.ExecuteAsync(null);
 
         Assert.Equal(PreviewTests.Picture, File.ReadAllBytes(Path.Combine(output, "logo.bin")));
     }
@@ -113,7 +113,7 @@ public class ExportTests : IDisposable
         var icons = await Loaded(input.Children.OfType<FolderNode>().Single(), "Icons");
         model.Selected = icons.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "SICN").Children.OfType<ResourceNode>().Single();
 
-        await model.SaveResourceAsCommand.ExecuteAsync(null);
+        await model.ExportActions.SaveResourceAsCommand.ExecuteAsync(null);
 
         Assert.Equal([".png", ".bin"], picker.Extensions);
         Assert.Equal([0x89, (byte)'P', (byte)'N', (byte)'G'], File.ReadAllBytes(Path.Combine(output, "128.png"))[..4]);
@@ -126,8 +126,8 @@ public class ExportTests : IDisposable
         var picture = await Loaded(input, "Picture");
         model.Selected = picture.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR#");
 
-        await model.ExportResourcesCommand.ExecuteAsync(null);
-        await model.ExportResourcesCommand.ExecuteAsync(null);
+        await model.ExportActions.ExportResourcesCommand.ExecuteAsync(null);
+        await model.ExportActions.ExportResourcesCommand.ExecuteAsync(null);
 
         var files = Files(Path.Combine(output, "Picture resources"));
         Assert.Contains("manifest.json", files);
@@ -142,7 +142,7 @@ public class ExportTests : IDisposable
         var (model, input, _, output) = await Open();
         model.Selected = input;
 
-        await model.ExtractAllCommand.ExecuteAsync(null);
+        await model.ExportActions.ExtractAllCommand.ExecuteAsync(null);
 
         var files = Files(Path.Combine(output, "Disk resources"));
         Assert.Contains("Picture/manifest.json", files);
@@ -172,7 +172,7 @@ public class ExportTests : IDisposable
         Assert.Equal(NodeKind.Loading, Assert.Single(input.Children.OfType<ContainerFileNode>().Single().Children).Kind);
         model.Selected = input;
 
-        await model.ExtractAllCommand.ExecuteAsync(null);
+        await model.ExportActions.ExtractAllCommand.ExecuteAsync(null);
 
         Assert.Contains("ICN#/128.png", Files(Path.Combine(output, "Wrapped resources")));
         Assert.StartsWith("1 resources from 1 files", model.Status, StringComparison.Ordinal);
@@ -184,7 +184,7 @@ public class ExportTests : IDisposable
         var (model, input, _, output) = await Open();
         model.Selected = input.Children.OfType<FolderNode>().Single();
 
-        await model.UnpackBasiliskCommand.ExecuteAsync(null);
+        await model.ExportActions.UnpackBasiliskCommand.ExecuteAsync(null);
 
         var target = Path.Combine(output, "Games unpacked");
         Assert.Equal(["Icons", "Read Me"], Directory.GetFiles(target).Select(Path.GetFileName).Order());
@@ -200,7 +200,7 @@ public class ExportTests : IDisposable
         var (model, input, _, output) = await Open();
         model.Selected = await Loaded(input, "Picture");
 
-        await model.UnpackAppleDoubleCommand.ExecuteAsync(null);
+        await model.ExportActions.UnpackAppleDoubleCommand.ExecuteAsync(null);
 
         var target = Path.Combine(output, "Picture unpacked");
         Assert.Equal(["._Picture", "Picture"], Files(target));

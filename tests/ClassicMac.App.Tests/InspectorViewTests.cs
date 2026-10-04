@@ -80,7 +80,7 @@ public sealed class InspectorViewTests
                 .Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Export");
             Assert.Same(model.InspectorActions.HeaderExportCommand, toolbarExport.Command);
             var buttons = header.GetVisualDescendants().OfType<Button>().ToList();
-            Assert.Same(model.SaveResourceAsCommand, buttons.Single(b => (string?)b.Content == "Export…").Command);
+            Assert.Same(model.ExportActions.SaveResourceAsCommand, buttons.Single(b => (string?)b.Content == "Export…").Command);
             var edit = buttons.Single(b => (string?)b.Content == "Edit");
             Assert.True(edit.IsEffectivelyVisible);
 

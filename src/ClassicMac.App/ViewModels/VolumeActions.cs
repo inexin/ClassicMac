@@ -75,9 +75,9 @@ public sealed partial class VolumeActions(MainViewModel main) : ObservableObject
 
     private static string MacPathOf(NodeViewModel item) => string.Join(":", FolderNames(Tree.FolderOf(item)!).Append(ItemName(item)));
 
-    private bool CanCreateInVolume() => !main.IsExporting && VolumeFolder(main.Selected) is not null;
+    private bool CanCreateInVolume() => !main.ExportActions.IsExporting && VolumeFolder(main.Selected) is not null;
 
-    private bool CanDeleteFromVolume() => !main.IsExporting && VolumeItem(main.Selected) is not null;
+    private bool CanDeleteFromVolume() => !main.ExportActions.IsExporting && VolumeItem(main.Selected) is not null;
 
     [RelayCommand(CanExecute = nameof(CanCreateInVolume))]
     private async Task NewFile()

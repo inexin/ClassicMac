@@ -658,8 +658,8 @@ public class WindowTests
             Assert.Same(model.SaveCommand, tools["Save"].Command);
             Assert.Same(model.GetInfoCommand, tools["Get Info"].Command);
             Assert.Same(model.EditHexCommand, tools["Edit Hex"].Command);
-            Assert.Same(model.ExportResourcesCommand, tools["Export"].Command);
-            Assert.Same(model.ExtractAllCommand, tools["Extract All"].Command);
+            Assert.Same(model.ExportActions.ExportResourcesCommand, tools["Export"].Command);
+            Assert.Same(model.ExportActions.ExtractAllCommand, tools["Extract All"].Command);
             Assert.Same(model.SoundPlayback.PlaySoundCommand, tools["Play"].Command);
             void EnabledFollowCommands()
             {

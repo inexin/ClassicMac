@@ -315,9 +315,9 @@ public sealed partial class MainViewModel
         return (type, name);
     }
 
-    private bool CanEditResource() => !IsExporting && Selected is ResourceNode && FileOwner(Selected) is not null;
+    private bool CanEditResource() => !ExportActions.IsExporting && Selected is ResourceNode && FileOwner(Selected) is not null;
 
-    internal bool CanNewResource() => !IsExporting && FileOwner(Selected) is not null;
+    internal bool CanNewResource() => !ExportActions.IsExporting && FileOwner(Selected) is not null;
 
     [RelayCommand(CanExecute = nameof(CanNewResource))]
     private async Task NewResource()
@@ -656,7 +656,7 @@ public sealed partial class MainViewModel
         }
     }
 
-    private bool CanSave() => !IsExporting && (SelectedState is { Session.IsDirty: true, Location: not null } || FileOwner(Selected) is not null && Drafts.HasDraft);
+    private bool CanSave() => !ExportActions.IsExporting && (SelectedState is { Session.IsDirty: true, Location: not null } || FileOwner(Selected) is not null && Drafts.HasDraft);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
     private Task Save() => SaveTask = SaveSelectedAsync();
@@ -719,7 +719,7 @@ public sealed partial class MainViewModel
     }
 
     private bool CanSaveAs(SaveAsFormat format) =>
-        !IsExporting && (format == SaveAsFormat.HfsImage ? Selected?.Input.IsWritableHfs == true : FileOwner(Selected) is not null);
+        !ExportActions.IsExporting && (format == SaveAsFormat.HfsImage ? Selected?.Input.IsWritableHfs == true : FileOwner(Selected) is not null);
 
     [RelayCommand(CanExecute = nameof(CanSaveAs))]
     private async Task SaveAs(SaveAsFormat format)

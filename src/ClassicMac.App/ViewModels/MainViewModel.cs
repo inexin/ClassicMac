@@ -68,6 +68,11 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private ExportActions? exportActions;
+
+    /// <summary>Save Resource As, Export, Extract All, Convert Documents and Unpack.</summary>
+    public ExportActions ExportActions => exportActions ??= new(this);
+
     private InspectorActions? inspectorActions;
 
     /// <summary>The inspector's header: the selection's title, icon, kind and actions.</summary>
@@ -330,8 +335,8 @@ public sealed partial class MainViewModel : ObservableObject
             OnPropertyChanging(nameof(Selected));
             selected = value;
             OnPropertyChanged(nameof(Selected));
-            foreach (var command in new IRelayCommand[] { CloseCommand, SaveResourceAsCommand, ExportResourcesCommand, ExtractAllCommand, UnpackAppleDoubleCommand,
-                UnpackBasiliskCommand })
+            foreach (var command in new IRelayCommand[] { CloseCommand, ExportActions.SaveResourceAsCommand, ExportActions.ExportResourcesCommand, ExportActions.ExtractAllCommand, ExportActions.UnpackAppleDoubleCommand,
+                ExportActions.UnpackBasiliskCommand })
             {
                 command.NotifyCanExecuteChanged();
             }

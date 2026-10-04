@@ -149,16 +149,16 @@ public sealed class InspectorTests : IDisposable
         model.InspectorActions.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
         model.Selected = Child<ResourceTypeNode>(prefs, "'STR#' (2)").Children[0];
-        Assert.Same(model.SaveResourceAsCommand, model.InspectorActions.HeaderExportCommand);
+        Assert.Same(model.ExportActions.SaveResourceAsCommand, model.InspectorActions.HeaderExportCommand);
         Assert.Contains(nameof(InspectorActions.HeaderExportCommand), changed);
         model.Selected = prefs;
-        Assert.Same(model.ExportResourcesCommand, model.InspectorActions.HeaderExportCommand);
+        Assert.Same(model.ExportActions.ExportResourcesCommand, model.InspectorActions.HeaderExportCommand);
         model.Selected = Child<ResourceTypeNode>(prefs, "'STR#' (2)");
-        Assert.Same(model.ExportResourcesCommand, model.InspectorActions.HeaderExportCommand);
+        Assert.Same(model.ExportActions.ExportResourcesCommand, model.InspectorActions.HeaderExportCommand);
         model.Selected = Child<FolderNode>(input, "Docs");
-        Assert.Same(model.ExtractAllCommand, model.InspectorActions.HeaderExportCommand);
+        Assert.Same(model.ExportActions.ExtractAllCommand, model.InspectorActions.HeaderExportCommand);
         model.Selected = input;
-        Assert.Same(model.ExtractAllCommand, model.InspectorActions.HeaderExportCommand);
+        Assert.Same(model.ExportActions.ExtractAllCommand, model.InspectorActions.HeaderExportCommand);
     }
 
     // A plain resource file: STR# 128 has a form.
