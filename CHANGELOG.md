@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- QuickDraw's ScrollRect (quickdraw.md §2.25): `QuickDrawPort.ScrollRect` moves a rect's pixels inside the clip by srcCopy
+  in black and white and erases what they leave when an update region is asked for, as both QuickDraws do.
 - Mac OS text encodings (codecs/text-encodings.md): `MacEncodings` reads and writes Mac OS Roman, Japanese, Chinese
   Traditional and Simplified, Korean, Arabic, Hebrew, Greek, Cyrillic, Ukrainian, Thai, Central European, Croatian,
   Romanian, Icelandic and Turkish; the decoders read text in `DecodeOptions.TextEncoding` (`MacTextEncoding` moved to

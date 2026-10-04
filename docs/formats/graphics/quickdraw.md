@@ -810,6 +810,23 @@ On a colour port:
   count (outline 1, shadow 2, both 3) to the descent. Then each is stretched, `(value × numer + denom / 2) / denom`,
   vertically for ascent, descent and leading and horizontally for widMax [Code].
 
+### 2.25 ScrollRect
+
+ScrollRect(r, dh, dv, updateRgn), the same in the ROM and Mac OS 9 except where noted [Code: 68k ROM $077D]
+[Code: Mac OS 9.0 QuickDraw]:
+
+1. With pnVis < 0, or dh = dv = 0, updateRgn (when not NIL) is made empty and nothing else happens.
+2. The foreground and background colours are saved and set to black and white, so the copy is not colorized.
+3. srcRgn = r ∩ visRgn ∩ clipRgn; maskRgn = srcRgn ∩ (srcRgn offset by dh, dv).
+4. With several screens, the parts of screens whose colour tables differ are cut out of the mask.
+5. CopyBits from the port's pixels to themselves, r to r offset by (dh, dv), srcCopy, through maskRgn; then the colours
+   are restored.
+6. Only when updateRgn is not NIL: updateRgn = srcRgn − maskRgn, and EraseRgn erases it with the restored colours and
+   the background pattern, clipped as any drawing. With updateRgn NIL nothing is erased.
+
+So a move by the rect's whole width or height copies nothing and erases all of srcRgn. Mac OS 9 gives QDErr −50 for a
+NIL rect and stops when a region operation fails.
+
 ## 3. Writing
 
 None. QuickDraw draws; recording drawing as a picture is [pict.md §3](pict.md#3-writing).
@@ -1163,6 +1180,8 @@ None. The renderer reports no diagnostics; the font readers' codes (`font.short`
   - `CopyBitsTests`: stretching and shrinking 1-bit and deep sources, colorizing, the Boolean modes, transparent,
     alpha, the ×1.5 and ×¾ column groups, the exact-shrink row start, Mac OS 9's DDA, rounding and channel blend.
   - `PortTests`: SetOrigin, a hidden pen, text measuring, DrawPicture, CopyMask on a 1-bit screen.
+  - `ScrollRectTests`: the move and the erase, no update region, no colorizing and the clip, a hidden pen or no move,
+    a move by the whole rect (both modes).
   - `TextTests`: strikes, placement, space extra, the missing symbol, bold, italic (both modes), underline, outline,
     ink past the pen (both modes), the lone return, ChExtra, PnLocHFrac, TxRatio, Mac OS 9's stretched srcOr rect and
     size folding, the Font Manager's size and style choice, fallbacks, width tables, FScaleDisable, colour fonts,
@@ -1180,6 +1199,7 @@ None. The renderer reports no diagnostics; the font readers' codes (`font.short`
 - **The ROM's arithmetic-mode text on indexed screens** is not verified (§4.11).
 - **Mac OS 9's quirks of §4.5**, its pattern origin and its TextWidth cache (§4.4).
 - **Custom screen colour tables and search procs.**
+- **ScrollRect with several screens** (§2.25 step 4): a port is one screen.
 - **QuickTime images on indexed screens**, which the Image Compression Manager's codecs dither themselves
   ([quicktime.md §8](quicktime.md#8-not-covered)).
 

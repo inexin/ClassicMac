@@ -305,6 +305,44 @@ public sealed class QuickDrawPort
     }
 
     /// <summary>
+    /// Scrolls <paramref name="rect"/> (local) by <paramref name="dh"/>, <paramref name="dv"/> (<c>ScrollRect</c>,
+    /// quickdraw.md §2.25): the pixels of the rect inside the screen and the clip region move by CopyBits srcCopy in
+    /// black on white (so nothing is colorized), cut to where they land inside the same area. With
+    /// <paramref name="updateRegion"/>, what they leave is erased with the port's background and returned (local);
+    /// without it nothing is erased and null is returned. A hidden pen, or no move, does nothing (an empty region).
+    /// </summary>
+    public Region? ScrollRect(MacRect rect, int dh, int dv, bool updateRegion)
+    {
+        if (PenVis < 0 || (dh == 0 && dv == 0))
+        {
+            return updateRegion ? Region.Empty : null;
+        }
+
+        // srcRgn = the rect ∩ visRgn (the canvas) ∩ clipRgn; maskRgn = srcRgn ∩ srcRgn moved.
+        var source = Region.FromRect(ToCanvas(rect)).Intersect(Region.FromRect(new PictRect(0, 0, canvas.Height, canvas.Width)));
+        if (ClipRegion != null)
+        {
+            source = source.Intersect(ClipRegion);
+        }
+
+        var mask = source.Intersect(source.Offset(dh, dv));
+        var (fore, back) = (ForeColor, BackColor);
+        (ForeColor, BackColor) = (RgbColor.Black, RgbColor.White);
+        var from = ToCanvas(rect);
+        var to = new PictRect(from.Top + dv, from.Left + dh, from.Bottom + dv, from.Right + dh);
+        CopyBits(PixMap.FromBitmap(canvas), from, to, TransferModes.SrcCopy, mask);
+        (ForeColor, BackColor) = (fore, back);
+        if (!updateRegion)
+        {
+            return null;
+        }
+
+        var update = source.Difference(mask);
+        RgnShape(update, 2);
+        return update.Offset(OriginH, OriginV);
+    }
+
+    /// <summary>
     /// Copies <paramref name="sourceRect"/> of <paramref name="source"/> to <paramref name="destinationRect"/> (local)
     /// where the 1-bit <paramref name="mask"/>'s <paramref name="maskRect"/> is set, both stretched to the destination
     /// (<c>CopyMask</c>): srcCopy with the port's colours, inside the clip region. A hidden pen does not stop it.
