@@ -970,25 +970,16 @@ public static partial class HfsWriter
         public sealed class RebuildException : Exception;
 
         private readonly int maxKeyLength;
-        private readonly List<(int Offset, int Length)> maps = [];
+        private readonly BTreeMap map;
         private Dictionary<uint, uint>? parents;
 
         public CatalogTreeEdit(byte[] bytes)
         {
             Bytes = bytes;
             maxKeyLength = U16(Reader, 14 + 20);
-            maps.Add((U16(Reader, NodeSize - 6), U16(Reader, NodeSize - 8) - U16(Reader, NodeSize - 6)));
-            var seen = new HashSet<uint>();
-            for (uint mapNode = U32(Reader, 0); mapNode != 0; mapNode = U32(Reader, checked((int)mapNode * NodeSize)))
+            if (!new BTreeFile(bytes, NodeSize, wordKeyLength: false).TryReadMap(out map, out var problem))
             {
-                if (mapNode >= NodeCount || !seen.Add(mapNode))
-                {
-                    throw new InvalidDataException("The HFS catalog B-tree map-node chain is invalid.");
-                }
-
-                int offset = checked((int)mapNode * NodeSize);
-                int start = U16(Reader, offset + NodeSize - 2);
-                maps.Add((offset + start, U16(Reader, offset + NodeSize - 4) - start));
+                throw new InvalidDataException($"The HFS catalog B-tree node map is invalid: {problem}");
             }
         }
 
@@ -1351,52 +1342,17 @@ public static partial class HfsWriter
         private void Free(uint node)
         {
             Bytes.AsSpan(Offset(node), NodeSize).Clear();
-            SetMapBit(node, false);
+            map.SetAllocated(node, false);
             FreeNodes++;
         }
 
         // AllocateNode: the first free node by the map, marked used.
         private uint Allocate()
         {
-            for (uint node = 1; node < NodeCount; node++)
-            {
-                if (!MapBit(node))
-                {
-                    SetMapBit(node, true);
-                    FreeNodes--;
-                    return node;
-                }
-            }
-
-            throw new NeedsNodesException();
-        }
-
-        private (int At, byte Bit) MapPlace(uint node)
-        {
-            int mapByte = checked((int)(node >> 3));
-            foreach (var (offset, length) in maps)
-            {
-                if (mapByte < length)
-                {
-                    return (offset + mapByte, (byte)(0x80 >> (int)(node & 7)));
-                }
-
-                mapByte -= length;
-            }
-
-            throw new RebuildException();
-        }
-
-        private bool MapBit(uint node)
-        {
-            var (at, bit) = MapPlace(node);
-            return (Bytes[at] & bit) != 0;
-        }
-
-        private void SetMapBit(uint node, bool used)
-        {
-            var (at, bit) = MapPlace(node);
-            Bytes[at] = used ? (byte)(Bytes[at] | bit) : (byte)(Bytes[at] & ~bit);
+            uint node = map.FirstFree(NodeCount) ?? throw new NeedsNodesException();
+            map.SetAllocated(node, true);
+            FreeNodes--;
+            return node;
         }
 
         // A key as the index stores it: at the tree's maximum key length, zero-padded, as Mac OS writes index keys

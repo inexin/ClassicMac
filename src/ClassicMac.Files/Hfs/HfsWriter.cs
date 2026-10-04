@@ -558,48 +558,35 @@ public static partial class HfsWriter
             throw new InvalidDataException("An HFS B-tree is shorter than one node.");
         }
 
-        uint node = U32(new BigEndianReader(tree), 14 + 10);
+        var file = new BTreeFile(tree, NodeSize, wordKeyLength: false);
         var seen = new HashSet<uint>();
-        while (node != 0)
+        for (uint node = file.FirstLeaf; node != 0; node = file.Node(node).FLink)
         {
-            if (node >= tree.Length / NodeSize || !seen.Add(node))
+            if (node >= file.NodeCount || !seen.Add(node))
             {
                 throw new InvalidDataException("An HFS B-tree leaf link is invalid or loops.");
             }
 
-            int nodeOffset = checked((int)node * NodeSize);
-            var bytes = tree.AsSpan(nodeOffset, NodeSize).ToArray();
-            var nodeReader = new BigEndianReader(bytes);
-            if ((sbyte)bytes[8] != -1)
+            var descriptor = file.Node(node);
+            if (descriptor.Kind != BTreeNode.LeafKind)
             {
                 throw new InvalidDataException("An HFS B-tree leaf chain links to a non-leaf node.");
             }
 
-            int count = U16(nodeReader, 10);
-            if (count > (NodeSize - 14) / 2 - 1)
+            if (descriptor.RecordCount > (NodeSize - 14) / 2 - 1)
             {
                 throw new InvalidDataException("An HFS B-tree node has too many records for its offset table.");
             }
 
-            for (int i = 0; i < count; i++)
+            for (int i = 0; i < descriptor.RecordCount; i++)
             {
-                int start = U16(nodeReader, NodeSize - 2 * (i + 1));
-                int end = U16(nodeReader, NodeSize - 2 * (i + 2));
-                if (start < 14 || end > NodeSize - 2 * (count + 1) || end <= start)
+                if (!file.TryRecord(node, i, out var key, out var data) || !file.TryRecordBounds(node, i, out int start, out int end))
                 {
                     throw new InvalidDataException("An HFS B-tree record has invalid offsets.");
                 }
 
-                int keyEnd = start + 1 + bytes[start];
-                int dataStart = (keyEnd + 1) & ~1;
-                if (dataStart > end)
-                {
-                    throw new InvalidDataException("An HFS B-tree key exceeds its record.");
-                }
-
-                yield return new TreeRecord(bytes[start..keyEnd], bytes[dataStart..end], nodeOffset, start, end);
+                yield return new TreeRecord(key.ToArray(), data.ToArray(), file.Offset(node), start, end);
             }
-            node = U32(nodeReader, 0);
         }
     }
 
@@ -656,26 +643,12 @@ public static partial class HfsWriter
             return padded;
         }
 
-        var reserved = new HashSet<uint> { 0 };
-        var maps = new List<(int Offset, int Length)>
+        if (!new BTreeFile(tree, NodeSize, wordKeyLength: false).TryReadMap(out var map, out var mapProblem))
         {
-            (U16(treeReader, NodeSize - 6), U16(treeReader, NodeSize - 8) - U16(treeReader, NodeSize - 6)),
-        };
-        uint mapNode = U32(treeReader, 0);
-        while (mapNode != 0)
-        {
-            if (mapNode >= nodeCount || !reserved.Add(mapNode))
-            {
-                throw new InvalidDataException("The extents-overflow B-tree map-node chain is invalid.");
-            }
-
-            int offset = checked((int)mapNode * NodeSize);
-            int start = U16(treeReader, offset + NodeSize - 2);
-            int end = U16(treeReader, offset + NodeSize - 4);
-            maps.Add((offset + start, end - start));
-            mapNode = U32(treeReader, offset);
+            throw new InvalidDataException($"The B-tree's node map is invalid: {mapProblem}");
         }
 
+        var reserved = new HashSet<uint>(map.MapNodes) { 0 };
         var available = Enumerable.Range(1, checked((int)nodeCount - 1))
             .Select(number => (uint)number).Where(number => !reserved.Contains(number)).ToArray();
         var built = new List<(uint Number, byte[] FirstKey, byte[] Bytes)>();
@@ -785,27 +758,16 @@ public static partial class HfsWriter
 
         var allocated = new HashSet<uint>(reserved);
         allocated.UnionWith(built.Select(node => node.Number));
+        if (!new BTreeFile(rebuilt, NodeSize, wordKeyLength: false).TryReadMap(out var rebuiltMap, out mapProblem))
+        {
+            throw new InvalidDataException($"The B-tree's node map is invalid: {mapProblem}");
+        }
+
         for (uint number = 0; number < nodeCount; number++)
         {
-            int mapByte = checked((int)(number >> 3));
-            int bit = (int)(number & 7);
-            foreach (var (offset, length) in maps)
+            if (number < rebuiltMap.Capacity)
             {
-                if (mapByte >= length)
-                {
-                    mapByte -= length;
-                    continue;
-                }
-                if (allocated.Contains(number))
-                {
-                    rebuilt[offset + mapByte] |= (byte)(0x80 >> bit);
-                }
-                else
-                {
-                    rebuilt[offset + mapByte] &= (byte)~(0x80 >> bit);
-                }
-
-                break;
+                rebuiltMap.SetAllocated(number, allocated.Contains(number));
             }
         }
 
@@ -824,98 +786,55 @@ public static partial class HfsWriter
         rebuilt.CopyTo(tree, 0);
     }
 
+    // The node map of a tree file grown from oldNodeCount to newNodeCount nodes: map nodes added where the map cannot
+    // cover them, the new nodes marked free and the new map nodes used; returns how many map nodes it added.
     internal static uint ExtendBTreeNodeMap(byte[] tree, uint oldNodeCount, uint newNodeCount)
     {
-        var treeReader = new BigEndianReader(tree);
-        int headerStart = U16(treeReader, NodeSize - 6);
-        int headerEnd = U16(treeReader, NodeSize - 8);
-        if (headerStart < 14 || headerEnd <= headerStart || headerEnd > NodeSize - 8)
+        var file = new BTreeFile(tree, NodeSize, wordKeyLength: false);
+        if (!file.TryReadMap(out var map, out var problem) || map.MapNodes.Any(node => node >= oldNodeCount))
         {
-            throw new InvalidDataException("The HFS B-tree header node map has invalid offsets.");
+            throw new InvalidDataException($"The HFS B-tree node map is invalid: {problem ?? "a map node lies past the tree"}");
         }
 
-        var maps = new List<(int Offset, int Length)> { (headerStart, headerEnd - headerStart) };
-        uint lastMapNode = 0;
-        var seen = new HashSet<uint>();
-        uint current = U32(treeReader, 0);
-        while (current != 0)
-        {
-            if (current >= oldNodeCount || !seen.Add(current))
-            {
-                throw new InvalidDataException("The HFS B-tree map-node chain is invalid.");
-            }
-
-            int at = checked((int)current * NodeSize);
-            int start = U16(treeReader, at + NodeSize - 2);
-            int end = U16(treeReader, at + NodeSize - 4);
-            if (tree[at + 8] != 2 || start < 14 || end <= start || end > NodeSize - 4)
-            {
-                throw new InvalidDataException("The HFS B-tree map node has invalid offsets.");
-            }
-
-            maps.Add((at + start, end - start));
-            lastMapNode = current;
-            current = U32(treeReader, at);
-        }
-
-        uint mapCapacity = checked((uint)maps.Sum(map => (long)map.Length * 8));
-        if (mapCapacity < oldNodeCount)
+        if (map.Capacity < oldNodeCount)
         {
             throw new InvalidDataException("The HFS B-tree node map does not cover its existing nodes.");
         }
 
         var newMapNodes = new List<uint>();
         var writer = new BigEndianWriter(tree);
-        while (mapCapacity < newNodeCount)
+        uint lastMapNode = map.MapNodes.Count == 0 ? 0 : map.MapNodes[^1];
+        for (long capacity = map.Capacity; capacity < newNodeCount; capacity += (NodeSize - 20) * 8)
         {
-            // At the old end of the tree, one after another, as Mac OS places them [Verified: Mac OS 9.0].
+            // At the old end of the tree, one after another, as Mac OS places them [Verified: Mac OS 9.0]; a map node of one
+            // record (offsets 14 and nodeSize - 6) whose backward link stays 0, as Apple's ExtendBTree leaves it [Doc:
+            // Apple's hfs sources, BTreeAllocate.c].
             uint number = oldNodeCount + (uint)newMapNodes.Count;
-            int at = checked((int)number * NodeSize);
-            if (number >= newNodeCount || at + NodeSize > tree.Length)
+            if (number >= newNodeCount)
             {
                 throw new InvalidDataException("The HFS B-tree has no node available for another map record.");
             }
 
-            writer.WriteUInt32At(lastMapNode == 0 ? 0 : checked((int)lastMapNode * NodeSize), number);
+            int at = file.Offset(number);
+            writer.WriteUInt32At(file.Offset(lastMapNode), number);
             tree[at + 8] = 2;
-            // The backward link stays 0, as Apple's ExtendBTree leaves it [Doc: Apple's hfs sources, BTreeAllocate.c].
             writer.WriteUInt16At(at + 10, 1);
             writer.WriteUInt16At(at + NodeSize - 2, 14);
             writer.WriteUInt16At(at + NodeSize - 4, NodeSize - 6);
-            maps.Add((at + 14, NodeSize - 20));
             newMapNodes.Add(number);
             lastMapNode = number;
-            mapCapacity = checked(mapCapacity + (NodeSize - 20) * 8u);
+        }
+
+        if (!file.TryReadMap(out map, out problem))
+        {
+            throw new InvalidDataException($"The HFS B-tree node map is invalid: {problem}");
         }
 
         for (uint number = oldNodeCount; number < newNodeCount; number++)
         {
-            int mapByte = checked((int)(number >> 3));
-            foreach (var (offset, length) in maps)
-            {
-                if (mapByte >= length)
-                {
-                    mapByte -= length;
-                    continue;
-                }
-                tree[offset + mapByte] &= (byte)~(0x80 >> (int)(number & 7));
-                break;
-            }
+            map.SetAllocated(number, newMapNodes.Contains(number));
         }
-        foreach (uint number in newMapNodes)
-        {
-            int mapByte = checked((int)(number >> 3));
-            foreach (var (offset, length) in maps)
-            {
-                if (mapByte >= length)
-                {
-                    mapByte -= length;
-                    continue;
-                }
-                tree[offset + mapByte] |= (byte)(0x80 >> (int)(number & 7));
-                break;
-            }
-        }
+
         return checked((uint)newMapNodes.Count);
     }
 
@@ -949,10 +868,8 @@ public static partial class HfsWriter
             throw new InvalidDataException("An HFS B-tree node lies outside the tree file.");
         }
 
-        int nodeOffset = checked((int)nodeNumber * NodeSize);
-        var bytes = tree.AsMemory(nodeOffset, NodeSize);
-        var nodeReader = new BigEndianReader(bytes);
-        int count = U16(nodeReader, 10);
+        var file = new BTreeFile(tree, NodeSize, wordKeyLength: false);
+        int count = file.Node(nodeNumber).RecordCount;
         if (count > (NodeSize - 14) / 2 - 1)
         {
             throw new InvalidDataException("An HFS B-tree node has too many records for its offset table.");
@@ -961,21 +878,12 @@ public static partial class HfsWriter
         var records = new List<(byte[] Key, byte[] Data)>(count);
         for (int i = 0; i < count; i++)
         {
-            int start = U16(nodeReader, NodeSize - 2 * (i + 1));
-            int end = U16(nodeReader, NodeSize - 2 * (i + 2));
-            if (start < 14 || end > NodeSize - 2 * (count + 1) || end <= start)
+            if (!file.TryRecord(nodeNumber, i, out var key, out var data))
             {
                 throw new InvalidDataException("An HFS B-tree node has invalid record offsets.");
             }
 
-            int keyEnd = start + 1 + bytes.Span[start];
-            int dataStart = (keyEnd + 1) & ~1;
-            if (keyEnd > end || dataStart > end)
-            {
-                throw new InvalidDataException("An HFS B-tree node record has an invalid key or data offset.");
-            }
-
-            records.Add((bytes[start..keyEnd].ToArray(), bytes[dataStart..end].ToArray()));
+            records.Add((key.ToArray(), data.ToArray()));
         }
         return records;
     }
