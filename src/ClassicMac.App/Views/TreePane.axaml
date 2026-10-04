@@ -123,6 +123,7 @@
         <MenuItem Header="Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
         <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
         <MenuItem Header="Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
+        <MenuItem Header="First Aid…" Command="{Binding VolumeActions.FirstAidCommand}" />
         <Separator />
         <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" />
         <MenuItem Header="_Export Resources…" Command="{Binding ExportActions.ExportResourcesCommand}" />

@@ -598,6 +598,57 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal(original, File.ReadAllBytes(path));
     }
 
+    // Volume ▸ First Aid…: the volume checked, its problems and verdict shown; Repair repairs it in the session, shows
+    // what it did, and Save As writes the repaired volume.
+    [Fact]
+    public async Task First_Aid_checks_a_volume_and_repairs_it_for_Save_As()
+    {
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Other", "other file"u8.ToArray(), []);
+        var image = WithFreeSpace(disk.Build("Volume"));
+        int files = 2 * HfsBuilder.Block + 0x54;
+        image[files + 3]++;                                                        // drFilCnt one too many
+        var path = Path.Combine(folder, "Volume.hfs");
+        File.WriteAllBytes(path, image);
+        var dialogs = new Dialogs();
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        var input = (await model.OpenAsync(path))!;
+        model.Selected = input.Children.Single(n => n.Title == "Other");          // any item of the volume
+        Assert.True(model.VolumeActions.FirstAidCommand.CanExecute(null));
+
+        await model.VolumeActions.FirstAidCommand.ExecuteAsync(null);              // Done
+        var report = Assert.Single(dialogs.FirstAidShown);
+        Assert.Equal(("Volume", true), (report.Volume, report.CanRepair));
+        Assert.Contains("Problem:  Master Directory Block needs minor repair, 2, 0", report.Lines);
+        Assert.Equal("The volume “Volume” needs to be repaired.", report.Summary);
+        Assert.False(model.EditActions.HasUnsavedChanges);
+
+        dialogs.FirstAid = _ => true;                                              // Repair
+        await model.VolumeActions.FirstAidCommand.ExecuteAsync(null);
+        var repaired = dialogs.FirstAidShown[^1];
+        Assert.Equal(3, dialogs.FirstAidShown.Count);
+        Assert.False(repaired.CanRepair);
+        Assert.Equal("The volume “Volume” was repaired successfully.", repaired.Summary);
+        Assert.Contains(repaired.Lines, l => l.Contains("master directory block", StringComparison.Ordinal));
+        Assert.True(model.EditActions.HasUnsavedChanges);
+        Assert.EndsWith("•", input.Title);
+        Assert.Equal(image, File.ReadAllBytes(path));                              // nothing written until Save As
+
+        model.Selected = input;
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = HfsFirstAid.Verify(ForkData.FromFile(Path.Combine(folder, "Volume-edited.hfs")));
+        Assert.Equal(FirstAidVerdict.AppearsOk, saved.Verdict);
+    }
+
+    [Fact]
+    public async Task First_Aid_is_for_HFS_volumes()
+    {
+        var model = new MainViewModel { EditDialogs = new Dialogs() };
+        model.Selected = await model.OpenAsync(MacBinary());
+
+        Assert.False(model.VolumeActions.FirstAidCommand.CanExecute(null));
+    }
+
     [Fact]
     public async Task Deleting_a_folder_deletes_its_contents_and_fork_edits_save_with_volume_changes()
     {

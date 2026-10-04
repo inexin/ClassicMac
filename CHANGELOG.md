@@ -9,7 +9,8 @@
   volume in Disk First Aid's order (B-trees with its repair list, bitmap, MDB) and verifies it again. Checks beyond
   Disk First Aid's, in the same verdict, find and repair a missing or stale alternate MDB,
   overflow records' start blocks, orphaned overflow extents, short physical lengths and wrong `drNmFls`/`drFreeBks`,
-  and report extents past the last block. Files that share blocks get their own copies. The test builder's volumes now carry their forks' physical lengths and a clump size.
+  and report extents past the last block. Files that share blocks get their own copies. The app's Volume ▸ First Aid… (and the tree's menu) checks the selected volume, lists the problems and the
+  verdict, and Repair repairs it in the session for Save As. The test builder's volumes now carry their forks' physical lengths and a clump size.
 - Code quality: the build runs the .NET analyzers' recommended rules as errors (`AnalysisMode`; `.editorconfig` lists
   the few turned off and why). `Fixed`, `UnsignedFixed` and `FourCC` gain `<`, `<=`, `>` and `>=`; `MacDate.ToString`
   and a code's `\xHH` escapes no longer follow the user's locale; `ExceptionFilters` (Core) names the recurring catch

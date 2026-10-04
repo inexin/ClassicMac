@@ -29,4 +29,6 @@ internal sealed class EditDialogs(Window owner) : IEditDialogs
     public Task<DraftChoice> AskApplyDraftAsync(string what, string? error) => Show(DialogViews.ApplyDraft(what, error));
 
     public Task<bool> ConfirmAsync(string title, string message) => Show(DialogViews.Confirm(title, message));
+
+    public Task<bool> FirstAidAsync(FirstAidView view) => Show(DialogViews.FirstAid(view));
 }

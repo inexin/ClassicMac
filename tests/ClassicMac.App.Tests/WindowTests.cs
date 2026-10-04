@@ -197,7 +197,7 @@ public class WindowTests
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
             var items = menu.Items.OfType<MenuItem>().ToList();
-            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…",
+            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…", "First Aid…",
                 "_Save Resource As…"],
                 items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
             Capture(window, "context-menu");
@@ -469,6 +469,7 @@ public class WindowTests
         public Task<ImportChoice?> ImportAsync(string fileName, IReadOnlyList<string> types, ImportChoice initial, ImportSource source) => throw new NotSupportedException();
         public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => throw new NotSupportedException();
         public Task<string?> NewFolderAsync(string initial) => throw new NotSupportedException();
+        public Task<bool> FirstAidAsync(FirstAidView view) => throw new NotSupportedException();
     }
 
     // Clicking or arrowing to another tree node with an unapplied form: the tree keeps the old node selected and nothing

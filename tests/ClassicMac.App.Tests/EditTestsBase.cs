@@ -87,6 +87,16 @@ public abstract class EditTestsBase : IDisposable
         public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => Task.FromResult(NewFile(initial));
 
         public Task<string?> NewFolderAsync(string initial) => Task.FromResult(FolderName);
+
+        // First Aid's window: each one shown, and whether Repair is clicked.
+        public Func<FirstAidView, bool> FirstAid { get; set; } = _ => false;
+        public List<FirstAidView> FirstAidShown { get; } = [];
+
+        public Task<bool> FirstAidAsync(FirstAidView view)
+        {
+            FirstAidShown.Add(view);
+            return Task.FromResult(FirstAid(view));
+        }
     }
 
     protected static readonly FourCC Str = FourCC.FromString("STR ");

@@ -550,6 +550,39 @@ internal static class DialogViews
         return dialog;
     }
 
+    /// <summary>
+    /// First Aid: the volume in the header, its lines in a scrolling list (monospaced, as Disk First Aid prints them), the
+    /// verdict, and Done with Repair when it can repair.
+    /// </summary>
+    public static Dialog<bool> FirstAid(FirstAidView view)
+    {
+        var window = NewWindow("First Aid");
+        var dialog = new Dialog<bool>(window, false);
+        var list = new StackPanel { Spacing = 2 };
+        foreach (var line in view.Lines)
+        {
+            list.Children.Add(new TextBlock { Text = line, Classes = { "mono" }, TextWrapping = TextWrapping.Wrap });
+        }
+
+        var body = new StackPanel { Spacing = 10, Width = 480 };
+        body.Children.Add(new TextBlock { Text = $"“{view.Volume}”", Classes = { "alert-question" } });
+        if (view.Lines.Count > 0)
+        {
+            body.Children.Add(new ScrollViewer { Name = "FirstAidLines", MaxHeight = 240, Content = list });
+        }
+
+        body.Children.Add(new TextBlock { Name = "FirstAidSummary", Text = view.Summary, TextWrapping = TextWrapping.Wrap });
+        var done = Button("Done", window.Close);
+        var repair = Button("Repair", () =>
+        {
+            dialog.Result = true;
+            window.Close();
+        });
+        repair.IsEnabled = view.CanRepair;
+        Compose(window, Header(window, "First Aid", () => { }), body, Footer(done, repair, null));
+        return dialog;
+    }
+
     /// <summary>A yes/no question: No and Yes.</summary>
     public static Dialog<bool> Confirm(string title, string message)
     {

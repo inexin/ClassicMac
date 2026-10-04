@@ -73,7 +73,16 @@ public interface IEditDialogs
 
     /// <summary>New Folder: the name, or null when cancelled.</summary>
     Task<string?> NewFolderAsync(string initial);
+
+    /// <summary>First Aid's window: what a check or repair found; true when Repair is clicked (offered only when it can).</summary>
+    Task<bool> FirstAidAsync(FirstAidView view);
 }
+
+/// <summary>
+/// First Aid's window (Volume ▸ First Aid…): the volume, the lines (problems, or the repairs made and what is left), the
+/// verdict, and whether Repair is offered.
+/// </summary>
+public sealed record FirstAidView(string Volume, IReadOnlyList<string> Lines, string Summary, bool CanRepair);
 
 /// <summary>Get Info's subject (design/boards/dialogs.md): the icon tile's PNG (null: a plain glyph), the name and "Icon family in Finder · 2,240 bytes".</summary>
 public sealed record DialogSubject(string Name, string Line, byte[]? IconPng);
@@ -234,7 +243,8 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
     {
         foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
             ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, appParts.ImportActions.ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
-            appParts.VolumeActions.NewFileCommand, appParts.VolumeActions.ImportFileCommand, appParts.VolumeActions.NewFolderCommand, appParts.VolumeActions.DeleteItemCommand })
+            appParts.VolumeActions.NewFileCommand, appParts.VolumeActions.ImportFileCommand, appParts.VolumeActions.NewFolderCommand, appParts.VolumeActions.DeleteItemCommand,
+            appParts.VolumeActions.FirstAidCommand })
         {
             command.NotifyCanExecuteChanged();
         }

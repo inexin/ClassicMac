@@ -55,7 +55,7 @@ A window is about 1200×780 by default and at least 700×450.
 | File | Open (Ctrl+O), Close (Ctrl+W), Save (Ctrl+S), Save As ▸ (MacBinary III, BinHex 4.0, AppleSingle, AppleDouble pair, Basilisk II entry, HFS volume image, resource fork only), Revert, Quit |
 | Edit | Undo and Redo, with titles such as "Undo Edit 'STR ' 128" |
 | Resource | New Resource (Ctrl+K), Duplicate (Ctrl+D), Delete, Get Info (Ctrl+I), Edit Hex (Ctrl+H), Replace Data from File, Import Image or Sound |
-| Volume | New File, Import File, New Folder, Delete File or Folder (plain HFS images only) |
+| Volume | New File, Import File, New Folder, Delete File or Folder, First Aid (check, then Repair; plain HFS images only) |
 | Export | Save Resource As (Ctrl+E), Export Resources, Extract All Resources, Convert Documents, Unpack (AppleDouble), Unpack (Basilisk II), and a "Drag Files Out as MacBinary" check box |
 
 The tree's context menu repeats the Resource, Volume and Export commands.

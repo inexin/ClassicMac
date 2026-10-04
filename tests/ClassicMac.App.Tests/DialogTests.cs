@@ -277,6 +277,25 @@ public class DialogTests
     });
 
     [Fact]
+    public void First_Aid_lists_the_problems_and_offers_repair_only_when_it_can() => OnUiThread(() =>
+    {
+        var dialog = Show(DialogViews.FirstAid(new FirstAidView("Macintosh HD", ["Problem:  Invalid PEOF, 18, 2"],
+            "The volume “Macintosh HD” needs to be repaired.", CanRepair: true)));
+        AssertFrame(dialog.Window, "First Aid", "Repair", "Done");
+        var texts = dialog.Window.GetVisualDescendants().OfType<TextBlock>().ToList();
+        Assert.Contains("mono", texts.Single(t => t.Text == "Problem:  Invalid PEOF, 18, 2").Classes);
+        Assert.Contains(texts, t => t.Text == "The volume “Macintosh HD” needs to be repaired.");
+        Footer(dialog.Window, "Repair").Command!.Execute(null);
+        Assert.True(dialog.Result);
+
+        var ok = Show(DialogViews.FirstAid(new FirstAidView("Macintosh HD", [], "The volume “Macintosh HD” appears to be OK.", CanRepair: false)));
+        Assert.False(Footer(ok.Window, "Repair").IsEffectivelyEnabled);
+        Assert.True(Footer(ok.Window, "Done").IsCancel);
+        Footer(ok.Window, "Done").Command!.Execute(null);
+        Assert.False(ok.Result);
+    });
+
+    [Fact]
     public void Dialogs_draw_in_light_and_dark() => OnUiThread(() =>
     {
         var baselines = new List<string>();
@@ -289,6 +308,10 @@ public class DialogTests
         var import = Show(DialogViews.Import("art.png", [.. ImageImport.Types, ImportActions.IconFamily], new ImportChoice("PICT", 128, ""), Art));
         Baselines.Check(import.Window, "dialog-import", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         import.Window.Close();
+        var firstAid = Show(DialogViews.FirstAid(new FirstAidView("Macintosh HD",
+            ["Problem:  Invalid PEOF, 18, 2", "Problem:  MountCheck found minor errors."], "The volume “Macintosh HD” needs to be repaired.", CanRepair: true)));
+        Baselines.Check(firstAid.Window, "dialog-first-aid", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        firstAid.Window.Close();
         Baselines.Verify(baselines);
     });
 }

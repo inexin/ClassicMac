@@ -899,7 +899,7 @@ appear to be OK].
 
 #### Repair
 
-`HfsFirstAid.Repair` (the CLI's `repair`) verifies, and repairs only a volume that needs repair; one that cannot be
+`HfsFirstAid.Repair` (the CLI's `repair`, the app's Volume ▸ First Aid…) verifies, and repairs only a volume that needs repair; one that cannot be
 repaired, or is not HFS, is left as it is. The repairs run in Disk First Aid's order, then the volume is
 verified again, at most three passes in all:
 

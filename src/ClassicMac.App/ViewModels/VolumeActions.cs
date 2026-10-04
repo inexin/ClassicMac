@@ -16,7 +16,7 @@ namespace ClassicMac.App.ViewModels;
 /// <summary>A new file's name, type and creator, as the New File dialog shows them.</summary>
 public sealed record NewFileChoice(string Name, string Type, string Creator);
 
-// The Volume menu: files and folders created and deleted in a plain HFS image through HfsWriter. Each change is made
+// The Volume menu: files and folders created and deleted in a plain HFS image through HfsWriter, and First Aid. Each change is made
 // at once on an in-memory copy of the volume (so a refused one says why straight away) and shown in the tree; the
 // image on disk is not touched, and the changes are written only by Save As ▸ HFS Volume Image, with the fork edits.
 public sealed partial class VolumeActions(IAppSelection appSelection, IAppServices appServices, IAppParts appParts) : ObservableObject
@@ -213,6 +213,40 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         appParts.EditActions.NotifyEditCommands();
         appServices.Status = $"Deleted {name}; Save As ▸ HFS Volume Image writes the change.";
     }
+
+    private bool CanFirstAid() => !appParts.ExportActions.IsExporting && appSelection.Selected?.Input is { IsWritableHfs: true };
+
+    // First Aid (hfs.md §5.6): the selected item's volume, as edited so far, is checked and the problems and verdict
+    // shown; Repair repairs it in the session (shown as an edit, written by Save As) and shows what it did. The tree is
+    // not read again: a folder made again shows once the saved volume is opened.
+    [RelayCommand(CanExecute = nameof(CanFirstAid))]
+    private async Task FirstAid()
+    {
+        if (appSelection.Selected?.Input is not { IsWritableHfs: true } input)
+        {
+            return;
+        }
+
+        var report = await Task.Run(() => HfsFirstAid.Verify(ForkData.FromBytes(input.VolumeSession.Volume)));
+        appServices.Status = report.Summary;
+        if (appServices.EditDialogs is not { } dialogs
+            || !await dialogs.FirstAidAsync(new FirstAidView(report.VolumeName, Lines(report), report.Summary, report.Verdict == FirstAidVerdict.NeedsRepair)))
+        {
+            return;
+        }
+
+        FirstAidRepairResult? result = null;
+        if (!ChangeVolume(input, session => result = session.Repair(), "repair the volume") || result is null)
+        {
+            return;
+        }
+
+        appServices.Status = result.Written ? $"{result.Summary} Save As ▸ HFS Volume Image writes the repairs." : result.Summary;
+        var lines = result.Changes.Select(c => c.Detail).Concat(Lines(result.After)).ToList();
+        await dialogs.FirstAidAsync(new FirstAidView(result.After.VolumeName, lines, result.Summary, CanRepair: false));
+    }
+
+    private static List<string> Lines(FirstAidReport report) => [.. report.Problems.Select(p => p.ToString())];
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>
         TreeLayout.Contents(node).SelectMany(c => Descendants(c).Prepend(c));
