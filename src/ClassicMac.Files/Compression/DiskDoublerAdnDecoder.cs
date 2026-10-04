@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using ClassicMac.Core;
 
 namespace ClassicMac.Files.Compression;
 
@@ -11,9 +12,11 @@ internal static class DiskDoublerAdnDecoder
     private const int BlockHeaderLength = 12;
     private const int MaximumBlockLength = 0x2000;
 
-    public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
+    public static byte[] Decode(ReadOnlyMemory<byte> encoded, int outputLength)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
+        var reader = new BigEndianReader(encoded);
+        ReadOnlySpan<byte> input = encoded.Span;
 
         byte[] output = new byte[outputLength];
         int inputOffset = 0;
@@ -26,20 +29,20 @@ internal static class DiskDoublerAdnDecoder
                 throw new InvalidDataException("A DiskDoubler ADn block header is truncated.");
             }
 
-            ReadOnlySpan<byte> header = input.Slice(inputOffset, BlockHeaderLength);
+            var header = reader.ReadSubReaderAt(inputOffset, BlockHeaderLength);
             byte headerXor = 0;
             for (int index = 0; index < BlockHeaderLength - 1; index++)
             {
-                headerXor ^= header[index];
+                headerXor ^= header.ReadByteAt(index);
             }
 
-            if (headerXor != header[^1])
+            if (headerXor != header.ReadByteAt(BlockHeaderLength - 1))
             {
                 throw new InvalidDataException("A DiskDoubler ADn block header checksum is invalid.");
             }
 
-            int compressedLength = U16(header, 0);
-            int blockLength = U16(header, 2);
+            int compressedLength = header.ReadUInt16();
+            int blockLength = header.ReadUInt16();
             if (blockLength is 0 or > MaximumBlockLength || blockLength > output.Length - outputOffset)
             {
                 throw new InvalidDataException("A DiskDoubler ADn block has an invalid expanded length.");
@@ -52,7 +55,7 @@ internal static class DiskDoublerAdnDecoder
             }
 
             ReadOnlySpan<byte> compressed = input.Slice(dataOffset, compressedLength);
-            if ((header[9] & 1) != 0)
+            if ((header.ReadByteAt(9) & 1) != 0)                                         // raw
             {
                 if (compressedLength < blockLength)
                 {
@@ -123,7 +126,6 @@ internal static class DiskDoublerAdnDecoder
         }
     }
 
-    private static int U16(ReadOnlySpan<byte> data, int offset) => (data[offset] << 8) | data[offset + 1];
 
     private ref struct MsbBitReader(ReadOnlySpan<byte> input)
     {

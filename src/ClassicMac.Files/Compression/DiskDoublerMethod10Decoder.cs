@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using ClassicMac.Core;
 
 namespace ClassicMac.Files.Compression;
 
@@ -12,9 +13,11 @@ internal static class DiskDoublerMethod10Decoder
     private const int MaximumBlockLength = 65536;
     private const int WindowLength = 65536;
 
-    public static byte[] Decode(ReadOnlySpan<byte> input, int outputLength)
+    public static byte[] Decode(ReadOnlyMemory<byte> encoded, int outputLength)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(outputLength);
+        var reader = new BigEndianReader(encoded);
+        ReadOnlySpan<byte> input = encoded.Span;
 
         byte[] output = new byte[outputLength];
         int inputOffset = 0;
@@ -27,26 +30,26 @@ internal static class DiskDoublerMethod10Decoder
                 throw new InvalidDataException("A DiskDoubler method-10 block header is truncated.");
             }
 
-            ReadOnlySpan<byte> header = input.Slice(inputOffset, BlockHeaderLength);
+            var header = reader.ReadSubReaderAt(inputOffset, BlockHeaderLength);
             int expectedHeaderXor = 0;
             for (int index = 0; index < BlockHeaderLength - 1; index++)
             {
-                expectedHeaderXor ^= header[index];
+                expectedHeaderXor ^= header.ReadByteAt(index);
             }
 
-            if (expectedHeaderXor != header[^1])
+            if (expectedHeaderXor != header.ReadByteAt(BlockHeaderLength - 1))
             {
                 throw new InvalidDataException("A DiskDoubler method-10 block header checksum is invalid.");
             }
 
-            uint storedLength = U32(header, 0);
-            int literalCount = U16(header, 4);
-            int offsetCount = U16(header, 6);
-            int lengthStreamLength = U16(header, 8);
-            int literalStreamLength = U16(header, 10);
-            int offsetStreamLength = U16(header, 12);
-            byte flags = header[14];
-            byte expectedBlockXor = header[19];
+            uint storedLength = header.ReadUInt32();
+            int literalCount = header.ReadUInt16();
+            int offsetCount = header.ReadUInt16();
+            int lengthStreamLength = header.ReadUInt16();
+            int literalStreamLength = header.ReadUInt16();
+            int offsetStreamLength = header.ReadUInt16();
+            byte flags = header.ReadByte();
+            byte expectedBlockXor = header.ReadByteAt(19);
             // Checked before it is an int: a damaged length can pass int's range.
             if (storedLength is 0 or > MaximumBlockLength || storedLength > output.Length - outputOffset)
             {
@@ -258,12 +261,6 @@ internal static class DiskDoublerMethod10Decoder
         bits.SkipToByte(tableEnd);
         return HuffmanCode.Create(lengths, maximumLength);
     }
-
-    private static ushort U16(ReadOnlySpan<byte> data, int offset) =>
-        (ushort)((data[offset] << 8) | data[offset + 1]);
-
-    private static uint U32(ReadOnlySpan<byte> data, int offset) =>
-        (uint)(data[offset] << 24 | data[offset + 1] << 16 | data[offset + 2] << 8 | data[offset + 3]);
 
     private sealed class HuffmanCode
     {

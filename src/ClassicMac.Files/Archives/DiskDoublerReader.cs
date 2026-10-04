@@ -677,12 +677,12 @@ public sealed class DiskDoublerReader : IContainerReader
 
         if (method is 6 or 9)
         {
-            return DiskDoublerAdnDecoder.Decode(input, outputLength);
+            return DiskDoublerAdnDecoder.Decode(encoded, outputLength);
         }
 
         if (method == 10)
         {
-            return DiskDoublerMethod10Decoder.Decode(input, outputLength);
+            return DiskDoublerMethod10Decoder.Decode(encoded, outputLength);
         }
 
         if (input.Length < 16)
