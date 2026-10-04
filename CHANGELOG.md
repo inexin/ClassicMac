@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- HFS: catalog edits follow Apple's BTree manager: a full node rotates records into its left sibling or splits to the
+  left into the first free node, emptied nodes are zeroed and freed, the root collapses, and the file grows first when
+  free nodes run short; a tree is rebuilt only when it cannot grow (hfs.md §1.8, §5.5).
 - NDIF: KenCode encoder as Disk Copy 6.3.3's (byte for byte on its own images); an edited KenCode image's changed chunks
   are compressed again (kencode.md §3, ndif.md §3).
 - NDIF: an edited ADC image's changed chunks are compressed again with Disk Copy 6.3.3's ADC encoder (adc.md §3,

@@ -768,7 +768,23 @@ public static partial class HfsWriter
     private static HfsVolume CommitCatalog(CatalogEditState state)
     {
         state.Records.Sort((left, right) => CompareCatalogKeys(left.Key, right.Key));
-        bool inPlace = TryUpdateLeaves(state);
+        // The tree's file grown when an operation finds too few free nodes, as the BTree manager grows it; on a volume with no
+        // block to grow into, the tree is built again instead, which a deletion needs no new node for.
+        CatalogUpdate update;
+        while ((update = TryUpdateLeaves(state)) == CatalogUpdate.NeedsNodes)
+        {
+            try
+            {
+                GrowCatalogTree(state);
+            }
+            catch (InvalidDataException)
+            {
+                update = CatalogUpdate.Rebuild;
+                break;
+            }
+        }
+
+        bool inPlace = update == CatalogUpdate.Done;
         while (true)
         {
             try
@@ -857,88 +873,102 @@ public static partial class HfsWriter
         return state.Result;
     }
 
-    // Writes the records' changes into the leaves that hold them, as Mac OS edits a B-tree, on a copy of the catalog: each
-    // changed leaf is laid out again with its records (a new record goes into its predecessor's leaf, the first leaf's when
-    // it sorts first); a leaf that overflows is split in two, a free node taking its second half and its parent a record
-    // for it, splitting in turn up to a new root; a leaf's new first key is carried up the index. False, with the catalog
-    // unchanged, when a leaf would be left empty, needs more than one new node, or the tree has no free node: the tree is
-    // then built again (Mac OS merges nodes and grows the file instead) [ClassicMac].
-    private static bool TryUpdateLeaves(CatalogEditState state)
+    // How an edit in place of the catalog ended.
+    private enum CatalogUpdate
+    {
+        // Every change is written.
+        Done,
+
+        // The tree has fewer free nodes than an operation may need: grow its file and try again.
+        NeedsNodes,
+
+        // A change the editor does not make in place: build the tree again.
+        Rebuild,
+    }
+
+    // Writes the records' changes into the catalog record by record, as Apple's BTree manager does (hfs.md §1.8), on a
+    // copy of it: records removed, then changed, then added, each in key order [ClassicMac order; Doc: the manager's
+    // rules for each]. NeedsNodes, with the catalog unchanged, when an operation finds fewer free nodes than the tree's
+    // depth + 1, as the manager grows the file then.
+    private static CatalogUpdate TryUpdateLeaves(CatalogEditState state)
     {
         var original = state.OriginalRecords;
         var records = state.Records;
-        if (original.Length == 0 || state.Catalog.Length != state.OriginalCatalog.Length)
+        if (original.Length == 0)
         {
-            return false;
+            return CatalogUpdate.Rebuild;
         }
 
-        var leaves = new Dictionary<int, List<(byte[] Key, byte[] Data)>>();
-        var changed = new List<int>();
-        void Change(int node)
-        {
-            if (changed.Count == 0 || changed[^1] != node)
-            {
-                changed.Add(node);
-            }
-        }
-
-        void Place(int node, (byte[] Key, byte[] Data) record)
-        {
-            if (!leaves.TryGetValue(node, out var list))
-            {
-                leaves[node] = list = [];
-            }
-
-            list.Add(record);
-        }
-
+        var removed = new List<byte[]>();
+        var changed = new List<(byte[] Key, byte[] Data)>();
+        var added = new List<(byte[] Key, byte[] Data)>();
         int i = 0, j = 0;
         while (i < original.Length || j < records.Count)
         {
             int order = i == original.Length ? 1 : j == records.Count ? -1 : CompareCatalogKeys(original[i].Key, records[j].Key);
             if (order == 0)
             {
-                int node = original[i].NodeOffset;
                 if (!original[i].Key.AsSpan().SequenceEqual(records[j].Key) || !original[i].Data.AsSpan().SequenceEqual(records[j].Data))
                 {
-                    Change(node);
+                    changed.Add(records[j]);
                 }
 
-                Place(node, records[j]);
                 i++;
                 j++;
             }
             else if (order < 0)
             {
-                Change(original[i].NodeOffset);
+                removed.Add(original[i].Key);
                 i++;
             }
             else
             {
-                int node = original[Math.Max(0, i - 1)].NodeOffset;
-                Change(node);
-                Place(node, records[j]);
+                added.Add(records[j]);
                 j++;
             }
         }
 
         var tree = new CatalogTreeEdit(state.Catalog.ToArray());
-        foreach (int node in changed.Distinct())
+        try
         {
-            if (!leaves.TryGetValue(node, out var list) || !tree.TryReplace((uint)(node / NodeSize), list))
+            foreach (var key in removed)
             {
-                return false;
+                tree.Delete(key);
+            }
+
+            foreach (var record in changed)
+            {
+                tree.Replace(record);
+            }
+
+            foreach (var record in added)
+            {
+                tree.Insert(record);
             }
         }
+        catch (CatalogTreeEdit.NeedsNodesException)
+        {
+            return CatalogUpdate.NeedsNodes;
+        }
+        catch (CatalogTreeEdit.RebuildException)
+        {
+            return CatalogUpdate.Rebuild;
+        }
 
-        new BigEndianWriter(tree.Bytes).WriteUInt32At(14 + 6, records.Count);
         state.Catalog = tree.Bytes;
-        return true;
+        return CatalogUpdate.Done;
     }
 
-    // A B-tree being edited in place: nodes rewritten, split into free nodes, and index records added or rekeyed.
+    // A B-tree edited in place by the BTree manager's rules (hfs.md §1.8) [Doc: Apple's hfs sources, BTreeTreeOps.c,
+    // BTreeAllocate.c, BTree.c]: inserts that fit go in; a full node rotates records into its left sibling, or splits to
+    // the left into the first free node; a node's new first key is deleted from its parent and inserted again; an emptied
+    // node is unlinked, zeroed and freed, its parent's record deleted; a root left with one record gives way to its child.
     private sealed class CatalogTreeEdit
     {
+        public sealed class NeedsNodesException : Exception;
+
+        public sealed class RebuildException : Exception;
+
         private readonly int maxKeyLength;
         private readonly List<(int Offset, int Length)> maps = [];
         private Dictionary<uint, uint>? parents;
@@ -946,11 +976,10 @@ public static partial class HfsWriter
         public CatalogTreeEdit(byte[] bytes)
         {
             Bytes = bytes;
-            var reader = new BigEndianReader(bytes);
-            maxKeyLength = U16(reader, 14 + 20);
-            maps.Add((U16(reader, NodeSize - 6), U16(reader, NodeSize - 8) - U16(reader, NodeSize - 6)));
+            maxKeyLength = U16(Reader, 14 + 20);
+            maps.Add((U16(Reader, NodeSize - 6), U16(Reader, NodeSize - 8) - U16(Reader, NodeSize - 6)));
             var seen = new HashSet<uint>();
-            for (uint mapNode = U32(reader, 0); mapNode != 0; mapNode = U32(reader, checked((int)mapNode * NodeSize)))
+            for (uint mapNode = U32(Reader, 0); mapNode != 0; mapNode = U32(Reader, checked((int)mapNode * NodeSize)))
             {
                 if (mapNode >= NodeCount || !seen.Add(mapNode))
                 {
@@ -958,200 +987,421 @@ public static partial class HfsWriter
                 }
 
                 int offset = checked((int)mapNode * NodeSize);
-                int start = U16(reader, offset + NodeSize - 2);
-                maps.Add((offset + start, U16(reader, offset + NodeSize - 4) - start));
+                int start = U16(Reader, offset + NodeSize - 2);
+                maps.Add((offset + start, U16(Reader, offset + NodeSize - 4) - start));
             }
         }
 
         public byte[] Bytes { get; }
 
-        private uint NodeCount => (uint)(Bytes.Length / NodeSize);
-
         private BigEndianReader Reader => new(Bytes);
 
-        // Lays the node out again with its records, split in two when they overflow it; the new first key goes up the index.
-        public bool TryReplace(uint node, List<(byte[] Key, byte[] Data)> records)
+        private BigEndianWriter Writer => new(Bytes);
+
+        private uint NodeCount => (uint)(Bytes.Length / NodeSize);
+
+        private int Depth
         {
-            var groups = Split(records);
-            if (groups is null)
-            {
-                return false;
-            }
-
-            var oldFirst = ReadNodeRecords(Bytes, node)[0].Key;
-            if (!Write(node, groups[0]))
-            {
-                return false;
-            }
-
-            if (!groups[0][0].Key.AsSpan().SequenceEqual(oldFirst) && !TryRekey(node, groups[0][0].Key))
-            {
-                return false;
-            }
-
-            return groups.Count == 1 || TrySplitOff(node, groups[1]);
+            get => U16(Reader, 14);
+            set => Writer.WriteUInt16At(14, value);
         }
 
-        // The records in one node, or two of about equal size when they overflow it; null when two cannot hold them.
-        private static List<List<(byte[] Key, byte[] Data)>>? Split(List<(byte[] Key, byte[] Data)> records)
+        private uint Root
         {
-            static int Size(IEnumerable<(byte[] Key, byte[] Data)> group)
-            {
-                int end = 14, count = 0;
-                foreach (var record in group)
-                {
-                    end = checked(((end + record.Key.Length + 1) & ~1) + record.Data.Length);
-                    count++;
-                }
-
-                return end + 2 * (count + 1);
-            }
-
-            if (records.Count > 0 && Size(records) <= NodeSize)
-            {
-                return [records];
-            }
-
-            int best = -1, bestDifference = int.MaxValue;
-            for (int at = 1; at < records.Count; at++)
-            {
-                int left = Size(records.Take(at)), right = Size(records.Skip(at));
-                if (left <= NodeSize && right <= NodeSize && Math.Abs(left - right) < bestDifference)
-                {
-                    best = at;
-                    bestDifference = Math.Abs(left - right);
-                }
-            }
-
-            return best < 0 ? null : [records[..best], records[best..]];
+            get => U32(Reader, 14 + 2);
+            set => Writer.WriteUInt32At(14 + 2, value);
         }
 
-        private bool Write(uint node, List<(byte[] Key, byte[] Data)> records)
+        private uint FreeNodes
         {
-            int offset = checked((int)node * NodeSize);
-            if (!TryBuildLeafNode(Bytes.AsSpan(offset, NodeSize).ToArray(), records, out var rebuilt))
+            get => U32(Reader, 14 + 26);
+            set => Writer.WriteUInt32At(14 + 26, value);
+        }
+
+        private void AddLeafRecords(int delta) => Writer.WriteUInt32At(14 + 6, checked((uint)(U32(Reader, 14 + 6) + delta)));
+
+        private static int Offset(uint node) => checked((int)node * NodeSize);
+
+        private uint FLink(uint node) => U32(Reader, Offset(node));
+
+        private uint BLink(uint node) => U32(Reader, Offset(node) + 4);
+
+        private void SetFLink(uint node, uint value) => Writer.WriteUInt32At(Offset(node), value);
+
+        private void SetBLink(uint node, uint value) => Writer.WriteUInt32At(Offset(node) + 4, value);
+
+        private bool IsLeaf(uint node) => Bytes[Offset(node) + 8] == 0xFF;
+
+        private List<(byte[] Key, byte[] Data)> Records(uint node) => ReadNodeRecords(Bytes, node);
+
+        private static uint Child(byte[] data) => U32(new BigEndianReader(data), 0);
+
+        // A record's bytes in a node, with its offset slot: key (padded to even) and data, + 2.
+        private static int Size((byte[] Key, byte[] Data) record) => ((record.Key.Length + 1) & ~1) + record.Data.Length + 2;
+
+        private static bool Fits(List<(byte[] Key, byte[] Data)> records) => 14 + 2 + records.Sum(Size) <= NodeSize;
+
+        private void Write(uint node, List<(byte[] Key, byte[] Data)> records)
+        {
+            if (!TryBuildLeafNode(Bytes.AsSpan(Offset(node), NodeSize).ToArray(), records, out var rebuilt))
+            {
+                throw new RebuildException();
+            }
+
+            rebuilt.CopyTo(Bytes, Offset(node));
+        }
+
+        // The leaf for a key, by the index: in each index node the last record whose key is not above it (the first when
+        // all are).
+        private uint LeafFor(byte[] key)
+        {
+            if (Depth == 0)
+            {
+                throw new RebuildException();
+            }
+
+            uint node = Root;
+            while (!IsLeaf(node))
+            {
+                var records = Records(node);
+                int at = records.FindLastIndex(record => CompareCatalogKeys(record.Key, key) <= 0);
+                node = Child(records[Math.Max(0, at)].Data);
+            }
+
+            return node;
+        }
+
+        // The manager grows the tree's file before an operation when it has fewer free nodes than its depth + 1.
+        private void RequireNodes()
+        {
+            if (FreeNodes < Depth + 1)
+            {
+                throw new NeedsNodesException();
+            }
+        }
+
+        public void Insert((byte[] Key, byte[] Data) record)
+        {
+            RequireNodes();
+            uint leaf = LeafFor(record.Key);
+            var records = Records(leaf);
+            int at = records.FindIndex(existing => CompareCatalogKeys(existing.Key, record.Key) >= 0);
+            at = at < 0 ? records.Count : at;
+            if (at < records.Count && CompareCatalogKeys(records[at].Key, record.Key) == 0)
+            {
+                throw new RebuildException();
+            }
+
+            records.Insert(at, record);
+            InsertInto(leaf, records, at, skipRotate: false);
+            AddLeafRecords(1);
+        }
+
+        public void Delete(byte[] key)
+        {
+            uint leaf = LeafFor(key);
+            var records = Records(leaf);
+            int at = records.FindIndex(existing => CompareCatalogKeys(existing.Key, key) == 0);
+            if (at < 0)
+            {
+                throw new RebuildException();
+            }
+
+            if (at == 0)
+            {
+                RequireNodes();
+            }
+
+            records.RemoveAt(at);
+            DeleteFrom(leaf, records, at);
+            AddLeafRecords(-1);
+            Collapse();
+        }
+
+        // A record whose key compares the same: in place when it fits, otherwise deleted and inserted.
+        public void Replace((byte[] Key, byte[] Data) record)
+        {
+            uint leaf = LeafFor(record.Key);
+            var records = Records(leaf);
+            int at = records.FindIndex(existing => CompareCatalogKeys(existing.Key, record.Key) == 0);
+            if (at < 0)
+            {
+                throw new RebuildException();
+            }
+
+            records[at] = record;
+            if (Fits(records))
+            {
+                Write(leaf, records);
+                return;
+            }
+
+            Delete(record.Key);
+            Insert(record);
+        }
+
+        // The node's records, the new one at index, written: in place when they fit, else rotated left or split left.
+        private void InsertInto(uint node, List<(byte[] Key, byte[] Data)> records, int index, bool skipRotate)
+        {
+            if (Fits(records))
+            {
+                Write(node, records);
+                if (index == 0 && node != Root)
+                {
+                    UpdateParentKey(node, records[0].Key);
+                }
+
+                return;
+            }
+
+            uint left = BLink(node);
+            if (left != 0 && !skipRotate && TryRotateLeft(left, node, records))
+            {
+                UpdateParentKey(node, Records(node)[0].Key);
+                return;
+            }
+
+            // Split left: a free node becomes the node's left sibling and takes about half its bytes.
+            uint added = Allocate();
+            int offset = Offset(node), addedOffset = Offset(added);
+            Bytes.AsSpan(addedOffset, NodeSize).Clear();
+            Bytes[addedOffset + 8] = Bytes[offset + 8];
+            Bytes[addedOffset + 9] = Bytes[offset + 9];
+            SetFLink(added, node);
+            SetBLink(added, left);
+            SetBLink(node, added);
+            if (left != 0)
+            {
+                SetFLink(left, added);
+            }
+            else if (IsLeaf(node))
+            {
+                Writer.WriteUInt32At(14 + 10, added);
+            }
+
+            Write(added, []);
+            if (!TryRotateLeft(added, node, records))
+            {
+                throw new RebuildException();
+            }
+
+            parents = null;
+            if (node == Root)
+            {
+                AddRoot(added, node);
+                return;
+            }
+
+            UpdateParentKey(node, Records(node)[0].Key);
+            uint parent = ParentOf(node);
+            var siblings = Records(parent);
+            int at = siblings.FindIndex(record => Child(record.Data) == node);
+            siblings.Insert(at, (IndexKey(Records(added)[0].Key, siblings[0].Key.Length), ChildNode(added)));
+            InsertInto(parent, siblings, at, skipRotate: true);
+            parents = null;
+        }
+
+        // RotateLeft: records move from the front of the right node (its new record counted) into the left while the
+        // left holds fewer bytes, the last move undone if it overfills the left; false, with nothing written, when the
+        // right still overflows.
+        private bool TryRotateLeft(uint left, uint right, List<(byte[] Key, byte[] Data)> rightRecords)
+        {
+            var leftRecords = Records(left);
+            var moving = rightRecords.ToList();
+            int leftBytes = leftRecords.Sum(Size), rightBytes = moving.Sum(Size), moved = 0;
+            while (leftBytes < rightBytes && moved < moving.Count - 1)
+            {
+                leftBytes += Size(moving[moved]);
+                rightBytes -= Size(moving[moved]);
+                moved++;
+            }
+
+            var newLeft = leftRecords.Concat(moving.Take(moved)).ToList();
+            if (moved > 0 && !Fits(newLeft))
+            {
+                moved--;
+                newLeft = [.. leftRecords, .. moving.Take(moved)];
+            }
+
+            var newRight = moving.Skip(moved).ToList();
+            if (moved == 0 || !Fits(newRight) || !Fits(newLeft))
             {
                 return false;
             }
 
-            rebuilt.CopyTo(Bytes, offset);
+            Write(left, newLeft);
+            Write(right, newRight);
+            if (!IsLeaf(left))
+            {
+                parents = null;
+            }
+
             return true;
         }
 
-        // Moves records into a free node after this one, linked into its level, with a record for it in the parent.
-        private bool TrySplitOff(uint node, List<(byte[] Key, byte[] Data)> records)
+        // A new root over the two nodes, a level up.
+        private void AddRoot(uint left, uint right)
         {
-            if (Allocate() is not { } added)
-            {
-                return false;
-            }
-
-            int offset = checked((int)node * NodeSize), addedOffset = checked((int)added * NodeSize);
-            uint next = U32(Reader, offset);
-            var template = new byte[NodeSize];
-            template[8] = Bytes[offset + 8];
-            template[9] = Bytes[offset + 9];
-            var links = new BigEndianWriter(template);
-            links.WriteUInt32At(0, next);
-            links.WriteUInt32At(4, node);
-            template.CopyTo(Bytes, addedOffset);
-            if (!Write(added, records))
-            {
-                return false;
-            }
-
-            var writer = new BigEndianWriter(Bytes);
-            writer.WriteUInt32At(offset, added);
-            if (next != 0)
-            {
-                writer.WriteUInt32At(checked((int)next * NodeSize) + 4, added);
-            }
-            else if (Bytes[offset + 9] == 1)
-            {
-                writer.WriteUInt32At(14 + 14, added);
-            }
-
-            if (Bytes[offset + 9] > 1)
-            {
-                foreach (var (_, data) in records)
-                {
-                    Parents[U32(new BigEndianReader(data), 0)] = added;
-                }
-            }
-
-            return TryAddIndexRecord(node, added, records[0].Key);
+            uint root = Allocate();
+            int offset = Offset(root);
+            Bytes.AsSpan(offset, NodeSize).Clear();
+            int height = Bytes[Offset(left) + 9] + 1;
+            Bytes[offset + 9] = (byte)height;
+            Write(root, [(IndexKey(Records(left)[0].Key), ChildNode(left)), (IndexKey(Records(right)[0].Key), ChildNode(right))]);
+            Root = root;
+            Depth = height;
+            parents = null;
         }
 
-        // A record for right in left's parent, after left's; a new root over both when left is the root.
-        private bool TryAddIndexRecord(uint left, uint right, byte[] firstKey)
+        // The parent's record for the node deleted and inserted again with the node's new first key.
+        private void UpdateParentKey(uint node, byte[] first)
         {
-            var writer = new BigEndianWriter(Bytes);
-            if (!Parents.TryGetValue(left, out uint parent))
-            {
-                if (Allocate() is not { } root)
-                {
-                    return false;
-                }
-
-                int height = Bytes[checked((int)left * NodeSize) + 9] + 1;
-                var template = new byte[NodeSize];
-                template[9] = (byte)height;
-                template.CopyTo(Bytes, checked((int)root * NodeSize));
-                if (!Write(root, [(IndexKey(ReadNodeRecords(Bytes, left)[0].Key), ChildNode(left)), (IndexKey(firstKey), ChildNode(right))]))
-                {
-                    return false;
-                }
-
-                writer.WriteUInt16At(14, height);
-                writer.WriteUInt32At(14 + 2, root);
-                Parents[left] = root;
-                Parents[right] = root;
-                return true;
-            }
-
-            var records = ReadNodeRecords(Bytes, parent);
-            int at = records.FindIndex(record => U32(new BigEndianReader(record.Data), 0) == left);
+            uint parent = ParentOf(node);
+            var records = Records(parent);
+            int at = records.FindIndex(record => Child(record.Data) == node);
             if (at < 0)
             {
-                return false;
+                throw new RebuildException();
             }
 
-            records.Insert(at + 1, (IndexKey(firstKey), ChildNode(right)));
-            Parents[right] = parent;
-            var groups = Split(records);
-            return groups is not null && Write(parent, groups[0]) && (groups.Count == 1 || TrySplitOff(parent, groups[1]));
+            var key = IndexKey(first, records[at].Key.Length);
+            if (key.AsSpan().SequenceEqual(records[at].Key))
+            {
+                return;
+            }
+
+            var data = records[at].Data;
+            records.RemoveAt(at);
+            records.Insert(at, (key, data));
+            InsertInto(parent, records, at, skipRotate: false);
         }
 
-        // The key of the index record naming node set to its new first key, and so on up while it is first in its parent.
-        private bool TryRekey(uint node, byte[] first)
+        // The node's records after a deletion at index: an emptied node unlinked, zeroed and freed, and its parent's
+        // record deleted in turn; a new first key carried up.
+        private void DeleteFrom(uint node, List<(byte[] Key, byte[] Data)> records, int index)
         {
-            if (!Parents.TryGetValue(node, out uint parent))
+            if (records.Count > 0)
             {
-                return true;
+                Write(node, records);
+                if (index == 0 && node != Root)
+                {
+                    UpdateParentKey(node, records[0].Key);
+                }
+
+                return;
             }
 
-            var records = ReadNodeRecords(Bytes, parent);
-            int at = records.FindIndex(record => U32(new BigEndianReader(record.Data), 0) == node);
-            if (at < 0 || IndexKey(first, records[at].Key.Length) is not { } key)
+            if (node == Root)
             {
-                return false;
+                Free(node);
+                Root = 0;
+                Depth = 0;
+                Writer.WriteUInt32At(14 + 10, 0u);
+                Writer.WriteUInt32At(14 + 14, 0u);
+                return;
             }
 
-            records[at] = (key, records[at].Data);
-            return Write(parent, records) && (at > 0 || TryRekey(parent, first));
+            uint left = BLink(node), right = FLink(node);
+            if (left != 0)
+            {
+                SetFLink(left, right);
+            }
+
+            if (right != 0)
+            {
+                SetBLink(right, left);
+            }
+
+            if (IsLeaf(node))
+            {
+                if (U32(Reader, 14 + 10) == node)
+                {
+                    Writer.WriteUInt32At(14 + 10, right);
+                }
+
+                if (U32(Reader, 14 + 14) == node)
+                {
+                    Writer.WriteUInt32At(14 + 14, left);
+                }
+            }
+
+            uint parent = ParentOf(node);
+            Free(node);
+            parents = null;
+            var siblings = Records(parent);
+            int at = siblings.FindIndex(record => Child(record.Data) == node);
+            siblings.RemoveAt(at);
+            DeleteFrom(parent, siblings, at);
+        }
+
+        // CollapseTree: while the root is an index node with one record, its child becomes the root.
+        private void Collapse()
+        {
+            while (Depth > 1 && Records(Root) is [var only])
+            {
+                uint old = Root;
+                Root = Child(only.Data);
+                Depth--;
+                Free(old);
+                parents = null;
+            }
+        }
+
+        // ClearNode and FreeNode: the node zeroed, its map bit cleared, the free count raised.
+        private void Free(uint node)
+        {
+            Bytes.AsSpan(Offset(node), NodeSize).Clear();
+            SetMapBit(node, false);
+            FreeNodes++;
+        }
+
+        // AllocateNode: the first free node by the map, marked used.
+        private uint Allocate()
+        {
+            for (uint node = 1; node < NodeCount; node++)
+            {
+                if (!MapBit(node))
+                {
+                    SetMapBit(node, true);
+                    FreeNodes--;
+                    return node;
+                }
+            }
+
+            throw new NeedsNodesException();
+        }
+
+        private (int At, byte Bit) MapPlace(uint node)
+        {
+            int mapByte = checked((int)(node >> 3));
+            foreach (var (offset, length) in maps)
+            {
+                if (mapByte < length)
+                {
+                    return (offset + mapByte, (byte)(0x80 >> (int)(node & 7)));
+                }
+
+                mapByte -= length;
+            }
+
+            throw new RebuildException();
+        }
+
+        private bool MapBit(uint node)
+        {
+            var (at, bit) = MapPlace(node);
+            return (Bytes[at] & bit) != 0;
+        }
+
+        private void SetMapBit(uint node, bool used)
+        {
+            var (at, bit) = MapPlace(node);
+            Bytes[at] = used ? (byte)(Bytes[at] | bit) : (byte)(Bytes[at] & ~bit);
         }
 
         // A key as the index stores it: at the tree's maximum key length, zero-padded, as Mac OS writes index keys
-        // (hfs.md §1.8), or as long as itself where the index keeps keys so; null when it cannot be stored at length.
-        private byte[]? IndexKey(byte[] key, int length)
-        {
-            if (length == key.Length)
-            {
-                return key;
-            }
-
-            return length == maxKeyLength + 1 ? IndexKey(key) : null;
-        }
+        // (hfs.md §1.8), or as long as the stored ones are where the index keeps keys so.
+        private byte[] IndexKey(byte[] key, int length) => length == maxKeyLength + 1 ? IndexKey(key) : key;
 
         private byte[] IndexKey(byte[] key)
         {
@@ -1166,7 +1416,9 @@ public static partial class HfsWriter
             return padded;
         }
 
-        // Each index node's children, by a walk from the root.
+        private uint ParentOf(uint node) => Parents.TryGetValue(node, out uint parent) ? parent : throw new RebuildException();
+
+        // Each node's parent, by a walk from the root.
         private Dictionary<uint, uint> Parents
         {
             get
@@ -1178,18 +1430,18 @@ public static partial class HfsWriter
 
                 parents = [];
                 var pending = new Stack<uint>();
-                if (U16(Reader, 14) > 1)
+                if (Depth > 1)
                 {
-                    pending.Push(U32(Reader, 14 + 2));
+                    pending.Push(Root);
                 }
 
                 while (pending.Count > 0)
                 {
                     uint node = pending.Pop();
-                    bool aboveIndex = Bytes[checked((int)node * NodeSize) + 9] > 2;
-                    foreach (var (_, data) in ReadNodeRecords(Bytes, node))
+                    bool aboveIndex = Bytes[Offset(node) + 9] > 2;
+                    foreach (var (_, data) in Records(node))
                     {
-                        uint child = U32(new BigEndianReader(data), 0);
+                        uint child = Child(data);
                         parents[child] = node;
                         if (aboveIndex)
                         {
@@ -1201,50 +1453,15 @@ public static partial class HfsWriter
                 return parents;
             }
         }
-
-        // The first free node by the node map, marked used and taken from the header's free count; null when none is free.
-        private uint? Allocate()
-        {
-            for (uint node = 1; node < NodeCount; node++)
-            {
-                int mapByte = checked((int)(node >> 3));
-                foreach (var (offset, length) in maps)
-                {
-                    if (mapByte >= length)
-                    {
-                        mapByte -= length;
-                        continue;
-                    }
-
-                    byte bit = (byte)(0x80 >> (int)(node & 7));
-                    if ((Bytes[offset + mapByte] & bit) == 0)
-                    {
-                        Bytes[offset + mapByte] |= bit;
-                        new BigEndianWriter(Bytes).WriteUInt32At(14 + 26, U32(Reader, 14 + 26) - 1);
-                        return node;
-                    }
-
-                    break;
-                }
-            }
-
-            return null;
-        }
     }
 
-    // The catalog's nodes that differ from the catalog as read, written through its extents (all of it when it grew).
+    // The catalog's nodes that differ from the catalog as read, and every node it grew by, written through its extents.
     private static void WriteChangedNodes(CatalogEditState state)
     {
-        if (state.Catalog.Length != state.OriginalCatalog.Length)
-        {
-            WriteFork(state.Result, state.FirstBlock, state.BlockSize, state.CatalogExtents, state.Catalog);
-            return;
-        }
-
         for (int node = 0; node < state.Catalog.Length; node += NodeSize)
         {
             var bytes = state.Catalog.AsSpan(node, NodeSize);
-            if (bytes.SequenceEqual(state.OriginalCatalog.AsSpan(node, NodeSize)))
+            if (node + NodeSize <= state.OriginalCatalog.Length && bytes.SequenceEqual(state.OriginalCatalog.AsSpan(node, NodeSize)))
             {
                 continue;
             }

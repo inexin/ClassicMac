@@ -211,8 +211,7 @@ manager written for Mac OS 8.1's File Manager, which serves HFS and HFS Plus; no
   length counts. New map nodes go at the old end, chained from the last map node, their own bits set. A tree file never
   shrinks.
 
-ClassicMac's in-place edits differ (§5.5): a full leaf splits to the right into equal halves, without rotation, and a
-node that would empty, or a tree with no free node, has the tree rebuilt; the result is a valid tree either way.
+ClassicMac's writer edits the catalog by these rules (§5.5).
 
 ### 1.9 Catalog records
 
@@ -692,17 +691,17 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   keys and child pointers, node order and sibling links, node maps, free-node and leaf-record counts, and key order.
   `HfsWriter.Check` runs these checks without an edit, even on a software-locked volume, and returns the first fault
   (the CLI's `check`).
-- The writer follows §3. A catalog edit changes the leaves its records are in, as Mac OS edits a B-tree: each changed
-  leaf is laid out again with its records (a new record goes into the leaf of the record before it, the first leaf when
-  it sorts first); a leaf that overflows is split about equally, its second half moved into a free node (the first free
-  one by the node map) linked after it, with a record for it in its parent, which splits the same way up to a new root;
-  a leaf's new first key is written into the index records above it, at their stored length. Only the nodes, bitmap
-  sectors and MDB that change are written [ClassicMac]. Volumes split so (a Mac OS-initialized 20 MB volume with 100 new
-  folders, catalog depth 1 to 3; a new 20 MB volume with 600, depth 4) mount in Mac OS 9.0, pass Disk First Aid 8.5,
-  take the Finder's own copies and deletions, and pass it again [Verified]. When a leaf would be left empty, two nodes cannot hold its
-  records, or no node is free, the writer instead rebuilds the tree's leaf and index nodes from the sorted records,
-  each node filled in turn (Mac OS merges nodes and extends the file instead; the result is a valid tree either way),
-  using the nodes already in the tree file first. The extents tree is always rebuilt so. It
+- The writer follows §3. A catalog edit is made record by record as the BTree manager makes it (§1.8): the records
+  removed, then those changed (in place when they fit, else deleted and inserted), then those added, each in key order
+  [ClassicMac order]; rotation into the left sibling, splits to the left into the first free node, parent keys
+  deleted and inserted again, emptied nodes unlinked, zeroed and freed, the root collapsing, and the tree's file grown
+  first when an operation finds fewer free nodes than the depth + 1. Only the nodes, bitmap sectors and MDB that change
+  are written [ClassicMac]. On a volume with no block to grow the file into, and for an empty tree, the writer instead
+  rebuilds the tree's leaf and index nodes from the sorted records, each node filled in turn, using the nodes already
+  in the tree file first. The extents tree is always rebuilt so. Volumes edited so (a Mac OS-initialized 20 MB volume
+  with 100 new folders, catalog depth 1 to 3; a new 20 MB volume with 600, depth 4) mount in Mac OS 9.0, pass Disk
+  First Aid 8.5, take the Finder's own copies and deletions, and pass it again [Verified: with right splits, before
+  the BTree manager's rules were followed]. It
   extends a tree file with free blocks when needed, through the MDB's extents and, for the catalog, overflow records;
   it adds linked map nodes when the header node's map is full. The bytes past a fork's end in its last block are
   zeroed. New catalog keys count the alignment byte in `ckrKeyLen`, as hfsutils does (§1.9). `CreateFile` and
@@ -775,10 +774,11 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   and contents following), Finder info and folder flags, and deleting a folder with its contents;
   `A_volume_with_Mac_OS_s_fixed_length_index_keys_is_edited_and_keeps_them` edits a catalog whose index keys are at
   the maximum length, as Mac OS writes them (§1.8; `HfsBuilder.FixedIndexKeys`), and checks the rebuilt index keeps it;
-  `HfsCatalogInPlaceTests.cs` covers edits in place: a new folder writing two leaves and the header, each file deleted
-  writing its leaves and index (first keys carried up, fixed and variable index keys), 600 folders on a new 20 MB volume
-  splitting leaves, index nodes and the root (depth 1 to 3 or more) with at most 16 sectors written each, and the
-  rebuild when a leaf would overflow with no free node or be emptied;
+  `HfsCatalogInPlaceTests.cs` covers §1.8's edits: a record into a leaf with room writing that leaf, a full leaf
+  rotating into its left sibling, a full leaf with a full left sibling splitting to the left into the first free node,
+  each file deleted writing its leaves and index (fixed and variable index keys), an emptied leaf zeroed and freed,
+  the root collapsing, 600 folders on a new 20 MB volume (depth 1 to 3 or more), and a tree with no free node growing
+  its file first;
   `HfsMoveTests.cs` covers moves of files and folders (threads, valences, root counts) and the refusals;
   `HfsFormatTests.cs` covers new volumes from 400 KB to 500 MB against §3.1's table (block sizes, bitmap, B-tree
   sizes and clumps, `drWrCnt`, the alternate MDB, the root folder), files and catalog growth on one, and the sizes and

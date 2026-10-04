@@ -20,6 +20,9 @@ internal sealed class HfsBuilder
     /// <summary>The catalog's leaf nodes (two by default), for catalogs too big for two.</summary>
     public int CatalogLeaves { get; init; } = 2;
 
+    // Free nodes after the catalog's used ones, mapped free, as a volume Mac OS has used has.
+    public int FreeCatalogNodes { get; init; }
+
     /// <summary>
     /// Writes the catalog's index keys at the tree's maximum key length (37, zero-padded) as Mac OS does, instead of the
     /// leaf keys' own lengths (hfs.md §1.8).
@@ -86,7 +89,8 @@ internal sealed class HfsBuilder
         var catalogStart = allocation.Count;
         var indexNodes = IndexNodesFor(CatalogLeaves);
         var catalogNodes = CatalogLeaves + 1 + indexNodes; // header, leaves, index
-        for (var i = 0; i < catalogNodes; i++)
+        var catalogFileNodes = catalogNodes + FreeCatalogNodes;
+        for (var i = 0; i < catalogFileNodes; i++)
         {
             allocation.Add(new byte[Block]);
             allocated.Add(true);
@@ -209,7 +213,7 @@ internal sealed class HfsBuilder
 
         root = nextIndexNode;
         allocation[catalogStart + (int)root] = Leaf(index, forward: 0, backward: 0, kind: 0, height: (byte)depth);
-        allocation[catalogStart] = Header(firstLeaf: 1, lastLeaf: (uint)CatalogLeaves, nodes: (uint)catalogNodes, records: keyed.Count,
+        allocation[catalogStart] = Header(firstLeaf: 1, lastLeaf: (uint)CatalogLeaves, nodes: (uint)catalogFileNodes, records: keyed.Count,
             usedNodes: catalogNodes, maxKeyLength: 37, root: root, depth: depth);
         FirstFileRecordOffset = -1;
         for (var leaf = 1; leaf <= CatalogLeaves && FirstFileRecordOffset < 0; leaf++)
@@ -267,8 +271,8 @@ internal sealed class HfsBuilder
         BinaryPrimitives.WriteUInt16BigEndian(mdb[0x52..], checked((ushort)folders.Count(f => f.Parent == Root)));
         BinaryPrimitives.WriteUInt32BigEndian(mdb[0x82..], (uint)(ExtentsTreeNodes * Block));
         ExtentRecord([(0, ExtentsTreeNodes)]).CopyTo(mdb[0x86..]);
-        BinaryPrimitives.WriteUInt32BigEndian(mdb[0x92..], (uint)(catalogNodes * Block));
-        ExtentRecord([(catalogStart, catalogNodes)]).CopyTo(mdb[0x96..]);
+        BinaryPrimitives.WriteUInt32BigEndian(mdb[0x92..], (uint)(catalogFileNodes * Block));
+        ExtentRecord([(catalogStart, catalogFileNodes)]).CopyTo(mdb[0x96..]);
         for (var i = 0; i < allocated.Count; i++)
         {
             if (allocated[i])

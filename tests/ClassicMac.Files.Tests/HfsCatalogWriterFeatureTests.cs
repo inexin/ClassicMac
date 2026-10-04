@@ -116,7 +116,7 @@ public sealed class HfsCatalogWriterFeatureTests
     [Fact]
     public void DeletingAFragmentedFileReclaimsOverflowExtentsAndPreservesOtherFiles()
     {
-        var builder = new HfsBuilder();
+        var builder = new HfsBuilder { FreeCatalogNodes = 4 };                    // so the catalog does not grow (hfs.md §1.8)
         builder.File(HfsBuilder.Root, "Fragmented", Bytes(5 * HfsBuilder.Block, 31),
             Bytes(2 * HfsBuilder.Block, 32), fragments: 5);
         byte[] survivor = Bytes(300, 33);

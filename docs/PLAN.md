@@ -342,9 +342,8 @@ the edited forks, so the writer stops holding whole images:
 
 - **KenCode encoder** (built): Disk Copy 6.3.3's (kencode.md §3), byte for byte against Disk Copy's own KenCode saves
   of `TestData/Adc/src2m.dsk.gz`; NDIF edits of KenCode images compress changed chunks again.
-- **B-tree edits as Mac OS makes them:** hfs.md §1.8's insert (rotate left, split left, first free node, root split,
-  parent keys deleted and inserted again) and delete (empty nodes zeroed and freed, root collapse), replacing the
-  right split and the rebuild fallback; the rebuild stays only for growing the file.
+- **B-tree edits as Mac OS makes them** (built): hfs.md §1.8's insert, delete and growth for the catalog; the rebuild
+  stays for a volume with no block to grow into. Still rebuilt: the extents tree.
 
 **Further improvements (suggested 2026-10-03, from the work above and the Mac RE session's tests on a real 500 MB
 Mac OS 9 volume).** Not ordered yet:

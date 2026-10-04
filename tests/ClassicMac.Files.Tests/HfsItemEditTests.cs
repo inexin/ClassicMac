@@ -56,7 +56,7 @@ public sealed class HfsItemEditTests
     [Fact]
     public void A_folder_tree_with_fragmented_files_is_deleted_in_one_pass()
     {
-        var builder = new HfsBuilder();
+        var builder = new HfsBuilder { FreeCatalogNodes = 4 };                    // so the catalog does not grow (hfs.md §1.8)
         var docs = builder.Folder(HfsBuilder.Root, "Docs");
         var deep = builder.Folder(docs, "Deep");
         builder.File(docs, "Fragmented", new byte[5 * HfsBuilder.Block], new byte[2 * HfsBuilder.Block], fragments: 5, thread: true);
