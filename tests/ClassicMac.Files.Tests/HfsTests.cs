@@ -1060,7 +1060,7 @@ public class HfsTests
         {
             var diagnostics = new List<Diagnostic>();
             var root = ContainerUnwrapper.Default.Unwrap(path, diagnostics: diagnostics);
-            Assert.DoesNotContain(diagnostics, d => d.Severity == DiagnosticSeverity.Error || d.Code == "hfs.counts");
+            Assert.DoesNotContain(diagnostics, d => (d.Severity == DiagnosticSeverity.Error || d.Code == "hfs.counts") && !CorpusFolders.IsDamageTest(path, d.Location));
             files += root.Leaves().Count();
         }
         TestContext.Current.SendDiagnosticMessage($"{images.Count} disk images, {files} files.");

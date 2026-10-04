@@ -833,7 +833,10 @@ They change what running applications see, not what a file contains.
   harness's samples. `CLASSICMAC_CORPUS` names one or more folders, separated by `;`; the tests that use it skip when
   it is absent. Only names, counts and hashes of corpus results are committed, never the files or their decoded output.
   A folder holding a `.classicmac-damage-test` file (or named `ndiftest`) holds deliberately damaged inputs: tests that
-  expect clean reads skip it, the tests written for it read it.
+  expect clean reads skip it, the tests written for it read it. Files damaged on purpose inside a corpus file (malformed
+  images kept in a disk image) are listed in a `.classicmac-damage-paths` file beside it, one per line,
+  `<file name> | <Mac path>` (a folder's path ends in `:`, the volume name may be left out); those tests expect the
+  diagnostics about them.
 - **Checks:**
   - Round trip: read → write → read gives the same model, and canonical forks are byte-identical.
   - **Golden outputs** (`tests/ClassicMac.Resources.Decoders.Tests/Golden/`): a fixture fork made in code, with one

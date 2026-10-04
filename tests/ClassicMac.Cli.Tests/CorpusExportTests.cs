@@ -97,7 +97,7 @@ public class CorpusExportTests : IDisposable
 
             foreach (var (source, d) in exported)
             {
-                if (d.Severity == DiagnosticSeverity.Error && damageTest)
+                if (d.Severity == DiagnosticSeverity.Error && (damageTest || CorpusFolders.IsDamageTest(path, d.Location ?? source)))
                 {
                     Count(damaged, d.Code);
                 }

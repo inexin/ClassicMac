@@ -504,7 +504,8 @@ public class HostFilesTests : IDisposable
             {
                 continue; // in use (an emulator holding a disk image)
             }
-            Assert.False(diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error), $"{path}: {string.Join("; ", diagnostics.Select(d => d.Message))}");
+            var errors = diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error && !CorpusFolders.IsDamageTest(path, d.Location)).ToList();
+            Assert.False(errors.Count > 0, $"{path}: {string.Join("; ", errors.Select(d => $"{d.Location}: {d.Message}"))}");
             files++;
             if (root.Format == "Basilisk II folder")
             {
