@@ -7,7 +7,7 @@ namespace ClassicMac.App.ViewModels;
 
 // The property view's Properties | JSON switch (design/boards/property-view.md, P2): Properties by default, the choice
 // kept for the session.
-public sealed partial class PropertyLinks(IAppSelection appSelection, IAppView appView, IAppParts appParts) : ObservableObject
+public sealed partial class PropertyLinks(IAppSelection appSelection, IAppServices appServices, IAppView appView) : ObservableObject
 {
     /// <summary>Whether a JSON preview shows its JSON rather than its properties.</summary>
     [ObservableProperty]
@@ -66,7 +66,7 @@ public sealed partial class PropertyLinks(IAppSelection appSelection, IAppView a
 
     /// <summary>A row's right-click Copy as decimal, hex or JSON: <paramref name="text"/> on the clipboard.</summary>
     [RelayCommand(CanExecute = nameof(CanCopyProperty))]
-    private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : appParts.ShellActions.Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
+    private Task CopyProperty(string? text) => text is null ? Task.CompletedTask : appServices.Shell?.CopyTextAsync(text) ?? Task.CompletedTask;
 
     private static bool CanCopyProperty(string? text) => text is not null;
 

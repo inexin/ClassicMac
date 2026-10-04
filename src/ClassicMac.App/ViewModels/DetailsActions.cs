@@ -8,7 +8,7 @@ namespace ClassicMac.App.ViewModels;
 
 // The Details tab's actions (design/boards/details.md, P4): Copy all, the File card's "In" link, and the chain card's
 // link to the file's problems.
-public sealed partial class DetailsActions(IAppSelection appSelection, IAppServices appServices, IAppView appView, IAppParts appParts) : ObservableObject
+public sealed partial class DetailsActions(IAppSelection appSelection, IAppServices appServices, IAppView appView) : ObservableObject
 {
     // The errors and warnings reported on the node or anything under it.
     internal int ProblemsIn(NodeViewModel? node)
@@ -38,7 +38,7 @@ public sealed partial class DetailsActions(IAppSelection appSelection, IAppServi
 
     /// <summary>Copy all: the details as plain "Label: value" lines on the clipboard.</summary>
     [RelayCommand(CanExecute = nameof(CanCopyDetails))]
-    private Task CopyDetails() => appParts.ShellActions.Shell?.CopyTextAsync(appView.Details.CopyText) ?? Task.CompletedTask;
+    private Task CopyDetails() => appServices.Shell?.CopyTextAsync(appView.Details.CopyText) ?? Task.CompletedTask;
 
     private bool CanGoToIn() => appView.Details.InNode is not null;
 

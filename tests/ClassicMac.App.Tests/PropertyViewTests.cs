@@ -101,7 +101,7 @@ public sealed class PropertyViewTests : IDisposable
     {
         var shell = new CopyShell();
         var model = new MainViewModel();
-        model.ShellActions.Shell = shell;
+        model.Shell = shell;
         Assert.False(model.PropertyLinks.CopyPropertyCommand.CanExecute(null));
         await model.PropertyLinks.CopyPropertyCommand.ExecuteAsync("0x780A");
         Assert.Equal("0x780A", shell.Copied);

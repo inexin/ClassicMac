@@ -59,10 +59,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
             model.Drafts.ChangeRefused += OnChangeRefused;
             model.HexFind.HexLineShown -= OnHexLineShown;
             model.HexFind.HexLineShown += OnHexLineShown;
-            model.FilePicker = this;
-            model.EditDialogs ??= new EditDialogs(this);
-            model.ImageReader ??= new AvaloniaImageReader();
-            model.SoundPlayback.AudioPlayer ??= audio;
+            model.AttachPlatform(new AppPlatform(this, new EditDialogs(this), new AvaloniaImageReader(), audio, shell));
             if (!ReferenceEquals(boundPanel, model.DiagnosticsPanel))
             {
                 boundPanel = model.DiagnosticsPanel;

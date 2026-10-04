@@ -56,6 +56,12 @@ public interface IAppServices
     /// <summary>Reads images for Resource ▸ Import, or null (no window).</summary>
     IImageReader? ImageReader { get; }
 
+    /// <summary>The player sounds play through, or null (no window).</summary>
+    IAudioPlayer? AudioPlayer { get; }
+
+    /// <summary>The window's part of the shell commands, or null (no window).</summary>
+    IShell? Shell { get; }
+
     /// <summary>How resource forks are read.</summary>
     ReadOptions ReadOptions { get; }
 
@@ -71,6 +77,10 @@ public interface IAppServices
     /// <summary>Saves the display options and the recent files.</summary>
     void SaveSettings();
 }
+
+/// <summary>The services the platform gives the app (the window gives its own); each may be null.</summary>
+public sealed record AppPlatform(IFilePicker? FilePicker = null, IEditDialogs? EditDialogs = null, IImageReader? ImageReader = null,
+    IAudioPlayer? AudioPlayer = null, IShell? Shell = null);
 
 /// <summary>What the inspector shows for the selection: its preview, hex view, details, zoom, depth and tab.</summary>
 public interface IAppView

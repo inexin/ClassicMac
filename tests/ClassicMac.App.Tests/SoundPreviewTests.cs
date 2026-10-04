@@ -34,7 +34,7 @@ public class SoundPreviewTests : IDisposable
         var path = Path.Combine(folder, "disk.img");
         File.WriteAllBytes(path, disk.Build("Disk"));
         var model = new MainViewModel();
-        model.SoundPlayback.AudioPlayer = player;
+        model.AudioPlayer = player;
         var input = (await model.OpenAsync(path))!;
         var file = input.Children.OfType<FileNode>().Single();
         await file.EnsureLoadedAsync();

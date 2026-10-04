@@ -15,10 +15,9 @@ internal sealed class WindowShell(Window window, MenuItem windowMenu) : IShell
     /// <summary>The About box while it is open (tests close it).</summary>
     internal Window? About { get; private set; }
 
-    /// <summary>Makes this the model's shell, and follows its theme and inputs.</summary>
+    /// <summary>Follows the model's theme and inputs (the window attaches this shell with its platform).</summary>
     public void Bind(MainViewModel model)
     {
-        model.ShellActions.Shell = this;
         if (model.ShellActions.Theme != AppTheme.System)
         {
             ApplyTheme(model.ShellActions.Theme);

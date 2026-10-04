@@ -42,18 +42,13 @@ public interface IAudioPlayer
 // a click on the waveform seeking, and Repeat the loop. Playback stops when the preview changes.
 public sealed partial class SoundPlayback(IAppSelection appSelection, IAppServices appServices, IAppView appView) : ObservableObject
 {
-    private IAudioPlayer? audioPlayer;
+    private IAudioPlayer? AudioPlayer => appServices.AudioPlayer;
 
-    /// <summary>The player sounds play through; set by the window (none in tests unless given).</summary>
-    public IAudioPlayer? AudioPlayer
+    // MainViewModel.AudioPlayer changed: whether sound can play follows.
+    internal void AudioPlayerChanged()
     {
-        get => audioPlayer;
-        set
-        {
-            audioPlayer = value;
-            OnPropertyChanged(nameof(PlaybackNote));
-            NotifySoundCommands();
-        }
+        OnPropertyChanged(nameof(PlaybackNote));
+        NotifySoundCommands();
     }
 
     [ObservableProperty]

@@ -65,7 +65,7 @@ public sealed record AboutInfo(string Name, string Version, string Description, 
 // The shell's commands (S1, S2, S7): the title, zoom and depth, the theme, the Window and Help menus.
 public sealed partial class ShellActions(IAppSelection appSelection, IAppServices appServices, IAppView appView) : ObservableObject
 {
-    public IShell? Shell { get; set; }
+    private IShell? Shell => appServices.Shell;
 
     // ---- Title (S1) ----
 

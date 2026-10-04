@@ -195,7 +195,7 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
     private DetailsActions? detailsActions;
 
     /// <summary>The Details tab's actions: Copy all, the File card's In link, the chain card's link to problems.</summary>
-    public DetailsActions DetailsActions => detailsActions ??= new(this, this, this, this);
+    public DetailsActions DetailsActions => detailsActions ??= new(this, this, this);
 
     internal readonly ISettingsStore settings;
 
@@ -326,6 +326,32 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
 
     /// <summary>Reads images for Resource ▸ Import.</summary>
     public IImageReader? ImageReader { get; set; }
+
+    /// <summary>The window's part of the shell commands: the browser, About, minimize, zoom, the clipboard.</summary>
+    public IShell? Shell { get; set; }
+
+    private IAudioPlayer? audioPlayer;
+
+    /// <summary>The player sounds play through (none in tests unless given).</summary>
+    public IAudioPlayer? AudioPlayer
+    {
+        get => audioPlayer;
+        set
+        {
+            audioPlayer = value;
+            SoundPlayback.AudioPlayerChanged();
+        }
+    }
+
+    /// <summary>Attaches the platform's services, keeping any already set (a test's fakes).</summary>
+    public void AttachPlatform(AppPlatform platform)
+    {
+        FilePicker ??= platform.FilePicker;
+        EditDialogs ??= platform.EditDialogs;
+        ImageReader ??= platform.ImageReader;
+        AudioPlayer ??= platform.AudioPlayer;
+        Shell ??= platform.Shell;
+    }
 
     public ContainerReadOptions ContainerOptions { get; init; } = ContainerReadOptions.Default;
 

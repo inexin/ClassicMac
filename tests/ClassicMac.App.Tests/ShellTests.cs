@@ -133,7 +133,7 @@ public sealed class ShellTests : IDisposable
     {
         var shell = new FakeShell();
         var model = new MainViewModel();
-        model.ShellActions.Shell = shell;
+        model.Shell = shell;
         model.ShellActions.MinimizeCommand.Execute(null);
         model.ShellActions.ZoomWindowCommand.Execute(null);
         model.ShellActions.ZoomWindowCommand.Execute(null);
@@ -163,7 +163,7 @@ public sealed class ShellTests : IDisposable
     {
         var shell = new FakeShell();
         var model = new MainViewModel();
-        model.ShellActions.Shell = shell;
+        model.Shell = shell;
         model.ShellActions.OpenHelpCommand.Execute(null);
         model.ShellActions.ReportProblemCommand.Execute(null);
         Assert.Equal([new Uri("https://github.com/inexin/ClassicMac#readme"), new Uri("https://github.com/inexin/ClassicMac/issues/new")], shell.Opened);

@@ -29,7 +29,7 @@ public sealed class SoundWindowTests : IDisposable
         File.WriteAllBytes(path, disk.Build("Disk"));
         var player = new FakeAudioPlayer();
         var model = new MainViewModel();
-        model.SoundPlayback.AudioPlayer = player;
+        model.AudioPlayer = player;
         var window = new MainWindow { DataContext = model };
         window.Show();
         Pump(model.OpenAsync(path));
