@@ -36,4 +36,38 @@ internal static class FirstAidImages
     public static void Put32(byte[] image, int offset, long value) => new BigEndianWriter(image).WriteUInt32At(offset, (uint)value);
 
     public static FirstAidReport Verify(byte[] image) => HfsFirstAid.Verify(ForkData.FromBytes(image));
+
+    // The catalog's node n, by the MDB's first catalog extent (the test volumes' catalogs are in one piece).
+    public static int CatalogNode(byte[] image, uint node)
+    {
+        int blockSize = (int)U32(image, Primary + 0x14);
+        int firstBlock = U16(image, Primary + 0x1C) * Sector;
+        int nodeSize = U16(image, firstBlock + U16(image, Primary + 0x96) * blockSize + 14 + 18);
+        return firstBlock + U16(image, Primary + 0x96) * blockSize + (int)node * nodeSize;
+    }
+
+    /// <summary>The offset of the data of the catalog record with key (parent, name), following the leaves.</summary>
+    public static int Record(byte[] image, uint parent, string name)
+    {
+        int header = CatalogNode(image, 0);
+        int nodeSize = U16(image, header + 14 + 18);
+        var macName = Core.MacRoman.Encode(name);
+        for (uint node = U32(image, header + 14 + 10); node != 0; node = U32(image, CatalogNode(image, node)))
+        {
+            int at = CatalogNode(image, node);
+            for (var i = 0; i < U16(image, at + 10); i++)
+            {
+                int start = at + U16(image, at + nodeSize - 2 * (i + 1));
+                int keyLength = image[start];
+                if (U32(image, start + 2) == parent && image.AsSpan(start + 7, image[start + 6]).SequenceEqual(macName))
+                {
+                    return start + ((1 + keyLength + 1) & ~1);
+                }
+            }
+        }
+
+        throw new InvalidOperationException($"No catalog record ({parent}, {name}).");
+    }
+
+    public const uint D1 = 16, D2 = 17, T1 = 18, W6Plain = 19, T2 = 20;
 }

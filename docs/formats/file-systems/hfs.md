@@ -813,6 +813,47 @@ header node, then a depth-first walk from the root; %3 = the node):
    total and free nodes) against the walk's → #54 "Invalid BTree Header", rewritten by repair [Verified: `bthNRecs`
    + 1].
 
+**"Checking catalog file."** The catalog's leaf records in key order (%2 = the record's CNID, %3 = its node). No
+thread record for the root, key (2, ""), → #35 "Missing thread record for root dir". A record type (its first word)
+other than $0100, $0200, $0300 or $0400 → #31 "Invalid catalog record type". Then by type ("ends" = ends the check;
+"repair" = recorded for repair, the scan going on):
+
+| Record | # | Text | When | |
+| --- | --- | --- | --- | --- |
+| Thread | 33 | Invalid thread record length | Not 46 bytes | ends |
+| Thread | 38 | Invalid key for thread record | Its key has a name | ends |
+| Thread | 39 | Invalid parent CName in thread record | `thdCName` not 1–31 bytes | ends |
+| Thread | 64 | Reserved fields in the catalog record have incorrect data | `thdResrv` not zero | repair |
+| Thread | 65 | Invalid file or directory ID found | Its CNID 0 or 3–15 | ends |
+| Folder thread | 37 | Missing directory record | No record at (`thdParID`, `thdCName`) | repair (the folder is made) |
+| Folder thread | 37 | | The record there is not a folder | ends |
+| File thread | 6 | Missing file record for file thread | No record there, or a file whose `filFlags` bit 1 is clear | repair (the thread is deleted) |
+| File thread | 6 | | The record there is not a file | ends |
+| Folder | 32 | Invalid directory record length | Not 70 bytes | ends |
+| Folder, file | 36 | Missing thread record | Its parent ID is not the CNID of the thread before it | ends |
+| Folder | 64 | (as above) | `dirFlags` not zero | repair |
+| Folder | 65 | (as above) | `dirDirID` 0 or 3–15 | ends |
+| Folder | 57 | Custom icon missing | `frFlags` bit $0400 and no file "Icon\r" in it | repair (bit cleared) [Verified] |
+| File | 34 | Invalid file record length | Not 102 bytes | ends |
+| File | 64 | (as above) | `filFlags` bits 2–6, `filStBlk`, `filRStBlk` or `filResrv` not zero | repair [Verified] |
+| File | 65 | (as above) | `filFlNum` 0 or 3–15 | ends |
+| File | 1 | Invalid PEOF | A fork's blocks × A < its PEOF (a PEOF short of them is not this check's) | ends [Verified] |
+| File | 2 | Invalid LEOF | A fork's LEOF > its PEOF (signed) | ends [Verified] |
+
+Each record's CNID raises the next free CNID (at least 16). A fork's blocks are its catalog extents and the overflow
+records from (fork, file, the blocks so far) on while file and fork match, each record through #11. Folder and file
+records without a thread are not named: unpaired counts only make repair write the missing threads. Disk First Aid
+never prints #50 "File thread flag not set in file rec".
+
+Then MountCheck's view, one line with no numbers:
+
+- **"MountCheck found serious errors"**: the extents leave fewer free blocks than the bitmap's clear bits (a used block
+  marked free) [Verified].
+- **"MountCheck found minor errors"**, otherwise, for any of: files plus folders (the root aside) other than the sum of
+  the valences; more folder threads than folders or more file threads than files with the thread flag; fewer (missing
+  threads); a fork whose blocks × A is not its PEOF (the catalog is then rebuilt); more free blocks by the extents than
+  the bitmap shows (leaked blocks) [Verified: C2, C4, C6, D1]. `drFreeBks` itself is not compared [Verified].
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's

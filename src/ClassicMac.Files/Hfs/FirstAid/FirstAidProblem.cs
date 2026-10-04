@@ -45,5 +45,5 @@ public sealed record FirstAidProblem(int Number, string Message, long Arg2, long
     FirstAidOrigin Origin = FirstAidOrigin.DiskFirstAid)
 {
     /// <summary>The line Disk First Aid prints.</summary>
-    public override string ToString() => $"Problem:  {Message}, {Arg2}, {Arg3}";
+    public override string ToString() => Number > 0 ? $"Problem:  {Message}, {Arg2}, {Arg3}" : $"Problem:  {Message}.";
 }

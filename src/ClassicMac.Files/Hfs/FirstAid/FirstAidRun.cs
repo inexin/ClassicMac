@@ -92,6 +92,23 @@ internal sealed class FirstAidRun(HfsVolume volume)
     /// <summary>The root folder's name, from its catalog key: the name the MDB's <c>drVN</c> must match.</summary>
     public byte[] RootName { get; set; } = [];
 
+    // What the catalog scan counts (Disk First Aid's CVCB): the volume's counts and the next CNID.
+    public int DirCount { get; set; }
+
+    public int FileCount { get; set; }
+
+    public int RootDirCount { get; set; }
+
+    public int RootFileCount { get; set; }
+
+    public uint NextCnid { get; set; }
+
+    /// <summary>The file IDs the scan saw (for the orphaned-extents repair).</summary>
+    public HashSet<uint> FileIds { get; } = [];
+
+    /// <summary>Every fork's extents: (file ID, fork, extent), the catalog's and extents file's included.</summary>
+    public List<(uint FileId, byte Fork, uint Start, uint Count)> ForkExtents { get; } = [];
+
     public List<string> Stages { get; } = [];
 
     public List<FirstAidProblem> Problems { get; } = [];
@@ -156,6 +173,13 @@ internal sealed class FirstAidRun(HfsVolume volume)
     public void Flag(int number, FirstAidRepairs repairs, long arg2 = 0, long arg3 = 0)
     {
         Add(number, arg2, arg3, repairable: true);
+        Repairs |= repairs;
+    }
+
+    /// <summary>Records one of Disk First Aid's lines with no number (MountCheck's), repairable.</summary>
+    public void Problem(string message, string code, FirstAidRepairs repairs)
+    {
+        Problems.Add(new FirstAidProblem(0, message, 0, 0, stage, Repairable: true, code));
         Repairs |= repairs;
     }
 

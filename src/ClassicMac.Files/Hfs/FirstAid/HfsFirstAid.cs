@@ -26,7 +26,8 @@ public static class HfsFirstAid
                 && LockedNameCheck.Run(run)
                 && Stage(run, FirstAidMessages.CheckingExtentsBTree) && BTreeCheck.Run(run, run.Extents!)
                 && Stage(run, FirstAidMessages.CheckingExtentsFile)
-                && Stage(run, FirstAidMessages.CheckingCatalogBTree) && BTreeCheck.Run(run, run.Catalog!);
+                && Stage(run, FirstAidMessages.CheckingCatalogBTree) && BTreeCheck.Run(run, run.Catalog!)
+                && CatalogScan.Run(run);
         }
         catch (EndOfStreamException)
         {

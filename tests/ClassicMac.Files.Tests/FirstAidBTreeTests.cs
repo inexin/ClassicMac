@@ -134,13 +134,5 @@ public class FirstAidBTreeTests
         ], Verify(Base()).Stages.Take(6));
     }
 
-    // The catalog's node n, by the MDB's first catalog extent (the base volume's catalog is in one piece).
-    private static int CatalogNode(byte[] image, uint node)
-    {
-        int blockSize = (int)U32(image, Primary + 0x14);
-        int firstBlock = U16(image, Primary + 0x1C) * Sector;
-        return firstBlock + U16(image, Primary + 0x96) * blockSize + (int)node * Sector;
-    }
-
     private static uint FirstLeaf(byte[] image) => U32(image, CatalogNode(image, 0) + 14 + 10);
 }

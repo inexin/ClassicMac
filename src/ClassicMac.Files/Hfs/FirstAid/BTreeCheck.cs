@@ -177,35 +177,10 @@ internal sealed class BTreeCheck
             file.TryRecord(node, i, out var key, out var data);
             tree.LeafRecords++;
             tree.Records.Add((key.ToArray(), data.ToArray(), node));
-            if (!tree.IsCatalog && !ExtentRecord(data.Span, node))
+            if (!tree.IsCatalog && !ExtentRecords.Check(run, data.Span, 0, node))
             {
                 return false;
             }
-        }
-
-        return true;
-    }
-
-    // ChkExtRec (#11): each of an extent record's three extents starts and runs inside the volume's blocks, and no
-    // extent with blocks follows an empty one. A start plus count past the end is not checked here [Code: $1FDC2].
-    private bool ExtentRecord(ReadOnlySpan<byte> record, uint node)
-    {
-        if (record.Length < 12)
-        {
-            return run.Fatal(22, 0, node);
-        }
-
-        var reader = new BigEndianReader(record.ToArray());
-        uint previousCount = 1;
-        for (var i = 0; i < 3; i++)
-        {
-            uint start = reader.ReadUInt16At(4 * i), count = reader.ReadUInt16At(4 * i + 2);
-            if (start >= run.BlockCount || count >= run.BlockCount || previousCount == 0 && count != 0)
-            {
-                return run.Fatal(11, 0, node);
-            }
-
-            previousCount = count;
         }
 
         return true;

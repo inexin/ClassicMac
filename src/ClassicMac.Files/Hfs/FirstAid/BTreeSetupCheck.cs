@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using ClassicMac.Core;
 
 namespace ClassicMac.Files.Hfs;
@@ -27,6 +28,7 @@ internal static class BTreeSetupCheck
         }
 
         run.Extents = extents;
+        run.ForkExtents.AddRange(extentsExtents.Select(e => ((uint)ExtentsFile, (byte)0, e.Start, e.Count)));
 
         // #46: the catalog's MDB extents and its overflow extents (fork $00, file 4) are its PEOF.
         var catalogExtents = Extents(mdb, 0x96);
@@ -36,6 +38,7 @@ internal static class BTreeSetupCheck
             return run.Fatal(46, CatalogFile);
         }
 
+        run.ForkExtents.AddRange(catalogExtents.Select(e => ((uint)CatalogFile, (byte)0, e.Start, e.Count)));
         run.Catalog = Tree(run, CatalogFile, catalogExtents, mdb.ReadUInt32At(0x92));
         return run.Catalog is not null;
     }
