@@ -175,19 +175,19 @@ public sealed class TemplateFormTests : IDisposable
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "BNDL").Children[0];
         await model.PreviewTask;
         var form = Assert.IsType<TemplateForm>(model.Form);
-        Assert.True(model.ShowsForm);
+        Assert.True(model.FormEditing.ShowsForm);
         string Size() => model.Header!.Facts.Single(f => f.Label == "Size").Value;
         Assert.Equal(new InspectorFact("Shown through", "'TMPL' 1000 “BNDL” in Bundle.rsrc", false), model.Header!.Facts.Single(f => f.Label == "Shown through"));
         Assert.Equal("'TMPL' 1000 “BNDL” in Bundle.rsrc", form.ShownThrough);
         Assert.Equal($"{Data.Length} bytes", Size());
 
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         var changed = new List<string?>();
         model.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
         ((TemplateListRow)form.Fields[3]).AddCommand.Execute(null);
         Assert.Contains(nameof(MainViewModel.Header), changed);
         Assert.Equal($"{Data.Length + 6} bytes", Size());
-        model.CancelFormCommand.Execute(null);
+        model.FormEditing.CancelFormCommand.Execute(null);
         Assert.Equal($"{Data.Length} bytes", Size());
     }
 
@@ -222,7 +222,7 @@ public sealed class TemplateFormTests : IDisposable
         Assert.Contains("128", Shown());
         Assert.DoesNotContain("Add Type", Buttons());
 
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         Assert.Contains("Add Type", Buttons());
         Assert.Contains("Add Local ID", Buttons());

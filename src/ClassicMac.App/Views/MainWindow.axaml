@@ -1301,8 +1301,8 @@
               <Button x:Name="SaveAsWavButton" Content="Save as WAV…" Command="{Binding SoundHeaderActions.SaveAsWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
               <Button x:Name="ReplaceFromWavButton" Content="Replace from WAV…" Command="{Binding SoundHeaderActions.ReplaceFromWavCommand}" IsVisible="{Binding SoundHeaderActions.IsSoundResource}" />
               <Panel IsVisible="{Binding HasForm}">
-                <Button Classes="accent" Content="Edit" Command="{Binding EditFormCommand}" IsVisible="{Binding !IsEditingForm}" />
-                <Border Classes="editing-badge" IsVisible="{Binding IsEditingForm}" VerticalAlignment="Center">
+                <Button Classes="accent" Content="Edit" Command="{Binding FormEditing.EditFormCommand}" IsVisible="{Binding !FormEditing.IsEditingForm}" />
+                <Border Classes="editing-badge" IsVisible="{Binding FormEditing.IsEditingForm}" VerticalAlignment="Center">
                   <TextBlock Text="Editing" />
                 </Border>
               </Panel>
@@ -1468,7 +1468,7 @@
 
           <TabItem Header="Preview">
             <Panel>
-            <DockPanel IsVisible="{Binding !ShowsForm}">
+            <DockPanel IsVisible="{Binding !FormEditing.ShowsForm}">
               <!-- An alias previews its original under this strip (docs/formats/resources/aliases.md §5). -->
               <Border x:Name="AliasStripBar" DockPanel.Dock="Top" Classes="alias-strip" IsVisible="{Binding AliasActions.AliasStrip, Converter={x:Static ObjectConverters.IsNotNull}}">
                 <DockPanel>
@@ -1969,25 +1969,25 @@
                 </Border>
               </Panel>
             </DockPanel>
-              <!-- The read-then-edit host (boards/read-then-edit.md, E1; FormHost.cs): every form, read only first, then
+              <!-- The read-then-edit host (boards/read-then-edit.md, E1; FormEditing.cs): every form, read only first, then
                    in place with Cancel and Apply. Esc cancels and Ctrl+Enter applies (MainWindow.Host.cs); a double-click
                    on a "form-row" edits with that row selected. -->
-              <DockPanel x:Name="FormHost" Classes="form-host" Classes.editing="{Binding IsEditingForm}" IsVisible="{Binding ShowsForm}">
+              <DockPanel x:Name="FormHost" Classes="form-host" Classes.editing="{Binding FormEditing.IsEditingForm}" IsVisible="{Binding FormEditing.ShowsForm}">
                 <Border x:Name="FormFooter" DockPanel.Dock="Bottom" Classes="host-footer">
                   <Panel>
-                    <StackPanel x:Name="ReadOnlyFooter" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditingForm}">
+                    <StackPanel x:Name="ReadOnlyFooter" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !FormEditing.IsEditingForm}">
                       <PathIcon Classes="lock" Data="M4,7 V5 A4,4 0 0 1 12,5 V7 H13 V15 H3 V7 Z M6,7 H10 V5 A2,2 0 0 0 6,5 Z" />
-                      <TextBlock Text="{Binding FormReadOnlyNote}" Classes="muted" />
-                      <TextBlock Text="{Binding LastApplied}" Classes="applied" IsVisible="{Binding LastApplied, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      <TextBlock Text="{Binding FormEditing.FormReadOnlyNote}" Classes="muted" />
+                      <TextBlock Text="{Binding FormEditing.LastApplied}" Classes="applied" IsVisible="{Binding FormEditing.LastApplied, Converter={x:Static ObjectConverters.IsNotNull}}" />
                     </StackPanel>
-                    <DockPanel x:Name="EditingFooter" IsVisible="{Binding IsEditingForm}">
+                    <DockPanel x:Name="EditingFooter" IsVisible="{Binding FormEditing.IsEditingForm}">
                       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
-                        <Button Content="Cancel" Command="{Binding CancelFormCommand}" ToolTip.Tip="Esc" />
+                        <Button Content="Cancel" Command="{Binding FormEditing.CancelFormCommand}" ToolTip.Tip="Esc" />
                         <Button Classes="accent" Content="Apply" Command="{Binding ApplyFormCommand}" IsDefault="False" ToolTip.Tip="Ctrl+Enter" />
                       </StackPanel>
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="12">
-                          <TextBlock Text="{Binding FormHint}" Classes="muted" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding FormEditing.FormHint}" Classes="muted" VerticalAlignment="Center" />
                           <CheckBox x:Name="TemplateBox" Content="Edit with template" IsChecked="{Binding UseTemplate}" IsVisible="{Binding HasTemplateChoice}" />
                         </StackPanel>
                         <StackPanel x:Name="FormErrorLine" Orientation="Horizontal" Spacing="6"
@@ -2179,7 +2179,7 @@
                                   <Grid Classes="card-row form-row" ColumnDefinitions="150,*">
                                     <TextBlock Classes="label" Text="Item list" />
                                     <Button Grid.Column="1" Classes="link" Content="{Binding ItemsText}" IsVisible="{Binding !IsEditing}"
-                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
+                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
                                     <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
                                   </Grid>
                                 </Border>
@@ -2265,7 +2265,7 @@
                                   <TextBlock Classes="label" Text="Item list" />
                                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsEditing}">
                                     <Button Classes="link" Content="{Binding ItemsText}"
-                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
+                                            Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.ShowItemListCommand, FallbackValue={x:Null}}" CommandParameter="{Binding}" />
                                     <TextBlock Classes="muted" Text="{Binding ItemCountText}" VerticalAlignment="Center" />
                                   </StackPanel>
                                   <NumericUpDown Grid.Column="1" Value="{Binding ItemsId}" FormatString="0" Classes="coord" HorizontalAlignment="Left" Minimum="-32768" Maximum="32767" IsVisible="{Binding IsEditing}" />
@@ -2340,7 +2340,7 @@
                               <DockPanel>
                                 <TextBlock DockPanel.Dock="Right" Classes="muted" Text="1× · Mac OS 8/9" />
                                 <TextBlock x:Name="ItemListPreviewTitle" Classes="strong"
-                                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormPreviewTitle, FallbackValue=Preview}" />
+                                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.FormPreviewTitle, FallbackValue=Preview}" />
                               </DockPanel>
                             </Border>
                             <TextBlock DockPanel.Dock="Top" Classes="muted preview-note"
@@ -2417,7 +2417,7 @@
                             <Border DockPanel.Dock="Top" Classes="preview-header">
                               <WrapPanel>
                                 <TextBlock x:Name="PreviewTitle" Classes="strong" Margin="0,0,10,0" TextWrapping="Wrap"
-                                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormPreviewTitle, FallbackValue=Preview}" />
+                                           Text="{Binding $parent[Window].((vm:MainViewModel)DataContext).FormEditing.FormPreviewTitle, FallbackValue=Preview}" />
                                 <TextBlock Classes="muted" Text="2× · Mac OS 8/9" />
                               </WrapPanel>
                             </Border>

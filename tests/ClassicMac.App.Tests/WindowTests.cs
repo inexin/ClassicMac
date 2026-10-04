@@ -341,7 +341,7 @@ public class WindowTests
                 model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == type).Children[0];
                 Pump(model.PreviewTask);
                 Assert.IsType(form, model.Form);
-                model.EditFormCommand.Execute(null);
+                model.FormEditing.EditFormCommand.Execute(null);
                 Dispatcher.UIThread.RunJobs();
                 Capture(window, "edit-" + type.TrimEnd('#'), type is "DITL" or "Rsrc" ? baselines : null);
                 Assert.Contains(window.GetVisualDescendants().OfType<TextBox>(), t => t.IsEffectivelyVisible);
@@ -798,7 +798,7 @@ public class WindowTests
             var cell = rows[2].GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "Save");
             cell.RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.DoubleTappedEvent, null!));
             Dispatcher.UIThread.RunJobs();
-            Assert.True(model.IsEditingForm);
+            Assert.True(model.FormEditing.IsEditingForm);
             Assert.Same(menu.Items[2], menu.SelectedItem);
             var preview = host.GetVisualDescendants().OfType<MenuView>().Single();
             Assert.Equal(2, preview.SelectedIndex);
@@ -859,11 +859,11 @@ public class WindowTests
             var text = host.GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible);
             text.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
             Dispatcher.UIThread.RunJobs();
-            Assert.False(model.IsEditingForm);
+            Assert.False(model.FormEditing.IsEditingForm);
             Assert.False(model.Drafts.HasDraft);
 
             // Edit again, change the title, Ctrl+Enter applies one undoable edit.
-            model.EditFormCommand.Execute(null);
+            model.FormEditing.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.IsType<MenuForm>(model.Form).Title = "Fichier";
             text = host.GetVisualDescendants().OfType<TextBox>().First(t => t.IsEffectivelyVisible);
@@ -872,10 +872,10 @@ public class WindowTests
                 RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter, KeyModifiers = Avalonia.Input.KeyModifiers.Control,
             });
             Dispatcher.UIThread.RunJobs();
-            Assert.False(model.IsEditingForm);
-            Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.LastApplied);
+            Assert.False(model.FormEditing.IsEditingForm);
+            Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.FormEditing.LastApplied);
             Assert.Contains(window.FindControl<StackPanel>("ReadOnlyFooter")!.GetVisualDescendants().OfType<TextBlock>(),
-                t => t.Text == model.LastApplied && t.IsEffectivelyVisible);
+                t => t.Text == model.FormEditing.LastApplied && t.IsEffectivelyVisible);
             window.Close();
             Baselines.Verify(baselines);
         }
@@ -929,7 +929,7 @@ public class WindowTests
             rows[1].GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "two")
                 .RaiseEvent(new Avalonia.Input.TappedEventArgs(Avalonia.Input.InputElement.DoubleTappedEvent, null!));
             Dispatcher.UIThread.RunJobs();
-            Assert.True(model.IsEditingForm);
+            Assert.True(model.FormEditing.IsEditingForm);
             var list = Assert.IsType<StringListForm>(model.Form);
             Assert.Same(list.Strings[1], list.SelectedItem);
             Assert.Contains(host.GetVisualDescendants().OfType<TextBox>(), t => t.Text == "two" && t.IsEffectivelyVisible);
@@ -1106,7 +1106,7 @@ public class WindowTests
             Pump(model.Roots[0].EnsureLoadedAsync());
             model.Selected = model.Roots[0].Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR ").Children[0];
             Pump(model.PreviewTask);
-            model.EditFormCommand.Execute(null);
+            model.FormEditing.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.IsType<StringForm>(model.Form).Text = "edited";
             var box = window.GetVisualDescendants().OfType<CheckBox>().Single(c => c.Content as string == "Edit with template");

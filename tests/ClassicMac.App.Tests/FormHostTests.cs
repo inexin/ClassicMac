@@ -38,29 +38,29 @@ public sealed class FormHostTests : IDisposable
         var (model, input) = await Open();
         await Select(model, input, "MENU");
         var menu = Assert.IsType<MenuForm>(model.Form);
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.IsEditingForm);
         Assert.False(menu.IsEditing);
-        Assert.True(model.ShowsForm);                                      // the menu's table, not the plain preview
-        Assert.Equal("Preview", model.FormPreviewTitle);
-        Assert.Equal("Read only. Press Edit or double-click a row to change it.", model.FormReadOnlyNote);
+        Assert.True(model.FormEditing.ShowsForm);                                      // the menu's table, not the plain preview
+        Assert.Equal("Preview", model.FormEditing.FormPreviewTitle);
+        Assert.Equal("Read only. Press Edit or double-click a row to change it.", model.FormEditing.FormReadOnlyNote);
 
         await Select(model, input, "STR#");
-        Assert.True(model.ShowsForm);                                      // moved (E5): its numbered list
+        Assert.True(model.FormEditing.ShowsForm);                                      // moved (E5): its numbered list
 
         await Select(model, input, "CNTL");
-        Assert.True(model.ShowsForm);                                      // moved (E4): its property cards
+        Assert.True(model.FormEditing.ShowsForm);                                      // moved (E4): its property cards
 
         await Select(model, input, "Rsrc");
-        Assert.True(model.ShowsForm);                                      // moved (E6): its fields and lists
+        Assert.True(model.FormEditing.ShowsForm);                                      // moved (E6): its fields and lists
 
         // A form without a read-only view (every form has one now; the host still shows the preview until Edit).
         model.Form = new NoReadOnlyView(model.Form!.Resource);
         Assert.False(model.Form!.HasReadOnlyView);
-        Assert.False(model.ShowsForm);
-        model.EditFormCommand.Execute(null);
-        Assert.True(model.ShowsForm);
+        Assert.False(model.FormEditing.ShowsForm);
+        model.FormEditing.EditFormCommand.Execute(null);
+        Assert.True(model.FormEditing.ShowsForm);
         Assert.True(model.Form!.IsEditing);
-        Assert.Equal("Esc cancels, Ctrl+Enter applies.", model.FormHint);   // the default hint
+        Assert.Equal("Esc cancels, Ctrl+Enter applies.", model.FormEditing.FormHint);   // the default hint
     }
 
     [Fact]
@@ -70,13 +70,13 @@ public sealed class FormHostTests : IDisposable
         await Select(model, input, "MENU");
         var menu = Assert.IsType<MenuForm>(model.Form);
         model.SelectedTab = 0;
-        model.EditFormCommand.Execute(menu.Items[2]);
-        Assert.True(model.IsEditingForm);
+        model.FormEditing.EditFormCommand.Execute(menu.Items[2]);
+        Assert.True(model.FormEditing.IsEditingForm);
         Assert.True(menu.IsEditing);
         Assert.Same(menu.Items[2], menu.SelectedItem);
         Assert.Equal(1, model.SelectedTab);
-        Assert.Equal(menu.EditHint, model.FormHint);
-        Assert.Equal("Live preview · unapplied changes", model.FormPreviewTitle);
+        Assert.Equal(menu.EditHint, model.FormEditing.FormHint);
+        Assert.Equal("Live preview · unapplied changes", model.FormEditing.FormPreviewTitle);
     }
 
     [Fact]
@@ -84,16 +84,16 @@ public sealed class FormHostTests : IDisposable
     {
         var (model, input) = await Open();
         await Select(model, input, "MENU");
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         Assert.IsType<MenuForm>(model.Form).Title = "Fichier";
         Assert.True(model.Drafts.HasDraft);
-        model.CancelFormCommand.Execute(null);
-        Assert.False(model.IsEditingForm);
+        model.FormEditing.CancelFormCommand.Execute(null);
+        Assert.False(model.FormEditing.IsEditingForm);
         Assert.False(model.Drafts.HasDraft);
         var fresh = Assert.IsType<MenuForm>(model.Form);
         Assert.Equal("File", fresh.Title);
         Assert.False(fresh.IsEditing);
-        Assert.Null(model.LastApplied);
+        Assert.Null(model.FormEditing.LastApplied);
     }
 
     [Fact]
@@ -101,21 +101,21 @@ public sealed class FormHostTests : IDisposable
     {
         var (model, input) = await Open();
         await Select(model, input, "MENU");
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         var menu = Assert.IsType<MenuForm>(model.Form);
         menu.Title = "Fichier";
         menu.Items[0].Italic = true;
         model.ApplyFormCommand.Execute(null);
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.IsEditingForm);
         Assert.False(model.Form!.IsEditing);
         Assert.Equal("Fichier", Assert.IsType<MenuForm>(model.Form).Title);
-        Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.LastApplied);
+        Assert.Equal("Applied · Undo Edit 'MENU' 129 (Ctrl+Z)", model.FormEditing.LastApplied);
 
         await model.UndoCommand.ExecuteAsync(null);                         // one edit: one undo brings it all back
         await Select(model, input, "MENU");
         Assert.Equal("File", Assert.IsType<MenuForm>(model.Form).Title);
         Assert.Equal(1, Assert.IsType<MenuForm>(model.Form).Items[0].Face);
-        Assert.Null(model.LastApplied);                                    // another selection clears it
+        Assert.Null(model.FormEditing.LastApplied);                                    // another selection clears it
     }
 
     [Fact]
@@ -123,14 +123,14 @@ public sealed class FormHostTests : IDisposable
     {
         var (model, input) = await Open();
         await Select(model, input, "MENU");
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         var menu = Assert.IsType<MenuForm>(model.Form);
         Assert.True(model.ApplyFormCommand.CanExecute(null));
         menu.Items[3].Key = "S";
         Assert.Equal(menu.Error, model.FormError);
         Assert.False(model.ApplyFormCommand.CanExecute(null));
         model.ApplyFormCommand.Execute(null);
-        Assert.True(model.IsEditingForm);                                  // nothing applied
+        Assert.True(model.FormEditing.IsEditingForm);                                  // nothing applied
         menu.Items[3].Key = "";
         Assert.Null(model.FormError);
         Assert.True(model.ApplyFormCommand.CanExecute(null));
@@ -140,14 +140,14 @@ public sealed class FormHostTests : IDisposable
     public async Task Edit_cannot_start_twice_or_without_a_form_and_cancel_needs_editing()
     {
         var (model, input) = await Open();
-        Assert.False(model.EditFormCommand.CanExecute(null));             // the input: no form
-        model.EditFormCommand.Execute(null);
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.EditFormCommand.CanExecute(null));             // the input: no form
+        model.FormEditing.EditFormCommand.Execute(null);
+        Assert.False(model.FormEditing.IsEditingForm);
         await Select(model, input, "MENU");
-        Assert.False(model.CancelFormCommand.CanExecute(null));
-        model.EditFormCommand.Execute(null);
-        Assert.False(model.EditFormCommand.CanExecute(null));
-        Assert.True(model.CancelFormCommand.CanExecute(null));
+        Assert.False(model.FormEditing.CancelFormCommand.CanExecute(null));
+        model.FormEditing.EditFormCommand.Execute(null);
+        Assert.False(model.FormEditing.EditFormCommand.CanExecute(null));
+        Assert.True(model.FormEditing.CancelFormCommand.CanExecute(null));
     }
 
     [Fact]
@@ -161,20 +161,20 @@ public sealed class FormHostTests : IDisposable
         var input = (await model.OpenAsync(path))!;
         await input.EnsureLoadedAsync();
         await Select(model, input, "MENU");
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         Assert.IsType<MenuForm>(model.Form).Title = "Fichier";
         var menuNode = model.Selected;
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR#").Children[0];
         await model.DraftTask;
         Assert.Single(dialogs.DraftAsked);
         Assert.Same(menuNode, model.Selected);                             // cancelled: still editing the menu
-        Assert.True(model.IsEditingForm);
+        Assert.True(model.FormEditing.IsEditingForm);
 
         dialogs.Draft = DraftChoice.Apply;
         model.Selected = input.Children.OfType<ResourceTypeNode>().Single(t => t.Type.ToString() == "STR#").Children[0];
         await model.DraftTask;
         Assert.IsType<StringListForm>(model.Form);
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.IsEditingForm);
         Assert.True(input.IsUnsaved);
     }
 

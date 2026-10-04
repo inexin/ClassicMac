@@ -184,24 +184,24 @@ public sealed class InspectorTests : IDisposable
     public async Task Edit_opens_the_form_in_place_and_Cancel_drops_the_draft()
     {
         var (model, input, strings) = await OpenForms(Forks());
-        Assert.False(model.IsEditingForm);
-        Assert.True(model.EditFormCommand.CanExecute(null));
-        Assert.False(model.CancelFormCommand.CanExecute(null));
+        Assert.False(model.FormEditing.IsEditingForm);
+        Assert.True(model.FormEditing.EditFormCommand.CanExecute(null));
+        Assert.False(model.FormEditing.CancelFormCommand.CanExecute(null));
         model.SelectedTab = 0;
 
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
 
-        Assert.True(model.IsEditingForm);
+        Assert.True(model.FormEditing.IsEditingForm);
         Assert.Equal(1, model.SelectedTab);
-        Assert.False(model.EditFormCommand.CanExecute(null));
-        Assert.True(model.CancelFormCommand.CanExecute(null));
+        Assert.False(model.FormEditing.EditFormCommand.CanExecute(null));
+        Assert.True(model.FormEditing.CancelFormCommand.CanExecute(null));
         var form = Assert.IsType<StringListForm>(model.Form);
         form.Strings[0].Text = "uno";
         Assert.True(model.Drafts.HasDraft);
 
-        model.CancelFormCommand.Execute(null);
+        model.FormEditing.CancelFormCommand.Execute(null);
 
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.IsEditingForm);
         Assert.False(model.Drafts.HasDraft);
         Assert.Equal("one", Assert.IsType<StringListForm>(model.Form).Strings[0].Text);
         Assert.False(input.IsUnsaved);
@@ -211,12 +211,12 @@ public sealed class InspectorTests : IDisposable
     public async Task Apply_ends_editing()
     {
         var (model, input, _) = await OpenForms(Forks());
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         Assert.IsType<StringListForm>(model.Form).Strings[0].Text = "uno";
 
         model.ApplyFormCommand.Execute(null);
 
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.IsEditingForm);
         Assert.True(input.IsUnsaved);
     }
 
@@ -224,17 +224,18 @@ public sealed class InspectorTests : IDisposable
     public async Task Another_selection_ends_editing_and_nodes_without_a_form_cannot_edit()
     {
         var (model, input, _) = await OpenForms(Forks());
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         var changed = new System.Collections.Concurrent.ConcurrentQueue<string?>(); // the preview reports from its own thread
         model.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
+        model.FormEditing.PropertyChanged += (_, e) => changed.Enqueue(e.PropertyName);
 
         model.Selected = Child<ResourceTypeNode>(input, "'ZZZZ' (1)").Children[0];
 
-        Assert.False(model.IsEditingForm);
-        Assert.Contains(nameof(MainViewModel.IsEditingForm), changed);
-        Assert.False(model.EditFormCommand.CanExecute(null));
-        model.EditFormCommand.Execute(null);
-        Assert.False(model.IsEditingForm);
+        Assert.False(model.FormEditing.IsEditingForm);
+        Assert.Contains(nameof(FormEditing.IsEditingForm), changed);
+        Assert.False(model.FormEditing.EditFormCommand.CanExecute(null));
+        model.FormEditing.EditFormCommand.Execute(null);
+        Assert.False(model.FormEditing.IsEditingForm);
     }
 
     // An ICN# 128 (black, full mask) with an icl8 128 (black: colour 255) and an ics# 128 (black left half); an ics# 129 alone; a cicn;

@@ -117,7 +117,7 @@ public sealed class DialogItemsFormTests : IDisposable
         Assert.Equal("Drawn from 'DLOG' 128 · 300 × 106", model.FormDialogNote);
         Assert.True(preview.ContentLeft > 0 && preview.ContentTop > 0);     // the window's frame around the content
 
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         form.Items[0].Right = 300;                                         // one keystroke in a bounds field
         var moved = model.FormDialog!;
         Assert.NotSame(preview, moved);

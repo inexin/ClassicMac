@@ -218,7 +218,7 @@ public sealed class FormCardTests : IDisposable
         form.SelectedStage = form.Stages[2];
         Assert.Equal(2, model.FormDialog!.Drawing.DefaultItem);
 
-        model.ShowItemListCommand.Execute(form);
+        model.FormEditing.ShowItemListCommand.Execute(form);
         Assert.Equal("DITL", Assert.IsType<ResourceNode>(model.Selected).Resource.Type.ToString());
         Assert.Equal(129, ((ResourceNode)model.Selected!).Resource.Id);
     }

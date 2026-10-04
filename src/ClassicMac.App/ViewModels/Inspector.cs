@@ -235,7 +235,7 @@ public sealed partial class MainViewModel
     {
         get
         {
-            var header = InspectorHeader.For(Selected, IsEditingForm ? Form?.DraftLength : null);
+            var header = InspectorHeader.For(Selected, FormEditing.IsEditingForm ? Form?.DraftLength : null);
             if (header is not null && AliasActions.SelectedAlias is { } alias && ReferenceEquals(alias.Alias, Selected))
             {
                 header = header with { Kind = InspectorHeader.AliasKind(alias), Original = alias.Path };
@@ -281,13 +281,13 @@ public sealed partial class MainViewModel
     // The header, its Export… and editing follow the selection.
     private void OnSelectionChangedForInspector()
     {
-        IsEditingForm = false;
-        LastApplied = null;
+        FormEditing.IsEditingForm = false;
+        FormEditing.LastApplied = null;
         HeaderIconPng = null;
         HeaderIconTask = LoadHeaderIconAsync(Selected);
         OnPropertyChanged(nameof(Header));
         OnPropertyChanged(nameof(HeaderExportCommand));
         SoundHeaderActions.OnSelectionChangedForSoundHeader();
-        EditFormCommand.NotifyCanExecuteChanged();
+        FormEditing.EditFormCommand.NotifyCanExecuteChanged();
     }
 }

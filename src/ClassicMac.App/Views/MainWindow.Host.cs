@@ -7,7 +7,7 @@ using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Views;
 
-// The read-then-edit host's keys and double-click (FormHost.cs): Esc cancels and Ctrl+Enter applies while editing,
+// The read-then-edit host's keys and double-click (FormEditing.cs): Esc cancels and Ctrl+Enter applies while editing,
 // before a text box can take the keys; a double-click on a read-only "form-row" edits with that row selected.
 internal sealed partial class MainWindow
 {
@@ -41,14 +41,14 @@ internal sealed partial class MainWindow
 
     private void OnHostKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainViewModel { IsEditingForm: true } model)
+        if (DataContext is not MainViewModel { FormEditing.IsEditingForm: true } model)
         {
             return;
         }
 
-        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None && model.CancelFormCommand.CanExecute(null))
+        if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None && model.FormEditing.CancelFormCommand.CanExecute(null))
         {
-            model.CancelFormCommand.Execute(null);
+            model.FormEditing.CancelFormCommand.Execute(null);
             e.Handled = true;
         }
         else if (e.Key is Key.Enter or Key.Return && e.KeyModifiers == KeyModifiers.Control)
@@ -65,15 +65,15 @@ internal sealed partial class MainWindow
 
     private void OnHostDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (DataContext is not MainViewModel { IsEditingForm: false } model || e.Source is not Visual source)
+        if (DataContext is not MainViewModel { FormEditing.IsEditingForm: false } model || e.Source is not Visual source)
         {
             return;
         }
 
         var row = FormRow(source);
-        if (row?.DataContext is { } item && model.EditFormCommand.CanExecute(item))
+        if (row?.DataContext is { } item && model.FormEditing.EditFormCommand.CanExecute(item))
         {
-            model.EditFormCommand.Execute(item);
+            model.FormEditing.EditFormCommand.Execute(item);
             e.Handled = true;
         }
     }

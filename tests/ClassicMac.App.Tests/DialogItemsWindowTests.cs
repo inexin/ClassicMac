@@ -57,8 +57,8 @@ public sealed class DialogItemsWindowTests : IDisposable
     {
         var (window, model, form) = Open();
         var baselines = new List<string>();
-        Assert.True(model.ShowsForm);
-        Assert.False(model.IsEditingForm);
+        Assert.True(model.FormEditing.ShowsForm);
+        Assert.False(model.FormEditing.IsEditingForm);
         var rows = Rows(window);
         Assert.Equal(5, rows.Count);
         var cells = rows[0].GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
@@ -90,7 +90,7 @@ public sealed class DialogItemsWindowTests : IDisposable
         var baselines = new List<string>();
         var rows = Rows(window);
         Click(window, rows[0], new Point(40, rows[0].Bounds.Height / 2), clicks: 2);   // a double-click edits at that row
-        Assert.True(model.IsEditingForm);
+        Assert.True(model.FormEditing.IsEditingForm);
         Assert.Same(form.Items[0], form.SelectedItem);
         var row = Rows(window)[0];
         var right = row.GetVisualDescendants().OfType<TextBox>().Single(t => t.Name == "RightBox");

@@ -445,7 +445,7 @@ internal sealed partial class MainWindow : Window, IFilePicker, IShell
 
         // Editing a menu: Alt+Up and Alt+Down move the selected row (boards/read-then-edit.md).
         if (e.KeyModifiers == KeyModifiers.Alt && e.Key is Key.Up or Key.Down
-            && DataContext is MainViewModel { IsEditingForm: true, Form: MenuForm menu })
+            && DataContext is MainViewModel { FormEditing.IsEditingForm: true, Form: MenuForm menu })
         {
             var move = e.Key == Key.Up ? menu.MoveSelectedUpCommand : menu.MoveSelectedDownCommand;
             if (move.CanExecute(null))

@@ -20,7 +20,7 @@ public abstract partial class ResourceForm : ObservableObject
 
     public Resource Resource { get; }
 
-    // ---- The read-then-edit host's side of a form (see FormHost.cs) ----
+    // ---- The read-then-edit host's side of a form (see FormEditing.cs) ----
 
     /// <summary>Whether the host is editing the form (inputs) or showing it read only. The host sets it.</summary>
     public bool IsEditing
@@ -195,15 +195,16 @@ public sealed partial class MainViewModel
 {
     /// <summary>The typed editor for the selection, or null.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand), nameof(SaveCommand), nameof(EditFormCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyFormCommand), nameof(SaveCommand))]
     private ResourceForm? form;
 
     public bool HasForm => Form is not null;
 
     partial void OnFormChanged(ResourceForm? value)
     {
+        FormEditing.EditFormCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(HasForm));
-        HostForm(value);
+        FormEditing.HostForm(value);
     }
 
     internal void UpdateForm(NodeViewModel? node)
@@ -299,7 +300,7 @@ public sealed partial class MainViewModel
         // Applied: no longer a draft, so the selection the edit moves to is not refused.
         form.MarkClean();
         Execute(owner, edit, () => resource);
-        IsEditingForm = false;
-        LastApplied = $"Applied · {UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
+        FormEditing.IsEditingForm = false;
+        FormEditing.LastApplied = $"Applied · {UndoTitle.Replace("_", "", StringComparison.Ordinal)} (Ctrl+Z)";
     }
 }

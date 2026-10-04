@@ -89,9 +89,9 @@ public sealed class DialogPreviewFitTests : IDisposable
         Pump(model.Roots[0].EnsureLoadedAsync());
         model.Selected = model.Roots[0].Children.OfType<ResourceTypeNode>().Single().Children[0];
         Pump(model.PreviewTask);
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
-        Assert.True(model.IsEditingForm);
+        Assert.True(model.FormEditing.IsEditingForm);
         Assert.Equal(1200, window.Bounds.Width);
         var text = window.GetVisualDescendants().OfType<TextBox>().First(t => t.Name == "MenuItemText" && t.IsEffectivelyVisible);
         Assert.True(text.Bounds.Width >= 160, $"the text box is {text.Bounds.Width} wide");
@@ -111,9 +111,9 @@ public sealed class DialogPreviewFitTests : IDisposable
     public void Editing_an_item_list_leaves_the_text_column_room() => OnUiThread(() =>
     {
         var (window, model) = Open("DITL");
-        model.EditFormCommand.Execute(null);
+        model.FormEditing.EditFormCommand.Execute(null);
         Dispatcher.UIThread.RunJobs();
-        Assert.True(model.IsEditingForm);
+        Assert.True(model.FormEditing.IsEditingForm);
         var text = window.GetVisualDescendants().OfType<TextBox>().First(t => t.Name == "ItemText" && t.IsEffectivelyVisible);
         Assert.True(text.Bounds.Width >= 160, $"the text box is {text.Bounds.Width} wide");
         var caption = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "ItemTextCaption" && t.IsEffectivelyVisible);

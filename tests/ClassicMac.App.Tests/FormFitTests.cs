@@ -47,7 +47,7 @@ public sealed class FormFitTests : IDisposable
         Pump(model.PreviewTask);
         if (edit)
         {
-            model.EditFormCommand.Execute(null);
+            model.FormEditing.EditFormCommand.Execute(null);
         }
 
         Dispatcher.UIThread.RunJobs();
@@ -125,7 +125,7 @@ public sealed class FormFitTests : IDisposable
                 Assert.True(Left(value, row) + value.Bounds.Width <= Left(code, row), $"{code.Text}: the value runs under the code");
             }
 
-            model.CancelFormCommand.Execute(null);
+            model.FormEditing.CancelFormCommand.Execute(null);
         }
 
         window.Close();

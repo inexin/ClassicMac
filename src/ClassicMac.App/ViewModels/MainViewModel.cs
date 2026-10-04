@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -67,6 +68,11 @@ public interface IFilePicker
 /// <summary>The main window: the opened inputs as a tree, the selection's details, and the diagnostics.</summary>
 public sealed partial class MainViewModel : ObservableObject
 {
+    private FormEditing? formEditing;
+
+    /// <summary>The read-then-edit host: Edit, Apply and Cancel for the selection's form, and its footer.</summary>
+    public FormEditing FormEditing => formEditing ??= new(this);
+
     private TreeSearch? treeSearch;
 
     /// <summary>The tree's filter and type-ahead, and Show item.</summary>
@@ -155,7 +161,108 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The Details tab's actions: Copy all, the File card's In link, the chain card's link to problems.</summary>
     public DetailsActions DetailsActions => detailsActions ??= new(this);
 
-    // (The constructors are in TreeDisplay.cs: the settings they read come first.)
+    internal readonly ISettingsStore settings;
+
+    public MainViewModel() : this(new MemorySettingsStore())
+    {
+    }
+
+    /// <summary>A model whose settings (the tree's display options) are read from and saved to <paramref name="settings"/>.</summary>
+    public MainViewModel(ISettingsStore settings)
+    {
+        this.settings = settings;
+        DiagnosticsPanel = new DiagnosticsPanel(entry => SelectedDiagnostic = entry);
+        var saved = settings.Load();
+        TreeDisplay = new TreeDisplayOptions { GroupNoName = saved.GroupNoName, HideInvisible = saved.HideInvisible, ShowDetails = saved.ShowDetails };
+        TreeDisplay.Inputs = () => Roots.OfType<InputNode>();
+        TreeDisplay.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(TreeDisplayOptions.ShowDetails))
+            {
+                OnShowDetailsChanged();
+            }
+            else
+            {
+                OnTreeDisplayChanged();
+            }
+        };
+        TreeDisplay.LaidOut += UpdateHiddenCount;
+        StatusLine.WatchSummary();
+        TreeDisplay.LaidOut += TreeSearch.ReapplySearch;
+        EmptyState.InitRecentFiles(saved.RecentFiles);
+        TypeCreatorActions.InitTypeCreatorDatabase(saved.TypeCreatorDatabase);
+    }
+
+    // What the app remembers: the display options and the recent files, over what else is stored (the theme).
+    internal void SaveSettings() =>
+        settings.Save(settings.Load() with
+        {
+            GroupNoName = TreeDisplay.GroupNoName,
+            HideInvisible = TreeDisplay.HideInvisible,
+            ShowDetails = TreeDisplay.ShowDetails,
+            RecentFiles = EmptyState.RecentFiles.Select(r => r.Path).ToList(),
+        });
+
+    /// <summary>Which files the tree hides or groups.</summary>
+    public TreeDisplayOptions TreeDisplay { get; }
+
+    /// <summary>How many invisible files the tree hides.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HiddenSummary))]
+    private int hiddenCount;
+
+    /// <summary>The tree's footer ("2 invisible items hidden"), or null when nothing is hidden.</summary>
+    public string? HiddenSummary => HiddenCount switch
+    {
+        0 => null,
+        1 => "1 invisible item hidden",
+        var n => string.Create(CultureInfo.InvariantCulture, $"{n} invisible items hidden"),
+    };
+
+    /// <summary>The footer's Show: invisible files are shown.</summary>
+    [RelayCommand]
+    private void ShowHidden() => TreeDisplay.HideInvisible = false;
+
+    private void UpdateHiddenCount() => HiddenCount = Roots.Sum(Tree.HiddenCount);
+
+    // The details column switched: saved, and every row's meta shown or hidden.
+    private void OnShowDetailsChanged()
+    {
+        SaveSettings();
+        foreach (var row in TreeSearch.AllRows())
+        {
+            row.OnMetaChanged();
+        }
+    }
+
+    // An option changed: it is saved and every tree laid out again; the selection stays, or moves to its folder
+    // when it is now hidden.
+    private void OnTreeDisplayChanged()
+    {
+        SaveSettings();
+        var kept = Selected;
+        foreach (var root in Roots)
+        {
+            Tree.Relayout(root);
+        }
+
+        UpdateHiddenCount();
+        if (kept is null)
+        {
+            return;
+        }
+
+        var shown = kept;
+        while (shown is not null && !Tree.IsShown(shown, Roots))
+        {
+            shown = shown.Parent;
+        }
+
+        if (!ReferenceEquals(Selected, shown))
+        {
+            Selected = shown;
+        }
+    }
 
     public ObservableCollection<InputNode> Roots { get; } = [];
 
@@ -268,6 +375,8 @@ public sealed partial class MainViewModel : ObservableObject
     private IReadOnlyList<ImageItem> images = [];
 
     partial void OnImagesChanged(IReadOnlyList<ImageItem> value) => ImageGrid.ImagesChanged();
+
+    partial void OnFormErrorChanged(string? value) => ApplyFormCommand.NotifyCanExecuteChanged();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasHex))]

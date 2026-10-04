@@ -22,7 +22,7 @@ namespace ClassicMac.App.ViewModels;
 //  - SelectRow(row): a double-click on a read-only row edits with that row selected; the view passes the row's
 //    DataContext as EditFormCommand's parameter (FormHostView marks rows with the "form-row" class).
 //  - A live preview of its own, if any, follows its Edited event (MenuForm.Preview).
-public sealed partial class MainViewModel
+public sealed partial class FormEditing(MainViewModel main) : ObservableObject
 {
     /// <summary>Whether the selection's form is open for editing (in the Preview tab).</summary>
     [ObservableProperty]
@@ -37,7 +37,7 @@ public sealed partial class MainViewModel
     private string? lastApplied;
 
     /// <summary>Whether the Preview tab shows the host (the form) rather than the resource's plain preview.</summary>
-    public bool ShowsForm => Form is { } form && (IsEditingForm || form.HasReadOnlyView);
+    public bool ShowsForm => main.Form is { } form && (IsEditingForm || form.HasReadOnlyView);
 
     /// <summary>The preview panel's title: "Preview", or "Live preview · unapplied changes" while editing.</summary>
     public string FormPreviewTitle => IsEditingForm ? "Live preview · unapplied changes" : "Preview";
@@ -46,9 +46,9 @@ public sealed partial class MainViewModel
     public string FormReadOnlyNote => "Read only. Press Edit or double-click a row to change it.";
 
     /// <summary>The editing footer's hint: the form's own.</summary>
-    public string FormHint => Form?.EditHint ?? "";
+    public string FormHint => main.Form?.EditHint ?? "";
 
-    private bool CanEditForm(object? row) => Form is not null && Selected is ResourceNode && !IsEditingForm;
+    private bool CanEditForm(object? row) => main.Form is not null && main.Selected is ResourceNode && !IsEditingForm;
 
     /// <summary>Opens the selection's form for editing in the Preview tab; with a row (a double-click), that row selected.</summary>
     [RelayCommand(CanExecute = nameof(CanEditForm))]
@@ -59,28 +59,28 @@ public sealed partial class MainViewModel
             return;
         }
 
-        Form!.SelectRow(row);
+        main.Form!.SelectRow(row);
         IsEditingForm = true;
         LastApplied = null;
-        SelectedTab = 1;
+        main.SelectedTab = 1;
     }
 
     /// <summary>Drops the form's unapplied values and ends editing.</summary>
     [RelayCommand(CanExecute = nameof(IsEditingForm))]
     private void CancelForm()
     {
-        Drafts.DiscardDraft();
+        main.Drafts.DiscardDraft();
         IsEditingForm = false;
     }
 
     partial void OnIsEditingFormChanged(bool value)
     {
-        if (Form is { } form)
+        if (main.Form is { } form)
         {
             form.IsEditing = value;
         }
 
-        OnPropertyChanged(nameof(Header));
+        main.RaisePropertyChanged(nameof(MainViewModel.Header));
     }
 
     private ResourceForm? sizedForm;
@@ -90,12 +90,12 @@ public sealed partial class MainViewModel
     {
         if (IsEditingForm)
         {
-            OnPropertyChanged(nameof(Header));
+            main.RaisePropertyChanged(nameof(MainViewModel.Header));
         }
     }
 
     // A new form (another selection, a discard, the template choice) takes the host's mode.
-    private void HostForm(ResourceForm? form)
+    internal void HostForm(ResourceForm? form)
     {
         if (sizedForm is not null)
         {
@@ -115,10 +115,8 @@ public sealed partial class MainViewModel
 
         OnPropertyChanged(nameof(ShowsForm));
         OnPropertyChanged(nameof(FormHint));
-        OnPropertyChanged(nameof(Header));
+        main.RaisePropertyChanged(nameof(MainViewModel.Header));
     }
-
-    partial void OnFormErrorChanged(string? value) => ApplyFormCommand.NotifyCanExecuteChanged();
 
     /// <summary>A dialog's or alert's item list link: selects that 'DITL' among its file's resources.</summary>
     [RelayCommand]
@@ -130,7 +128,7 @@ public sealed partial class MainViewModel
             WindowForm { IsDialog: true } dialog => (short)dialog.ItemsId,
             _ => (short?)null,
         };
-        if (id is null || Selected is not ResourceNode { Parent.Parent: { } file })
+        if (id is null || main.Selected is not ResourceNode { Parent.Parent: { } file })
         {
             return;
         }
@@ -139,7 +137,7 @@ public sealed partial class MainViewModel
             .Children.OfType<ResourceNode>().FirstOrDefault(r => r.Resource.Id == id);
         if (target is not null)
         {
-            Selected = target;
+            main.Selected = target;
         }
     }
 }

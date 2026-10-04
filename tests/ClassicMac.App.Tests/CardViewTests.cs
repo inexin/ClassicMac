@@ -47,7 +47,7 @@ public sealed class CardViewTests
             model.Selected = Resource("WIND");
             Pump(model.PreviewTask);
             Dispatcher.UIThread.RunJobs();
-            Assert.True(model.ShowsForm);
+            Assert.True(model.FormEditing.ShowsForm);
             var cards = window.GetVisualDescendants().OfType<Grid>().Single(g => g.Name == "WindowCards");
             Assert.Contains("“Untitled”", Shown(cards));
             Assert.Contains("documentProc · 0", Shown(cards));
@@ -55,11 +55,11 @@ public sealed class CardViewTests
             Assert.Contains("Bounds on a 512 × 342 screen", Shown(cards));
             Assert.True(cards.GetVisualDescendants().OfType<ScreenBoundsView>().Single().IsEffectivelyVisible);
             Assert.DoesNotContain(cards.GetVisualDescendants().OfType<ComboBox>(), c => c.IsEffectivelyVisible && c.ItemsSource == ((WindowForm)model.Form!).Definitions);
-            model.EditFormCommand.Execute(null);
+            model.FormEditing.EditFormCommand.Execute(null);
             Dispatcher.UIThread.RunJobs();
             Assert.Contains(cards.GetVisualDescendants().OfType<ComboBox>(), c => c.IsEffectivelyVisible && c.SelectedItem is DefinitionChoice { Value: 0 });
             Assert.DoesNotContain("“Untitled”", Shown(cards));
-            model.CancelFormCommand.Execute(null);
+            model.FormEditing.CancelFormCommand.Execute(null);
 
             // The alert: the stages table; a stage chosen redraws the preview with its default button.
             model.Selected = Resource("ALRT");
