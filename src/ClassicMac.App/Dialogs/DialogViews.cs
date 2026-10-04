@@ -584,41 +584,6 @@ internal static class DialogViews
         return dialog;
     }
 
-    /// <summary>
-    /// Resize: the volume in the header, its size and the smallest and largest it takes, and the new size (bytes, or
-    /// with K, M or G; the size as it is to start with).
-    /// </summary>
-    public static Dialog<string?> Resize(ResizeView view)
-    {
-        const string title = "Resize";
-        var window = NewWindow(title);
-        var dialog = new Dialog<string?>(window, null);
-        static TextBlock Bytes(long value, bool unit = false) => new()
-        {
-            Text = value.ToString("N0", CultureInfo.InvariantCulture) + " bytes" + (unit ? $" ({ByteSize.Format(value)})" : ""),
-            Classes = { "mono" },
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        var size = Input("Size", ByteSize.Format(view.Size), 160, mono: true);
-        var body = new StackPanel { Spacing = 10, Width = 420 };
-        body.Children.Add(new TextBlock { Text = $"“{view.Volume}”", Classes = { "alert-question" } });
-        body.Children.Add(Fields(("Now", Bytes(view.Size, unit: true)), ("Smallest", Bytes(view.Smallest)), ("Largest", Bytes(view.Largest)), ("New size", size)));
-        body.Children.Add(new TextBlock
-        {
-            Text = "Bytes, or a number with K, M or G. Growing past 65,535 blocks takes a larger block size and lays every file out whole; shrinking moves what lies past the new end.",
-            TextWrapping = TextWrapping.Wrap,
-            Classes = { "muted" },
-        });
-        var cancel = Button("Cancel", window.Close);
-        var resize = Button("Resize", () =>
-        {
-            dialog.Result = size.Text ?? "";
-            window.Close();
-        });
-        Compose(window, Header(window, title, () => { }), body, Footer(cancel, resize, null));
-        return dialog;
-    }
-
     // ---- Volume operations (design/boards/volume-tools.md §2) ----
 
     private static TextBlock Line(params string[] classes)
@@ -756,6 +721,191 @@ internal static class DialogViews
 
         Update();
         model.PropertyChanged += (_, _) => Update();
+        window.Closing += (_, _) => model.CancelCommand.Execute(null);
+        Compose(window, Header(window, model.Title, () => model.CancelCommand.Execute(null)), body, footer);
+        return dialog;
+    }
+
+    // "Smallest 403K": the words muted, the size in mono.
+    private static TextBlock ScaleLabel(string label, HorizontalAlignment alignment)
+    {
+        int space = label.IndexOf(' ', StringComparison.Ordinal);
+        var text = new TextBlock { Classes = { "muted" }, HorizontalAlignment = alignment, FontSize = 12 };
+        text.Inlines!.Add(new Avalonia.Controls.Documents.Run(label[..(space + 1)]));
+        var size = new Avalonia.Controls.Documents.Run(label[(space + 1)..]);
+        size.Bind(Avalonia.Controls.Documents.TextElement.FontFamilyProperty, text.GetResourceObservable("CmFontMono"));
+        text.Inlines.Add(size);
+        return text;
+    }
+
+    /// <summary>
+    /// Resize (volume-tools.md §4): the size box (mono 14) and its unit select, the note under them as you type (with
+    /// Defragment first… when the free space is in the way), the slider with its scale line, and the block size select;
+    /// the progress state while it runs. True when the volume was resized.
+    /// </summary>
+    public static Dialog<bool> Resize(ResizeViewModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var window = NewWindow(model.Title);
+        var dialog = new Dialog<bool>(window, false);
+        bool syncing = false;
+
+        var box = new TextBox { Name = "Size", Width = 160, Classes = { "size-box" }, Text = model.Text };
+        Avalonia.Automation.AutomationProperties.SetName(box, "New size");
+        var unit = new ComboBox { Name = "Unit", ItemsSource = model.Units, SelectedItem = model.Unit, MinWidth = 84, VerticalAlignment = VerticalAlignment.Center };
+        Avalonia.Automation.AutomationProperties.SetName(unit, "Unit");
+        var field = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { box, unit } };
+
+        var noteText = new TextBlock { Name = "ResizeNote", TextWrapping = TextWrapping.Wrap };
+        var defragmentFirst = new Button { Content = "Defragment first…", Command = model.DefragmentFirstCommand, HorizontalAlignment = HorizontalAlignment.Left };
+        var note = new Border { Name = "ResizeNoteBox", Classes = { "inline-note" }, Child = new StackPanel { Spacing = 8, Children = { noteText, defragmentFirst } } };
+
+        var nowLabel = ScaleLabel(model.NowLabel, HorizontalAlignment.Center);
+        var largestLabel = ScaleLabel(model.LargestLabel, HorizontalAlignment.Right);
+        Grid.SetColumn(nowLabel, 1);
+        Grid.SetColumn(largestLabel, 2);
+        var scaleLine = new Grid { ColumnDefinitions = new ColumnDefinitions("*,*,*"), Children = { nowLabel, largestLabel } };
+        TextBlock? smallestLabel = null;
+        void SmallestLabel()
+        {
+            if (smallestLabel is not null)
+            {
+                scaleLine.Children.Remove(smallestLabel);
+            }
+
+            smallestLabel = ScaleLabel(model.SmallestLabel, HorizontalAlignment.Left);
+            scaleLine.Children.Add(smallestLabel);
+        }
+
+        SmallestLabel();
+        var slider = new SizeSlider { Name = "SizeSlider", Minimum = model.Smallest, Maximum = model.Largest, Current = model.Current, Value = model.Size ?? model.Current };
+
+        var blockSize = new ComboBox
+        {
+            Name = "BlockSize",
+            ItemTemplate = new FuncDataTemplate<BlockSizeChoice>((choice, _) => new TextBlock { Text = choice?.Label }),
+            MinWidth = 200,
+        };
+        Avalonia.Automation.AutomationProperties.SetName(blockSize, "Block size");
+        var blockRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 12,
+            Children = { new TextBlock { Text = "Block size", Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center }, blockSize },
+        };
+
+        var error = Line("error");
+        var choosing = new StackPanel { Spacing = 10, Children = { field, note, scaleLine, slider, blockRow, error } };
+        var (running, updateRunning) = Running(model);
+        var body = new StackPanel { Width = 420, Spacing = 10, Children = { choosing, running } };
+
+        var cancel = Button("Cancel", () =>
+        {
+            if (model.IsRunning)
+            {
+                model.CancelCommand.Execute(null);
+            }
+            else
+            {
+                window.Close();
+            }
+        });
+        var resize = new Button { Content = "Resize", MinWidth = 76, HorizontalContentAlignment = HorizontalAlignment.Center, Command = model.StartCommand };
+        var footer = Footer(cancel, resize, null);
+        resize.IsDefault = true;
+
+        void Update()
+        {
+            syncing = true;
+            if (box.Text != model.Text)
+            {
+                box.Text = model.Text;
+                box.ClearSelection();
+                box.CaretIndex = model.Text.Length;
+            }
+
+            unit.SelectedItem = model.Unit;
+            if (!ReferenceEquals(blockSize.ItemsSource, model.BlockSizes))
+            {
+                blockSize.ItemsSource = model.BlockSizes;
+            }
+
+            blockSize.SelectedItem = model.SelectedBlockSize;
+            slider.Minimum = model.Smallest;
+            slider.WarningEnd = model.SmallestNow > model.Smallest && model.SelectedBlockSize?.Size is null ? model.SmallestNow : 0;
+            slider.Marks = model.Marks;
+            slider.Severity = model.NoteSeverity;
+            if (model.Size is { } size)
+            {
+                slider.Value = Math.Clamp(size, model.Smallest, model.Largest);
+            }
+
+            Avalonia.Automation.AutomationProperties.SetName(slider, model.ValueText);
+            syncing = false;
+
+            box.Classes.Set("invalid", model.IsInvalid);
+            Avalonia.Automation.AutomationProperties.SetHelpText(box, model.IsInvalid ? model.NoteText : null);
+            note.IsVisible = model.HasNote;
+            note.Classes.Set("info", model.NoteSeverity == NoteSeverity.Info);
+            note.Classes.Set("warning", model.NoteSeverity == NoteSeverity.Warning);
+            note.Classes.Set("error", model.NoteSeverity == NoteSeverity.Error);
+            noteText.Text = model.NoteText;
+            defragmentFirst.IsVisible = model.NoteSeverity == NoteSeverity.Warning && model.DefragmentFirst is not null;
+            error.IsVisible = model.HasError;
+            error.Text = model.Error;
+            choosing.IsVisible = !model.IsRunning;
+            resize.IsVisible = !model.IsRunning;
+            updateRunning();
+            if (model.IsDone)
+            {
+                dialog.Result = true;
+                window.Close();
+            }
+        }
+
+        box.TextChanged += (_, _) =>
+        {
+            if (!syncing && box.Text is { } typed && typed != model.Text)
+            {
+                model.Text = typed;
+            }
+        };
+        unit.SelectionChanged += (_, _) =>
+        {
+            if (!syncing && unit.SelectedItem is string chosen)
+            {
+                model.Unit = chosen;
+            }
+        };
+        blockSize.SelectionChanged += (_, _) =>
+        {
+            if (!syncing && blockSize.SelectedItem is BlockSizeChoice chosen)
+            {
+                model.SelectedBlockSize = chosen;
+            }
+        };
+        slider.PropertyChanged += (_, e) =>
+        {
+            if (!syncing && e.Property == SizeSlider.ValueProperty && slider.Value != model.Size)
+            {
+                model.SetSize(slider.Value);
+            }
+        };
+        model.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ResizeViewModel.SmallestLabel))
+            {
+                SmallestLabel();
+            }
+
+            Update();
+        };
+        Update();
+        window.Opened += (_, _) =>
+        {
+            box.Focus();
+            box.SelectAll();
+        };
         window.Closing += (_, _) => model.CancelCommand.Execute(null);
         Compose(window, Header(window, model.Title, () => model.CancelCommand.Execute(null)), body, footer);
         return dialog;

@@ -687,7 +687,7 @@ public sealed class EditTests : EditTestsBase
         image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Read Me", "hello"u8.ToArray(), Array.Empty<byte>(), FinderInfo.Empty);
         var path = Path.Combine(folder, "Floppy.hfs");
         File.WriteAllBytes(path, image);
-        var dialogs = new Dialogs { Resize = _ => typed };
+        var dialogs = new Dialogs { Resize = Typing(typed) };
         var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
         var input = (await model.OpenAsync(path))!;
         model.Selected = input.Children.Single(n => n.Title == "Read Me");          // any item of the volume
@@ -697,7 +697,8 @@ public sealed class EditTests : EditTestsBase
 
         var view = Assert.Single(dialogs.ResizeShown);
         Assert.Equal(("Floppy", 800L * 1024, HfsWriter.SmallestSize(ForkData.FromBytes(image)), HfsWriter.MaximumFormatSize),
-            (view.Volume, view.Size, view.Smallest, view.Largest));
+            (view.Volume, view.Current, view.SmallestNow, view.Largest));
+        Assert.Equal(VolumeOperationState.Done, view.State);
         Assert.True(model.EditActions.HasUnsavedChanges);
         Assert.Contains("Resized", model.Status);
         model.Selected = input;
@@ -707,26 +708,63 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal("hello"u8.ToArray(), HfsReader.Instance.Read(ForkData.FromBytes(saved), new ContainerContext()).Single().DataFork.ToArray());
     }
 
+    // The dialog's stand-in: types the size, then clicks Resize when it is offered.
+    private static Func<ResizeViewModel, Task> Typing(string typed) => model =>
+    {
+        model.Text = typed;
+        return model.StartCommand.CanExecute(null) ? model.StartCommand.ExecuteAsync(null) : Task.CompletedTask;
+    };
+
     [Fact]
     public async Task Resize_refuses_what_is_no_size_and_disk_images_inside_others()
     {
         var path = Path.Combine(folder, "Floppy.hfs");
         File.WriteAllBytes(path, HfsWriter.Format(800 * 1024, "Floppy"));
-        var dialogs = new Dialogs { Resize = _ => "big" };
+        var dialogs = new Dialogs { Resize = Typing("big") };
         var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
         model.Selected = await model.OpenAsync(path);
 
         await model.VolumeActions.ResizeCommand.ExecuteAsync(null);
-        Assert.Contains("“big” is not a size", model.Status);
-        dialogs.Resize = _ => "2K";                                                    // too small for the volume's blocks
+        Assert.Equal((NoteSeverity.Error, VolumeOperationState.Ready), (dialogs.ResizeShown[^1].NoteSeverity, dialogs.ResizeShown[^1].State));
+        dialogs.Resize = Typing("2K");                                                  // too small for the volume's blocks
         await model.VolumeActions.ResizeCommand.ExecuteAsync(null);
-        Assert.Contains("Could not resize", model.Status);
+        Assert.Equal("Too small: the files need at least 15K.", dialogs.ResizeShown[^1].NoteText);
         Assert.False(model.EditActions.HasUnsavedChanges);
 
         var disk = Path.Combine(folder, "Disk.img");
         File.WriteAllBytes(disk, Fixtures.PartitionMap(("Floppy", "Apple_HFS", HfsWriter.Format(800 * 1024, "Floppy"))));
         model.Selected = await model.OpenAsync(disk);
         Assert.False(model.VolumeActions.ResizeCommand.CanExecute(null));             // a partition keeps its size
+    }
+
+    // Resize's Defragment first… (volume-tools.md §3, §4): Defragment's dialog opens over Resize, and Resize then has the
+    // new smallest size with the typed size kept.
+    [Fact]
+    public async Task Resize_defragments_first_when_the_free_space_is_in_the_way()
+    {
+        var image = HfsDefragmentFixtures.Fragmented();
+        var path = Path.Combine(folder, "Frag.hfs");
+        File.WriteAllBytes(path, image);
+        var layout = HfsReader.Instance.ReadLayout(ForkData.FromBytes(image))!;
+        string between = $"{(layout.SmallestSizeDefragmented + layout.SmallestSize) / 2 / 1024}K";
+        var dialogs = new Dialogs();
+        dialogs.Resize = async resize =>
+        {
+            resize.Text = between;
+            Assert.Equal(NoteSeverity.Warning, resize.NoteSeverity);
+            await resize.DefragmentFirstCommand.ExecuteAsync(null);
+            Assert.Equal((NoteSeverity.None, between), (resize.NoteSeverity, resize.Text + "K"));
+            await resize.StartCommand.ExecuteAsync(null);
+        };
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = dialogs };
+        model.Selected = await model.OpenAsync(path);
+
+        await model.VolumeActions.ResizeCommand.ExecuteAsync(null);
+
+        Assert.Equal(VolumeOperationState.Done, Assert.Single(dialogs.DefragmentShown).State);
+        Assert.Equal(VolumeOperationState.Done, Assert.Single(dialogs.ResizeShown).State);
+        Assert.Contains("Resized", model.Status);
+        Assert.True(model.EditActions.HasUnsavedChanges);
     }
 
     [Fact]

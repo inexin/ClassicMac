@@ -327,27 +327,43 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
-        var input = selected.Input;
-        var session = input.VolumeSession;
-        VolumeLayout? Measure() => HfsReader.Instance.ReadLayout(ForkData.FromBytes(session.VolumeOf(volume.Name)));
-        if (await Task.Run(Measure) is not { } before)
+        if (await DefragmentModel(selected.Input, volume) is not { } model)
         {
             appServices.Status = "Could not defragment the volume: the writer can't read its layout.";
             return;
         }
 
-        var model = new DefragmentViewModel(VolumeName(volume.Root), before, async (progress, token) =>
-        {
-            await Task.Run(() => session.Defragment(volume.Name, progress, token), token);
-            input.Title = input.BaseTitle + " •";
-            appParts.EditActions.NotifyEditCommands();
-            return await Task.Run(Measure);
-        });
         await dialogs.DefragmentAsync(model);
         if (model.IsDone)
         {
             appServices.Status = "Defragmented the volume; Save As ▸ HFS Volume Image writes it.";
         }
+    }
+
+    private static VolumeLayout? Measure(InputNode input, string volume) =>
+        HfsReader.Instance.ReadLayout(ForkData.FromBytes(input.VolumeSession.VolumeOf(volume)));
+
+    // Defragment's dialog over the volume's layout now; running it defragments the volume in the session and measures
+    // it again. Null when the writer can't read the layout.
+    private async Task<DefragmentViewModel?> DefragmentModel(InputNode input, (NodeViewModel Root, string Name) volume)
+    {
+        if (await Task.Run(() => Measure(input, volume.Name)) is not { } before)
+        {
+            return null;
+        }
+
+        return new DefragmentViewModel(VolumeName(volume.Root), before, async (progress, token) =>
+        {
+            await Task.Run(() => input.VolumeSession.Defragment(volume.Name, progress, token), token);
+            Edited(input);
+            return await Task.Run(() => Measure(input, volume.Name));
+        });
+    }
+
+    private void Edited(InputNode input)
+    {
+        input.Title = input.BaseTitle + " •";
+        appParts.EditActions.NotifyEditCommands();
     }
 
     // A volume node's own name (drVN): the input's, or the disk image's or partition's volume.
@@ -370,33 +386,35 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
+        if (input.VolumeOf(input) is not { } volume || await Task.Run(() => Measure(input, volume.Name)) is not { } layout)
+        {
+            appServices.Status = "Could not resize the volume: the writer can't read its layout.";
+            return;
+        }
+
         var session = input.VolumeSession;
-        long smallest;
-        try
+        var model = new ResizeViewModel(VolumeName(volume.Root), session.VolumeSize, layout, HfsWriter.MaximumFormatSize, async (size, blockSize, progress, token) =>
         {
-            smallest = await Task.Run(() => session.SmallestSize);
-        }
-        catch (InvalidDataException e)
+            await Task.Run(() => session.Resize(size, blockSize, progress, token), token);
+            Edited(input);
+        })
         {
-            appServices.Status = $"Could not resize the volume: {e.Message}";
-            return;
-        }
+            DefragmentFirst = async () =>
+            {
+                if (await DefragmentModel(input, volume) is not { } defragment)
+                {
+                    return null;
+                }
 
-        var name = input.Root.Volume?.Name ?? input.BaseTitle;
-        if (await dialogs.ResizeAsync(new ResizeView(name, session.VolumeSize, smallest, HfsWriter.MaximumFormatSize)) is not { } typed)
+                await dialogs.DefragmentAsync(defragment);
+                return defragment.IsDone ? defragment.After : null;
+            },
+        };
+        await dialogs.ResizeAsync(model);
+        if (model.IsDone && model.Size is { } resized)
         {
-            return;
-        }
-
-        if (!ByteSize.TryParse(typed, out var size))
-        {
-            appServices.Status = $"“{typed}” is not a size: give bytes, or a number with K, M or G.";
-            return;
-        }
-
-        if (ChangeVolume(input, s => s.Resize(size), "resize the volume"))
-        {
-            appServices.Status = $"Resized the volume to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes; Save As ▸ HFS Volume Image writes it.";
+            appServices.Status = string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"Resized the volume to {resized:N0} bytes; Save As ▸ HFS Volume Image writes it.");
         }
     }
 

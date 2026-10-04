@@ -471,7 +471,7 @@ public class WindowTests
         public Task<NewFileChoice?> NewFileAsync(string title, NewFileChoice initial) => throw new NotSupportedException();
         public Task<string?> NewFolderAsync(string initial) => throw new NotSupportedException();
         public Task<bool> FirstAidAsync(FirstAidView view) => throw new NotSupportedException();
-        public Task<string?> ResizeAsync(ResizeView view) => throw new NotSupportedException();
+        public Task ResizeAsync(ResizeViewModel model) => throw new NotSupportedException();
         public Task DefragmentAsync(DefragmentViewModel model) => throw new NotSupportedException();
     }
 

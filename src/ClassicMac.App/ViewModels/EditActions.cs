@@ -77,15 +77,12 @@ public interface IEditDialogs
     /// <summary>First Aid's window: what a check or repair found; true when Repair is clicked (offered only when it can).</summary>
     Task<bool> FirstAidAsync(FirstAidView view);
 
-    /// <summary>Resize: the new size as typed (bytes, or with K, M or G), or null when cancelled.</summary>
-    Task<string?> ResizeAsync(ResizeView view);
+    /// <summary>Resize's dialog, which runs the model; done when it closes.</summary>
+    Task ResizeAsync(ResizeViewModel model);
 
     /// <summary>Defragment's dialog, which runs the model and shows what it did; done when it closes.</summary>
     Task DefragmentAsync(DefragmentViewModel model);
 }
-
-/// <summary>Resize's window (Volume ▸ Resize…): the volume, its size, the smallest it shrinks to and the largest it grows to, in bytes.</summary>
-public sealed record ResizeView(string Volume, long Size, long Smallest, long Largest);
 
 /// <summary>
 /// First Aid's window (Volume ▸ First Aid…): the volume, the lines (problems, or the repairs made and what is left), the

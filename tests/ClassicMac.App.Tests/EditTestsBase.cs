@@ -104,13 +104,14 @@ public abstract class EditTestsBase : IDisposable
             return Defragment(model);
         }
 
-        public Func<ResizeView, string?> Resize { get; set; } = _ => null;
-        public List<ResizeView> ResizeShown { get; } = [];
+        // Cancels, unless a test sets what to do with the dialog.
+        public Func<ResizeViewModel, Task> Resize { get; set; } = _ => Task.CompletedTask;
+        public List<ResizeViewModel> ResizeShown { get; } = [];
 
-        public Task<string?> ResizeAsync(ResizeView view)
+        public Task ResizeAsync(ResizeViewModel model)
         {
-            ResizeShown.Add(view);
-            return Task.FromResult(Resize(view));
+            ResizeShown.Add(model);
+            return Resize(model);
         }
 
         public Task<bool> FirstAidAsync(FirstAidView view)

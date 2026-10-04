@@ -648,6 +648,42 @@
     <Setter Property="Free" Value="{DynamicResource CmSegmentTrack}" />
     <Setter Property="BorderBrush" Value="{DynamicResource CmBorder}" />
   </Style>
+  <!-- Resize's slider and the notes under its field (volume-tools.md §4). -->
+  <Style Selector="controls|SizeSlider">
+    <Setter Property="TrackBrush" Value="{DynamicResource CmSegmentTrack}" />
+    <Setter Property="Accent" Value="{DynamicResource CmAccent}" />
+    <Setter Property="Warning" Value="{DynamicResource CmWarning}" />
+    <Setter Property="Error" Value="{DynamicResource CmError}" />
+    <Setter Property="TickBrush" Value="{DynamicResource CmText}" />
+    <Setter Property="ThumbFill" Value="{DynamicResource CmPaneBackground}" />
+    <Setter Property="LabelBrush" Value="{DynamicResource CmTextMuted}" />
+    <Setter Property="LabelFont" Value="{DynamicResource CmFontMono}" />
+    <Setter Property="LabelSize" Value="11" />
+  </Style>
+  <Style Selector="Border.inline-note">
+    <Setter Property="CornerRadius" Value="{DynamicResource CmRadius}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,8" />
+  </Style>
+  <Style Selector="Border.inline-note.info">
+    <Setter Property="Background" Value="{DynamicResource CmInfoTint}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmInfo}" />
+  </Style>
+  <Style Selector="Border.inline-note.warning">
+    <Setter Property="Background" Value="{DynamicResource CmWarningTint}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmWarning}" />
+  </Style>
+  <Style Selector="Border.inline-note.error">
+    <Setter Property="Background" Value="{DynamicResource CmErrorTint}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CmError}" />
+  </Style>
+  <Style Selector="TextBox.size-box">
+    <Setter Property="FontFamily" Value="{DynamicResource CmFontMono}" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <Style Selector="TextBox.size-box.invalid /template/ Border#PART_BorderElement">
+    <Setter Property="BorderBrush" Value="{DynamicResource CmError}" />
+  </Style>
   <Style Selector="WrapPanel.map-legend > StackPanel">
     <Setter Property="Spacing" Value="5" />
     <Setter Property="Margin" Value="0,0,12,0" />

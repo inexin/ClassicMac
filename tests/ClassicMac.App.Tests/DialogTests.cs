@@ -296,26 +296,9 @@ public class DialogTests
         Assert.False(ok.Result);
     });
 
-    [Fact]
-    public void Resize_shows_the_size_and_its_limits_and_returns_what_was_typed() => OnUiThread(() =>
-    {
-        var dialog = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
-        AssertFrame(dialog.Window, "Resize", "Resize", "Cancel");
-        var texts = dialog.Window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
-        Assert.Contains("819,200 bytes (800K)", texts);
-        Assert.Contains("412,160 bytes", texts);
-        Assert.Contains("2,147,483,136 bytes", texts);
-        var size = dialog.Window.GetVisualDescendants().OfType<TextBox>().Single(b => b.Name == "Size");
-        Assert.Equal("800K", size.Text);
-        Assert.Contains("mono", size.Classes);
-        size.Text = "20M";
-        Footer(dialog.Window, "Resize").Command!.Execute(null);
-        Assert.Equal("20M", dialog.Result);
-
-        var cancelled = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
-        Footer(cancelled.Window, "Cancel").Command!.Execute(null);
-        Assert.Null(cancelled.Result);
-    });
+    private static ResizeViewModel Resizing(Func<long, uint?, IProgress<VolumeProgress>, CancellationToken, Task>? resize = null) =>
+        new("Macintosh HD", 800 * 1024, new VolumeLayout(1594, 512, 21, 1, 1, 4, [new(10, 2), new(20, 1), new(1500, 94)], [new(100, 50)], 640 * 1024, 403 * 1024),
+            2_147_483_136, resize ?? ((_, _, _, _) => Task.CompletedTask));
 
     private static VolumeLayout Fragmented() => new(4090, 512, 21, 1, 1, 17,
         [new(10, 2), new(20, 1), new(40, 2), new(90, 3), new(4000, 90)], [new(100, 50), new(300, 40)], 640 * 1024, 403 * 1024);
@@ -327,6 +310,75 @@ public class DialogTests
 
     private static List<string?> Texts(Window window) =>
         window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+
+    private static T Named<T>(Window window, string name) where T : Control =>
+        window.GetVisualDescendants().OfType<T>().Single(c => c.Name == name);
+
+    [Fact]
+    public void Resize_follows_the_typed_size_with_the_slider_and_the_note() => OnUiThread(() =>
+    {
+        var model = Resizing();
+        var dialog = Show(DialogViews.Resize(model));
+        Assert.Contains(dialog.Window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Resize “Macintosh HD”");
+        var box = Named<TextBox>(dialog.Window, "Size");
+        var slider = Named<SizeSlider>(dialog.Window, "SizeSlider");
+        Assert.Equal(("800", "KB", 800L * 1024), (box.Text, Named<ComboBox>(dialog.Window, "Unit").SelectedItem, slider.Value));
+        Assert.Contains("size-box", box.Classes);
+        Assert.False(Named<Border>(dialog.Window, "ResizeNoteBox").IsVisible);
+        Assert.False(Footer(dialog.Window, "Resize").IsEffectivelyEnabled);              // the size it is
+        Assert.Equal("Automatic · 512 bytes", ((BlockSizeChoice)Named<ComboBox>(dialog.Window, "BlockSize").SelectedItem!).Label);
+
+        box.Text = "20M";
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(("20", "MB", 20L * 1024 * 1024), (box.Text, model.Unit, slider.Value));
+        Assert.True(Footer(dialog.Window, "Resize").IsEffectivelyEnabled);
+
+        box.Text = "500K";
+        Dispatcher.UIThread.RunJobs();
+        var note = Named<Border>(dialog.Window, "ResizeNoteBox");
+        Assert.True(note.IsVisible);
+        Assert.Contains("warning", note.Classes);
+        Assert.Equal((NoteSeverity.Warning, 640L * 1024), (slider.Severity, slider.WarningEnd));
+        Assert.False(Footer(dialog.Window, "Resize").IsEffectivelyEnabled);
+        Assert.Equal("500 KB, needs Defragment", Avalonia.Automation.AutomationProperties.GetName(slider));
+
+        box.Text = "big";
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains("error", note.Classes);
+        Assert.Contains("invalid", box.Classes);
+        Assert.Equal("Type a size, such as 800K or 20M.", Named<TextBlock>(dialog.Window, "ResizeNote").Text);
+
+        slider.Value = 1440L * 1024;                                                     // the slider sets the field
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(("1440", "KB"), (box.Text, model.Unit));
+        Assert.DoesNotContain("invalid", box.Classes);
+        Footer(dialog.Window, "Cancel").Command!.Execute(null);
+        Assert.False(dialog.Result);
+    });
+
+    [Fact]
+    public void Resize_runs_with_progress_and_closes_when_done() => OnUiThread(() =>
+    {
+        var finish = new TaskCompletionSource();
+        var model = Resizing((_, _, progress, _) =>
+        {
+            progress.Report(new VolumeProgress(1, 3, "Planning the moves."));
+            return finish.Task;
+        });
+        var dialog = Show(DialogViews.Resize(model));
+        Named<TextBox>(dialog.Window, "Size").Text = "1440K";
+        Dispatcher.UIThread.RunJobs();
+
+        Footer(dialog.Window, "Resize").Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(["Cancel"], Visible(dialog.Window));
+        Assert.Contains("Step 1 of 3 · Planning the moves.", Texts(dialog.Window));
+        finish.SetResult();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(dialog.Result);
+        Assert.False(dialog.Window.IsVisible);
+    });
 
     [Fact]
     public void Defragment_explains_runs_and_shows_the_result_in_one_dialog() => OnUiThread(() =>
@@ -405,6 +457,29 @@ public class DialogTests
     }
 
     [Fact]
+    public void Resize_draws_its_field_slider_and_notes() => OnUiThread(() =>
+    {
+        var baselines = new List<string>();
+        var model = Resizing();
+        model.DefragmentFirst = () => Task.FromResult<VolumeLayout?>(null);
+        var dialog = Show(DialogViews.Resize(model));
+        model.Text = "1440K";
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-resize", baselines, Baselines.All);
+        model.Text = "500K";
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-resize-warning", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        model.Text = "40M";
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-resize-info", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        model.Text = "3G";
+        Dispatcher.UIThread.RunJobs();
+        Baselines.Check(dialog.Window, "dialog-resize-error", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
+        dialog.Window.Close();
+        Baselines.Verify(baselines);
+    });
+
+    [Fact]
     public void Defragment_draws_before_running_and_done() => OnUiThread(() =>
     {
         var baselines = new List<string>();
@@ -445,9 +520,6 @@ public class DialogTests
             ["Problem:  Invalid PEOF, 18, 2", "Problem:  MountCheck found minor errors."], "The volume “Macintosh HD” needs to be repaired.", CanRepair: true)));
         Baselines.Check(firstAid.Window, "dialog-first-aid", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
         firstAid.Window.Close();
-        var resize = Show(DialogViews.Resize(new ResizeView("Macintosh HD", 819_200, 412_160, 2_147_483_136)));
-        Baselines.Check(resize.Window, "dialog-resize", baselines, Baselines.Variant.Light, Baselines.Variant.Dark);
-        resize.Window.Close();
         Baselines.Verify(baselines);
     });
 }

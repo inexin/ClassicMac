@@ -5,12 +5,25 @@ using ClassicMac.App.ViewModels;
 
 namespace ClassicMac.App.Dialogs;
 
-// The editing dialogs (DialogViews builds them in one frame), shown modal over the window.
+// The editing dialogs (DialogViews builds them in one frame), shown modal over the window, or over the dialog that
+// opened them (Resize's Defragment first…).
 internal sealed class EditDialogs(Window owner) : IEditDialogs
 {
+    private readonly List<Window> open = [];
+
     private async Task<T> Show<T>(Dialog<T> dialog)
     {
-        await dialog.Window.ShowDialog(owner);
+        var parent = open.Count > 0 ? open[^1] : owner;
+        open.Add(dialog.Window);
+        try
+        {
+            await dialog.Window.ShowDialog(parent);
+        }
+        finally
+        {
+            open.Remove(dialog.Window);
+        }
+
         return dialog.Result;
     }
 
@@ -32,7 +45,7 @@ internal sealed class EditDialogs(Window owner) : IEditDialogs
 
     public Task<bool> FirstAidAsync(FirstAidView view) => Show(DialogViews.FirstAid(view));
 
-    public Task<string?> ResizeAsync(ResizeView view) => Show(DialogViews.Resize(view));
+    public Task ResizeAsync(ResizeViewModel model) => Show(DialogViews.Resize(model));
 
     public Task DefragmentAsync(DefragmentViewModel model) => Show(DialogViews.Defragment(model));
 }
