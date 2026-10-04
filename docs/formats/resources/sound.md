@@ -513,8 +513,8 @@ both sides; of more than two channels, the first two). [ClassicMac]
 
 ## 8. Not covered
 
-- AIFF and AIFC files. `SndStartFilePlay` parses them itself and plays them through the same `sdec` decompressors
-  [Code]; ClassicMac will read them with the codecs above.
+- AIFF and AIFF-C files are [aiff.md](../documents/aiff.md); `SndStartFilePlay` parses them itself and plays them
+  through the same `sdec` decompressors [Code].
 - Instrument playback (§2.7): notes, loops and envelopes are not rendered; only the recorded samples are.
 - Square-wave and wave-table sounds: resources for synthesizers 1 and 3 hold commands only and give the JSON alone.
 - Writing compressed sounds: the MACE compressors (`Comp3to1`, `Comp6to1`, also in SoundLib), IMA 4:1 and µ-law.

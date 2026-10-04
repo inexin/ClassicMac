@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- AIFF and AIFF-C sound files (documents/aiff.md): `AiffFile` reads the chunks into the same sampled sound a `'snd '`
+  resource gives, so MACE, IMA 4:1, µ-law, float and integer samples decode with the same codecs; `convert` and the
+  app's Convert Documents write `sound.wav` and `sound.json`, and the app previews them as sounds.
 - `format --block-size` and `resize --block-size`: a larger allocation block size than Mac OS's automatic one; a resize to another block size lays the volume out again (hfs.md §3.1, §3.2).
 - App volume tools (design/boards/volume-tools.md): the Volume menu in two groups with the reason as a tooltip on
   what does not apply, and First Aid, Defragment and Resize on the volume's own node; the Volume card's used bar and

@@ -270,7 +270,7 @@ public class MacWordTests
     public void The_document_converter_converts_a_WDBN_file_with_no_resource_fork()
     {
         var data = Builder().Text("Hello\r").Build();
-        var converter = Assert.Single(ResourceDecoders.CreateDocumentConverters(DecodeOptions.Default));
+        var converter = ResourceDecoders.CreateDocumentConverters(DecodeOptions.Default).Single(c => c.Name == "document.html");
         var input = new DocumentInput(new ResourceFork(), () => data, Wdbn, FourCC.FromString("MSWD"), "Letter", ReadOptions.Default, []);
 
         var files = converter.Convert(input);

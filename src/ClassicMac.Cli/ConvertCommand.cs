@@ -25,9 +25,9 @@ internal sealed class ConvertCommand(TextWriter output, TextWriter error)
             var diagnostics = new List<Diagnostic>();
             opened = Input.Open(input, containerOptions, diagnostics);
             reporter.Write(input.Name, diagnostics);
-            // Files with a resource fork, and Word documents (their data fork is the document) with or without one.
+            // Files with a resource fork, and Word documents and AIFF sounds (their data fork is the document) with or without one.
             forks = opened.Forks(input, readOptions, reporter)
-                .Where(f => f.Fork is not null || ClassicMac.Resources.Decoders.Documents.StyledDocuments.IsWord(f.Node.File.FinderInfo.Type)).ToList();
+                .Where(f => f.Fork is not null || ClassicMac.Resources.Decoders.DataForkDocuments.Applies(f.Node.File.FinderInfo.Type)).ToList();
         }
         catch (InvalidDataException e)
         {

@@ -175,9 +175,9 @@ public sealed partial class ExportActions(IAppSelection appSelection, IAppServic
                 {
                     forks.Add(new ForkToExtract(leaf, [leaf.Format], fork));
                 }
-                else if (ClassicMac.Resources.Decoders.Documents.StyledDocuments.IsWord(leaf.File.FinderInfo.Type))
+                else if (ClassicMac.Resources.Decoders.DataForkDocuments.Applies(leaf.File.FinderInfo.Type))
                 {
-                    // A Word document is its data fork.
+                    // A Word document or an AIFF sound is its data fork.
                     forks.Add(new ForkToExtract(leaf, [leaf.Format], found.Fork ?? new ResourceFork()));
                 }
             }

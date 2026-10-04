@@ -302,6 +302,21 @@ public sealed class PreviewViewModel
             return new PreviewViewModel(PreviewKind.Document, "") { Document = DocumentWebPreview.Create(document, options, diagnostics) };
         }
 
+        if (type is "AIFF" or "AIFC" && file.DataFork.Length is > 12 and <= MaxPictureFile)
+        {
+            var found = new List<Diagnostic>();
+            var aiff = AiffFile.Read(file.DataFork.ToArray(), found, file.Name.ToString());
+            foreach (var d in found)
+            {
+                diagnostics.Add(d);
+            }
+
+            return aiff is null
+                ? SoundError("this sound", found.FirstOrDefault() is { } problem ? $"{problem.Message} · {problem.Code}" : "The sound cannot be read")
+                : SoundPreview(aiff.Sound, "this sound", aiff.SampleRate,
+                    aiff.IsCompressed ? $"AIFF-C ('{aiff.Compression}')" : "AIFF");
+        }
+
         if (type == "PICT" && file.DataFork.Length is > 512 + 10 and <= MaxPictureFile)
         {
             var picture = new Resource(FourCC.FromString("PICT"), 0, file.DataFork.Slice(512, file.DataFork.Length - 512).ToArray());
@@ -388,17 +403,19 @@ public sealed class PreviewViewModel
     private static PreviewViewModel SoundError(string what, string detail) =>
         new(PreviewKind.SoundError, "") { ErrorTitle = $"No preview for {what}", ErrorDetail = detail };
 
-    private static PreviewViewModel SoundPreview(SampledSound sampled, string what)
+    // A sampled sound's preview; an AIFF file gives its exact rate and its format's name.
+    private static PreviewViewModel SoundPreview(SampledSound sampled, string what, double? rate = null, string? format = null)
     {
-        var compressed = sampled.Kind == SoundHeaderKind.Compressed;
+        var compressed = sampled.Kind == SoundHeaderKind.Compressed || format is not null && SoundSamples.IsCodec(sampled.Format);
         var bits = compressed ? $"'{sampled.Format}'" : $"{sampled.SampleSize}-bit";
-        if (SoundSamples.Decode(sampled) is not { } sound)
+        if (SoundSamples.Decode(sampled) is not { } decoded)
         {
             return SoundError(what, compressed
                 ? $"Compressed as '{sampled.Format}', which ClassicMac does not decode"
                 : $"{sampled.SampleSize}-bit samples, which ClassicMac does not decode");
         }
 
+        var sound = rate is { } exact ? decoded with { SampleRate = exact } : decoded;
         var channels = sound.Channels == 1 ? "mono" : sound.Channels == 2 ? "stereo" : $"{sound.Channels} channels";
         var hasLoop = sampled.LoopEnd > sampled.LoopStart && sampled.LoopEnd - sampled.LoopStart > 2;
         var loop = hasLoop ? $", loop {sampled.LoopStart}–{sampled.LoopEnd}" : "";
@@ -422,7 +439,7 @@ public sealed class PreviewViewModel
             facts.Add(new("Base note", sampled.BaseNote.ToString(CultureInfo.InvariantCulture)));
         }
 
-        facts.Add(new("Format", compressed ? $"sampled, compressed ('{sampled.Format}')" : "sampled, uncompressed"));
+        facts.Add(new("Format", format ?? (compressed ? $"sampled, compressed ('{sampled.Format}')" : "sampled, uncompressed")));
         return new PreviewViewModel(PreviewKind.Sound, "")
         {
             Sound = sound,

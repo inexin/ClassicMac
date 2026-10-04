@@ -93,5 +93,5 @@ public static class ResourceDecoders
 
     /// <summary>The built-in document converters with <paramref name="options"/>, for <see cref="ExportOptions.Documents"/>.</summary>
     public static IReadOnlyList<IDocumentConverter> CreateDocumentConverters(DecodeOptions? options = null) =>
-        [new Documents.HtmlDocumentConverter(options ?? DecodeOptions.Default)];
+        [new Documents.HtmlDocumentConverter(options ?? DecodeOptions.Default), new Sound.AiffConverter()];
 }

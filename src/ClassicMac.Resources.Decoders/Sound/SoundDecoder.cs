@@ -89,7 +89,7 @@ internal sealed class SoundDecoder : IResourceDecoder, IBuiltInDecoder
     }
 
     // A smpl chunk when there is a loop inside the sound or a base note other than middle C.
-    private static SamplerInfo? Sampler(SampledSound sound, int frames)
+    internal static SamplerInfo? Sampler(SampledSound sound, int frames)
     {
         var note = sound.BaseNote; // 0 is note 0: the Sound Manager has no special case
         var loop = sound.LoopEnd > sound.LoopStart && sound.LoopEnd - sound.LoopStart > 2 && sound.LoopEnd <= frames;

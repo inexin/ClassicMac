@@ -83,6 +83,26 @@ public class ConvertTests : IDisposable
     }
 
     [Fact]
+    public void An_AIFF_sound_converts_to_WAV_and_JSON()
+    {
+        byte[] comm = [0, 1, 0, 0, 0, 4, 0, 16, 0x40, 0x0D, 0xAC, 0x44, 0, 0, 0, 0, 0, 0];
+        byte[] body = [.. "AIFF"u8, .. "COMM"u8, 0, 0, 0, 18, .. comm, .. "SSND"u8, 0, 0, 0, 16, .. new byte[16]];
+        byte[] aiff = [.. "FORM"u8, 0, 0, 0, (byte)body.Length, .. body];
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Beep", aiff, [], type: "AIFF", creator: "SCPL");
+        var input = Path.Combine(folder, "disk.img");
+        File.WriteAllBytes(input, disk.Build("Disk"));
+        var target = Path.Combine(folder, "out");
+
+        var (code, output, error) = Run("convert", input, "-o", target);
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("1 document, to", output);
+        Assert.True(File.Exists(Path.Combine(target, "sound.wav")));
+        Assert.Contains("\"sampleRate\": 22050", File.ReadAllText(Path.Combine(target, "sound.json")));
+    }
+
+    [Fact]
     public void One_document_converts_straight_into_the_output_folder()
     {
         var input = Path.Combine(folder, "Manual.rsrc");

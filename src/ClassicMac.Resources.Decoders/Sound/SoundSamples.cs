@@ -1,4 +1,5 @@
 using System;
+using ClassicMac.Core;
 using System.Buffers.Binary;
 
 namespace ClassicMac.Resources.Decoders.Sound;
@@ -19,6 +20,9 @@ public sealed record DecodedSound(float[] Samples, int Channels, double SampleRa
 /// <summary>Decodes a <see cref="SampledSound"/>'s samples.</summary>
 public static class SoundSamples
 {
+    /// <summary>Whether <paramref name="format"/> is a codec (MACE, IMA 4:1, µ-law) rather than plain samples.</summary>
+    public static bool IsCodec(FourCC format) => SoundCodecs.Packet(format) is not null;
+
     /// <summary>The samples of <paramref name="sound"/>, or null when its format is not read.</summary>
     public static DecodedSound? Decode(SampledSound sound)
     {

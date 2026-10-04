@@ -42,6 +42,33 @@ public class SoundPreviewTests : IDisposable
         return (model, sound);
     }
 
+    // An AIFF file (docs/formats/documents/aiff.md): 16-bit mono at 22,050 Hz, 100 frames.
+    private static byte[] Aiff()
+    {
+        byte[] comm = [0, 1, 0, 0, 0, 100, 0, 16, 0x40, 0x0D, 0xAC, 0x44, 0, 0, 0, 0, 0, 0];
+        byte[] ssnd = [0, 0, 0, 0, 0, 0, 0, 0, .. new byte[200]];
+        byte[] body = [.. "AIFF"u8, .. "COMM"u8, .. BigEndian(18), .. comm, .. "SSND"u8, .. BigEndian((uint)ssnd.Length), .. ssnd];
+        return [.. "FORM"u8, .. BigEndian((uint)body.Length), .. body];
+    }
+
+    [Fact]
+    public async Task An_AIFF_file_previews_as_a_sound()
+    {
+        var disk = new HfsBuilder();
+        disk.File(HfsBuilder.Root, "Beep", Aiff(), [], "AIFF", "SCPL");
+        var path = Path.Combine(folder, "disk.img");
+        File.WriteAllBytes(path, disk.Build("Disk"));
+        var model = new MainViewModel();
+        var input = (await model.OpenAsync(path))!;
+
+        model.Selected = input.Children.OfType<FileNode>().Single();
+        await model.PreviewTask;
+
+        Assert.Equal(PreviewKind.Sound, model.Preview.Kind);
+        Assert.Equal("22050 Hz, mono, 16-bit, 0.00 s (100 frames)", model.Preview.SoundDetails);
+        Assert.Contains(new SoundFact("Format", "AIFF"), model.Preview.SoundFacts);
+    }
+
     [Fact]
     public async Task A_sound_previews_with_its_details_and_plays()
     {
