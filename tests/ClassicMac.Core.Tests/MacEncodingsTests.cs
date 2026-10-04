@@ -52,6 +52,20 @@ public sealed class MacEncodingsTests
         Assert.Equal(bytes, MacEncodings.Encode(text, encoding));
     }
 
+    // Apple's mapping where .NET's code pages differ (MacEncodingCorrections, generated from Apple's tables).
+    [Theory]
+    [InlineData(MacTextEncoding.Japanese, new byte[] { 0x5C, 0x80 }, "¥\\")]
+    [InlineData(MacTextEncoding.Japanese, new byte[] { 0x81, 0x5C }, "—")]
+    [InlineData(MacTextEncoding.Greek, new byte[] { 0x9C }, "€")]
+    [InlineData(MacTextEncoding.Romanian, new byte[] { 0xAF, 0xBF }, "Șș")]
+    [InlineData(MacTextEncoding.Hebrew, new byte[] { 0x81 }, "ײַ")]
+    [InlineData(MacTextEncoding.Korean, new byte[] { 0x81 }, "₩")]
+    public void Apples_mapping_wins_where_the_code_pages_differ(MacTextEncoding encoding, byte[] bytes, string text)
+    {
+        Assert.Equal(text, MacEncodings.Decode(bytes, encoding));
+        Assert.Equal(bytes, MacEncodings.Encode(text, encoding));
+    }
+
     [Fact]
     public void A_lead_byte_without_its_second_byte_is_a_replacement_character()
     {

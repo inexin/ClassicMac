@@ -9,7 +9,7 @@ every encoding below and, by default, Mac OS Roman.
 | --- | --- |
 | Used by | Every text the decoders read: `TEXT`, `STR `, `STR#`, `styl` documents, menus, dialogs, aliases, Finder resources, Help pages ([help-pages.md](../resources/help-pages.md)) |
 | ClassicMac | Reads and writes; `ClassicMac.Core` (`MacEncodings`, `MacTextEncoding`) |
-| Verified against | Nothing yet: the check against Apple's mapping tables runs when they are at hand (§7) |
+| Verified against | Apple's mapping tables, every code of all 16 (§7) |
 | Sources | Apple's Mac OS mapping tables (unicode.org `VENDORS/APPLE`, version 2.x, Apple's licence); Apple's TextCommon.h (Universal Interfaces 3.4), the base encodings; *Inside Macintosh: Text* |
 
 Contents
@@ -72,8 +72,12 @@ None.
 ## 5. ClassicMac
 
 - Mac OS Roman is ClassicMac's own table (`MacRoman`); the other encodings are read from .NET's Mac code pages into a
-  table of every one- and two-byte code, a byte the decoder holds back being a lead byte. Where Apple's table differs,
-  Apple's mapping is used: the corrections come from the check of §7. [ClassicMac]
+  table of every one- and two-byte code, a byte the decoder holds back being a lead byte. Where Apple's table differs
+  (1,664 codes: Apple's additions in the two-byte encodings with their transcoding hints, the euro sign, Ω for
+  U+2126, Romanian's comma-below letters, Arabic's and Hebrew's punctuation as ASCII, Mac OS Japanese's ¥ at $5C and
+  backslash at $80), Apple's mapping is used, a two-byte code making its first byte a lead byte.
+  `tools/EncodingTables` writes these corrections, as codes and Unicode only, into `MacEncodingCorrections.g.cs` from
+  Apple's tables. [ClassicMac]
 - A code that is not text (§2 step 3) becomes U+FFFD; after a lead byte whose next byte makes no code, that next byte
   is read on its own. [ClassicMac]
 - Writing takes the longest text at each place that maps to a code (codes of one byte before codes of two); a
@@ -88,13 +92,14 @@ None.
 ## 7. Verification
 
 - `tests/ClassicMac.Core.Tests/MacEncodingsTests.cs`: the numbers and names, names parsed, Mac OS Roman, each kind of
-  script decoded and encoded back, lead bytes without a second byte, text an encoding cannot hold. With Apple's
-  mapping tables in `tests/golden/encodings` (gitignored, never committed), every code of every table is checked.
+  script decoded and encoded back, Apple's mapping where the code pages differ, lead bytes without a second byte, text
+  an encoding cannot hold. With Apple's mapping tables in `tests/golden/encodings` (gitignored, never committed), every
+  code of every table is checked: all 16 match.
 - `tests/ClassicMac.Cli.Tests/PathCommandTests.cs`, `Encoding_reads_text_in_another_Mac_script`.
 
 ## 8. Not covered
 
-- The check against Apple's mapping tables has not run, so .NET's code pages are used with no corrections yet.
+- Codes .NET's code pages define that Apple's tables do not are left as .NET reads them.
 - File and resource names (`MacString`) are shown as Mac OS Roman.
 - Choosing the encoding from what a file says: a font family's script, a `'vers'` region code, a `styl` run's font,
   HFS Plus's text encoding hints; and an encoding setting in the app.
@@ -106,4 +111,5 @@ None.
    licence; not committed.
 2. Apple Computer, `TextCommon.h`, Universal Interfaces 3.4: the base text encodings.
 3. Apple Computer, *Inside Macintosh: Text* (1993): scripts and the Script Manager.
-4. Microsoft, .NET's code pages 10001–10082 (`System.Text.Encoding.CodePages`, MIT): the tables ClassicMac reads.
+4. Microsoft, .NET's code pages 10001–10082 (`System.Text.Encoding.CodePages`, MIT): the tables ClassicMac reads,
+   corrected to Apple's.

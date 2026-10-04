@@ -6,7 +6,8 @@
   Traditional and Simplified, Korean, Arabic, Hebrew, Greek, Cyrillic, Ukrainian, Thai, Central European, Croatian,
   Romanian, Icelandic and Turkish; the decoders read text in `DecodeOptions.TextEncoding` (`MacTextEncoding` moved to
   Core); the CLI's `--encoding` applies to `cat`, `find --contains`, `extract` and `convert`; Help pages in Shift_JIS,
-  Big5, GB2312, EUC-KR or a Mac encoding read as the Mac encoding.
+  Big5, GB2312, EUC-KR or a Mac encoding read as the Mac encoding. Every code matches Apple's mapping tables: where
+  .NET's code pages differ (1,664 codes), `tools/EncodingTables` generates Apple's mapping as corrections.
 - `IconFamily.ToIcns` writes an `'icns'` as Mac OS 9.0's Icon Services does (icon-families.md §3): members in table
   order, 32-bit ones compressed plane by plane (runs from three bytes, literals up to 128); `SetMember` sets one as
   SetIconFamilyData does.

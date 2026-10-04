@@ -77,10 +77,6 @@ public static class MacEncodings
         [MacTextEncoding.Icelandic] = 10079, [MacTextEncoding.Turkish] = 10081, [MacTextEncoding.Croatian] = 10082,
     };
 
-    // Where Apple's mapping tables differ from .NET's code pages: the code (one byte, or lead << 8 | trail) and Apple's
-    // Unicode. Filled from the verification against Apple's tables (MacEncodingsTests).
-    private static readonly Dictionary<MacTextEncoding, (int Code, string Text)[]> Corrections = [];
-
     private static readonly ConcurrentDictionary<MacTextEncoding, Table> Tables = new();
 
     static MacEncodings() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
@@ -243,14 +239,18 @@ public static class MacEncodings
             }
         }
 
-        foreach (var (code, text) in Corrections.GetValueOrDefault(encoding, []))
+        // Apple's mapping where it differs (MacEncodingCorrections, generated from Apple's tables): a two-byte code makes
+        // its first byte a lead byte; a one-byte code is a character of its own.
+        foreach (var (code, text) in MacEncodingCorrections.All.GetValueOrDefault(encoding, []))
         {
             if (code > 0xFF)
             {
+                table.Lead[code >> 8] = true;
                 table.Double[code] = text;
             }
             else
             {
+                table.Lead[code] = false;
                 table.Single[code] = text;
             }
         }

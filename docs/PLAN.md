@@ -133,7 +133,7 @@ In rough priority; each item names what blocks it, if anything.
    cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
    HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.
 4. **Decoders, later**: the text encodings' second step (names in other scripts, choosing the encoding from a file's
-   script or region, the app's setting, and the check against Apple's mapping tables), a "make loadable" option
+   script or region, the app's setting), a "make loadable" option
    for exported fonts, lossless WebP; QuickDraw's ScrollRect, OpenRgn/OpenPoly and OpenPicture.
 5. **App**: editing the hex view's text column; packaging (macOS bundle icon, Linux icons and `.desktop` file).
 6. **Samples wanted** (no original yet): StuffIt method 6 and 5's method 14, a SegmentIt set, PackIt `PMa4` and
