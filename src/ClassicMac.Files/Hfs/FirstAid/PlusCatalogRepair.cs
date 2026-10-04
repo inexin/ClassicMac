@@ -19,8 +19,11 @@ internal sealed class PlusCatalogRepair
     private readonly List<(byte[] Key, byte[] Data)> records;
     private readonly List<PlannedChange> changes;
 
-    private PlusCatalogRepair(FirstAidRun run, List<PlannedChange> changes)
+    private readonly Dictionary<(uint FileId, byte Fork), List<(uint Start, uint Count)>> relocated;
+
+    private PlusCatalogRepair(FirstAidRun run, List<PlannedChange> changes, Dictionary<(uint FileId, byte Fork), List<(uint Start, uint Count)>> relocated)
     {
+        this.relocated = relocated;
         this.run = run;
         catalog = run.Catalog!;
         records = catalog.Records.Select(r => (r.Key.ToArray(), r.Data.ToArray())).ToList();
@@ -28,9 +31,10 @@ internal sealed class PlusCatalogRepair
     }
 
     /// <summary>The catalog's records with the repairs made, in key order.</summary>
-    public static List<(byte[] Key, byte[] Data)> Repair(FirstAidRun run, List<PlannedChange> changes)
+    public static List<(byte[] Key, byte[] Data)> Repair(FirstAidRun run, List<PlannedChange> changes,
+        Dictionary<(uint FileId, byte Fork), List<(uint Start, uint Count)>> relocated)
     {
-        var repair = new PlusCatalogRepair(run, changes);
+        var repair = new PlusCatalogRepair(run, changes, relocated);
         repair.Threads();
         repair.MissingThreads();
         repair.Files();
@@ -144,6 +148,12 @@ internal sealed class PlusCatalogRepair
 
             foreach (var (at, fork, name) in new[] { (88, (byte)0x00, "data"), (168, (byte)0xFF, "resource") })
             {
+                // A fork given its own copy (#12): its first eight extents; the rest are in the extents tree.
+                if (relocated.TryGetValue((id, fork), out var moved))
+                {
+                    writer.WriteBytesAt(at + 16, OverlapRepair.PlusRecords(id, fork, moved).First);
+                }
+
                 uint declared = reader.ReadUInt32At(at + 12);
                 long extents = blocks.GetValueOrDefault((id, fork));
                 if (declared < extents)

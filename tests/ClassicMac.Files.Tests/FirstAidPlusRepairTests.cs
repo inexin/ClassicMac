@@ -185,6 +185,54 @@ public class FirstAidPlusRepairTests
         Assert.Equal(1u, U32(inner, Record(inner, HfsPlusBuilder.Root, "Docs") + 4));
     }
 
+    // #12: the fork found later gets its own copy, in free blocks; both read as before.
+    [Fact]
+    public void A_fork_sharing_blocks_gets_its_own_copy()
+    {
+        var image = Base();
+        int letter = Record(image, Docs, "Letter"), fragmented = Record(image, HfsPlusBuilder.Root, "Fragmented");
+        uint shared = U32(image, fragmented + 88 + 16);
+        "MARK"u8.CopyTo(image.AsSpan((int)(shared * Block)));
+        Put32(image, letter + 88 + 16, shared);                                    // Letter's one block is Fragmented's first
+
+        var repaired = Repaired(image);
+
+        uint moved = U32(repaired, Record(repaired, Docs, "Letter") + 88 + 16);
+        Assert.NotEqual(shared, moved);
+        Assert.Equal(shared, U32(repaired, Record(repaired, HfsPlusBuilder.Root, "Fragmented") + 88 + 16));
+        Assert.Equal("MARK"u8.ToArray(), repaired.AsSpan((int)(moved * Block), 4).ToArray());
+    }
+
+    [Fact]
+    public void A_fragmented_fork_sharing_blocks_is_copied_whole_and_loses_its_overflow_records()
+    {
+        var builder = new HfsPlusBuilder();
+        uint docs = builder.Folder(HfsPlusBuilder.Root, "Docs");
+        builder.File(HfsPlusBuilder.Root, "A", Enumerable.Range(0, Block).Select(i => (byte)i).ToArray(), []);
+        builder.File(docs, "B", Enumerable.Range(0, 12 * Block).Select(i => (byte)(i * 7)).ToArray(), [], fragments: 12);
+        var image = builder.Build("Plus");
+        Assert.NotEmpty(OverflowRecords(image));
+        Put32(image, Record(image, docs, "B") + 88 + 16, U32(image, Record(image, HfsPlusBuilder.Root, "A") + 88 + 16));
+        var before = Enumerable.Range(0, Block).Select(i => (byte)i)                      // its first block is A's now
+            .Concat(Enumerable.Range(Block, 11 * Block).Select(i => (byte)(i * 7))).ToArray();
+
+        var repaired = Repaired(image);
+
+        Assert.Equal(before, Data(repaired, "Docs:B"));
+        Assert.Equal(Enumerable.Range(0, Block).Select(i => (byte)i), Data(repaired, "A"));
+        Assert.Empty(OverflowRecords(repaired));                                   // B in free blocks, in one piece
+    }
+
+    private static byte[] Data(byte[] image, string path) =>
+        HfsReader.Instance.Read(ForkData.FromBytes(image), new ContainerContext()).Single(f => f.MacPath == path).DataFork.ToArray();
+
+    private static List<(byte[] Key, byte[] Data)> OverflowRecords(byte[] image)
+    {
+        int start = Node(image, 192, 0);
+        var tree = image.AsSpan(start, (int)U32(image, Header + 192 + 12) * Block).ToArray();
+        return HfsPlusBTree.LeafRecords(tree, "extents-overflow").ToList();
+    }
+
     [Fact]
     public void A_volume_that_appears_to_be_OK_is_left_alone()
     {

@@ -87,6 +87,44 @@ internal static class OverlapRepair
         return (first, overflow);
     }
 
+    /// <summary>
+    /// An HFS Plus fork's extents as its fork data's record of eight (zeros after the last) and the overflow records for
+    /// the rest, keyed (fork, file ID, start block).
+    /// </summary>
+    public static (byte[] First, List<(byte[] Key, byte[] Data)> Overflow) PlusRecords(uint fileId, byte fork, List<(uint Start, uint Count)> extents)
+    {
+        static byte[] Eight(IEnumerable<(uint Start, uint Count)> part)
+        {
+            var record = new byte[PlusExtentRecords.RecordLength];
+            var writer = new BigEndianWriter(record);
+            var at = 0;
+            foreach (var (start, count) in part)
+            {
+                writer.WriteUInt32At(at, start);
+                writer.WriteUInt32At(at + 4, count);
+                at += 8;
+            }
+
+            return record;
+        }
+
+        var overflow = new List<(byte[], byte[])>();
+        long blocks = extents.Take(8).Sum(e => (long)e.Count);
+        for (var i = 8; i < extents.Count; i += 8)
+        {
+            var key = new byte[12];
+            var writer = new BigEndianWriter(key);
+            writer.WriteUInt16At(0, (ushort)10);
+            key[2] = fork;
+            writer.WriteUInt32At(4, fileId);
+            writer.WriteUInt32At(8, blocks);
+            overflow.Add((key, Eight(extents.Skip(i).Take(8))));
+            blocks += extents.Skip(i).Take(8).Sum(e => (long)e.Count);
+        }
+
+        return (Eight(extents.Take(8)), overflow);
+    }
+
     private static byte[] Record(IEnumerable<(uint Start, uint Count)> extents)
     {
         var record = new byte[12];

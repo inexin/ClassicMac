@@ -15,19 +15,26 @@ internal static class PlusRepair
 {
     private const FirstAidRepairs CatalogRepairs = FirstAidRepairs.MissingFolder | FirstAidRepairs.MissingThreads | FirstAidRepairs.FileThreads
         | FirstAidRepairs.Valences | FirstAidRepairs.ForkLengths | FirstAidRepairs.LinkCounts;
+    private const FirstAidRepairs ExtentsRepairs = FirstAidRepairs.OrphanedExtents | FirstAidRepairs.ExtentStarts;
 
     /// <summary>The trees a repair needs written again; true when either was.</summary>
     public static bool Trees(FirstAidRun run, HfsVolume volume, List<PlannedChange> changes)
     {
         bool written = false;
-        if (run.Extents is { } extents
-            && (run.TreesToRebuild.Contains(3) || (run.Repairs & (FirstAidRepairs.OrphanedExtents | FirstAidRepairs.ExtentStarts)) != 0))
+        // Forks that share blocks (#12) are copied first; their new extents go into both trees.
+        var relocated = (run.Repairs & FirstAidRepairs.OverlappingExtents) != 0 ? OverlapRepair.Relocate(run, volume, changes) : [];
+        if (run.Extents is { } extents && (run.TreesToRebuild.Contains(3) || relocated.Count > 0 || (run.Repairs & ExtentsRepairs) != 0))
         {
             var made = new List<PlannedChange>();
             var records = new List<(byte[] Key, byte[] Data)>();
             foreach (var (key, data, _) in extents.Records)
             {
                 uint fileId = new BigEndianReader(key).ReadUInt32At(4);
+                if (relocated.ContainsKey((fileId, key[2])))
+                {
+                    continue;                                                        // a moved fork's: made again below
+                }
+
                 if (fileId >= 16 && !run.FileIds.Contains(fileId))
                 {
                     made.Add(new PlannedChange("repair", "", $"extents, file {fileId}: an overflow extents record of a file not in the catalog deleted"));
@@ -37,6 +44,12 @@ internal static class PlusRepair
                 records.Add((key.ToArray(), data));
             }
 
+            foreach (var ((fileId, fork), moved) in relocated)
+            {
+                records.AddRange(OverlapRepair.PlusRecords(fileId, fork, moved).Overflow);
+            }
+
+            records.Sort((a, b) => HfsPlusBTree.CompareExtentKeys(a.Key, b.Key));
             int renumbered = Renumber(records);
             if (renumbered > 0)
             {
@@ -50,11 +63,11 @@ internal static class PlusRepair
             }
         }
 
-        if (run.Catalog is { } catalog && (run.TreesToRebuild.Contains(4) || (run.Repairs & CatalogRepairs) != 0))
+        if (run.Catalog is { } catalog && (run.TreesToRebuild.Contains(4) || relocated.Count > 0 || (run.Repairs & CatalogRepairs) != 0))
         {
             var made = new List<PlannedChange>();
-            var records = PlusCatalogRepair.Repair(run, made);
-            if ((made.Count > 0 || run.TreesToRebuild.Contains(4)) && Write(run, volume, catalog, HfsPlusBTreeWriter.Catalog, records, changes))
+            var records = PlusCatalogRepair.Repair(run, made, relocated);
+            if ((made.Count > 0 || relocated.Count > 0 || run.TreesToRebuild.Contains(4)) && Write(run, volume, catalog, HfsPlusBTreeWriter.Catalog, records, changes))
             {
                 changes.AddRange(made);
                 written = true;
