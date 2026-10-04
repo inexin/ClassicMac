@@ -736,6 +736,42 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   an edit, every catalog record kept is byte for byte the source's (the parent's `dirVal` aside), and every allocated
   block outside the catalog and extents files is the source's. A tree holding a locked file is refused, naming it.
 
+### 5.6 First Aid
+
+`HfsFirstAid.Verify` checks an HFS volume as Disk First Aid 8.5.5 (Mac OS 9.0) does: in its stages and order, naming
+each problem by Disk First Aid's number and words, and ending with its verdict [Code: Disk First Aid 8.5.5]. It does
+not read the volume as the reader does (§2): Disk First Aid builds its view from the alternate MDB.
+
+**Problems.** Each is printed as Disk First Aid prints it, `Problem:  <text>, <n2>, <n3>`; the text is its problem
+list's entry (numbers 1–71, error code −(499 + n)). A problem either ends the check, after which Disk First Aid cannot
+repair the volume, or records a repair and lets the check go on; which is decided by the check that finds it, not by
+the number. The verdict is the first that applies:
+
+| Verdict | Line | When |
+| --- | --- | --- |
+| Not HFS | "This is not an HFS disk." | The alternate MDB is not an HFS one |
+| Cannot repair | "Test done. Problems were found, but Disk First Aid cannot repair them." | A check ended at a problem |
+| Needs repair | "The volume “name” needs to be repaired." | Problems were found, all repairable |
+| Appears OK | "The volume “name” appears to be OK." | Nothing was found |
+
+An HFS Plus volume, bare or in its HFS wrapper, is not checked [ClassicMac].
+
+**Stage 1, "Checking disk volume."** (IVChk):
+
+1. With S the volume's size in 512-byte sectors, read sector S − 2, the alternate MDB (§2.6). `'H+'`, or `'BD'` with
+   `drEmbedSigWord` `'H+'`, is HFS Plus; anything other than `'BD'` is "not an HFS disk", even when the primary MDB is
+   good [Verified: Mac OS 9.0 mounts such a volume; Disk First Aid refuses it].
+2. Show "Checking "Mac OS Standard" volume structures." and check the alternate MDB's geometry, with V = S − 2,
+   A = `drAlBlkSiz`, N = `drNmAlBlks` and B = (V ÷ (A ÷ 512) + 4095) >> 12 bitmap sectors. The first that fails ends
+   the check:
+
+| # | Text | Fails when |
+| --- | --- | --- |
+| 7 | Invalid allocation block size | A is not a multiple of 512, is over $7FFFFE00, or is under 512·k for the smallest k with V ÷ k ≤ 65,535 |
+| 8 | Invalid number of allocation blocks | N > (V − 3 − B) ÷ (A ÷ 512) |
+| 9 | Invalid VBM start block | `drVBMSt` ≤ 2 |
+| 10 | Invalid allocation block start | `drVBMSt` + B > `drAlBlSt` (read as a signed word) |
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's

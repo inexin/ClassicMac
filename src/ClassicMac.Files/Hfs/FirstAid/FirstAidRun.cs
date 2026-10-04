@@ -1,0 +1,130 @@
+using System;
+using System.Collections.Generic;
+using ClassicMac.Core;
+
+namespace ClassicMac.Files.Hfs;
+
+/// <summary>
+/// The repairs a verify found needed, as Disk First Aid's status words record them (hfs.md §5.6); any set makes the
+/// volume "need to be repaired".
+/// </summary>
+[Flags]
+public enum FirstAidRepairs
+{
+    /// <summary>No repair: the volume appears to be OK.</summary>
+    None = 0,
+
+    /// <summary>The MDB is written from the values the check computed (#58).</summary>
+    Mdb = 1 << 0,
+
+    /// <summary>The volume bitmap is written from the blocks the check found in use (#60).</summary>
+    Bitmap = 1 << 1,
+
+    /// <summary>Folder valences and the volume's counts are set to the ones counted (#3, #42–#45).</summary>
+    Valences = 1 << 2,
+
+    /// <summary>A B-tree is rebuilt from its records.</summary>
+    RebuildBTree = 1 << 3,
+
+    /// <summary>A B-tree's header record is written from the values the walk computed (#54).</summary>
+    BTreeHeader = 1 << 4,
+
+    /// <summary>A B-tree's node map is written from the nodes the walk reached.</summary>
+    BTreeMap = 1 << 5,
+
+    /// <summary>Reserved fields of catalog records are cleared (#64).</summary>
+    ReservedFields = 1 << 6,
+
+    /// <summary>A file thread whose file is missing is deleted (#6).</summary>
+    FileThreads = 1 << 7,
+
+    /// <summary>A missing directory record is made again (#37).</summary>
+    MissingFolder = 1 << 8,
+
+    /// <summary>Missing thread records are made.</summary>
+    MissingThreads = 1 << 9,
+
+    /// <summary>A Finder flag is cleared: the root's name lock (#55), a folder's custom icon (#57).</summary>
+    FinderFlags = 1 << 10,
+
+    /// <summary>Files that share blocks get copies (#12).</summary>
+    OverlappingExtents = 1 << 11,
+
+    /// <summary>Overflow extents records of files not in the catalog are deleted.</summary>
+    OrphanedExtents = 1 << 12,
+
+    /// <summary>MountCheck's minor findings: MountCheck runs again and the MDB is written.</summary>
+    MountCheck = 1 << 13,
+}
+
+// The state of one First Aid verify: the volume, the MDBs it reads, the stage lines shown, the problems found, the
+// repairs needed, and how it ended.
+internal sealed class FirstAidRun(HfsVolume volume)
+{
+    public const int SectorSize = 512;
+
+    public HfsVolume Volume { get; } = volume;
+
+    /// <summary>The device's size in 512-byte sectors, Disk First Aid's S.</summary>
+    public long Sectors { get; } = volume.Length / SectorSize;
+
+    /// <summary>The alternate MDB, at sector S − 2: Disk First Aid builds its view of the volume from it.</summary>
+    public byte[] Alternate { get; set; } = [];
+
+    /// <summary>The primary MDB, at sector 2.</summary>
+    public byte[] Primary { get; set; } = [];
+
+    public List<string> Stages { get; } = [];
+
+    public List<FirstAidProblem> Problems { get; } = [];
+
+    public FirstAidRepairs Repairs { get; set; }
+
+    /// <summary>How the check ended early, or null while it runs or when every stage passed.</summary>
+    public FirstAidVerdict? Ended { get; set; }
+
+    private string stage = "";
+
+    public void Stage(string line)
+    {
+        stage = line;
+        Stages.Add(line);
+    }
+
+    public byte[] ReadSector(long sector)
+    {
+        var bytes = new byte[SectorSize];
+        Volume.Read(sector * SectorSize, bytes);
+        return bytes;
+    }
+
+    /// <summary>Records a problem that ends the check: Disk First Aid cannot repair it. Returns false, for the stage to return.</summary>
+    public bool Fatal(int number, long arg2 = 0, long arg3 = 0)
+    {
+        Add(number, arg2, arg3, repairable: false);
+        Ended = FirstAidVerdict.CannotRepair;
+        return false;
+    }
+
+    /// <summary>Records a problem repair fixes, and the repair it needs; the check goes on.</summary>
+    public void Flag(int number, FirstAidRepairs repairs, long arg2 = 0, long arg3 = 0)
+    {
+        Add(number, arg2, arg3, repairable: true);
+        Repairs |= repairs;
+    }
+
+    /// <summary>Ends the check: the disk is not an HFS volume (or not one ClassicMac's First Aid checks).</summary>
+    public bool End(FirstAidVerdict verdict)
+    {
+        Ended = verdict;
+        return false;
+    }
+
+    private void Add(int number, long arg2, long arg3, bool repairable) =>
+        Problems.Add(new FirstAidProblem(number, FirstAidMessages.Text(number) ?? $"Problem {number}", arg2, arg3, stage,
+            repairable, FirstAidMessages.Code(number) ?? $"firstaid.problem-{number}"));
+
+    /// <summary>The volume's name, from the primary MDB's <c>drVN</c>.</summary>
+    public string VolumeName =>
+        Primary.Length >= 0x40 ? MacRoman.Decode(Primary.AsSpan(0x25, Math.Min((int)Primary[0x24], 27))) : "";
+}
