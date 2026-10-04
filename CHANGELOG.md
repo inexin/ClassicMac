@@ -3,7 +3,13 @@
 ## Unreleased
 
 - `format --block-size` and `resize --block-size`: a larger allocation block size than Mac OS's automatic one; a resize to another block size lays the volume out again (hfs.md §3.1, §3.2).
-- App: Volume ▸ Resize… grows or shrinks a plain HFS volume image, showing its size, the smallest it shrinks to and the largest; sizes are typed as in the CLI (bytes, or K, M, G).
+- App volume tools (design/boards/volume-tools.md): the Volume menu in two groups with the reason as a tooltip on
+  what does not apply, and First Aid, Defragment and Resize on the volume's own node; the Volume card's used bar and
+  allocation map; First Aid, Defragment and Resize each run in their own dialog with progress and Cancel (the session's
+  volume untouched until it finishes), mirrored in the status bar. First Aid checks as it opens and shows a verdict
+  banner over one log, with Repair, Extract All… and Copy report; Defragment shows the map and the Now and After
+  figures; Resize takes a size and unit or a logarithmic slider with snap points, a block size, and a note as you type,
+  with Defragment first… when the free space is in the way.
 - A container whose data is shorter than its structures say is reported as unreadable (`container.unreadable`) and kept, as damaged data is, instead of ending the read.
 - Fragmentation (hfs.md §5.7): `stat` on an HFS volume shows how many files lie in more than one extent and how the
   free space lies (JSON `fragmentation`); the app's Volume card shows the block size, size, free space, files and

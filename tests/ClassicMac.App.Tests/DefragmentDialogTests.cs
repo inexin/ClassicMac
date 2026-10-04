@@ -71,6 +71,30 @@ public sealed class DefragmentDialogTests : EditTestsBase
         Assert.Null(model.After);
     }
 
+    // The status bar mirrors a running dialog (volume-tools.md §2), with the operation and the volume named.
+    [Fact]
+    public async Task The_status_bar_follows_the_operation_while_it_runs()
+    {
+        var main = new MainViewModel();
+        var release = new TaskCompletionSource();
+        var model = new DefragmentViewModel("Macintosh HD", Fragmented(), async (progress, _) =>
+        {
+            progress.Report(new VolumeProgress(12, 21, "File 12 of 21"));
+            await release.Task;
+            return InOrder();
+        });
+        main.StatusLine.Follow(model, "Macintosh HD");
+
+        var running = model.StartCommand.ExecuteAsync(null);
+        Assert.True(SpinWait.SpinUntil(() => main.StatusLine.ProgressCount == "File 12 of 21", TimeSpan.FromSeconds(5)));
+        Assert.Equal(("Defragmenting “Macintosh HD”…", false), (main.StatusLine.ProgressText, main.StatusLine.IsProgressIndeterminate));
+        Assert.Equal(12 / 21.0, (double)main.StatusLine.ProgressValue / main.StatusLine.ProgressMaximum, 3);
+        release.SetResult();
+        await running;
+
+        Assert.False(main.StatusLine.IsWorking);
+    }
+
     [Fact]
     public void Progress_reads_as_a_share_and_a_detail_line()
     {

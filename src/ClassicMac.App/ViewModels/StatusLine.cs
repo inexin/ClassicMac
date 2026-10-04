@@ -45,6 +45,11 @@ public sealed partial class StatusLine(IAppSelection appSelection, IAppServices 
     [NotifyPropertyChangedFor(nameof(ProgressCount), nameof(IsProgressIndeterminate))]
     private int progressMaximum;
 
+    /// <summary>A line in place of the count ("File 12 of 21"), for work that reports its own; else null.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProgressCount))]
+    private string? progressDetail;
+
     /// <summary>Whether work runs (the progress shows instead of the status text).</summary>
     public bool IsWorking => ProgressText is not null;
 
@@ -52,9 +57,35 @@ public sealed partial class StatusLine(IAppSelection appSelection, IAppServices 
     public bool IsProgressIndeterminate => IsWorking && ProgressMaximum == 0;
 
     /// <summary>"1,240 of 3,906" while counted work runs; else null.</summary>
-    public string? ProgressCount => IsWorking && ProgressMaximum > 0
-        ? string.Create(CultureInfo.InvariantCulture, $"{ProgressValue:N0} of {ProgressMaximum:N0}")
-        : null;
+    public string? ProgressCount => !IsWorking ? null
+        : ProgressDetail ?? (ProgressMaximum > 0 ? string.Create(CultureInfo.InvariantCulture, $"{ProgressValue:N0} of {ProgressMaximum:N0}") : null);
+
+    /// <summary>
+    /// Mirrors a volume operation's dialog while it runs (volume-tools.md §2): its step with the volume named
+    /// ("Defragmenting “Macintosh HD”…"), its bar and its detail line, so the work shows after the dialog is moved.
+    /// </summary>
+    internal void Follow(VolumeOperation operation, string volume)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        bool shown = false;
+        operation.PropertyChanged += (_, _) =>
+        {
+            if (operation.IsRunning)
+            {
+                shown = true;
+                ProgressMaximum = 1000;
+                ProgressValue = (int)Math.Round(operation.Progress * 1000);
+                ProgressDetail = operation.DetailText.Length > 0 ? operation.DetailText : null;
+                ProgressText = $"{operation.StepText.TrimEnd('…')} “{volume}”…";
+            }
+            else if (shown)
+            {
+                shown = false;
+                ProgressText = null;
+                ProgressDetail = null;
+            }
+        };
+    }
 
     /// <summary>The summary of the selected node's input (the first input when nothing is selected); null with none open.</summary>
     public StatusSummary? Summary

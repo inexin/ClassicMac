@@ -321,6 +321,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         {
             ExtractAll = () => appParts.ExportActions.ExtractAllCommand.CanExecute(null) ? appParts.ExportActions.ExtractAllCommand.ExecuteAsync(null) : Task.CompletedTask,
         };
+        appParts.StatusLine.Follow(model, name);
         await dialogs.FirstAidAsync(model);
         if (model.HasOutcome)
         {
@@ -347,6 +348,7 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
             return;
         }
 
+        appParts.StatusLine.Follow(model, VolumeName(volume.Root));
         await dialogs.DefragmentAsync(model);
         if (model.IsDone)
         {
@@ -420,10 +422,12 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
                     return null;
                 }
 
+                appParts.StatusLine.Follow(defragment, VolumeName(volume.Root));
                 await dialogs.DefragmentAsync(defragment);
                 return defragment.IsDone ? defragment.After : null;
             },
         };
+        appParts.StatusLine.Follow(model, VolumeName(volume.Root));
         await dialogs.ResizeAsync(model);
         if (model.IsDone && model.Size is { } resized)
         {
