@@ -58,6 +58,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
             model.HexFind.HexLineShown += OnHexLineShown;
             model.FilePicker = this;
             model.EditDialogs ??= new EditDialogs(this);
+            model.ImageReader ??= new AvaloniaImageReader();
             model.SoundPlayback.AudioPlayer ??= audio;
             if (!ReferenceEquals(boundPanel, model.DiagnosticsPanel))
             {

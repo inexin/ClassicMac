@@ -39,7 +39,7 @@ internal sealed partial class HexTab : UserControl
     // Keys of the hex view go to the byte editor while it is on; the cursor's line is kept in view.
     private void OnHexKeyDown(object? sender, KeyEventArgs e)
     {
-        if (DataContext is not MainViewModel { EditActions.HexEdit: { } editor } || !editor.OnKey(e.Key, e.KeyModifiers))
+        if (DataContext is not MainViewModel { EditActions.HexEdit: { } editor } || !HexKeys.Handle(editor, e.Key, e.KeyModifiers))
         {
             return;
         }

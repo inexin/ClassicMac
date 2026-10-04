@@ -295,7 +295,7 @@ public class WindowTests
         File.WriteAllBytes(path, ClassicMac.Resources.Decoders.Images.PngEncoder.Instance.Encode(2, 2, rgba));
         try
         {
-            var image = new MainViewModel().ImportActions.LoadImage(path);
+            var image = new ClassicMac.App.Views.AvaloniaImageReader().Read(path);
             Assert.Equal((2, 2), (image.Width, image.Height));
             Assert.Equal(new byte[] { 255, 0, 0, 255 }, image.Pixels[..4]);
             Assert.Equal(new byte[] { 10, 200, 30, 255 }, image.Pixels[12..]);

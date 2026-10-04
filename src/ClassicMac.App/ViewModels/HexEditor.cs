@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Avalonia.Input;
 using ClassicMac.Core;
 using ClassicMac.Files;
 using ClassicMac.Resources.Decoders.Templates;
@@ -188,63 +187,46 @@ public sealed partial class HexEditor : ObservableObject
 
     public void Move(int delta) => MoveTo(Cursor + delta);
 
-    /// <summary>Handles a key of the hex view; false when it is not one the editor uses.</summary>
-    public bool OnKey(Key key, KeyModifiers modifiers)
+    /// <summary>Moves the cursor, switches insert and overwrite, or deletes, as the key does in the hex view.</summary>
+    public void OnKey(HexKey key)
     {
-        if ((modifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Meta)) != 0)
-        {
-            return false;
-        }
-
-        var digit = key switch
-        {
-            >= Key.D0 and <= Key.D9 when modifiers == KeyModifiers.None => key - Key.D0,
-            >= Key.NumPad0 and <= Key.NumPad9 => key - Key.NumPad0,
-            >= Key.A and <= Key.F => key - Key.A + 10,
-            _ => -1,
-        };
-        if (digit >= 0)
-        {
-            TypeDigit(digit);
-            return true;
-        }
         switch (key)
         {
-            case Key.Left:
+            case HexKey.Left:
                 Move(-1);
-                return true;
-            case Key.Right:
+                break;
+            case HexKey.Right:
                 Move(1);
-                return true;
-            case Key.Up:
+                break;
+            case HexKey.Up:
                 Move(-16);
-                return true;
-            case Key.Down:
+                break;
+            case HexKey.Down:
                 Move(16);
-                return true;
-            case Key.PageUp:
+                break;
+            case HexKey.PageUp:
                 Move(-256);
-                return true;
-            case Key.PageDown:
+                break;
+            case HexKey.PageDown:
                 Move(256);
-                return true;
-            case Key.Home:
+                break;
+            case HexKey.Home:
                 MoveTo(Cursor / 16 * 16);
-                return true;
-            case Key.End:
+                break;
+            case HexKey.End:
                 MoveTo(Math.Min(Cursor / 16 * 16 + 15, bytes.Count));
-                return true;
-            case Key.Insert:
+                break;
+            case HexKey.Insert:
                 ToggleInsert();
-                return true;
-            case Key.Delete:
+                break;
+            case HexKey.Delete:
                 Delete();
-                return true;
-            case Key.Back:
+                break;
+            case HexKey.Backspace:
                 Backspace();
-                return true;
+                break;
             default:
-                return false;
+                throw new ArgumentOutOfRangeException(nameof(key));
         }
     }
 
@@ -294,4 +276,20 @@ public sealed record HexInspection(string Heading, IReadOnlyList<HexReading> Row
         };
         return new HexInspection(string.Create(CultureInfo.InvariantCulture, $"At 0x{offset:X4}"), rows, meaning?.Invoke(data, offset));
     }
+}
+
+/// <summary>A key of the hex view other than a hex digit (<see cref="HexEditor.TypeDigit"/>).</summary>
+public enum HexKey
+{
+    Left,
+    Right,
+    Up,
+    Down,
+    PageUp,
+    PageDown,
+    Home,
+    End,
+    Insert,
+    Delete,
+    Backspace,
 }

@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Avalonia;
-using Avalonia.Media.Imaging;
-using Avalonia.Platform;
 using ClassicMac.Core;
 using ClassicMac.Graphics;
 using ClassicMac.Resources;
@@ -24,9 +21,6 @@ public sealed partial class ImportActions(IAppSelection appSelection, IAppServic
 {
     /// <summary>The import choice that makes every icon of a Finder icon family.</summary>
     public const string IconFamily = "Icon family (ICN#, icl4, icl8, ics#, ics4, ics8)";
-
-    /// <summary>Reads an image file (PNG, JPEG, BMP, GIF…) as RGBA; tests may replace it.</summary>
-    internal Func<string, RgbaBitmap> LoadImage { get; set; } = ReadImage;
 
     // Resource ▸ Import: a PNG (or other image) or WAV file made into a new resource, or into the data of the one
     // of that type and ID, as one undoable edit.
@@ -62,7 +56,7 @@ public sealed partial class ImportActions(IAppSelection appSelection, IAppServic
             }
             else
             {
-                image = LoadImage(path);
+                image = appServices.ImageReader?.Read(path) ?? throw new NotSupportedException("No image decoder is set.");
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or ArgumentException or NotSupportedException)
@@ -171,50 +165,4 @@ public sealed partial class ImportActions(IAppSelection appSelection, IAppServic
     // A sound's rate, channels, sample size and length, as its preview says them; nothing drawn.
     private ImportSource SoundSource(byte[] sound) =>
         new(PreviewViewModel.ForData("snd ", sound, appParts.ExportActions.CurrentDecodeOptions, appServices.ReadOptions).SoundDetails, _ => []);
-
-    // Any image Avalonia decodes, converted to unpremultiplied RGBA.
-    private static RgbaBitmap ReadImage(string path)
-    {
-        using var source = new Bitmap(path);
-        var size = source.PixelSize;
-        var format = source.Format ?? PixelFormat.Bgra8888;
-        bool bgra = format == PixelFormat.Bgra8888;
-        if (!bgra && format != PixelFormat.Rgba8888)
-        {
-            throw new NotSupportedException($"The image's pixel format {format} is not read.");
-        }
-
-        var result = new RgbaBitmap(size.Width, size.Height);
-        var pixels = result.Pixels;
-        var handle = System.Runtime.InteropServices.GCHandle.Alloc(pixels, System.Runtime.InteropServices.GCHandleType.Pinned);
-        try
-        {
-            source.CopyPixels(new PixelRect(size), handle.AddrOfPinnedObject(), pixels.Length, size.Width * 4);
-        }
-        finally
-        {
-            handle.Free();
-        }
-        bool premultiplied = source.AlphaFormat == AlphaFormat.Premul;
-        for (int i = 0; i < pixels.Length; i += 4)
-        {
-            if (bgra)
-            {
-                (pixels[i], pixels[i + 2]) = (pixels[i + 2], pixels[i]);
-            }
-
-            if (source.AlphaFormat == AlphaFormat.Opaque)
-            {
-                pixels[i + 3] = 255;
-            }
-            else if (premultiplied && pixels[i + 3] is > 0 and < 255 and var a)
-            {
-                for (int c = 0; c < 3; c++)
-                {
-                    pixels[i + c] = (byte)Math.Min(255, (pixels[i + c] * 255 + a / 2) / a);
-                }
-            }
-        }
-        return result;
-    }
 }

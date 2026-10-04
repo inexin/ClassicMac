@@ -53,6 +53,9 @@ public interface IAppServices
     /// <summary>The editing dialogs, or null (no window).</summary>
     IEditDialogs? EditDialogs { get; }
 
+    /// <summary>Reads images for Resource ▸ Import, or null (no window).</summary>
+    IImageReader? ImageReader { get; }
+
     /// <summary>How resource forks are read.</summary>
     ReadOptions ReadOptions { get; }
 

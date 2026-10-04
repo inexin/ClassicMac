@@ -40,9 +40,9 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal("00000000", editor.Lines[0].Offset);
         Assert.Equal(("", "CD", " 02 03"), (editor.Lines[0].Before, editor.Lines[0].At, editor.Lines[0].After));
 
-        Assert.True(editor.OnKey(Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.None));
-        Assert.False(editor.OnKey(Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.None));
-        Assert.False(editor.OnKey(Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.Control));
+        Assert.True(ClassicMac.App.Views.HexKeys.Handle(editor, Avalonia.Input.Key.F, Avalonia.Input.KeyModifiers.None));
+        Assert.False(ClassicMac.App.Views.HexKeys.Handle(editor, Avalonia.Input.Key.S, Avalonia.Input.KeyModifiers.None));
+        Assert.False(ClassicMac.App.Views.HexKeys.Handle(editor, Avalonia.Input.Key.A, Avalonia.Input.KeyModifiers.Control));
         Assert.Equal(2, new HexEditor(new byte[16]).Lines.Count);             // a line to append on
     }
 
@@ -185,7 +185,7 @@ public sealed class EditTests : EditTestsBase
             (image.Pixels[i], image.Pixels[i + 3]) = (200, 255);   // red top half
         }
 
-        model.ImportActions.LoadImage = _ => image;
+        model.ImageReader = new FixedImage(image);
         picker.Open = Path.Combine(folder, "art.png");
 
         // A picture, at the next free ID, named.
@@ -423,7 +423,7 @@ public sealed class EditTests : EditTestsBase
         var (model, file, dialogs, picker, _) = await Open();
         var image = new RgbaBitmap(40, 20);
         Array.Fill(image.Pixels, (byte)255);
-        model.ImportActions.LoadImage = _ => image;
+        model.ImageReader = new FixedImage(image);
         picker.Open = Path.Combine(folder, "art.png");
         model.Selected = file;
         dialogs.Import = _ => null;
@@ -721,5 +721,11 @@ public sealed class EditTests : EditTestsBase
         Assert.False(model.EditActions.HasUnsavedChanges);
         await Task.CompletedTask;
         _ = path;
+    }
+
+    // An image reader that returns one image whatever the path.
+    private sealed class FixedImage(RgbaBitmap image) : IImageReader
+    {
+        public RgbaBitmap Read(string path) => image;
     }
 }

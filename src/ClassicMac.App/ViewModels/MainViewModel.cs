@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ClassicMac.Core;
 using ClassicMac.Files;
+using ClassicMac.Graphics;
 using ClassicMac.Resources;
 using ClassicMac.Resources.Decoders;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -47,6 +48,13 @@ public enum DiagnosticFilter
 /// pixels per Mac pixel at any scaling).
 /// </summary>
 public sealed record ImageItem(PreviewImage Image, double Width, double Height, int Zoom);
+
+/// <summary>Reads an image file (PNG, JPEG, BMP, GIF…) as unpremultiplied RGBA; the window provides it, tests replace it.</summary>
+public interface IImageReader
+{
+    /// <summary>The image's pixels; <see cref="NotSupportedException"/> or an I/O exception when it cannot be read.</summary>
+    RgbaBitmap Read(string path);
+}
 
 /// <summary>Picks files to open; the window provides it, tests replace it.</summary>
 public interface IFilePicker
@@ -315,6 +323,9 @@ public sealed partial class MainViewModel : ObservableObject, IAppSelection, IAp
     public IFilePicker? FilePicker { get; set; }
 
     public IEditDialogs? EditDialogs { get; set; }
+
+    /// <summary>Reads images for Resource ▸ Import.</summary>
+    public IImageReader? ImageReader { get; set; }
 
     public ContainerReadOptions ContainerOptions { get; init; } = ContainerReadOptions.Default;
 
