@@ -6,10 +6,11 @@ using ClassicMac.Core;
 using static ClassicMac.Files.Hfs.HfsWriter;
 using static ClassicMac.Files.Hfs.HfsCatalogEditing;
 using static ClassicMac.Files.Hfs.HfsAllocation;
+using static ClassicMac.Files.Hfs.HfsBTreeWriting;
 
 namespace ClassicMac.Files.Hfs;
 
-// HfsWriter.Resize: a volume grown within its allocation block size (hfs.md §3.2).
+// HfsWriter.Resize: a volume grown or shrunk within its allocation block size (hfs.md §3.2, §3.3).
 internal static class HfsResizer
 {
     internal static byte[] Resize(ForkData image, long size)
@@ -24,7 +25,7 @@ internal static class HfsResizer
         var source = state.Source.ToArray();
         if (size < source.Length)
         {
-            throw new InvalidDataException("Shrinking an HFS volume is not supported yet.");
+            return Shrink(state, source, size);
         }
 
         if (size == source.Length)
@@ -97,5 +98,224 @@ internal static class HfsResizer
         }
 
         return result;
+    }
+
+    // A shrink (hfs.md §3.3): the allocation area keeps its start, so the bitmap keeps its sectors; every extent that
+    // reaches past the new last block (a fork's, an overflow record's, the B-trees' own) moves whole to the first free run
+    // below it that holds it, its descriptor rewritten where it lies (the catalog record, the extents record, the MDB).
+    private static byte[] Shrink(CatalogEditState state, byte[] source, long size)
+    {
+        var mdb = new BigEndianReader(source.AsMemory(MdbOffset, MdbSize));
+        if (U16(mdb, 0x7C) == 0x482B)
+        {
+            throw new InvalidDataException("An HFS wrapper around an HFS Plus volume is not shrunk.");
+        }
+
+        long factor = state.BlockSize / BlockSize;
+        long start = U16(mdb, 0x1C);
+        long count = (size / BlockSize - start - 2) / factor;
+        if (count <= 0)
+        {
+            throw new InvalidDataException($"An HFS volume of {size} bytes has no room for its allocation blocks.");
+        }
+
+        long used = Enumerable.Range(0, (int)state.BlockCount).LongCount(b => IsAllocated(state.Bitmap, (ushort)b));
+        if (used > count)
+        {
+            throw new InvalidDataException($"The HFS volume has {used} allocation blocks in use; {size} bytes hold {count}.");
+        }
+
+        // Every extent descriptor, where it lies: the MDB's two trees, each file record's two forks, each overflow record.
+        var mdbBytes = source.AsSpan(MdbOffset, MdbSize).ToArray();
+        var catalog = state.Catalog.ToArray();
+        var extentsTree = state.ExtentsTree.ToArray();
+        var descriptors = new List<(byte[] Bytes, int Offset)>();
+        for (var slot = 0; slot < 3; slot++)
+        {
+            descriptors.Add((mdbBytes, 0x86 + slot * 4));
+            descriptors.Add((mdbBytes, 0x96 + slot * 4));
+        }
+
+        foreach (var record in LeafRecords(catalog).Where(r => r.Data.Length >= 0x62 && r.Data[0] == 2))
+        {
+            int data = DataOffset(catalog, record);
+            for (var slot = 0; slot < 3; slot++)
+            {
+                descriptors.Add((catalog, data + 0x4A + slot * 4));
+                descriptors.Add((catalog, data + 0x56 + slot * 4));
+            }
+        }
+
+        foreach (var record in LeafRecords(extentsTree))
+        {
+            int data = DataOffset(extentsTree, record);
+            bool badBlocks = new BigEndianReader(record.Key).ReadUInt32At(2) == 5;
+            for (var slot = 0; slot < 3; slot++)
+            {
+                if (badBlocks && Extent(extentsTree, data + slot * 4) is var (s, c) && c > 0 && s + c > count)
+                {
+                    throw new InvalidDataException("Bad blocks past the new end cannot be moved.");
+                }
+
+                descriptors.Add((extentsTree, data + slot * 4));
+            }
+        }
+
+        // The moves: each extent past the new end freed, then given the first free run below the end that holds it whole.
+        var bitmap = state.Bitmap.ToArray();
+        var moves = new List<(long From, long To, long Count)>();
+        foreach (var (bytes, offset) in descriptors)
+        {
+            var (from, blocks) = Extent(bytes, offset);
+            if (blocks == 0 || from + blocks <= count)
+            {
+                continue;
+            }
+
+            for (long b = from; b < from + blocks; b++)
+            {
+                SetBitmap(bitmap, (ushort)b, false);
+            }
+
+            long to = FreeRun(bitmap, count, blocks)
+                ?? throw new InvalidDataException($"No run of {blocks} free allocation blocks below the new end holds an extent in use; the volume needs defragmenting first.");
+            for (long b = to; b < to + blocks; b++)
+            {
+                SetBitmap(bitmap, (ushort)b, true);
+            }
+
+            var writer = new BigEndianWriter(bytes);
+            writer.WriteUInt16At(offset, to);
+            moves.Add((from, to, blocks));
+        }
+
+        // The image: the source up to the new end, each moved extent's blocks copied to their new place, the trees as
+        // rewritten across their extents, the bitmap, the MDB and its copy.
+        var result = new byte[size];
+        long areaEnd = start * BlockSize + count * state.BlockSize;
+        source.AsSpan(0, (int)areaEnd).CopyTo(result);
+        foreach (var (from, to, blocks) in moves)
+        {
+            source.AsSpan((int)(start * BlockSize + from * state.BlockSize), (int)(blocks * state.BlockSize))
+                .CopyTo(result.AsSpan((int)(start * BlockSize + to * state.BlockSize)));
+        }
+
+        var mdbWriter = new BigEndianWriter(mdbBytes);
+        var overflow = LeafRecords(extentsTree).ToList();
+        WriteTree(result, start, state.BlockSize, extentsTree, Extents(mdbBytes, 0x86, overflow, 3));
+        WriteTree(result, start, state.BlockSize, catalog, Extents(mdbBytes, 0x96, overflow, 4));
+        int bitmapOffset = U16(mdb, 0x0E) * BlockSize;
+        result.AsSpan(bitmapOffset, (int)(start * BlockSize - bitmapOffset)).Clear();
+        bitmap.AsSpan(0, (int)((count + 7) / 8)).CopyTo(result.AsSpan(bitmapOffset));
+        for (long block = count; block < (count + 7) / 8 * 8; block++)
+        {
+            result[bitmapOffset + block / 8] &= (byte)~(0x80 >> (int)(block % 8));
+        }
+
+        mdbWriter.WriteUInt16At(0x12, count);                                          // drNmAlBlks
+        mdbWriter.WriteUInt16At(0x22, count - used);                                   // drFreeBks
+        if (U16(mdb, 0x10) >= count)
+        {
+            mdbWriter.WriteUInt16At(0x10, 0);                                          // drAllocPtr
+        }
+
+        mdbWriter.WriteUInt32At(0x06, MacDate.FromDateTime(Now).Seconds);              // drLsMod
+        mdbWriter.WriteUInt32At(0x46, unchecked(U32(mdb, 0x46) + 1));                  // drWrCnt
+        mdbBytes.CopyTo(result.AsSpan(MdbOffset));
+        result.AsSpan(MdbOffset, BlockSize).CopyTo(result.AsSpan((int)(size - 2 * BlockSize)));
+
+        // Checked as a growth is, and by its files: the result opens as the writer opens a volume, its catalog is the
+        // source's but for the extents moved, and every file reads back as the source's.
+        if (HfsWriter.Check(ForkData.FromBytes(result)) is { } fault)
+        {
+            throw new InvalidDataException($"The shrunk HFS volume does not pass the writer's checks: {fault}");
+        }
+
+        var before = HfsReader.Instance.Read(state.Source.AsForkData(), new ContainerContext());
+        var after = HfsReader.Instance.Read(ForkData.FromBytes(result), new ContainerContext());
+        if (before.Count != after.Count || before.Zip(after).Any(pair => pair.First.MacPath != pair.Second.MacPath
+                || !pair.First.DataFork.ToArray().AsSpan().SequenceEqual(pair.Second.DataFork.ToArray())
+                || !pair.First.ResourceFork.ToArray().AsSpan().SequenceEqual(pair.Second.ResourceFork.ToArray())))
+        {
+            throw new InvalidDataException("The shrunk HFS volume's files differ from the source's.");
+        }
+
+        return result;
+    }
+
+    // Where a leaf record's data lies in its tree's bytes.
+    private static int DataOffset(byte[] tree, TreeRecord record)
+    {
+        int at = record.NodeOffset + record.RecordEnd - record.Data.Length;
+        if (!tree.AsSpan(at, record.Data.Length).SequenceEqual(record.Data))
+        {
+            throw new InvalidDataException("An HFS B-tree record is not where its offsets put it.");
+        }
+
+        return at;
+    }
+
+    private static (long Start, long Count) Extent(byte[] bytes, int offset)
+    {
+        var reader = new BigEndianReader(bytes);
+        return (reader.ReadUInt16At(offset), reader.ReadUInt16At(offset + 2));
+    }
+
+    // The first run of free blocks below the end that holds count, or null.
+    private static long? FreeRun(byte[] bitmap, long end, long count)
+    {
+        long run = 0;
+        for (long block = 0; block < end; block++)
+        {
+            run = IsAllocated(bitmap, (ushort)block) ? 0 : run + 1;
+            if (run == count)
+            {
+                return block - count + 1;
+            }
+        }
+
+        return null;
+    }
+
+    // A tree file's extents: its three in the MDB, then its overflow records' in key order.
+    private static List<(long Start, long Count)> Extents(byte[] mdb, int offset, List<TreeRecord> overflow, uint fileId)
+    {
+        var extents = new List<(long, long)>();
+        for (var slot = 0; slot < 3; slot++)
+        {
+            extents.Add(Extent(mdb, offset + slot * 4));
+        }
+
+        foreach (var record in overflow.Where(r => r.Key[1] == 0 && new BigEndianReader(r.Key).ReadUInt32At(2) == fileId))
+        {
+            for (var slot = 0; slot < 3; slot++)
+            {
+                extents.Add(Extent(record.Data, slot * 4));
+            }
+        }
+
+        return extents;
+    }
+
+    // A tree file's bytes written across its extents.
+    private static void WriteTree(byte[] image, long start, uint blockSize, byte[] tree, List<(long Start, long Count)> extents)
+    {
+        long written = 0;
+        foreach (var (first, blocks) in extents)
+        {
+            if (written >= tree.Length)
+            {
+                break;
+            }
+
+            var length = (int)Math.Min(blocks * blockSize, tree.Length - written);
+            tree.AsSpan((int)written, length).CopyTo(image.AsSpan((int)(start * BlockSize + first * blockSize)));
+            written += length;
+        }
+
+        if (written < tree.Length)
+        {
+            throw new InvalidDataException("An HFS B-tree file is longer than its extents.");
+        }
     }
 }

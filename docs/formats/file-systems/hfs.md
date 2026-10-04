@@ -565,8 +565,26 @@ catalog record or B-tree changes [Doc: Inside Macintosh: Files]. For the new siz
    N' − 2.
 
 ClassicMac's `Resize` checks the result as it checks a deletion (§5.5), comparing each block in use at its new place.
-Shrinking (files and B-tree extents in the blocks cut off moved down first) and growing past 65,535 blocks (a larger
-block size, every extent rewritten) are not done [ClassicMac].
+Growing past 65,535 blocks (a larger block size, every extent rewritten) is not done [ClassicMac].
+
+### 3.3 Shrinking a volume
+
+A volume shrinks within its allocation block size, its allocation area keeping its start (so the bitmap keeps its
+sectors). For the new size of N' logical blocks [ClassicMac]:
+
+1. `drNmAlBlks` becomes ⌊(N' − `drAlBlSt` − 2) ÷ (`drAlBlkSiz` ÷ 512)⌋. A size whose blocks are fewer than those in
+   use is refused.
+2. Every extent that reaches past the new last block moves whole to the first run of free blocks below it that holds
+   it, and its descriptor is rewritten where it lies: a file record's `filExtRec` or `filRExtRec`, an overflow
+   record, or the MDB's `drXTExtRec` or `drCTExtRec`. Overflow keys hold logical block numbers, so no key changes and
+   no extent is split. When no free run holds an extent, the shrink is refused (the volume needs defragmenting);
+   bad blocks past the new end are refused too, and so is an HFS wrapper.
+3. The bitmap's bits from the new end on are 0, `drFreeBks` is the new count less the blocks in use, `drAllocPtr` goes
+   to 0 when it lies past the end, and `drLsMod` and `drWrCnt` change as for any write (§3).
+4. The MDB's block is copied to N' − 2.
+
+The result must pass the writer's checks (§5.5), and every file must read back as the source's, both forks byte for
+byte.
 
 ## 4. Variants
 
@@ -681,7 +699,7 @@ The reader throws, and the unwrapper reports `container.unreadable` with the rea
   thread; `Rename` renames a file or folder in its folder; `Move` moves one into another folder (§3), and refuses a
   move into the folder it is in, which PBCatMove allows as a no-op [ClassicMac]; `SetFinderInfo` sets a file's Finder info and
   `SetFolderFlags` a folder's Finder flags; `Format` and `FormatTo` make a new, empty volume (§3.1, up to 2 GB in memory or 2 TB to a file, checked
-  with `Check` before it is returned); `Resize` grows a volume (§3.2); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
+  with `Check` before it is returned); `Resize` grows or shrinks a volume (§3.2, §3.3); `SetLocked` locks or unlocks a file; `Bless` blesses a System Folder; `Delete` removes a file, or a folder (an empty one, or with `recursive`
   everything in it, deepest first). Paths are colon-separated with no empty part; each part is the name's Mac OS Roman text, control characters
   included (a folder's `Icon
 `, a name that is only a tab), not `MacFile.MacPath`'s escaped form. Each returns a new
@@ -1047,7 +1065,8 @@ number 0, printed `Problem:  <text>.`). They are ClassicMac's rules, not Disk Fi
   repair.
 - Writing partition maps, disk image formats, MFS or HFS Plus.
 - Open: the Mac OS 9.0 initializer's `drDirCnt` was not traced; the System 7.1 one leaves it 0 (§2.7).
-- Shrinking a volume, and growing one past 65,535 allocation blocks (§3.2).
+- Growing a volume past 65,535 allocation blocks (§3.2); shrinking one by splitting extents that no free run holds
+  (§3.3).
 - Open: whether Finder's Erase (of a volume already initialized) passes the initializer values of its own (§3.1).
 - No rule in this document is fitted to data alone.
 

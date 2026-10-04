@@ -51,7 +51,10 @@ public sealed class FormatCommandTests : IDisposable
         Assert.Equal(1440 * 1024, new FileInfo(grown).Length);
         Assert.Equal(800 * 1024, new FileInfo(disk).Length);
         Assert.Equal(ExitCodes.Success, Run("check", grown).Code);
-        Assert.Equal(ExitCodes.Usage, Run("resize", disk, "--size", "400K", "-o", grown).Code);        // shrinking is not built
+        var shrunk = Path.Combine(folder, "shrunk.img");
+        Assert.Equal(ExitCodes.Success, Run("resize", grown, "--size", "400K", "-o", shrunk).Code);    // an empty volume shrinks
+        Assert.Equal(400 * 1024, new FileInfo(shrunk).Length);
+        Assert.Equal(ExitCodes.Success, Run("check", shrunk).Code);
         Assert.Equal(ExitCodes.Usage, Run("resize", disk, "--size", "1G", "-o", grown).Code);          // past 65,535 blocks of 512 bytes
     }
 

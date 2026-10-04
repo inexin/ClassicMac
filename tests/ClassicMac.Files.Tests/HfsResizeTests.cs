@@ -5,8 +5,8 @@ using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Files.Tests;
 
-// HfsWriter.Resize (docs/formats/file-systems/hfs.md §3.2): a volume grown within its allocation block size, its files
-// and folders untouched.
+// HfsWriter.Resize (docs/formats/file-systems/hfs.md §3.2, §3.3): a volume grown or shrunk within its allocation block
+// size, its files and folders untouched (a shrink moves what lies past the new end down first).
 public sealed class HfsResizeTests
 {
     private const int Mdb = 1024;
@@ -79,13 +79,100 @@ public sealed class HfsResizeTests
         Assert.Null(HfsWriter.Check(ForkData.FromBytes(after)));                         // the new space is usable
     }
 
+    // A file past the new end: a filler deleted before it leaves the room below.
+    private static byte[] WithLateFile()
+    {
+        var image = Volume(800 * 1024);
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Filler", new byte[500 * 1024], Array.Empty<byte>(), FinderInfo.Empty);
+        var late = Enumerable.Range(0, 100 * 1024).Select(b => (byte)(b * 7 + 1)).ToArray();
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Docs:Late", late, new byte[] { 9, 8, 7 }, FinderInfo.Empty);
+        return HfsWriter.DeleteFile(ForkData.FromBytes(image), "Filler");
+    }
+
+    private static int FirstBlockOf(byte[] image, string macPath) =>
+        U16(image, Record(image, macPath) + 0x4A);                                    // filExtRec's first start
+
+    // The offset of a file's catalog record data in the image (the catalog in one extent, as the writer formats it).
+    private static int Record(byte[] image, string macPath)
+    {
+        int blockSize = (int)BinaryPrimitives.ReadUInt32BigEndian(image.AsSpan(Mdb + 0x14));
+        int catalog = (U16(image, Mdb + 0x1C) + U16(image, Mdb + 0x96) * blockSize / 512) * 512;
+        var name = System.Text.Encoding.Latin1.GetBytes(macPath[(macPath.LastIndexOf(':') + 1)..]);
+        for (var at = catalog; at < image.Length - name.Length; at++)
+        {
+            if (image[at] == name.Length && image.AsSpan(at + 1, name.Length).SequenceEqual(name) && image[at + 1 + name.Length + (name.Length % 2 == 0 ? 1 : 0)] == 2)
+            {
+                return at + 1 + name.Length + (name.Length % 2 == 0 ? 1 : 0);
+            }
+        }
+
+        throw new InvalidOperationException(macPath);
+    }
+
     [Fact]
-    public void Growing_past_65535_blocks_shrinking_and_odd_sizes_are_refused()
+    public void A_volume_shrinks_with_what_lies_past_its_new_end_moved_down()
+    {
+        var source = WithLateFile();
+        int start = U16(source, Mdb + 0x1C);
+        Assert.True((FirstBlockOf(source, "Docs:Late") + start) * 512L > 400 * 1024);   // past the new end
+
+        var shrunk = HfsWriter.Resize(ForkData.FromBytes(source), 400 * 1024);
+
+        Assert.Equal(400 * 1024, shrunk.Length);
+        int blocks = U16(shrunk, Mdb + 0x12);
+        Assert.Equal((400 * 2 - start - 2), blocks);                                   // 512-byte blocks
+        Assert.True(FirstBlockOf(shrunk, "Docs:Late") < blocks);
+        AssertSameFiles(source, shrunk);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(shrunk)));
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(shrunk)).Verdict);
+        Assert.Equal(shrunk.AsSpan(Mdb, 162).ToArray(), shrunk.AsSpan(shrunk.Length - 1024, 162).ToArray());
+        var after = HfsWriter.CreateFile(ForkData.FromBytes(shrunk), "Docs:New", new byte[50 * 1024], Array.Empty<byte>(), FinderInfo.Empty);
+        Assert.Null(HfsWriter.Check(ForkData.FromBytes(after)));                          // its free space is usable
+    }
+
+    [Fact]
+    public void A_catalog_past_the_new_end_is_moved_down_with_the_MDB_naming_it()
+    {
+        var source = Volume(800 * 1024);
+        // The catalog's blocks moved to the volume's last free blocks, as a volume's later growth may leave them.
+        int blockSize = (int)BinaryPrimitives.ReadUInt32BigEndian(source.AsSpan(Mdb + 0x14));
+        int start = U16(source, Mdb + 0x1C), blocks = U16(source, Mdb + 0x12), bitmap = U16(source, Mdb + 0x0E) * 512;
+        int from = U16(source, Mdb + 0x96), count = U16(source, Mdb + 0x98);
+        int to = blocks - count;
+        source.AsSpan((start + from) * 512, count * blockSize).CopyTo(source.AsSpan((start + to) * 512));
+        for (var b = 0; b < count; b++)
+        {
+            source[bitmap + (from + b) / 8] &= (byte)~(0x80 >> ((from + b) % 8));
+            source[bitmap + (to + b) / 8] |= (byte)(0x80 >> ((to + b) % 8));
+        }
+
+        BinaryPrimitives.WriteUInt16BigEndian(source.AsSpan(Mdb + 0x96), (ushort)to);
+        source.AsSpan(Mdb, 512).CopyTo(source.AsSpan(source.Length - 1024));
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(source)).Verdict);
+
+        var shrunk = HfsWriter.Resize(ForkData.FromBytes(source), 600 * 1024);
+
+        Assert.True(U16(shrunk, Mdb + 0x96) + count <= U16(shrunk, Mdb + 0x12));
+        AssertSameFiles(source, shrunk);
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(shrunk)).Verdict);
+    }
+
+    [Fact]
+    public void A_shrink_that_would_cut_off_blocks_in_use_is_refused()
+    {
+        var source = WithLateFile();
+        source = HfsWriter.CreateFile(ForkData.FromBytes(source), "More", new byte[400 * 1024], Array.Empty<byte>(), FinderInfo.Empty);
+
+        var refused = Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), 400 * 1024));
+        Assert.Contains("in use", refused.Message);
+    }
+
+    [Fact]
+    public void Growing_past_65535_blocks_and_odd_sizes_are_refused()
     {
         var source = Volume(20 * 1024 * 1024);                                         // 512-byte blocks: 32 MB at most
 
         Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), 100 * 1024 * 1024));
-        Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), 10 * 1024 * 1024));
         Assert.Throws<InvalidDataException>(() => HfsWriter.Resize(ForkData.FromBytes(source), source.Length));
         Assert.Throws<ArgumentOutOfRangeException>(() => HfsWriter.Resize(ForkData.FromBytes(source), 30L * 1024 * 1024 + 100));
     }

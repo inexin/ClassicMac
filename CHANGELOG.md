@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `resize` shrinks an HFS volume (hfs.md §3.3): extents past the new end move to free space below it, the result
+  checked file by file; a size too small for the blocks in use is refused.
 - First Aid prints Disk First Aid's numbers where the live runs showed them: #55 and #60 as "4, node" and "4, 0", HFS
   Plus #59 as "1, 0", and HFS Plus valence faults with "MountCheck found minor errors." first.
 - Writing to disks with several partitions (partition-map.md §5): each HFS partition is edited by its name

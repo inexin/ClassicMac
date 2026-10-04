@@ -23,7 +23,7 @@ and the containers they travel in, disk images and archives, resources decoded t
 | Single-file wrappers and host folders | AppleSingle/Double, MacBinary I–III, BinHex, uuencode, Basilisk II, PC Exchange; read and written | containers/ |
 | Disk images | HFS, MFS, HFS Plus/HFSX (plain and wrapped), partition maps, Disk Copy 4.2, NDIF, DART, UDIF, ISO 9660/High Sierra, raw CD and cue sheets, FAT with DOS partitions, DiskDup+, ROM images | file-systems/, disk-images/ |
 | Archives | StuffIt 1–5 and segments, Compact Pro, DiskDoubler, PackIt, LHA, zip/tar/gzip with Mac data, `.sea` | archives/ |
-| Writing HFS | Plain HFS volumes, also in a partition map (each partition by its name when there are several), Disk Copy 4.2 and NDIF: files and folders added, deleted, renamed, moved, locked, blessed, Finder info and forks set, `format`, `resize` (growing within the block size); edited through a sector overlay, saved verified | hfs.md §3, §5.5 |
+| Writing HFS | Plain HFS volumes, also in a partition map (each partition by its name when there are several), Disk Copy 4.2 and NDIF: files and folders added, deleted, renamed, moved, locked, blessed, Finder info and forks set, `format`, `resize` (growing and shrinking within the block size); edited through a sector overlay, saved verified | hfs.md §3, §5.5 |
 | First Aid | HFS, HFS Plus and HFSX (plain, wrapped, journaled) checked and repaired: `check`, `repair`, Volume ▸ First Aid…; HFS checked live against Disk First Aid 8.5.5 | hfs.md §5.6, hfs-plus.md §5.4 |
 | Decoders | Images (PICT, icons, cursors, patterns), sound (`snd ` with MACE, IMA4, µ-law), text and styled text, fonts, UI resources with previews, palettes, Finder resources, aliases, documents (DOCMaker, SimpleText, Word 4/5/6/98, help pages) to HTML, code | resources/, documents/, output/ |
 | Graphics | `ClassicMac.Graphics`: QuickDraw renderer (two QuickDraws, screen depths), PICT read and write, QuickTime images, MacPaint, fonts; ImageSharp and SkiaSharp adapters | graphics/ |
@@ -128,8 +128,8 @@ In rough priority; each item names what blocks it, if anything.
    Digital Corpora journaled Mac OS X image checks out; HFS Plus repairs on Mac OS 9-made volumes (valences, header
    counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
    the in-place extents-tree edits and multi-partition writes await a live check.
-2. **Writing, still to do**: NDIF changed chunks compressed again, segmented images, a check against Disk Copy; `resize` shrinking and a
-   new block size.
+2. **Writing, still to do**: segmented NDIF images; new NDIF images from a disk; `resize` to a new block size, and a
+   shrink that splits extents no free run holds.
 3. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
    cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
    HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.
