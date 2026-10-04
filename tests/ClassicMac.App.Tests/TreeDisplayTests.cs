@@ -223,7 +223,7 @@ public sealed class TreeDisplayTests : IDisposable
 }
 
 // The volume commands with hidden and grouped files.
-public sealed partial class EditTests
+public sealed class VolumeTreeEditTests : EditTestsBase
 {
     [Fact]
     public async Task Volume_commands_see_hidden_and_grouped_files()

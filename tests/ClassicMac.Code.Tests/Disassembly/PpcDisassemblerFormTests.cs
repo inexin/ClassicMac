@@ -5,7 +5,7 @@ namespace ClassicMac.Code.Tests.Disassembly;
 // One test per instruction form and extended mnemonic. The words were encoded from the field layouts of the PowerPC
 // Microprocessor Family: The Programming Environments for 32-Bit Microprocessors and the AltiVec Technology
 // Programming Environments Manual, not by the decoder.
-public partial class PpcDisassemblerTests
+public class PpcDisassemblerFormTests
 {
     private static void Check(uint word, string expected)
     {

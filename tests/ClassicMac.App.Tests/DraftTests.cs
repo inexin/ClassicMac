@@ -6,7 +6,7 @@ namespace ClassicMac.App.Tests;
 
 // Unapplied edits (a form's values or the hex view's bytes): moving the selection, undoing, closing or quitting asks to
 // apply, discard or cancel first.
-public sealed partial class EditTests
+public sealed class DraftTests : EditTestsBase
 {
     [Fact]
     public async Task A_form_draft_keeps_the_selection_until_answered_and_cancel_stays()
@@ -342,7 +342,7 @@ public sealed partial class EditTests
         var path = Path.Combine(folder, "Both.rsrc");
         var fork = new ResourceFork();
         fork.Add(new Resource(Str, 128, new byte[] { 2, (byte)'h', (byte)'i' }));
-        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("Text", "PSTR"))) { Name = MacString.FromMacRoman("STR ") });
+        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, EditTests.Tmpl(("Text", "PSTR"))) { Name = MacString.FromMacRoman("STR ") });
         File.WriteAllBytes(path, fork.ToArray());
         var dialogs = new Dialogs();
         var model = new MainViewModel { EditDialogs = dialogs };
@@ -474,7 +474,7 @@ public sealed partial class EditTests
         var rsrc = FourCC.FromString("Rsrc");
         var fork = new ResourceFork();
         fork.Add(new Resource(rsrc, 128, new byte[] { 0, 7, 0, 0, 0, 2 }));     // id, ZCNT 0 (one item), the item
-        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, Tmpl(("ID", "DWRD"), ("Count", "ZCNT"), ("*****", "LSTC"), ("Value", "HWRD"), ("*****", "LSTE")))
+        fork.Add(new Resource(FourCC.FromString("TMPL"), 1000, EditTests.Tmpl(("ID", "DWRD"), ("Count", "ZCNT"), ("*****", "LSTC"), ("Value", "HWRD"), ("*****", "LSTE")))
         { Name = MacString.FromMacRoman("Rsrc") });
         File.WriteAllBytes(path, fork.ToArray());
         var model = new MainViewModel { EditDialogs = new Dialogs() };

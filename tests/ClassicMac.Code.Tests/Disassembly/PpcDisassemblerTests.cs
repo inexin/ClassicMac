@@ -2,7 +2,7 @@ using ClassicMac.Code.Disassembly;
 
 namespace ClassicMac.Code.Tests.Disassembly;
 
-public partial class PpcDisassemblerTests
+public class PpcDisassemblerTests
 {
     // The prologue, epilogue and cross-fragment glue of every PEF function [Doc: Mac OS Runtime Architectures,
     // ch. 3 "PowerPC Runtime Conventions"].
