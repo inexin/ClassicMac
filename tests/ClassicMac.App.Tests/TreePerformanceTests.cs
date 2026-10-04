@@ -61,7 +61,7 @@ public sealed class TreePerformanceTests
 
             clock.Restart();
             model.Selected = many.Children[^1];
-            window.ShowNode(many.Children[^1]);
+            window.TreePane.ShowNode(many.Children[^1]);
             Render(window);
             var toEnd = clock.Elapsed;
 

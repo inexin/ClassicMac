@@ -43,9 +43,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
         AddHandler(DragDrop.DragOverEvent, OnDragOver);
         AddHandler(DragDrop.DragLeaveEvent, OnDragLeave);
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
-        Tree.AddHandler(TextInputEvent, OnTreeTextInput, RoutingStrategies.Tunnel);
-        Tree.SelectionChanged += OnTreeSelectionChanged;
-        Tree.AddHandler(KeyDownEvent, OnTreeKeyDown, RoutingStrategies.Tunnel);
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not MainViewModel model)
@@ -66,14 +63,11 @@ internal sealed partial class MainWindow : Window, IFilePicker
             {
                 boundPanel = model.DiagnosticsPanel;
                 DiagnosticsRow.Bind(Body.RowDefinitions[1], Body.RowDefinitions[2], boundPanel);
-                model.ItemShown += ShowInTree;
+                model.ItemShown += TreePane.ShowItem;
                 shell.Bind(model);
             }
         };
         Closing += OnClosing;
-        Tree.AddHandler(PointerPressedEvent, OnTreePointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
-        Tree.AddHandler(PointerMovedEvent, OnTreePointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
-        Tree.AddHandler(PointerReleasedEvent, (_, _) => dragPress = null, RoutingStrategies.Tunnel, handledEventsToo: true);
         Closed += (_, _) =>
         {
             audio.Dispose();
@@ -82,164 +76,6 @@ internal sealed partial class MainWindow : Window, IFilePicker
     }
 
     private DiagnosticsPanel? boundPanel;
-
-    // "Show item" and type-ahead: once the opened ancestors have their rows, the node's row scrolls into view and takes
-    // the focus.
-    private void ShowInTree(NodeViewModel node) => Dispatcher.UIThread.Post(() => ShowNode(node), DispatcherPriority.Background);
-
-    /// <summary>Scrolls the node's row into view and focuses it (its ancestors already open).</summary>
-    internal void ShowNode(NodeViewModel node)
-    {
-        if (RevealNode(node) is { } row)
-        {
-            row.Focus();
-        }
-    }
-
-    // Any selection made away from the tree (the Details tab's "In", a diagnostic's row, a form's link) scrolls the tree
-    // to it once its ancestors' rows are made; a click in the tree is already in view.
-    private void OnSelectedChanged(MainViewModel model)
-    {
-        if (model.Selected is { } node)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (ReferenceEquals(model.Selected, node))
-                {
-                    RevealNode(node);
-                }
-            }, DispatcherPriority.Background);
-        }
-    }
-
-    /// <summary>
-    /// Scrolls the node's row into view and returns it (null when the row does not show: an ancestor closed or the
-    /// node filtered out). The rows are one flat list of fixed height, so its index places it exactly.
-    /// </summary>
-    private Control? RevealNode(NodeViewModel node)
-    {
-        if (DataContext is not MainViewModel model || model.TreeRows.IndexOf(node) is not (>= 0 and var index))
-        {
-            return null;
-        }
-
-        Tree.ScrollIntoView(index);
-        Tree.UpdateLayout();
-        return Tree.ContainerFromIndex(index);
-    }
-
-    // The expander: a press opens or closes the row (without selecting it); with Alt, the row and every row below it.
-    private void OnExpanderPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (sender is not Control { DataContext: NodeViewModel node } || !e.GetCurrentPoint(sender as Visual).Properties.IsLeftButtonPressed)
-        {
-            return;
-        }
-
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
-        {
-            BrowseTree.SetExpandedDeep(node, !node.IsExpanded);
-        }
-        else
-        {
-            node.IsExpanded = !node.IsExpanded;
-        }
-
-        e.Handled = true;
-    }
-
-    // Drag out of the tree: a press on a file or resource that moves a few pixels writes it to the drag folder, then
-    // hands those files to the platform's drag (a file manager copies them).
-    private PointerPressedEventArgs? dragPress;
-    private Point dragOrigin;
-    private bool draggingOut;
-
-    private void OnTreePointerPressed(object? sender, PointerPressedEventArgs e)
-    {
-        dragPress = e.GetCurrentPoint(Tree).Properties.IsLeftButtonPressed ? e : null;
-        dragOrigin = e.GetPosition(Tree);
-    }
-
-    private async void OnTreePointerMoved(object? sender, PointerEventArgs e)
-    {
-        if (dragPress is not { } press || draggingOut)
-        {
-            return;
-        }
-
-        var moved = e.GetPosition(Tree) - dragOrigin;
-        if (Math.Abs(moved.X) < 6 && Math.Abs(moved.Y) < 6)
-        {
-            return;
-        }
-
-        var node = (press.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true)?.DataContext as NodeViewModel;
-        if (DataContext is not MainViewModel model || !DragOut.CanDragOut(node))
-        {
-            dragPress = null;
-            return;
-        }
-        draggingOut = true;
-        node!.IsDragSource = true; // outlined while its files are written and dragged
-        try
-        {
-            var paths = await model.DragOut.PrepareDragOutAsync(node!);
-            // Released while the files were written: no drag (it would drop wherever the pointer is).
-            if (paths.Count == 0 || dragPress != press)
-            {
-                return;
-            }
-
-            var data = new DataTransfer();
-            foreach (var path in paths)
-            {
-                if (await StorageProvider.TryGetFileFromPathAsync(new Uri(path)) is { } file)
-                {
-                    data.Add(DataTransferItem.CreateFile(file));
-                }
-            }
-
-            await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Copy);
-        }
-        finally
-        {
-            dragPress = null;
-            draggingOut = false;
-            node.IsDragSource = false;
-        }
-    }
-
-    // The tree's selection goes to the view-model (the binding only brings the view-model's to the tree). The rows are
-    // virtualized: when the selected node's rows are rebuilt (an applied edit) the tree drops its selection though the
-    // view-model has moved on to the new node, so a selection gone to nothing is put back rather than passed on.
-    private void OnTreeSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (DataContext is not MainViewModel model)
-        {
-            return;
-        }
-
-        if (Tree.SelectedItem is NodeViewModel node)
-        {
-            if (!ReferenceEquals(model.Selected, node))
-            {
-                model.Selected = node;
-            }
-
-            return;
-        }
-
-        if (model.Selected is { } selected)
-        {
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (Tree.SelectedItem is null && ReferenceEquals(model.Selected, selected))
-                {
-                    Tree.SelectedItem = selected;
-                }
-            });
-        }
-    }
 
     // A new preview's images start at the top.
     private void OnPreviewChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -251,7 +87,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
 
         if (e.PropertyName == nameof(MainViewModel.Selected) && sender is MainViewModel model)
         {
-            OnSelectedChanged(model);
+            TreePane.FollowSelection(model);
         }
     }
 
@@ -267,9 +103,9 @@ internal sealed partial class MainWindow : Window, IFilePicker
 
         Dispatcher.UIThread.Post(() =>
         {
-            if (property == nameof(MainViewModel.Selected) && !ReferenceEquals(Tree.SelectedItem, model.Selected))
+            if (property == nameof(MainViewModel.Selected))
             {
-                Tree.SelectedItem = model.Selected;
+                TreePane.RestoreSelection(model);
             }
 
             if (property == nameof(Forms.UseTemplate) && FormHostPane.TemplateBox.IsChecked != model.Forms.UseTemplate)
@@ -354,7 +190,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
     // empty state's drop zone is marked.
     private void OnDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = !draggingOut && e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.DragEffects = !TreePane.IsDraggingOut && e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
         if (DataContext is MainViewModel model)
         {
             model.EmptyState.IsDropTarget = e.DragEffects != DragDropEffects.None;
@@ -375,7 +211,7 @@ internal sealed partial class MainWindow : Window, IFilePicker
         {
             dropped.EmptyState.IsDropTarget = false;
         }
-        if (draggingOut || DataContext is not MainViewModel model)
+        if (TreePane.IsDraggingOut || DataContext is not MainViewModel model)
         {
             return;
         }
@@ -427,47 +263,8 @@ internal sealed partial class MainWindow : Window, IFilePicker
 
         if (e.Key == Key.F && e.KeyModifiers == KeyModifiers.Control)
         {
-            TreeFilter.Focus();
-            TreeFilter.SelectAll();
+            TreePane.FocusFilter();
             e.Handled = true;
         }
-    }
-
-    // Typing in the tree opens the type-ahead; F3 and Shift+F3 step through its matches, Backspace removes a letter,
-    // Esc closes it.
-    private void OnTreeTextInput(object? sender, TextInputEventArgs e)
-    {
-        if (DataContext is not MainViewModel model || string.IsNullOrEmpty(e.Text) || e.Text.Any(char.IsControl))
-        {
-            return;
-        }
-        model.TreeSearch.TypeAhead(e.Text);
-        e.Handled = true;
-    }
-
-    private void OnTreeKeyDown(object? sender, KeyEventArgs e)
-    {
-        if (DataContext is not MainViewModel { TreeSearch.IsTypeAheadOpen: true } model)
-        {
-            return;
-        }
-        switch (e.Key)
-        {
-            case Key.F3 when e.KeyModifiers == KeyModifiers.Shift:
-                model.TreeSearch.PreviousMatchCommand.Execute(null);
-                break;
-            case Key.F3:
-                model.TreeSearch.NextMatchCommand.Execute(null);
-                break;
-            case Key.Back:
-                model.TreeSearch.TypeAheadBackspace();
-                break;
-            case Key.Escape:
-                model.TreeSearch.ClearTypeAheadCommand.Execute(null);
-                break;
-            default:
-                return;
-        }
-        e.Handled = true;
     }
 }

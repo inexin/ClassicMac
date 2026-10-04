@@ -1,0 +1,151 @@
+<!--
+  The browse tree's column (boards/browse-tree.md): the filter and display options, the tree with its rows, the
+  hidden-items footer and the type-ahead pill.
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ClassicMac.App.ViewModels"
+             xmlns:views="using:ClassicMac.App.Views"
+             x:Class="ClassicMac.App.Views.TreePane"
+             x:DataType="vm:MainViewModel">
+  <DockPanel x:Name="TreeColumn">
+  <Border DockPanel.Dock="Top" Classes="tree-bar" Padding="6,6,4,6" BorderThickness="0,0,0,1">
+    <DockPanel>
+    <Button x:Name="TreeDisplayButton" DockPanel.Dock="Right" Classes="flat" Margin="4,0,0,0" ToolTip.Tip="Tree display" AutomationProperties.Name="Tree display">
+      <PathIcon Width="12" Height="12" Data="M1,2 H15 V4 H1 Z M1,7 H15 V9 H1 Z M1,12 H15 V14 H1 Z" />
+      <Button.Flyout>
+        <Flyout Placement="BottomEdgeAlignedRight" FlyoutPresenterClasses="tree-display">
+          <StackPanel x:Name="TreeDisplayPanel" Spacing="8" MinWidth="220">
+            <TextBlock Text="Tree display" FontWeight="SemiBold" />
+            <CheckBox Content="Group files with no name" IsChecked="{Binding TreeDisplay.GroupNoName}" />
+            <CheckBox Content="Hide invisible files" IsChecked="{Binding TreeDisplay.HideInvisible}" />
+            <CheckBox Content="Show details column" IsChecked="{Binding TreeDisplay.ShowDetails}" />
+          </StackPanel>
+        </Flyout>
+      </Button.Flyout>
+    </Button>
+    <TextBox x:Name="TreeFilter" Classes="filter" PlaceholderText="Filter tree" Text="{Binding TreeSearch.FilterText}" AutomationProperties.Name="Filter tree">
+      <TextBox.InnerLeftContent>
+        <PathIcon Classes="search" Data="M6.5,1 A5.5,5.5 0 1 1 6.5,12 A5.5,5.5 0 1 1 6.5,1 Z M6.5,3 A3.5,3.5 0 1 0 6.5,10 A3.5,3.5 0 1 0 6.5,3 Z M10.2,11.6 L11.6,10.2 L15,13.6 L13.6,15 Z" />
+      </TextBox.InnerLeftContent>
+      <TextBox.InnerRightContent>
+        <TextBlock Classes="mono muted key-hint" Text="Ctrl+F" />
+      </TextBox.InnerRightContent>
+      <TextBox.KeyBindings>
+        <KeyBinding Gesture="Escape" Command="{Binding TreeSearch.ClearFilterCommand}" />
+      </TextBox.KeyBindings>
+    </TextBox>
+    </DockPanel>
+  </Border>
+  <Border x:Name="HiddenFooter" DockPanel.Dock="Bottom" Classes="tree-bar" Padding="8,3" BorderThickness="0,1,0,0" IsVisible="{Binding HiddenSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <PathIcon Width="12" Height="12" Data="M1,8 C4,3 12,3 15,8 C12,13 4,13 1,8 Z M2,13 L13,2 L14,3 L3,14 Z" />
+      <TextBlock Text="{Binding HiddenSummary}" Classes="muted" VerticalAlignment="Center" />
+      <Button Content="Show" Command="{Binding ShowHiddenCommand}" Classes="flat link" Padding="4,0" Cursor="Hand" />
+    </StackPanel>
+  </Border>
+  <Panel>
+  <!-- One virtualized list of the visible rows (VisibleRows), each CmRowTree high and indented by its depth. -->
+  <views:BrowseTree x:Name="Tree" Classes="sidebar browse" ItemsSource="{Binding TreeRows}" SelectedItem="{Binding Selected, Mode=OneWay}"
+            ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.AllowAutoHide="False">
+    <ListBox.KeyBindings>
+      <KeyBinding Gesture="Delete" Command="{Binding EditActions.DeleteResourceCommand}" />
+    </ListBox.KeyBindings>
+    <ListBox.ItemTemplate>
+      <DataTemplate DataType="vm:NodeViewModel">
+        <!-- A row (boards/browse-tree.md): the indent, the expander, then icon or spinner, name, unsaved mark, "not
+             read" chip; meta on the right. -->
+        <DockPanel Classes="tree-line">
+        <Border DockPanel.Dock="Left" Width="{Binding Depth, Converter={x:Static views:BrowseTree.IndentConverter}}" />
+        <Panel DockPanel.Dock="Left" Classes="tree-expander-slot">
+          <Border Classes="tree-expander" Classes.open="{Binding IsExpanded}" IsVisible="{Binding HasChildren}"
+                  PointerPressed="OnExpanderPressed">
+            <Path Data="M 1,0 10,10 l -9,10 -1,-1 L 8,10 -0,1 z" />
+          </Border>
+        </Panel>
+        <Panel Classes="tree-row">
+          <Rectangle Classes="drag-outline" IsVisible="{Binding IsDragSource}" />
+          <!-- The row fits the pane: the meta and the chip keep their width on the right, the name trims with an
+               ellipsis (a left-aligned grid: the name's star column is as wide as the name until the row is
+               full), the unsaved mark right after it. -->
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Right" Classes="meta" Text="{Binding Meta}" ToolTip.Tip="{Binding KindTip}"
+                       IsVisible="{Binding Meta, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <Panel DockPanel.Dock="Right" Classes="not-read" IsVisible="{Binding IsUnread}">
+              <Rectangle />
+              <TextBlock Text="not read" />
+            </Panel>
+            <views:TreeIcon DockPanel.Dock="Left" Margin="0,0,4,0" Node="{Binding}" IsVisible="{Binding !IsLoading}" />
+            <Panel DockPanel.Dock="Left" Margin="0,0,4,0" Classes="spinner" IsVisible="{Binding IsLoading}">
+              <Ellipse Classes="track" />
+              <Path Classes="arc" Data="M8,2 A6,6 0 0 1 14,8" />
+            </Panel>
+            <Grid ColumnDefinitions="*,Auto" HorizontalAlignment="Left">
+              <!-- A whitespace name as token chips (boards/tree-no-name.md), its bytes on hover. -->
+              <ItemsControl Classes="name-tokens" ItemsSource="{Binding NameTokens}" IsVisible="{Binding HasNameTokens}"
+                            ToolTip.Tip="{Binding NameBytes}" VerticalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Orientation="Horizontal" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:NameToken">
+                    <Border Classes="name-token">
+                      <TextBlock Text="{Binding Label}" />
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="name" Classes.type="{Binding IsResourceType}" Classes.loading="{Binding IsLoading}" Classes.italic="{Binding IsItalic}" Classes.broken="{Binding IsBrokenAlias}"
+                         Classes.dimmed="{Binding IsDimmed}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !HasNameTokens}">
+                <Run Text="{Binding NameBefore}" /><Run Classes="match" Classes.on="{Binding HasMatch}" Classes.current="{Binding IsCurrentMatch}" Text="{Binding NameMatch}" /><Run Text="{Binding NameAfter}" />
+              </TextBlock>
+              <TextBlock Grid.Column="1" Classes="unsaved" Text=" •" IsVisible="{Binding IsUnsaved}" />
+            </Grid>
+          </DockPanel>
+        </Panel>
+        </DockPanel>
+      </DataTemplate>
+    </ListBox.ItemTemplate>
+    <ListBox.ContextMenu>
+      <ContextMenu>
+        <MenuItem Header="_New Resource…" Command="{Binding EditActions.NewResourceCommand}" InputGesture="Ctrl+K" />
+        <MenuItem Header="_Duplicate" Command="{Binding EditActions.DuplicateResourceCommand}" InputGesture="Ctrl+D" />
+        <MenuItem Header="De_lete" Command="{Binding EditActions.DeleteResourceCommand}" InputGesture="Delete" />
+        <MenuItem Header="Get _Info…" Command="{Binding EditActions.GetInfoCommand}" InputGesture="Ctrl+I" />
+        <MenuItem Header="Edit _Hex…" Command="{Binding EditActions.EditHexCommand}" InputGesture="Ctrl+H" />
+        <MenuItem Header="_Replace Data from File…" Command="{Binding EditActions.ReplaceDataCommand}" />
+        <MenuItem Header="I_mport Image or Sound…" Command="{Binding ImportActions.ImportCommand}" />
+        <Separator />
+        <MenuItem Header="New _File…" Command="{Binding VolumeActions.NewFileCommand}" />
+        <MenuItem Header="Import File…" Command="{Binding VolumeActions.ImportFileCommand}" />
+        <MenuItem Header="New F_older…" Command="{Binding VolumeActions.NewFolderCommand}" />
+        <MenuItem Header="Delete File or Folder…" Command="{Binding VolumeActions.DeleteItemCommand}" />
+        <Separator />
+        <MenuItem Header="_Save Resource As…" Command="{Binding ExportActions.SaveResourceAsCommand}" InputGesture="Ctrl+E" />
+        <MenuItem Header="_Export Resources…" Command="{Binding ExportActions.ExportResourcesCommand}" />
+        <MenuItem Header="E_xtract All Resources…" Command="{Binding ExportActions.ExtractAllCommand}" />
+        <MenuItem Header="_Convert Documents…" Command="{Binding ExportActions.ConvertDocumentsCommand}" />
+        <Separator />
+        <MenuItem Header="_Unpack (AppleDouble)…" Command="{Binding ExportActions.UnpackAppleDoubleCommand}" />
+        <MenuItem Header="Unpack (_Basilisk II)…" Command="{Binding ExportActions.UnpackBasiliskCommand}" />
+      </ContextMenu>
+    </ListBox.ContextMenu>
+  </views:BrowseTree>
+  <!-- The type-ahead pill: what was typed, the matches, F3 and Esc. -->
+  <Border x:Name="TypeAheadPill" Classes="type-ahead" IsVisible="{Binding TreeSearch.IsTypeAheadOpen}" VerticalAlignment="Bottom" HorizontalAlignment="Center">
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <PathIcon Classes="search" Margin="0" Data="M6.5,1 A5.5,5.5 0 1 1 6.5,12 A5.5,5.5 0 1 1 6.5,1 Z M6.5,3 A3.5,3.5 0 1 0 6.5,10 A3.5,3.5 0 1 0 6.5,3 Z M10.2,11.6 L11.6,10.2 L15,13.6 L13.6,15 Z" />
+      <StackPanel Orientation="Horizontal">
+        <TextBlock Classes="mono" Text="{Binding TreeSearch.TypeAheadText}" VerticalAlignment="Center" />
+        <TextBlock Classes="mono caret" Text="|" VerticalAlignment="Center" />
+      </StackPanel>
+      <TextBlock Classes="muted" Text="{Binding TreeSearch.TypeAheadSummary}" VerticalAlignment="Center" />
+      <Border Classes="key"><TextBlock Classes="mono muted key-hint" Text="F3" /></Border>
+      <Border Classes="key"><TextBlock Classes="mono muted key-hint" Text="Esc" /></Border>
+    </StackPanel>
+  </Border>
+  </Panel>
+  </DockPanel>
+</UserControl>
