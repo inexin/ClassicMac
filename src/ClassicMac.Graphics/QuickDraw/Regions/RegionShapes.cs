@@ -445,7 +445,7 @@ internal static class RegionShapes
 
     // An edge's inversion points: wherever the edge's rounded h changes between scan lines, a pair of points
     // bounding the change. Vertical edges add none (their neighbours' points already bound them).
-    private static void EdgeInversions(Dictionary<int, List<int>> points, int h1, int v1, int h2, int v2)
+    internal static void EdgeInversions(Dictionary<int, List<int>> points, int h1, int v1, int h2, int v2)
     {
         void Toggle(int v, int a, int b)
         {

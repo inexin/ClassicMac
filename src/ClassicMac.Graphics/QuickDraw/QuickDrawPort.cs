@@ -175,6 +175,77 @@ public sealed class QuickDrawPort
     /// </summary>
     public void HidePen() => PenVis--;
 
+    /// <summary>The pen's visibility (<c>pnVis</c>): drawing is hidden while it is negative.</summary>
+    public int PenVisibility => PenVis;
+
+    // OpenRgn's and OpenPoly's recordings, while open (quickdraw.md §2.26, §2.27).
+    private RegionRecording? regionRecording;
+    private PolygonRecording? polygonRecording;
+
+    /// <summary>
+    /// Starts recording a region (<c>OpenRgn</c>, quickdraw.md §2.26) and hides the pen: lines, and the frames of
+    /// rects, ovals, round rects, regions and polygons, add their inversion points until <see cref="CloseRgn"/>. Opening
+    /// again starts over and hides the pen once more.
+    /// </summary>
+    public void OpenRgn()
+    {
+        regionRecording = new RegionRecording(macOS9);
+        HidePen();
+    }
+
+    /// <summary>
+    /// Ends the region recording and shows the pen (<c>CloseRgn</c>): the region the points make (local). After an
+    /// overflow the ROM gives an empty region and Mac OS 9 null (its destination is left as it was); null without a
+    /// recording.
+    /// </summary>
+    public Region? CloseRgn()
+    {
+        if (regionRecording is not { } recording)
+        {
+            return null;
+        }
+
+        regionRecording = null;
+        ShowPen();
+        return recording.Close();
+    }
+
+    /// <summary>
+    /// Starts recording a polygon (<c>OpenPoly</c>, quickdraw.md §2.27) and hides the pen: lines, and FramePoly's edges,
+    /// add their ends until <see cref="ClosePoly"/>. Lines go to an open polygon rather than an open region.
+    /// </summary>
+    public void OpenPoly()
+    {
+        HidePen();
+        polygonRecording = new PolygonRecording();
+    }
+
+    /// <summary>Ends the polygon recording and shows the pen (<c>ClosePoly</c>): the polygon, not closed; null without a recording.</summary>
+    public Polygon? ClosePoly()
+    {
+        if (polygonRecording is not { } recording)
+        {
+            return null;
+        }
+
+        polygonRecording = null;
+        ShowPen();
+        return recording.Close();
+    }
+
+    // A line to an open polygon, else to an open region (DoLine).
+    private void RecordLine(int h1, int v1, int h2, int v2)
+    {
+        if (polygonRecording != null)
+        {
+            polygonRecording.Line(h1, v1, h2, v2);
+        }
+        else
+        {
+            regionRecording?.Line(h1, v1, h2, v2);
+        }
+    }
+
     /// <summary>Undoes one <see cref="HidePen"/> (<c>ShowPen</c>).</summary>
     public void ShowPen() => PenVis++;
 
@@ -192,6 +263,7 @@ public sealed class QuickDrawPort
     /// <summary>Draws a line from the pen to (<paramref name="h"/>, <paramref name="v"/>) and moves the pen there (<c>LineTo</c>).</summary>
     public void LineTo(int h, int v)
     {
+        RecordLine(PenH, PenV, h, v);
         PaintLine(PenH - OriginH, PenV - OriginV, h - OriginH, v - OriginV);
         MoveTo(h, v);
         Done();
@@ -203,7 +275,11 @@ public sealed class QuickDrawPort
     // ---- shapes ----
 
     /// <summary>Outlines a rectangle with the pen (<c>FrameRect</c>).</summary>
-    public void FrameRect(MacRect rect) => RectShape(ToCanvas(rect), 0);
+    public void FrameRect(MacRect rect)
+    {
+        regionRecording?.Rect(rect);
+        RectShape(ToCanvas(rect), 0);
+    }
     /// <summary>Fills a rectangle with the pen pattern and mode (<c>PaintRect</c>).</summary>
     public void PaintRect(MacRect rect) => RectShape(ToCanvas(rect), 1);
     /// <summary>Fills a rectangle with the background pattern (<c>EraseRect</c>).</summary>
@@ -214,7 +290,11 @@ public sealed class QuickDrawPort
     public void FillRect(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; RectShape(ToCanvas(rect), 4); }
 
     /// <summary>Outlines the oval inscribed in a rectangle (<c>FrameOval</c>).</summary>
-    public void FrameOval(MacRect rect) => OvalShape(ToCanvas(rect), 0);
+    public void FrameOval(MacRect rect)
+    {
+        regionRecording?.Shape(Region.Oval(rect));
+        OvalShape(ToCanvas(rect), 0);
+    }
     /// <summary>Paints an oval (<c>PaintOval</c>).</summary>
     public void PaintOval(MacRect rect) => OvalShape(ToCanvas(rect), 1);
     /// <summary>Erases an oval (<c>EraseOval</c>).</summary>
@@ -225,7 +305,11 @@ public sealed class QuickDrawPort
     public void FillOval(MacRect rect, QuickDrawPattern pattern) { FillPattern = pattern; OvalShape(ToCanvas(rect), 4); }
 
     /// <summary>Outlines a rounded rectangle with corner ovals <paramref name="ovalWidth"/> × <paramref name="ovalHeight"/> (<c>FrameRoundRect</c>).</summary>
-    public void FrameRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 0);
+    public void FrameRoundRect(MacRect rect, int ovalWidth, int ovalHeight)
+    {
+        regionRecording?.Shape(Region.RoundRect(rect, ovalWidth, ovalHeight));
+        RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 0);
+    }
     /// <summary>Paints a rounded rectangle (<c>PaintRoundRect</c>).</summary>
     public void PaintRoundRect(MacRect rect, int ovalWidth, int ovalHeight) => RoundRectShape(ToCanvas(rect), ovalWidth, ovalHeight, 1);
     /// <summary>Erases a rounded rectangle (<c>EraseRoundRect</c>).</summary>
@@ -257,6 +341,12 @@ public sealed class QuickDrawPort
     /// <summary>Draws lines from each point of a polygon to the next, not closing it (<c>FramePoly</c>).</summary>
     public void FramePoly(IReadOnlyList<MacPoint> points)
     {
+        ArgumentNullException.ThrowIfNull(points);
+        for (int i = 1; i < points.Count; i++)
+        {
+            RecordLine(points[i - 1].H, points[i - 1].V, points[i].H, points[i].V);       // no closing edge
+        }
+
         PolyShape(Points(points), 0);
         PenFrac = 0x8000;                                     // the line routine's reset
     }
@@ -270,7 +360,12 @@ public sealed class QuickDrawPort
     public void FillPoly(IReadOnlyList<MacPoint> points, QuickDrawPattern pattern) { FillPattern = pattern; PolyShape(Points(points), 4); }
 
     /// <summary>Outlines a region with the pen, inside its edge (<c>FrameRgn</c>).</summary>
-    public void FrameRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 0);
+    public void FrameRgn(Region region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+        regionRecording?.Shape(region);
+        RgnShape(ToCanvas(region), 0);
+    }
     /// <summary>Paints a region (<c>PaintRgn</c>).</summary>
     public void PaintRgn(Region region) => RgnShape(ToCanvas(region ?? throw new ArgumentNullException(nameof(region))), 1);
     /// <summary>Erases a region (<c>EraseRgn</c>).</summary>

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- QuickDraw's region and polygon recording (quickdraw.md §2.26, §2.27, §4.13): `OpenRgn`/`CloseRgn` and
+  `OpenPoly`/`ClosePoly` on `QuickDrawPort`, recording what both QuickDraws record (whole framed shapes and lines as
+  inversion points; line ends for polygons, not closed), with each one's overflow.
 - QuickDraw's ScrollRect (quickdraw.md §2.25): `QuickDrawPort.ScrollRect` moves a rect's pixels inside the clip by srcCopy
   in black and white and erases what they leave when an update region is asked for, as both QuickDraws do.
 - Mac OS text encodings (codecs/text-encodings.md): `MacEncodings` reads and writes Mac OS Roman, Japanese, Chinese

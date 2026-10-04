@@ -827,6 +827,50 @@ ScrollRect(r, dh, dv, updateRgn), the same in the ROM and Mac OS 9 except where 
 So a move by the rect's whole width or height copies nothing and erases all of srcRgn. Mac OS 9 gives QDErr −50 for a
 NIL rect and stops when a region operation fails.
 
+### 2.26 Recording a region
+
+OpenRgn sets rgnSave, starts an empty point buffer (rgnBuf, 256 bytes) and calls HidePen; nothing is drawn until
+CloseRgn [Code: 68k ROM $077D]. While it is open the frame verbs and lines add inversion points (§1.3), in local
+coordinates, whatever the pen's size, mode, pattern or visibility [Code]:
+
+| Call | Adds |
+| --- | --- |
+| LineTo, Line, and FramePoly's edges (PutLine) | A horizontal line its two ends; a vertical line nothing; a slanted line the points of §2.8's polygon edge. FramePoly adds no closing edge |
+| FrameRect (PutRect) | The rect's four corners: the whole rect, not an outline |
+| FrameOval, FrameRoundRect (PutOval) | The points of the whole oval or round rect |
+| FrameRgn (PutRgn) | The region's points |
+
+Nothing else adds points: MoveTo and Move, FrameArc, the paint, erase, invert and fill verbs, text, CopyBits and
+pictures [Code]. Points toggle, so overlapping frames combine even-odd. While a polygon is also open, lines go to the
+polygon only (§2.27); the other frames still go to the region [Code].
+
+CloseRgn, when a region is open [Code]:
+
+1. Clear rgnSave and ShowPen.
+2. Sort the points by v, then h (SortPoints), and remove adjacent equal points in pairs (CullPoints): of three equal
+   points one is left, of four none.
+3. PackRgn: under four points, an empty region; exactly four, the rect from the first point to the last (even when
+   they do not make a rectangle: two horizontal lines (10,10)–(10,20) and (30,15)–(30,25) give (10,10,30,25)); more,
+   the region of the points, its bounding box the first and last v and the least and greatest h.
+
+The ROM refuses an item that would take the buffer past its routine's bound and sets QDErr rgnOverflowErr (−147):
+PutLine when index + 8 × (min(|dh|, |dv|) + 1) ≥ $FE00, PutRgn when index + 2 × rgnSize ≥ $FF00, PutRect when the
+index is over 65,535 − 1,024 − 16; smaller items after it still go in. CloseRgn, seeing −147, gives an empty region
+and clears QDErr [Code]. Opening a region while one is open starts the buffer over and hides the pen once more, so
+after the one CloseRgn the pen stays hidden by a level [Code]. Mac OS 9's differences are §4.13.
+
+### 2.27 Recording a polygon
+
+OpenPoly calls HidePen and starts a polygon (polySize 10, room for 32 points) with polySave set [Code]. While it is
+open only lines record: LineTo, Line and FramePoly's edges [Code]:
+
+- The first line stores the pen's position (its start) and its end; every later line only its end. MoveTo and Move
+  record nothing, so a move in the middle of a polygon is dropped and the next point joins the last.
+- No duplicate is dropped: a line to the pen's own position adds the point again.
+
+ClosePoly clears polySave, sets polyBBox to the points' least and greatest v and h (all 0 with no points) and calls
+ShowPen; the first point is not repeated, so the polygon is not closed [Code]. Mac OS 9's differences are §4.13.
+
 ## 3. Writing
 
 None. QuickDraw draws; recording drawing as a picture is [pict.md §3](pict.md#3-writing).
@@ -1129,7 +1173,28 @@ Apple's published 1984 QuickDraw source differs from the ROM `$077D` in two plac
 - vertical scaling always starts the error at `srcH / 2`, so exact integer shrinks merge other rows (§2.15);
 - the character generator always starts charLoc's fraction at ½, not at the pen's fraction (§2.22).
 
+### 4.13 Mac OS 9: recording regions and polygons
+
+Mac OS 9's native QuickDraw records the same shapes in the same order [Code: Mac OS 9.0 QuickDraw], except:
+
+- **The region buffer** is capped at $7FF8 bytes (8,190 points). An item that would pass it sets rgnTooBigErr (−500),
+  which stays: every later item is refused. CloseRgn then returns −500 and leaves the destination region unchanged
+  (the ROM gives an empty region and no error).
+- **CloseRgn with a NIL region** gives −705 and leaves the region open; OpenRgn checks its NewHandle and, when it fails,
+  neither records nor hides the pen.
+- **PutOval** emits horizontal pairs where the oval's left edge changes, the same points as the ROM's after sorting;
+  StdRRect pins the oval size first.
+- **The polygon** grows by 128 bytes before each write and refuses a point that would take polySize past 65,535 (−108),
+  where the ROM's size wraps and corrupts the polygon; OpenPoly hides the pen before its NewHandle, and when that
+  fails returns NIL with the pen left hidden. KillPoly of NIL gives −706.
+
 ## 5. ClassicMac
+
+- **Recording** (§2.26, §2.27): `OpenRgn`/`CloseRgn` and `OpenPoly`/`ClosePoly` on `QuickDrawPort`. CloseRgn returns the
+  region, or null after Mac OS 9's overflow or with no region open; ClosePoly returns a `Polygon` (its bounding box and
+  points). The ROM's PutOval is taken to have PutRgn's bound; a polygon past 65,535 bytes stops taking points in both
+  modes rather than corrupting itself as the ROM's does. The handles, QDErr and NIL arguments of the Mac calls have no
+  counterpart. [ClassicMac]
 
 - **The port:** `QuickDrawPort` draws on an `RgbaBitmap` with QuickDraw's names (pen, patterns, colours, clip,
   SetOrigin, the frame/paint/erase/invert/fill verbs, CopyBits, CopyMask, text, TextWidth, GetFontInfo, DrawPicture).
@@ -1182,6 +1247,9 @@ None. The renderer reports no diagnostics; the font readers' codes (`font.short`
   - `PortTests`: SetOrigin, a hidden pen, text measuring, DrawPicture, CopyMask on a 1-bit screen.
   - `ScrollRectTests`: the move and the erase, no update region, no colorizing and the clip, a hidden pen or no move,
     a move by the whole rect (both modes).
+  - `RecordingTests`: whole rects and even-odd overlaps, lines as a polygon's edges, ovals, round rects and regions,
+    vertical lines, four points as a rect, verbs that record nothing, each QuickDraw's overflow, a polygon's ends with
+    no closing and no duplicate dropped, lines going to an open polygon before an open region (both modes).
   - `TextTests`: strikes, placement, space extra, the missing symbol, bold, italic (both modes), underline, outline,
     ink past the pen (both modes), the lone return, ChExtra, PnLocHFrac, TxRatio, Mac OS 9's stretched srcOr rect and
     size folding, the Font Manager's size and style choice, fallbacks, width tables, FScaleDisable, colour fonts,
