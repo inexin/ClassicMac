@@ -128,8 +128,7 @@ In rough priority; each item names what blocks it, if anything.
    Digital Corpora journaled Mac OS X image checks out; HFS Plus repairs on Mac OS 9-made volumes (valences, header
    counts, the alternate header, a fragmented wrapped disk) pass it too. HFSX has been tried only on built volumes, and
    the in-place extents-tree edits and multi-partition writes await a live check.
-2. **Writing, still to do**: segmented NDIF images; new NDIF images from a disk; a `resize` shrink that splits extents no free
-   run holds.
+2. **Writing, still to do**: segmented NDIF images; new NDIF images from a disk.
 3. **Fuzzing**: SharpFuzz with libFuzzer per reader in CI. The seeded mutation tests (`tests/Shared/Mutations.cs`)
    cover the containers, resource maps, `dcmp`, every decoder's fixtures, NDIF's two forks and First Aid on HFS and
    HFS Plus; `CLASSICMAC_MUTANTS` runs them deeper.

@@ -458,6 +458,31 @@ public sealed class InputEditSession
         changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"));
     }
 
+    /// <summary>
+    /// Defragments the volume (hfs.md §3.4): every fork in one extent and the free space in one run at the end, written
+    /// over the volume where its sectors differ. On a disk with several partitions, <paramref name="volume"/> names the
+    /// partition.
+    /// </summary>
+    public void Defragment(string volume = "")
+    {
+        ArgumentNullException.ThrowIfNull(volume);
+        var (edited, _) = RequireVolume(volume, "have a volume to defragment");
+        var overlay = Overlay(edited);
+        var bytes = HfsWriter.Defragment(overlay.AsForkData());
+        var sector = new byte[512];
+        for (long at = 0; at < bytes.Length; at += sector.Length)
+        {
+            var laidOut = bytes.AsSpan((int)at, sector.Length);
+            overlay.Read(at, sector);
+            if (!laidOut.SequenceEqual(sector))
+            {
+                overlay.Write(at, laidOut);
+            }
+        }
+
+        changes.Add(new PlannedChange("defragment", edited.Name, "every fork in one extent, the free space in one run at the end"));
+    }
+
     private static InvalidOperationException PartitionNotResized() => new("A partition of a partitioned disk cannot be resized: its map would change.");
 
     /// <summary>

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Defragmenting (hfs.md §3.4): `classicmac defrag`, the MCP `defrag` tool and Volume ▸ Defragment lay an HFS volume
+  out again in its own geometry, every fork in one extent and the free space in one run at the end; a shrink refused
+  for want of a free run points to it.
 - `check disk.img:<partition>` checks one partition of a partitioned disk.
 - `resize` grows an HFS volume past 65,535 allocation blocks (hfs.md §3.2): the volume is laid out again with the
   block size Mac OS's initializer gives the new size, every fork in one extent, the catalog and MDB otherwise kept.

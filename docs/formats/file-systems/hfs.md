@@ -597,7 +597,25 @@ sectors). For the new size of N' logical blocks [ClassicMac]:
 4. The MDB's block is copied to N' − 2.
 
 The result must pass the writer's checks (§5.5), and every file must read back as the source's, both forks byte for
-byte.
+byte. A shrink refused for want of a free run succeeds after a defragmentation (§3.4).
+
+### 3.4 Defragmenting a volume
+
+`Defragment` lays the volume out again in its own size and geometry, as a growth past 65,535 blocks does in a new one
+(§3.2) [ClassicMac]:
+
+1. `drAlBlkSiz`, `drVBMSt`, `drAlBlSt`, `drNmAlBlks` and the clump sizes stay. The extents tree keeps its size, but
+   empty and in one extent from block 0.
+2. The catalog keeps its nodes, records and size, in one extent after the extents tree.
+3. Each file's forks, in catalog order, take one extent each after the catalog. Its file record gets that extent and a
+   physical length of whole blocks; nothing else in it changes, and no overflow record is left.
+4. The bitmap marks the blocks laid out, so the free space is one run at the end; `drFreeBks` stays, `drAllocPtr` is
+   the first free block, and `drLsMod` and `drWrCnt` change as for any write. The MDB's other fields and the boot
+   blocks stay, and the MDB is copied to N' − 2.
+
+A volume with bad blocks, and an HFS wrapper, are refused. The result must pass the writer's checks, and every file
+must read back as the source's. The edit session writes over the volume only the sectors that differ, so a
+defragmentation inside a partition or a disk image is saved as any edit is.
 
 ## 4. Variants
 

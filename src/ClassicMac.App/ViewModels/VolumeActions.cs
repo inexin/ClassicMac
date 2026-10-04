@@ -266,6 +266,43 @@ public sealed partial class VolumeActions(IAppSelection appSelection, IAppServic
         await dialogs.FirstAidAsync(new FirstAidView(result.After.VolumeName, lines, result.Summary, CanRepair: false));
     }
 
+    private bool CanDefragment() => !appParts.ExportActions.IsExporting && appSelection.Selected is { } selected
+        && selected.Input.VolumeOf(selected) is { } volume && selected.Input.VolumeSession.KindOf(volume.Name) == InputEditKind.HfsVolume;
+
+    // Volume ▸ Defragment (hfs.md §3.4): the selected item's volume laid out again in the session, every fork in one
+    // extent and the free space in one run, written by Save As. The tree shows the same items, so it is not read again.
+    [RelayCommand(CanExecute = nameof(CanDefragment))]
+    private async Task Defragment()
+    {
+        if (appSelection.Selected is not { } selected || selected.Input.VolumeOf(selected) is not { } volume)
+        {
+            return;
+        }
+
+        var input = selected.Input;
+        Exception? failed = null;
+        await Task.Run(() =>
+        {
+            try
+            {
+                input.VolumeSession.Defragment(volume.Name);
+            }
+            catch (Exception e) when (e is InvalidDataException or InvalidOperationException)
+            {
+                failed = e;
+            }
+        });
+        if (failed is not null)
+        {
+            appServices.Status = $"Could not defragment the volume: {failed.Message}";
+            return;
+        }
+
+        input.Title = input.BaseTitle + " •";
+        appParts.EditActions.NotifyEditCommands();
+        appServices.Status = "Defragmented the volume; Save As ▸ HFS Volume Image writes it.";
+    }
+
     private static List<string> Lines(FirstAidReport report) => [.. report.Problems.Select(p => p.ToString())];
 
     private static IEnumerable<NodeViewModel> Descendants(NodeViewModel node) =>

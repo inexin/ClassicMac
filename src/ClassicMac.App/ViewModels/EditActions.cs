@@ -244,7 +244,7 @@ public sealed partial class EditActions(IAppSelection appSelection, IAppServices
         foreach (var command in new IRelayCommand[] { NewResourceCommand, DuplicateResourceCommand, DeleteResourceCommand, GetInfoCommand,
             ReplaceDataCommand, EditHexCommand, BeginHexEditCommand, appParts.ImportActions.ImportCommand, UndoCommand, RedoCommand, SaveCommand, SaveAsCommand, RevertCommand,
             appParts.VolumeActions.NewFileCommand, appParts.VolumeActions.ImportFileCommand, appParts.VolumeActions.NewFolderCommand, appParts.VolumeActions.DeleteItemCommand,
-            appParts.VolumeActions.FirstAidCommand })
+            appParts.VolumeActions.FirstAidCommand, appParts.VolumeActions.DefragmentCommand })
         {
             command.NotifyCanExecuteChanged();
         }

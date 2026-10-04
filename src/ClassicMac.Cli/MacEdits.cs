@@ -161,19 +161,33 @@ internal static class MacEdits
     /// </summary>
     public static Action<InputEditSession> Repair(MacPathTree tree, string rest, Action<FirstAidRepairResult> repaired)
     {
-        var volume = "";
-        if (Partitioned(tree))
-        {
-            var entry = Existing(tree, rest);
-            if (entry.Parent != tree.Root || entry.Kind != MacPathKind.Container)
-            {
-                throw new WriteRefused("Give the partition to repair: the disk's path and the partition's name.");
-            }
+        var volume = VolumeName(tree, rest, "repair");
+        return session => repaired(session.Repair(volume));
+    }
 
-            volume = entry.Name;
+    /// <summary>Defragments the volume (hfs.md §3.4): "" for the input's own, or a partition named as for repair.</summary>
+    public static Action<InputEditSession> Defragment(MacPathTree tree, string rest)
+    {
+        var volume = VolumeName(tree, rest, "defragment");
+        return session => session.Defragment(volume);
+    }
+
+    // The volume a path names for a whole-volume command: "" for the input's own, or on a disk with several partitions
+    // the partition named after the disk.
+    private static string VolumeName(MacPathTree tree, string rest, string what)
+    {
+        if (!Partitioned(tree))
+        {
+            return "";
         }
 
-        return session => repaired(session.Repair(volume));
+        var entry = Existing(tree, rest);
+        if (entry.Parent != tree.Root || entry.Kind != MacPathKind.Container)
+        {
+            throw new WriteRefused($"Give the partition to {what}: the disk's path and the partition's name.");
+        }
+
+        return entry.Name;
     }
 
     // Whether the input is a disk with several partitions, each a container under it named by its partition.

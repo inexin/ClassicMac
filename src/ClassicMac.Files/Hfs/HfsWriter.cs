@@ -803,6 +803,14 @@ public static class HfsWriter
     /// allocation blocks of its size.
     /// </exception>
     public static byte[] Resize(ForkData image, long size) => HfsResizer.Resize(image, size);
+
+    /// <summary>
+    /// Lays the volume out again in its own size and geometry (hfs.md §3.4): every fork in one extent, in catalog order
+    /// after the B-trees, the extents tree empty and the free space in one run at the end; the catalog's records, the
+    /// files' contents and the MDB's other fields kept. The result is checked by the writer and file by file.
+    /// </summary>
+    /// <exception cref="InvalidDataException">The volume is not one the writer edits, has bad blocks or wraps HFS Plus.</exception>
+    public static byte[] Defragment(ForkData image) => HfsResizer.Defragment(image);
 }
 
 /// <summary>The fork selected for an HFS file edit.</summary>

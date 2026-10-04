@@ -197,7 +197,7 @@ public class WindowTests
             menu.Open(tree);
             Dispatcher.UIThread.RunJobs();
             var items = menu.Items.OfType<MenuItem>().ToList();
-            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…", "First Aid…",
+            Assert.Equal(["_New Resource…", "_Duplicate", "De_lete", "Get _Info…", "Edit _Hex…", "_Replace Data from File…", "I_mport Image or Sound…", "First Aid…", "Defragment",
                 "_Save Resource As…"],
                 items.Where(i => i.Command?.CanExecute(null) == true).Select(i => (string)i.Header!));
             Capture(window, "context-menu");

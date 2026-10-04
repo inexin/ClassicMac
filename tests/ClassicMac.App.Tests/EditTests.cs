@@ -640,6 +640,51 @@ public sealed class EditTests : EditTestsBase
         Assert.Equal(FirstAidVerdict.AppearsOk, saved.Verdict);
     }
 
+    // Volume ▸ Defragment (hfs.md §3.4): the volume laid out again in the session, written by Save As.
+    [Fact]
+    public async Task Defragment_lays_the_volume_out_again_for_Save_As()
+    {
+        var image = HfsWriter.Format(2 * 1024 * 1024, "Frag");
+        for (var i = 0; i < 20; i++)
+        {
+            image = HfsWriter.CreateFile(ForkData.FromBytes(image), $"Pad {i:D2}", new byte[1024], Array.Empty<byte>(), FinderInfo.Empty);
+        }
+
+        for (var i = 0; i < 20; i += 2)
+        {
+            image = HfsWriter.DeleteFile(ForkData.FromBytes(image), $"Pad {i:D2}");
+        }
+
+        var free = new BigEndianReader(image).ReadUInt16At(1024 + 0x22);
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Spread", new byte[(free - 4) * 512], Array.Empty<byte>(), FinderInfo.Empty);
+        var path = Path.Combine(folder, "Frag.hfs");
+        File.WriteAllBytes(path, image);
+        var model = new MainViewModel { FilePicker = new Picker(folder), EditDialogs = new Dialogs() };
+        var input = (await model.OpenAsync(path))!;
+        model.Selected = input;
+        Assert.True(model.VolumeActions.DefragmentCommand.CanExecute(null));
+
+        await model.VolumeActions.DefragmentCommand.ExecuteAsync(null);
+
+        Assert.True(model.EditActions.HasUnsavedChanges);
+        Assert.Contains("Defragmented", model.Status);
+        Assert.Equal(image, File.ReadAllBytes(path));                              // nothing written until Save As
+        await model.EditActions.SaveAsCommand.ExecuteAsync(SaveAsFormat.HfsImage);
+        var saved = File.ReadAllBytes(Path.Combine(folder, "Frag-edited.hfs"));
+        int between = saved.Length - 0x600 - 1024;                                 // past the MDB, before its copy (their dates)
+        Assert.Equal(HfsWriter.Defragment(ForkData.FromBytes(image)).AsSpan(0x600, between).ToArray(), saved.AsSpan(0x600, between).ToArray());
+        Assert.Equal(FirstAidVerdict.AppearsOk, HfsFirstAid.Verify(ForkData.FromBytes(saved)).Verdict);
+    }
+
+    [Fact]
+    public async Task Defragment_is_for_writable_HFS_volumes()
+    {
+        var model = new MainViewModel { EditDialogs = new Dialogs() };
+        model.Selected = await model.OpenAsync(MacBinary());
+
+        Assert.False(model.VolumeActions.DefragmentCommand.CanExecute(null));
+    }
+
     [Fact]
     public async Task First_Aid_repairs_an_HFS_Plus_volume()
     {

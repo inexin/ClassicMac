@@ -283,6 +283,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 | `rename` | `<Mac path> <new name>` | Renames a file or folder in its folder (names are at most 31 bytes, unique as HFS compares them) |
 | `lock`, `unlock` | `<Mac path>` | Locks or unlocks a file (an HFS folder has no lock); a locked file cannot be deleted |
 | `bless` | `<Mac path>` | Makes a folder the volume's System Folder (`drFndrInfo[0]`); it must hold a System file (type `zsys`) |
+| `defrag` | `<volume>` (on a disk with several partitions, `disk.img:<partition>`) | Defragments an HFS volume ([hfs.md §3.4](formats/file-systems/hfs.md#34-defragmenting-a-volume)): every fork in one extent and the free space in one run at the end, the files, folders and volume otherwise as they were; one `defragment` change |
 | `mv` | `<Mac path> <folder>` | Moves a file or folder into another folder of its volume, keeping its name; the folder is a path inside the same input, or a Mac path starting with the input (`disk.img:` for the top level). A folder cannot move into itself, nor anything onto a name the folder holds |
 | `set` | `<Mac path> [--type T] [--creator C] [--flags F]` | Sets a file's type and creator; `--flags` replaces the Finder flags: a number (`0x4000`, `$4000`, `16384`) or flag names joined with commas (`Invisible,HasBundle`; `IsInvisible` too) |
 | `res-add` | `<file>:#rsrc:<type>:<ID> <data file> [--name N] [--replace]` | Adds a resource with the data file's bytes; one that exists is replaced only with `--replace` |
@@ -400,6 +401,7 @@ it. Inputs ClassicMac does not write (§3.1) can be read but not changed.
 | `rm` | `session`, `path`, `recursive`, `dry_run` | the same |
 | `rename` | `session`, `path`, `name`, `dry_run` | the same |
 | `lock`, `unlock`, `bless` | `session`, `path`, `dry_run` | the same |
+| `defrag` | `session`, `path` (`""`, or a partition's name), `dry_run` | the same |
 | `mv` | `session`, `path`, `to`, `dry_run` | the same (`to` a folder's path; empty for the top level) |
 | `set` | `session`, `path`, `type`, `creator`, `flags`, `dry_run` | the same |
 | `res_add` | `session`, `path` (`<file>:#rsrc:<type>:<ID>`), `data_file` or `data_hex`, `name`, `replace`, `dry_run` | the same |

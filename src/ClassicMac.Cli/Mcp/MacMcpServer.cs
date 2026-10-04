@@ -594,13 +594,16 @@ internal sealed class MacMcpServer : IDisposable
         new("bless", "Bless", "Makes a folder holding a System file the volume's System Folder.",
             Schema($"{SessionProperty}, {PathProperty}, {DryRunProperty}", "session", "path"), false, false,
             args => Write(args, (_, tree, rest) => MacEdits.Bless(tree, rest))),
-        new("resize", "Resize", "Grows the session's volume image to size (bytes, or with K/M/G): free space added at its end.",
+        new("resize", "Resize", "Grows or shrinks the session's volume image to size (bytes, or with K/M/G): grown, free space added at its end; shrunk, what lies past the new end moved down first.",
             Schema($"{SessionProperty}, \"size\": {{ \"type\": \"string\" }}, {DryRunProperty}", "session", "size"), false, false,
             args => Write(args, (_, _, _) =>
             {
                 var size = CommandLine.TryParseSize(args.Required("size"), out var bytes) ? bytes : throw new BadArguments("size is bytes, or a number with K/KiB, M/MiB or G/GiB.");
                 return session => session.Resize(size);
             })),
+        new("defrag", "Defragment", "Lays the session's volume out again: every fork in one extent, the free space in one run at the end (path: empty, or on a disk with several partitions the partition's name).",
+            Schema($"{SessionProperty}, {PathProperty}, {DryRunProperty}", "session", "path"), false, false,
+            args => Write(args, (_, tree, rest) => MacEdits.Defragment(tree, rest))),
         new("set", "Set Finder info",
             "Sets a file's type and creator, or the Finder flags (a number like 0x4000, or names joined with commas: Invisible,HasBundle; replaces them all).",
             Schema($"{SessionProperty}, {PathProperty}, \"type\": {{ \"type\": \"string\" }}, \"creator\": {{ \"type\": \"string\" }}, \"flags\": {{ \"type\": \"string\" }}, {DryRunProperty}", "session", "path"), false, false,

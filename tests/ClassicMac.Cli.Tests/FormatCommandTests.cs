@@ -20,6 +20,8 @@ public sealed class FormatCommandTests : IDisposable
         return (code, output.ToString().Replace("\r\n", "\n"), error.ToString());
     }
 
+    private static IReadOnlyList<MacFile> Files(string image) => HfsReader.Instance.Read(ForkData.FromFile(image), new ContainerContext());
+
     [Fact]
     public void Format_writes_a_new_volume_that_the_other_commands_take()
     {
@@ -59,6 +61,36 @@ public sealed class FormatCommandTests : IDisposable
         Assert.Equal(ExitCodes.Success, Run("resize", disk, "--size", "40M", "-o", big).Code);           // past 65,535 blocks of 512 bytes
         Assert.Equal(ExitCodes.Success, Run("check", big).Code);
         Assert.Equal(ExitCodes.Usage, Run("resize", disk, "--size", "3G", "-o", big).Code);             // past what is made in memory
+    }
+
+    // defrag (docs/cli.md §3.4): a volume whose free space lies in gaps between a file's pieces laid out again.
+    [Fact]
+    public void Defrag_lays_every_fork_out_whole()
+    {
+        var image = HfsWriter.Format(2 * 1024 * 1024, "Frag");
+        for (var i = 0; i < 20; i++)
+        {
+            image = HfsWriter.CreateFile(ForkData.FromBytes(image), $"Pad {i:D2}", new byte[1024], Array.Empty<byte>(), FinderInfo.Empty);
+        }
+
+        for (var i = 0; i < 20; i += 2)
+        {
+            image = HfsWriter.DeleteFile(ForkData.FromBytes(image), $"Pad {i:D2}");
+        }
+
+        var free = new BigEndianReader(image).ReadUInt16At(1024 + 0x22);
+        image = HfsWriter.CreateFile(ForkData.FromBytes(image), "Spread", new byte[(free - 4) * 512], Array.Empty<byte>(), FinderInfo.Empty);
+        var disk = Path.Combine(folder, "frag.img");
+        File.WriteAllBytes(disk, image);
+        var defragmented = Path.Combine(folder, "defrag.img");
+
+        var (code, output, error) = Run("defrag", disk, "-o", defragmented);
+
+        Assert.True(code == ExitCodes.Success, error);
+        Assert.Contains("defragment (every fork in one extent, the free space in one run at the end)", output);
+        Assert.Equal(ExitCodes.Success, Run("check", defragmented).Code);
+        Assert.Equal(Files(disk).Select(f => f.MacPath), Files(defragmented).Select(f => f.MacPath));
+        Assert.Equal(image, File.ReadAllBytes(disk));
     }
 
     [Fact]

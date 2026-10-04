@@ -46,6 +46,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
         yield return FormatCommand();
         yield return ResizeCommand();
         yield return RepairCommand();
+        yield return DefragCommand();
         yield return SetCommand();
         yield return ResAddCommand();
         yield return ResRmCommand();
@@ -254,6 +255,17 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
             var repair = new RepairRun();
             return RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Repair(tree, rest, r => repair.Result = r), repair);
         });
+        return command;
+    }
+
+    // defrag: every fork in one extent, the free space in one run at the end (cli.md §3.4, hfs.md §3.4).
+    private Command DefragCommand()
+    {
+        var path = MacPathArgument("volume", "The volume image (on a partitioned disk with several volumes, the disk's path and the partition's name)");
+        var options = NewWriteOptions();
+        var command = new Command("defrag", "Defragment an HFS volume: every fork in one extent, the free space in one run at the end") { path };
+        AddWriteOptions(command, options);
+        command.SetAction(result => RunWrite(result, options, result.GetRequiredValue(path), (_, tree, rest) => MacEdits.Defragment(tree, rest)));
         return command;
     }
 
