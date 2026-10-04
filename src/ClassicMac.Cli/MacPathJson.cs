@@ -160,15 +160,17 @@ internal static class MacPathJson
                 w.WriteNumber("folders", folders);
             }
 
-            if (info.Fragmentation is { } pieces)
+            if (info.Layout is { } layout)
             {
                 w.WriteStartObject("fragmentation");
-                w.WriteNumber("files", pieces.Files);
-                w.WriteNumber("fragmentedFiles", pieces.FragmentedFiles);
-                w.WriteNumber("fragmentedForks", pieces.FragmentedForks);
-                w.WriteNumber("mostExtents", pieces.MostExtents);
-                w.WriteNumber("freeRuns", pieces.FreeRuns);
-                w.WriteNumber("largestFreeRun", pieces.LargestFreeRun);
+                w.WriteNumber("files", layout.Files);
+                w.WriteNumber("fragmentedFiles", layout.SplitFiles);
+                w.WriteNumber("fragmentedForks", layout.SplitForks);
+                w.WriteNumber("mostExtents", layout.MostExtents);
+                w.WriteNumber("freeRuns", layout.FreeRuns.Count);
+                w.WriteNumber("largestFreeRun", layout.LargestFreeRun);
+                w.WriteNumber("smallestSize", layout.SmallestSize);
+                w.WriteNumber("smallestSizeDefragmented", layout.SmallestSizeDefragmented);
                 w.WriteEndObject();
             }
 

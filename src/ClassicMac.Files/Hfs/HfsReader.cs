@@ -49,14 +49,14 @@ public sealed class HfsReader : IContainerReader, IVolumeReader
     public IReadOnlyList<MacFile> Read(ForkData input, ContainerContext context) => Read(input, context, null);
 
     /// <summary>
-    /// How an HFS volume's files and free space lie (docs/formats/file-systems/hfs.md §5.7): the files with a fork in
-    /// more than one extent and the runs of free blocks. Null when the input is not an HFS volume the writer opens (HFS
-    /// Plus, a wrapper, a damaged volume).
+    /// Where an HFS volume's free space and files lie (docs/formats/file-systems/hfs.md §5.7): the free runs and the
+    /// extents of files in more than one piece, as block ranges, and the smallest sizes a resize reaches now and after a
+    /// defragmentation. Null when the input is not an HFS volume the writer opens (HFS Plus, a wrapper, a damaged volume).
     /// </summary>
-    public VolumeFragmentation? ReadFragmentation(ForkData input)
+    public VolumeLayout? ReadLayout(ForkData input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        return CanRead(input) ? HfsFragmentation.Measure(input) : null;
+        return CanRead(input) ? HfsLayout.Measure(input) : null;
     }
 
     /// <summary>

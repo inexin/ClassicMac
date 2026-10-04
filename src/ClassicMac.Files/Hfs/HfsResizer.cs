@@ -138,68 +138,40 @@ internal static class HfsResizer
             throw new InvalidDataException($"The HFS volume has {used} allocation blocks in use; {size} bytes hold {count}.");
         }
 
-        // Every extent descriptor, where it lies: the MDB's two trees, each file record's two forks, each overflow record.
         var mdbBytes = source.AsSpan(MdbOffset, MdbSize).ToArray();
         var catalog = state.Catalog.ToArray();
         var extentsTree = state.ExtentsTree.ToArray();
-        var descriptors = new List<(byte[] Bytes, int Offset)>();
-        for (var slot = 0; slot < 3; slot++)
-        {
-            descriptors.Add((mdbBytes, 0x86 + slot * 4));
-            descriptors.Add((mdbBytes, 0x96 + slot * 4));
-        }
-
-        foreach (var record in LeafRecords(catalog).Where(r => r.Data.Length >= 0x62 && r.Data[0] == 2))
-        {
-            int data = DataOffset(catalog, record);
-            for (var slot = 0; slot < 3; slot++)
-            {
-                descriptors.Add((catalog, data + 0x4A + slot * 4));
-                descriptors.Add((catalog, data + 0x56 + slot * 4));
-            }
-        }
-
-        foreach (var record in LeafRecords(extentsTree))
-        {
-            int data = DataOffset(extentsTree, record);
-            bool badBlocks = KeyId(record.Key) == 5;
-            for (var slot = 0; slot < 3; slot++)
-            {
-                if (badBlocks && Extent(extentsTree, data + slot * 4) is var (s, c) && c > 0 && s + c > count)
-                {
-                    throw new InvalidDataException("Bad blocks past the new end cannot be moved.");
-                }
-
-                descriptors.Add((extentsTree, data + slot * 4));
-            }
-        }
-
-        // The moves: each extent past the new end freed, then given the first free run below the end that holds it whole.
-        var bitmap = state.Bitmap.ToArray();
+        var descriptors = Descriptors(mdbBytes, catalog, extentsTree);
+        var starts = PlanMoves(descriptors.ConvertAll(d => (Extent(d.Bytes, d.Offset), d.BadBlocks)), FreeRuns(state.Bitmap, state.BlockCount), count)
+            ?? throw new InvalidDataException("No run of free allocation blocks below the new end holds an extent in use, or bad blocks lie past it; defragment the volume first (defrag).");
         var moves = new List<(long From, long To, long Count)>();
-        foreach (var (bytes, offset) in descriptors)
+        for (var i = 0; i < descriptors.Count; i++)
         {
+            var (bytes, offset, _) = descriptors[i];
             var (from, blocks) = Extent(bytes, offset);
-            if (blocks == 0 || from + blocks <= count)
+            if (starts[i] != from)
             {
-                continue;
+                new BigEndianWriter(bytes).WriteUInt16At(offset, starts[i]);
+                moves.Add((from, starts[i], blocks));
             }
+        }
 
+        // The bitmap: each moved extent's old blocks freed, then its new ones taken.
+        var bitmap = state.Bitmap.ToArray();
+        foreach (var (from, _, blocks) in moves)
+        {
             for (long b = from; b < from + blocks; b++)
             {
                 SetBitmap(bitmap, (ushort)b, false);
             }
+        }
 
-            long to = FreeRun(bitmap, count, blocks)
-                ?? throw new InvalidDataException($"No run of {blocks} free allocation blocks below the new end holds an extent in use; defragment the volume first (defrag).");
+        foreach (var (_, to, blocks) in moves)
+        {
             for (long b = to; b < to + blocks; b++)
             {
                 SetBitmap(bitmap, (ushort)b, true);
             }
-
-            var writer = new BigEndianWriter(bytes);
-            writer.WriteUInt16At(offset, to);
-            moves.Add((from, to, blocks));
         }
 
         // The image: the source up to the new end, each moved extent's blocks copied to their new place, the trees as
@@ -256,8 +228,143 @@ internal static class HfsResizer
         return result;
     }
 
+    // Every extent descriptor, where it lies, in the order a shrink moves them: the MDB's two trees, each file record's
+    // two forks, each overflow record (a bad-blocks record's marked: those are never moved).
+    internal static List<(byte[] Bytes, int Offset, bool BadBlocks)> Descriptors(byte[] mdb, byte[] catalog, byte[] extentsTree)
+    {
+        var descriptors = new List<(byte[] Bytes, int Offset, bool BadBlocks)>();
+        for (var slot = 0; slot < 3; slot++)
+        {
+            descriptors.Add((mdb, 0x86 + slot * 4, false));
+            descriptors.Add((mdb, 0x96 + slot * 4, false));
+        }
+
+        foreach (var record in LeafRecords(catalog).Where(r => r.Data.Length >= 0x62 && r.Data[0] == 2))
+        {
+            int data = DataOffset(catalog, record);
+            for (var slot = 0; slot < 3; slot++)
+            {
+                descriptors.Add((catalog, data + 0x4A + slot * 4, false));
+                descriptors.Add((catalog, data + 0x56 + slot * 4, false));
+            }
+        }
+
+        foreach (var record in LeafRecords(extentsTree))
+        {
+            int data = DataOffset(extentsTree, record);
+            bool badBlocks = KeyId(record.Key) == 5;
+            for (var slot = 0; slot < 3; slot++)
+            {
+                descriptors.Add((extentsTree, data + slot * 4, badBlocks));
+            }
+        }
+
+        return descriptors;
+    }
+
+    // A shrink's moves to count blocks (§3.3): each extent past the new end, in order, freed and given the first free run
+    // below the end that holds it whole; each extent's start afterwards. Null when an extent finds no run, or bad blocks
+    // lie past the end. The free space is kept as runs, so a plan costs the runs, not the bitmap's bits, per extent.
+    internal static long[]? PlanMoves(IReadOnlyList<((long Start, long Count) Extent, bool BadBlocks)> extents, IReadOnlyList<BlockRange> freeRuns, long count)
+    {
+        var free = freeRuns.Select(r => (r.Start, r.End)).ToList();
+        var starts = new long[extents.Count];
+        for (var i = 0; i < extents.Count; i++)
+        {
+            var ((from, blocks), badBlocks) = extents[i];
+            starts[i] = from;
+            if (blocks == 0 || from + blocks <= count)
+            {
+                continue;
+            }
+
+            if (badBlocks)
+            {
+                return null;
+            }
+
+            Release(free, from, from + blocks);
+            if (Take(free, blocks, count) is not { } to)
+            {
+                return null;
+            }
+
+            starts[i] = to;
+        }
+
+        return starts;
+    }
+
+    // Frees a range in a sorted list of free runs, joining the runs it touches.
+    private static void Release(List<(long Start, long End)> free, long start, long end)
+    {
+        int at = free.FindIndex(r => r.Start >= start);
+        at = at < 0 ? free.Count : at;
+        if (at > 0 && free[at - 1].End == start)
+        {
+            start = free[at - 1].Start;
+            free.RemoveAt(--at);
+        }
+
+        if (at < free.Count && free[at].Start == end)
+        {
+            end = free[at].End;
+            free.RemoveAt(at);
+        }
+
+        free.Insert(at, (start, end));
+    }
+
+    // The first free run below the end that holds so many blocks, taken from its start; null when none does.
+    private static long? Take(List<(long Start, long End)> free, long blocks, long end)
+    {
+        for (var i = 0; i < free.Count && free[i].Start < end; i++)
+        {
+            var (start, runEnd) = free[i];
+            if (Math.Min(runEnd, end) - start >= blocks)
+            {
+                if (start + blocks == runEnd)
+                {
+                    free.RemoveAt(i);
+                }
+                else
+                {
+                    free[i] = (start + blocks, runEnd);
+                }
+
+                return start;
+            }
+        }
+
+        return null;
+    }
+
+    // The runs of free blocks in a bitmap, in order.
+    internal static List<BlockRange> FreeRuns(byte[] bitmap, long blockCount)
+    {
+        var runs = new List<BlockRange>();
+        for (long block = 0; block < blockCount;)
+        {
+            if (IsAllocated(bitmap, (ushort)block))
+            {
+                block++;
+                continue;
+            }
+
+            long run = block;
+            while (block < blockCount && !IsAllocated(bitmap, (ushort)block))
+            {
+                block++;
+            }
+
+            runs.Add(new BlockRange(run, block - run));
+        }
+
+        return runs;
+    }
+
     // Where a leaf record's data lies in its tree's bytes.
-    private static int DataOffset(byte[] tree, TreeRecord record)
+    internal static int DataOffset(byte[] tree, TreeRecord record)
     {
         int at = record.NodeOffset + record.RecordEnd - record.Data.Length;
         if (!tree.AsSpan(at, record.Data.Length).SequenceEqual(record.Data))
@@ -268,26 +375,10 @@ internal static class HfsResizer
         return at;
     }
 
-    private static (long Start, long Count) Extent(byte[] bytes, int offset)
+    internal static (long Start, long Count) Extent(byte[] bytes, int offset)
     {
         var reader = new BigEndianReader(bytes);
         return (reader.ReadUInt16At(offset), reader.ReadUInt16At(offset + 2));
-    }
-
-    // The first run of free blocks below the end that holds count, or null.
-    private static long? FreeRun(byte[] bitmap, long end, long count)
-    {
-        long run = 0;
-        for (long block = 0; block < end; block++)
-        {
-            run = IsAllocated(bitmap, (ushort)block) ? 0 : run + 1;
-            if (run == count)
-            {
-                return block - count + 1;
-            }
-        }
-
-        return null;
     }
 
     // A tree file's extents: its three in the MDB, then its overflow records' in key order.

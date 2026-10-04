@@ -311,11 +311,11 @@ public sealed class MacPathTree : IDisposable
         return entry.Kind == MacPathKind.Container ? ContentsOf(entry).Volume : null;
     }
 
-    /// <summary>How an HFS volume entry's files and free space lie (hfs.md §5.7); null for other entries and volumes.</summary>
-    public VolumeFragmentation? FragmentationOf(MacPathEntry entry)
+    /// <summary>Where an HFS volume entry's free space and files lie (hfs.md §5.7); null for other entries and volumes.</summary>
+    public VolumeLayout? LayoutOf(MacPathEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        return VolumeInfoOf(entry) is { Format: "HFS" } ? Hfs.HfsReader.Instance.ReadFragmentation(ContentsOf(entry).File.DataFork) : null;
+        return VolumeInfoOf(entry) is { Format: "HFS" } ? Hfs.HfsReader.Instance.ReadLayout(ContentsOf(entry).File.DataFork) : null;
     }
 
     /// <summary>The path inside a volume entry of its folder with this catalog ID (colon-separated), or null.</summary>

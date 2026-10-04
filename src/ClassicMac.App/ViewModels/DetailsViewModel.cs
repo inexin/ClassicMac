@@ -347,7 +347,7 @@ public sealed class DetailsViewModel
     // The Volume card of the volume a container holds, with an HFS volume's fragmentation.
     private static DetailGroup? VolumeCard(ContainerNode node) =>
         VolumeNode(node) is { Volume: { } volume } at
-            ? VolumeGroup(volume, volume.Format == "HFS" ? HfsReader.Instance.ReadFragmentation(at.File.DataFork) : null)
+            ? VolumeGroup(volume, volume.Format == "HFS" ? HfsReader.Instance.ReadLayout(at.File.DataFork) : null)
             : null;
 
     // The volume a file was read from: the nearest input or disk image above it that holds one.
@@ -375,7 +375,7 @@ public sealed class DetailsViewModel
     /// volume's fragmentation (hfs.md §5.7), and its dates — creation as stored (local time on every Mac volume), the
     /// others in local time on HFS and MFS and in UTC, shown in local time, on HFS Plus; MFS has no modification date.
     /// </summary>
-    public static DetailGroup VolumeGroup(VolumeInfo volume, VolumeFragmentation? fragmentation = null)
+    public static DetailGroup VolumeGroup(VolumeInfo volume, VolumeLayout? layout = null)
     {
         ArgumentNullException.ThrowIfNull(volume);
         var utc = volume.UtcAfterCreation;
@@ -395,12 +395,12 @@ public sealed class DetailsViewModel
                 : new("Files", files.ToString("N0", CultureInfo.InvariantCulture), Mono: true));
         }
 
-        if (fragmentation is { } pieces)
+        if (layout is { } pieces)
         {
             rows.Add(new("Fragmented files", string.Create(CultureInfo.InvariantCulture,
-                $"{pieces.FragmentedFiles:N0} of {pieces.Files:N0}{(pieces.FragmentedFiles > 0 ? $" (at most {pieces.MostExtents:N0} extents)" : "")}"), Mono: true));
+                $"{pieces.SplitFiles:N0} of {pieces.Files:N0}{(pieces.SplitFiles > 0 ? $" (at most {pieces.MostExtents:N0} extents)" : "")}"), Mono: true));
             rows.Add(new("Free space", string.Create(CultureInfo.InvariantCulture,
-                $"{pieces.FreeRuns:N0} {(pieces.FreeRuns == 1 ? "run" : "runs")}, the largest {pieces.LargestFreeRun:N0} blocks"), Mono: true));
+                $"{pieces.FreeRuns.Count:N0} {(pieces.FreeRuns.Count == 1 ? "run" : "runs")}, the largest {pieces.LargestFreeRun:N0} blocks"), Mono: true));
         }
 
         rows.Add(new("Created", DisplayDate(volume.Created, utc: false), Mono: true));

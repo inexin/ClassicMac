@@ -1006,18 +1006,24 @@ number 0, printed `Problem:  <text>.`). They are ClassicMac's rules, not Disk Fi
 | `firstaid.mdb-counts` | `drNmFls` other than the root's files, or `drFreeBks` other than the bitmap's clear bits (Disk First Aid ignores both) | the MDB written (repair step 3) |
 | `firstaid.extent-past-end` | an extent running past `drNmAlBlks` (Disk First Aid checks only its start and count) | none: the volume cannot be repaired |
 
-### 5.7 Fragmentation
+### 5.7 Fragmentation and layout
 
-`HfsReader.ReadFragmentation` tells how a volume's files and free space lie, for telling whether a defragmentation
-(§3.4) is worth it or why a shrink (§3.3) finds no room [ClassicMac]:
+`HfsReader.ReadLayout` tells where a volume's free space and files lie, in allocation blocks, for telling whether a
+defragmentation (§3.4) is worth it, how small a resize (§3.3) can make the volume, and what an allocation map draws
+[ClassicMac]:
 
-- Each file record's two forks are counted in extents: the descriptors with blocks among its record's three, and among
-  its overflow records' (§1.8). A fork in more than one extent is fragmented, and so is a file with such a fork; the
-  most extents of one fork is given too.
-- The bitmap's first `drNmAlBlks` bits give the runs of free blocks and the longest.
+- Each file record's two forks in extents: the descriptors with blocks among its record's three, then its overflow
+  records' (§1.8). A fork in more than one extent is split, and so is a file with such a fork; the extents of every
+  split fork are given as block ranges, with the most extents of one fork.
+- The bitmap's first `drNmAlBlks` bits give the runs of free blocks, as block ranges, and the longest.
+- The smallest size a shrink reaches now: the least block count for which the shrink's own plan (§3.3: each extent past
+  the new end, in the shrink's order, freed and given the first free run below the end that holds it) succeeds, found
+  by bisection between the blocks in use and the volume's own count. The plan works on the free runs, not the bitmap's
+  bits. The smallest size after a defragmentation is room for the blocks in use (`SmallestSize`, §3.3).
 
-The volume is opened as the writer opens it (§5.5); HFS Plus, a wrapper, and a volume the writer refuses give none. The
-CLI's `stat` shows it for a volume, and the app's Volume card with the block size, size, free space and counts.
+The volume is opened as the writer opens it (§5.5); HFS Plus, a wrapper, and a volume the writer refuses give none. On
+a 500 MB Mac OS 9 volume with 4,874 files it takes about 40 ms. The CLI's `stat` shows it for a volume, and the app's
+Volume card, Defragment and Resize use it.
 
 ## 6. Diagnostics
 

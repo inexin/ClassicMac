@@ -174,10 +174,12 @@ internal sealed class PathCommands(TextWriter output, TextWriter error, Stream b
             output.WriteLine($"Free: {volume.FreeBytes.ToString("N0", CultureInfo.InvariantCulture)} bytes ({Bytes(volume.FreeBytes)}), " +
                 $"{volume.FreeBlocks.ToString("N0", CultureInfo.InvariantCulture)} blocks");
             output.WriteLine(volume.Folders is { } folders ? $"Files / folders: {volume.Files:N0} / {folders:N0}" : $"Files: {volume.Files:N0}");
-            if (info.Fragmentation is { } pieces)
+            if (info.Layout is { } layout)
             {
                 output.WriteLine(string.Create(CultureInfo.InvariantCulture,
-                    $"Fragmentation: {pieces.FragmentedFiles} of {pieces.Files} files in more than one extent; free space in {pieces.FreeRuns:N0} {(pieces.FreeRuns == 1 ? "run" : "runs")}, the largest {pieces.LargestFreeRun:N0} blocks"));
+                    $"Fragmentation: {layout.SplitFiles} of {layout.Files} files in more than one extent; free space in {layout.FreeRuns.Count:N0} {(layout.FreeRuns.Count == 1 ? "run" : "runs")}, the largest {layout.LargestFreeRun:N0} blocks"));
+                output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"Smallest size: {layout.SmallestSize:N0} bytes now, {layout.SmallestSizeDefragmented:N0} bytes defragmented"));
             }
 
             Line("Volume created", volume.Created is { } created ? Date(created.ToDateTime()) : null);

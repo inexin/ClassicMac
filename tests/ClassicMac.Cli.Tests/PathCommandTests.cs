@@ -100,6 +100,7 @@ public sealed class PathCommandTests : IDisposable
         var fragmentation = volume.GetProperty("fragmentation");
         Assert.Equal(volume.GetProperty("files").GetInt64(), fragmentation.GetProperty("files").GetInt64());
         Assert.True(fragmentation.GetProperty("largestFreeRun").GetInt64() <= volume.GetProperty("freeBlocks").GetInt64());
+        Assert.True(fragmentation.GetProperty("smallestSize").GetInt64() >= fragmentation.GetProperty("smallestSizeDefragmented").GetInt64());
         foreach (var name in new[] { "fragmentedFiles", "fragmentedForks", "mostExtents", "freeRuns" })
         {
             Assert.True(fragmentation.TryGetProperty(name, out _), name);

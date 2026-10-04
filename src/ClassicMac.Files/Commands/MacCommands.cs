@@ -123,8 +123,8 @@ public sealed record MacEntryInfo
     /// <summary>For a volume, its blessed System Folder's path inside it (stat); null when none is blessed or found.</summary>
     public string? BlessedFolder { get; init; }
 
-    /// <summary>For an HFS volume, how its files and free space lie (stat); null for other entries.</summary>
-    public VolumeFragmentation? Fragmentation { get; init; }
+    /// <summary>For an HFS volume, where its free space and files lie (stat); null for other entries.</summary>
+    public VolumeLayout? Layout { get; init; }
 }
 
 /// <summary>Where an alias file points (docs/formats/resources/aliases.md §2) and what resolving it found.</summary>
@@ -210,7 +210,7 @@ public static class MacCommands
             Alias = AliasOf(tree, entry),
             Volume = tree.VolumeInfoOf(entry),
             BlessedFolder = tree.VolumeInfoOf(entry)?.BlessedFolderId is { } blessed ? tree.FolderPathOf(entry, blessed) : null,
-            Fragmentation = tree.FragmentationOf(entry),
+            Layout = tree.LayoutOf(entry),
         };
     }
 

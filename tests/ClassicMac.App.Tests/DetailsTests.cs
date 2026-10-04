@@ -188,9 +188,10 @@ public sealed class DetailsTests : IDisposable
         {
             BlockSize = 2048, TotalBlocks = 1000, FreeBlocks = 250, Files = 42, Folders = 7,
         };
-        var fragmentation = new VolumeFragmentation(42, 3, 4, 9, 5, 120);
+        BlockRange[] free = [new(0, 120), new(200, 30), new(300, 50), new(400, 25), new(600, 25)];
+        var layout = new VolumeLayout(1000, 2048, 42, 3, 4, 9, free, [], 0, 0);
 
-        var group = DetailsViewModel.VolumeGroup(volume, fragmentation);
+        var group = DetailsViewModel.VolumeGroup(volume, layout);
 
         Assert.Equal("2,048 bytes", Value(group, "Block size"));
         Assert.Equal("2,048,000 bytes in 1,000 blocks", Value(group, "Size"));
