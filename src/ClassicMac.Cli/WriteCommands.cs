@@ -12,7 +12,7 @@ using ClassicMac.Files.Hfs;
 
 namespace ClassicMac.Cli;
 
-// The write commands on Mac paths (docs/cli.md §3): put, mkdir, rm, rename, set, res-add and res-rm. Each opens the
+// The write commands on Mac paths (docs/cli.md §3): put, mkdir, rm, rename, set, res-add, res-rm and repair. Each opens the
 // host file the path starts with in an InputEditSession, makes one change, prints the planned changes, and writes a
 // new file (-o) or, only with --in-place, the input itself; --dry-run writes nothing.
 internal sealed class WriteCommands(TextWriter output, TextWriter error, CommandLine cli)
@@ -45,6 +45,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
         yield return BlessCommand();
         yield return FormatCommand();
         yield return ResizeCommand();
+        yield return RepairCommand();
         yield return SetCommand();
         yield return ResAddCommand();
         yield return ResRmCommand();
@@ -241,6 +242,27 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
         return command;
     }
 
+    // repair: First Aid's repair of a volume (cli.md §3.2); the verify after it decides the exit code.
+    private Command RepairCommand()
+    {
+        var path = MacPathArgument("volume", "The volume image (a disk image, or a partitioned disk with one HFS volume)");
+        var options = NewWriteOptions();
+        var command = new Command("repair", "Repair an HFS volume as Disk First Aid would, then verify it again") { path };
+        AddWriteOptions(command, options);
+        command.SetAction(result =>
+        {
+            var repair = new RepairRun();
+            return RunWrite(result, options, result.GetRequiredValue(path), (_, _, _) => session => repair.Result = session.Repair(), repair);
+        });
+        return command;
+    }
+
+    // What the repair command's edit did, for the output after its changes.
+    private sealed class RepairRun
+    {
+        public FirstAidRepairResult? Result { get; set; }
+    }
+
     private Command SetCommand()
     {
         var path = MacPathArgument("path", "The file or folder");
@@ -284,7 +306,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
 
     // Opens the host file a path starts with, resolves the path, makes the change, prints it and saves.
     private int RunWrite(System.CommandLine.ParseResult result, WriteOptions options, string path,
-        Func<InputEditKind, MacPathTree, string, Action<InputEditSession>> plan)
+        Func<InputEditKind, MacPathTree, string, Action<InputEditSession>> plan, RepairRun? repair = null)
     {
         var target = result.GetValue(options.Output);
         var inPlace = result.GetValue(options.InPlace);
@@ -322,7 +344,7 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
             }
 
             change(session);
-            if (!dryRun)
+            if (!dryRun && repair?.Result is not { Written: false })
             {
                 if (inPlace)
                 {
@@ -353,7 +375,15 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
 
         if (json)
         {
-            WriteJson(session, dryRun, written);
+            output.WriteLine(MacPathJson.Document(w =>
+            {
+                MacPathJson.Changes(w, session.Path, dryRun, written, session.Changes);
+                if (repair?.Result is { } repaired)
+                {
+                    FirstAidOutput.Json(w, repaired.Before, "firstAidBefore");
+                    FirstAidOutput.Json(w, repaired.After, "firstAid", repaired.Summary);
+                }
+            }));
         }
         else
         {
@@ -366,6 +396,11 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
                 }
             }
 
+            if (repair?.Result is { } repaired)
+            {
+                FirstAidOutput.Text(output, "first aid: ", repaired.After, repaired.Summary);
+            }
+
             foreach (var file in written)
             {
                 output.WriteLine($"Wrote {file}");
@@ -375,11 +410,12 @@ internal sealed class WriteCommands(TextWriter output, TextWriter error, Command
             {
                 output.WriteLine("Dry run: nothing written.");
             }
+            else if (repair?.Result is { Written: false } unrepaired)
+            {
+                output.WriteLine(unrepaired.After.Verdict == FirstAidVerdict.AppearsOk ? "Nothing to repair: nothing written." : "Nothing written.");
+            }
         }
 
-        return ExitCodes.Success;
+        return repair?.Result is { } outcome && outcome.After.Verdict != FirstAidVerdict.AppearsOk ? ExitCodes.Damaged : ExitCodes.Success;
     }
-
-    private void WriteJson(InputEditSession session, bool dryRun, IReadOnlyList<string> written) =>
-        output.WriteLine(MacPathJson.Document(w => MacPathJson.Changes(w, session.Path, dryRun, written, session.Changes)));
 }

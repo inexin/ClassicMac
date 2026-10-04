@@ -16,7 +16,19 @@ public static class HfsFirstAid
         return Verify(new HfsVolume(image));
     }
 
-    internal static FirstAidReport Verify(HfsVolume volume)
+    internal static FirstAidReport Verify(HfsVolume volume) => Check(volume).Report;
+
+    /// <summary>
+    /// Repairs what a verify of the HFS volume in <paramref name="image"/> finds repairable, in Disk First Aid's order, then
+    /// verifies it again; the volume is not written when nothing could be repaired.
+    /// </summary>
+    public static FirstAidRepairResult Repair(ForkData image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        return FirstAidRepairer.Repair(new HfsVolume(image));
+    }
+
+    internal static (FirstAidRun Run, FirstAidReport Report) Check(HfsVolume volume)
     {
         var run = new FirstAidRun(volume);
         try
@@ -37,7 +49,7 @@ public static class HfsFirstAid
             run.End(FirstAidVerdict.CannotRepair);
         }
 
-        return new FirstAidReport(run);
+        return (run, new FirstAidReport(run));
     }
 
     private static bool Stage(FirstAidRun run, string line)

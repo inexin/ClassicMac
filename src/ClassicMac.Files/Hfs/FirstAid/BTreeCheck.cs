@@ -111,18 +111,18 @@ internal sealed class BTreeCheck
         lastAtLevel[level] = (node, descriptor.FLink);
         if (descriptor.Kind is not (BTreeNode.IndexKind or BTreeNode.LeafKind))
         {
-            run.Flag(16, FirstAidRepairs.RebuildBTree, 0, node);
+            FlagTree(16, FirstAidRepairs.RebuildBTree, 0, node);
             return true;
         }
 
         if (descriptor.Height != treeDepth - level + 1)
         {
-            run.Flag(5, FirstAidRepairs.RebuildBTree, 0, node);
+            FlagTree(5, FirstAidRepairs.RebuildBTree, 0, node);
         }
 
         if (parentKey is not null && firstKey is not null && Compare(firstKey, parentKey) != 0)
         {
-            run.Flag(19, FirstAidRepairs.RebuildBTree, 0, node);
+            FlagTree(19, FirstAidRepairs.RebuildBTree, 0, node);
         }
 
         return descriptor.Kind == BTreeNode.LeafKind ? Leaf(node, descriptor) : Index(node, descriptor, level);
@@ -204,13 +204,13 @@ internal sealed class BTreeCheck
                     return run.Fatal(20, 0, node);
                 }
 
-                run.Flag(20, FirstAidRepairs.RebuildBTree, 0, node);
+                FlagTree(20, FirstAidRepairs.RebuildBTree, 0, node);
                 continue;
             }
 
             if (level + 1 > MaxDepth)
             {
-                run.Flag(29, FirstAidRepairs.RebuildBTree, 0, node);
+                FlagTree(29, FirstAidRepairs.RebuildBTree, 0, node);
                 continue;
             }
 
@@ -260,7 +260,7 @@ internal sealed class BTreeCheck
 
             if (descriptor.Height != 0)
             {
-                run.Flag(5, FirstAidRepairs.BTreeMap, 0, next);
+                FlagTree(5, FirstAidRepairs.BTreeMap, 0, next);
             }
 
             needed -= end - start;
@@ -283,6 +283,7 @@ internal sealed class BTreeCheck
                     if (((file.Bytes[at + b] & mask) != 0) != tree.Reached.Contains(bit))
                     {
                         run.Silent(FirstAidRepairs.BTreeMap);
+                        run.TreesToRebuild.Add(tree.FileId);
                         return true;
                     }
                 }
@@ -306,10 +307,17 @@ internal sealed class BTreeCheck
             || file.LastLeaf != tree.LastLeaf || file.DeclaredNodeSize != tree.NodeSize || file.MaxKeyLength != tree.MaxKeyLength
             || file.TotalNodes != tree.TotalNodes || file.FreeNodes != free)
         {
-            run.Flag(54, FirstAidRepairs.BTreeHeader);
+            FlagTree(54, FirstAidRepairs.BTreeHeader);
         }
 
         return true;
+    }
+
+    // A problem repair fixes by writing this tree again.
+    private void FlagTree(int number, FirstAidRepairs repairs, long arg2 = 0, long arg3 = 0)
+    {
+        run.Flag(number, repairs, arg2, arg3);
+        run.TreesToRebuild.Add(tree.FileId);
     }
 
     // AllocBTN: a node reached twice is an overlap.

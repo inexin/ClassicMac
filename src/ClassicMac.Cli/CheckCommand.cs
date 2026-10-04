@@ -125,7 +125,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                     w.WriteNull("volume");
                 }
 
-                WriteFirstAid(w, partitions.Count == 0 ? firstAid : null);
+                FirstAidOutput.Json(w, partitions.Count == 0 ? firstAid : null);
 
                 if (partitions.Count > 0)
                 {
@@ -137,7 +137,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
                         w.WriteString("name", partition.Name);
                         w.WriteBoolean("passes", partitionFault is null);
                         w.WriteString("fault", partitionFault);
-                        WriteFirstAid(w, partitionFirstAid);
+                        FirstAidOutput.Json(w, partitionFirstAid);
                         w.WriteEndObject();
                     }
 
@@ -158,7 +158,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
             }
             if (partitions.Count == 0 && firstAid is not null)
             {
-                WriteFirstAid(output, "first aid: ", firstAid);
+                FirstAidOutput.Text(output, "first aid: ", firstAid);
             }
 
             if (volume)
@@ -168,7 +168,7 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
 
             foreach (var (partition, partitionFault, partitionFirstAid) in partitions)
             {
-                WriteFirstAid(output, $"partition {partition.Number} \"{partition.Name}\" first aid: ", partitionFirstAid);
+                FirstAidOutput.Text(output, $"partition {partition.Number} \"{partition.Name}\" first aid: ", partitionFirstAid);
                 output.WriteLine($"partition {partition.Number} \"{partition.Name}\": {partitionFault ?? "passes the writer's checks"}");
             }
 
@@ -186,45 +186,4 @@ internal sealed class CheckCommand(TextWriter output, TextWriter error)
     // A volume First Aid does not find OK: one that needs repair, cannot be repaired, or is not an HFS disk.
     private static bool Fails(FirstAidReport? report) =>
         report is { Verdict: not (FirstAidVerdict.AppearsOk or FirstAidVerdict.NotChecked) };
-
-    // Disk First Aid's lines: each problem, then the verdict.
-    private static void WriteFirstAid(TextWriter output, string prefix, FirstAidReport report)
-    {
-        foreach (var problem in report.Problems)
-        {
-            output.WriteLine(prefix + problem);
-        }
-
-        output.WriteLine(prefix + report.Summary);
-    }
-
-    private static void WriteFirstAid(Utf8JsonWriter w, FirstAidReport? report)
-    {
-        if (report is null)
-        {
-            w.WriteNull("firstAid");
-            return;
-        }
-
-        w.WriteStartObject("firstAid");
-        w.WriteString("verdict", JsonNamingPolicy.CamelCase.ConvertName(report.Verdict.ToString()));
-        w.WriteString("summary", report.Summary);
-        w.WriteStartArray("problems");
-        foreach (var problem in report.Problems)
-        {
-            w.WriteStartObject();
-            w.WriteNumber("number", problem.Number);
-            w.WriteString("message", problem.Message);
-            w.WriteNumber("arg2", problem.Arg2);
-            w.WriteNumber("arg3", problem.Arg3);
-            w.WriteString("stage", problem.Stage);
-            w.WriteBoolean("repairable", problem.Repairable);
-            w.WriteString("code", problem.Code);
-            w.WriteString("origin", JsonNamingPolicy.CamelCase.ConvertName(problem.Origin.ToString()));
-            w.WriteEndObject();
-        }
-
-        w.WriteEndArray();
-        w.WriteEndObject();
-    }
 }

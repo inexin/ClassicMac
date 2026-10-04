@@ -5,7 +5,8 @@
 - First Aid (hfs.md §5.6): `check` checks each HFS volume and partition as Disk First Aid 8.5.5 does, in its stages,
   naming each problem by its number and words (`first aid: Problem:  Invalid PEOF, 18, 2`) and ending with its verdict
   (appears to be OK, needs to be repaired, cannot be repaired, not an HFS disk); JSON gains `firstAid`.
-  `HfsFirstAid.Verify` is the API. The test builder's volumes now carry their forks' physical lengths and a clump size.
+  `HfsFirstAid.Verify` is the API. `repair` (cli.md §3.2; `HfsFirstAid.Repair`, `InputEditSession.Repair`) repairs a
+  volume in Disk First Aid's order (B-trees with its repair list, bitmap, MDB) and verifies it again. The test builder's volumes now carry their forks' physical lengths and a clump size.
 - Code quality: the build runs the .NET analyzers' recommended rules as errors (`AnalysisMode`; `.editorconfig` lists
   the few turned off and why). `Fixed`, `UnsignedFixed` and `FourCC` gain `<`, `<=`, `>` and `>=`; `MacDate.ToString`
   and a code's `\xHH` escapes no longer follow the user's locale; `ExceptionFilters` (Core) names the recurring catch

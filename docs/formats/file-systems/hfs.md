@@ -897,6 +897,33 @@ repair" with %2 its detail, repaired by writing the built MDB:
 `drNmFls`, `drAllocPtr`, `drAlBlkSiz` and `drFreeBks` are not compared [Verified: `drNmFls` + 1 and `drFreeBks` − 1
 appear to be OK].
 
+#### Repair
+
+`HfsFirstAid.Repair` (the CLI's `repair`) verifies, and repairs only a volume that needs repair; one Disk First Aid
+cannot repair, or that is not HFS, is left as it is. The repairs run in Disk First Aid's order, then the volume is
+verified again, at most three passes in all:
+
+1. **The B-trees written again** from their leaf records, when a B-tree stage flagged the tree (#5, #13, #15, #16,
+   #19–#29, #54, the map, the reserved header byte) or a repair below changes its records: the header's node count
+   from the file's PEOF, its node size and maximum key length Disk First Aid's (7, 37), nodes packed full, the map
+   from the nodes in use (a header node whose map record is unreadable is laid out again first). The catalog's
+   records are written with Disk First Aid's repair list made:
+   - reserved fields cleared (#64) [Verified: RC1, `filStBlk` 5 → 0];
+   - the root's name lock (#55) [Verified: RC7] and a custom-icon flag without an `Icon\r` file (#57) cleared;
+   - a file thread whose file is missing deleted, and a file's thread flag set when its thread is found (#6);
+   - a folder whose thread is left made again from it (#37), empty until counted;
+   - a thread made for every folder and every file whose thread flag is set (MountCheck's missing threads);
+   - every folder's valence set to the folders and files in it (#3) [Verified: RC6, 3 → 2].
+   The extents tree is written without the records of files (ID 16 and up) the catalog does not hold (MountCheck's
+   orphaned extents).
+2. **The bitmap** the verify after step 1 builds, when the volume's differs (#12 aside, #60) [Verified: RD1].
+3. **The MDB** that verify computes (#58) [Verified: RB6], with `drNmFls` and `drFreeBks` set as well (ClassicMac's:
+   Disk First Aid does not compare them).
+
+Overlapping extents (#12) are not repaired yet: Disk First Aid copies the blocks for each file. Each fix is a
+`PlannedChange` (`repair`, detail `catalog, CNID n: …`, `extents, file n: …`, `catalog B-tree written again (n
+records)`, `volume bitmap …`, `master directory block …`).
+
 ## 6. Diagnostics
 
 "Not traced" means the Mac's behaviour in that case has not been followed in its code. The HFS wrapper's

@@ -100,9 +100,10 @@ internal static class BTreeSetupCheck
         if (bytes[0x32] != 0)
         {
             run.Silent(FirstAidRepairs.BTreeHeader);
+            run.TreesToRebuild.Add(fileId);
         }
 
-        return new FirstAidTree(fileId, bytes, nodeSize);
+        return new FirstAidTree(fileId, bytes, nodeSize, extents);
     }
 
     // A file's overflow extents from the extents tree's leaves, in key order; none when the tree cannot be followed.

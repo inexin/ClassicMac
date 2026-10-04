@@ -75,7 +75,20 @@ internal static class MdbCompare
             run.RootName.AsSpan(0, mdb[0x24]).CopyTo(mdb.AsSpan(0x25));
         }
 
-        // The counts the catalog scan made.
+        // The counts the catalog scan made. drNmFls and drFreeBks are not compared; repair writes them as well, one of
+        // ClassicMac's extras (hfs.md §5.6).
+        writer.WriteUInt16At(0x0C, (ushort)run.RootFileCount);
+        if (run.ComputedBitmap.Length > 0)
+        {
+            long used = 0;
+            for (uint block = 0; block < run.BlockCount; block++)
+            {
+                used += (run.ComputedBitmap[block / 8] >> (7 - (int)(block % 8))) & 1;
+            }
+
+            writer.WriteUInt16At(0x22, (ushort)(run.BlockCount - used));
+        }
+
         writer.WriteUInt16At(0x52, (ushort)run.RootDirCount);
         writer.WriteUInt32At(0x54, (uint)run.FileCount);
         writer.WriteUInt32At(0x58, (uint)run.DirCount);

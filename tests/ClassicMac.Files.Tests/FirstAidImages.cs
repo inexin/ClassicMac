@@ -69,5 +69,26 @@ internal static class FirstAidImages
         throw new InvalidOperationException($"No catalog record ({parent}, {name}).");
     }
 
+    /// <summary>Removes the catalog record (parent, name) from its leaf, as if it had been lost; the header's record count follows.</summary>
+    public static void RemoveRecord(byte[] image, uint parent, string name)
+    {
+        int header = CatalogNode(image, 0);
+        int nodeSize = U16(image, header + 14 + 18);
+        int data = Record(image, parent, name);
+        int node = header + (data - header) / nodeSize * nodeSize;
+        int count = U16(image, node + 10);
+        int index = Enumerable.Range(0, count).Last(i => node + U16(image, node + nodeSize - 2 * (i + 1)) < data);
+        int start = U16(image, node + nodeSize - 2 * (index + 1)), end = U16(image, node + nodeSize - 2 * (index + 2));
+        int freeStart = U16(image, node + nodeSize - 2 * (count + 1));
+        image.AsSpan(node + end, freeStart - end).CopyTo(image.AsSpan(node + start));
+        for (int i = index + 1; i <= count; i++)
+        {
+            Put16(image, node + nodeSize - 2 * i, U16(image, node + nodeSize - 2 * (i + 1)) - (end - start));
+        }
+
+        Put16(image, node + 10, count - 1);
+        Put32(image, header + 14 + 6, U32(image, header + 14 + 6) - 1);
+    }
+
     public const uint D1 = 16, D2 = 17, T1 = 18, W6Plain = 19, T2 = 20;
 }

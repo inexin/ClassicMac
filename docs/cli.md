@@ -284,6 +284,7 @@ Each write command changes one thing on a Mac path, through the library's `Input
 | `set` | `<Mac path> [--type T] [--creator C] [--flags F]` | Sets a file's type and creator; `--flags` replaces the Finder flags: a number (`0x4000`, `$4000`, `16384`) or flag names joined with commas (`Invisible,HasBundle`; `IsInvisible` too) |
 | `res-add` | `<file>:#rsrc:<type>:<ID> <data file> [--name N] [--replace]` | Adds a resource with the data file's bytes; one that exists is replaced only with `--replace` |
 | `res-rm` | `<file>:#rsrc:<type>:<ID>` | Deletes a resource |
+| `repair` | `<volume>` | Repairs an HFS volume as Disk First Aid would ([hfs.md §5.6](formats/file-systems/hfs.md#56-first-aid)), then verifies it again: one `repair` change per fix, then `first aid: ` and the problems left and the last line (`The volume “X” was repaired successfully.`, or the verify's verdict). A volume that appears to be OK, or that First Aid cannot repair, is not written (`Nothing to repair: nothing written.` / `Nothing written.`). Exit 0 when the volume ends OK, 1 when problems remain. JSON adds `firstAidBefore` and `firstAid` (§2.7's shape, `summary` the last line) |
 
 Every command takes:
 
@@ -311,7 +312,8 @@ input. With `--json`:
 }
 ```
 
-`action` is `add`, `mkdir`, `delete`, `rename`, `move`, `lock`, `unlock`, `bless`, `set`, `res-set` or `res-delete`. An AppleDouble pair or a Basilisk II
+`action` is `add`, `mkdir`, `delete`, `rename`, `move`, `lock`, `unlock`, `bless`, `set`, `res-set`, `res-delete` or
+`repair`. An AppleDouble pair or a Basilisk II
 entry writes more than one file.
 
 ### 3.4 format
@@ -331,7 +333,7 @@ are refused (exit 2). The MCP server's `resize` tool takes `session` and `size`.
 
 ### 3.5 Exit codes
 
-0 success; 2 a usage error or a refused change (a name in use, a folder that is not empty, an input ClassicMac does not
+0 success; 1 `repair` left problems (or could not repair the volume); 2 a usage error or a refused change (a name in use, a folder that is not empty, an input ClassicMac does not
 write), with the reason on standard error; 4 the file could not be written; 5 a path that names nothing (no host file,
 no such item, no folder for a new item, no file before `#rsrc`), as for the read commands (§2).
 

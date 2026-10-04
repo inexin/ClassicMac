@@ -103,6 +103,9 @@ internal sealed class FirstAidRun(HfsVolume volume)
 
     public uint NextCnid { get; set; }
 
+    /// <summary>The B-trees (by file ID, 3 or 4) whose header, map or nodes repair writes again.</summary>
+    public HashSet<int> TreesToRebuild { get; } = [];
+
     /// <summary>The bitmap built from the extents (the bitmap stage's), which repair writes.</summary>
     public byte[] ComputedBitmap { get; set; } = [];
 

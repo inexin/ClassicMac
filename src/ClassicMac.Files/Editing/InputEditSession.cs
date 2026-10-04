@@ -362,6 +362,28 @@ public sealed class InputEditSession
         changes.Add(new PlannedChange("resize", "", $"to {size.ToString("N0", System.Globalization.CultureInfo.InvariantCulture)} bytes"));
     }
 
+    /// <summary>
+    /// Repairs the volume as Disk First Aid would, with ClassicMac's safe extras (hfs.md §5.6): the repairs become this
+    /// session's changes; a volume that appears to be OK or cannot be repaired is left as it is.
+    /// </summary>
+    public FirstAidRepairResult Repair()
+    {
+        // Not prepared first: the writer's own checks refuse much of what First Aid repairs.
+        if (Kind != InputEditKind.HfsVolume)
+        {
+            throw NotVolume("have a volume to repair");
+        }
+
+        var result = FirstAidRepairer.Repair(Overlay);
+        if (result.Repaired is { } repaired)
+        {
+            overlay = repaired;
+            changes.AddRange(result.Changes);
+        }
+
+        return result;
+    }
+
     /// <summary>Locks or unlocks a volume's file (an HFS folder has no lock).</summary>
     public void SetLocked(string macPath, bool locked)
     {
