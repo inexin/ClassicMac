@@ -258,7 +258,8 @@ An image is made again around a changed disk of the same size, keeping what Disk
    [kencode.md §3](../codecs/kencode.md#3-writing)) when it holds KenCode chunks; stored so unless that is longer than
    the sectors, and `+$48` grows when the run and its margin need more. An edited ADC
    image of an 800 KB volume is 148,295 bytes (153,375 before the edit), mounts in Disk Copy 6.3.3 with the checksum
-   valid and passes Disk First Aid 8.5 [Verified]. Its runs of
+   valid and passes Disk First Aid 8.5 [Verified]; so do edited KenCode images with 512- and 20-sector chunks, given
+   as Basilisk II entries (216,620 and 216,667 bytes; 224,622 and 219,336 before) [Verified]. Its runs of
    all-zero sectors become zero
    chunks of their own (offset and length 0, §1.3), so an edit does not store empty space; the map gains their entries
    and its count (`+$7C`) and size follow (§2.1). An image whose chunks are all raw (a read/write image, §4.3) stays
